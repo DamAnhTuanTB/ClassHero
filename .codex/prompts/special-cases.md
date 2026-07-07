@@ -51,6 +51,7 @@ Ghi nhớ:
 - `/change-ui`: chỉ sửa UI theo feedback, không chốt docs UI cho đến khi owner nói "ưng/chốt".
 - `/task-connect`: nếu API chưa có thì code API đầy đủ theo task rồi nối UI.
 - UI phải mobile-first và ổn trên tablet/iPad, desktop.
+- UI public/indexable phải giữ cấu trúc SEO; flow nhạy độ trễ phải đọc performance docs.
 
 ## 4. Bug, Refactor, Commit
 

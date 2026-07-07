@@ -329,7 +329,7 @@ Guard bắt buộc:
 Checks phải tỉ lệ với rủi ro:
 
 - Task nhỏ, docs-only, wording, UI-only nhỏ, config nhẹ hoặc sửa bug cô lập có thể dùng lean mode để tối đa tốc độ.
-- Lean mode nghĩa là không cần chạy full lint/build/test toàn repo nếu không cần thiết; chỉ chạy check nhỏ nhất đủ tin cậy như `git diff --check`, `quick_validate.py`, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú.
+- Lean mode nghĩa là không cần chạy full lint/build/test toàn repo nếu không cần thiết; chỉ chạy check nhỏ nhất đủ tin cậy như `git diff --check`, kiểm tra frontmatter skill/script validation nếu có, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú.
 - Nếu bỏ qua check lớn, ghi rõ `Not run: <lý do>` trong changelog/final response.
 - Auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification hoặc multi-module phải dùng workflow đầy đủ hơn.
 

@@ -582,3 +582,10 @@
 - Changed: Tạo `docs/13-seo-and-content-discovery.md` và nối vào AGENTS, README, UI/architecture docs, skill task/change/feature/fix/refactor.
 - Files: `docs/13-seo-and-content-discovery.md`, `AGENTS.md`, `README.md`, `docs/03-technical-architecture.md`, `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`, `.codex/skills/**`, `.codex/context/current-context.md`
 - Tests: `rg` kiểm tra reference SEO/public discovery; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Review docs workflow consistency
+
+- Summary: Rà soát docs/skill sau phần performance và SEO, sửa rule check skill không phụ thuộc script chưa có.
+- Changed: Làm rõ fallback frontmatter check, bổ sung performance/SEO vào README, prompt và review-docs skill.
+- Files: `AGENTS.md`, `README.md`, `.codex/skills/commit/SKILL.md`, `.codex/skills/review-docs/SKILL.md`, `.codex/prompts/*.md`
+- Tests: `rg` kiểm tra stale references; kiểm tra frontmatter skill; `pnpm format:check`; `git diff --check`.

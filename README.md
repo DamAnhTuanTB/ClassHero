@@ -371,12 +371,13 @@ Ví dụ:
 Codex sẽ:
 
 1. Đọc `AGENTS.md`, UI design system, UI pages/components và approved patterns nếu có.
-2. Xác định màn/component cần sửa.
-3. Chỉ sửa front-end UI: layout, spacing, màu, typography, icon, state hiển thị, component composition.
-4. Không sửa backend, API, database, Prisma, worker, payment, AI/RAG hoặc business logic.
-5. Không tự cập nhật `docs/ui-references/approved-patterns.md`, `docs/11-ui-design-system.md` hoặc `docs/08-ui-pages-and-components.md` trong lúc chỉ đang sửa thử UI.
-6. Chạy check UI phù hợp, có thể tạo screenshot review nếu app chạy được.
-7. Cập nhật changelog ngắn vì repo có thay đổi file.
+2. Đọc SEO docs nếu sửa landing/public course/news/event hoặc route indexable.
+3. Xác định màn/component cần sửa.
+4. Chỉ sửa front-end UI: layout, spacing, màu, typography, icon, state hiển thị, component composition.
+5. Không sửa backend, API, database, Prisma, worker, payment, AI/RAG hoặc business logic.
+6. Không tự cập nhật `docs/ui-references/approved-patterns.md`, `docs/11-ui-design-system.md` hoặc `docs/08-ui-pages-and-components.md` trong lúc chỉ đang sửa thử UI.
+7. Chạy check UI phù hợp, có thể tạo screenshot review nếu app chạy được.
+8. Cập nhật changelog ngắn vì repo có thay đổi file.
 
 Khi bạn nói `Oke, ưng UI này`, `ưng rồi`, `ok rồi`, `đúng ý rồi` hoặc `chốt UI này`, Codex mới cập nhật tài liệu UI cần thiết:
 
@@ -406,10 +407,11 @@ Codex sẽ:
 6. Nếu database/schema còn thiếu và task cho phép, cập nhật schema/migration/docs tương ứng.
 7. Thay mock data bằng API client/hooks, ưu tiên TanStack Query.
 8. Giữ UX mượt: pending state tức thì, cache/invalidate hợp lý, debounce/pagination khi có list/search.
-9. Backend vẫn enforce auth/RBAC/ownership, không chỉ guard bằng UI.
-10. Chạy check phù hợp.
-11. Cập nhật changelog.
-12. Báo nguyên lý kết nối: UI gọi hook nào, hook gọi API nào, API đi qua controller/service/database như nào.
+9. Với public page, giữ đúng metadata/slug/published/canonical/sitemap impact theo SEO docs.
+10. Backend vẫn enforce auth/RBAC/ownership, không chỉ guard bằng UI.
+11. Chạy check phù hợp.
+12. Cập nhật changelog.
+13. Báo nguyên lý kết nối: UI gọi hook nào, hook gọi API nào, API đi qua controller/service/database như nào.
 
 ## 12. `/task-full <mã task>`
 
@@ -429,14 +431,15 @@ Codex sẽ:
 3. Map `Mx.y` sang `docs/implementation/Mx.md`.
 4. Đọc `Mode` của subtask.
 5. Đọc docs liên quan theo `Task Routing Map`.
-6. Kiểm tra code hiện tại và dependency của task.
-7. Làm đủ phần cần thiết của task theo mode: UI, API, database, worker/integration, shared types hoặc docs.
-8. Không làm sang subtask khác nếu bạn chưa yêu cầu.
-9. Nếu task quá lớn hoặc thiếu dependency, Codex sẽ báo và đề xuất tách nhỏ.
-10. Chạy check phù hợp.
-11. Cập nhật changelog.
-12. Giải thích kỹ thuật dễ hiểu: mục tiêu, luồng code, kỹ thuật dùng, lý do, file quan trọng và kiến thức rút ra.
-13. Gợi ý task tiếp theo.
+6. Đọc performance/SEO docs khi task có độ trễ, list/search, worker/AI hoặc public/indexable page.
+7. Kiểm tra code hiện tại và dependency của task.
+8. Làm đủ phần cần thiết của task theo mode: UI, API, database, worker/integration, shared types hoặc docs.
+9. Không làm sang subtask khác nếu bạn chưa yêu cầu.
+10. Nếu task quá lớn hoặc thiếu dependency, Codex sẽ báo và đề xuất tách nhỏ.
+11. Chạy check phù hợp.
+12. Cập nhật changelog.
+13. Giải thích kỹ thuật dễ hiểu: mục tiêu, luồng code, kỹ thuật dùng, lý do, file quan trọng và kiến thức rút ra.
+14. Gợi ý task tiếp theo.
 
 ## 13. `/refactor <mã task/tính năng/module>`
 
@@ -734,7 +737,7 @@ Codex có thể:
 
 - không chạy full lint/build/test toàn repo,
 - chỉ chạy check nhỏ nhất đủ tin cậy,
-- dùng `git diff --check`, `quick_validate.py`, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú,
+- dùng `git diff --check`, kiểm tra frontmatter skill/script validation nếu có, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú,
 - ghi rõ `Not run: <lý do>` nếu bỏ qua check lớn.
 
 Không dùng lean mode cho thay đổi rủi ro cao:

@@ -8,6 +8,7 @@ Dùng file này khi không gọi trực tiếp được slash skill. Nếu dùng
 - Codex phải đọc `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, rồi đọc docs liên quan theo Task Routing Map.
 - `docs/04-database-model.md` và `docs/05-api-contract.md` là index; khi cần phải đọc thêm file con trong `docs/database/` hoặc `docs/api/`.
 - Nếu có `.codex/plans/codex-execution-plan.md`, dùng để kiểm tra phụ thuộc/TODO, không thay docs gốc.
+- Nếu task chạm UI/performance/SEO public, đọc thêm `docs/11-ui-design-system.md`, `docs/12-performance-and-observability.md` hoặc `docs/13-seo-and-content-discovery.md` đúng phạm vi.
 - Sau khi có thay đổi file đáng commit, cập nhật changelog.
 
 ## Prompt Khởi Động

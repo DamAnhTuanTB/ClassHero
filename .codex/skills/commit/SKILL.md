@@ -79,7 +79,7 @@ Use these mode rules:
 Default for `/commit`.
 
 - Docs-only: `git diff --check`; `rg` or focused doc checks if useful.
-- Skill changes: `quick_validate.py` for touched skills.
+- Skill changes: run the repo's skill validator if available; otherwise do a lightweight frontmatter check for touched `SKILL.md` files.
 - Front-end only: relevant web typecheck/lint; build only if route/config/build surface changed.
 - API/back-end only: relevant api typecheck/lint; build when TypeScript compile surface changed.
 - Shared package: typecheck/lint/build for affected packages.
@@ -92,7 +92,7 @@ Default for `/commit`.
 For `/commit fast`.
 
 - Still run safety checks and changelog check.
-- Run `quick_validate.py` only for touched skills.
+- Run the repo's skill validator if available; otherwise do a lightweight frontmatter check for touched `SKILL.md` files.
 - Run `git diff --check`.
 - For code changes, run only the most focused typecheck/validation for the touched package.
 - Skip full repo `lint`, `build`, browser checks, and broad tests unless the diff is risky.
