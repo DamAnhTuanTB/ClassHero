@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Full Runner"
-  short_description: "Implement a complete roadmap task"
-  default_prompt: "Use $task-full to run /task-full M7.1 as a complete task."
+  short_description: "Plan or implement a complete roadmap task"
+  default_prompt: "Use $task-full to run /task-full plan M7.1 for an approval-gated plan, or /task-full M7.1 to implement."

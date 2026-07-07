@@ -1,4 +1,4 @@
 interface:
   display_name: "Task UI Runner"
-  short_description: "Build task UI with mock data first"
-  default_prompt: "Use $task-ui to run /task-ui M7.1 for UI with mock data."
+  short_description: "Plan or build task UI with mock data"
+  default_prompt: "Use $task-ui to run /task-ui plan M7.1 for an approval-gated UI plan, or /task-ui M7.1 to build mock UI."

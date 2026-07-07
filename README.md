@@ -216,9 +216,12 @@ Giao việc bằng một trong các lệnh:
 
 ```txt
 /task-ui M3.4
+/task-ui plan M3.4
 /change-ui sửa màn landing page phần hero
 /task-connect M3.4
+/task-connect plan M3.4
 /task-full M0.2
+/task-full plan M1.2
 /refactor M3.4
 /update-feature thay đổi tính năng abc thành như này
 /add-feature thêm mới tính năng abc
@@ -233,6 +236,31 @@ Giao việc bằng một trong các lệnh:
 Codex sẽ đọc docs liên quan trước khi code, không đổi stack, không thêm tính năng ngoài MVP, cập nhật changelog khi có thay đổi file và gợi ý bước tiếp theo sau khi xong.
 
 Các skill `/update-feature`, `/add-feature`, `/delete-feature`, `/move-feature-to-next-version` mặc định là docs/planning-only: chúng chỉnh tài liệu, roadmap và mã task trước; chưa code production nếu bạn không nói rõ.
+
+### Plan mode cho task
+
+Với `/task-ui`, `/task-connect` và `/task-full`, bạn có thể thêm chữ `plan` để Codex chỉ lập kế hoạch trước:
+
+```txt
+/task-full plan M1.2
+/task-ui plan M3.5
+/task-connect plan M3.4
+```
+
+Khi có `plan`, Codex sẽ:
+
+- đọc docs/code liên quan đủ để lập kế hoạch,
+- nêu rõ sẽ sửa file/module nào, thứ tự làm, check dự kiến, rủi ro và giả định,
+- không sửa file, không chạy triển khai, không cập nhật changelog,
+- dừng lại chờ bạn duyệt.
+
+Sau đó bạn có thể nói:
+
+```txt
+ok, làm đi
+```
+
+Codex sẽ dựa trên plan đã duyệt, kiểm tra lại code/docs nếu cần rồi mới bắt đầu triển khai. Nếu bạn muốn đổi kế hoạch, hãy phản hồi phần cần sửa; Codex sẽ chỉnh plan và chờ bạn duyệt lại.
 
 ### Giải thích kỹ thuật sau khi làm xong
 
@@ -272,6 +300,7 @@ Ví dụ:
 
 ```txt
 /task-ui M3.4
+/task-ui plan M3.4
 ```
 
 Codex sẽ:
@@ -334,6 +363,7 @@ Ví dụ:
 
 ```txt
 /task-connect M3.4
+/task-connect plan M3.4
 ```
 
 Codex sẽ:
@@ -358,6 +388,7 @@ Ví dụ:
 
 ```txt
 /task-full M0.2
+/task-full plan M1.2
 ```
 
 Codex sẽ:
@@ -555,6 +586,8 @@ Ví dụ:
 
 ```txt
 /commit
+/commit fast
+/commit full
 ```
 
 Codex sẽ:
@@ -563,8 +596,12 @@ Codex sẽ:
 2. Không sửa code production trong bước commit.
 3. Bổ sung changelog ngắn nếu thiếu.
 4. Kiểm tra không có secret/file rác rõ ràng.
-5. Stage đúng file cần commit.
-6. Commit bằng message ngắn theo format:
+5. Chọn chế độ kiểm tra:
+   - `/commit`: smart mode, tự chọn check theo diff.
+   - `/commit fast`: kiểm tra tối thiểu an toàn, phù hợp docs/skill nhỏ.
+   - `/commit full`: chạy check rộng hơn, phù hợp dependency/schema/nhiều module.
+6. Stage đúng file cần commit.
+7. Commit bằng message ngắn theo format:
 
 ```txt
 <type>(<scope>): <summary>
@@ -576,6 +613,8 @@ Ví dụ:
 docs(codex): update task workflow guide
 fix(api): handle root health check
 ```
+
+Nên dùng `/commit fast` cho thay đổi docs/skill nhỏ, `/commit` cho đa số trường hợp bình thường, và `/commit full` khi có thay đổi dependency, Prisma/schema/migration, shared package hoặc nhiều module.
 
 ## 22. File Codex có thể tự cập nhật
 

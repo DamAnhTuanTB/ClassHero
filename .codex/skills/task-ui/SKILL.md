@@ -1,6 +1,6 @@
 ---
 name: task-ui
-description: Run UI-first roadmap subtasks for the Vietnamese learning-path project from commands like "/task-ui M7.1" or "/task-ui M3.4". Use when Codex must implement only the front-end UI for a task using clear mock data first, read the project UI design system and relevant docs, avoid backend/database/API implementation, build mobile-first layouts that also work on tablet/iPad and laptop/desktop, keep mock data easy to remove, update changelog, and suggest the matching "/task-connect" command after completion.
+description: Run or plan UI-first roadmap subtasks for the Vietnamese learning-path project from commands like "/task-ui M7.1", "/task-ui M3.4", or "/task-ui plan M3.5". Use when Codex must implement only the front-end UI for a task using clear mock data first, or produce an approval-gated UI plan first when the command contains "plan"; read the project UI design system and relevant docs, avoid backend/database/API implementation, build mobile-first layouts that also work on tablet/iPad and laptop/desktop, keep mock data easy to remove, update changelog after implementation, and suggest the matching "/task-connect" command after completion.
 ---
 
 # Task UI Runner
@@ -13,9 +13,30 @@ Accept:
 
 - `/task-ui M7.1`
 - `/task-ui: M7.1`
+- `/task-ui plan M7.1`
+- `/task-ui plan: M7.1`
 - `/task-ui M3.4 + M6.2`
 
-Parse subtask IDs in order. Multiple IDs are allowed only when the user explicitly lists them.
+Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when the user explicitly lists them.
+
+## Plan Mode
+
+When the command contains `plan`, do approval-gated UI planning only.
+
+- Read the same startup docs needed to make a reliable UI plan.
+- Inspect existing web code/component patterns enough to identify likely files and risks.
+- Do not edit files, create screenshots, run implementation, update changelog, or stage/commit.
+- Output a plan with:
+  - subtask ID, mode, screen/component goal,
+  - docs/code inspected,
+  - route/component/mock data files likely to change,
+  - proposed layout, states, responsive approach, and mock data shape,
+  - what will not be touched, especially backend/API/database/worker,
+  - expected UI checks/screenshots,
+  - risks, blockers, assumptions, and questions.
+- End by asking the owner to approve or revise the plan.
+- If the owner later says "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
+- If the owner revises the plan, update the plan and wait again before implementing.
 
 ## Required Startup
 
@@ -34,6 +55,8 @@ Before editing:
 7. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
 8. Inspect existing web code and component patterns.
 9. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, and commands.
+
+In plan mode, stop after this plan and wait for approval.
 
 ## Scope Rules
 

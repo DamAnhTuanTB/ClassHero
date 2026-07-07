@@ -1,6 +1,6 @@
 ---
 name: task-connect
-description: Connect previously built mock UI to real APIs for the Vietnamese learning-path project from commands like "/task-connect M7.1" or "/task-connect M3.4". Use when Codex must preserve the approved UI, replace mock data with API clients/hooks, implement the complete backend API required by the requested subtask when it does not exist, read API contracts/database/user-flow docs, use TanStack Query and React Hook Form plus Zod where appropriate, avoid broad UI redesign, update changelog, and explain the UI-to-API technical flow.
+description: Connect or plan connection of previously built mock UI to real APIs for the Vietnamese learning-path project from commands like "/task-connect M7.1", "/task-connect M3.4", or "/task-connect plan M3.4". Use when Codex must preserve the approved UI, replace mock data with API clients/hooks, implement the complete backend API required by the requested subtask when it does not exist, or produce an approval-gated connection plan first when the command contains "plan"; read API contracts/database/user-flow docs, use TanStack Query and React Hook Form plus Zod where appropriate, avoid broad UI redesign, update changelog after implementation, and explain the UI-to-API technical flow.
 ---
 
 # Task Connect Runner
@@ -13,9 +13,31 @@ Accept:
 
 - `/task-connect M7.1`
 - `/task-connect: M7.1`
+- `/task-connect plan M7.1`
+- `/task-connect plan: M7.1`
 - `/task-connect M3.4 + M6.2`
 
-Parse subtask IDs in order. Multiple IDs are allowed only when explicitly listed.
+Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed.
+
+## Plan Mode
+
+When the command contains `plan`, do approval-gated connection planning only.
+
+- Read the same startup docs needed to make a reliable connection plan.
+- Inspect existing UI/API/backend code enough to identify likely files and risks.
+- Do not edit files, implement endpoints, replace mock data, update changelog, or stage/commit.
+- Output a plan with:
+  - subtask ID, mode, UI-to-API goal,
+  - docs/code inspected,
+  - mock data to replace,
+  - API endpoints/services/hooks likely to add or reuse,
+  - database/schema/docs updates expected if API is missing,
+  - expected technical flow from component to database/provider and back,
+  - verification commands expected,
+  - risks, blockers, assumptions, and questions.
+- End by asking the owner to approve or revise the plan.
+- If the owner later says "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
+- If the owner revises the plan, update the plan and wait again before implementing.
 
 ## Required Startup
 
@@ -39,6 +61,8 @@ Before editing:
 7. Inspect the UI files created by `/task-ui`.
 8. Inspect existing API client/hook patterns and backend module/controller/service patterns.
 9. Give a short plan: subtask mode, mock data to replace, full API endpoints/services to implement or use, backend files, frontend hooks/files, docs updates, checks.
+
+In plan mode, stop after this plan and wait for approval.
 
 ## Scope Rules
 

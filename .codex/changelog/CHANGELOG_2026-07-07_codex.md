@@ -519,3 +519,17 @@
 - Changed: Tạo `docs/learning-notes/`, thêm note nền Prisma và cập nhật skill/README/AGENTS để merge kiến thức, tránh trùng lặp.
 - Files: `docs/learning-notes/**`, `.codex/skills/task-*/SKILL.md`, `.codex/skills/fix-bug/SKILL.md`, `.codex/skills/refactor/SKILL.md`, `README.md`, `AGENTS.md`
 - Tests: `rg` kiểm tra learning notes rules; `quick_validate.py` cho 5 skill; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add commit verification modes
+
+- Summary: Cập nhật `/commit` để có smart/fast/full mode, giảm thời gian commit khi diff nhỏ.
+- Changed: Thêm rule chọn check theo diff và hướng dẫn `/commit fast`, `/commit full` trong README.
+- Files: `.codex/skills/commit/SKILL.md`, `README.md`
+- Tests: `quick_validate.py` cho commit skill; `rg` kiểm tra mode; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add plan mode for task skills
+
+- Summary: Thêm cú pháp `plan` cho `/task-ui`, `/task-connect` và `/task-full` để Codex lập kế hoạch rồi chờ duyệt.
+- Changed: Bổ sung approval-gated plan mode, cập nhật skill metadata và README.
+- Files: `.codex/skills/task-ui/**`, `.codex/skills/task-connect/**`, `.codex/skills/task-full/**`, `README.md`
+- Tests: `quick_validate.py` cho task/commit skills; `rg` kiểm tra plan mode; `pnpm format:check`; `git diff --check`.

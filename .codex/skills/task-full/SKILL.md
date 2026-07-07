@@ -1,6 +1,6 @@
 ---
 name: task-full
-description: Implement complete roadmap subtasks for the Vietnamese learning-path project from commands like "/task-full M7.1" or "/task-full M3.4". Use when Codex must do everything needed for a subtask end to end, including backend/API/database/UI/worker/docs when the implementation plan requires them, read all relevant docs, keep scope to the requested subtask, apply mobile-first UI rules when UI is involved, run proportional verification, update changelog, explain technical flow, and suggest the next subtask.
+description: Implement or plan complete roadmap subtasks for the Vietnamese learning-path project from commands like "/task-full M7.1", "/task-full M3.4", or "/task-full plan M1.2". Use when Codex must either do everything needed for a subtask end to end, including backend/API/database/UI/worker/docs when the implementation plan requires them, or produce an approval-gated plan first when the command contains "plan"; read relevant docs, keep scope to the requested subtask, apply mobile-first UI rules when UI is involved, run proportional verification, update changelog after implementation, explain technical flow, and suggest the next subtask.
 ---
 
 # Task Full Runner
@@ -13,9 +13,30 @@ Accept:
 
 - `/task-full M7.1`
 - `/task-full: M7.1`
+- `/task-full plan M7.1`
+- `/task-full plan: M7.1`
 - `/task-full M1.1 + M1.2`
 
-Parse subtask IDs in order. Multiple IDs are allowed only when explicitly listed. Execute sequentially and stop if one creates unresolved risk.
+Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed. Execute sequentially and stop if one creates unresolved risk.
+
+## Plan Mode
+
+When the command contains `plan`, do approval-gated planning only.
+
+- Read the same startup docs needed to make a reliable plan.
+- Inspect existing code enough to identify likely files and risks.
+- Do not edit files, run migrations, install packages, start implementation, update changelog, or stage/commit.
+- Output a plan with:
+  - subtask ID, mode, goal, and dependencies,
+  - docs/code inspected,
+  - files/modules likely to change,
+  - implementation steps,
+  - docs/database/API/AI/UI/env updates expected,
+  - verification commands expected,
+  - risks, blockers, assumptions, and questions.
+- End by asking the owner to approve or revise the plan.
+- If the owner later says "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
+- If the owner revises the plan, update the plan and wait again before implementing.
 
 ## Required Startup
 
@@ -33,6 +54,8 @@ Before editing:
    - `docs/ui-references/approved-patterns.md` if present and relevant.
 7. Inspect existing code for touched modules.
 8. Give a short plan: subtask, mode, docs read, modules/files, database/API/docs impact, commands.
+
+In plan mode, stop after this plan and wait for approval.
 
 ## Scope Rules
 

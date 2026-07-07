@@ -12,11 +12,19 @@ Use this skill to turn the current repo changes into a clean git commit without 
 Accept these forms:
 
 - `/commit`
+- `/commit fast`
+- `/commit full`
 - `/commit <optional hint>`
 - `commit giúp tôi`
 - `commit các thay đổi hiện tại`
 
-If the user provides a hint, use it only as guidance. The diff and changelog remain the source of truth for the commit message.
+Verification mode:
+
+- `smart`: default for `/commit`; choose checks from the diff.
+- `fast`: for `/commit fast`; run only required safety checks plus the smallest relevant validation.
+- `full`: for `/commit full`; run broader checks before committing.
+
+If the user provides another hint, use it only as guidance. The diff and changelog remain the source of truth for the commit message.
 
 ## Required Startup
 
@@ -45,13 +53,60 @@ When blocked, stop and explain the exact reason plus the command or decision nee
 ## Commit Workflow
 
 1. Summarize the changed areas from diff and changelog.
-2. Run lightweight verification when practical:
-   - docs/skill-only: validate the skill or skip with reason.
-   - code changes: prefer relevant `typecheck`, `lint`, `build`, or focused tests if they are reasonably available.
-3. Stage the intended files explicitly. Use `git add <files>` instead of broad staging when there are suspicious or unrelated files.
-4. Re-check `git diff --cached --stat` and `git diff --cached --name-only`.
-5. Create the commit with `git commit -m "<subject>"` and optional extra `-m "<body>"` paragraphs.
-6. After commit, run `git status --short` and `git log -1 --oneline`.
+2. Choose verification mode and explain it briefly.
+3. Run verification according to the mode:
+   - `smart`: choose the smallest checks that cover the touched areas.
+   - `fast`: run safety checks and minimal validation only.
+   - `full`: run broad repo/package checks.
+4. Stage the intended files explicitly. Use `git add <files>` instead of broad staging when there are suspicious or unrelated files.
+5. Re-check `git diff --cached --stat` and `git diff --cached --name-only`.
+6. Create the commit with `git commit -m "<subject>"` and optional extra `-m "<body>"` paragraphs.
+7. After commit, run `git status --short` and `git log -1 --oneline`.
+
+## Verification Selection
+
+Always run these safety checks before committing:
+
+- `git status --short`
+- inspect `git diff --stat` and changed filenames
+- secret/conflict scan for changed files when practical
+- `git diff --check`
+
+Use these mode rules:
+
+### Smart Mode
+
+Default for `/commit`.
+
+- Docs-only: `git diff --check`; `rg` or focused doc checks if useful.
+- Skill changes: `quick_validate.py` for touched skills.
+- Front-end only: relevant web typecheck/lint; build only if route/config/build surface changed.
+- API/back-end only: relevant api typecheck/lint; build when TypeScript compile surface changed.
+- Shared package: typecheck/lint/build for affected packages.
+- Prisma/schema/migration: `db:validate`; `db:generate`; API typecheck/build.
+- Dependency or lockfile changes: broader typecheck/lint/build unless clearly docs-only package metadata.
+- Docker/env/deploy changes: config validation where available; skip full app build unless code/dependency changed.
+
+### Fast Mode
+
+For `/commit fast`.
+
+- Still run safety checks and changelog check.
+- Run `quick_validate.py` only for touched skills.
+- Run `git diff --check`.
+- For code changes, run only the most focused typecheck/validation for the touched package.
+- Skip full repo `lint`, `build`, browser checks, and broad tests unless the diff is risky.
+- In the final response, clearly say which broader checks were skipped because fast mode was requested.
+
+### Full Mode
+
+For `/commit full`.
+
+- Run safety checks.
+- Run touched skill validation if applicable.
+- Run relevant database/API validation if applicable.
+- Prefer full `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `pnpm format:check` when available.
+- Run focused tests if the diff includes behavior changes and tests exist.
 
 ## Commit Message Rules
 
@@ -85,6 +140,7 @@ After committing, report briefly:
 
 - Commit hash and message.
 - Main files included.
+- Verification mode.
 - Checks run or skipped.
 - Remaining uncommitted files, if any.
 
