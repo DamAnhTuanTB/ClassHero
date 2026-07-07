@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bug Fix Runner"
+  short_description: "Reproduce, fix, and verify project bugs"
+  default_prompt: "Use $bug-fix-runner to fix this project bug: describe the bug here."

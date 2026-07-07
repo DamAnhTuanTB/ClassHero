@@ -1,6 +1,6 @@
 ---
 name: learning-task-runner
-description: Run roadmap subtasks for the Vietnamese learning-path project from commands like "/task M0.1", "/task M1.1 + M1.2 + M1.3", "làm M8.3", or "theo subtask tiếp theo". Use when Codex must parse one or more implementation-plan subtask IDs, determine required docs from AGENTS.md Task routing map, read those docs before coding, keep scope to requested subtasks, maintain .codex/plans/codex-execution-plan.md when it is wrong or incomplete, update changelog, report files/tests, explain the implemented code/data flow and applied front-end/back-end/database/worker/AI techniques in plain language, and suggest the next subtask ID to do after completion.
+description: Run roadmap subtasks for the Vietnamese learning-path project from commands like "/task M0.1", "/task M1.1 + M1.2 + M1.3", "làm M8.3", or "theo subtask tiếp theo". Use when Codex must parse one or more implementation-plan subtask IDs, determine required docs from AGENTS.md Task routing map, read docs before coding, keep scope to requested subtasks, scale process and checks to task size, maintain .codex/plans/codex-execution-plan.md when it is wrong or incomplete, update changelog, report files/tests, explain the implemented code/data flow in plain language, and suggest the next subtask ID.
 ---
 
 # Learning Task Runner
@@ -32,9 +32,29 @@ Before coding any subtask:
 5. Use the `Task routing map` in `AGENTS.md` to choose docs to read for the subtask's milestone.
 6. Read those docs before editing files.
 7. Inspect existing code/files for the module being changed.
-8. Give a short plan: subtask, docs read, files/modules likely touched, docs likely updated, commands to run.
+8. For UI tasks, apply the project mobile-first rule from `AGENTS.md` and `docs/08-ui-pages-and-components.md`.
+9. Give a short plan: subtask, docs read, files/modules likely touched, docs likely updated, commands to run.
 
 Do not substitute `.codex/prompts/*` for project docs. Prompt files are examples for the owner, not source of truth.
+
+## Lean Mode For Small Tasks
+
+For small, low-risk subtasks or tiny follow-up edits, finish quickly by scaling the workflow down.
+
+Allowed reductions:
+
+- Read only `AGENTS.md`, the relevant `docs/09-implementation-plan.md` section, directly relevant routing docs, and touched code.
+- Keep the plan to 1-3 short bullets.
+- Run the smallest useful verification command, such as a focused typecheck, validator, curl, or no command if the change is docs/wording-only.
+- Skip broad `build`, full test suites, or cross-module checks when the touched files and risk do not justify them.
+- Keep the final response compact.
+
+Non-negotiable:
+
+- Do not skip scope, stack, MVP, secret, or unrelated-change checks.
+- Do not skip changelog when repository files changed in a commit-worthy way.
+- If a check is skipped, state `Not run: <short reason>` in changelog and final response.
+- Use the full workflow for schema, API behavior, auth/RBAC, payment, AI/RAG, worker, storage, notification, migration, or multi-module changes.
 
 ## Scope Rules
 
@@ -42,6 +62,7 @@ Do not substitute `.codex/prompts/*` for project docs. Prompt files are examples
 - Do not change the approved stack.
 - Do not add features outside MVP.
 - Do not skip docs because the user prompt is short.
+- For UI work, prioritize mobile-first layouts while keeping laptop/desktop usable.
 - If a dependency subtask is missing, say so and either stop or implement only the requested scaffold if safe.
 - If a requested subtask needs files from another subtask to compile/run, state the reason before editing and record it in changelog.
 - If docs conflict, apply priority from `AGENTS.md` and report the conflict.
@@ -60,12 +81,12 @@ For each subtask:
    - AI/RAG behavior: `docs/06-ai-rag-spec.md`
    - Env/integration: `docs/07-integration-and-env.md`
    - UI pages/components: `docs/08-ui-pages-and-components.md`
-4. Run relevant format/lint/typecheck/test/build commands if available.
+4. Run verification proportional to risk: focused checks for small tasks; broader format/lint/typecheck/test/build for shared, production, or multi-module changes.
 5. Maintain `.codex/plans/codex-execution-plan.md` using the "Execution Plan Maintenance" rules below.
-6. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md`.
+6. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` using the concise format from `AGENTS.md`.
 7. Prepare the technical flow summary using the "Technical Flow Summary" rules below.
 8. Determine the next suggested subtask using the "Next Subtask Suggestion" rules below.
-9. Final response must include completed subtask IDs, files changed, commands run, test status, technical flow summary, remaining TODO/ASSUMPTION, whether the execution plan was updated, and suggested next subtask ID.
+9. Final response must include completed subtask IDs, files changed, commands run or skipped with reason, test status, technical flow summary, remaining TODO/ASSUMPTION, whether the execution plan was updated, and suggested next subtask ID.
 
 ## Execution Plan Maintenance
 
@@ -135,6 +156,13 @@ Gợi ý tiếp theo: /task M0.2 — Tooling, env example, Docker local và heal
 
 ## Changelog
 
-Use the changelog format from `AGENTS.md`. If multiple subtasks are completed in one request, either add one concise entry per subtask or one entry with a clear list of subtask IDs and their changes.
+Use the concise changelog format from `AGENTS.md`. Prefer one short entry with:
+
+- `Summary`: one sentence.
+- `Changed`: 1-2 key points only.
+- `Files`: grouped paths when useful.
+- `Tests`: commands run or `Not run`.
+
+If multiple subtasks are completed in one request, either add one compact entry per subtask or one compact combined entry with clear subtask IDs.
 
 If tests cannot run, write `Not run: <reason>` in changelog and final response.

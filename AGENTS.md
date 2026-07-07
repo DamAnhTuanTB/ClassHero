@@ -738,6 +738,8 @@ Nếu owner có quyết định khác, cập nhật `docs/07-integration-and-env
 - Form dùng React Hook Form + Zod.
 - Rich text dùng Tiptap.
 - Công thức Toán/Lý/Hóa lưu LaTeX trong Tiptap JSON.
+- UI ưu tiên mobile-first: thiết kế và kiểm tra trước cho màn hình điện thoại, sau đó mở rộng để laptop/desktop vẫn dễ dùng.
+- Các màn học, quiz, flashcard, test, payment và dashboard phải responsive rõ ràng; tránh layout chỉ đẹp trên laptop.
 - Không xử lý permission chỉ bằng UI. Backend vẫn phải enforce RBAC.
 - Route admin/student/parent phải có guard.
 
@@ -811,46 +813,40 @@ Không bắt buộc ghi changelog cho:
 
 ### 13.3. Format entry changelog
 
-Mỗi entry trong file changelog phải dùng format:
+Mỗi entry changelog phải ngắn gọn, chỉ ghi ý chính. Mặc định dùng format:
 
 ```md
 ## YYYY-MM-DD — <tên task ngắn>
 
 - Summary: <1 câu mô tả thay đổi chính>
-- Changed:
-  - <thay đổi 1>
-  - <thay đổi 2>
-- Files touched:
-  - `path/to/file`
-  - `path/to/another-file`
-- Tests:
-  - <test đã chạy hoặc "Not run: <lý do>">
-- Notes:
-  - <migration/env/seed/TODO/ASSUMPTION nếu có>
+- Changed: <1-2 ý chính, có thể ghi cùng một dòng>
+- Files: `path/to/file`, `path/to/another-file`
+- Tests: <test đã chạy hoặc "Not run: <lý do>">
+- Notes: <chỉ ghi nếu có migration/env/TODO/ASSUMPTION/rủi ro>
 ```
 
-Nếu task lớn, có thể thêm các mục:
+Nếu mục nào không có thông tin đáng nói thì bỏ mục đó, trừ `Summary`, `Files` và `Tests`.
+
+Nếu task lớn hoặc có rủi ro cao, có thể thêm các mục:
 
 ```md
-- Database:
-  - <migration/schema/index/constraint đã đổi>
-- API:
-  - <endpoint/DTO/guard/service đã đổi>
-- Worker/AI:
-  - <queue/job/provider/schema/retrieval/cache đã đổi>
-- Security:
-  - <auth/RBAC/secret/webhook permission đã kiểm tra>
+- Database: <migration/schema/index/constraint đã đổi>
+- API: <endpoint/DTO/guard/service đã đổi>
+- Worker/AI: <queue/job/provider/schema/retrieval/cache đã đổi>
+- Security: <auth/RBAC/secret/webhook permission đã kiểm tra>
 ```
 
 ### 13.4. Quy tắc nội dung changelog
 
-- Viết ngắn, cụ thể, không kể lại toàn bộ diff.
+- Viết ngắn, cụ thể, không kể lại toàn bộ diff; ưu tiên 4-8 dòng cho một entry thường.
+- `Changed` tối đa 2 ý chính, trừ task lớn thật sự cần nhiều hơn.
+- `Files` có thể gom path liên quan bằng wildcard như `apps/api/**` nếu hợp lý.
 - Không ghi secret, API key, token, webhook signature, private URL hoặc thông tin nhạy cảm.
 - Không copy raw prompt dài hoặc dữ liệu người dùng vào changelog.
 - Nếu có migration, ghi tên migration và mục đích.
 - Nếu có biến môi trường mới, chỉ ghi tên biến, không ghi giá trị.
 - Nếu test chưa chạy được, phải ghi rõ `Not run` và lý do.
-- Nếu có rủi ro còn lại, ghi vào `Notes` hoặc `TODO`.
+- Nếu có rủi ro còn lại, ghi ngắn trong `Notes` hoặc `TODO`.
 
 ### 13.5. Quan hệ với commit
 

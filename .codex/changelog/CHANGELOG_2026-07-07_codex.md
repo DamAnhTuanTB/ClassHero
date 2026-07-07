@@ -140,3 +140,128 @@
   - `pnpm` was not available locally, so `pnpm@11.10.0` was installed globally to satisfy the M0.1 install check.
   - `pnpm approve-builds --all` approved `esbuild` and `sharp` build scripts in workspace config.
   - Execution plan checked; no update needed for M0.1.
+
+## 2026-07-07 — Add beginner README
+
+- Summary: Thêm README ngắn gọn hướng dẫn người mới cài dependencies, chạy local và hiểu cấu trúc repo.
+- Changed:
+  - Tạo hướng dẫn cài `pnpm`, chạy `pnpm dev`, mở front-end/back-end local.
+  - Ghi các lệnh kiểm tra cơ bản và cấu trúc thư mục chính.
+  - Thêm cách giao task cho Codex bằng `/task`.
+- Files touched:
+  - `README.md`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - Not run: docs-only change.
+- Notes:
+  - Không thay đổi code production.
+
+## 2026-07-07 — Fix API root 500
+
+- Summary: Sửa lỗi `GET /` của NestJS API trả 500 do `AppService` không được inject khi chạy dev bằng `tsx`.
+- Changed:
+  - Khai báo injection tường minh `@Inject(AppService)` trong `AppController`.
+- Files touched:
+  - `apps/api/src/app.controller.ts`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - `curl -i http://localhost:4100/` while running `API_PORT=4100 pnpm --filter @learning-path/api dev`
+  - `pnpm typecheck`
+  - `pnpm build`
+  - `API_PORT=4100 pnpm --filter @learning-path/api start` with a short curl check, then server was stopped.
+- Notes:
+  - Existing API process on port `4000` must be restarted to load this fix.
+
+## 2026-07-07 — Add bug fix runner skill
+
+- Summary: Thêm skill project-local `bug-fix-runner` cho lệnh `/fix bug mô tả lỗi`.
+- Changed:
+  - Tạo workflow đọc docs liên quan, reproduce lỗi, tìm root cause, sửa tối thiểu và verify.
+  - Yêu cầu cập nhật changelog, bảo toàn thay đổi unrelated và giải thích luồng kỹ thuật sau fix.
+  - Thêm metadata UI cho skill trong `agents/openai.yaml`.
+- Files touched:
+  - `.codex/skills/bug-fix-runner/SKILL.md`
+  - `.codex/skills/bug-fix-runner/agents/openai.yaml`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - `python3 /Users/damanhtuan/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/bug-fix-runner`
+- Notes:
+  - Skill nằm trong `.codex/skills` của dự án, không lưu toàn cục.
+
+## 2026-07-07 — Clarify bug fix final report
+
+- Summary: Cập nhật skill `bug-fix-runner` để sau khi fix bug Codex bắt buộc nói rõ nguyên nhân và cách xử lý.
+- Changed:
+  - Làm rõ metadata skill về yêu cầu giải thích nguyên nhân bug và hướng xử lý.
+  - Đổi phần final response thành `Nguyên nhân bug` và `Cách xử lý`.
+  - Yêu cầu không gộp nguyên nhân và fix thành mô tả mơ hồ; nếu chưa chắc phải ghi rõ assumption.
+- Files touched:
+  - `.codex/skills/bug-fix-runner/SKILL.md`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - `python3 /Users/damanhtuan/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/bug-fix-runner`
+- Notes:
+  - Không thay đổi code production.
+
+## 2026-07-07 — Include technical flow in bug fix handling
+
+- Summary: Cập nhật skill `bug-fix-runner` để mục `Cách xử lý` sau fix bug nêu ngắn gọn cả luồng kỹ thuật đã áp dụng.
+- Changed:
+  - Yêu cầu `Cách xử lý` giải thích đủ ý: đã sửa gì, vì sao sửa đúng root cause và luồng code/data đi qua đâu.
+  - Gộp luồng kỹ thuật vào mục `Cách xử lý` để final response dễ đọc hơn.
+- Files touched:
+  - `.codex/skills/bug-fix-runner/SKILL.md`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - `python3 /Users/damanhtuan/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/bug-fix-runner`
+- Notes:
+  - Không thay đổi code production.
+
+## 2026-07-07 — Add commit runner skill
+
+- Summary: Thêm skill project-local `commit-runner` cho lệnh `/commit`.
+- Changed:
+  - Tạo workflow tự kiểm tra worktree, changelog, diff và safety gate trước khi commit.
+  - Yêu cầu commit message theo format ngắn gọn `<type>(<scope>): <summary>` nhưng đủ ý chính.
+  - Yêu cầu báo lại commit hash, files chính, checks đã chạy và file còn uncommitted nếu có.
+- Files touched:
+  - `.codex/skills/commit-runner/SKILL.md`
+  - `.codex/skills/commit-runner/agents/openai.yaml`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - `python3 /Users/damanhtuan/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/commit-runner`
+- Notes:
+  - Skill nằm trong `.codex/skills` của dự án, không lưu toàn cục.
+  - Skill không tự push, amend, rebase, reset hoặc squash nếu owner chưa yêu cầu rõ.
+
+## 2026-07-07 — Add lean mode to task and bug skills
+
+- Summary: Cập nhật skill `/task` và `/fix bug` để task/bug nhỏ có thể lược bớt quy trình nặng và hoàn thành nhanh hơn.
+- Changed:
+  - Thêm `Lean Mode For Small Tasks` vào `learning-task-runner`.
+  - Thêm `Lean Mode For Small Bugs` vào `bug-fix-runner`.
+  - Cho phép bỏ full build/test hoặc kiểm tra rộng khi thay đổi nhỏ, miễn là ghi rõ lý do skip.
+  - Giữ các điểm bắt buộc: scope, stack, MVP, secret, unrelated changes và changelog khi có thay đổi file.
+- Files touched:
+  - `.codex/skills/learning-task-runner/SKILL.md`
+  - `.codex/skills/bug-fix-runner/SKILL.md`
+  - `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests:
+  - `python3 /Users/damanhtuan/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/learning-task-runner`
+  - `python3 /Users/damanhtuan/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/bug-fix-runner`
+- Notes:
+  - Không thay đổi code production.
+
+## 2026-07-07 — Shorten changelog style
+
+- Summary: Rút gọn quy tắc changelog để chỉ ghi ý chính.
+- Changed: Cập nhật `AGENTS.md` và các skill `/task`, `/fix`, `/commit`.
+- Files: `AGENTS.md`, `.codex/skills/**`, `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests: `quick_validate.py` cho 3 skill.
+
+## 2026-07-07 — Add mobile-first UI rule
+
+- Summary: Chốt định hướng UI mobile-first nhưng vẫn hỗ trợ laptop/desktop tốt.
+- Changed: Cập nhật rule front-end, nguyên tắc UI và skill `/task`.
+- Files: `AGENTS.md`, `docs/08-ui-pages-and-components.md`, `.codex/skills/learning-task-runner/SKILL.md`
+- Tests: `quick_validate.py` cho `learning-task-runner`.

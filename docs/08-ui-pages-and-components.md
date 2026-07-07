@@ -16,6 +16,9 @@ Front-end dùng Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, Tan
 - Rich text dùng Tiptap.
 - Công thức Toán/Lý/Hóa render bằng KaTeX + mhchem.
 - Các màn học nên ưu tiên rõ ràng, ít nhiễu, phù hợp học sinh.
+- Thiết kế UI theo mobile-first: ưu tiên trải nghiệm trên điện thoại trước, sau đó mở rộng layout cho laptop/desktop.
+- Laptop/desktop vẫn phải dễ dùng: tận dụng chiều ngang cho sidebar, bảng, split view hoặc panel phụ khi phù hợp.
+- Không tạo layout chỉ hoạt động tốt ở desktop; các CTA, form, quiz, flashcard, test và payment phải dùng tốt trên mobile.
 
 ---
 
@@ -488,6 +491,6 @@ JobStatusBadge
 ## 10. UI TODO
 
 - TODO: Design system final: màu, typography, spacing.
-- TODO: Responsive behavior chi tiết cho mobile/tablet.
+- TODO: Chi tiết breakpoint/pattern responsive cho từng nhóm màn hình.
 - TODO: Empty states và skeleton loading final.
 - TODO: Nội dung copywriting final.
