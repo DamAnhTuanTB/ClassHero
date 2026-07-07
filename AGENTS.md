@@ -13,6 +13,7 @@ Codex phải xem các tài liệu sau là nguồn chính của dự án:
 | File | Vai trò |
 | --- | --- |
 | `AGENTS.md` | Quy tắc cao nhất về cách Codex làm việc trong repo |
+| `docs/00-docs-map.md` | Bản đồ đọc docs nhanh cho owner/Codex; không thay thế docs nguồn |
 | `docs/01-product-scope.md` | Scope MVP, role, nghiệp vụ sản phẩm |
 | `docs/02-user-flows.md` | Luồng sử dụng chính |
 | `docs/03-technical-architecture.md` | Kiến trúc, stack, deploy |
@@ -36,6 +37,8 @@ Codex phải xem các tài liệu sau là nguồn chính của dự án:
 Nếu có `.codex/plans/codex-execution-plan.md`, dùng file đó để kiểm tra thứ tự/phụ thuộc, nhưng không dùng để thay thế docs gốc.
 
 Nếu có `.codex/context/current-context.md` hoặc `.codex/context/code-index.md`, dùng để định hướng nhanh trạng thái repo và vị trí code, nhưng vẫn phải đọc docs/code gốc trước khi sửa.
+
+Nếu cần định tuyến nhanh bộ tài liệu, đọc `docs/00-docs-map.md`; file này chỉ là bản đồ, không phải nguồn thay thế cho `AGENTS.md`, docs domain hoặc code thật.
 
 ---
 

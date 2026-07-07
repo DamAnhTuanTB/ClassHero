@@ -10,6 +10,7 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
 ## Workflow
 
 1. Read `AGENTS.md`, `README.md`, and the docs indexes:
+   - `docs/00-docs-map.md` if present.
    - `docs/09-implementation-plan.md`
    - `docs/04-database-model.md`
    - `docs/05-api-contract.md`

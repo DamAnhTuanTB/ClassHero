@@ -616,3 +616,13 @@
 - Files: `docs/08-ui-pages-and-components.md`, `docs/implementation/dependency-graph.md`, `.codex/skills/**`, `.codex/plans/codex-execution-plan.md`
 - Tests: `quick_validate.py` cho các skill đã sửa; `rg` kiểm tra reference; `pnpm format:check`; `git diff --check`.
 - Notes: Không thay đổi code production.
+
+## 2026-07-07 — Add docs map and refresh README
+
+- Summary: Thêm bản đồ đọc docs một trang và rút README thành cửa vào nhanh cho owner/Codex.
+- Changed:
+  - Tạo `docs/00-docs-map.md` để định tuyến tài liệu theo mục tiêu/task.
+  - Rút README thành quickstart/cheatsheet, đồng thời nối `AGENTS.md` và skill review docs tới docs map.
+- Files: `docs/00-docs-map.md`, `README.md`, `AGENTS.md`, `.codex/skills/review-docs/SKILL.md`
+- Tests: `quick_validate.py` cho review-docs skill; `rg` kiểm tra reference; `pnpm format:check`; `pnpm exec prettier --check README.md docs/00-docs-map.md`; `git diff --check`.
+- Notes: Không thay đổi code production.
