@@ -1,0 +1,4 @@
+interface:
+  display_name: "Refactor"
+  short_description: "Refactor code without behavior changes"
+  default_prompt: "Use $refactor to refactor this task, feature, or module: describe the target here."

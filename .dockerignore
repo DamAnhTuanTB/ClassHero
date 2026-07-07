@@ -1,0 +1,17 @@
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+.next
+apps/web/.next
+.turbo
+dist
+build
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+!apps/api/.env.example
+!apps/web/.env.example
+.git
+.DS_Store

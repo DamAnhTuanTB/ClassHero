@@ -11,4 +11,17 @@ export class AppService {
       meta: {},
     };
   }
+
+  getHealth() {
+    return {
+      data: {
+        name: "learning-path-api",
+        status: "ok",
+        uptimeSeconds: Math.floor(process.uptime()),
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
 }

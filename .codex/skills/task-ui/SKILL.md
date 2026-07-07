@@ -22,7 +22,7 @@ Parse subtask IDs in order. Multiple IDs are allowed only when the user explicit
 Before editing:
 
 1. Read `AGENTS.md`.
-2. Read the requested subtask in `docs/09-implementation-plan.md`.
+2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M3.4` -> `docs/implementation/M3.md`).
 3. If present, read `.codex/plans/codex-execution-plan.md`.
 4. Read UI docs:
    - `docs/11-ui-design-system.md`
@@ -30,7 +30,7 @@ Before editing:
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
 5. Read `docs/02-user-flows.md` for the affected role/flow.
-6. Read `docs/05-api-contract.md` only to understand expected data shape; do not connect API.
+6. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
 7. Inspect existing web code and component patterns.
 8. Give a short plan: screen/component, mock data location, likely files, responsive checks, and commands.
 

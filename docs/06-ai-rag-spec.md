@@ -4,6 +4,15 @@ Bản v0.2. Tài liệu này quy định cách hệ thống dùng AI, xử lý t
 
 Mục tiêu: đủ rõ để Codex tạo NestJS AI module, AiProvider abstraction, BullMQ workers, RAG retrieval service, AI generation service, explanation cache và AI logs.
 
+## Cách đọc nhanh cho Codex
+
+- Embedding/RAG `M5.x`: đọc `Provider strategy`, `Document processing pipeline`, `Retrieval spec`, `Background jobs`.
+- AI generation `M9.1` đến `M9.3`: đọc `AI generation types`, `Mapping AI output to database`, `Background jobs`.
+- Explanation/chat `M9.4` đến `M9.7`: đọc `Explanation cache invalidation`, `Chat AI trong buổi học`, `Student request-new logic`, `Safety`.
+- Nếu task đổi bảng/log/cache, đối chiếu `docs/04-database-model.md` và file phù hợp trong `docs/database/`.
+- Nếu task đổi endpoint hoặc response, đối chiếu `docs/05-api-contract.md` và file phù hợp trong `docs/api/`.
+- Không gọi provider thật trong test mặc định; dùng mock provider.
+
 ---
 
 ## 1. Nguyên tắc bắt buộc

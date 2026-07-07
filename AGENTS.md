@@ -1,928 +1,372 @@
 # AGENTS.md
 
-## 0. Tổng quan bộ tài liệu đầu vào cho Codex
+File này là luật làm việc cấp cao cho Codex trong repo hệ thống học theo lộ trình.
 
-Bộ tài liệu này là nguồn đầu vào chính để Codex bắt đầu phát triển hệ thống học theo lộ trình.
+Mục tiêu của `AGENTS.md` là điều phối cách Codex đọc tài liệu, chọn phạm vi, code, test, cập nhật docs/changelog và báo cáo. Chi tiết sản phẩm/kỹ thuật nằm trong các file `docs/*`; không lặp lại toàn bộ ở đây.
 
-Mục tiêu của bộ tài liệu không phải là mô tả mọi chi tiết nhỏ của sản phẩm, mà là cung cấp đủ thông tin cốt lõi để Codex có thể code đúng hướng, đúng kiến trúc, đúng phạm vi MVP và hạn chế tự suy diễn.
+---
 
-Bộ tài liệu gồm 12 file chính:
+## 1. Nguồn Tài Liệu
 
-1. `AGENTS.md`  
-   Tài liệu chỉ đạo chung cho Codex. File này quy định mục tiêu dự án, công nghệ bắt buộc, cấu trúc repo, quy tắc code, quy tắc test, quy tắc migration, quy tắc bảo mật và Definition of Done.
+Codex phải xem các tài liệu sau là nguồn chính của dự án:
 
-2. `docs/01-product-scope.md`  
-   Mô tả phạm vi MVP: hệ thống làm gì, không làm gì, có những role nào, admin/học sinh/phụ huynh được làm gì, và các quy tắc nghiệp vụ chính.
+| File | Vai trò |
+| --- | --- |
+| `AGENTS.md` | Quy tắc cao nhất về cách Codex làm việc trong repo |
+| `docs/01-product-scope.md` | Scope MVP, role, nghiệp vụ sản phẩm |
+| `docs/02-user-flows.md` | Luồng sử dụng chính |
+| `docs/03-technical-architecture.md` | Kiến trúc, stack, deploy |
+| `docs/04-database-model.md` | Index database model, quan hệ, constraint |
+| `docs/database/*.md` | Chi tiết database theo domain |
+| `docs/05-api-contract.md` | Index REST API contract giữa web và API |
+| `docs/api/*.md` | Chi tiết API contract theo domain |
+| `docs/06-ai-rag-spec.md` | AI/RAG, embedding, retrieval, cache |
+| `docs/07-integration-and-env.md` | Env, provider, tích hợp bên thứ ba |
+| `docs/08-ui-pages-and-components.md` | Danh sách màn hình/component |
+| `docs/09-implementation-plan.md` | Index milestone/subtask, thứ tự triển khai và phụ thuộc |
+| `docs/implementation/M*.md` | Chi tiết phạm vi/Done từng milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md` |
+| `docs/10-seed-data-and-test-cases.md` | Seed data và test case cơ bản |
+| `docs/11-ui-design-system.md` | Gu UI, token, responsive, screenshot/review |
 
-3. `docs/02-user-flows.md`  
-   Mô tả các luồng sử dụng chính: đăng ký, đăng nhập, tạo lộ trình, tạo buổi học, thanh toán, học thử, làm quiz, học flashcard, làm bài kiểm tra, chat AI, phụ huynh theo dõi con và admin xử lý report.
+Nếu có `.codex/plans/codex-execution-plan.md`, dùng file đó để kiểm tra thứ tự/phụ thuộc, nhưng không dùng để thay thế docs gốc.
 
-4. `docs/03-technical-architecture.md`  
-   Mô tả kiến trúc kỹ thuật đã chốt, gồm front-end, back-end, database, storage, queue, AI provider, realtime notification, payment, email/Zalo và deploy production.
+---
 
-5. `docs/04-database-model.md`  
-   Mô tả mô hình dữ liệu chính. File này là cơ sở để tạo Prisma schema, database migration, quan hệ bảng, enum, index và constraint.
+## 2. Nguyên Tắc Bắt Buộc
 
-6. `docs/05-api-contract.md`  
-   Mô tả hợp đồng API giữa front-end và back-end. File này quy định endpoint, method, role được gọi, request body, response body, lỗi thường gặp và side effect.
+- Không tự đổi stack công nghệ đã chốt.
+- Không thêm tính năng ngoài MVP.
+- Không làm sang subtask khác nếu owner chưa yêu cầu rõ.
+- Không hard-code secret, token, API key, webhook key hoặc config production.
+- Không revert/sửa thay đổi không liên quan của user.
+- Không dùng prompt ngắn của owner làm lý do để bỏ qua docs liên quan.
+- Nếu thiếu thông tin để code an toàn, hỏi lại hoặc ghi rõ `TODO`/`ASSUMPTION`.
+- Nếu phát hiện mâu thuẫn lớn giữa docs, báo owner hoặc ghi rõ quyết định tạm thời; không âm thầm tự quyết.
+- Khi thay đổi file đáng commit, cập nhật changelog.
 
-7. `docs/06-ai-rag-spec.md`  
-   Mô tả cách hệ thống sử dụng AI và RAG: xử lý tài liệu, chunking, embedding, retrieval theo từng buổi học, cache lời giải AI, validate output AI và giới hạn phạm vi trả lời.
+---
 
-8. `docs/07-integration-and-env.md`  
-   Mô tả tích hợp bên thứ ba và biến môi trường: Supabase, Cloudflare R2, OpenAI, Gemini, payOS, Resend, Zalo, Redis, JWT, web URL và API URL.
+## 3. Cách Đọc Tài Liệu
 
-9. `docs/08-ui-pages-and-components.md`  
-   Mô tả danh sách màn hình và component chính ở public, student, parent và admin.
+### Đọc đầy đủ
 
-10. `docs/09-implementation-plan.md`  
-    Mô tả thứ tự triển khai theo milestone để Codex và dev team code theo đúng trình tự.
+Áp dụng khi onboarding lần đầu, khởi tạo repo, làm milestone lớn, refactor kiến trúc, hoặc task ảnh hưởng nhiều module.
 
-11. `docs/10-seed-data-and-test-cases.md`  
-    Mô tả dữ liệu mẫu và test case cơ bản để kiểm tra hệ thống trong quá trình phát triển.
+Thứ tự đọc:
 
-12. `docs/11-ui-design-system.md`
-    Mô tả gu thiết kế chính thức cho Codex khi làm UI: phong cách, màu sắc, typography, spacing, layout, component rules, responsive rules, trạng thái UI và checklist nghiệm thu.
+1. `AGENTS.md`
+2. `docs/01-product-scope.md`
+3. `docs/03-technical-architecture.md`
+4. `docs/04-database-model.md`
+5. `docs/05-api-contract.md`
+6. `docs/02-user-flows.md`
+7. `docs/06-ai-rag-spec.md`
+8. `docs/07-integration-and-env.md`
+9. `docs/08-ui-pages-and-components.md`
+10. `docs/09-implementation-plan.md`
+11. File milestone liên quan trong `docs/implementation/`
+12. `docs/10-seed-data-and-test-cases.md`
+13. `docs/11-ui-design-system.md` nếu task có UI
 
-### Cách Codex nên đọc tài liệu
+### Đọc theo phạm vi task
 
-Codex không bắt buộc phải đọc lại toàn bộ tài liệu cho mọi task.
+Áp dụng cho task nhỏ hoặc task đã có module rõ ràng.
 
-Bộ tài liệu này có hai chế độ đọc:
+Luôn đọc:
 
-1. **Đọc đầy đủ** khi onboarding lần đầu, khởi tạo repo, làm milestone lớn, refactor kiến trúc hoặc task có ảnh hưởng nhiều module.
-2. **Đọc theo phạm vi task** khi task nhỏ, task đã có module rõ ràng hoặc task chỉ sửa một phần hẹp.
+- `AGENTS.md`
+- `docs/09-implementation-plan.md`
+- File milestone tương ứng trong `docs/implementation/`
+- docs liên quan theo `Task routing map`
+- code hiện tại của module đang sửa
+- changelog gần nhất nếu cần hiểu thay đổi trước đó
 
-#### 1. Đọc đầy đủ khi onboarding hoặc task lớn
+Nếu task đang làm lan sang domain khác, mở thêm docs liên quan. Ví dụ:
 
-Codex phải đọc `AGENTS.md` trước tiên.
+- Database đổi API response: đọc `docs/04-database-model.md`, file con trong `docs/database/`, `docs/05-api-contract.md` và file con trong `docs/api/`.
+- AI explanation đổi cache/schema: đọc `docs/06-ai-rag-spec.md`, `docs/04-database-model.md`, file con trong `docs/database/`, `docs/05-api-contract.md`, file con trong `docs/api/`.
+- Payment ảnh hưởng enrollment: đọc `docs/05-api-contract.md`, `docs/api/payment-discount.md`, `docs/04-database-model.md`, `docs/database/payment-discount.md`, `docs/database/progress-enrollment.md`, `docs/02-user-flows.md`.
 
-Sau đó, nếu đây là lần đầu làm việc với repo hoặc task có phạm vi lớn, Codex nên đọc các tài liệu theo thứ tự:
+---
 
-1. `docs/01-product-scope.md`
-2. `docs/03-technical-architecture.md`
-3. `docs/04-database-model.md`
-4. `docs/05-api-contract.md`
-5. `docs/02-user-flows.md`
-6. `docs/06-ai-rag-spec.md`
-7. `docs/07-integration-and-env.md`
-8. `docs/08-ui-pages-and-components.md`
-9. `docs/09-implementation-plan.md`
-10. `docs/10-seed-data-and-test-cases.md`
-11. `docs/11-ui-design-system.md` nếu task có UI.
+## 4. Quy Trình Bắt Đầu Mỗi Task
 
-Áp dụng chế độ đọc đầy đủ cho các task như:
-
-- Khởi tạo repo.
-- Tạo database schema ban đầu.
-- Tạo module lớn mới.
-- Làm milestone mới chưa có code nền.
-- Refactor kiến trúc.
-- Tích hợp AI, payment, storage, notification hoặc worker.
-- Task có ảnh hưởng nhiều module cùng lúc.
-
-#### 2. Đọc theo phạm vi task
-
-Với task nhỏ hoặc task đã có phạm vi rõ ràng, Codex chỉ cần đọc:
-
-- `AGENTS.md`.
-- `docs/09-implementation-plan.md` để xác định task thuộc milestone/subtask nào.
-- Tài liệu liên quan trực tiếp đến task theo bảng `Task routing map` bên dưới.
-- Code hiện tại của module đang sửa.
-- Changelog gần nhất nếu cần hiểu thay đổi trước đó.
-
-Không cần đọc lại toàn bộ tài liệu nếu task không ảnh hưởng toàn hệ thống.
-
-#### 3. Khi có nghi ngờ hoặc mâu thuẫn
-
-Nếu task đang làm có dấu hiệu ảnh hưởng sang tài liệu khác, Codex phải mở thêm tài liệu liên quan để kiểm tra chéo.
-
-Ví dụ:
-
-- Sửa database mà làm thay đổi API response thì phải xem cả `docs/04-database-model.md` và `docs/05-api-contract.md`.
-- Sửa AI explanation mà ảnh hưởng cache hoặc bảng dữ liệu thì phải xem `docs/06-ai-rag-spec.md`, `docs/04-database-model.md` và `docs/05-api-contract.md`.
-- Sửa payment mà ảnh hưởng enrollment thì phải xem `docs/05-api-contract.md`, `docs/04-database-model.md` và `docs/02-user-flows.md`.
-
-#### 4. Nguyên tắc tiết kiệm context
-
-Codex phải ưu tiên đọc đúng tài liệu cần thiết, không đọc tràn lan.
-
-Không dùng việc “đọc thiếu tài liệu” để tự suy diễn nghiệp vụ hoặc tự đổi kiến trúc.
-
-Nếu thiếu thông tin để code an toàn, Codex phải dừng lại, nêu câu hỏi hoặc ghi rõ `TODO`/`ASSUMPTION`.
-
-### Quy trình bắt đầu mỗi task
-
-Trước khi sửa code cho bất kỳ task nào, Codex phải thực hiện quy trình sau:
+Trước khi sửa code, Codex phải:
 
 1. Đọc `AGENTS.md`.
-2. Đọc yêu cầu task của owner.
-3. Tự phân loại task thuộc milestone/subtask nào trong `docs/09-implementation-plan.md`.
-4. Xác định tài liệu liên quan cần đọc theo `Task routing map`.
-5. Đọc các tài liệu liên quan trước khi code.
-6. Viết kế hoạch thực hiện ngắn gọn, gồm:
-   - task thuộc milestone/subtask nào,
-   - đã đọc hoặc sẽ đọc tài liệu nào,
-   - sẽ sửa module/file nào,
-   - có cần cập nhật database/API/AI docs không,
-   - lệnh test/build dự kiến sẽ chạy.
-7. Chỉ sau đó mới bắt đầu sửa code.
+2. Đọc yêu cầu của owner.
+3. Xác định task thuộc milestone/subtask nào trong `docs/09-implementation-plan.md`.
+4. Đọc chi tiết subtask trong file milestone tương ứng, ví dụ `M8.3` đọc `docs/implementation/M8.md`.
+5. Chọn docs cần đọc theo `Task routing map`.
+6. Đọc docs liên quan trước khi code.
+7. Kiểm tra code hiện tại và `git status --short`.
+8. Nêu kế hoạch ngắn:
+   - subtask/milestone,
+   - docs đã đọc,
+   - module/file dự kiến sửa,
+   - có cần cập nhật API/database/AI/UI/env docs không,
+   - check/test dự kiến chạy.
 
-Nếu task quá mơ hồ và không thể phân loại an toàn, Codex phải hỏi lại hoặc ghi rõ `ASSUMPTION`, không tự ý suy diễn nghiệp vụ lớn.
+Nếu task quá mơ hồ, hỏi lại hoặc ghi `ASSUMPTION`, không tự suy diễn nghiệp vụ lớn.
 
-Codex không được dùng prompt ngắn của owner làm lý do để bỏ qua tài liệu liên quan.
+---
 
-### Quy tắc phạm vi khi làm milestone/subtask
+## 5. File Codex Có Thể Tự Cập Nhật
 
-`docs/09-implementation-plan.md` chia việc thành các subtask nhỏ dạng `M0.1`, `M0.2`, `M1.1`, v.v.
+Trong quá trình làm task, Codex có thể cập nhật các file sau nếu cần để task rõ ràng, đúng thứ tự và không lệch contract:
 
-Quy tắc:
+- `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md`: khi có thay đổi file đáng commit.
+- `.codex/plans/codex-execution-plan.md`: nếu phát hiện dependency, thứ tự subtask, `TODO` hoặc `ASSUMPTION` nhỏ cần chỉnh.
+- `docs/ui-references/approved-patterns.md`: khi owner xác nhận UI đã "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này".
+- `docs/11-ui-design-system.md`: khi owner chốt một rule UI áp dụng rộng.
+- `docs/05-api-contract.md` và file con trong `docs/api/`: nếu task làm đổi API contract hoặc behavior API.
+- `docs/04-database-model.md` và file con trong `docs/database/`: nếu task làm đổi schema/database model.
+- `docs/06-ai-rag-spec.md`: nếu task làm đổi AI/RAG behavior.
+- `docs/07-integration-and-env.md`: nếu task làm đổi env hoặc tích hợp bên thứ ba.
 
-- Một lần owner giao task mặc định chỉ được làm **một subtask**.
-- Không tự ý làm sang subtask khác nếu chưa được yêu cầu.
-- Nếu cần sửa file thuộc subtask khác để task hiện tại chạy được, phải ghi rõ lý do trong kế hoạch và changelog.
-- Nếu một subtask vẫn quá lớn so với context hoặc khả năng hoàn thành trọn vẹn, Codex phải đề xuất chia nhỏ hơn trước khi code.
-- Không gom nhiều milestone vào một request, trừ khi owner yêu cầu rõ.
+Không được dùng các file này để tự đổi scope lớn, stack hoặc nghiệp vụ quan trọng.
 
-### Task routing map
+---
 
-Codex phải dùng bảng này để chọn tài liệu cần đọc trước khi code.
+## 6. Phạm Vi Milestone/Subtask
 
-Quy tắc UI bổ sung:
+- Một lần owner giao task mặc định chỉ làm một subtask.
+- Không gom nhiều milestone nếu owner không yêu cầu rõ.
+- Nếu phải sửa file thuộc subtask khác để task hiện tại chạy được, ghi rõ lý do trong kế hoạch và changelog.
+- Nếu một subtask quá lớn, đề xuất chia nhỏ trước khi code.
+- `docs/09-implementation-plan.md` quy định thứ tự triển khai, không được dùng để thay đổi scope/stack đã chốt.
 
-- Nếu task có giao diện, ngoài các tài liệu trong milestone, Codex phải đọc `docs/08-ui-pages-and-components.md` và `docs/11-ui-design-system.md`.
-- Nếu UI cần data/API, đọc thêm `docs/05-api-contract.md`.
-- Nếu UI là một flow người dùng cụ thể, đọc thêm `docs/02-user-flows.md`.
+---
+
+## 7. Task Routing Map
+
+| Nhóm task | Milestone | Phải đọc |
+| --- | --- | --- |
+| Repo setup/tooling/monorepo | `M0.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md` |
+| Database/Prisma/migration/seed | `M1.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/04-database-model.md`; thêm `docs/05-api-contract.md` nếu API ảnh hưởng; thêm `docs/06-ai-rag-spec.md` nếu liên quan vector/AI; thêm `docs/10-seed-data-and-test-cases.md` nếu seed/test |
+| Auth/RBAC/profile/password | `M2.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md` |
+| Learning path/course/lesson admin | `M3.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
+| File upload/R2/PDF processing | `M4.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md` |
+| Embedding/pgvector/RAG retrieval | `M5.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`, `docs/07-integration-and-env.md` |
+| Quiz/flashcard/test CRUD | `M6.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
+| Student learning/progress/attempts | `M7.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
+| Payment/payOS/discount/enrollment | `M8.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md` |
+| AI generation/explanation/chat | `M9.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`, `docs/07-integration-and-env.md` |
+| Notification/realtime/email/Zalo | `M10.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md`; thêm UI docs nếu có UI |
+| Parent portal | `M11.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/08-ui-pages-and-components.md` |
+| Report/moderation/news/events | `M12.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
+| XP/level/leaderboard/profile/avatar | `M13.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI; thêm `docs/10-seed-data-and-test-cases.md` nếu seed/test |
+| Testing/hardening/deploy | `M14.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md`, `docs/10-seed-data-and-test-cases.md` |
+
+UI bổ sung:
+
+- Nếu task có giao diện, đọc `docs/08-ui-pages-and-components.md` và `docs/11-ui-design-system.md`.
+- Nếu có `docs/ui-references/approved-patterns.md`, đọc khi làm UI tương tự pattern đã được owner chốt.
+- Nếu UI cần data/API, đọc `docs/05-api-contract.md`.
 - Nếu task chỉ làm UI, không sửa backend/database trừ khi owner yêu cầu rõ.
 
-#### Repo setup / tooling / monorepo
+Database/API bổ sung:
 
-Milestone liên quan:
+- `docs/04-database-model.md` và `docs/05-api-contract.md` là index.
+- Khi task thật sự chạm database hoặc API, mở thêm file con tương ứng trong `docs/database/` hoặc `docs/api/` theo mapping trong index.
 
-- `M0.x`
+---
 
-Phải đọc:
+## 8. Thứ Tự Ưu Tiên Khi Docs Mâu Thuẫn
 
-- `AGENTS.md`
-- `docs/03-technical-architecture.md`
-- `docs/07-integration-and-env.md`
-- `docs/09-implementation-plan.md`
+1. `AGENTS.md`: cách làm việc, code rule, stack guard, scope guard.
+2. `docs/01-product-scope.md`: phạm vi MVP và nghiệp vụ sản phẩm.
+3. `docs/03-technical-architecture.md`: công nghệ và kiến trúc hệ thống.
+4. `docs/04-database-model.md` và `docs/database/`: dữ liệu, quan hệ bảng, constraint.
+5. `docs/05-api-contract.md` và `docs/api/`: giao tiếp frontend/backend.
+6. `docs/06-ai-rag-spec.md`: AI/RAG, embedding, retrieval, cache.
+7. `docs/09-implementation-plan.md`: thứ tự triển khai.
 
-#### Database / Prisma / migration / seed
-
-Milestone liên quan:
-
-- `M1.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md` nếu API bị ảnh hưởng
-- `docs/06-ai-rag-spec.md` nếu liên quan embedding, AI logs, document chunks hoặc pgvector
-- `docs/10-seed-data-and-test-cases.md` nếu liên quan seed/test
-- `docs/09-implementation-plan.md`
-
-#### Auth / register / login / refresh token / forgot password / RBAC
-
-Milestone liên quan:
-
-- `M2.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/07-integration-and-env.md`
-- `docs/09-implementation-plan.md`
-
-#### Learning path / course / lesson admin
-
-Milestone liên quan:
-
-- `M3.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/08-ui-pages-and-components.md` nếu có UI
-- `docs/09-implementation-plan.md`
-
-#### File upload / Cloudflare R2 / PDF processing
-
-Milestone liên quan:
-
-- `M4.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/03-technical-architecture.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/07-integration-and-env.md`
-- `docs/09-implementation-plan.md`
-
-#### Embedding / pgvector / RAG retrieval
-
-Milestone liên quan:
-
-- `M5.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/03-technical-architecture.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/06-ai-rag-spec.md`
-- `docs/07-integration-and-env.md`
-- `docs/09-implementation-plan.md`
-
-#### Quiz / flashcard / test CRUD
-
-Milestone liên quan:
-
-- `M6.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/08-ui-pages-and-components.md` nếu có UI
-- `docs/09-implementation-plan.md`
-
-#### Student learning flow / attempts / progress / top 5
-
-Milestone liên quan:
-
-- `M7.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/08-ui-pages-and-components.md` nếu có UI
-- `docs/09-implementation-plan.md`
-
-#### Payment / payOS / discount / enrollment
-
-Milestone liên quan:
-
-- `M8.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/07-integration-and-env.md`
-- `docs/09-implementation-plan.md`
-
-#### AI generation / explanation / AI chat
-
-Milestone liên quan:
-
-- `M9.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/06-ai-rag-spec.md`
-- `docs/07-integration-and-env.md`
-- `docs/09-implementation-plan.md`
-
-#### Notification / realtime / email / Zalo
-
-Milestone liên quan:
-
-- `M10.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/03-technical-architecture.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/07-integration-and-env.md`
-- `docs/08-ui-pages-and-components.md` nếu có UI
-- `docs/09-implementation-plan.md`
-
-#### Parent portal
-
-Milestone liên quan:
-
-- `M11.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/08-ui-pages-and-components.md`
-- `docs/09-implementation-plan.md`
-
-#### Report / moderation / news / events / livestream
-
-Milestone liên quan:
-
-- `M12.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/08-ui-pages-and-components.md` nếu có UI
-- `docs/09-implementation-plan.md`
-
-#### XP / level / leaderboard / profile / avatar
-
-Milestone liên quan:
-
-- `M13.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/01-product-scope.md`
-- `docs/02-user-flows.md`
-- `docs/04-database-model.md`
-- `docs/05-api-contract.md`
-- `docs/08-ui-pages-and-components.md` nếu có UI
-- `docs/10-seed-data-and-test-cases.md` nếu có test/seed
-- `docs/09-implementation-plan.md`
-
-#### Testing / hardening / deploy
-
-Milestone liên quan:
-
-- `M14.x`
-
-Phải đọc:
-
-- `AGENTS.md`
-- `docs/03-technical-architecture.md`
-- `docs/07-integration-and-env.md`
-- `docs/10-seed-data-and-test-cases.md`
-- `docs/09-implementation-plan.md`
-
-
-### Nguyên tắc xử lý khi có mâu thuẫn
-
-Nếu các tài liệu có điểm chưa khớp, áp dụng thứ tự ưu tiên:
-
-1. `AGENTS.md` ưu tiên cao nhất về quy tắc code, công nghệ, cấu trúc repo và cách làm việc.
-2. `docs/01-product-scope.md` ưu tiên cao nhất về phạm vi MVP và nghiệp vụ sản phẩm.
-3. `docs/03-technical-architecture.md` ưu tiên cao nhất về công nghệ và kiến trúc hệ thống.
-4. `docs/04-database-model.md` ưu tiên cao nhất về dữ liệu và quan hệ bảng.
-5. `docs/05-api-contract.md` ưu tiên cao nhất về giao tiếp front-end/back-end.
-6. `docs/06-ai-rag-spec.md` ưu tiên cao nhất về AI, RAG, embedding, retrieval và cache lời giải.
-7. `docs/09-implementation-plan.md` chỉ quy định thứ tự triển khai, không được dùng để thay đổi phạm vi nghiệp vụ hoặc kiến trúc đã chốt.
-
-Nếu phát hiện mâu thuẫn lớn, Codex phải ghi rõ trong phần trả lời hoặc PR description:
+Khi phát hiện mâu thuẫn lớn, báo rõ:
 
 - tài liệu nào mâu thuẫn,
 - quyết định tạm thời đang áp dụng,
 - file nào cần cập nhật sau.
 
-Không được âm thầm tự ý chọn một hướng làm thay đổi scope hoặc stack.
+---
+
+## 9. Scope MVP Và Stack Bắt Buộc
+
+MVP và stack chi tiết nằm ở `docs/01-product-scope.md` và `docs/03-technical-architecture.md`. Codex phải giữ các điểm cốt lõi sau:
+
+- Frontend: Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, TanStack Query, Zustand, React Hook Form, Zod, Tiptap, KaTeX/mhchem.
+- Backend: NestJS, TypeScript, REST API, Swagger/OpenAPI, JWT access/refresh token, RBAC `ADMIN`/`STUDENT`/`PARENT`.
+- Database: Supabase Postgres, pgvector, Prisma; không chạy PostgreSQL production trên VPS.
+- Queue/worker: Redis, BullMQ, worker container riêng.
+- Storage: Cloudflare R2; không lưu file upload chính trên disk app/VPS.
+- AI: OpenAI chính, Gemini phụ, `AiProvider` abstraction, output validate bằng Zod/JSON Schema.
+- Realtime: Socket.IO chỉ cho notification realtime trong MVP, không làm chat realtime user-user.
+- Payment/email/Zalo: payOS, Resend, Zalo OA/ZNS.
+- Deploy: VPS Ubuntu, Docker Compose, Nginx, Certbot.
+
+Không làm ngoài MVP: chat realtime user-user, bạn thân, chat nhóm, format riêng Tiếng Anh, học bổng, chống gian lận bài kiểm tra.
 
 ---
 
-## 1. Mục tiêu dự án
+## 10. Repo Structure
 
-Dự án là hệ thống học theo lộ trình cho học sinh.
-
-MVP tập trung vào:
-
-- Môn Toán, Lý, Hóa.
-- Lộ trình học theo môn và khối lớp, ví dụ Toán 7, Toán 8, Lý 8, Hóa 9.
-- Học sinh học lần lượt từng buổi trong lộ trình.
-- Admin quản lý lộ trình, buổi học, tài liệu, quiz, flashcard, bài kiểm tra, thông báo, report.
-- Học sinh học thử buổi đầu, mua lộ trình, học bài, làm quiz, học flashcard, làm bài kiểm tra, chat AI trong buổi học.
-- Phụ huynh liên kết con, thanh toán cho con, theo dõi tiến độ và nhận thông báo.
-- AI hỗ trợ tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải và chat theo tài liệu từng buổi học.
-- Thông báo realtime trong hệ thống qua biểu tượng/nút thông báo.
-- Thanh toán QR/đối soát tự động bằng payOS.
-- File upload lưu ở Cloudflare R2.
-- Database production dùng Supabase Postgres + pgvector.
-
-MVP không làm:
-
-- Chat realtime giữa người dùng.
-- Chat realtime học sinh với admin.
-- Chat realtime phụ huynh với admin.
-- Bạn thân.
-- Chat nhóm theo khóa.
-- Format riêng cho môn Tiếng Anh.
-- Học bổng.
-- Chống gian lận bài kiểm tra.
-
----
-
-## 2. Stack công nghệ bắt buộc
-
-Không tự ý thay đổi stack dưới đây.
-
-### Front-end
-
-- Next.js.
-- TypeScript.
-- Tailwind CSS.
-- shadcn/ui.
-- Framer Motion.
-- TanStack Query.
-- Zustand.
-- React Hook Form.
-- Zod.
-- Tiptap.
-- KaTeX.
-- KaTeX + mhchem.
-- Công thức lưu dạng LaTeX trong Tiptap JSON.
-
-### Back-end
-
-- NestJS.
-- TypeScript.
-- REST API.
-- Swagger/OpenAPI.
-- JWT access token + refresh token.
-- RBAC theo role `ADMIN`, `STUDENT`, `PARENT`.
-- API container và worker container tách riêng.
-
-### Database
-
-- Supabase Postgres.
-- pgvector.
-- Prisma.
-- Raw SQL trong Prisma cho vector/hybrid search khi cần.
-- Không chạy PostgreSQL production trên VPS.
-
-### Queue và worker
-
-- Redis chạy trên VPS.
-- BullMQ làm job queue.
-- NestJS worker chạy riêng với API container.
-- Worker xử lý PDF, embedding, AI generation, gửi notification/email/Zalo, render ảnh minh họa.
-
-### Storage
-
-- Cloudflare R2.
-- Không dùng MinIO trong production MVP.
-- Không lưu file upload chính trên disk của app/VPS.
-
-### AI
-
-- OpenAI là provider chính.
-- Gemini là provider phụ.
-- Tạo lớp `AiProvider` abstraction.
-- Embedding chính dùng OpenAI Embeddings.
-- Structured output chính dùng OpenAI.
-- Không trộn embedding của nhiều provider trong cùng một vector space.
-- AI output phải validate bằng Zod hoặc JSON Schema.
-
-### Realtime
-
-- Socket.IO.
-- NestJS WebSocket Gateway.
-- MVP chỉ làm notification realtime trong hệ thống, không làm chat realtime user-user.
-
-### Payment, email, Zalo
-
-- Payment: payOS.
-- Email: Resend.
-- Zalo notification: Zalo OA/ZNS.
-
-### Deploy
-
-- VPS: Viettel Cloud GEN05.
-- OS: Ubuntu LTS.
-- Runtime: Docker + Docker Compose.
-- Reverse proxy: Nginx.
-- SSL: Certbot/Let's Encrypt.
-- Chỉ cần 1 domain chính:
-  - Front-end: `yourdomain.com`.
-  - Back-end API: `api.yourdomain.com`.
-
----
-
-## 3. Cấu trúc repo đề xuất
-
-Dùng monorepo với Turborepo.
+Repo dùng monorepo Turborepo:
 
 ```txt
-.
-├── AGENTS.md
-├── docs/
-├── apps/
-│   ├── web/
-│   │   ├── app/
-│   │   ├── components/
-│   │   ├── features/
-│   │   ├── lib/
-│   │   └── tests/
-│   └── api/
-│       ├── src/
-│       │   ├── main.ts
-│       │   ├── app.module.ts
-│       │   ├── modules/
-│       │   ├── common/
-│       │   ├── config/
-│       │   ├── jobs/
-│       │   └── workers/
-│       ├── prisma/
-│       │   ├── schema.prisma
-│       │   ├── migrations/
-│       │   └── seed.ts
-│       └── test/
-├── packages/
-│   └── shared/
-│       ├── src/
-│       │   ├── types/
-│       │   ├── schemas/
-│       │   └── constants/
-├── docker-compose.yml
-├── docker-compose.prod.yml
-├── package.json
-└── turbo.json
+apps/web          Next.js front-end
+apps/api          NestJS API + worker source
+packages/shared   shared types/schemas/constants
+docs/             product/technical docs
+.codex/           Codex plans/prompts/skills/changelog
 ```
 
-ASSUMPTION: Dự án sẽ dùng `apps/web` cho Next.js, `apps/api` cho NestJS, `packages/shared` cho type/schema dùng chung. Nếu repo thực tế đã có cấu trúc khác, không đổi cấu trúc lớn nếu chưa được yêu cầu.
+Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 
 ---
 
-## 4. Quy tắc code chung
+## 11. Code Rules
 
 - Dùng TypeScript nghiêm ngặt.
-- Không dùng `any` nếu có thể định nghĩa type rõ.
-- Tất cả input từ client phải validate bằng Zod hoặc DTO + class-validator.
-- Không hard-code secret, token, API key, webhook key hoặc config production.
-- Không tự ý thêm package nặng nếu không cần thiết.
-- Không tự ý thêm tính năng ngoài MVP.
-- Không đổi database, queue, storage, payment, AI provider đã chốt.
-- Code phải chia module rõ theo domain.
-- Tên biến, tên hàm và tên file dùng tiếng Anh.
-- Nội dung hiển thị cho người dùng có thể dùng tiếng Việt.
-- API response nên nhất quán theo format trong `docs/05-api-contract.md`.
-- Cần xử lý lỗi rõ ràng, không nuốt lỗi.
-- Các thao tác nhạy cảm phải có audit log.
+- Tránh `any`; định nghĩa type rõ khi có thể.
+- Input từ client phải validate bằng Zod hoặc DTO/class-validator.
+- Tên biến, hàm, file dùng tiếng Anh; text UI có thể dùng tiếng Việt.
+- API response bám `docs/05-api-contract.md`.
+- Xử lý lỗi rõ ràng, không nuốt lỗi.
+- Thao tác nhạy cảm cần audit/log theo docs domain.
+- Không thêm package nặng nếu không cần thiết.
+- Không sửa database production trực tiếp; schema đổi phải có migration khi đến bước Prisma.
 
 ---
 
-## 5. Quy tắc back-end
-
-### Module NestJS đề xuất
-
-```txt
-AuthModule
-UsersModule
-ProfilesModule
-CoursesModule
-LessonsModule
-MaterialsModule
-FilesModule
-QuizModule
-FlashcardsModule
-TestsModule
-AttemptsModule
-ProgressModule
-PaymentsModule
-DiscountsModule
-AiModule
-RagModule
-NotificationsModule
-ReportsModule
-NewsModule
-GamificationModule
-ParentsModule
-AuditModule
-```
-
-Không bắt buộc tạo tất cả module ngay từ commit đầu, nhưng nên bám theo hướng này.
-
-### Authentication
-
-- Dùng JWT access token ngắn hạn.
-- Dùng refresh token dài hạn.
-- Refresh token phải được hash trước khi lưu database.
-- Logout phải revoke refresh token.
-- Không trả password hash ra API.
-
-### Authorization
-
-- Admin được quản lý nội dung.
-- Student chỉ thao tác dữ liệu học tập của chính mình.
-- Parent chỉ xem/thao tác dữ liệu của con đã liên kết.
-- Một học sinh chỉ có một phụ huynh.
-- Một phụ huynh có thể liên kết nhiều con.
-
-### API conventions
-
-- Base path: `/api/v1`.
-- Swagger/OpenAPI bật ở môi trường dev/staging.
-- Không bật Swagger public production nếu chưa có bảo vệ.
-- Các endpoint admin dùng prefix `/admin`.
-- Các endpoint parent dùng prefix `/parent`.
-- Các endpoint student dùng prefix `/student` khi cần phân biệt rõ.
-
----
-
-## 6. Quy tắc database và migration
-
-- Dùng Prisma schema làm nguồn định nghĩa chính cho model.
-- Migration phải được commit vào repo.
-- Không sửa database trực tiếp trong production nếu không có migration.
-- Với pgvector, Prisma có thể cần `Unsupported("vector(1536)")` hoặc raw SQL.
-- Các index vector/hybrid search nên tạo bằng raw SQL migration.
-- Cần bật extension `vector` trên Supabase Postgres.
-- Cần unique/index rõ cho:
-  - email/phone/username user,
-  - mã con của học sinh,
-  - enrollment active,
-  - payment order code,
-  - webhook idempotency,
-  - target của cached AI explanation,
-  - notification recipient/time,
-  - report target/status.
-
-Không đặt database production trên VPS.
-
----
-
-## 7. Quy tắc AI/RAG
-
-- Không gửi toàn bộ tài liệu/PDF lên AI mỗi lần học sinh hỏi.
-- Tài liệu buổi học phải được extract text, chunk, embedding và lưu theo `lesson_id`.
-- Khi chat AI, retrieval chỉ lấy chunk thuộc đúng `lesson_id` hiện tại.
-- Có thể kết hợp vector search với keyword search để bắt công thức/ký hiệu.
-- Nếu không tìm được context phù hợp, AI phải từ chối trả lời nội dung ngoài phạm vi và yêu cầu học sinh hỏi lại câu liên quan đến buổi học.
-- Lời giải AI cho quiz/flashcard/câu thi phải được cache ở cấp item.
-- Nếu đã có lời giải lưu sẵn thì học sinh bấm “Giải thích cho tôi” dùng lại, không gọi AI mới.
-- Chỉ tạo lại lời giải khi:
-  - chưa có lời giải,
-  - admin yêu cầu tạo lại,
-  - nội dung câu hỏi thay đổi,
-  - tài liệu nguồn thay đổi.
-- AI output phải validate bằng Zod/JSON Schema trước khi lưu database.
-- Không render raw SVG trực tiếp từ AI.
-- Nếu cần ảnh minh họa, AI tạo `diagram_spec_json`, backend render thành SVG/PNG an toàn.
-
----
-
-## 8. Quy tắc payment
-
-- Payment dùng payOS.
-- Webhook phải verify chữ ký/checksum.
-- Webhook phải idempotent.
-- Không mở khóa lộ trình nếu webhook chưa verify.
-- Thanh toán thành công tạo enrollment 12 tháng.
-- `expires_at = paid_at + 12 months`.
-- Cần lưu payment logs và webhook logs.
-- Không tin tưởng dữ liệu amount/course từ client. Server phải tự tính lại amount theo course và discount code.
-
----
-
-## 9. Quy tắc storage/file upload
-
-- File upload lưu vào Cloudflare R2.
-- Không lưu file chính trong thư mục app trên VPS.
-- Backend tạo signed URL hoặc proxy upload/download theo quyền.
-- Cần lưu metadata file trong database.
-- File private phải kiểm tra quyền truy cập.
-- File trong editor, ảnh câu hỏi/câu trả lời, avatar, PDF, ảnh ghi chú, ảnh minh họa AI đều dùng chung cơ chế file metadata + R2 object key.
-- Cần giới hạn loại file và dung lượng upload.
-
-ASSUMPTION: Giới hạn dung lượng file cụ thể chưa được chốt. Có thể đặt tạm:
-
-- PDF bài học: tối đa 50MB.
-- Ảnh: tối đa 10MB.
-- Avatar: tối đa 5MB.
-
-Nếu owner có quyết định khác, cập nhật `docs/07-integration-and-env.md` và backend validation.
-
----
-
-## 10. Quy tắc notification
-
-- Notification in-app luôn lưu DB.
-- Nếu user online, gửi realtime event qua Socket.IO.
-- Nếu user offline, user mở nút thông báo thì load danh sách mới nhất từ DB.
-- Email/Zalo là kênh bổ sung cho một số thông báo quan trọng.
-- Admin có thể gửi thông báo thủ công tới từng tài khoản student/parent.
-- Realtime notification không đồng nghĩa với chat realtime giữa người dùng.
-
----
-
-## 11. Quy tắc front-end
+## 12. Frontend Rules
 
 - Dùng Next.js App Router.
-- Dùng TypeScript.
-- Dùng Tailwind CSS + shadcn/ui.
-- Dùng TanStack Query cho server state.
-- Dùng Zustand cho client state nhỏ như auth/session UI, selected child, notification dropdown state.
+- Server state dùng TanStack Query; client UI state nhỏ dùng Zustand.
 - Form dùng React Hook Form + Zod.
-- Rich text dùng Tiptap.
-- Công thức Toán/Lý/Hóa lưu LaTeX trong Tiptap JSON.
-- Khi làm UI, phải đọc `docs/11-ui-design-system.md` và `docs/08-ui-pages-and-components.md`.
-- Nếu có `docs/ui-references/approved-patterns.md`, phải đọc khi làm UI tương tự pattern đã được owner chốt.
-- Không tự chọn style ngẫu nhiên; bám token, spacing, typography và responsive rules trong `docs/11-ui-design-system.md`.
-- UI ưu tiên mobile-first: thiết kế và kiểm tra trước cho điện thoại, sau đó mở rộng cho tablet/iPad và laptop/desktop.
-- Các màn học, quiz, flashcard, test, payment và dashboard phải responsive rõ ràng trên mobile, tablet/iPad và laptop/desktop; tránh layout chỉ đẹp trên một nhóm thiết bị.
-- Màn hình có data/action phải có loading, empty, error và disabled state phù hợp.
-- Nếu task chỉ làm UI, không sửa backend/database. Nếu cần mock data, đặt mock rõ ràng và dễ xóa khi connect API.
-- Nếu có thể chạy app, UI task nên được kiểm tra bằng browser/screenshot ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad.
-- Khi owner nói "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này", Codex phải lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là nguyên tắc áp dụng rộng.
-- Không xử lý permission chỉ bằng UI. Backend vẫn phải enforce RBAC.
+- Rich text dùng Tiptap; công thức lưu LaTeX trong Tiptap JSON.
+- Không xử lý permission chỉ bằng UI; backend vẫn enforce RBAC.
 - Route admin/student/parent phải có guard.
+- UI mobile-first, nhưng phải ổn trên tablet/iPad và laptop/desktop.
+- Màn hình có data/action phải có loading, empty, error, disabled state.
+- Nếu có thể chạy app, UI task nên kiểm tra bằng browser/screenshot ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad.
+- Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
 
 ---
 
-## 12. Testing
+## 13. Backend/API Rules
+
+- Base path API: `/api/v1`.
+- Swagger/OpenAPI bật ở dev/staging; không public production nếu chưa bảo vệ.
+- Admin endpoint dùng prefix `/admin`; parent dùng `/parent`; student dùng `/student` khi cần phân biệt rõ.
+- Auth dùng JWT access token ngắn hạn và refresh token dài hạn.
+- Refresh/reset token phải hash trước khi lưu DB.
+- Backend enforce RBAC/ownership, không tin UI guard.
+- Controller chỉ xử lý HTTP boundary; service chứa nghiệp vụ; DB/provider đi qua service/repository phù hợp.
+- Job nặng enqueue BullMQ, không blocking request nếu có thể.
+
+---
+
+## 14. Database, AI, Payment, Storage, Notification
+
+Chi tiết nằm trong docs chuyên môn; Codex phải đọc đúng docs trước khi code.
+
+- Database/migration: `docs/04-database-model.md` và file con trong `docs/database/`.
+- API contract: `docs/05-api-contract.md` và file con trong `docs/api/`.
+- AI/RAG: `docs/06-ai-rag-spec.md`.
+- Integration/env: `docs/07-integration-and-env.md`.
+
+Guard bắt buộc:
+
+- pgvector cần extension `vector`; vector/hybrid search có thể dùng raw SQL qua Prisma.
+- Không trộn embedding của nhiều provider trong cùng vector space.
+- Không gửi toàn bộ PDF/tài liệu lên AI mỗi lần học sinh hỏi.
+- RAG chat phải retrieval trong đúng `lesson_id`.
+- AI output phải validate trước khi lưu.
+- Payment payOS webhook phải verify checksum/signature và idempotent.
+- Server tự tính amount/course/discount, không tin dữ liệu tiền từ client.
+- File upload lưu Cloudflare R2, file private phải check quyền.
+- Notification in-app phải lưu DB trước; realtime chỉ là kênh delivery.
+
+---
+
+## 15. Testing
 
 - Unit test: Jest.
 - Backend API test: Jest + Supertest.
 - Frontend E2E: Playwright.
-- AI output test: validate bằng Zod/JSON Schema.
+- AI output test: validate Zod/JSON Schema.
 - Payment webhook test phải kiểm tra idempotency.
-- Worker job test nên dùng mock provider cho AI, mock R2, mock payOS, mock Resend/Zalo.
+- Worker job test dùng mock provider khi phù hợp.
+- Không gọi OpenAI/Gemini/payOS/R2/Resend/Zalo thật trong unit test mặc định.
 
-Không gọi OpenAI/Gemini thật trong unit test mặc định.
+Checks phải tỉ lệ với rủi ro:
+
+- Task nhỏ/docs-only có thể dùng lean mode và ghi rõ nếu không chạy test.
+- Auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification hoặc multi-module phải dùng workflow đầy đủ hơn.
 
 ---
 
-## 13. Quy tắc changelog và commit
+## 16. Changelog Và Commit
 
-Mục tiêu: mỗi lần Codex hoàn thành một thay đổi có thể commit, repo phải có changelog ngắn gọn ghi lại việc đã làm. Changelog này giúp owner kiểm tra lịch sử thay đổi mà không phải đọc toàn bộ diff.
+Codex không được tự commit nếu owner chưa yêu cầu rõ.
 
-### 13.1. Vị trí changelog
-
-Codex phải ghi changelog trong thư mục:
-
-```txt
-.codex/changelog/
-```
-
-Nếu thư mục chưa tồn tại, Codex phải tạo thư mục này.
-
-Tên file changelog theo ngày:
+Khi có thay đổi file đáng commit, cập nhật changelog:
 
 ```txt
 .codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md
 ```
 
-Ví dụ:
+Nếu cùng ngày đã có file changelog, append vào file đó.
 
-```txt
-.codex/changelog/CHANGELOG_2026-07-06_codex.md
-```
-
-Quy tắc:
-
-- Nếu trong cùng ngày đã có file changelog, append thêm entry mới vào file đó.
-- Nếu chưa có file changelog của ngày hiện tại, tạo file mới.
-- Ngày dùng theo ngày local của môi trường chạy Codex nếu có thể lấy được bằng hệ thống; nếu không rõ timezone, dùng UTC và ghi `ASSUMPTION: date uses UTC`.
-- Không tạo một file changelog mới cho từng commit nếu cùng ngày đã có file.
-
-### 13.2. Khi nào phải ghi changelog
-
-Codex phải cập nhật changelog khi:
-
-- Hoàn thành một task code có thể commit.
-- Thay đổi database schema hoặc migration.
-- Thay đổi API contract hoặc behavior API.
-- Thay đổi worker/job/queue.
-- Thay đổi AI/RAG prompt, schema, retrieval hoặc cache logic.
-- Thay đổi payment, auth, permission, storage, notification hoặc integration bên thứ ba.
-- Sửa bug có tác động đến nghiệp vụ.
-- Thêm/sửa test đáng kể.
-- Cập nhật tài liệu trong repo theo yêu cầu task.
-
-Không bắt buộc ghi changelog cho:
-
-- Thay đổi nháp chưa hoàn thành.
-- Format whitespace nhỏ không có ý nghĩa.
-- Comment tạm thời trong quá trình làm việc chưa commit.
-
-### 13.3. Format entry changelog
-
-Mỗi entry changelog phải ngắn gọn, chỉ ghi ý chính. Mặc định dùng format:
+Format ngắn:
 
 ```md
 ## YYYY-MM-DD — <tên task ngắn>
 
 - Summary: <1 câu mô tả thay đổi chính>
-- Changed: <1-2 ý chính, có thể ghi cùng một dòng>
-- Files: `path/to/file`, `path/to/another-file`
+- Changed: <1-2 ý chính>
+- Files: `path`, `path`
 - Tests: <test đã chạy hoặc "Not run: <lý do>">
 - Notes: <chỉ ghi nếu có migration/env/TODO/ASSUMPTION/rủi ro>
 ```
 
-Nếu mục nào không có thông tin đáng nói thì bỏ mục đó, trừ `Summary`, `Files` và `Tests`.
+Không ghi secret, token, API key, webhook signature, private URL hoặc dữ liệu nhạy cảm vào changelog.
 
-Nếu task lớn hoặc có rủi ro cao, có thể thêm các mục:
+Khi owner yêu cầu commit:
 
-```md
-- Database: <migration/schema/index/constraint đã đổi>
-- API: <endpoint/DTO/guard/service đã đổi>
-- Worker/AI: <queue/job/provider/schema/retrieval/cache đã đổi>
-- Security: <auth/RBAC/secret/webhook permission đã kiểm tra>
-```
-
-### 13.4. Quy tắc nội dung changelog
-
-- Viết ngắn, cụ thể, không kể lại toàn bộ diff; ưu tiên 4-8 dòng cho một entry thường.
-- `Changed` tối đa 2 ý chính, trừ task lớn thật sự cần nhiều hơn.
-- `Files` có thể gom path liên quan bằng wildcard như `apps/api/**` nếu hợp lý.
-- Không ghi secret, API key, token, webhook signature, private URL hoặc thông tin nhạy cảm.
-- Không copy raw prompt dài hoặc dữ liệu người dùng vào changelog.
-- Nếu có migration, ghi tên migration và mục đích.
-- Nếu có biến môi trường mới, chỉ ghi tên biến, không ghi giá trị.
-- Nếu test chưa chạy được, phải ghi rõ `Not run` và lý do.
-- Nếu có rủi ro còn lại, ghi ngắn trong `Notes` hoặc `TODO`.
-
-### 13.5. Quan hệ với commit
-
-Codex không được tự commit nếu owner chưa yêu cầu rõ.
-
-Khi owner yêu cầu commit hoặc khi Codex đề xuất một commit, Codex phải đảm bảo:
-
-- Changelog đã được cập nhật trước.
-- File changelog nằm trong cùng commit với code liên quan.
-- Commit message tóm tắt đúng nội dung thay đổi.
-
-Format commit message đề xuất:
+- Changelog phải nằm cùng commit với thay đổi liên quan.
+- Không stage file rác/generated/local nếu không thuộc task.
+- Commit message dùng:
 
 ```txt
 <type>(<scope>): <summary>
 ```
 
-Ví dụ:
-
-```txt
-feat(auth): add refresh token rotation
-fix(payment): make payOS webhook idempotent
-docs(codex): update AI RAG implementation rules
-```
-
-Type gợi ý:
-
-```txt
-feat, fix, refactor, docs, test, chore, perf, build, ci
-```
+Type gợi ý: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`.
 
 ---
 
-## 14. Definition of Done
+## 17. Definition Of Done
 
-Một task được xem là xong khi:
+Task được xem là xong khi:
 
-- Code chạy được ở local.
+- Đúng subtask/milestone trong `docs/09-implementation-plan.md`.
+- Không vượt scope MVP và không đổi stack.
+- Code chạy được local hoặc ghi rõ lý do chưa chạy được.
 - Không có lỗi TypeScript nghiêm trọng.
-- API liên quan có validation, auth và authorization.
-- Database thay đổi có migration.
-- Side effect quan trọng có log hoặc audit log.
-- Có test phù hợp hoặc có ghi chú rõ nếu chưa test được.
-- Không làm lệch scope MVP.
+- API liên quan có validation/auth/authorization phù hợp.
+- Database đổi có migration/docs phù hợp.
+- Side effect quan trọng có log/audit nếu domain yêu cầu.
+- Có test/check phù hợp hoặc ghi rõ `Not run`.
 - Không hard-code secret.
-- Đã cập nhật changelog trong `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` nếu task có thể commit.
-- Đã xác định đúng milestone/subtask trong `docs/09-implementation-plan.md` và không làm vượt phạm vi task đã giao.
-- Không phá các flow chính đã mô tả trong `docs/02-user-flows.md`.
-- Nếu thay đổi API, cập nhật `docs/05-api-contract.md`.
-- Nếu thay đổi schema, cập nhật `docs/04-database-model.md`.
-- Nếu thay đổi AI/RAG, cập nhật `docs/06-ai-rag-spec.md`.
+- Không phá flow chính trong `docs/02-user-flows.md`.
+- Nếu đổi API/schema/AI/env/UI rule, cập nhật docs liên quan.
+- Changelog đã cập nhật nếu có thay đổi file đáng commit.
 
 ---
 
-## 15. Ghi chú vận hành ban đầu
+## 18. Ghi Chú Vận Hành
 
-Quy mô production ban đầu dự kiến là 50 học sinh.
+Quy mô production ban đầu dự kiến khoảng 50 học sinh.
 
-Ngân sách production nên chuẩn bị khoảng 5.500.000 VNĐ/tháng, gồm VPS Viettel GEN05, Supabase Postgres Pro, Cloudflare R2, Resend, Zalo/ZNS, OpenAI/Gemini, domain và dự phòng phát sinh.
-
-Ghi chú này chỉ dùng để định hướng vận hành và không phải là yêu cầu code trực tiếp.
+Ngân sách production và chi tiết vận hành nằm trong `docs/07-integration-and-env.md`. Ghi chú này chỉ để định hướng, không phải yêu cầu code trực tiếp.

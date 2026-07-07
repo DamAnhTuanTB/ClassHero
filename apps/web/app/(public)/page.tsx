@@ -8,8 +8,8 @@ export default function HomePage() {
         Hệ thống học theo lộ trình
       </h1>
       <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
-        Nền Next.js App Router đã sẵn sàng cho các màn hình public,
-        student, parent và admin trong các subtask tiếp theo.
+        Nền Next.js App Router đã sẵn sàng cho các màn hình public, student, parent và
+        admin trong các subtask tiếp theo.
       </p>
     </main>
   );

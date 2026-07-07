@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Feature"
+  short_description: "Plan a new feature in docs and roadmap"
+  default_prompt: "Use $add-feature to document and plan this new feature: describe it here."

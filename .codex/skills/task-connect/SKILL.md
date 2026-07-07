@@ -22,16 +22,18 @@ Parse subtask IDs in order. Multiple IDs are allowed only when explicitly listed
 Before editing:
 
 1. Read `AGENTS.md`.
-2. Read the requested subtask in `docs/09-implementation-plan.md`.
+2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M3.4` -> `docs/implementation/M3.md`).
 3. If present, read `.codex/plans/codex-execution-plan.md`.
 4. Read UI/API docs:
    - `docs/08-ui-pages-and-components.md`
    - `docs/11-ui-design-system.md`
    - `docs/ui-references/approved-patterns.md` if present and relevant.
    - `docs/05-api-contract.md`
+   - the matching file in `docs/api/` for the endpoint/domain.
    - `docs/02-user-flows.md`
 5. Read database docs when the endpoint does not exist, API behavior changes, or data shape is unclear:
    - `docs/04-database-model.md`
+   - the matching file in `docs/database/` for the model/domain.
    - `docs/10-seed-data-and-test-cases.md` if seed/test data is affected.
 6. Inspect the UI files created by `/task-ui`.
 7. Inspect existing API client/hook patterns and backend module/controller/service patterns.
@@ -44,10 +46,10 @@ Before editing:
 - Preserve the approved UI tokens and responsive behavior from `/task-ui`.
 - Replace mock data with API client/hooks.
 - Do not do broad visual redesign or polish unless needed to handle real states.
-- If the needed API endpoint does not exist, implement the complete backend API required by the requested subtask and `docs/05-api-contract.md`.
-- If the API contract is missing or incomplete, update `docs/05-api-contract.md` with the implemented contract.
+- If the needed API endpoint does not exist, implement the complete backend API required by the requested subtask and `docs/05-api-contract.md` plus the matching `docs/api/` file.
+- If the API contract is missing or incomplete, update `docs/05-api-contract.md` and/or the matching `docs/api/` file with the implemented contract.
 - Backend work must fully satisfy the requested subtask's API scope, but must not expand into unrelated feature work.
-- Database schema changes are allowed only when required by the subtask/docs; update `docs/04-database-model.md` and migrations when that happens.
+- Database schema changes are allowed only when required by the subtask/docs; update `docs/04-database-model.md`, the matching `docs/database/` file, and migrations when that happens.
 - If required backend work is too broad or crosses multiple subtasks, stop and explain the split instead of silently expanding scope.
 
 ## Connection Rules

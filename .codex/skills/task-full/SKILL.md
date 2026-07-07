@@ -22,7 +22,7 @@ Parse subtask IDs in order. Multiple IDs are allowed only when explicitly listed
 Before editing:
 
 1. Read `AGENTS.md`.
-2. Read the requested subtask in `docs/09-implementation-plan.md`.
+2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M8.3` -> `docs/implementation/M8.md`).
 3. If present, read `.codex/plans/codex-execution-plan.md`.
 4. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
 5. If UI is involved, also read:
@@ -42,7 +42,7 @@ Before editing:
 - If a dependency subtask is missing, stop or implement only safe scaffold and explain the blocker.
 - For UI work, follow mobile-first, tablet/iPad, and laptop/desktop rules.
 - For UI work, use the default UI tokens from `docs/11-ui-design-system.md` and save useful review screenshots under `.codex/screenshots/`.
-- For database/API/AI behavior changes, update the corresponding docs.
+- For database/API/AI behavior changes, update the corresponding docs. `docs/04-database-model.md` and `docs/05-api-contract.md` are indexes; update matching files in `docs/database/` and `docs/api/` when domain details change.
 
 ## Full Implementation Rules
 

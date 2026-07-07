@@ -1,0 +1,4 @@
+interface:
+  display_name: "Change UI"
+  short_description: "Adjust existing UI from feedback only"
+  default_prompt: "Use $change-ui to adjust this screen or component: describe the UI change here."

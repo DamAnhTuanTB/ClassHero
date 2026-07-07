@@ -9,4 +9,9 @@ export class AppController {
   getRoot() {
     return this.appService.getRoot();
   }
+
+  @Get("api/v1/health")
+  getHealth() {
+    return this.appService.getHealth();
+  }
 }

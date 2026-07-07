@@ -363,3 +363,109 @@
 - Changed: Mô tả `/task-ui`, `/task-connect`, `/task-full`, `/fix bug`, `/commit` và luồng UI review.
 - Files: `README.md`
 - Tests: `git diff --check -- README.md`.
+
+## 2026-07-07 — Complete M0.2 local tooling
+
+- Summary: Hoàn thiện nền chạy local với env mẫu, lint/format, Docker local và API health check.
+- Changed: Thêm ESLint/Prettier, `.env.example`, Docker dev cho web/API/Redis và `GET /api/v1/health`.
+- Files: `package.json`, `apps/**`, `packages/shared/package.json`, `.env.example`, `docker-compose.yml`, `README.md`
+- Tests: `pnpm lint`; `pnpm typecheck`; `pnpm format:check`; `pnpm build`; `docker compose config`; `curl http://localhost:4010/api/v1/health`.
+- Notes: `docker compose build` not run: Docker daemon is not available.
+
+## 2026-07-07 — Clarify Codex-maintained files
+
+- Summary: Làm rõ trong README các file Codex có thể tự cập nhật khi thực hiện task.
+- Changed: Ghi rule cho changelog, execution plan, approved UI patterns và docs contract/schema/AI.
+- Files: `README.md`
+- Tests: `git diff --check -- README.md .codex/changelog/CHANGELOG_2026-07-07_codex.md`.
+
+## 2026-07-07 — Add Codex-maintained files rule
+
+- Summary: Bổ sung rule cấp cao trong `AGENTS.md` cho các file Codex có thể tự cập nhật khi làm task.
+- Changed: Liệt kê execution plan, changelog, approved UI patterns và docs API/database/AI/env được cập nhật khi phù hợp.
+- Files: `AGENTS.md`
+- Tests: `git diff --check -- AGENTS.md .codex/changelog/CHANGELOG_2026-07-07_codex.md`.
+
+## 2026-07-07 — Shorten AGENTS coordination rules
+
+- Summary: Rút gọn `AGENTS.md` thành file điều phối cấp cao để giảm context cho Codex.
+- Changed: Giữ rule đọc docs, routing map, scope/stack guard, changelog, DoD; chuyển chi tiết sang docs chuyên môn.
+- Files: `AGENTS.md`
+- Tests: `git diff --check -- AGENTS.md .codex/changelog/CHANGELOG_2026-07-07_codex.md`.
+
+## 2026-07-07 — Split implementation details by milestone
+
+- Summary: Tách chi tiết implementation theo từng milestone để Codex đọc đúng file nhỏ hơn.
+- Changed: Tạo `docs/implementation/M0.md` đến `M14.md`, cập nhật plan/skill/prompt và thêm hướng dẫn đọc nhanh cho docs dài.
+- Files: `docs/implementation/**`, `docs/09-implementation-plan.md`, `AGENTS.md`, `README.md`, `.codex/skills/**`, `.codex/prompts/**`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`
+- Tests: `rg` kiểm tra reference cũ; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Split database and API docs by domain
+
+- Summary: Rút gọn `docs/04` và `docs/05` thành index, tách chi tiết sang thư mục domain.
+- Changed: Thêm `docs/database/**` và `docs/api/**`, cập nhật AGENTS/README/skill/prompt để đọc file con phù hợp.
+- Files: `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/database/**`, `docs/api/**`, `AGENTS.md`, `README.md`, `.codex/skills/**`, `.codex/prompts/**`, `docs/06-ai-rag-spec.md`
+- Tests: Kiểm tra đủ 44 section database/API; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Rewrite README for beginner workflow
+
+- Summary: Viết lại README để người mới hiểu cách chạy dự án và cơ chế từng skill Codex.
+- Changed: Làm rõ cơ chế map `Mx.y -> docs/implementation/Mx.md`, cách đọc database/API file con và quy trình `/task-ui`, `/task-connect`, `/task-full`, `/fix bug`, `/commit`.
+- Files: `README.md`
+- Tests: `rg` kiểm tra heading/cơ chế chính; `git diff --check`.
+
+## 2026-07-07 — Add feature change skills
+
+- Summary: Thêm skill cho sửa, thêm và xóa tính năng theo hướng docs-first.
+- Changed: Tạo `/update-feature`, `/add-feature`, `/delete-feature` và cập nhật README.
+- Files: `.codex/skills/update-feature/SKILL.md`, `.codex/skills/add-feature/SKILL.md`, `.codex/skills/delete-feature/SKILL.md`, `README.md`
+- Tests: Kiểm tra frontmatter skill; `rg` kiểm tra README; `git diff --check`.
+
+## 2026-07-07 — Add change-ui skill
+
+- Summary: Thêm skill `/change-ui` để chỉnh UI theo feedback mà chưa chốt vào tài liệu thiết kế.
+- Changed: Tạo skill UI-only, chỉ cập nhật approved UI docs sau khi owner nói UI đã ưng/chốt; cập nhật README.
+- Files: `.codex/skills/change-ui/SKILL.md`, `README.md`
+- Tests: Kiểm tra frontmatter skill; `rg` kiểm tra README; `git diff --check`.
+
+## 2026-07-07 — Clarify feature task-code rules
+
+- Summary: Làm rõ cách các skill feature sửa, thêm hoặc bỏ mã task khi roadmap thay đổi.
+- Changed: Bổ sung rule task code cho `/update-feature`, `/add-feature`, `/delete-feature` và README.
+- Files: `.codex/skills/update-feature/SKILL.md`, `.codex/skills/add-feature/SKILL.md`, `.codex/skills/delete-feature/SKILL.md`, `README.md`
+- Tests: `rg` kiểm tra rule task-code; `git diff --check`.
+
+## 2026-07-07 — Add defer feature skill
+
+- Summary: Thêm skill chuyển tính năng sang version sau mà không xóa khỏi tài liệu.
+- Changed: Tạo `/move-feature-to-next-version` và cập nhật README.
+- Files: `.codex/skills/move-feature-to-next-version/SKILL.md`, `README.md`
+- Tests: Kiểm tra frontmatter skill; `rg` kiểm tra README; `git diff --check`.
+
+## 2026-07-07 — Add refactor skill
+
+- Summary: Thêm skill `/refactor` để cải thiện cấu trúc code mà không đổi behavior.
+- Changed: Tạo skill refactor có guard không đổi API/schema/UI/business logic và cập nhật README.
+- Files: `.codex/skills/refactor/SKILL.md`, `README.md`
+- Tests: Kiểm tra frontmatter skill; `rg` kiểm tra README; `git diff --check`.
+
+## 2026-07-07 — Make feature skills docs-only by default
+
+- Summary: Làm rõ `/add-feature`, `/update-feature`, `/delete-feature` chỉ chỉnh docs/roadmap mặc định.
+- Changed: Cấm code production nếu owner không yêu cầu rõ và bắt buộc gợi ý bước tiếp theo kèm mã task nếu có.
+- Files: `.codex/skills/add-feature/SKILL.md`, `.codex/skills/update-feature/SKILL.md`, `.codex/skills/delete-feature/SKILL.md`, `README.md`
+- Tests: `rg` kiểm tra docs-only rules; `git diff --check`.
+
+## 2026-07-07 — Optimize Codex prompts and skill metadata
+
+- Summary: Rà soát bộ docs/skill và rút gọn prompt cũ để tránh trùng lặp, sai lệch với skill mới.
+- Changed: Rút gọn `.codex/prompts`, thêm metadata `agents/openai.yaml` cho các skill mới.
+- Files: `.codex/prompts/core-features.md`, `.codex/prompts/special-cases.md`, `.codex/skills/*/agents/openai.yaml`
+- Tests: `wc -l`; `rg` kiểm tra reference cũ/mâu thuẫn; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add next-task and review-docs skills
+
+- Summary: Thêm 2 skill nhẹ để chọn task tiếp theo và rà soát docs/skill.
+- Changed: Tạo `/next-task`, `/review-docs` và thêm bảng chọn lệnh nhanh vào README.
+- Files: `.codex/skills/next-task/**`, `.codex/skills/review-docs/**`, `README.md`
+- Tests: `quick_validate.py` cho 2 skill; `pnpm format:check`; `git diff --check`.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next Task"
+  short_description: "Gợi ý task tiếp theo nên làm"
+  default_prompt: "Use $next-task to suggest the next project task to run."

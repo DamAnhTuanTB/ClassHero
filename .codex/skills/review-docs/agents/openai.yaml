@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Docs"
+  short_description: "Rà soát docs, skill và workflow"
+  default_prompt: "Use $review-docs to review this repo's docs, skills, and workflow consistency."

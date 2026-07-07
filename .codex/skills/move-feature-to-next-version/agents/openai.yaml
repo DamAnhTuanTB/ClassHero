@@ -1,0 +1,4 @@
+interface:
+  display_name: "Move Feature"
+  short_description: "Defer a feature to the next version"
+  default_prompt: "Use $move-feature-to-next-version to defer this feature: describe it here."

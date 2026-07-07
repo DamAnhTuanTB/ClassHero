@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Feature"
+  short_description: "Update feature docs and roadmap"
+  default_prompt: "Use $update-feature to update this feature behavior in docs: describe the change here."

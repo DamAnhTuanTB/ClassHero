@@ -24,7 +24,7 @@ Before editing files:
 
 1. Locate repo root containing `AGENTS.md`.
 2. Read `AGENTS.md`.
-3. Read `docs/09-implementation-plan.md` enough to map the bug to the likely milestone/subtask.
+3. Read `docs/09-implementation-plan.md` enough to map the bug to the likely milestone/subtask; read the matching milestone file in `docs/implementation/` if subtask detail is needed.
 4. If present, read `.codex/plans/codex-execution-plan.md` for known dependencies, assumptions, or recent plan notes.
 5. Use the `Task routing map` in `AGENTS.md` to choose the project docs relevant to the suspected bug area.
 6. Read those docs before code changes. If the suspected area changes during diagnosis, read the newly relevant docs too.

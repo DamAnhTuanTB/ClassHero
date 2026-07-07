@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delete Feature"
+  short_description: "Remove a feature from docs and roadmap"
+  default_prompt: "Use $delete-feature to remove this feature from scope: describe it here."
