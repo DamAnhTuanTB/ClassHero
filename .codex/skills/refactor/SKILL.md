@@ -66,6 +66,19 @@ Run checks proportional to risk:
 
 Update changelog after file changes.
 
+## Learning Notes
+
+After refactor work, update `docs/learning-notes/` only when the refactor teaches a reusable structure or pattern.
+
+- Read `docs/learning-notes/README.md` and `docs/learning-notes/index.md` first.
+- Prefer updating the affected feature note if the refactor is tied to one product flow.
+- Use `docs/learning-notes/foundation/` for reusable architecture patterns, module boundaries, database access, worker/provider patterns, or shared typing.
+- Add before/after flow only when it helps the owner understand the system better.
+- Do not document purely mechanical renames or tiny cleanup.
+- Do not copy the final response verbatim.
+- Update changelog if learning notes changed.
+- If not updated, mention briefly in the final response.
+
 ## Final Response
 
 Include:
@@ -73,7 +86,14 @@ Include:
 - Refactored area.
 - What changed structurally.
 - Confirmed behavior/API/schema/UI design stayed the same, or state any intentional exception.
-- Technical flow before/after in concise terms.
+- `Giải thích kỹ thuật dễ hiểu`:
+  - Mục tiêu kỹ thuật của refactor.
+  - Luồng code trước refactor và luồng code sau refactor.
+  - Kỹ thuật đã dùng: tách lớp, gom helper, typing, module boundary, component composition, provider abstraction, etc.; explain why each matters.
+  - Vì sao refactor này giữ nguyên behavior nhưng giúp code dễ đọc/dễ bảo trì hơn.
+  - File quan trọng: entry point, logic chính, helper/shared file, test liên quan.
+  - Bạn nên hiểu gì sau refactor này: 2-4 ý kiến thức rút ra.
+- Whether learning notes changed.
 - Checks run or skipped with reason.
 - Files touched.
 - Risks/TODO/ASSUMPTION.

@@ -119,6 +119,7 @@ Trong quá trình làm task, Codex có thể cập nhật các file sau nếu c�
 - `.codex/plans/codex-execution-plan.md`: nếu phát hiện dependency, thứ tự subtask, `TODO` hoặc `ASSUMPTION` nhỏ cần chỉnh.
 - `docs/ui-references/approved-patterns.md`: khi owner xác nhận UI đã "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này".
 - `docs/11-ui-design-system.md`: khi owner chốt một rule UI áp dụng rộng.
+- `docs/learning-notes/`: khi phần giải thích kỹ thuật có giá trị học tập lâu dài; ghi theo feature-first, merge vào note cũ khi có thể và tránh copy trùng final response.
 - `docs/05-api-contract.md` và file con trong `docs/api/`: nếu task làm đổi API contract hoặc behavior API.
 - `docs/04-database-model.md` và file con trong `docs/database/`: nếu task làm đổi schema/database model.
 - `docs/06-ai-rag-spec.md`: nếu task làm đổi AI/RAG behavior.
@@ -132,6 +133,7 @@ Không được dùng các file này để tự đổi scope lớn, stack hoặc
 
 - Một lần owner giao task mặc định chỉ làm một subtask.
 - Không gom nhiều milestone nếu owner không yêu cầu rõ.
+- Mỗi subtask trong `docs/implementation/M*.md` có dòng `Mode`; Codex phải đọc mode này trước khi chọn làm UI, API, DB, worker/integration hay docs-only.
 - Nếu phải sửa file thuộc subtask khác để task hiện tại chạy được, ghi rõ lý do trong kế hoạch và changelog.
 - Nếu một subtask quá lớn, đề xuất chia nhỏ trước khi code.
 - `docs/09-implementation-plan.md` quy định thứ tự triển khai, không được dùng để thay đổi scope/stack đã chốt.

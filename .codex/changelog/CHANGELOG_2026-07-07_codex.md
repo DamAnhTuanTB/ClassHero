@@ -469,3 +469,53 @@
 - Changed: Tạo `/next-task`, `/review-docs` và thêm bảng chọn lệnh nhanh vào README.
 - Files: `.codex/skills/next-task/**`, `.codex/skills/review-docs/**`, `README.md`
 - Tests: `quick_validate.py` cho 2 skill; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — M1.1 Prisma foundation
+
+- Summary: Thiết lập Prisma foundation cho NestJS API và pgvector migration nền.
+- Changed: Thêm Prisma 7 config/client adapter, PrismaModule/PrismaService skeleton và migration bật extension `vector`.
+- Files: `apps/api/prisma/**`, `apps/api/src/common/prisma/**`, `apps/api/package.json`, `pnpm-lock.yaml`
+- Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm typecheck`; `pnpm lint`; `pnpm build`; `pnpm format:check`.
+- Notes: Prisma v7 dùng `apps/api/prisma.config.ts` cho `DATABASE_URL`; `DIRECT_URL` giữ trong env docs cho trường hợp Supabase cần tách URL sau.
+
+## 2026-07-07 — Add task modes to implementation docs
+
+- Summary: Gắn `Mode` cho từng subtask để Codex biết task chỉ UI, API, DB, worker/integration hay docs.
+- Changed: Thêm mode cho 72 subtask và cập nhật README/skill task để đọc mode trước khi làm.
+- Files: `docs/implementation/**`, `docs/09-implementation-plan.md`, `README.md`, `.codex/skills/task-*/SKILL.md`, `AGENTS.md`
+- Tests: `rg` kiểm tra 72/72 subtask có mode; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Fill missing UI roadmap tasks
+
+- Summary: Rà soát UI docs với roadmap và thêm các task UI còn thiếu.
+- Changed: Thêm task cho auth UI, course browsing UI, document upload UI, student/admin dashboard, discount UI và AI generation panel; thêm bảng UI coverage.
+- Files: `docs/implementation/**`, `docs/09-implementation-plan.md`, `docs/08-ui-pages-and-components.md`, `.codex/plans/codex-execution-plan.md`
+- Tests: `rg` kiểm tra 79/79 subtask có mode; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Expand screen coverage matrix
+
+- Summary: Mở rộng bảng coverage UI để map từng màn sang task UI, API, DB và integration liên quan.
+- Changed: Thay bảng `Task chính` bằng screen coverage matrix nhiều cột trong `docs/08-ui-pages-and-components.md`.
+- Files: `docs/08-ui-pages-and-components.md`
+- Tests: `rg` kiểm tra bảng mới; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Clarify vertical-slice task strategy
+
+- Summary: Làm rõ chiến lược mặc định là làm task theo lát dọc hoàn chỉnh khi scope đã rõ.
+- Changed: Cập nhật `docs/09-implementation-plan.md` để ưu tiên `/task-full`, chỉ tách `/task-ui` và `/task-connect` khi cần review UI trước.
+- Files: `docs/09-implementation-plan.md`
+- Tests: `rg` kiểm tra rule lát dọc; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Expand technical explanation rules
+
+- Summary: Làm rõ phần giải thích kỹ thuật phải giúp owner học được luồng code và kỹ thuật đã dùng.
+- Changed: Cập nhật skill task/fix/refactor và README để bắt buộc mục `Giải thích kỹ thuật dễ hiểu`.
+- Files: `.codex/skills/task-*/SKILL.md`, `.codex/skills/fix-bug/SKILL.md`, `.codex/skills/refactor/SKILL.md`, `README.md`
+- Tests: `rg` kiểm tra rule giải thích kỹ thuật; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add feature-first learning notes
+
+- Summary: Thêm sổ tay kỹ thuật feature-first để lưu kiến thức từ phần giải thích kỹ thuật sau task.
+- Changed: Tạo `docs/learning-notes/`, thêm note nền Prisma và cập nhật skill/README/AGENTS để merge kiến thức, tránh trùng lặp.
+- Files: `docs/learning-notes/**`, `.codex/skills/task-*/SKILL.md`, `.codex/skills/fix-bug/SKILL.md`, `.codex/skills/refactor/SKILL.md`, `README.md`, `AGENTS.md`
+- Tests: `rg` kiểm tra learning notes rules; `quick_validate.py` cho 5 skill; `pnpm format:check`; `git diff --check`.

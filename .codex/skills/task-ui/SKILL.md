@@ -23,20 +23,22 @@ Before editing:
 
 1. Read `AGENTS.md`.
 2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M3.4` -> `docs/implementation/M3.md`).
-3. If present, read `.codex/plans/codex-execution-plan.md`.
-4. Read UI docs:
+3. Read the subtask `Mode`.
+4. If present, read `.codex/plans/codex-execution-plan.md`.
+5. Read UI docs:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-5. Read `docs/02-user-flows.md` for the affected role/flow.
-6. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
-7. Inspect existing web code and component patterns.
-8. Give a short plan: screen/component, mock data location, likely files, responsive checks, and commands.
+6. Read `docs/02-user-flows.md` for the affected role/flow.
+7. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
+8. Inspect existing web code and component patterns.
+9. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, and commands.
 
 ## Scope Rules
 
-- If the requested subtask has no UI surface, stop before editing files, explain that `/task-ui` is not the right mode, and suggest `/task-full <ID>` or the correct next command.
+- Continue only when `Mode` is `UI only` or `UI + API`.
+- If the requested subtask has no UI surface or has another mode, stop before editing files, explain that `/task-ui` is not the right mode, and suggest `/task-full <ID>` or the correct next command.
 - Only implement front-end UI and mock data.
 - Do not edit backend, database, Prisma, API services, workers, payment, storage, or AI logic.
 - Do not connect real API calls.
@@ -75,6 +77,18 @@ Run checks proportional to risk:
 - When screenshots are useful for owner review, save them under `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
 - For tiny docs/wording changes, `Not run: docs-only` is acceptable.
 
+## Learning Notes
+
+After UI work, update `docs/learning-notes/` only when the UI pattern or screen flow teaches something reusable.
+
+- Read `docs/learning-notes/README.md` and `docs/learning-notes/index.md` first.
+- Prefer updating the matching feature note in `docs/learning-notes/features/`.
+- For UI-only work, update the `Front-end`, `Luồng code end-to-end`, `File quan trọng`, or `Kiến thức cần nhớ` sections rather than creating frontend-only notes.
+- Do not copy the final response verbatim.
+- Do not duplicate design rules already captured in `docs/11-ui-design-system.md` or `docs/ui-references/approved-patterns.md`; link/summarize instead.
+- Update changelog if learning notes changed.
+- If not updated, mention briefly in the final response.
+
 ## Final Response
 
 Include:
@@ -85,7 +99,14 @@ Include:
 - Screenshot paths if screenshots were created.
 - Files changed.
 - Commands run or skipped with reason.
-- Technical UI flow: page/component -> mock data -> state/render.
+- `Giải thích kỹ thuật dễ hiểu`:
+  - Mục tiêu kỹ thuật của UI.
+  - Luồng code UI: route/page -> component -> mock data -> local state/form state -> render states.
+  - Kỹ thuật UI đã dùng: responsive/mobile-first, component composition, form/state/mock data pattern, loading/empty/error state nếu có.
+  - Vì sao làm vậy: cách này giúp UI dễ review, dễ thay mock bằng API ở `/task-connect`.
+  - File quan trọng: page/component/mock data/style helper liên quan.
+  - Bạn nên hiểu gì sau task này: 2-4 ý về cách màn hình được dựng.
+- Whether learning notes changed.
 - Suggested next command: `/task-connect Mx.y`.
 
 Update changelog using the concise format from `AGENTS.md`.

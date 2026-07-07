@@ -138,10 +138,22 @@ Bạn gõ /task-full M8.3
 -> đọc docs/09-implementation-plan.md
 -> lấy M8 từ M8.3
 -> đọc docs/implementation/M8.md
+-> đọc Mode của M8.3
 -> đọc docs liên quan theo Task Routing Map trong AGENTS.md
 -> đọc code hiện tại
 -> nêu kế hoạch ngắn
 -> mới sửa file
+```
+
+`Mode` cho biết task thuộc loại nào:
+
+```txt
+UI only             Chỉ UI/mock data
+API only            Backend/API/service
+UI + API            Có cả UI và API
+DB only             Prisma/schema/migration/seed
+Worker/Integration  Worker, queue, storage, AI, payment, realtime, deploy/tooling
+Docs only           Chỉ tài liệu/kế hoạch
 ```
 
 ## 7. Cơ chế đọc database/API
@@ -222,6 +234,36 @@ Codex sẽ đọc docs liên quan trước khi code, không đổi stack, không
 
 Các skill `/update-feature`, `/add-feature`, `/delete-feature`, `/move-feature-to-next-version` mặc định là docs/planning-only: chúng chỉnh tài liệu, roadmap và mã task trước; chưa code production nếu bạn không nói rõ.
 
+### Giải thích kỹ thuật sau khi làm xong
+
+Với `/task-full`, `/task-ui`, `/task-connect`, `/fix bug` và `/refactor`, Codex phải có phần `Giải thích kỹ thuật dễ hiểu`.
+
+Mục tiêu của phần này là giúp owner không code vẫn hiểu được kỹ thuật:
+
+- task/bug/refactor đang giải quyết vấn đề kỹ thuật gì,
+- luồng code chạy qua các lớp nào,
+- kỹ thuật/thư viện nào được dùng và vai trò của nó,
+- vì sao chọn cách làm đó,
+- file nào là điểm bắt đầu, file nào chứa logic chính,
+- sau task này owner nên hiểu được kiến thức gì.
+
+### Learning notes
+
+Nếu phần giải thích kỹ thuật có giá trị học tập lâu dài, Codex sẽ cập nhật:
+
+```txt
+docs/learning-notes/
+```
+
+Cách lưu là feature-first:
+
+- Tính năng end-to-end ghi vào `docs/learning-notes/features/`.
+- Kiến thức nền dùng chung ghi vào `docs/learning-notes/foundation/`.
+- Thuật ngữ dùng nhiều lần ghi vào `docs/learning-notes/glossary.md`.
+- `docs/learning-notes/index.md` là mục lục các note đã có.
+
+Codex không copy nguyên văn câu trả lời cuối vào learning notes. Codex phải đọc note cũ trước, merge vào đúng section, hạn chế trùng lặp và chỉ lưu kiến thức có giá trị đọc lại.
+
 ## 9. `/task-ui <mã task>`
 
 Dùng khi muốn làm giao diện trước bằng mock data, chưa nối API thật.
@@ -235,14 +277,15 @@ Ví dụ:
 Codex sẽ:
 
 1. Đọc `AGENTS.md`, `docs/09-implementation-plan.md` và file milestone tương ứng.
-2. Đọc UI docs: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
-3. Đọc API docs chỉ để hiểu data shape, không connect API.
-4. Kiểm tra task có UI không. Nếu không có UI, Codex dừng và gợi ý lệnh phù hợp hơn.
-5. Code UI mobile-first, vẫn ổn trên tablet/iPad và desktop.
-6. Dùng mock data rõ ràng, dễ thay bằng API sau này.
-7. Nếu app chạy được, kiểm tra responsive và có thể lưu screenshot vào `.codex/screenshots/`.
-8. Cập nhật changelog.
-9. Gợi ý bước tiếp theo, thường là `/task-connect <mã task>`.
+2. Đọc `Mode` của subtask. Chỉ tiếp tục nếu mode là `UI only` hoặc `UI + API`.
+3. Đọc UI docs: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
+4. Đọc API docs chỉ để hiểu data shape, không connect API.
+5. Kiểm tra task có UI không. Nếu không có UI, Codex dừng và gợi ý lệnh phù hợp hơn.
+6. Code UI mobile-first, vẫn ổn trên tablet/iPad và desktop.
+7. Dùng mock data rõ ràng, dễ thay bằng API sau này.
+8. Nếu app chạy được, kiểm tra responsive và có thể lưu screenshot vào `.codex/screenshots/`.
+9. Cập nhật changelog.
+10. Gợi ý bước tiếp theo, thường là `/task-connect <mã task>` nếu mode là `UI + API`.
 
 Sau khi bạn review UI và nói `ưng rồi`, `ok rồi`, `đúng ý rồi` hoặc `chốt UI này`, Codex sẽ lưu pattern vào:
 
@@ -296,15 +339,16 @@ Ví dụ:
 Codex sẽ:
 
 1. Đọc UI đã làm, approved UI patterns nếu có, API docs và database docs liên quan.
-2. Kiểm tra đã có UI/mock UI chưa. Nếu chưa có, Codex dừng và gợi ý `/task-ui <mã task>` hoặc `/task-full <mã task>`.
-3. Giữ layout/UI đã duyệt, không redesign lớn.
-4. Nếu API chưa có, code API đầy đủ theo phạm vi task.
-5. Nếu database/schema còn thiếu và task cho phép, cập nhật schema/migration/docs tương ứng.
-6. Thay mock data bằng API client/hooks, ưu tiên TanStack Query.
-7. Backend vẫn enforce auth/RBAC/ownership, không chỉ guard bằng UI.
-8. Chạy check phù hợp.
-9. Cập nhật changelog.
-10. Báo nguyên lý kết nối: UI gọi hook nào, hook gọi API nào, API đi qua controller/service/database như nào.
+2. Đọc `Mode` của subtask. Mode phù hợp nhất là `UI + API`.
+3. Kiểm tra đã có UI/mock UI chưa. Nếu chưa có, Codex dừng và gợi ý `/task-ui <mã task>` hoặc `/task-full <mã task>`.
+4. Giữ layout/UI đã duyệt, không redesign lớn.
+5. Nếu API chưa có, code API đầy đủ theo phạm vi task.
+6. Nếu database/schema còn thiếu và task cho phép, cập nhật schema/migration/docs tương ứng.
+7. Thay mock data bằng API client/hooks, ưu tiên TanStack Query.
+8. Backend vẫn enforce auth/RBAC/ownership, không chỉ guard bằng UI.
+9. Chạy check phù hợp.
+10. Cập nhật changelog.
+11. Báo nguyên lý kết nối: UI gọi hook nào, hook gọi API nào, API đi qua controller/service/database như nào.
 
 ## 12. `/task-full <mã task>`
 
@@ -321,14 +365,16 @@ Codex sẽ:
 1. Đọc `AGENTS.md`.
 2. Đọc `docs/09-implementation-plan.md`.
 3. Map `Mx.y` sang `docs/implementation/Mx.md`.
-4. Đọc docs liên quan theo `Task Routing Map`.
-5. Kiểm tra code hiện tại và dependency của task.
-6. Làm đủ phần cần thiết của task: UI, API, database, worker, shared types hoặc docs nếu task yêu cầu.
-7. Không làm sang subtask khác nếu bạn chưa yêu cầu.
-8. Nếu task quá lớn hoặc thiếu dependency, Codex sẽ báo và đề xuất tách nhỏ.
-9. Chạy check phù hợp.
-10. Cập nhật changelog.
-11. Mô tả ngắn luồng kỹ thuật đã làm và gợi ý task tiếp theo.
+4. Đọc `Mode` của subtask.
+5. Đọc docs liên quan theo `Task Routing Map`.
+6. Kiểm tra code hiện tại và dependency của task.
+7. Làm đủ phần cần thiết của task theo mode: UI, API, database, worker/integration, shared types hoặc docs.
+8. Không làm sang subtask khác nếu bạn chưa yêu cầu.
+9. Nếu task quá lớn hoặc thiếu dependency, Codex sẽ báo và đề xuất tách nhỏ.
+10. Chạy check phù hợp.
+11. Cập nhật changelog.
+12. Giải thích kỹ thuật dễ hiểu: mục tiêu, luồng code, kỹ thuật dùng, lý do, file quan trọng và kiến thức rút ra.
+13. Gợi ý task tiếp theo.
 
 ## 13. `/refactor <mã task/tính năng/module>`
 
@@ -352,7 +398,7 @@ Codex sẽ:
 6. Không cố ý đổi API contract, database schema, RBAC, payment behavior, AI/RAG behavior, env hoặc UI design.
 7. Nếu phát hiện cần đổi behavior, Codex dừng và gợi ý dùng `/update-feature` hoặc `/fix bug`.
 8. Chạy check phù hợp, cập nhật changelog.
-9. Báo luồng kỹ thuật trước/sau và xác nhận behavior giữ nguyên.
+9. Giải thích kỹ thuật dễ hiểu: luồng code trước/sau, kỹ thuật refactor đã dùng, vì sao giữ nguyên behavior nhưng code dễ bảo trì hơn.
 
 ## 14. `/update-feature <mô tả thay đổi>`
 
@@ -463,7 +509,7 @@ Codex sẽ:
 4. Sửa nhỏ nhất có thể, không refactor lan rộng.
 5. Chạy lại check phù hợp.
 6. Cập nhật changelog nếu có thay đổi file đáng commit.
-7. Báo ngắn gọn nguyên nhân bug và cách xử lý, gồm luồng kỹ thuật đã áp dụng.
+7. Báo nguyên nhân bug và giải thích kỹ thuật dễ hiểu: luồng lỗi trước khi sửa, luồng sau khi sửa, kỹ thuật đã dùng, file quan trọng và kiến thức rút ra.
 
 Với bug nhỏ, Codex có thể dùng quy trình nhẹ hơn để sửa nhanh, nhưng vẫn phải giữ scope và không bỏ qua an toàn cơ bản.
 

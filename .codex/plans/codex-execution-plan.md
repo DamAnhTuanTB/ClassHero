@@ -2,6 +2,12 @@
 
 Ngày: 2026-07-07
 
+Update note 2026-07-07:
+
+- File này là baseline execution plan được tạo ở bước `M0.P`.
+- Roadmap hiện tại đã được bổ sung `Mode` và các task UI còn thiếu trong `docs/09-implementation-plan.md` + `docs/implementation/M*.md`.
+- Khi chọn task tiếp theo, ưu tiên đọc `docs/09-implementation-plan.md` và file milestone tương ứng thay vì dùng danh sách task cũ trong file này.
+
 ## 1. Phạm vi bước này
 
 Subtask hiện tại: `M0.P` - đọc tài liệu và tạo execution plan.

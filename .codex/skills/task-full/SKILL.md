@@ -23,19 +23,20 @@ Before editing:
 
 1. Read `AGENTS.md`.
 2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M8.3` -> `docs/implementation/M8.md`).
-3. If present, read `.codex/plans/codex-execution-plan.md`.
-4. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
-5. If UI is involved, also read:
+3. Read the subtask `Mode`.
+4. If present, read `.codex/plans/codex-execution-plan.md`.
+5. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
+6. If `Mode` is `UI only` or `UI + API`, also read:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-6. Inspect existing code for touched modules.
-7. Give a short plan: subtask, docs read, modules/files, database/API/docs impact, commands.
+7. Inspect existing code for touched modules.
+8. Give a short plan: subtask, mode, docs read, modules/files, database/API/docs impact, commands.
 
 ## Scope Rules
 
-- Implement only the requested subtask's scope.
+- Implement only the requested subtask's scope and `Mode`.
 - Do not add features outside MVP.
 - Do not change the approved stack.
 - If the task is too large, split the work and say which part is being completed.
@@ -68,6 +69,19 @@ Run checks proportional to risk:
 
 Lean mode is allowed for tiny low-risk tasks, but do not skip safety checks, changelog, or scope control.
 
+## Learning Notes
+
+After implementation, decide whether the technical explanation has long-term learning value for the owner.
+
+- If yes, update `docs/learning-notes/`.
+- Read `docs/learning-notes/README.md` and `docs/learning-notes/index.md` first.
+- Prefer feature-first notes in `docs/learning-notes/features/` for end-to-end product flows.
+- Use `docs/learning-notes/foundation/` only for reusable technical foundations that do not belong to one feature.
+- Merge into an existing note when possible; do not copy the final response verbatim and do not duplicate existing explanations.
+- Update `docs/learning-notes/glossary.md` only for reusable terms that will appear across many notes.
+- Update changelog if learning notes changed.
+- If not updated, mention briefly in the final response, for example `Learning notes: Not updated, change was too small`.
+
 ## Final Response
 
 Include:
@@ -76,9 +90,16 @@ Include:
 - Main changes.
 - Files changed.
 - Commands run or skipped with reason.
-- Technical flow across touched layers.
+- `Giải thích kỹ thuật dễ hiểu`:
+  - Mục tiêu kỹ thuật: task này thêm/sửa năng lực gì trong hệ thống.
+  - Luồng code: mô tả đường đi thực tế, ví dụ UI -> hook/API client -> controller -> service -> Prisma/provider -> database/cache -> response -> UI state.
+  - Kỹ thuật đã dùng: giải thích ngắn mỗi kỹ thuật quan trọng được áp dụng, không chỉ liệt kê tên thư viện.
+  - Vì sao làm vậy: lý do cách làm phù hợp với kiến trúc repo và scope MVP.
+  - File quan trọng: entry point, file chứa logic chính, file cấu hình/schema/docs liên quan.
+  - Bạn nên hiểu gì sau task này: 2-4 ý kiến thức rút ra.
 - TODO/ASSUMPTION/blockers.
 - Whether execution plan changed.
+- Whether learning notes changed.
 - Suggested next subtask.
 
 Update changelog using the concise format from `AGENTS.md`.

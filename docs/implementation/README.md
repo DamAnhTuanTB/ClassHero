@@ -2,10 +2,22 @@
 
 Thư mục này chứa chi tiết phạm vi, `Không làm` và `Done khi` cho từng milestone.
 
+Mỗi subtask có dòng `Mode` để Codex biết bề mặt triển khai chính:
+
+```txt
+Mode: UI only
+Mode: API only
+Mode: UI + API
+Mode: DB only
+Mode: Worker/Integration
+Mode: Docs only
+```
+
 Quy tắc đọc:
 
 - Xác định mã task trong `docs/09-implementation-plan.md`.
 - Mở đúng file milestone ở đây. Ví dụ `M8.3` thì đọc `docs/implementation/M8.md`.
+- Đọc dòng `Mode` của subtask trước khi chọn `/task-ui`, `/task-connect` hoặc `/task-full`.
 - Không cần đọc toàn bộ thư mục nếu task chỉ thuộc một milestone.
 - Nếu task chạm nhiều domain, đọc thêm docs liên quan theo `Task Routing Map` trong `AGENTS.md`.
 

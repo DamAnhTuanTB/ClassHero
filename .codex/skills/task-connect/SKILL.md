@@ -23,24 +23,26 @@ Before editing:
 
 1. Read `AGENTS.md`.
 2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M3.4` -> `docs/implementation/M3.md`).
-3. If present, read `.codex/plans/codex-execution-plan.md`.
-4. Read UI/API docs:
+3. Read the subtask `Mode`.
+4. If present, read `.codex/plans/codex-execution-plan.md`.
+5. Read UI/API docs:
    - `docs/08-ui-pages-and-components.md`
    - `docs/11-ui-design-system.md`
    - `docs/ui-references/approved-patterns.md` if present and relevant.
    - `docs/05-api-contract.md`
    - the matching file in `docs/api/` for the endpoint/domain.
    - `docs/02-user-flows.md`
-5. Read database docs when the endpoint does not exist, API behavior changes, or data shape is unclear:
+6. Read database docs when the endpoint does not exist, API behavior changes, or data shape is unclear:
    - `docs/04-database-model.md`
    - the matching file in `docs/database/` for the model/domain.
    - `docs/10-seed-data-and-test-cases.md` if seed/test data is affected.
-6. Inspect the UI files created by `/task-ui`.
-7. Inspect existing API client/hook patterns and backend module/controller/service patterns.
-8. Give a short plan: mock data to replace, full API endpoints/services to implement or use, backend files, frontend hooks/files, docs updates, checks.
+7. Inspect the UI files created by `/task-ui`.
+8. Inspect existing API client/hook patterns and backend module/controller/service patterns.
+9. Give a short plan: subtask mode, mock data to replace, full API endpoints/services to implement or use, backend files, frontend hooks/files, docs updates, checks.
 
 ## Scope Rules
 
+- Best fit is `Mode: UI + API`. If mode is `API only`, use `/task-full <ID>` instead. If mode is `UI only`, there is no API to connect.
 - If there is no existing UI/mock UI for the requested subtask, stop before editing files and suggest `/task-ui <ID>` first or `/task-full <ID>` if the owner wants the full feature in one pass.
 - Preserve the approved UI layout and visual style.
 - Preserve the approved UI tokens and responsive behavior from `/task-ui`.
@@ -75,6 +77,19 @@ Run focused checks:
 - If API cannot run locally, state what was checked statically.
 - For UI states changed by real data, re-check at least the affected mobile and desktop layouts when practical.
 
+## Learning Notes
+
+After connecting UI to real API/data, update `docs/learning-notes/` when the flow is useful for future learning.
+
+- Read `docs/learning-notes/README.md` and `docs/learning-notes/index.md` first.
+- Prefer the matching feature note in `docs/learning-notes/features/`, because `/task-connect` usually creates an end-to-end flow.
+- Capture the full path: UI/component -> hook/API client -> endpoint -> controller/service -> database/provider -> response -> UI state.
+- Include database/worker/AI/integration only when they are actually involved.
+- Merge with existing sections instead of adding duplicate paragraphs.
+- Do not copy the final response verbatim.
+- Update changelog if learning notes changed.
+- If not updated, mention briefly in the final response.
+
 ## Final Response
 
 Include:
@@ -85,7 +100,14 @@ Include:
 - Any blocker or assumption.
 - Files changed.
 - Commands run or skipped with reason.
-- Technical flow: component -> hook/API client -> API endpoint -> controller/service/database -> state/render.
+- `Giải thích kỹ thuật dễ hiểu`:
+  - Mục tiêu kỹ thuật: UI nào được nối với dữ liệu thật và API nào được thêm/sửa.
+  - Luồng code: component -> hook/API client -> API endpoint -> controller -> DTO/guard/validation -> service -> Prisma/provider -> database/external service -> response -> cache/state/render.
+  - Kỹ thuật đã dùng: TanStack Query/mutation invalidation, React Hook Form/Zod, NestJS controller-service, Prisma, RBAC hoặc provider nếu có; giải thích vai trò từng phần.
+  - Vì sao làm vậy: lý do giữ UI đã duyệt, thay mock bằng API, và backend vẫn enforce quyền.
+  - File quan trọng: UI entry, hook/client, controller/service, DTO/schema/docs.
+  - Bạn nên hiểu gì sau task này: 2-4 ý về cách frontend và backend nối với nhau.
+- Whether learning notes changed.
 - Suggested next action or subtask.
 
 Update changelog using the concise format from `AGENTS.md`.

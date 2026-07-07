@@ -85,10 +85,17 @@ After the fix:
 
 ## Final Response
 
-Keep the final answer short and useful. Include:
+Keep the final answer useful, but do not over-compress the technical explanation. The owner is non-coding but wants to learn the technical flow. Include:
 
 - Nguyên nhân bug: what broke, why it broke, and where it happened.
-- Cách xử lý: explain briefly but sufficiently what changed, why it fixes the root cause, and the applied technical flow through the touched code. Prefer 2-5 clear bullets or a compact paragraph.
+- Cách xử lý: explain what changed, why it fixes the root cause, and the applied technical flow through the touched code.
+- `Giải thích kỹ thuật dễ hiểu`:
+  - Mục tiêu kỹ thuật của fix.
+  - Luồng code trước khi lỗi xảy ra và luồng code sau khi sửa.
+  - Kỹ thuật đã dùng để xử lý: validation, config, controller/service, Prisma, hook/state, worker/provider, etc.; explain the role instead of only naming tools.
+  - Vì sao cách sửa này đúng root cause and does not expand scope.
+  - File quan trọng: where the symptom appeared, where the root cause lived, and where the fix was applied.
+  - Bạn nên hiểu gì sau bug này: 2-4 lessons learned.
 - Verification: commands run and result.
 - Files changed.
 - Notes: restart required, env/config needed, TODO/ASSUMPTION, or execution plan update.
@@ -96,12 +103,25 @@ Keep the final answer short and useful. Include:
 
 Do not merge cause and fix into a vague summary. If the root cause is uncertain, say what was confirmed, what remains an assumption, and how the fix was verified.
 
-In `Cách xử lý`, describe the flow path, not just tool names. Examples:
+In `Cách xử lý` and `Giải thích kỹ thuật dễ hiểu`, describe the flow path, not just tool names. Examples:
 
 - Front-end: page/component -> hook/API client -> state/cache -> UI update.
 - Back-end: controller -> DTO/guard/validation -> service -> Prisma/external provider -> response.
 - Worker/AI: API -> BullMQ job -> worker/provider -> DB/status/cache.
 - Docs/config-only: say there is no runtime code flow.
+
+## Learning Notes
+
+After a bug fix, update `docs/learning-notes/` only when the bug teaches a reusable lesson.
+
+- Read `docs/learning-notes/README.md` and `docs/learning-notes/index.md` first.
+- Prefer updating the affected feature note in `docs/learning-notes/features/`.
+- Use `docs/learning-notes/foundation/` for reusable config/tooling/database/worker lessons.
+- Add the lesson under `Luồng lỗi thường gặp`, `Kiến thức cần nhớ`, or the most relevant section.
+- Do not store one-off symptoms, stack traces, secrets, private URLs, or noisy logs.
+- Do not copy the final response verbatim.
+- Update changelog if learning notes changed.
+- If not updated, mention briefly in the final response.
 
 ## Changelog
 

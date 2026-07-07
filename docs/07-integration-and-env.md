@@ -129,7 +129,8 @@ Yêu cầu:
 
 - Bật extension `vector`.
 - Prisma dùng `DATABASE_URL`.
-- Migration có thể cần `DIRECT_URL`.
+- Prisma v7 đọc URL qua `apps/api/prisma.config.ts`; migration hiện dùng `DATABASE_URL`.
+- `DIRECT_URL` vẫn giữ trong `.env.example` để dành cho trường hợp cần tách URL direct/pooling ở bước triển khai Supabase sau.
 - Không dùng Supabase Auth trong MVP nếu backend tự quản JWT.
 
 Cần lưu:

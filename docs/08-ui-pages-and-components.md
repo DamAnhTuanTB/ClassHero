@@ -101,6 +101,44 @@ ASSUMPTION: URL có thể điều chỉnh theo design final, nhưng cần giữ 
 
 ---
 
+## 2.1. Screen implementation coverage
+
+Các màn UI chính phải được map về task theo từng lớp để tránh thiếu UI/API/DB/worker. Khi owner giao một màn cụ thể, Codex dùng bảng này để xác định task UI, task API, task database và task integration liên quan.
+
+| Màn/nhóm màn | Task UI | Task API | Task DB | Task worker/integration | Ghi chú |
+| --- | --- | --- | --- | --- | --- |
+| Public landing, public course list/detail | `M3.5` | `M3.3` | `M1.3` | - | CTA mua/học thử nối thật ở `M8.4`. |
+| Login/register/forgot/reset password | `M2.4` | `M2.2`, `M2.3` | `M1.2` | - | Gồm session UI, form validation và forgot/reset flow. |
+| Student course list/detail | `M3.5` | `M3.3`, `M8.2`, `M8.3` | `M1.3`, `M1.5` | payOS trong `M8.2`, `M8.3` | Payment page/status nằm ở `M8.4`. |
+| Student lesson page skeleton | `M7.1` | `M7.1`, `M6.5` | `M1.3`, `M1.4` | `M4.4`, `M5.x` khi có tài liệu/AI | Chỉ skeleton lesson; quiz/flashcard/test/AI tách task riêng. |
+| Quiz runner | `M7.2` | `M7.2` | `M1.4` | `M9.5` nếu có giải thích AI | CRUD câu hỏi admin ở `M6.2`. |
+| Flashcard deck | `M7.3` | `M7.3` | `M1.4` | `M9.5` nếu có giải thích AI | CRUD flashcard admin ở `M6.3`. |
+| Test runner/review | `M7.4` | `M7.4` | `M1.4` | - | CRUD đề kiểm tra admin ở `M6.4`. |
+| Student dashboard | `M7.7` | `M7.5`, `M10.1`, `M13.1` | `M1.3`, `M1.4`, `M1.5` | `M10.5`, `M13.1` | Notification/XP thật phụ thuộc `M10.x`, `M13.x`. |
+| Student notes/private comments | `M7.6` | `M7.6` | `M1.4` | - | Comment là private dưới video, không phải chat realtime. |
+| AI chat panel | `M9.6` | `M9.6` | `M1.5` | `M4.4`, `M5.x`, `M9.1` | Chat chỉ theo context lesson bằng RAG. |
+| Student profile | `M13.3`, `M13.4` | `M13.3`, `M13.4` | `M1.2` | `M4.1` cho avatar upload | Profile base/auth user nằm ở `M2.3`. |
+| Student leaderboard | `M13.2` | `M13.2` | `M1.5` | `M13.1` | XP event/level tính trước ở `M13.1`. |
+| Notification bell/list/page | `M10.2` | `M10.1` | `M1.5` | `M10.3`, `M10.5`, `M10.6` | `M10.2` chỉ UI đọc danh sách; realtime/email/Zalo tách task. |
+| Parent child link/selection | `M11.1` | `M11.1` | `M1.2` | - | Một student chỉ liên kết một parent. |
+| Parent dashboard | `M11.2` | `M11.2`, `M7.5` | `M1.2`, `M1.3`, `M1.4` | - | Dữ liệu tiến độ lấy theo selected child. |
+| Parent course/payment pages | `M11.3`, `M8.4` | `M11.3`, `M8.2`, `M8.3` | `M1.3`, `M1.5` | payOS trong `M8.2`, `M8.3` | Parent thanh toán cho con đã liên kết. |
+| Parent notifications/news | `M11.4`, `M12.5` | `M10.1`, `M12.4`, `M12.5` | `M1.5` | `M10.3`, `M10.6` | News/event/livestream public cho student/parent. |
+| Admin dashboard | `M13.5` | `M13.5` hoặc API module liên quan | `M1.x` theo metric | `M4.3`, `M10.5` nếu hiển thị job/notification | Cho phép placeholder với metric chưa có API. |
+| Admin course/lesson management | `M3.4` | `M3.1`, `M3.2` | `M1.3` | - | Quản lý lộ trình và buổi học. |
+| Admin lesson document upload/status | `M4.5` | `M4.2` | `M1.2`, `M1.3` | `M4.1`, `M4.3`, `M4.4` | Upload R2, job status, extract/chunk PDF. |
+| Admin quiz/flashcard/test CRUD UI | `M6.2`, `M6.3`, `M6.4` | `M6.2`, `M6.3`, `M6.4` | `M1.4` | `M6.1` content schema | Rich text/LaTeX dùng schema chung. |
+| Admin AI generation panel | `M9.8` | `M9.2`, `M9.3` | `M1.4`, `M1.5` | `M5.x`, `M9.1` | Front-end không gọi AI trực tiếp. |
+| Admin report moderation | `M12.2` | `M12.2` | `M1.5` | - | Student tạo report ở `M12.1`. |
+| Admin AI unreviewed content | `M12.3` | `M12.3` | `M1.5` | `M9.2`, `M9.3` | Duyệt nội dung AI trước khi dùng chính thức nếu cần. |
+| Admin discount codes | `M8.5` | `M8.1` | `M1.5` | - | Validation discount server-side trong `M8.1`. |
+| Admin manual notifications | `M10.4` | `M10.4` | `M1.5` | `M10.3`, `M10.6` | In-app lưu DB; realtime/email/Zalo là kênh bổ sung. |
+| Admin news/events/livestream | `M12.4` | `M12.4` | `M1.5` | - | Student/parent xem ở `M12.5`. |
+
+Nếu thêm màn mới vào file này, phải cập nhật bảng trên, `docs/09-implementation-plan.md` và `docs/implementation/Mx.md` tương ứng.
+
+---
+
 ## 3. Public pages
 
 ### 3.1. Trang chủ
