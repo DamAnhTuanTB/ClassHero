@@ -25,10 +25,11 @@ Before editing:
 1. Read `AGENTS.md`.
 2. Read `docs/11-ui-design-system.md`.
 3. Read `docs/08-ui-pages-and-components.md` if the target screen/component needs routing/context.
-4. Read `docs/ui-references/approved-patterns.md` if present and relevant.
-5. Inspect existing web code for the target screen/component.
-6. Inspect `git status --short`.
-7. Give a short plan: target UI, files likely touched, responsive checks, and commands.
+4. Read `docs/13-seo-and-content-discovery.md` if the target is landing, public course list/detail, public news/event, or another indexable public page.
+5. Read `docs/ui-references/approved-patterns.md` if present and relevant.
+6. Inspect existing web code for the target screen/component.
+7. Inspect `git status --short`.
+8. Give a short plan: target UI, files likely touched, responsive/SEO checks if relevant, and commands.
 
 ## Scope Rules
 
@@ -38,6 +39,7 @@ Before editing:
 - Do not add product features outside the requested UI change.
 - Preserve approved UI patterns unless the owner explicitly asks to change them.
 - Keep mobile-first support and also check tablet/iPad and desktop when practical.
+- Preserve or improve smooth mobile interaction: immediate tap feedback, stable layout, no heavy animation/render, and friendly loading state.
 - If the request requires API/data/business behavior changes, stop and suggest `/task-connect`, `/task-full`, `/update-feature`, or `/add-feature`.
 
 ## Documentation Rule
@@ -73,6 +75,8 @@ Changelog is still allowed during UI iteration because it records repository fil
 - Avoid large redesign unless requested.
 - Do not make desktop-only layouts.
 - Keep text from overflowing on mobile/tablet/desktop.
+- Keep interaction lightweight; avoid animation/layout changes that make mobile feel laggy.
+- For public/indexable pages, do not break heading hierarchy, crawlable text, alt text, or metadata-friendly structure while changing visuals.
 - Save useful screenshot review files under `.codex/screenshots/` when the app can run and screenshots are practical.
 
 ## Verification
@@ -82,6 +86,7 @@ Run checks proportional to the UI change:
 - Small CSS/layout text-only: `git diff --check` may be enough.
 - Component/page change: run focused typecheck/lint/build if practical.
 - Visual change: check mobile and desktop; tablet/iPad for complex layouts.
+- Interaction change: check tap/pending/loading feedback and obvious layout shift when practical.
 - If unable to run app/browser checks, state why.
 
 Update changelog after repository file changes.

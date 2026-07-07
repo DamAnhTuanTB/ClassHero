@@ -33,6 +33,7 @@ Before editing:
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
+   - SEO/public discovery: `docs/13-seo-and-content-discovery.md` if removing a public/indexable feature, route, metadata, sitemap entry, robots rule, canonical or structured data.
 6. Search existing docs and code only enough to understand feature boundaries; do not plan production edits unless the owner explicitly asks to implement removal now.
 7. Inspect `git status --short`.
 8. Give a short plan: remove vs deprecate in docs, task codes affected, current-version impact, and checks.
@@ -58,6 +59,7 @@ When scope is clear:
 - API: remove/deprecate endpoint docs in matching `docs/api/` file.
 - Database: remove/deprecate schema docs only with a safe future migration note.
 - AI/RAG/env: remove or mark related docs out of scope if no longer used.
+- SEO/public discovery: update SEO docs if public indexability, sitemap, robots, canonical, structured data or public discovery behavior changes.
 - Roadmap: update `docs/implementation/Mx.md`; update `docs/09-implementation-plan.md` only if order/dependencies change.
 - Coverage/dependencies: update `docs/implementation/feature-coverage-matrix.md` and `docs/implementation/dependency-graph.md` when coverage/status/dependency changes.
 - Decision log: add/update `docs/decisions/` only when removal is an important long-term product/architecture decision.

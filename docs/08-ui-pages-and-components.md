@@ -4,6 +4,8 @@ Tài liệu này mô tả danh sách màn hình và component chính cần có �
 
 Gu thiết kế, token UI, responsive rules và checklist nghiệm thu nằm ở `docs/11-ui-design-system.md`. Khi làm UI, Codex phải đọc cả file này và `docs/11-ui-design-system.md`.
 
+Trang public có mục tiêu xuất hiện trên Google phải đọc thêm `docs/13-seo-and-content-discovery.md`.
+
 Nếu đã có pattern được owner chốt, Codex phải đọc thêm `docs/ui-references/approved-patterns.md`.
 
 Front-end dùng Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, TanStack Query, Zustand, React Hook Form, Zod, Tiptap, KaTeX và mhchem.
@@ -155,6 +157,7 @@ Component chính:
 - Course category preview.
 - Benefits section.
 - CTA đăng ký/học thử.
+- Metadata-friendly content structure: một `h1`, section heading rõ, text thật dễ crawl.
 
 ### 3.2. Danh sách lộ trình public
 
@@ -163,6 +166,7 @@ Hiển thị:
 - Lộ trình published.
 - Filter theo môn/lớp.
 - Card gồm tên, môn, lớp, giá, ảnh, trạng thái học thử.
+- Chỉ index URL chính; filter/sort không tạo nhiều URL trùng nội dung nếu chưa có chiến lược canonical.
 
 ### 3.3. Chi tiết lộ trình public
 
@@ -173,6 +177,7 @@ Hiển thị:
 - Giá gốc/giá sau khuyến mãi.
 - Danh sách buổi học metadata.
 - CTA mua lộ trình hoặc học thử buổi đầu.
+- Metadata, canonical, Open Graph và structured data nếu dữ liệu đủ rõ.
 
 ### 3.4. Đăng nhập/đăng ký/quên mật khẩu
 

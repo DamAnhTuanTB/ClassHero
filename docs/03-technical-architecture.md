@@ -126,6 +126,20 @@ apps/web/app/
 - Zustand cho client state nhỏ như selected child, notification dropdown, UI preference.
 - Không dùng Zustand thay thế database/API state.
 
+Chi tiết performance budget, cache, pagination, query, worker latency và observability nằm ở `docs/12-performance-and-observability.md`.
+
+### SEO và public discovery
+
+Các route public quan trọng như landing, course list/detail và news/event public phải có nền SEO theo `docs/13-seo-and-content-discovery.md`.
+
+Nguyên tắc kiến trúc:
+
+- Nội dung chính của public page nên render được từ server bằng Next.js App Router.
+- Dùng `metadata`/`generateMetadata` cho title, description, canonical và Open Graph.
+- Dùng `sitemap.ts` và `robots.ts` khi có route public thật.
+- Không index route private như admin, student, parent, auth hoặc API.
+- Public API cấp dữ liệu SEO phải chỉ trả nội dung `published` và có query/index/cache phù hợp.
+
 ### Rich text và công thức
 
 Các nội dung sau nên dùng cùng cơ chế rich text:
@@ -205,6 +219,7 @@ Quy tắc:
 - Repository hoặc PrismaService xử lý DB.
 - Không gọi AI/payment/storage trực tiếp trong controller.
 - Job nặng phải enqueue BullMQ, không xử lý blocking trong request nếu có thể.
+- Endpoint list/search hoặc flow nhạy độ trễ phải bám `docs/12-performance-and-observability.md`.
 
 ---
 

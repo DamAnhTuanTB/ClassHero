@@ -27,9 +27,11 @@ Before editing files:
 3. Read `docs/09-implementation-plan.md` enough to map the bug to the likely milestone/subtask; read the matching milestone file in `docs/implementation/` if subtask detail is needed.
 4. If present, read `.codex/plans/codex-execution-plan.md` for known dependencies, assumptions, or recent plan notes.
 5. Use the `Task routing map` in `AGENTS.md` to choose the project docs relevant to the suspected bug area.
-6. Read those docs before code changes. If the suspected area changes during diagnosis, read the newly relevant docs too.
-7. Inspect `git status --short` and preserve unrelated user changes.
-8. Give a short plan: suspected module/subtask, docs read, reproduction/evidence command, likely files, docs to update if behavior changes, and verification commands.
+6. If the bug is about slowness, lag, timeout, cache, query, worker delay, AI latency, or observability, read `docs/12-performance-and-observability.md`.
+7. If the bug is about public pages not being indexable, wrong metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or Google discovery, read `docs/13-seo-and-content-discovery.md`.
+8. Read those docs before code changes. If the suspected area changes during diagnosis, read the newly relevant docs too.
+9. Inspect `git status --short` and preserve unrelated user changes.
+10. Give a short plan: suspected module/subtask, docs read, reproduction/evidence command, likely files, docs to update if behavior changes, and verification commands.
 
 Do not use prompt files as source of truth. Use project docs and code.
 
@@ -70,6 +72,7 @@ Non-negotiable:
 - Do not overwrite or revert unrelated dirty files.
 - Update docs only when the actual contract, schema, AI/RAG behavior, env, or workflow changes.
 - If a database/API/AI behavior change is required, follow `AGENTS.md` rules for updating the corresponding docs.
+- If SEO/indexability behavior changes, update `docs/13-seo-and-content-discovery.md` or related public docs when needed.
 - If the bug reveals a small roadmap dependency/TODO issue, update `.codex/plans/codex-execution-plan.md`; ask the owner before major roadmap or scope changes.
 - If a fix requires a secret, paid service, production access, or large product decision, stop and ask.
 

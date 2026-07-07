@@ -561,3 +561,24 @@
 - Changed: Bổ sung danh sách file context/coverage/decision vào mục file Codex có thể tự cập nhật.
 - Files: `README.md`, `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
 - Tests: `rg` kiểm tra reference; kiểm tra 79/79 task có mode; kiểm tra 14 skill có frontmatter; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add mobile performance UX rules
+
+- Summary: Bổ sung chuẩn UI mượt trên mobile, hiệu năng cao và độ trễ cảm nhận thấp.
+- Changed: Thêm performance/mobile UX checklist vào design system và nối rule vào AGENTS, README, skill UI/task.
+- Files: `docs/11-ui-design-system.md`, `AGENTS.md`, `README.md`, `.codex/skills/task-ui/SKILL.md`, `.codex/skills/task-connect/SKILL.md`, `.codex/skills/task-full/SKILL.md`, `.codex/skills/change-ui/SKILL.md`, `.codex/context/current-context.md`
+- Tests: `rg` kiểm tra performance/mobile UX rule; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add system performance observability docs
+
+- Summary: Thêm chuẩn hiệu năng toàn hệ thống cho frontend, API, database, worker, AI/RAG và observability.
+- Changed: Tạo `docs/12-performance-and-observability.md` và nối vào AGENTS, README, architecture docs, task/fix/refactor skills.
+- Files: `docs/12-performance-and-observability.md`, `AGENTS.md`, `README.md`, `docs/03-technical-architecture.md`, `docs/11-ui-design-system.md`, `.codex/skills/task-*/SKILL.md`, `.codex/skills/fix-bug/SKILL.md`, `.codex/skills/refactor/SKILL.md`, `.codex/context/current-context.md`
+- Tests: `rg` kiểm tra reference performance/observability; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add SEO public discovery docs
+
+- Summary: Thêm chuẩn SEO/public discovery để Codex làm đúng nền top Google cho trang public.
+- Changed: Tạo `docs/13-seo-and-content-discovery.md` và nối vào AGENTS, README, UI/architecture docs, skill task/change/feature/fix/refactor.
+- Files: `docs/13-seo-and-content-discovery.md`, `AGENTS.md`, `README.md`, `docs/03-technical-architecture.md`, `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`, `.codex/skills/**`, `.codex/context/current-context.md`
+- Tests: `rg` kiểm tra reference SEO/public discovery; `pnpm format:check`; `git diff --check`.

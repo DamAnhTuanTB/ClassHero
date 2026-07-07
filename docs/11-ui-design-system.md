@@ -2,6 +2,10 @@
 
 Tài liệu này là nguồn gu thiết kế chính thức cho Codex khi làm UI. Mục tiêu là biến chữ "đẹp đúng ý" thành rule cụ thể để giảm vòng sửa lại.
 
+Hiệu năng UI/mobile nằm ở file này; hiệu năng toàn hệ thống như API, database, worker, AI/RAG và observability nằm ở `docs/12-performance-and-observability.md`.
+
+SEO cho landing, course public và các trang public indexable nằm ở `docs/13-seo-and-content-discovery.md`.
+
 ## 1. Phong cách tổng thể
 
 Sản phẩm là nền tảng học theo lộ trình cho học sinh THCS/THPT, phụ huynh và admin.
@@ -113,6 +117,7 @@ Spacing/radius mặc định:
 - Rõ value proposition, CTA học thử/mua lộ trình dễ thấy.
 - Course card phải dễ so sánh môn, lớp, giá, trạng thái học thử.
 - Mobile ưu tiên CTA và danh sách lộ trình dễ quét.
+- Nội dung public phải có heading/text thật rõ ràng để vừa dễ đọc vừa thân thiện SEO.
 
 ### Student
 
@@ -174,7 +179,58 @@ Breakpoint/pattern mặc định:
 - Không dùng animation trang trí quá nhiều trong admin/parent.
 - Tôn trọng trạng thái loading; skeleton nên ổn định layout.
 
-## 10. Empty/loading/error states
+## 10. Performance, smooth interaction và mobile UX
+
+UI không chỉ cần đẹp/responsive; mặc định phải cho cảm giác nhanh, mượt và phản hồi rõ trên mobile.
+
+Mục tiêu:
+
+- Mobile interaction phải phản hồi gần như tức thì sau khi bấm, kéo, chọn đáp án, lật flashcard, mở modal hoặc submit form.
+- Hạn chế layout shift; skeleton/placeholder phải giữ kích thước gần với nội dung thật.
+- Không để thao tác học chính bị delay vì animation, fetch thừa, render list quá dài hoặc logic chạy nặng trên main thread.
+- Ưu tiên perceived performance: người dùng phải thấy trạng thái đang xử lý ngay cả khi API chưa trả kết quả.
+
+Frontend rules:
+
+- Dùng TanStack Query cho server state, cache, refetch, mutation và invalidate; không tự fetch rải rác trong component sâu.
+- Với action có độ trễ như submit quiz, lưu note, favorite, thanh toán, gửi chat AI: hiển thị pending/disabled state ngay khi người dùng thao tác.
+- Dùng optimistic UI chỉ khi rollback an toàn và không ảnh hưởng nghiệp vụ nhạy cảm; không optimistic cho payment, auth hoặc dữ liệu cần xác nhận server nghiêm ngặt.
+- Debounce search/filter/input gọi API liên tục; không gọi API mỗi ký tự nếu không cần.
+- Paginate, infinite query hoặc virtualize list dài; không render toàn bộ danh sách lớn trên mobile.
+- Prefetch data cho bước kế tiếp khi flow học rõ ràng, ví dụ bài tiếp theo hoặc detail sau khi user sắp mở.
+- Tách component nặng theo route/feature; lazy load phần ít dùng như editor nặng, chart lớn, AI panel hoặc admin tool nếu phù hợp.
+- Ảnh phải tối ưu kích thước, dùng responsive image, lazy load ảnh ngoài viewport và tránh ảnh quá lớn cho mobile.
+- Không dùng animation trên thuộc tính gây layout/reflow nặng; ưu tiên transform/opacity.
+- Tôn trọng `prefers-reduced-motion` khi thêm animation đáng kể.
+
+Mobile UX rules:
+
+- Touch target tối thiểu khoảng `44px` cho CTA, option quiz, tab, icon button quan trọng.
+- Trạng thái bấm/tap phải rõ: pressed/active/loading/disabled.
+- Form mobile phải ít ma sát: input label rõ, lỗi hiện gần field, keyboard type phù hợp, submit không bị che bởi keyboard/sticky footer.
+- Với quiz/flashcard/test, thao tác chính phải nằm trong tầm ngón tay; tránh bắt user cuộn quá nhiều chỉ để submit/chuyển câu.
+- Khi API chậm, ưu tiên skeleton, inline progress hoặc retry thân thiện thay vì màn hình trắng.
+
+Performance budget/checklist:
+
+| Hạng mục | Mục tiêu |
+| --- | --- |
+| Core Web Vitals | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile |
+| Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn |
+| Interaction | Button/action đổi state ngay sau thao tác |
+| List dài | Có pagination/infinite/virtualization |
+| Animation | Nhẹ, ngắn, không block thao tác |
+| Bundle | Không thêm thư viện nặng nếu shadcn/Tailwind/native API đủ dùng |
+
+Khi làm UI phức tạp, Codex nên ghi rõ trong final/changelog đã kiểm tra hoặc bỏ qua phần nào:
+
+- mobile viewport,
+- desktop viewport,
+- loading/empty/error/disabled state,
+- interaction latency/perceived response,
+- screenshot hoặc browser check nếu chạy được app.
+
+## 11. Empty/loading/error states
 
 Mỗi màn hình hoặc block có data fetching phải có:
 
@@ -185,13 +241,15 @@ Mỗi màn hình hoặc block có data fetching phải có:
 
 Không để trắng màn hình hoặc chỉ hiện lỗi raw.
 
-## 11. UI acceptance checklist
+## 12. UI acceptance checklist
 
 Một màn hình UI chỉ xem là xong khi:
 
 - Đúng role và flow trong `docs/08-ui-pages-and-components.md`.
 - Đúng gu trong tài liệu này.
 - Responsive cơ bản trên mobile, tablet/iPad và laptop/desktop.
+- Tương tác chính trên mobile phản hồi nhanh, có pending/pressed/loading state rõ.
+- Không dùng animation hoặc render list làm chậm thao tác học/chấm bài/submit.
 - Có loading/empty/error/disabled state nếu màn hình có data/action.
 - Không text tràn, overlap, button cắt chữ hoặc layout nhảy mạnh.
 - Không hard-code khác API contract nếu API đã có trong `docs/05-api-contract.md`.
@@ -199,7 +257,7 @@ Một màn hình UI chỉ xem là xong khi:
 - Nếu có thể chạy app, Codex chụp hoặc kiểm tra screenshot/browser ở ít nhất mobile và desktop; với layout phức tạp kiểm tra thêm tablet/iPad.
 - Nếu chụp screenshot để owner review, lưu vào `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
 
-## 12. Quy trình làm UI để giảm sửa lại
+## 13. Quy trình làm UI để giảm sửa lại
 
 Nên làm theo thứ tự:
 
@@ -218,7 +276,7 @@ Nếu owner đưa ảnh/reference UI:
 3. Không copy y nguyên brand/asset của sản phẩm khác nếu không có quyền.
 4. Áp dụng lại theo design system của dự án và ghi changelog ngắn.
 
-## 13. Lưu pattern UI đã được duyệt
+## 14. Lưu pattern UI đã được duyệt
 
 Khi owner review UI và nói rõ kiểu như "ưng rồi", "ok rồi", "đúng ý rồi", "chốt UI này" hoặc "giữ style này", Codex phải xem đó là tín hiệu UI đã được duyệt.
 
@@ -235,7 +293,7 @@ Ví dụ phân loại:
 - "Landing page này ưng rồi" -> ghi vào `approved-patterns.md` cho public landing page.
 - "Sau này các card cứ dùng spacing và radius kiểu này" -> cập nhật `approved-patterns.md` và cân nhắc cập nhật design system.
 
-## 14. Prompt UI nên dùng
+## 15. Prompt UI nên dùng
 
 ```txt
 Màn hình/component: <tên màn hình>
@@ -245,6 +303,7 @@ Dữ liệu hiển thị: <các trường/chỉ số chính>
 Hành động chính: <CTA hoặc workflow>
 Cảm giác UI: <sáng/gọn/học tập/tin cậy/...>
 Thiết bị cần ổn: mobile, tablet/iPad, laptop/desktop
+Ưu tiên hiệu năng: mượt trên mobile, phản hồi nhanh, độ trễ thấp
 Phạm vi: chỉ UI với mock data / connect API / polish UI
 Không làm: <những thứ ngoài MVP hoặc không muốn>
 ```

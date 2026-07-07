@@ -13,7 +13,9 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
   - API: `docs/05-api-contract.md` + `docs/api/*.md`
-- UI direction là mobile-first, vẫn phải ổn trên tablet/iPad và laptop/desktop.
+- UI direction là mobile-first, vẫn phải ổn trên tablet/iPad và laptop/desktop, đồng thời ưu tiên cảm giác mượt, phản hồi nhanh và độ trễ cảm nhận thấp.
+- Performance toàn hệ thống dùng `docs/12-performance-and-observability.md` cho frontend/API/database/worker/AI và đo đạc.
+- SEO/public discovery dùng `docs/13-seo-and-content-discovery.md` cho landing, public course, news/event, metadata, sitemap, robots, canonical và structured data.
 
 ## 2. Quyết định workflow đang áp dụng
 
@@ -23,6 +25,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - Thêm chữ `plan` sau skill task để Codex chỉ lập kế hoạch và chờ duyệt, ví dụ `/task-full plan M1.2`.
 - `/do` có nghĩa là duyệt plan gần nhất và bắt đầu làm.
 - Task nhỏ/rủi ro thấp được dùng lean mode: chạy check nhỏ nhất đủ tin cậy, không bắt buộc full lint/build/test toàn repo.
+- Khi làm public page có mục tiêu xuất hiện Google, Codex phải đọc SEO docs bên cạnh UI/performance docs.
 
 ## 3. Task tiếp theo nên ưu tiên
 

@@ -59,9 +59,11 @@ Before editing:
    - `docs/04-database-model.md`
    - the matching file in `docs/database/` for the model/domain.
    - `docs/10-seed-data-and-test-cases.md` if seed/test data is affected.
-8. Inspect the UI files created by `/task-ui`.
-9. Inspect existing API client/hook patterns and backend module/controller/service patterns.
-10. Give a short plan: subtask mode, mock data to replace, full API endpoints/services to implement or use, backend files, frontend hooks/files, docs updates, checks.
+8. Read `docs/12-performance-and-observability.md` when the connection adds list/search/cache/mutation-heavy UI, new database query, worker/job, AI call, or latency-sensitive endpoint.
+9. Read `docs/13-seo-and-content-discovery.md` when connecting public/indexable pages or adding API/database fields used for SEO such as slug, title, description, cover image, published status, sitemap data, canonical, Open Graph, or structured data.
+10. Inspect the UI files created by `/task-ui`.
+11. Inspect existing API client/hook patterns and backend module/controller/service patterns.
+12. Give a short plan: subtask mode, mock data to replace, full API endpoints/services to implement or use, backend files, frontend hooks/files, SEO/docs updates if relevant, checks.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -84,11 +86,15 @@ In plan mode, stop after this plan and wait for approval.
 
 - Use TanStack Query for server state.
 - Use mutation invalidation where relevant.
+- Use pending state immediately for mutations; use optimistic UI only when rollback is safe and not payment/auth/security-sensitive.
+- Debounce search/filter calls and use pagination/infinite query for long lists when relevant.
 - Forms use React Hook Form + Zod if validation is present.
 - Remove or isolate mock data so it cannot be confused with production data.
 - Keep loading, empty, error, and disabled states.
 - Map API response types carefully; do not hard-code data that should come from API.
 - Backend API should follow NestJS patterns: controller -> DTO/guard/validation -> service -> Prisma/provider.
+- Backend/API/database performance must follow `docs/12-performance-and-observability.md`: pagination, select only needed fields, avoid N+1, enqueue heavy work.
+- Public/indexable API data must follow `docs/13-seo-and-content-discovery.md`: only published data, stable slug/canonical data, metadata fields when needed, and no private content exposure.
 - Enforce auth/RBAC on the backend, not only in UI.
 - Backend still enforces RBAC; UI guard is only UX.
 
@@ -102,6 +108,8 @@ Run focused checks:
 - If a new API endpoint is implemented, verify it with a focused API test or curl when local services allow it.
 - If API cannot run locally, state what was checked statically.
 - For UI states changed by real data, re-check at least the affected mobile and desktop layouts when practical.
+- For data-connected UI, mention whether perceived latency, pending state, cache/invalidation, and list/search performance were checked or skipped.
+- For public/indexable UI, mention whether metadata/slug/published/canonical/sitemap impact was handled or not in scope.
 
 ## Lean Mode For Small Connection Tasks
 

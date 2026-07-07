@@ -13,6 +13,7 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
    - `docs/09-implementation-plan.md`
    - `docs/04-database-model.md`
    - `docs/05-api-contract.md`
+   - `docs/13-seo-and-content-discovery.md` if present.
    - `docs/implementation/dependency-graph.md` if present.
    - `docs/implementation/feature-coverage-matrix.md` if present.
    - `docs/decisions/README.md` if present.

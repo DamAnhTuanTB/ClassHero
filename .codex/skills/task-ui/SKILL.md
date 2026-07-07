@@ -52,10 +52,12 @@ Before editing:
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-7. Read `docs/02-user-flows.md` for the affected role/flow.
-8. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
-9. Inspect existing web code and component patterns.
-10. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, and commands.
+7. Read `docs/12-performance-and-observability.md` when the UI has list/search/heavy interaction, large media, or performance-sensitive learning flows.
+8. Read `docs/13-seo-and-content-discovery.md` when the UI is landing, public course list/detail, public news/event, or any route intended to be indexable.
+9. Read `docs/02-user-flows.md` for the affected role/flow.
+10. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
+11. Inspect existing web code and component patterns.
+12. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, SEO notes if public/indexable, and commands.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -77,10 +79,13 @@ In plan mode, stop after this plan and wait for approval.
 - Follow `docs/11-ui-design-system.md`.
 - Use the default UI tokens from `docs/11-ui-design-system.md`; do not invent a new palette per screen.
 - Mobile-first, with tablet/iPad and laptop/desktop support.
+- Keep mobile interactions smooth: immediate pressed/pending/loading feedback, low perceived latency, no heavy animation or large blocking render.
 - Include loading, empty, error, and disabled states when the screen has data/action.
 - Use shadcn/ui primitives when available.
 - Use `lucide-react` icons when icons are needed.
 - Do not create desktop-only layouts.
+- For long lists/search/filter UI, use pagination/infinite/virtualized patterns or debounce in the mock flow when relevant.
+- For public/indexable UI, keep content structure SEO-friendly: one clear `h1`, meaningful headings/text, alt text for important images, and a layout that can later support metadata/canonical/Open Graph.
 - If app can run, check at least mobile and desktop; check tablet/iPad for complex layouts.
 
 ## Owner Approval Memory
@@ -115,6 +120,7 @@ Allowed reductions:
 Non-negotiable:
 
 - Keep mobile-first and no-overlap checks in mind even when manual.
+- Keep smooth interaction checks in mind: tap feedback, loading state, no obvious layout shift, no expensive animation.
 - Do not use lean mode for broad layouts, auth/payment flows, data-connected UI, route guards, or multi-screen changes.
 - If larger checks/screenshots are skipped, state `Not run: <reason>` in changelog and final response.
 
@@ -137,6 +143,8 @@ Include:
 - Completed `/task-ui` ID(s).
 - What UI was built and where mock data lives.
 - Responsive checks done or skipped.
+- Mobile smoothness/performance checks done or skipped.
+- SEO/public discovery checks done or skipped when the screen is public/indexable.
 - Screenshot paths if screenshots were created.
 - Files changed.
 - Commands run or skipped with reason.

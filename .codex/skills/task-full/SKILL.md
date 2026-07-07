@@ -53,8 +53,10 @@ Before editing:
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-8. Inspect existing code for touched modules.
-9. Give a short plan: subtask, mode, docs read, modules/files, database/API/docs impact, commands.
+8. If the task affects performance, latency, cache, list/search, database query, worker/job, AI/RAG, or observability, read `docs/12-performance-and-observability.md`.
+9. If the task affects landing, public course list/detail, news/event public, metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or public indexability, read `docs/13-seo-and-content-discovery.md`.
+10. Inspect existing code for touched modules.
+11. Give a short plan: subtask, mode, docs read, modules/files, database/API/UI/SEO/docs impact, commands.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -67,7 +69,9 @@ In plan mode, stop after this plan and wait for approval.
 - If a dependency subtask is missing, stop or implement only safe scaffold and explain the blocker.
 - For UI work, follow mobile-first, tablet/iPad, and laptop/desktop rules.
 - For UI work, use the default UI tokens from `docs/11-ui-design-system.md` and save useful review screenshots under `.codex/screenshots/`.
+- For UI work, apply `docs/11-ui-design-system.md` performance rules: smooth mobile interaction, immediate feedback, low perceived latency, stable skeleton/layout, and no heavy blocking animation/render.
 - For database/API/AI behavior changes, update the corresponding docs. `docs/04-database-model.md` and `docs/05-api-contract.md` are indexes; update matching files in `docs/database/` and `docs/api/` when domain details change.
+- For public/indexable page changes, follow `docs/13-seo-and-content-discovery.md` and update SEO/public docs if metadata, sitemap, robots, canonical, structured data, slug, or indexability rules change.
 
 ## Full Implementation Rules
 
@@ -79,6 +83,8 @@ Depending on the subtask, do what is necessary:
 - Shared package: types/schemas/constants used by both apps.
 - Worker/integration: queue/provider/job code when required by docs.
 - Docs: update API/database/AI/UI/env docs only when behavior changes.
+- Performance: follow `docs/12-performance-and-observability.md` for cache, pagination, slow queries, worker jobs, AI latency and measurement.
+- SEO/public discovery: follow `docs/13-seo-and-content-discovery.md` for public pages, metadata, sitemap, robots, canonical, Open Graph, structured data and noindex for private routes.
 - Codex context: update `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/feature-coverage-matrix.md`, or `docs/implementation/dependency-graph.md` only when the completed task changes repo state, module paths, feature status, or dependencies.
 - UI approval memory: if the owner says the UI is approved after review, record the pattern in `docs/ui-references/approved-patterns.md`; update `docs/11-ui-design-system.md` only for broad design rules.
 
@@ -90,7 +96,8 @@ Run checks proportional to risk:
 - Focused tests where available.
 - Build/lint when shared or production surface changed.
 - Browser/curl/API checks when practical.
-- For UI, mention responsive viewports checked or skipped and screenshot paths if created.
+- For UI, mention responsive viewports, smoothness/performance checks, and screenshot paths if created.
+- For performance-sensitive work, mention what was measured or why measurement was skipped.
 
 ## Lean Mode For Small Tasks
 

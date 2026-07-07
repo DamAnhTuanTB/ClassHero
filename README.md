@@ -117,6 +117,8 @@ docs/implementation/dependency-graph.md Phụ thuộc task đọc nhanh
 docs/implementation/feature-coverage-matrix.md Feature đã đủ DB/API/UI/worker/test chưa
 docs/10-seed-data-and-test-cases.md Seed data và test case
 docs/11-ui-design-system.md       Gu UI, token, responsive, screenshot review
+docs/12-performance-and-observability.md Hiệu năng, độ trễ, cache, query, worker, AI, đo đạc
+docs/13-seo-and-content-discovery.md SEO, metadata, sitemap, robots, canonical, structured data
 docs/ui-references/               Pattern UI đã duyệt
 docs/decisions/                   Decision log
 .codex/context/current-context.md Trạng thái repo hiện tại cho Codex
@@ -197,6 +199,8 @@ docs/05-api-contract.md
 docs/api/payment-discount.md
 docs/02-user-flows.md
 docs/07-integration-and-env.md
+docs/12-performance-and-observability.md nếu task ảnh hưởng hiệu năng/độ trễ/cache/query/job
+docs/13-seo-and-content-discovery.md nếu task làm landing/public course/news/event hoặc route indexable
 ```
 
 ## 8. Các skill Codex
@@ -330,13 +334,17 @@ Codex sẽ:
 1. Đọc `AGENTS.md`, `docs/09-implementation-plan.md` và file milestone tương ứng.
 2. Đọc `Mode` của subtask. Chỉ tiếp tục nếu mode là `UI only` hoặc `UI + API`.
 3. Đọc UI docs: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
-4. Đọc API docs chỉ để hiểu data shape, không connect API.
-5. Kiểm tra task có UI không. Nếu không có UI, Codex dừng và gợi ý lệnh phù hợp hơn.
-6. Code UI mobile-first, vẫn ổn trên tablet/iPad và desktop.
-7. Dùng mock data rõ ràng, dễ thay bằng API sau này.
-8. Nếu app chạy được, kiểm tra responsive và có thể lưu screenshot vào `.codex/screenshots/`.
-9. Cập nhật changelog.
-10. Gợi ý bước tiếp theo, thường là `/task-connect <mã task>` nếu mode là `UI + API`.
+4. Đọc performance docs nếu màn có list/search/action dễ chậm: `docs/12-performance-and-observability.md`.
+5. Đọc SEO docs nếu là landing/public course/news/event hoặc route indexable: `docs/13-seo-and-content-discovery.md`.
+6. Đọc API docs chỉ để hiểu data shape, không connect API.
+7. Kiểm tra task có UI không. Nếu không có UI, Codex dừng và gợi ý lệnh phù hợp hơn.
+8. Code UI mobile-first, vẫn ổn trên tablet/iPad và desktop.
+9. Tối ưu cảm giác mượt trên mobile: interaction phản hồi nhanh, state bấm/loading rõ, không animation/render nặng.
+10. Với public page, chuẩn bị cấu trúc heading/content/metadata-friendly để dễ SEO khi connect thật.
+11. Dùng mock data rõ ràng, dễ thay bằng API sau này.
+12. Nếu app chạy được, kiểm tra responsive/perceived performance và có thể lưu screenshot vào `.codex/screenshots/`.
+13. Cập nhật changelog.
+14. Gợi ý bước tiếp theo, thường là `/task-connect <mã task>` nếu mode là `UI + API`.
 
 Sau khi bạn review UI và nói `ưng rồi`, `ok rồi`, `đúng ý rồi` hoặc `chốt UI này`, Codex sẽ lưu pattern vào:
 
@@ -397,10 +405,11 @@ Codex sẽ:
 5. Nếu API chưa có, code API đầy đủ theo phạm vi task.
 6. Nếu database/schema còn thiếu và task cho phép, cập nhật schema/migration/docs tương ứng.
 7. Thay mock data bằng API client/hooks, ưu tiên TanStack Query.
-8. Backend vẫn enforce auth/RBAC/ownership, không chỉ guard bằng UI.
-9. Chạy check phù hợp.
-10. Cập nhật changelog.
-11. Báo nguyên lý kết nối: UI gọi hook nào, hook gọi API nào, API đi qua controller/service/database như nào.
+8. Giữ UX mượt: pending state tức thì, cache/invalidate hợp lý, debounce/pagination khi có list/search.
+9. Backend vẫn enforce auth/RBAC/ownership, không chỉ guard bằng UI.
+10. Chạy check phù hợp.
+11. Cập nhật changelog.
+12. Báo nguyên lý kết nối: UI gọi hook nào, hook gọi API nào, API đi qua controller/service/database như nào.
 
 ## 12. `/task-full <mã task>`
 
@@ -678,6 +687,8 @@ docs/implementation/feature-coverage-matrix.md   Cập nhật nếu coverage DB/
 docs/decisions/                                  Cập nhật khi có quyết định dài hạn
 docs/ui-references/approved-patterns.md          Cập nhật khi bạn chốt UI đã ưng
 docs/11-ui-design-system.md                      Cập nhật khi bạn chốt rule UI dùng rộng
+docs/12-performance-and-observability.md         Cập nhật nếu đổi chuẩn hiệu năng/đo đạc/cache/query/job
+docs/13-seo-and-content-discovery.md             Cập nhật nếu đổi chuẩn SEO/public discovery
 docs/05-api-contract.md + docs/api/              Cập nhật nếu task đổi API contract
 docs/04-database-model.md + docs/database/       Cập nhật nếu task đổi schema/database
 docs/06-ai-rag-spec.md                           Cập nhật nếu task đổi AI/RAG behavior

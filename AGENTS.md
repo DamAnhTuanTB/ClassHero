@@ -29,6 +29,8 @@ Codex phải xem các tài liệu sau là nguồn chính của dự án:
 | `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa |
 | `docs/10-seed-data-and-test-cases.md` | Seed data và test case cơ bản |
 | `docs/11-ui-design-system.md` | Gu UI, token, responsive, screenshot/review |
+| `docs/12-performance-and-observability.md` | Chuẩn hiệu năng, độ trễ, cache, query, worker, AI và đo đạc |
+| `docs/13-seo-and-content-discovery.md` | SEO, metadata, sitemap, robots, canonical, structured data cho trang public |
 | `docs/decisions/` | Decision log cho quyết định dài hạn |
 
 Nếu có `.codex/plans/codex-execution-plan.md`, dùng file đó để kiểm tra thứ tự/phụ thuộc, nhưng không dùng để thay thế docs gốc.
@@ -72,6 +74,8 @@ Thứ tự đọc:
 11. File milestone liên quan trong `docs/implementation/`
 12. `docs/10-seed-data-and-test-cases.md`
 13. `docs/11-ui-design-system.md` nếu task có UI
+14. `docs/12-performance-and-observability.md` nếu task ảnh hưởng hiệu năng/độ trễ/cache/query/worker/AI
+15. `docs/13-seo-and-content-discovery.md` nếu task ảnh hưởng trang public/indexable hoặc SEO metadata
 
 ### Đọc theo phạm vi task
 
@@ -129,6 +133,8 @@ Trong quá trình làm task, Codex có thể cập nhật các file sau nếu c�
 - `docs/decisions/`: khi có quyết định dài hạn về workflow, kiến trúc, scope, UI rule hoặc tích hợp.
 - `docs/ui-references/approved-patterns.md`: khi owner xác nhận UI đã "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này".
 - `docs/11-ui-design-system.md`: khi owner chốt một rule UI áp dụng rộng.
+- `docs/12-performance-and-observability.md`: nếu task làm đổi chuẩn hiệu năng, cache, query, worker, AI latency hoặc observability.
+- `docs/13-seo-and-content-discovery.md`: nếu task làm đổi chuẩn SEO, index/noindex, metadata, sitemap, robots, canonical, structured data hoặc nội dung public indexable.
 - `docs/learning-notes/`: khi phần giải thích kỹ thuật có giá trị học tập lâu dài; ghi theo feature-first, merge vào note cũ khi có thể và tránh copy trùng final response.
 - `docs/05-api-contract.md` và file con trong `docs/api/`: nếu task làm đổi API contract hoặc behavior API.
 - `docs/04-database-model.md` và file con trong `docs/database/`: nếu task làm đổi schema/database model.
@@ -173,6 +179,8 @@ Không được dùng các file này để tự đổi scope lớn, stack hoặc
 UI bổ sung:
 
 - Nếu task có giao diện, đọc `docs/08-ui-pages-and-components.md` và `docs/11-ui-design-system.md`.
+- Nếu task có UI/API/list/search/cache hoặc flow nhạy độ trễ, đọc thêm `docs/12-performance-and-observability.md`.
+- Nếu task là landing/public course/news/event hoặc route có thể index Google, đọc thêm `docs/13-seo-and-content-discovery.md`.
 - Nếu có `docs/ui-references/approved-patterns.md`, đọc khi làm UI tương tự pattern đã được owner chốt.
 - Nếu UI cần data/API, đọc `docs/05-api-contract.md`.
 - Nếu task chỉ làm UI, không sửa backend/database trừ khi owner yêu cầu rõ.
@@ -181,6 +189,7 @@ Database/API bổ sung:
 
 - `docs/04-database-model.md` và `docs/05-api-contract.md` là index.
 - Khi task thật sự chạm database hoặc API, mở thêm file con tương ứng trong `docs/database/` hoặc `docs/api/` theo mapping trong index.
+- Nếu endpoint/query/list/search/job có nguy cơ chậm, đọc `docs/12-performance-and-observability.md`.
 
 ---
 
@@ -192,7 +201,9 @@ Database/API bổ sung:
 4. `docs/04-database-model.md` và `docs/database/`: dữ liệu, quan hệ bảng, constraint.
 5. `docs/05-api-contract.md` và `docs/api/`: giao tiếp frontend/backend.
 6. `docs/06-ai-rag-spec.md`: AI/RAG, embedding, retrieval, cache.
-7. `docs/09-implementation-plan.md`: thứ tự triển khai.
+7. `docs/12-performance-and-observability.md`: hiệu năng và đo đạc, nếu không mâu thuẫn với kiến trúc/domain docs.
+8. `docs/13-seo-and-content-discovery.md`: SEO/public discovery, nếu không mâu thuẫn với scope, architecture hoặc API/database docs.
+9. `docs/09-implementation-plan.md`: thứ tự triển khai.
 
 Khi phát hiện mâu thuẫn lớn, báo rõ:
 
@@ -243,6 +254,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Input từ client phải validate bằng Zod hoặc DTO/class-validator.
 - Tên biến, hàm, file dùng tiếng Anh; text UI có thể dùng tiếng Việt.
 - API response bám `docs/05-api-contract.md`.
+- Flow chính phải bám `docs/12-performance-and-observability.md` khi có list/query/cache/job/AI hoặc độ trễ đáng kể.
 - Xử lý lỗi rõ ràng, không nuốt lỗi.
 - Thao tác nhạy cảm cần audit/log theo docs domain.
 - Không thêm package nặng nếu không cần thiết.
@@ -259,6 +271,8 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Không xử lý permission chỉ bằng UI; backend vẫn enforce RBAC.
 - Route admin/student/parent phải có guard.
 - UI mobile-first, nhưng phải ổn trên tablet/iPad và laptop/desktop.
+- UI phải mượt trên mobile, phản hồi nhanh, độ trễ cảm nhận thấp; đọc `docs/11-ui-design-system.md` phần performance khi làm UI.
+- Public page có mục tiêu xuất hiện trên Google phải bám `docs/13-seo-and-content-discovery.md`.
 - Màn hình có data/action phải có loading, empty, error, disabled state.
 - Nếu có thể chạy app, UI task nên kiểm tra bằng browser/screenshot ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad.
 - Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
@@ -275,6 +289,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Backend enforce RBAC/ownership, không tin UI guard.
 - Controller chỉ xử lý HTTP boundary; service chứa nghiệp vụ; DB/provider đi qua service/repository phù hợp.
 - Job nặng enqueue BullMQ, không blocking request nếu có thể.
+- API list/search phải có pagination/debounce/cache/index phù hợp theo `docs/12-performance-and-observability.md`.
 
 ---
 

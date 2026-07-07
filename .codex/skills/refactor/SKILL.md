@@ -31,13 +31,16 @@ Before editing:
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
-5. Inspect current code, tests, call sites, and `git status --short`.
-6. Give a short plan: target area, intended refactor, behavior-preservation checks, files likely touched.
+5. If the refactor targets performance, latency, cache, query shape, worker throughput, or AI/RAG speed, read `docs/12-performance-and-observability.md`.
+6. If the refactor touches public/indexable page structure, metadata, slug, sitemap, robots, canonical, Open Graph or structured data, read `docs/13-seo-and-content-discovery.md`.
+7. Inspect current code, tests, call sites, and `git status --short`.
+8. Give a short plan: target area, intended refactor, behavior-preservation checks, files likely touched.
 
 ## Refactor Rules
 
 - Preserve existing product behavior unless the owner explicitly asks otherwise.
 - Do not change API contract, database schema, permission/RBAC, payment behavior, AI/RAG behavior, env names, or UI design as part of refactor.
+- Do not change SEO/indexability behavior such as robots, canonical, sitemap or metadata as part of refactor.
 - Do not change stack or add new packages unless clearly necessary and approved.
 - Keep edits scoped to the requested feature/module/task.
 - Do not rename public exports/routes/files broadly unless all call sites are updated and the benefit is clear.
