@@ -1,0 +1,4 @@
+interface:
+  display_name: "Learning Task Runner"
+  short_description: "Run subtasks, maintain plan, suggest next"
+  default_prompt: "Use $learning-task-runner to run /task M0.1 for the learning roadmap repo."

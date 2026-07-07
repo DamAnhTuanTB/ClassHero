@@ -1,0 +1,15 @@
+{
+  "name": "learning-path-system",
+  "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "2.10.4",
+    "typescript": "6.0.3"
+  }
+}

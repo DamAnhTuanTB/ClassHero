@@ -1,0 +1,23 @@
+{
+  "name": "@learning-path/api",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "echo \"Lint setup is scheduled for M0.2\"",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.27",
+    "@nestjs/core": "11.1.27",
+    "@nestjs/platform-express": "11.1.27",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.4",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3"
+  }
+}
