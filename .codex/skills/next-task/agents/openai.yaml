@@ -1,4 +1,4 @@
 interface:
   display_name: "Next Task"
-  short_description: "Gợi ý task tiếp theo kèm mode"
-  default_prompt: "Use $next-task to suggest the next project task, including its mode and short description."
+  short_description: "Gợi ý task, mode và mục docs cốt lõi"
+  default_prompt: "Use $next-task to suggest the next project task, including its mode, prerequisite notes, and a short core-docs reading list with exact sections."

@@ -626,3 +626,13 @@
 - Files: `docs/00-docs-map.md`, `README.md`, `AGENTS.md`, `.codex/skills/review-docs/SKILL.md`
 - Tests: `quick_validate.py` cho review-docs skill; `rg` kiểm tra reference; `pnpm format:check`; `pnpm exec prettier --check README.md docs/00-docs-map.md`; `git diff --check`.
 - Notes: Không thay đổi code production.
+
+## 2026-07-07 — Clarify next task core docs guidance
+
+- Summary: Làm rõ output `/next-task` để nêu ngắn gọn tài liệu cốt lõi owner nên đọc trước.
+- Changed:
+  - Bổ sung bước chọn 2-4 file docs cốt lõi, kèm đúng heading/subsection cần đọc trong file lớn.
+  - Siết mục phụ thuộc/lưu ý thành trạng thái git, dependency và blocker cụ thể thay vì câu chung chung.
+- Files: `.codex/skills/next-task/SKILL.md`, `.codex/skills/next-task/agents/openai.yaml`
+- Tests: `quick_validate.py` cho next-task skill; `rg` kiểm tra output guidance; `pnpm format:check`; `pnpm exec prettier --check .codex/skills/next-task/SKILL.md .codex/skills/next-task/agents/openai.yaml`; `git diff --check`.
+- Notes: Không thay đổi code production.
