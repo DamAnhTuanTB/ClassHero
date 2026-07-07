@@ -95,4 +95,4 @@ Include:
 - Planned technical flow after the change.
 - Checks run or skipped with reason.
 - Risks/TODO/ASSUMPTION.
-- Suggested next implementation command with task code when possible, for example `/task-ui Mx.y`, `/task-connect Mx.y`, or `/task-full Mx.y`.
+- Suggested next implementation command with task code when possible, for example `/task-ui Mx.y`, `/task-connect Mx.y`, or `/task-full Mx.y`; include the task `Mode` and a one-sentence description of what that implementation task does.

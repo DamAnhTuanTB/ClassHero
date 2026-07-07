@@ -596,3 +596,13 @@
 - Changed: Giữ README làm cửa vào/router; trỏ chi tiết sang `AGENTS.md`, docs nguồn và `.codex/skills/*/SKILL.md`.
 - Files: `README.md`
 - Tests: `rg` kiểm tra stale references; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Include mode in next task suggestions
+
+- Summary: Cập nhật các skill Codex để khi gợi ý task tiếp theo luôn kèm mode và mô tả ngắn của task.
+- Changed:
+  - Bổ sung yêu cầu `/next-task` đọc milestone để lấy `Mode`, scope và mô tả một câu cho task được đề xuất.
+  - Đồng bộ output các skill có gợi ý roadmap tiếp theo như `/task-full`, `/task-ui`, `/task-connect`, `/do`, `/add-feature`, `/update-feature`, `/delete-feature`, `/fix bug`.
+- Files: `.codex/skills/next-task/SKILL.md`, `.codex/skills/next-task/agents/openai.yaml`, `.codex/skills/task-full/SKILL.md`, `.codex/skills/task-ui/SKILL.md`, `.codex/skills/task-connect/SKILL.md`, `.codex/skills/do/SKILL.md`, `.codex/skills/add-feature/SKILL.md`, `.codex/skills/update-feature/SKILL.md`, `.codex/skills/delete-feature/SKILL.md`, `.codex/skills/fix-bug/SKILL.md`, `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests: `quick_validate.py` cho các skill đã sửa; `git diff --check`.
+- Notes: Không thay đổi code production; không cần chạy build/test app.

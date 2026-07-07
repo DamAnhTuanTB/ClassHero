@@ -96,4 +96,4 @@ Include:
 - Planned cleanup flow: what path should be removed later and what replaces it, if anything.
 - Checks run or skipped with reason.
 - Migration/data risks or TODO.
-- Suggested next cleanup command with task code when possible, for example `/task-full Mx.y` or `/refactor Mx.y`.
+- Suggested next cleanup command with task code when possible, for example `/task-full Mx.y` or `/refactor Mx.y`; include the task `Mode` and a one-sentence description of what that cleanup task does.

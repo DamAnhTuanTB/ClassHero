@@ -95,4 +95,4 @@ Include:
 - Planned technical flow for the future implementation.
 - Checks run or skipped with reason.
 - Remaining TODO/ASSUMPTION.
-- Suggested next task command with task code when possible, for example `/task-ui Mx.y`, `/task-connect Mx.y`, or `/task-full Mx.y`.
+- Suggested next task command with task code when possible, for example `/task-ui Mx.y`, `/task-connect Mx.y`, or `/task-full Mx.y`; include the task `Mode` and a one-sentence description of what that implementation task does.

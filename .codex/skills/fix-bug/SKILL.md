@@ -102,7 +102,7 @@ Keep the final answer useful, but do not over-compress the technical explanation
 - Verification: commands run and result.
 - Files changed.
 - Notes: restart required, env/config needed, TODO/ASSUMPTION, or execution plan update.
-- Next action: the next check or likely `/task-ui`, `/task-connect`, or `/task-full` command if the bug blocks roadmap work.
+- Next action: the next check or likely `/task-ui`, `/task-connect`, or `/task-full` command if the bug blocks roadmap work. When recommending a roadmap command, include the task `Mode` and a one-sentence description of what that task does.
 
 Do not merge cause and fix into a vague summary. If the root cause is uncertain, say what was confirmed, what remains an assumption, and how the fix was verified.
 

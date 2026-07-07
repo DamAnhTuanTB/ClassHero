@@ -1,6 +1,6 @@
 ---
 name: task-full
-description: Implement or plan complete roadmap subtasks for the Vietnamese learning-path project from commands like "/task-full M7.1", "/task-full M3.4", or "/task-full plan M1.2". Use when Codex must either do everything needed for a subtask end to end, including backend/API/database/UI/worker/docs when the implementation plan requires them, or produce an approval-gated plan first when the command contains "plan"; read relevant docs, keep scope to the requested subtask, apply mobile-first UI rules when UI is involved, run proportional verification, update changelog after implementation, explain technical flow, and suggest the next subtask.
+description: Implement or plan complete roadmap subtasks for the Vietnamese learning-path project from commands like "/task-full M7.1", "/task-full M3.4", or "/task-full plan M1.2". Use when Codex must either do everything needed for a subtask end to end, including backend/API/database/UI/worker/docs when the implementation plan requires them, or produce an approval-gated plan first when the command contains "plan"; read relevant docs, keep scope to the requested subtask, apply mobile-first UI rules when UI is involved, run proportional verification, update changelog after implementation, explain technical flow, and suggest the next subtask with its Mode and short description.
 ---
 
 # Task Full Runner
@@ -148,6 +148,6 @@ Include:
 - TODO/ASSUMPTION/blockers.
 - Whether execution plan changed.
 - Whether learning notes changed.
-- Suggested next subtask.
+- Suggested next subtask: include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.
 
 Update changelog using the concise format from `AGENTS.md`.

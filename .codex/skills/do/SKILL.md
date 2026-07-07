@@ -64,4 +64,4 @@ Include:
 - Checks run or skipped with reason.
 - `Giải thích kỹ thuật dễ hiểu` when code/behavior changed.
 - Whether changelog, execution plan, learning notes, or UI docs changed.
-- Suggested next step.
+- Suggested next step: when recommending a roadmap command, include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.

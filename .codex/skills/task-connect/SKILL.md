@@ -158,6 +158,6 @@ Include:
   - File quan trọng: UI entry, hook/client, controller/service, DTO/schema/docs.
   - Bạn nên hiểu gì sau task này: 2-4 ý về cách frontend và backend nối với nhau.
 - Whether learning notes changed.
-- Suggested next action or subtask.
+- Suggested next action or subtask: when recommending a roadmap command, include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.
 
 Update changelog using the concise format from `AGENTS.md`.

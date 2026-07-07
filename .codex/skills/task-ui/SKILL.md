@@ -156,6 +156,6 @@ Include:
   - File quan trọng: page/component/mock data/style helper liên quan.
   - Bạn nên hiểu gì sau task này: 2-4 ý về cách màn hình được dựng.
 - Whether learning notes changed.
-- Suggested next command: `/task-connect Mx.y`.
+- Suggested next command: `/task-connect Mx.y`, plus the exact task `Mode` from the milestone file and a one-sentence description of what the connection step will do.
 
 Update changelog using the concise format from `AGENTS.md`.
