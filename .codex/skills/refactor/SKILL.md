@@ -66,6 +66,22 @@ Run checks proportional to risk:
 
 Update changelog after file changes.
 
+## Lean Mode For Small Refactors
+
+For tiny, low-risk refactors, optimize for speed.
+
+Allowed reductions:
+
+- Skip full repo lint/build/test when the refactor is isolated and behavior-neutral.
+- Run the smallest useful check: focused typecheck, existing focused test, `git diff --check`, or static inspection.
+- For docs-only or mechanical cleanup, `Not run: docs-only` or `Not run: mechanical cleanup only` is acceptable.
+
+Non-negotiable:
+
+- Do not use lean mode for public API changes, database/schema, auth/RBAC, payment, AI/RAG, worker/queue, security, shared package contracts, or broad module moves.
+- Do not change behavior under the label of refactor.
+- If broader checks are skipped, state `Not run: <reason>` in changelog and final response.
+
 ## Learning Notes
 
 After refactor work, update `docs/learning-notes/` only when the refactor teaches a reusable structure or pattern.

@@ -35,7 +35,7 @@ When the command contains `plan`, do approval-gated planning only.
   - verification commands expected,
   - risks, blockers, assumptions, and questions.
 - End by asking the owner to approve or revise the plan.
-- If the owner later says "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
+- If the owner later says `/do`, "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
 - If the owner revises the plan, update the plan and wait again before implementing.
 
 ## Required Startup
@@ -90,7 +90,23 @@ Run checks proportional to risk:
 - Browser/curl/API checks when practical.
 - For UI, mention responsive viewports checked or skipped and screenshot paths if created.
 
-Lean mode is allowed for tiny low-risk tasks, but do not skip safety checks, changelog, or scope control.
+## Lean Mode For Small Tasks
+
+For tiny, low-risk tasks, optimize for speed.
+
+Allowed reductions:
+
+- Skip full repo lint/build/test when the change is isolated.
+- Run the smallest useful check: `git diff --check`, focused typecheck, focused validator, small curl, or manual verification with a note.
+- Keep the plan and final response shorter.
+- For docs-only or wording-only changes, `Not run: docs-only` is acceptable.
+
+Non-negotiable:
+
+- Do not skip safety checks for secrets, scope, stack, MVP, or unrelated dirty files.
+- Do not skip changelog when repository files changed in a commit-worthy way.
+- If a larger check is skipped, state `Not run: <reason>` in changelog and final response.
+- Do not use lean mode for auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior changes.
 
 ## Learning Notes
 

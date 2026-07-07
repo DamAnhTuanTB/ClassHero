@@ -1,0 +1,4 @@
+interface:
+  display_name: "Do Runner"
+  short_description: "Execute the latest approved plan"
+  default_prompt: "Use $do after a reviewed plan to run /do and execute the approved work."

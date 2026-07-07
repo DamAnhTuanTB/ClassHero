@@ -35,7 +35,7 @@ When the command contains `plan`, do approval-gated UI planning only.
   - expected UI checks/screenshots,
   - risks, blockers, assumptions, and questions.
 - End by asking the owner to approve or revise the plan.
-- If the owner later says "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
+- If the owner later says `/do`, "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
 - If the owner revises the plan, update the plan and wait again before implementing.
 
 ## Required Startup
@@ -99,6 +99,22 @@ Run checks proportional to risk:
 - If app can run, provide URL/route and mention responsive viewport checks or screenshots.
 - When screenshots are useful for owner review, save them under `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
 - For tiny docs/wording changes, `Not run: docs-only` is acceptable.
+
+## Lean Mode For Small UI Tasks
+
+For tiny, low-risk UI tasks, optimize for speed.
+
+Allowed reductions:
+
+- Skip full repo lint/build when only a small component, copy, spacing, mock data, or docs changed.
+- Run only a focused web typecheck, `git diff --check`, or a quick visual/manual check when enough.
+- Skip screenshot generation if the change is trivial or the app is not already running.
+
+Non-negotiable:
+
+- Keep mobile-first and no-overlap checks in mind even when manual.
+- Do not use lean mode for broad layouts, auth/payment flows, data-connected UI, route guards, or multi-screen changes.
+- If larger checks/screenshots are skipped, state `Not run: <reason>` in changelog and final response.
 
 ## Learning Notes
 

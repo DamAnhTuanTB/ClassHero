@@ -36,7 +36,7 @@ When the command contains `plan`, do approval-gated connection planning only.
   - verification commands expected,
   - risks, blockers, assumptions, and questions.
 - End by asking the owner to approve or revise the plan.
-- If the owner later says "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
+- If the owner later says `/do`, "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
 - If the owner revises the plan, update the plan and wait again before implementing.
 
 ## Required Startup
@@ -100,6 +100,22 @@ Run focused checks:
 - If a new API endpoint is implemented, verify it with a focused API test or curl when local services allow it.
 - If API cannot run locally, state what was checked statically.
 - For UI states changed by real data, re-check at least the affected mobile and desktop layouts when practical.
+
+## Lean Mode For Small Connection Tasks
+
+For tiny, low-risk connection tasks, optimize for speed.
+
+Allowed reductions:
+
+- Skip full repo lint/build when only one hook/client mapping, endpoint wiring, or small UI state mapping changed.
+- Run the smallest useful check: touched package typecheck, focused curl/API check, focused validator, or `git diff --check`.
+- If local services are not running and the change is straightforward, use static verification and state that clearly.
+
+Non-negotiable:
+
+- Do not use lean mode when adding/changing auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior.
+- Do not skip backend permission reasoning when real data is connected.
+- If broader checks are skipped, state `Not run: <reason>` in changelog and final response.
 
 ## Learning Notes
 

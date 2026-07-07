@@ -533,3 +533,17 @@
 - Changed: Bổ sung approval-gated plan mode, cập nhật skill metadata và README.
 - Files: `.codex/skills/task-ui/**`, `.codex/skills/task-connect/**`, `.codex/skills/task-full/**`, `README.md`
 - Tests: `quick_validate.py` cho task/commit skills; `rg` kiểm tra plan mode; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Clarify lean mode for small tasks
+
+- Summary: Làm rõ rule tối ưu tốc độ cho task nhỏ bằng lean mode.
+- Changed: Cập nhật AGENTS, README và skill task/refactor để chỉ chạy check tối thiểu khi rủi ro thấp.
+- Files: `AGENTS.md`, `README.md`, `.codex/skills/task-*/SKILL.md`, `.codex/skills/refactor/SKILL.md`
+- Tests: `quick_validate.py` cho task/refactor skills; `rg` kiểm tra lean mode; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add do approval skill
+
+- Summary: Thêm skill `/do` để duyệt plan gần nhất và bắt đầu triển khai.
+- Changed: Tạo skill `do`, cập nhật task plan mode và README để dùng `/do` như câu "ok làm đi".
+- Files: `.codex/skills/do/**`, `.codex/skills/task-*/SKILL.md`, `README.md`
+- Tests: `quick_validate.py` cho do/task skills; `rg` kiểm tra /do; `pnpm format:check`; `git diff --check`.

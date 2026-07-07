@@ -212,6 +212,7 @@ Giao việc bằng một trong các lệnh:
 | Hoãn feature sang version sau | `/move-feature-to-next-version ...` |
 | Hỏi task tiếp theo | `/next-task` |
 | Review docs/skills/workflow | `/review-docs` |
+| Duyệt plan và bắt đầu làm | `/do` |
 | Commit thay đổi | `/commit` |
 
 ```txt
@@ -230,6 +231,7 @@ Giao việc bằng một trong các lệnh:
 /fix bug <mô tả lỗi>
 /next-task
 /review-docs
+/do
 /commit
 ```
 
@@ -258,9 +260,10 @@ Sau đó bạn có thể nói:
 
 ```txt
 ok, làm đi
+/do
 ```
 
-Codex sẽ dựa trên plan đã duyệt, kiểm tra lại code/docs nếu cần rồi mới bắt đầu triển khai. Nếu bạn muốn đổi kế hoạch, hãy phản hồi phần cần sửa; Codex sẽ chỉnh plan và chờ bạn duyệt lại.
+Codex sẽ dựa trên plan đã duyệt, kiểm tra lại code/docs nếu cần rồi mới bắt đầu triển khai. `/do` có tác dụng giống các câu "ok làm đi", "triển khai đi", "bạn làm giúp tôi", "bạn sửa giúp tôi". Nếu bạn muốn đổi kế hoạch, hãy phản hồi phần cần sửa; Codex sẽ chỉnh plan và chờ bạn duyệt lại.
 
 ### Giải thích kỹ thuật sau khi làm xong
 
@@ -578,7 +581,33 @@ Codex sẽ:
 3. Nếu bạn yêu cầu sửa, hoặc lỗi docs-only rõ ràng, Codex sẽ cập nhật file liên quan.
 4. Cập nhật changelog và chạy check nhẹ nếu có sửa file.
 
-## 21. `/commit`
+## 21. `/do`
+
+Dùng sau khi Codex vừa đưa plan/hướng triển khai và bạn muốn duyệt cho Codex bắt đầu làm.
+
+Ví dụ:
+
+```txt
+/task-full plan M1.2
+```
+
+Sau khi đọc plan, nếu đồng ý:
+
+```txt
+/do
+```
+
+Codex sẽ:
+
+1. Lấy plan rõ ràng gần nhất trong cuộc trò chuyện.
+2. Kiểm tra lại `git status` và đọc lại docs/code nếu cần.
+3. Thực hiện đúng workflow gốc của plan, ví dụ `/task-full`, `/task-ui`, `/task-connect`, `/fix bug`, `/refactor` hoặc `/change-ui`.
+4. Không mở rộng phạm vi ngoài plan đã duyệt.
+5. Chạy check phù hợp, cập nhật changelog nếu có thay đổi file.
+
+Nếu không tìm thấy plan rõ ràng, Codex sẽ hỏi lại trước khi sửa file.
+
+## 22. `/commit`
 
 Dùng khi muốn Codex commit các thay đổi hiện tại.
 
@@ -616,7 +645,7 @@ fix(api): handle root health check
 
 Nên dùng `/commit fast` cho thay đổi docs/skill nhỏ, `/commit` cho đa số trường hợp bình thường, và `/commit full` khi có thay đổi dependency, Prisma/schema/migration, shared package hoặc nhiều module.
 
-## 22. File Codex có thể tự cập nhật
+## 23. File Codex có thể tự cập nhật
 
 Khi làm task, Codex có thể tự cập nhật một số file vận hành nếu việc đó giúp task rõ ràng, đúng thứ tự và không lệch contract.
 
@@ -633,7 +662,7 @@ docs/07-integration-and-env.md                   Cập nhật nếu task đổi 
 
 Codex không được tự đổi scope lớn, stack công nghệ hoặc rule nghiệp vụ quan trọng. Nếu phát hiện mâu thuẫn lớn, Codex phải báo lại hoặc ghi `TODO`/`ASSUMPTION`.
 
-## 23. Quy trình UI khuyến nghị
+## 24. Quy trình UI khuyến nghị
 
 Với màn hình mới, nên đi theo thứ tự:
 
@@ -651,13 +680,37 @@ Nếu muốn làm nhanh cả UI, API và phần liên quan trong một lượt:
 /task-full <mã task>
 ```
 
-## 24. Lưu ý
+## 25. Lưu ý
 
 - Mỗi lần nên giao một subtask, ví dụ `M3.4`.
 - Nếu không chắc nên làm gì tiếp, dùng `/next-task`.
 - Không dùng `/task-connect` khi chưa có UI mock, trừ khi bạn muốn Codex dừng và nhắc làm UI trước.
 - Không dùng `/task-ui` cho task không có giao diện.
 - Dùng `/change-ui` cho vòng chỉnh UI sau review; skill này không chốt pattern vào docs cho đến khi bạn nói UI đã ưng/chốt.
-- Nếu task nhỏ hoặc bug nhỏ, Codex có thể dùng quy trình nhẹ hơn để hoàn thành nhanh.
+- Nếu task nhỏ hoặc bug nhỏ, Codex có thể dùng lean mode để hoàn thành nhanh.
 - Nếu thay đổi file, Codex phải cập nhật changelog trong `.codex/changelog/`.
 - Codex không tự commit nếu bạn chưa gọi `/commit` hoặc yêu cầu rõ.
+
+## 26. Lean mode để làm nhanh task nhỏ
+
+Với task nhỏ, docs-only, UI-only nhỏ, wording, config nhẹ hoặc bug cô lập, Codex được phép rút gọn quy trình để tối đa tốc độ.
+
+Codex có thể:
+
+- không chạy full lint/build/test toàn repo,
+- chỉ chạy check nhỏ nhất đủ tin cậy,
+- dùng `git diff --check`, `quick_validate.py`, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú,
+- ghi rõ `Not run: <lý do>` nếu bỏ qua check lớn.
+
+Không dùng lean mode cho thay đổi rủi ro cao:
+
+- auth/RBAC,
+- payment,
+- database/schema/migration,
+- API contract,
+- AI/RAG,
+- worker/queue,
+- storage/file upload,
+- notification/realtime,
+- security,
+- thay đổi nhiều module cùng lúc.
