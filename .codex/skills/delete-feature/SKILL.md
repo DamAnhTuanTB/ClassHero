@@ -26,15 +26,16 @@ Before editing:
 1. Read `AGENTS.md`.
 2. Read `docs/01-product-scope.md` and `docs/02-user-flows.md`.
 3. Read `docs/09-implementation-plan.md` and relevant `docs/implementation/Mx.md` files.
-4. Read affected domain docs:
+4. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
+5. Read affected domain docs:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
-5. Search existing docs and code only enough to understand feature boundaries; do not plan production edits unless the owner explicitly asks to implement removal now.
-6. Inspect `git status --short`.
-7. Give a short plan: remove vs deprecate in docs, task codes affected, current-version impact, and checks.
+6. Search existing docs and code only enough to understand feature boundaries; do not plan production edits unless the owner explicitly asks to implement removal now.
+7. Inspect `git status --short`.
+8. Give a short plan: remove vs deprecate in docs, task codes affected, current-version impact, and checks.
 
 ## Safety Rules
 
@@ -58,6 +59,8 @@ When scope is clear:
 - Database: remove/deprecate schema docs only with a safe future migration note.
 - AI/RAG/env: remove or mark related docs out of scope if no longer used.
 - Roadmap: update `docs/implementation/Mx.md`; update `docs/09-implementation-plan.md` only if order/dependencies change.
+- Coverage/dependencies: update `docs/implementation/feature-coverage-matrix.md` and `docs/implementation/dependency-graph.md` when coverage/status/dependency changes.
+- Decision log: add/update `docs/decisions/` only when removal is an important long-term product/architecture decision.
 
 ## Task Code Rules
 
@@ -66,6 +69,7 @@ If the removed feature has roadmap/subtask codes:
 - Prefer marking the task as removed/out of scope in the relevant `docs/implementation/Mx.md` instead of renumbering other tasks.
 - Remove the task from `docs/09-implementation-plan.md` recommended order only if it should no longer be executed.
 - If later tasks depend on the removed task, update dependencies and note the replacement path or removed dependency.
+- If feature coverage changes, update `docs/implementation/feature-coverage-matrix.md`.
 - Do not delete historical context that explains why a task disappeared; add a short note when useful.
 - If `.codex/plans/codex-execution-plan.md` exists, update it when the removal affects near-term next steps/TODOs.
 - Mention in the final response which task code was removed, marked out of scope, or left unchanged.

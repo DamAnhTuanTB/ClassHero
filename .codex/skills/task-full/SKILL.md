@@ -46,14 +46,15 @@ Before editing:
 2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M8.3` -> `docs/implementation/M8.md`).
 3. Read the subtask `Mode`.
 4. If present, read `.codex/plans/codex-execution-plan.md`.
-5. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
-6. If `Mode` is `UI only` or `UI + API`, also read:
+5. If useful for orientation, read `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/dependency-graph.md`, and `docs/implementation/feature-coverage-matrix.md`.
+6. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
+7. If `Mode` is `UI only` or `UI + API`, also read:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-7. Inspect existing code for touched modules.
-8. Give a short plan: subtask, mode, docs read, modules/files, database/API/docs impact, commands.
+8. Inspect existing code for touched modules.
+9. Give a short plan: subtask, mode, docs read, modules/files, database/API/docs impact, commands.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -78,6 +79,7 @@ Depending on the subtask, do what is necessary:
 - Shared package: types/schemas/constants used by both apps.
 - Worker/integration: queue/provider/job code when required by docs.
 - Docs: update API/database/AI/UI/env docs only when behavior changes.
+- Codex context: update `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/feature-coverage-matrix.md`, or `docs/implementation/dependency-graph.md` only when the completed task changes repo state, module paths, feature status, or dependencies.
 - UI approval memory: if the owner says the UI is approved after review, record the pattern in `docs/ui-references/approved-patterns.md`; update `docs/11-ui-design-system.md` only for broad design rules.
 
 ## Verification

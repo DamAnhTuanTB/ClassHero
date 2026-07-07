@@ -25,10 +25,15 @@ Codex phải xem các tài liệu sau là nguồn chính của dự án:
 | `docs/08-ui-pages-and-components.md` | Danh sách màn hình/component |
 | `docs/09-implementation-plan.md` | Index milestone/subtask, thứ tự triển khai và phụ thuộc |
 | `docs/implementation/M*.md` | Chi tiết phạm vi/Done từng milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md` |
+| `docs/implementation/dependency-graph.md` | Bản đồ phụ thuộc đọc nhanh giữa milestone/subtask |
+| `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa |
 | `docs/10-seed-data-and-test-cases.md` | Seed data và test case cơ bản |
 | `docs/11-ui-design-system.md` | Gu UI, token, responsive, screenshot/review |
+| `docs/decisions/` | Decision log cho quyết định dài hạn |
 
 Nếu có `.codex/plans/codex-execution-plan.md`, dùng file đó để kiểm tra thứ tự/phụ thuộc, nhưng không dùng để thay thế docs gốc.
+
+Nếu có `.codex/context/current-context.md` hoặc `.codex/context/code-index.md`, dùng để định hướng nhanh trạng thái repo và vị trí code, nhưng vẫn phải đọc docs/code gốc trước khi sửa.
 
 ---
 
@@ -116,7 +121,12 @@ Nếu task quá mơ hồ, hỏi lại hoặc ghi `ASSUMPTION`, không tự suy d
 Trong quá trình làm task, Codex có thể cập nhật các file sau nếu cần để task rõ ràng, đúng thứ tự và không lệch contract:
 
 - `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md`: khi có thay đổi file đáng commit.
+- `.codex/context/current-context.md`: khi trạng thái repo, task tiếp theo, blocker hoặc quyết định workflow quan trọng thay đổi.
+- `.codex/context/code-index.md`: khi tạo/di chuyển module, entrypoint, API client, worker hoặc shared schema quan trọng.
 - `.codex/plans/codex-execution-plan.md`: nếu phát hiện dependency, thứ tự subtask, `TODO` hoặc `ASSUMPTION` nhỏ cần chỉnh.
+- `docs/implementation/dependency-graph.md`: khi thêm/xóa/hoãn task hoặc đổi phụ thuộc giữa milestone/subtask.
+- `docs/implementation/feature-coverage-matrix.md`: khi feature đổi coverage DB/API/UI/worker/test hoặc status.
+- `docs/decisions/`: khi có quyết định dài hạn về workflow, kiến trúc, scope, UI rule hoặc tích hợp.
 - `docs/ui-references/approved-patterns.md`: khi owner xác nhận UI đã "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này".
 - `docs/11-ui-design-system.md`: khi owner chốt một rule UI áp dụng rộng.
 - `docs/learning-notes/`: khi phần giải thích kỹ thuật có giá trị học tập lâu dài; ghi theo feature-first, merge vào note cũ khi có thể và tránh copy trùng final response.

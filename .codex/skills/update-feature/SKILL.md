@@ -25,15 +25,16 @@ Before editing:
 1. Read `AGENTS.md`.
 2. Read `docs/01-product-scope.md` and `docs/02-user-flows.md` for product impact.
 3. Read `docs/09-implementation-plan.md` and the matching file in `docs/implementation/` if the feature maps to a milestone.
-4. Read source-of-truth docs for affected domains:
+4. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
+5. Read source-of-truth docs for affected domains:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
-5. Inspect existing code only enough to understand boundaries; do not plan production edits unless the owner explicitly asks to implement now.
-6. Inspect `git status --short`.
-7. Give a short plan: feature being changed, docs to update, task codes affected, checks, and whether implementation should be a later `/task-*` step.
+6. Inspect existing code only enough to understand boundaries; do not plan production edits unless the owner explicitly asks to implement now.
+7. Inspect `git status --short`.
+8. Give a short plan: feature being changed, docs to update, task codes affected, checks, and whether implementation should be a later `/task-*` step.
 
 ## Rules
 
@@ -57,6 +58,8 @@ When scope is clear:
 - UI: update UI docs if screens/components/UX expectations change.
 - AI/RAG: update AI/RAG docs if prompts/schema/cache/retrieval behavior changes.
 - Implementation plan: update `docs/implementation/Mx.md` if subtask scope/Done changes; update `docs/09-implementation-plan.md` only if order/dependencies change.
+- Coverage/dependencies: update `docs/implementation/feature-coverage-matrix.md` or `docs/implementation/dependency-graph.md` when layer coverage, status, order, or dependency changes.
+- Decision log: add/update `docs/decisions/` only for important long-term decisions.
 
 ## Task Code Rules
 
@@ -66,6 +69,7 @@ If the feature change affects roadmap/subtask codes:
 - Create a new task code only when the change creates a clearly separate piece of work that should be implemented/reviewed independently.
 - Do not renumber existing task codes unless the owner explicitly asks; renumbering breaks references.
 - If dependencies or execution order change, update `docs/09-implementation-plan.md`.
+- If feature coverage or dependency graph changes, update the matching helper docs.
 - If `.codex/plans/codex-execution-plan.md` exists and the change affects near-term execution order/TODOs, update it too.
 - Mention in the final response which task code was updated, added, or left unchanged.
 

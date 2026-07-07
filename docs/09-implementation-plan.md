@@ -13,6 +13,13 @@ docs/implementation/M14.md
 
 Nếu cần xem cách map nhanh, mở `docs/implementation/README.md`.
 
+Nếu cần xem phụ thuộc hoặc coverage theo feature nhanh hơn, mở thêm:
+
+```txt
+docs/implementation/dependency-graph.md
+docs/implementation/feature-coverage-matrix.md
+```
+
 Khi làm task, Codex đọc file index này trước. Sau khi xác định mã subtask, mở đúng file milestone tương ứng. Ví dụ `M8.3` thì đọc `docs/implementation/M8.md`.
 
 `Mode` dùng để chọn phạm vi kỹ thuật của subtask:

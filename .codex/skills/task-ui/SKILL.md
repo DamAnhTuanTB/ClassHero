@@ -46,15 +46,16 @@ Before editing:
 2. Read the requested subtask in `docs/09-implementation-plan.md` and the matching milestone file in `docs/implementation/` (for example `M3.4` -> `docs/implementation/M3.md`).
 3. Read the subtask `Mode`.
 4. If present, read `.codex/plans/codex-execution-plan.md`.
-5. Read UI docs:
+5. If useful for orientation, read `.codex/context/current-context.md`, `.codex/context/code-index.md`, and `docs/implementation/feature-coverage-matrix.md`.
+6. Read UI docs:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-6. Read `docs/02-user-flows.md` for the affected role/flow.
-7. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
-8. Inspect existing web code and component patterns.
-9. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, and commands.
+7. Read `docs/02-user-flows.md` for the affected role/flow.
+8. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
+9. Inspect existing web code and component patterns.
+10. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, and commands.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -66,6 +67,7 @@ In plan mode, stop after this plan and wait for approval.
 - Do not edit backend, database, Prisma, API services, workers, payment, storage, or AI logic.
 - Do not connect real API calls.
 - Do not add features outside MVP or outside the requested subtask.
+- If new routes/components/features are created, update `.codex/context/code-index.md` or `docs/implementation/feature-coverage-matrix.md` only when that helps future tasks find or track the UI.
 - If required API/backend does not exist, keep UI mock-only and note `/task-connect` may be blocked later.
 - Use the approved stack: Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, TanStack Query only if useful for local UI state mock, Zustand only for small UI state.
 - Mock data must be obvious, typed where practical, and easy to delete or replace when `/task-connect` runs.

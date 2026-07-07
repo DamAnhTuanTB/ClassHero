@@ -547,3 +547,17 @@
 - Changed: Tạo skill `do`, cập nhật task plan mode và README để dùng `/do` như câu "ok làm đi".
 - Files: `.codex/skills/do/**`, `.codex/skills/task-*/SKILL.md`, `README.md`
 - Tests: `quick_validate.py` cho do/task skills; `rg` kiểm tra /do; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Add lightweight Codex context docs
+
+- Summary: Bổ sung bộ context/coverage/decision docs nhẹ để Codex định hướng nhanh khi làm task.
+- Changed: Thêm current context, code index, dependency graph, feature coverage matrix, decision log và rule dùng chúng trong skill liên quan.
+- Files: `.codex/context/**`, `docs/implementation/dependency-graph.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/decisions/**`, `.codex/skills/**`, `AGENTS.md`, `README.md`, `docs/09-implementation-plan.md`, `docs/implementation/README.md`
+- Tests: `git diff --check`.
+
+## 2026-07-07 — Review Codex docs consistency
+
+- Summary: Rà soát docs/skill workflow và đồng bộ README với các file context mới.
+- Changed: Bổ sung danh sách file context/coverage/decision vào mục file Codex có thể tự cập nhật.
+- Files: `README.md`, `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
+- Tests: `rg` kiểm tra reference; kiểm tra 79/79 task có mode; kiểm tra 14 skill có frontmatter; `pnpm format:check`; `git diff --check`.

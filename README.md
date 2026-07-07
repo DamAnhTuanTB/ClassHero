@@ -113,9 +113,14 @@ docs/07-integration-and-env.md    Env và tích hợp bên thứ ba
 docs/08-ui-pages-and-components.md Danh sách màn hình/component
 docs/09-implementation-plan.md    Index milestone/subtask
 docs/implementation/              Chi tiết từng milestone M0..M14
+docs/implementation/dependency-graph.md Phụ thuộc task đọc nhanh
+docs/implementation/feature-coverage-matrix.md Feature đã đủ DB/API/UI/worker/test chưa
 docs/10-seed-data-and-test-cases.md Seed data và test case
 docs/11-ui-design-system.md       Gu UI, token, responsive, screenshot review
 docs/ui-references/               Pattern UI đã duyệt
+docs/decisions/                   Decision log
+.codex/context/current-context.md Trạng thái repo hiện tại cho Codex
+.codex/context/code-index.md      Bản đồ code hiện tại cho Codex
 ```
 
 ## 6. Cơ chế đọc task Mx.y
@@ -236,6 +241,20 @@ Giao việc bằng một trong các lệnh:
 ```
 
 Codex sẽ đọc docs liên quan trước khi code, không đổi stack, không thêm tính năng ngoài MVP, cập nhật changelog khi có thay đổi file và gợi ý bước tiếp theo sau khi xong.
+
+Trong quá trình làm, Codex có thể tự cập nhật các file hỗ trợ nếu cần:
+
+```txt
+.codex/context/current-context.md     Trạng thái repo, task tiếp theo, blocker
+.codex/context/code-index.md          Bản đồ module/path code
+.codex/plans/codex-execution-plan.md  Ghi chú thứ tự/phụ thuộc/assumption nhỏ
+docs/implementation/dependency-graph.md Phụ thuộc task/milestone
+docs/implementation/feature-coverage-matrix.md Coverage DB/API/UI/worker/test
+docs/decisions/                       Quyết định dài hạn
+.codex/changelog/                     Lịch sử thay đổi ngắn
+```
+
+Các file trên là tài liệu hỗ trợ, không được dùng để tự đổi scope, stack hoặc nghiệp vụ đã chốt trong docs chính.
 
 Các skill `/update-feature`, `/add-feature`, `/delete-feature`, `/move-feature-to-next-version` mặc định là docs/planning-only: chúng chỉnh tài liệu, roadmap và mã task trước; chưa code production nếu bạn không nói rõ.
 
@@ -651,7 +670,12 @@ Khi làm task, Codex có thể tự cập nhật một số file vận hành n�
 
 ```txt
 .codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md   Cập nhật khi có thay đổi file đáng commit
+.codex/context/current-context.md                Cập nhật khi trạng thái repo/task tiếp theo/blocker thay đổi
+.codex/context/code-index.md                     Cập nhật khi module/path code quan trọng thay đổi
 .codex/plans/codex-execution-plan.md             Cập nhật nếu phát hiện phụ thuộc/TODO/thứ tự nhỏ cần chỉnh
+docs/implementation/dependency-graph.md          Cập nhật nếu phụ thuộc task/milestone thay đổi
+docs/implementation/feature-coverage-matrix.md   Cập nhật nếu coverage DB/API/UI/worker/test thay đổi
+docs/decisions/                                  Cập nhật khi có quyết định dài hạn
 docs/ui-references/approved-patterns.md          Cập nhật khi bạn chốt UI đã ưng
 docs/11-ui-design-system.md                      Cập nhật khi bạn chốt rule UI dùng rộng
 docs/05-api-contract.md + docs/api/              Cập nhật nếu task đổi API contract

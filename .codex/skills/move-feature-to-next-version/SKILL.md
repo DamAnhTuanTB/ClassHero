@@ -26,15 +26,16 @@ Before editing:
 1. Read `AGENTS.md`.
 2. Read `docs/01-product-scope.md` and `docs/02-user-flows.md`.
 3. Read `docs/09-implementation-plan.md` and relevant `docs/implementation/Mx.md` files.
-4. Read affected domain docs:
+4. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
+5. Read affected domain docs:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
-5. Search existing code/docs for the feature.
-6. Inspect `git status --short`.
-7. Give a short plan: feature to defer, docs/tasks affected, current-version impact, checks.
+6. Search existing code/docs for the feature.
+7. Inspect `git status --short`.
+8. Give a short plan: feature to defer, docs/tasks affected, current-version impact, checks.
 
 ## Core Rules
 
@@ -54,6 +55,7 @@ If the feature has roadmap/subtask codes:
 - Remove or move it out of the current recommended order in `docs/09-implementation-plan.md` if it should not be executed now.
 - Keep the original task code unless the owner asks to reorganize.
 - Update dependencies for later tasks that depended on the deferred task.
+- Update `docs/implementation/feature-coverage-matrix.md` and `docs/implementation/dependency-graph.md` when status/order/dependencies change.
 - If `.codex/plans/codex-execution-plan.md` exists, update near-term next steps/TODOs so Codex does not suggest the deferred task next.
 - Mention in the final response which task code was deferred and what current-version task replaces it, if any.
 
@@ -66,6 +68,7 @@ When scope is clear:
 - UI docs: remove current-version screens/components or mark as future.
 - API/database/AI/env docs: mark as future/deferred if already documented; do not delete details that are useful later unless requested.
 - Implementation docs: mark task/subtask deferred and update order/dependencies.
+- Decision log: add/update `docs/decisions/` only if deferral is an important long-term scope decision.
 
 ## Verification
 

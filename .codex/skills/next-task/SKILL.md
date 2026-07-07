@@ -12,11 +12,12 @@ Use this skill to recommend what the owner should do next. Do not edit productio
 1. Read `AGENTS.md`.
 2. Read `README.md` for current workflow rules.
 3. Read `docs/09-implementation-plan.md` and the relevant `docs/implementation/Mx.md` files.
-4. Check `.codex/plans/codex-execution-plan.md` if it exists.
-5. Check recent changelog entries in `.codex/changelog/`.
-6. Check `git status --short` to see whether there are uncommitted changes.
-7. Identify completed, blocked, and dependency-ready subtasks.
-8. Recommend 1 primary next command and up to 2 alternatives.
+4. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
+5. Check `.codex/context/current-context.md` and `.codex/plans/codex-execution-plan.md` if they exist.
+6. Check recent changelog entries in `.codex/changelog/`.
+7. Check `git status --short` to see whether there are uncommitted changes.
+8. Identify completed, blocked, and dependency-ready subtasks.
+9. Recommend 1 primary next command and up to 2 alternatives.
 
 ## Output
 

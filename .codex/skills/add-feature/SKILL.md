@@ -26,15 +26,16 @@ Before editing:
 2. Read `docs/01-product-scope.md` to check MVP fit.
 3. Read `docs/02-user-flows.md` to understand affected roles/flows.
 4. Read `docs/09-implementation-plan.md` and relevant `docs/implementation/Mx.md` files.
-5. Read affected domain docs:
+5. Read `docs/implementation/dependency-graph.md` and `docs/implementation/feature-coverage-matrix.md` if they exist.
+6. Read affected domain docs:
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - API: `docs/05-api-contract.md` and matching/new `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching/new `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
-6. Inspect existing code only enough to understand existing boundaries; do not plan production edits unless the owner explicitly asks to implement now.
-7. Inspect `git status --short`.
-8. Give a short plan: MVP decision, docs to add/update, task code to add/reuse, and checks.
+7. Inspect existing code only enough to understand existing boundaries; do not plan production edits unless the owner explicitly asks to implement now.
+8. Inspect `git status --short`.
+9. Give a short plan: MVP decision, docs to add/update, task code to add/reuse, and checks.
 
 ## Scope Guard
 
@@ -55,6 +56,9 @@ If the new feature needs roadmap tracking:
 - Pick the milestone by domain, not by where the prompt happened to be asked.
 - Use the next available task number in that milestone; do not insert in the middle unless the owner explicitly wants that.
 - Update `docs/09-implementation-plan.md` if the new task must appear in recommended order or changes dependencies.
+- Update `docs/implementation/feature-coverage-matrix.md` if the feature adds or changes DB/API/UI/worker/test coverage.
+- Update `docs/implementation/dependency-graph.md` if dependencies change.
+- Add a decision record in `docs/decisions/` only if the feature changes long-term scope/architecture/workflow.
 - If the feature is tiny and fully covered by an existing task, update that task's scope instead of creating a new code.
 - If `.codex/plans/codex-execution-plan.md` exists, update it when the new task affects near-term next steps/TODOs.
 - Mention in the final response which task code was added or reused.
@@ -70,6 +74,7 @@ When approved and clear:
 - Database: update `docs/04-database-model.md` and matching `docs/database/` file if the feature needs data changes.
 - AI/RAG/env: update relevant docs only if the feature needs them.
 - Roadmap: update `docs/09-implementation-plan.md` only for order/dependency changes; update `docs/implementation/Mx.md` for subtask scope.
+- Coverage/dependencies: update helper docs when the feature changes coverage or dependency graph.
 
 ## Verification
 
