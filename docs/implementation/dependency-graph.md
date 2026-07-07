@@ -19,7 +19,7 @@ M3 course/lesson + M6 quiz/flashcard/test
     -> M13 XP/profile/leaderboard
 
 M3 course/lesson + M8 payment/enrollment
-  -> M7 access learning
+  -> full paid enrollment access and payment CTA after M8.4
   -> M11 parent payment/progress
 
 M10 notification + M12 news/report

@@ -111,7 +111,7 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | --- | --- | --- | --- | --- | --- |
 | Public landing, public course list/detail | `M3.5` | `M3.3` | `M1.3` | - | CTA mua/học thử nối thật ở `M8.4`. |
 | Login/register/forgot/reset password | `M2.4` | `M2.2`, `M2.3` | `M1.2` | - | Gồm session UI, form validation và forgot/reset flow. |
-| Student course list/detail | `M3.5` | `M3.3`, `M8.2`, `M8.3` | `M1.3`, `M1.5` | payOS trong `M8.2`, `M8.3` | Payment page/status nằm ở `M8.4`. |
+| Student course list/detail | `M3.5` | `M3.3` | `M1.3` | - | Chỉ browse/detail và trạng thái học thử/enrollment nếu API `M3.3` trả; CTA/payment thật nối ở `M8.4`, không kéo `M8.2`/`M8.3` vào `M3.5`. |
 | Student lesson page skeleton | `M7.1` | `M7.1`, `M6.5` | `M1.3`, `M1.4` | `M4.4`, `M5.x` khi có tài liệu/AI | Chỉ skeleton lesson; quiz/flashcard/test/AI tách task riêng. |
 | Quiz runner | `M7.2` | `M7.2` | `M1.4` | `M9.5` nếu có giải thích AI | CRUD câu hỏi admin ở `M6.2`. |
 | Flashcard deck | `M7.3` | `M7.3` | `M1.4` | `M9.5` nếu có giải thích AI | CRUD flashcard admin ở `M6.3`. |

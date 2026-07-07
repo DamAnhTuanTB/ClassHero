@@ -606,3 +606,13 @@
 - Files: `.codex/skills/next-task/SKILL.md`, `.codex/skills/next-task/agents/openai.yaml`, `.codex/skills/task-full/SKILL.md`, `.codex/skills/task-ui/SKILL.md`, `.codex/skills/task-connect/SKILL.md`, `.codex/skills/do/SKILL.md`, `.codex/skills/add-feature/SKILL.md`, `.codex/skills/update-feature/SKILL.md`, `.codex/skills/delete-feature/SKILL.md`, `.codex/skills/fix-bug/SKILL.md`, `.codex/changelog/CHANGELOG_2026-07-07_codex.md`
 - Tests: `quick_validate.py` cho các skill đã sửa; `git diff --check`.
 - Notes: Không thay đổi code production; không cần chạy build/test app.
+
+## 2026-07-07 — Fix docs review findings
+
+- Summary: Sửa các điểm lệch scope/routing trong docs và skill sau review bộ tài liệu Codex.
+- Changed:
+  - Làm rõ `M3.5` không kéo payment/payOS sớm, cập nhật dependency graph và execution plan baseline.
+  - Bổ sung rule đọc performance docs cho các skill feature/change UI khi task chạm list/search/cache/query/job/latency.
+- Files: `docs/08-ui-pages-and-components.md`, `docs/implementation/dependency-graph.md`, `.codex/skills/**`, `.codex/plans/codex-execution-plan.md`
+- Tests: `quick_validate.py` cho các skill đã sửa; `rg` kiểm tra reference; `pnpm format:check`; `git diff --check`.
+- Notes: Không thay đổi code production.

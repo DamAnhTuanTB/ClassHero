@@ -33,6 +33,7 @@ Before editing:
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
+   - Performance/observability: `docs/12-performance-and-observability.md` if deferring the feature changes list/search/cache, latency-sensitive flow, database query, worker/job, AI call, or observability behavior.
    - SEO/public discovery: `docs/13-seo-and-content-discovery.md` if deferring a public/indexable feature, route, metadata, sitemap entry, robots rule, canonical or structured data.
 6. Search existing code/docs for the feature.
 7. Inspect `git status --short`.
@@ -68,6 +69,7 @@ When scope is clear:
 - User flows: remove the feature from current flows or mark it as future flow.
 - UI docs: remove current-version screens/components or mark as future.
 - API/database/AI/env docs: mark as future/deferred if already documented; do not delete details that are useful later unless requested.
+- Performance/observability: update performance docs if deferral changes budgets, cache/index/query/job/AI latency, or observability standards for the current version.
 - SEO/public discovery: remove from current-version SEO/indexing docs or mark future/deferred when the postponed feature affected public discovery.
 - Implementation docs: mark task/subtask deferred and update order/dependencies.
 - Decision log: add/update `docs/decisions/` only if deferral is an important long-term scope decision.

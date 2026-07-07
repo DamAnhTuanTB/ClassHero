@@ -25,11 +25,12 @@ Before editing:
 1. Read `AGENTS.md`.
 2. Read `docs/11-ui-design-system.md`.
 3. Read `docs/08-ui-pages-and-components.md` if the target screen/component needs routing/context.
-4. Read `docs/13-seo-and-content-discovery.md` if the target is landing, public course list/detail, public news/event, or another indexable public page.
-5. Read `docs/ui-references/approved-patterns.md` if present and relevant.
-6. Inspect existing web code for the target screen/component.
-7. Inspect `git status --short`.
-8. Give a short plan: target UI, files likely touched, responsive/SEO checks if relevant, and commands.
+4. Read `docs/12-performance-and-observability.md` if the UI change touches list/search/cache behavior, large media, heavy interaction, latency-sensitive learning/payment/AI flow, or perceived performance.
+5. Read `docs/13-seo-and-content-discovery.md` if the target is landing, public course list/detail, public news/event, or another indexable public page.
+6. Read `docs/ui-references/approved-patterns.md` if present and relevant.
+7. Inspect existing web code for the target screen/component.
+8. Inspect `git status --short`.
+9. Give a short plan: target UI, files likely touched, responsive/performance/SEO checks if relevant, and commands.
 
 ## Scope Rules
 

@@ -33,6 +33,7 @@ Before editing:
    - Database: `docs/04-database-model.md` and matching/new `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
+   - Performance/observability: `docs/12-performance-and-observability.md` if the feature adds or changes list/search/cache, latency-sensitive flow, database query, worker/job, AI call, or observability behavior.
    - SEO/public discovery: `docs/13-seo-and-content-discovery.md` if the feature adds public/indexable pages or metadata/search-discovery behavior.
 7. Inspect existing code only enough to understand existing boundaries; do not plan production edits unless the owner explicitly asks to implement now.
 8. Inspect `git status --short`.
@@ -74,6 +75,7 @@ When approved and clear:
 - API: update `docs/05-api-contract.md` and matching `docs/api/` file if the feature needs API.
 - Database: update `docs/04-database-model.md` and matching `docs/database/` file if the feature needs data changes.
 - AI/RAG/env: update relevant docs only if the feature needs them.
+- Performance/observability: update `docs/12-performance-and-observability.md` only if the feature changes performance budgets, cache/index/query/job/AI latency, or observability standards.
 - SEO/public discovery: update `docs/13-seo-and-content-discovery.md` only if the feature changes public indexability, metadata, sitemap, robots, canonical, structured data or search-discovery behavior.
 - Roadmap: update `docs/09-implementation-plan.md` only for order/dependency changes; update `docs/implementation/Mx.md` for subtask scope.
 - Coverage/dependencies: update helper docs when the feature changes coverage or dependency graph.

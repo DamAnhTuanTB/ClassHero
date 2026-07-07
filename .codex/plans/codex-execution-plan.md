@@ -7,6 +7,7 @@ Update note 2026-07-07:
 - File này là baseline execution plan được tạo ở bước `M0.P`.
 - Roadmap hiện tại đã được bổ sung `Mode` và các task UI còn thiếu trong `docs/09-implementation-plan.md` + `docs/implementation/M*.md`.
 - Khi chọn task tiếp theo, ưu tiên đọc `docs/09-implementation-plan.md` và file milestone tương ứng thay vì dùng danh sách task cũ trong file này.
+- Danh sách task trong mục 3 là snapshot lịch sử, có thể thiếu task UI mới như `M2.4`, `M3.5`, `M4.5`, `M7.7`, `M8.5`, `M9.8`, `M13.5`; không dùng mục đó làm roadmap hiện hành.
 
 ## 1. Phạm vi bước này
 
@@ -269,7 +270,7 @@ Các điểm cần ghi chú khi triển khai:
 
 - `pwd`
 - `rg --files`
-- `git status --short` - không chạy được vì thư mục hiện tại chưa phải Git repo.
+- `git status --short` - ghi chú lịch sử lúc tạo baseline; repo hiện tại đã là Git repo, luôn chạy lại `git status --short` khi bắt đầu task mới.
 - `wc -l` các tài liệu được yêu cầu.
 - `sed` đọc các tài liệu được yêu cầu.
 - `date +%Y-%m-%d`

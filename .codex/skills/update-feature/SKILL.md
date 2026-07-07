@@ -32,6 +32,7 @@ Before editing:
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
    - Env/integration: `docs/07-integration-and-env.md`.
+   - Performance/observability: `docs/12-performance-and-observability.md` if list/search/cache, latency-sensitive flow, database query, worker/job, AI call, or observability behavior changes.
    - SEO/public discovery: `docs/13-seo-and-content-discovery.md` if public indexability, metadata, sitemap, robots, canonical, structured data or search-discovery behavior changes.
 6. Inspect existing code only enough to understand boundaries; do not plan production edits unless the owner explicitly asks to implement now.
 7. Inspect `git status --short`.
@@ -58,6 +59,7 @@ When scope is clear:
 - Database: update database index/file if schema/model meaning changes.
 - UI: update UI docs if screens/components/UX expectations change.
 - AI/RAG: update AI/RAG docs if prompts/schema/cache/retrieval behavior changes.
+- Performance/observability: update performance docs if budgets, cache/index/query/job/AI latency, or observability standards change.
 - SEO/public discovery: update SEO docs if index/noindex, metadata, sitemap, robots, canonical, structured data or public content discovery changes.
 - Implementation plan: update `docs/implementation/Mx.md` if subtask scope/Done changes; update `docs/09-implementation-plan.md` only if order/dependencies change.
 - Coverage/dependencies: update `docs/implementation/feature-coverage-matrix.md` or `docs/implementation/dependency-graph.md` when layer coverage, status, order, or dependency changes.
