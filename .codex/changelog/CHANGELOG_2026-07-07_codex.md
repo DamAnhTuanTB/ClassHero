@@ -589,3 +589,10 @@
 - Changed: Làm rõ fallback frontmatter check, bổ sung performance/SEO vào README, prompt và review-docs skill.
 - Files: `AGENTS.md`, `README.md`, `.codex/skills/commit/SKILL.md`, `.codex/skills/review-docs/SKILL.md`, `.codex/prompts/*.md`
 - Tests: `rg` kiểm tra stale references; kiểm tra frontmatter skill; `pnpm format:check`; `git diff --check`.
+
+## 2026-07-07 — Shorten README as docs router
+
+- Summary: Rút README thành hướng dẫn nhanh cho người mới, giảm lặp chi tiết với AGENTS và skill docs.
+- Changed: Giữ README làm cửa vào/router; trỏ chi tiết sang `AGENTS.md`, docs nguồn và `.codex/skills/*/SKILL.md`.
+- Files: `README.md`
+- Tests: `rg` kiểm tra stale references; `pnpm format:check`; `git diff --check`.
