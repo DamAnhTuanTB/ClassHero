@@ -1,5 +1,5 @@
 ---
-name: bug-fix-runner
+name: fix-bug
 description: Fix bugs in the Vietnamese learning-path project from commands like "/fix bug mô tả lỗi", "/fix bug lỗi 500 khi mở API", or "sửa bug mô tả". Use when Codex must read relevant project docs, map the bug to the likely milestone/module, reproduce or gather enough evidence, identify root cause, make the smallest safe fix, scale process and checks to bug size, avoid unrelated changes, update changelog, verify with focused commands when practical, then explain the bug cause and concise handling approach with applied technical flow.
 ---
 
@@ -92,7 +92,7 @@ Keep the final answer short and useful. Include:
 - Verification: commands run and result.
 - Files changed.
 - Notes: restart required, env/config needed, TODO/ASSUMPTION, or execution plan update.
-- Next action: the next check or likely `/task Mx.y` if the bug blocks roadmap work.
+- Next action: the next check or likely `/task-ui`, `/task-connect`, or `/task-full` command if the bug blocks roadmap work.
 
 Do not merge cause and fix into a vague summary. If the root cause is uncertain, say what was confirmed, what remains an assumption, and how the fix was verified.
 

@@ -145,15 +145,126 @@ Yêu cầu:
 ## 11. UI/UX Change
 
 ```txt
-Tôi cần đổi UI/UX: <MÔ TẢ>.
+Tôi cần làm UI: <MÔ TẢ>.
 
 Yêu cầu:
-- Đọc AGENTS.md, docs/08-ui-pages-and-components.md, docs/02-user-flows.md.
+- Đọc AGENTS.md, docs/11-ui-design-system.md, docs/08-ui-pages-and-components.md, docs/02-user-flows.md.
+- Đọc docs/ui-references/approved-patterns.md nếu có pattern đã chốt liên quan.
 - Đọc docs/05-api-contract.md nếu UI gọi API.
 - Xác định role bị ảnh hưởng.
+- Ưu tiên mobile-first nhưng phải ổn trên tablet/iPad và laptop/desktop.
 - Không thay backend permission bằng UI-only guard.
 - Không thêm thư viện ngoài stack nếu chưa được duyệt.
-- Chạy lint/typecheck/build liên quan và cập nhật changelog.
+- Có loading, empty, error, disabled state nếu màn hình có data/action.
+- Nếu có thể chạy app, kiểm tra browser/screenshot ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad.
+- Nếu cần gửi owner review, lưu screenshot vào `.codex/screenshots/<ten-man-hinh>-<viewport>.png`.
+- Chạy check liên quan và cập nhật changelog.
+```
+
+## 11.1. UI Shell
+
+```txt
+Hãy tạo UI shell cho frontend theo docs/11-ui-design-system.md.
+
+Phải đọc:
+- AGENTS.md
+- docs/03-technical-architecture.md
+- docs/08-ui-pages-and-components.md
+- docs/11-ui-design-system.md
+- docs/09-implementation-plan.md
+
+Phạm vi:
+- Chỉ làm frontend UI shell.
+- Không connect API thật.
+- Không làm business logic.
+
+Yêu cầu:
+- Setup layout public/student/parent/admin.
+- Tạo common Header, PageHeader, EmptyState, LoadingState, ErrorState.
+- Tạo layout responsive cho mobile, tablet/iPad, laptop/desktop.
+- Dùng Tailwind + shadcn/ui.
+- Nếu có thể chạy app, cung cấp URL/route để review.
+- Cập nhật changelog.
+```
+
+## 11.2. Page UI Với Mock Data
+
+```txt
+Hãy implement UI màn hình: <TÊN MÀN HÌNH>.
+
+Phải đọc:
+- AGENTS.md
+- docs/11-ui-design-system.md
+- docs/08-ui-pages-and-components.md
+- docs/02-user-flows.md
+- docs/05-api-contract.md nếu màn hình có data/API.
+
+Phạm vi:
+- Chỉ làm UI với mock data rõ ràng, dễ xóa khi connect API.
+- Không sửa backend/database.
+
+Yêu cầu UI:
+- Người dùng chính: <student/parent/admin/public>.
+- Mục tiêu màn hình: <mục tiêu>.
+- Dữ liệu hiển thị: <danh sách dữ liệu>.
+- Hành động chính: <CTA/workflow>.
+- Có loading, empty, error, disabled state nếu phù hợp.
+- Responsive mobile, tablet/iPad, laptop/desktop.
+- Nếu cần owner review, lưu screenshot vào `.codex/screenshots/<ten-man-hinh>-<viewport>.png`.
+- Không thêm tính năng ngoài MVP.
+- Cập nhật changelog.
+```
+
+## 11.3. Connect UI Với API
+
+```txt
+Hãy connect UI màn hình <TÊN MÀN HÌNH> với API thật. Nếu API chưa có, hãy code API đầy đủ theo phạm vi subtask/API contract rồi kết nối.
+
+Phải đọc:
+- AGENTS.md
+- docs/11-ui-design-system.md
+- docs/08-ui-pages-and-components.md
+- docs/05-api-contract.md
+- docs/02-user-flows.md
+
+Yêu cầu:
+- Giữ layout/UI hiện có, không polish lớn nếu chưa cần.
+- Nếu endpoint/API chưa có, implement backend API đầy đủ theo contract và docs liên quan.
+- Thay mock data bằng API client/hook phù hợp.
+- Dùng TanStack Query cho server state.
+- Form dùng React Hook Form + Zod nếu có validation.
+- Xử lý loading, empty, error, disabled state.
+- Không mở rộng backend ngoài phạm vi màn hình/subtask đang connect.
+- Chạy check liên quan và cập nhật changelog.
+```
+
+## 11.4. Polish UI Theo Feedback
+
+```txt
+Hãy polish UI theo feedback sau: <FEEDBACK>.
+
+Yêu cầu:
+- Đọc AGENTS.md và docs/11-ui-design-system.md.
+- Chỉ sửa UI/CSS/component layout.
+- Không sửa logic/backend/database.
+- Không đổi flow nếu owner không yêu cầu.
+- Kiểm tra lại mobile, tablet/iPad, laptop/desktop ở phần bị ảnh hưởng.
+- Nếu owner nói "ưng rồi/ok rồi/chốt UI này" sau vòng sửa, lưu pattern vào docs/ui-references/approved-patterns.md; chỉ cập nhật docs/11-ui-design-system.md nếu là rule dùng rộng.
+- Cập nhật changelog.
+```
+
+## 11.5. Responsive/UI Consistency Audit
+
+```txt
+Hãy audit UI consistency cho: <MÀN HÌNH/THƯ MỤC>.
+
+Yêu cầu:
+- Đọc AGENTS.md, docs/11-ui-design-system.md và docs/08-ui-pages-and-components.md.
+- Kiểm tra mobile, tablet/iPad, laptop/desktop.
+- Tìm overflow, overlap, text bị cắt, spacing lệch, state thiếu, màu ngoài design system.
+- Nếu lỗi nhỏ rõ ràng thì sửa luôn.
+- Nếu lỗi lớn hoặc đổi flow thì báo findings trước.
+- Cập nhật changelog nếu có sửa file.
 ```
 
 ## 12. Add Tests

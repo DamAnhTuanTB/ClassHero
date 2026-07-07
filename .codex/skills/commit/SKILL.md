@@ -1,5 +1,5 @@
 ---
-name: commit-runner
+name: commit
 description: Create a git commit for the Vietnamese learning-path project when the user types "/commit", "commit giúp tôi", or asks Codex to commit current changes. Use when Codex must inspect the worktree, verify changelog requirements from AGENTS.md, avoid committing secrets or unrelated unsafe files, stage the intended project changes, write a short conventional commit message that still covers the main points, run lightweight checks when practical, execute git commit, and report the commit hash and included files.
 ---
 

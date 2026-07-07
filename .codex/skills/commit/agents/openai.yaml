@@ -1,4 +1,4 @@
 interface:
   display_name: "Commit Runner"
   short_description: "Review changes and create a concise commit"
-  default_prompt: "Use $commit-runner to commit the current project changes."
+  default_prompt: "Use $commit to commit the current project changes."

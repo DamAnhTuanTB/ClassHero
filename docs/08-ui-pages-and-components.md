@@ -2,6 +2,10 @@
 
 Tài liệu này mô tả danh sách màn hình và component chính cần có ở phía public, student, parent và admin.
 
+Gu thiết kế, token UI, responsive rules và checklist nghiệm thu nằm ở `docs/11-ui-design-system.md`. Khi làm UI, Codex phải đọc cả file này và `docs/11-ui-design-system.md`.
+
+Nếu đã có pattern được owner chốt, Codex phải đọc thêm `docs/ui-references/approved-patterns.md`.
+
 Front-end dùng Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, TanStack Query, Zustand, React Hook Form, Zod, Tiptap, KaTeX và mhchem.
 
 ---
@@ -16,9 +20,42 @@ Front-end dùng Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, Tan
 - Rich text dùng Tiptap.
 - Công thức Toán/Lý/Hóa render bằng KaTeX + mhchem.
 - Các màn học nên ưu tiên rõ ràng, ít nhiễu, phù hợp học sinh.
-- Thiết kế UI theo mobile-first: ưu tiên trải nghiệm trên điện thoại trước, sau đó mở rộng layout cho laptop/desktop.
+- Thiết kế UI theo mobile-first: ưu tiên trải nghiệm trên điện thoại trước, sau đó mở rộng layout cho tablet/iPad và laptop/desktop.
+- Tablet/iPad phải có layout trung gian hợp lý, không chỉ phóng to mobile hoặc ép dùng desktop layout.
 - Laptop/desktop vẫn phải dễ dùng: tận dụng chiều ngang cho sidebar, bảng, split view hoặc panel phụ khi phù hợp.
-- Không tạo layout chỉ hoạt động tốt ở desktop; các CTA, form, quiz, flashcard, test và payment phải dùng tốt trên mobile.
+- Không tạo layout chỉ hoạt động tốt ở một nhóm thiết bị; các CTA, form, quiz, flashcard, test và payment phải dùng tốt trên mobile, tablet/iPad và laptop/desktop.
+
+### 1.1. UI direction
+
+Xem `docs/11-ui-design-system.md`.
+
+### 1.2. Mobile-first responsive patterns
+
+Xem `docs/11-ui-design-system.md`.
+
+### 1.3. Component and state rules
+
+Xem `docs/11-ui-design-system.md`.
+
+### 1.4. UI acceptance checklist
+
+Xem `docs/11-ui-design-system.md`.
+
+### 1.5. Cách owner nên giao task UI
+
+Để Codex code đúng gu nhanh hơn, prompt UI nên có:
+
+```txt
+Màn hình/component: <tên màn hình>
+Người dùng chính: <student/parent/admin/public>
+Mục tiêu: <người dùng cần làm gì>
+Dữ liệu hiển thị: <các trường/chỉ số chính>
+Hành động chính: <CTA hoặc workflow>
+Cảm giác UI: <ví dụ: sáng, gọn, học tập, tin cậy>
+Ưu tiên responsive: mobile-first, desktop vẫn đủ rộng/dễ quét
+Thiết bị cần ổn: mobile, tablet/iPad, laptop/desktop
+Không làm: <những thứ ngoài MVP hoặc không muốn>
+```
 
 ---
 
@@ -490,7 +527,5 @@ JobStatusBadge
 
 ## 10. UI TODO
 
-- TODO: Design system final: màu, typography, spacing.
-- TODO: Chi tiết breakpoint/pattern responsive cho từng nhóm màn hình.
-- TODO: Empty states và skeleton loading final.
-- TODO: Nội dung copywriting final.
+- TODO: Bổ sung pattern responsive riêng cho các màn hình phức tạp sau khi có UI thật.
+- TODO: Chốt copywriting final theo từng role khi sản phẩm đi vào polish.

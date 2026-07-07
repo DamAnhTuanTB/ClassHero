@@ -87,7 +87,7 @@ Phạm vi:
 
 - Không sửa code.
 - Đọc tài liệu cốt lõi.
-- Tạo hoặc cập nhật `docs/codex-execution-plan.md` nếu owner yêu cầu.
+- Tạo hoặc cập nhật `.codex/plans/codex-execution-plan.md` nếu owner yêu cầu.
 
 Phải đọc:
 

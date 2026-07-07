@@ -33,6 +33,16 @@ Sau khi xong, báo file đã tạo/sửa.
 
 ## Prompt Chuẩn Cho Một Subtask
 
+Nên dùng một trong ba lệnh mới:
+
+```txt
+/task-ui <MÃ SUBTASK>       # Làm UI với mock data trước, không connect API thật
+/task-connect <MÃ SUBTASK>  # Code API còn thiếu nếu cần, rồi kết nối UI đã làm với API thật
+/task-full <MÃ SUBTASK>     # Làm trọn task gồm UI/API/backend/docs nếu subtask cần
+```
+
+Prompt dưới đây chỉ dùng như fallback khi không dùng được skill/lệnh slash ở trên.
+
 ```txt
 Hãy làm <MÃ SUBTASK>: <TÊN SUBTASK>.
 
@@ -60,7 +70,10 @@ Sau khi xong:
 ## Prompt Làm Subtask Tiếp Theo
 
 ```txt
-Hãy làm subtask tiếp theo theo .codex/plans/codex-execution-plan.md và docs/09-implementation-plan.md.
+Hãy chọn subtask tiếp theo theo .codex/plans/codex-execution-plan.md và docs/09-implementation-plan.md, rồi đề xuất 1 trong 3 lệnh:
+- /task-ui <MÃ SUBTASK>
+- /task-connect <MÃ SUBTASK>
+- /task-full <MÃ SUBTASK>
 
 Trước khi code:
 - Đọc AGENTS.md.
@@ -68,7 +81,7 @@ Trước khi code:
 - Đọc docs liên quan theo Task routing map.
 - Nêu rõ subtask sẽ làm và những phần không làm trong lượt này.
 
-Giữ phạm vi đúng một subtask, cập nhật changelog sau khi có thay đổi file.
+Chỉ code sau khi đã chọn đúng mode. Giữ phạm vi đúng một subtask, cập nhật changelog sau khi có thay đổi file.
 ```
 
 ## Catalog Subtask

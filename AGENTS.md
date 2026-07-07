@@ -6,7 +6,7 @@ Bộ tài liệu này là nguồn đầu vào chính để Codex bắt đầu ph
 
 Mục tiêu của bộ tài liệu không phải là mô tả mọi chi tiết nhỏ của sản phẩm, mà là cung cấp đủ thông tin cốt lõi để Codex có thể code đúng hướng, đúng kiến trúc, đúng phạm vi MVP và hạn chế tự suy diễn.
 
-Bộ tài liệu gồm đúng 11 file:
+Bộ tài liệu gồm 12 file chính:
 
 1. `AGENTS.md`  
    Tài liệu chỉ đạo chung cho Codex. File này quy định mục tiêu dự án, công nghệ bắt buộc, cấu trúc repo, quy tắc code, quy tắc test, quy tắc migration, quy tắc bảo mật và Definition of Done.
@@ -41,6 +41,9 @@ Bộ tài liệu gồm đúng 11 file:
 11. `docs/10-seed-data-and-test-cases.md`  
     Mô tả dữ liệu mẫu và test case cơ bản để kiểm tra hệ thống trong quá trình phát triển.
 
+12. `docs/11-ui-design-system.md`
+    Mô tả gu thiết kế chính thức cho Codex khi làm UI: phong cách, màu sắc, typography, spacing, layout, component rules, responsive rules, trạng thái UI và checklist nghiệm thu.
+
 ### Cách Codex nên đọc tài liệu
 
 Codex không bắt buộc phải đọc lại toàn bộ tài liệu cho mọi task.
@@ -66,6 +69,7 @@ Sau đó, nếu đây là lần đầu làm việc với repo hoặc task có ph
 8. `docs/08-ui-pages-and-components.md`
 9. `docs/09-implementation-plan.md`
 10. `docs/10-seed-data-and-test-cases.md`
+11. `docs/11-ui-design-system.md` nếu task có UI.
 
 Áp dụng chế độ đọc đầy đủ cho các task như:
 
@@ -143,6 +147,13 @@ Quy tắc:
 ### Task routing map
 
 Codex phải dùng bảng này để chọn tài liệu cần đọc trước khi code.
+
+Quy tắc UI bổ sung:
+
+- Nếu task có giao diện, ngoài các tài liệu trong milestone, Codex phải đọc `docs/08-ui-pages-and-components.md` và `docs/11-ui-design-system.md`.
+- Nếu UI cần data/API, đọc thêm `docs/05-api-contract.md`.
+- Nếu UI là một flow người dùng cụ thể, đọc thêm `docs/02-user-flows.md`.
+- Nếu task chỉ làm UI, không sửa backend/database trừ khi owner yêu cầu rõ.
 
 #### Repo setup / tooling / monorepo
 
@@ -738,8 +749,15 @@ Nếu owner có quyết định khác, cập nhật `docs/07-integration-and-env
 - Form dùng React Hook Form + Zod.
 - Rich text dùng Tiptap.
 - Công thức Toán/Lý/Hóa lưu LaTeX trong Tiptap JSON.
-- UI ưu tiên mobile-first: thiết kế và kiểm tra trước cho màn hình điện thoại, sau đó mở rộng để laptop/desktop vẫn dễ dùng.
-- Các màn học, quiz, flashcard, test, payment và dashboard phải responsive rõ ràng; tránh layout chỉ đẹp trên laptop.
+- Khi làm UI, phải đọc `docs/11-ui-design-system.md` và `docs/08-ui-pages-and-components.md`.
+- Nếu có `docs/ui-references/approved-patterns.md`, phải đọc khi làm UI tương tự pattern đã được owner chốt.
+- Không tự chọn style ngẫu nhiên; bám token, spacing, typography và responsive rules trong `docs/11-ui-design-system.md`.
+- UI ưu tiên mobile-first: thiết kế và kiểm tra trước cho điện thoại, sau đó mở rộng cho tablet/iPad và laptop/desktop.
+- Các màn học, quiz, flashcard, test, payment và dashboard phải responsive rõ ràng trên mobile, tablet/iPad và laptop/desktop; tránh layout chỉ đẹp trên một nhóm thiết bị.
+- Màn hình có data/action phải có loading, empty, error và disabled state phù hợp.
+- Nếu task chỉ làm UI, không sửa backend/database. Nếu cần mock data, đặt mock rõ ràng và dễ xóa khi connect API.
+- Nếu có thể chạy app, UI task nên được kiểm tra bằng browser/screenshot ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad.
+- Khi owner nói "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này", Codex phải lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là nguyên tắc áp dụng rộng.
 - Không xử lý permission chỉ bằng UI. Backend vẫn phải enforce RBAC.
 - Route admin/student/parent phải có guard.
 

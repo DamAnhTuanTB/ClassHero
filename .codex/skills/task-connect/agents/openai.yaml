@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Connect Runner"
+  short_description: "Connect finished UI to project APIs"
+  default_prompt: "Use $task-connect to run /task-connect M7.1 and connect the UI to APIs."

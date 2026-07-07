@@ -265,3 +265,101 @@
 - Changed: Cập nhật rule front-end, nguyên tắc UI và skill `/task`.
 - Files: `AGENTS.md`, `docs/08-ui-pages-and-components.md`, `.codex/skills/learning-task-runner/SKILL.md`
 - Tests: `quick_validate.py` cho `learning-task-runner`.
+
+## 2026-07-07 — Add UI operating brief
+
+- Summary: Bổ sung hướng dẫn để Codex code UI đúng gu và giảm vòng sửa.
+- Changed: Thêm UI direction, responsive patterns, checklist và prompt format.
+- Files: `docs/08-ui-pages-and-components.md`, `.codex/skills/learning-task-runner/SKILL.md`
+- Tests: `quick_validate.py` cho `learning-task-runner`.
+
+## 2026-07-07 — Clarify tablet UI support
+
+- Summary: Làm rõ UI phải tối ưu mobile-first và hỗ trợ tablet/iPad, laptop/desktop.
+- Changed: Cập nhật responsive rule, checklist và skill `/task`.
+- Files: `AGENTS.md`, `docs/08-ui-pages-and-components.md`, `.codex/skills/learning-task-runner/SKILL.md`
+- Tests: `quick_validate.py` cho `learning-task-runner`.
+
+## 2026-07-07 — Add UI design system docs
+
+- Summary: Thiết lập tài liệu gu UI để Codex code đúng ý hơn và giảm vòng sửa.
+- Changed: Thêm design system, UI reference notes và prompt mẫu UI theo từng giai đoạn.
+- Files: `docs/11-ui-design-system.md`, `docs/ui-references/reference-notes.md`, `AGENTS.md`, `.codex/prompts/special-cases.md`, `.codex/skills/learning-task-runner/SKILL.md`
+- Tests: `quick_validate.py` cho `learning-task-runner`.
+
+## 2026-07-07 — Rename UI design system doc
+
+- Summary: Đổi tên file UI design system theo thứ tự tài liệu.
+- Changed: Cập nhật reference từ `docs/ui-design-system.md` sang `docs/11-ui-design-system.md`.
+- Files: `docs/11-ui-design-system.md`, `AGENTS.md`, `docs/08-ui-pages-and-components.md`, `.codex/prompts/special-cases.md`, `.codex/skills/learning-task-runner/SKILL.md`
+- Tests: `quick_validate.py` cho `learning-task-runner`.
+
+## 2026-07-07 — Split task runner skills
+
+- Summary: Tách workflow `/task` thành `/task-ui`, `/task-connect` và `/task-full`.
+- Changed: Thêm 3 skill mới và chuyển `/task` cũ thành legacy/router.
+- Files: `.codex/skills/task-*-runner/**`, `.codex/skills/learning-task-runner/SKILL.md`, `.codex/prompts/core-features.md`
+- Tests: `quick_validate.py` cho 4 skill task runner.
+
+## 2026-07-07 — Remove legacy task skill
+
+- Summary: Xóa skill `/task` cũ, chỉ giữ 3 skill task mới.
+- Changed: Cập nhật README, prompt và bug-fix next action sang `/task-ui`, `/task-connect`, `/task-full`.
+- Files: `.codex/skills/learning-task-runner/**`, `README.md`, `.codex/prompts/core-features.md`, `.codex/skills/bug-fix-runner/SKILL.md`
+- Tests: `quick_validate.py` cho 3 skill task mới và `bug-fix-runner`.
+
+## 2026-07-07 — Rename task skill folders
+
+- Summary: Đổi tên thư mục skill task trùng với câu lệnh kích hoạt.
+- Changed: `task-ui-runner`, `task-connect-runner`, `task-full-runner` thành `task-ui`, `task-connect`, `task-full`.
+- Files: `.codex/skills/task-ui/**`, `.codex/skills/task-connect/**`, `.codex/skills/task-full/**`
+- Tests: `quick_validate.py` cho 3 skill task.
+
+## 2026-07-07 — Rename command skill folders
+
+- Summary: Đổi tên các skill còn lại cho khớp lệnh kích hoạt.
+- Changed: `bug-fix-runner` thành `fix-bug`, `commit-runner` thành `commit`.
+- Files: `.codex/skills/fix-bug/**`, `.codex/skills/commit/**`
+- Tests: `quick_validate.py` cho tất cả skill hiện có.
+
+## 2026-07-07 — Expand task-connect scope
+
+- Summary: Sửa `/task-connect` để code API còn thiếu rồi kết nối UI.
+- Changed: Cho phép implement backend API đầy đủ theo phạm vi subtask/API contract rồi connect UI.
+- Files: `.codex/skills/task-connect/SKILL.md`, `.codex/prompts/core-features.md`, `.codex/prompts/special-cases.md`
+- Tests: `quick_validate.py` cho `task-connect`.
+
+## 2026-07-07 — Tighten Codex workflow docs
+
+- Summary: Chuẩn hóa execution plan, UI token và screenshot workflow để Codex ít phải tự đoán.
+- Changed: Thống nhất `.codex/plans/codex-execution-plan.md`, thêm UI token mặc định và screenshot path.
+- Files: `AGENTS.md`, `docs/08-ui-pages-and-components.md`, `docs/09-implementation-plan.md`, `docs/11-ui-design-system.md`, `.codex/skills/**`, `.codex/prompts/special-cases.md`
+- Tests: `quick_validate.py` cho 5 skill; `git diff --check`.
+
+## 2026-07-07 — Guard task-ui non-UI tasks
+
+- Summary: Thêm rule để `/task-ui` dừng sớm nếu subtask không có phần UI.
+- Changed: Gợi ý chuyển sang `/task-full` hoặc lệnh phù hợp thay vì sửa file sai mode.
+- Files: `.codex/skills/task-ui/SKILL.md`
+- Tests: `quick_validate.py` cho `task-ui`; `git diff --check`.
+
+## 2026-07-07 — Add approved UI pattern memory
+
+- Summary: Thêm cơ chế lưu pattern UI khi owner xác nhận "ưng rồi/ok rồi".
+- Changed: Tạo `approved-patterns.md` và cập nhật rule cho UI docs, `/task-ui`, `/task-full`.
+- Files: `docs/ui-references/approved-patterns.md`, `docs/11-ui-design-system.md`, `AGENTS.md`, `.codex/skills/**`
+- Tests: `quick_validate.py` cho 5 skill; `git diff --check`.
+
+## 2026-07-07 — Tighten task-connect guardrails
+
+- Summary: Siết `/task-connect` để không chạy khi chưa có UI và vẫn giữ pattern UI đã duyệt.
+- Changed: Đọc `approved-patterns.md`, dừng sớm nếu chưa có UI/mock UI, đánh dấu prompt generic là fallback.
+- Files: `.codex/skills/task-connect/SKILL.md`, `.codex/prompts/core-features.md`
+- Tests: `quick_validate.py` cho `task-connect`; `git diff --check`.
+
+## 2026-07-07 — Expand README workflow guide
+
+- Summary: Bổ sung hướng dẫn sử dụng dự án và quy trình các skill Codex.
+- Changed: Mô tả `/task-ui`, `/task-connect`, `/task-full`, `/fix bug`, `/commit` và luồng UI review.
+- Files: `README.md`
+- Tests: `git diff --check -- README.md`.
