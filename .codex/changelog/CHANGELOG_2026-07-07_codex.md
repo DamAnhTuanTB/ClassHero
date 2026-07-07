@@ -636,3 +636,13 @@
 - Files: `.codex/skills/next-task/SKILL.md`, `.codex/skills/next-task/agents/openai.yaml`
 - Tests: `quick_validate.py` cho next-task skill; `rg` kiểm tra output guidance; `pnpm format:check`; `pnpm exec prettier --check .codex/skills/next-task/SKILL.md .codex/skills/next-task/agents/openai.yaml`; `git diff --check`.
 - Notes: Không thay đổi code production.
+
+## 2026-07-07 — M1.2 foundation database models
+
+- Summary: Thêm các model Prisma nền cho user/auth/profile/file/background job/audit log.
+- Changed:
+  - Bổ sung enum và model `User`, profile, parent-child link, refresh/reset token, `File`, `BackgroundJob`, `AuditLog`.
+  - Tạo migration SQL cho các bảng, index, unique constraint và foreign key nền.
+- Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260707001000_add_foundation_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
+- Notes: `background_jobs.lesson_id` giữ dạng UUID, chưa tạo FK tới `lessons` cho đến khi model lesson được thêm ở `M1.3`; chưa apply migration vào DB thật trong phiên này.
