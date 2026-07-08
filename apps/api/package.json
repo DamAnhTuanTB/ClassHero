@@ -5,6 +5,8 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "db:generate": "prisma generate --config prisma.config.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:check": "tsc --noEmit -p tsconfig.seed.json",
     "db:validate": "prisma validate --config prisma.config.ts",
     "lint": "eslint .",
     "prisma": "prisma --config prisma.config.ts",

@@ -29,6 +29,7 @@ NestJS module/service
 7. Các model học tập lõi như `LearningPath`, `Lesson`, `LessonDocument`, `DocumentChunk`, `Enrollment` và `LessonProgress` nối phần course, tài liệu, RAG và tiến độ học vào cùng một schema.
 8. Các model tương tác học tập như `QuizSet`, `FlashcardSet`, `TestSet`, `QuizAttempt`, `TestAttempt`, `FlashcardProgress`, `StudentNote`, `LessonVideoComment` và `Favorite` lưu nội dung luyện tập, lịch sử làm bài và ghi chú riêng của học sinh theo từng lesson.
 9. Các model còn lại như `Payment`, `PaymentWebhookLog`, `DiscountCode`, `Notification`, `Report`, `AiGeneration`, `AiExplanation`, `AiChatSession`, `XpEvent` và `NewsItem` hoàn thiện nền dữ liệu cho payment, notification, AI, moderation, gamification và tin tức.
+10. `apps/api/prisma/seed.ts` tạo dữ liệu dev tối thiểu để kiểm tra các quan hệ chính sau khi chạy migration: admin, học sinh, phụ huynh, lộ trình Toán 7, lesson, tài liệu mẫu, quiz/flashcard/test, enrollment/payment và notification.
 
 ## Kỹ thuật chính
 
@@ -49,6 +50,7 @@ NestJS module/service
 - AI trace và cache: `ai_generations` lưu provider/model/token/cost/error để debug, còn `ai_explanations` lưu hash/stale fields để biết lời giải AI còn khớp với nội dung hiện tại không.
 - Notification delivery: `notifications` là nội dung thông báo trong app, còn `notification_deliveries` theo dõi từng kênh như in-app, email hoặc Zalo để worker retry riêng.
 - XP idempotency: `xp_events.idempotency_key` giúp cộng XP một lần cho cùng sự kiện, còn `student_profiles.total_xp` và `level` là số liệu denormalized để đọc nhanh.
+- Seed idempotent: seed dùng `upsert` với email/slug/unique key cố định để có thể chạy lại nhiều lần trên dev database mà không tạo trùng dữ liệu mẫu.
 
 ## File quan trọng
 
@@ -59,6 +61,8 @@ NestJS module/service
 - `apps/api/prisma/migrations/20260708001000_add_learning_models/migration.sql`: migration thêm model lộ trình, buổi học, tài liệu, chunk, enrollment và progress.
 - `apps/api/prisma/migrations/20260708002000_add_learning_interaction_models/migration.sql`: migration thêm quiz, flashcard, test, attempt, favorite, note/comment riêng.
 - `apps/api/prisma/migrations/20260708003000_add_remaining_mvp_models/migration.sql`: migration thêm payment, notification, report, AI log/cache/chat, XP và news.
+- `apps/api/prisma/seed.ts`: seed dev tối thiểu cho admin/student/parent, Toán 7 và sample learning data.
+- `apps/api/tsconfig.seed.json`: typecheck riêng cho seed script.
 - `apps/api/src/common/prisma/prisma.service.ts`: service kết nối database.
 - `apps/api/src/common/prisma/prisma.module.ts`: module export PrismaService.
 - `apps/api/src/app.module.ts`: import PrismaModule vào app.
@@ -75,6 +79,7 @@ NestJS module/service
 - quiz/flashcard/test/attempt/note/favorite cần biết cách dữ liệu luyện tập nối với lesson và user,
 - payment/webhook/discount, notification delivery, AI generation/cache/chat, report moderation, XP hoặc news cần biết bảng nền và idempotency/log nằm ở đâu,
 - tính năng AI/RAG cần `pgvector` và `document_chunks`.
+- cần seed dữ liệu dev để kiểm tra nhanh luồng auth/course/payment/progress ở các milestone sau.
 
 ## Task liên quan
 
@@ -83,3 +88,4 @@ NestJS module/service
 - `M1.3`: Learning path, lesson, material, document và enrollment models.
 - `M1.4`: Quiz, flashcard, test, attempt và learning interaction models.
 - `M1.5`: Payment, notification, report, AI log, gamification và news models.
+- `M1.6`: Seed tối thiểu và database validation.

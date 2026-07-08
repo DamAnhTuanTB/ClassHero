@@ -37,3 +37,13 @@
 - Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708003000_add_remaining_mvp_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
 - Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
 - Notes: Chưa apply migration vào database thật; payment/webhook/AI provider logic sẽ được implement ở các milestone API/worker sau.
+
+## 2026-07-08 — M1.6 database seed and validation
+
+- Summary: Thêm seed dev tối thiểu và check riêng cho dữ liệu mẫu Prisma.
+- Changed:
+  - Bổ sung `db:seed` và `db:seed:check` cho API package.
+  - Tạo seed idempotent cho admin/student/parent, Toán 7, lesson, document chunk, quiz/flashcard/test, payment/enrollment, notification, report, note, XP và news.
+- Files: `apps/api/package.json`, `apps/api/tsconfig.seed.json`, `apps/api/prisma/seed.ts`, `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `pnpm --filter @learning-path/api db:seed:check`; `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
+- Notes: Chưa chạy `db:seed` vào database thật vì chưa có `.env`/`DATABASE_URL` trong môi trường hiện tại.

@@ -14,7 +14,7 @@ Deferred     Chuyển sang version sau.
 | Feature                        | DB                                                 | API                    | UI                    | Worker/Integration               | Test/Check           | Status      |
 | ------------------------------ | -------------------------------------------------- | ---------------------- | --------------------- | -------------------------------- | -------------------- | ----------- |
 | Repo/tooling local             | -                                                  | `M0.2`                 | `M0.1` web foundation | Docker/Redis `M0.2`              | `M0.2`               | Done        |
-| Prisma foundation              | `M1.1`                                             | -                      | -                     | pgvector extension               | `M1.1`               | Done        |
+| Prisma foundation              | `M1.1`, seed `M1.6`                                | -                      | -                     | pgvector extension               | `M1.1`, `M1.6`       | Done        |
 | User/auth/profile foundation   | `M1.2` Done                                        | `M2.2`, `M2.3`         | `M2.4`                | email reset later if needed      | `M14.2`              | In progress |
 | Public/student course browsing | `M1.3` Done                                        | `M3.3`                 | `M3.5`                | payment CTA `M8.4`               | `M14.3`              | In progress |
 | Admin course/lesson management | `M1.3` Done                                        | `M3.1`, `M3.2`         | `M3.4`                | -                                | `M14.1`, `M14.2`     | In progress |
