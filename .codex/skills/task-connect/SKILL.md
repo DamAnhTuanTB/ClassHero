@@ -140,6 +140,16 @@ After connecting UI to real API/data, update `docs/learning-notes/` when the flo
 - Update changelog if learning notes changed.
 - If not updated, mention briefly in the final response.
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the connection work or plan is complete.
+- `blocked` when owner input is needed before continuing.
+- `failed` when implementation or checks fail and the task cannot be finished in this turn.
+
+Use a concrete task label such as `/task-connect M3.4` or `/task-connect plan M3.4`. For plan mode, say the plan is ready for approval. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Final Response
 
 Include:

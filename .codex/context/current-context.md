@@ -8,7 +8,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, Postgres + pgvector local, Redis, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
@@ -28,16 +28,18 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - `/do plan` có nghĩa là commit phần đã xong nếu cần, rồi lập plan cho task tiếp theo đã được gợi ý để owner duyệt trước khi làm.
 - Task nhỏ/rủi ro thấp được dùng lean mode: chạy check nhỏ nhất đủ tin cậy, không bắt buộc full lint/build/test toàn repo.
 - Khi làm public page có mục tiêu xuất hiện Google, Codex phải đọc SEO docs bên cạnh UI/performance docs.
+- Sau mỗi task/plan/commit, Codex phải gọi `.codex/scripts/notify-task.sh` trước final response để hiện thông báo rõ ràng trên macOS; dùng `done`, `blocked` hoặc `failed` theo trạng thái.
+- Repo có Telegram bot local ở `.codex/scripts/codex-telegram-bot.py`: chat ID được allow có thể chat/ra lệnh cho Codex qua Telegram với quyền full access trong repo; token thật nằm ở `.codex/telegram/.env.local` và không commit. Nên chạy bền bằng `.codex/scripts/install-telegram-launch-agent.sh`; mặc định dùng `telegram-thread` để Telegram có thread Codex riêng. Transcript local ghi ở `.codex/telegram/transcript.md` và bị ignore khỏi git.
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau `M1.6` nên làm:
+Theo roadmap hiện tại, sau `M2.1` nên làm:
 
 ```txt
-/task-full M2.1
+/task-full M2.2
 ```
 
-Mục tiêu `M2.1`: chuẩn hóa backend foundation module với env validation, global validation pipe, error response format, Swagger/OpenAPI và logger cơ bản.
+Mục tiêu `M2.2`: hoàn thiện register student/parent, login, JWT access token, refresh token rotate/revoke và logout.
 
 ## 4. Khi nào cập nhật file này
 

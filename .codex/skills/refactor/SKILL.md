@@ -98,6 +98,16 @@ After refactor work, update `docs/learning-notes/` only when the refactor teache
 - Update changelog if learning notes changed.
 - If not updated, mention briefly in the final response.
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the refactor is complete.
+- `blocked` when owner input is needed before continuing.
+- `failed` when implementation or checks fail and the task cannot be finished in this turn.
+
+Use a concrete task label such as `/refactor M3.4` or the refactored module. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Final Response
 
 Include:

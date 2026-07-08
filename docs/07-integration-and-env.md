@@ -122,6 +122,26 @@ ASSUMPTION: Model names trong `.env.example` là placeholder để bắt đầu.
 
 ---
 
+## 2.1. API env validation
+
+API validate các biến nền khi boot. Ở `M2.1`, nhóm env bắt buộc gồm:
+
+- `WEB_URL`, `API_URL`, `API_PORT`.
+- `DATABASE_URL`.
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`.
+- `REDIS_URL`.
+- `CORS_ORIGINS`, `LOG_LEVEL`.
+
+Nếu thiếu env, API phải fail fast với message liệt kê biến thiếu. `JWT_ACCESS_SECRET` và `JWT_REFRESH_SECRET` không được để placeholder trong production.
+
+Swagger dev/staging chạy tại:
+
+```txt
+http://localhost:4000/api/docs
+```
+
+---
+
 ## 3. Postgres database
 
 Local/dev mặc định dùng Postgres có pgvector trong Docker Compose để có thể chạy migration, seed và xem database bằng DBeaver trên máy lập trình viên.

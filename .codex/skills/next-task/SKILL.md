@@ -44,6 +44,16 @@ Use this skill to recommend what the owner should do next. Do not edit productio
 
 13. Recommend 1 primary next command and up to 2 alternatives.
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the next-task recommendation is ready.
+- `blocked` when owner input is needed before recommending safely.
+- `failed` when required docs/status checks fail and the recommendation cannot be finished in this turn.
+
+Use `/next-task` as the task label. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Output
 
 Keep the answer short and practical:

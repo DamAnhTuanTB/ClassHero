@@ -397,7 +397,29 @@ Task được xem là xong khi:
 
 ---
 
-## 18. Ghi Chú Vận Hành
+## 18. Thông Báo Hoàn Thành Task
+
+Trước final response của mỗi task, Codex phải gọi script thông báo từ repo root:
+
+```bash
+.codex/scripts/notify-task.sh done "<task/command>" "<kết quả ngắn>"
+```
+
+Dùng trạng thái:
+
+- `done`: task/plan/commit đã hoàn thành.
+- `blocked`: cần owner quyết định hoặc cung cấp thêm thông tin.
+- `failed`: implement/check lỗi và chưa thể hoàn thành trong turn hiện tại.
+
+Nội dung thông báo phải rõ task nào, kết quả gì, bước tiếp theo là gì nếu có. Không đưa secret, token, private URL hoặc dữ liệu nhạy cảm vào notification. Nếu notification lỗi, không được làm task fail; vẫn báo trong final response nếu cần.
+
+Nếu `.codex/telegram/.env.local` có `TELEGRAM_BOT_TOKEN` và chat ID nhận thông báo, script có thể gửi thêm notification qua Telegram. Token/chat ID thật không được commit.
+
+Repo có thể chạy Telegram bot local ở `.codex/scripts/codex-telegram-bot.py` để owner chat/ra lệnh cho Codex qua Telegram. Bot này chỉ được chạy Codex cho `TELEGRAM_ALLOWED_CHAT_IDS`, nhưng trong danh sách đó thì coi như full quyền với repo: câu hỏi thì trả lời, lệnh thì thực hiện theo `AGENTS.md` và skill liên quan.
+
+---
+
+## 19. Ghi Chú Vận Hành
 
 Quy mô production ban đầu dự kiến khoảng 50 học sinh.
 

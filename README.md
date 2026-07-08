@@ -85,6 +85,7 @@ Mở:
 Web:    http://localhost:3000
 API:    http://localhost:4000
 Health: http://localhost:4000/api/v1/health
+Swagger: http://localhost:4000/api/docs
 ```
 
 Chạy riêng từng app:
@@ -227,7 +228,84 @@ Sau khi cập nhật docs, Codex sẽ gợi ý task implementation tiếp theo n
 
 ---
 
-## 8. Changelog và commit
+## 8. Điều khiển Codex qua Telegram
+
+Repo có bot local để bạn chat/ra lệnh cho Codex qua Telegram gần giống như đang chat trong Codex:
+
+```bash
+.codex/scripts/run-telegram-bot.sh
+```
+
+Chạy bền bằng macOS LaunchAgent:
+
+```bash
+.codex/scripts/install-telegram-launch-agent.sh
+launchctl print gui/$(id -u)/com.codex.learning-path.telegram-bot
+```
+
+Xem log:
+
+```bash
+tail -f .codex/telegram/runs/launchd.out.log
+tail -f .codex/telegram/runs/launchd.err.log
+```
+
+Xem transcript chat Telegram trong repo:
+
+```bash
+open .codex/telegram/transcript.md
+```
+
+Transcript này lưu local, bị `.gitignore` chặn và có redaction cơ bản cho token/secret pattern. Không dùng transcript để lưu secret thật.
+
+Dừng và gỡ LaunchAgent:
+
+```bash
+.codex/scripts/uninstall-telegram-launch-agent.sh
+```
+
+Bot đọc cấu hình từ:
+
+```txt
+.codex/telegram/.env.local
+```
+
+Tạo cấu hình dựa trên `.codex/telegram/.env.example`, với các biến chính:
+
+```txt
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ALLOWED_CHAT_IDS=...
+TELEGRAM_NOTIFY_CHAT_IDS=...
+```
+
+Cách lấy `chat_id`:
+
+1. Tạo bot bằng BotFather và lấy `TELEGRAM_BOT_TOKEN`.
+2. Chạy bot khi `TELEGRAM_ALLOWED_CHAT_IDS` còn trống.
+3. Nhắn `/id` cho bot trên Telegram.
+4. Bot sẽ trả lại `chat_id`; đưa ID đó vào `TELEGRAM_ALLOWED_CHAT_IDS`.
+
+Khi `chat_id` đã được allow, mọi tin nhắn text từ Telegram sẽ được chuyển cho Codex trong repo này với quyền local full access. Ví dụ:
+
+```txt
+next task
+/do plan
+/do
+/commit
+DATABASE_URL tôi lấy như nào
+```
+
+Bot sẽ gửi lại final response của Codex vào Telegram. Ngoài ra, `.codex/scripts/notify-task.sh` cũng có thể gửi thông báo hoàn thành/bị chặn/thất bại qua Telegram nếu đã cấu hình token và chat ID.
+
+Mặc định bot dùng `CODEX_TELEGRAM_SESSION_MODE=telegram-thread`, tức là Telegram có thread Codex riêng và không resume nhầm phiên Codex app/terminal gần nhất.
+
+Transcript mặc định bật bằng `CODEX_TELEGRAM_TRANSCRIPT_ENABLED=1` và ghi vào `.codex/telegram/transcript.md`.
+
+Không commit `.codex/telegram/.env.local`, token bot, chat ID riêng hoặc dữ liệu nhạy cảm.
+
+---
+
+## 9. Changelog và commit
 
 Khi thay đổi file đáng commit, Codex cập nhật:
 
@@ -245,7 +323,7 @@ Codex không tự commit nếu owner chưa yêu cầu. Khi muốn commit:
 
 ---
 
-## 9. Khi không chắc bắt đầu từ đâu
+## 10. Khi không chắc bắt đầu từ đâu
 
 Dùng:
 

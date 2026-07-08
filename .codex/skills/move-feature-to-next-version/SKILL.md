@@ -83,6 +83,16 @@ Run checks proportional to changes:
 
 Update changelog after file changes.
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the feature deferral update is complete.
+- `blocked` when owner input is needed before continuing.
+- `failed` when docs/code checks fail and the task cannot be finished in this turn.
+
+Use a concrete task label such as `/move-feature-to-next-version <short feature>`. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Final Response
 
 Include:

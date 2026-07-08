@@ -86,6 +86,16 @@ After the fix:
 4. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` using the concise format from `AGENTS.md`.
 5. If tests cannot run, write the reason in changelog and final response.
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the bug fix is complete.
+- `blocked` when owner input is needed before continuing.
+- `failed` when reproduction, implementation, or checks fail and the task cannot be finished in this turn.
+
+Use a concrete task label such as `/fix bug <short topic>`. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Final Response
 
 Keep the final answer useful, but do not over-compress the technical explanation. The owner is non-coding but wants to learn the technical flow. Include:

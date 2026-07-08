@@ -14,6 +14,10 @@ coverage/
 .env
 .env.*
 !.env.example
+.codex/telegram/.env.local
+.codex/telegram/state.json
+.codex/telegram/runs/
+.codex/telegram/transcript.md
 
 # Logs
 *.log

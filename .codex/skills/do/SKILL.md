@@ -80,6 +80,16 @@ Run the checks described in the approved plan, adjusted only if repo state chang
 
 If a planned check becomes unnecessary or too expensive for a tiny low-risk change, use lean mode and state `Not run: <reason>` in changelog/final response.
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the work or plan is complete.
+- `blocked` when owner input is needed before continuing.
+- `failed` when implementation or checks fail and the task cannot be finished in this turn.
+
+Use a concrete task label such as `/do`, `/do plan`, `/task-full M2.1`, or `/commit`. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Final Response
 
 Include:

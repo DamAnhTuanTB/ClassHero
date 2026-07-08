@@ -170,6 +170,14 @@ Dữ liệu lưu dạng Tiptap JSON. Công thức Toán/Lý/Hóa lưu LaTeX tron
 - BullMQ.
 - Socket.IO.
 
+### API foundation
+
+- Base path API là `/api/v1`.
+- Swagger/OpenAPI bật ở dev/staging tại `/api/docs`; không bật public production nếu chưa bảo vệ.
+- Env bắt buộc được validate khi boot API để thiếu cấu hình báo lỗi rõ.
+- Request DTO dùng global validation pipe với whitelist và transform.
+- Response lỗi dùng envelope `{ "error": { "code", "message", "details" } }`.
+
 ### Module đề xuất
 
 ```txt
@@ -312,7 +320,10 @@ Tạo interface chung:
 
 ```ts
 export interface AiProvider {
-  generateStructured<TOutput>(input: AiStructuredInput, schema: unknown): Promise<TOutput>;
+  generateStructured<TOutput>(
+    input: AiStructuredInput,
+    schema: unknown,
+  ): Promise<TOutput>;
   generateText(input: AiTextInput): Promise<AiTextOutput>;
   createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput>;
 }

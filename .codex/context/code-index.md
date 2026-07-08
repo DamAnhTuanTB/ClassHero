@@ -6,13 +6,20 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 
 ## 1. Root
 
-| Path                  | Vai trò                                      |
-| --------------------- | -------------------------------------------- |
-| `package.json`        | Script monorepo, package manager `pnpm`      |
-| `pnpm-workspace.yaml` | Workspace `apps/*`, `packages/*`             |
-| `turbo.json`          | Pipeline build/lint/typecheck/dev            |
-| `docker-compose.yml`  | Docker local cho web, API, Postgres và Redis |
-| `.env.example`        | Env root placeholder                         |
+| Path                            | Vai trò                                                        |
+| ------------------------------- | -------------------------------------------------------------- |
+| `package.json`                  | Script monorepo, package manager `pnpm`                        |
+| `pnpm-workspace.yaml`           | Workspace `apps/*`, `packages/*`                               |
+| `turbo.json`                    | Pipeline build/lint/typecheck/dev                              |
+| `docker-compose.yml`            | Docker local cho web, API, Postgres và Redis                   |
+| `.env.example`                  | Env root placeholder                                           |
+| `.codex/scripts/notify-task.sh` | Script thông báo hoàn thành/bị chặn/thất bại cho task Codex    |
+| `.codex/scripts/codex-telegram-bot.py` | Bot Telegram local chuyển tin nhắn owner thành `codex exec` full quyền |
+| `.codex/scripts/run-telegram-bot.sh` | Wrapper chạy Telegram bot từ repo root                         |
+| `.codex/scripts/install-telegram-launch-agent.sh` | Cài LaunchAgent macOS để Telegram bot chạy bền ở nền           |
+| `.codex/scripts/uninstall-telegram-launch-agent.sh` | Dừng và gỡ LaunchAgent Telegram bot                            |
+| `.codex/telegram/.env.example`  | Mẫu env cho Telegram bot/notification, không chứa secret thật  |
+| `.codex/telegram/transcript.md` | Transcript chat Telegram local, bị `.gitignore` chặn           |
 
 ## 2. Front-end
 
@@ -37,9 +44,12 @@ Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<fe
 | `apps/api/src/app.module.ts`     | Root module                                  |
 | `apps/api/src/app.controller.ts` | Controller health/foundation hiện tại        |
 | `apps/api/src/app.service.ts`    | Service health/foundation hiện tại           |
+| `apps/api/src/common/api`        | API response envelope interceptor            |
+| `apps/api/src/common/errors`     | Global HTTP error envelope filter            |
 | `apps/api/src/modules`           | Domain modules, hiện mới có `.gitkeep`       |
 | `apps/api/src/common`            | Common providers/guards/filters/interceptors |
-| `apps/api/src/config`            | Config/env helpers                           |
+| `apps/api/src/common/validation` | Global validation error helper               |
+| `apps/api/src/config`            | Env validation và Swagger setup              |
 | `apps/api/src/jobs`              | Queue/job definitions                        |
 | `apps/api/src/workers`           | Worker entrypoints/processors                |
 | `apps/api/test`                  | Backend tests                                |

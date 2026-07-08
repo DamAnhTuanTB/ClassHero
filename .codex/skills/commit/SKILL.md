@@ -134,6 +134,16 @@ fix(api): inject app service explicitly
 chore(repo): add beginner setup README
 ```
 
+## Completion Notification
+
+Before the final response, call `.codex/scripts/notify-task.sh` from the repo root:
+
+- `done` when the commit is created.
+- `blocked` when owner input is needed before committing safely.
+- `failed` when commit verification or `git commit` fails and the commit cannot be finished in this turn.
+
+Use a concrete task label such as `/commit` or the commit scope. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+
 ## Final Response
 
 After committing, report briefly:
