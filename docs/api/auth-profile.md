@@ -31,6 +31,27 @@ Side effects:
 - Tạo `student_profiles` và `child_code`.
 - Hash password.
 
+Response:
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "uuid",
+      "role": "STUDENT",
+      "email": "student1@example.com",
+      "phone": "0900000001",
+      "username": "student1",
+      "fullName": "Nguyễn Văn A"
+    },
+    "studentProfile": {
+      "grade": 7,
+      "childCode": "LP123456"
+    }
+  }
+}
+```
+
 Errors: `DUPLICATE_EMAIL`, `DUPLICATE_PHONE`, `DUPLICATE_USERNAME`, `VALIDATION_ERROR`.
 
 ### `POST /auth/register/parent`
@@ -53,6 +74,23 @@ Side effects:
 - Tạo `users` role `PARENT`.
 - Tạo `parent_profiles`.
 - Hash password.
+
+Response:
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "uuid",
+      "role": "PARENT",
+      "email": "parent1@example.com",
+      "phone": "0910000001",
+      "username": null,
+      "fullName": "Phụ huynh A"
+    }
+  }
+}
+```
 
 ### `POST /auth/login`
 
@@ -97,7 +135,24 @@ Body:
 Side effects:
 
 - Validate token hash trong `refresh_tokens`.
-- Có thể rotate refresh token.
+- Rotate refresh token: revoke token cũ và trả token mới.
+
+Response:
+
+```json
+{
+  "data": {
+    "accessToken": "jwt",
+    "refreshToken": "new-token",
+    "user": {
+      "id": "uuid",
+      "role": "STUDENT",
+      "email": "student1@example.com",
+      "username": "student1"
+    }
+  }
+}
+```
 
 ### `POST /auth/logout`
 
@@ -112,6 +167,16 @@ Body:
 Side effects:
 
 - Revoke refresh token.
+
+Response:
+
+```json
+{
+  "data": {
+    "success": true
+  }
+}
+```
 
 ### `POST /auth/forgot-password`
 

@@ -8,7 +8,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, Postgres + pgvector local, Redis, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
@@ -33,13 +33,13 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau `M2.1` nên làm:
+Theo roadmap hiện tại, sau `M2.2` nên làm:
 
 ```txt
-/task-full M2.2
+/task-full M2.3
 ```
 
-Mục tiêu `M2.2`: hoàn thiện register student/parent, login, JWT access token, refresh token rotate/revoke và logout.
+Mục tiêu `M2.3`: thêm RBAC guard/decorator, `GET /me`, profile base và forgot/reset password.
 
 ## 4. Khi nào cập nhật file này
 

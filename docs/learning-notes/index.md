@@ -4,17 +4,17 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 
 ## Feature Notes
 
-| Note    | Chủ đề                                                   | Task liên quan | Trạng thái |
-| ------- | -------------------------------------------------------- | -------------- | ---------- |
-| Chưa có | Sẽ được tạo khi các tính năng end-to-end được triển khai | -              | -          |
+| Note                                     | Chủ đề                                                | Task liên quan | Trạng thái  |
+| ---------------------------------------- | ----------------------------------------------------- | -------------- | ----------- |
+| [Basic Auth API](features/auth-basic.md) | Register student/parent, login, refresh token, logout | `M2.2`         | Đã cập nhật |
 
 ## Foundation Notes
 
-| Note                                                        | Chủ đề                                                                    | Task liên quan | Trạng thái  |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------- | -------------- | ----------- |
-| [API foundation](foundation/api-foundation.md)              | NestJS env validation, global validation, error envelope, Swagger, logger | `M2.1`         | Đã cập nhật |
+| Note                                                                                     | Chủ đề                                                                     | Task liên quan | Trạng thái  |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------- | ----------- |
+| [API foundation](foundation/api-foundation.md)                                           | NestJS env validation, global validation, error envelope, Swagger, logger  | `M2.1`         | Đã cập nhật |
 | [Codex notification and Telegram control](foundation/codex-notification-and-telegram.md) | macOS notification, Telegram notification/control, LaunchAgent, transcript | Codex tooling  | Đã cập nhật |
-| [Prisma database foundation](foundation/prisma-database.md) | Prisma, migration, pgvector, PrismaService, seed dev và foundation models | `M1.1`-`M1.6`  | Đã cập nhật |
+| [Prisma database foundation](foundation/prisma-database.md)                              | Prisma, migration, pgvector, PrismaService, seed dev và foundation models  | `M1.1`-`M1.6`  | Đã cập nhật |
 
 ## Glossary
 

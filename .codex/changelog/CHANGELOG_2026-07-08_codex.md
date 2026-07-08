@@ -109,3 +109,14 @@
 - Files: `docs/learning-notes/foundation/codex-notification-and-telegram.md`, `docs/learning-notes/index.md`, `.codex/changelog/CHANGELOG_2026-07-08_codex.md`
 - Tests: `pnpm format:check`; `git diff --check`; scan conflict/secret bằng `rg`.
 - Notes: Note không ghi token/chat ID thật.
+
+## 2026-07-08 — M2.2 auth register login refresh logout
+
+- Summary: Thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotation và logout.
+- Changed:
+  - Bổ sung endpoint `/auth/register/student`, `/auth/register/parent`, `/auth/login`, `/auth/refresh`, `/auth/logout` với DTO validation, password scrypt hash, duplicate identity errors và access token JWT.
+  - Refresh token được sinh dạng opaque token, chỉ lưu SHA-256 hash trong `refresh_tokens`, rotate khi refresh và revoke khi logout.
+  - Cập nhật API docs, context/code index, feature coverage matrix và learning note cho basic auth.
+- Files: `apps/api/src/modules/auth/**`, `apps/api/src/app.module.ts`, `apps/api/package.json`, `pnpm-lock.yaml`, `docs/api/auth-profile.md`, `.codex/context/**`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `pnpm --filter @learning-path/api typecheck`; `pnpm --filter @learning-path/api build`; `pnpm --filter @learning-path/api lint`; `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `prisma migrate status` với local `DATABASE_URL`; smoke test HTTP local cho register student/parent, login, refresh rotate, old refresh 401, logout và refresh sau logout 401; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
+- Notes: Smoke test tạo user test trong Postgres dev local rồi đã cleanup; không đổi schema/migration.
