@@ -1,6 +1,6 @@
 ---
 name: move-feature-to-next-version
-description: Move an existing feature out of the current MVP/version into a later version from commands like "/move-feature-to-next-version tạm hoãn livestream" or "chuyển tính năng abc sang version sau". Use when Codex must keep the feature documented for later instead of deleting it, update product scope/user flows/implementation task codes to mark it deferred, remove it from current execution order when needed, avoid destructive data/code deletion, update changelog, and explain what remains for the current version versus next version.
+description: Move an existing feature out of the current MVP/version into a later version from commands like "/move-feature-to-next-version tạm hoãn livestream" or "chuyển tính năng abc sang version sau". Use when Codex must keep the feature documented for later instead of deleting it, update product scope/user flows/implementation task codes to mark it deferred, remove it from current execution order when needed, avoid destructive data/code deletion, and explain what remains for the current version versus next version.
 ---
 
 # Move Feature To Next Version Runner
@@ -81,7 +81,7 @@ Run checks proportional to changes:
 - Docs-only: `git diff --check`.
 - If UI/API code is hidden/disabled: run focused typecheck/build/curl/browser checks where practical.
 
-Update changelog after file changes.
+Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 
 ## Completion Notification
 

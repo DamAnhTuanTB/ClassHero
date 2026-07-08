@@ -4,6 +4,8 @@
 
 Chủ đề này giải thích cách repo cho phép Codex báo trạng thái task qua macOS/Telegram và nhận lệnh từ Telegram như một kênh chat phụ.
 
+Trạng thái hiện tại: Telegram notification/bot đang tắt theo yêu cầu owner. Chỉ bật lại khi owner yêu cầu rõ.
+
 Mục tiêu không phải biến Telegram thành một backend sản phẩm. Đây là tooling nội bộ cho owner điều khiển Codex trong repo:
 
 - Codex làm xong task thì báo rõ trạng thái.

@@ -9,7 +9,7 @@ Dùng file này khi không gọi trực tiếp được slash skill. Nếu dùng
 - `docs/04-database-model.md` và `docs/05-api-contract.md` là index; khi cần phải đọc thêm file con trong `docs/database/` hoặc `docs/api/`.
 - Nếu có `.codex/plans/codex-execution-plan.md`, dùng để kiểm tra phụ thuộc/TODO, không thay docs gốc.
 - Nếu task chạm UI/performance/SEO public, đọc thêm `docs/11-ui-design-system.md`, `docs/12-performance-and-observability.md` hoặc `docs/13-seo-and-content-discovery.md` đúng phạm vi.
-- Sau khi có thay đổi file đáng commit, cập nhật changelog.
+- Không cập nhật changelog trong task thường; changelog chỉ được ghi trong workflow `/commit`.
 
 ## Prompt Khởi Động
 
@@ -26,7 +26,7 @@ Yêu cầu:
 - Đọc docs/09-implementation-plan.md.
 - Không sửa code production.
 - Tạo/cập nhật .codex/plans/codex-execution-plan.md nếu cần.
-- Cập nhật changelog nếu có thay đổi file.
+- Không cập nhật changelog; nếu owner yêu cầu `/commit`, workflow commit sẽ ghi changelog cho commit đó.
 
 Sau khi xong, báo file đã tạo/sửa.
 ```
@@ -64,7 +64,7 @@ Phạm vi:
 Sau khi xong:
 - Chạy check phù hợp.
 - Cập nhật docs liên quan nếu đổi database/API/AI/env/UI rule.
-- Cập nhật changelog.
+- Không cập nhật changelog trong task thường; chỉ ghi khi thực hiện `/commit`.
 - Báo file đã sửa, lệnh đã chạy, test status, TODO còn lại.
 ```
 

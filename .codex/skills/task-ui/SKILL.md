@@ -1,6 +1,6 @@
 ---
 name: task-ui
-description: Run or plan UI-first roadmap subtasks for the Vietnamese learning-path project from commands like "/task-ui M7.1", "/task-ui M3.4", or "/task-ui plan M3.5". Use when Codex must implement only the front-end UI for a task using clear mock data first, or produce an approval-gated UI plan first when the command contains "plan"; read the project UI design system and relevant docs, avoid backend/database/API implementation, build mobile-first layouts that also work on tablet/iPad and laptop/desktop, keep mock data easy to remove, update changelog after implementation, and suggest the matching "/task-connect" command after completion.
+description: Run or plan UI-first roadmap subtasks for the Vietnamese learning-path project from commands like "/task-ui M7.1", "/task-ui M3.4", or "/task-ui plan M3.5". Use when Codex must implement only the front-end UI for a task using clear mock data first, or produce an approval-gated UI plan first when the command contains "plan"; read the project UI design system and relevant docs, avoid backend/database/API implementation, build mobile-first layouts that also work on tablet/iPad and laptop/desktop, keep mock data easy to remove, and suggest the matching "/task-connect" command after completion.
 ---
 
 # Task UI Runner
@@ -84,7 +84,7 @@ In plan mode, stop after this plan and wait for approval.
 
 - Follow `docs/11-ui-design-system.md`.
 - Use the default UI tokens from `docs/11-ui-design-system.md`; do not invent a new palette per screen.
-- Write visible text as real production copy for the target user role. Put technical explanation in final responses, changelog, docs, comments, or test names, not in the product surface.
+- Write visible text as real production copy for the target user role. Put technical explanation in final responses, docs, comments, or test names, not in the product surface.
 - If the owner provides a reference image, extract the relevant visual principles instead of copying the reference literally; for auth/register/login, a dashboard reference may inspire color, rounded cards, icons, spacing, and energy, but the result must remain a clear auth flow. If the owner says the reference is a mobile design, prioritize matching the mobile layout first and do not add extra footer chips, secondary tabs, or out-of-scope steps.
 - Keep user-facing copy concise and action-focused. For student/parent auth/register/forgot/reset screens, prefer a small brand cue, one clear title, one short supporting sentence, form labels, CTA, and essential links; avoid side panels or repeated cards whose main purpose is explaining how the system works.
 - For student/parent auth/register screens, keep the UI lively and age-appropriate: use a bright but controlled learning palette, clear CTA emphasis, suitable photo/illustration or light visual accents, and fitting typography instead of flat gray enterprise styling.
@@ -112,14 +112,15 @@ When the owner says the UI is approved, for example "ưng rồi", "ok rồi", "�
 - Add a concise entry to `docs/ui-references/approved-patterns.md`.
 - Record context, approved layout/style choices, things to avoid, reusable screens/flows, and screenshot/file evidence if available.
 - Update `docs/11-ui-design-system.md` only when the owner approves a broad rule that should apply across many screens.
-- Update changelog.
+- Do not update changelog; `/commit` will record the approved UI/docs changes if a commit is created.
 
 ## Verification
 
 Run checks proportional to risk:
 
 - Default for UI-only work is speed-first lean verification per owner preference. Do not automatically run `typecheck`, `lint`, `build`, Playwright, or E2E after every UI task.
-- Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, update changelog briefly, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
+- If the owner writes `sửa nhanh`, `fast`, or `check nhẹ`, use the fastest safe path by default: inspect the smallest relevant scope, patch directly, avoid unrelated refactor/cleanup, do not update changelog, and skip typecheck/lint/build/Playwright/E2E unless the change touches shared logic, route guards, form/session/data behavior, or obvious TypeScript risk.
+- Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, do not update changelog, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
 - Prefer `git diff --check`, a targeted format check, or manual visual reasoning for small UI/copy/spacing/color/mock-data changes.
 - Run `pnpm --filter @learning-path/web typecheck` only when web types are likely affected, such as new props, shared components, form schemas, route files, conditional state, or TypeScript errors.
 - Run lint/build only when the change is broad, touches shared primitives/layout across screens, or a previous command suggests risk.
@@ -142,7 +143,7 @@ Non-negotiable:
 - Keep mobile-first and no-overlap checks in mind even when manual.
 - Keep smooth interaction checks in mind: tap feedback, loading state, no obvious layout shift, no expensive animation.
 - Do not use lean mode for payment flows, data-connected UI, route guards, or multi-screen changes with state/business risk. For auth UI visual-only iteration, lean mode is acceptable; use broader checks only when changing form logic/session/data behavior.
-- If larger checks are skipped, state `Not run: <reason>` in changelog and final response. Do not list skipped screenshots as a gap when the command did not request screenshot mode.
+- If larger checks are skipped, state `Not run: <reason>` in the final response. Do not list skipped screenshots as a gap when the command did not request screenshot mode.
 
 ## Learning Notes
 
@@ -153,7 +154,7 @@ After UI work, update `docs/learning-notes/` only when the UI pattern or screen 
 - For UI-only work, update the `Front-end`, `Luồng code end-to-end`, `File quan trọng`, or `Kiến thức cần nhớ` sections rather than creating frontend-only notes.
 - Do not copy the final response verbatim.
 - Do not duplicate design rules already captured in `docs/11-ui-design-system.md` or `docs/ui-references/approved-patterns.md`; link/summarize instead.
-- Update changelog if learning notes changed.
+- Do not update changelog when learning notes change; `/commit` will record the commit's main changes.
 - If not updated, mention briefly in the final response.
 
 ## Completion Notification
@@ -188,4 +189,4 @@ Include:
 - Whether learning notes changed.
 - Suggested next command: `/task-connect Mx.y`, plus the exact task `Mode` from the milestone file and a one-sentence description of what the connection step will do.
 
-Update changelog using the concise format from `AGENTS.md`.
+Do not update changelog here. Changelog is written only during `/commit`, with one short line per main change included in that commit.

@@ -421,3 +421,8 @@
 - Files: `AGENTS.md`, `.codex/context/current-context.md`, `.codex/changelog/CHANGELOG_2026-07-08_codex.md`
 - Tests: `git diff --check`.
 - Notes: Đây là rule workflow Codex, không phải thay đổi app.
+
+- 2026-07-08: Đồng bộ rule changelog chỉ ghi trong workflow `/commit`.
+- 2026-07-08: Ghi rule ưu tiên tool song song, fast path UI nhỏ và screenshot opt-in.
+- 2026-07-08: Tắt Telegram notification/bot cho tới khi owner yêu cầu bật lại.
+- 2026-07-08: Dịch ảnh minh họa học sinh nữ ở màn đăng ký lên cao hơn.

@@ -1,6 +1,6 @@
 ---
 name: refactor
-description: Refactor existing code in the Vietnamese learning-path project from commands like "/refactor M3.4", "/refactor tính năng thanh toán", or "/refactor apps/api auth module". Use when Codex must improve code structure, readability, maintainability, duplication, layering, types, or local architecture without intentionally changing product behavior, API contract, database schema, UI design, or approved stack; read relevant docs/code first, preserve tests and behavior, run proportional checks, update changelog, and explain the before/after technical flow.
+description: Refactor existing code in the Vietnamese learning-path project from commands like "/refactor M3.4", "/refactor tính năng thanh toán", or "/refactor apps/api auth module". Use when Codex must improve code structure, readability, maintainability, duplication, layering, types, or local architecture without intentionally changing product behavior, API contract, database schema, UI design, or approved stack; read relevant docs/code first, preserve tests and behavior, run proportional checks, and explain the before/after technical flow.
 ---
 
 # Refactor Runner
@@ -67,7 +67,7 @@ Run checks proportional to risk:
 - Browser/curl smoke check if route/API behavior could be affected.
 - For docs-only refactor notes, `git diff --check` may be enough.
 
-Update changelog after file changes.
+Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 
 ## Lean Mode For Small Refactors
 
@@ -83,7 +83,7 @@ Non-negotiable:
 
 - Do not use lean mode for public API changes, database/schema, auth/RBAC, payment, AI/RAG, worker/queue, security, shared package contracts, or broad module moves.
 - Do not change behavior under the label of refactor.
-- If broader checks are skipped, state `Not run: <reason>` in changelog and final response.
+- If broader checks are skipped, state `Not run: <reason>` in the final response.
 
 ## Learning Notes
 
@@ -95,7 +95,7 @@ After refactor work, update `docs/learning-notes/` only when the refactor teache
 - Add before/after flow only when it helps the owner understand the system better.
 - Do not document purely mechanical renames or tiny cleanup.
 - Do not copy the final response verbatim.
-- Update changelog if learning notes changed.
+- Do not update changelog when learning notes change; `/commit` will record the commit's main changes.
 - If not updated, mention briefly in the final response.
 
 ## Completion Notification

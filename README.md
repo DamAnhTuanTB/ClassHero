@@ -112,12 +112,13 @@ pnpm build
 pnpm format:check
 ```
 
-Chạy Playwright cho auth UI và sinh screenshot local:
+Chạy Playwright cho auth UI:
 
 ```bash
 pnpm --filter @learning-path/web e2e:auth-ui
-open .codex/screenshots
 ```
+
+Chỉ sinh/lưu screenshot khi bạn yêu cầu command có từ `screenshot`.
 
 Nếu máy mới chưa có browser Playwright:
 
@@ -174,7 +175,7 @@ File hỗ trợ Codex:
 .codex/context/current-context.md         Trạng thái repo hiện tại
 .codex/context/code-index.md              Bản đồ code hiện tại
 .codex/plans/codex-execution-plan.md      Ghi chú phụ thuộc nếu cần
-.codex/changelog/                         Changelog ngắn mỗi thay đổi
+.codex/changelog/                         Changelog ngắn theo từng commit
 ```
 
 ---
@@ -243,6 +244,8 @@ Sau khi cập nhật docs, Codex sẽ gợi ý task implementation tiếp theo n
 
 ## 8. Điều khiển Codex qua Telegram
 
+Trạng thái hiện tại: Telegram notification/bot đang tắt theo yêu cầu owner. Chỉ bật lại khi owner yêu cầu rõ.
+
 Repo có bot local để bạn chat/ra lệnh cho Codex qua Telegram gần giống như đang chat trong Codex:
 
 ```bash
@@ -308,7 +311,7 @@ next task
 DATABASE_URL tôi lấy như nào
 ```
 
-Bot sẽ gửi lại final response của Codex vào Telegram. Ngoài ra, `.codex/scripts/notify-task.sh` cũng có thể gửi thông báo hoàn thành/bị chặn/thất bại qua Telegram nếu đã cấu hình token và chat ID.
+Bot sẽ gửi lại final response của Codex vào Telegram. Ngoài ra, `.codex/scripts/notify-task.sh` cũng có thể gửi thông báo hoàn thành/bị chặn/thất bại qua Telegram nếu đã cấu hình token/chat ID và không bật `CODEX_TELEGRAM_SUPPRESS_NOTIFY=1`.
 
 Mặc định bot dùng `CODEX_TELEGRAM_SESSION_MODE=telegram-thread`, tức là Telegram có thread Codex riêng và không resume nhầm phiên Codex app/terminal gần nhất.
 
@@ -320,7 +323,7 @@ Không commit `.codex/telegram/.env.local`, token bot, chat ID riêng hoặc d�
 
 ## 9. Changelog và commit
 
-Khi thay đổi file đáng commit, Codex cập nhật:
+Codex không ghi changelog trong task thường. Changelog chỉ được cập nhật khi owner yêu cầu `/commit` và commit thật sự được tạo:
 
 ```txt
 .codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md
@@ -333,6 +336,8 @@ Codex không tự commit nếu owner chưa yêu cầu. Khi muốn commit:
 /commit fast
 /commit full
 ```
+
+Changelog dùng một dòng ngắn cho mỗi chức năng/thay đổi chính nằm trong commit: `- YYYY-MM-DD: <chức năng/thay đổi chính của commit>`.
 
 ---
 

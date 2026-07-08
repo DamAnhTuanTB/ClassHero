@@ -20,16 +20,16 @@ Mục tiêu: Codex không chỉ code "chạy được", mà phải code theo hư
 
 Các con số dưới đây là mục tiêu định hướng, không phải lý do để trì hoãn MVP khi chưa có đủ hạ tầng đo.
 
-| Hạng mục | Mục tiêu MVP |
-| --- | --- |
-| Mobile LCP | Hướng tới tốt theo Core Web Vitals |
-| Mobile INP | Tương tác chính phản hồi nhanh, không lag rõ |
-| CLS | Thấp; skeleton/placeholder không làm layout nhảy mạnh |
-| API read phổ biến | p95 nên hướng tới dưới `500ms` khi không gọi provider ngoài |
-| API write phổ biến | p95 nên hướng tới dưới `800ms` khi không có side effect nặng |
-| Endpoint gọi provider ngoài | Trả job/status hoặc pending state nếu có thể lâu |
-| List/table | Phải phân trang, infinite query hoặc virtualize khi dữ liệu có thể dài |
-| Database query chính | Có index cho filter/sort/search thường dùng |
+| Hạng mục                    | Mục tiêu MVP                                                           |
+| --------------------------- | ---------------------------------------------------------------------- |
+| Mobile LCP                  | Hướng tới tốt theo Core Web Vitals                                     |
+| Mobile INP                  | Tương tác chính phản hồi nhanh, không lag rõ                           |
+| CLS                         | Thấp; skeleton/placeholder không làm layout nhảy mạnh                  |
+| API read phổ biến           | p95 nên hướng tới dưới `500ms` khi không gọi provider ngoài            |
+| API write phổ biến          | p95 nên hướng tới dưới `800ms` khi không có side effect nặng           |
+| Endpoint gọi provider ngoài | Trả job/status hoặc pending state nếu có thể lâu                       |
+| List/table                  | Phải phân trang, infinite query hoặc virtualize khi dữ liệu có thể dài |
+| Database query chính        | Có index cho filter/sort/search thường dùng                            |
 
 Nếu chưa đo được p95, Codex phải dùng check thay thế hợp lý: curl timing, log duration, browser Network tab, Lighthouse hoặc test focused.
 
@@ -167,7 +167,7 @@ Khi task có ảnh hưởng performance, Codex nên chạy hoặc ghi rõ nếu 
 - AI/RAG: cache/retrieval limit/provider timeout/error state.
 - Bundle/dependency: không thêm package nặng nếu có cách nhẹ hơn.
 
-Final response/changelog nên ghi ngắn:
+Final response nên ghi ngắn:
 
 ```txt
 Performance: checked <what> / Not run: <reason>

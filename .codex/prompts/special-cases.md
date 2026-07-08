@@ -65,7 +65,7 @@ Ghi nhớ:
 
 - `/fix bug`: tìm root cause, sửa nhỏ nhất, giải thích nguyên nhân và cách xử lý.
 - `/refactor`: không đổi behavior/API/schema/UI design; nếu cần đổi behavior thì dùng `/update-feature`.
-- `/commit`: không sửa code production, chỉ kiểm tra diff/changelog rồi commit.
+- `/commit`: không sửa code production, chỉ kiểm tra diff, ghi changelog cho commit rồi commit.
 
 ## 5. Docs-Only Fallback
 
@@ -77,7 +77,7 @@ Yêu cầu:
 - Xác định docs bị ảnh hưởng.
 - Nếu đổi API/database/AI/UI/env, cập nhật cả index và file con tương ứng.
 - Nếu ảnh hưởng roadmap, cập nhật docs/09-implementation-plan.md hoặc docs/implementation/Mx.md.
-- Cập nhật changelog.
+- Không cập nhật changelog trong fallback docs-only; changelog sẽ được ghi nếu owner yêu cầu `/commit`.
 ```
 
 ## 6. Security/Review Fallback

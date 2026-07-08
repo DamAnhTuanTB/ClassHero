@@ -29,7 +29,7 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
    - stale current context, code index, feature coverage, dependency graph, or decision log references;
    - overly long repeated rules that should live in `AGENTS.md` or README instead.
 4. If the user asks to fix, or the issue is an obvious docs-only correction, patch the relevant docs.
-5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` when files change.
+5. Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 6. Run lightweight checks such as `rg` for stale references, `pnpm format:check`, and `git diff --check` when relevant.
 
 ## Completion Notification

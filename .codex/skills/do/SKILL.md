@@ -1,6 +1,6 @@
 ---
 name: do
-description: Execute the previously approved plan in the Vietnamese learning-path project when the user says "/do", "/do plan", "ok làm đi", "oke triển khai đi", "triển khai đi", "bạn làm giúp tôi", "bạn sửa giúp tôi", or similar after Codex has just provided an implementation plan, direction, approval-gated task plan, or next-task recommendation. Use when Codex must treat the message as approval to proceed, optionally commit already-finished uncommitted work before continuing to the clearly recommended next task, re-check repo state, apply the original task/fix/refactor/change workflow rules, implement or plan without expanding scope, verify proportionally, update changelog, and report results.
+description: Execute the previously approved plan in the Vietnamese learning-path project when the user says "/do", "/do plan", "ok làm đi", "oke triển khai đi", "triển khai đi", "bạn làm giúp tôi", "bạn sửa giúp tôi", or similar after Codex has just provided an implementation plan, direction, approval-gated task plan, or next-task recommendation. Use when Codex must treat the message as approval to proceed, optionally commit already-finished uncommitted work before continuing to the clearly recommended next task, re-check repo state, apply the original task/fix/refactor/change workflow rules, implement or plan without expanding scope, verify proportionally, and report results.
 ---
 
 # Do Runner
@@ -43,7 +43,7 @@ For `/do`:
 1. Re-check `git status --short`.
 2. If there are uncommitted changes from the just-finished task, run the `/commit` workflow first.
 3. If commit succeeds and the next task command is clear, immediately execute that recommended task with its normal workflow, for example `/task-full M1.3`.
-4. If commit is blocked by unclear scope, suspicious files, missing changelog, failed safety checks, or unrelated risky changes, stop and report the blocker; do not start the next task.
+4. If commit is blocked by unclear scope, suspicious files, failed safety checks, or unrelated risky changes, stop and report the blocker; do not start the next task.
 
 For `/do plan`:
 
@@ -71,14 +71,14 @@ If the worktree is already clean, skip the commit step and continue with the sam
 - When continuing from a next-task recommendation rather than a detailed plan, first run the startup/planning steps of the target task skill so docs, dependencies, mode, files, and checks are re-confirmed before implementation.
 - Keep edits within the approved plan and requested subtask/bug/module.
 - Use lean mode for small low-risk work when appropriate.
-- Update changelog when repository files changed in a commit-worthy way.
+- Do not update changelog during normal `/do` execution. If `/do` invokes `/commit`, the commit workflow writes changelog for that commit.
 - Update learning notes only when the technical explanation has long-term learning value.
 
 ## Verification
 
 Run the checks described in the approved plan, adjusted only if repo state changed.
 
-If a planned check becomes unnecessary or too expensive for a tiny low-risk change, use lean mode and state `Not run: <reason>` in changelog/final response.
+If a planned check becomes unnecessary or too expensive for a tiny low-risk change, use lean mode and state `Not run: <reason>` in the final response.
 
 ## Completion Notification
 
@@ -100,5 +100,5 @@ Include:
 - Files changed.
 - Checks run or skipped with reason.
 - `Giải thích kỹ thuật dễ hiểu` when code/behavior changed.
-- Whether changelog, execution plan, learning notes, or UI docs changed.
+- Whether execution plan, learning notes, or UI docs changed; mention changelog only if `/do` invoked `/commit`.
 - Suggested next step: when recommending a roadmap command, include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.

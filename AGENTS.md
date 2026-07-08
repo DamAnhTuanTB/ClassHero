@@ -52,7 +52,7 @@ Nếu cần định tuyến nhanh bộ tài liệu, đọc `docs/00-docs-map.md`
 - Không dùng prompt ngắn của owner làm lý do để bỏ qua docs liên quan.
 - Nếu thiếu thông tin để code an toàn, hỏi lại hoặc ghi rõ `TODO`/`ASSUMPTION`.
 - Nếu phát hiện mâu thuẫn lớn giữa docs, báo owner hoặc ghi rõ quyết định tạm thời; không âm thầm tự quyết.
-- Khi thay đổi file đáng commit, cập nhật changelog.
+- Không cập nhật changelog trong task thường. Changelog chỉ được ghi khi owner yêu cầu commit và commit thật sự được thực hiện.
 
 ### 2.1. Khi Owner Không Hài Lòng
 
@@ -62,13 +62,14 @@ Khi owner đưa ra feedback không hài lòng, ví dụ "tôi không đồng ý"
 - Nếu Codex đưa ra giải pháp, quy tắc mới hoặc cách hiểu mới có giá trị tái sử dụng, phải tự ghi lại ngay vào tài liệu/skill/context phù hợp trong cùng lượt làm việc.
 - Không chờ owner hỏi lại kiểu "bạn đã note lại chưa".
 - Nếu feedback chỉ là sở thích tạm thời cho một màn hình, ghi vào `docs/ui-references/approved-patterns.md` chỉ khi owner xác nhận chốt/ưng; nếu là rule workflow hoặc chất lượng áp dụng rộng, ghi vào `AGENTS.md`, skill liên quan, `docs/11-ui-design-system.md` hoặc context phù hợp.
-- Cập nhật changelog khi có sửa file.
+- Không cập nhật changelog ngay trong task thường; nếu cần commit, workflow `/commit` sẽ ghi changelog.
 
 ### 2.2. Tránh Lỗi Hiển Thị Tool `Bad Request`
 
 Nếu Codex UI hiển thị lỗi tool dạng `{"detail":"Bad Request"}`, thường đó là lỗi hiển thị/lớp tool của Codex, không phải lỗi app trong repo. Để giảm khả năng owner hiểu nhầm mà vẫn giữ tốc độ:
 
 - Theo ưu tiên của owner, Codex phải ưu tiên tốc độ: dùng nhiều command/tool song song khi độc lập và an toàn, nhất là các lệnh read-only ngắn như `rg`, `sed`, `git status`, `git diff`.
+- Ưu tiên đọc/search/check song song tối đa khi độc lập; với edit file, gom nhiều chỉnh sửa liên quan vào một `apply_patch` hợp lý thay vì nhiều patch rời rạc, nhưng không chạy nhiều patch song song.
 - Chỉ hạ cấp sang từng bước khi chính thao tác vừa chạy tạo `Bad Request`, output quá dài, hoặc command có nhiều path/ký tự phức tạp khiến UI tool dễ render lỗi.
 - Luôn quote path có khoảng trắng, dấu ngoặc hoặc Unicode tổ hợp; ví dụ dùng `'apps/web/app/(public)/page.tsx'`.
 - Không dùng shell heredoc/append kiểu `cat <<EOF >> file` cho file repo, đặc biệt trong `.codex`; khi sửa docs/changelog/skill, dùng `apply_patch`.
@@ -148,7 +149,7 @@ Nếu task quá mơ hồ, hỏi lại hoặc ghi `ASSUMPTION`, không tự suy d
 
 Trong quá trình làm task, Codex có thể cập nhật các file sau nếu cần để task rõ ràng, đúng thứ tự và không lệch contract:
 
-- `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md`: khi có thay đổi file đáng commit.
+- `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md`: chỉ cập nhật trong workflow `/commit` khi commit thật sự được tạo.
 - `.codex/context/current-context.md`: khi trạng thái repo, task tiếp theo, blocker hoặc quyết định workflow quan trọng thay đổi.
 - `.codex/context/code-index.md`: khi tạo/di chuyển module, entrypoint, API client, worker hoặc shared schema quan trọng.
 - `.codex/plans/codex-execution-plan.md`: nếu phát hiện dependency, thứ tự subtask, `TODO` hoặc `ASSUMPTION` nhỏ cần chỉnh.
@@ -174,7 +175,7 @@ Không được dùng các file này để tự đổi scope lớn, stack hoặc
 - Một lần owner giao task mặc định chỉ làm một subtask.
 - Không gom nhiều milestone nếu owner không yêu cầu rõ.
 - Mỗi subtask trong `docs/implementation/M*.md` có dòng `Mode`; Codex phải đọc mode này trước khi chọn làm UI, API, DB, worker/integration hay docs-only.
-- Nếu phải sửa file thuộc subtask khác để task hiện tại chạy được, ghi rõ lý do trong kế hoạch và changelog.
+- Nếu phải sửa file thuộc subtask khác để task hiện tại chạy được, ghi rõ lý do trong kế hoạch và final response.
 - Nếu một subtask quá lớn, đề xuất chia nhỏ trước khi code.
 - `docs/09-implementation-plan.md` quy định thứ tự triển khai, không được dùng để thay đổi scope/stack đã chốt.
 
@@ -354,8 +355,9 @@ Checks phải tỉ lệ với rủi ro:
 
 - Task nhỏ, docs-only, wording, UI-only nhỏ, config nhẹ hoặc sửa bug cô lập có thể dùng lean mode để tối đa tốc độ.
 - Lean mode nghĩa là không cần chạy full lint/build/test toàn repo nếu không cần thiết; chỉ chạy check nhỏ nhất đủ tin cậy như `git diff --check`, kiểm tra frontmatter skill/script validation nếu có, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú.
+- Khi owner ghi `sửa nhanh`, `fast`, hoặc `check nhẹ`, Codex mặc định dùng fast path: đọc đúng phạm vi nhỏ nhất, patch trực tiếp, không refactor/cleanup lan, không cập nhật changelog, không chạy `typecheck`, `lint`, `build`, Playwright/E2E trừ khi thay đổi đụng auth/API/database/shared logic, route guard, form/session/data behavior hoặc có dấu hiệu lỗi TypeScript rõ ràng.
 - Với task làm UI hoặc owner yêu cầu "sửa UI", mặc định ưu tiên tốc độ: hạn chế chạy `typecheck`, `lint`, `build`, Playwright/E2E. Chỉ chạy các check này khi thay đổi chạm nhiều component/route, sửa shared UI primitive, đổi form/state phức tạp, nghi có lỗi TypeScript, hoặc owner yêu cầu rõ. Nếu chỉ chỉnh màu, spacing, copy, class Tailwind, vị trí ảnh/icon hoặc style nhỏ, dùng `git diff --check`, format check nhỏ hoặc kiểm tra thủ công là đủ.
-- Nếu bỏ qua check lớn, ghi rõ `Not run: <lý do>` trong changelog/final response.
+- Nếu bỏ qua check lớn, ghi rõ `Not run: <lý do>` trong final response.
 - Auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification hoặc multi-module phải dùng workflow đầy đủ hơn.
 
 ---
@@ -364,31 +366,23 @@ Checks phải tỉ lệ với rủi ro:
 
 Codex không được tự commit nếu owner chưa yêu cầu rõ.
 
-Khi có thay đổi file đáng commit, cập nhật changelog:
+Không ghi changelog trong task thường, kể cả khi có thay đổi file đáng commit. Changelog chỉ được cập nhật trong workflow `/commit`, ngay trước khi tạo commit.
 
 ```txt
 .codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md
 ```
 
-Nếu cùng ngày đã có file changelog, append vào file đó.
-
-Format ngắn:
+Khi commit, changelog ghi các chức năng/thay đổi chính nằm trong commit đó. Mỗi chức năng là một dòng ngắn:
 
 ```md
-## YYYY-MM-DD — <tên task ngắn>
-
-- Summary: <1 câu mô tả thay đổi chính>
-- Changed: <1-2 ý chính>
-- Files: `path`, `path`
-- Tests: <test đã chạy hoặc "Not run: <lý do>">
-- Notes: <chỉ ghi nếu có migration/env/TODO/ASSUMPTION/rủi ro>
+- YYYY-MM-DD: <chức năng/thay đổi chính của commit>
 ```
 
-Không ghi secret, token, API key, webhook signature, private URL hoặc dữ liệu nhạy cảm vào changelog.
+Không ghi file list, test/check, notes dài, secret, token, API key, webhook signature, private URL hoặc dữ liệu nhạy cảm vào changelog. Các chi tiết về files/tests/notes nằm trong final response hoặc tài liệu liên quan khi thật sự cần.
 
 Khi owner yêu cầu commit:
 
-- Changelog phải nằm cùng commit với thay đổi liên quan.
+- Changelog phải nằm cùng commit với thay đổi liên quan và chỉ ghi cho commit đó.
 - Không stage file rác/generated/local nếu không thuộc task.
 - Commit message dùng:
 
@@ -415,7 +409,7 @@ Task được xem là xong khi:
 - Không hard-code secret.
 - Không phá flow chính trong `docs/02-user-flows.md`.
 - Nếu đổi API/schema/AI/env/UI rule, cập nhật docs liên quan.
-- Changelog đã cập nhật nếu có thay đổi file đáng commit.
+- Changelog đã cập nhật nếu commit được thực hiện.
 
 ---
 
@@ -435,7 +429,7 @@ Dùng trạng thái:
 
 Nội dung thông báo phải rõ task nào, kết quả gì, bước tiếp theo là gì nếu có. Không đưa secret, token, private URL hoặc dữ liệu nhạy cảm vào notification. Nếu notification lỗi, không được làm task fail; vẫn báo trong final response nếu cần.
 
-Nếu `.codex/telegram/.env.local` có `TELEGRAM_BOT_TOKEN` và chat ID nhận thông báo, script có thể gửi thêm notification qua Telegram. Token/chat ID thật không được commit.
+Telegram notification/bot đang tắt theo yêu cầu owner; không bật lại cho đến khi owner yêu cầu rõ. Nếu sau này owner bật lại và `.codex/telegram/.env.local` có `TELEGRAM_BOT_TOKEN`, chat ID nhận thông báo, đồng thời không có `CODEX_TELEGRAM_SUPPRESS_NOTIFY=1`, script có thể gửi thêm notification qua Telegram. Token/chat ID thật không được commit.
 
 Repo có thể chạy Telegram bot local ở `.codex/scripts/codex-telegram-bot.py` để owner chat/ra lệnh cho Codex qua Telegram. Bot này chỉ được chạy Codex cho `TELEGRAM_ALLOWED_CHAT_IDS`, nhưng trong danh sách đó thì coi như full quyền với repo: câu hỏi thì trả lời, lệnh thì thực hiện theo `AGENTS.md` và skill liên quan.
 

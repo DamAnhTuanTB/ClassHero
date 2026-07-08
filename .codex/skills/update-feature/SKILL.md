@@ -1,6 +1,6 @@
 ---
 name: update-feature
-description: Update an existing feature in the Vietnamese learning-path project from commands like "/update-feature đổi thanh toán 12 tháng thành 6 tháng" or "/update-feature tính năng abc bây giờ làm như này". Use when Codex must identify the existing feature, update the right source-of-truth docs and roadmap task codes as a docs/planning-only step by default, keep the approved stack/MVP guardrails, update API/database/UI/AI/implementation docs as needed, avoid production code changes unless the owner explicitly asks to implement now, run docs checks, update changelog, explain the planned changed technical flow, and suggest the next implementation task command with task code when possible.
+description: Update an existing feature in the Vietnamese learning-path project from commands like "/update-feature đổi thanh toán 12 tháng thành 6 tháng" or "/update-feature tính năng abc bây giờ làm như này". Use when Codex must identify the existing feature, update the right source-of-truth docs and roadmap task codes as a docs/planning-only step by default, keep the approved stack/MVP guardrails, update API/database/UI/AI/implementation docs as needed, avoid production code changes unless the owner explicitly asks to implement now, run docs checks, explain the planned changed technical flow, and suggest the next implementation task command with task code when possible.
 ---
 
 # Update Feature Runner
@@ -84,7 +84,7 @@ Run checks proportional to risk:
 - Docs-only by default: `git diff --check`.
 - If the owner explicitly requested implementation in the same request, run code checks proportional to changed code.
 
-Update changelog after file changes.
+Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 
 ## Completion Notification
 

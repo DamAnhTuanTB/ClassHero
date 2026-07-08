@@ -1,6 +1,6 @@
 ---
 name: add-feature
-description: Add a new feature to the Vietnamese learning-path project from commands like "/add-feature thêm tính năng abc" or "thêm mới tính năng ...". Use when Codex must evaluate whether the feature belongs in MVP, update product/user-flow/implementation/API/database/UI/AI docs and roadmap task codes as a docs/planning-only step by default, avoid changing the approved stack, split large work into roadmap subtasks, avoid production code changes unless the owner explicitly asks to implement now, run docs checks, update changelog, and suggest the next implementation task command with task code when possible.
+description: Add a new feature to the Vietnamese learning-path project from commands like "/add-feature thêm tính năng abc" or "thêm mới tính năng ...". Use when Codex must evaluate whether the feature belongs in MVP, update product/user-flow/implementation/API/database/UI/AI docs and roadmap task codes as a docs/planning-only step by default, avoid changing the approved stack, split large work into roadmap subtasks, avoid production code changes unless the owner explicitly asks to implement now, run docs checks, and suggest the next implementation task command with task code when possible.
 ---
 
 # Add Feature Runner
@@ -84,7 +84,7 @@ When approved and clear:
 
 Run docs checks such as `git diff --check`. If the owner explicitly requested implementation in the same request, run code checks proportional to changed code.
 
-Update changelog after file changes.
+Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 
 ## Completion Notification
 

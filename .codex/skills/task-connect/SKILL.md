@@ -1,6 +1,6 @@
 ---
 name: task-connect
-description: Connect or plan connection of previously built mock UI to real APIs for the Vietnamese learning-path project from commands like "/task-connect M7.1", "/task-connect M3.4", or "/task-connect plan M3.4". Use when Codex must preserve the approved UI, replace mock data with API clients/hooks, implement the complete backend API required by the requested subtask when it does not exist, or produce an approval-gated connection plan first when the command contains "plan"; read API contracts/database/user-flow docs, use TanStack Query and React Hook Form plus Zod where appropriate, avoid broad UI redesign, update changelog after implementation, and explain the UI-to-API technical flow.
+description: Connect or plan connection of previously built mock UI to real APIs for the Vietnamese learning-path project from commands like "/task-connect M7.1", "/task-connect M3.4", or "/task-connect plan M3.4". Use when Codex must preserve the approved UI, replace mock data with API clients/hooks, implement the complete backend API required by the requested subtask when it does not exist, or produce an approval-gated connection plan first when the command contains "plan"; read API contracts/database/user-flow docs, use TanStack Query and React Hook Form plus Zod where appropriate, avoid broad UI redesign, and explain the UI-to-API technical flow.
 ---
 
 # Task Connect Runner
@@ -129,8 +129,9 @@ Allowed reductions:
 Non-negotiable:
 
 - Do not use lean mode when adding/changing auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior.
+- If the owner writes `fast`, `check nhẹ`, or `sửa nhanh`, use lean verification only when the connection change is low risk; keep the full workflow when connecting auth/session, permissions, payment, database writes, API contracts, or multi-screen data behavior.
 - Do not skip backend permission reasoning when real data is connected.
-- If broader checks are skipped, state `Not run: <reason>` in changelog and final response.
+- If broader checks are skipped, state `Not run: <reason>` in the final response.
 
 ## Learning Notes
 
@@ -142,7 +143,7 @@ After connecting UI to real API/data, update `docs/learning-notes/` when the flo
 - Include database/worker/AI/integration only when they are actually involved.
 - Merge with existing sections instead of adding duplicate paragraphs.
 - Do not copy the final response verbatim.
-- Update changelog if learning notes changed.
+- Do not update changelog when learning notes change; `/commit` will record the commit's main changes.
 - If not updated, mention briefly in the final response.
 
 ## Completion Notification
@@ -175,4 +176,4 @@ Include:
 - Whether learning notes changed.
 - Suggested next action or subtask: when recommending a roadmap command, include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.
 
-Update changelog using the concise format from `AGENTS.md`.
+Do not update changelog here. Changelog is written only during `/commit`, with one short line per main change included in that commit.

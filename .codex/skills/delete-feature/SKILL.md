@@ -1,6 +1,6 @@
 ---
 name: delete-feature
-description: Delete or remove an existing feature from the Vietnamese learning-path project from commands like "/delete-feature xóa tính năng abc" or "bỏ tính năng ...". Use when Codex must identify the feature, assess product/API/database/UI/AI impact, update source-of-truth docs and roadmap task codes as a docs/planning-only step by default, avoid production code/data deletion unless the owner explicitly asks to implement removal now, avoid destructive data loss without confirmation, run docs checks, update changelog, explain what is removed from scope, and suggest the next cleanup task command with task code when possible.
+description: Delete or remove an existing feature from the Vietnamese learning-path project from commands like "/delete-feature xóa tính năng abc" or "bỏ tính năng ...". Use when Codex must identify the feature, assess product/API/database/UI/AI impact, update source-of-truth docs and roadmap task codes as a docs/planning-only step by default, avoid production code/data deletion unless the owner explicitly asks to implement removal now, avoid destructive data loss without confirmation, run docs checks, explain what is removed from scope, and suggest the next cleanup task command with task code when possible.
 ---
 
 # Delete Feature Runner
@@ -85,7 +85,7 @@ Run checks proportional to removal risk:
 - Docs-only by default: `git diff --check`.
 - If the owner explicitly requested implementation cleanup in the same request, run code checks proportional to changed code.
 
-Update changelog after file changes.
+Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 
 ## Completion Notification
 

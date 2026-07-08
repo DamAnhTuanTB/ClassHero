@@ -1,6 +1,6 @@
 ---
 name: task-full
-description: Implement or plan complete roadmap subtasks for the Vietnamese learning-path project from commands like "/task-full M7.1", "/task-full M3.4", or "/task-full plan M1.2". Use when Codex must either do everything needed for a subtask end to end, including backend/API/database/UI/worker/docs when the implementation plan requires them, or produce an approval-gated plan first when the command contains "plan"; read relevant docs, keep scope to the requested subtask, apply mobile-first UI rules when UI is involved, run proportional verification, update changelog after implementation, explain technical flow, and suggest the next subtask with its Mode and short description.
+description: Implement or plan complete roadmap subtasks for the Vietnamese learning-path project from commands like "/task-full M7.1", "/task-full M3.4", or "/task-full plan M1.2". Use when Codex must either do everything needed for a subtask end to end, including backend/API/database/UI/worker/docs when the implementation plan requires them, or produce an approval-gated plan first when the command contains "plan"; read relevant docs, keep scope to the requested subtask, apply mobile-first UI rules when UI is involved, run proportional verification, explain technical flow, and suggest the next subtask with its Mode and short description.
 ---
 
 # Task Full Runner
@@ -118,8 +118,9 @@ Allowed reductions:
 Non-negotiable:
 
 - Do not skip safety checks for secrets, scope, stack, MVP, or unrelated dirty files.
-- Do not skip changelog when repository files changed in a commit-worthy way.
-- If a larger check is skipped, state `Not run: <reason>` in changelog and final response.
+- Do not update changelog during implementation; `/commit` will record the commit's main changes.
+- If a larger check is skipped, state `Not run: <reason>` in the final response.
+- If the owner writes `fast`, `check nhẹ`, or `sửa nhanh`, use lean verification only when the requested change is low risk; keep the full workflow for auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior changes.
 - Do not use lean mode for auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior changes.
 
 ## Learning Notes
@@ -132,7 +133,7 @@ After implementation, decide whether the technical explanation has long-term lea
 - Use `docs/learning-notes/foundation/` only for reusable technical foundations that do not belong to one feature.
 - Merge into an existing note when possible; do not copy the final response verbatim and do not duplicate existing explanations.
 - Update `docs/learning-notes/glossary.md` only for reusable terms that will appear across many notes.
-- Update changelog if learning notes changed.
+- Do not update changelog when learning notes change; `/commit` will record the commit's main changes.
 - If not updated, mention briefly in the final response, for example `Learning notes: Not updated, change was too small`.
 
 ## Completion Notification
@@ -165,4 +166,4 @@ Include:
 - Whether learning notes changed.
 - Suggested next subtask: include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.
 
-Update changelog using the concise format from `AGENTS.md`.
+Do not update changelog here. Changelog is written only during `/commit`, with one short line per main change included in that commit.

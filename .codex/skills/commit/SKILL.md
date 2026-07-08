@@ -34,7 +34,7 @@ Before committing:
 2. Read `AGENTS.md`, especially changelog and commit rules.
 3. Run `git status --short`.
 4. Inspect `git diff --stat`, `git diff --name-only`, staged diff if any, and file-level diffs needed to understand the change.
-5. Check whether `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` includes the current commit-worthy changes. If missing, add a concise entry before staging.
+5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for the commit being created. Add one short bullet per main feature/change included in this commit.
 6. Do not modify production code during `/commit`; only update changelog if needed for commit hygiene.
 
 ## Safety Gates
@@ -159,9 +159,8 @@ Do not amend, rebase, reset, or squash unless explicitly asked.
 
 ## Changelog Style
 
-When `/commit` needs to add or adjust changelog before committing, keep it compact:
+During `/commit`, add or adjust changelog for the commit being created:
 
-- One entry per coherent commit.
-- `Changed` has 1-2 key points, not a diff recap.
-- `Files` may group related paths.
-- `Notes` appears only for migration/env/TODO/ASSUMPTION/risk.
+- Add one bullet per main feature/change included in the commit: `- YYYY-MM-DD: <short feature/change summary>`.
+- Do not add `Summary`, `Changed`, `Files`, `Tests`, or `Notes` sections.
+- Keep checks, skipped checks, file lists, and risk notes in the final response or the relevant docs instead of the changelog.

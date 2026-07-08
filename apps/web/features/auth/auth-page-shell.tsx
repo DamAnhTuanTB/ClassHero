@@ -157,7 +157,7 @@ export function AuthPageShell({
               currentTheme.illustration === "parent"
                 ? "bottom-0 h-56 w-64 sm:h-[18rem] sm:w-[20rem] lg:bottom-4 lg:h-[21rem] lg:w-[24rem] xl:bottom-5 xl:h-[23rem] xl:w-[26rem]"
                 : currentTheme.illustration === "student"
-                  ? "bottom-4 h-56 w-56 sm:bottom-5 sm:h-[18rem] sm:w-[18rem] lg:bottom-12 lg:h-[21rem] lg:w-[21rem] xl:bottom-14 xl:h-[23rem] xl:w-[23rem]"
+                  ? "bottom-12 h-56 w-56 sm:bottom-14 sm:h-[18rem] sm:w-[18rem] lg:bottom-24 lg:h-[21rem] lg:w-[21rem] xl:bottom-28 xl:h-[23rem] xl:w-[23rem]"
                   : "bottom-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:h-[23rem] xl:w-[23rem]"
             }`}
           />

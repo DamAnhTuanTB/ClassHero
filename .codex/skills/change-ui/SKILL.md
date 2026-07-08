@@ -1,6 +1,6 @@
 ---
 name: change-ui
-description: Change only the front-end UI for the Vietnamese learning-path project from commands like "/change-ui màn landing page sửa hero nhỏ lại", "/change-ui chỗ card khóa học đổi layout", or "sửa UI màn ...". Use when Codex must adjust existing UI according to owner feedback without changing backend/API/database/business logic, preserve mobile-first/tablet/desktop quality, avoid updating approved UI pattern/design-system docs until the owner explicitly says the UI is approved such as "Oke, ưng UI này", run proportional UI checks, update changelog, and explain the visual/code flow changed.
+description: Change only the front-end UI for the Vietnamese learning-path project from commands like "/change-ui màn landing page sửa hero nhỏ lại", "/change-ui chỗ card khóa học đổi layout", or "sửa UI màn ...". Use when Codex must adjust existing UI according to owner feedback without changing backend/API/database/business logic, preserve mobile-first/tablet/desktop quality, avoid updating approved UI pattern/design-system docs until the owner explicitly says the UI is approved such as "Oke, ưng UI này", run proportional UI checks, and explain the visual/code flow changed.
 ---
 
 # Change UI Runner
@@ -67,9 +67,9 @@ When approval happens:
 
 - Add a concise entry to `docs/ui-references/approved-patterns.md` with context, approved choices, and files/screens.
 - Update `docs/11-ui-design-system.md` only if the approval creates a broad reusable UI rule.
-- Update changelog.
+- Do not update changelog; `/commit` will record the approved UI/docs changes if a commit is created.
 
-Changelog is still allowed during UI iteration because it records repository file changes; keep it short.
+Changelog is not written during UI iteration. It is written only during `/commit`, with one short line per main change included in the commit.
 
 ## UI Work Rules
 
@@ -95,16 +95,17 @@ Changelog is still allowed during UI iteration because it records repository fil
 Run checks proportional to the UI change:
 
 - Default for UI feedback is speed-first lean verification. Do not automatically run `typecheck`, `lint`, `build`, Playwright, or E2E after every UI tweak.
-- Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, update changelog briefly, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
+- If the owner writes `sửa nhanh`, `fast`, or `check nhẹ`, use the fastest safe path by default: inspect the smallest relevant scope, patch directly, avoid unrelated refactor/cleanup, do not update changelog, and skip typecheck/lint/build/Playwright/E2E unless the change touches shared logic, route guards, form/session/data behavior, or obvious TypeScript risk.
+- Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, do not update changelog, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
 - Small CSS/layout/text/color/spacing/icon/image-position changes: `git diff --check`, a targeted format check, or manual visual reasoning may be enough.
 - Component/page changes: run focused typecheck/lint/build only when the change touches shared primitives, form/state logic, route structure, conditional rendering, or likely TypeScript errors.
 - Visual change: check mobile and desktop by reasoning/browser only when practical; tablet/iPad for complex layouts.
 - In screenshot mode only: save review screenshots under `.codex/screenshots/`.
 - Interaction change: check tap/pending/loading feedback and obvious layout shift when practical.
 - If unable to run app/browser checks, state why.
-- If larger checks are skipped for speed, write `Not run: UI lean mode per owner preference` or a more specific reason in changelog/final response.
+- If larger checks are skipped for speed, write `Not run: UI lean mode per owner preference` or a more specific reason in the final response.
 
-Update changelog after repository file changes.
+Do not write UI changelog entries here. Changelog is written only during `/commit` for the commit being created.
 
 ## Completion Notification
 

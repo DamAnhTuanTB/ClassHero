@@ -1,6 +1,6 @@
 ---
 name: fix-bug
-description: Fix bugs in the Vietnamese learning-path project from commands like "/fix bug mô tả lỗi", "/fix bug lỗi 500 khi mở API", or "sửa bug mô tả". Use when Codex must read relevant project docs, map the bug to the likely milestone/module, reproduce or gather enough evidence, identify root cause, make the smallest safe fix, scale process and checks to bug size, avoid unrelated changes, update changelog, verify with focused commands when practical, then explain the bug cause and concise handling approach with applied technical flow.
+description: Fix bugs in the Vietnamese learning-path project from commands like "/fix bug mô tả lỗi", "/fix bug lỗi 500 khi mở API", or "sửa bug mô tả". Use when Codex must read relevant project docs, map the bug to the likely milestone/module, reproduce or gather enough evidence, identify root cause, make the smallest safe fix, scale process and checks to bug size, avoid unrelated changes, verify with focused commands when practical, then explain the bug cause and concise handling approach with applied technical flow.
 ---
 
 # Bug Fix Runner
@@ -51,8 +51,8 @@ Non-negotiable:
 
 - Do not guess root cause when evidence is insufficient; say what is assumed.
 - Do not skip safety checks for secrets, scope, stack, MVP, or unrelated dirty files.
-- Do not skip changelog when repository files changed in a commit-worthy way.
-- If a check is skipped, state `Not run: <short reason>` in changelog and final response.
+- Do not update changelog during the bug-fix workflow; `/commit` will record the commit's main changes.
+- If a check is skipped, state `Not run: <short reason>` in the final response.
 - Use the fuller workflow for auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification, security, or multi-module bugs.
 
 ## Diagnosis Workflow
@@ -83,8 +83,8 @@ After the fix:
 1. Rerun the command or flow that exposed the bug.
 2. Run verification proportional to risk: focused checks for small bugs; broader `typecheck`, `build`, `lint`, or tests for shared, production, or multi-module changes.
 3. If a long-running server was started, stop it unless the user asked to keep it running.
-4. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` using the concise format from `AGENTS.md`.
-5. If tests cannot run, write the reason in changelog and final response.
+4. Do not update changelog here; if the owner asks for `/commit`, that workflow writes changelog for the commit being created.
+5. If tests cannot run, write the reason in the final response.
 
 ## Completion Notification
 
@@ -133,16 +133,9 @@ After a bug fix, update `docs/learning-notes/` only when the bug teaches a reusa
 - Add the lesson under `Luồng lỗi thường gặp`, `Kiến thức cần nhớ`, or the most relevant section.
 - Do not store one-off symptoms, stack traces, secrets, private URLs, or noisy logs.
 - Do not copy the final response verbatim.
-- Update changelog if learning notes changed.
+- Do not update changelog when learning notes change; `/commit` will record the commit's main changes.
 - If not updated, mention briefly in the final response.
 
 ## Changelog
 
-Keep bug-fix changelog entries short:
-
-- `Summary`: one sentence about the fixed symptom/root cause.
-- `Changed`: 1-2 key points only.
-- `Files`: grouped paths when useful.
-- `Tests`: reproduction or focused verification command, or `Not run`.
-
-Do not duplicate the full final explanation in changelog.
+Do not write bug-fix changelog entries in this workflow. Changelog is written only during `/commit`, with one short line per main fix/change included in that commit.
