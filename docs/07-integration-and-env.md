@@ -134,6 +134,8 @@ API validate các biến nền khi boot. Ở `M2.1`, nhóm env bắt buộc gồ
 
 Nếu thiếu env, API phải fail fast với message liệt kê biến thiếu. `JWT_ACCESS_SECRET` và `JWT_REFRESH_SECRET` không được để placeholder trong production.
 
+Từ `M2.3`, API cũng đọc optional `RESEND_API_KEY` và `RESEND_FROM_EMAIL` để gửi email reset password. Nếu hai biến này chưa cấu hình thật ở local/dev, forgot-password vẫn tạo reset token hash và trả response chung nhưng không gọi Resend.
+
 Swagger dev/staging chạy tại:
 
 ```txt

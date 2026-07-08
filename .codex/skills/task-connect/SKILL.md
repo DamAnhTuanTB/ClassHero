@@ -15,9 +15,13 @@ Accept:
 - `/task-connect: M7.1`
 - `/task-connect plan M7.1`
 - `/task-connect plan: M7.1`
+- `/task-connect screenshot M7.1`
+- `/task-connect plan screenshot M7.1`
 - `/task-connect M3.4 + M6.2`
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed.
+
+If `screenshot` appears after the command, enable screenshot mode for UI states affected by the connection. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code/API checks and mention any responsive review that was done without screenshots.
 
 ## Plan Mode
 
@@ -108,6 +112,7 @@ Run focused checks:
 - If a new API endpoint is implemented, verify it with a focused API test or curl when local services allow it.
 - If API cannot run locally, state what was checked statically.
 - For UI states changed by real data, re-check at least the affected mobile and desktop layouts when practical.
+- Only create or save screenshots when screenshot mode is enabled by the command, for example `/task-connect screenshot M3.4`.
 - For data-connected UI, mention whether perceived latency, pending state, cache/invalidation, and list/search performance were checked or skipped.
 - For public/indexable UI, mention whether metadata/slug/published/canonical/sitemap impact was handled or not in scope.
 

@@ -191,8 +191,18 @@ Body:
 Side effects:
 
 - Tạo `password_reset_tokens` với `token_hash`, `expires_at`.
-- Gửi email qua Resend nếu user có email.
+- Gửi email qua Resend nếu user có email và `RESEND_API_KEY`/`RESEND_FROM_EMAIL` đã cấu hình thật.
 - Không tiết lộ email/identifier có tồn tại hay không.
+
+Response:
+
+```json
+{
+  "data": {
+    "success": true
+  }
+}
+```
 
 ### `POST /auth/reset-password`
 
@@ -215,6 +225,18 @@ Side effects:
 - Set `password_reset_tokens.used_at`.
 - Revoke refresh tokens hiện có của user.
 
+Response:
+
+```json
+{
+  "data": {
+    "success": true
+  }
+}
+```
+
+Errors: `INVALID_RESET_TOKEN`, `RESET_TOKEN_EXPIRED`, `VALIDATION_ERROR`.
+
 ---
 
 ## 3. Current user/profile API
@@ -224,6 +246,43 @@ Side effects:
 Role: authenticated.
 
 Behavior: trả user và profile theo role. Không trả hash/token/secret.
+
+Response:
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "uuid",
+      "role": "STUDENT",
+      "status": "ACTIVE",
+      "email": "student1@example.com",
+      "phone": "0900000001",
+      "username": "student1",
+      "fullName": "Nguyễn Văn A",
+      "gender": "MALE",
+      "dateOfBirth": "2012-01-01",
+      "avatarFileId": null,
+      "lastLoginAt": "2026-07-08T05:00:00.000Z",
+      "emailVerifiedAt": null,
+      "phoneVerifiedAt": null,
+      "createdAt": "2026-07-08T05:00:00.000Z"
+    },
+    "studentProfile": {
+      "id": "uuid",
+      "grade": 7,
+      "childCode": "LP123456",
+      "address": null,
+      "displayName": "An",
+      "totalXp": 0,
+      "level": 1
+    },
+    "parentProfile": null
+  }
+}
+```
+
+Errors: `UNAUTHORIZED`, `FORBIDDEN`.
 
 ### `PATCH /me/student-profile`
 
@@ -248,5 +307,9 @@ Không cho đổi:
 - email.
 
 ASSUMPTION: MVP chưa cần endpoint đổi profile riêng cho parent ngoài avatar nếu sau này chốt.
+
+Response: cùng shape với `GET /me`.
+
+Errors: `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`.
 
 ---

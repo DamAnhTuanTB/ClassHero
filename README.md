@@ -112,6 +112,19 @@ pnpm build
 pnpm format:check
 ```
 
+Chạy Playwright cho auth UI và sinh screenshot local:
+
+```bash
+pnpm --filter @learning-path/web e2e:auth-ui
+open .codex/screenshots
+```
+
+Nếu máy mới chưa có browser Playwright:
+
+```bash
+pnpm --filter @learning-path/web exec playwright install chromium
+```
+
 Format:
 
 ```bash

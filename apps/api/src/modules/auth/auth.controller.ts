@@ -1,10 +1,21 @@
-import { Body, Controller, HttpCode, HttpStatus, Inject, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+} from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
 import { AuthService } from "./auth.service";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { RegisterParentDto } from "./dto/register-parent.dto";
 import { RegisterStudentDto } from "./dto/register-student.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -42,5 +53,22 @@ export class AuthController {
   @ApiOperation({ summary: "Revoke a refresh token" })
   logout(@Body() dto: RefreshTokenDto) {
     return this.authService.logout(dto);
+  }
+
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Request a password reset token" })
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() request: AuthenticatedRequest) {
+    return this.authService.forgotPassword(dto, {
+      ipAddress: request.ip,
+      userAgent: request.get?.("user-agent"),
+    });
+  }
+
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Reset password by reset token" })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

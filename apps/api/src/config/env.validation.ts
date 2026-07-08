@@ -15,6 +15,8 @@ const envSchema = z
     JWT_REFRESH_SECRET: z.string().min(8),
     JWT_ACCESS_EXPIRES_IN: z.string().min(1).default("15m"),
     JWT_REFRESH_EXPIRES_IN: z.string().min(1).default("30d"),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    RESEND_FROM_EMAIL: z.string().email().optional(),
     REDIS_URL: z.string().min(1),
     CORS_ORIGINS: z.string().min(1).default("http://localhost:3000"),
     LOG_LEVEL: z.enum(["error", "warn", "log", "debug", "verbose"]).default("debug"),

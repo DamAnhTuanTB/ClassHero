@@ -10,29 +10,29 @@ Mục tiêu của `AGENTS.md` là điều phối cách Codex đọc tài liệu,
 
 Codex phải xem các tài liệu sau là nguồn chính của dự án:
 
-| File | Vai trò |
-| --- | --- |
-| `AGENTS.md` | Quy tắc cao nhất về cách Codex làm việc trong repo |
-| `docs/00-docs-map.md` | Bản đồ đọc docs nhanh cho owner/Codex; không thay thế docs nguồn |
-| `docs/01-product-scope.md` | Scope MVP, role, nghiệp vụ sản phẩm |
-| `docs/02-user-flows.md` | Luồng sử dụng chính |
-| `docs/03-technical-architecture.md` | Kiến trúc, stack, deploy |
-| `docs/04-database-model.md` | Index database model, quan hệ, constraint |
-| `docs/database/*.md` | Chi tiết database theo domain |
-| `docs/05-api-contract.md` | Index REST API contract giữa web và API |
-| `docs/api/*.md` | Chi tiết API contract theo domain |
-| `docs/06-ai-rag-spec.md` | AI/RAG, embedding, retrieval, cache |
-| `docs/07-integration-and-env.md` | Env, provider, tích hợp bên thứ ba |
-| `docs/08-ui-pages-and-components.md` | Danh sách màn hình/component |
-| `docs/09-implementation-plan.md` | Index milestone/subtask, thứ tự triển khai và phụ thuộc |
-| `docs/implementation/M*.md` | Chi tiết phạm vi/Done từng milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md` |
-| `docs/implementation/dependency-graph.md` | Bản đồ phụ thuộc đọc nhanh giữa milestone/subtask |
-| `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa |
-| `docs/10-seed-data-and-test-cases.md` | Seed data và test case cơ bản |
-| `docs/11-ui-design-system.md` | Gu UI, token, responsive, screenshot/review |
-| `docs/12-performance-and-observability.md` | Chuẩn hiệu năng, độ trễ, cache, query, worker, AI và đo đạc |
-| `docs/13-seo-and-content-discovery.md` | SEO, metadata, sitemap, robots, canonical, structured data cho trang public |
-| `docs/decisions/` | Decision log cho quyết định dài hạn |
+| File                                             | Vai trò                                                                            |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `AGENTS.md`                                      | Quy tắc cao nhất về cách Codex làm việc trong repo                                 |
+| `docs/00-docs-map.md`                            | Bản đồ đọc docs nhanh cho owner/Codex; không thay thế docs nguồn                   |
+| `docs/01-product-scope.md`                       | Scope MVP, role, nghiệp vụ sản phẩm                                                |
+| `docs/02-user-flows.md`                          | Luồng sử dụng chính                                                                |
+| `docs/03-technical-architecture.md`              | Kiến trúc, stack, deploy                                                           |
+| `docs/04-database-model.md`                      | Index database model, quan hệ, constraint                                          |
+| `docs/database/*.md`                             | Chi tiết database theo domain                                                      |
+| `docs/05-api-contract.md`                        | Index REST API contract giữa web và API                                            |
+| `docs/api/*.md`                                  | Chi tiết API contract theo domain                                                  |
+| `docs/06-ai-rag-spec.md`                         | AI/RAG, embedding, retrieval, cache                                                |
+| `docs/07-integration-and-env.md`                 | Env, provider, tích hợp bên thứ ba                                                 |
+| `docs/08-ui-pages-and-components.md`             | Danh sách màn hình/component                                                       |
+| `docs/09-implementation-plan.md`                 | Index milestone/subtask, thứ tự triển khai và phụ thuộc                            |
+| `docs/implementation/M*.md`                      | Chi tiết phạm vi/Done từng milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md` |
+| `docs/implementation/dependency-graph.md`        | Bản đồ phụ thuộc đọc nhanh giữa milestone/subtask                                  |
+| `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa                          |
+| `docs/10-seed-data-and-test-cases.md`            | Seed data và test case cơ bản                                                      |
+| `docs/11-ui-design-system.md`                    | Gu UI, token, responsive, screenshot/review                                        |
+| `docs/12-performance-and-observability.md`       | Chuẩn hiệu năng, độ trễ, cache, query, worker, AI và đo đạc                        |
+| `docs/13-seo-and-content-discovery.md`           | SEO, metadata, sitemap, robots, canonical, structured data cho trang public        |
+| `docs/decisions/`                                | Decision log cho quyết định dài hạn                                                |
 
 Nếu có `.codex/plans/codex-execution-plan.md`, dùng file đó để kiểm tra thứ tự/phụ thuộc, nhưng không dùng để thay thế docs gốc.
 
@@ -53,6 +53,27 @@ Nếu cần định tuyến nhanh bộ tài liệu, đọc `docs/00-docs-map.md`
 - Nếu thiếu thông tin để code an toàn, hỏi lại hoặc ghi rõ `TODO`/`ASSUMPTION`.
 - Nếu phát hiện mâu thuẫn lớn giữa docs, báo owner hoặc ghi rõ quyết định tạm thời; không âm thầm tự quyết.
 - Khi thay đổi file đáng commit, cập nhật changelog.
+
+### 2.1. Khi Owner Không Hài Lòng
+
+Khi owner đưa ra feedback không hài lòng, ví dụ "tôi không đồng ý", "làm cẩu thả", "không đúng ý", "sai rồi", "không ổn", Codex phải:
+
+- Trả lời thẳng vào vấn đề, nhận diện rõ điều cần đổi.
+- Nếu Codex đưa ra giải pháp, quy tắc mới hoặc cách hiểu mới có giá trị tái sử dụng, phải tự ghi lại ngay vào tài liệu/skill/context phù hợp trong cùng lượt làm việc.
+- Không chờ owner hỏi lại kiểu "bạn đã note lại chưa".
+- Nếu feedback chỉ là sở thích tạm thời cho một màn hình, ghi vào `docs/ui-references/approved-patterns.md` chỉ khi owner xác nhận chốt/ưng; nếu là rule workflow hoặc chất lượng áp dụng rộng, ghi vào `AGENTS.md`, skill liên quan, `docs/11-ui-design-system.md` hoặc context phù hợp.
+- Cập nhật changelog khi có sửa file.
+
+### 2.2. Tránh Lỗi Hiển Thị Tool `Bad Request`
+
+Nếu Codex UI hiển thị lỗi tool dạng `{"detail":"Bad Request"}`, thường đó là lỗi hiển thị/lớp tool của Codex, không phải lỗi app trong repo. Để giảm khả năng owner hiểu nhầm mà vẫn giữ tốc độ:
+
+- Theo ưu tiên của owner, Codex phải ưu tiên tốc độ: dùng nhiều command/tool song song khi độc lập và an toàn, nhất là các lệnh read-only ngắn như `rg`, `sed`, `git status`, `git diff`.
+- Chỉ hạ cấp sang từng bước khi chính thao tác vừa chạy tạo `Bad Request`, output quá dài, hoặc command có nhiều path/ký tự phức tạp khiến UI tool dễ render lỗi.
+- Luôn quote path có khoảng trắng, dấu ngoặc hoặc Unicode tổ hợp; ví dụ dùng `'apps/web/app/(public)/page.tsx'`.
+- Không dùng shell heredoc/append kiểu `cat <<EOF >> file` cho file repo, đặc biệt trong `.codex`; khi sửa docs/changelog/skill, dùng `apply_patch`.
+- Không dùng shell command nối chuỗi kiểu `&&`, `;` hoặc nhiều lệnh trong một activity khi session vừa gặp `Bad Request`; chạy từng command đơn lẻ để activity UI không render lỗi. Vẫn có thể đọc song song các lệnh read-only ngắn khi an toàn.
+- Nếu lỗi vẫn xuất hiện, không được dừng task chỉ vì lỗi này. Kiểm tra xem command thực tế có chạy được không; nếu chưa rõ, retry bằng command đơn giản hơn hoặc đọc/sửa file bằng cách khác. Báo rõ với owner rằng đó là lỗi hiển thị của Codex tool rồi tiếp tục phần việc chính.
 
 ---
 
@@ -161,23 +182,23 @@ Không được dùng các file này để tự đổi scope lớn, stack hoặc
 
 ## 7. Task Routing Map
 
-| Nhóm task | Milestone | Phải đọc |
-| --- | --- | --- |
-| Repo setup/tooling/monorepo | `M0.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md` |
-| Database/Prisma/migration/seed | `M1.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/04-database-model.md`; thêm `docs/05-api-contract.md` nếu API ảnh hưởng; thêm `docs/06-ai-rag-spec.md` nếu liên quan vector/AI; thêm `docs/10-seed-data-and-test-cases.md` nếu seed/test |
-| Auth/RBAC/profile/password | `M2.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md` |
-| Learning path/course/lesson admin | `M3.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
-| File upload/R2/PDF processing | `M4.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md` |
-| Embedding/pgvector/RAG retrieval | `M5.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`, `docs/07-integration-and-env.md` |
-| Quiz/flashcard/test CRUD | `M6.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
-| Student learning/progress/attempts | `M7.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
-| Payment/payOS/discount/enrollment | `M8.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md` |
-| AI generation/explanation/chat | `M9.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`, `docs/07-integration-and-env.md` |
-| Notification/realtime/email/Zalo | `M10.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md`; thêm UI docs nếu có UI |
-| Parent portal | `M11.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/08-ui-pages-and-components.md` |
-| Report/moderation/news/events | `M12.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI |
-| XP/level/leaderboard/profile/avatar | `M13.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI; thêm `docs/10-seed-data-and-test-cases.md` nếu seed/test |
-| Testing/hardening/deploy | `M14.x` | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md`, `docs/10-seed-data-and-test-cases.md` |
+| Nhóm task                           | Milestone | Phải đọc                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repo setup/tooling/monorepo         | `M0.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md`                                                                                                                                      |
+| Database/Prisma/migration/seed      | `M1.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/04-database-model.md`; thêm `docs/05-api-contract.md` nếu API ảnh hưởng; thêm `docs/06-ai-rag-spec.md` nếu liên quan vector/AI; thêm `docs/10-seed-data-and-test-cases.md` nếu seed/test             |
+| Auth/RBAC/profile/password          | `M2.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md`                                                              |
+| Learning path/course/lesson admin   | `M3.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI                                                                        |
+| File upload/R2/PDF processing       | `M4.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md`                                                                              |
+| Embedding/pgvector/RAG retrieval    | `M5.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`, `docs/07-integration-and-env.md`                                                    |
+| Quiz/flashcard/test CRUD            | `M6.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI                                                                        |
+| Student learning/progress/attempts  | `M7.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI                                                                        |
+| Payment/payOS/discount/enrollment   | `M8.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md`                                                              |
+| AI generation/explanation/chat      | `M9.x`    | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/06-ai-rag-spec.md`, `docs/07-integration-and-env.md`                                    |
+| Notification/realtime/email/Zalo    | `M10.x`   | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/07-integration-and-env.md`; thêm UI docs nếu có UI |
+| Parent portal                       | `M11.x`   | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`, `docs/08-ui-pages-and-components.md`                                                          |
+| Report/moderation/news/events       | `M12.x`   | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI                                                                        |
+| XP/level/leaderboard/profile/avatar | `M13.x`   | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/01-product-scope.md`, `docs/02-user-flows.md`, `docs/04-database-model.md`, `docs/05-api-contract.md`; thêm UI docs nếu có UI; thêm `docs/10-seed-data-and-test-cases.md` nếu seed/test              |
+| Testing/hardening/deploy            | `M14.x`   | `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, `docs/03-technical-architecture.md`, `docs/07-integration-and-env.md`, `docs/10-seed-data-and-test-cases.md`                                                                                               |
 
 UI bổ sung:
 
@@ -277,7 +298,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - UI phải mượt trên mobile, phản hồi nhanh, độ trễ cảm nhận thấp; đọc `docs/11-ui-design-system.md` phần performance khi làm UI.
 - Public page có mục tiêu xuất hiện trên Google phải bám `docs/13-seo-and-content-discovery.md`.
 - Màn hình có data/action phải có loading, empty, error, disabled state.
-- Nếu có thể chạy app, UI task nên kiểm tra bằng browser/screenshot ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad.
+- Nếu có thể chạy app, UI task nên kiểm tra bằng browser ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad. Chỉ chụp/lưu screenshot khi command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`.
 - Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
 
 ---
@@ -333,6 +354,7 @@ Checks phải tỉ lệ với rủi ro:
 
 - Task nhỏ, docs-only, wording, UI-only nhỏ, config nhẹ hoặc sửa bug cô lập có thể dùng lean mode để tối đa tốc độ.
 - Lean mode nghĩa là không cần chạy full lint/build/test toàn repo nếu không cần thiết; chỉ chạy check nhỏ nhất đủ tin cậy như `git diff --check`, kiểm tra frontmatter skill/script validation nếu có, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú.
+- Với task làm UI hoặc owner yêu cầu "sửa UI", mặc định ưu tiên tốc độ: hạn chế chạy `typecheck`, `lint`, `build`, Playwright/E2E. Chỉ chạy các check này khi thay đổi chạm nhiều component/route, sửa shared UI primitive, đổi form/state phức tạp, nghi có lỗi TypeScript, hoặc owner yêu cầu rõ. Nếu chỉ chỉnh màu, spacing, copy, class Tailwind, vị trí ảnh/icon hoặc style nhỏ, dùng `git diff --check`, format check nhỏ hoặc kiểm tra thủ công là đủ.
 - Nếu bỏ qua check lớn, ghi rõ `Not run: <lý do>` trong changelog/final response.
 - Auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification hoặc multi-module phải dùng workflow đầy đủ hơn.
 

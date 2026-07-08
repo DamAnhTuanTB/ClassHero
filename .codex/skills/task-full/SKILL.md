@@ -15,9 +15,13 @@ Accept:
 - `/task-full: M7.1`
 - `/task-full plan M7.1`
 - `/task-full plan: M7.1`
+- `/task-full screenshot M7.1`
+- `/task-full plan screenshot M7.1`
 - `/task-full M1.1 + M1.2`
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed. Execute sequentially and stop if one creates unresolved risk.
+
+If `screenshot` appears after the command, enable screenshot mode for UI portions of the task. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code checks and mention any responsive review that was done without screenshots.
 
 ## Plan Mode
 
@@ -68,7 +72,8 @@ In plan mode, stop after this plan and wait for approval.
 - If the task is too large, split the work and say which part is being completed.
 - If a dependency subtask is missing, stop or implement only safe scaffold and explain the blocker.
 - For UI work, follow mobile-first, tablet/iPad, and laptop/desktop rules.
-- For UI work, use the default UI tokens from `docs/11-ui-design-system.md` and save useful review screenshots under `.codex/screenshots/`.
+- For UI work, use the default UI tokens from `docs/11-ui-design-system.md`.
+- Only create or save UI screenshots when screenshot mode is enabled by the command, for example `/task-full screenshot M3.4`.
 - For UI work, apply `docs/11-ui-design-system.md` performance rules: smooth mobile interaction, immediate feedback, low perceived latency, stable skeleton/layout, and no heavy blocking animation/render.
 - For database/API/AI behavior changes, update the corresponding docs. `docs/04-database-model.md` and `docs/05-api-contract.md` are indexes; update matching files in `docs/database/` and `docs/api/` when domain details change.
 - For public/indexable page changes, follow `docs/13-seo-and-content-discovery.md` and update SEO/public docs if metadata, sitemap, robots, canonical, structured data, slug, or indexability rules change.
@@ -96,7 +101,7 @@ Run checks proportional to risk:
 - Focused tests where available.
 - Build/lint when shared or production surface changed.
 - Browser/curl/API checks when practical.
-- For UI, mention responsive viewports, smoothness/performance checks, and screenshot paths if created.
+- For UI, mention responsive viewports and smoothness/performance checks. Include screenshot paths only when screenshot mode created them.
 - For performance-sensitive work, mention what was measured or why measurement was skipped.
 
 ## Lean Mode For Small Tasks

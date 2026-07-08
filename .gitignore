@@ -18,6 +18,9 @@ coverage/
 .codex/telegram/state.json
 .codex/telegram/runs/
 .codex/telegram/transcript.md
+.codex/screenshots/
+.codex/playwright-results/
+.codex/playwright-report/
 
 # Logs
 *.log

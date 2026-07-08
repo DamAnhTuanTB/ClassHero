@@ -12,11 +12,14 @@ Use this skill when the owner wants to adjust UI only.
 Accept:
 
 - `/change-ui <screen/place and requested UI change>`
+- `/change-ui screenshot <screen/place and requested UI change>`
 - `/change ui <screen/place and requested UI change>`
 - `sửa UI <screen/place and requested UI change>`
 - `đổi giao diện <screen/place and requested UI change>`
 
-If the target screen/component is unclear, ask one concise question. If the request includes an attached reference image/design, inspect it before editing.
+If `screenshot` appears after the command, enable screenshot mode. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code checks and mention any responsive review that was done without screenshots.
+
+If the target screen/component is unclear, ask one concise question. If the request includes an attached reference image/design, inspect it before editing. Extract the relevant visual principles instead of copying the reference literally; for auth/register/login, a dashboard reference may inspire color, rounded cards, icons, spacing, and energy, but the result must remain a clear auth flow. If the owner says the reference is a mobile design, prioritize matching the mobile layout first and do not add extra footer chips, secondary tabs, or out-of-scope steps.
 
 ## Required Startup
 
@@ -76,19 +79,30 @@ Changelog is still allowed during UI iteration because it records repository fil
 - Avoid large redesign unless requested.
 - Do not make desktop-only layouts.
 - Keep text from overflowing on mobile/tablet/desktop.
+- Keep user-facing copy concise and action-focused. For student/parent auth/register/forgot/reset screens, avoid explanatory side panels and repeated cards; use only text that helps the user complete the action.
+- For student/parent auth/register screens, keep the UI lively and age-appropriate: use a bright but controlled learning palette, clear CTA emphasis, suitable photo/illustration or light visual accents, and fitting typography instead of flat gray enterprise styling.
+- Avoid adult coworking, office, corporate, or worker-style photos for student auth. Prefer school-age study visuals such as desk, books, backpack, classroom, formulas, flashcards, or student illustrations.
+- When auth uses a strong visual, prefer a clear desktop split-screen: left visual/slogan panel, right clean form panel. Avoid floating explanatory hero cards on top of the background if the result feels unclear.
+- Auth visual panels should use brand welcome copy and a short value slogan, not detailed role-function explanations.
+- A distinct display font can be used for auth visual-panel headings to add youthful character, while form/body typography should remain highly readable.
+- Auth visual panels must not use oversized all-black headlines or opaque blocks that hide the learning background. Prefer moderate gradient/accent display text, translucent panels, compact learning icons, and subtle motion with `prefers-reduced-motion` support.
 - Keep interaction lightweight; avoid animation/layout changes that make mobile feel laggy.
 - For public/indexable pages, do not break heading hierarchy, crawlable text, alt text, or metadata-friendly structure while changing visuals.
-- Save useful screenshot review files under `.codex/screenshots/` when the app can run and screenshots are practical.
+- Only create or save screenshots when screenshot mode is enabled by the command, for example `/change-ui screenshot màn đăng ký`. If the command does not contain `screenshot`, do not run screenshot capture or leave new screenshot artifacts.
 
 ## Verification
 
 Run checks proportional to the UI change:
 
-- Small CSS/layout text-only: `git diff --check` may be enough.
-- Component/page change: run focused typecheck/lint/build if practical.
-- Visual change: check mobile and desktop; tablet/iPad for complex layouts.
+- Default for UI feedback is speed-first lean verification. Do not automatically run `typecheck`, `lint`, `build`, Playwright, or E2E after every UI tweak.
+- Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, update changelog briefly, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
+- Small CSS/layout/text/color/spacing/icon/image-position changes: `git diff --check`, a targeted format check, or manual visual reasoning may be enough.
+- Component/page changes: run focused typecheck/lint/build only when the change touches shared primitives, form/state logic, route structure, conditional rendering, or likely TypeScript errors.
+- Visual change: check mobile and desktop by reasoning/browser only when practical; tablet/iPad for complex layouts.
+- In screenshot mode only: save review screenshots under `.codex/screenshots/`.
 - Interaction change: check tap/pending/loading feedback and obvious layout shift when practical.
 - If unable to run app/browser checks, state why.
+- If larger checks are skipped for speed, write `Not run: UI lean mode per owner preference` or a more specific reason in changelog/final response.
 
 Update changelog after repository file changes.
 

@@ -1,23 +1,37 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import { Gender, Prisma, UserRole, UserStatus } from "@prisma/client";
+import {
+  FilePurpose,
+  FileStatus,
+  Gender,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from "@prisma/client";
 import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { EnvConfig } from "../../config/env.validation";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { RegisterParentDto } from "./dto/register-parent.dto";
 import { RegisterStudentDto } from "./dto/register-student.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { UpdateStudentProfileDto } from "./dto/update-student-profile.dto";
 
 const passwordKeyLength = 64;
+const passwordResetTtlMs = 15 * 60 * 1000;
 const scryptParams = {
   N: 16384,
   r: 8,
@@ -37,7 +51,42 @@ const authUserSelect = {
   deletedAt: true,
 } satisfies Prisma.UserSelect;
 
+const currentUserSelect = {
+  id: true,
+  role: true,
+  status: true,
+  email: true,
+  phone: true,
+  username: true,
+  fullName: true,
+  gender: true,
+  dateOfBirth: true,
+  avatarFileId: true,
+  lastLoginAt: true,
+  emailVerifiedAt: true,
+  phoneVerifiedAt: true,
+  createdAt: true,
+  deletedAt: true,
+  studentProfile: {
+    select: {
+      id: true,
+      grade: true,
+      childCode: true,
+      address: true,
+      displayName: true,
+      totalXp: true,
+      level: true,
+    },
+  },
+  parentProfile: {
+    select: {
+      id: true,
+    },
+  },
+} satisfies Prisma.UserSelect;
+
 type AuthUser = Prisma.UserGetPayload<{ select: typeof authUserSelect }>;
+type CurrentUser = Prisma.UserGetPayload<{ select: typeof currentUserSelect }>;
 
 type UserResponse = {
   id: string;
@@ -54,11 +103,20 @@ type RefreshTokenMaterial = {
   expiresAt: Date;
 };
 
+type RequestContext = {
+  ipAddress?: string;
+  userAgent?: string;
+};
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly accessTokenSecret: string;
   private readonly accessTokenTtlSeconds: number;
   private readonly refreshTokenTtlMs: number;
+  private readonly webUrl: string;
+  private readonly resendApiKey?: string;
+  private readonly resendFromEmail?: string;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -73,6 +131,13 @@ export class AuthService {
     );
     this.refreshTokenTtlMs = parseDurationMs(
       configService.get("JWT_REFRESH_EXPIRES_IN", { infer: true }),
+    );
+    this.webUrl = configService.get("WEB_URL", { infer: true });
+    this.resendApiKey = normalizeOptionalSecret(
+      configService.get("RESEND_API_KEY", { infer: true }),
+    );
+    this.resendFromEmail = normalizeOptionalSecret(
+      configService.get("RESEND_FROM_EMAIL", { infer: true }),
     );
   }
 
@@ -233,6 +298,268 @@ export class AuthService {
     return { success: true };
   }
 
+  async forgotPassword(dto: ForgotPasswordDto, context: RequestContext = {}) {
+    const user = await this.findUserByIdentifier(dto.identifier);
+
+    if (!user || user.deletedAt || user.status !== UserStatus.ACTIVE) {
+      return { success: true };
+    }
+
+    const now = new Date();
+    const resetToken = this.createPasswordResetTokenMaterial(now);
+
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: resetToken.tokenHash,
+          expiresAt: resetToken.expiresAt,
+          requestIp: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      }),
+      this.prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          action: "AUTH_PASSWORD_RESET_REQUESTED",
+          entityType: "User",
+          entityId: user.id,
+          metadata: {
+            deliveryChannel: user.email ? "email" : "none",
+          },
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      }),
+    ]);
+
+    await this.sendPasswordResetEmail(user, resetToken.rawToken);
+
+    return { success: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const now = new Date();
+    const tokenHash = hashPasswordResetToken(dto.token);
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: {
+        user: {
+          select: authUserSelect,
+        },
+      },
+    });
+
+    if (
+      !resetToken ||
+      resetToken.usedAt ||
+      resetToken.revokedAt ||
+      resetToken.user.deletedAt
+    ) {
+      throwInvalidResetToken();
+    }
+
+    if (resetToken.expiresAt <= now) {
+      throwResetTokenExpired();
+    }
+
+    assertActiveUser(resetToken.user);
+
+    const passwordHash = await hashPassword(dto.newPassword);
+
+    await this.prisma.$transaction(async (tx) => {
+      const consumeResult = await tx.passwordResetToken.updateMany({
+        where: {
+          id: resetToken.id,
+          usedAt: null,
+          revokedAt: null,
+          expiresAt: {
+            gt: now,
+          },
+        },
+        data: {
+          usedAt: now,
+        },
+      });
+
+      if (consumeResult.count !== 1) {
+        throwInvalidResetToken();
+      }
+
+      await tx.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      });
+
+      await tx.refreshToken.updateMany({
+        where: {
+          userId: resetToken.userId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      });
+
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: resetToken.userId,
+          id: {
+            not: resetToken.id,
+          },
+          usedAt: null,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: resetToken.userId,
+          action: "AUTH_PASSWORD_RESET_COMPLETED",
+          entityType: "User",
+          entityId: resetToken.userId,
+        },
+      });
+    });
+
+    return { success: true };
+  }
+
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: currentUserSelect,
+    });
+
+    if (!user || user.deletedAt) {
+      throwInvalidAccessToken();
+    }
+
+    assertActiveUser(user);
+
+    return serializeCurrentUser(user);
+  }
+
+  async updateStudentProfile(userId: string, dto: UpdateStudentProfileDto) {
+    const profileData: Prisma.StudentProfileUpdateInput = {};
+    const userData: Prisma.UserUpdateInput = {};
+    const changedFields: string[] = [];
+
+    if (dto.displayName !== undefined) {
+      profileData.displayName = normalizeName(dto.displayName);
+      changedFields.push("displayName");
+    }
+
+    if (dto.address !== undefined) {
+      profileData.address = normalizeNullableText(dto.address);
+      changedFields.push("address");
+    }
+
+    if (dto.avatarFileId !== undefined) {
+      await this.assertAvatarFileAllowed(userId, dto.avatarFileId);
+      userData.avatarFile = {
+        connect: {
+          id: dto.avatarFileId,
+        },
+      };
+      changedFields.push("avatarFileId");
+    }
+
+    if (changedFields.length === 0) {
+      throw new BadRequestException({
+        code: "VALIDATION_ERROR",
+        message: "Cần cung cấp ít nhất một trường để cập nhật",
+      });
+    }
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          role: true,
+          status: true,
+          deletedAt: true,
+          studentProfile: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      if (!existingUser || existingUser.deletedAt) {
+        throwInvalidAccessToken();
+      }
+
+      assertActiveUser(existingUser);
+
+      if (existingUser.role !== UserRole.STUDENT) {
+        throw new ForbiddenException({
+          code: "FORBIDDEN",
+          message: "Chỉ học sinh được cập nhật hồ sơ học sinh",
+        });
+      }
+
+      if (!existingUser.studentProfile) {
+        throw new NotFoundException({
+          code: "NOT_FOUND",
+          message: "Không tìm thấy hồ sơ học sinh",
+        });
+      }
+
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({
+          where: { id: userId },
+          data: userData,
+        });
+      }
+
+      if (Object.keys(profileData).length > 0) {
+        await tx.studentProfile.update({
+          where: { userId },
+          data: profileData,
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "STUDENT_PROFILE_UPDATED",
+          entityType: "StudentProfile",
+          entityId: existingUser.studentProfile.id,
+          metadata: {
+            changedFields,
+          },
+        },
+      });
+
+      return tx.user.findUnique({
+        where: { id: userId },
+        select: currentUserSelect,
+      });
+    });
+
+    if (!user || user.deletedAt) {
+      throwInvalidAccessToken();
+    }
+
+    return serializeCurrentUser(user);
+  }
+
   private async createStudentWithProfile(data: {
     email: string;
     phone: string;
@@ -358,6 +685,16 @@ export class AuthService {
     };
   }
 
+  private createPasswordResetTokenMaterial(now: Date): RefreshTokenMaterial {
+    const rawToken = randomBytes(32).toString("base64url");
+
+    return {
+      rawToken,
+      tokenHash: hashPasswordResetToken(rawToken),
+      expiresAt: new Date(now.getTime() + passwordResetTtlMs),
+    };
+  }
+
   private signAccessToken(user: Pick<AuthUser, "id" | "role">) {
     return this.jwtService.signAsync(
       {
@@ -370,6 +707,72 @@ export class AuthService {
         expiresIn: this.accessTokenTtlSeconds,
       },
     );
+  }
+
+  private async assertAvatarFileAllowed(userId: string, avatarFileId: string) {
+    const file = await this.prisma.file.findFirst({
+      where: {
+        id: avatarFileId,
+        purpose: FilePurpose.AVATAR,
+        status: {
+          in: [FileStatus.UPLOADED, FileStatus.READY],
+        },
+        deletedAt: null,
+        OR: [{ uploadedById: userId }, { uploadedById: null }],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!file) {
+      throw new NotFoundException({
+        code: "NOT_FOUND",
+        message: "Không tìm thấy avatar hợp lệ",
+      });
+    }
+  }
+
+  private async sendPasswordResetEmail(
+    user: Pick<AuthUser, "email" | "fullName">,
+    rawToken: string,
+  ) {
+    if (!user.email || !this.resendApiKey || !this.resendFromEmail) {
+      return;
+    }
+
+    const resetUrl = new URL("/reset-password", this.webUrl);
+    resetUrl.searchParams.set("token", rawToken);
+
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: this.resendFromEmail,
+          to: [user.email],
+          subject: "Đặt lại mật khẩu",
+          text: [
+            `Xin chào ${user.fullName ?? ""}`.trim(),
+            "Bạn vừa yêu cầu đặt lại mật khẩu.",
+            `Mở liên kết này để đặt mật khẩu mới: ${resetUrl.toString()}`,
+            "Liên kết hết hạn sau 15 phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.",
+          ].join("\n\n"),
+        }),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          `Password reset email delivery failed with status ${response.status}`,
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.warn(`Password reset email delivery failed: ${message}`);
+    }
   }
 }
 
@@ -531,6 +934,14 @@ function safeCompareBase64Url(actual: Buffer, expectedBase64Url: string) {
 }
 
 function hashRefreshToken(token: string) {
+  return hashOpaqueToken(token);
+}
+
+function hashPasswordResetToken(token: string) {
+  return hashOpaqueToken(token);
+}
+
+function hashOpaqueToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
@@ -571,12 +982,25 @@ function normalizeName(name: string) {
   return name.trim().replace(/\s+/g, " ");
 }
 
+function normalizeNullableText(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized.length > 0 ? normalized : null;
+}
+
 function normalizeIdentifier(identifier: string) {
   return identifier.trim();
 }
 
 function parseDateOnly(value: string) {
   return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+}
+
+function formatDateOnly(value: Date | null) {
+  return value ? value.toISOString().slice(0, 10) : null;
+}
+
+function formatDateTime(value: Date | null) {
+  return value ? value.toISOString() : null;
 }
 
 function serializeUser(user: Pick<AuthUser, keyof UserResponse>): UserResponse {
@@ -587,6 +1011,43 @@ function serializeUser(user: Pick<AuthUser, keyof UserResponse>): UserResponse {
     phone: user.phone,
     username: user.username,
     fullName: user.fullName,
+  };
+}
+
+function serializeCurrentUser(user: CurrentUser) {
+  return {
+    user: {
+      id: user.id,
+      role: user.role,
+      status: user.status,
+      email: user.email,
+      phone: user.phone,
+      username: user.username,
+      fullName: user.fullName,
+      gender: user.gender,
+      dateOfBirth: formatDateOnly(user.dateOfBirth),
+      avatarFileId: user.avatarFileId,
+      lastLoginAt: formatDateTime(user.lastLoginAt),
+      emailVerifiedAt: formatDateTime(user.emailVerifiedAt),
+      phoneVerifiedAt: formatDateTime(user.phoneVerifiedAt),
+      createdAt: user.createdAt.toISOString(),
+    },
+    studentProfile: user.studentProfile
+      ? {
+          id: user.studentProfile.id,
+          grade: user.studentProfile.grade,
+          childCode: user.studentProfile.childCode,
+          address: user.studentProfile.address,
+          displayName: user.studentProfile.displayName,
+          totalXp: user.studentProfile.totalXp,
+          level: user.studentProfile.level,
+        }
+      : null,
+    parentProfile: user.parentProfile
+      ? {
+          id: user.parentProfile.id,
+        }
+      : null,
   };
 }
 
@@ -610,6 +1071,27 @@ function throwInvalidRefreshToken(): never {
   throw new UnauthorizedException({
     code: "UNAUTHORIZED",
     message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
+  });
+}
+
+function throwInvalidAccessToken(): never {
+  throw new UnauthorizedException({
+    code: "UNAUTHORIZED",
+    message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
+  });
+}
+
+function throwInvalidResetToken(): never {
+  throw new BadRequestException({
+    code: "INVALID_RESET_TOKEN",
+    message: "Token đặt lại mật khẩu không hợp lệ",
+  });
+}
+
+function throwResetTokenExpired(): never {
+  throw new BadRequestException({
+    code: "RESET_TOKEN_EXPIRED",
+    message: "Token đặt lại mật khẩu đã hết hạn",
   });
 }
 
@@ -652,4 +1134,17 @@ function isPrismaKnownRequestError(error: unknown): error is {
     "code" in error &&
     typeof error.code === "string"
   );
+}
+
+function normalizeOptionalSecret(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  const unsafeValues = new Set(["change-me", "changeme"]);
+
+  return normalized && !unsafeValues.has(normalized.toLowerCase())
+    ? normalized
+    : undefined;
 }

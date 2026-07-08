@@ -46,19 +46,19 @@ Codex phải ưu tiên shadcn/Tailwind semantic tokens (`background`, `foregroun
 
 Token mặc định nếu project chưa có theme riêng:
 
-| Token | Mục đích | Gợi ý Tailwind |
-| --- | --- | --- |
-| `background` | Nền app chính | `slate-50` hoặc `white` |
-| `foreground` | Text chính | `slate-950` |
-| `muted` | Nền phụ/skeleton | `slate-100` |
-| `muted-foreground` | Text phụ | `slate-500` |
-| `border` | Border nhẹ | `slate-200` |
-| `primary` | CTA chính/hành động học tập | `sky-600` hoặc `teal-600` |
-| `primary-foreground` | Text trên primary | `white` |
-| `accent` | Highlight tiến độ/streak/nhấn nhẹ | `amber-400` hoặc `emerald-500` |
-| `success` | Thành công/hoàn thành | `emerald-600` |
-| `warning` | Cảnh báo/chờ xử lý | `amber-500` |
-| `error/destructive` | Lỗi/hành động nguy hiểm | `red-600` |
+| Token                | Mục đích                          | Gợi ý Tailwind                 |
+| -------------------- | --------------------------------- | ------------------------------ |
+| `background`         | Nền app chính                     | `slate-50` hoặc `white`        |
+| `foreground`         | Text chính                        | `slate-950`                    |
+| `muted`              | Nền phụ/skeleton                  | `slate-100`                    |
+| `muted-foreground`   | Text phụ                          | `slate-500`                    |
+| `border`             | Border nhẹ                        | `slate-200`                    |
+| `primary`            | CTA chính/hành động học tập       | `sky-600` hoặc `teal-600`      |
+| `primary-foreground` | Text trên primary                 | `white`                        |
+| `accent`             | Highlight tiến độ/streak/nhấn nhẹ | `amber-400` hoặc `emerald-500` |
+| `success`            | Thành công/hoàn thành             | `emerald-600`                  |
+| `warning`            | Cảnh báo/chờ xử lý                | `amber-500`                    |
+| `error/destructive`  | Lỗi/hành động nguy hiểm           | `red-600`                      |
 
 Nguyên tắc dùng màu:
 
@@ -81,14 +81,14 @@ Nguyên tắc dùng màu:
 
 Scale mặc định:
 
-| Context | Size gợi ý |
-| --- | --- |
-| Page title mobile | `text-2xl` |
+| Context            | Size gợi ý                                    |
+| ------------------ | --------------------------------------------- |
+| Page title mobile  | `text-2xl`                                    |
 | Page title desktop | `text-3xl` hoặc `text-4xl` nếu là public hero |
-| Section title | `text-lg` hoặc `text-xl` |
-| Card title | `text-base` hoặc `text-lg` |
-| Body | `text-sm` hoặc `text-base` |
-| Helper/caption | `text-xs` hoặc `text-sm` |
+| Section title      | `text-lg` hoặc `text-xl`                      |
+| Card title         | `text-base` hoặc `text-lg`                    |
+| Body               | `text-sm` hoặc `text-base`                    |
+| Helper/caption     | `text-xs` hoặc `text-sm`                      |
 
 ## 5. Spacing, radius, shadow
 
@@ -100,15 +100,15 @@ Scale mặc định:
 
 Spacing/radius mặc định:
 
-| Pattern | Rule |
-| --- | --- |
-| Mobile page padding | `px-4 py-4` hoặc tương đương |
-| Tablet page padding | `px-6 py-6` |
-| Desktop page padding | `px-8 py-8`, content đọc nên có `max-w-*` |
-| Card/panel padding | `p-4` mobile, `p-5` hoặc `p-6` desktop |
-| Section gap | `gap-4` mobile, `gap-6` desktop |
-| Radius | `rounded-lg` là mặc định; tránh radius quá lớn cho dashboard |
-| Shadow | ưu tiên `border`; nếu cần dùng `shadow-sm` |
+| Pattern              | Rule                                                         |
+| -------------------- | ------------------------------------------------------------ |
+| Mobile page padding  | `px-4 py-4` hoặc tương đương                                 |
+| Tablet page padding  | `px-6 py-6`                                                  |
+| Desktop page padding | `px-8 py-8`, content đọc nên có `max-w-*`                    |
+| Card/panel padding   | `p-4` mobile, `p-5` hoặc `p-6` desktop                       |
+| Section gap          | `gap-4` mobile, `gap-6` desktop                              |
+| Radius               | `rounded-lg` là mặc định; tránh radius quá lớn cho dashboard |
+| Shadow               | ưu tiên `border`; nếu cần dùng `shadow-sm`                   |
 
 ## 6. Layout tổng thể
 
@@ -148,6 +148,37 @@ Spacing/radius mặc định:
 - Không fetch dữ liệu rải rác trong component sâu; dùng feature hook/API client.
 - Mock data phải đặt rõ ràng, dễ xóa khi connect API.
 
+### 7.1. Production-quality mock UI
+
+Khi làm `/task-ui`, mock data chỉ là chi tiết kỹ thuật trong code để màn hình chạy được trước khi nối API. Giao diện vẫn phải trông như bản production thật.
+
+Rules:
+
+- Không đưa text kỹ thuật, task code, ghi chú Codex hoặc hướng dẫn implementation lên giao diện.
+- Không hiển thị các cụm như `mock`, `M2.4`, `task-ui`, `connect API later`, `backend enforce`, `Codex`, debug/test hint hoặc roadmap label nếu người dùng thật không cần biết.
+- Copy hiển thị phải viết cho người dùng thật theo role: học sinh, phụ huynh, admin hoặc public visitor.
+- Empty/loading/error/success state phải là thông điệp sản phẩm tự nhiên, không phải chú thích kỹ thuật.
+- Muốn giải thích mock/API/technical flow thì ghi trong final response, changelog, docs, code comment hoặc test name, không ghi trong UI.
+
+### 7.2. Copy ngắn gọn cho UI người dùng thật
+
+Các màn dành cho học sinh và phụ huynh phải giống sản phẩm thật, không giống tài liệu giải thích hệ thống.
+
+Rules:
+
+- Không đưa các đoạn mô tả dài để giải thích vì sao hệ thống làm như vậy.
+- Không dùng nhiều card phụ chỉ để diễn giải lợi ích hiển nhiên của form.
+- Không lặp lại cùng một ý ở nhiều vị trí trên màn hình.
+- Auth/register/forgot/reset nên ưu tiên: brand nhỏ, một tiêu đề rõ, một câu phụ ngắn, form label dễ hiểu, CTA chính và link phụ cần thiết.
+- Text hỗ trợ chỉ nên xuất hiện khi giúp người dùng nhập đúng hoặc xử lý lỗi ngay tại chỗ.
+- Với học sinh/phụ huynh, giọng văn cần thân thiện, chuyên nghiệp, trực tiếp; tránh văn phong như tài liệu kỹ thuật, policy hoặc lời giải thích cho Codex.
+- Auth UI cho học sinh/phụ huynh không được quá xám hoặc lạnh; cần có năng lượng học tập qua nền màu sáng, CTA nổi, ảnh/illustration hoặc visual nhẹ, subject chips ngắn và font phù hợp. Giữ trẻ trung vừa phải, không biến thành giao diện trẻ con.
+- Khi dùng ảnh/visual cho auth học sinh, tránh ảnh coworking, văn phòng, người đi làm hoặc mood corporate. Ưu tiên minh họa/ảnh học đường như bàn học, sách vở, balo, lớp học, công thức, flashcard hoặc học sinh đúng độ tuổi.
+- Auth desktop nên dùng split-screen rõ ràng khi có visual: bên trái là vùng ảnh/minh họa và slogan lớn, bên phải là form sạch trên nền trắng. Tránh đặt một glass hero card lơ lửng trên background nếu làm người dùng khó hiểu.
+- Nội dung bên trái của auth nên là lời chào thương hiệu và slogan ngắn, ví dụ "Chào mừng bạn đến với..." + một câu định vị giá trị. Tránh biến phần này thành mô tả chức năng theo role quá chi tiết.
+- Có thể dùng display font riêng cho heading ở visual panel auth để tạo cá tính trẻ trung, nhưng form/body vẫn dùng font dễ đọc và nhất quán.
+- Visual panel auth không được để headline quá to, toàn màu đen nặng hoặc panel quá đục che mất ảnh nền. Ưu tiên chữ gradient/accent vừa phải, thẻ nền trong nhẹ, nhiều icon học tập ngắn gọn và animation tinh tế có hỗ trợ `prefers-reduced-motion`.
+
 ## 8. Responsive rules
 
 UI của dự án là mobile-first nhưng phải ổn trên 3 nhóm:
@@ -166,11 +197,11 @@ Rules:
 
 Breakpoint/pattern mặc định:
 
-| Viewport | Pattern |
-| --- | --- |
-| Mobile `375px-430px` | Một cột, sticky CTA khi flow cần hành động liên tục |
-| Tablet/iPad `768px-1024px` | Hai cột nhẹ hoặc sidebar phụ khi giúp đọc/học tốt hơn |
-| Desktop `1366px-1440px` | Sidebar, split view, bảng/filter rõ; tránh content text quá rộng |
+| Viewport                   | Pattern                                                          |
+| -------------------------- | ---------------------------------------------------------------- |
+| Mobile `375px-430px`       | Một cột, sticky CTA khi flow cần hành động liên tục              |
+| Tablet/iPad `768px-1024px` | Hai cột nhẹ hoặc sidebar phụ khi giúp đọc/học tốt hơn            |
+| Desktop `1366px-1440px`    | Sidebar, split view, bảng/filter rõ; tránh content text quá rộng |
 
 ## 9. Motion/animation
 
@@ -213,14 +244,14 @@ Mobile UX rules:
 
 Performance budget/checklist:
 
-| Hạng mục | Mục tiêu |
-| --- | --- |
-| Core Web Vitals | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile |
-| Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn |
-| Interaction | Button/action đổi state ngay sau thao tác |
-| List dài | Có pagination/infinite/virtualization |
-| Animation | Nhẹ, ngắn, không block thao tác |
-| Bundle | Không thêm thư viện nặng nếu shadcn/Tailwind/native API đủ dùng |
+| Hạng mục         | Mục tiêu                                                        |
+| ---------------- | --------------------------------------------------------------- |
+| Core Web Vitals  | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile                |
+| Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn     |
+| Interaction      | Button/action đổi state ngay sau thao tác                       |
+| List dài         | Có pagination/infinite/virtualization                           |
+| Animation        | Nhẹ, ngắn, không block thao tác                                 |
+| Bundle           | Không thêm thư viện nặng nếu shadcn/Tailwind/native API đủ dùng |
 
 Khi làm UI phức tạp, Codex nên ghi rõ trong final/changelog đã kiểm tra hoặc bỏ qua phần nào:
 
@@ -228,7 +259,8 @@ Khi làm UI phức tạp, Codex nên ghi rõ trong final/changelog đã kiểm t
 - desktop viewport,
 - loading/empty/error/disabled state,
 - interaction latency/perceived response,
-- screenshot hoặc browser check nếu chạy được app.
+- browser/responsive check nếu chạy được app,
+- screenshot chỉ khi owner yêu cầu bằng command có từ `screenshot`.
 
 ## 11. Empty/loading/error states
 
@@ -254,8 +286,8 @@ Một màn hình UI chỉ xem là xong khi:
 - Không text tràn, overlap, button cắt chữ hoặc layout nhảy mạnh.
 - Không hard-code khác API contract nếu API đã có trong `docs/05-api-contract.md`.
 - Không thêm tính năng ngoài MVP.
-- Nếu có thể chạy app, Codex chụp hoặc kiểm tra screenshot/browser ở ít nhất mobile và desktop; với layout phức tạp kiểm tra thêm tablet/iPad.
-- Nếu chụp screenshot để owner review, lưu vào `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
+- Nếu có thể chạy app, Codex kiểm tra browser/responsive ở ít nhất mobile và desktop; với layout phức tạp kiểm tra thêm tablet/iPad.
+- Chỉ chụp/lưu screenshot khi owner yêu cầu bằng command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`. Khi chụp để owner review, lưu vào `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
 
 ## 13. Quy trình làm UI để giảm sửa lại
 
@@ -263,7 +295,7 @@ Nên làm theo thứ tự:
 
 1. UI shell/layout nền.
 2. UI từng màn hình với mock data rõ ràng.
-3. Review bằng browser/screenshot.
+3. Review bằng browser; chụp screenshot nếu command có từ `screenshot`.
 4. Polish theo feedback cụ thể.
 5. Connect API thật sau khi UI ổn.
 
@@ -275,6 +307,8 @@ Nếu owner đưa ảnh/reference UI:
 2. Tách rõ phần nên học theo: layout, spacing, màu, typography, component hoặc interaction.
 3. Không copy y nguyên brand/asset của sản phẩm khác nếu không có quyền.
 4. Áp dụng lại theo design system của dự án và ghi changelog ngắn.
+5. Nếu reference là dashboard nhưng màn đang làm là auth/register/login, chỉ lấy style direction như màu, bo góc, card, icon, spacing và năng lượng thị giác; không biến auth flow thành dashboard giả.
+6. Nếu owner nói reference là thiết kế mobile, ưu tiên mobile layout giống reference trước; không tự thêm chip chân trang, tab phụ hoặc bước phụ ngoài flow hiện có.
 
 ## 14. Lưu pattern UI đã được duyệt
 
