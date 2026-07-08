@@ -27,3 +27,13 @@
 - Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708002000_add_learning_interaction_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
 - Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
 - Notes: `ai_generation_id` và `explanation_id` giữ dạng UUID scalar cho đến khi các model AI/explanation được thêm ở `M1.5`.
+
+## 2026-07-08 — M1.5 remaining MVP database models
+
+- Summary: Thêm model Prisma còn lại cho payment, notification, report, AI log/cache/chat, XP và news.
+- Changed:
+  - Bổ sung enum/model cho discount/payment/webhook, notification delivery, report moderation, AI generation/explanation/chat, XP event và news item.
+  - Nối các UUID scalar từ M1.3/M1.4 sang relation thật với `Payment`, `AiGeneration` và `AiExplanation`; thêm partial unique index cho payment idempotency.
+- Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708003000_add_remaining_mvp_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
+- Notes: Chưa apply migration vào database thật; payment/webhook/AI provider logic sẽ được implement ở các milestone API/worker sau.
