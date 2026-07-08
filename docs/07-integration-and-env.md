@@ -12,7 +12,8 @@ Không hard-code secret trong source code. Không commit `.env` thật vào repo
 
 - Dev local trên máy lập trình viên.
 - Không thuê VPS dev riêng.
-- Supabase dùng Free/dev project.
+- Database mặc định chạy local bằng Docker Postgres + pgvector.
+- Supabase Free/dev project chỉ dùng khi cần test gần giống staging/production.
 - Cloudflare R2 dùng free tier.
 - Resend dùng Free tier để test email.
 - payOS dùng môi trường test/sandbox.
@@ -43,9 +44,9 @@ WEB_URL=http://localhost:3000
 API_URL=http://localhost:4000/api/v1
 API_PORT=4000
 
-# Database - Supabase Postgres
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
-DIRECT_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
+# Database - local Postgres + pgvector
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/learning_path_dev?schema=public
+DIRECT_URL=postgresql://postgres:postgres@localhost:5432/learning_path_dev?schema=public
 
 # JWT
 JWT_ACCESS_SECRET=change-me
@@ -121,9 +122,27 @@ ASSUMPTION: Model names trong `.env.example` là placeholder để bắt đầu.
 
 ---
 
-## 3. Supabase Postgres
+## 3. Postgres database
 
-Dùng Supabase Postgres làm database production.
+Local/dev mặc định dùng Postgres có pgvector trong Docker Compose để có thể chạy migration, seed và xem database bằng DBeaver trên máy lập trình viên.
+
+Thông tin kết nối local từ host machine:
+
+```txt
+Host: localhost
+Port: 5432
+Database: learning_path_dev
+Username: postgres
+Password: postgres
+```
+
+Khi API chạy trong Docker Compose, `DATABASE_URL` phải dùng host service `postgres` thay vì `localhost`:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
+```
+
+Staging/production dùng Supabase Postgres.
 
 Yêu cầu:
 

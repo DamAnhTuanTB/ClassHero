@@ -30,6 +30,7 @@ NestJS module/service
 8. Các model tương tác học tập như `QuizSet`, `FlashcardSet`, `TestSet`, `QuizAttempt`, `TestAttempt`, `FlashcardProgress`, `StudentNote`, `LessonVideoComment` và `Favorite` lưu nội dung luyện tập, lịch sử làm bài và ghi chú riêng của học sinh theo từng lesson.
 9. Các model còn lại như `Payment`, `PaymentWebhookLog`, `DiscountCode`, `Notification`, `Report`, `AiGeneration`, `AiExplanation`, `AiChatSession`, `XpEvent` và `NewsItem` hoàn thiện nền dữ liệu cho payment, notification, AI, moderation, gamification và tin tức.
 10. `apps/api/prisma/seed.ts` tạo dữ liệu dev tối thiểu để kiểm tra các quan hệ chính sau khi chạy migration: admin, học sinh, phụ huynh, lộ trình Toán 7, lesson, tài liệu mẫu, quiz/flashcard/test, enrollment/payment và notification.
+11. Local database chạy bằng Docker Postgres + pgvector trong `docker-compose.yml`; Prisma chạy từ host dùng `localhost`, còn API chạy trong Docker dùng hostname service `postgres`.
 
 ## Kỹ thuật chính
 
@@ -51,6 +52,7 @@ NestJS module/service
 - Notification delivery: `notifications` là nội dung thông báo trong app, còn `notification_deliveries` theo dõi từng kênh như in-app, email hoặc Zalo để worker retry riêng.
 - XP idempotency: `xp_events.idempotency_key` giúp cộng XP một lần cho cùng sự kiện, còn `student_profiles.total_xp` và `level` là số liệu denormalized để đọc nhanh.
 - Seed idempotent: seed dùng `upsert` với email/slug/unique key cố định để có thể chạy lại nhiều lần trên dev database mà không tạo trùng dữ liệu mẫu.
+- Local connection split: `postgresql://postgres:postgres@localhost:5432/learning_path_dev` dùng cho terminal/DBeaver trên máy host; `postgresql://postgres:postgres@postgres:5432/learning_path_dev` dùng bên trong container Docker Compose.
 
 ## File quan trọng
 
@@ -63,6 +65,7 @@ NestJS module/service
 - `apps/api/prisma/migrations/20260708003000_add_remaining_mvp_models/migration.sql`: migration thêm payment, notification, report, AI log/cache/chat, XP và news.
 - `apps/api/prisma/seed.ts`: seed dev tối thiểu cho admin/student/parent, Toán 7 và sample learning data.
 - `apps/api/tsconfig.seed.json`: typecheck riêng cho seed script.
+- `docker-compose.yml`: Postgres local dùng image pgvector, Redis, API và web cho môi trường dev.
 - `apps/api/src/common/prisma/prisma.service.ts`: service kết nối database.
 - `apps/api/src/common/prisma/prisma.module.ts`: module export PrismaService.
 - `apps/api/src/app.module.ts`: import PrismaModule vào app.

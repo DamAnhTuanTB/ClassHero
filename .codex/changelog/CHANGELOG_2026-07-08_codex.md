@@ -47,3 +47,13 @@
 - Files: `apps/api/package.json`, `apps/api/tsconfig.seed.json`, `apps/api/prisma/seed.ts`, `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
 - Tests: `pnpm --filter @learning-path/api db:seed:check`; `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
 - Notes: Chưa chạy `db:seed` vào database thật vì chưa có `.env`/`DATABASE_URL` trong môi trường hiện tại.
+
+## 2026-07-08 — Local Postgres dev database
+
+- Summary: Bổ sung Postgres + pgvector local cho môi trường dev và DBeaver.
+- Changed:
+  - Thêm service `postgres` dùng image pgvector vào Docker Compose, kèm healthcheck và volume local.
+  - Chuyển env example/docs sang local database mặc định, đồng thời giữ Supabase cho staging/production.
+- Files: `docker-compose.yml`, `.env.example`, `apps/api/.env.example`, `README.md`, `docs/03-technical-architecture.md`, `docs/04-database-model.md`, `docs/07-integration-and-env.md`, `.codex/context/**`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `docker compose config`; `docker compose up -d postgres`; `pnpm --filter @learning-path/api prisma migrate dev` với local `DATABASE_URL`; `pnpm --filter @learning-path/api db:seed` với local `DATABASE_URL`; kiểm tra `vector` extension và seed counts bằng `psql`; `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:seed:check`; `pnpm format:check`; `git diff --check`.
+- Notes: Local credentials `postgres/postgres` chỉ dùng cho dev Docker; không phải production secret.

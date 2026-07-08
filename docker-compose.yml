@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: learning-path-postgres
+    environment:
+      POSTGRES_DB: learning_path_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d learning_path_dev"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: learning-path-redis
@@ -20,6 +37,8 @@ services:
       - .env.example
     environment:
       API_PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
       REDIS_URL: redis://redis:6379
     ports:
       - "4000:4000"
@@ -30,6 +49,8 @@ services:
       - /app/apps/web/node_modules
       - /app/packages/shared/node_modules
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -53,3 +74,6 @@ services:
       - /app/packages/shared/node_modules
     depends_on:
       - api
+
+volumes:
+  postgres_data:

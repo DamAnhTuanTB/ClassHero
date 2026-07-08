@@ -7,7 +7,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 ## 1. Trạng thái hiện tại
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
-- Nền local đã có Next.js app, NestJS API, shared package, Docker local, env example và health/foundation code.
+- Nền local đã có Next.js app, NestJS API, shared package, Docker local, Postgres + pgvector local, Redis, env example và health/foundation code.
 - Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
@@ -16,6 +16,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - UI direction là mobile-first, vẫn phải ổn trên tablet/iPad và laptop/desktop, đồng thời ưu tiên cảm giác mượt, phản hồi nhanh và độ trễ cảm nhận thấp.
 - Performance toàn hệ thống dùng `docs/12-performance-and-observability.md` cho frontend/API/database/worker/AI và đo đạc.
 - SEO/public discovery dùng `docs/13-seo-and-content-discovery.md` cho landing, public course, news/event, metadata, sitemap, robots, canonical và structured data.
+- Database dev mặc định chạy local bằng Docker Postgres + pgvector; staging/production vẫn dùng Supabase Postgres.
 
 ## 2. Quyết định workflow đang áp dụng
 

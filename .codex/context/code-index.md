@@ -6,13 +6,13 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 
 ## 1. Root
 
-| Path                  | Vai trò                                 |
-| --------------------- | --------------------------------------- |
-| `package.json`        | Script monorepo, package manager `pnpm` |
-| `pnpm-workspace.yaml` | Workspace `apps/*`, `packages/*`        |
-| `turbo.json`          | Pipeline build/lint/typecheck/dev       |
-| `docker-compose.yml`  | Docker local cho web, API và Redis      |
-| `.env.example`        | Env root placeholder                    |
+| Path                  | Vai trò                                      |
+| --------------------- | -------------------------------------------- |
+| `package.json`        | Script monorepo, package manager `pnpm`      |
+| `pnpm-workspace.yaml` | Workspace `apps/*`, `packages/*`             |
+| `turbo.json`          | Pipeline build/lint/typecheck/dev            |
+| `docker-compose.yml`  | Docker local cho web, API, Postgres và Redis |
+| `.env.example`        | Env root placeholder                         |
 
 ## 2. Front-end
 

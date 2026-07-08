@@ -21,6 +21,7 @@ Cần có:
 ```txt
 Node.js
 pnpm 11.10.0
+Docker Desktop hoặc Docker Engine
 ```
 
 Cài pnpm nếu chưa có:
@@ -48,6 +49,29 @@ Không commit file `.env` thật.
 ---
 
 ## 2. Chạy local
+
+Chạy database local và Redis:
+
+```bash
+docker compose up -d postgres redis
+```
+
+Apply migration và seed dữ liệu mẫu:
+
+```bash
+pnpm --filter @learning-path/api prisma migrate dev
+pnpm --filter @learning-path/api db:seed
+```
+
+DBeaver có thể kết nối database local bằng:
+
+```txt
+Host: localhost
+Port: 5432
+Database: learning_path_dev
+Username: postgres
+Password: postgres
+```
 
 Chạy cả web và API:
 

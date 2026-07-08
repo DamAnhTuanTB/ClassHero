@@ -473,7 +473,8 @@ Local/dev:
 
 - Dev local trên máy lập trình viên.
 - Không thuê VPS dev riêng.
-- Supabase dùng Free/dev project.
+- Database local chạy bằng Docker Postgres + pgvector.
+- Supabase Free/dev project chỉ dùng khi cần test gần giống staging/production.
 - Cloudflare R2 dùng free tier.
 - Resend dùng Free tier để test email.
 - payOS dùng sandbox/test.

@@ -4,7 +4,7 @@ Bản v0.3. File này là index ngắn cho database docs.
 
 Chi tiết model, field, constraint và checklist nằm trong `docs/database/`.
 
-Database production dùng Supabase Postgres + pgvector. ORM dùng Prisma. Query vector/hybrid search có thể dùng raw SQL trong Prisma.
+Local/dev dùng Docker Postgres + pgvector. Database staging/production dùng Supabase Postgres + pgvector. ORM dùng Prisma. Query vector/hybrid search có thể dùng raw SQL trong Prisma.
 
 ---
 
@@ -24,7 +24,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 
 ## 2. Quy tắc database bắt buộc
 
-- Dùng Supabase Postgres + pgvector.
+- Dùng Postgres + pgvector; local chạy bằng Docker, staging/production chạy trên Supabase.
 - Dùng Prisma schema làm nguồn định nghĩa chính.
 - Migration phải được commit vào repo khi đổi schema.
 - ID dùng UUID.
