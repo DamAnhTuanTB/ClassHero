@@ -25,6 +25,37 @@ enum Gender {
   UNKNOWN
 }
 
+enum Subject {
+  MATH
+  PHYSICS
+  CHEMISTRY
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+  ARCHIVED
+}
+
+enum ContentSource {
+  ADMIN
+  AI
+}
+
+enum ReviewStatus {
+  DRAFT
+  NEEDS_REVIEW
+  APPROVED
+  HIDDEN
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
 enum FileProvider {
   CLOUDFLARE_R2
 }
@@ -51,6 +82,32 @@ enum FilePurpose {
   AI_DIAGRAM
 }
 
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum LessonMaterialType {
+  PDF
+  IMAGE
+  TEXT
+  RICH_TEXT
+  LINK
+}
+
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AiProviderName {
+  OPENAI
+  GEMINI
+}
+
 enum BackgroundJobQueue {
   DOCUMENT_PROCESSING
   EMBEDDING
@@ -71,33 +128,42 @@ enum BackgroundJobStatus {
 }
 
 model User {
-  id                   String               @id @default(uuid()) @db.Uuid
-  role                 UserRole
-  status               UserStatus           @default(ACTIVE)
-  email                String?              @unique
-  phone                String?              @unique
-  username             String?              @unique
-  passwordHash         String               @map("password_hash")
-  fullName             String?              @map("full_name")
-  gender               Gender               @default(UNKNOWN)
-  dateOfBirth          DateTime?            @map("date_of_birth") @db.Date
-  avatarFileId         String?              @map("avatar_file_id") @db.Uuid
-  avatarFile           File?                @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
-  lastLoginAt          DateTime?            @map("last_login_at")
-  emailVerifiedAt      DateTime?            @map("email_verified_at")
-  phoneVerifiedAt      DateTime?            @map("phone_verified_at")
-  createdAt            DateTime             @default(now()) @map("created_at")
-  updatedAt            DateTime             @updatedAt @map("updated_at")
-  deletedAt            DateTime?            @map("deleted_at")
-  studentProfile       StudentProfile?
-  parentProfile        ParentProfile?
-  uploadedFiles        File[]               @relation("FileUploadedBy")
-  refreshTokens        RefreshToken[]
-  passwordResetTokens  PasswordResetToken[]
-  parentLinksAsParent  ParentStudentLink[]  @relation("ParentStudentLinksParent")
-  parentLinksAsStudent ParentStudentLink[]  @relation("ParentStudentLinksStudent")
-  backgroundJobs       BackgroundJob[]      @relation("BackgroundJobOwner")
-  auditLogs            AuditLog[]           @relation("AuditLogActor")
+  id                     String               @id @default(uuid()) @db.Uuid
+  role                   UserRole
+  status                 UserStatus           @default(ACTIVE)
+  email                  String?              @unique
+  phone                  String?              @unique
+  username               String?              @unique
+  passwordHash           String               @map("password_hash")
+  fullName               String?              @map("full_name")
+  gender                 Gender               @default(UNKNOWN)
+  dateOfBirth            DateTime?            @map("date_of_birth") @db.Date
+  avatarFileId           String?              @map("avatar_file_id") @db.Uuid
+  avatarFile             File?                @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  lastLoginAt            DateTime?            @map("last_login_at")
+  emailVerifiedAt        DateTime?            @map("email_verified_at")
+  phoneVerifiedAt        DateTime?            @map("phone_verified_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  deletedAt              DateTime?            @map("deleted_at")
+  studentProfile         StudentProfile?
+  parentProfile          ParentProfile?
+  uploadedFiles          File[]               @relation("FileUploadedBy")
+  refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
+  parentLinksAsParent    ParentStudentLink[]  @relation("ParentStudentLinksParent")
+  parentLinksAsStudent   ParentStudentLink[]  @relation("ParentStudentLinksStudent")
+  backgroundJobs         BackgroundJob[]      @relation("BackgroundJobOwner")
+  auditLogs              AuditLog[]           @relation("AuditLogActor")
+  createdLearningPaths   LearningPath[]       @relation("LearningPathCreatedBy")
+  updatedLearningPaths   LearningPath[]       @relation("LearningPathUpdatedBy")
+  createdLessons         Lesson[]             @relation("LessonCreatedBy")
+  updatedLessons         Lesson[]             @relation("LessonUpdatedBy")
+  createdLessonSummaries LessonSummary[]      @relation("LessonSummaryCreatedBy")
+  updatedLessonSummaries LessonSummary[]      @relation("LessonSummaryUpdatedBy")
+  enrollmentsAsStudent   Enrollment[]         @relation("EnrollmentStudent")
+  enrollmentsPaid        Enrollment[]         @relation("EnrollmentPaidBy")
+  lessonProgress         LessonProgress[]     @relation("LessonProgressStudent")
 
   @@index([role, status])
   @@map("users")
@@ -173,25 +239,28 @@ model PasswordResetToken {
 }
 
 model File {
-  id           String         @id @default(uuid()) @db.Uuid
-  provider     FileProvider   @default(CLOUDFLARE_R2)
-  purpose      FilePurpose
-  bucket       String
-  objectKey    String         @unique @map("object_key")
-  originalName String         @map("original_name")
-  mimeType     String         @map("mime_type")
-  sizeBytes    BigInt         @map("size_bytes")
-  visibility   FileVisibility @default(PRIVATE)
-  status       FileStatus     @default(UPLOADED)
-  uploadedById String?        @map("uploaded_by_id") @db.Uuid
-  uploadedBy   User?          @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
-  avatarUsers  User[]         @relation("UserAvatar")
-  publicUrl    String?        @map("public_url")
-  checksum     String?
-  metadataJson Json?          @map("metadata_json")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
-  deletedAt    DateTime?      @map("deleted_at")
+  id                     String           @id @default(uuid()) @db.Uuid
+  provider               FileProvider     @default(CLOUDFLARE_R2)
+  purpose                FilePurpose
+  bucket                 String
+  objectKey              String           @unique @map("object_key")
+  originalName           String           @map("original_name")
+  mimeType               String           @map("mime_type")
+  sizeBytes              BigInt           @map("size_bytes")
+  visibility             FileVisibility   @default(PRIVATE)
+  status                 FileStatus       @default(UPLOADED)
+  uploadedById           String?          @map("uploaded_by_id") @db.Uuid
+  uploadedBy             User?            @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  avatarUsers            User[]           @relation("UserAvatar")
+  thumbnailLearningPaths LearningPath[]   @relation("LearningPathThumbnail")
+  lessonMaterials        LessonMaterial[] @relation("LessonMaterialFile")
+  lessonDocuments        LessonDocument[] @relation("LessonDocumentFile")
+  publicUrl              String?          @map("public_url")
+  checksum               String?
+  metadataJson           Json?            @map("metadata_json")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+  deletedAt              DateTime?        @map("deleted_at")
 
   @@index([purpose, status])
   @@index([uploadedById])
@@ -200,31 +269,245 @@ model File {
 }
 
 model BackgroundJob {
-  id           String              @id @default(uuid()) @db.Uuid
-  queue        BackgroundJobQueue
-  status       BackgroundJobStatus @default(QUEUED)
-  bullmqJobId  String?             @map("bullmq_job_id")
-  ownerUserId  String?             @map("owner_user_id") @db.Uuid
-  ownerUser    User?               @relation("BackgroundJobOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  lessonId     String?             @map("lesson_id") @db.Uuid
-  resourceType String?             @map("resource_type")
-  resourceId   String?             @map("resource_id") @db.Uuid
-  inputMeta    Json?               @map("input_meta_json")
-  result       Json?               @map("result_json")
-  errorMessage String?             @map("error_message") @db.Text
-  attempts     Int                 @default(0)
-  maxAttempts  Int                 @default(3) @map("max_attempts")
-  availableAt  DateTime?           @map("available_at")
-  startedAt    DateTime?           @map("started_at")
-  finishedAt   DateTime?           @map("finished_at")
-  createdAt    DateTime            @default(now()) @map("created_at")
-  updatedAt    DateTime            @updatedAt @map("updated_at")
+  id              String              @id @default(uuid()) @db.Uuid
+  queue           BackgroundJobQueue
+  status          BackgroundJobStatus @default(QUEUED)
+  bullmqJobId     String?             @map("bullmq_job_id")
+  ownerUserId     String?             @map("owner_user_id") @db.Uuid
+  ownerUser       User?               @relation("BackgroundJobOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  lessonId        String?             @map("lesson_id") @db.Uuid
+  lesson          Lesson?             @relation("BackgroundJobLesson", fields: [lessonId], references: [id], onDelete: SetNull)
+  lessonDocuments LessonDocument[]    @relation("LessonDocumentProcessingJob")
+  resourceType    String?             @map("resource_type")
+  resourceId      String?             @map("resource_id") @db.Uuid
+  inputMeta       Json?               @map("input_meta_json")
+  result          Json?               @map("result_json")
+  errorMessage    String?             @map("error_message") @db.Text
+  attempts        Int                 @default(0)
+  maxAttempts     Int                 @default(3) @map("max_attempts")
+  availableAt     DateTime?           @map("available_at")
+  startedAt       DateTime?           @map("started_at")
+  finishedAt      DateTime?           @map("finished_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
 
   @@index([bullmqJobId])
   @@index([ownerUserId, createdAt])
   @@index([queue, status])
   @@index([resourceType, resourceId])
   @@map("background_jobs")
+}
+
+model LearningPath {
+  id               String        @id @default(uuid()) @db.Uuid
+  subject          Subject
+  grade            Int
+  title            String
+  slug             String        @unique
+  originalPriceVnd Int           @map("original_price_vnd")
+  salePriceVnd     Int?          @map("sale_price_vnd")
+  totalLessonCount Int           @default(0) @map("total_lesson_count")
+  thumbnailFileId  String?       @map("thumbnail_file_id") @db.Uuid
+  thumbnailFile    File?         @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
+  descriptionJson  Json?         @map("description_json")
+  status           PublishStatus @default(DRAFT)
+  trialEnabled     Boolean       @default(true) @map("trial_enabled")
+  publishedAt      DateTime?     @map("published_at")
+  sortOrder        Int           @default(0) @map("sort_order")
+  createdById      String?       @map("created_by_id") @db.Uuid
+  createdBy        User?         @relation("LearningPathCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById      String?       @map("updated_by_id") @db.Uuid
+  updatedBy        User?         @relation("LearningPathUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  deletedAt        DateTime?     @map("deleted_at")
+  lessons          Lesson[]
+  enrollments      Enrollment[]
+
+  @@index([subject, grade])
+  @@index([status])
+  @@index([sortOrder])
+  @@index([thumbnailFileId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("learning_paths")
+}
+
+model Lesson {
+  id                 String           @id @default(uuid()) @db.Uuid
+  learningPathId     String           @map("learning_path_id") @db.Uuid
+  learningPath       LearningPath     @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  orderIndex         Int              @map("order_index")
+  title              String
+  shortDescription   String?          @map("short_description")
+  prepMaterialJson   Json?            @map("prep_material_json")
+  scheduledAt        DateTime?        @map("scheduled_at")
+  examOpenAt         DateTime?        @map("exam_open_at")
+  videoUrl           String?          @map("video_url")
+  completionMinScore Decimal          @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  status             PublishStatus    @default(DRAFT)
+  createdById        String?          @map("created_by_id") @db.Uuid
+  createdBy          User?            @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById        String?          @map("updated_by_id") @db.Uuid
+  updatedBy          User?            @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  deletedAt          DateTime?        @map("deleted_at")
+  materials          LessonMaterial[]
+  documents          LessonDocument[]
+  documentChunks     DocumentChunk[]
+  summary            LessonSummary?
+  progressEntries    LessonProgress[]
+  backgroundJobs     BackgroundJob[]  @relation("BackgroundJobLesson")
+
+  @@unique([learningPathId, orderIndex])
+  @@index([learningPathId, status])
+  @@index([scheduledAt])
+  @@index([examOpenAt])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("lessons")
+}
+
+model LessonMaterial {
+  id          String             @id @default(uuid()) @db.Uuid
+  lessonId    String             @map("lesson_id") @db.Uuid
+  lesson      Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type        LessonMaterialType
+  fileId      String?            @map("file_id") @db.Uuid
+  file        File?              @relation("LessonMaterialFile", fields: [fileId], references: [id], onDelete: SetNull)
+  url         String?
+  title       String?
+  contentJson Json?              @map("content_json")
+  sortOrder   Int                @default(0) @map("sort_order")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  deletedAt   DateTime?          @map("deleted_at")
+
+  @@index([lessonId, sortOrder])
+  @@index([fileId])
+  @@map("lesson_materials")
+}
+
+model LessonDocument {
+  id                  String          @id @default(uuid()) @db.Uuid
+  lessonId            String          @map("lesson_id") @db.Uuid
+  lesson              Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileId              String          @map("file_id") @db.Uuid
+  file                File            @relation("LessonDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  title               String?
+  status              DocumentStatus  @default(UPLOADED)
+  extractedText       String?         @map("extracted_text") @db.Text
+  extractError        String?         @map("extract_error") @db.Text
+  contentHash         String?         @map("content_hash")
+  chunkCount          Int             @default(0) @map("chunk_count")
+  processingJobId     String?         @map("processing_job_id") @db.Uuid
+  processingJob       BackgroundJob?  @relation("LessonDocumentProcessingJob", fields: [processingJobId], references: [id], onDelete: SetNull)
+  processedAt         DateTime?       @map("processed_at")
+  embeddingProvider   AiProviderName? @map("embedding_provider")
+  embeddingModel      String?         @map("embedding_model")
+  embeddingDimensions Int?            @map("embedding_dimensions")
+  metadataJson        Json?           @map("metadata_json")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  chunks              DocumentChunk[]
+
+  @@index([lessonId])
+  @@index([status])
+  @@index([contentHash])
+  @@index([fileId])
+  @@index([processingJobId])
+  @@map("lesson_documents")
+}
+
+model DocumentChunk {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  documentId          String                       @map("document_id") @db.Uuid
+  document            LessonDocument               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lessonId            String                       @map("lesson_id") @db.Uuid
+  lesson              Lesson                       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  chunkIndex          Int                          @map("chunk_index")
+  content             String                       @db.Text
+  contentHash         String?                      @map("content_hash")
+  tokenCount          Int?                         @map("token_count")
+  embedding           Unsupported("vector(1536)")?
+  embeddingProvider   AiProviderName?              @map("embedding_provider")
+  embeddingModel      String?                      @map("embedding_model")
+  embeddingDimensions Int?                         @map("embedding_dimensions")
+  metadataJson        Json?                        @map("metadata_json")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@index([lessonId])
+  @@index([lessonId, embeddingProvider, embeddingModel, embeddingDimensions])
+  @@map("document_chunks")
+}
+
+model LessonSummary {
+  id             String        @id @default(uuid()) @db.Uuid
+  lessonId       String        @unique @map("lesson_id") @db.Uuid
+  lesson         Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  contentJson    Json          @map("content_json")
+  source         ContentSource @default(ADMIN)
+  reviewStatus   ReviewStatus  @default(APPROVED) @map("review_status")
+  aiGenerationId String?       @map("ai_generation_id") @db.Uuid
+  createdById    String?       @map("created_by_id") @db.Uuid
+  createdBy      User?         @relation("LessonSummaryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById    String?       @map("updated_by_id") @db.Uuid
+  updatedBy      User?         @relation("LessonSummaryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
+
+  @@index([aiGenerationId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("lesson_summaries")
+}
+
+model Enrollment {
+  id             String           @id @default(uuid()) @db.Uuid
+  studentUserId  String           @map("student_user_id") @db.Uuid
+  studentUser    User             @relation("EnrollmentStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  learningPathId String           @map("learning_path_id") @db.Uuid
+  learningPath   LearningPath     @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  paidByUserId   String?          @map("paid_by_user_id") @db.Uuid
+  paidByUser     User?            @relation("EnrollmentPaidBy", fields: [paidByUserId], references: [id], onDelete: SetNull)
+  paymentId      String?          @map("payment_id") @db.Uuid
+  status         EnrollmentStatus @default(ACTIVE)
+  startsAt       DateTime         @map("starts_at")
+  expiresAt      DateTime         @map("expires_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([studentUserId, learningPathId, status])
+  @@index([learningPathId])
+  @@index([paidByUserId])
+  @@index([paymentId])
+  @@map("enrollments")
+}
+
+model LessonProgress {
+  id                  String               @id @default(uuid()) @db.Uuid
+  studentUserId       String               @map("student_user_id") @db.Uuid
+  studentUser         User                 @relation("LessonProgressStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId            String               @map("lesson_id") @db.Uuid
+  lesson              Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  status              LessonProgressStatus @default(NOT_STARTED)
+  bestTestAttemptId   String?              @map("best_test_attempt_id") @db.Uuid
+  bestScore           Decimal?             @map("best_score") @db.Decimal(5, 2)
+  bestDurationSeconds Int?                 @map("best_duration_seconds")
+  completedAt         DateTime?            @map("completed_at")
+  xpAwarded           Boolean              @default(false) @map("xp_awarded")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  @@unique([studentUserId, lessonId])
+  @@index([studentUserId, status])
+  @@index([lessonId, status])
+  @@index([bestTestAttemptId])
+  @@map("lesson_progress")
 }
 
 model AuditLog {

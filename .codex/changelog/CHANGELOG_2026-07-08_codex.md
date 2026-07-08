@@ -7,3 +7,13 @@
 - Files: `.codex/skills/do/SKILL.md`, `.codex/skills/do/agents/openai.yaml`
 - Tests: `pnpm format:check`; `pnpm exec prettier --check .codex/skills/do/SKILL.md .codex/skills/do/agents/openai.yaml .codex/changelog/CHANGELOG_2026-07-08_codex.md`; `git diff --check`; frontmatter check thủ công cho `do/SKILL.md`.
 - Notes: Không thay đổi code production.
+
+## 2026-07-08 — M1.3 learning database models
+
+- Summary: Thêm các model Prisma lõi cho learning path, lesson, document, enrollment và progress.
+- Changed:
+  - Bổ sung enum/model `LearningPath`, `Lesson`, `LessonMaterial`, `LessonDocument`, `DocumentChunk`, `LessonSummary`, `Enrollment`, `LessonProgress`.
+  - Tạo migration SQL kèm FK, index, pgvector field và partial unique index cho active enrollment.
+- Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708001000_add_learning_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
+- Notes: `enrollments.payment_id`, `lesson_progress.best_test_attempt_id` và `lesson_summaries.ai_generation_id` giữ dạng UUID scalar cho đến khi các model `Payment`, `TestAttempt`, `AiGeneration` được thêm ở các milestone sau.

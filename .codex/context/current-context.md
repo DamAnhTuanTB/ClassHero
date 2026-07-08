@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên làm việc nhanh hơn. Nó không thay thế `AGENTS.md` hoặc docs gốc trong `docs/`.
 
@@ -8,7 +8,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
@@ -23,19 +23,20 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - `/task-ui` dùng khi cần dựng UI/mock data trước để owner review.
 - `/task-connect` dùng sau UI mock, code API đầy đủ nếu thiếu rồi nối UI với data thật.
 - Thêm chữ `plan` sau skill task để Codex chỉ lập kế hoạch và chờ duyệt, ví dụ `/task-full plan M1.2`.
-- `/do` có nghĩa là duyệt plan gần nhất và bắt đầu làm.
+- `/do` có nghĩa là duyệt plan hoặc task tiếp theo đã được gợi ý và bắt đầu làm; nếu còn thay đổi đã xong chưa commit, `/do` có thể commit trước rồi triển khai task mới rõ ràng.
+- `/do plan` có nghĩa là commit phần đã xong nếu cần, rồi lập plan cho task tiếp theo đã được gợi ý để owner duyệt trước khi làm.
 - Task nhỏ/rủi ro thấp được dùng lean mode: chạy check nhỏ nhất đủ tin cậy, không bắt buộc full lint/build/test toàn repo.
 - Khi làm public page có mục tiêu xuất hiện Google, Codex phải đọc SEO docs bên cạnh UI/performance docs.
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau `M1.2` nên làm:
+Theo roadmap hiện tại, sau `M1.3` nên làm:
 
 ```txt
-/task-full M1.3
+/task-full M1.4
 ```
 
-Mục tiêu `M1.3`: thêm learning path, lesson, material, document và enrollment models vào Prisma schema theo docs database.
+Mục tiêu `M1.4`: thêm quiz, flashcard, test, attempt và learning interaction models vào Prisma schema theo docs database.
 
 ## 4. Khi nào cập nhật file này
 
