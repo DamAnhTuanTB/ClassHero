@@ -372,10 +372,10 @@ Không ghi changelog trong task thường, kể cả khi có thay đổi file đ
 .codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md
 ```
 
-Khi commit, changelog ghi các chức năng/thay đổi chính nằm trong commit đó. Mỗi chức năng là một dòng ngắn:
+Khi commit, changelog ghi một entry/đoạn ngắn gọn, liền mạch cho toàn bộ commit đó. Không tách thành nhiều dòng rời rạc.
 
 ```md
-- YYYY-MM-DD: <chức năng/thay đổi chính của commit>
+- YYYY-MM-DD: <đoạn ngắn tóm tắt liền mạch các thay đổi chính của commit>
 ```
 
 Không ghi file list, test/check, notes dài, secret, token, API key, webhook signature, private URL hoặc dữ liệu nhạy cảm vào changelog. Các chi tiết về files/tests/notes nằm trong final response hoặc tài liệu liên quan khi thật sự cần.

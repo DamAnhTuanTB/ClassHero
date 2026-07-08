@@ -1,3 +1,5 @@
+- 2026-07-08: Chuẩn hóa quy tắc changelog của Codex để mỗi commit chỉ ghi một entry liền mạch, đồng bộ trong AGENTS, README, context và các skill liên quan.
+
 ## 2026-07-08 — Update do runner continuation flow
 
 - Summary: Làm rõ `/do` và `/do plan` để có thể commit phần vừa xong rồi tiếp tục task mới đã được gợi ý.

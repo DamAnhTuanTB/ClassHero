@@ -138,4 +138,4 @@ After a bug fix, update `docs/learning-notes/` only when the bug teaches a reusa
 
 ## Changelog
 
-Do not write bug-fix changelog entries in this workflow. Changelog is written only during `/commit`, with one short line per main fix/change included in that commit.
+Do not write bug-fix changelog entries in this workflow. Changelog is written only during `/commit`, with one short, coherent entry for the whole commit.

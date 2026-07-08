@@ -166,4 +166,4 @@ Include:
 - Whether learning notes changed.
 - Suggested next subtask: include the command, exact `Mode` from the milestone file, and a one-sentence description of what that task does.
 
-Do not update changelog here. Changelog is written only during `/commit`, with one short line per main change included in that commit.
+Do not update changelog here. Changelog is written only during `/commit`, with one short, coherent entry for the whole commit.

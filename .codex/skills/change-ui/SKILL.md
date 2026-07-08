@@ -69,7 +69,7 @@ When approval happens:
 - Update `docs/11-ui-design-system.md` only if the approval creates a broad reusable UI rule.
 - Do not update changelog; `/commit` will record the approved UI/docs changes if a commit is created.
 
-Changelog is not written during UI iteration. It is written only during `/commit`, with one short line per main change included in the commit.
+Changelog is not written during UI iteration. It is written only during `/commit`, with one short, coherent entry for the whole commit.
 
 ## UI Work Rules
 

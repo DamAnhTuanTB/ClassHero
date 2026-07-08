@@ -34,7 +34,7 @@ Before committing:
 2. Read `AGENTS.md`, especially changelog and commit rules.
 3. Run `git status --short`.
 4. Inspect `git diff --stat`, `git diff --name-only`, staged diff if any, and file-level diffs needed to understand the change.
-5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for the commit being created. Add one short bullet per main feature/change included in this commit.
+5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for the commit being created. Add one short, coherent changelog entry for the whole commit.
 6. Do not modify production code during `/commit`; only update changelog if needed for commit hygiene.
 
 ## Safety Gates
@@ -161,6 +161,7 @@ Do not amend, rebase, reset, or squash unless explicitly asked.
 
 During `/commit`, add or adjust changelog for the commit being created:
 
-- Add one bullet per main feature/change included in the commit: `- YYYY-MM-DD: <short feature/change summary>`.
+- Add one short, coherent entry per commit: `- YYYY-MM-DD: <short paragraph summarizing the commit's main changes>`.
+- Do not split one commit into multiple changelog bullets by feature unless the owner explicitly asks.
 - Do not add `Summary`, `Changed`, `Files`, `Tests`, or `Notes` sections.
 - Keep checks, skipped checks, file lists, and risk notes in the final response or the relevant docs instead of the changelog.

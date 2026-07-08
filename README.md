@@ -337,7 +337,7 @@ Codex không tự commit nếu owner chưa yêu cầu. Khi muốn commit:
 /commit full
 ```
 
-Changelog dùng một dòng ngắn cho mỗi chức năng/thay đổi chính nằm trong commit: `- YYYY-MM-DD: <chức năng/thay đổi chính của commit>`.
+Changelog dùng một entry ngắn, liền mạch cho mỗi commit: `- YYYY-MM-DD: <đoạn ngắn tóm tắt các thay đổi chính của commit>`.
 
 ---
 

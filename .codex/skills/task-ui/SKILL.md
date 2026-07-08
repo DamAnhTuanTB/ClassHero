@@ -189,4 +189,4 @@ Include:
 - Whether learning notes changed.
 - Suggested next command: `/task-connect Mx.y`, plus the exact task `Mode` from the milestone file and a one-sentence description of what the connection step will do.
 
-Do not update changelog here. Changelog is written only during `/commit`, with one short line per main change included in that commit.
+Do not update changelog here. Changelog is written only during `/commit`, with one short, coherent entry for the whole commit.
