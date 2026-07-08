@@ -8,7 +8,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
@@ -30,13 +30,13 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau `M1.3` nên làm:
+Theo roadmap hiện tại, sau `M1.4` nên làm:
 
 ```txt
-/task-full M1.4
+/task-full M1.5
 ```
 
-Mục tiêu `M1.4`: thêm quiz, flashcard, test, attempt và learning interaction models vào Prisma schema theo docs database.
+Mục tiêu `M1.5`: thêm payment, notification, report, AI log, gamification và news models còn lại cho MVP.
 
 ## 4. Khi nào cập nhật file này
 

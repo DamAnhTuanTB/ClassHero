@@ -27,6 +27,7 @@ NestJS module/service
 5. `PrismaModule` export `PrismaService` để các module khác inject khi cần truy cập DB.
 6. Các model nền như `User`, `StudentProfile`, `ParentProfile`, `File`, `BackgroundJob` và `AuditLog` được thêm vào Prisma schema trước các module nghiệp vụ để auth, upload, worker và audit có điểm tựa chung.
 7. Các model học tập lõi như `LearningPath`, `Lesson`, `LessonDocument`, `DocumentChunk`, `Enrollment` và `LessonProgress` nối phần course, tài liệu, RAG và tiến độ học vào cùng một schema.
+8. Các model tương tác học tập như `QuizSet`, `FlashcardSet`, `TestSet`, `QuizAttempt`, `TestAttempt`, `FlashcardProgress`, `StudentNote`, `LessonVideoComment` và `Favorite` lưu nội dung luyện tập, lịch sử làm bài và ghi chú riêng của học sinh theo từng lesson.
 
 ## Kỹ thuật chính
 
@@ -40,6 +41,9 @@ NestJS module/service
 - Audit log: `audit_logs` ghi lại thao tác nhạy cảm như admin CRUD, file upload, payment hoặc moderation để sau này truy vết được ai đã làm gì.
 - Unsupported field: `document_chunks.embedding` dùng `Unsupported("vector(1536)")` để Prisma vẫn quản lý bảng có cột pgvector, còn vector query/index chuyên sâu sẽ dùng raw SQL khi đến milestone RAG.
 - Partial unique index: `enrollments_one_active_per_student_path` được viết bằng raw SQL trong migration để đảm bảo một học sinh chỉ có một enrollment active cho một lộ trình.
+- Set/question/attempt pattern: quiz, flashcard và test đều tách bảng bộ câu hỏi/card khỏi bảng lịch sử làm bài. Nhờ vậy admin hoặc AI có thể đổi nội dung học tập mà vẫn giữ được attempt cũ để tính tiến độ.
+- Denormalized best attempt: `lesson_progress.best_test_attempt_id`, `best_score` và `best_duration_seconds` lưu kết quả tốt nhất để dashboard đọc nhanh, còn partial unique index `test_attempts_one_best_per_student_lesson` đảm bảo mỗi học sinh chỉ có một best attempt cho một lesson.
+- Polymorphic favorite nhẹ: `favorites` dùng `target_type` + `target_id` để một bảng có thể lưu cả câu quiz và flashcard yêu thích. Backend sau này phải validate target thật vì Prisma không tạo FK động cho kiểu quan hệ này.
 
 ## File quan trọng
 
@@ -48,6 +52,7 @@ NestJS module/service
 - `apps/api/prisma/migrations/20260707000000_enable_pgvector/migration.sql`: migration bật pgvector.
 - `apps/api/prisma/migrations/20260707001000_add_foundation_models/migration.sql`: migration thêm model nền user/auth/profile/file/job/audit.
 - `apps/api/prisma/migrations/20260708001000_add_learning_models/migration.sql`: migration thêm model lộ trình, buổi học, tài liệu, chunk, enrollment và progress.
+- `apps/api/prisma/migrations/20260708002000_add_learning_interaction_models/migration.sql`: migration thêm quiz, flashcard, test, attempt, favorite, note/comment riêng.
 - `apps/api/src/common/prisma/prisma.service.ts`: service kết nối database.
 - `apps/api/src/common/prisma/prisma.module.ts`: module export PrismaService.
 - `apps/api/src/app.module.ts`: import PrismaModule vào app.
@@ -61,6 +66,7 @@ NestJS module/service
 - lỗi liên quan `DATABASE_URL`, Prisma generate, Prisma validate hoặc migration,
 - flow auth, upload, worker/job hoặc audit cần biết bảng nền nằm ở đâu,
 - course/lesson/enrollment/progress cần biết quan hệ dữ liệu nền,
+- quiz/flashcard/test/attempt/note/favorite cần biết cách dữ liệu luyện tập nối với lesson và user,
 - tính năng AI/RAG cần `pgvector` và `document_chunks`.
 
 ## Task liên quan
@@ -68,3 +74,4 @@ NestJS module/service
 - `M1.1`: Setup Prisma và database foundation.
 - `M1.2`: User, auth token, profile, file và background job models.
 - `M1.3`: Learning path, lesson, material, document và enrollment models.
+- `M1.4`: Quiz, flashcard, test, attempt và learning interaction models.

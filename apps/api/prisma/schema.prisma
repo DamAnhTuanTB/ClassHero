@@ -38,6 +38,19 @@ enum PublishStatus {
   ARCHIVED
 }
 
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+  MIXED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  TEXT_INPUT
+}
+
 enum ContentSource {
   ADMIN
   AI
@@ -103,9 +116,21 @@ enum LessonProgressStatus {
   COMPLETED
 }
 
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  CANCELLED
+}
+
 enum AiProviderName {
   OPENAI
   GEMINI
+}
+
+enum FavoriteTargetType {
+  QUIZ_QUESTION
+  FLASHCARD
 }
 
 enum BackgroundJobQueue {
@@ -164,6 +189,21 @@ model User {
   enrollmentsAsStudent   Enrollment[]         @relation("EnrollmentStudent")
   enrollmentsPaid        Enrollment[]         @relation("EnrollmentPaidBy")
   lessonProgress         LessonProgress[]     @relation("LessonProgressStudent")
+  generatedQuizSets      QuizSet[]            @relation("QuizSetGeneratedBy")
+  createdQuizSets        QuizSet[]            @relation("QuizSetCreatedBy")
+  updatedQuizSets        QuizSet[]            @relation("QuizSetUpdatedBy")
+  quizAttempts           QuizAttempt[]        @relation("QuizAttemptStudent")
+  generatedFlashcardSets FlashcardSet[]       @relation("FlashcardSetGeneratedBy")
+  createdFlashcardSets   FlashcardSet[]       @relation("FlashcardSetCreatedBy")
+  updatedFlashcardSets   FlashcardSet[]       @relation("FlashcardSetUpdatedBy")
+  flashcardProgress      FlashcardProgress[]  @relation("FlashcardProgressStudent")
+  generatedTestSets      TestSet[]            @relation("TestSetGeneratedBy")
+  createdTestSets        TestSet[]            @relation("TestSetCreatedBy")
+  updatedTestSets        TestSet[]            @relation("TestSetUpdatedBy")
+  testAttempts           TestAttempt[]        @relation("TestAttemptStudent")
+  studentNotes           StudentNote[]        @relation("StudentNoteStudent")
+  lessonVideoComments    LessonVideoComment[] @relation("LessonVideoCommentStudent")
+  favorites              Favorite[]           @relation("FavoriteStudent")
 
   @@index([role, status])
   @@map("users")
@@ -334,31 +374,43 @@ model LearningPath {
 }
 
 model Lesson {
-  id                 String           @id @default(uuid()) @db.Uuid
-  learningPathId     String           @map("learning_path_id") @db.Uuid
-  learningPath       LearningPath     @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  orderIndex         Int              @map("order_index")
+  id                 String               @id @default(uuid()) @db.Uuid
+  learningPathId     String               @map("learning_path_id") @db.Uuid
+  learningPath       LearningPath         @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  orderIndex         Int                  @map("order_index")
   title              String
-  shortDescription   String?          @map("short_description")
-  prepMaterialJson   Json?            @map("prep_material_json")
-  scheduledAt        DateTime?        @map("scheduled_at")
-  examOpenAt         DateTime?        @map("exam_open_at")
-  videoUrl           String?          @map("video_url")
-  completionMinScore Decimal          @default(7) @map("completion_min_score") @db.Decimal(5, 2)
-  status             PublishStatus    @default(DRAFT)
-  createdById        String?          @map("created_by_id") @db.Uuid
-  createdBy          User?            @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById        String?          @map("updated_by_id") @db.Uuid
-  updatedBy          User?            @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
-  deletedAt          DateTime?        @map("deleted_at")
+  shortDescription   String?              @map("short_description")
+  prepMaterialJson   Json?                @map("prep_material_json")
+  scheduledAt        DateTime?            @map("scheduled_at")
+  examOpenAt         DateTime?            @map("exam_open_at")
+  videoUrl           String?              @map("video_url")
+  completionMinScore Decimal              @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  status             PublishStatus        @default(DRAFT)
+  createdById        String?              @map("created_by_id") @db.Uuid
+  createdBy          User?                @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById        String?              @map("updated_by_id") @db.Uuid
+  updatedBy          User?                @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  deletedAt          DateTime?            @map("deleted_at")
   materials          LessonMaterial[]
   documents          LessonDocument[]
   documentChunks     DocumentChunk[]
   summary            LessonSummary?
   progressEntries    LessonProgress[]
-  backgroundJobs     BackgroundJob[]  @relation("BackgroundJobLesson")
+  quizSets           QuizSet[]
+  quizQuestions      QuizQuestion[]
+  quizAttempts       QuizAttempt[]
+  flashcardSets      FlashcardSet[]
+  flashcards         Flashcard[]
+  flashcardProgress  FlashcardProgress[]
+  testSets           TestSet[]
+  testQuestions      TestQuestion[]
+  testAttempts       TestAttempt[]
+  studentNotes       StudentNote[]
+  videoComments      LessonVideoComment[]
+  favorites          Favorite[]
+  backgroundJobs     BackgroundJob[]      @relation("BackgroundJobLesson")
 
   @@unique([learningPathId, orderIndex])
   @@index([learningPathId, status])
@@ -496,6 +548,7 @@ model LessonProgress {
   lesson              Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   status              LessonProgressStatus @default(NOT_STARTED)
   bestTestAttemptId   String?              @map("best_test_attempt_id") @db.Uuid
+  bestTestAttempt     TestAttempt?         @relation("LessonProgressBestTestAttempt", fields: [bestTestAttemptId], references: [id], onDelete: SetNull)
   bestScore           Decimal?             @map("best_score") @db.Decimal(5, 2)
   bestDurationSeconds Int?                 @map("best_duration_seconds")
   completedAt         DateTime?            @map("completed_at")
@@ -508,6 +561,343 @@ model LessonProgress {
   @@index([lessonId, status])
   @@index([bestTestAttemptId])
   @@map("lesson_progress")
+}
+
+model QuizSet {
+  id                String         @id @default(uuid()) @db.Uuid
+  lessonId          String         @map("lesson_id") @db.Uuid
+  lesson            Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title             String
+  difficulty        Difficulty     @default(MIXED)
+  source            ContentSource  @default(ADMIN)
+  reviewStatus      ReviewStatus   @default(APPROVED) @map("review_status")
+  isReserve         Boolean        @default(false) @map("is_reserve")
+  generatedByUserId String?        @map("generated_by_user_id") @db.Uuid
+  generatedByUser   User?          @relation("QuizSetGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+  aiGenerationId    String?        @map("ai_generation_id") @db.Uuid
+  questionCount     Int            @default(0) @map("question_count")
+  sortOrder         Int            @default(0) @map("sort_order")
+  createdById       String?        @map("created_by_id") @db.Uuid
+  createdBy         User?          @relation("QuizSetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById       String?        @map("updated_by_id") @db.Uuid
+  updatedBy         User?          @relation("QuizSetUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  deletedAt         DateTime?      @map("deleted_at")
+  questions         QuizQuestion[]
+  attempts          QuizAttempt[]
+
+  @@index([lessonId, sortOrder])
+  @@index([lessonId, reviewStatus])
+  @@index([generatedByUserId])
+  @@index([aiGenerationId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("quiz_sets")
+}
+
+model QuizQuestion {
+  id                String              @id @default(uuid()) @db.Uuid
+  quizSetId         String              @map("quiz_set_id") @db.Uuid
+  quizSet           QuizSet             @relation(fields: [quizSetId], references: [id], onDelete: Cascade)
+  lessonId          String              @map("lesson_id") @db.Uuid
+  lesson            Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questionType      QuestionType        @map("question_type")
+  questionJson      Json                @map("question_json")
+  optionsJson       Json?               @map("options_json")
+  correctAnswerJson Json                @map("correct_answer_json")
+  hintJson          Json?               @map("hint_json")
+  gradingConfigJson Json?               @map("grading_config_json")
+  difficulty        Difficulty          @default(MEDIUM)
+  reviewStatus      ReviewStatus        @default(APPROVED) @map("review_status")
+  explanationId     String?             @map("explanation_id") @db.Uuid
+  sortOrder         Int                 @default(0) @map("sort_order")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  deletedAt         DateTime?           @map("deleted_at")
+  attemptAnswers    QuizAttemptAnswer[]
+
+  @@index([quizSetId, sortOrder])
+  @@index([lessonId])
+  @@index([lessonId, reviewStatus])
+  @@index([explanationId])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id            String              @id @default(uuid()) @db.Uuid
+  studentUserId String              @map("student_user_id") @db.Uuid
+  studentUser   User                @relation("QuizAttemptStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId      String              @map("lesson_id") @db.Uuid
+  lesson        Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  quizSetId     String              @map("quiz_set_id") @db.Uuid
+  quizSet       QuizSet             @relation(fields: [quizSetId], references: [id], onDelete: Restrict)
+  status        AttemptStatus       @default(IN_PROGRESS)
+  startedAt     DateTime            @default(now()) @map("started_at")
+  submittedAt   DateTime?           @map("submitted_at")
+  correctCount  Int                 @default(0) @map("correct_count")
+  wrongCount    Int                 @default(0) @map("wrong_count")
+  totalCount    Int                 @default(0) @map("total_count")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  answers       QuizAttemptAnswer[]
+
+  @@index([studentUserId, lessonId])
+  @@index([lessonId])
+  @@index([quizSetId])
+  @@index([status])
+  @@map("quiz_attempts")
+}
+
+model QuizAttemptAnswer {
+  id         String       @id @default(uuid()) @db.Uuid
+  attemptId  String       @map("attempt_id") @db.Uuid
+  attempt    QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String       @map("question_id") @db.Uuid
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answerJson Json         @map("answer_json")
+  isCorrect  Boolean      @map("is_correct")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
+  @@map("quiz_attempt_answers")
+}
+
+model FlashcardSet {
+  id                String        @id @default(uuid()) @db.Uuid
+  lessonId          String        @map("lesson_id") @db.Uuid
+  lesson            Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title             String
+  difficulty        Difficulty    @default(MIXED)
+  source            ContentSource @default(ADMIN)
+  reviewStatus      ReviewStatus  @default(APPROVED) @map("review_status")
+  isReserve         Boolean       @default(false) @map("is_reserve")
+  generatedByUserId String?       @map("generated_by_user_id") @db.Uuid
+  generatedByUser   User?         @relation("FlashcardSetGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+  aiGenerationId    String?       @map("ai_generation_id") @db.Uuid
+  cardCount         Int           @default(0) @map("card_count")
+  sortOrder         Int           @default(0) @map("sort_order")
+  createdById       String?       @map("created_by_id") @db.Uuid
+  createdBy         User?         @relation("FlashcardSetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById       String?       @map("updated_by_id") @db.Uuid
+  updatedBy         User?         @relation("FlashcardSetUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  deletedAt         DateTime?     @map("deleted_at")
+  flashcards        Flashcard[]
+
+  @@index([lessonId, sortOrder])
+  @@index([lessonId, reviewStatus])
+  @@index([generatedByUserId])
+  @@index([aiGenerationId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("flashcard_sets")
+}
+
+model Flashcard {
+  id             String              @id @default(uuid()) @db.Uuid
+  flashcardSetId String              @map("flashcard_set_id") @db.Uuid
+  flashcardSet   FlashcardSet        @relation(fields: [flashcardSetId], references: [id], onDelete: Cascade)
+  lessonId       String              @map("lesson_id") @db.Uuid
+  lesson         Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  frontJson      Json                @map("front_json")
+  backJson       Json                @map("back_json")
+  hintJson       Json?               @map("hint_json")
+  explanationId  String?             @map("explanation_id") @db.Uuid
+  difficulty     Difficulty          @default(MEDIUM)
+  reviewStatus   ReviewStatus        @default(APPROVED) @map("review_status")
+  sortOrder      Int                 @default(0) @map("sort_order")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  deletedAt      DateTime?           @map("deleted_at")
+  progress       FlashcardProgress[]
+
+  @@index([flashcardSetId, sortOrder])
+  @@index([lessonId])
+  @@index([lessonId, reviewStatus])
+  @@index([explanationId])
+  @@map("flashcards")
+}
+
+model FlashcardProgress {
+  id             String    @id @default(uuid()) @db.Uuid
+  studentUserId  String    @map("student_user_id") @db.Uuid
+  studentUser    User      @relation("FlashcardProgressStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId       String    @map("lesson_id") @db.Uuid
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  flashcardId    String    @map("flashcard_id") @db.Uuid
+  flashcard      Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  isKnown        Boolean   @default(false) @map("is_known")
+  lastReviewedAt DateTime  @map("last_reviewed_at")
+  reviewCount    Int       @default(0) @map("review_count")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([studentUserId, flashcardId])
+  @@index([studentUserId, lessonId])
+  @@index([lessonId])
+  @@index([flashcardId])
+  @@map("flashcard_progress")
+}
+
+model TestSet {
+  id                  String         @id @default(uuid()) @db.Uuid
+  lessonId            String         @map("lesson_id") @db.Uuid
+  lesson              Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title               String
+  durationSeconds     Int            @map("duration_seconds")
+  difficulty          Difficulty     @default(MIXED)
+  difficultyRatioJson Json?          @map("difficulty_ratio_json")
+  source              ContentSource  @default(ADMIN)
+  reviewStatus        ReviewStatus   @default(APPROVED) @map("review_status")
+  isReserve           Boolean        @default(false) @map("is_reserve")
+  generatedByUserId   String?        @map("generated_by_user_id") @db.Uuid
+  generatedByUser     User?          @relation("TestSetGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+  aiGenerationId      String?        @map("ai_generation_id") @db.Uuid
+  questionCount       Int            @default(0) @map("question_count")
+  totalScore          Decimal        @default(10) @map("total_score") @db.Decimal(5, 2)
+  sortOrder           Int            @default(0) @map("sort_order")
+  createdById         String?        @map("created_by_id") @db.Uuid
+  createdBy           User?          @relation("TestSetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById         String?        @map("updated_by_id") @db.Uuid
+  updatedBy           User?          @relation("TestSetUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  deletedAt           DateTime?      @map("deleted_at")
+  questions           TestQuestion[]
+  attempts            TestAttempt[]
+
+  @@index([lessonId, sortOrder])
+  @@index([lessonId, reviewStatus])
+  @@index([generatedByUserId])
+  @@index([aiGenerationId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("test_sets")
+}
+
+model TestQuestion {
+  id                String              @id @default(uuid()) @db.Uuid
+  testSetId         String              @map("test_set_id") @db.Uuid
+  testSet           TestSet             @relation(fields: [testSetId], references: [id], onDelete: Cascade)
+  lessonId          String              @map("lesson_id") @db.Uuid
+  lesson            Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questionType      QuestionType        @map("question_type")
+  questionJson      Json                @map("question_json")
+  optionsJson       Json?               @map("options_json")
+  correctAnswerJson Json                @map("correct_answer_json")
+  hintJson          Json?               @map("hint_json")
+  gradingConfigJson Json?               @map("grading_config_json")
+  points            Decimal?            @db.Decimal(5, 2)
+  difficulty        Difficulty          @default(MEDIUM)
+  reviewStatus      ReviewStatus        @default(APPROVED) @map("review_status")
+  explanationId     String?             @map("explanation_id") @db.Uuid
+  sortOrder         Int                 @default(0) @map("sort_order")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  deletedAt         DateTime?           @map("deleted_at")
+  attemptAnswers    TestAttemptAnswer[]
+
+  @@index([testSetId, sortOrder])
+  @@index([lessonId])
+  @@index([lessonId, reviewStatus])
+  @@index([explanationId])
+  @@map("test_questions")
+}
+
+model TestAttempt {
+  id                  String              @id @default(uuid()) @db.Uuid
+  studentUserId       String              @map("student_user_id") @db.Uuid
+  studentUser         User                @relation("TestAttemptStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId            String              @map("lesson_id") @db.Uuid
+  lesson              Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  testSetId           String              @map("test_set_id") @db.Uuid
+  testSet             TestSet             @relation(fields: [testSetId], references: [id], onDelete: Restrict)
+  status              AttemptStatus       @default(IN_PROGRESS)
+  startedAt           DateTime            @default(now()) @map("started_at")
+  submittedAt         DateTime?           @map("submitted_at")
+  durationSeconds     Int?                @map("duration_seconds")
+  score               Decimal?            @db.Decimal(5, 2)
+  correctCount        Int                 @default(0) @map("correct_count")
+  wrongCount          Int                 @default(0) @map("wrong_count")
+  totalCount          Int                 @default(0) @map("total_count")
+  isBestForLesson     Boolean             @default(false) @map("is_best_for_lesson")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  answers             TestAttemptAnswer[]
+  bestProgressEntries LessonProgress[]    @relation("LessonProgressBestTestAttempt")
+
+  @@index([studentUserId, lessonId])
+  @@index([lessonId, score, durationSeconds])
+  @@index([testSetId])
+  @@index([status])
+  @@map("test_attempts")
+}
+
+model TestAttemptAnswer {
+  id            String       @id @default(uuid()) @db.Uuid
+  attemptId     String       @map("attempt_id") @db.Uuid
+  attempt       TestAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId    String       @map("question_id") @db.Uuid
+  question      TestQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answerJson    Json         @map("answer_json")
+  isCorrect     Boolean      @map("is_correct")
+  pointsAwarded Decimal?     @map("points_awarded") @db.Decimal(5, 2)
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@unique([attemptId, questionId])
+  @@index([questionId])
+  @@map("test_attempt_answers")
+}
+
+model StudentNote {
+  id            String    @id @default(uuid()) @db.Uuid
+  studentUserId String    @map("student_user_id") @db.Uuid
+  studentUser   User      @relation("StudentNoteStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId      String    @map("lesson_id") @db.Uuid
+  lesson        Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  contentJson   Json      @map("content_json")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@index([studentUserId, lessonId])
+  @@index([lessonId])
+  @@map("student_notes")
+}
+
+model LessonVideoComment {
+  id            String    @id @default(uuid()) @db.Uuid
+  studentUserId String    @map("student_user_id") @db.Uuid
+  studentUser   User      @relation("LessonVideoCommentStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId      String    @map("lesson_id") @db.Uuid
+  lesson        Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  contentJson   Json      @map("content_json")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@index([studentUserId, lessonId])
+  @@index([lessonId])
+  @@map("lesson_video_comments")
+}
+
+model Favorite {
+  id            String             @id @default(uuid()) @db.Uuid
+  studentUserId String             @map("student_user_id") @db.Uuid
+  studentUser   User               @relation("FavoriteStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId      String             @map("lesson_id") @db.Uuid
+  lesson        Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  targetType    FavoriteTargetType @map("target_type")
+  targetId      String             @map("target_id") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  @@unique([studentUserId, targetType, targetId])
+  @@index([studentUserId, lessonId])
+  @@index([lessonId, targetType])
+  @@map("favorites")
 }
 
 model AuditLog {

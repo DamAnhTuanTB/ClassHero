@@ -17,3 +17,13 @@
 - Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708001000_add_learning_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
 - Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
 - Notes: `enrollments.payment_id`, `lesson_progress.best_test_attempt_id` và `lesson_summaries.ai_generation_id` giữ dạng UUID scalar cho đến khi các model `Payment`, `TestAttempt`, `AiGeneration` được thêm ở các milestone sau.
+
+## 2026-07-08 — M1.4 learning interaction database models
+
+- Summary: Thêm model Prisma cho quiz, flashcard, test, attempt, favorite và note/comment riêng.
+- Changed:
+  - Bổ sung enum/model cho `QuizSet`, `QuizQuestion`, `QuizAttempt`, `FlashcardSet`, `FlashcardProgress`, `TestSet`, `TestAttempt`, `StudentNote`, `LessonVideoComment` và `Favorite`.
+  - Tạo migration SQL kèm FK, unique constraint, index và partial unique index cho best test attempt theo từng học sinh/lesson.
+- Files: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260708002000_add_learning_interaction_models/migration.sql`, `.codex/context/current-context.md`, `docs/implementation/feature-coverage-matrix.md`, `docs/learning-notes/**`
+- Tests: `pnpm --filter @learning-path/api db:validate`; `pnpm --filter @learning-path/api db:generate`; `pnpm --filter @learning-path/api typecheck`; `pnpm format:check`; `pnpm exec prettier --check` cho Markdown liên quan; `git diff --check`.
+- Notes: `ai_generation_id` và `explanation_id` giữ dạng UUID scalar cho đến khi các model AI/explanation được thêm ở `M1.5`.
