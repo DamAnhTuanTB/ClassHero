@@ -56,7 +56,7 @@ Chỉ tách `/task-ui` trước rồi `/task-connect` khi:
 - Nếu task có thể thuộc nhiều subtask, hỏi lại hoặc ghi `ASSUMPTION` trước khi code.
 - Nếu một subtask quá lớn, đề xuất chia nhỏ hơn trước khi code.
 - Database/API/AI/env/UI behavior đổi phải cập nhật docs liên quan theo `AGENTS.md`.
-- Changelog phải cập nhật khi có thay đổi file đáng commit.
+- Không cập nhật changelog trong task thường; changelog chỉ ghi trong workflow `/commit`.
 
 ---
 
@@ -83,7 +83,7 @@ Codex phải:
    - `/task-full`: làm đủ lát dọc trong scope subtask.
    - `/task-ui`: chỉ UI/mock data.
    - `/task-connect`: code API đầy đủ nếu thiếu rồi nối UI đã có với dữ liệu thật.
-9. Chạy check phù hợp và cập nhật changelog.
+9. Chạy check phù hợp. Changelog chỉ được ghi nếu owner yêu cầu `/commit`.
 
 ### Khi owner giao task ngắn
 

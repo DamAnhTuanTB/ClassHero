@@ -6,12 +6,13 @@ import {
   Check,
   ChevronLeft,
   GraduationCap,
+  UsersRound,
   VenusAndMars,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState, type FormEvent, type MouseEvent } from "react";
+import { useForm, type FieldValues, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 import {
   forgotPasswordSchema,
@@ -40,6 +41,8 @@ type SubmitState =
   | { status: "idle" }
   | { status: "success"; result: MockAuthResult }
   | { status: "error"; message: string };
+
+type SubmitIntentEvent = FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement>;
 
 const gradeOptions = Array.from({ length: 10 }, (_, index) => {
   const grade = String(index + 3);
@@ -75,6 +78,31 @@ async function submitMock(
   }
 }
 
+async function submitWhenValid<TFormValues extends FieldValues>(
+  form: UseFormReturn<TFormValues>,
+  onValid: () => Promise<void> | void,
+  setSubmitState: (state: SubmitState) => void,
+) {
+  const isValid = await form.trigger(undefined, { shouldFocus: true });
+
+  if (!isValid) {
+    setSubmitState({ status: "idle" });
+    return;
+  }
+
+  await onValid();
+}
+
+function handleSubmitIntent<TFormValues extends FieldValues>(
+  event: SubmitIntentEvent,
+  form: UseFormReturn<TFormValues>,
+  onValid: () => Promise<void> | void,
+  setSubmitState: (state: SubmitState) => void,
+) {
+  event.preventDefault();
+  void submitWhenValid(form, onValid, setSubmitState);
+}
+
 export function LoginForm() {
   const router = useRouter();
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
@@ -89,6 +117,13 @@ export function LoginForm() {
     },
   });
   const isPending = form.formState.isSubmitting;
+  const handleLoginSubmit = (event: SubmitIntentEvent) =>
+    handleSubmitIntent(
+      event,
+      form,
+      () => submitMock("login", setSubmitState),
+      setSubmitState,
+    );
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -108,94 +143,103 @@ export function LoginForm() {
     <form
       className="grid gap-5"
       autoComplete="off"
-      onSubmit={form.handleSubmit(() => submitMock("login", setSubmitState))}
+      noValidate
+      onSubmit={handleLoginSubmit}
     >
-        <FormHeader title="Đăng nhập" />
+      <FormHeader title="Đăng nhập" />
 
-        <div className="grid gap-4">
-          <TextField
-            id="identifier"
-            label="Tên đăng nhập"
-            placeholder="Nhập tên đăng nhập hoặc số điện thoại"
+      <div className="grid gap-4">
+        <TextField
+          id="identifier"
+          label="Tên đăng nhập/Số điện thoại"
+          placeholder="Vui lòng nhập"
+          autoComplete="off"
+          error={form.formState.errors.identifier}
+          disabled={isPending}
+          {...form.register("identifier")}
+        />
+        <TextField
+          id="password"
+          label="Mật khẩu"
+          type="password"
+          placeholder="Nhập mật khẩu"
+          autoComplete="off"
+          error={form.formState.errors.password}
+          disabled={isPending}
+          {...form.register("password")}
+        />
+      </div>
+
+      {submitState.status === "success" ? (
+        <FormStatus
+          tone="success"
+          title={submitState.result.title}
+          message={submitState.result.message}
+          detail={submitState.result.detail}
+        />
+      ) : null}
+      {submitState.status === "error" ? (
+        <FormStatus
+          tone="error"
+          title="Không thể đăng nhập"
+          message={submitState.message}
+        />
+      ) : null}
+
+      <SubmitButton isPending={isPending} onClick={handleLoginSubmit}>
+        Đăng nhập
+      </SubmitButton>
+
+      <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+        <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 font-semibold text-slate-700 transition hover:text-slate-950">
+          <input
+            type="checkbox"
             autoComplete="off"
-            error={form.formState.errors.identifier}
+            checked={rememberLogin}
             disabled={isPending}
-            {...form.register("identifier")}
+            onChange={(event) => setRememberLogin(event.target.checked)}
+            className="peer sr-only"
           />
-          <TextField
-            id="password"
-            label="Mật khẩu"
-            type="password"
-            placeholder="Nhập mật khẩu"
-            autoComplete="off"
-            error={form.formState.errors.password}
-            disabled={isPending}
-            {...form.register("password")}
-          />
-        </div>
-
-        {submitState.status === "success" ? (
-          <FormStatus
-            tone="success"
-            title={submitState.result.title}
-            message={submitState.result.message}
-            detail={submitState.result.detail}
-          />
-        ) : null}
-        {submitState.status === "error" ? (
-          <FormStatus
-            tone="error"
-            title="Không thể đăng nhập"
-            message={submitState.message}
-          />
-        ) : null}
-
-        <SubmitButton isPending={isPending}>Đăng nhập</SubmitButton>
-
-        <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
-          <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 font-semibold text-slate-700 transition hover:text-slate-950">
-            <input
-              type="checkbox"
-              autoComplete="off"
-              checked={rememberLogin}
-              disabled={isPending}
-              onChange={(event) => setRememberLogin(event.target.checked)}
-              className="peer sr-only"
-            />
-            <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-4 peer-focus-visible:ring-indigo-100 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
-                rememberLogin
-                  ? "border-[var(--auth-primary)] bg-[var(--auth-primary)] text-white shadow-sm shadow-indigo-950/10"
-                  : "border-slate-300 bg-white text-transparent"
-              }`}
-            >
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            </span>
-            Ghi nhớ đăng nhập
-          </label>
-          <Link
-            className="shrink-0 font-bold text-[var(--auth-primary)] hover:brightness-90"
-            href="/forgot-password"
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-4 peer-focus-visible:ring-indigo-100 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+              rememberLogin
+                ? "border-[var(--auth-primary)] bg-[var(--auth-primary)] text-white shadow-sm shadow-indigo-950/10"
+                : "border-slate-300 bg-white text-transparent"
+            }`}
           >
-            Quên mật khẩu?
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+          Ghi nhớ đăng nhập
+        </label>
+        <Link
+          className="shrink-0 font-bold text-[var(--auth-primary)] hover:brightness-90"
+          href="/forgot-password"
+        >
+          Quên mật khẩu?
+        </Link>
+      </div>
+
+      <div className="rounded-xl bg-slate-50 p-3 text-center text-sm text-slate-600 sm:p-4">
+        <p>Chưa có tài khoản? Chọn vai trò</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Link
+            aria-label="Đăng ký tài khoản học sinh"
+            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-sky-100 bg-white px-2 text-[13px] font-extrabold leading-none text-sky-700 shadow-sm shadow-sky-950/5 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:text-sm"
+            href="/register/student"
+          >
+            <GraduationCap className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Học sinh
+          </Link>
+          <Link
+            aria-label="Đăng ký tài khoản phụ huynh"
+            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-100 bg-white px-2 text-[13px] font-extrabold leading-none text-emerald-700 shadow-sm shadow-emerald-950/5 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 sm:text-sm"
+            href="/register/parent"
+          >
+            <UsersRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Phụ huynh
           </Link>
         </div>
-
-        <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-600">
-          <p>Chưa có tài khoản?</p>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-3 font-bold">
-            <Link className="text-sky-700 hover:text-sky-800" href="/register/student">
-              Đăng ký học sinh
-            </Link>
-            <span className="text-slate-300">•</span>
-            <Link
-              className="text-emerald-700 hover:text-emerald-800"
-              href="/register/parent"
-            >
-              Đăng ký phụ huynh
-            </Link>
-          </div>
-        </div>
+      </div>
     </form>
   );
 }
@@ -220,12 +264,20 @@ export function StudentRegisterForm() {
   const isPending = form.formState.isSubmitting;
   const hasNoPhone = form.watch("hasNoPhone");
   const acceptedTerms = form.watch("acceptedTerms");
+  const handleStudentRegisterSubmit = (event: SubmitIntentEvent) =>
+    handleSubmitIntent(
+      event,
+      form,
+      () => submitMock("register-student", setSubmitState),
+      setSubmitState,
+    );
 
   return (
     <form
       className="grid gap-5"
       autoComplete="off"
-      onSubmit={form.handleSubmit(() => submitMock("register-student", setSubmitState))}
+      noValidate
+      onSubmit={handleStudentRegisterSubmit}
     >
       <FormHeader title="Đăng ký" />
 
@@ -349,7 +401,7 @@ export function StudentRegisterForm() {
               >
                 <Check className="h-3 w-3" aria-hidden="true" />
               </span>
-              Không có số điện thoại
+              Không có SĐT
             </label>
           }
           {...form.register("phone")}
@@ -420,7 +472,7 @@ export function StudentRegisterForm() {
             <span>Tôi đã đọc và đồng ý với</span>
           </label>
           <Link
-            className="font-extrabold text-blue-600 underline-offset-4 hover:text-blue-700 hover:underline"
+            className="font-extrabold text-blue-600 underline-offset-4 hover:text-blue-700 hover:none"
             href="/terms"
           >
             Điều khoản sử dụng
@@ -433,7 +485,9 @@ export function StudentRegisterForm() {
         ) : null}
       </div>
 
-      <SubmitButton isPending={isPending}>Tạo tài khoản học sinh</SubmitButton>
+      <SubmitButton isPending={isPending} onClick={handleStudentRegisterSubmit}>
+        Tạo tài khoản học sinh
+      </SubmitButton>
       <p className="text-center text-sm text-slate-600">
         Đã có tài khoản?{" "}
         <Link
@@ -464,12 +518,20 @@ export function ParentRegisterForm() {
   });
   const isPending = form.formState.isSubmitting;
   const acceptedTerms = form.watch("acceptedTerms");
+  const handleParentRegisterSubmit = (event: SubmitIntentEvent) =>
+    handleSubmitIntent(
+      event,
+      form,
+      () => submitMock("register-parent", setSubmitState),
+      setSubmitState,
+    );
 
   return (
     <form
       className="grid gap-5"
       autoComplete="off"
-      onSubmit={form.handleSubmit(() => submitMock("register-parent", setSubmitState))}
+      noValidate
+      onSubmit={handleParentRegisterSubmit}
     >
       <FormHeader title="Đăng ký" />
 
@@ -569,7 +631,9 @@ export function ParentRegisterForm() {
         ) : null}
       </div>
 
-      <SubmitButton isPending={isPending}>Tiếp tục</SubmitButton>
+      <SubmitButton isPending={isPending} onClick={handleParentRegisterSubmit}>
+        Tiếp tục
+      </SubmitButton>
       <p className="text-center text-sm text-slate-600">
         Đã có tài khoản?{" "}
         <Link
@@ -609,6 +673,8 @@ export function ForgotPasswordForm() {
       });
     }
   }
+  const handleForgotPasswordIntent = (event: SubmitIntentEvent) =>
+    handleSubmitIntent(event, form, handleForgotPasswordSubmit, setSubmitState);
 
   if (isVerified) {
     return <VerifiedResetPasswordForm />;
@@ -618,7 +684,8 @@ export function ForgotPasswordForm() {
     <form
       className="grid gap-5"
       autoComplete="off"
-      onSubmit={form.handleSubmit(handleForgotPasswordSubmit)}
+      noValidate
+      onSubmit={handleForgotPasswordIntent}
     >
       <FormHeader title="Quên mật khẩu" />
 
@@ -634,8 +701,8 @@ export function ForgotPasswordForm() {
         />
         <TextField
           id="forgot-identifier"
-          label="Tài khoản"
-          placeholder="Nhập tên đăng nhập hoặc số điện thoại"
+          label="Tên đăng nhập/Số điện thoại"
+          placeholder="Vui lòng nhập"
           autoComplete="off"
           error={form.formState.errors.identifier}
           disabled={isPending}
@@ -661,14 +728,20 @@ export function ForgotPasswordForm() {
       </div>
 
       {submitState.status === "error" ? (
-        <FormStatus tone="error" title="Không thể xác minh" message={submitState.message} />
+        <FormStatus
+          tone="error"
+          title="Không thể xác minh"
+          message={submitState.message}
+        />
       ) : null}
 
-      <SubmitButton isPending={isPending}>Tiếp tục</SubmitButton>
+      <SubmitButton isPending={isPending} onClick={handleForgotPasswordIntent}>
+        Tiếp tục
+      </SubmitButton>
 
       <div className="text-sm text-slate-600">
         <Link
-          className="inline-flex items-center gap-1.5 font-medium text-sky-700 hover:text-sky-800"
+          className="inline-flex items-center gap-1.5 font-medium text-[var(--auth-primary)] hover:brightness-90"
           href="/login"
         >
           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -704,12 +777,15 @@ function VerifiedResetPasswordForm() {
       });
     }
   }
+  const handleVerifiedResetPasswordIntent = (event: SubmitIntentEvent) =>
+    handleSubmitIntent(event, form, handleResetPasswordSubmit, setSubmitState);
 
   return (
     <form
       className="grid gap-5"
       autoComplete="off"
-      onSubmit={form.handleSubmit(handleResetPasswordSubmit)}
+      noValidate
+      onSubmit={handleVerifiedResetPasswordIntent}
     >
       <FormHeader title="Đổi mật khẩu" />
 
@@ -735,10 +811,16 @@ function VerifiedResetPasswordForm() {
       </div>
 
       {submitState.status === "error" ? (
-        <FormStatus tone="error" title="Không thể đổi mật khẩu" message={submitState.message} />
+        <FormStatus
+          tone="error"
+          title="Không thể đổi mật khẩu"
+          message={submitState.message}
+        />
       ) : null}
 
-      <SubmitButton isPending={isPending}>Đổi mật khẩu</SubmitButton>
+      <SubmitButton isPending={isPending} onClick={handleVerifiedResetPasswordIntent}>
+        Đổi mật khẩu
+      </SubmitButton>
       <Link
         className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-700 hover:text-sky-800"
         href="/login"
@@ -761,12 +843,20 @@ export function ResetPasswordForm() {
     },
   });
   const isPending = form.formState.isSubmitting;
+  const handleResetPasswordSubmit = (event: SubmitIntentEvent) =>
+    handleSubmitIntent(
+      event,
+      form,
+      () => submitMock("reset-password", setSubmitState),
+      setSubmitState,
+    );
 
   return (
     <form
       className="grid gap-5"
       autoComplete="off"
-      onSubmit={form.handleSubmit(() => submitMock("reset-password", setSubmitState))}
+      noValidate
+      onSubmit={handleResetPasswordSubmit}
     >
       <FormHeader title="Đặt lại mật khẩu" />
 
@@ -810,7 +900,9 @@ export function ResetPasswordForm() {
         />
       ) : null}
 
-      <SubmitButton isPending={isPending}>Đặt lại mật khẩu</SubmitButton>
+      <SubmitButton isPending={isPending} onClick={handleResetPasswordSubmit}>
+        Đặt lại mật khẩu
+      </SubmitButton>
       <Link
         className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-700 hover:text-sky-800"
         href="/login"

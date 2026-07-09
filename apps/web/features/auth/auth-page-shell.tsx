@@ -1,6 +1,7 @@
 import { ChevronLeft, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { AuthDevHydrationBoundary } from "./auth-dev-hydration-boundary";
 
 type AuthPageShellProps = {
   children: ReactNode;
@@ -22,7 +23,7 @@ const theme = {
     titleAccent: "text-indigo-600",
     description: "Tiếp tục học tập, chinh phục mục tiêu.",
     illustration: "login" as IllustrationType,
-    illustrationSrc: "/images/auth/reference/auth-hero-login-transparent.png",
+    illustrationSrc: "/images/auth/reference/auth-hero-login-inclusive-transparent.png",
     blob: "from-indigo-100 via-sky-100 to-violet-100 lg:from-indigo-100 lg:via-sky-100 lg:to-violet-100",
   },
   student: {
@@ -34,7 +35,7 @@ const theme = {
     titleAccent: "text-sky-600",
     description: "Bắt đầu hành trình học thú vị.",
     illustration: "student" as IllustrationType,
-    illustrationSrc: "/images/auth/reference/auth-hero-student-transparent.png",
+    illustrationSrc: "/images/auth/reference/auth-hero-student-inclusive-transparent.png",
     blob: "from-sky-100 via-cyan-50 to-blue-100 lg:from-sky-100 lg:via-cyan-50 lg:to-blue-100",
   },
   parent: {
@@ -50,16 +51,16 @@ const theme = {
     blob: "from-emerald-100 via-green-50 to-teal-100 lg:from-emerald-100 lg:via-green-50 lg:to-teal-100",
   },
   recovery: {
-    primary: "#0284c7",
-    secondary: "#4f46e5",
-    soft: "from-sky-50 via-white to-indigo-50",
-    titleFirst: "Quay lại lớp",
-    titleSecond: "học",
-    titleAccent: "text-sky-600",
+    primary: "#e11d48",
+    secondary: "#f97316",
+    soft: "from-rose-50 via-white to-orange-50",
+    titleFirst: "Quay lại",
+    titleSecond: "lớp học",
+    titleAccent: "text-rose-600",
     description: "Bài học đang chờ bạn.",
     illustration: "secure" as IllustrationType,
-    illustrationSrc: "/images/auth/reference/auth-hero-login-transparent.png",
-    blob: "from-sky-100 via-indigo-50 to-blue-100 lg:from-sky-100 lg:via-indigo-50 lg:to-blue-100",
+    illustrationSrc: "/images/auth/reference/auth-hero-recovery-transparent.png",
+    blob: "from-rose-100 via-orange-50 to-amber-100 lg:from-rose-100 lg:via-orange-50 lg:to-amber-100",
   },
 } satisfies Record<
   NonNullable<AuthPageShellProps["variant"]>,
@@ -94,7 +95,7 @@ export function AuthPageShell({
       className="relative min-h-screen overflow-hidden bg-[#f4f6fb] px-3 py-4 text-slate-950 sm:px-6 sm:py-8 lg:px-8"
       style={authStyle}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(79,70,229,.08),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(16,185,129,.08),transparent_26%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(79,70,229,.08),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(16,185,129,.08),transparent_26%)]" />
 
       <section
         className={`relative mx-auto min-h-[calc(100vh-2rem)] max-w-[560px] overflow-hidden rounded-2xl bg-gradient-to-br ${currentTheme.soft} shadow-xl shadow-slate-900/10 ring-1 ring-slate-200/80 sm:min-h-[calc(100vh-4rem)] lg:grid lg:max-w-[1280px] lg:grid-cols-[1fr_0.94fr] lg:rounded-[2.35rem]`}
@@ -144,25 +145,31 @@ export function AuthPageShell({
           </div>
 
           <div
-            className={`pointer-events-none absolute bottom-3 right-0 z-0 h-36 w-64 rounded-[50%] bg-gradient-to-br ${currentTheme.blob} opacity-90 blur-sm sm:h-44 sm:w-72 lg:bottom-4 lg:right-7 lg:h-56 lg:w-[24rem] xl:bottom-5 xl:h-64 xl:w-[27rem]`}
+            className={`pointer-events-none absolute bottom-3 right-0 z-0 h-36 w-64 rounded-[50%] bg-gradient-to-br ${currentTheme.blob} opacity-90 blur-sm sm:h-44 sm:w-72 ${
+              currentTheme.illustration === "student"
+                ? "lg:bottom-[6.75rem] lg:right-7 lg:h-56 lg:w-[24rem] xl:bottom-[8rem] xl:h-64 xl:w-[27rem]"
+                : "lg:bottom-4 lg:right-7 lg:h-56 lg:w-[24rem] xl:bottom-5 xl:h-64 xl:w-[27rem]"
+            }`}
             aria-hidden="true"
           />
           <img
             src={currentTheme.illustrationSrc}
             alt=""
             className={`pointer-events-none absolute z-10 object-contain ${
-              currentTheme.illustration === "parent"
-                ? "bottom-0 right-0 h-56 w-64 sm:h-[18rem] sm:w-[20rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[24rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[26rem]"
-                : currentTheme.illustration === "student"
-                  ? "bottom-0 right-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[23rem]"
-                  : "bottom-0 right-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[23rem]"
+              currentTheme.illustration === "login"
+                ? "bottom-0 right-[-1rem] h-[15.2rem] w-[17.1rem] sm:right-[-2rem] sm:h-[20rem] sm:w-[22rem] lg:bottom-4 lg:right-3 lg:h-[24rem] lg:w-[26rem] xl:bottom-5 xl:right-3 xl:h-[26rem] xl:w-[29rem]"
+                : currentTheme.illustration === "parent"
+                  ? "bottom-0 right-0 h-56 w-64 sm:h-[18rem] sm:w-[20rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[24rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[26rem]"
+                  : currentTheme.illustration === "student"
+                    ? "bottom-0 right-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-[7rem] lg:right-[2.125rem] lg:h-[21rem] lg:w-[21rem] xl:bottom-[8.75rem] xl:right-9 xl:h-[23rem] xl:w-[23rem]"
+                    : "bottom-0 right-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[23rem]"
             }`}
           />
         </div>
 
         <div className="relative z-20 -mt-12 px-5 pb-5 sm:px-7 sm:pb-7 lg:mt-0 lg:flex lg:min-h-full lg:items-center lg:justify-center lg:bg-white lg:px-10 lg:py-10 xl:px-14">
           <div className="w-full rounded-[1.7rem] bg-white/94 p-5 shadow-xl shadow-slate-900/10 ring-1 ring-slate-200/80 backdrop-blur sm:p-6 lg:max-w-[39rem] lg:bg-transparent lg:p-0 lg:shadow-none lg:ring-0">
-            {children}
+            <AuthDevHydrationBoundary>{children}</AuthDevHydrationBoundary>
           </div>
         </div>
       </section>

@@ -17,7 +17,7 @@ Khi task có API/backend hoặc kết nối UI với API:
 3. Mở file API chi tiết phù hợp trong `docs/api/`.
 4. Đọc `docs/04-database-model.md` nếu endpoint dùng data mới, đổi schema hoặc behavior phụ thuộc database.
 5. Đọc `docs/06-ai-rag-spec.md` nếu endpoint liên quan AI/RAG.
-6. Nếu đổi request/response/side effect, cập nhật file API chi tiết và changelog.
+6. Nếu đổi request/response/side effect, cập nhật file API chi tiết; changelog chỉ ghi trong workflow `/commit`.
 
 Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, không tự connect API.
 

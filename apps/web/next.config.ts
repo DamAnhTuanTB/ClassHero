@@ -1,5 +1,15 @@
 import type { NextConfig } from "next";
+import { networkInterfaces } from "node:os";
 
-const nextConfig: NextConfig = {};
+const localIpv4Origins = Object.values(networkInterfaces()).flatMap(
+  (networks) =>
+    networks
+      ?.filter((network) => network.family === "IPv4" && !network.internal)
+      .map((network) => network.address) ?? [],
+);
+
+const nextConfig: NextConfig = {
+  allowedDevOrigins: localIpv4Origins,
+};
 
 export default nextConfig;

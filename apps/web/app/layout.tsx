@@ -26,8 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <body className={`${beVietnamPro.variable} ${baloo2.variable}`}>
+    <html lang="vi" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className={`${beVietnamPro.variable} ${baloo2.variable}`}
+      >
         {children}
         <Toaster position="top-right" richColors closeButton />
       </body>

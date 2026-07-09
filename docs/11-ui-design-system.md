@@ -68,7 +68,7 @@ Nguyên tắc dùng màu:
 - Success/warning/error phải nhất quán, không dùng đỏ cho CTA thường.
 - Không lạm dụng tím/xanh tím, beige, dark slate hoặc gradient làm theme chính.
 - Không tạo palette một màu; mỗi màn nên có nền trung tính, primary rõ và accent vừa đủ.
-- Nếu cần thêm màu mới, thêm vào theme/token trước hoặc ghi rõ lý do trong changelog.
+- Nếu cần thêm màu mới, thêm vào theme/token trước hoặc ghi rõ lý do trong final response/docs liên quan; changelog chỉ ghi trong workflow `/commit`.
 
 ## 4. Typography
 
@@ -162,7 +162,7 @@ Rules:
 - Empty/loading/error/success state phải là thông điệp sản phẩm tự nhiên, không phải chú thích kỹ thuật.
 - Mock UI chỉ được mock dữ liệu hoặc API boundary; trải nghiệm hiển thị và tương tác phải giống production thật. Không để button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control hoặc icon có vẻ bấm được nhưng thực chất là tĩnh.
 - Mọi control tương tác phải dùng element semantic, state/handler thật, feedback bấm rõ và pending/disabled/loading state phù hợp. Nếu chưa nối API, dùng local/mock state để mô phỏng đúng hành vi sản phẩm thay vì bỏ trống interaction.
-- Muốn giải thích mock/API/technical flow thì ghi trong final response, changelog, docs, code comment hoặc test name, không ghi trong UI.
+- Muốn giải thích mock/API/technical flow thì ghi trong final response, docs, code comment hoặc test name, không ghi trong UI.
 
 ### 7.2. Copy ngắn gọn cho UI người dùng thật
 
@@ -243,8 +243,19 @@ Mobile UX rules:
 - Touch target tối thiểu khoảng `44px` cho CTA, option quiz, tab, icon button quan trọng.
 - Trạng thái bấm/tap phải rõ: pressed/active/loading/disabled.
 - Form mobile phải ít ma sát: input label rõ, lỗi hiện gần field, keyboard type phù hợp, submit không bị che bởi keyboard/sticky footer.
+- Trên iOS, mọi `input`, `textarea` và trigger nhập liệu/select trông như ô nhập phải dùng font-size tối thiểu `16px` ở mobile để tránh Safari/Chrome tự zoom khi focus; có thể giảm về size nhỏ hơn ở desktop bằng breakpoint lớn.
+- Nếu form không muốn browser hiện gợi ý/autofill, không chỉ dựa vào `autocomplete="off"`; cần tránh DOM `name/id/type/label` dễ bị browser/password manager nhận diện, đồng thời vẫn giữ state/form library nhận field name thật.
+- Control custom như select/checkbox phải dùng component semantic/thư viện ổn định, có state và handler thật. Khi gặp lỗi mobile, kiểm tra hydration/runtime/overlay pointer trước khi thay control bằng hướng khác.
+- Select/dropdown không được ép mở bằng `touchstart`/`pointerdown` khi người dùng chỉ lướt qua; chỉ mở sau click/tap có chủ đích. Với form mobile đơn giản như auth, ưu tiên inline controlled button/listbox nếu portal dropdown tạo lỗi double-open trên touch viewport. Click/tap lại trigger khi đang mở phải đóng hẳn, và icon mũi tên phải phản ánh đúng trạng thái mở/đóng.
+- Nút submit trong form mock/client-only nên có `preventDefault` rõ hoặc dùng intent handler riêng để tránh submit HTML mặc định làm reload trang khi client JS chưa hydrate.
 - Với quiz/flashcard/test, thao tác chính phải nằm trong tầm ngón tay; tránh bắt user cuộn quá nhiều chỉ để submit/chuyển câu.
 - Khi API chậm, ưu tiên skeleton, inline progress hoặc retry thân thiện thay vì màn hình trắng.
+
+Local dev/browser guardrails:
+
+- Khi test Next.js dev server trên điện thoại qua IP LAN, nếu console/server báo chặn `/_next/webpack-hmr` hoặc dev resource theo origin, cấu hình `allowedDevOrigins` cho IP LAN và restart server trước khi debug UI control.
+- Nếu Safari ổn nhưng Chrome/Google iOS hiện Next hydration overlay trong khi tương tác vẫn chạy, kiểm tra khả năng browser/extension/app wrapper chèn attribute vào DOM trước hydration; không vội refactor UI control.
+- Khi nhiều control cùng lỗi trên một thiết bị như select không mở, checkbox không đổi state, validation không hiện và submit bị reload, ưu tiên điều tra client JS hydration/runtime thay vì sửa từng control rời rạc.
 
 Performance budget/checklist:
 
@@ -257,7 +268,7 @@ Performance budget/checklist:
 | Animation        | Nhẹ, ngắn, không block thao tác                                 |
 | Bundle           | Không thêm thư viện nặng nếu shadcn/Tailwind/native API đủ dùng |
 
-Khi làm UI phức tạp, Codex nên ghi rõ trong final/changelog đã kiểm tra hoặc bỏ qua phần nào:
+Khi làm UI phức tạp, Codex nên ghi rõ trong final response đã kiểm tra hoặc bỏ qua phần nào:
 
 - mobile viewport,
 - desktop viewport,
@@ -312,7 +323,7 @@ Nếu owner đưa ảnh/reference UI:
 1. Lưu hoặc ghi chú reference trong `docs/ui-references/reference-notes.md`.
 2. Tách rõ phần nên học theo: layout, spacing, màu, typography, component hoặc interaction.
 3. Không copy y nguyên brand/asset của sản phẩm khác nếu không có quyền.
-4. Áp dụng lại theo design system của dự án và ghi changelog ngắn.
+4. Áp dụng lại theo design system của dự án; changelog chỉ ghi trong workflow `/commit`.
 5. Nếu reference là dashboard nhưng màn đang làm là auth/register/login, chỉ lấy style direction như màu, bo góc, card, icon, spacing và năng lượng thị giác; không biến auth flow thành dashboard giả.
 6. Nếu owner nói reference là thiết kế mobile, ưu tiên mobile layout giống reference trước; không tự thêm chip chân trang, tab phụ hoặc bước phụ ngoài flow hiện có.
 
@@ -326,7 +337,7 @@ Sau tín hiệu này:
 2. Ghi ngắn: context, điểm đã được duyệt, điểm cần tránh, màn hình/flow có thể tái sử dụng, screenshot/file liên quan nếu có.
 3. Chỉ cập nhật `docs/11-ui-design-system.md` nếu owner chốt một nguyên tắc áp dụng rộng cho nhiều màn, ví dụ màu chủ đạo, spacing/card style chung, typography chung hoặc motion chung.
 4. Không ghi mọi sở thích tạm thời thành rule toàn hệ thống.
-5. Cập nhật changelog ngắn.
+5. Không cập nhật changelog trong task UI thường; changelog chỉ ghi trong workflow `/commit`.
 
 Ví dụ phân loại:
 

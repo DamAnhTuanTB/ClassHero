@@ -18,7 +18,7 @@ const acceptedTermsSchema = z.boolean().refine((value) => value, {
 });
 
 export const loginSchema = z.object({
-  identifier: requiredText("Nhập tên đăng nhập hoặc số điện thoại."),
+  identifier: requiredText("Nhập tên đăng nhập/SĐT"),
   password: z.string().min(1, "Nhập mật khẩu."),
 });
 
@@ -81,7 +81,7 @@ export const studentRegisterSchema = z
       if (!phone) {
         context.addIssue({
           code: "custom",
-          message: "Nhập số điện thoại hoặc chọn Không có số điện thoại.",
+          message: "Nhập số điện thoại hoặc chọn Không có SĐT.",
           path: ["phone"],
         });
       } else {
@@ -147,7 +147,7 @@ export const parentRegisterSchema = z
 
 export const forgotPasswordSchema = z.object({
   fullName: requiredText("Nhập họ tên."),
-  identifier: requiredText("Nhập tên đăng nhập hoặc số điện thoại."),
+  identifier: requiredText("Nhập tên đăng nhập/SĐT"),
   grade: z
     .number({ error: "Chọn khối lớp." })
     .int()

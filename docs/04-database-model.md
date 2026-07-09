@@ -16,7 +16,7 @@ Khi task có database/schema/migration/seed:
 2. Mở file chi tiết phù hợp trong `docs/database/`.
 3. Đối chiếu `docs/05-api-contract.md` nếu API response/request bị ảnh hưởng.
 4. Đối chiếu `docs/06-ai-rag-spec.md` nếu liên quan document chunks, embedding, AI logs, chat hoặc explanation cache.
-5. Nếu thay đổi schema thật, cập nhật Prisma schema, migration và changelog.
+5. Nếu thay đổi schema thật, cập nhật Prisma schema và migration; changelog chỉ ghi trong workflow `/commit`.
 
 Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan để hiểu data shape.
 

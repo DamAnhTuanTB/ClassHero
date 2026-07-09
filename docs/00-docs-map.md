@@ -40,7 +40,7 @@ File này là bản đồ nhanh để owner và Codex biết nên đọc tài li
 - `docs/04-database-model.md` và `docs/05-api-contract.md` chỉ là index; khi chạm DB/API phải đọc file con tương ứng.
 - UI phải đọc design system; public/indexable page phải đọc SEO docs; list/search/cache/job/AI/latency phải đọc performance docs.
 - Feature management mặc định là docs/planning-only, chưa sửa production code nếu owner không yêu cầu rõ.
-- Khi đổi file đáng commit, cập nhật changelog.
+- Không cập nhật changelog trong task thường; changelog chỉ ghi trong workflow `/commit`.
 
 ## 4. Nếu không chắc bắt đầu từ đâu
 
