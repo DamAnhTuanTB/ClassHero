@@ -1,10 +1,15 @@
 "use client";
 
 import {
+  Check,
+  ChevronDown,
   Eye,
   EyeOff,
+  GraduationCap,
+  IdCard,
   LockKeyhole,
   Mail,
+  MapPin,
   Phone,
   ShieldCheck,
   UserRound,
@@ -20,6 +25,9 @@ type TextFieldProps = {
   autoComplete?: string;
   error?: FieldError;
   helperText?: string;
+  wrapperClassName?: string;
+  labelAction?: React.ReactNode;
+  suppressBrowserSuggestions?: boolean;
 } & React.InputHTMLAttributes<HTMLInputElement>;
 
 type SelectFieldProps = {
@@ -28,6 +36,23 @@ type SelectFieldProps = {
   error?: FieldError;
   children: React.ReactNode;
 } & React.SelectHTMLAttributes<HTMLSelectElement>;
+
+export type OptionItem = {
+  value: string;
+  label: string;
+};
+
+type OptionFieldProps = {
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  options: OptionItem[];
+  error?: FieldError;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+  onChange: (value: string) => void;
+};
 
 type FormStatusProps = {
   tone: "success" | "error" | "info";
@@ -57,8 +82,20 @@ function FieldIcon({ id, type, label }: { id: string; type: string; label: strin
     return <Phone className="h-5 w-5" aria-hidden="true" />;
   }
 
-  if (normalized.includes("tài khoản") || normalized.includes("username")) {
+  if (
+    normalized.includes("tài khoản") ||
+    normalized.includes("username") ||
+    normalized.includes("tên đăng nhập")
+  ) {
     return <UserRound className="h-5 w-5" aria-hidden="true" />;
+  }
+
+  if (normalized.includes("họ tên")) {
+    return <IdCard className="h-5 w-5" aria-hidden="true" />;
+  }
+
+  if (normalized.includes("địa chỉ")) {
+    return <MapPin className="h-5 w-5" aria-hidden="true" />;
   }
 
   if (normalized.includes("mã")) {
@@ -76,17 +113,30 @@ export function TextField({
   autoComplete,
   error,
   helperText,
+  wrapperClassName,
+  labelAction,
+  suppressBrowserSuggestions = false,
+  onBlur,
+  onFocus,
+  readOnly,
   ...inputProps
 }: TextFieldProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isSuggestionLocked, setIsSuggestionLocked] = useState(
+    suppressBrowserSuggestions,
+  );
   const isPasswordField = type === "password";
   const inputType = isPasswordField && isPasswordVisible ? "text" : type;
+  const inputAutoComplete = suppressBrowserSuggestions ? "new-password" : autoComplete;
 
   return (
-    <div>
-      <label htmlFor={id} className="text-sm font-extrabold text-slate-800">
-        {label}
-      </label>
+    <div className={wrapperClassName}>
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor={id} className="text-sm font-extrabold text-slate-800">
+          {label}
+        </label>
+        {labelAction ? <div className="shrink-0">{labelAction}</div> : null}
+      </div>
       <div className="relative mt-2">
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
           <FieldIcon id={id} type={type} label={label} />
@@ -95,7 +145,29 @@ export function TextField({
           id={id}
           type={inputType}
           placeholder={placeholder}
-          autoComplete={autoComplete}
+          autoComplete={inputAutoComplete}
+          autoCorrect={suppressBrowserSuggestions ? "off" : undefined}
+          autoCapitalize={suppressBrowserSuggestions ? "none" : undefined}
+          spellCheck={suppressBrowserSuggestions ? false : undefined}
+          data-1p-ignore={suppressBrowserSuggestions ? "true" : undefined}
+          data-bwignore={suppressBrowserSuggestions ? "true" : undefined}
+          data-form-type={suppressBrowserSuggestions ? "other" : undefined}
+          data-lpignore={suppressBrowserSuggestions ? "true" : undefined}
+          readOnly={suppressBrowserSuggestions ? isSuggestionLocked : readOnly}
+          onBlur={(event) => {
+            if (suppressBrowserSuggestions) {
+              setIsSuggestionLocked(true);
+            }
+
+            onBlur?.(event);
+          }}
+          onFocus={(event) => {
+            if (suppressBrowserSuggestions) {
+              window.setTimeout(() => setIsSuggestionLocked(false), 80);
+            }
+
+            onFocus?.(event);
+          }}
           aria-invalid={error ? "true" : "false"}
           aria-describedby={
             error ? `${id}-error` : helperText ? `${id}-helper` : undefined
@@ -135,6 +207,99 @@ export function TextField({
   );
 }
 
+export function OptionField({
+  id,
+  label,
+  value,
+  placeholder = "Chọn",
+  options,
+  error,
+  disabled,
+  icon,
+  onChange,
+}: OptionFieldProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <div
+      className="relative"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsOpen(false);
+        }
+      }}
+    >
+      <label htmlFor={id} className="text-sm font-extrabold text-slate-800">
+        {label}
+      </label>
+      <div className="relative mt-2">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+          {icon ?? <UserRound className="h-5 w-5" aria-hidden="true" />}
+        </span>
+        <button
+          id={id}
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-invalid={error ? "true" : "false"}
+          aria-describedby={error ? `${id}-error` : undefined}
+          disabled={disabled}
+          onClick={() => setIsOpen((open) => !open)}
+          className="flex min-h-[3.35rem] w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white py-0 pl-12 pr-4 text-left text-sm font-semibold text-slate-950 outline-none transition hover:border-indigo-200 focus:border-[var(--auth-primary)] focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+        >
+          <span className={selectedOption ? "text-slate-950" : "text-slate-400"}>
+            {selectedOption?.label ?? placeholder}
+          </span>
+          <ChevronDown
+            className={`h-5 w-5 shrink-0 text-slate-500 transition ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+      {isOpen ? (
+        <div
+          role="listbox"
+          aria-labelledby={id}
+          className="absolute z-40 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/12"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-left text-sm font-bold transition ${
+                  isSelected
+                    ? "bg-sky-50 text-[var(--auth-primary)]"
+                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                }`}
+              >
+                {option.label}
+                {isSelected ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-red-600">
+          {error.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function SelectField({
   id,
   label,
@@ -149,7 +314,7 @@ export function SelectField({
       </label>
       <div className="relative mt-2">
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-          <UserRound className="h-5 w-5" aria-hidden="true" />
+          <GraduationCap className="h-5 w-5" aria-hidden="true" />
         </span>
         <select
           id={id}

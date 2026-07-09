@@ -142,11 +142,11 @@ export class AuthService {
   }
 
   async registerStudent(dto: RegisterStudentDto) {
-    const email = normalizeEmail(dto.email);
-    const phone = normalizePhone(dto.phone);
+    const email = dto.email ? normalizeEmail(dto.email) : null;
+    const phone = dto.phone ? normalizePhone(dto.phone) : null;
     const username = normalizeUsername(dto.username);
     const passwordHash = await hashPassword(dto.password);
-    const dateOfBirth = parseDateOnly(dto.dateOfBirth);
+    const dateOfBirth = parseBirthYear(dto.birthYear);
 
     const user = await this.createStudentWithProfile({
       email,
@@ -157,6 +157,7 @@ export class AuthService {
       gender: dto.gender,
       dateOfBirth,
       grade: dto.grade,
+      address: normalizeName(dto.address),
     });
 
     const studentProfile = user.studentProfile;
@@ -561,20 +562,21 @@ export class AuthService {
   }
 
   private async createStudentWithProfile(data: {
-    email: string;
-    phone: string;
+    email: string | null;
+    phone: string | null;
     username: string;
     passwordHash: string;
     fullName: string;
     gender: Gender;
     dateOfBirth: Date;
     grade: number;
+    address: string;
   }) {
     try {
       return await this.prisma.$transaction(async (tx) => {
         await assertUniqueIdentity(tx, {
-          email: data.email,
-          phone: data.phone,
+          email: data.email ?? undefined,
+          phone: data.phone ?? undefined,
           username: data.username,
         });
 
@@ -595,6 +597,7 @@ export class AuthService {
               create: {
                 grade: data.grade,
                 childCode,
+                address: data.address,
                 displayName: data.fullName,
               },
             },
@@ -991,8 +994,8 @@ function normalizeIdentifier(identifier: string) {
   return identifier.trim();
 }
 
-function parseDateOnly(value: string) {
-  return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+function parseBirthYear(value: number) {
+  return new Date(`${value}-01-01T00:00:00.000Z`);
 }
 
 function formatDateOnly(value: Date | null) {

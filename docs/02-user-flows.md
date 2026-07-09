@@ -11,12 +11,12 @@ Actor: Student.
 Tiền điều kiện:
 
 - Student chưa có tài khoản.
-- Email/phone/username chưa bị dùng.
+- Username chưa bị dùng; email/số điện thoại cũng chưa bị dùng nếu student có cung cấp.
 
 Các bước:
 
 1. Student mở màn đăng ký.
-2. Nhập email, số điện thoại, username, password và thông tin cơ bản.
+2. Nhập họ tên, khối lớp, năm sinh, giới tính, địa chỉ, số điện thoại, username, password và nhập lại mật khẩu. Nếu không có số điện thoại, student chọn "Không có số điện thoại" để bỏ qua field này. Email là optional ở API nhưng không hiển thị trong form đăng ký học sinh hiện tại.
 3. Front-end validate form.
 4. Backend validate dữ liệu và kiểm tra unique.
 5. Backend hash password.
@@ -28,7 +28,13 @@ Các bước:
 Acceptance Criteria:
 
 - Không lưu password plain text.
-- Email/phone/username phải unique nếu được cung cấp.
+- Username phải unique; email/phone phải unique nếu được cung cấp.
+- Khối lớp chỉ nhận từ lớp 3 đến lớp 12.
+- Năm sinh chỉ nhận khoảng phù hợp với học sinh lớp 3 đến lớp 12.
+- Địa chỉ là bắt buộc trong form đăng ký học sinh.
+- Số điện thoại là bắt buộc trừ khi student chọn "Không có số điện thoại".
+- Mật khẩu chỉ yêu cầu tối thiểu 6 ký tự.
+- Mật khẩu nhập lại phải khớp ở front-end trước khi gửi request.
 - Response không trả password hash.
 - Nếu input trùng, trả lỗi rõ ràng.
 

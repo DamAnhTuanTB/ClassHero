@@ -96,7 +96,7 @@ Admin có quyền:
 
 Học sinh có quyền:
 
-- Đăng ký bằng email, số điện thoại, username, password.
+- Đăng ký bằng họ tên, lớp, năm sinh, giới tính, địa chỉ, số điện thoại, username và password; số điện thoại có thể bỏ qua nếu học sinh chọn "Không có số điện thoại", email optional nếu học sinh có.
 - Đăng nhập bằng username/email/số điện thoại + password.
 - Quên mật khẩu.
 - Xem danh sách lộ trình học.

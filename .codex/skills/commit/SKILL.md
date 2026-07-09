@@ -37,6 +37,8 @@ Before committing:
 5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for the commit being created. Add one short, coherent changelog entry for the whole commit.
 6. Do not modify production code during `/commit`; only update changelog if needed for commit hygiene.
 
+Use a faster diff-reading path when the work happened in the same active conversation and the changed files are low-risk UI/docs/skill files: inspect status/stat/name-only, targeted hunks, changelog, and safety scan instead of rereading every unchanged context line in full. Still inspect enough diff to write an accurate commit message and catch unrelated or risky files.
+
 ## Safety Gates
 
 Do not commit if:
@@ -55,9 +57,11 @@ When blocked, stop and explain the exact reason plus the command or decision nee
 1. Summarize the changed areas from diff and changelog.
 2. Choose verification mode and explain it briefly.
 3. Run verification according to the mode:
-   - `smart`: choose the smallest checks that cover the touched areas.
-   - `fast`: run safety checks and minimal validation only.
-   - `full`: run broad repo/package checks.
+
+- `smart`: choose the smallest checks that cover the touched areas.
+- `fast`: run safety checks and minimal validation only.
+- `full`: run broad repo/package checks.
+
 4. Stage the intended files explicitly. Use `git add <files>` instead of broad staging when there are suspicious or unrelated files.
 5. Re-check `git diff --cached --stat` and `git diff --cached --name-only`.
 6. Create the commit with `git commit -m "<subject>"` and optional extra `-m "<body>"` paragraphs.
@@ -80,7 +84,8 @@ Default for `/commit`.
 
 - Docs-only: `git diff --check`; `rg` or focused doc checks if useful.
 - Skill changes: run the repo's skill validator if available; otherwise do a lightweight frontmatter check for touched `SKILL.md` files.
-- Front-end only: relevant web typecheck/lint; build only if route/config/build surface changed.
+- Front-end visual-only UI changes, such as copy, color, spacing, Tailwind class tweaks, image position, static layout sizing, or docs/context updates: skip package typecheck by default; use `git diff --check`, targeted Prettier/format check, and static code review.
+- Front-end changes that touch TypeScript behavior, props, form/state handlers, route structure, shared UI primitives, schemas, session/auth/data behavior, conditional rendering, or imports/exports: run the relevant web typecheck. Run lint/build only if route/config/build surface changed.
 - API/back-end only: relevant api typecheck/lint; build when TypeScript compile surface changed.
 - Shared package: typecheck/lint/build for affected packages.
 - Prisma/schema/migration: `db:validate`; `db:generate`; API typecheck/build.
@@ -94,7 +99,8 @@ For `/commit fast`.
 - Still run safety checks and changelog check.
 - Run the repo's skill validator if available; otherwise do a lightweight frontmatter check for touched `SKILL.md` files.
 - Run `git diff --check`.
-- For code changes, run only the most focused typecheck/validation for the touched package.
+- For docs/skill/context and front-end visual-only UI changes, skip package typecheck by default unless there is obvious TypeScript risk.
+- For code changes with behavior risk, run only the most focused typecheck/validation for the touched package.
 - Skip full repo `lint`, `build`, browser checks, and broad tests unless the diff is risky.
 - In the final response, clearly say which broader checks were skipped because fast mode was requested.
 

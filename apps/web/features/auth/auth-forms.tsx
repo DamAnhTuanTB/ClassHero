@@ -1,7 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronLeft } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  GraduationCap,
+  VenusAndMars,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -20,7 +26,7 @@ import {
 import {
   FormHeader,
   FormStatus,
-  SelectField,
+  OptionField,
   SubmitButton,
   TextField,
 } from "./auth-form-primitives";
@@ -30,6 +36,25 @@ type SubmitState =
   | { status: "idle" }
   | { status: "success"; result: MockAuthResult }
   | { status: "error"; message: string };
+
+const gradeOptions = Array.from({ length: 10 }, (_, index) => {
+  const grade = String(index + 3);
+
+  return { value: grade, label: `Lớp ${grade}` };
+});
+
+const genderOptions = [
+  { value: "MALE", label: "Nam" },
+  { value: "FEMALE", label: "Nữ" },
+  { value: "OTHER", label: "Khác" },
+];
+
+const currentYear = new Date().getFullYear();
+const birthYearOptions = Array.from({ length: 11 }, (_, index) => {
+  const year = String(currentYear - 8 - index);
+
+  return { value: year, label: year };
+});
 
 async function submitMock(
   action: MockAuthAction,
@@ -155,104 +180,186 @@ export function LoginForm() {
 export function StudentRegisterForm() {
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const form = useForm<StudentRegisterFormValues>({
+    mode: "onChange",
+    reValidateMode: "onChange",
     resolver: zodResolver(studentRegisterSchema),
     defaultValues: {
-      email: "",
+      fullName: "",
+      address: "",
       phone: "",
+      hasNoPhone: false,
       username: "",
       password: "",
-      fullName: "",
-      grade: 7,
-      gender: "MALE",
-      dateOfBirth: "",
+      confirmPassword: "",
     },
   });
   const isPending = form.formState.isSubmitting;
+  const hasNoPhone = form.watch("hasNoPhone");
 
   return (
     <form
       className="grid gap-5"
+      autoComplete="off"
       onSubmit={form.handleSubmit(() => submitMock("register-student", setSubmitState))}
     >
       <FormHeader title="Đăng ký" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
-          id="student-email"
-          label="Email"
-          type="email"
-          placeholder="name@example.com"
-          autoComplete="email"
-          error={form.formState.errors.email}
+          id="student-full-name"
+          label="Họ tên học sinh"
+          placeholder="Nhập họ tên"
+          autoComplete="off"
+          error={form.formState.errors.fullName}
           disabled={isPending}
-          {...form.register("email")}
+          suppressBrowserSuggestions
+          {...form.register("fullName")}
+        />
+        <OptionField
+          id="student-grade"
+          label="Khối lớp"
+          value={form.watch("grade") ? String(form.watch("grade")) : ""}
+          placeholder="Chọn khối lớp"
+          options={gradeOptions}
+          error={form.formState.errors.grade}
+          disabled={isPending}
+          icon={<GraduationCap className="h-5 w-5" aria-hidden="true" />}
+          onChange={(value) =>
+            form.setValue("grade", Number(value), {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            })
+          }
+        />
+        <OptionField
+          id="student-birth-year"
+          label="Năm sinh"
+          value={form.watch("birthYear") ? String(form.watch("birthYear")) : ""}
+          placeholder="Chọn năm sinh"
+          options={birthYearOptions}
+          error={form.formState.errors.birthYear}
+          disabled={isPending}
+          icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
+          onChange={(value) =>
+            form.setValue("birthYear", Number(value), {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            })
+          }
+        />
+        <OptionField
+          id="student-gender"
+          label="Giới tính"
+          value={form.watch("gender") ?? ""}
+          placeholder="Chọn giới tính"
+          options={genderOptions}
+          error={form.formState.errors.gender}
+          disabled={isPending}
+          icon={<VenusAndMars className="h-5 w-5" aria-hidden="true" />}
+          onChange={(value) =>
+            form.setValue("gender", value as StudentRegisterFormValues["gender"], {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            })
+          }
+        />
+        <TextField
+          id="student-address"
+          label="Địa chỉ"
+          placeholder="Nhập địa chỉ"
+          autoComplete="off"
+          error={form.formState.errors.address}
+          disabled={isPending}
+          suppressBrowserSuggestions
+          wrapperClassName="sm:col-span-2"
+          {...form.register("address")}
         />
         <TextField
           id="student-phone"
           label="Số điện thoại"
           type="tel"
-          placeholder="0900000000"
-          autoComplete="tel"
+          placeholder="Nhập số điện thoại"
+          autoComplete="off"
           error={form.formState.errors.phone}
-          disabled={isPending}
+          disabled={isPending || hasNoPhone}
+          suppressBrowserSuggestions
+          wrapperClassName="sm:col-span-2"
+          labelAction={
+            <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-xs font-bold text-slate-600 transition hover:text-slate-950">
+              <input
+                type="checkbox"
+                checked={hasNoPhone}
+                disabled={isPending}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  form.setValue("hasNoPhone", checked, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                  });
+
+                  if (checked) {
+                    form.setValue("phone", "", {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    });
+                    form.clearErrors("phone");
+                  } else {
+                    void form.trigger("phone");
+                  }
+                }}
+                className="peer sr-only"
+              />
+              <span
+                className={`flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded border transition peer-focus-visible:ring-4 peer-focus-visible:ring-indigo-100 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+                  hasNoPhone
+                    ? "border-[var(--auth-primary)] bg-[var(--auth-primary)] text-white"
+                    : "border-slate-300 bg-white text-transparent"
+                }`}
+              >
+                <Check className="h-3 w-3" aria-hidden="true" />
+              </span>
+              Không có số điện thoại
+            </label>
+          }
           {...form.register("phone")}
         />
         <TextField
           id="student-username"
           label="Tên đăng nhập"
           placeholder="Ví dụ: tuananh07"
-          autoComplete="username"
+          autoComplete="off"
           error={form.formState.errors.username}
           disabled={isPending}
+          suppressBrowserSuggestions
+          wrapperClassName="sm:col-span-2"
           {...form.register("username")}
         />
         <TextField
           id="student-password"
           label="Mật khẩu"
           type="password"
-          placeholder="Tối thiểu 8 ký tự"
-          autoComplete="new-password"
+          placeholder="Tối thiểu 6 ký tự"
+          autoComplete="off"
           error={form.formState.errors.password}
           disabled={isPending}
+          suppressBrowserSuggestions
           {...form.register("password")}
         />
         <TextField
-          id="student-full-name"
-          label="Họ tên học sinh"
-          placeholder="Nhập họ tên"
-          autoComplete="name"
-          error={form.formState.errors.fullName}
+          id="student-confirm-password"
+          label="Nhập lại mật khẩu"
+          type="password"
+          placeholder="Nhập lại mật khẩu"
+          autoComplete="off"
+          error={form.formState.errors.confirmPassword}
           disabled={isPending}
-          {...form.register("fullName")}
-        />
-        <TextField
-          id="student-grade"
-          label="Khối lớp"
-          type="number"
-          min={6}
-          max={12}
-          error={form.formState.errors.grade}
-          disabled={isPending}
-          {...form.register("grade", { valueAsNumber: true })}
-        />
-        <SelectField
-          id="student-gender"
-          label="Giới tính"
-          error={form.formState.errors.gender}
-          disabled={isPending}
-          {...form.register("gender")}
-        >
-          <option value="MALE">Nam</option>
-          <option value="FEMALE">Nữ</option>
-          <option value="OTHER">Khác</option>
-        </SelectField>
-        <TextField
-          id="student-date-of-birth"
-          label="Ngày sinh"
-          type="date"
-          error={form.formState.errors.dateOfBirth}
-          disabled={isPending}
-          {...form.register("dateOfBirth")}
+          suppressBrowserSuggestions
+          {...form.register("confirmPassword")}
         />
       </div>
 
@@ -287,6 +394,7 @@ export function ParentRegisterForm() {
       email: "",
       phone: "",
       password: "",
+      confirmPassword: "",
       fullName: "",
     },
   });
@@ -327,17 +435,28 @@ export function ParentRegisterForm() {
           autoComplete="name"
           error={form.formState.errors.fullName}
           disabled={isPending}
+          wrapperClassName="sm:col-span-2"
           {...form.register("fullName")}
         />
         <TextField
           id="parent-password"
           label="Mật khẩu"
           type="password"
-          placeholder="Tối thiểu 8 ký tự"
+          placeholder="Tối thiểu 6 ký tự"
           autoComplete="new-password"
           error={form.formState.errors.password}
           disabled={isPending}
           {...form.register("password")}
+        />
+        <TextField
+          id="parent-confirm-password"
+          label="Nhập lại mật khẩu"
+          type="password"
+          placeholder="Nhập lại mật khẩu"
+          autoComplete="new-password"
+          error={form.formState.errors.confirmPassword}
+          disabled={isPending}
+          {...form.register("confirmPassword")}
         />
       </div>
 

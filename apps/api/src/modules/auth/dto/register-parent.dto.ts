@@ -2,7 +2,6 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsEmail, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 const phonePattern = /^\+?[0-9]{9,15}$/;
-const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,72}$/;
 
 export class RegisterParentDto {
   @ApiProperty({ example: "parent1@example.com" })
@@ -17,12 +16,10 @@ export class RegisterParentDto {
   })
   phone!: string;
 
-  @ApiProperty({ example: "Password123!" })
+  @ApiProperty({ example: "123456", minLength: 6, maxLength: 72 })
   @IsString()
-  @Matches(passwordPattern, {
-    message:
-      "password must be 8-72 characters and include uppercase, lowercase, number and symbol",
-  })
+  @MinLength(6)
+  @MaxLength(72)
   password!: string;
 
   @ApiProperty({ example: "Phụ huynh A" })

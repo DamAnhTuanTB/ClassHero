@@ -1,10 +1,10 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Gender } from "@prisma/client";
 import {
   IsEmail,
   IsEnum,
   IsInt,
-  IsISO8601,
+  IsOptional,
   IsString,
   Matches,
   Max,
@@ -15,20 +15,24 @@ import {
 
 const phonePattern = /^\+?[0-9]{9,15}$/;
 const usernamePattern = /^[a-zA-Z0-9_]{3,32}$/;
-const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,72}$/;
+const currentYear = new Date().getFullYear();
+const minStudentBirthYear = currentYear - 18;
+const maxStudentBirthYear = currentYear - 8;
 
 export class RegisterStudentDto {
-  @ApiProperty({ example: "student1@example.com" })
+  @ApiPropertyOptional({ example: "student1@example.com" })
+  @IsOptional()
   @IsEmail()
   @MaxLength(255)
-  email!: string;
+  email?: string;
 
-  @ApiProperty({ example: "0900000001" })
+  @ApiPropertyOptional({ example: "0900000001" })
+  @IsOptional()
   @IsString()
   @Matches(phonePattern, {
     message: "phone must contain 9-15 digits and may start with +",
   })
-  phone!: string;
+  phone?: string;
 
   @ApiProperty({ example: "student1" })
   @IsString()
@@ -37,12 +41,10 @@ export class RegisterStudentDto {
   })
   username!: string;
 
-  @ApiProperty({ example: "Password123!" })
+  @ApiProperty({ example: "123456", minLength: 6, maxLength: 72 })
   @IsString()
-  @Matches(passwordPattern, {
-    message:
-      "password must be 8-72 characters and include uppercase, lowercase, number and symbol",
-  })
+  @MinLength(6)
+  @MaxLength(72)
   password!: string;
 
   @ApiProperty({ example: "Nguyễn Văn A" })
@@ -51,17 +53,29 @@ export class RegisterStudentDto {
   @MaxLength(120)
   fullName!: string;
 
-  @ApiProperty({ example: 7, minimum: 1, maximum: 12 })
+  @ApiProperty({ example: 7, minimum: 3, maximum: 12 })
   @IsInt()
-  @Min(1)
+  @Min(3)
   @Max(12)
   grade!: number;
+
+  @ApiProperty({
+    example: 2012,
+    minimum: minStudentBirthYear,
+    maximum: maxStudentBirthYear,
+  })
+  @IsInt()
+  @Min(minStudentBirthYear)
+  @Max(maxStudentBirthYear)
+  birthYear!: number;
 
   @ApiProperty({ enum: Gender, example: Gender.MALE })
   @IsEnum(Gender)
   gender!: Gender;
 
-  @ApiProperty({ example: "2012-01-01" })
-  @IsISO8601({ strict: true })
-  dateOfBirth!: string;
+  @ApiProperty({ example: "Hà Nội" })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(255)
+  address!: string;
 }

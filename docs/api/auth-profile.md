@@ -14,14 +14,14 @@ Body:
 
 ```json
 {
-  "email": "student1@example.com",
   "phone": "0900000001",
   "username": "student1",
-  "password": "Password123!",
+  "password": "123456",
   "fullName": "Nguyễn Văn A",
   "grade": 7,
   "gender": "MALE",
-  "dateOfBirth": "2012-01-01"
+  "birthYear": 2012,
+  "address": "Hà Nội"
 }
 ```
 
@@ -39,8 +39,8 @@ Response:
     "user": {
       "id": "uuid",
       "role": "STUDENT",
-      "email": "student1@example.com",
-      "phone": "0900000001",
+      "email": null,
+      "phone": null,
       "username": "student1",
       "fullName": "Nguyễn Văn A"
     },
@@ -52,7 +52,16 @@ Response:
 }
 ```
 
-Errors: `DUPLICATE_EMAIL`, `DUPLICATE_PHONE`, `DUPLICATE_USERNAME`, `VALIDATION_ERROR`.
+Notes:
+
+- `email` là optional cho student và không hiển thị trong form đăng ký học sinh hiện tại.
+- `phone` là optional ở API. Trên UI, student phải nhập số điện thoại hoặc chọn "Không có số điện thoại".
+- `grade` chỉ nhận từ lớp 3 đến lớp 12.
+- `birthYear` chỉ nhận khoảng năm sinh phù hợp với học sinh lớp 3 đến lớp 12. Backend lưu nội bộ vào `users.date_of_birth` bằng ngày `01/01` của năm sinh.
+- `address` là bắt buộc và được lưu vào `student_profiles.address`.
+- `password` chỉ yêu cầu tối thiểu 6 ký tự, tối đa 72 ký tự.
+
+Errors: `DUPLICATE_EMAIL`, `DUPLICATE_PHONE`, `DUPLICATE_USERNAME`, `VALIDATION_ERROR`. `DUPLICATE_EMAIL` và `DUPLICATE_PHONE` chỉ áp dụng khi request có gửi `email` hoặc `phone`.
 
 ### `POST /auth/register/parent`
 
@@ -64,7 +73,7 @@ Body:
 {
   "email": "parent1@example.com",
   "phone": "0910000001",
-  "password": "Password123!",
+  "password": "123456",
   "fullName": "Phụ huynh A"
 }
 ```
@@ -213,7 +222,7 @@ Body:
 ```json
 {
   "token": "reset-token",
-  "newPassword": "NewPassword123!"
+  "newPassword": "123456"
 }
 ```
 
