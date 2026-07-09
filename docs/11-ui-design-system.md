@@ -142,9 +142,11 @@ Spacing/radius mặc định:
 
 - Button dùng shadcn/ui `Button`.
 - Form dùng React Hook Form + Zod; nếu đã setup shadcn Form thì dùng shadcn Form.
+- Mọi ô input nhập liệu phải tắt gợi ý trình duyệt/autofill bằng cấu hình input chung; không dùng `autoComplete` semantic như `username`, `name`, `tel`, `street-address` hoặc `new-password` trong UI trừ khi owner yêu cầu rõ.
 - Dialog, Drawer, Sheet, Tabs, Card, Table, Badge, Alert ưu tiên shadcn/ui.
 - Icon button phải có `aria-label` hoặc tooltip nếu không hiển nhiên.
 - Loading, empty, error, disabled state phải được thiết kế cùng component/màn hình.
+- Toast/notification ngắn hạn phải dùng thư viện toast chung của web app, hiện là `sonner`; không hand-roll toast cục bộ trong từng form/page.
 - Không fetch dữ liệu rải rác trong component sâu; dùng feature hook/API client.
 - Mock data phải đặt rõ ràng, dễ xóa khi connect API.
 

@@ -115,7 +115,7 @@ export function TextField({
   helperText,
   wrapperClassName,
   labelAction,
-  suppressBrowserSuggestions = false,
+  suppressBrowserSuggestions = true,
   onBlur,
   onFocus,
   readOnly,
@@ -127,7 +127,7 @@ export function TextField({
   );
   const isPasswordField = type === "password";
   const inputType = isPasswordField && isPasswordVisible ? "text" : type;
-  const inputAutoComplete = suppressBrowserSuggestions ? "new-password" : autoComplete;
+  const inputAutoComplete = suppressBrowserSuggestions ? "off" : (autoComplete ?? "off");
 
   return (
     <div className={wrapperClassName}>
@@ -153,6 +153,7 @@ export function TextField({
           data-bwignore={suppressBrowserSuggestions ? "true" : undefined}
           data-form-type={suppressBrowserSuggestions ? "other" : undefined}
           data-lpignore={suppressBrowserSuggestions ? "true" : undefined}
+          aria-autocomplete={suppressBrowserSuggestions ? "none" : undefined}
           readOnly={suppressBrowserSuggestions ? isSuggestionLocked : readOnly}
           onBlur={(event) => {
             if (suppressBrowserSuggestions) {

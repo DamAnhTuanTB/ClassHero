@@ -7,14 +7,18 @@ const maxStudentBirthYear = currentYear - 8;
 
 const vietnamPhoneSchema = z
   .string()
+  .trim()
   .min(9, "Số điện thoại chưa hợp lệ.")
   .max(12, "Số điện thoại quá dài.")
   .regex(/^[0-9+]+$/, "Số điện thoại chỉ gồm số hoặc dấu +.");
 
 const requiredText = (message: string) => z.string().trim().min(1, message);
+const acceptedTermsSchema = z.boolean().refine((value) => value, {
+  message: "Bạn cần đồng ý với Điều khoản sử dụng để đăng ký.",
+});
 
 export const loginSchema = z.object({
-  identifier: z.string().min(3, "Nhập email, số điện thoại hoặc tên đăng nhập."),
+  identifier: requiredText("Nhập tên đăng nhập hoặc số điện thoại."),
   password: z.string().min(1, "Nhập mật khẩu."),
 });
 
@@ -39,10 +43,12 @@ export const studentRegisterSchema = z
     hasNoPhone: z.boolean(),
     username: z
       .string()
+      .trim()
       .min(4, "Tên đăng nhập cần ít nhất 4 ký tự.")
       .regex(/^[a-zA-Z0-9_]+$/, "Tên đăng nhập chỉ gồm chữ, số hoặc dấu _."),
     password: passwordSchema,
     confirmPassword: z.string().optional(),
+    acceptedTerms: acceptedTermsSchema,
   })
   .superRefine((values, context) => {
     if (!values.grade) {
@@ -112,20 +118,54 @@ export const studentRegisterSchema = z
 
 export const parentRegisterSchema = z
   .object({
-    email: z.string().email("Email chưa đúng định dạng."),
+    fullName: requiredText("Nhập họ tên phụ huynh."),
     phone: vietnamPhoneSchema,
+    address: requiredText("Nhập địa chỉ."),
     password: passwordSchema,
-    confirmPassword: z.string().min(1, "Nhập lại mật khẩu."),
-    fullName: z.string().min(2, "Nhập họ tên phụ huynh."),
+    confirmPassword: z.string().optional(),
+    acceptedTerms: acceptedTermsSchema,
   })
-  .refine((values) => values.password === values.confirmPassword, {
-    message: "Mật khẩu nhập lại chưa khớp.",
-    path: ["confirmPassword"],
+  .superRefine((values, context) => {
+    if (!values.confirmPassword?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "Nhập lại mật khẩu.",
+        path: ["confirmPassword"],
+      });
+
+      return;
+    }
+
+    if (values.password && values.password !== values.confirmPassword) {
+      context.addIssue({
+        code: "custom",
+        message: "Mật khẩu nhập lại chưa khớp.",
+        path: ["confirmPassword"],
+      });
+    }
   });
 
 export const forgotPasswordSchema = z.object({
-  identifier: z.string().min(3, "Nhập email, số điện thoại hoặc tên đăng nhập."),
+  fullName: requiredText("Nhập họ tên."),
+  identifier: requiredText("Nhập tên đăng nhập hoặc số điện thoại."),
+  grade: z
+    .number({ error: "Chọn khối lớp." })
+    .int()
+    .min(3, "Khối lớp từ 3 trở lên.")
+    .max(12, "Khối lớp tối đa là 12.")
+    .optional()
+    .refine((value) => value !== undefined, "Chọn khối lớp."),
 });
+
+export const verifiedResetPasswordSchema = z
+  .object({
+    newPassword: passwordSchema,
+    confirmPassword: z.string().min(1, "Nhập lại mật khẩu mới."),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "Mật khẩu nhập lại chưa khớp.",
+    path: ["confirmPassword"],
+  });
 
 export const resetPasswordSchema = z
   .object({
@@ -143,3 +183,4 @@ export type StudentRegisterFormValues = z.infer<typeof studentRegisterSchema>;
 export type ParentRegisterFormValues = z.infer<typeof parentRegisterSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+export type VerifiedResetPasswordFormValues = z.infer<typeof verifiedResetPasswordSchema>;
