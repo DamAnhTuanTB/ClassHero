@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -48,6 +48,7 @@ async function submitMock(
 
 export function LoginForm() {
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const [rememberLogin, setRememberLogin] = useState(true);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -62,10 +63,7 @@ export function LoginForm() {
       className="grid gap-5"
       onSubmit={form.handleSubmit(() => submitMock("login", setSubmitState))}
     >
-      <FormHeader
-        title="Đăng nhập"
-        description="Chào mừng trở lại, tiếp tục hành trình học của bạn."
-      />
+      <FormHeader title="Đăng nhập" />
 
       <div className="grid gap-4">
         <TextField
@@ -107,15 +105,28 @@ export function LoginForm() {
 
       <SubmitButton isPending={isPending}>Đăng nhập</SubmitButton>
 
-      <div className="flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <label className="inline-flex items-center gap-2 font-medium">
-          <span className="flex h-4 w-4 items-center justify-center rounded bg-[var(--auth-primary)] text-white">
-            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+      <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+        <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 font-semibold text-slate-700 transition hover:text-slate-950">
+          <input
+            type="checkbox"
+            checked={rememberLogin}
+            disabled={isPending}
+            onChange={(event) => setRememberLogin(event.target.checked)}
+            className="peer sr-only"
+          />
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-4 peer-focus-visible:ring-indigo-100 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+              rememberLogin
+                ? "border-[var(--auth-primary)] bg-[var(--auth-primary)] text-white shadow-sm shadow-indigo-950/10"
+                : "border-slate-300 bg-white text-transparent"
+            }`}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
           Ghi nhớ đăng nhập
         </label>
         <Link
-          className="font-bold text-[var(--auth-primary)] hover:brightness-90"
+          className="shrink-0 font-bold text-[var(--auth-primary)] hover:brightness-90"
           href="/forgot-password"
         >
           Quên mật khẩu?
@@ -163,10 +174,7 @@ export function StudentRegisterForm() {
       className="grid gap-5"
       onSubmit={form.handleSubmit(() => submitMock("register-student", setSubmitState))}
     >
-      <FormHeader
-        title="Đăng ký"
-        description="Tạo tài khoản học sinh để bắt đầu học theo lộ trình."
-      />
+      <FormHeader title="Đăng ký" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
@@ -257,29 +265,6 @@ export function StudentRegisterForm() {
         />
       ) : null}
 
-      <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm">
-            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-extrabold text-sky-900">Mật khẩu mạnh gồm:</p>
-            <div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold text-slate-600">
-              {[
-                "Ít nhất 8 ký tự",
-                "Có chữ hoa và chữ thường",
-                "Có số hoặc ký tự đặc biệt",
-              ].map((item) => (
-                <span key={item} className="inline-flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
       <SubmitButton isPending={isPending}>Tạo tài khoản học sinh</SubmitButton>
       <p className="text-center text-sm text-slate-600">
         Đã có tài khoản?{" "}
@@ -312,10 +297,7 @@ export function ParentRegisterForm() {
       className="grid gap-5"
       onSubmit={form.handleSubmit(() => submitMock("register-parent", setSubmitState))}
     >
-      <FormHeader
-        title="Đăng ký"
-        description="Tạo tài khoản phụ huynh để đồng hành cùng con."
-      />
+      <FormHeader title="Đăng ký" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
@@ -368,20 +350,6 @@ export function ParentRegisterForm() {
         />
       ) : null}
 
-      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
-            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-extrabold text-emerald-900">Bảo mật tài khoản</p>
-            <p className="mt-1 text-sm leading-6 text-emerald-950/70">
-              Thông tin của bạn được bảo vệ và chỉ dùng để hỗ trợ việc học tập của con.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <SubmitButton isPending={isPending}>Tiếp tục</SubmitButton>
       <p className="text-center text-sm text-slate-600">
         Đã có tài khoản?{" "}
@@ -411,10 +379,7 @@ export function ForgotPasswordForm() {
       className="grid gap-5"
       onSubmit={form.handleSubmit(() => submitMock("forgot-password", setSubmitState))}
     >
-      <FormHeader
-        title="Quên mật khẩu"
-        description="Nhập thông tin tài khoản để nhận hướng dẫn đặt lại mật khẩu."
-      />
+      <FormHeader title="Quên mật khẩu" />
 
       <TextField
         id="forgot-identifier"
@@ -438,8 +403,12 @@ export function ForgotPasswordForm() {
       <SubmitButton isPending={isPending}>Gửi hướng dẫn</SubmitButton>
 
       <div className="text-sm text-slate-600">
-        <Link className="font-medium text-sky-700 hover:text-sky-800" href="/login">
-          Quay lại đăng nhập
+        <Link
+          className="inline-flex items-center gap-1.5 font-medium text-sky-700 hover:text-sky-800"
+          href="/login"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          Đăng nhập
         </Link>
       </div>
     </form>
@@ -463,10 +432,7 @@ export function ResetPasswordForm() {
       className="grid gap-5"
       onSubmit={form.handleSubmit(() => submitMock("reset-password", setSubmitState))}
     >
-      <FormHeader
-        title="Đặt lại mật khẩu"
-        description="Nhập mã khôi phục và chọn mật khẩu mới."
-      />
+      <FormHeader title="Đặt lại mật khẩu" />
 
       <div className="grid gap-4">
         <TextField
@@ -509,8 +475,12 @@ export function ResetPasswordForm() {
       ) : null}
 
       <SubmitButton isPending={isPending}>Đặt lại mật khẩu</SubmitButton>
-      <Link className="text-sm font-medium text-sky-700 hover:text-sky-800" href="/login">
-        Đăng nhập bằng mật khẩu mới
+      <Link
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-700 hover:text-sky-800"
+        href="/login"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        Đăng nhập
       </Link>
     </form>
   );

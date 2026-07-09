@@ -299,7 +299,9 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - UI phải mượt trên mobile, phản hồi nhanh, độ trễ cảm nhận thấp; đọc `docs/11-ui-design-system.md` phần performance khi làm UI.
 - Public page có mục tiêu xuất hiện trên Google phải bám `docs/13-seo-and-content-discovery.md`.
 - Màn hình có data/action phải có loading, empty, error, disabled state.
-- Nếu có thể chạy app, UI task nên kiểm tra bằng browser ở mobile và desktop; layout phức tạp kiểm tra thêm tablet/iPad. Chỉ chụp/lưu screenshot khi command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`.
+- Mọi UI được tạo/sửa phải đạt cảm giác production thật: bố cục, copy, trạng thái, hành động và tương tác phải giống sản phẩm thật, dù dữ liệu bên dưới còn là mock.
+- Không làm UI tĩnh giả tương tác. Button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control hoặc icon có vẻ bấm được phải dùng element semantic, state/handler thật và feedback/pending/disabled phù hợp; nếu chưa thể nối API thì vẫn phải có tương tác local/mock đúng hành vi.
+- Theo preference của owner, Codex không tự chạy browser check, Playwright UI, screenshot hoặc kiểm tương tác thật cho mỗi task/bug/sửa UI. Owner sẽ tự kiểm tra UI/tương tác. Chỉ chạy browser/Playwright/screenshot khi owner yêu cầu rõ, ví dụ command có từ `screenshot` hoặc nói "kiểm bằng browser".
 - Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
 
 ---
@@ -357,6 +359,7 @@ Checks phải tỉ lệ với rủi ro:
 - Lean mode nghĩa là không cần chạy full lint/build/test toàn repo nếu không cần thiết; chỉ chạy check nhỏ nhất đủ tin cậy như `git diff --check`, kiểm tra frontmatter skill/script validation nếu có, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú.
 - Khi owner ghi `sửa nhanh`, `fast`, hoặc `check nhẹ`, Codex mặc định dùng fast path: đọc đúng phạm vi nhỏ nhất, patch trực tiếp, không refactor/cleanup lan, không cập nhật changelog, không chạy `typecheck`, `lint`, `build`, Playwright/E2E trừ khi thay đổi đụng auth/API/database/shared logic, route guard, form/session/data behavior hoặc có dấu hiệu lỗi TypeScript rõ ràng.
 - Với task làm UI hoặc owner yêu cầu "sửa UI", mặc định ưu tiên tốc độ: hạn chế chạy `typecheck`, `lint`, `build`, Playwright/E2E. Chỉ chạy các check này khi thay đổi chạm nhiều component/route, sửa shared UI primitive, đổi form/state phức tạp, nghi có lỗi TypeScript, hoặc owner yêu cầu rõ. Nếu chỉ chỉnh màu, spacing, copy, class Tailwind, vị trí ảnh/icon hoặc style nhỏ, dùng `git diff --check`, format check nhỏ hoặc kiểm tra thủ công là đủ.
+- Không tự chạy browser check/Playwright UI/kiểm tương tác thật như một bước verification mặc định, kể cả bug UI hoặc form interaction. Nếu cần xác minh hành vi, ưu tiên check tĩnh/focused như `git diff --check`, targeted format, typecheck package liên quan hoặc đọc code; owner sẽ tự kiểm tra trên app.
 - Nếu bỏ qua check lớn, ghi rõ `Not run: <lý do>` trong final response.
 - Auth/RBAC, payment, database/schema, API contract, AI/RAG, worker, storage, notification hoặc multi-module phải dùng workflow đầy đủ hơn.
 

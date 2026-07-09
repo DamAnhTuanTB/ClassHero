@@ -10,6 +10,8 @@ type AuthPageShellProps = {
 
 type IllustrationType = "login" | "student" | "parent" | "secure";
 
+const authBrandSlogan = "Học thông minh, vững tương lai";
+
 const theme = {
   login: {
     primary: "#4f46e5",
@@ -18,10 +20,9 @@ const theme = {
     titleFirst: "Chào mừng bạn",
     titleSecond: "trở lại!",
     titleAccent: "text-indigo-600",
-    description: "Đăng nhập để tiếp tục hành trình học tập và chinh phục mục tiêu.",
+    description: "Tiếp tục học tập, chinh phục mục tiêu.",
     illustration: "login" as IllustrationType,
     illustrationSrc: "/images/auth/reference/auth-hero-login-transparent.png",
-    badge: "Học thông minh, tiến bộ mỗi ngày",
     blob: "from-indigo-100 via-sky-100 to-violet-100 lg:from-indigo-100 lg:via-sky-100 lg:to-violet-100",
   },
   student: {
@@ -31,10 +32,9 @@ const theme = {
     titleFirst: "Tạo tài khoản",
     titleSecond: "học sinh",
     titleAccent: "text-sky-600",
-    description: "Điền thông tin để bắt đầu hành trình học thú vị và hiệu quả.",
+    description: "Bắt đầu hành trình học thú vị.",
     illustration: "student" as IllustrationType,
     illustrationSrc: "/images/auth/reference/auth-hero-student-transparent.png",
-    badge: "Không gian học tập riêng",
     blob: "from-sky-100 via-cyan-50 to-blue-100 lg:from-sky-100 lg:via-cyan-50 lg:to-blue-100",
   },
   parent: {
@@ -44,10 +44,9 @@ const theme = {
     titleFirst: "Tạo tài khoản",
     titleSecond: "phụ huynh",
     titleAccent: "text-emerald-600",
-    description: "Theo dõi tiến độ học tập của con mọi lúc, mọi nơi.",
+    description: "Nắm tiến độ của con mỗi ngày.",
     illustration: "parent" as IllustrationType,
     illustrationSrc: "/images/auth/reference/auth-hero-parent-transparent.png",
-    badge: "Đồng hành cùng con",
     blob: "from-emerald-100 via-green-50 to-teal-100 lg:from-emerald-100 lg:via-green-50 lg:to-teal-100",
   },
   recovery: {
@@ -57,10 +56,9 @@ const theme = {
     titleFirst: "Quay lại lớp",
     titleSecond: "học",
     titleAccent: "text-sky-600",
-    description: "Khôi phục tài khoản nhanh để tiếp tục bài học đang chờ.",
+    description: "Bài học đang chờ bạn.",
     illustration: "secure" as IllustrationType,
     illustrationSrc: "/images/auth/reference/auth-hero-login-transparent.png",
-    badge: "An toàn và nhanh gọn",
     blob: "from-sky-100 via-indigo-50 to-blue-100 lg:from-sky-100 lg:via-indigo-50 lg:to-blue-100",
   },
 } satisfies Record<
@@ -75,7 +73,6 @@ const theme = {
     description: string;
     illustration: IllustrationType;
     illustrationSrc: string;
-    badge: string;
     blob: string;
   }
 >;
@@ -102,7 +99,7 @@ export function AuthPageShell({
       <section
         className={`relative mx-auto min-h-[calc(100vh-2rem)] max-w-[560px] overflow-hidden rounded-2xl bg-gradient-to-br ${currentTheme.soft} shadow-xl shadow-slate-900/10 ring-1 ring-slate-200/80 sm:min-h-[calc(100vh-4rem)] lg:grid lg:max-w-[1280px] lg:grid-cols-[1fr_0.94fr] lg:rounded-[2.35rem]`}
       >
-        <div className="relative min-h-[24.5rem] px-6 pb-28 pt-6 sm:px-8 sm:pb-28 sm:pt-8 lg:min-h-full lg:px-10 lg:pb-12 lg:pt-10 xl:px-14">
+        <div className="relative h-[25rem] px-6 pb-28 pt-6 sm:h-[26.125rem] sm:px-8 sm:pb-28 sm:pt-8 lg:h-auto lg:min-h-full lg:px-10 lg:pb-12 lg:pt-10 xl:px-14">
           <div className="flex items-center justify-between gap-4">
             <Link href="/" className="inline-flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/14">
@@ -117,8 +114,8 @@ export function AuthPageShell({
                     Hero
                   </span>
                 </span>
-                <span className="block text-xs font-semibold text-slate-500">
-                  {currentTheme.badge}
+                <span className="block text-xs font-extrabold text-sky-700">
+                  {authBrandSlogan}
                 </span>
               </span>
             </Link>
@@ -126,22 +123,22 @@ export function AuthPageShell({
             {showBackLink ? (
               <Link
                 href="/login"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white/80 px-4 text-sm font-extrabold text-slate-500 shadow-sm ring-1 ring-slate-200/80 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:text-[var(--auth-primary)] hover:shadow-md"
+                className="hidden min-h-11 items-center justify-center gap-2 rounded-full bg-white/80 px-4 text-sm font-extrabold text-slate-500 shadow-sm ring-1 ring-slate-200/80 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:text-[var(--auth-primary)] hover:shadow-md sm:inline-flex"
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                Quay lại đăng nhập
+                Đăng nhập
               </Link>
             ) : null}
           </div>
 
-          <div className="relative z-20 mt-12 max-w-[15.25rem] sm:mt-16 sm:max-w-[22rem] lg:mt-20 lg:max-w-[24rem] xl:mt-24 xl:max-w-[30rem]">
+          <div className="relative z-20 mt-10 max-w-none sm:mt-16 sm:max-w-[22rem] lg:mt-20 lg:max-w-[24rem] xl:mt-24 xl:max-w-[30rem]">
             <h1 className="font-[var(--font-display)] text-[2.45rem] font-extrabold leading-[1.02] text-slate-950 sm:text-5xl lg:text-6xl xl:text-7xl">
               <span className="block whitespace-nowrap">{currentTheme.titleFirst}</span>
               <span className={`block whitespace-nowrap ${currentTheme.titleAccent}`}>
                 {currentTheme.titleSecond}
               </span>
             </h1>
-            <p className="mt-5 max-w-[13.75rem] text-sm font-semibold leading-6 text-slate-600 sm:max-w-[22rem] lg:max-w-[18rem] lg:text-base lg:leading-7 xl:max-w-[20rem]">
+            <p className="mt-5 max-w-[50%] text-sm font-extrabold leading-6 text-slate-600 sm:max-w-[22rem] lg:max-w-none lg:whitespace-nowrap lg:text-lg lg:leading-7 xl:max-w-none">
               {currentTheme.description}
             </p>
           </div>
@@ -153,12 +150,12 @@ export function AuthPageShell({
           <img
             src={currentTheme.illustrationSrc}
             alt=""
-            className={`pointer-events-none absolute right-0 z-10 object-contain lg:right-7 xl:right-9 ${
+            className={`pointer-events-none absolute z-10 object-contain ${
               currentTheme.illustration === "parent"
-                ? "bottom-0 h-56 w-64 sm:h-[18rem] sm:w-[20rem] lg:bottom-4 lg:h-[21rem] lg:w-[24rem] xl:bottom-5 xl:h-[23rem] xl:w-[26rem]"
+                ? "bottom-0 right-0 h-56 w-64 sm:h-[18rem] sm:w-[20rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[24rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[26rem]"
                 : currentTheme.illustration === "student"
-                  ? "bottom-12 h-56 w-56 sm:bottom-14 sm:h-[18rem] sm:w-[18rem] lg:bottom-24 lg:h-[21rem] lg:w-[21rem] xl:bottom-28 xl:h-[23rem] xl:w-[23rem]"
-                  : "bottom-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:h-[23rem] xl:w-[23rem]"
+                  ? "bottom-0 right-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[23rem]"
+                  : "bottom-0 right-0 h-56 w-56 sm:h-[18rem] sm:w-[18rem] lg:bottom-4 lg:right-7 lg:h-[21rem] lg:w-[21rem] xl:bottom-5 xl:right-9 xl:h-[23rem] xl:w-[23rem]"
             }`}
           />
         </div>

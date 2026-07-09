@@ -21,7 +21,7 @@ Accept:
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when the user explicitly lists them.
 
-If `screenshot` appears after the command, enable screenshot mode. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code checks and mention any responsive review that was done without screenshots.
+If `screenshot` appears after the command, enable screenshot mode only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code checks instead.
 
 ## Plan Mode
 
@@ -36,7 +36,7 @@ When the command contains `plan`, do approval-gated UI planning only.
   - route/component/mock data files likely to change,
   - proposed layout, states, responsive approach, and mock data shape,
   - what will not be touched, especially backend/API/database/worker,
-  - expected UI checks, and screenshots only when `screenshot` was requested,
+  - expected static/focused UI checks, and screenshots only when `screenshot` was requested,
   - risks, blockers, assumptions, and questions.
 - End by asking the owner to approve or revise the plan.
 - If the owner later says `/do`, "ok", "làm đi", "triển khai đi", or similar, continue from the approved plan, re-check `git status --short`, re-read any docs/code that may have changed, then implement.
@@ -94,6 +94,8 @@ In plan mode, stop after this plan and wait for approval.
 - A distinct display font can be used for auth visual-panel headings to add youthful character, while form/body typography should remain highly readable.
 - Auth visual panels must not use oversized all-black headlines or opaque blocks that hide the learning background. Prefer moderate gradient/accent display text, translucent panels, compact learning icons, and subtle motion with `prefers-reduced-motion` support.
 - Build polished, careful screens with real layout hierarchy, spacing, typography, navigation, empty/loading/error/success states, and actions the target user would naturally expect.
+- UI must look and behave like production, even when data is mocked. Mock data is acceptable; static fake controls are not.
+- Any visible button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control, or clickable-looking icon must use semantic elements, real state/handlers, and pressed/pending/disabled/loading feedback as appropriate. If API is not connected, implement local/mock state that mirrors the production behavior.
 - Mobile-first, with tablet/iPad and laptop/desktop support.
 - Keep mobile interactions smooth: immediate pressed/pending/loading feedback, low perceived latency, no heavy animation or large blocking render.
 - Include loading, empty, error, and disabled states when the screen has data/action.
@@ -102,7 +104,7 @@ In plan mode, stop after this plan and wait for approval.
 - Do not create desktop-only layouts.
 - For long lists/search/filter UI, use pagination/infinite/virtualized patterns or debounce in the mock flow when relevant.
 - For public/indexable UI, keep content structure SEO-friendly: one clear `h1`, meaningful headings/text, alt text for important images, and a layout that can later support metadata/canonical/Open Graph.
-- If app can run, check at least mobile and desktop; check tablet/iPad for complex layouts.
+- Do not run browser/mobile/desktop checks by default. Owner will self-check UI/tương tác; run browser/Playwright/screenshot only when explicitly requested.
 - Only create or save screenshots when screenshot mode is enabled by the command, for example `/task-ui screenshot M3.4`. If the command does not contain `screenshot`, do not run screenshot capture or leave new screenshot artifacts.
 
 ## Owner Approval Memory
@@ -124,7 +126,7 @@ Run checks proportional to risk:
 - Prefer `git diff --check`, a targeted format check, or manual visual reasoning for small UI/copy/spacing/color/mock-data changes.
 - Run `pnpm --filter @learning-path/web typecheck` only when web types are likely affected, such as new props, shared components, form schemas, route files, conditional state, or TypeScript errors.
 - Run lint/build only when the change is broad, touches shared primitives/layout across screens, or a previous command suggests risk.
-- If app can run, provide URL/route and mention responsive viewport checks.
+- If useful, provide URL/route for the owner to self-check; do not run responsive viewport checks unless explicitly requested.
 - In screenshot mode only, save screenshots under `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
 - For tiny docs/wording changes, `Not run: docs-only` is acceptable.
 

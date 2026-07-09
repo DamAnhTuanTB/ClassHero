@@ -1,14 +1,15 @@
 "use client";
 
 import {
-  AtSign,
   Eye,
+  EyeOff,
   LockKeyhole,
   Mail,
   Phone,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+import { useState } from "react";
 import type { FieldError } from "react-hook-form";
 
 type TextFieldProps = {
@@ -57,7 +58,7 @@ function FieldIcon({ id, type, label }: { id: string; type: string; label: strin
   }
 
   if (normalized.includes("tài khoản") || normalized.includes("username")) {
-    return <AtSign className="h-5 w-5" aria-hidden="true" />;
+    return <UserRound className="h-5 w-5" aria-hidden="true" />;
   }
 
   if (normalized.includes("mã")) {
@@ -77,6 +78,10 @@ export function TextField({
   helperText,
   ...inputProps
 }: TextFieldProps) {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const isPasswordField = type === "password";
+  const inputType = isPasswordField && isPasswordVisible ? "text" : type;
+
   return (
     <div>
       <label htmlFor={id} className="text-sm font-extrabold text-slate-800">
@@ -88,18 +93,33 @@ export function TextField({
         </span>
         <input
           id={id}
-          type={type}
+          type={inputType}
           placeholder={placeholder}
           autoComplete={autoComplete}
           aria-invalid={error ? "true" : "false"}
           aria-describedby={
             error ? `${id}-error` : helperText ? `${id}-helper` : undefined
           }
-          className="min-h-[3.35rem] w-full rounded-xl border border-slate-200 bg-white px-12 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-indigo-200 focus:border-[var(--auth-primary)] focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+          className={`min-h-[3.35rem] w-full rounded-xl border border-slate-200 bg-white py-0 pl-12 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-indigo-200 focus:border-[var(--auth-primary)] focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
+            isPasswordField ? "pr-14" : "pr-12"
+          }`}
           {...inputProps}
         />
-        {type === "password" ? (
-          <Eye className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+        {isPasswordField ? (
+          <button
+            type="button"
+            aria-label={isPasswordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            aria-pressed={isPasswordVisible}
+            disabled={inputProps.disabled}
+            onClick={() => setIsPasswordVisible((visible) => !visible)}
+            className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isPasswordVisible ? (
+              <EyeOff className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Eye className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
         ) : null}
       </div>
       {error ? (
@@ -186,7 +206,7 @@ export function FormHeader({
   description,
 }: {
   title: string;
-  description: string;
+  description?: string;
 }) {
   return (
     <div className="pb-1">
@@ -194,7 +214,11 @@ export function FormHeader({
       <h2 className="text-2xl font-extrabold leading-tight text-slate-950 sm:text-3xl">
         {title}
       </h2>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{description}</p>
+      {description ? (
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+          {description}
+        </p>
+      ) : null}
     </div>
   );
 }

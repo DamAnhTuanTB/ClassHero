@@ -17,7 +17,7 @@ Accept:
 - `sửa UI <screen/place and requested UI change>`
 - `đổi giao diện <screen/place and requested UI change>`
 
-If `screenshot` appears after the command, enable screenshot mode. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code checks and mention any responsive review that was done without screenshots.
+If `screenshot` appears after the command, enable screenshot mode only when the owner explicitly asks for it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code checks instead.
 
 If the target screen/component is unclear, ask one concise question. If the request includes an attached reference image/design, inspect it before editing. Extract the relevant visual principles instead of copying the reference literally; for auth/register/login, a dashboard reference may inspire color, rounded cards, icons, spacing, and energy, but the result must remain a clear auth flow. If the owner says the reference is a mobile design, prioritize matching the mobile layout first and do not add extra footer chips, secondary tabs, or out-of-scope steps.
 
@@ -42,7 +42,7 @@ Before editing:
 - Do not connect new real API calls.
 - Do not add product features outside the requested UI change.
 - Preserve approved UI patterns unless the owner explicitly asks to change them.
-- Keep mobile-first support and also check tablet/iPad and desktop when practical.
+- Keep mobile-first support and preserve tablet/iPad/desktop quality through responsive code reasoning by default; run browser/device checks only when the owner explicitly asks.
 - Preserve or improve smooth mobile interaction: immediate tap feedback, stable layout, no heavy animation/render, and friendly loading state.
 - If the request requires API/data/business behavior changes, stop and suggest `/task-connect`, `/task-full`, `/update-feature`, or `/add-feature`.
 
@@ -76,6 +76,8 @@ Changelog is not written during UI iteration. It is written only during `/commit
 - Use existing components and local patterns first.
 - Use Tailwind/shadcn/ui/lucide/framer only as already available in the project.
 - Include or preserve loading, empty, error, disabled, hover/focus states when the touched UI needs them.
+- UI changes must feel production-ready, not static mockups: visual hierarchy, copy, states, controls, and expected actions should match what a real user would use.
+- Do not create or leave fake-static interaction. Any visible button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control, or clickable-looking icon must use semantic elements, real state/handlers, and pressed/pending/disabled/loading feedback as appropriate. If API is not connected, implement local/mock state that behaves like the production interaction.
 - Avoid large redesign unless requested.
 - Do not make desktop-only layouts.
 - Keep text from overflowing on mobile/tablet/desktop.
@@ -99,10 +101,10 @@ Run checks proportional to the UI change:
 - Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, do not update changelog, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
 - Small CSS/layout/text/color/spacing/icon/image-position changes: `git diff --check`, a targeted format check, or manual visual reasoning may be enough.
 - Component/page changes: run focused typecheck/lint/build only when the change touches shared primitives, form/state logic, route structure, conditional rendering, or likely TypeScript errors.
-- Visual change: check mobile and desktop by reasoning/browser only when practical; tablet/iPad for complex layouts.
+- Visual change: check by code reasoning/static inspection by default; do not run browser/mobile/desktop checks unless the owner explicitly asks.
 - In screenshot mode only: save review screenshots under `.codex/screenshots/`.
-- Interaction change: check tap/pending/loading feedback and obvious layout shift when practical.
-- If unable to run app/browser checks, state why.
+- Interaction change: verify by code reasoning/typecheck/static inspection by default; owner will test real interaction.
+- Do not state inability to run browser checks as a gap unless the owner explicitly requested browser verification.
 - If larger checks are skipped for speed, write `Not run: UI lean mode per owner preference` or a more specific reason in the final response.
 
 Do not write UI changelog entries here. Changelog is written only during `/commit` for the commit being created.

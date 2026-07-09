@@ -21,7 +21,7 @@ Accept:
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed. Execute sequentially and stop if one creates unresolved risk.
 
-If `screenshot` appears after the command, enable screenshot mode for UI portions of the task. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code checks and mention any responsive review that was done without screenshots.
+If `screenshot` appears after the command, enable screenshot mode for UI portions only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code checks instead.
 
 ## Plan Mode
 
@@ -73,6 +73,7 @@ In plan mode, stop after this plan and wait for approval.
 - If a dependency subtask is missing, stop or implement only safe scaffold and explain the blocker.
 - For UI work, follow mobile-first, tablet/iPad, and laptop/desktop rules.
 - For UI work, use the default UI tokens from `docs/11-ui-design-system.md`.
+- For UI work, deliver production-like interaction, not static mockups. Mock data is fine, but controls that look interactive must have semantic elements, real state/handlers, and appropriate pressed/pending/disabled/loading feedback.
 - Only create or save UI screenshots when screenshot mode is enabled by the command, for example `/task-full screenshot M3.4`.
 - For UI work, apply `docs/11-ui-design-system.md` performance rules: smooth mobile interaction, immediate feedback, low perceived latency, stable skeleton/layout, and no heavy blocking animation/render.
 - For database/API/AI behavior changes, update the corresponding docs. `docs/04-database-model.md` and `docs/05-api-contract.md` are indexes; update matching files in `docs/database/` and `docs/api/` when domain details change.
@@ -84,7 +85,7 @@ Depending on the subtask, do what is necessary:
 
 - Backend/API: controller, DTO/validation, guard/RBAC, service, Swagger if project pattern exists.
 - Database: Prisma schema/migration/seed updates when required.
-- Front-end: page/component/hooks/forms/state and responsive UI.
+- Front-end: page/component/hooks/forms/state and responsive, production-like interactive UI.
 - Shared package: types/schemas/constants used by both apps.
 - Worker/integration: queue/provider/job code when required by docs.
 - Docs: update API/database/AI/UI/env docs only when behavior changes.
@@ -100,8 +101,8 @@ Run checks proportional to risk:
 - Typecheck for touched packages.
 - Focused tests where available.
 - Build/lint when shared or production surface changed.
-- Browser/curl/API checks when practical.
-- For UI, mention responsive viewports and smoothness/performance checks. Include screenshot paths only when screenshot mode created them.
+- Curl/API checks when practical for API/backend work.
+- For UI, use static/focused checks by default and mention that owner self-checks responsive/tương tác. Include screenshot paths only when screenshot mode created them.
 - For performance-sensitive work, mention what was measured or why measurement was skipped.
 
 ## Lean Mode For Small Tasks

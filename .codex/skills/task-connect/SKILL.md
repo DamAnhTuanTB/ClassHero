@@ -21,7 +21,7 @@ Accept:
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed.
 
-If `screenshot` appears after the command, enable screenshot mode for UI states affected by the connection. Screenshot mode means Codex should use browser/Playwright screenshots when practical and save review images under `.codex/screenshots/`. Without the `screenshot` keyword, do not create or save screenshots; still run proportional code/API checks and mention any responsive review that was done without screenshots.
+If `screenshot` appears after the command, enable screenshot mode for UI states only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code/API checks instead.
 
 ## Plan Mode
 
@@ -91,6 +91,7 @@ In plan mode, stop after this plan and wait for approval.
 - Use TanStack Query for server state.
 - Use mutation invalidation where relevant.
 - Use pending state immediately for mutations; use optimistic UI only when rollback is safe and not payment/auth/security-sensitive.
+- Preserve production-like interaction when replacing mock data with APIs. Do not regress working local/mock interactions into static controls; buttons, checkbox/toggle state, tabs, menus, filters, pagination, modals, uploads, and form flows must keep semantic elements, state/handlers, and feedback.
 - Debounce search/filter calls and use pagination/infinite query for long lists when relevant.
 - Forms use React Hook Form + Zod if validation is present.
 - Remove or isolate mock data so it cannot be confused with production data.
@@ -108,10 +109,10 @@ Run focused checks:
 
 - Typecheck for touched web/shared/api code.
 - Focused API/client tests if available.
-- Browser/curl check if practical.
+- Curl/API check if practical for API/backend behavior; do not run browser checks unless explicitly requested.
 - If a new API endpoint is implemented, verify it with a focused API test or curl when local services allow it.
 - If API cannot run locally, state what was checked statically.
-- For UI states changed by real data, re-check at least the affected mobile and desktop layouts when practical.
+- For UI states changed by real data, use static/focused checks by default; owner will self-check mobile/desktop layout and interaction.
 - Only create or save screenshots when screenshot mode is enabled by the command, for example `/task-connect screenshot M3.4`.
 - For data-connected UI, mention whether perceived latency, pending state, cache/invalidation, and list/search performance were checked or skipped.
 - For public/indexable UI, mention whether metadata/slug/published/canonical/sitemap impact was handled or not in scope.

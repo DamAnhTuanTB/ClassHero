@@ -1,0 +1,1 @@
+- 2026-07-09: Hoàn thiện các tinh chỉnh giao diện auth theo feedback gồm slogan/hero copy đồng bộ, bố cục minh họa responsive, control đăng nhập có tương tác thật và cập nhật luật Codex/UI để mọi UI sau này phải giống production, có state/handler thật và không tự chạy browser check nếu owner chưa yêu cầu.

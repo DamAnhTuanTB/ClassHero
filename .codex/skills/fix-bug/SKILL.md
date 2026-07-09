@@ -42,7 +42,7 @@ For small, low-risk bugs, finish quickly by using the lightest safe workflow.
 Allowed reductions:
 
 - Read only `AGENTS.md`, enough of `docs/09-implementation-plan.md` to orient the bug, directly relevant routing docs, logs/error output, and touched code.
-- Use existing error output or a simple code inspection as evidence when spinning up servers, browsers, or full flows would be overkill.
+- Per owner preference, do not spin up servers, browsers, Playwright UI, screenshots, or real interaction checks by default. Use existing error output, code inspection, focused static checks, targeted format, or typecheck as evidence unless the owner explicitly asks for browser/runtime verification.
 - Keep the plan to 1-3 short bullets.
 - Run one focused verification command, a quick curl, a validator, or no command if the change is docs/wording-only.
 - Skip broad `build`, full test suites, or full regression checks when the bug is isolated and low risk.
@@ -57,7 +57,7 @@ Non-negotiable:
 
 ## Diagnosis Workflow
 
-1. Reproduce the bug with the smallest realistic command, curl, page visit, test, or dev-server run.
+1. Reproduce the bug with the smallest realistic non-browser evidence when practical: existing error output, code inspection, focused command, curl/API check, or test. Do not use browser/page visits/dev-server interaction checks unless the owner explicitly asks.
 2. Capture the useful symptom: status code, stack trace, console output, failing test, request path, or UI state.
 3. If reproduction is not possible, explain why and use the best available evidence from code, logs, docs, and user description.
 4. Identify the root cause before editing. Avoid speculative fixes.
@@ -73,6 +73,7 @@ Non-negotiable:
 - Update docs only when the actual contract, schema, AI/RAG behavior, env, or workflow changes.
 - If a database/API/AI behavior change is required, follow `AGENTS.md` rules for updating the corresponding docs.
 - If SEO/indexability behavior changes, update `docs/13-seo-and-content-discovery.md` or related public docs when needed.
+- For UI bugs, the fix must preserve production-like interaction. Do not replace broken behavior with static fake controls; visible buttons, checkbox/toggle state, tabs, menus, filters, forms, modals, and clickable-looking icons must keep semantic elements, state/handlers, and feedback.
 - If the bug reveals a small roadmap dependency/TODO issue, update `.codex/plans/codex-execution-plan.md`; ask the owner before major roadmap or scope changes.
 - If a fix requires a secret, paid service, production access, or large product decision, stop and ask.
 
@@ -80,7 +81,7 @@ Non-negotiable:
 
 After the fix:
 
-1. Rerun the command or flow that exposed the bug.
+1. Rerun the focused command/static check that fits the fix. If the original symptom was UI interaction, use code/typecheck/static verification by default and let the owner test the real UI.
 2. Run verification proportional to risk: focused checks for small bugs; broader `typecheck`, `build`, `lint`, or tests for shared, production, or multi-module changes.
 3. If a long-running server was started, stop it unless the user asked to keep it running.
 4. Do not update changelog here; if the owner asks for `/commit`, that workflow writes changelog for the commit being created.

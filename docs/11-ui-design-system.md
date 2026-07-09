@@ -158,6 +158,8 @@ Rules:
 - Không hiển thị các cụm như `mock`, `M2.4`, `task-ui`, `connect API later`, `backend enforce`, `Codex`, debug/test hint hoặc roadmap label nếu người dùng thật không cần biết.
 - Copy hiển thị phải viết cho người dùng thật theo role: học sinh, phụ huynh, admin hoặc public visitor.
 - Empty/loading/error/success state phải là thông điệp sản phẩm tự nhiên, không phải chú thích kỹ thuật.
+- Mock UI chỉ được mock dữ liệu hoặc API boundary; trải nghiệm hiển thị và tương tác phải giống production thật. Không để button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control hoặc icon có vẻ bấm được nhưng thực chất là tĩnh.
+- Mọi control tương tác phải dùng element semantic, state/handler thật, feedback bấm rõ và pending/disabled/loading state phù hợp. Nếu chưa nối API, dùng local/mock state để mô phỏng đúng hành vi sản phẩm thay vì bỏ trống interaction.
 - Muốn giải thích mock/API/technical flow thì ghi trong final response, changelog, docs, code comment hoặc test name, không ghi trong UI.
 
 ### 7.2. Copy ngắn gọn cho UI người dùng thật
@@ -259,7 +261,7 @@ Khi làm UI phức tạp, Codex nên ghi rõ trong final/changelog đã kiểm t
 - desktop viewport,
 - loading/empty/error/disabled state,
 - interaction latency/perceived response,
-- browser/responsive check nếu chạy được app,
+- browser/responsive check chỉ khi owner yêu cầu rõ; mặc định Codex dùng static/focused check và owner tự kiểm UI/tương tác,
 - screenshot chỉ khi owner yêu cầu bằng command có từ `screenshot`.
 
 ## 11. Empty/loading/error states
@@ -279,6 +281,8 @@ Một màn hình UI chỉ xem là xong khi:
 
 - Đúng role và flow trong `docs/08-ui-pages-and-components.md`.
 - Đúng gu trong tài liệu này.
+- Trông như production thật: không có placeholder/debug/mock label, không có vùng tĩnh giả tính năng, copy/trạng thái/hành động đủ tự nhiên cho người dùng thật.
+- Tương tác như production thật: control có semantic element, state/handler, feedback bấm, pending/loading/disabled/error/success khi phù hợp; mock data vẫn phải có local/mock interaction đúng hành vi.
 - Responsive cơ bản trên mobile, tablet/iPad và laptop/desktop.
 - Tương tác chính trên mobile phản hồi nhanh, có pending/pressed/loading state rõ.
 - Không dùng animation hoặc render list làm chậm thao tác học/chấm bài/submit.
@@ -286,7 +290,7 @@ Một màn hình UI chỉ xem là xong khi:
 - Không text tràn, overlap, button cắt chữ hoặc layout nhảy mạnh.
 - Không hard-code khác API contract nếu API đã có trong `docs/05-api-contract.md`.
 - Không thêm tính năng ngoài MVP.
-- Nếu có thể chạy app, Codex kiểm tra browser/responsive ở ít nhất mobile và desktop; với layout phức tạp kiểm tra thêm tablet/iPad.
+- Theo preference của owner, Codex không tự kiểm browser/Playwright/responsive thật trừ khi owner yêu cầu rõ; mặc định dùng kiểm tĩnh/focused và để owner tự kiểm UI/tương tác trên app.
 - Chỉ chụp/lưu screenshot khi owner yêu cầu bằng command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`. Khi chụp để owner review, lưu vào `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
 
 ## 13. Quy trình làm UI để giảm sửa lại
