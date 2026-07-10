@@ -1,0 +1,127 @@
+const defaultApiBaseUrl = "http://localhost:4000/api/v1";
+
+export type ApiRequestOptions = {
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  body?: unknown;
+  token?: string;
+  headers?: HeadersInit;
+};
+
+type ApiSuccessEnvelope<TData> = {
+  data: TData;
+  meta?: Record<string, unknown>;
+};
+
+type ApiErrorEnvelope = {
+  error: {
+    code?: string;
+    message?: string;
+    details?: unknown;
+  };
+};
+
+export class ApiRequestError extends Error {
+  readonly statusCode: number;
+  readonly code: string;
+  readonly details?: unknown;
+
+  constructor({
+    statusCode,
+    code,
+    message,
+    details,
+  }: {
+    statusCode: number;
+    code: string;
+    message: string;
+    details?: unknown;
+  }) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+function getApiBaseUrl() {
+  return (process.env.NEXT_PUBLIC_API_URL ?? defaultApiBaseUrl).replace(/\/$/, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSuccessEnvelope<TData>(value: unknown): value is ApiSuccessEnvelope<TData> {
+  return isRecord(value) && "data" in value;
+}
+
+function parseErrorEnvelope(payload: unknown, statusCode: number) {
+  if (isRecord(payload) && isRecord(payload.error)) {
+    const error = payload.error as ApiErrorEnvelope["error"];
+
+    return {
+      code: typeof error.code === "string" ? error.code : "REQUEST_FAILED",
+      message:
+        typeof error.message === "string" ? error.message : "Chưa thể hoàn tất yêu cầu.",
+      details: error.details,
+    };
+  }
+
+  return {
+    code: "REQUEST_FAILED",
+    message:
+      statusCode >= 500
+        ? "Máy chủ đang bận. Vui lòng thử lại sau ít phút."
+        : "Yêu cầu chưa hợp lệ.",
+    details: undefined,
+  };
+}
+
+async function readJsonResponse(response: Response) {
+  const contentType = response.headers.get("content-type");
+
+  if (!contentType?.includes("application/json")) {
+    return undefined;
+  }
+
+  return response.json() as Promise<unknown>;
+}
+
+export async function apiRequest<TData>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<TData> {
+  const headers = new Headers(options.headers);
+
+  if (options.body !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (options.token) {
+    headers.set("Authorization", `Bearer ${options.token}`);
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  const payload = await readJsonResponse(response);
+
+  if (!response.ok) {
+    const error = parseErrorEnvelope(payload, response.status);
+    throw new ApiRequestError({
+      statusCode: response.status,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    });
+  }
+
+  if (isSuccessEnvelope<TData>(payload)) {
+    return payload.data;
+  }
+
+  return payload as TData;
+}

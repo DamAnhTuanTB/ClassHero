@@ -46,6 +46,7 @@ Allowed reductions:
 - Keep the plan to 1-3 short bullets.
 - Run one focused verification command, a quick curl, a validator, or no command if the change is docs/wording-only.
 - Skip broad `build`, full test suites, or full regression checks when the bug is isolated and low risk.
+- For backend/API bugs visible in a UI the owner is actively testing, verify the actual API origin used by the web app, usually `localhost:4000`. If that dev server is stale, restart the process on `4000` and rerun the failing payload there; do not rely only on a temporary alternate port.
 
 Non-negotiable:
 
@@ -83,7 +84,7 @@ After the fix:
 
 1. Rerun the focused command/static check that fits the fix. If the original symptom was UI interaction, use code/typecheck/static verification by default and let the owner test the real UI.
 2. Run verification proportional to risk: focused checks for small bugs; broader `typecheck`, `build`, `lint`, or tests for shared, production, or multi-module changes.
-3. If a long-running server was started, stop it unless the user asked to keep it running.
+3. If a long-running server was started only for the bug fix, stop it unless the user asked to keep it running. If the server is the owner-facing dev API/web process they are currently testing, mention whether it was left running.
 4. Do not update changelog here; if the owner asks for `/commit`, that workflow writes changelog for the commit being created.
 5. If tests cannot run, write the reason in the final response.
 

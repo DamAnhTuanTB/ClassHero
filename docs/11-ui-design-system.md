@@ -147,6 +147,8 @@ Spacing/radius mặc định:
 - Icon button phải có `aria-label` hoặc tooltip nếu không hiển nhiên.
 - Loading, empty, error, disabled state phải được thiết kế cùng component/màn hình.
 - Toast/notification ngắn hạn phải dùng thư viện toast chung của web app, hiện là `sonner`; không hand-roll toast cục bộ trong từng form/page.
+- Toast phải giữ màu chủ đạo theo trạng thái trên nền/border/text, không chỉ ở icon: success dùng xanh lá, error dùng đỏ, warning dùng vàng/cam, info dùng xanh dương; icon phải có vùng/cột riêng và không được đè chữ; close button không được nổi lệch ra ngoài khối toast, không dùng biểu tượng trùng lặp với icon trạng thái và không làm toast quá thưa.
+- Toast ngắn hạn chỉ hiển thị toast mới nhất; khi có toast mới, các toast cũ phải biến mất ngay thay vì xếp chồng bên dưới.
 - Không fetch dữ liệu rải rác trong component sâu; dùng feature hook/API client.
 - Mock data phải đặt rõ ràng, dễ xóa khi connect API.
 

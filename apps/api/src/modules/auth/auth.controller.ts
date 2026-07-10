@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "../../common/auth/authenticated-request";
+import { createDtoValidationPipe } from "../../common/validation/validation-error";
 import { AuthService } from "./auth.service";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
@@ -24,41 +25,48 @@ export class AuthController {
 
   @Post("register/student")
   @ApiOperation({ summary: "Register a student account" })
-  registerStudent(@Body() dto: RegisterStudentDto) {
+  registerStudent(
+    @Body(createDtoValidationPipe(RegisterStudentDto)) dto: RegisterStudentDto,
+  ) {
     return this.authService.registerStudent(dto);
   }
 
   @Post("register/parent")
   @ApiOperation({ summary: "Register a parent account" })
-  registerParent(@Body() dto: RegisterParentDto) {
+  registerParent(
+    @Body(createDtoValidationPipe(RegisterParentDto)) dto: RegisterParentDto,
+  ) {
     return this.authService.registerParent(dto);
   }
 
   @Post("login")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Login by username, email or phone number" })
-  login(@Body() dto: LoginDto) {
+  login(@Body(createDtoValidationPipe(LoginDto)) dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Rotate a refresh token and issue a new access token" })
-  refresh(@Body() dto: RefreshTokenDto) {
+  refresh(@Body(createDtoValidationPipe(RefreshTokenDto)) dto: RefreshTokenDto) {
     return this.authService.refresh(dto);
   }
 
   @Post("logout")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Revoke a refresh token" })
-  logout(@Body() dto: RefreshTokenDto) {
+  logout(@Body(createDtoValidationPipe(RefreshTokenDto)) dto: RefreshTokenDto) {
     return this.authService.logout(dto);
   }
 
   @Post("forgot-password")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Request a password reset token" })
-  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() request: AuthenticatedRequest) {
+  forgotPassword(
+    @Body(createDtoValidationPipe(ForgotPasswordDto)) dto: ForgotPasswordDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
     return this.authService.forgotPassword(dto, {
       ipAddress: request.ip,
       userAgent: request.get?.("user-agent"),
@@ -68,7 +76,7 @@ export class AuthController {
   @Post("reset-password")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reset password by reset token" })
-  resetPassword(@Body() dto: ResetPasswordDto) {
+  resetPassword(@Body(createDtoValidationPipe(ResetPasswordDto)) dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
 }

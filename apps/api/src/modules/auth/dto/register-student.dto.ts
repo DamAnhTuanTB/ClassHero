@@ -2,8 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Gender } from "@prisma/client";
 import {
   IsEmail,
+  IsDefined,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
@@ -36,6 +38,7 @@ export class RegisterStudentDto {
 
   @ApiProperty({ example: "student1" })
   @IsString()
+  @IsNotEmpty()
   @Matches(usernamePattern, {
     message: "username must be 3-32 letters, numbers or underscores",
   })
@@ -43,17 +46,20 @@ export class RegisterStudentDto {
 
   @ApiProperty({ example: "123456", minLength: 6, maxLength: 72 })
   @IsString()
+  @IsNotEmpty()
   @MinLength(6)
   @MaxLength(72)
   password!: string;
 
   @ApiProperty({ example: "Nguyễn Văn A" })
   @IsString()
+  @IsNotEmpty()
   @MinLength(2)
   @MaxLength(120)
   fullName!: string;
 
   @ApiProperty({ example: 7, minimum: 3, maximum: 12 })
+  @IsDefined()
   @IsInt()
   @Min(3)
   @Max(12)
@@ -64,17 +70,20 @@ export class RegisterStudentDto {
     minimum: minStudentBirthYear,
     maximum: maxStudentBirthYear,
   })
+  @IsDefined()
   @IsInt()
   @Min(minStudentBirthYear)
   @Max(maxStudentBirthYear)
   birthYear!: number;
 
   @ApiProperty({ enum: Gender, example: Gender.MALE })
+  @IsDefined()
   @IsEnum(Gender)
   gender!: Gender;
 
   @ApiProperty({ example: "Hà Nội" })
   @IsString()
+  @IsNotEmpty()
   @MinLength(3)
   @MaxLength(255)
   address!: string;

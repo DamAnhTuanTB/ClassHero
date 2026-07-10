@@ -1,0 +1,1 @@
+- 2026-07-10: Nối auth UI với API thật cho đăng nhập, đăng ký học sinh/phụ huynh, quên/đặt lại mật khẩu, bổ sung API client/session store/TanStack Query provider, chỉnh validation DTO và reset-password flow phía API, đồng thời chuẩn hóa toast global theo trạng thái với countdown và cập nhật docs/context/skill cho workflow nối API.

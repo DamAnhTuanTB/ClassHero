@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Baloo_2, Be_Vietnam_Pro } from "next/font/google";
-import { Toaster } from "sonner";
+import { AppToaster } from "./app-toaster";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -31,8 +32,8 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${beVietnamPro.variable} ${baloo2.variable}`}
       >
-        {children}
-        <Toaster position="top-right" richColors closeButton />
+        <Providers>{children}</Providers>
+        <AppToaster />
       </body>
     </html>
   );

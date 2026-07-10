@@ -157,19 +157,9 @@ export const forgotPasswordSchema = z.object({
     .refine((value) => value !== undefined, "Chọn khối lớp."),
 });
 
-export const verifiedResetPasswordSchema = z
-  .object({
-    newPassword: passwordSchema,
-    confirmPassword: z.string().min(1, "Nhập lại mật khẩu mới."),
-  })
-  .refine((values) => values.newPassword === values.confirmPassword, {
-    message: "Mật khẩu nhập lại chưa khớp.",
-    path: ["confirmPassword"],
-  });
-
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(12, "Mã đặt lại mật khẩu chưa hợp lệ."),
+    token: z.string().min(32, "Mã đặt lại mật khẩu chưa hợp lệ."),
     newPassword: passwordSchema,
     confirmPassword: z.string().min(1, "Nhập lại mật khẩu mới."),
   })
@@ -183,4 +173,3 @@ export type StudentRegisterFormValues = z.infer<typeof studentRegisterSchema>;
 export type ParentRegisterFormValues = z.infer<typeof parentRegisterSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
-export type VerifiedResetPasswordFormValues = z.infer<typeof verifiedResetPasswordSchema>;

@@ -75,10 +75,13 @@ In plan mode, stop after this plan and wait for approval.
 
 - Best fit is `Mode: UI + API`. If mode is `API only`, use `/task-full <ID>` instead. If mode is `UI only`, there is no API to connect.
 - If there is no existing UI/mock UI for the requested subtask, stop before editing files and suggest `/task-ui <ID>` first or `/task-full <ID>` if the owner wants the full feature in one pass.
+- Treat any owner request to "ghép API", "nối API", "connect API", or `/task-connect` after UI feedback as confirmation that the current UI layout, fields, copy, and flow are approved.
 - Preserve the approved UI layout and visual style.
+- Preserve the approved UI fields, field order, labels, placeholders, validation UX, and screen flow. Do not add, remove, reorder, rename, or hide UI fields just to match an existing DTO/API/database shape.
 - Preserve the approved UI tokens and responsive behavior from `/task-ui`.
 - Replace mock data with API client/hooks.
 - Do not do broad visual redesign or polish unless needed to handle real states.
+- If the approved UI and existing API contract/database schema do not match, adapt the backend/API contract/database or add a clearly documented payload mapping. Do not force the approved UI to fit the old API unless the owner explicitly asks to change the UI.
 - If the needed API endpoint does not exist, implement the complete backend API required by the requested subtask and `docs/05-api-contract.md` plus the matching `docs/api/` file.
 - If the API contract is missing or incomplete, update `docs/05-api-contract.md` and/or the matching `docs/api/` file with the implemented contract.
 - Backend work must fully satisfy the requested subtask's API scope, but must not expand into unrelated feature work.
@@ -97,6 +100,7 @@ In plan mode, stop after this plan and wait for approval.
 - Remove or isolate mock data so it cannot be confused with production data.
 - Keep loading, empty, error, and disabled states.
 - Map API response types carefully; do not hard-code data that should come from API.
+- When an approved UI field has no backend field yet, decide explicitly: store it by extending the API/database when it is part of the feature contract, or keep it as a local/verification-only field with a note when storage is out of scope. Never silently delete it from the UI.
 - Backend API should follow NestJS patterns: controller -> DTO/guard/validation -> service -> Prisma/provider.
 - Backend/API/database performance must follow `docs/12-performance-and-observability.md`: pagination, select only needed fields, avoid N+1, enqueue heavy work.
 - Public/indexable API data must follow `docs/13-seo-and-content-discovery.md`: only published data, stable slug/canonical data, metadata fields when needed, and no private content exposure.
@@ -111,6 +115,7 @@ Run focused checks:
 - Focused API/client tests if available.
 - Curl/API check if practical for API/backend behavior; do not run browser checks unless explicitly requested.
 - If a new API endpoint is implemented, verify it with a focused API test or curl when local services allow it.
+- When backend/API behavior is fixed for a UI the owner is actively testing, verify the actual API origin that the web app calls, usually `localhost:4000`, and restart any stale dev server on that port before saying the UI is ready. Do not rely only on a temporary alternate port if the owner will test against `4000`.
 - If API cannot run locally, state what was checked statically.
 - For UI states changed by real data, use static/focused checks by default; owner will self-check mobile/desktop layout and interaction.
 - Only create or save screenshots when screenshot mode is enabled by the command, for example `/task-connect screenshot M3.4`.

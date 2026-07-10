@@ -30,6 +30,7 @@ File này là bản đồ nhanh để owner và Codex biết nên đọc tài li
 | Duyệt plan gần nhất                  | `/do`                                                                                                 |
 | Sửa bug                              | `/fix bug ...`                                                                                        |
 | Refactor không đổi behavior          | `/refactor ...`                                                                                       |
+| Review docs/skill                    | `/review-docs`                                                                                        |
 | Thêm/sửa/xóa/hoãn feature trong docs | `/add-feature ...`, `/update-feature ...`, `/delete-feature ...`, `/move-feature-to-next-version ...` |
 | Commit thay đổi                      | `/commit`                                                                                             |
 

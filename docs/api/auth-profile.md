@@ -71,7 +71,6 @@ Body:
 
 ```json
 {
-  "email": "parent1@example.com",
   "phone": "0910000001",
   "password": "123456",
   "fullName": "Phụ huynh A"
@@ -92,7 +91,7 @@ Response:
     "user": {
       "id": "uuid",
       "role": "PARENT",
-      "email": "parent1@example.com",
+      "email": null,
       "phone": "0910000001",
       "username": null,
       "fullName": "Phụ huynh A"
@@ -100,6 +99,11 @@ Response:
   }
 }
 ```
+
+Notes:
+
+- Form phụ huynh hiện tại không yêu cầu email; parent có thể đăng ký bằng số điện thoại.
+- API vẫn chấp nhận `email` optional nếu client tương lai cần gửi, nhưng không được làm UI hiện tại tự thêm ô email.
 
 ### `POST /auth/login`
 
@@ -194,24 +198,33 @@ Role: public.
 Body:
 
 ```json
-{ "identifier": "student1@example.com" }
+{
+  "identifier": "student1",
+  "fullName": "Nguyễn Văn An",
+  "grade": 7
+}
 ```
 
 Side effects:
 
 - Tạo `password_reset_tokens` với `token_hash`, `expires_at`.
-- Gửi email qua Resend nếu user có email và `RESEND_API_KEY`/`RESEND_FROM_EMAIL` đã cấu hình thật.
-- Không tiết lộ email/identifier có tồn tại hay không.
+- Xác minh cả 3 thông tin trên UI đã duyệt: tên đăng nhập/số điện thoại, họ tên và khối lớp.
+- `fullName` được so khớp không phân biệt chữ hoa/thường sau khi trim và gộp khoảng trắng; dấu tiếng Việt vẫn phải nhập đúng.
+- Nếu 3 thông tin khớp với hồ sơ học sinh trong database, API trả `resetToken` raw một lần để UI chuyển sang bước đổi mật khẩu.
+- Nếu không khớp hoặc tài khoản không phải học sinh active, trả `INVALID_RECOVERY_INFO` để UI hiển thị toast lỗi.
 
 Response:
 
 ```json
 {
   "data": {
-    "success": true
+    "success": true,
+    "resetToken": "raw-reset-token"
   }
 }
 ```
+
+Errors: `INVALID_RECOVERY_INFO`, `VALIDATION_ERROR`.
 
 ### `POST /auth/reset-password`
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import {
   CalendarDays,
   Check,
@@ -20,27 +21,23 @@ import {
   parentRegisterSchema,
   resetPasswordSchema,
   studentRegisterSchema,
-  verifiedResetPasswordSchema,
   type ForgotPasswordFormValues,
   type LoginFormValues,
   type ParentRegisterFormValues,
   type ResetPasswordFormValues,
   type StudentRegisterFormValues,
-  type VerifiedResetPasswordFormValues,
 } from "./auth-schemas";
 import {
-  FormHeader,
-  FormStatus,
-  OptionField,
-  SubmitButton,
-  TextField,
-} from "./auth-form-primitives";
-import { runMockAuthAction, type MockAuthAction, type MockAuthResult } from "./mock-auth";
-
-type SubmitState =
-  | { status: "idle" }
-  | { status: "success"; result: MockAuthResult }
-  | { status: "error"; message: string };
+  forgotPassword,
+  getAuthErrorMessage,
+  login,
+  registerParent,
+  registerStudent,
+  resetPassword,
+  type AuthGender,
+} from "./auth-api";
+import { FormHeader, OptionField, SubmitButton, TextField } from "./auth-form-primitives";
+import { saveAuthSession } from "./auth-session";
 
 type SubmitIntentEvent = FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement>;
 
@@ -63,30 +60,13 @@ const birthYearOptions = Array.from({ length: 11 }, (_, index) => {
   return { value: year, label: year };
 });
 
-async function submitMock(
-  action: MockAuthAction,
-  setSubmitState: (state: SubmitState) => void,
-) {
-  try {
-    const result = await runMockAuthAction(action);
-    setSubmitState({ status: "success", result });
-  } catch {
-    setSubmitState({
-      status: "error",
-      message: "Chưa thể hoàn tất yêu cầu. Vui lòng thử lại sau ít phút.",
-    });
-  }
-}
-
 async function submitWhenValid<TFormValues extends FieldValues>(
   form: UseFormReturn<TFormValues>,
   onValid: () => Promise<void> | void,
-  setSubmitState: (state: SubmitState) => void,
 ) {
   const isValid = await form.trigger(undefined, { shouldFocus: true });
 
   if (!isValid) {
-    setSubmitState({ status: "idle" });
     return;
   }
 
@@ -97,16 +77,17 @@ function handleSubmitIntent<TFormValues extends FieldValues>(
   event: SubmitIntentEvent,
   form: UseFormReturn<TFormValues>,
   onValid: () => Promise<void> | void,
-  setSubmitState: (state: SubmitState) => void,
 ) {
   event.preventDefault();
-  void submitWhenValid(form, onValid, setSubmitState);
+  void submitWhenValid(form, onValid);
 }
 
 export function LoginForm() {
   const router = useRouter();
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [rememberLogin, setRememberLogin] = useState(true);
+  const loginMutation = useMutation({
+    mutationFn: login,
+  });
   const form = useForm<LoginFormValues>({
     mode: "onChange",
     reValidateMode: "onChange",
@@ -116,14 +97,31 @@ export function LoginForm() {
       password: "",
     },
   });
-  const isPending = form.formState.isSubmitting;
+  const isPending = loginMutation.isPending;
+  async function handleLogin() {
+    const values = form.getValues();
+
+    try {
+      const response = await loginMutation.mutateAsync({
+        identifier: values.identifier.trim(),
+        password: values.password,
+      });
+
+      saveAuthSession(response, rememberLogin);
+      toast.success("Đăng nhập thành công", {
+        description: "Chào mừng bạn đến với lớp học ClassHero.",
+      });
+    } catch (error) {
+      toast.error("Không thể đăng nhập", {
+        description: getAuthErrorMessage(
+          error,
+          "Chưa thể đăng nhập. Vui lòng thử lại sau ít phút.",
+        ),
+      });
+    }
+  }
   const handleLoginSubmit = (event: SubmitIntentEvent) =>
-    handleSubmitIntent(
-      event,
-      form,
-      () => submitMock("login", setSubmitState),
-      setSubmitState,
-    );
+    handleSubmitIntent(event, form, handleLogin);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -169,22 +167,6 @@ export function LoginForm() {
           {...form.register("password")}
         />
       </div>
-
-      {submitState.status === "success" ? (
-        <FormStatus
-          tone="success"
-          title={submitState.result.title}
-          message={submitState.result.message}
-          detail={submitState.result.detail}
-        />
-      ) : null}
-      {submitState.status === "error" ? (
-        <FormStatus
-          tone="error"
-          title="Không thể đăng nhập"
-          message={submitState.message}
-        />
-      ) : null}
 
       <SubmitButton isPending={isPending} onClick={handleLoginSubmit}>
         Đăng nhập
@@ -245,7 +227,10 @@ export function LoginForm() {
 }
 
 export function StudentRegisterForm() {
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const router = useRouter();
+  const registerStudentMutation = useMutation({
+    mutationFn: registerStudent,
+  });
   const form = useForm<StudentRegisterFormValues>({
     mode: "onChange",
     reValidateMode: "onChange",
@@ -261,16 +246,60 @@ export function StudentRegisterForm() {
       acceptedTerms: false,
     },
   });
-  const isPending = form.formState.isSubmitting;
+  const isPending = registerStudentMutation.isPending;
   const hasNoPhone = form.watch("hasNoPhone");
   const acceptedTerms = form.watch("acceptedTerms");
+  async function handleStudentRegister() {
+    const values = form.getValues();
+
+    if (
+      values.grade === undefined ||
+      values.birthYear === undefined ||
+      values.gender === undefined
+    ) {
+      toast.error("Thông tin chưa đầy đủ", {
+        description: "Vui lòng kiểm tra lại khối lớp, năm sinh và giới tính.",
+      });
+      return;
+    }
+
+    try {
+      const response = await registerStudentMutation.mutateAsync({
+        fullName: values.fullName.trim(),
+        address: values.address.trim(),
+        phone: values.hasNoPhone ? undefined : values.phone?.trim(),
+        username: values.username.trim(),
+        password: values.password,
+        grade: values.grade,
+        birthYear: values.birthYear,
+        gender: values.gender as AuthGender,
+      });
+
+      toast.success("Tạo tài khoản học sinh thành công", {
+        description: `Mã liên kết phụ huynh: ${response.studentProfile.childCode}. Vui lòng đăng nhập để bắt đầu học.`,
+      });
+      form.reset({
+        fullName: "",
+        address: "",
+        phone: "",
+        hasNoPhone: false,
+        username: "",
+        password: "",
+        confirmPassword: "",
+        acceptedTerms: false,
+      });
+      router.replace("/login");
+    } catch (error) {
+      toast.error("Không thể tạo tài khoản", {
+        description: getAuthErrorMessage(
+          error,
+          "Chưa thể tạo tài khoản học sinh. Vui lòng thử lại sau ít phút.",
+        ),
+      });
+    }
+  }
   const handleStudentRegisterSubmit = (event: SubmitIntentEvent) =>
-    handleSubmitIntent(
-      event,
-      form,
-      () => submitMock("register-student", setSubmitState),
-      setSubmitState,
-    );
+    handleSubmitIntent(event, form, handleStudentRegister);
 
   return (
     <form
@@ -441,15 +470,6 @@ export function StudentRegisterForm() {
         />
       </div>
 
-      {submitState.status === "success" ? (
-        <FormStatus
-          tone="success"
-          title={submitState.result.title}
-          message={submitState.result.message}
-          detail={submitState.result.detail}
-        />
-      ) : null}
-
       <div className="text-sm font-semibold leading-6 text-slate-700">
         <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1">
           <label className="inline-flex cursor-pointer items-start gap-3 transition hover:text-slate-950">
@@ -502,7 +522,10 @@ export function StudentRegisterForm() {
 }
 
 export function ParentRegisterForm() {
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const router = useRouter();
+  const registerParentMutation = useMutation({
+    mutationFn: registerParent,
+  });
   const form = useForm<ParentRegisterFormValues>({
     mode: "onChange",
     reValidateMode: "onChange",
@@ -516,15 +539,41 @@ export function ParentRegisterForm() {
       acceptedTerms: false,
     },
   });
-  const isPending = form.formState.isSubmitting;
+  const isPending = registerParentMutation.isPending;
   const acceptedTerms = form.watch("acceptedTerms");
+  async function handleParentRegister() {
+    const values = form.getValues();
+
+    try {
+      await registerParentMutation.mutateAsync({
+        fullName: values.fullName.trim(),
+        phone: values.phone.trim(),
+        password: values.password,
+      });
+
+      toast.success("Tạo tài khoản phụ huynh thành công", {
+        description: "Vui lòng đăng nhập để tiếp tục.",
+      });
+      form.reset({
+        fullName: "",
+        phone: "",
+        address: "",
+        password: "",
+        confirmPassword: "",
+        acceptedTerms: false,
+      });
+      router.replace("/login");
+    } catch (error) {
+      toast.error("Không thể tạo tài khoản", {
+        description: getAuthErrorMessage(
+          error,
+          "Chưa thể tạo tài khoản phụ huynh. Vui lòng thử lại sau ít phút.",
+        ),
+      });
+    }
+  }
   const handleParentRegisterSubmit = (event: SubmitIntentEvent) =>
-    handleSubmitIntent(
-      event,
-      form,
-      () => submitMock("register-parent", setSubmitState),
-      setSubmitState,
-    );
+    handleSubmitIntent(event, form, handleParentRegister);
 
   return (
     <form
@@ -587,15 +636,6 @@ export function ParentRegisterForm() {
         />
       </div>
 
-      {submitState.status === "success" ? (
-        <FormStatus
-          tone="success"
-          title={submitState.result.title}
-          message={submitState.result.message}
-          detail={submitState.result.detail}
-        />
-      ) : null}
-
       <div className="text-sm font-semibold leading-6 text-slate-700">
         <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1">
           <label className="inline-flex cursor-pointer items-start gap-3 transition hover:text-slate-950">
@@ -618,7 +658,7 @@ export function ParentRegisterForm() {
             <span>Tôi đã đọc và đồng ý với</span>
           </label>
           <Link
-            className="font-extrabold text-blue-600 underline-offset-4 hover:text-blue-700 hover:underline"
+            className="font-extrabold text-blue-600 underline-offset-4 hover:text-blue-700 hover:none"
             href="/terms"
           >
             Điều khoản sử dụng
@@ -648,8 +688,10 @@ export function ParentRegisterForm() {
 }
 
 export function ForgotPasswordForm() {
-  const [isVerified, setIsVerified] = useState(false);
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const forgotPasswordMutation = useMutation({
+    mutationFn: forgotPassword,
+  });
   const form = useForm<ForgotPasswordFormValues>({
     mode: "onChange",
     reValidateMode: "onChange",
@@ -659,25 +701,43 @@ export function ForgotPasswordForm() {
       identifier: "",
     },
   });
-  const isPending = form.formState.isSubmitting;
+  const isPending = forgotPasswordMutation.isPending;
 
   async function handleForgotPasswordSubmit() {
     try {
-      await runMockAuthAction("forgot-password");
-      setSubmitState({ status: "idle" });
-      setIsVerified(true);
-    } catch {
-      setSubmitState({
-        status: "error",
-        message: "Chưa thể xác minh thông tin. Vui lòng thử lại sau ít phút.",
+      const values = form.getValues();
+
+      if (values.grade === undefined) {
+        toast.error("Thông tin chưa đầy đủ", {
+          description: "Vui lòng chọn khối lớp.",
+        });
+        return;
+      }
+
+      const response = await forgotPasswordMutation.mutateAsync({
+        identifier: values.identifier.trim(),
+        fullName: values.fullName.trim(),
+        grade: values.grade,
+      });
+
+      setResetToken(response.resetToken);
+      toast.success("Xác minh thành công", {
+        description: "Vui lòng đặt mật khẩu mới.",
+      });
+    } catch (error) {
+      toast.error("Không thể khôi phục", {
+        description: getAuthErrorMessage(
+          error,
+          "Thông tin khôi phục chưa khớp. Vui lòng kiểm tra lại.",
+        ),
       });
     }
   }
   const handleForgotPasswordIntent = (event: SubmitIntentEvent) =>
-    handleSubmitIntent(event, form, handleForgotPasswordSubmit, setSubmitState);
+    handleSubmitIntent(event, form, handleForgotPasswordSubmit);
 
-  if (isVerified) {
-    return <VerifiedResetPasswordForm />;
+  if (resetToken) {
+    return <VerifiedResetPasswordForm resetToken={resetToken} />;
   }
 
   return (
@@ -691,15 +751,6 @@ export function ForgotPasswordForm() {
 
       <div className="grid gap-4">
         <TextField
-          id="forgot-full-name"
-          label="Họ tên"
-          placeholder="Nhập họ tên"
-          autoComplete="off"
-          error={form.formState.errors.fullName}
-          disabled={isPending}
-          {...form.register("fullName")}
-        />
-        <TextField
           id="forgot-identifier"
           label="Tên đăng nhập/Số điện thoại"
           placeholder="Vui lòng nhập"
@@ -707,6 +758,15 @@ export function ForgotPasswordForm() {
           error={form.formState.errors.identifier}
           disabled={isPending}
           {...form.register("identifier")}
+        />
+        <TextField
+          id="forgot-full-name"
+          label="Họ tên"
+          placeholder="Nhập họ tên"
+          autoComplete="off"
+          error={form.formState.errors.fullName}
+          disabled={isPending}
+          {...form.register("fullName")}
         />
         <OptionField
           id="forgot-grade"
@@ -727,14 +787,6 @@ export function ForgotPasswordForm() {
         />
       </div>
 
-      {submitState.status === "error" ? (
-        <FormStatus
-          tone="error"
-          title="Không thể xác minh"
-          message={submitState.message}
-        />
-      ) : null}
-
       <SubmitButton isPending={isPending} onClick={handleForgotPasswordIntent}>
         Tiếp tục
       </SubmitButton>
@@ -752,33 +804,55 @@ export function ForgotPasswordForm() {
   );
 }
 
-function VerifiedResetPasswordForm() {
+function VerifiedResetPasswordForm({ resetToken }: { resetToken: string }) {
   const router = useRouter();
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
-  const form = useForm<VerifiedResetPasswordFormValues>({
+  const resetPasswordMutation = useMutation({
+    mutationFn: resetPassword,
+  });
+  const form = useForm<ResetPasswordFormValues>({
     mode: "onChange",
     reValidateMode: "onChange",
-    resolver: zodResolver(verifiedResetPasswordSchema),
+    resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
+      token: resetToken,
       newPassword: "",
       confirmPassword: "",
     },
   });
-  const isPending = form.formState.isSubmitting;
+  const isPending = resetPasswordMutation.isPending;
 
-  async function handleResetPasswordSubmit() {
+  useEffect(() => {
+    form.setValue("token", resetToken, {
+      shouldDirty: false,
+      shouldTouch: false,
+      shouldValidate: true,
+    });
+  }, [form, resetToken]);
+
+  async function handleVerifiedResetPassword() {
+    const values = form.getValues();
+
     try {
-      await runMockAuthAction("reset-password");
-      router.replace("/login?passwordChanged=1");
-    } catch {
-      setSubmitState({
-        status: "error",
-        message: "Chưa thể đổi mật khẩu. Vui lòng thử lại sau ít phút.",
+      await resetPasswordMutation.mutateAsync({
+        token: resetToken,
+        newPassword: values.newPassword,
+      });
+      toast.success("Đã đổi mật khẩu thành công", {
+        description: "Vui lòng đăng nhập lại.",
+      });
+      router.replace("/login");
+    } catch (error) {
+      toast.error("Không thể đổi mật khẩu", {
+        description: getAuthErrorMessage(
+          error,
+          "Chưa thể đổi mật khẩu. Vui lòng thử lại sau ít phút.",
+        ),
       });
     }
   }
+
   const handleVerifiedResetPasswordIntent = (event: SubmitIntentEvent) =>
-    handleSubmitIntent(event, form, handleResetPasswordSubmit, setSubmitState);
+    handleSubmitIntent(event, form, handleVerifiedResetPassword);
 
   return (
     <form
@@ -810,14 +884,6 @@ function VerifiedResetPasswordForm() {
         />
       </div>
 
-      {submitState.status === "error" ? (
-        <FormStatus
-          tone="error"
-          title="Không thể đổi mật khẩu"
-          message={submitState.message}
-        />
-      ) : null}
-
       <SubmitButton isPending={isPending} onClick={handleVerifiedResetPasswordIntent}>
         Đổi mật khẩu
       </SubmitButton>
@@ -833,8 +899,13 @@ function VerifiedResetPasswordForm() {
 }
 
 export function ResetPasswordForm() {
-  const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const router = useRouter();
+  const resetPasswordMutation = useMutation({
+    mutationFn: resetPassword,
+  });
   const form = useForm<ResetPasswordFormValues>({
+    mode: "onChange",
+    reValidateMode: "onChange",
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       token: "",
@@ -842,14 +913,40 @@ export function ResetPasswordForm() {
       confirmPassword: "",
     },
   });
-  const isPending = form.formState.isSubmitting;
+  const isPending = resetPasswordMutation.isPending;
+  useEffect(() => {
+    const resetToken = new URLSearchParams(window.location.search).get("token");
+
+    if (!resetToken) {
+      return;
+    }
+
+    form.setValue("token", resetToken, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }, [form]);
+  async function handleResetPasswordAction() {
+    const values = form.getValues();
+
+    try {
+      await resetPasswordMutation.mutateAsync({
+        token: values.token.trim(),
+        newPassword: values.newPassword,
+      });
+      router.replace("/login?passwordChanged=1");
+    } catch (error) {
+      toast.error("Không thể đặt lại mật khẩu", {
+        description: getAuthErrorMessage(
+          error,
+          "Chưa thể đặt lại mật khẩu. Vui lòng thử lại sau ít phút.",
+        ),
+      });
+    }
+  }
   const handleResetPasswordSubmit = (event: SubmitIntentEvent) =>
-    handleSubmitIntent(
-      event,
-      form,
-      () => submitMock("reset-password", setSubmitState),
-      setSubmitState,
-    );
+    handleSubmitIntent(event, form, handleResetPasswordAction);
 
   return (
     <form
@@ -890,15 +987,6 @@ export function ResetPasswordForm() {
           {...form.register("confirmPassword")}
         />
       </div>
-
-      {submitState.status === "success" ? (
-        <FormStatus
-          tone="success"
-          title={submitState.result.title}
-          message={submitState.result.message}
-          detail={submitState.result.detail}
-        />
-      ) : null}
 
       <SubmitButton isPending={isPending} onClick={handleResetPasswordSubmit}>
         Đặt lại mật khẩu

@@ -11,3 +11,193 @@ body {
   color: var(--foreground);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
+
+[data-sonner-toaster].app-toaster {
+  pointer-events: none !important;
+}
+
+[data-sonner-toast].app-toast {
+  --app-toast-progress-color: #64748b;
+  --app-toast-duration: 4200ms;
+
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr) !important;
+  align-items: start !important;
+  column-gap: 7px !important;
+  width: min(calc(100vw - 24px), 380px) !important;
+  padding: 12px 32px 12px 10px !important;
+  border: 1px solid transparent !important;
+  border-left-width: 4px !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 36px rgb(15 23 42 / 11%) !important;
+  backdrop-filter: blur(10px);
+  overflow: hidden !important;
+  pointer-events: none !important;
+  user-select: none;
+}
+
+[data-sonner-toast].app-toast[data-front="false"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+[data-sonner-toast].app-toast[data-type="success"] {
+  --app-toast-progress-color: #10b981;
+
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  border-left-color: #10b981 !important;
+  color: #047857 !important;
+}
+
+[data-sonner-toast].app-toast[data-type="error"] {
+  --app-toast-progress-color: #ef4444;
+
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  border-left-color: #ef4444 !important;
+  color: #b91c1c !important;
+}
+
+[data-sonner-toast].app-toast[data-type="warning"] {
+  --app-toast-progress-color: #f59e0b;
+
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+  border-left-color: #f59e0b !important;
+  color: #b45309 !important;
+}
+
+[data-sonner-toast].app-toast[data-type="info"] {
+  --app-toast-progress-color: #3b82f6;
+
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  border-left-color: #3b82f6 !important;
+  color: #1d4ed8 !important;
+}
+
+[data-sonner-toast].app-toast[data-type="loading"],
+[data-sonner-toast].app-toast[data-type="default"],
+[data-sonner-toast].app-toast[data-type="normal"] {
+  --app-toast-progress-color: #64748b;
+
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  border-left-color: #64748b !important;
+  color: #334155 !important;
+}
+
+[data-sonner-toast].app-toast .app-toast__icon {
+  grid-column: 1 !important;
+  width: 28px !important;
+  height: 32px !important;
+  margin: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+[data-sonner-toast].app-toast .app-toast-status-icon {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 46%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 62%);
+}
+
+[data-sonner-toast].app-toast .app-toast__content {
+  grid-column: 2 !important;
+  display: grid !important;
+  min-width: 0 !important;
+  gap: 2px !important;
+  padding-top: 0 !important;
+}
+
+[data-sonner-toast].app-toast .app-toast__content::after {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  left: -1px;
+  height: 4px;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  background: var(--app-toast-progress-color);
+  content: "";
+  opacity: 0.9;
+  transform-origin: left center;
+  animation: app-toast-countdown var(--app-toast-duration) linear forwards;
+}
+
+[data-sonner-toast].app-toast[data-type="loading"] .app-toast__content::after {
+  display: none;
+}
+
+[data-sonner-toast].app-toast .app-toast__title {
+  color: currentColor !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+}
+
+[data-sonner-toast].app-toast .app-toast__description {
+  color: currentColor !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  opacity: 0.78 !important;
+}
+
+[data-sonner-toast].app-toast .app-toast__close-button {
+  top: 10px !important;
+  right: 7px !important;
+  left: auto !important;
+  width: 24px !important;
+  height: 24px !important;
+  transform: none !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: currentColor !important;
+  box-shadow: none !important;
+  opacity: 0.58;
+  pointer-events: auto !important;
+}
+
+[data-sonner-toast].app-toast .app-toast__close-button:hover {
+  background: rgb(255 255 255 / 58%) !important;
+  opacity: 0.95;
+}
+
+[data-sonner-toast].app-toast .app-toast__action-button {
+  border-radius: 10px !important;
+  background: currentColor !important;
+  color: white !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+@keyframes app-toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toast].app-toast .app-toast__content::after {
+    animation: none;
+    opacity: 0.45;
+  }
+}
+
+[data-sonner-toast].app-toast .app-toast__cancel-button {
+  border-radius: 10px !important;
+  background: rgb(255 255 255 / 65%) !important;
+  color: currentColor !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}

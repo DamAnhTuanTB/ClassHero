@@ -14,7 +14,7 @@ Auth trong repo tách thành 2 loại token:
 
 Register chỉ tạo tài khoản và profile. Login mới cấp cặp access/refresh token.
 
-`M2.4` thêm lớp UI mock cho auth. Mock UI chưa gọi API thật, nhưng bám đúng contract để sau này thay bằng API client mà không đổi luồng màn hình.
+`M2.4` thêm lớp UI auth và đã nối với API thật. UI vẫn giữ layout đã duyệt, nhưng phần submit dùng API client, TanStack Query mutation và session store thay cho mock handler.
 
 ## Luồng code end-to-end
 
@@ -28,7 +28,9 @@ Register chỉ tạo tài khoản và profile. Login mới cấp cặp access/re
 8. API cần đăng nhập đi qua `JwtAuthGuard`: verify JWT, kiểm tra user còn active trong database, rồi gắn `request.user`.
 9. API cần role cụ thể đi qua `RolesGuard` và `@Roles(...)`; sai role trả `403`.
 10. Response đi qua global API envelope thành `{ data, meta }`.
-11. Với UI mock `M2.4`, route Next.js render từng form public, React Hook Form validate bằng Zod, mock submit tạo trạng thái loading/success/error để owner review flow trước khi nối API.
+11. Với UI `M2.4`, route Next.js render từng form public, React Hook Form validate bằng Zod, rồi TanStack Query mutation gọi API thật qua `apiRequest`.
+12. Login thành công lưu access token, refresh token và user vào Zustand store, đồng thời persist vào `localStorage` hoặc `sessionStorage` theo lựa chọn "Ghi nhớ đăng nhập".
+13. Register student/parent gọi endpoint tạo tài khoản thật; khi thành công UI hiển thị toast rồi redirect về `/login`. Forgot password gửi tên đăng nhập/số điện thoại, họ tên và khối lớp; nếu 3 thông tin khớp database thì API trả reset token để UI chuyển ngay sang bước đổi mật khẩu, còn mismatch trả lỗi cho toast. Reset password dùng token đó hoặc token từ URL/email nếu có.
 
 ## Front-end
 
@@ -37,8 +39,8 @@ Các route UI auth hiện có:
 - `/login`: form identifier + password cho Student/Parent/Admin.
 - `/register/student`: form tạo tài khoản học sinh theo body `POST /auth/register/student`.
 - `/register/parent`: form tạo tài khoản phụ huynh theo body `POST /auth/register/parent`.
-- `/forgot-password`: form gửi identifier, luôn hiển thị thông báo chung để không lộ tài khoản có tồn tại hay không.
-- `/reset-password`: form token + mật khẩu mới, mô phỏng reset thành công và revoke phiên cũ.
+- `/forgot-password`: form giữ đủ các ô đã duyệt gồm tên đăng nhập/số điện thoại, họ tên và khối lớp; submit gửi cả 3 field vào API, thông tin khớp thì chuyển sang form "Đổi mật khẩu", không khớp thì hiển thị toast lỗi.
+- `/reset-password`: form token + mật khẩu mới, đọc token từ query email reset nếu có, gọi API thật và quay lại login sau khi đổi mật khẩu.
 
 UI tách thành:
 
@@ -46,9 +48,12 @@ UI tách thành:
 - shell chung trong `apps/web/features/auth/auth-page-shell.tsx`,
 - form client trong `apps/web/features/auth/auth-forms.tsx`,
 - Zod schema trong `apps/web/features/auth/auth-schemas.ts`,
-- mock action trong `apps/web/features/auth/mock-auth.ts`.
+- auth API wrappers trong `apps/web/features/auth/auth-api.ts`,
+- auth session store trong `apps/web/features/auth/auth-session.ts`,
+- API envelope/error parser dùng chung trong `apps/web/lib/api-client.ts`,
+- TanStack Query provider trong `apps/web/app/providers.tsx`.
 
-Khi làm `/task-connect M2.4`, phần mock action sẽ được thay bằng API client thật, còn layout/form state có thể giữ lại.
+Parent register không hiển thị email theo UI đã duyệt. API nhận `phone`, `password`, `fullName` là phần bắt buộc; `email` optional cho client tương lai nhưng không được dùng để ép UI hiện tại đổi flow.
 
 ## Back-end/API
 
@@ -81,23 +86,36 @@ Các bảng dùng lại từ `M1.2`:
 
 ## Worker/AI/Integration
 
-M2.3 chưa thêm worker email riêng. Forgot password sẽ gọi Resend trực tiếp nếu `RESEND_API_KEY` và `RESEND_FROM_EMAIL` đã cấu hình thật. Nếu local/dev chưa có env thật, API vẫn tạo reset token hash và trả response chung để không lộ identifier có tồn tại hay không.
+M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, API xác minh 3 field rồi trả reset token raw một lần cho client để đổi mật khẩu inline; database chỉ lưu hash của token. Luồng email qua Resend vẫn có helper trong service cho trường hợp sau này cần khôi phục qua email, nhưng không được dùng để đổi UI hiện tại.
 
 ## Kỹ thuật cần nhớ
 
+- API response luôn qua envelope `{ data, meta }`, nên front-end dùng `apiRequest<T>()` để lấy đúng `data` và chuyển error envelope thành `ApiRequestError`.
+- Auth mutation dùng TanStack Query để có pending/error state rõ. Không optimistic UI cho auth vì đây là flow bảo mật và cần server xác nhận.
+- Login token raw chỉ nên lưu phía client sau khi API trả thành công. Store hiện tại dùng Zustand cho state runtime và browser storage cho persistence theo lựa chọn ghi nhớ đăng nhập.
+- Khi `/task-connect` một UI đã được owner duyệt, API/client phải thích nghi với UI đó. Không tự thêm field hoặc xóa field trên form chỉ vì DTO hiện tại chưa khớp; nếu contract thiếu thì sửa contract/API hoặc map payload rõ ràng.
 - Password không được lưu plain text; repo dùng `scrypt` với salt riêng khi tạo tài khoản mới.
 - Seed dev cũ cũng dùng format `scrypt`, nên AuthService vẫn verify được user seed.
 - Refresh token raw chỉ trả cho client một lần. DB chỉ giữ SHA-256 hash để nếu DB lộ cũng không dùng trực tiếp được token.
 - Refresh token rotation giúp token cũ bị vô hiệu hóa ngay sau khi đổi token mới.
 - Reset password token raw cũng không lưu DB. Khi reset thành công, backend set `used_at` và revoke toàn bộ refresh token cũ của user.
+- Với forgot password dùng họ tên để xác minh, backend chuẩn hóa tên bằng trim, gộp khoảng trắng, chuẩn Unicode và lower-case tiếng Việt trước khi so sánh. Vì vậy user nhập sai hoa/thường vẫn hợp lệ, nhưng thiếu dấu hoặc sai ký tự vẫn bị từ chối.
 - RBAC phải nằm ở backend guard/service, không được chỉ ẩn nút trên UI.
+- Với NestJS chạy bằng `tsx` trong dev, không nên phụ thuộc hoàn toàn vào `design:paramtypes` metadata cho DTO validation hoặc dependency injection. Auth controller dùng `createDtoValidationPipe(DtoClass)` để truyền DTO class trực tiếp cho `ValidationPipe`, còn guard/service/controller dùng `@Inject(...)` cho dependency quan trọng.
 - Với auth form trên mobile/iOS, không nên tự dựng dropdown bằng `button + listbox` nếu thư viện UI đã có control tương ứng. Ưu tiên shadcn/Radix Select để có hành vi focus, portal, keyboard và touch ổn định hơn. Nếu Safari iOS không kích hoạt `click` ổn định trên trigger custom, giữ Radix Select nhưng điều khiển `open` chủ động bằng touch/pointer handler; không quay về giao diện native khi owner đã chốt custom UI.
 - Nếu text input vẫn nhập được nhưng checkbox/select custom/validate/submit đều không chạy và form bị reload, cần nghi ngờ client JS chưa hydrate trên thiết bị đó. Với Next dev local trên iPhone, ưu tiên chạy webpack dev server thay vì Turbopack dev để giảm rủi ro chunk dev/HMR không chạy trên iOS; đây là vấn đề dev runtime, không phải lỗi riêng từng form control.
 - Khi test Next dev từ iPhone qua IP LAN, nếu terminal báo chặn `/_next/webpack-hmr` từ IP của máy dev, thêm IP LAN vào `allowedDevOrigins` trong `next.config.ts` và restart dev server. Repo đang tự lấy IPv4 LAN của máy khi server khởi động để tránh lỗi này khi đổi Wi-Fi/IP.
 - Nếu Safari ổn nhưng Chrome/Google iOS hiện Next dev overlay `A tree hydrated...` trong khi tương tác vẫn chạy, cần kiểm tra browser có chèn attribute lạ vào HTML trước hydration hay không. Với auth form ở local dev, repo dùng một dev-only hydration boundary để không SSR form controls ban đầu; production vẫn render bình thường.
 
+## Luồng lỗi thường gặp
+
+- Nếu request auth thiếu field bắt buộc trả `500` thay vì `400 VALIDATION_ERROR`, kiểm tra controller đã dùng `createDtoValidationPipe(DtoClass)` chưa. Khi DTO validation không chạy, body thiếu field có thể đi thẳng vào service và gây lỗi kiểu `undefined.trim()`.
+- Nếu route có `RolesGuard` trả `500` với lỗi `getAllAndOverride` trên `undefined`, kiểm tra guard có inject `Reflector` bằng `@Inject(Reflector)` chưa. Trong dev runtime thiếu metadata, constructor DI không explicit có thể nhận `undefined`.
+
 ## File quan trọng
 
+- `apps/api/src/common/validation/validation-error.ts`
+- `apps/api/src/common/auth/roles.guard.ts`
 - `apps/api/src/modules/auth/auth.controller.ts`
 - `apps/api/src/modules/auth/profile.controller.ts`
 - `apps/api/src/modules/auth/auth.service.ts`
@@ -110,6 +128,8 @@ M2.3 chưa thêm worker email riêng. Forgot password sẽ gọi Resend trực t
 - `apps/web/app/(public)/reset-password/page.tsx`
 - `apps/web/features/auth/*.tsx`
 - `apps/web/features/auth/*.ts`
+- `apps/web/lib/api-client.ts`
+- `apps/web/app/providers.tsx`
 - `docs/api/auth-profile.md`
 
 ## Task liên quan

@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên làm việc nhanh hơn. Nó không thay thế `AGENTS.md` hoặc docs gốc trong `docs/`.
 
@@ -8,7 +8,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, Postgres + pgvector local, Redis, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout; `M2.3` đã thêm JWT auth guard, RBAC guard/decorator, `GET /me`, cập nhật student profile và forgot/reset password; `M2.4` đã có UI mock cho login/register/forgot/reset password, chưa nối API thật.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout; `M2.3` đã thêm JWT auth guard, RBAC guard/decorator, `GET /me`, cập nhật student profile và forgot/reset password; `M2.4` đã nối auth UI với API thật cho login/register student/register parent/forgot/reset password, dùng TanStack Query mutations, lưu session/token client-side bằng Zustand + browser storage, và bổ sung explicit DTO validation pipe để auth API validate ổn khi chạy dev bằng `tsx`.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
@@ -41,6 +41,8 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - Với task làm UI hoặc owner yêu cầu sửa UI, mặc định ưu tiên tốc độ: hạn chế typecheck/lint/build/E2E. Chỉ chạy check lớn khi thay đổi chạm shared component, form/state/route phức tạp, nhiều màn, data-connected UI, hoặc owner yêu cầu rõ. UI nhỏ chỉ cần `git diff --check`, format check nhỏ hoặc ghi chú kiểm tra thủ công.
 - Khi owner ghi `sửa nhanh`, `fast`, hoặc `check nhẹ`, mặc định dùng fast path: đọc phạm vi nhỏ nhất, patch trực tiếp, không refactor/cleanup lan, không cập nhật changelog, không chạy typecheck/lint/build/Playwright/E2E trừ khi đụng auth/API/database/shared logic, route guard, form/session/data behavior hoặc có dấu hiệu TypeScript lỗi rõ.
 - Theo preference mới của owner, từ nay không tự chạy browser check, Playwright UI, screenshot hoặc kiểm tương tác thật cho mỗi task/bug/sửa UI; owner sẽ tự kiểm tra. Chỉ chạy các check code tĩnh/focused trừ khi owner yêu cầu rõ kiểm browser/screenshot.
+- Khi owner bảo "ghép API", "nối API", "connect API" hoặc dùng `/task-connect` sau khi đã feedback UI, mặc định hiểu UI hiện tại đã được chốt/ưng. Codex phải giữ nguyên layout, field, label, placeholder, validation UX và flow màn hình; nếu API/database hiện tại chưa khớp UI thì sửa API contract, backend, database hoặc mapping payload cho phù hợp, không tự thêm/xóa/sửa field UI để ép theo DTO cũ nếu owner không yêu cầu rõ.
+- Sau khi sửa backend/API cho UI owner đang test, phải verify đúng API origin web đang gọi, thường là `localhost:4000`; nếu cổng này đang có dev server cũ thì restart server đó rồi curl lại payload lỗi. Không chỉ verify trên cổng tạm như `4001` rồi để owner tiếp tục hit bản cũ ở `4000`.
 - Khi làm public page có mục tiêu xuất hiện Google, Codex phải đọc SEO docs bên cạnh UI/performance docs.
 - Khi owner không hài lòng và Codex đưa ra giải pháp/quy tắc mới có thể tái sử dụng, Codex phải tự ghi lại ngay vào docs/skill/context phù hợp, không chờ owner hỏi lại đã note chưa.
 - Với các skill có làm UI, screenshot/browser/Playwright/kiểm tương tác thật là opt-in: chỉ chạy khi owner yêu cầu rõ, ví dụ command có từ `screenshot` hoặc nói "kiểm bằng browser"; nếu không có yêu cầu đó thì dùng check code tĩnh/focused và để owner tự kiểm UI/tương tác.
@@ -55,13 +57,13 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau UI mock `M2.4` nên làm:
+Theo roadmap hiện tại, sau khi nối API thật cho `M2.4` nên làm:
 
 ```txt
-/task-connect M2.4
+/task-full M3.1
 ```
 
-Mục tiêu `M2.4` bước connect: thay mock auth UI bằng API auth/profile thật, lưu session/token theo pattern đã chốt và kiểm tra flow đăng ký/đăng nhập/forgot/reset từ UI.
+Mục tiêu `M3.1`: xây Admin learning path API để admin quản lý lộ trình học, mở khóa các task lesson/course public tiếp theo.
 
 ## 4. Khi nào cập nhật file này
 

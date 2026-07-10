@@ -4,9 +4,9 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 
 ## Feature Notes
 
-| Note                                     | Chủ đề                                                         | Task liên quan | Trạng thái  |
-| ---------------------------------------- | -------------------------------------------------------------- | -------------- | ----------- |
-| [Basic Auth API](features/auth-basic.md) | Auth, RBAC, profile base, refresh/reset password, auth UI mock | `M2.2`-`M2.4`  | Đã cập nhật |
+| Note                                     | Chủ đề                                                                 | Task liên quan | Trạng thái  |
+| ---------------------------------------- | ---------------------------------------------------------------------- | -------------- | ----------- |
+| [Basic Auth API](features/auth-basic.md) | Auth, RBAC, profile base, refresh/reset password, auth UI nối API thật | `M2.2`-`M2.4`  | Đã cập nhật |
 
 ## Foundation Notes
 

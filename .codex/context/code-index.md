@@ -1,6 +1,6 @@
 # Code Index
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 File này là bản đồ nhanh của code hiện tại để Codex tìm đúng nơi sửa. Nó chỉ mô tả code đang có hoặc vị trí dự kiến đã được docs chốt; không thay thế việc đọc file thật trước khi sửa.
 
@@ -23,21 +23,21 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 
 ## 2. Front-end
 
-| Path                                    | Vai trò                                                              |
-| --------------------------------------- | -------------------------------------------------------------------- |
-| `apps/web`                              | Next.js App Router front-end                                         |
-| `apps/web/app/(public)/page.tsx`        | Landing page tạm thời, có link vào auth UI mock                      |
-| `apps/web/app/(public)/login`           | Route đăng nhập mock cho `M2.4`                                      |
-| `apps/web/app/(public)/register`        | Route đăng ký student/parent mock cho `M2.4`                         |
-| `apps/web/app/(public)/forgot-password` | Route quên mật khẩu mock cho `M2.4`                                  |
-| `apps/web/app/(public)/reset-password`  | Route đặt lại mật khẩu mock cho `M2.4`                               |
-| `apps/web/app/globals.css`              | Tailwind/global styles                                               |
-| `apps/web/components`                   | Component dùng chung, hiện mới có `.gitkeep`                         |
-| `apps/web/features/auth`                | Auth UI shell, forms, Zod schemas và mock submit cho `M2.4`          |
-| `apps/web/lib`                          | Client utilities/API client/hooks dùng chung, hiện mới có `.gitkeep` |
-| `apps/web/playwright.config.ts`         | Playwright config, tự build/start web và lưu report local            |
-| `apps/web/tests/auth-ui.spec.ts`        | E2E/screenshot smoke test cho auth UI `M2.4`                         |
-| `apps/web/tests`                        | Test front-end theo feature                                          |
+| Path                                    | Vai trò                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `apps/web`                              | Next.js App Router front-end                                              |
+| `apps/web/app/(public)/page.tsx`        | Landing page tạm thời, có link vào auth UI                                |
+| `apps/web/app/(public)/login`           | Route đăng nhập nối API thật cho `M2.4`                                   |
+| `apps/web/app/(public)/register`        | Route đăng ký student/parent nối API thật cho `M2.4`                      |
+| `apps/web/app/(public)/forgot-password` | Route quên mật khẩu nối API thật cho `M2.4`                               |
+| `apps/web/app/(public)/reset-password`  | Route đặt lại mật khẩu nối API thật cho `M2.4`                            |
+| `apps/web/app/globals.css`              | Tailwind/global styles                                                    |
+| `apps/web/components`                   | Component dùng chung, gồm primitive UI như select                         |
+| `apps/web/features/auth`                | Auth UI shell, forms, Zod schemas, API client và session store cho `M2.4` |
+| `apps/web/lib`                          | Client utilities/API client dùng chung, gồm `api-client.ts`               |
+| `apps/web/playwright.config.ts`         | Playwright config, tự build/start web và lưu report local                 |
+| `apps/web/tests/auth-ui.spec.ts`        | E2E/screenshot smoke test cho auth UI `M2.4`                              |
+| `apps/web/tests`                        | Test front-end theo feature                                               |
 
 Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<feature>/` và route trong `apps/web/app/...`.
 
@@ -55,7 +55,7 @@ Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<fe
 | `apps/api/src/modules`           | Domain modules                                                                    |
 | `apps/api/src/common`            | Common providers/guards/filters/interceptors                                      |
 | `apps/api/src/common/auth`       | JWT auth guard, roles guard/decorator và current user decorator                   |
-| `apps/api/src/common/validation` | Global validation error helper                                                    |
+| `apps/api/src/common/validation` | Global validation error helper và explicit DTO validation pipe                    |
 | `apps/api/src/config`            | Env validation và Swagger setup                                                   |
 | `apps/api/src/modules/auth`      | Auth/profile API cho register/login/refresh/logout, `/me`, RBAC và reset password |
 | `apps/api/src/modules/auth/dto`  | DTO validation cho auth request bodies                                            |

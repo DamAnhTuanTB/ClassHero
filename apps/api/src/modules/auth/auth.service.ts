@@ -49,6 +49,11 @@ const authUserSelect = {
   passwordHash: true,
   fullName: true,
   deletedAt: true,
+  studentProfile: {
+    select: {
+      grade: true,
+    },
+  },
 } satisfies Prisma.UserSelect;
 
 const currentUserSelect = {
@@ -179,7 +184,7 @@ export class AuthService {
   }
 
   async registerParent(dto: RegisterParentDto) {
-    const email = normalizeEmail(dto.email);
+    const email = dto.email ? normalizeEmail(dto.email) : null;
     const phone = normalizePhone(dto.phone);
     const passwordHash = await hashPassword(dto.password);
 
@@ -302,8 +307,13 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto, context: RequestContext = {}) {
     const user = await this.findUserByIdentifier(dto.identifier);
 
-    if (!user || user.deletedAt || user.status !== UserStatus.ACTIVE) {
-      return { success: true };
+    if (
+      !user ||
+      user.deletedAt ||
+      user.status !== UserStatus.ACTIVE ||
+      !matchesPasswordResetIdentity(user, dto)
+    ) {
+      throwInvalidRecoveryInfo();
     }
 
     const now = new Date();
@@ -336,7 +346,7 @@ export class AuthService {
           entityType: "User",
           entityId: user.id,
           metadata: {
-            deliveryChannel: user.email ? "email" : "none",
+            deliveryChannel: "inline",
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -344,9 +354,7 @@ export class AuthService {
       }),
     ]);
 
-    await this.sendPasswordResetEmail(user, resetToken.rawToken);
-
-    return { success: true };
+    return { success: true, resetToken: resetToken.rawToken };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -620,7 +628,7 @@ export class AuthService {
   }
 
   private async createParentWithProfile(data: {
-    email: string;
+    email: string | null;
     phone: string;
     passwordHash: string;
     fullName: string;
@@ -628,7 +636,7 @@ export class AuthService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         await assertUniqueIdentity(tx, {
-          email: data.email,
+          email: data.email ?? undefined,
           phone: data.phone,
         });
 
@@ -985,6 +993,10 @@ function normalizeName(name: string) {
   return name.trim().replace(/\s+/g, " ");
 }
 
+function normalizeNameForIdentityMatch(name: string) {
+  return normalizeName(name).normalize("NFC").toLocaleLowerCase("vi-VN");
+}
+
 function normalizeNullableText(value: string) {
   const normalized = value.trim().replace(/\s+/g, " ");
   return normalized.length > 0 ? normalized : null;
@@ -1015,6 +1027,21 @@ function serializeUser(user: Pick<AuthUser, keyof UserResponse>): UserResponse {
     username: user.username,
     fullName: user.fullName,
   };
+}
+
+function matchesPasswordResetIdentity(user: AuthUser, dto: ForgotPasswordDto) {
+  if (
+    normalizeNameForIdentityMatch(user.fullName ?? "") !==
+    normalizeNameForIdentityMatch(dto.fullName)
+  ) {
+    return false;
+  }
+
+  if (user.role !== UserRole.STUDENT || user.studentProfile?.grade !== dto.grade) {
+    return false;
+  }
+
+  return true;
 }
 
 function serializeCurrentUser(user: CurrentUser) {
@@ -1088,6 +1115,13 @@ function throwInvalidResetToken(): never {
   throw new BadRequestException({
     code: "INVALID_RESET_TOKEN",
     message: "Token đặt lại mật khẩu không hợp lệ",
+  });
+}
+
+function throwInvalidRecoveryInfo(): never {
+  throw new BadRequestException({
+    code: "INVALID_RECOVERY_INFO",
+    message: "Thông tin khôi phục chưa chính xác",
   });
 }
 
