@@ -1,15 +1,9 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { CanActivate, ExecutionContext, Inject, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { UserRole } from "@prisma/client";
-import { AuthenticatedRequest } from "./authenticated-request";
-import { ROLES_KEY } from "./roles.decorator";
+import { AuthenticatedRequest } from "#api/common/auth/authenticated-request";
+import { ROLES_KEY } from "#api/common/auth/roles.decorator";
+import { throwForbidden, throwUnauthorized } from "#api/common/errors/api-exception";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -28,17 +22,11 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     if (!request.user) {
-      throw new UnauthorizedException({
-        code: "UNAUTHORIZED",
-        message: "Bạn cần đăng nhập để thực hiện thao tác này",
-      });
+      throwUnauthorized("UNAUTHORIZED", "Bạn cần đăng nhập để thực hiện thao tác này");
     }
 
     if (!roles.includes(request.user.role)) {
-      throw new ForbiddenException({
-        code: "FORBIDDEN",
-        message: "Bạn không có quyền thực hiện thao tác này",
-      });
+      throwForbidden("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này");
     }
 
     return true;

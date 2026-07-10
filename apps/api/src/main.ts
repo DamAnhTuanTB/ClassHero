@@ -2,12 +2,12 @@ import "reflect-metadata";
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module";
-import { ApiResponseInterceptor } from "./common/api/api-response.interceptor";
-import { HttpExceptionFilter } from "./common/errors/http-exception.filter";
-import { createValidationException } from "./common/validation/validation-error";
-import { EnvConfig, parseCorsOrigins } from "./config/env.validation";
-import { setupSwagger } from "./config/swagger";
+import { AppModule } from "#api/app.module";
+import { ApiResponseInterceptor } from "#api/common/api/api-response.interceptor";
+import { HttpExceptionFilter } from "#api/common/errors/http-exception.filter";
+import { createValidationException } from "#api/common/validation/validation-error";
+import { EnvConfig, parseCorsOrigins } from "#api/config/env.validation";
+import { setupSwagger } from "#api/config/swagger";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {

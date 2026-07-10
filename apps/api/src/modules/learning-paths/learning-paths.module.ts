@@ -1,13 +1,14 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
-import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
-import { RolesGuard } from "../../common/auth/roles.guard";
-import { AuthModule } from "../auth/auth.module";
-import { AdminLessonsController } from "./admin-lessons.controller";
-import { AdminLearningPathsController } from "./admin-learning-paths.controller";
-import { LearningPathsService } from "./learning-paths.service";
-import { LessonsService } from "./lessons.service";
-import { PublicLearningPathsController } from "./public-learning-paths.controller";
+import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
+import { OptionalJwtAuthGuard } from "#api/common/auth/optional-jwt-auth.guard";
+import { RolesGuard } from "#api/common/auth/roles.guard";
+import { AuthModule } from "#api/modules/auth/auth.module";
+import { AdminLearningPathsController } from "#api/modules/learning-paths/controllers/admin-learning-paths.controller";
+import { AdminLessonsController } from "#api/modules/learning-paths/controllers/admin-lessons.controller";
+import { LearningPathsService } from "#api/modules/learning-paths/services/learning-paths.service";
+import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
+import { PublicLearningPathsController } from "#api/modules/learning-paths/controllers/public-learning-paths.controller";
 
 @Module({
   imports: [AuthModule, JwtModule.register({})],
@@ -16,7 +17,13 @@ import { PublicLearningPathsController } from "./public-learning-paths.controlle
     AdminLessonsController,
     PublicLearningPathsController,
   ],
-  providers: [LearningPathsService, LessonsService, JwtAuthGuard, RolesGuard],
+  providers: [
+    LearningPathsService,
+    LessonsService,
+    JwtAuthGuard,
+    OptionalJwtAuthGuard,
+    RolesGuard,
+  ],
   exports: [LearningPathsService],
 })
 export class LearningPathsModule {}

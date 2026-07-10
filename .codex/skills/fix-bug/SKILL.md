@@ -74,6 +74,8 @@ Non-negotiable:
 - Update docs only when the actual contract, schema, AI/RAG behavior, env, or workflow changes.
 - If a database/API/AI behavior change is required, follow `AGENTS.md` rules for updating the corresponding docs.
 - If SEO/indexability behavior changes, update `docs/13-seo-and-content-discovery.md` or related public docs when needed.
+- For backend fixes in `apps/api/src`, preserve the alias convention: use `#api/...` for internal imports instead of `../` or `./`.
+- For backend fixes that touch HTTP errors, use `apps/api/src/common/errors` helpers/factories instead of adding direct Nest exception constructors with custom bodies in the fixed module.
 - For UI bugs, the fix must preserve production-like interaction. Do not replace broken behavior with static fake controls; visible buttons, checkbox/toggle state, tabs, menus, filters, forms, modals, and clickable-looking icons must keep semantic elements, state/handlers, and feedback.
 - If the bug reveals a small roadmap dependency/TODO issue, update `.codex/plans/codex-execution-plan.md`; ask the owner before major roadmap or scope changes.
 - If a fix requires a secret, paid service, production access, or large product decision, stop and ask.

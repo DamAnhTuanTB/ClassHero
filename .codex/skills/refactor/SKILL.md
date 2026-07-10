@@ -52,6 +52,8 @@ Before editing:
 ## Common Refactor Targets
 
 - Backend: controller -> DTO/guard/validation -> service -> Prisma/provider flow.
+- Back-end module reorganization: keep module roots clean with `*.module.ts` only; group controller/service/DTO/select/serializer/helper/type files into responsibility folders instead of leaving a flat file list.
+- Back-end error handling: move repeated HTTP exception bodies and Prisma error checks into reusable helpers under `apps/api/src/common/errors`; domain utils may keep message-specific wrappers.
 - Front-end: page -> component -> hook/client/state flow.
 - Shared: schemas/types/constants reused by web/API.
 - Worker/AI: queue job -> worker -> provider -> DB/status/cache flow.

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Baloo_2, Be_Vietnam_Pro } from "next/font/google";
-import { AppToaster } from "./app-toaster";
-import { Providers } from "./providers";
-import "./globals.css";
+import { Providers } from "@/app/providers";
+import { AppToaster } from "@/app/toaster";
+import "@/app/globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],

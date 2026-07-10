@@ -1,16 +1,11 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { CanActivate, ExecutionContext, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { UserRole, UserStatus } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
-import { EnvConfig } from "../../config/env.validation";
-import { AuthenticatedRequest } from "./authenticated-request";
+import { AuthenticatedRequest } from "#api/common/auth/authenticated-request";
+import { throwUnauthorized as throwApiUnauthorized } from "#api/common/errors/api-exception";
+import { PrismaService } from "#api/common/prisma/prisma.service";
+import { EnvConfig } from "#api/config/env.validation";
 
 type AccessTokenPayload = {
   sub?: unknown;
@@ -119,8 +114,5 @@ function isUserRole(value: unknown): value is UserRole {
 }
 
 function throwUnauthorized(): never {
-  throw new UnauthorizedException({
-    code: "UNAUTHORIZED",
-    message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
-  });
+  throwApiUnauthorized("UNAUTHORIZED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
 }

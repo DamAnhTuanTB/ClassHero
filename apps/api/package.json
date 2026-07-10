@@ -1,6 +1,12 @@
 {
   "name": "@learning-path/api",
   "private": true,
+  "imports": {
+    "#api/*": {
+      "types": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
+  },
   "scripts": {
     "dev": "node scripts/dev-with-metadata.mjs",
     "build": "tsc -p tsconfig.build.json",

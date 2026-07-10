@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
-import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
-import { RolesGuard } from "../../common/auth/roles.guard";
-import { AuthController } from "./auth.controller";
-import { AuthService } from "./auth.service";
-import { ProfileController } from "./profile.controller";
+import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
+import { RolesGuard } from "#api/common/auth/roles.guard";
+import { AuthController } from "#api/modules/auth/controllers/auth.controller";
+import { AuthService } from "#api/modules/auth/services/auth.service";
+import { ProfileController } from "#api/modules/auth/controllers/profile.controller";
 
 @Module({
   imports: [JwtModule.register({})],

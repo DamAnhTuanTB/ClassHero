@@ -1,5 +1,5 @@
-import { BadRequestException } from "@nestjs/common";
 import type { ValidationError } from "@nestjs/common";
+import { badRequestException } from "#api/common/errors/api-exception";
 
 type ValidationErrorDetail = {
   field: string;
@@ -32,9 +32,9 @@ function flattenValidationErrors(
 }
 
 export function createValidationException(errors: ValidationError[]) {
-  return new BadRequestException({
-    code: "VALIDATION_ERROR",
-    message: "Dữ liệu không hợp lệ",
-    details: flattenValidationErrors(errors),
-  });
+  return badRequestException(
+    "VALIDATION_ERROR",
+    "Dữ liệu không hợp lệ",
+    flattenValidationErrors(errors),
+  );
 }

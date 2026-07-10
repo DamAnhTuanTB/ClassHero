@@ -44,12 +44,13 @@ Các route UI auth hiện có:
 
 UI tách thành:
 
-- route/page trong `apps/web/app/(public)/...`,
-- shell chung trong `apps/web/features/auth/auth-page-shell.tsx`,
-- form client trong `apps/web/features/auth/auth-forms.tsx`,
-- Zod schema trong `apps/web/features/auth/auth-schemas.ts`,
-- auth API wrappers trong `apps/web/features/auth/auth-api.ts`,
-- auth session store trong `apps/web/features/auth/auth-session.ts`,
+- route/page trong `apps/web/app/(auth)/...`,
+- layout chung trong `apps/web/app/(auth)/layout.tsx`, với implementation visual/form frame ở `apps/web/features/auth/layout/`,
+- form client cấp màn hình trong `apps/web/features/auth/screens/`, export qua `apps/web/features/auth/index.ts`,
+- field/helper/option nội bộ lần lượt nằm trong `apps/web/features/auth/components/`, `apps/web/features/auth/utils/`, `apps/web/features/auth/data/`,
+- Zod schema trong `apps/web/features/auth/schemas/`,
+- auth API wrappers trong `apps/web/features/auth/api/`,
+- auth session store trong `apps/web/features/auth/session/`,
 - API envelope/error parser dùng chung trong `apps/web/lib/api-client.ts`,
 - TanStack Query provider trong `apps/web/app/providers.tsx`.
 
@@ -121,13 +122,13 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - `apps/api/src/modules/auth/auth.service.ts`
 - `apps/api/src/modules/auth/dto/*.ts`
 - `apps/api/src/common/auth/*.ts`
-- `apps/web/app/(public)/login/page.tsx`
-- `apps/web/app/(public)/register/student/page.tsx`
-- `apps/web/app/(public)/register/parent/page.tsx`
-- `apps/web/app/(public)/forgot-password/page.tsx`
-- `apps/web/app/(public)/reset-password/page.tsx`
-- `apps/web/features/auth/*.tsx`
-- `apps/web/features/auth/*.ts`
+- `apps/web/app/(auth)/login/page.tsx`
+- `apps/web/app/(auth)/register/student/page.tsx`
+- `apps/web/app/(auth)/register/parent/page.tsx`
+- `apps/web/app/(auth)/forgot-password/page.tsx`
+- `apps/web/app/(auth)/reset-password/page.tsx`
+- `apps/web/features/auth/screens/`
+- `apps/web/features/auth/api/`, `components/`, `data/`, `schemas/`, `session/`, `layout/`, `utils/`
 - `apps/web/lib/api-client.ts`
 - `apps/web/app/providers.tsx`
 - `docs/api/auth-profile.md`

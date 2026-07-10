@@ -21,8 +21,11 @@ Behavior:
 - Chỉ trả `PUBLISHED`.
 - M3.1 trả public list tối thiểu theo `subject`, `grade`, pagination để bảo đảm student/public không thấy `DRAFT`, `HIDDEN`, `ARCHIVED` hoặc soft-deleted.
 - M3.3 bổ sung ưu tiên lộ trình theo grade của student và enrollment/trial state khi authenticated.
+- Nếu request có `Authorization: Bearer <access_token>` hợp lệ của student, danh sách ưu tiên lộ trình cùng `student_profiles.grade` khi query không truyền `grade`.
+- Response item có `summary` cho course card/detail và `access` gồm active enrollment/trial state an toàn cho UI.
+- Response `meta` có `priorityGrade` và `gradeGroups` để UI group/filter theo grade.
 
-### `GET /learning-paths/:id`
+### `GET /learning-paths/:idOrSlug`
 
 Role: public hoặc authenticated.
 
@@ -32,6 +35,31 @@ Behavior:
 - Trả lessons public metadata.
 - Chỉ trả lộ trình `PUBLISHED`.
 - M3.3 bổ sung trạng thái enrollment/trial nếu authenticated.
+- `idOrSlug` nhận UUID hoặc slug public ổn định.
+
+Response item fields bổ sung từ M3.3:
+
+```json
+{
+  "summary": {
+    "lessonCount": 12,
+    "firstLessonId": "uuid",
+    "effectivePriceVnd": 1500000,
+    "hasDiscount": true
+  },
+  "access": {
+    "hasActiveEnrollment": false,
+    "enrollment": null,
+    "trialAvailable": true,
+    "trialLessonId": "uuid"
+  }
+}
+```
+
+Ghi chú:
+
+- `hasActiveEnrollment` chỉ tính cho authenticated student và yêu cầu enrollment `ACTIVE`, `startsAt <= now`, `expiresAt > now`.
+- Parent selected child/enrollment state sẽ nối ở milestone parent/payment sau; hiện parent token vẫn xem được dữ liệu public an toàn như guest.
 
 ---
 

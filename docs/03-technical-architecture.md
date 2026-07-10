@@ -168,6 +168,12 @@ Dữ liệu lưu dạng Tiptap JSON. Công thức Toán/Lý/Hóa lưu LaTeX tron
 - JWT access token + refresh token.
 - RBAC guard.
 - BullMQ.
+
+### Import alias
+
+- Back-end source trong `apps/api/src` dùng alias native Node `#api/...` cho import/export nội bộ.
+- Alias khai báo trong `apps/api/package.json` bằng package `imports`: TypeScript resolve về `src`, runtime Node resolve về `dist`.
+- Không dùng `@/...` trong `apps/api` nếu chưa bổ sung runtime resolver tương ứng, vì `tsc` không tự rewrite alias cho Node.
 - Socket.IO.
 
 ### API foundation
@@ -177,6 +183,8 @@ Dữ liệu lưu dạng Tiptap JSON. Công thức Toán/Lý/Hóa lưu LaTeX tron
 - Env bắt buộc được validate khi boot API để thiếu cấu hình báo lỗi rõ.
 - Request DTO dùng global validation pipe với whitelist và transform.
 - Response lỗi dùng envelope `{ "error": { "code", "message", "details" } }`.
+- HTTP exception phải tạo qua helper/factory trong `apps/api/src/common/errors` để giữ code/message/details thống nhất; module domain không tự dựng trực tiếp Nest exception với body riêng lẻ.
+- Prisma error mapping dùng helper chung trong `apps/api/src/common/errors`, còn module domain quyết định message nghiệp vụ phù hợp.
 
 ### Module đề xuất
 
@@ -211,12 +219,15 @@ Mỗi module nên tách:
 
 ```txt
 module/
+├── controllers/
 ├── dto/
+├── selectors/
+├── serializers/
+├── services/
 ├── types/
-├── module.ts
-├── controller.ts
-├── service.ts
-├── repository.ts nếu cần
+├── utils/
+├── *.module.ts
+├── repositories/ nếu cần
 └── tests/
 ```
 
@@ -225,6 +236,7 @@ Quy tắc:
 - Controller chỉ xử lý HTTP boundary.
 - Service chứa nghiệp vụ.
 - Repository hoặc PrismaService xử lý DB.
+- Root module domain chỉ giữ `*.module.ts`; không đặt dồn controller/service/helper/select/type/serializer ngang hàng ở root.
 - Không gọi AI/payment/storage trực tiếp trong controller.
 - Job nặng phải enqueue BullMQ, không xử lý blocking trong request nếu có thể.
 - Endpoint list/search hoặc flow nhạy độ trễ phải bám `docs/12-performance-and-observability.md`.

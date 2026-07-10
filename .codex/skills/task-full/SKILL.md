@@ -84,6 +84,9 @@ In plan mode, stop after this plan and wait for approval.
 Depending on the subtask, do what is necessary:
 
 - Backend/API: controller, DTO/validation, guard/RBAC, service, Swagger if project pattern exists.
+- Back-end imports in `apps/api/src` must use the native Node alias `#api/...` for internal files instead of `../` or `./`, including controller/service/DTO/guard/common/config/module imports.
+- Back-end module files must be grouped by responsibility. Keep only `*.module.ts` at `apps/api/src/modules/<domain>` root; put HTTP handlers in `controllers/`, business orchestration in `services/`, DTOs in `dto/`, Prisma selects in `selectors/`, response mappers in `serializers/`, pure helpers/errors/normalizers in `utils/`, and exported local types in `types/`.
+- Back-end HTTP errors must use reusable helpers from `apps/api/src/common/errors`; do not scatter direct Nest exception constructors with custom response bodies across controllers/services/utils.
 - Database: Prisma schema/migration/seed updates when required.
 - Front-end: page/component/hooks/forms/state and responsive, production-like interactive UI.
 - Shared package: types/schemas/constants used by both apps.

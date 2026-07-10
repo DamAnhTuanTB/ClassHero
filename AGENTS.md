@@ -281,9 +281,12 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - API response bám `docs/05-api-contract.md`.
 - Flow chính phải bám `docs/12-performance-and-observability.md` khi có list/query/cache/job/AI hoặc độ trễ đáng kể.
 - Xử lý lỗi rõ ràng, không nuốt lỗi.
+- Backend không tự tạo trực tiếp `BadRequestException`, `UnauthorizedException`, `ForbiddenException`, `NotFoundException`, `ConflictException` hoặc `InternalServerErrorException` rải rác trong module. Lỗi HTTP phải đi qua helper/factory trong `apps/api/src/common/errors` để giữ envelope `{ error: { code, message, details } }` thống nhất; module domain chỉ chọn mã lỗi, message nghiệp vụ và details cần thiết.
 - Thao tác nhạy cảm cần audit/log theo docs domain.
 - Không thêm package nặng nếu không cần thiết.
 - Không sửa database production trực tiếp; schema đổi phải có migration khi đến bước Prisma.
+- Với `apps/web`, import/export nội bộ phải dùng alias tuyệt đối `@/...` thay vì đường dẫn tương đối `../` hoặc `./`, kể cả giữa các file cùng feature/component. Chỉ ngoại lệ file tự sinh của framework hoặc import bắt buộc bởi tool không hỗ trợ alias.
+- Với `apps/api`, import/export nội bộ trong `src` phải dùng alias native Node `#api/...` thay vì đường dẫn tương đối `../` hoặc `./`. Alias này được khai báo bằng package `imports` để TypeScript đọc `src` và runtime Node đọc `dist`, nên không tự đổi sang `@/...` nếu chưa bổ sung runtime resolver tương ứng.
 
 ---
 
@@ -301,6 +304,8 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Màn hình có data/action phải có loading, empty, error, disabled state.
 - Mọi UI được tạo/sửa phải đạt cảm giác production thật: bố cục, copy, trạng thái, hành động và tương tác phải giống sản phẩm thật, dù dữ liệu bên dưới còn là mock.
 - Không làm UI tĩnh giả tương tác. Button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control hoặc icon có vẻ bấm được phải dùng element semantic, state/handler thật và feedback/pending/disabled phù hợp; nếu chưa thể nối API thì vẫn phải có tương tác local/mock đúng hành vi.
+- Không gom nhiều React component vào một file, kể cả shared primitives hoặc shadcn/Radix wrapper. Mỗi file `.tsx` chỉ nên có một component chính; subcomponent render JSX phải tách file riêng. File barrel như `index.ts` hoặc file compatibility re-export được phép export nhiều component nhưng không chứa JSX/component implementation. Component con, form control, state view, hook orchestration, schema/DTO, mapper/formatter/helper và mock data phải tách file theo feature/module rõ ràng; file page/manager chỉ nên compose layout và nối state/action cần thiết.
+- Trước khi tạo component, hook, API client/service hoặc form control mới, phải kiểm tra component/pattern đã có trong `apps/web/components`, feature tương tự và `docs/ui-references/approved-patterns.md`. Pattern đã được owner ưng phải được tái sử dụng hoặc nâng thành shared component/hook/service; không tạo lại UI/control cùng chức năng với style khác. Component/hook/helper chỉ dùng riêng một feature thì đặt trong feature đó; phần có thể dùng lại nhiều màn phải đặt ở shared layer rõ ràng.
 - Khi owner bảo "ghép API", "nối API", "connect API" hoặc dùng `/task-connect` sau khi đã feedback UI, mặc định hiểu UI hiện tại đã được chốt/ưng. Codex phải giữ nguyên layout, field, label, placeholder, validation UX và flow màn hình; nếu API/database hiện tại chưa khớp UI thì sửa API contract, backend, database hoặc mapping payload cho phù hợp, không tự thêm/xóa/sửa field UI để ép theo DTO cũ nếu owner không yêu cầu rõ.
 - Theo preference của owner, Codex không tự chạy browser check, Playwright UI, screenshot hoặc kiểm tương tác thật cho mỗi task/bug/sửa UI. Owner sẽ tự kiểm tra UI/tương tác. Chỉ chạy browser/Playwright/screenshot khi owner yêu cầu rõ, ví dụ command có từ `screenshot` hoặc nói "kiểm bằng browser".
 - Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
@@ -316,6 +321,8 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Refresh/reset token phải hash trước khi lưu DB.
 - Backend enforce RBAC/ownership, không tin UI guard.
 - Controller chỉ xử lý HTTP boundary; service chứa nghiệp vụ; DB/provider đi qua service/repository phù hợp.
+- Exception/error dùng chung đặt ở `apps/api/src/common/errors`; helper domain có thể wrap message nghiệp vụ, nhưng không được dựng body lỗi HTTP thủ công ở nhiều nơi.
+- Module backend trong `apps/api/src/modules/<domain>` không được đặt dồn controller/service/helper/select/type/serializer ngang hàng ở root module. Root module chỉ nên giữ `*.module.ts`; code phải tách theo folder trách nhiệm như `controllers/`, `services/`, `dto/`, `selectors/`, `serializers/`, `utils/`, `types/` hoặc folder chuyên biệt tương đương khi domain lớn hơn.
 - Job nặng enqueue BullMQ, không blocking request nếu có thể.
 - API list/search phải có pagination/debounce/cache/index phù hợp theo `docs/12-performance-and-observability.md`.
 

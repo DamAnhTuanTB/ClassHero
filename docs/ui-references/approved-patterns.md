@@ -79,5 +79,5 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
   - Các màn role-based entry cần cảm giác thân thiện, học đường và có visual minh họa.
   - Các UI form cần theme theo ngữ cảnh nhưng vẫn giữ chung component, spacing và interaction.
 - Evidence:
-  - Files: `apps/web/features/auth/auth-page-shell.tsx`, `apps/web/features/auth/auth-form-primitives.tsx`, `apps/web/features/auth/auth-forms.tsx`, `apps/web/components/ui/select.tsx`.
+  - Files: `apps/web/app/(auth)/layout.tsx`, `apps/web/features/auth/layout/`, `apps/web/features/auth/screens/`, `apps/web/features/auth/components/`, `apps/web/features/auth/data/`, `apps/web/features/auth/utils/`, `apps/web/components/forms/`, `apps/web/components/ui/select/`.
   - Assets: `apps/web/public/images/auth/reference/auth-hero-login-inclusive-transparent.png`, `apps/web/public/images/auth/reference/auth-hero-student-inclusive-transparent.png`, `apps/web/public/images/auth/reference/auth-hero-recovery-transparent.png`.

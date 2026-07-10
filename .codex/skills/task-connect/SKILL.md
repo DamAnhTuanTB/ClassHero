@@ -95,13 +95,19 @@ In plan mode, stop after this plan and wait for approval.
 - Use mutation invalidation where relevant.
 - Use pending state immediately for mutations; use optimistic UI only when rollback is safe and not payment/auth/security-sensitive.
 - Preserve production-like interaction when replacing mock data with APIs. Do not regress working local/mock interactions into static controls; buttons, checkbox/toggle state, tabs, menus, filters, pagination, modals, uploads, and form flows must keep semantic elements, state/handlers, and feedback.
+- Preserve the frontend file boundary: one React component implementation per `.tsx` file, with barrel files only for re-exports and no JSX implementation.
+- In `apps/web`, use absolute alias imports/exports with `@/...` for internal source files. Do not use `../` or `./` between route, feature, component, hook, schema, data, utility, or barrel files, except framework-generated files or tool-required relative imports.
+- In `apps/api`, use native Node package-import aliases with `#api/...` for internal source files. Do not use `../` or `./` between controller, service, DTO, guard, common provider, config, module, or helper files unless a tool explicitly requires it.
 - Debounce search/filter calls and use pagination/infinite query for long lists when relevant.
 - Forms use React Hook Form + Zod if validation is present.
+- Reuse existing shared components, feature hooks, API clients, and approved UI patterns before creating new ones. If API service/hook logic is reusable across screens, place it in a clear shared or feature client layer instead of mixing it into page/components.
 - Remove or isolate mock data so it cannot be confused with production data.
 - Keep loading, empty, error, and disabled states.
 - Map API response types carefully; do not hard-code data that should come from API.
 - When an approved UI field has no backend field yet, decide explicitly: store it by extending the API/database when it is part of the feature contract, or keep it as a local/verification-only field with a note when storage is out of scope. Never silently delete it from the UI.
 - Backend API should follow NestJS patterns: controller -> DTO/guard/validation -> service -> Prisma/provider.
+- Backend module organization should stay layered: keep only `*.module.ts` at module root, with `controllers/`, `services/`, `dto/`, `selectors/`, `serializers/`, `utils/`, and `types/` folders as needed. Do not add new controller/service/helper/select/type files flat beside the module file.
+- Backend HTTP errors must go through `apps/api/src/common/errors` helpers/factories so response envelopes and Prisma error mapping stay reusable instead of being rebuilt per module.
 - Backend/API/database performance must follow `docs/12-performance-and-observability.md`: pagination, select only needed fields, avoid N+1, enqueue heavy work.
 - Public/indexable API data must follow `docs/13-seo-and-content-discovery.md`: only published data, stable slug/canonical data, metadata fields when needed, and no private content exposure.
 - Enforce auth/RBAC on the backend, not only in UI.
