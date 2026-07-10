@@ -19,8 +19,8 @@ subject=MATH&grade=7&page=1&pageSize=20
 Behavior:
 
 - Chỉ trả `PUBLISHED`.
-- Nếu user là student, ưu tiên lộ trình theo grade.
-- Nếu authenticated, kèm enrollment/trial state.
+- M3.1 trả public list tối thiểu theo `subject`, `grade`, pagination để bảo đảm student/public không thấy `DRAFT`, `HIDDEN`, `ARCHIVED` hoặc soft-deleted.
+- M3.3 bổ sung ưu tiên lộ trình theo grade của student và enrollment/trial state khi authenticated.
 
 ### `GET /learning-paths/:id`
 
@@ -30,7 +30,8 @@ Behavior:
 
 - Trả thông tin lộ trình.
 - Trả lessons public metadata.
-- Trả trạng thái enrollment/trial nếu authenticated.
+- Chỉ trả lộ trình `PUBLISHED`.
+- M3.3 bổ sung trạng thái enrollment/trial nếu authenticated.
 
 ---
 
@@ -42,6 +43,14 @@ Role: `ADMIN`.
 
 Query: `status`, `subject`, `grade`, `search`, pagination.
 
+### `GET /admin/learning-paths/:id`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả chi tiết learning path chưa bị soft delete.
+
 ### `POST /admin/learning-paths`
 
 Role: `ADMIN`.
@@ -51,6 +60,7 @@ Body:
 ```json
 {
   "title": "Toán 7",
+  "slug": "toan-7",
   "subject": "MATH",
   "grade": 7,
   "originalPriceVnd": 2000000,
@@ -58,9 +68,15 @@ Body:
   "thumbnailFileId": "uuid",
   "descriptionJson": {},
   "trialEnabled": true,
-  "status": "DRAFT"
+  "status": "DRAFT",
+  "sortOrder": 1
 }
 ```
+
+Ghi chú:
+
+- `slug` optional; nếu không gửi, backend tự tạo từ `title` và đảm bảo unique.
+- `status` default là `DRAFT`.
 
 Side effects:
 
@@ -71,11 +87,23 @@ Side effects:
 
 Role: `ADMIN`.
 
+Body: partial của body create, gồm `status` để chuyển `DRAFT`, `PUBLISHED`, `HIDDEN`, `ARCHIVED`.
+
+Behavior:
+
+- Nếu chuyển sang `PUBLISHED`, set `published_at`.
+- Nếu chuyển khỏi `PUBLISHED`, clear `published_at`.
+- Ghi `audit_logs`.
+
 ### `DELETE /admin/learning-paths/:id`
 
 Role: `ADMIN`.
 
-Behavior: soft delete hoặc archive.
+Behavior: soft delete và set status `ARCHIVED`.
+
+Side effects:
+
+- Ghi `audit_logs`.
 
 ### `POST /admin/learning-paths/:id/publish`
 

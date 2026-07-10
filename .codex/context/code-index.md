@@ -1,6 +1,6 @@
 # Code Index
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 File này là bản đồ nhanh của code hiện tại để Codex tìm đúng nơi sửa. Nó chỉ mô tả code đang có hoặc vị trí dự kiến đã được docs chốt; không thay thế việc đọc file thật trước khi sửa.
 
@@ -43,25 +43,26 @@ Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<fe
 
 ## 3. Back-end
 
-| Path                             | Vai trò                                                                           |
-| -------------------------------- | --------------------------------------------------------------------------------- |
-| `apps/api`                       | NestJS API                                                                        |
-| `apps/api/src/main.ts`           | Entry NestJS API                                                                  |
-| `apps/api/src/app.module.ts`     | Root module                                                                       |
-| `apps/api/src/app.controller.ts` | Controller health/foundation hiện tại                                             |
-| `apps/api/src/app.service.ts`    | Service health/foundation hiện tại                                                |
-| `apps/api/src/common/api`        | API response envelope interceptor                                                 |
-| `apps/api/src/common/errors`     | Global HTTP error envelope filter                                                 |
-| `apps/api/src/modules`           | Domain modules                                                                    |
-| `apps/api/src/common`            | Common providers/guards/filters/interceptors                                      |
-| `apps/api/src/common/auth`       | JWT auth guard, roles guard/decorator và current user decorator                   |
-| `apps/api/src/common/validation` | Global validation error helper và explicit DTO validation pipe                    |
-| `apps/api/src/config`            | Env validation và Swagger setup                                                   |
-| `apps/api/src/modules/auth`      | Auth/profile API cho register/login/refresh/logout, `/me`, RBAC và reset password |
-| `apps/api/src/modules/auth/dto`  | DTO validation cho auth request bodies                                            |
-| `apps/api/src/jobs`              | Queue/job definitions                                                             |
-| `apps/api/src/workers`           | Worker entrypoints/processors                                                     |
-| `apps/api/test`                  | Backend tests                                                                     |
+| Path                                  | Vai trò                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `apps/api`                            | NestJS API                                                                                      |
+| `apps/api/src/main.ts`                | Entry NestJS API                                                                                |
+| `apps/api/src/app.module.ts`          | Root module                                                                                     |
+| `apps/api/src/app.controller.ts`      | Controller health/foundation hiện tại                                                           |
+| `apps/api/src/app.service.ts`         | Service health/foundation hiện tại                                                              |
+| `apps/api/src/common/api`             | API response envelope interceptor                                                               |
+| `apps/api/src/common/errors`          | Global HTTP error envelope filter                                                               |
+| `apps/api/src/modules`                | Domain modules                                                                                  |
+| `apps/api/src/common`                 | Common providers/guards/filters/interceptors                                                    |
+| `apps/api/src/common/auth`            | JWT auth guard, roles guard/decorator và current user decorator                                 |
+| `apps/api/src/common/validation`      | Global validation error helper và explicit DTO validation pipe                                  |
+| `apps/api/src/config`                 | Env validation và Swagger setup                                                                 |
+| `apps/api/src/modules/auth`           | Auth/profile API cho register/login/refresh/logout, `/me`, RBAC và reset password               |
+| `apps/api/src/modules/auth/dto`       | DTO validation cho auth request bodies                                                          |
+| `apps/api/src/modules/learning-paths` | Public published learning path API tối thiểu và admin learning path CRUD/publish API cho `M3.1` |
+| `apps/api/src/jobs`                   | Queue/job definitions                                                                           |
+| `apps/api/src/workers`                | Worker entrypoints/processors                                                                   |
+| `apps/api/test`                       | Backend tests                                                                                   |
 
 Khi làm API mới, ưu tiên tạo module trong `apps/api/src/modules/<domain>/` với controller/service/DTO/guard theo NestJS.
 

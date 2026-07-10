@@ -8,12 +8,13 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, Postgres + pgvector local, Redis, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout; `M2.3` đã thêm JWT auth guard, RBAC guard/decorator, `GET /me`, cập nhật student profile và forgot/reset password; `M2.4` đã nối auth UI với API thật cho login/register student/register parent/forgot/reset password, dùng TanStack Query mutations, lưu session/token client-side bằng Zustand + browser storage, và bổ sung explicit DTO validation pipe để auth API validate ổn khi chạy dev bằng `tsx`.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout; `M2.3` đã thêm JWT auth guard, RBAC guard/decorator, `GET /me`, cập nhật student profile và forgot/reset password; `M2.4` đã nối auth UI với API thật cho login/register student/register parent/forgot/reset password, dùng TanStack Query mutations, lưu session/token client-side bằng Zustand + browser storage, và bổ sung explicit DTO validation pipe để auth API validate ổn khi chạy dev bằng `tsx`; `M3.1` đã thêm public published learning path API tối thiểu và admin learning path CRUD/publish API có RBAC, validation, pagination và audit log.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
   - API: `docs/05-api-contract.md` + `docs/api/*.md`
 - UI direction là mobile-first, vẫn phải ổn trên tablet/iPad và laptop/desktop, đồng thời ưu tiên cảm giác mượt, phản hồi nhanh và độ trễ cảm nhận thấp.
+- Hệ thống sẽ có chế độ chuyển theme sáng/tối; khi làm UI phải ưu tiên semantic token/CSS variable/dark variants, tránh hard-code màu chỉ hợp light mode và phải nghĩ trước contrast/state cho cả hai theme.
 - Mỗi khi làm UI, kết quả phải giống production thật cả về visual lẫn interaction: mock data được phép, nhưng control không được tĩnh giả bấm. Button/checkbox/tab/menu/input/toggle/modal/filter/pagination/upload/editor/icon có vẻ tương tác phải có semantic element, state/handler thật, feedback bấm và pending/disabled/loading/error/success khi phù hợp.
 - UI cho học sinh/phụ huynh phải thân thiện, chuyên nghiệp, ít lời và có năng lượng học tập: không dùng text kỹ thuật, không dùng panel/card chỉ để giải thích hệ thống, không để auth/register quá xám/lạnh; ưu tiên nền màu sáng, CTA nổi, ảnh/illustration học đường, font phù hợp và hành động chính rõ. Tránh ảnh người đi làm/coworking/corporate cho auth học sinh. Nếu auth dùng visual mạnh, ưu tiên split-screen desktop rõ ràng: trái visual/slogan dạng lời chào thương hiệu + câu định vị ngắn, phải form sạch. Có thể dùng display font riêng cho heading bên trái, nhưng form/body vẫn phải dễ đọc.
 - Auth visual bên trái không được để chữ quá to/toàn đen hoặc panel quá đục che mất nền. Ưu tiên headline gradient/accent vừa phải, lớp nền trong nhẹ, icon học tập ngắn gọn và chuyển động tinh tế có tôn trọng reduced motion.
@@ -57,13 +58,13 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau khi nối API thật cho `M2.4` nên làm:
+Theo roadmap hiện tại, sau khi hoàn thành `M3.1` nên làm:
 
 ```txt
-/task-full M3.1
+/task-full M3.2
 ```
 
-Mục tiêu `M3.1`: xây Admin learning path API để admin quản lý lộ trình học, mở khóa các task lesson/course public tiếp theo.
+Mục tiêu `M3.2`: xây Admin lesson API để admin quản lý buổi học trong từng lộ trình, gồm order, video, `exam_open_at`, completion score và publish status.
 
 ## 4. Khi nào cập nhật file này
 

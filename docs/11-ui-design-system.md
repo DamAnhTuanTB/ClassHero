@@ -70,6 +70,16 @@ Nguyên tắc dùng màu:
 - Không tạo palette một màu; mỗi màn nên có nền trung tính, primary rõ và accent vừa đủ.
 - Nếu cần thêm màu mới, thêm vào theme/token trước hoặc ghi rõ lý do trong final response/docs liên quan; changelog chỉ ghi trong workflow `/commit`.
 
+### 3.1. Light/Dark theme
+
+Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới hoặc sửa UI hiện có, Codex phải:
+
+- Ưu tiên semantic token/CSS variable hoặc class Tailwind có biến thể dark mode thay vì hard-code màu chỉ hợp light mode.
+- Kiểm tra text, border, surface, shadow, icon, trạng thái success/warning/error/info và skeleton/loading vẫn đủ contrast ở cả light và dark.
+- Tránh dùng ảnh, gradient, overlay hoặc shadow chỉ đẹp trên nền sáng; nếu dùng phải có fallback/variant cho dark mode.
+- Với chart, badge, toast, form, table và dashboard/card, thiết kế state màu theo vai trò semantic để sau này đổi theme không phải sửa từng component.
+- Nếu task chưa triển khai toggle theme thật, vẫn không được viết UI khóa cứng vào light-only style trừ khi có lý do rõ trong final response.
+
 ## 4. Typography
 
 - Ưu tiên dễ đọc trên mobile.

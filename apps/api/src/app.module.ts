@@ -5,6 +5,7 @@ import { AppService } from "./app.service";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { validateEnv } from "./config/env.validation";
 import { AuthModule } from "./modules/auth/auth.module";
+import { LearningPathsModule } from "./modules/learning-paths/learning-paths.module";
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AuthModule } from "./modules/auth/auth.module";
     }),
     PrismaModule,
     AuthModule,
+    LearningPathsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
