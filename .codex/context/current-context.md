@@ -8,7 +8,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 - Repo dùng monorepo Turborepo với `apps/web`, `apps/api` và `packages/shared`.
 - Nền local đã có Next.js app, NestJS API, shared package, Docker local, Postgres + pgvector local, Redis, env example và health/foundation code.
-- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout; `M2.3` đã thêm JWT auth guard, RBAC guard/decorator, `GET /me`, cập nhật student profile và forgot/reset password; `M2.4` đã nối auth UI với API thật cho login/register student/register parent/forgot/reset password, dùng TanStack Query mutations, lưu session/token client-side bằng Zustand + browser storage, và bổ sung explicit DTO validation pipe để auth API validate ổn khi chạy dev bằng `tsx`; `M3.1` đã thêm public published learning path API tối thiểu và admin learning path CRUD/publish API có RBAC, validation, pagination và audit log.
+- Prisma foundation `M1.1` đã có nền kết nối Postgres/pgvector; `M1.2` đã thêm các model nền cho user/auth/profile/file/background job/audit log; `M1.3` đã thêm model learning path/lesson/document/enrollment/progress; `M1.4` đã thêm model quiz/flashcard/test/attempt/favorite/note/comment riêng; `M1.5` đã thêm payment/discount/webhook, notification, report, AI log/cache/chat, XP và news models; `M1.6` đã thêm seed dev tối thiểu cho admin/student/parent, Toán 7, lesson, quiz/flashcard/test, payment/enrollment và notification; `M2.1` đã chuẩn hóa backend foundation với env validation, global validation pipe, error envelope, Swagger dev và logger cơ bản; `M2.2` đã thêm AuthModule cho register student/parent, login, JWT access token, refresh token rotate/revoke và logout; `M2.3` đã thêm JWT auth guard, RBAC guard/decorator, `GET /me`, cập nhật student profile và forgot/reset password; `M2.4` đã nối auth UI với API thật cho login/register student/register parent/forgot/reset password, dùng TanStack Query mutations, lưu session/token client-side bằng Zustand + browser storage, và bổ sung explicit DTO validation pipe để auth API validate ổn khi chạy dev bằng `tsx`; `M3.1` đã thêm public published learning path API tối thiểu và admin learning path CRUD/publish API có RBAC, validation, pagination và audit log; `M3.2` đã thêm admin lesson API cho list/create/detail/update/delete/publish lesson trong learning path, có RBAC, validation video URL/order/completion score, unique order handling, total lesson count update và audit log.
 - Bộ docs đã được tách theo index và file con:
   - implementation: `docs/09-implementation-plan.md` + `docs/implementation/M*.md`
   - database: `docs/04-database-model.md` + `docs/database/*.md`
@@ -58,13 +58,13 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 
 ## 3. Task tiếp theo nên ưu tiên
 
-Theo roadmap hiện tại, sau khi hoàn thành `M3.1` nên làm:
+Theo roadmap hiện tại, sau khi hoàn thành `M3.2` nên làm:
 
 ```txt
-/task-full M3.2
+/task-full M3.3
 ```
 
-Mục tiêu `M3.2`: xây Admin lesson API để admin quản lý buổi học trong từng lộ trình, gồm order, video, `exam_open_at`, completion score và publish status.
+Mục tiêu `M3.3`: xây public/student learning path listing API để học sinh/phụ huynh xem lộ trình published, filter/group theo grade và chuẩn bị course detail summary.
 
 ## 4. Khi nào cập nhật file này
 

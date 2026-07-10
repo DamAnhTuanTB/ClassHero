@@ -119,6 +119,11 @@ Behavior: set status `PUBLISHED`, set `published_at`.
 
 Role: `ADMIN`.
 
+Behavior:
+
+- Trả danh sách lesson chưa bị soft delete trong một learning path, sắp xếp theo `orderIndex` tăng dần.
+- Nếu learning path không tồn tại hoặc đã bị xóa mềm, trả `404 NOT_FOUND`.
+
 ### `POST /admin/learning-paths/:learningPathId/lessons`
 
 Role: `ADMIN`.
@@ -138,21 +143,58 @@ Body:
 }
 ```
 
+Behavior:
+
+- `completionMinScore` mặc định là `7` nếu không gửi.
+- `orderIndex` phải unique trong cùng learning path.
+- `videoUrl` chỉ chấp nhận YouTube hoặc Google Drive.
+
+Side effects:
+
+- Tạo `lessons`.
+- Tăng `learning_paths.total_lesson_count`.
+- Ghi `audit_logs`.
+
 ### `GET /admin/lessons/:lessonId`
 
 Role: `ADMIN`.
+
+Behavior:
+
+- Trả lesson chưa bị soft delete.
 
 ### `PATCH /admin/lessons/:lessonId`
 
 Role: `ADMIN`.
 
+Body: partial của body create.
+
+Behavior:
+
+- Cho phép đổi `orderIndex`, metadata, thời điểm mở bài thi, video URL, completion score và `status`.
+- `shortDescription`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
+- Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng learning path.
+- Ghi `audit_logs`.
+
 ### `DELETE /admin/lessons/:lessonId`
 
 Role: `ADMIN`.
 
+Behavior:
+
+- Soft delete lesson và set status `ARCHIVED`.
+- Giải phóng `orderIndex` để admin có thể tạo lesson mới cùng thứ tự trong learning path nếu cần.
+- Giảm `learning_paths.total_lesson_count`.
+- Ghi `audit_logs`.
+
 ### `POST /admin/lessons/:lessonId/publish`
 
 Role: `ADMIN`.
+
+Behavior:
+
+- Set status `PUBLISHED`.
+- Ghi `audit_logs`.
 
 ---
 
