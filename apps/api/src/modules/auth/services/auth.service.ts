@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { JwtService } from "@nestjs/jwt";
 import {
   FilePurpose,
   FileStatus,
@@ -9,7 +8,6 @@ import {
   UserRole,
   UserStatus,
 } from "@prisma/client";
-import { randomBytes } from "node:crypto";
 import {
   throwBadRequest,
   throwForbidden,
@@ -22,8 +20,6 @@ import {
   hashPassword,
   hashPasswordResetToken,
   hashRefreshToken,
-  parseDurationMs,
-  passwordResetTtlMs,
   verifyPassword,
 } from "#api/modules/auth/utils/crypto";
 import {
@@ -59,11 +55,8 @@ import {
   serializeCurrentUser,
   serializeUser,
 } from "#api/modules/auth/serializers/auth.serializers";
-import type {
-  AuthUser,
-  RefreshTokenMaterial,
-  RequestContext,
-} from "#api/modules/auth/types/auth.types";
+import type { AuthUser, RequestContext } from "#api/modules/auth/types/auth.types";
+import { AuthTokenService } from "#api/modules/auth/services/auth-token.service";
 import { ForgotPasswordDto } from "#api/modules/auth/dto/forgot-password.dto";
 import { LoginDto } from "#api/modules/auth/dto/login.dto";
 import { RefreshTokenDto } from "#api/modules/auth/dto/refresh-token.dto";
@@ -75,27 +68,15 @@ import { UpdateStudentProfileDto } from "#api/modules/auth/dto/update-student-pr
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly accessTokenSecret: string;
-  private readonly accessTokenTtlSeconds: number;
-  private readonly refreshTokenTtlMs: number;
   private readonly webUrl: string;
   private readonly resendApiKey?: string;
   private readonly resendFromEmail?: string;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(JwtService) private readonly jwtService: JwtService,
+    @Inject(AuthTokenService) private readonly authTokenService: AuthTokenService,
     @Inject(ConfigService) configService: ConfigService<EnvConfig, true>,
   ) {
-    this.accessTokenSecret = configService.get("JWT_ACCESS_SECRET", {
-      infer: true,
-    });
-    this.accessTokenTtlSeconds = Math.floor(
-      parseDurationMs(configService.get("JWT_ACCESS_EXPIRES_IN", { infer: true })) / 1000,
-    );
-    this.refreshTokenTtlMs = parseDurationMs(
-      configService.get("JWT_REFRESH_EXPIRES_IN", { infer: true }),
-    );
     this.webUrl = configService.get("WEB_URL", { infer: true });
     this.resendApiKey = normalizeOptionalSecret(
       configService.get("RESEND_API_KEY", { infer: true }),
@@ -165,8 +146,8 @@ export class AuthService {
 
     assertActiveUser(user);
 
-    const refreshToken = this.createRefreshTokenMaterial(new Date());
-    const accessToken = await this.signAccessToken(user);
+    const refreshToken = this.authTokenService.createRefreshTokenMaterial(new Date());
+    const accessToken = await this.authTokenService.signAccessToken(user);
 
     await this.prisma.$transaction([
       this.prisma.user.update({
@@ -212,8 +193,8 @@ export class AuthService {
 
     assertActiveUser(existingToken.user);
 
-    const refreshToken = this.createRefreshTokenMaterial(now);
-    const accessToken = await this.signAccessToken(existingToken.user);
+    const refreshToken = this.authTokenService.createRefreshTokenMaterial(now);
+    const accessToken = await this.authTokenService.signAccessToken(existingToken.user);
 
     await this.prisma.$transaction(async (tx) => {
       const revokeResult = await tx.refreshToken.updateMany({
@@ -273,7 +254,7 @@ export class AuthService {
     }
 
     const now = new Date();
-    const resetToken = this.createPasswordResetTokenMaterial(now);
+    const resetToken = this.authTokenService.createPasswordResetTokenMaterial(now);
 
     await this.prisma.$transaction([
       this.prisma.passwordResetToken.updateMany({
@@ -631,40 +612,6 @@ export class AuthService {
       },
       select: authUserSelect,
     });
-  }
-
-  private createRefreshTokenMaterial(now: Date): RefreshTokenMaterial {
-    const rawToken = randomBytes(32).toString("base64url");
-
-    return {
-      rawToken,
-      tokenHash: hashRefreshToken(rawToken),
-      expiresAt: new Date(now.getTime() + this.refreshTokenTtlMs),
-    };
-  }
-
-  private createPasswordResetTokenMaterial(now: Date): RefreshTokenMaterial {
-    const rawToken = randomBytes(32).toString("base64url");
-
-    return {
-      rawToken,
-      tokenHash: hashPasswordResetToken(rawToken),
-      expiresAt: new Date(now.getTime() + passwordResetTtlMs),
-    };
-  }
-
-  private signAccessToken(user: Pick<AuthUser, "id" | "role">) {
-    return this.jwtService.signAsync(
-      {
-        sub: user.id,
-        role: user.role,
-        tokenType: "access",
-      },
-      {
-        secret: this.accessTokenSecret,
-        expiresIn: this.accessTokenTtlSeconds,
-      },
-    );
   }
 
   private async assertAvatarFileAllowed(userId: string, avatarFileId: string) {

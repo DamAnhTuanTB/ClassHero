@@ -17,7 +17,7 @@ Mapping nhanh:
 | Quy ước, enum | `conventions-and-enums.md` |
 | Auth, users, parent-child link | `auth-users.md` |
 | File, R2 metadata, document chunks | `files-documents.md` |
-| Learning path, lesson, material, summary | `learning-paths-lessons.md` |
+| Learning path, chapter, lesson, material, summary | `learning-paths-lessons.md` |
 | Enrollment, progress, trial lesson | `progress-enrollment.md` |
 | Quiz, flashcard, test, attempts | `quiz-flashcard-tests.md` |
 | Background jobs | `background-jobs.md` |

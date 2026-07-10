@@ -13,6 +13,7 @@ Role: `STUDENT`.
 Behavior:
 
 - Trả chi tiết lộ trình.
+- Response gồm cây `chapters -> lessons`; chapter chỉ có metadata tổng quan, lesson có trạng thái truy cập/progress.
 - Kèm enrollment/trial status.
 
 ### `GET /student/lessons/:lessonId`
@@ -22,6 +23,7 @@ Role: `STUDENT`.
 Behavior:
 
 - Kiểm tra enrollment còn hạn hoặc trial hợp lệ.
+- Trả metadata chapter cha để UI hiển thị breadcrumb/tổng quan.
 - Trả video, tài liệu, tóm tắt, quiz/flashcard/test metadata, notes/comments/favorites của student.
 - Trước `exam_open_at`, bài kiểm tra có `canStartTest = false`.
 

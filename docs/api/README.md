@@ -17,7 +17,7 @@ Mapping nhanh:
 | --- | --- |
 | Convention, error, security | `conventions-errors-security.md` |
 | Auth, current user, profile | `auth-profile.md` |
-| Learning path, lesson, material, summary | `learning-paths-lessons.md` |
+| Learning path, chapter, lesson, material, summary | `learning-paths-lessons.md` |
 | Student lesson, notes, comments, favorites | `student-learning.md` |
 | Quiz, flashcard, test, attempts | `quiz-flashcard-tests.md` |
 | AI explanation, chat | `ai-chat.md` |

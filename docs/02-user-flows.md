@@ -76,12 +76,14 @@ Các bước:
 4. Backend tạo access token và refresh token.
 5. Backend hash refresh token rồi lưu DB.
 6. Front-end lưu access token theo cơ chế an toàn.
+7. Front-end điều hướng theo role sau khi đăng nhập thành công; Admin vào trang admin hiện có, Student/Parent vào trang phù hợp khi dashboard tương ứng đã triển khai.
 
 Acceptance Criteria:
 
 - Sai password trả lỗi chung, không tiết lộ tài khoản có tồn tại hay không.
 - Access token chứa user id và role.
 - Refresh token có thể revoke khi logout.
+- Admin đăng nhập thành công phải được chuyển vào trang admin, không ở lại màn login.
 
 ---
 
@@ -104,26 +106,32 @@ Acceptance Criteria:
 - Giá không âm.
 - Slug unique.
 - Trạng thái mặc định là `DRAFT`.
+- Khi admin xóa lộ trình, backend chuyển trạng thái sang `ARCHIVED`; lộ trình này không xuất hiện ở danh sách chính và chỉ xem/khôi phục trong thùng rác quản trị. Thùng rác cho phép chọn từng dòng hoặc chọn tất cả để khôi phục hoặc xóa vĩnh viễn. Khôi phục đưa lộ trình về `DRAFT`.
 - Chỉ admin được gọi API này.
 
 ---
 
-## 5. Admin tạo buổi học
+## 5. Admin tạo chương học và buổi học
 
 Actor: Admin.
 
 Các bước:
 
 1. Admin vào chi tiết lộ trình.
-2. Admin bấm thêm buổi học.
-3. Nhập title, order index, mô tả ngắn, ngày/giờ học hoặc ngày/giờ mở bài thi, video URL, tiêu chí hoàn thành.
-4. Backend tạo `lessons`.
-5. Backend cập nhật tổng số buổi nếu cần.
-6. Backend ghi audit log.
+2. Admin bấm thêm chương học.
+3. Nhập tên chương, thứ tự, mô tả/tổng quan ngắn, mục tiêu học tập hoặc nội dung trọng tâm nếu có, trạng thái.
+4. Backend tạo `learning_path_chapters`.
+5. Admin mở chương học và bấm thêm buổi học.
+6. Nhập title, order index, mô tả ngắn, ngày/giờ học hoặc ngày/giờ mở bài thi, video URL, tiêu chí hoàn thành.
+7. Backend tạo `lessons` thuộc chương học.
+8. Backend cập nhật tổng số buổi nếu cần.
+9. Backend ghi audit log.
 
 Acceptance Criteria:
 
-- `order_index` không trùng trong cùng lộ trình.
+- `order_index` của chương không trùng trong cùng lộ trình.
+- `order_index` của buổi học không trùng trong cùng chương.
+- Chương học chỉ chứa thông tin tổng quan, không có video/tài liệu/PDF/quiz/flashcard/test riêng.
 - `completion_min_score` mặc định là 7.
 - Video URL chấp nhận YouTube hoặc Google Drive.
 - Chỉ admin được tạo/sửa/xóa.
@@ -140,7 +148,7 @@ Các bước:
 2. Admin upload PDF/ảnh/tài liệu.
 3. Backend validate file type và size.
 4. Backend tạo object key.
-5. Backend upload file lên Cloudflare R2.
+5. Backend upload file lên object storage theo môi trường: MinIO local/dev hoặc Cloudflare R2 staging/production.
 6. Backend lưu metadata vào `files`.
 7. Backend tạo `lesson_documents` hoặc `lesson_materials`.
 8. Backend enqueue job xử lý PDF nếu là PDF.
@@ -235,24 +243,24 @@ Acceptance Criteria:
 
 ---
 
-## 10. Học sinh học thử buổi đầu tiên
+## 10. Học sinh học thử buổi học được bật trial
 
 Actor: Student.
 
 Các bước:
 
 1. Student vào chi tiết lộ trình chưa mua.
-2. Nếu lộ trình bật học thử, UI hiển thị buổi đầu.
+2. Nếu có buổi học được bật học thử, UI hiển thị buổi học đó.
 3. Student mở buổi đầu.
 4. Backend kiểm tra quyền trial.
 5. Student được xem nội dung học thử được phép.
 
 Acceptance Criteria:
 
-- Chỉ buổi đầu tiên được học thử.
+- Chỉ buổi học được admin bật học thử mới mở quyền trial.
 - Trial không mở khóa toàn bộ lộ trình.
 
-ASSUMPTION: MVP cho phép học thử nội dung buổi đầu gồm video/tài liệu/tóm tắt/quiz/flashcard. Quyền làm bài kiểm tra trong trial cần owner chốt nếu muốn giới hạn khác.
+ASSUMPTION: MVP cho phép học thử nội dung buổi được bật trial gồm video/tài liệu/tóm tắt/quiz/flashcard. Quyền làm bài kiểm tra trong trial cần owner chốt nếu muốn giới hạn khác.
 
 ---
 
@@ -479,7 +487,7 @@ Các bước:
 4. UI lưu selected child state.
 5. Parent mở dashboard tiến độ.
 6. Backend kiểm tra parent-child link.
-7. Backend trả tiến độ theo từng lộ trình/buổi học.
+7. Backend trả tiến độ theo từng lộ trình/chương học/buổi học.
 
 Acceptance Criteria:
 

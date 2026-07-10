@@ -97,7 +97,7 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 3. `M0.2` - Tooling, env example, Docker local, health check.
 4. `M1.1` - Setup Prisma và database foundation.
 5. `M1.2` - User, auth token, profile, file và background job models.
-6. `M1.3` - Learning path, lesson, material, document và enrollment models.
+6. `M1.3` - Learning path, chapter, lesson, material, document và enrollment models.
 7. `M1.4` - Quiz, flashcard, test, attempt và learning interaction models.
 8. `M1.5` - Payment, notification, report, AI log, gamification và news models.
 9. `M1.6` - Seed tối thiểu và database validation.
@@ -105,9 +105,9 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 11. `M2.2` - Register, login, refresh và logout.
 12. `M2.3` - RBAC, `GET /me`, profile base và forgot/reset password.
 13. `M3.1` - Admin learning path API.
-14. `M3.2` - Admin lesson API.
+14. `M3.2` - Admin chapter và lesson API.
 15. `M3.3` - Public/student learning path listing.
-16. `M3.4` - Admin learning path/lesson UI cơ bản.
+16. `M3.4` - Admin learning path/chapter/lesson UI cơ bản.
 17. `M4.1` - FilesModule và R2 service.
 18. `M4.2` - Lesson document API.
 19. `M4.3` - BullMQ worker foundation.
@@ -194,7 +194,7 @@ Phụ thuộc file/document/worker:
 Phụ thuộc quiz/flashcard/test thủ công:
 
 - `M6.1` phụ thuộc `M0.1`, `M2.1`; nên làm sau khi shared package có nền.
-- `M6.2`, `M6.3`, `M6.4` phụ thuộc `M1.4`, `M2.3`, `M3.2`, `M6.1`.
+- `M6.2`, `M6.3`, `M6.4` phụ thuộc `M1.4`, `M2.3`, `M3.2`, `M6.1`; quiz/flashcard/test chỉ gắn với lesson, không gắn với chapter.
 - `M6.5` phụ thuộc `M6.2` đến `M6.4`, `M3.2`, `M2.3`.
 
 Phụ thuộc student learning:

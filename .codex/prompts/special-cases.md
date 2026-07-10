@@ -54,6 +54,7 @@ Ghi nhớ:
 - UI phải mobile-first và ổn trên tablet/iPad, desktop.
 - UI public/indexable phải giữ cấu trúc SEO; flow nhạy độ trễ phải đọc performance docs.
 - UI code phải tuân thủ `docs/14-source-code-structure.md`: route/page compose screen, feature tách `screens/components/hooks/api/data/schemas/utils`, shared component tái sử dụng trước khi tạo mới, mỗi `.tsx` một component implementation chính.
+- UI form, modal, detail grid, action control, upload preview, badge/status và loading/empty/error state phải đối chiếu routing index trong `docs/ui-references/code-patterns.md` và file/section phù hợp trong `docs/ui-references/code-patterns/` trước khi tự viết biến thể mới.
 
 ## 4. Bug, Refactor, Commit
 
@@ -79,6 +80,7 @@ Yêu cầu:
 - Xác định docs bị ảnh hưởng.
 - Nếu đổi API/database/AI/UI/env, cập nhật cả index và file con tương ứng.
 - Nếu đổi rule tổ chức source code, cập nhật `docs/14-source-code-structure.md`, `AGENTS.md` và skill liên quan.
+- Nếu đổi hoặc chốt pattern code UI tái sử dụng, cập nhật `docs/ui-references/code-patterns.md`, file phù hợp trong `docs/ui-references/code-patterns/` và skill/prompt liên quan.
 - Nếu ảnh hưởng roadmap, cập nhật docs/09-implementation-plan.md hoặc docs/implementation/Mx.md.
 - Không cập nhật changelog trong fallback docs-only; changelog sẽ được ghi nếu owner yêu cầu `/commit`.
 ```

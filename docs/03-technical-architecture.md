@@ -29,7 +29,7 @@ Nginx + Certbot on VPS
   +--> backend-nestjs-api container
             |
             +--> Supabase Postgres + pgvector
-            +--> Cloudflare R2
+            +--> Object storage (Cloudflare R2; MinIO local/dev)
             +--> Redis on VPS
             +--> OpenAI / Gemini
             +--> payOS
@@ -41,7 +41,7 @@ backend-worker container
   |
   +--> Redis/BullMQ
   +--> Supabase Postgres + pgvector
-  +--> Cloudflare R2
+  +--> Object storage (Cloudflare R2; MinIO local/dev)
   +--> OpenAI / Gemini
   +--> Resend / Zalo
 ```
@@ -270,7 +270,7 @@ Quy tắc:
 
 Không chạy PostgreSQL production trên VPS để giảm rủi ro mất dữ liệu, đầy ổ, lỗi backup, lỗi deploy app và tranh tài nguyên với worker/API.
 
-Database lưu user, student/parent profile, lộ trình, buổi học, tài liệu, quiz, flashcard, bài thi, attempt, progress, payment, enrollment, notification, report, AI logs, audit logs, document chunks/embedding.
+Database lưu user, student/parent profile, lộ trình, chương học tổng quan, buổi học, tài liệu, quiz, flashcard, bài thi, attempt, progress, payment, enrollment, notification, report, AI logs, audit logs, document chunks/embedding.
 
 Chi tiết ở `docs/04-database-model.md`.
 
@@ -278,9 +278,12 @@ Chi tiết ở `docs/04-database-model.md`.
 
 ## 7. File storage architecture
 
-Provider: Cloudflare R2.
+Provider:
 
-File lưu trên R2:
+- Local/dev: MinIO trong Docker, dùng S3-compatible API.
+- Staging/production: Cloudflare R2.
+
+File lưu trên object storage:
 
 - PDF bài học.
 - Ảnh trong editor.
@@ -290,7 +293,9 @@ File lưu trên R2:
 - Ảnh minh họa AI.
 - File/ảnh ghi chú.
 
-Backend phải validate file type/size, tạo object key, upload lên R2, lưu metadata file trong database, tạo signed URL hoặc proxy download theo quyền, không lưu file chính trong app disk.
+Backend phải validate file type/size, tạo object key, upload qua object storage adapter, lưu metadata file trong database, tạo signed URL hoặc proxy download theo quyền, không lưu file chính trong app disk.
+
+MinIO chỉ dùng local/dev để giảm phụ thuộc tài khoản Cloudflare khi lập trình. Production không chạy MinIO trên VPS và vẫn dùng Cloudflare R2.
 
 ASSUMPTION: Có thể dùng signed URL ngắn hạn cho download/upload. Nếu cần kiểm soát chặt hơn, dùng proxy endpoint có auth.
 
@@ -371,7 +376,7 @@ Pipeline tài liệu:
 
 ```txt
 Upload PDF
-  -> Save R2
+  -> Save object storage
   -> lesson_documents status UPLOADED
   -> enqueue document-processing
   -> extract text
@@ -395,6 +400,7 @@ Student asks question in lesson
 ```
 
 AI không được lấy context từ lesson khác.
+Chapter chỉ là metadata tổng quan để nhóm lesson; document processing và RAG không chạy ở cấp chapter trong MVP.
 
 ---
 
@@ -478,7 +484,7 @@ Services không chạy trên VPS:
 
 - PostgreSQL database chính.
 - File storage chính.
-- MinIO.
+- MinIO làm storage production.
 
 Production dùng Docker Compose.
 
@@ -504,6 +510,7 @@ Theo dõi vận hành:
 - AI usage/cost.
 - Supabase usage.
 - R2 storage/bandwidth.
+- MinIO local/dev disk usage.
 - Email/Zalo delivery failure.
 
 ---
@@ -516,7 +523,8 @@ Local/dev:
 - Không thuê VPS dev riêng.
 - Database local chạy bằng Docker Postgres + pgvector.
 - Supabase Free/dev project chỉ dùng khi cần test gần giống staging/production.
-- Cloudflare R2 dùng free tier.
+- MinIO Docker dùng mặc định cho file storage local/dev.
+- Cloudflare R2 free tier chỉ dùng khi cần test storage gần staging/production.
 - Resend dùng Free tier để test email.
 - payOS dùng sandbox/test.
 - AI vẫn cần ngân sách test.

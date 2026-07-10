@@ -130,7 +130,7 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Parent course/payment pages               | `M11.3`, `M8.4`        | `M11.3`, `M8.2`, `M8.3`           | `M1.3`, `M1.5`         | payOS trong `M8.2`, `M8.3`                    | Parent thanh toán cho con đã liên kết.                                                                                                    |
 | Parent notifications/news                 | `M11.4`, `M12.5`       | `M10.1`, `M12.4`, `M12.5`         | `M1.5`                 | `M10.3`, `M10.6`                              | News/event/livestream public cho student/parent.                                                                                          |
 | Admin dashboard                           | `M13.5`                | `M13.5` hoặc API module liên quan | `M1.x` theo metric     | `M4.3`, `M10.5` nếu hiển thị job/notification | Cho phép placeholder với metric chưa có API.                                                                                              |
-| Admin course/lesson management            | `M3.4`                 | `M3.1`, `M3.2`                    | `M1.3`                 | -                                             | Quản lý lộ trình và buổi học.                                                                                                             |
+| Admin course/chapter/lesson management    | `M3.4`                 | `M3.1`, `M3.2`                    | `M1.3`                 | -                                             | Quản lý lộ trình, chương học tổng quan và buổi học.                                                                                       |
 | Admin lesson document upload/status       | `M4.5`                 | `M4.2`                            | `M1.2`, `M1.3`         | `M4.1`, `M4.3`, `M4.4`                        | Upload R2, job status, extract/chunk PDF.                                                                                                 |
 | Admin quiz/flashcard/test CRUD UI         | `M6.2`, `M6.3`, `M6.4` | `M6.2`, `M6.3`, `M6.4`            | `M1.4`                 | `M6.1` content schema                         | Rich text/LaTeX dùng schema chung.                                                                                                        |
 | Admin AI generation panel                 | `M9.8`                 | `M9.2`, `M9.3`                    | `M1.4`, `M1.5`         | `M5.x`, `M9.1`                                | Front-end không gọi AI trực tiếp.                                                                                                         |
@@ -178,7 +178,7 @@ Hiển thị:
 - Tên lộ trình.
 - Mô tả.
 - Giá gốc/giá sau khuyến mãi.
-- Danh sách buổi học metadata.
+- Danh sách chương học và buổi học metadata.
 - CTA mua lộ trình hoặc học thử buổi đầu.
 - Metadata, canonical, Open Graph và structured data nếu dữ liệu đủ rõ.
 
@@ -222,7 +222,7 @@ Hiển thị:
 - Tổng quan lộ trình.
 - Enrollment status.
 - Hạn còn lại nếu đã mua.
-- Danh sách buổi học theo thứ tự.
+- Danh sách chương học và buổi học theo thứ tự.
 - Trạng thái từng buổi: chưa học, đang học, hoàn thành, bị khóa.
 
 ### 4.4. Trang buổi học student
@@ -408,7 +408,19 @@ CRUD learning path:
 - Trial enabled.
 - Status.
 
-### 6.3. Lesson management
+### 6.3. Chapter management
+
+CRUD chapter:
+
+- Title.
+- Order index.
+- Overview/short description.
+- Objectives/focus points.
+- Status.
+
+Chapter không có video, tài liệu/PDF, summary, quiz, flashcard hoặc test riêng.
+
+### 6.4. Lesson management
 
 CRUD lesson:
 
@@ -424,7 +436,7 @@ CRUD lesson:
 - Flashcard.
 - Test.
 
-### 6.4. AI generation panel
+### 6.5. AI generation panel
 
 Trong lesson detail, admin có panel:
 
@@ -437,7 +449,7 @@ Trong lesson detail, admin có panel:
 - Sửa output.
 - Duyệt/ẩn.
 
-### 6.5. Content editors
+### 6.6. Content editors
 
 Dùng chung editor cho:
 
@@ -455,7 +467,7 @@ Editor cần hỗ trợ:
 - Math/chem formula.
 - Basic formatting.
 
-### 6.6. Report moderation
+### 6.7. Report moderation
 
 Hiển thị:
 
@@ -466,7 +478,7 @@ Hiển thị:
 - Reason/description.
 - Action: sửa, ẩn, khôi phục, đánh dấu đã xử lý, reject.
 
-### 6.7. AI unreviewed content
+### 6.8. AI unreviewed content
 
 Admin xem các quiz/flashcard/test do AI tạo chưa duyệt.
 
@@ -477,7 +489,7 @@ Actions:
 - Duyệt.
 - Ẩn.
 
-### 6.8. Discount codes
+### 6.9. Discount codes
 
 CRUD mã giảm giá:
 
@@ -488,7 +500,7 @@ CRUD mã giảm giá:
 - Max uses.
 - Active.
 
-### 6.9. Manual notifications
+### 6.10. Manual notifications
 
 Form:
 
@@ -498,7 +510,7 @@ Form:
 - Channels.
 - Send.
 
-### 6.10. News/events/livestream
+### 6.11. News/events/livestream
 
 CRUD:
 

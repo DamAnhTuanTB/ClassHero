@@ -12,7 +12,12 @@ import { FormHeader, SubmitButton, TextField } from "@/components/forms/form-pri
 import { getAuthErrorMessage, login } from "@/features/auth/api";
 import { loginSchema, type LoginFormValues } from "@/features/auth/schemas";
 import { saveAuthSession } from "@/features/auth/session";
-import { handleSubmitIntent, type SubmitIntentEvent } from "@/features/auth/utils";
+import {
+  getPostLoginRedirectPath,
+  getPostLoginSuccessToast,
+  handleSubmitIntent,
+  type SubmitIntentEvent,
+} from "@/features/auth/utils";
 
 export function LoginForm() {
   const router = useRouter();
@@ -40,9 +45,12 @@ export function LoginForm() {
       });
 
       saveAuthSession(response, rememberLogin);
-      toast.success("Đăng nhập thành công", {
-        description: "Chào mừng bạn đến với lớp học ClassHero.",
+      const successToast = getPostLoginSuccessToast(response.user.role);
+
+      toast.success(successToast.title, {
+        description: successToast.description,
       });
+      router.replace(getPostLoginRedirectPath(response.user.role));
     } catch (error) {
       toast.error("Không thể đăng nhập", {
         description: getAuthErrorMessage(

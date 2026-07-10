@@ -6,6 +6,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 
 | Note                                     | Chủ đề                                                                 | Task liên quan | Trạng thái  |
 | ---------------------------------------- | ---------------------------------------------------------------------- | -------------- | ----------- |
+| [Admin course management](features/admin-course-management.md) | Admin lộ trình/chương học/buổi học, modal form, upload preview mock | `M3.4` | Đã cập nhật |
 | [Basic Auth API](features/auth-basic.md) | Auth, RBAC, profile base, refresh/reset password, auth UI nối API thật | `M2.2`-`M2.4`  | Đã cập nhật |
 
 ## Foundation Notes

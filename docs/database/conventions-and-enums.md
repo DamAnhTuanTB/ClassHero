@@ -20,7 +20,7 @@ Chi tiết tách từ `docs/04-database-model.md`. File index chính vẫn là `
 
 Nên dùng soft delete cho:
 
-- `learning_paths`, `lessons`, `lesson_materials`, `lesson_summaries` nếu cần,
+- `learning_paths`, `learning_path_chapters`, `lessons`, `lesson_materials`, `lesson_summaries` nếu cần,
 - `quiz_sets`, `quiz_questions`,
 - `flashcard_sets`, `flashcards`,
 - `test_sets`, `test_questions`,
@@ -94,7 +94,7 @@ EnrollmentStatus: ACTIVE, EXPIRED, CANCELLED
 PaymentProvider: PAYOS
 PaymentStatus: PENDING, PAID, FAILED, CANCELLED, EXPIRED
 DiscountType: PERCENT, FIXED_AMOUNT
-FileProvider: CLOUDFLARE_R2
+FileProvider: CLOUDFLARE_R2, MINIO_LOCAL
 FileVisibility: PRIVATE, PUBLIC
 FileStatus: UPLOADED, PROCESSING, READY, FAILED, DELETED
 FilePurpose: AVATAR, LESSON_DOCUMENT, EDITOR_IMAGE, QUESTION_IMAGE, NOTE_IMAGE, AI_DIAGRAM

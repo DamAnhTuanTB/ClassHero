@@ -70,8 +70,7 @@ Rules:
 
 ASSUMPTION: Không cần bảng trial riêng ở MVP. Quyền học thử được tính bằng:
 
-- `learning_paths.trial_enabled = true`.
-- `lessons.order_index = 1`.
+- `lessons.trial_enabled = true`.
 - Student chưa có enrollment active.
 
 Nếu cần tracking trial view, thêm bảng `trial_access_logs` sau.

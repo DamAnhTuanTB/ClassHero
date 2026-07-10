@@ -8,17 +8,17 @@ File này là bản đồ phụ thuộc dạng đọc nhanh. Source of truth chi
 M0 repo/tooling
   -> M1 database foundation/models/seed
     -> M2 auth/RBAC
-      -> M3 course/lesson
+      -> M3 course/chapter/lesson
         -> M4 file/document/worker foundation
           -> M5 embedding/retrieval
             -> M9 AI generation/chat
 
-M3 course/lesson + M6 quiz/flashcard/test
+M3 course/chapter/lesson + M6 quiz/flashcard/test
   -> M7 student learning flow
     -> M10 notification triggers
     -> M13 XP/profile/leaderboard
 
-M3 course/lesson + M8 payment/enrollment
+M3 course/chapter/lesson + M8 payment/enrollment
   -> full paid enrollment access and payment CTA after M8.4
   -> M11 parent payment/progress
 
@@ -36,8 +36,8 @@ M14 testing/hardening/deploy
 | `M0` | Docs/project decision | Repo, tooling, Docker local |
 | `M1` | `M0` | Schema/model nền cho toàn hệ thống |
 | `M2` | `M1.2`, `M2.1` | Auth, RBAC, profile, protected APIs |
-| `M3` | `M1.3`, `M2.3` | Course/lesson APIs và UI public/student/admin |
-| `M4` | `M1.2`, `M1.3`, `M2.3`, `M3.2` | Upload, document API, worker, PDF processing |
+| `M3` | `M1.3`, `M2.3` | Course/chapter/lesson APIs và UI public/student/admin |
+| `M4` | `M1.2`, `M1.3`, `M2.3`, `M3.2` | Upload, lesson document API, worker, PDF processing |
 | `M5` | `M4.4`, API/env nền | Embedding, pgvector retrieval, hybrid search |
 | `M6` | `M1.4`, `M2.3`, `M3.2` | Quiz/flashcard/test CRUD và read-only lesson content |
 | `M7` | `M3.2`, `M6.5`, `M2.3` | Student lesson flow, attempts, progress, dashboard |
@@ -53,6 +53,7 @@ M14 testing/hardening/deploy
 
 - `M2.4` auth UI có thể làm mock sau `M0.2`, nhưng nối API thật cần `M2.2` và `M2.3`.
 - `M3.5` public/student course UI cần `M3.3`; CTA mua thật cần `M8.4`.
+- Course detail từ M3.3/M3.5 hiển thị `chapters -> lessons`; chapter chỉ có metadata tổng quan.
 - `M4.5` upload UI cần `M4.1`, `M4.2`, `M4.3`; status extract/chunk đầy đủ cần `M4.4`.
 - `M7.1` lesson page skeleton cần `M6.5` để đọc lesson content.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.

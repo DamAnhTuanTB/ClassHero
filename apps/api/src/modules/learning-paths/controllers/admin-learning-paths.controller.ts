@@ -17,6 +17,7 @@ import type {
   AuthenticatedRequest,
   AuthenticatedUser,
 } from "#api/common/auth/authenticated-request";
+import { getRequestContext } from "#api/common/api/request-context";
 import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
@@ -89,11 +90,4 @@ export class AdminLearningPathsController {
   ) {
     return this.learningPathsService.publish(id, user.id, getRequestContext(request));
   }
-}
-
-function getRequestContext(request: AuthenticatedRequest) {
-  return {
-    ipAddress: request.ip,
-    userAgent: request.get?.("user-agent"),
-  };
 }

@@ -32,9 +32,11 @@ Before editing:
 5. Read `docs/12-performance-and-observability.md` if the UI change touches list/search/cache behavior, large media, heavy interaction, latency-sensitive learning/payment/AI flow, or perceived performance.
 6. Read `docs/13-seo-and-content-discovery.md` if the target is landing, public course list/detail, public news/event, or another indexable public page.
 7. Read `docs/ui-references/approved-patterns.md` if present and relevant.
-8. Inspect existing web code for the target screen/component.
-9. Inspect `git status --short`.
-10. Give a short plan: target UI, files/layers likely touched, shared pattern reuse, responsive/performance/SEO checks if relevant, and commands.
+8. Read `0. Cách Đọc Nhanh` in `docs/ui-references/code-patterns.md`, then read only the matching file/section in `docs/ui-references/code-patterns/` when the change touches form, modal, detail grid, action button, upload, badge/status, loading/empty/error state, or another reusable UI code flow.
+9. Inspect existing web code for the target screen/component.
+10. Inspect `git status --short`.
+11. If the task creates or touches a form, inspect `apps/web/components/forms`, similar feature forms, and `docs/ui-references/approved-patterns.md` before editing.
+12. Give a short plan: target UI, files/layers likely touched, shared pattern/form reuse, responsive/performance/SEO checks if relevant, and commands.
 
 ## Scope Rules
 
@@ -67,6 +69,7 @@ Update them only after the owner explicitly approves the result with wording lik
 When approval happens:
 
 - Add a concise entry to `docs/ui-references/approved-patterns.md` with context, approved choices, and files/screens.
+- If the approved UI introduced or normalized reusable implementation for form, modal, detail grid, action button, upload, badge/status, loading/empty/error state, or another UI code flow, also update `docs/ui-references/code-patterns.md` routing and the matching file in `docs/ui-references/code-patterns/` with the code pattern, checklist, and anti-pattern.
 - Update `docs/11-ui-design-system.md` only if the approval creates a broad reusable UI rule.
 - Do not update changelog; `/commit` will record the approved UI/docs changes if a commit is created.
 
@@ -77,6 +80,8 @@ Changelog is not written during UI iteration. It is written only during `/commit
 - Use existing components and local patterns first.
 - Follow `docs/14-source-code-structure.md`: keep route/page and screen components thin, do not add new subcomponents/helpers/schema/mock data into an already large UI file, and preserve one component implementation per `.tsx` file.
 - Use Tailwind/shadcn/ui/lucide/framer only as already available in the project.
+- When creating or touching any form, first pick the closest approved/reference form pattern from `apps/web/components/forms`, a similar feature form, or `docs/ui-references/approved-patterns.md`; reuse or upgrade that pattern instead of making a new visual/control variant. If no matching pattern exists, state the assumption in the plan/final.
+- Run a mandatory form-quality audit before final response: follow the closest approved/reference form pattern first (`mode: "onChange"`, `reValidateMode: "onChange"`, pass `form.formState.errors.<field>` directly to field primitives, and do not call `trigger()` right after `reset()` on modal open), every required/limited field must show a visible error state and message while the user edits, validation copy must match the failing rule (`Nhập ...` only for empty required fields, separate copy for min length/format/range/duplicate), required text fields should use the shared validation helper such as `requiredTrimmedText`, submit must respect invalid/pending state, modal/drawer forms must reset/default correctly, and numeric fields must not use native browser number controls when the app already has styled text/numeric inputs.
 - Include or preserve loading, empty, error, disabled, hover/focus states when the touched UI needs them.
 - UI changes must feel production-ready, not static mockups: visual hierarchy, copy, states, controls, and expected actions should match what a real user would use.
 - Do not create or leave fake-static interaction. Any visible button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control, or clickable-looking icon must use semantic elements, real state/handlers, and pressed/pending/disabled/loading feedback as appropriate. If API is not connected, implement local/mock state that behaves like the production interaction.

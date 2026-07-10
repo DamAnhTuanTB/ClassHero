@@ -30,6 +30,7 @@ Codex phải xem các tài liệu sau là nguồn chính của dự án:
 | `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa                            |
 | `docs/10-seed-data-and-test-cases.md`            | Seed data và test case cơ bản                                                        |
 | `docs/11-ui-design-system.md`                    | Gu UI, token, responsive, screenshot/review                                          |
+| `docs/ui-references/code-patterns.md`            | Index điều hướng pattern code UI; pattern chi tiết nằm trong `docs/ui-references/code-patterns/` |
 | `docs/12-performance-and-observability.md`       | Chuẩn hiệu năng, độ trễ, cache, query, worker, AI và đo đạc                          |
 | `docs/13-seo-and-content-discovery.md`           | SEO, metadata, sitemap, robots, canonical, structured data cho trang public          |
 | `docs/14-source-code-structure.md`               | Contract tổ chức source code front-end/back-end, shared layer, alias và anti-pattern |
@@ -162,6 +163,7 @@ Trong quá trình làm task, Codex có thể cập nhật các file sau nếu c�
 - `docs/implementation/feature-coverage-matrix.md`: khi feature đổi coverage DB/API/UI/worker/test hoặc status.
 - `docs/decisions/`: khi có quyết định dài hạn về workflow, kiến trúc, scope, UI rule hoặc tích hợp.
 - `docs/ui-references/approved-patterns.md`: khi owner xác nhận UI đã "ưng rồi", "ok rồi", "đúng ý rồi" hoặc "chốt UI này".
+- `docs/ui-references/code-patterns.md` và file phù hợp trong `docs/ui-references/code-patterns/`: khi owner xác nhận UI đã "ưng/ok/chốt" và phần UI đó tạo ra hoặc chuẩn hóa cách code có thể dùng lại cho form, modal, detail grid, action, upload, badge/status hoặc state view.
 - `docs/11-ui-design-system.md`: khi owner chốt một rule UI áp dụng rộng.
 - `docs/12-performance-and-observability.md`: nếu task làm đổi chuẩn hiệu năng, cache, query, worker, AI latency hoặc observability.
 - `docs/13-seo-and-content-discovery.md`: nếu task làm đổi chuẩn SEO, index/noindex, metadata, sitemap, robots, canonical, structured data hoặc nội dung public indexable.
@@ -210,6 +212,7 @@ Không được dùng các file này để tự đổi scope lớn, stack hoặc
 UI bổ sung:
 
 - Nếu task có giao diện, đọc `docs/08-ui-pages-and-components.md` và `docs/11-ui-design-system.md`.
+- Nếu task tạo/sửa UI component, form, modal, table/list/detail, upload, badge/action hoặc state view, đọc mục `0. Cách Đọc Nhanh` trong `docs/ui-references/code-patterns.md`, sau đó chỉ đọc file/section pattern phù hợp trong `docs/ui-references/code-patterns/` trước khi sửa.
 - Nếu task có UI/API/list/search/cache hoặc flow nhạy độ trễ, đọc thêm `docs/12-performance-and-observability.md`.
 - Nếu task là landing/public course/news/event hoặc route có thể index Google, đọc thêm `docs/13-seo-and-content-discovery.md`.
 - Nếu có `docs/ui-references/approved-patterns.md`, đọc khi làm UI tương tự pattern đã được owner chốt.
@@ -313,10 +316,17 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Không làm UI tĩnh giả tương tác. Button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control hoặc icon có vẻ bấm được phải dùng element semantic, state/handler thật và feedback/pending/disabled phù hợp; nếu chưa thể nối API thì vẫn phải có tương tác local/mock đúng hành vi.
 - Không gom nhiều React component vào một file, kể cả shared primitives hoặc shadcn/Radix wrapper. Mỗi file `.tsx` chỉ nên có một component chính; subcomponent render JSX phải tách file riêng. File barrel như `index.ts` hoặc file compatibility re-export được phép export nhiều component nhưng không chứa JSX/component implementation. Component con, form control, state view, hook orchestration, schema/DTO, mapper/formatter/helper và mock data phải tách file theo feature/module rõ ràng; file page/manager chỉ nên compose layout và nối state/action cần thiết.
 - Trước khi tạo component, hook, API client/service hoặc form control mới, phải kiểm tra component/pattern đã có trong `apps/web/components`, feature tương tự và `docs/ui-references/approved-patterns.md`. Pattern đã được owner ưng phải được tái sử dụng hoặc nâng thành shared component/hook/service; không tạo lại UI/control cùng chức năng với style khác. Component/hook/helper chỉ dùng riêng một feature thì đặt trong feature đó; phần có thể dùng lại nhiều màn phải đặt ở shared layer rõ ràng.
+- Trước khi tạo hoặc sửa bất kỳ form nào, bắt buộc chọn form chuẩn/pattern đã duyệt gần nhất làm tham chiếu: đọc `apps/web/components/forms`, form tương tự trong feature hiện có và `docs/ui-references/approved-patterns.md`; trong kế hoạch/final phải nêu đã reuse pattern nào hoặc ghi rõ vì sao chưa có pattern phù hợp.
+- Form mới hoặc form được sửa phải có đủ behavior chuẩn ngay từ lần đầu: React Hook Form + Zod, validate khi người dùng nhập/chọn (`mode: "onChange"` và `reValidateMode: "onChange"` hoặc flow tương đương), lỗi inline gần field, trạng thái invalid/pending/disabled cho submit, icon/spacing/focus/error style đồng nhất với form chuẩn đã duyệt.
+- Modal/drawer form không được hiển thị lỗi validation ngay khi vừa mở ở trạng thái pristine. Có thể validate để tính disabled state, nhưng error inline chỉ hiện sau khi field đã `dirty`/`touched`, sau submit attempt, hoặc sau lỗi nghiệp vụ trả về khi người dùng thực hiện hành động.
+- Với React Hook Form, ưu tiên pattern form chuẩn đã duyệt hoặc form tương tự đang chạy ổn trong dự án: `mode: "onChange"`, `reValidateMode: "onChange"`, truyền trực tiếp `form.formState.errors.<field>` vào field primitive, và không gọi `trigger()` ngay sau `reset()` khi mở modal. Không tự chế gate `dirtyFields/touchedFields` trong từng form nếu chưa có lý do rõ và chưa có kiểm chứng, vì dễ làm mất realtime validation khi người dùng nhập rồi xóa về giá trị mặc định.
+- Validation message phải đúng với rule đang fail: message dạng "Nhập ..." chỉ dùng cho required/empty (`min(1)` sau khi trim); nếu có rule độ dài tối thiểu lớn hơn 1, format, range hoặc uniqueness thì phải có message riêng kiểu "Tối thiểu ... ký tự", "Sai định dạng", "Giá trị không hợp lệ". Không được dùng message required cho rule `min(2+)`, vì người dùng đã nhập vẫn bị báo như chưa nhập.
+- Với text input required trong `apps/web`, ưu tiên dùng helper validation chung như `requiredTrimmedText` thay vì tự viết chuỗi `.string().trim().min(...)` thủ công. Nếu phải tự viết schema riêng, Codex phải kiểm bằng `rg` hoặc đọc diff để chắc không có pattern `.min(2+)` dùng message "Nhập ...".
+- Không dùng native browser control làm lệch giao diện form chuẩn nếu dự án đã có pattern riêng. Field số/thứ tự/tiền/phần trăm phải dùng input text styled thống nhất, `inputMode` phù hợp, normalize/format dữ liệu rõ ràng và không hiện spinner/default number UI của browser.
 - Với UI phức tạp, bắt buộc tách theo flow `app route/page -> feature screens -> feature hooks/api/data/schemas/utils -> shared components`; không để route/page hoặc screen giữ toàn bộ subcomponent, schema, mock data và helper trong cùng một file.
 - Khi owner bảo "ghép API", "nối API", "connect API" hoặc dùng `/task-connect` sau khi đã feedback UI, mặc định hiểu UI hiện tại đã được chốt/ưng. Codex phải giữ nguyên layout, field, label, placeholder, validation UX và flow màn hình; nếu API/database hiện tại chưa khớp UI thì sửa API contract, backend, database hoặc mapping payload cho phù hợp, không tự thêm/xóa/sửa field UI để ép theo DTO cũ nếu owner không yêu cầu rõ.
 - Theo preference của owner, Codex không tự chạy browser check, Playwright UI, screenshot hoặc kiểm tương tác thật cho mỗi task/bug/sửa UI. Owner sẽ tự kiểm tra UI/tương tác. Chỉ chạy browser/Playwright/screenshot khi owner yêu cầu rõ, ví dụ command có từ `screenshot` hoặc nói "kiểm bằng browser".
-- Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
+- Khi owner nói UI đã "ưng/ok/chốt", lưu visual/UX pattern vào `docs/ui-references/approved-patterns.md`; đồng thời tự rút phần implementation có thể tái sử dụng vào `docs/ui-references/code-patterns.md` và file con phù hợp trong `docs/ui-references/code-patterns/` nếu UI đó tạo hoặc chuẩn hóa pattern code cho form, modal, detail grid, action, upload, badge/status hoặc state view. Chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
 
 ---
 

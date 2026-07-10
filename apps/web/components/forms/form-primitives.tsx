@@ -2,6 +2,7 @@
 
 export {
   CheckboxField,
+  FieldLabel,
   FieldIcon,
   FormHeader,
   FormStatus,

@@ -1,4 +1,5 @@
 export { CheckboxField } from "@/components/forms/checkbox-field";
+export { FieldLabel } from "@/components/forms/field-label";
 export { FieldIcon } from "@/components/forms/field-icon";
 export { FormHeader } from "@/components/forms/form-header";
 export { FormStatus } from "@/components/forms/form-status";

@@ -56,6 +56,7 @@ Before editing:
    - `docs/08-ui-pages-and-components.md`
    - `docs/11-ui-design-system.md`
    - `docs/14-source-code-structure.md`
+   - `docs/ui-references/code-patterns.md` routing index and matching file/section in `docs/ui-references/code-patterns/` when connection work touches form validation/submission, modal flow, detail grids, action controls, upload previews, badge/status UI, or loading/empty/error states.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
    - `docs/05-api-contract.md`
    - the matching file in `docs/api/` for the endpoint/domain.
@@ -103,6 +104,7 @@ In plan mode, stop after this plan and wait for approval.
 - Follow `docs/14-source-code-structure.md` for both sides of the connection. Do not connect an approved UI by stuffing API calls into deep components or by adding flat backend files beside a module file.
 - Debounce search/filter calls and use pagination/infinite query for long lists when relevant.
 - Forms use React Hook Form + Zod if validation is present.
+- If connecting data changes form behavior, preserve the closest project form pattern routed from `docs/ui-references/code-patterns.md`: realtime validation, direct error wiring to field primitives, stable modal reset/default behavior, and no local `dirtyFields`/`touchedFields` workaround unless the pattern explicitly calls for it.
 - Reuse existing shared components, feature hooks, API clients, and approved UI patterns before creating new ones. If API service/hook logic is reusable across screens, place it in a clear shared or feature client layer instead of mixing it into page/components.
 - Remove or isolate mock data so it cannot be confused with production data.
 - Keep loading, empty, error, and disabled states.

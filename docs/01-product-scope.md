@@ -11,12 +11,12 @@ Mỗi lộ trình tương ứng với một môn học theo khối lớp, ví d�
 - Lý 8.
 - Hóa 9.
 
-Mỗi lộ trình gồm nhiều buổi học/bài học được sắp xếp theo thứ tự. Học sinh học lần lượt từng buổi cho đến hết lộ trình.
+Mỗi lộ trình gồm nhiều chương học được sắp xếp theo thứ tự. Mỗi chương học gồm nhiều buổi học/bài học được sắp xếp theo thứ tự. Học sinh học lần lượt từng chương và từng buổi cho đến hết lộ trình.
 
 MVP tập trung vào việc giúp:
 
 - Admin tạo và quản lý lộ trình học.
-- Admin tạo nội dung học tập, quiz, flashcard, bài kiểm tra.
+- Admin tạo chương học, buổi học, nội dung học tập, quiz, flashcard, bài kiểm tra.
 - AI hỗ trợ tạo nội dung, tạo lời giải và chat theo tài liệu buổi học.
 - Học sinh học theo từng buổi, làm quiz, flashcard, bài kiểm tra và nhận XP.
 - Phụ huynh thanh toán cho con, theo dõi tiến độ và nhận thông báo.
@@ -31,7 +31,8 @@ MVP tập trung vào việc giúp:
 - Chỉ làm các môn: Toán, Lý, Hóa.
 - Có các role: Admin, Student, Parent.
 - Có lộ trình học theo môn và khối lớp.
-- Có học thử buổi đầu tiên nếu lộ trình cho phép.
+- Mỗi lộ trình có nhiều chương học; mỗi chương có nhiều buổi học.
+- Có học thử ở buổi học cụ thể do admin bật.
 - Có thanh toán QR/đối soát tự động bằng payOS.
 - Lộ trình học có hạn 12 tháng sau khi thanh toán.
 - Có mã giảm giá.
@@ -102,7 +103,7 @@ Học sinh có quyền:
 - Xem danh sách lộ trình học.
 - Mua lộ trình bằng thanh toán QR.
 - Nhập mã giảm giá khi thanh toán.
-- Học thử buổi đầu tiên nếu lộ trình cho phép.
+- Học thử buổi học cụ thể nếu admin bật cho buổi đó.
 - Vào buổi học đã mở quyền truy cập.
 - Xem video bài giảng.
 - Xem phiếu tài liệu trước buổi học.
@@ -160,12 +161,27 @@ Quy tắc liên kết:
 ### 4.1. Lộ trình học
 
 - Mỗi lộ trình gắn với một môn và một khối lớp.
-- Mỗi lộ trình gồm nhiều buổi học theo thứ tự.
+- Mỗi lộ trình gồm nhiều chương học theo thứ tự.
+- Mỗi chương học gồm nhiều buổi học theo thứ tự.
 - Lộ trình có thể có giá gốc, giá sau khuyến mãi và mã giảm giá.
-- Lộ trình có thể bật/tắt học thử buổi đầu.
+- Học thử được bật/tắt ở từng buổi học cụ thể, không cấu hình ở cấp lộ trình.
 - Sau khi thanh toán thành công, enrollment có hạn 12 tháng.
 
-### 4.2. Buổi học
+### 4.2. Chương học
+
+Chương học là lớp nhóm nội dung trong một lộ trình. Mỗi chương chỉ chứa thông tin tổng quan:
+
+- Tên chương học.
+- Thứ tự trong lộ trình.
+- Mô tả/tổng quan ngắn.
+- Mục tiêu học tập chính hoặc nội dung trọng tâm nếu admin nhập.
+- Trạng thái hiển thị.
+
+Chương học không có video, tài liệu/PDF riêng, tóm tắt bài học riêng, quiz, flashcard hoặc bài kiểm tra. Các nội dung học chi tiết này chỉ nằm trong buổi học.
+
+ASSUMPTION: Ở MVP, chương học chỉ dùng để chia cấu trúc và giải thích tổng quan. Tiến độ hoàn thành và chấm điểm chính vẫn tính theo từng buổi học.
+
+### 4.3. Buổi học
 
 Mỗi buổi học gồm:
 
@@ -191,7 +207,7 @@ Trước ngày mở bài thi, học sinh vẫn có thể:
 
 Nhưng chưa được làm bài kiểm tra.
 
-### 4.3. Hoàn thành buổi học
+### 4.4. Hoàn thành buổi học
 
 Ở MVP, tiêu chí hoàn thành buổi học là:
 
@@ -199,7 +215,7 @@ Nhưng chưa được làm bài kiểm tra.
 
 ASSUMPTION: Nếu một buổi học có nhiều bộ đề/bài kiểm tra, kết quả dùng để xét hoàn thành là kết quả tốt nhất của học sinh trong buổi học.
 
-### 4.4. Quiz
+### 4.5. Quiz
 
 - Một buổi học có thể có nhiều bộ quiz.
 - Quiz có thể do admin tạo hoặc AI tạo.
@@ -209,14 +225,14 @@ ASSUMPTION: Nếu một buổi học có nhiều bộ đề/bài kiểm tra, k�
 - Học sinh làm xong quiz thì thấy số câu đúng/sai.
 - Học sinh có thể làm lại tất cả, làm lại câu sai hoặc làm bộ quiz khác.
 
-### 4.5. Flashcard
+### 4.6. Flashcard
 
 - Một buổi học có thể có nhiều bộ flashcard.
 - Flashcard có thể do admin tạo hoặc AI tạo.
 - Học sinh học xong thì thấy đã thuộc bao nhiêu, chưa thuộc bao nhiêu.
 - Học sinh có thể ôn lại tất cả, ôn lại câu chưa thuộc hoặc học bộ khác.
 
-### 4.6. Bài kiểm tra
+### 4.7. Bài kiểm tra
 
 - Bài kiểm tra chỉ mở vào ngày/giờ admin thiết lập.
 - Học sinh được làm lại nhiều lần.
@@ -239,7 +255,7 @@ Sau khi nộp bài, học sinh thấy:
 - Xem lại câu sai.
 - Làm bài thi mới.
 
-### 4.7. Kho bộ dự phòng quiz/flashcard/bài thi
+### 4.8. Kho bộ dự phòng quiz/flashcard/bài thi
 
 Khi học sinh bấm tạo bộ quiz/flashcard/bài thi mới:
 
@@ -252,7 +268,7 @@ Khi học sinh bấm tạo bộ quiz/flashcard/bài thi mới:
 
 Dù chưa duyệt, học sinh vẫn được dùng và kết quả vẫn được tính điểm/xếp hạng.
 
-### 4.8. Lời giải AI inline
+### 4.9. Lời giải AI inline
 
 Ở mỗi câu quiz và flashcard có nút “Giải thích cho tôi”.
 
@@ -267,7 +283,7 @@ Khi bấm:
 
 Lời giải là lời giải chi tiết chung, không cần giải thích riêng theo đáp án học sinh chọn sai.
 
-### 4.9. Chat AI trong buổi học
+### 4.10. Chat AI trong buổi học
 
 Mỗi buổi học có khung chat AI.
 
@@ -279,7 +295,7 @@ Toàn bộ lịch sử chat AI của từng học sinh trong từng buổi học
 
 Khi gọi AI, hệ thống không cần gửi toàn bộ lịch sử. Chỉ gửi một số tin nhắn gần nhất và conversation summary nếu hội thoại dài.
 
-### 4.10. Report lỗi
+### 4.11. Report lỗi
 
 Học sinh report lỗi ở cấp item lẻ:
 
@@ -291,7 +307,7 @@ Không report cả bộ quiz/flashcard/bài thi chỉ vì một câu lỗi.
 
 Admin xử lý report bằng cách sửa, ẩn, khôi phục hoặc đánh dấu đã xử lý.
 
-### 4.11. Notification
+### 4.12. Notification
 
 Học sinh và phụ huynh có biểu tượng/nút thông báo trên giao diện.
 

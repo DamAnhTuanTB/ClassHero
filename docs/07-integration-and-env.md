@@ -14,7 +14,8 @@ Không hard-code secret trong source code. Không commit `.env` thật vào repo
 - Không thuê VPS dev riêng.
 - Database mặc định chạy local bằng Docker Postgres + pgvector.
 - Supabase Free/dev project chỉ dùng khi cần test gần giống staging/production.
-- Cloudflare R2 dùng free tier.
+- File storage local/dev mặc định dùng MinIO trong Docker để giả lập S3/R2.
+- Cloudflare R2 free tier chỉ dùng khi cần test gần giống staging/production.
 - Resend dùng Free tier để test email.
 - payOS dùng môi trường test/sandbox.
 - AI vẫn cần ngân sách test.
@@ -60,13 +61,16 @@ WORKER_CONCURRENCY_AI=2
 WORKER_CONCURRENCY_DOCUMENT=1
 WORKER_CONCURRENCY_NOTIFICATION=3
 
-# Cloudflare R2
-R2_ACCOUNT_ID=change-me
-R2_ACCESS_KEY_ID=change-me
-R2_SECRET_ACCESS_KEY=change-me
-R2_BUCKET_NAME=learning-path-dev
-R2_PUBLIC_BASE_URL=
-R2_SIGNED_URL_TTL_SECONDS=900
+# File storage - local/dev mặc định dùng MinIO, staging/production dùng Cloudflare R2
+FILE_STORAGE_PROVIDER=minio_local
+S3_ENDPOINT=http://localhost:9000
+S3_REGION=auto
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_BUCKET_NAME=learning-path-dev
+S3_FORCE_PATH_STYLE=true
+FILE_PUBLIC_BASE_URL=
+FILE_SIGNED_URL_TTL_SECONDS=900
 
 # OpenAI
 OPENAI_API_KEY=change-me
@@ -188,9 +192,11 @@ Cần lưu:
 
 ---
 
-## 4. Cloudflare R2
+## 4. File storage: MinIO local/dev và Cloudflare R2 production
 
-Dùng cho file storage chính.
+Local/dev mặc định dùng MinIO chạy trong Docker vì MinIO tương thích S3, giúp dev upload/download thật trên máy local mà không cần tài khoản Cloudflare.
+
+Staging/production dùng Cloudflare R2 làm file storage chính. Cloudflare R2 free tier có thể dùng ở dev khi cần test gần giống staging/production.
 
 File types:
 
@@ -207,7 +213,7 @@ Backend responsibilities:
 - Validate file type.
 - Validate file size.
 - Tạo object key.
-- Upload file.
+- Upload file qua adapter S3-compatible.
 - Lưu metadata vào `files`.
 - Trả signed URL hoặc proxy theo quyền.
 
@@ -218,6 +224,14 @@ uploads/{environment}/{purpose}/{yyyy}/{mm}/{uuid}-{safe-filename}
 ```
 
 Không lưu file chính trong app disk.
+
+Provider rules:
+
+- `FILE_STORAGE_PROVIDER=minio_local`: chỉ dùng local/dev, trỏ tới MinIO bằng `S3_ENDPOINT=http://localhost:9000`, `S3_FORCE_PATH_STYLE=true`.
+- `FILE_STORAGE_PROVIDER=cloudflare_r2`: dùng staging/production, trỏ tới endpoint S3-compatible của Cloudflare R2 như `https://<account_id>.r2.cloudflarestorage.com`, không chạy MinIO trên VPS production.
+- Code upload/download phải đi qua một service/adapter chung; module domain không gọi trực tiếp SDK R2/MinIO.
+- Signed URL TTL dùng `FILE_SIGNED_URL_TTL_SECONDS`; backend vẫn kiểm tra quyền trước khi trả URL.
+- Bucket local/dev có thể tạo tự động khi khởi động Docker/dev script, nhưng production bucket phải tạo và phân quyền thủ công trên Cloudflare.
 
 ---
 

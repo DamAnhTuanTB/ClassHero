@@ -8,6 +8,8 @@ SEO cho landing, course public và các trang public indexable nằm ở `docs/1
 
 Cấu trúc source code UI, feature folders, shared components, alias import và anti-pattern nằm ở `docs/14-source-code-structure.md`.
 
+Pattern code UI chuẩn cho form, modal, detail field grid, badge/action, upload preview và state view được điều hướng bởi `docs/ui-references/code-patterns.md`, còn pattern chi tiết nằm trong `docs/ui-references/code-patterns/`; khi tạo/sửa UI phải đọc mục routing `0. Cách Đọc Nhanh`, chọn file/section pattern gần nhất rồi mới tự viết biến thể mới.
+
 ## 1. Phong cách tổng thể
 
 Sản phẩm là nền tảng học theo lộ trình cho học sinh THCS/THPT, phụ huynh và admin.
@@ -149,11 +151,25 @@ Spacing/radius mặc định:
 - Utilitarian, dense vừa phải, dễ quét.
 - Sidebar trái, header trên, bảng/filter/action rõ.
 - Không dùng hero/marketing layout trong admin.
+- Với admin CRUD dạng phân cấp như lộ trình -> chương học -> buổi học, phải dùng flow master-detail: trang danh sách chỉ quản lý entity cha với list/filter/thêm/sửa/xóa; khi bấm vào một entity cha thì điều hướng sang trang chi tiết riêng để xem đầy đủ thông tin và quản lý entity con. Form tạo/sửa mở trong modal/drawer theo đúng ngữ cảnh, không render tất cả form thường trực trên cùng một trang.
+- Stat cards trên trang danh sách admin chỉ nên tóm tắt entity chính của trang đó; chỉ số của entity con như buổi học, học thử, tài liệu hoặc nội dung chi tiết phải nằm ở trang detail/dashboard phù hợp.
+- Form admin phải đi theo form chuẩn đã duyệt gần nhất, không tự dựng style/control mới nếu `apps/web/components/forms`, feature tương tự hoặc `docs/ui-references/approved-patterns.md` đã có pattern dùng được. Khi tạo form admin mới, Codex phải nêu rõ pattern tham chiếu trong kế hoạch/final.
+- Form admin phải validate ngay khi nhập hoặc chọn (`mode: "onChange"` và `reValidateMode: "onChange"` với React Hook Form, hoặc flow tương đương), đặc biệt với modal tạo/sửa. Lỗi phải hiện inline gần field, có trạng thái border/focus/error rõ, và nút submit phải phản ánh invalid/pending/disabled state.
+- Field không bắt buộc trong form không được hiện badge chữ dài cạnh label. Dùng icon nhỏ cạnh tên field; khi hover hoặc focus icon thì hiện tooltip `Không bắt buộc nhập`.
+- Field số trong admin như thứ tự, tiền VNĐ, phần trăm hoặc số lượng không dùng native number spinner/default browser UI; dùng input text styled cùng form chuẩn, `inputMode` phù hợp, chỉ nhận ký tự hợp lệ, normalize/format dữ liệu trước khi lưu và hiển thị đơn vị rõ khi cần.
+- Không đặt toggle học thử ở form lộ trình; học thử là cấu hình của buổi học cụ thể.
+- Action icon trong admin phải dùng màu theo ý nghĩa để dễ quét: sửa dùng xanh, xóa dùng đỏ, đóng/hủy dùng màu trung tính hoặc xanh nhẹ. Hành động xóa phải mở modal xác nhận rõ tên item trước khi thực thi.
 
 ## 7. Component rules
 
 - Button dùng shadcn/ui `Button`.
 - Form dùng React Hook Form + Zod; nếu đã setup shadcn Form thì dùng shadcn Form.
+- Trước khi tạo form, phải kiểm tra form chuẩn đã duyệt và reusable primitives: `apps/web/components/forms`, các form tương tự trong feature đang làm, và `docs/ui-references/approved-patterns.md`. Reuse/nâng cấp component sẵn có thay vì tạo input/select/textarea/button cùng chức năng với style khác.
+- Checklist bắt buộc cho mọi form mới hoặc form được sửa: schema Zod đủ required/min/max/format; React Hook Form validate khi nhập/chọn; lỗi inline có copy rõ và đúng rule đang fail; submit bị chặn/disabled khi invalid hoặc pending; pending state có feedback; reset/default values đúng khi mở lại modal/drawer; không có control nhìn bấm được nhưng thiếu handler/state thật.
+- Modal/drawer form khi mở mới phải sạch lỗi ở trạng thái chưa tương tác. Không hiện inline error ngay lúc mở modal chỉ vì default value còn thiếu; error chỉ hiện sau khi người dùng chạm/sửa field, bấm submit, hoặc sau lỗi nghiệp vụ của hành động lưu.
+- Pattern form mặc định phải bám form chuẩn đã duyệt hoặc form tương tự đang chạy ổn trong dự án: dùng `mode: "onChange"`/`reValidateMode: "onChange"` và truyền `form.formState.errors.<field>` trực tiếp vào primitive field. Muốn modal không hiện lỗi lúc mở thì không gọi `trigger()` sau `reset()`; không tự bọc lỗi bằng `dirtyFields/touchedFields` nếu không có test/logic rõ.
+- Với text input required, message "Nhập ..." chỉ được gắn với trạng thái rỗng sau khi trim. Nếu field có rule tối thiểu 2 ký tự trở lên, định dạng, khoảng giá trị hoặc kiểm tra trùng lặp, phải dùng message riêng tương ứng; không để người dùng đã nhập rồi vẫn thấy lỗi như chưa nhập.
+- Text input required trong `apps/web` nên dùng helper validation chung như `requiredTrimmedText` để tách required/min/max message từ đầu. Nếu một field cần min length lớn hơn 1, helper phải nhận `minMessage` riêng; không dùng lại required message.
 - Mọi ô input nhập liệu phải tắt gợi ý trình duyệt/autofill bằng cấu hình input chung; không dùng `autoComplete` semantic như `username`, `name`, `tel`, `street-address` hoặc `new-password` trong UI trừ khi owner yêu cầu rõ.
 - Dialog, Drawer, Sheet, Tabs, Card, Table, Badge, Alert ưu tiên shadcn/ui.
 - Icon button phải có `aria-label` hoặc tooltip nếu không hiển nhiên.
@@ -167,6 +183,7 @@ Spacing/radius mặc định:
 - Trước khi viết UI mới, áp dụng checklist trong `docs/14-source-code-structure.md`: route/page, screen, component, hook, schema, data, utils và shared layer phải có ranh giới rõ ngay từ đầu.
 - Import/export nội bộ trong `apps/web` phải dùng alias tuyệt đối `@/...`, không dùng `../` hoặc `./` để trỏ file source khác. Điều này áp dụng cho route, feature, shared component, barrel export và helper trong cùng module; chỉ bỏ qua file tự sinh hoặc import mà framework/tool yêu cầu giữ relative.
 - Component/pattern đã được owner duyệt phải là nguồn ưu tiên cho màn sau. Trước khi tạo input, select, checkbox, button, card, filter, hook hoặc API service mới, kiểm tra `apps/web/components`, feature tương tự và `docs/ui-references/approved-patterns.md`; nếu chức năng/style có thể tái sử dụng thì dùng lại hoặc nâng lên shared. Chỉ giữ component lẻ trong feature khi nó thật sự gắn riêng với màn đó và không có giá trị dùng lại.
+- Nếu routing index trong `docs/ui-references/code-patterns.md` trỏ tới pattern phù hợp, Codex phải đọc đúng file/section trong `docs/ui-references/code-patterns/` và copy/đối chiếu theo pattern đó trước khi tự thiết kế code flow mới.
 
 ### 7.1. Production-quality mock UI
 

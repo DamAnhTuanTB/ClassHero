@@ -28,11 +28,12 @@ Before editing files:
 4. If present, read `.codex/plans/codex-execution-plan.md` for known dependencies, assumptions, or recent plan notes.
 5. Use the `Task routing map` in `AGENTS.md` to choose the project docs relevant to the suspected bug area.
 6. Read `docs/14-source-code-structure.md` if the fix changes source files, moves code, touches shared components, or edits backend module organization.
-7. If the bug is about slowness, lag, timeout, cache, query, worker delay, AI latency, or observability, read `docs/12-performance-and-observability.md`.
-8. If the bug is about public pages not being indexable, wrong metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or Google discovery, read `docs/13-seo-and-content-discovery.md`.
-9. Read those docs before code changes. If the suspected area changes during diagnosis, read the newly relevant docs too.
-10. Inspect `git status --short` and preserve unrelated user changes.
-11. Give a short plan: suspected module/subtask, docs read, reproduction/evidence command, likely files/layers, docs to update if behavior changes, and verification commands.
+7. If the bug touches UI forms, modals, detail grids, action controls, upload previews, badge/status UI, or loading/empty/error states, read `0. Cách Đọc Nhanh` in `docs/ui-references/code-patterns.md` and the matching file/section in `docs/ui-references/code-patterns/` before editing, then compare the fix against the closest approved implementation pattern.
+8. If the bug is about slowness, lag, timeout, cache, query, worker delay, AI latency, or observability, read `docs/12-performance-and-observability.md`.
+9. If the bug is about public pages not being indexable, wrong metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or Google discovery, read `docs/13-seo-and-content-discovery.md`.
+10. Read those docs before code changes. If the suspected area changes during diagnosis, read the newly relevant docs too.
+11. Inspect `git status --short` and preserve unrelated user changes.
+12. Give a short plan: suspected module/subtask, docs read, reproduction/evidence command, likely files/layers, docs to update if behavior changes, and verification commands.
 
 Do not use prompt files as source of truth. Use project docs and code.
 
@@ -79,6 +80,7 @@ Non-negotiable:
 - For backend fixes in `apps/api/src`, preserve the alias convention: use `#api/...` for internal imports instead of `../` or `./`.
 - For backend fixes that touch HTTP errors, use `apps/api/src/common/errors` helpers/factories instead of adding direct Nest exception constructors with custom bodies in the fixed module.
 - For UI bugs, the fix must preserve production-like interaction. Do not replace broken behavior with static fake controls; visible buttons, checkbox/toggle state, tabs, menus, filters, forms, modals, and clickable-looking icons must keep semantic elements, state/handlers, and feedback.
+- For UI implementation bugs, do not invent local workaround gates when an approved code pattern exists. Forms, especially, must keep realtime validation from the shared/project pattern rather than patching symptoms with per-field `dirtyFields`/`touchedFields` logic.
 - If the bug reveals a small roadmap dependency/TODO issue, update `.codex/plans/codex-execution-plan.md`; ask the owner before major roadmap or scope changes.
 - If a fix requires a secret, paid service, production access, or large product decision, stop and ask.
 

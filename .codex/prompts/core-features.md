@@ -10,6 +10,7 @@ Dùng file này khi không gọi trực tiếp được slash skill. Nếu dùng
 - Task có sửa code phải đọc `docs/14-source-code-structure.md` để chọn đúng route/feature/shared/domain layer, alias import và boundary tách file.
 - Nếu có `.codex/plans/codex-execution-plan.md`, dùng để kiểm tra phụ thuộc/TODO, không thay docs gốc.
 - Nếu task chạm UI/performance/SEO public, đọc thêm `docs/11-ui-design-system.md`, `docs/12-performance-and-observability.md` hoặc `docs/13-seo-and-content-discovery.md` đúng phạm vi.
+- Nếu task tạo/sửa form, modal, detail grid, action control, upload preview, badge/status UI hoặc state view, đọc routing index trong `docs/ui-references/code-patterns.md` và file/section phù hợp trong `docs/ui-references/code-patterns/` trước khi viết/sửa.
 - Không cập nhật changelog trong task thường; changelog chỉ được ghi trong workflow `/commit`.
 
 ## Prompt Khởi Động
@@ -63,6 +64,7 @@ Phạm vi:
 - Không đổi stack.
 - Không thêm tính năng ngoài MVP.
 - Tuân thủ docs/14-source-code-structure.md: không gom nhiều component/helper vào một file, không tạo lại shared pattern đã có, không đặt backend controller/service/helper phẳng ở module root, dùng alias `@/...` hoặc `#api/...`.
+- Nếu có UI form/modal/detail/action/upload/badge/state, tuân thủ pattern được route từ `docs/ui-references/code-patterns.md`; không tự chế validation/control flow riêng khi đã có pattern chuẩn.
 
 Sau khi xong:
 - Chạy check phù hợp.

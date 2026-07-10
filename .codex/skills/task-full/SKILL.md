@@ -56,6 +56,7 @@ Before editing:
 8. If `Mode` is `UI only` or `UI + API`, also read:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
+   - `docs/ui-references/code-patterns.md` routing index and matching file/section in `docs/ui-references/code-patterns/` when the task creates or touches form, modal, detail grid, action button, upload, badge/status, loading/empty/error state, or another reusable UI code flow.
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
 9. If the task affects performance, latency, cache, list/search, database query, worker/job, AI/RAG, or observability, read `docs/12-performance-and-observability.md`.
@@ -92,13 +93,14 @@ Depending on the subtask, do what is necessary:
 - Database: Prisma schema/migration/seed updates when required.
 - Front-end: page/component/hooks/forms/state and responsive, production-like interactive UI.
 - Front-end source placement must follow `docs/14-source-code-structure.md`: route/page composes, feature screen orchestrates, hook handles state/query/form wiring, components render one implementation per file, schema/data/types/utils stay outside JSX, and shared components are reused before new variants are created.
+- Front-end UI implementation must follow the closest matching pattern routed from `docs/ui-references/code-patterns.md` into `docs/ui-references/code-patterns/` before creating a new form/modal/detail/action/upload/badge/state flow. If no pattern fits, state the gap and keep the implementation easy to promote into a pattern after owner approval.
 - Shared package: types/schemas/constants used by both apps.
 - Worker/integration: queue/provider/job code when required by docs.
 - Docs: update API/database/AI/UI/env docs only when behavior changes.
 - Performance: follow `docs/12-performance-and-observability.md` for cache, pagination, slow queries, worker jobs, AI latency and measurement.
 - SEO/public discovery: follow `docs/13-seo-and-content-discovery.md` for public pages, metadata, sitemap, robots, canonical, Open Graph, structured data and noindex for private routes.
 - Codex context: update `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/feature-coverage-matrix.md`, or `docs/implementation/dependency-graph.md` only when the completed task changes repo state, module paths, feature status, or dependencies.
-- UI approval memory: if the owner says the UI is approved after review, record the pattern in `docs/ui-references/approved-patterns.md`; update `docs/11-ui-design-system.md` only for broad design rules.
+- UI approval memory: if the owner says the UI is approved after review, record the visual/UX pattern in `docs/ui-references/approved-patterns.md`; if the UI creates or normalizes reusable implementation, also update `docs/ui-references/code-patterns.md` routing and the matching file in `docs/ui-references/code-patterns/`. Update `docs/11-ui-design-system.md` only for broad design rules.
 
 ## Verification
 

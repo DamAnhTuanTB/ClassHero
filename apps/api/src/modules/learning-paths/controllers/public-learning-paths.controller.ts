@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { AuthenticatedRequest } from "#api/common/auth/authenticated-request";
 import { OptionalJwtAuthGuard } from "#api/common/auth/optional-jwt-auth.guard";
 import { PublicLearningPathQueryDto } from "#api/modules/learning-paths/dto/public-learning-path-query.dto";
-import { LearningPathsService } from "#api/modules/learning-paths/services/learning-paths.service";
+import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 
 @ApiTags("learning-paths")
 @ApiBearerAuth()
@@ -11,8 +11,8 @@ import { LearningPathsService } from "#api/modules/learning-paths/services/learn
 @Controller("learning-paths")
 export class PublicLearningPathsController {
   constructor(
-    @Inject(LearningPathsService)
-    private readonly learningPathsService: LearningPathsService,
+    @Inject(PublicLearningPathsService)
+    private readonly learningPathsService: PublicLearningPathsService,
   ) {}
 
   @Get()

@@ -15,6 +15,7 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Ghi pattern cụ thể theo màn hình, role hoặc flow.
 - Không biến mọi feedback nhỏ thành design system toàn cục.
 - Chỉ cập nhật `docs/11-ui-design-system.md` nếu owner chốt một nguyên tắc áp dụng rộng cho nhiều màn.
+- Khi một UI được owner duyệt đồng thời tạo ra cách code có thể tái sử dụng, phải cập nhật thêm routing index `docs/ui-references/code-patterns.md` và file phù hợp trong `docs/ui-references/code-patterns/`.
 - Ghi ngắn, dễ tái sử dụng cho lần làm UI sau.
 
 ## Template

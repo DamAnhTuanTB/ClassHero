@@ -55,6 +55,7 @@ Before editing:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
    - `docs/14-source-code-structure.md`
+   - `docs/ui-references/code-patterns.md` routing index and matching file/section in `docs/ui-references/code-patterns/` if the screen uses form, modal, detail grid, action button, upload, badge/status, loading/empty/error state, or another reusable UI code flow.
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
 7. Read `docs/12-performance-and-observability.md` when the UI has list/search/heavy interaction, large media, or performance-sensitive learning flows.
@@ -118,6 +119,7 @@ In plan mode, stop after this plan and wait for approval.
 When the owner says the UI is approved, for example "ưng rồi", "ok rồi", "đúng ý rồi", "chốt UI này", or "giữ style này":
 
 - Add a concise entry to `docs/ui-references/approved-patterns.md`.
+- If the approved UI introduced or normalized reusable implementation for form, modal, detail grid, action button, upload, badge/status, loading/empty/error state, or another UI code flow, also update `docs/ui-references/code-patterns.md` routing and the matching file in `docs/ui-references/code-patterns/`.
 - Record context, approved layout/style choices, things to avoid, reusable screens/flows, and screenshot/file evidence if available.
 - Update `docs/11-ui-design-system.md` only when the owner approves a broad rule that should apply across many screens.
 - Do not update changelog; `/commit` will record the approved UI/docs changes if a commit is created.

@@ -2,12 +2,13 @@
 
 Thư mục này chứa chi tiết phạm vi, `Không làm` và `Done khi` cho từng milestone.
 
-Hai file phụ trợ trong thư mục này:
+Các file phụ trợ trong thư mục này:
 
+- `milestone-overview.md`: diễn giải dễ hiểu từng milestone lớn `M0` đến `M14` cho owner.
 - `dependency-graph.md`: xem nhanh phụ thuộc giữa milestone/subtask.
 - `feature-coverage-matrix.md`: rà feature đã đủ DB/API/UI/worker/test chưa.
 
-Hai file này giúp chọn task và phát hiện thiếu coverage, nhưng không thay thế `docs/09-implementation-plan.md` hoặc file milestone `M*.md`.
+Các file này giúp chọn task và phát hiện thiếu coverage, nhưng không thay thế `docs/09-implementation-plan.md` hoặc file milestone `M*.md`.
 
 Mỗi subtask có dòng `Mode` để Codex biết bề mặt triển khai chính:
 

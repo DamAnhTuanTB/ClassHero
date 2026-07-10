@@ -32,7 +32,7 @@ Role: public hoặc authenticated.
 Behavior:
 
 - Trả thông tin lộ trình.
-- Trả lessons public metadata.
+- Trả chapters public metadata, mỗi chapter chứa lessons public metadata theo thứ tự.
 - Chỉ trả lộ trình `PUBLISHED`.
 - M3.3 bổ sung trạng thái enrollment/trial nếu authenticated.
 - `idOrSlug` nhận UUID hoặc slug public ổn định.
@@ -42,6 +42,7 @@ Response item fields bổ sung từ M3.3:
 ```json
 {
   "summary": {
+    "chapterCount": 4,
     "lessonCount": 12,
     "firstLessonId": "uuid",
     "effectivePriceVnd": 1500000,
@@ -71,6 +72,10 @@ Role: `ADMIN`.
 
 Query: `status`, `subject`, `grade`, `search`, pagination.
 
+Behavior:
+
+- Mặc định không trả lộ trình `ARCHIVED`; màn thùng rác quản trị lấy riêng bằng `status=ARCHIVED`.
+
 ### `GET /admin/learning-paths/:id`
 
 Role: `ADMIN`.
@@ -78,6 +83,7 @@ Role: `ADMIN`.
 Behavior:
 
 - Trả chi tiết learning path chưa bị soft delete.
+- Response có thể include `chapters` và lesson count để admin dựng màn chi tiết.
 
 ### `POST /admin/learning-paths`
 
@@ -95,7 +101,6 @@ Body:
   "salePriceVnd": 1500000,
   "thumbnailFileId": "uuid",
   "descriptionJson": {},
-  "trialEnabled": true,
   "status": "DRAFT",
   "sortOrder": 1
 }
@@ -115,7 +120,7 @@ Side effects:
 
 Role: `ADMIN`.
 
-Body: partial của body create, gồm `status` để chuyển `DRAFT`, `PUBLISHED`, `HIDDEN`, `ARCHIVED`.
+Body: partial của body create, gồm `status` để chuyển giữa `DRAFT`, `PUBLISHED`, `HIDDEN`. Trạng thái `ARCHIVED` chỉ được tạo qua thao tác xóa mềm.
 
 Behavior:
 
@@ -127,10 +132,33 @@ Behavior:
 
 Role: `ADMIN`.
 
-Behavior: soft delete và set status `ARCHIVED`.
+Behavior: soft delete và set status `ARCHIVED`. Lộ trình archived không nằm trong danh sách quản trị mặc định.
 
 Side effects:
 
+- Ghi `audit_logs`.
+
+### `POST /admin/learning-paths/:id/restore`
+
+Role: `ADMIN`.
+
+Behavior: khôi phục lộ trình archived về `DRAFT` để xuất hiện lại trong danh sách quản trị.
+
+Side effects:
+
+- Clear `deleted_at` nếu backend đã set khi xóa mềm.
+- Clear `published_at`.
+- Ghi `audit_logs`.
+
+### `DELETE /admin/learning-paths/:id/permanent`
+
+Role: `ADMIN`.
+
+Behavior: xóa vĩnh viễn một lộ trình đang `ARCHIVED`. Chỉ cho phép thao tác từ thùng rác quản trị.
+
+Side effects:
+
+- Xóa hoặc purge dữ liệu phụ thuộc theo chính sách retention đã chốt.
 - Ghi `audit_logs`.
 
 ### `POST /admin/learning-paths/:id/publish`
@@ -141,18 +169,99 @@ Behavior: set status `PUBLISHED`, set `published_at`.
 
 ---
 
-## 6. Admin lesson API
+## 6. Admin chapter API
 
-### `GET /admin/learning-paths/:learningPathId/lessons`
+### `GET /admin/learning-paths/:learningPathId/chapters`
 
 Role: `ADMIN`.
 
 Behavior:
 
-- Trả danh sách lesson chưa bị soft delete trong một learning path, sắp xếp theo `orderIndex` tăng dần.
+- Trả danh sách chapter chưa bị soft delete trong một learning path, sắp xếp theo `orderIndex` tăng dần.
 - Nếu learning path không tồn tại hoặc đã bị xóa mềm, trả `404 NOT_FOUND`.
 
-### `POST /admin/learning-paths/:learningPathId/lessons`
+### `POST /admin/learning-paths/:learningPathId/chapters`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{
+  "orderIndex": 1,
+  "title": "Chương 1: Số hữu tỉ",
+  "overview": "Tổng quan các kiến thức nền về số hữu tỉ",
+  "objectivesJson": {
+    "items": ["Nhận biết số hữu tỉ", "Thực hiện phép tính cơ bản"]
+  },
+  "status": "DRAFT"
+}
+```
+
+Behavior:
+
+- `orderIndex` phải unique trong cùng learning path.
+- Chapter chỉ chứa thông tin tổng quan; không nhận video URL, document/material, summary học tập, quiz, flashcard hoặc test.
+
+Side effects:
+
+- Tạo `learning_path_chapters`.
+- Tăng `learning_paths.total_chapter_count` nếu dùng denormalized counter.
+- Ghi `audit_logs`.
+
+### `GET /admin/chapters/:chapterId`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả chapter chưa bị soft delete, kèm lesson metadata nếu UI chi tiết cần.
+
+### `PATCH /admin/chapters/:chapterId`
+
+Role: `ADMIN`.
+
+Body: partial của body create.
+
+Behavior:
+
+- Cho phép đổi `orderIndex`, `title`, `overview`, `objectivesJson` và `status`.
+- Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng learning path.
+- Ghi `audit_logs`.
+
+### `DELETE /admin/chapters/:chapterId`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Soft delete chapter và set status `ARCHIVED`.
+- Chỉ cho phép xóa mềm khi service xử lý rõ các lesson con theo policy archive; MVP ưu tiên archive chapter kèm các lesson con để tránh lesson mồ côi.
+- Ghi `audit_logs`.
+
+### `POST /admin/chapters/:chapterId/publish`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Set status `PUBLISHED`.
+- Ghi `audit_logs`.
+
+---
+
+## 7. Admin lesson API
+
+### `GET /admin/chapters/:chapterId/lessons`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả danh sách lesson chưa bị soft delete trong một chapter, sắp xếp theo `orderIndex` tăng dần.
+- Nếu chapter không tồn tại hoặc đã bị xóa mềm, trả `404 NOT_FOUND`.
+
+### `POST /admin/chapters/:chapterId/lessons`
 
 Role: `ADMIN`.
 
@@ -167,6 +276,7 @@ Body:
   "examOpenAt": "2026-08-01T13:00:00.000Z",
   "videoUrl": "https://youtube.com/...",
   "completionMinScore": 7,
+  "trialEnabled": false,
   "status": "DRAFT"
 }
 ```
@@ -174,7 +284,8 @@ Body:
 Behavior:
 
 - `completionMinScore` mặc định là `7` nếu không gửi.
-- `orderIndex` phải unique trong cùng learning path.
+- `trialEnabled` mặc định là `false`; học thử thuộc từng buổi học, không thuộc lộ trình.
+- `orderIndex` phải unique trong cùng chapter.
 - `videoUrl` chỉ chấp nhận YouTube hoặc Google Drive.
 
 Side effects:
@@ -199,9 +310,9 @@ Body: partial của body create.
 
 Behavior:
 
-- Cho phép đổi `orderIndex`, metadata, thời điểm mở bài thi, video URL, completion score và `status`.
+- Cho phép đổi `orderIndex`, metadata, thời điểm mở bài thi, video URL, completion score, `trialEnabled` và `status`.
 - `shortDescription`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
-- Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng learning path.
+- Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng chapter.
 - Ghi `audit_logs`.
 
 ### `DELETE /admin/lessons/:lessonId`
@@ -226,7 +337,7 @@ Behavior:
 
 ---
 
-## 7. Lesson summary API
+## 8. Lesson summary API
 
 ### `GET /admin/lessons/:lessonId/summary`
 
@@ -293,7 +404,7 @@ Behavior:
 
 ---
 
-## 8. File/material API
+## 9. File/material API
 
 ### `POST /files/upload`
 
@@ -331,7 +442,7 @@ AI_DIAGRAM:
 Behavior:
 
 - Validate file type/size theo purpose.
-- Upload Cloudflare R2.
+- Upload qua storage adapter S3-compatible: MinIO local/dev hoặc Cloudflare R2 staging/production.
 - Lưu `files` với `purpose`.
 - Trả file metadata.
 
@@ -347,6 +458,8 @@ Behavior:
 ### `POST /admin/lessons/:lessonId/documents`
 
 Role: `ADMIN`.
+
+Ghi chú: Chapter không có document/material upload riêng ở MVP; upload tài liệu chỉ thực hiện ở cấp lesson.
 
 Body:
 

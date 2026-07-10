@@ -35,6 +35,8 @@ Vector index ví dụ, cần điều chỉnh theo Supabase/model thực tế:
 [ ] Có `password_reset_tokens`.
 [ ] Có `background_jobs` và `ai_generations.background_job_id`.
 [ ] `files` có `purpose`.
+[ ] `learning_path_chapters` có unique `(learning_path_id, order_index)`.
+[ ] `lessons` có unique `(chapter_id, order_index)`.
 [ ] `lesson_documents` có `title`, `content_hash`, `processing_job_id`, provider/model/dimension.
 [ ] `document_chunks` có provider/model/dimension và filter rule.
 [ ] `quiz_questions`, `flashcards`, `test_questions` có `review_status` để admin ẩn item report.

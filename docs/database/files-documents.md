@@ -8,11 +8,13 @@ Chi tiết tách từ `docs/04-database-model.md`. File index chính vẫn là `
 
 ### 4.1. `files`
 
-Metadata file lưu trên Cloudflare R2. Không lưu file binary trong database.
+Metadata file lưu cho object storage. Không lưu file binary trong database.
+
+Local/dev dùng `MINIO_LOCAL`; staging/production dùng `CLOUDFLARE_R2`.
 
 ```txt
 id uuid pk
-provider FileProvider default CLOUDFLARE_R2
+provider FileProvider
 purpose FilePurpose
 bucket string
 object_key string unique
@@ -32,6 +34,7 @@ deleted_at timestamp?
 
 Rules:
 
+- `provider` ghi backend storage thật đã lưu file; không dùng để cấp quyền.
 - File permission phải kiểm tra theo `purpose`, `uploaded_by_id` và entity đang tham chiếu file.
 - Không được chỉ dựa vào `file_id` để cấp signed URL.
 - Client không được upload trực tiếp `AI_DIAGRAM`; chỉ backend/worker tạo sau khi validate `diagram_spec_json`.
@@ -70,6 +73,7 @@ Rules:
 
 - `content_hash` dùng để phát hiện tài liệu nguồn thay đổi và invalidate embedding/explanation liên quan.
 - Nếu tài liệu thay đổi, worker phải tạo lại chunks/embedding và các explanation liên quan có thể bị stale.
+- Chapter không có `chapter_documents` riêng ở MVP; tài liệu/chunk/embedding chỉ gắn với lesson.
 
 ### 4.3. `document_chunks`
 

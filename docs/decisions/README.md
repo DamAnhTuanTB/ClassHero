@@ -48,3 +48,5 @@ Hệ quả tốt/xấu/cần lưu ý.
 | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `ADR-0001-codex-context-docs.md`             | Accepted | Thêm bộ context/coverage/decision docs nhẹ để Codex làm việc nhanh hơn                                       |
 | `ADR-0002-source-code-structure-contract.md` | Accepted | Chốt contract tổ chức source code front-end/back-end để tránh gom file, duplicate UI pattern và module phẳng |
+| `ADR-0003-local-dev-file-storage.md`         | Accepted | Chọn MinIO local/dev làm object storage S3-compatible, giữ Cloudflare R2 cho staging/production              |
+| `ADR-0004-learning-path-chapters.md`         | Accepted | Chốt cấu trúc lộ trình gồm chương học tổng quan, mỗi chương gồm nhiều buổi học chi tiết                      |

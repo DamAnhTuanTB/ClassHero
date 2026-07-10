@@ -22,6 +22,7 @@ Mục tiêu: đủ rõ để Codex tạo NestJS AI module, AiProvider abstractio
 - Tài liệu phải được extract text, chunk, embedding và lưu vào database.
 - Retrieval phải filter theo `lesson_id`.
 - Không lấy chunk từ lesson khác.
+- Chapter chỉ là metadata tổng quan để nhóm lesson; MVP không có document chunks, summary generation, quiz/flashcard/test generation hoặc chat RAG ở cấp chapter.
 - Không trộn embedding của nhiều provider/model/dimension trong cùng một retrieval space.
 - Output AI có cấu trúc phải validate bằng Zod/JSON Schema trước khi lưu.
 - Lời giải AI cho quiz/flashcard/câu thi phải cache ở cấp item.

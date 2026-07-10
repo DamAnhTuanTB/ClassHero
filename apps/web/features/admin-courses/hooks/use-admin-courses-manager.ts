@@ -3,113 +3,132 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
 import {
-  adminLearningPaths,
   type AdminLearningPath,
-  type AdminLesson,
   type AdminPublishStatus,
   type AdminSubject,
 } from "@/features/admin-courses/data";
+import { useAdminLearningPathsQuery } from "@/features/admin-courses/hooks/use-admin-course-queries";
 import {
-  emptyLessonValues,
   emptyPathValues,
   learningPathSchema,
-  lessonSchema,
   type LearningPathFormValues,
-  type LessonFormValues,
 } from "@/features/admin-courses/schemas";
-import type { EditorMode, ViewState } from "@/features/admin-courses/types";
+import type {
+  EditorMode,
+  LearningPathSortKey,
+  SortDirection,
+  ViewState,
+} from "@/features/admin-courses/types";
 import {
-  byLessonOrder,
+  filterAndSortLearningPaths,
+  getActiveLearningPaths,
+  getAdminCourseStats,
+  getArchivedLearningPaths,
   toLearningPathPayload,
-  toLessonFormValues,
-  toLessonPayload,
   toPathFormValues,
   wait,
 } from "@/features/admin-courses/utils";
 
 export function useAdminCoursesManager() {
-  const [viewState, setViewState] = useState<ViewState>("loading");
-  const [paths, setPaths] = useState<AdminLearningPath[]>(adminLearningPaths);
-  const [selectedPathId, setSelectedPathId] = useState(adminLearningPaths[0]?.id ?? "");
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const learningPathsQuery = useAdminLearningPathsQuery();
+  const [paths, setPaths] = useState<AdminLearningPath[]>([]);
   const [pathEditorMode, setPathEditorMode] = useState<EditorMode>("edit");
-  const [lessonEditorMode, setLessonEditorMode] = useState<EditorMode>("create");
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [isPathEditorOpen, setIsPathEditorOpen] = useState(false);
+  const [editingPathId, setEditingPathId] = useState<string | null>(null);
+  const [deletingPathIds, setDeletingPathIds] = useState<string[]>([]);
+  const [permanentDeletingPathIds, setPermanentDeletingPathIds] = useState<string[]>([]);
+  const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
   const [query, setQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<AdminSubject | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<AdminPublishStatus | "ALL">("ALL");
   const [gradeFilter, setGradeFilter] = useState<number | "ALL">("ALL");
+  const [sortKey, setSortKey] = useState<LearningPathSortKey>("title");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isSavingPath, setIsSavingPath] = useState(false);
-  const [isSavingLesson, setIsSavingLesson] = useState(false);
 
-  const selectedPath = paths.find((path) => path.id === selectedPathId) ?? null;
-  const selectedLesson =
-    selectedPath?.lessons.find((lesson) => lesson.id === selectedLessonId) ?? null;
+  const editingPath = paths.find((path) => path.id === editingPathId) ?? null;
 
   const pathForm = useForm<LearningPathFormValues>({
+    mode: "onChange",
+    reValidateMode: "onChange",
     resolver: zodResolver(learningPathSchema) as Resolver<LearningPathFormValues>,
-    defaultValues: selectedPath ? toPathFormValues(selectedPath) : emptyPathValues,
-  });
-  const lessonForm = useForm<LessonFormValues>({
-    resolver: zodResolver(lessonSchema) as Resolver<LessonFormValues>,
-    defaultValues: emptyLessonValues,
+    defaultValues: emptyPathValues,
   });
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setViewState("ready");
-    }, 420);
-
-    return () => window.clearTimeout(timer);
-  }, []);
+    if (learningPathsQuery.data) {
+      setPaths(learningPathsQuery.data);
+    }
+  }, [learningPathsQuery.data]);
 
   useEffect(() => {
-    if (pathEditorMode === "edit" && selectedPath) {
-      pathForm.reset(toPathFormValues(selectedPath));
+    if (pathEditorMode === "edit" && editingPath) {
+      pathForm.reset(toPathFormValues(editingPath));
     }
-  }, [pathEditorMode, pathForm, selectedPath]);
+  }, [editingPath, pathEditorMode, pathForm]);
+
+  const activePaths = useMemo(() => getActiveLearningPaths(paths), [paths]);
+  const deletingPaths = useMemo(
+    () => activePaths.filter((path) => deletingPathIds.includes(path.id)),
+    [activePaths, deletingPathIds],
+  );
+
+  const archivedPaths = useMemo(() => getArchivedLearningPaths(paths), [paths]);
+  const permanentDeletingPaths = useMemo(
+    () => archivedPaths.filter((path) => permanentDeletingPathIds.includes(path.id)),
+    [archivedPaths, permanentDeletingPathIds],
+  );
+
+  const filteredPaths = useMemo(
+    () =>
+      filterAndSortLearningPaths(activePaths, {
+        gradeFilter,
+        query,
+        sortDirection,
+        sortKey,
+        statusFilter,
+        subjectFilter,
+      }),
+    [
+      activePaths,
+      gradeFilter,
+      query,
+      sortDirection,
+      sortKey,
+      statusFilter,
+      subjectFilter,
+    ],
+  );
+  const filteredPathIds = useMemo(
+    () => filteredPaths.map((path) => path.id),
+    [filteredPaths],
+  );
+  const allFilteredPathsSelected =
+    filteredPathIds.length > 0 &&
+    filteredPathIds.every((pathId) => selectedPathIds.includes(pathId));
+
+  const stats = useMemo(
+    () => getAdminCourseStats(activePaths, archivedPaths),
+    [activePaths, archivedPaths],
+  );
 
   useEffect(() => {
-    if (lessonEditorMode === "edit" && selectedLesson) {
-      lessonForm.reset(toLessonFormValues(selectedLesson));
-      return;
-    }
+    setSelectedPathIds((current) => {
+      const visiblePathIds = new Set(filteredPathIds);
+      const nextSelectedIds = current.filter((pathId) => visiblePathIds.has(pathId));
 
-    if (lessonEditorMode === "create") {
-      lessonForm.reset({
-        ...emptyLessonValues,
-        orderIndex: (selectedPath?.lessons.length ?? 0) + 1,
-      });
-    }
-  }, [lessonEditorMode, lessonForm, selectedLesson, selectedPath]);
-
-  const filteredPaths = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-
-    return paths.filter((path) => {
-      const matchesKeyword =
-        !keyword ||
-        path.title.toLowerCase().includes(keyword) ||
-        path.slug.toLowerCase().includes(keyword);
-      const matchesSubject = subjectFilter === "ALL" || path.subject === subjectFilter;
-      const matchesStatus = statusFilter === "ALL" || path.status === statusFilter;
-      const matchesGrade = gradeFilter === "ALL" || path.grade === gradeFilter;
-
-      return matchesKeyword && matchesSubject && matchesStatus && matchesGrade;
+      return nextSelectedIds.length === current.length ? current : nextSelectedIds;
     });
-  }, [gradeFilter, paths, query, statusFilter, subjectFilter]);
-
-  const stats = useMemo(() => {
-    const published = paths.filter((path) => path.status === "PUBLISHED").length;
-    const lessons = paths.reduce((total, path) => total + path.lessons.length, 0);
-    const trial = paths.filter((path) => path.trialEnabled).length;
-
-    return { published, lessons, trial };
-  }, [paths]);
+  }, [filteredPathIds]);
 
   function startCreatePath() {
     setPathEditorMode("create");
-    setSelectedLessonId(null);
+    setEditingPathId(null);
     pathForm.reset(emptyPathValues);
+    setIsPathEditorOpen(true);
   }
 
   function startEditPath(pathId: string) {
@@ -118,30 +137,10 @@ export function useAdminCoursesManager() {
       return;
     }
 
-    setSelectedPathId(path.id);
+    setEditingPathId(path.id);
     setPathEditorMode("edit");
-    setSelectedLessonId(null);
     pathForm.reset(toPathFormValues(path));
-  }
-
-  function startCreateLesson() {
-    setLessonEditorMode("create");
-    setSelectedLessonId(null);
-    lessonForm.reset({
-      ...emptyLessonValues,
-      orderIndex: (selectedPath?.lessons.length ?? 0) + 1,
-    });
-  }
-
-  function startEditLesson(lessonId: string) {
-    const lesson = selectedPath?.lessons.find((item) => item.id === lessonId);
-    if (!lesson) {
-      return;
-    }
-
-    setSelectedLessonId(lesson.id);
-    setLessonEditorMode("edit");
-    lessonForm.reset(toLessonFormValues(lesson));
+    setIsPathEditorOpen(true);
   }
 
   async function savePath(values: LearningPathFormValues) {
@@ -153,24 +152,28 @@ export function useAdminCoursesManager() {
       const createdPath: AdminLearningPath = {
         ...payload,
         id: `path-${Date.now()}`,
+        enrolledStudentCount: 0,
+        totalChapterCount: 0,
         totalLessonCount: 0,
         updatedAt: new Date().toISOString(),
-        lessons: [],
+        chapters: [],
       };
       setPaths((current) => [createdPath, ...current]);
-      setSelectedPathId(createdPath.id);
+      setEditingPathId(createdPath.id);
       setPathEditorMode("edit");
+      setIsPathEditorOpen(false);
       toast.success("Đã tạo lộ trình", {
-        description: "Bạn có thể thêm buổi học ngay bên dưới.",
+        description: "Mở chi tiết lộ trình để thêm chương học và buổi học.",
       });
-    } else if (selectedPath) {
+    } else if (editingPath) {
       setPaths((current) =>
         current.map((path) =>
-          path.id === selectedPath.id
+          path.id === editingPath.id
             ? { ...path, ...payload, updatedAt: new Date().toISOString() }
             : path,
         ),
       );
+      setIsPathEditorOpen(false);
       toast.success("Đã lưu lộ trình", {
         description: "Thông tin quản trị đã được cập nhật trên màn hình.",
       });
@@ -179,145 +182,195 @@ export function useAdminCoursesManager() {
     setIsSavingPath(false);
   }
 
-  async function saveLesson(values: LessonFormValues) {
-    if (!selectedPath) {
-      return;
-    }
-
-    const duplicatedOrder = selectedPath.lessons.some(
-      (lesson) =>
-        lesson.orderIndex === values.orderIndex &&
-        (lessonEditorMode === "create" || lesson.id !== selectedLesson?.id),
+  function toggleSelectPath(pathId: string) {
+    setSelectedPathIds((current) =>
+      current.includes(pathId)
+        ? current.filter((selectedPathId) => selectedPathId !== pathId)
+        : [...current, pathId],
     );
-
-    if (duplicatedOrder) {
-      lessonForm.setError("orderIndex", {
-        type: "manual",
-        message: "Thứ tự này đã có trong lộ trình",
-      });
-      return;
-    }
-
-    setIsSavingLesson(true);
-    await wait(360);
-    const payload = toLessonPayload(values);
-
-    setPaths((current) =>
-      current.map((path) => {
-        if (path.id !== selectedPath.id) {
-          return path;
-        }
-
-        if (lessonEditorMode === "create") {
-          const createdLesson: AdminLesson = {
-            ...payload,
-            id: `lesson-${Date.now()}`,
-          };
-
-          return {
-            ...path,
-            totalLessonCount: path.lessons.length + 1,
-            updatedAt: new Date().toISOString(),
-            lessons: [...path.lessons, createdLesson].sort(byLessonOrder),
-          };
-        }
-
-        return {
-          ...path,
-          updatedAt: new Date().toISOString(),
-          lessons: path.lessons
-            .map((lesson) =>
-              lesson.id === selectedLesson?.id ? { ...lesson, ...payload } : lesson,
-            )
-            .sort(byLessonOrder),
-        };
-      }),
-    );
-
-    toast.success(
-      lessonEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
-      {
-        description: "Danh sách buổi học đã được cập nhật.",
-      },
-    );
-    setLessonEditorMode("create");
-    setSelectedLessonId(null);
-    setIsSavingLesson(false);
   }
 
-  function archiveSelectedPath() {
-    if (!selectedPath) {
+  function toggleSelectAllPaths() {
+    setSelectedPathIds(allFilteredPathsSelected ? [] : filteredPathIds);
+  }
+
+  function toggleSort(nextSortKey: LearningPathSortKey) {
+    if (sortKey === nextSortKey) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
       return;
     }
+
+    setSortKey(nextSortKey);
+    setSortDirection("asc");
+  }
+
+  function requestDeletePaths(pathIds: string[]) {
+    const pathIdSet = new Set(pathIds);
+    const activePathIds = activePaths
+      .filter((path) => pathIdSet.has(path.id))
+      .map((path) => path.id);
+
+    if (activePathIds.length === 0) {
+      return;
+    }
+
+    setDeletingPathIds(activePathIds);
+  }
+
+  function requestDeletePath(pathId: string) {
+    requestDeletePaths([pathId]);
+  }
+
+  function requestDeleteSelectedPaths() {
+    requestDeletePaths(selectedPathIds);
+  }
+
+  function confirmDeletePath() {
+    if (deletingPaths.length === 0) {
+      return;
+    }
+
+    const pathIdSet = new Set(deletingPaths.map((path) => path.id));
+    const deletedCount = deletingPaths.length;
 
     setPaths((current) =>
       current.map((path) =>
-        path.id === selectedPath.id
+        pathIdSet.has(path.id)
           ? { ...path, status: "ARCHIVED", updatedAt: new Date().toISOString() }
           : path,
       ),
     );
-    toast.info("Đã chuyển vào lưu trữ", {
-      description: "Lộ trình không còn nằm trong nhóm đang mở.",
-    });
+    toast.info(
+      deletedCount === 1 ? "Đã xóa lộ trình" : `Đã xóa ${deletedCount} lộ trình`,
+      {
+        description: "Lộ trình đã được chuyển vào thùng rác.",
+      },
+    );
+    setIsPathEditorOpen(false);
+    setSelectedPathIds((current) => current.filter((pathId) => !pathIdSet.has(pathId)));
+    setDeletingPathIds([]);
   }
 
-  function archiveLesson(lessonId: string) {
-    if (!selectedPath) {
+  function restorePaths(pathIds: string[]) {
+    const pathIdSet = new Set(pathIds);
+    const restoredCount = archivedPaths.filter((path) => pathIdSet.has(path.id)).length;
+    if (restoredCount === 0) {
       return;
     }
 
     setPaths((current) =>
       current.map((path) =>
-        path.id === selectedPath.id
-          ? {
-              ...path,
-              lessons: path.lessons.map((lesson) =>
-                lesson.id === lessonId ? { ...lesson, status: "ARCHIVED" } : lesson,
-              ),
-            }
+        pathIdSet.has(path.id) && path.status === "ARCHIVED"
+          ? { ...path, status: "DRAFT", updatedAt: new Date().toISOString() }
           : path,
       ),
     );
-    toast.info("Đã lưu trữ buổi học");
+    toast.success(
+      restoredCount === 1
+        ? "Đã khôi phục lộ trình"
+        : `Đã khôi phục ${restoredCount} lộ trình`,
+      {
+        description: "Lộ trình trở lại danh sách ở trạng thái Nháp.",
+      },
+    );
+  }
+
+  function requestPermanentDeletePaths(pathIds: string[]) {
+    const pathIdSet = new Set(pathIds);
+    const archivedIds = archivedPaths
+      .filter((path) => pathIdSet.has(path.id))
+      .map((path) => path.id);
+
+    if (archivedIds.length === 0) {
+      return;
+    }
+
+    setPermanentDeletingPathIds(archivedIds);
+  }
+
+  function confirmPermanentDeletePaths() {
+    if (permanentDeletingPaths.length === 0) {
+      return;
+    }
+
+    const pathIdSet = new Set(permanentDeletingPaths.map((path) => path.id));
+    const deletedCount = permanentDeletingPaths.length;
+
+    setPaths((current) => current.filter((path) => !pathIdSet.has(path.id)));
+    toast.success(
+      deletedCount === 1
+        ? "Đã xóa vĩnh viễn lộ trình"
+        : `Đã xóa vĩnh viễn ${deletedCount} lộ trình`,
+      {
+        description: "Lộ trình đã được gỡ khỏi thùng rác.",
+      },
+    );
+    setPermanentDeletingPathIds([]);
+  }
+
+  function closePermanentDeleteConfirm() {
+    setPermanentDeletingPathIds([]);
   }
 
   function retryLoad() {
-    setViewState("loading");
-    window.setTimeout(() => setViewState("ready"), 380);
+    void learningPathsQuery.refetch();
   }
 
+  const viewState: ViewState = learningPathsQuery.isLoading
+    ? "loading"
+    : learningPathsQuery.isError
+      ? "error"
+      : "ready";
+
   return {
+    allFilteredPathsSelected,
+    archivedPaths,
     filteredPaths,
     gradeFilter,
-    isSavingLesson,
+    isArchiveDialogOpen,
+    isPathEditorOpen,
     isSavingPath,
-    lessonEditorMode,
-    lessonForm,
+    isDarkTheme,
+    isSidebarCollapsed,
     pathEditorMode,
     pathForm,
     query,
-    selectedLessonId,
-    selectedPath,
-    selectedPathId,
+    deletingPaths,
+    editingPath,
+    permanentDeletingPaths,
+    selectedPathIds,
+    sortDirection,
+    sortKey,
     stats,
     statusFilter,
     subjectFilter,
     viewState,
     actions: {
-      archiveLesson,
-      archiveSelectedPath,
+      clearSelectedPaths: () => setSelectedPathIds([]),
+      closeDeleteConfirm: () => setDeletingPathIds([]),
+      closePermanentDeleteConfirm,
+      closeArchiveDialog: () => setIsArchiveDialogOpen(false),
+      closePathEditor: () => setIsPathEditorOpen(false),
+      confirmDeletePath,
+      confirmPermanentDeletePaths,
+      openArchiveDialog: () => setIsArchiveDialogOpen(true),
+      requestPermanentDeletePaths,
+      requestDeletePath,
+      requestDeleteSelectedPaths,
       retryLoad,
-      saveLesson,
+      restorePaths,
       savePath,
       setGradeFilter,
       setQuery,
       setStatusFilter,
       setSubjectFilter,
-      startCreateLesson,
       startCreatePath,
-      startEditLesson,
       startEditPath,
+      toggleDarkTheme: () => setIsDarkTheme((current) => !current),
+      toggleSidebarCollapsed: () => setIsSidebarCollapsed((current) => !current),
+      toggleSelectAllPaths,
+      toggleSelectPath,
+      toggleSort,
     },
   };
 }

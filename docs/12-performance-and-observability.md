@@ -87,11 +87,11 @@ Các flow cần chú ý độ trễ:
 
 Codex phải kiểm tra index khi thêm hoặc sửa query chính:
 
-- Filter/sort theo `user_id`, `course_id`, `lesson_id`, `status`, `created_at`, `updated_at`.
+- Filter/sort theo `user_id`, `course_id`/`learning_path_id`, `chapter_id`, `lesson_id`, `status`, `created_at`, `updated_at`.
 - Unique/idempotency key cho payment/webhook/job/cache.
 - Enrollment active lookup.
 - Notification recipient/time.
-- Attempt/progress theo student/course/lesson.
+- Attempt/progress theo student/course/chapter/lesson.
 - Report moderation status.
 - Vector index cho embedding search khi triển khai pgvector.
 
@@ -100,6 +100,7 @@ Rules:
 - Không query bảng lớn không phân trang.
 - Không trả JSON/blob/rich text lớn nếu màn chỉ cần metadata.
 - Không join/include nhiều quan hệ nếu UI không dùng.
+- Course detail query có thể trả cây `chapters -> lessons`, nhưng chỉ trả metadata cần cho UI; tài liệu/rich text lớn của lesson phải lazy-load ở lesson detail.
 - Với query phức tạp, cân nhắc raw SQL có kiểm soát và ghi rõ lý do.
 - Migration thêm index phải được commit cùng thay đổi schema/query liên quan.
 
@@ -131,7 +132,7 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 
 - Không gọi AI đồng bộ cho tác vụ generate nặng nếu có thể dùng job.
 - Không gửi toàn bộ PDF/tài liệu mỗi lần hỏi.
-- Retrieval chỉ lấy context cần thiết theo `lesson_id`.
+- Retrieval chỉ lấy context cần thiết theo `lesson_id`; không có retrieval cấp chapter ở MVP.
 - Cache AI explanation theo item khi docs đã quy định.
 - Giới hạn số chunk/context đưa vào model.
 - Validate structured output trước khi lưu.

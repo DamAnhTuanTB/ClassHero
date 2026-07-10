@@ -1,28 +1,23 @@
 import {
   BookOpen,
-  CircleDollarSign,
   Hash,
   Layers3,
   LinkIcon,
-  ListOrdered,
   Loader2,
   Save,
   SlidersHorizontal,
-  Trash2,
 } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
-import {
-  CheckboxField,
-  OptionField,
-  TextField,
-} from "@/components/forms/form-primitives";
+import { OptionField, TextField } from "@/components/forms/form-primitives";
+import { MoneyField } from "@/features/admin-courses/components/money-field";
+import { PathCoverUpload } from "@/features/admin-courses/components/path-cover-upload";
+import { PathDescriptionField } from "@/features/admin-courses/components/path-description-field";
 import {
   adminGrades,
   adminStatuses,
   adminSubjects,
   statusLabels,
   subjectLabels,
-  type AdminLearningPath,
 } from "@/features/admin-courses/data";
 import type { LearningPathFormValues } from "@/features/admin-courses/schemas";
 import type { EditorMode } from "@/features/admin-courses/types";
@@ -31,24 +26,20 @@ export function PathEditor({
   mode,
   form,
   isSaving,
-  selectedPath,
   onSubmit,
-  onArchive,
 }: {
   mode: EditorMode;
   form: UseFormReturn<LearningPathFormValues>;
   isSaving: boolean;
-  selectedPath: AdminLearningPath | null;
   onSubmit: (values: LearningPathFormValues) => void | Promise<void>;
-  onArchive: () => void;
 }) {
   return (
     <form
-      className="rounded-lg border border-slate-200 bg-white p-4"
+      className="grid gap-4"
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 pr-28">
         <div>
           <h2 className="text-lg font-extrabold text-slate-950">
             {mode === "create" ? "Tạo lộ trình" : "Thông tin lộ trình"}
@@ -59,19 +50,9 @@ export function PathEditor({
               : "Cập nhật tiêu đề, giá và trạng thái."}
           </p>
         </div>
-        {mode === "edit" && selectedPath ? (
-          <button
-            type="button"
-            onClick={onArchive}
-            className="inline-flex min-h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
-            aria-label="Lưu trữ lộ trình"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        ) : null}
       </div>
 
-      <div className="mt-4 grid gap-3">
+      <div className="grid gap-3">
         <TextField
           id="admin-course-title"
           label="Tên lộ trình"
@@ -86,12 +67,35 @@ export function PathEditor({
           error={form.formState.errors.slug}
           {...form.register("slug")}
         />
+        <PathCoverUpload
+          fileName={form.watch("thumbnailFileName")}
+          imageUrl={form.watch("thumbnailImageUrl")}
+          onChange={(value) => {
+            form.setValue("thumbnailFileName", value.fileName, {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            });
+            form.setValue("thumbnailImageUrl", value.imageUrl, {
+              shouldDirty: true,
+              shouldTouch: true,
+              shouldValidate: true,
+            });
+          }}
+        />
+        <PathDescriptionField
+          placeholder="Ví dụ: Lộ trình giúp học sinh nắm chắc kiến thức nền tảng và luyện bài theo từng chủ đề."
+          error={form.formState.errors.description}
+          {...form.register("description")}
+        />
         <div className="grid gap-3 sm:grid-cols-2">
           <OptionField
             id="admin-course-subject"
             label="Môn"
             value={form.watch("subject")}
+            placeholder="Chọn môn"
             icon={<Layers3 className="h-5 w-5" aria-hidden="true" />}
+            error={form.formState.errors.subject}
             options={adminSubjects.map((subject) => ({
               value: subject,
               label: subjectLabels[subject],
@@ -106,14 +110,16 @@ export function PathEditor({
           <OptionField
             id="admin-course-grade"
             label="Lớp"
-            value={String(form.watch("grade"))}
+            value={form.watch("grade") === "" ? "" : String(form.watch("grade"))}
+            placeholder="Chọn lớp"
             icon={<Hash className="h-5 w-5" aria-hidden="true" />}
+            error={form.formState.errors.grade}
             options={adminGrades.map((grade) => ({
               value: String(grade),
               label: `Lớp ${grade}`,
             }))}
             onChange={(value) =>
-              form.setValue("grade", Number(value), {
+              form.setValue("grade", value === "" ? "" : Number(value), {
                 shouldDirty: true,
                 shouldValidate: true,
               })
@@ -121,24 +127,35 @@ export function PathEditor({
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField
+          <MoneyField
             id="admin-course-original-price"
             label="Giá gốc"
-            type="number"
-            icon={<CircleDollarSign className="h-5 w-5" aria-hidden="true" />}
+            value={form.watch("originalPriceVnd")}
             error={form.formState.errors.originalPriceVnd}
-            {...form.register("originalPriceVnd")}
+            onChange={(value) =>
+              form.setValue("originalPriceVnd", value, {
+                shouldDirty: true,
+                shouldTouch: true,
+                shouldValidate: true,
+              })
+            }
           />
-          <TextField
+          <MoneyField
             id="admin-course-sale-price"
             label="Giá ưu đãi"
-            type="number"
-            icon={<CircleDollarSign className="h-5 w-5" aria-hidden="true" />}
+            isOptional
+            value={form.watch("salePriceVnd")}
             error={form.formState.errors.salePriceVnd}
-            {...form.register("salePriceVnd")}
+            onChange={(value) =>
+              form.setValue("salePriceVnd", value, {
+                shouldDirty: true,
+                shouldTouch: true,
+                shouldValidate: true,
+              })
+            }
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3">
           <OptionField
             id="admin-course-status"
             label="Trạng thái"
@@ -155,25 +172,13 @@ export function PathEditor({
               })
             }
           />
-          <TextField
-            id="admin-course-sort-order"
-            label="Thứ tự"
-            type="number"
-            icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
-            {...form.register("sortOrder")}
-          />
         </div>
-        <CheckboxField
-          id="admin-course-trial-enabled"
-          label="Cho phép học thử"
-          {...form.register("trialEnabled")}
-        />
       </div>
 
       <button
         type="submit"
         disabled={isSaving}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         {isSaving ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

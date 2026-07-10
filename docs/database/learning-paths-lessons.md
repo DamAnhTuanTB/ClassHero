@@ -4,7 +4,7 @@ Chi tiết tách từ `docs/04-database-model.md`. File index chính vẫn là `
 
 ---
 
-## 5. Learning paths và lessons
+## 5. Learning paths, chapters và lessons
 
 ### 5.1. `learning_paths`
 
@@ -16,11 +16,11 @@ title string
 slug string unique
 original_price_vnd int
 sale_price_vnd int?
+total_chapter_count int default 0
 total_lesson_count int default 0
 thumbnail_file_id uuid? fk files.id
 description_json jsonb?
 status PublishStatus default DRAFT
-trial_enabled boolean default true
 published_at timestamp?
 sort_order int default 0
 created_by_id uuid? fk users.id
@@ -36,19 +36,24 @@ Index:
 - `status`.
 - `sort_order`.
 
-### 5.2. `lessons`
+Status behavior:
+
+- `DRAFT` là trạng thái mặc định khi tạo lộ trình.
+- `ARCHIVED` chỉ dùng cho xóa mềm; không nằm trong danh sách quản trị mặc định.
+- Khôi phục lộ trình archived đưa `status` về `DRAFT` và clear `deleted_at`/`published_at` nếu có.
+- Xóa vĩnh viễn chỉ thực hiện từ thùng rác quản trị với item đang archived; cần audit log và tuân thủ chính sách retention khi nối backend thật.
+
+### 5.2. `learning_path_chapters`
+
+Chương học là lớp nhóm tổng quan trong lộ trình. Chương không có video, tài liệu/PDF riêng, summary học tập riêng, quiz, flashcard hoặc test.
 
 ```txt
 id uuid pk
 learning_path_id uuid fk learning_paths.id
 order_index int
 title string
-short_description string?
-prep_material_json jsonb?
-scheduled_at timestamp?
-exam_open_at timestamp?
-video_url string?
-completion_min_score numeric default 7
+overview string?
+objectives_json jsonb?
 status PublishStatus default DRAFT
 created_by_id uuid? fk users.id
 updated_by_id uuid? fk users.id
@@ -61,7 +66,45 @@ Constraint:
 
 - unique `(learning_path_id, order_index)`.
 
-### 5.3. `lesson_materials`
+Rules:
+
+- `overview` là mô tả/tổng quan ngắn của chương.
+- `objectives_json` lưu các mục tiêu học tập chính hoặc nội dung trọng tâm nếu admin nhập.
+- Khi xóa mềm chương, backend phải xử lý các buổi học con theo policy đã chốt ở API/service; không được xóa vĩnh viễn dữ liệu học tập nếu chưa qua flow archive/retention.
+
+### 5.3. `lessons`
+
+```txt
+id uuid pk
+chapter_id uuid fk learning_path_chapters.id
+order_index int
+title string
+short_description string?
+prep_material_json jsonb?
+scheduled_at timestamp?
+exam_open_at timestamp?
+video_url string?
+completion_min_score numeric default 7
+trial_enabled boolean default false
+status PublishStatus default DRAFT
+created_by_id uuid? fk users.id
+updated_by_id uuid? fk users.id
+created_at timestamp
+updated_at timestamp
+deleted_at timestamp?
+```
+
+Constraint:
+
+- unique `(chapter_id, order_index)`.
+
+Rules:
+
+- Buổi học luôn thuộc một chương học.
+- Quiz, flashcard, test, document, summary, progress và AI chat vẫn gắn với `lesson_id`.
+- Nếu cần lọc nhanh lesson theo lộ trình, service query qua `learning_path_chapters.learning_path_id` hoặc thêm denormalized index sau khi có nhu cầu hiệu năng thật.
+
+### 5.4. `lesson_materials`
 
 Dùng cho phiếu tài liệu, ảnh, text nhập tay, link phụ.
 
@@ -79,7 +122,7 @@ updated_at timestamp
 deleted_at timestamp?
 ```
 
-### 5.4. `lesson_summaries`
+### 5.5. `lesson_summaries`
 
 ```txt
 id uuid pk

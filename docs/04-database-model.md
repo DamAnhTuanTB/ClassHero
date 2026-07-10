@@ -43,7 +43,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | Quy ước chung, enum | `docs/database/conventions-and-enums.md` |
 | Auth, user, profile, refresh token, parent-child link | `docs/database/auth-users.md` |
 | File upload, R2 metadata, lesson document, document chunks | `docs/database/files-documents.md` |
-| Learning path, lesson, material, summary | `docs/database/learning-paths-lessons.md` |
+| Learning path, chapter, lesson, material, summary | `docs/database/learning-paths-lessons.md` |
 | Enrollment, progress, trial lesson | `docs/database/progress-enrollment.md` |
 | Quiz, flashcard, test, attempts | `docs/database/quiz-flashcard-tests.md` |
 | Background jobs, queue/job status | `docs/database/background-jobs.md` |

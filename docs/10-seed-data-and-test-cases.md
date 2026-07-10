@@ -14,7 +14,8 @@ Seed data cần đủ để dev kiểm tra nhanh:
 - Student/parent account.
 - Parent link child.
 - Learning path Toán 7 và Lý 8.
-- Mỗi learning path có 2 lessons.
+- Mỗi learning path có ít nhất 1 chapter.
+- Mỗi chapter có 2 lessons.
 - Mỗi lesson có tài liệu mẫu, summary, quiz, flashcard, test.
 - Có payment success sample.
 - Có enrollment active.
@@ -99,22 +100,27 @@ trial_enabled: true
 status: PUBLISHED
 ```
 
-Lessons:
+Chapters/Lessons:
 
 ```txt
-Lesson 1:
-  title: Buổi 1 - Số hữu tỉ
+Chapter 1:
+  title: Chương 1 - Số hữu tỉ
   order_index: 1
-  exam_open_at: now - 1 day
-  completion_min_score: 7
-  video_url: https://youtube.com/example-toan7-buoi1
+  overview: Tổng quan số hữu tỉ và các phép toán nền tảng.
 
-Lesson 2:
-  title: Buổi 2 - Lũy thừa của số hữu tỉ
-  order_index: 2
-  exam_open_at: now + 7 days
-  completion_min_score: 7
-  video_url: https://youtube.com/example-toan7-buoi2
+  Lesson 1:
+    title: Buổi 1 - Số hữu tỉ
+    order_index: 1
+    exam_open_at: now - 1 day
+    completion_min_score: 7
+    video_url: https://youtube.com/example-toan7-buoi1
+
+  Lesson 2:
+    title: Buổi 2 - Lũy thừa của số hữu tỉ
+    order_index: 2
+    exam_open_at: now + 7 days
+    completion_min_score: 7
+    video_url: https://youtube.com/example-toan7-buoi2
 ```
 
 ### 3.2. Lý 8
@@ -303,11 +309,12 @@ ASSUMPTION: Seed dev có thể tạo document_chunks không embedding để test
 - Parent không xem được child chưa link.
 - Admin xem được report.
 
-### 9.3. Learning path/lesson
+### 9.3. Learning path/chapter/lesson
 
 - Admin tạo learning path môn MATH/PHYSICS/CHEMISTRY thành công.
 - Môn ngoài scope bị reject.
-- Lesson order index trùng bị reject.
+- Chapter order index trùng trong cùng learning path bị reject.
+- Lesson order index trùng trong cùng chapter bị reject.
 - Public chỉ thấy PUBLISHED.
 - Student grade 7 được ưu tiên Toán 7.
 
@@ -397,11 +404,12 @@ ASSUMPTION: Seed dev có thể tạo document_chunks không embedding để test
 
 1. Login admin.
 2. Create learning path.
-3. Create lesson.
-4. Upload file mock.
-5. Create quiz/flashcard/test.
-6. Publish learning path.
-7. Student sees path.
+3. Create chapter.
+4. Create lesson trong chapter.
+5. Upload file mock.
+6. Create quiz/flashcard/test.
+7. Publish learning path.
+8. Student sees path.
 
 ### Flow D: AI explanation cache
 
@@ -417,7 +425,7 @@ ASSUMPTION: Seed dev có thể tạo document_chunks không embedding để test
 
 Ưu tiên E2E nhẹ:
 
-1. Login admin, tạo lộ trình và buổi học.
+1. Login admin, tạo lộ trình, chương học và buổi học.
 2. Login student, xem danh sách lộ trình.
 3. Student học thử buổi đầu.
 4. Student làm quiz.

@@ -13,6 +13,7 @@ Khi làm task có sửa code, Codex phải đọc file này cùng `AGENTS.md`, d
 - Component, hook, API client/service, schema, type, mapper, formatter, mock data và helper phải có vị trí rõ ràng.
 - Code dùng chung phải đặt ở shared layer phù hợp; code chỉ dùng riêng một feature thì đặt trong feature đó.
 - Không tạo lại component/pattern đã được owner duyệt với style khác. Phải kiểm tra shared components, feature tương tự và `docs/ui-references/approved-patterns.md` trước khi tạo mới.
+- Khi tạo/sửa UI, phải đọc routing index trong `docs/ui-references/code-patterns.md` rồi chọn file/section pattern gần nhất trong `docs/ui-references/code-patterns/` cho form, modal, detail grid, action, upload hoặc state view trước khi tự viết biến thể mới.
 - Import nội bộ phải dùng alias chuẩn: `@/...` trong `apps/web`, `#api/...` trong `apps/api`.
 - File barrel `index.ts` chỉ re-export; không chứa JSX/component implementation hoặc logic nghiệp vụ.
 - Không cập nhật changelog khi sửa code thường; changelog chỉ ghi trong workflow `/commit`.
@@ -98,6 +99,9 @@ Rules:
 
 - Shared component phải đủ generic để dùng lại nhiều màn, nhưng vẫn giữ style nhất quán của hệ thống.
 - Form input/select/checkbox/submit/status/header đã được owner ưng phải được tái sử dụng hoặc nâng cấp tại `apps/web/components/forms`.
+- Khi một form/control đã được owner duyệt hoặc dùng lặp lại từ hai nơi trở lên, không để mỗi feature tự dựng lại biến thể riêng; phải nâng cấp thành primitive/hook/helper trong `apps/web/components/forms` hoặc shared layer phù hợp rồi cho màn mới reuse.
+- Validation helper dùng chung cho form text nên đặt ở shared web layer như `apps/web/lib/form-validation.ts`; form schema không nên lặp lại chuỗi Zod required/min/max dễ sai message ở từng feature.
+- Form numeric dùng chung như tiền, thứ tự, phần trăm hoặc số lượng phải có primitive/style thống nhất, không để từng màn dùng `type="number"` native với spinner/default UI riêng của browser.
 - shadcn/Radix wrapper cũng phải tách mỗi wrapper một file khi có nhiều component con; file compatibility như `components/ui/select.tsx` chỉ re-export.
 - Không đặt component chỉ dùng một feature vào shared layer.
 - Không tạo component shared mới nếu chỉ một màn dùng và chưa thấy nhu cầu tái sử dụng rõ.
@@ -107,6 +111,9 @@ Rules:
 Trước khi tạo hoặc sửa UI lớn, Codex phải tự kiểm:
 
 - Có shared component/pattern đã duyệt dùng được chưa?
+- Nếu có form, đã chọn form chuẩn/pattern tham chiếu và reuse primitive/hook/schema style tương ứng chưa?
+- Nếu component thuộc form/modal/detail grid/action/upload/state view, đã đọc routing index và đối chiếu file/section phù hợp trong `docs/ui-references/code-patterns/` chưa?
+- Form có validate on change, inline error copy đúng rule fail, submit invalid/pending state và numeric input không dùng native spinner chưa?
 - `page.tsx` có đang chỉ compose screen/layout không?
 - Mỗi `.tsx` có một component implementation chính chưa?
 - Hook/state/form orchestration đã tách khỏi component render chưa?

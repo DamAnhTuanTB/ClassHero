@@ -8,6 +8,7 @@ import { AdminLearningPathsController } from "#api/modules/learning-paths/contro
 import { AdminLessonsController } from "#api/modules/learning-paths/controllers/admin-lessons.controller";
 import { LearningPathsService } from "#api/modules/learning-paths/services/learning-paths.service";
 import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
+import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 import { PublicLearningPathsController } from "#api/modules/learning-paths/controllers/public-learning-paths.controller";
 
 @Module({
@@ -20,6 +21,7 @@ import { PublicLearningPathsController } from "#api/modules/learning-paths/contr
   providers: [
     LearningPathsService,
     LessonsService,
+    PublicLearningPathsService,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     RolesGuard,

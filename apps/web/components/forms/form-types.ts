@@ -12,7 +12,10 @@ export type TextFieldProps = {
   wrapperClassName?: string;
   labelAction?: ReactNode;
   hideLabel?: boolean;
+  isOptional?: boolean;
+  optionalLabel?: string;
   icon?: ReactNode | null;
+  isDarkTheme?: boolean;
   suppressBrowserSuggestions?: boolean;
 } & InputHTMLAttributes<HTMLInputElement>;
 
@@ -30,7 +33,10 @@ export type OptionFieldProps = {
   error?: FieldError;
   disabled?: boolean;
   hideLabel?: boolean;
+  isOptional?: boolean;
+  optionalLabel?: string;
   icon?: ReactNode | null;
+  isDarkTheme?: boolean;
   wrapperClassName?: string;
   onChange: (value: string) => void;
 };

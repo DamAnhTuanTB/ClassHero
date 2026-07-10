@@ -78,7 +78,7 @@ Trang public nên có nội dung đủ giúp Google và người dùng hiểu:
 - Lộ trình dành cho ai.
 - Môn/lớp rõ ràng.
 - Kết quả học tập kỳ vọng.
-- Cấu trúc buổi học.
+- Cấu trúc chương học và buổi học.
 - Học thử hoặc CTA rõ.
 - Câu hỏi thường gặp nếu thật sự hữu ích.
 

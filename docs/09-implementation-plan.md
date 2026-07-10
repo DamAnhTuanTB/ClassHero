@@ -13,6 +13,8 @@ docs/implementation/M14.md
 
 Nếu cần xem cách map nhanh, mở `docs/implementation/README.md`.
 
+Nếu muốn đọc diễn giải dễ hiểu theo milestone lớn `M0` đến `M14`, mở `docs/implementation/milestone-overview.md`.
+
 Nếu cần xem phụ thuộc hoặc coverage theo feature nhanh hơn, mở thêm:
 
 ```txt
@@ -108,7 +110,7 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 3      | `M0.2`  | Tooling, env example, Docker local và health check                 |
 | 4      | `M1.1`  | Setup Prisma và database foundation                                |
 | 5      | `M1.2`  | User, auth token, profile, file và background job models           |
-| 6      | `M1.3`  | Learning path, lesson, material, document và enrollment models     |
+| 6      | `M1.3`  | Learning path, chapter, lesson, material, document và enrollment models |
 | 7      | `M1.4`  | Quiz, flashcard, test, attempt và learning interaction models      |
 | 8      | `M1.5`  | Payment, notification, report, AI log, gamification và news models |
 | 9      | `M1.6`  | Seed tối thiểu và database validation                              |
@@ -117,11 +119,11 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 12     | `M2.3`  | RBAC, `GET /me`, profile base và forgot/reset password             |
 | 13     | `M2.4`  | Auth UI login/register/forgot password                             |
 | 14     | `M3.1`  | Admin learning path API                                            |
-| 15     | `M3.2`  | Admin lesson API                                                   |
+| 15     | `M3.2`  | Admin chapter và lesson API                                        |
 | 16     | `M3.3`  | Public/student learning path listing                               |
-| 17     | `M3.4`  | Admin learning path/lesson UI cơ bản                               |
+| 17     | `M3.4`  | Admin learning path/chapter/lesson UI cơ bản                       |
 | 18     | `M3.5`  | Public/student course browsing UI                                  |
-| 19     | `M4.1`  | FilesModule và R2 service                                          |
+| 19     | `M4.1`  | FilesModule và storage service                                     |
 | 20     | `M4.2`  | Lesson document API                                                |
 | 21     | `M4.3`  | BullMQ worker foundation                                           |
 | 22     | `M4.4`  | PDF extract và chunking                                            |
@@ -206,6 +208,7 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 - `M3.3` phụ thuộc `M3.1`, `M3.2`, `M2.3`.
 - `M3.4` phụ thuộc API `M3.1`, `M3.2` và nền web.
 - `M3.5` phụ thuộc `M3.3`; payment CTA thật phụ thuộc `M8.4`.
+- Từ M3 trở đi, cấu trúc course detail là `learning path -> chapters -> lessons`; chapter chỉ chứa thông tin tổng quan, còn nội dung học chi tiết nằm ở lesson.
 
 ### File/document/worker
 
@@ -218,7 +221,7 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 ### Quiz/flashcard/test và student learning
 
 - `M6.1` nên làm sau khi shared package có nền.
-- `M6.2` đến `M6.4` phụ thuộc `M1.4`, `M2.3`, `M3.2`, `M6.1`.
+- `M6.2` đến `M6.4` phụ thuộc `M1.4`, `M2.3`, `M3.2`, `M6.1`; quiz/flashcard/test chỉ gắn với lesson, không gắn với chapter.
 - `M6.5` phụ thuộc `M6.2` đến `M6.4`, `M3.2`, `M2.3`.
 - `M7.1` phụ thuộc `M1.3`, `M2.3`, `M3.2`, `M6.5`.
 - `M7.2` đến `M7.4` phụ thuộc content tương ứng trong `M6.x` và `M7.1`.

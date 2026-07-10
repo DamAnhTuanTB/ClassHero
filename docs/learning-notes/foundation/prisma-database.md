@@ -78,7 +78,7 @@ NestJS module/service
 - service backend cần query database,
 - lỗi liên quan `DATABASE_URL`, Prisma generate, Prisma validate hoặc migration,
 - flow auth, upload, worker/job hoặc audit cần biết bảng nền nằm ở đâu,
-- course/lesson/enrollment/progress cần biết quan hệ dữ liệu nền,
+- course/chapter/lesson/enrollment/progress cần biết quan hệ dữ liệu nền,
 - quiz/flashcard/test/attempt/note/favorite cần biết cách dữ liệu luyện tập nối với lesson và user,
 - payment/webhook/discount, notification delivery, AI generation/cache/chat, report moderation, XP hoặc news cần biết bảng nền và idempotency/log nằm ở đâu,
 - tính năng AI/RAG cần `pgvector` và `document_chunks`.
@@ -88,7 +88,7 @@ NestJS module/service
 
 - `M1.1`: Setup Prisma và database foundation.
 - `M1.2`: User, auth token, profile, file và background job models.
-- `M1.3`: Learning path, lesson, material, document và enrollment models.
+- `M1.3`: Learning path, chapter, lesson, material, document và enrollment models.
 - `M1.4`: Quiz, flashcard, test, attempt và learning interaction models.
 - `M1.5`: Payment, notification, report, AI log, gamification và news models.
 - `M1.6`: Seed tối thiểu và database validation.

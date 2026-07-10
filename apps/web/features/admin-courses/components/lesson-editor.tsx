@@ -1,5 +1,4 @@
 import {
-  CalendarDays,
   Check,
   FileText,
   ListOrdered,
@@ -33,20 +32,17 @@ export function LessonEditor({
 }) {
   return (
     <form
-      className={cn(
-        "rounded-lg border border-slate-200 bg-white p-4",
-        disabled && "opacity-65",
-      )}
+      className={cn("grid gap-4", disabled && "opacity-65")}
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 pr-12">
         <div>
           <h2 className="text-lg font-extrabold text-slate-950">
             {mode === "create" ? "Thêm buổi học" : "Sửa buổi học"}
           </h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            Thứ tự, video và thời điểm mở bài thi.
+            Thứ tự trong chương, video và tiêu chí hoàn thành.
           </p>
         </div>
         {mode === "edit" ? (
@@ -61,15 +57,15 @@ export function LessonEditor({
         ) : null}
       </div>
 
-      <fieldset disabled={disabled || isSaving} className="mt-4 grid gap-3">
+      <fieldset disabled={disabled || isSaving} className="grid gap-3">
         <div className="grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
           <TextField
             id="admin-lesson-order"
             label="Thứ tự"
-            type="number"
+            inputMode="numeric"
             icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
             error={form.formState.errors.orderIndex}
-            {...form.register("orderIndex")}
+            {...form.register("orderIndex", { setValueAs: toNumericFormValue })}
           />
           <TextField
             id="admin-lesson-title"
@@ -81,30 +77,16 @@ export function LessonEditor({
         </div>
         <TextField
           id="admin-lesson-description"
-          label="Mô tả ngắn"
+          label="Tổng quan buổi học"
+          isOptional
           icon={<FileText className="h-5 w-5" aria-hidden="true" />}
           error={form.formState.errors.shortDescription}
           {...form.register("shortDescription")}
         />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField
-            id="admin-lesson-scheduled-at"
-            label="Ngày học"
-            type="datetime-local"
-            icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
-            {...form.register("scheduledAt")}
-          />
-          <TextField
-            id="admin-lesson-exam-open-at"
-            label="Mở bài thi"
-            type="datetime-local"
-            icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
-            {...form.register("examOpenAt")}
-          />
-        </div>
         <TextField
           id="admin-lesson-video-url"
           label="Video URL"
+          isOptional
           icon={<Video className="h-5 w-5" aria-hidden="true" />}
           error={form.formState.errors.videoUrl}
           {...form.register("videoUrl")}
@@ -113,11 +95,11 @@ export function LessonEditor({
           <TextField
             id="admin-lesson-completion-score"
             label="Điểm hoàn thành"
-            type="number"
+            inputMode="decimal"
             step="0.5"
             icon={<Trophy className="h-5 w-5" aria-hidden="true" />}
             error={form.formState.errors.completionMinScore}
-            {...form.register("completionMinScore")}
+            {...form.register("completionMinScore", { setValueAs: toNumericFormValue })}
           />
           <OptionField
             id="admin-lesson-status"
@@ -141,7 +123,7 @@ export function LessonEditor({
       <button
         type="submit"
         disabled={disabled || isSaving}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 text-sm font-extrabold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 text-sm font-extrabold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         {isSaving ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -152,4 +134,8 @@ export function LessonEditor({
       </button>
     </form>
   );
+}
+
+function toNumericFormValue(value: unknown) {
+  return value === "" ? "" : Number(value);
 }
