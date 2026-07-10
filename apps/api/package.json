@@ -2,7 +2,7 @@
   "name": "@learning-path/api",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "node scripts/dev-with-metadata.mjs",
     "build": "tsc -p tsconfig.build.json",
     "db:generate": "prisma generate --config prisma.config.ts",
     "db:seed": "tsx prisma/seed.ts",

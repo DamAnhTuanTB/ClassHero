@@ -1,5 +1,5 @@
-import { BadRequestException, ValidationPipe } from "@nestjs/common";
-import type { Type, ValidationError } from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
+import type { ValidationError } from "@nestjs/common";
 
 type ValidationErrorDetail = {
   field: string;
@@ -36,18 +36,5 @@ export function createValidationException(errors: ValidationError[]) {
     code: "VALIDATION_ERROR",
     message: "Dữ liệu không hợp lệ",
     details: flattenValidationErrors(errors),
-  });
-}
-
-export function createDtoValidationPipe<T extends object>(expectedType: Type<T>) {
-  return new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-    transformOptions: {
-      enableImplicitConversion: true,
-    },
-    expectedType,
-    exceptionFactory: createValidationException,
   });
 }

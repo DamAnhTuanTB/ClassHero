@@ -19,7 +19,6 @@ import { CurrentUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { Roles } from "../../common/auth/roles.decorator";
 import { RolesGuard } from "../../common/auth/roles.guard";
-import { createDtoValidationPipe } from "../../common/validation/validation-error";
 import { CreateLearningPathDto } from "./dto/create-learning-path.dto";
 import { LearningPathQueryDto } from "./dto/learning-path-query.dto";
 import { UpdateLearningPathDto } from "./dto/update-learning-path.dto";
@@ -38,10 +37,7 @@ export class AdminLearningPathsController {
 
   @Get()
   @ApiOperation({ summary: "List learning paths for admin management" })
-  list(
-    @Query(createDtoValidationPipe(LearningPathQueryDto))
-    query: LearningPathQueryDto,
-  ) {
+  list(@Query() query: LearningPathQueryDto) {
     return this.learningPathsService.listForAdmin(query);
   }
 
@@ -55,7 +51,7 @@ export class AdminLearningPathsController {
   @ApiOperation({ summary: "Create a learning path" })
   create(
     @CurrentUser() user: AuthenticatedUser,
-    @Body(createDtoValidationPipe(CreateLearningPathDto)) dto: CreateLearningPathDto,
+    @Body() dto: CreateLearningPathDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.learningPathsService.create(user.id, dto, getRequestContext(request));
@@ -66,7 +62,7 @@ export class AdminLearningPathsController {
   update(
     @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body(createDtoValidationPipe(UpdateLearningPathDto)) dto: UpdateLearningPathDto,
+    @Body() dto: UpdateLearningPathDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.learningPathsService.update(id, user.id, dto, getRequestContext(request));

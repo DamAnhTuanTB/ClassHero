@@ -1,6 +1,5 @@
 import { Controller, Get, Inject, Param, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { createDtoValidationPipe } from "../../common/validation/validation-error";
 import { PublicLearningPathQueryDto } from "./dto/public-learning-path-query.dto";
 import { LearningPathsService } from "./learning-paths.service";
 
@@ -14,10 +13,7 @@ export class PublicLearningPathsController {
 
   @Get()
   @ApiOperation({ summary: "List published learning paths" })
-  list(
-    @Query(createDtoValidationPipe(PublicLearningPathQueryDto))
-    query: PublicLearningPathQueryDto,
-  ) {
+  list(@Query() query: PublicLearningPathQueryDto) {
     return this.learningPathsService.listPublished(query);
   }
 

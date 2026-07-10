@@ -6,7 +6,6 @@ import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { Roles } from "../../common/auth/roles.decorator";
 import { RolesGuard } from "../../common/auth/roles.guard";
 import type { AuthenticatedUser } from "../../common/auth/authenticated-request";
-import { createDtoValidationPipe } from "../../common/validation/validation-error";
 import { AuthService } from "./auth.service";
 import { UpdateStudentProfileDto } from "./dto/update-student-profile.dto";
 
@@ -28,8 +27,7 @@ export class ProfileController {
   @ApiOperation({ summary: "Update allowed student profile fields" })
   updateStudentProfile(
     @CurrentUser() user: AuthenticatedUser,
-    @Body(createDtoValidationPipe(UpdateStudentProfileDto))
-    dto: UpdateStudentProfileDto,
+    @Body() dto: UpdateStudentProfileDto,
   ) {
     return this.authService.updateStudentProfile(user.id, dto);
   }
