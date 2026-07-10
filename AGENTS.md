@@ -10,29 +10,30 @@ Mục tiêu của `AGENTS.md` là điều phối cách Codex đọc tài liệu,
 
 Codex phải xem các tài liệu sau là nguồn chính của dự án:
 
-| File                                             | Vai trò                                                                            |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `AGENTS.md`                                      | Quy tắc cao nhất về cách Codex làm việc trong repo                                 |
-| `docs/00-docs-map.md`                            | Bản đồ đọc docs nhanh cho owner/Codex; không thay thế docs nguồn                   |
-| `docs/01-product-scope.md`                       | Scope MVP, role, nghiệp vụ sản phẩm                                                |
-| `docs/02-user-flows.md`                          | Luồng sử dụng chính                                                                |
-| `docs/03-technical-architecture.md`              | Kiến trúc, stack, deploy                                                           |
-| `docs/04-database-model.md`                      | Index database model, quan hệ, constraint                                          |
-| `docs/database/*.md`                             | Chi tiết database theo domain                                                      |
-| `docs/05-api-contract.md`                        | Index REST API contract giữa web và API                                            |
-| `docs/api/*.md`                                  | Chi tiết API contract theo domain                                                  |
-| `docs/06-ai-rag-spec.md`                         | AI/RAG, embedding, retrieval, cache                                                |
-| `docs/07-integration-and-env.md`                 | Env, provider, tích hợp bên thứ ba                                                 |
-| `docs/08-ui-pages-and-components.md`             | Danh sách màn hình/component                                                       |
-| `docs/09-implementation-plan.md`                 | Index milestone/subtask, thứ tự triển khai và phụ thuộc                            |
-| `docs/implementation/M*.md`                      | Chi tiết phạm vi/Done từng milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md` |
-| `docs/implementation/dependency-graph.md`        | Bản đồ phụ thuộc đọc nhanh giữa milestone/subtask                                  |
-| `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa                          |
-| `docs/10-seed-data-and-test-cases.md`            | Seed data và test case cơ bản                                                      |
-| `docs/11-ui-design-system.md`                    | Gu UI, token, responsive, screenshot/review                                        |
-| `docs/12-performance-and-observability.md`       | Chuẩn hiệu năng, độ trễ, cache, query, worker, AI và đo đạc                        |
-| `docs/13-seo-and-content-discovery.md`           | SEO, metadata, sitemap, robots, canonical, structured data cho trang public        |
-| `docs/decisions/`                                | Decision log cho quyết định dài hạn                                                |
+| File                                             | Vai trò                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `AGENTS.md`                                      | Quy tắc cao nhất về cách Codex làm việc trong repo                                   |
+| `docs/00-docs-map.md`                            | Bản đồ đọc docs nhanh cho owner/Codex; không thay thế docs nguồn                     |
+| `docs/01-product-scope.md`                       | Scope MVP, role, nghiệp vụ sản phẩm                                                  |
+| `docs/02-user-flows.md`                          | Luồng sử dụng chính                                                                  |
+| `docs/03-technical-architecture.md`              | Kiến trúc, stack, deploy                                                             |
+| `docs/04-database-model.md`                      | Index database model, quan hệ, constraint                                            |
+| `docs/database/*.md`                             | Chi tiết database theo domain                                                        |
+| `docs/05-api-contract.md`                        | Index REST API contract giữa web và API                                              |
+| `docs/api/*.md`                                  | Chi tiết API contract theo domain                                                    |
+| `docs/06-ai-rag-spec.md`                         | AI/RAG, embedding, retrieval, cache                                                  |
+| `docs/07-integration-and-env.md`                 | Env, provider, tích hợp bên thứ ba                                                   |
+| `docs/08-ui-pages-and-components.md`             | Danh sách màn hình/component                                                         |
+| `docs/09-implementation-plan.md`                 | Index milestone/subtask, thứ tự triển khai và phụ thuộc                              |
+| `docs/implementation/M*.md`                      | Chi tiết phạm vi/Done từng milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md`   |
+| `docs/implementation/dependency-graph.md`        | Bản đồ phụ thuộc đọc nhanh giữa milestone/subtask                                    |
+| `docs/implementation/feature-coverage-matrix.md` | Ma trận kiểm tra feature đã đủ DB/API/UI/worker/test chưa                            |
+| `docs/10-seed-data-and-test-cases.md`            | Seed data và test case cơ bản                                                        |
+| `docs/11-ui-design-system.md`                    | Gu UI, token, responsive, screenshot/review                                          |
+| `docs/12-performance-and-observability.md`       | Chuẩn hiệu năng, độ trễ, cache, query, worker, AI và đo đạc                          |
+| `docs/13-seo-and-content-discovery.md`           | SEO, metadata, sitemap, robots, canonical, structured data cho trang public          |
+| `docs/14-source-code-structure.md`               | Contract tổ chức source code front-end/back-end, shared layer, alias và anti-pattern |
+| `docs/decisions/`                                | Decision log cho quyết định dài hạn                                                  |
 
 Nếu có `.codex/plans/codex-execution-plan.md`, dùng file đó để kiểm tra thứ tự/phụ thuộc, nhưng không dùng để thay thế docs gốc.
 
@@ -95,12 +96,13 @@ Thứ tự đọc:
 7. `docs/06-ai-rag-spec.md`
 8. `docs/07-integration-and-env.md`
 9. `docs/08-ui-pages-and-components.md`
-10. `docs/09-implementation-plan.md`
-11. File milestone liên quan trong `docs/implementation/`
-12. `docs/10-seed-data-and-test-cases.md`
-13. `docs/11-ui-design-system.md` nếu task có UI
-14. `docs/12-performance-and-observability.md` nếu task ảnh hưởng hiệu năng/độ trễ/cache/query/worker/AI
-15. `docs/13-seo-and-content-discovery.md` nếu task ảnh hưởng trang public/indexable hoặc SEO metadata
+10. `docs/14-source-code-structure.md`
+11. `docs/09-implementation-plan.md`
+12. File milestone liên quan trong `docs/implementation/`
+13. `docs/10-seed-data-and-test-cases.md`
+14. `docs/11-ui-design-system.md` nếu task có UI
+15. `docs/12-performance-and-observability.md` nếu task ảnh hưởng hiệu năng/độ trễ/cache/query/worker/AI
+16. `docs/13-seo-and-content-discovery.md` nếu task ảnh hưởng trang public/indexable hoặc SEO metadata
 
 ### Đọc theo phạm vi task
 
@@ -111,6 +113,7 @@ Luôn đọc:
 - `AGENTS.md`
 - `docs/09-implementation-plan.md`
 - File milestone tương ứng trong `docs/implementation/`
+- `docs/14-source-code-structure.md` nếu task có sửa code hoặc di chuyển file
 - docs liên quan theo `Task routing map`
 - code hiện tại của module đang sửa
 - changelog gần nhất nếu cần hiểu thay đổi trước đó
@@ -134,10 +137,12 @@ Trước khi sửa code, Codex phải:
 5. Chọn docs cần đọc theo `Task routing map`.
 6. Đọc docs liên quan trước khi code.
 7. Kiểm tra code hiện tại và `git status --short`.
-8. Nêu kế hoạch ngắn:
+8. Kiểm tra cấu trúc source theo `docs/14-source-code-structure.md`: shared component/pattern đã có chưa, file mới nên đặt ở shared hay feature/domain, có cần tách hook/schema/helper/mock data/select/serializer không, import alias nào phải dùng.
+9. Nêu kế hoạch ngắn:
    - subtask/milestone,
    - docs đã đọc,
    - module/file dự kiến sửa,
+   - cấu trúc file/layer dự kiến và phần nào sẽ tái sử dụng thay vì tạo mới,
    - có cần cập nhật API/database/AI/UI/env docs không,
    - check/test dự kiến chạy.
 
@@ -160,6 +165,7 @@ Trong quá trình làm task, Codex có thể cập nhật các file sau nếu c�
 - `docs/11-ui-design-system.md`: khi owner chốt một rule UI áp dụng rộng.
 - `docs/12-performance-and-observability.md`: nếu task làm đổi chuẩn hiệu năng, cache, query, worker, AI latency hoặc observability.
 - `docs/13-seo-and-content-discovery.md`: nếu task làm đổi chuẩn SEO, index/noindex, metadata, sitemap, robots, canonical, structured data hoặc nội dung public indexable.
+- `docs/14-source-code-structure.md`: nếu task làm đổi rule tổ chức source code, layer shared/feature/domain, alias import, module boundary hoặc anti-pattern cần tránh.
 - `docs/learning-notes/`: khi phần giải thích kỹ thuật có giá trị học tập lâu dài; ghi theo feature-first, merge vào note cũ khi có thể và tránh copy trùng final response.
 - `docs/05-api-contract.md` và file con trong `docs/api/`: nếu task làm đổi API contract hoặc behavior API.
 - `docs/04-database-model.md` và file con trong `docs/database/`: nếu task làm đổi schema/database model.
@@ -280,6 +286,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Tên biến, hàm, file dùng tiếng Anh; text UI có thể dùng tiếng Việt.
 - API response bám `docs/05-api-contract.md`.
 - Flow chính phải bám `docs/12-performance-and-observability.md` khi có list/query/cache/job/AI hoặc độ trễ đáng kể.
+- Cấu trúc source code phải bám `docs/14-source-code-structure.md`; trước khi tạo file mới phải xác định rõ file thuộc shared layer, feature layer hay domain module.
 - Xử lý lỗi rõ ràng, không nuốt lỗi.
 - Backend không tự tạo trực tiếp `BadRequestException`, `UnauthorizedException`, `ForbiddenException`, `NotFoundException`, `ConflictException` hoặc `InternalServerErrorException` rải rác trong module. Lỗi HTTP phải đi qua helper/factory trong `apps/api/src/common/errors` để giữ envelope `{ error: { code, message, details } }` thống nhất; module domain chỉ chọn mã lỗi, message nghiệp vụ và details cần thiết.
 - Thao tác nhạy cảm cần audit/log theo docs domain.
@@ -306,6 +313,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Không làm UI tĩnh giả tương tác. Button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control hoặc icon có vẻ bấm được phải dùng element semantic, state/handler thật và feedback/pending/disabled phù hợp; nếu chưa thể nối API thì vẫn phải có tương tác local/mock đúng hành vi.
 - Không gom nhiều React component vào một file, kể cả shared primitives hoặc shadcn/Radix wrapper. Mỗi file `.tsx` chỉ nên có một component chính; subcomponent render JSX phải tách file riêng. File barrel như `index.ts` hoặc file compatibility re-export được phép export nhiều component nhưng không chứa JSX/component implementation. Component con, form control, state view, hook orchestration, schema/DTO, mapper/formatter/helper và mock data phải tách file theo feature/module rõ ràng; file page/manager chỉ nên compose layout và nối state/action cần thiết.
 - Trước khi tạo component, hook, API client/service hoặc form control mới, phải kiểm tra component/pattern đã có trong `apps/web/components`, feature tương tự và `docs/ui-references/approved-patterns.md`. Pattern đã được owner ưng phải được tái sử dụng hoặc nâng thành shared component/hook/service; không tạo lại UI/control cùng chức năng với style khác. Component/hook/helper chỉ dùng riêng một feature thì đặt trong feature đó; phần có thể dùng lại nhiều màn phải đặt ở shared layer rõ ràng.
+- Với UI phức tạp, bắt buộc tách theo flow `app route/page -> feature screens -> feature hooks/api/data/schemas/utils -> shared components`; không để route/page hoặc screen giữ toàn bộ subcomponent, schema, mock data và helper trong cùng một file.
 - Khi owner bảo "ghép API", "nối API", "connect API" hoặc dùng `/task-connect` sau khi đã feedback UI, mặc định hiểu UI hiện tại đã được chốt/ưng. Codex phải giữ nguyên layout, field, label, placeholder, validation UX và flow màn hình; nếu API/database hiện tại chưa khớp UI thì sửa API contract, backend, database hoặc mapping payload cho phù hợp, không tự thêm/xóa/sửa field UI để ép theo DTO cũ nếu owner không yêu cầu rõ.
 - Theo preference của owner, Codex không tự chạy browser check, Playwright UI, screenshot hoặc kiểm tương tác thật cho mỗi task/bug/sửa UI. Owner sẽ tự kiểm tra UI/tương tác. Chỉ chạy browser/Playwright/screenshot khi owner yêu cầu rõ, ví dụ command có từ `screenshot` hoặc nói "kiểm bằng browser".
 - Khi owner nói UI đã "ưng/ok/chốt", lưu pattern vào `docs/ui-references/approved-patterns.md`; chỉ cập nhật `docs/11-ui-design-system.md` nếu đó là rule dùng rộng.
@@ -323,6 +331,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Controller chỉ xử lý HTTP boundary; service chứa nghiệp vụ; DB/provider đi qua service/repository phù hợp.
 - Exception/error dùng chung đặt ở `apps/api/src/common/errors`; helper domain có thể wrap message nghiệp vụ, nhưng không được dựng body lỗi HTTP thủ công ở nhiều nơi.
 - Module backend trong `apps/api/src/modules/<domain>` không được đặt dồn controller/service/helper/select/type/serializer ngang hàng ở root module. Root module chỉ nên giữ `*.module.ts`; code phải tách theo folder trách nhiệm như `controllers/`, `services/`, `dto/`, `selectors/`, `serializers/`, `utils/`, `types/` hoặc folder chuyên biệt tương đương khi domain lớn hơn.
+- Backend phải tách rõ controller/service/DTO/select/serializer/utils/types từ đầu; nếu một service bắt đầu chứa nhiều Prisma select, response mapper, normalizer hoặc error mapping lặp lại thì phải tách ngay thay vì để phình file.
 - Job nặng enqueue BullMQ, không blocking request nếu có thể.
 - API list/search phải có pagination/debounce/cache/index phù hợp theo `docs/12-performance-and-observability.md`.
 

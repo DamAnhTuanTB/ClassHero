@@ -16,6 +16,7 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
    - `docs/05-api-contract.md`
    - `docs/12-performance-and-observability.md` if present.
    - `docs/13-seo-and-content-discovery.md` if present.
+   - `docs/14-source-code-structure.md` if present.
    - `docs/implementation/dependency-graph.md` if present.
    - `docs/implementation/feature-coverage-matrix.md` if present.
    - `docs/decisions/README.md` if present.
@@ -26,6 +27,7 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
    - wrong paths after docs were split;
    - overlapping or conflicting skill responsibilities;
    - missing docs-only/code-producing guardrails;
+   - missing or stale source-code structure rules, especially route groups, feature folders, shared components, backend module layering, alias imports, and reusable error handling;
    - stale current context, code index, feature coverage, dependency graph, or decision log references;
    - overly long repeated rules that should live in `AGENTS.md` or README instead.
 4. If the user asks to fix, or the issue is an obvious docs-only correction, patch the relevant docs.

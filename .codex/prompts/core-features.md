@@ -7,6 +7,7 @@ Dùng file này khi không gọi trực tiếp được slash skill. Nếu dùng
 - Mỗi lần chỉ giao một subtask, ví dụ `M4.2`.
 - Codex phải đọc `AGENTS.md`, `docs/09-implementation-plan.md`, file milestone tương ứng trong `docs/implementation/`, rồi đọc docs liên quan theo Task Routing Map.
 - `docs/04-database-model.md` và `docs/05-api-contract.md` là index; khi cần phải đọc thêm file con trong `docs/database/` hoặc `docs/api/`.
+- Task có sửa code phải đọc `docs/14-source-code-structure.md` để chọn đúng route/feature/shared/domain layer, alias import và boundary tách file.
 - Nếu có `.codex/plans/codex-execution-plan.md`, dùng để kiểm tra phụ thuộc/TODO, không thay docs gốc.
 - Nếu task chạm UI/performance/SEO public, đọc thêm `docs/11-ui-design-system.md`, `docs/12-performance-and-observability.md` hoặc `docs/13-seo-and-content-discovery.md` đúng phạm vi.
 - Không cập nhật changelog trong task thường; changelog chỉ được ghi trong workflow `/commit`.
@@ -52,14 +53,16 @@ Trước khi code:
 - Đọc AGENTS.md.
 - Đọc docs/09-implementation-plan.md.
 - Đọc file milestone tương ứng trong docs/implementation/.
+- Đọc docs/14-source-code-structure.md nếu sửa code.
 - Đọc docs liên quan theo Task Routing Map.
-- Nêu kế hoạch ngắn: subtask, docs đã đọc, file/module dự kiến sửa, test dự kiến.
+- Nêu kế hoạch ngắn: subtask, docs đã đọc, file/module/layer dự kiến sửa, phần sẽ tái sử dụng, test dự kiến.
 
 Phạm vi:
 - Chỉ làm <MÃ SUBTASK>.
 - Không làm sang subtask khác.
 - Không đổi stack.
 - Không thêm tính năng ngoài MVP.
+- Tuân thủ docs/14-source-code-structure.md: không gom nhiều component/helper vào một file, không tạo lại shared pattern đã có, không đặt backend controller/service/helper phẳng ở module root, dùng alias `@/...` hoặc `#api/...`.
 
 Sau khi xong:
 - Chạy check phù hợp.

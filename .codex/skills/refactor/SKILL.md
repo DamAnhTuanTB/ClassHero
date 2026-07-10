@@ -25,16 +25,17 @@ Before editing:
 
 1. Read `AGENTS.md`.
 2. If a task code is provided, read `docs/09-implementation-plan.md` and the matching `docs/implementation/Mx.md`.
-3. Use the `Task Routing Map` in `AGENTS.md` to read only directly relevant docs.
-4. If API/database/AI/UI surfaces are touched, read the matching index and domain docs:
+3. Read `docs/14-source-code-structure.md`.
+4. Use the `Task Routing Map` in `AGENTS.md` to read only directly relevant docs.
+5. If API/database/AI/UI surfaces are touched, read the matching index and domain docs:
    - API: `docs/05-api-contract.md` and matching `docs/api/` file.
    - Database: `docs/04-database-model.md` and matching `docs/database/` file.
    - UI: `docs/08-ui-pages-and-components.md`, `docs/11-ui-design-system.md`.
    - AI/RAG: `docs/06-ai-rag-spec.md`.
-5. If the refactor targets performance, latency, cache, query shape, worker throughput, or AI/RAG speed, read `docs/12-performance-and-observability.md`.
-6. If the refactor touches public/indexable page structure, metadata, slug, sitemap, robots, canonical, Open Graph or structured data, read `docs/13-seo-and-content-discovery.md`.
-7. Inspect current code, tests, call sites, and `git status --short`.
-8. Give a short plan: target area, intended refactor, behavior-preservation checks, files likely touched.
+6. If the refactor targets performance, latency, cache, query shape, worker throughput, or AI/RAG speed, read `docs/12-performance-and-observability.md`.
+7. If the refactor touches public/indexable page structure, metadata, slug, sitemap, robots, canonical, Open Graph or structured data, read `docs/13-seo-and-content-discovery.md`.
+8. Inspect current code, tests, call sites, and `git status --short`.
+9. Give a short plan: target area, intended refactor, source layers/boundaries to enforce, behavior-preservation checks, files likely touched.
 
 ## Refactor Rules
 
@@ -46,6 +47,7 @@ Before editing:
 - Do not rename public exports/routes/files broadly unless all call sites are updated and the benefit is clear.
 - Prefer existing project patterns over introducing new abstractions.
 - Add an abstraction only when it removes real duplication or clarifies a repeated flow.
+- Refactor toward the placement contract in `docs/14-source-code-structure.md`; do not create new intermediate structures that conflict with the documented shared/feature/domain layers.
 - If a refactor reveals a bug, stop and explain whether to fix it now or use `/fix bug`.
 - If a refactor requires behavior/schema/API changes, stop and suggest `/update-feature`.
 
@@ -54,7 +56,7 @@ Before editing:
 - Backend: controller -> DTO/guard/validation -> service -> Prisma/provider flow.
 - Back-end module reorganization: keep module roots clean with `*.module.ts` only; group controller/service/DTO/select/serializer/helper/type files into responsibility folders instead of leaving a flat file list.
 - Back-end error handling: move repeated HTTP exception bodies and Prisma error checks into reusable helpers under `apps/api/src/common/errors`; domain utils may keep message-specific wrappers.
-- Front-end: page -> component -> hook/client/state flow.
+- Front-end: app route/page -> feature screen -> hook/API client/state -> one-file component -> schema/data/utils flow.
 - Shared: schemas/types/constants reused by web/API.
 - Worker/AI: queue job -> worker -> provider -> DB/status/cache flow.
 - Tests: reduce duplication and align tests with refactored units.

@@ -94,9 +94,13 @@ apps/web/app/
 ├── (public)/
 │   ├── page.tsx
 │   ├── courses/
+│   └── news/
+├── (auth)/
+│   ├── layout.tsx
 │   ├── login/
 │   ├── register/
-│   └── forgot-password/
+│   ├── forgot-password/
+│   └── reset-password/
 ├── (student)/student/
 │   ├── dashboard/
 │   ├── courses/
@@ -125,6 +129,16 @@ apps/web/app/
 - TanStack Query cho server state, cache, mutation, invalidate sau update.
 - Zustand cho client state nhỏ như selected child, notification dropdown, UI preference.
 - Không dùng Zustand thay thế database/API state.
+
+### Source organization
+
+Cấu trúc source front-end bắt buộc theo `docs/14-source-code-structure.md`.
+
+- Route/page chỉ compose screen/layout và xử lý boundary của Next.js.
+- Feature code đặt trong `apps/web/features/<feature>/` theo nhóm `api/components/data/hooks/layout/screens/schemas/session/types/utils` khi cần.
+- Component/shared primitive dùng lại nhiều màn đặt trong `apps/web/components`; component chỉ dùng một feature đặt trong feature đó.
+- Mỗi file `.tsx` chỉ có một component implementation chính; barrel chỉ re-export, không chứa JSX implementation.
+- Import nội bộ dùng `@/...`.
 
 Chi tiết performance budget, cache, pagination, query, worker latency và observability nằm ở `docs/12-performance-and-observability.md`.
 
@@ -215,6 +229,8 @@ AuditModule
 
 ### Layering
 
+Cấu trúc source back-end bắt buộc theo `docs/14-source-code-structure.md`.
+
 Mỗi module nên tách:
 
 ```txt
@@ -237,6 +253,8 @@ Quy tắc:
 - Service chứa nghiệp vụ.
 - Repository hoặc PrismaService xử lý DB.
 - Root module domain chỉ giữ `*.module.ts`; không đặt dồn controller/service/helper/select/type/serializer ngang hàng ở root.
+- Prisma select dùng lại đặt trong `selectors/`; response mapper đặt trong `serializers/`; normalizer/helper/error wrapper domain đặt trong `utils/`; type nội bộ đặt trong `types/`.
+- Import nội bộ dùng `#api/...`.
 - Không gọi AI/payment/storage trực tiếp trong controller.
 - Job nặng phải enqueue BullMQ, không xử lý blocking trong request nếu có thể.
 - Endpoint list/search hoặc flow nhạy độ trễ phải bám `docs/12-performance-and-observability.md`.

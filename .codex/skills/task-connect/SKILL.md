@@ -55,6 +55,7 @@ Before editing:
 6. Read UI/API docs:
    - `docs/08-ui-pages-and-components.md`
    - `docs/11-ui-design-system.md`
+   - `docs/14-source-code-structure.md`
    - `docs/ui-references/approved-patterns.md` if present and relevant.
    - `docs/05-api-contract.md`
    - the matching file in `docs/api/` for the endpoint/domain.
@@ -67,7 +68,8 @@ Before editing:
 9. Read `docs/13-seo-and-content-discovery.md` when connecting public/indexable pages or adding API/database fields used for SEO such as slug, title, description, cover image, published status, sitemap data, canonical, Open Graph, or structured data.
 10. Inspect the UI files created by `/task-ui`.
 11. Inspect existing API client/hook patterns and backend module/controller/service patterns.
-12. Give a short plan: subtask mode, mock data to replace, full API endpoints/services to implement or use, backend files, frontend hooks/files, SEO/docs updates if relevant, checks.
+12. Decide source placement and reuse before editing: feature API hook/client, shared components, backend controller/service/DTO/select/serializer/utils/types, and alias imports.
+13. Give a short plan: subtask mode, mock data to replace, full API endpoints/services to implement or use, backend files/layers, frontend hooks/files/layers, reusable patterns, SEO/docs updates if relevant, checks.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -98,6 +100,7 @@ In plan mode, stop after this plan and wait for approval.
 - Preserve the frontend file boundary: one React component implementation per `.tsx` file, with barrel files only for re-exports and no JSX implementation.
 - In `apps/web`, use absolute alias imports/exports with `@/...` for internal source files. Do not use `../` or `./` between route, feature, component, hook, schema, data, utility, or barrel files, except framework-generated files or tool-required relative imports.
 - In `apps/api`, use native Node package-import aliases with `#api/...` for internal source files. Do not use `../` or `./` between controller, service, DTO, guard, common provider, config, module, or helper files unless a tool explicitly requires it.
+- Follow `docs/14-source-code-structure.md` for both sides of the connection. Do not connect an approved UI by stuffing API calls into deep components or by adding flat backend files beside a module file.
 - Debounce search/filter calls and use pagination/infinite query for long lists when relevant.
 - Forms use React Hook Form + Zod if validation is present.
 - Reuse existing shared components, feature hooks, API clients, and approved UI patterns before creating new ones. If API service/hook logic is reusable across screens, place it in a clear shared or feature client layer instead of mixing it into page/components.

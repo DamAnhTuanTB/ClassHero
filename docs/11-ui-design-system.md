@@ -6,6 +6,8 @@ Hiệu năng UI/mobile nằm ở file này; hiệu năng toàn hệ thống như
 
 SEO cho landing, course public và các trang public indexable nằm ở `docs/13-seo-and-content-discovery.md`.
 
+Cấu trúc source code UI, feature folders, shared components, alias import và anti-pattern nằm ở `docs/14-source-code-structure.md`.
+
 ## 1. Phong cách tổng thể
 
 Sản phẩm là nền tảng học theo lộ trình cho học sinh THCS/THPT, phụ huynh và admin.
@@ -162,6 +164,7 @@ Spacing/radius mặc định:
 - Không fetch dữ liệu rải rác trong component sâu; dùng feature hook/API client.
 - Mock data phải đặt rõ ràng, dễ xóa khi connect API.
 - Màn UI có nhiều form, list, panel, trạng thái hoặc helper phải tách theo feature: page/manager chỉ compose layout; mỗi component render JSX ở file riêng; hook xử lý orchestration/state; schema/type và mapper/formatter/helper nằm ngoài file UI; mock data nằm file riêng. File barrel được export nhiều component nhưng không được chứa implementation JSX.
+- Trước khi viết UI mới, áp dụng checklist trong `docs/14-source-code-structure.md`: route/page, screen, component, hook, schema, data, utils và shared layer phải có ranh giới rõ ngay từ đầu.
 - Import/export nội bộ trong `apps/web` phải dùng alias tuyệt đối `@/...`, không dùng `../` hoặc `./` để trỏ file source khác. Điều này áp dụng cho route, feature, shared component, barrel export và helper trong cùng module; chỉ bỏ qua file tự sinh hoặc import mà framework/tool yêu cầu giữ relative.
 - Component/pattern đã được owner duyệt phải là nguồn ưu tiên cho màn sau. Trước khi tạo input, select, checkbox, button, card, filter, hook hoặc API service mới, kiểm tra `apps/web/components`, feature tương tự và `docs/ui-references/approved-patterns.md`; nếu chức năng/style có thể tái sử dụng thì dùng lại hoặc nâng lên shared. Chỉ giữ component lẻ trong feature khi nó thật sự gắn riêng với màn đó và không có giá trị dùng lại.
 

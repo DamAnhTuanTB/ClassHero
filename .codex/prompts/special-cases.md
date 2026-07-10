@@ -11,6 +11,7 @@ Yêu cầu:
 - Đọc AGENTS.md và docs/09-implementation-plan.md.
 - Tự map vào subtask gần nhất.
 - Đọc file milestone tương ứng trong docs/implementation/.
+- Đọc docs/14-source-code-structure.md nếu task có sửa code.
 - Đọc docs liên quan theo Task Routing Map.
 - Nếu có thể thuộc nhiều subtask, hỏi lại hoặc ghi ASSUMPTION.
 - Chỉ code khi phạm vi rõ.
@@ -52,6 +53,7 @@ Ghi nhớ:
 - `/task-connect`: nếu API chưa có thì code API đầy đủ theo task rồi nối UI.
 - UI phải mobile-first và ổn trên tablet/iPad, desktop.
 - UI public/indexable phải giữ cấu trúc SEO; flow nhạy độ trễ phải đọc performance docs.
+- UI code phải tuân thủ `docs/14-source-code-structure.md`: route/page compose screen, feature tách `screens/components/hooks/api/data/schemas/utils`, shared component tái sử dụng trước khi tạo mới, mỗi `.tsx` một component implementation chính.
 
 ## 4. Bug, Refactor, Commit
 
@@ -64,7 +66,7 @@ Ghi nhớ:
 Ghi nhớ:
 
 - `/fix bug`: tìm root cause, sửa nhỏ nhất, giải thích nguyên nhân và cách xử lý.
-- `/refactor`: không đổi behavior/API/schema/UI design; nếu cần đổi behavior thì dùng `/update-feature`.
+- `/refactor`: không đổi behavior/API/schema/UI design; nếu cần đổi behavior thì dùng `/update-feature`; refactor phải bám `docs/14-source-code-structure.md`.
 - `/commit`: không sửa code production, chỉ kiểm tra diff, ghi changelog cho commit rồi commit.
 
 ## 5. Docs-Only Fallback
@@ -76,6 +78,7 @@ Yêu cầu:
 - Đọc AGENTS.md.
 - Xác định docs bị ảnh hưởng.
 - Nếu đổi API/database/AI/UI/env, cập nhật cả index và file con tương ứng.
+- Nếu đổi rule tổ chức source code, cập nhật `docs/14-source-code-structure.md`, `AGENTS.md` và skill liên quan.
 - Nếu ảnh hưởng roadmap, cập nhật docs/09-implementation-plan.md hoặc docs/implementation/Mx.md.
 - Không cập nhật changelog trong fallback docs-only; changelog sẽ được ghi nếu owner yêu cầu `/commit`.
 ```

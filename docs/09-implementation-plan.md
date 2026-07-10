@@ -56,6 +56,7 @@ Chỉ tách `/task-ui` trước rồi `/task-connect` khi:
 - Nếu task có thể thuộc nhiều subtask, hỏi lại hoặc ghi `ASSUMPTION` trước khi code.
 - Nếu một subtask quá lớn, đề xuất chia nhỏ hơn trước khi code.
 - Database/API/AI/env/UI behavior đổi phải cập nhật docs liên quan theo `AGENTS.md`.
+- Task có sửa code phải đọc `docs/14-source-code-structure.md` trước khi tạo file mới hoặc di chuyển file, để chọn đúng shared/feature/domain layer và tránh gom component/helper/service vào một chỗ.
 - Không cập nhật changelog trong task thường; changelog chỉ ghi trong workflow `/commit`.
 
 ---
@@ -76,14 +77,15 @@ Codex phải:
 2. Đọc file index này.
 3. Đọc subtask tương ứng trong file milestone, ví dụ `M8.3` đọc `docs/implementation/M8.md`.
 4. Đọc dòng `Mode` của subtask để xác định task có UI/API/DB/worker/docs hay không.
-5. Nếu subtask có UI, đọc thêm bảng screen coverage trong `docs/08-ui-pages-and-components.md` để biết task UI/API/DB/worker liên quan.
-6. Đọc docs liên quan theo `Task routing map` trong `AGENTS.md`.
-7. Nêu kế hoạch ngắn.
-8. Code đúng phạm vi subtask và đúng chiến lược owner chọn:
+5. Nếu task có sửa code, đọc `docs/14-source-code-structure.md` để xác định route/feature/shared/domain layer, alias import và boundary tách file.
+6. Nếu subtask có UI, đọc thêm bảng screen coverage trong `docs/08-ui-pages-and-components.md` để biết task UI/API/DB/worker liên quan.
+7. Đọc docs liên quan theo `Task routing map` trong `AGENTS.md`.
+8. Nêu kế hoạch ngắn, gồm cả cấu trúc file/layer dự kiến và phần sẽ tái sử dụng thay vì tạo mới.
+9. Code đúng phạm vi subtask và đúng chiến lược owner chọn:
    - `/task-full`: làm đủ lát dọc trong scope subtask.
    - `/task-ui`: chỉ UI/mock data.
    - `/task-connect`: code API đầy đủ nếu thiếu rồi nối UI đã có với dữ liệu thật.
-9. Chạy check phù hợp. Changelog chỉ được ghi nếu owner yêu cầu `/commit`.
+10. Chạy check phù hợp. Changelog chỉ được ghi nếu owner yêu cầu `/commit`.
 
 ### Khi owner giao task ngắn
 
@@ -99,87 +101,87 @@ Codex không code ngay nếu phạm vi chưa rõ. Cần:
 
 Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/plans/codex-execution-plan.md` có cập nhật mới hơn, dùng file đó để kiểm tra phụ thuộc, nhưng vẫn không thay thế docs gốc.
 
-| Thứ tự | Mã | Tên |
-| --- | --- | --- |
-| 1 | `M0.P` | Đọc tài liệu và tạo execution plan |
-| 2 | `M0.1` | Khởi tạo monorepo Turborepo |
-| 3 | `M0.2` | Tooling, env example, Docker local và health check |
-| 4 | `M1.1` | Setup Prisma và database foundation |
-| 5 | `M1.2` | User, auth token, profile, file và background job models |
-| 6 | `M1.3` | Learning path, lesson, material, document và enrollment models |
-| 7 | `M1.4` | Quiz, flashcard, test, attempt và learning interaction models |
-| 8 | `M1.5` | Payment, notification, report, AI log, gamification và news models |
-| 9 | `M1.6` | Seed tối thiểu và database validation |
-| 10 | `M2.1` | Backend foundation module |
-| 11 | `M2.2` | Register, login, refresh và logout |
-| 12 | `M2.3` | RBAC, `GET /me`, profile base và forgot/reset password |
-| 13 | `M2.4` | Auth UI login/register/forgot password |
-| 14 | `M3.1` | Admin learning path API |
-| 15 | `M3.2` | Admin lesson API |
-| 16 | `M3.3` | Public/student learning path listing |
-| 17 | `M3.4` | Admin learning path/lesson UI cơ bản |
-| 18 | `M3.5` | Public/student course browsing UI |
-| 19 | `M4.1` | FilesModule và R2 service |
-| 20 | `M4.2` | Lesson document API |
-| 21 | `M4.3` | BullMQ worker foundation |
-| 22 | `M4.4` | PDF extract và chunking |
-| 23 | `M4.5` | Lesson document upload UI/status |
-| 24 | `M6.1` | Rich text JSON và shared content schema |
-| 25 | `M6.2` | Quiz CRUD API và admin UI tối thiểu |
-| 26 | `M6.3` | Flashcard CRUD API và admin UI tối thiểu |
-| 27 | `M6.4` | Test CRUD API và admin UI tối thiểu |
-| 28 | `M6.5` | Student read-only lesson content API |
-| 29 | `M7.1` | Access check, trial lesson và lesson page skeleton |
-| 30 | `M7.2` | Quiz attempt và submit |
-| 31 | `M7.3` | Flashcard progress, favorite và review |
-| 32 | `M7.4` | Test start, submit và review |
-| 33 | `M7.5` | Best attempt, lesson completion và top 5 |
-| 34 | `M7.6` | Personal notes và private comments dưới video |
-| 35 | `M7.7` | Student dashboard UI |
-| 36 | `M8.1` | Discount code admin và validation |
-| 37 | `M8.2` | Create payment order bằng payOS |
-| 38 | `M8.3` | payOS webhook verify, idempotency và enrollment 12 tháng |
-| 39 | `M8.4` | Payment UI/status và thông báo sau thanh toán |
-| 40 | `M8.5` | Admin discount code UI |
-| 41 | `M5.1` | AiProvider abstraction cho embedding |
-| 42 | `M5.2` | Embedding worker và lưu pgvector |
-| 43 | `M5.3` | RetrievalService vector search theo lesson |
-| 44 | `M5.4` | Hybrid search cho công thức/ký hiệu |
-| 45 | `M9.1` | AiModule structured output foundation |
-| 46 | `M9.2` | Admin generate lesson summary |
-| 47 | `M9.3` | Admin generate quiz/flashcard/test |
-| 48 | `M9.4` | Student request-new reserve-first flow |
-| 49 | `M9.5` | AI explanation cache inline |
-| 50 | `M9.6` | Chat AI trong lesson bằng RAG |
-| 51 | `M9.7` | Conversation summary và diagram placeholder |
-| 52 | `M9.8` | Admin AI generation panel UI |
-| 53 | `M10.1` | Notification in-app API |
-| 54 | `M10.2` | NotificationBell UI và notification page |
-| 55 | `M10.3` | Socket.IO realtime notification |
-| 56 | `M10.4` | Admin manual notification |
-| 57 | `M10.5` | Automatic notification triggers |
-| 58 | `M10.6` | Email/Zalo delivery workers |
-| 59 | `M11.1` | Parent-child link và selected child |
-| 60 | `M11.2` | Parent dashboard và progress view |
-| 61 | `M11.3` | Parent course list và payment for child |
-| 62 | `M11.4` | Parent notifications và news view |
-| 63 | `M12.1` | Student report item |
-| 64 | `M12.2` | Admin report moderation |
-| 65 | `M12.3` | AI unreviewed content moderation |
-| 66 | `M12.4` | News/events/livestream CRUD admin |
-| 67 | `M12.5` | Student/parent news/events view |
-| 68 | `M13.1` | XP events và level calculation |
-| 69 | `M13.2` | Global student leaderboard |
-| 70 | `M13.3` | Student profile editable fields |
-| 71 | `M13.4` | Avatar upload integration |
-| 72 | `M13.5` | Admin dashboard overview UI |
-| 73 | `M14.1` | Unit tests cho service quan trọng |
-| 74 | `M14.2` | API tests cho flow nhạy cảm |
-| 75 | `M14.3` | Playwright E2E cho flow chính |
-| 76 | `M14.4` | Security hardening và rate limit |
-| 77 | `M14.5` | Logging, monitoring và error tracking |
-| 78 | `M14.6` | Docker Compose production, Nginx và health checks |
-| 79 | `M14.7` | Backup/restore và vận hành production notes |
+| Thứ tự | Mã      | Tên                                                                |
+| ------ | ------- | ------------------------------------------------------------------ |
+| 1      | `M0.P`  | Đọc tài liệu và tạo execution plan                                 |
+| 2      | `M0.1`  | Khởi tạo monorepo Turborepo                                        |
+| 3      | `M0.2`  | Tooling, env example, Docker local và health check                 |
+| 4      | `M1.1`  | Setup Prisma và database foundation                                |
+| 5      | `M1.2`  | User, auth token, profile, file và background job models           |
+| 6      | `M1.3`  | Learning path, lesson, material, document và enrollment models     |
+| 7      | `M1.4`  | Quiz, flashcard, test, attempt và learning interaction models      |
+| 8      | `M1.5`  | Payment, notification, report, AI log, gamification và news models |
+| 9      | `M1.6`  | Seed tối thiểu và database validation                              |
+| 10     | `M2.1`  | Backend foundation module                                          |
+| 11     | `M2.2`  | Register, login, refresh và logout                                 |
+| 12     | `M2.3`  | RBAC, `GET /me`, profile base và forgot/reset password             |
+| 13     | `M2.4`  | Auth UI login/register/forgot password                             |
+| 14     | `M3.1`  | Admin learning path API                                            |
+| 15     | `M3.2`  | Admin lesson API                                                   |
+| 16     | `M3.3`  | Public/student learning path listing                               |
+| 17     | `M3.4`  | Admin learning path/lesson UI cơ bản                               |
+| 18     | `M3.5`  | Public/student course browsing UI                                  |
+| 19     | `M4.1`  | FilesModule và R2 service                                          |
+| 20     | `M4.2`  | Lesson document API                                                |
+| 21     | `M4.3`  | BullMQ worker foundation                                           |
+| 22     | `M4.4`  | PDF extract và chunking                                            |
+| 23     | `M4.5`  | Lesson document upload UI/status                                   |
+| 24     | `M6.1`  | Rich text JSON và shared content schema                            |
+| 25     | `M6.2`  | Quiz CRUD API và admin UI tối thiểu                                |
+| 26     | `M6.3`  | Flashcard CRUD API và admin UI tối thiểu                           |
+| 27     | `M6.4`  | Test CRUD API và admin UI tối thiểu                                |
+| 28     | `M6.5`  | Student read-only lesson content API                               |
+| 29     | `M7.1`  | Access check, trial lesson và lesson page skeleton                 |
+| 30     | `M7.2`  | Quiz attempt và submit                                             |
+| 31     | `M7.3`  | Flashcard progress, favorite và review                             |
+| 32     | `M7.4`  | Test start, submit và review                                       |
+| 33     | `M7.5`  | Best attempt, lesson completion và top 5                           |
+| 34     | `M7.6`  | Personal notes và private comments dưới video                      |
+| 35     | `M7.7`  | Student dashboard UI                                               |
+| 36     | `M8.1`  | Discount code admin và validation                                  |
+| 37     | `M8.2`  | Create payment order bằng payOS                                    |
+| 38     | `M8.3`  | payOS webhook verify, idempotency và enrollment 12 tháng           |
+| 39     | `M8.4`  | Payment UI/status và thông báo sau thanh toán                      |
+| 40     | `M8.5`  | Admin discount code UI                                             |
+| 41     | `M5.1`  | AiProvider abstraction cho embedding                               |
+| 42     | `M5.2`  | Embedding worker và lưu pgvector                                   |
+| 43     | `M5.3`  | RetrievalService vector search theo lesson                         |
+| 44     | `M5.4`  | Hybrid search cho công thức/ký hiệu                                |
+| 45     | `M9.1`  | AiModule structured output foundation                              |
+| 46     | `M9.2`  | Admin generate lesson summary                                      |
+| 47     | `M9.3`  | Admin generate quiz/flashcard/test                                 |
+| 48     | `M9.4`  | Student request-new reserve-first flow                             |
+| 49     | `M9.5`  | AI explanation cache inline                                        |
+| 50     | `M9.6`  | Chat AI trong lesson bằng RAG                                      |
+| 51     | `M9.7`  | Conversation summary và diagram placeholder                        |
+| 52     | `M9.8`  | Admin AI generation panel UI                                       |
+| 53     | `M10.1` | Notification in-app API                                            |
+| 54     | `M10.2` | NotificationBell UI và notification page                           |
+| 55     | `M10.3` | Socket.IO realtime notification                                    |
+| 56     | `M10.4` | Admin manual notification                                          |
+| 57     | `M10.5` | Automatic notification triggers                                    |
+| 58     | `M10.6` | Email/Zalo delivery workers                                        |
+| 59     | `M11.1` | Parent-child link và selected child                                |
+| 60     | `M11.2` | Parent dashboard và progress view                                  |
+| 61     | `M11.3` | Parent course list và payment for child                            |
+| 62     | `M11.4` | Parent notifications và news view                                  |
+| 63     | `M12.1` | Student report item                                                |
+| 64     | `M12.2` | Admin report moderation                                            |
+| 65     | `M12.3` | AI unreviewed content moderation                                   |
+| 66     | `M12.4` | News/events/livestream CRUD admin                                  |
+| 67     | `M12.5` | Student/parent news/events view                                    |
+| 68     | `M13.1` | XP events và level calculation                                     |
+| 69     | `M13.2` | Global student leaderboard                                         |
+| 70     | `M13.3` | Student profile editable fields                                    |
+| 71     | `M13.4` | Avatar upload integration                                          |
+| 72     | `M13.5` | Admin dashboard overview UI                                        |
+| 73     | `M14.1` | Unit tests cho service quan trọng                                  |
+| 74     | `M14.2` | API tests cho flow nhạy cảm                                        |
+| 75     | `M14.3` | Playwright E2E cho flow chính                                      |
+| 76     | `M14.4` | Security hardening và rate limit                                   |
+| 77     | `M14.5` | Logging, monitoring và error tracking                              |
+| 78     | `M14.6` | Docker Compose production, Nginx và health checks                  |
+| 79     | `M14.7` | Backup/restore và vận hành production notes                        |
 
 Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toán/học thủ công trước AI nâng cao. Khi làm AI/RAG vẫn phải giữ phụ thuộc `M4.x -> M5.x -> M9.x`.
 

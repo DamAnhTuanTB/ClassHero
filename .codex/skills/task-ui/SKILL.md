@@ -54,6 +54,7 @@ Before editing:
 6. Read UI docs:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
+   - `docs/14-source-code-structure.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
 7. Read `docs/12-performance-and-observability.md` when the UI has list/search/heavy interaction, large media, or performance-sensitive learning flows.
@@ -61,7 +62,8 @@ Before editing:
 9. Read `docs/02-user-flows.md` for the affected role/flow.
 10. Read `docs/05-api-contract.md` and the matching `docs/api/` file only to understand expected data shape; do not connect API.
 11. Inspect existing web code and component patterns.
-12. Give a short plan: subtask mode, screen/component, mock data location, likely files, responsive checks, SEO notes if public/indexable, and commands.
+12. Decide the source structure before editing: route/page, feature screen, components, hook, schema, data, utils, shared component reuse, and alias imports.
+13. Give a short plan: subtask mode, screen/component, mock data location, likely files/layers, reusable components/patterns, responsive checks, SEO notes if public/indexable, and commands.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -80,6 +82,7 @@ In plan mode, stop after this plan and wait for approval.
 - In `apps/web`, use absolute alias imports/exports with `@/...` for internal source files. Do not use `../` or `./` between route, feature, component, hook, schema, data, utility, or barrel files, except framework-generated files or tool-required relative imports.
 - For non-trivial UI screens, split code by responsibility from the first implementation: page/manager for composition, feature hook for orchestration, one component implementation per `.tsx` file, schema/type files for form validation, utility files for mapper/formatter/helper logic, and a separate mock-data file. Barrel files may export many components only when they contain no JSX implementation. Do not leave a large screen or shared primitive file with many components or helpers in one file.
 - Before creating new UI primitives, form controls, hooks, client services, or API helpers, inspect existing shared components/hooks and approved UI patterns. Reuse them, or promote the reusable part to `apps/web/components`, a shared hook/client layer, or another clear shared location. Do not recreate an approved input/select/button/card pattern with a different style in a later screen.
+- Follow `docs/14-source-code-structure.md` as the placement contract. If a file does not clearly belong to route, feature, shared component, hook, schema, data, type, or utility layer, pause and choose the closest existing pattern before editing.
 - Mock data must be obvious, typed where practical, and easy to delete or replace when `/task-connect` runs.
 - Mock data must not leak into visible product copy. Do not show labels such as `mock`, `M2.4`, `task-ui`, `connect API later`, `backend enforce`, `Codex`, technical implementation notes, debug text, test hints, or roadmap/task labels in the UI unless the product itself genuinely needs that language.
 

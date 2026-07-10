@@ -167,6 +167,7 @@ docs/implementation/                      Chi tiết milestone M0..M14
 docs/11-ui-design-system.md               UI design system
 docs/12-performance-and-observability.md  Hiệu năng/đo đạc
 docs/13-seo-and-content-discovery.md      SEO/public discovery
+docs/14-source-code-structure.md          Cấu trúc source code front-end/back-end
 ```
 
 File hỗ trợ Codex:

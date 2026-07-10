@@ -27,13 +27,14 @@ Before editing:
 
 1. Read `AGENTS.md`.
 2. Read `docs/11-ui-design-system.md`.
-3. Read `docs/08-ui-pages-and-components.md` if the target screen/component needs routing/context.
-4. Read `docs/12-performance-and-observability.md` if the UI change touches list/search/cache behavior, large media, heavy interaction, latency-sensitive learning/payment/AI flow, or perceived performance.
-5. Read `docs/13-seo-and-content-discovery.md` if the target is landing, public course list/detail, public news/event, or another indexable public page.
-6. Read `docs/ui-references/approved-patterns.md` if present and relevant.
-7. Inspect existing web code for the target screen/component.
-8. Inspect `git status --short`.
-9. Give a short plan: target UI, files likely touched, responsive/performance/SEO checks if relevant, and commands.
+3. Read `docs/14-source-code-structure.md`.
+4. Read `docs/08-ui-pages-and-components.md` if the target screen/component needs routing/context.
+5. Read `docs/12-performance-and-observability.md` if the UI change touches list/search/cache behavior, large media, heavy interaction, latency-sensitive learning/payment/AI flow, or perceived performance.
+6. Read `docs/13-seo-and-content-discovery.md` if the target is landing, public course list/detail, public news/event, or another indexable public page.
+7. Read `docs/ui-references/approved-patterns.md` if present and relevant.
+8. Inspect existing web code for the target screen/component.
+9. Inspect `git status --short`.
+10. Give a short plan: target UI, files/layers likely touched, shared pattern reuse, responsive/performance/SEO checks if relevant, and commands.
 
 ## Scope Rules
 
@@ -74,6 +75,7 @@ Changelog is not written during UI iteration. It is written only during `/commit
 ## UI Work Rules
 
 - Use existing components and local patterns first.
+- Follow `docs/14-source-code-structure.md`: keep route/page and screen components thin, do not add new subcomponents/helpers/schema/mock data into an already large UI file, and preserve one component implementation per `.tsx` file.
 - Use Tailwind/shadcn/ui/lucide/framer only as already available in the project.
 - Include or preserve loading, empty, error, disabled, hover/focus states when the touched UI needs them.
 - UI changes must feel production-ready, not static mockups: visual hierarchy, copy, states, controls, and expected actions should match what a real user would use.

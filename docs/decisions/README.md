@@ -44,6 +44,7 @@ Hệ quả tốt/xấu/cần lưu ý.
 
 ## Danh sách quyết định
 
-| ADR | Status | Tóm tắt |
-| --- | --- | --- |
-| `ADR-0001-codex-context-docs.md` | Accepted | Thêm bộ context/coverage/decision docs nhẹ để Codex làm việc nhanh hơn |
+| ADR                                          | Status   | Tóm tắt                                                                                                      |
+| -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `ADR-0001-codex-context-docs.md`             | Accepted | Thêm bộ context/coverage/decision docs nhẹ để Codex làm việc nhanh hơn                                       |
+| `ADR-0002-source-code-structure-contract.md` | Accepted | Chốt contract tổ chức source code front-end/back-end để tránh gom file, duplicate UI pattern và module phẳng |

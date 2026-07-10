@@ -51,16 +51,18 @@ Before editing:
 3. Read the subtask `Mode`.
 4. If present, read `.codex/plans/codex-execution-plan.md`.
 5. If useful for orientation, read `.codex/context/current-context.md`, `.codex/context/code-index.md`, `docs/implementation/dependency-graph.md`, and `docs/implementation/feature-coverage-matrix.md`.
-6. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
-7. If `Mode` is `UI only` or `UI + API`, also read:
+6. Read `docs/14-source-code-structure.md` when the task creates, moves, or edits source files.
+7. Use the `Task routing map` in `AGENTS.md` to read all relevant docs.
+8. If `Mode` is `UI only` or `UI + API`, also read:
    - `docs/11-ui-design-system.md`
    - `docs/08-ui-pages-and-components.md`
    - `docs/ui-references/reference-notes.md` if relevant.
    - `docs/ui-references/approved-patterns.md` if present and relevant.
-8. If the task affects performance, latency, cache, list/search, database query, worker/job, AI/RAG, or observability, read `docs/12-performance-and-observability.md`.
-9. If the task affects landing, public course list/detail, news/event public, metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or public indexability, read `docs/13-seo-and-content-discovery.md`.
-10. Inspect existing code for touched modules.
-11. Give a short plan: subtask, mode, docs read, modules/files, database/API/UI/SEO/docs impact, commands.
+9. If the task affects performance, latency, cache, list/search, database query, worker/job, AI/RAG, or observability, read `docs/12-performance-and-observability.md`.
+10. If the task affects landing, public course list/detail, news/event public, metadata, slug, sitemap, robots, canonical, Open Graph, structured data, or public indexability, read `docs/13-seo-and-content-discovery.md`.
+11. Inspect existing code for touched modules.
+12. Decide source placement and reuse before editing: shared vs feature/domain, screen/component/hook/schema/data/utils, controller/service/select/serializer/utils/types, and alias imports.
+13. Give a short plan: subtask, mode, docs read, modules/files/layers, reusable components/helpers, database/API/UI/SEO/docs impact, commands.
 
 In plan mode, stop after this plan and wait for approval.
 
@@ -89,6 +91,7 @@ Depending on the subtask, do what is necessary:
 - Back-end HTTP errors must use reusable helpers from `apps/api/src/common/errors`; do not scatter direct Nest exception constructors with custom response bodies across controllers/services/utils.
 - Database: Prisma schema/migration/seed updates when required.
 - Front-end: page/component/hooks/forms/state and responsive, production-like interactive UI.
+- Front-end source placement must follow `docs/14-source-code-structure.md`: route/page composes, feature screen orchestrates, hook handles state/query/form wiring, components render one implementation per file, schema/data/types/utils stay outside JSX, and shared components are reused before new variants are created.
 - Shared package: types/schemas/constants used by both apps.
 - Worker/integration: queue/provider/job code when required by docs.
 - Docs: update API/database/AI/UI/env docs only when behavior changes.
