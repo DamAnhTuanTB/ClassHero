@@ -54,16 +54,18 @@ export function DeleteConfirmDialog({
               ease: [0.22, 1, 0.36, 1],
             }}
           >
-            <button
-              type="button"
-              onClick={onCancel}
-              className="theme-button-primary-subtle absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-lg transition"
-              aria-label="Đóng"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <div className="absolute right-4 top-0 z-20 flex h-[4.5rem] items-center">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="theme-button-primary-subtle grid h-10 w-10 place-items-center rounded-lg transition"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
 
-            <div className="theme-dialog-header flex shrink-0 items-center gap-3 p-4 pr-16">
+            <div className="theme-dialog-header flex min-h-[4.5rem] shrink-0 items-center gap-3 p-4 pr-16">
               <span className="theme-button-danger-subtle grid h-10 w-10 shrink-0 place-items-center rounded-lg">
                 <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               </span>

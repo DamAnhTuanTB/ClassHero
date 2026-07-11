@@ -252,6 +252,13 @@ button {
 .theme-dialog-footer {
   background: color-mix(in srgb, var(--theme-bg-elevated) 76%, transparent);
   border-top: 1px solid var(--theme-border);
+  padding-block: 0.625rem;
+}
+
+@media (min-width: 640px) {
+  .theme-dialog-footer {
+    padding-block: 0.75rem;
+  }
 }
 
 .theme-button-neutral {

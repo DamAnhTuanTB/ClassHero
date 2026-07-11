@@ -46,7 +46,7 @@ export function ChapterEditor({
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
     >
-      <div className="theme-dialog-header flex shrink-0 items-center px-4 py-3 pr-16 sm:px-5 sm:py-3 sm:pr-16">
+      <div className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-16 sm:px-5 sm:py-3 sm:pr-16">
         <div>
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
             {mode === "create" ? "Thêm chương học" : "Sửa chương học"}

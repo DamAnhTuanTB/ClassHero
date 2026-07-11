@@ -78,6 +78,7 @@ Nguyên tắc dùng màu:
 
 Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới hoặc sửa UI hiện có, Codex phải:
 
+- Mọi UI mới hoặc UI được sửa phải hỗ trợ đầy đủ cả theme sáng và theme tối trong cùng phạm vi task. Không được chỉ làm đẹp ở một theme rồi bỏ theme còn lại; text, surface, border, shadow, icon, button, label, form control, modal, table, badge/status, loading/empty/error state và media/overlay phải được kiểm contrast/state ở cả hai theme.
 - Không đổi màu sáng/tối thủ công rải rác trong từng component. Màu theme phải đi qua token/utility semantic dùng chung như `--theme-*`, class theme chung, hoặc variant đã được chuẩn hóa; chỉ hard-code màu ở lớp token trung tâm hoặc trường hợp trạng thái đặc biệt thật sự bất khả kháng và phải nêu rõ lý do.
 - Ưu tiên semantic token/CSS variable hoặc class Tailwind có biến thể dark mode thay vì hard-code màu chỉ hợp light mode.
 - Kiểm tra text, border, surface, shadow, icon, trạng thái success/warning/error/info và skeleton/loading vẫn đủ contrast ở cả light và dark.

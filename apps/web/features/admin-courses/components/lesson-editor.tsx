@@ -5,7 +5,6 @@ import {
   FileText,
   ListOrdered,
   Loader2,
-  Plus,
   SlidersHorizontal,
   Trophy,
   Video,
@@ -25,7 +24,6 @@ export function LessonEditor({
   disabled,
   onClose,
   onSubmit,
-  onCreateMode,
 }: {
   mode: EditorMode;
   form: UseFormReturn<LessonFormValues>;
@@ -33,7 +31,6 @@ export function LessonEditor({
   disabled: boolean;
   onClose: () => void;
   onSubmit: (values: LessonFormValues) => void | Promise<void>;
-  onCreateMode: () => void;
 }) {
   return (
     <form
@@ -41,22 +38,12 @@ export function LessonEditor({
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
     >
-      <div className="theme-dialog-header flex shrink-0 items-center justify-between gap-3 px-4 py-3 pr-16 sm:px-5 sm:py-3 sm:pr-16">
+      <div className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-3 px-4 py-3 pr-16 sm:px-5 sm:py-3 sm:pr-16">
         <div>
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
             {mode === "create" ? "Thêm buổi học" : "Sửa buổi học"}
           </h2>
         </div>
-        {mode === "edit" ? (
-          <button
-            type="button"
-            onClick={onCreateMode}
-            className="theme-button-neutral inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Mới
-          </button>
-        ) : null}
       </div>
 
       <fieldset

@@ -151,7 +151,7 @@ export function AuthRouteLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="relative z-20 -mt-12 px-5 pb-5 sm:px-7 sm:pb-7 lg:mt-0 lg:flex lg:min-h-full lg:items-center lg:justify-center lg:bg-[var(--theme-surface)] lg:px-10 lg:py-10 xl:px-14">
-          <div className="theme-form-shell w-full rounded-[1.7rem] p-5 backdrop-blur sm:p-6 lg:max-w-[39rem] lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+          <div className="theme-form-shell w-full rounded-[1.7rem] p-5 backdrop-blur sm:p-6 lg:max-w-[39rem] lg:p-8 xl:p-10">
             <AuthDevHydrationBoundary>{children}</AuthDevHydrationBoundary>
           </div>
         </div>

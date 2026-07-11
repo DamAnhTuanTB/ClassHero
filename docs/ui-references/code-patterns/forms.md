@@ -9,20 +9,24 @@ Dùng cho modal/drawer tạo/sửa có React Hook Form + Zod.
 ### Pattern chuẩn
 
 ```tsx
-<DialogShell>
+<EditorDialogShell ariaLabel={title} isOpen={isOpen} onClose={onClose}>
   <form className="flex min-h-0 flex-1 flex-col">
-    <header className="shrink-0 px-4 py-3">Title + X close button</header>
+    <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5">
+      <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+        {title}
+      </h2>
+    </header>
     <div className="min-h-0 flex-1 overflow-y-auto">...</div>
     <footer className="grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">
-      <Button type="button" variant="outline" className="sm:w-auto" onClick={onClose}>
+      <Button type="button" variant="outline" className="whitespace-nowrap sm:w-auto" onClick={onClose}>
         Hủy
       </Button>
-      <Button type="submit" className="sm:w-auto">
+      <Button type="submit" className="whitespace-nowrap sm:w-auto">
         Lưu
       </Button>
     </footer>
   </form>
-</DialogShell>
+</EditorDialogShell>
 
 const form = useForm<FormValues>({
   mode: "onChange",
@@ -65,6 +69,7 @@ function openCreateModal() {
 - Submit dùng `handleSubmit`, hoặc helper intent đã có nếu form dùng button `type="button"`.
 - Submit/action trong modal không phụ thuộc `formState.isValid`, `dirtyFields`, required-empty check thủ công hoặc `errors` để khóa nút; validation chặn payload invalid, còn button vẫn cho bấm để người dùng thấy lỗi.
 - Modal shell căn giữa dọc-ngang ở mọi viewport. Modal form có header/body/footer tách biệt; header và footer dùng `shrink-0`, body dùng `min-h-0 flex-1 overflow-y-auto`; header dùng padding gọn như `px-4 py-3`, footer dùng padding gọn như `p-3 sm:p-4`.
+- Với admin modal title-only header, shell đặt nút `X` trong action rail cao bằng header (`absolute right-4 top-0 flex h-16 items-center`) và header dùng `min-h-16 items-center`, để nút đóng luôn căn giữa dọc với title.
 - Modal có nút `Hủy` trong footer và nút icon `X` đóng ở header/shell, cả hai gọi đúng close/cancel handler và có disabled/pending state phù hợp khi đang lưu.
 - Footer button mobile giữ layout `grid-cols-2` khi có hai action hoặc full width khi chỉ có một action; từ laptop/desktop dùng `sm:flex sm:justify-end` và button `sm:w-auto`/`max-w-max`. Button label luôn một dòng bằng `whitespace-nowrap`.
 - Primary/action button trong footer modal dùng màu thống nhất với modal cùng hệ, ưu tiên `bg-sky-600 hover:bg-sky-700 text-white` cho action lưu thường; không đổi sang đen/tối nếu không phải semantic riêng đã được chốt.

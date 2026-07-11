@@ -1,0 +1,4 @@
+interface:
+  display_name: "Accept UI"
+  short_description: "Record approved UI patterns and reusable UI code patterns."
+  default_prompt: "Use $accept-ui to record the approved UI for M3.4."

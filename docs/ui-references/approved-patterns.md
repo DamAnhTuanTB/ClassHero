@@ -82,3 +82,34 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Evidence:
   - Files: `apps/web/app/(auth)/layout.tsx`, `apps/web/features/auth/layout/`, `apps/web/features/auth/screens/`, `apps/web/features/auth/components/`, `apps/web/features/auth/data/`, `apps/web/features/auth/utils/`, `apps/web/components/forms/`, `apps/web/components/ui/select/`.
   - Assets: `apps/web/public/images/auth/reference/auth-hero-login-inclusive-transparent.png`, `apps/web/public/images/auth/reference/auth-hero-student-inclusive-transparent.png`, `apps/web/public/images/auth/reference/auth-hero-recovery-transparent.png`.
+
+## Admin Course CRUD M3.4 - 2026-07-11
+
+- Context: `M3.4` admin learning path/chapter/lesson management, gồm danh sách lộ trình, chi tiết lộ trình, modal tạo/sửa, thùng rác/lưu trữ, xác nhận xóa và quản lý chương/buổi học.
+- Approved:
+  - Admin dùng layout làm việc gọn, dense vừa phải: sidebar cố định/collapsible, header rõ hành động chính, filter/list/table ở màn danh sách và detail riêng cho entity cha.
+  - Flow phân cấp giữ đúng master-detail: danh sách chỉ quản lý lộ trình; trang chi tiết lộ trình hiển thị summary và quản lý chương/buổi học trong panel riêng.
+  - Modal form dùng cấu trúc 3 vùng: header title-only có nút `X`, body giữa scroll, footer action luôn visible. Nút `X` phải căn giữa dọc với header.
+  - Form admin dùng field primitive chung, icon trái, label đậm, validation inline, `mode: "onChange"`, không hiện lỗi pristine khi vừa mở modal.
+  - Footer modal compact: mobile hai action cùng một hàng khi có hai action; desktop action co theo nội dung và canh phải. Button label luôn một dòng.
+  - Màu action thống nhất theo vai trò: lưu/action chính dùng primary xanh, thêm buổi có success, xóa/destructive dùng đỏ, hủy/đóng dùng trung tính hoặc primary subtle.
+  - Table/list responsive dùng row dạng grid: desktop giống bảng dễ quét, mobile chuyển thành các ô metadata có nhãn ngắn để không overflow ngang.
+  - Status badge dùng component/mapping chung, không viết lại màu/label theo từng màn.
+  - Summary detail dùng ảnh bên trái, metadata grid bên phải, mô tả full width bên dưới; dùng theme token để hỗ trợ light/dark.
+  - Panel chương/buổi học hiển thị thứ bậc rõ: chapter là card cha, lessons nằm trong vùng con, có drag handle, selected/drop target state và action ngay tại item.
+  - Empty/loading/error state viết như sản phẩm thật, có CTA hoặc retry phù hợp, không lộ chữ mock/technical.
+  - Modal lưu trữ/thùng rác dùng selection state thật, bulk action footer chỉ hiện khi có item được chọn; từng item vẫn có action riêng.
+- Avoid:
+  - Không render form thường trực trong trang list/detail khi đây là CRUD admin; dùng modal đúng ngữ cảnh.
+  - Không để toàn bộ modal scroll hoặc để footer/header trôi khỏi viewport.
+  - Không top-align modal trên mobile, không để nút `X` lệch khỏi tâm header.
+  - Không copy lại badge/action button với màu khác ở từng component.
+  - Không đặt chỉ số entity con quá nhiều ở trang danh sách entity cha.
+  - Không để button trong modal/table wrap chữ; nếu thiếu chỗ thì đổi layout/copy/padding.
+  - Không dùng hard-code màu light-only trong admin M3.4; ưu tiên `theme-*` class hoặc CSS variable.
+- Reuse for:
+  - Các màn admin CRUD phân cấp như quiz/flashcard/test, discount, report moderation, notification/news admin.
+  - Các form admin modal/drawer có upload, numeric money/order, select status hoặc destructive confirm.
+  - Các detail page cần summary media + metadata grid + child entity manager.
+- Evidence:
+  - Files: `apps/web/features/admin-courses/screens/admin-courses-manager.tsx`, `apps/web/features/admin-courses/screens/admin-course-detail-manager.tsx`, `apps/web/features/admin-courses/components/editor-dialog-shell.tsx`, `apps/web/features/admin-courses/components/path-editor.tsx`, `apps/web/features/admin-courses/components/chapter-editor.tsx`, `apps/web/features/admin-courses/components/lesson-editor.tsx`, `apps/web/features/admin-courses/components/delete-confirm-dialog.tsx`, `apps/web/features/admin-courses/components/archived-paths-dialog.tsx`, `apps/web/features/admin-courses/components/chapter-lesson-panel.tsx`, `apps/web/features/admin-courses/components/learning-path-summary-panel.tsx`, `apps/web/features/admin-courses/components/learning-path-row.tsx`.

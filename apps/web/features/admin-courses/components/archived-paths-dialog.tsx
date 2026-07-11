@@ -58,7 +58,7 @@ export function ArchivedPathsDialog({
       onClose={onClose}
     >
       <section className="flex min-h-0 flex-1 flex-col">
-        <div className="theme-dialog-header shrink-0 px-4 py-3 pr-20 sm:px-5 sm:py-3 sm:pr-20">
+        <div className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5 sm:py-3 sm:pr-20">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
             Lộ trình lưu trữ
           </h2>

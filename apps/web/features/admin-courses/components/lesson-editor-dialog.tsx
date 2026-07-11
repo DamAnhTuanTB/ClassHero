@@ -20,7 +20,6 @@ export function LessonEditorDialog({
   mode,
   selectedLesson,
   onClose,
-  onCreateMode,
   onSubmit,
 }: {
   defaultOrderIndex: number;
@@ -30,7 +29,6 @@ export function LessonEditorDialog({
   mode: EditorMode;
   selectedLesson: AdminLesson | null;
   onClose: () => void;
-  onCreateMode: () => void;
   onSubmit: (values: LessonFormValues) => void | Promise<void>;
 }) {
   const form = useForm<LessonFormValues>({
@@ -84,7 +82,6 @@ export function LessonEditorDialog({
         disabled={disabled}
         onClose={onClose}
         onSubmit={submit}
-        onCreateMode={onCreateMode}
       />
     </EditorDialogShell>
   );

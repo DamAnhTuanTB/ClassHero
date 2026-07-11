@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Trash2 } from "lucide-react";
 import { useEffect } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { EditorDialogShell } from "@/features/admin-courses/components/editor-dialog-shell";
@@ -20,7 +19,6 @@ export function PathEditorDialog({
   isSaving,
   mode,
   selectedPath,
-  onArchive,
   onClose,
   onSubmit,
 }: {
@@ -28,7 +26,6 @@ export function PathEditorDialog({
   isSaving: boolean;
   mode: EditorMode;
   selectedPath: AdminLearningPath | null;
-  onArchive: () => void;
   onClose: () => void;
   onSubmit: (values: LearningPathFormValues) => void | Promise<void>;
 }) {
@@ -53,18 +50,6 @@ export function PathEditorDialog({
     <EditorDialogShell
       ariaLabel={mode === "create" ? "Tạo lộ trình" : "Sửa lộ trình"}
       isOpen={isOpen}
-      leadingAction={
-        mode === "edit" && selectedPath ? (
-          <button
-            type="button"
-            onClick={onArchive}
-            className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg transition"
-            aria-label="Xóa lộ trình"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        ) : null
-      }
       onClose={onClose}
     >
       <PathEditor

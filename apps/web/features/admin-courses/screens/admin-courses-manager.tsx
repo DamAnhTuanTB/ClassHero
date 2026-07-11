@@ -139,11 +139,6 @@ export function AdminCoursesManager({
           isSaving={isSavingPath}
           selectedPath={editingPath}
           onSubmit={actions.savePath}
-          onArchive={() => {
-            if (editingPath) {
-              actions.requestDeletePath(editingPath.id);
-            }
-          }}
           onClose={actions.closePathEditor}
         />
       ) : null}

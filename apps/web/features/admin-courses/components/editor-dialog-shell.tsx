@@ -73,7 +73,7 @@ export function EditorDialogShell({
               ease: [0.22, 1, 0.36, 1],
             }}
           >
-            <div className="absolute right-4 top-2 z-20 flex items-center gap-2">
+            <div className="absolute right-4 top-0 z-20 flex h-16 items-center gap-2 sm:right-5">
               {leadingAction}
               <button
                 type="button"

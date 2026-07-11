@@ -183,7 +183,6 @@ export function AdminCourseDetailManager({
           selectedLesson={selectedLesson}
           disabled={!path}
           onSubmit={actions.saveLesson}
-          onCreateMode={actions.startCreateLesson}
           onClose={actions.closeLessonEditor}
         />
       ) : null}
