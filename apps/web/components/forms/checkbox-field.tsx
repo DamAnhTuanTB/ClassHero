@@ -15,9 +15,11 @@ export function CheckboxField({
     <div className={wrapperClassName}>
       <label
         htmlFor={id}
-        className="flex min-h-[3.35rem] cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 transition hover:border-indigo-200 hover:bg-white"
+        className="flex min-h-[3.35rem] cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-surface-soft)] px-4 transition hover:border-[var(--theme-input-hover-border)] hover:bg-[var(--theme-input-bg)]"
       >
-        <span className="text-sm font-extrabold text-slate-800">{label}</span>
+        <span className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+          {label}
+        </span>
         <input
           {...inputProps}
           id={id}
@@ -26,13 +28,13 @@ export function CheckboxField({
           aria-invalid={error ? "true" : "false"}
           aria-describedby={error ? `${id}-error` : undefined}
           className={cn(
-            "h-5 w-5 rounded-md border-slate-300 text-[var(--form-primary,var(--auth-primary,#4f46e5))] focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60",
+            "h-5 w-5 rounded-md border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-[var(--form-primary,var(--auth-primary,var(--theme-primary)))] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60",
             className,
           )}
         />
       </label>
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-red-600">
+        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]">
           {error.message}
         </p>
       ) : null}

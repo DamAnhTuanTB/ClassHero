@@ -78,6 +78,7 @@ Nguyên tắc dùng màu:
 
 Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới hoặc sửa UI hiện có, Codex phải:
 
+- Không đổi màu sáng/tối thủ công rải rác trong từng component. Màu theme phải đi qua token/utility semantic dùng chung như `--theme-*`, class theme chung, hoặc variant đã được chuẩn hóa; chỉ hard-code màu ở lớp token trung tâm hoặc trường hợp trạng thái đặc biệt thật sự bất khả kháng và phải nêu rõ lý do.
 - Ưu tiên semantic token/CSS variable hoặc class Tailwind có biến thể dark mode thay vì hard-code màu chỉ hợp light mode.
 - Kiểm tra text, border, surface, shadow, icon, trạng thái success/warning/error/info và skeleton/loading vẫn đủ contrast ở cả light và dark.
 - Tránh dùng ảnh, gradient, overlay hoặc shadow chỉ đẹp trên nền sáng; nếu dùng phải có fallback/variant cho dark mode.
@@ -154,7 +155,7 @@ Spacing/radius mặc định:
 - Với admin CRUD dạng phân cấp như lộ trình -> chương học -> buổi học, phải dùng flow master-detail: trang danh sách chỉ quản lý entity cha với list/filter/thêm/sửa/xóa; khi bấm vào một entity cha thì điều hướng sang trang chi tiết riêng để xem đầy đủ thông tin và quản lý entity con. Form tạo/sửa mở trong modal/drawer theo đúng ngữ cảnh, không render tất cả form thường trực trên cùng một trang.
 - Stat cards trên trang danh sách admin chỉ nên tóm tắt entity chính của trang đó; chỉ số của entity con như buổi học, học thử, tài liệu hoặc nội dung chi tiết phải nằm ở trang detail/dashboard phù hợp.
 - Form admin phải đi theo form chuẩn đã duyệt gần nhất, không tự dựng style/control mới nếu `apps/web/components/forms`, feature tương tự hoặc `docs/ui-references/approved-patterns.md` đã có pattern dùng được. Khi tạo form admin mới, Codex phải nêu rõ pattern tham chiếu trong kế hoạch/final.
-- Form admin phải validate ngay khi nhập hoặc chọn (`mode: "onChange"` và `reValidateMode: "onChange"` với React Hook Form, hoặc flow tương đương), đặc biệt với modal tạo/sửa. Lỗi phải hiện inline gần field, có trạng thái border/focus/error rõ, và nút submit phải phản ánh invalid/pending/disabled state.
+- Form admin phải validate ngay khi nhập hoặc chọn (`mode: "onChange"` và `reValidateMode: "onChange"` với React Hook Form, hoặc flow tương đương), đặc biệt với modal tạo/sửa. Lỗi phải hiện inline gần field, có trạng thái border/focus/error rõ. Riêng modal/drawer form không được khóa nút action chỉ vì form đang invalid hoặc pristine; cho người dùng bấm để `handleSubmit` bật validation/error inline, chỉ disabled khi đang pending/saving hoặc thiếu prerequisite cứng khiến action thật sự không thể chạy.
 - Field không bắt buộc trong form không được hiện badge chữ dài cạnh label. Dùng icon nhỏ cạnh tên field; khi hover hoặc focus icon thì hiện tooltip `Không bắt buộc nhập`.
 - Field số trong admin như thứ tự, tiền VNĐ, phần trăm hoặc số lượng không dùng native number spinner/default browser UI; dùng input text styled cùng form chuẩn, `inputMode` phù hợp, chỉ nhận ký tự hợp lệ, normalize/format dữ liệu trước khi lưu và hiển thị đơn vị rõ khi cần.
 - Không đặt toggle học thử ở form lộ trình; học thử là cấu hình của buổi học cụ thể.
@@ -163,10 +164,14 @@ Spacing/radius mặc định:
 ## 7. Component rules
 
 - Button dùng shadcn/ui `Button`.
+- Text trong button không được xuống dòng trong mọi viewport. Button phải có `white-space: nowrap`/`whitespace-nowrap`; khi nhãn dài hoặc màn hẹp, ưu tiên chỉnh layout, độ rộng, padding, font size hoặc copy ngắn hơn thay vì cho chữ wrap.
 - Form dùng React Hook Form + Zod; nếu đã setup shadcn Form thì dùng shadcn Form.
 - Trước khi tạo form, phải kiểm tra form chuẩn đã duyệt và reusable primitives: `apps/web/components/forms`, các form tương tự trong feature đang làm, và `docs/ui-references/approved-patterns.md`. Reuse/nâng cấp component sẵn có thay vì tạo input/select/textarea/button cùng chức năng với style khác.
-- Checklist bắt buộc cho mọi form mới hoặc form được sửa: schema Zod đủ required/min/max/format; React Hook Form validate khi nhập/chọn; lỗi inline có copy rõ và đúng rule đang fail; submit bị chặn/disabled khi invalid hoặc pending; pending state có feedback; reset/default values đúng khi mở lại modal/drawer; không có control nhìn bấm được nhưng thiếu handler/state thật.
+- Checklist bắt buộc cho mọi form mới hoặc form được sửa: schema Zod đủ required/min/max/format; React Hook Form validate khi nhập/chọn; lỗi inline có copy rõ và đúng rule đang fail; submit invalid phải bị chặn bằng validation handler thay vì khóa nút modal; action button trong modal vẫn bấm được để hiện lỗi, chỉ disabled khi pending/saving hoặc thiếu prerequisite cứng; pending state có feedback; reset/default values đúng khi mở lại modal/drawer; không có control nhìn bấm được nhưng thiếu handler/state thật.
 - Modal/drawer form khi mở mới phải sạch lỗi ở trạng thái chưa tương tác. Không hiện inline error ngay lúc mở modal chỉ vì default value còn thiếu; error chỉ hiện sau khi người dùng chạm/sửa field, bấm submit, hoặc sau lỗi nghiệp vụ của hành động lưu.
+- Modal/drawer luôn căn giữa theo chiều dọc và chiều ngang trong viewport trên mobile, tablet và desktop. Không top-align modal ở mobile; khi nội dung dài, giữ modal trong `max-height` và chỉ cho vùng body giữa scroll.
+- Tất cả modal/drawer phải có cấu trúc 3 vùng rõ ràng: phần trên chỉ là tiêu đề ngắn và nút icon `X` để đóng, không có mô tả/subtitle dưới title; phần giữa là nội dung; phần dưới là action chính/phụ. Chỉ phần nội dung ở giữa được scroll; header/footer phải gọn và luôn nằm trong tầm mắt người dùng trên mobile, tablet và desktop. Footer modal luôn có nút `Hủy` để thoát/hủy thao tác và action chính/destructive khi có. Trên mobile, nếu thật sự chỉ có một action thì nút full width; mặc định hai action nằm cùng một hàng hai cột. Trên laptop/desktop, button trong footer modal co theo nội dung (`max-content`/`w-auto`), không kéo full width, và thường canh về phía phải.
+- Button trong modal/drawer phải đồng nhất màu theo vai trò action trên toàn bộ flow: action chính/lưu dùng cùng màu `primary`, mặc định là xanh dương `sky-600` với hover `sky-700` và chữ trắng; hủy/đóng dùng trung tính; destructive dùng đỏ. Không dùng primary màu đen/tối trong một modal nếu các modal cùng hệ đang dùng xanh dương, vì làm UI mất nhất quán và người dùng khó nhận diện hành động chính.
 - Pattern form mặc định phải bám form chuẩn đã duyệt hoặc form tương tự đang chạy ổn trong dự án: dùng `mode: "onChange"`/`reValidateMode: "onChange"` và truyền `form.formState.errors.<field>` trực tiếp vào primitive field. Muốn modal không hiện lỗi lúc mở thì không gọi `trigger()` sau `reset()`; không tự bọc lỗi bằng `dirtyFields/touchedFields` nếu không có test/logic rõ.
 - Với text input required, message "Nhập ..." chỉ được gắn với trạng thái rỗng sau khi trim. Nếu field có rule tối thiểu 2 ký tự trở lên, định dạng, khoảng giá trị hoặc kiểm tra trùng lặp, phải dùng message riêng tương ứng; không để người dùng đã nhập rồi vẫn thấy lỗi như chưa nhập.
 - Text input required trong `apps/web` nên dùng helper validation chung như `requiredTrimmedText` để tách required/min/max message từ đầu. Nếu một field cần min length lớn hơn 1, helper phải nhận `minMessage` riêng; không dùng lại required message.
@@ -255,6 +260,7 @@ UI không chỉ cần đẹp/responsive; mặc định phải cho cảm giác nh
 
 Mục tiêu:
 
+- Tốc độ load trên điện thoại là mục tiêu ưu tiên mặc định ở mọi đường tải: lần mở đầu, chuyển trang, fetch/refetch dữ liệu, skeleton, asset/font/image, hydration và các thao tác có pending. Một UI chỉ được xem là mượt khi các đường load chính trên điện thoại đều nhanh, không chỉ khi điều hướng nội bộ nhanh nhờ cache/router.
 - Mobile interaction phải phản hồi gần như tức thì sau khi bấm, kéo, chọn đáp án, lật flashcard, mở modal hoặc submit form.
 - Hạn chế layout shift; skeleton/placeholder phải giữ kích thước gần với nội dung thật.
 - Không để thao tác học chính bị delay vì animation, fetch thừa, render list quá dài hoặc logic chạy nặng trên main thread.
@@ -269,6 +275,12 @@ Frontend rules:
 - Paginate, infinite query hoặc virtualize list dài; không render toàn bộ danh sách lớn trên mobile.
 - Prefetch data cho bước kế tiếp khi flow học rõ ràng, ví dụ bài tiếp theo hoặc detail sau khi user sắp mở.
 - Tách component nặng theo route/feature; lazy load phần ít dùng như editor nặng, chart lớn, AI panel hoặc admin tool nếu phù hợp.
+- Với trang có form/modal/drawer/editor/chart chỉ dùng sau thao tác của user, không kéo toàn bộ stack đó vào bundle tải đầu. Lazy-load dialog/form nặng, giữ screen list/detail ban đầu nhẹ nhất có thể.
+- Khi mock data hoặc nối API thật, ưu tiên server render/initial data/placeholder data an toàn để màn đầu không giữ skeleton lâu. Không thêm mock latency mặc định trừ khi task đang test trạng thái loading.
+- Route transition phải nhẹ: prefetch/cache khi hợp lý, chỉ tải chunk cần cho route đích, không để màn trắng, và tránh refetch lại dữ liệu đã có nếu cache còn đúng.
+- Asset/font/image phải phục vụ mobile trước: không dùng ảnh quá lớn, không kéo nhiều font/weight, không tải chart/editor/media ngoài viewport hoặc chưa cần.
+- API/data load phải trả đúng phần UI cần, phân trang/list limit rõ, tránh include/rich text/blob lớn ở màn chỉ cần metadata.
+- Mọi output render lần đầu phải hydration-safe: không dùng formatter/sort phụ thuộc khác biệt server-client, `Date.now()`, `Math.random()` hoặc browser-only branch trong JSX đầu tiên; nếu browser/autofill chèn attribute ngoài ý muốn vào input, xử lý tại primitive thay vì để dev overlay làm người dùng tưởng app lỗi.
 - Ảnh phải tối ưu kích thước, dùng responsive image, lazy load ảnh ngoài viewport và tránh ảnh quá lớn cho mobile.
 - Không dùng animation trên thuộc tính gây layout/reflow nặng; ưu tiên transform/opacity.
 - Tôn trọng `prefers-reduced-motion` khi thêm animation đáng kể.
@@ -298,6 +310,7 @@ Performance budget/checklist:
 | ---------------- | --------------------------------------------------------------- |
 | Core Web Vitals  | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile                |
 | Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn     |
+| Mobile load      | Mọi đường load trên điện thoại phải nhẹ nhất có thể: cold load, transition, data, asset |
 | Interaction      | Button/action đổi state ngay sau thao tác                       |
 | List dài         | Có pagination/infinite/virtualization                           |
 | Animation        | Nhẹ, ngắn, không block thao tác                                 |

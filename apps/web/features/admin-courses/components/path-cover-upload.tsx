@@ -9,10 +9,12 @@ const maxImageSizeBytes = 5 * 1024 * 1024;
 export function PathCoverUpload({
   fileName,
   imageUrl,
+  isDarkTheme = false,
   onChange,
 }: {
   fileName: string;
   imageUrl: string;
+  isDarkTheme?: boolean;
   onChange: (value: { fileName: string; imageUrl: string }) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -27,11 +29,18 @@ export function PathCoverUpload({
   return (
     <section className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
-        <FieldLabel id="admin-course-cover" label="Ảnh đại diện" isOptional />
-        <span className="text-xs font-bold text-slate-400">PNG/JPG/WebP tối đa 5MB</span>
+        <FieldLabel
+          id="admin-course-cover"
+          label="Ảnh đại diện"
+          isDarkTheme={isDarkTheme}
+          isOptional
+        />
+        <span className="text-xs font-bold text-[var(--theme-text-muted)]">
+          PNG/JPG/WebP tối đa 5MB
+        </span>
       </div>
-      <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
-        <div className="relative aspect-[16/10] overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="grid gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
+        <div className="relative aspect-[16/10] overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]">
           {shouldShowImage ? (
             <img
               src={imageUrl}
@@ -40,13 +49,13 @@ export function PathCoverUpload({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="grid h-full place-items-center bg-gradient-to-br from-sky-50 via-white to-emerald-50 text-sky-600">
+            <div className="grid h-full place-items-center bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]">
               <ImagePlus className="h-9 w-9" aria-hidden="true" />
             </div>
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-extrabold text-slate-900">
+          <p className="truncate text-sm font-extrabold text-[var(--theme-text-strong)]">
             {fileName || "Chưa chọn ảnh"}
           </p>
 
@@ -54,7 +63,7 @@ export function PathCoverUpload({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-sky-600 px-3 text-sm font-extrabold text-white transition hover:bg-sky-700"
+              className="theme-button-success inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
             >
               <Upload className="h-4 w-4" aria-hidden="true" />
               Chọn ảnh
@@ -70,7 +79,7 @@ export function PathCoverUpload({
                     inputRef.current.value = "";
                   }
                 }}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-sm font-extrabold text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
+                className="theme-button-danger-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                 Xóa ảnh
@@ -114,7 +123,9 @@ export function PathCoverUpload({
             }}
           />
           {localError ? (
-            <p className="mt-2 text-sm leading-5 text-red-600">{localError}</p>
+            <p className="mt-2 text-sm leading-5 text-[var(--theme-error-text)]">
+              {localError}
+            </p>
           ) : null}
         </div>
       </div>

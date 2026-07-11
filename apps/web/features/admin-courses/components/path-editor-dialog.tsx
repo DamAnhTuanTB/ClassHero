@@ -1,13 +1,21 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2 } from "lucide-react";
-import type { UseFormReturn } from "react-hook-form";
+import { useEffect } from "react";
+import { useForm, type Resolver } from "react-hook-form";
 import { EditorDialogShell } from "@/features/admin-courses/components/editor-dialog-shell";
 import { PathEditor } from "@/features/admin-courses/components/path-editor";
 import type { AdminLearningPath } from "@/features/admin-courses/data";
-import type { LearningPathFormValues } from "@/features/admin-courses/schemas";
+import {
+  emptyPathValues,
+  learningPathSchema,
+  type LearningPathFormValues,
+} from "@/features/admin-courses/schemas";
 import type { EditorMode } from "@/features/admin-courses/types";
+import { toPathFormValues } from "@/features/admin-courses/utils";
 
 export function PathEditorDialog({
-  form,
   isOpen,
   isSaving,
   mode,
@@ -16,7 +24,6 @@ export function PathEditorDialog({
   onClose,
   onSubmit,
 }: {
-  form: UseFormReturn<LearningPathFormValues>;
   isOpen: boolean;
   isSaving: boolean;
   mode: EditorMode;
@@ -25,6 +32,23 @@ export function PathEditorDialog({
   onClose: () => void;
   onSubmit: (values: LearningPathFormValues) => void | Promise<void>;
 }) {
+  const form = useForm<LearningPathFormValues>({
+    mode: "onChange",
+    reValidateMode: "onChange",
+    resolver: zodResolver(learningPathSchema) as Resolver<LearningPathFormValues>,
+    defaultValues: emptyPathValues,
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    form.reset(
+      mode === "edit" && selectedPath ? toPathFormValues(selectedPath) : emptyPathValues,
+    );
+  }, [form, isOpen, mode, selectedPath]);
+
   return (
     <EditorDialogShell
       ariaLabel={mode === "create" ? "Tạo lộ trình" : "Sửa lộ trình"}
@@ -34,7 +58,7 @@ export function PathEditorDialog({
           <button
             type="button"
             onClick={onArchive}
-            className="grid h-11 w-11 place-items-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
+            className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg transition"
             aria-label="Xóa lộ trình"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -47,6 +71,7 @@ export function PathEditorDialog({
         mode={mode}
         form={form}
         isSaving={isSaving}
+        onClose={onClose}
         onSubmit={onSubmit}
       />
     </EditorDialogShell>

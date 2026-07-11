@@ -140,6 +140,43 @@ export function byLessonOrder(left: AdminLesson, right: AdminLesson) {
   return left.orderIndex - right.orderIndex;
 }
 
+export function moveItemById<TItem extends { id: string }>(
+  items: TItem[],
+  sourceId: string,
+  targetId: string,
+) {
+  const sourceIndex = items.findIndex((item) => item.id === sourceId);
+  const targetIndex = items.findIndex((item) => item.id === targetId);
+
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(sourceIndex, 1);
+  if (!movedItem) {
+    return items;
+  }
+
+  nextItems.splice(targetIndex, 0, movedItem);
+
+  return nextItems;
+}
+
+export function reindexChapters(chapters: AdminChapter[]) {
+  return chapters.map((chapter, index) => ({
+    ...chapter,
+    orderIndex: index + 1,
+  }));
+}
+
+export function reindexLessons(lessons: AdminLesson[]) {
+  return lessons.map((lesson, index) => ({
+    ...lesson,
+    orderIndex: index + 1,
+  }));
+}
+
 export function getLessonsFromPath(path: AdminLearningPath) {
   return path.chapters.flatMap((chapter) => chapter.lessons);
 }
@@ -238,11 +275,12 @@ export function wait(ms: number) {
 }
 
 export function formatPrice(value: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(value);
+  const roundedValue = Math.trunc(value);
+  const sign = roundedValue < 0 ? "-" : "";
+  const absoluteValue = Math.abs(roundedValue).toString();
+  const groupedValue = absoluteValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `${sign}${groupedValue} VND`;
 }
 
 export function getPriceChangePercent(originalPriceVnd: number, currentPriceVnd: number) {
@@ -258,13 +296,13 @@ export function formatDateTime(value: string) {
     return "Chưa đặt";
   }
 
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  const dateParts = parseVietnamDateTimeParts(value);
+
+  if (!dateParts) {
+    return "Chưa đặt";
+  }
+
+  return `${padDatePart(dateParts.day)}/${padDatePart(dateParts.month)}/${dateParts.year} ${padDatePart(dateParts.hour)}:${padDatePart(dateParts.minute)}`;
 }
 
 export function isAllowedVideoUrl(value: string) {
@@ -318,8 +356,83 @@ function compareNumber(leftValue: number, rightValue: number) {
 }
 
 function compareText(leftValue: string, rightValue: string) {
-  return leftValue.localeCompare(rightValue, "vi", {
-    numeric: true,
-    sensitivity: "base",
-  });
+  const normalizedLeftValue = normalizeSearchableText(leftValue);
+  const normalizedRightValue = normalizeSearchableText(rightValue);
+
+  if (normalizedLeftValue < normalizedRightValue) {
+    return -1;
+  }
+
+  if (normalizedLeftValue > normalizedRightValue) {
+    return 1;
+  }
+
+  return compareCodePointText(leftValue, rightValue);
+}
+
+type DateTimeParts = {
+  day: number;
+  hour: number;
+  minute: number;
+  month: number;
+  year: number;
+};
+
+const VIETNAM_TIME_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+function parseVietnamDateTimeParts(value: string): DateTimeParts | null {
+  const localMatch = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d{1,3})?)?$/,
+  );
+
+  if (localMatch) {
+    return {
+      year: Number(localMatch[1]),
+      month: Number(localMatch[2]),
+      day: Number(localMatch[3]),
+      hour: Number(localMatch[4]),
+      minute: Number(localMatch[5]),
+    };
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const vietnamDate = new Date(date.getTime() + VIETNAM_TIME_OFFSET_MS);
+
+  return {
+    year: vietnamDate.getUTCFullYear(),
+    month: vietnamDate.getUTCMonth() + 1,
+    day: vietnamDate.getUTCDate(),
+    hour: vietnamDate.getUTCHours(),
+    minute: vietnamDate.getUTCMinutes(),
+  };
+}
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function normalizeSearchableText(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d");
+}
+
+function compareCodePointText(leftValue: string, rightValue: string) {
+  if (leftValue < rightValue) {
+    return -1;
+  }
+
+  if (leftValue > rightValue) {
+    return 1;
+  }
+
+  return 0;
 }

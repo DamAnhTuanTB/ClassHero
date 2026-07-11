@@ -1,0 +1,1 @@
+- 2026-07-11: Chuẩn hóa theme sáng/tối bằng token và utility dùng chung cho web UI, áp dụng cho auth/admin/forms/modal/checkbox, đồng thời lưu theme qua cookie để server render đúng trạng thái tối khi reload và tránh nháy sáng.

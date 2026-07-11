@@ -1,9 +1,11 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
+import { useThemeStore } from "@/lib/theme-store";
 
 export function Providers({ children }: { children: ReactNode }) {
+  const hydrateTheme = useThemeStore((state) => state.hydrateTheme);
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -18,6 +20,10 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
+
+  useLayoutEffect(() => {
+    hydrateTheme();
+  }, [hydrateTheme]);
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

@@ -195,7 +195,7 @@ export function StudentRegisterForm() {
           suppressBrowserSuggestions
           wrapperClassName="sm:col-span-2"
           labelAction={
-            <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-xs font-bold text-slate-600 transition hover:text-slate-950">
+            <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-xs font-bold text-[var(--theme-text)] transition hover:text-[var(--theme-text-strong)]">
               <input
                 type="checkbox"
                 autoComplete="off"
@@ -223,10 +223,10 @@ export function StudentRegisterForm() {
                 className="peer sr-only"
               />
               <span
-                className={`flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded border transition peer-focus-visible:ring-4 peer-focus-visible:ring-indigo-100 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+                className={`flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded border transition peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--theme-focus-ring)] peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
                   hasNoPhone
-                    ? "border-[var(--auth-primary)] bg-[var(--auth-primary)] text-white"
-                    : "border-slate-300 bg-white text-transparent"
+                    ? "border-[var(--auth-primary,var(--theme-primary))] bg-[var(--auth-primary,var(--theme-primary))] text-[var(--theme-primary-foreground)]"
+                    : "border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-transparent"
                 }`}
               >
                 <Check className="h-3 w-3" aria-hidden="true" />
@@ -281,7 +281,7 @@ export function StudentRegisterForm() {
       <SubmitButton isPending={isPending} onClick={handleStudentRegisterSubmit}>
         Tạo tài khoản học sinh
       </SubmitButton>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-[var(--theme-text)]">
         Đã có tài khoản?{" "}
         <Link
           className="font-bold text-[var(--auth-primary)] hover:brightness-90"

@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Clock3,
+  GripVertical,
   Layers3,
   ListChecks,
   Pencil,
@@ -9,6 +10,7 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
+import { useState, type DragEvent } from "react";
 import { StatusBadge } from "@/features/admin-courses/components/badges";
 import type { AdminLearningPath } from "@/features/admin-courses/data";
 import { formatDateTime } from "@/features/admin-courses/utils";
@@ -24,7 +26,10 @@ export function ChapterLessonPanel({
   onCreateLesson,
   onEditChapter,
   onEditLesson,
+  onReorderChapter,
+  onReorderLesson,
 }: {
+  isDarkTheme?: boolean;
   path: AdminLearningPath;
   selectedChapterId: string | null;
   selectedLessonId: string | null;
@@ -34,22 +39,113 @@ export function ChapterLessonPanel({
   onCreateLesson: (chapterId: string) => void;
   onEditChapter: (chapterId: string) => void;
   onEditLesson: (lessonId: string) => void;
+  onReorderChapter: (sourceChapterId: string, targetChapterId: string) => void;
+  onReorderLesson: (
+    chapterId: string,
+    sourceLessonId: string,
+    targetLessonId: string,
+  ) => void;
 }) {
+  const [draggedChapterId, setDraggedChapterId] = useState<string | null>(null);
+  const [draggedLesson, setDraggedLesson] = useState<{
+    chapterId: string;
+    lessonId: string;
+  } | null>(null);
+  const [chapterDropTargetId, setChapterDropTargetId] = useState<string | null>(null);
+  const [lessonDropTargetId, setLessonDropTargetId] = useState<string | null>(null);
+
+  function handleChapterDragStart(event: DragEvent<HTMLElement>, chapterId: string) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", chapterId);
+    setDraggedChapterId(chapterId);
+  }
+
+  function handleChapterDragOver(event: DragEvent<HTMLElement>, chapterId: string) {
+    if (!draggedChapterId || draggedChapterId === chapterId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setChapterDropTargetId(chapterId);
+  }
+
+  function handleChapterDrop(event: DragEvent<HTMLElement>, targetChapterId: string) {
+    event.preventDefault();
+    if (draggedChapterId && draggedChapterId !== targetChapterId) {
+      onReorderChapter(draggedChapterId, targetChapterId);
+    }
+    setDraggedChapterId(null);
+    setChapterDropTargetId(null);
+  }
+
+  function handleLessonDragStart(
+    event: DragEvent<HTMLElement>,
+    chapterId: string,
+    lessonId: string,
+  ) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", lessonId);
+    setDraggedLesson({ chapterId, lessonId });
+  }
+
+  function handleLessonDragOver(
+    event: DragEvent<HTMLElement>,
+    chapterId: string,
+    lessonId: string,
+  ) {
+    if (
+      !draggedLesson ||
+      draggedLesson.chapterId !== chapterId ||
+      draggedLesson.lessonId === lessonId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setLessonDropTargetId(lessonId);
+  }
+
+  function handleLessonDrop(
+    event: DragEvent<HTMLElement>,
+    chapterId: string,
+    targetLessonId: string,
+  ) {
+    event.preventDefault();
+    if (
+      draggedLesson &&
+      draggedLesson.chapterId === chapterId &&
+      draggedLesson.lessonId !== targetLessonId
+    ) {
+      onReorderLesson(chapterId, draggedLesson.lessonId, targetLessonId);
+    }
+    setDraggedLesson(null);
+    setLessonDropTargetId(null);
+  }
+
+  function clearDragState() {
+    setDraggedChapterId(null);
+    setDraggedLesson(null);
+    setChapterDropTargetId(null);
+    setLessonDropTargetId(null);
+  }
+
   return (
     <section className="mt-5">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-950">
+          <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
             Cấu trúc lộ trình
           </h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="mt-1 text-sm font-semibold text-[var(--theme-text-muted)]">
             {path.chapters.length} chương, {path.totalLessonCount} buổi học
           </p>
         </div>
         <button
           type="button"
           onClick={onCreateChapter}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-extrabold text-sky-700 transition hover:bg-sky-100"
+          className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Thêm chương
@@ -58,18 +154,18 @@ export function ChapterLessonPanel({
 
       <div className="mt-4 grid gap-4">
         {path.chapters.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center">
-            <Layers3 className="mx-auto h-9 w-9 text-slate-400" aria-hidden="true" />
-            <p className="mt-3 text-sm font-extrabold text-slate-800">
+          <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
+            <Layers3 className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]" aria-hidden="true" />
+            <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
               Chưa có chương học
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[var(--theme-text-muted)]">
               Tạo chương học trước, sau đó thêm các buổi học vào từng chương.
             </p>
             <button
               type="button"
               onClick={onCreateChapter}
-              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 text-sm font-extrabold text-white transition hover:bg-sky-700"
+              className="theme-button-primary mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Thêm chương đầu tiên
@@ -79,28 +175,56 @@ export function ChapterLessonPanel({
           path.chapters.map((chapter) => (
             <article
               key={chapter.id}
+              onDragOver={(event) => handleChapterDragOver(event, chapter.id)}
+              onDragLeave={() => setChapterDropTargetId(null)}
+              onDrop={(event) => handleChapterDrop(event, chapter.id)}
               className={cn(
-                "rounded-lg border bg-white transition",
+                "rounded-lg border bg-[var(--theme-surface)] transition",
                 selectedChapterId === chapter.id
-                  ? "border-sky-200 shadow-sm shadow-sky-900/10"
-                  : "border-slate-200",
+                  ? "border-[var(--theme-primary-border)] shadow-[var(--theme-shadow-sm)]"
+                  : "border-[var(--theme-border)]",
+                draggedChapterId === chapter.id && "opacity-60",
+                chapterDropTargetId === chapter.id &&
+                  "border-[var(--theme-success-border)] ring-2 ring-[var(--theme-success-border)]",
               )}
             >
-              <div className="grid gap-3 p-4 md:grid-cols-[3.25rem_minmax(0,1fr)_auto]">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-50 text-sm font-extrabold text-sky-700 ring-1 ring-sky-100">
-                  {chapter.orderIndex}
+              <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] gap-3 p-4 md:grid-cols-[4.25rem_minmax(0,1fr)_auto]">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={(event) => handleChapterDragStart(event, chapter.id)}
+                    onDragEnd={clearDragState}
+                    className="grid h-10 w-6 cursor-grab place-items-center rounded-md text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] active:cursor-grabbing"
+                    aria-label={`Kéo để đổi vị trí ${chapter.title}`}
+                    title="Kéo để đổi vị trí chương"
+                  >
+                    <GripVertical className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                  <div
+                    className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--theme-primary-soft)] text-sm font-extrabold text-[var(--theme-primary)] ring-1 ring-[var(--theme-primary-border)]"
+                  >
+                    {chapter.orderIndex}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-extrabold text-slate-950">
+                <div className="flex items-center justify-end md:hidden">
+                  <StatusBadge status={chapter.status} />
+                </div>
+                <div className="col-span-2 min-w-0 md:col-span-1">
+                  <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
+                    <h3
+                      className="w-full text-base font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0"
+                    >
                       {chapter.title}
                     </h3>
-                    <StatusBadge status={chapter.status} />
+                    <span className="hidden shrink-0 md:inline-flex">
+                      <StatusBadge status={chapter.status} />
+                    </span>
                   </div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                  <p className="mt-1 text-sm leading-6 text-[var(--theme-text)]">
                     {chapter.overview || "Chưa có tổng quan cho chương này."}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                     <span className="inline-flex items-center gap-1">
                       <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
                       {chapter.lessons.length} buổi học
@@ -113,11 +237,11 @@ export function ChapterLessonPanel({
                     ) : null}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 md:col-span-1">
                   <button
                     type="button"
                     onClick={() => onCreateLesson(chapter.id)}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+                    className="theme-button-success inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
                   >
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     Thêm buổi
@@ -125,7 +249,7 @@ export function ChapterLessonPanel({
                   <button
                     type="button"
                     onClick={() => onEditChapter(chapter.id)}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
+                    className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
                   >
                     <Pencil className="h-4 w-4" aria-hidden="true" />
                     Sửa
@@ -133,28 +257,31 @@ export function ChapterLessonPanel({
                   <button
                     type="button"
                     onClick={() => onArchiveChapter(chapter.id)}
-                    className="grid h-10 w-10 place-items-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
+                    className="theme-button-danger-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
                     aria-label={`Xóa ${chapter.title}`}
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Xóa
                   </button>
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 bg-slate-50/70 p-3">
+              <div
+                className="border-t border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
+              >
                 {chapter.lessons.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center">
+                  <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-4 text-center">
                     <ListChecks
-                      className="mx-auto h-7 w-7 text-slate-400"
+                      className="mx-auto h-7 w-7 text-[var(--theme-text-muted)]"
                       aria-hidden="true"
                     />
-                    <p className="mt-2 text-sm font-extrabold text-slate-800">
+                    <p className="mt-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
                       Chưa có buổi học trong chương này
                     </p>
                     <button
                       type="button"
                       onClick={() => onCreateLesson(chapter.id)}
-                      className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-extrabold text-emerald-700 transition hover:bg-emerald-100"
+                      className="theme-button-success mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
                       Thêm buổi học
@@ -165,27 +292,59 @@ export function ChapterLessonPanel({
                     {chapter.lessons.map((lesson) => (
                       <article
                         key={lesson.id}
+                        onDragOver={(event) =>
+                          handleLessonDragOver(event, chapter.id, lesson.id)
+                        }
+                        onDragLeave={() => setLessonDropTargetId(null)}
+                        onDrop={(event) => handleLessonDrop(event, chapter.id, lesson.id)}
                         className={cn(
-                          "grid gap-3 rounded-lg border p-3 transition md:grid-cols-[2.75rem_minmax(0,1fr)_auto]",
+                          "grid grid-cols-[3.75rem_minmax(0,1fr)] gap-3 rounded-lg border p-3 transition md:grid-cols-[3.75rem_minmax(0,1fr)_auto]",
                           selectedLessonId === lesson.id
-                            ? "border-sky-200 bg-sky-50"
-                            : "border-slate-200 bg-white",
+                            ? "border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)]"
+                            : "border-[var(--theme-border)] bg-[var(--theme-surface)]",
+                          draggedLesson?.lessonId === lesson.id && "opacity-60",
+                          lessonDropTargetId === lesson.id &&
+                            "border-[var(--theme-success-border)] ring-2 ring-[var(--theme-success-border)]",
                         )}
                       >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-sm font-extrabold text-slate-700">
-                          {lesson.orderIndex}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={(event) =>
+                              handleLessonDragStart(event, chapter.id, lesson.id)
+                            }
+                            onDragEnd={clearDragState}
+                            className="grid h-10 w-5 cursor-grab place-items-center rounded-md text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] active:cursor-grabbing"
+                            aria-label={`Kéo để đổi vị trí ${lesson.title}`}
+                            title="Kéo để đổi vị trí buổi học"
+                          >
+                            <GripVertical className="h-5 w-5" aria-hidden="true" />
+                          </button>
+                          <div
+                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--theme-surface-soft)] text-sm font-extrabold text-[var(--theme-text)]"
+                          >
+                            {lesson.orderIndex}
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-sm font-extrabold text-slate-950">
+                        <div className="flex items-center justify-end md:hidden">
+                          <StatusBadge status={lesson.status} />
+                        </div>
+                        <div className="col-span-2 min-w-0 md:col-span-1">
+                          <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
+                            <h4
+                              className="w-full text-sm font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0"
+                            >
                               {lesson.title}
                             </h4>
-                            <StatusBadge status={lesson.status} />
+                            <span className="hidden shrink-0 md:inline-flex">
+                              <StatusBadge status={lesson.status} />
+                            </span>
                           </div>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">
+                          <p className="mt-1 text-sm leading-6 text-[var(--theme-text)]">
                             {lesson.shortDescription || "Chưa có mô tả ngắn."}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                             <span className="inline-flex items-center gap-1">
                               <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
                               Mở bài thi: {formatDateTime(lesson.examOpenAt)}
@@ -196,11 +355,11 @@ export function ChapterLessonPanel({
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="col-span-2 flex items-center justify-end gap-2 md:col-span-1">
                           <button
                             type="button"
                             onClick={() => onEditLesson(lesson.id)}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
+                            className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
                           >
                             <Pencil className="h-4 w-4" aria-hidden="true" />
                             Sửa
@@ -208,10 +367,11 @@ export function ChapterLessonPanel({
                           <button
                             type="button"
                             onClick={() => onArchiveLesson(lesson.id)}
-                            className="grid h-10 w-10 place-items-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100"
+                            className="theme-button-danger-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
                             aria-label={`Xóa ${lesson.title}`}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            Xóa
                           </button>
                         </div>
                       </article>

@@ -10,6 +10,7 @@ Mục tiêu: Codex không chỉ code "chạy được", mà phải code theo hư
 
 - Không tối ưu mù. Với thay đổi quan trọng, phải có cách đo hoặc ít nhất có lý do kỹ thuật rõ.
 - Tối ưu theo đường đi thật của người dùng: landing/course list, auth, lesson, quiz/flashcard/test, payment, AI chat, parent dashboard, admin CRUD.
+- Với frontend, tốc độ load trên điện thoại là đường đo mặc định cho mọi loại tải: cold first load, route transition, data fetch/refetch, asset/font/image load, hydration và pending interaction. Một đường tải nhanh sau khi app đã hydrate/cache không đủ để kết luận màn đã tối ưu nếu đường tải khác còn chậm.
 - Ưu tiên perceived performance: phản hồi UI ngay, skeleton ổn định, API/job có trạng thái rõ.
 - Không dùng thêm cache, queue, index hoặc abstraction phức tạp nếu chưa có bottleneck hoặc nhu cầu rõ.
 - Task nhỏ có thể dùng lean mode, nhưng task chạm performance của flow chính phải ghi rõ check đã chạy hoặc `Not run`.
@@ -41,6 +42,12 @@ Codex phải ưu tiên:
 
 - Next.js route/page nhỏ, tách component theo feature.
 - Lazy load phần nặng hoặc ít dùng như editor, chart, AI panel, admin tool.
+- Không kéo form/modal/drawer/editor/chart/admin tool chưa dùng vào client bundle ban đầu; dynamic import/lazy-load khi người dùng mở hoặc chuẩn bị mở.
+- Dùng server render, initial data hoặc placeholder data an toàn để giảm thời gian skeleton ở lần mở đầu, kể cả khi đang dùng mock data.
+- Prefetch/cache route và data hợp lý để chuyển trang nhanh nhưng không refetch thừa; tránh màn trắng trong route transition.
+- Giảm asset/font/image trên mobile: chỉ tải kích thước cần, lazy-load media ngoài viewport và không kéo font/weight không dùng.
+- API/data cho UI phải trả đúng metadata cần hiển thị, có pagination/list limit, tránh trả rich text/blob/include lớn nếu màn chưa dùng.
+- Tránh hydration mismatch trên mobile: formatter ngày/tiền/sort phải deterministic giữa server và client; browser-only logic chỉ chạy sau hydrate; attribute do browser/autofill chèn vào input phải được xử lý ở primitive phù hợp.
 - TanStack Query cho cache, `staleTime`, prefetch, mutation pending và invalidate.
 - Debounce search/filter/input gọi API liên tục.
 - Pagination/infinite query/virtualization cho danh sách dài.

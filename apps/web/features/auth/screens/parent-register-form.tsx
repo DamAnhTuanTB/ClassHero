@@ -140,7 +140,7 @@ export function ParentRegisterForm() {
       <SubmitButton isPending={isPending} onClick={handleParentRegisterSubmit}>
         Tiếp tục
       </SubmitButton>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-[var(--theme-text)]">
         Đã có tài khoản?{" "}
         <Link
           className="font-bold text-[var(--auth-primary)] hover:brightness-90"

@@ -1,6 +1,4 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
-import { useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
 import {
   type AdminLearningPath,
@@ -8,11 +6,7 @@ import {
   type AdminSubject,
 } from "@/features/admin-courses/data";
 import { useAdminLearningPathsQuery } from "@/features/admin-courses/hooks/use-admin-course-queries";
-import {
-  emptyPathValues,
-  learningPathSchema,
-  type LearningPathFormValues,
-} from "@/features/admin-courses/schemas";
+import type { LearningPathFormValues } from "@/features/admin-courses/schemas";
 import type {
   EditorMode,
   LearningPathSortKey,
@@ -25,13 +19,22 @@ import {
   getAdminCourseStats,
   getArchivedLearningPaths,
   toLearningPathPayload,
-  toPathFormValues,
   wait,
 } from "@/features/admin-courses/utils";
+import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 
-export function useAdminCoursesManager() {
-  const learningPathsQuery = useAdminLearningPathsQuery();
-  const [paths, setPaths] = useState<AdminLearningPath[]>([]);
+export function useAdminCoursesManager(
+  initialLearningPaths?: AdminLearningPath[],
+  initialThemeMode: AppThemeMode = "light",
+) {
+  const learningPathsQuery = useAdminLearningPathsQuery(initialLearningPaths);
+  const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
+  const isThemeHydrated = useThemeStore((state) => state.isHydrated);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
+  const [paths, setPaths] = useState<AdminLearningPath[]>(
+    () => learningPathsQuery.data ?? [],
+  );
   const [pathEditorMode, setPathEditorMode] = useState<EditorMode>("edit");
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [isPathEditorOpen, setIsPathEditorOpen] = useState(false);
@@ -40,7 +43,6 @@ export function useAdminCoursesManager() {
   const [permanentDeletingPathIds, setPermanentDeletingPathIds] = useState<string[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isDarkTheme, setIsDarkTheme] = useState(false);
   const [query, setQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<AdminSubject | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<AdminPublishStatus | "ALL">("ALL");
@@ -51,24 +53,11 @@ export function useAdminCoursesManager() {
 
   const editingPath = paths.find((path) => path.id === editingPathId) ?? null;
 
-  const pathForm = useForm<LearningPathFormValues>({
-    mode: "onChange",
-    reValidateMode: "onChange",
-    resolver: zodResolver(learningPathSchema) as Resolver<LearningPathFormValues>,
-    defaultValues: emptyPathValues,
-  });
-
   useEffect(() => {
     if (learningPathsQuery.data) {
       setPaths(learningPathsQuery.data);
     }
   }, [learningPathsQuery.data]);
-
-  useEffect(() => {
-    if (pathEditorMode === "edit" && editingPath) {
-      pathForm.reset(toPathFormValues(editingPath));
-    }
-  }, [editingPath, pathEditorMode, pathForm]);
 
   const activePaths = useMemo(() => getActiveLearningPaths(paths), [paths]);
   const deletingPaths = useMemo(
@@ -127,7 +116,6 @@ export function useAdminCoursesManager() {
   function startCreatePath() {
     setPathEditorMode("create");
     setEditingPathId(null);
-    pathForm.reset(emptyPathValues);
     setIsPathEditorOpen(true);
   }
 
@@ -139,7 +127,6 @@ export function useAdminCoursesManager() {
 
     setEditingPathId(path.id);
     setPathEditorMode("edit");
-    pathForm.reset(toPathFormValues(path));
     setIsPathEditorOpen(true);
   }
 
@@ -333,7 +320,6 @@ export function useAdminCoursesManager() {
     isDarkTheme,
     isSidebarCollapsed,
     pathEditorMode,
-    pathForm,
     query,
     deletingPaths,
     editingPath,
@@ -366,7 +352,7 @@ export function useAdminCoursesManager() {
       setSubjectFilter,
       startCreatePath,
       startEditPath,
-      toggleDarkTheme: () => setIsDarkTheme((current) => !current),
+      toggleDarkTheme: toggleTheme,
       toggleSidebarCollapsed: () => setIsSidebarCollapsed((current) => !current),
       toggleSelectAllPaths,
       toggleSelectPath,

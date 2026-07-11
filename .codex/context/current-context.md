@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên làm việc nhanh hơn. Nó không thay thế `AGENTS.md` hoặc docs gốc trong `docs/`.
 
@@ -14,8 +14,10 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   - database: `docs/04-database-model.md` + `docs/database/*.md`
   - API: `docs/05-api-contract.md` + `docs/api/*.md`
 - UI direction là mobile-first, vẫn phải ổn trên tablet/iPad và laptop/desktop, đồng thời ưu tiên cảm giác mượt, phản hồi nhanh và độ trễ cảm nhận thấp.
+- Rule toàn cục mới: mọi UI phải tối ưu mọi đường load trên điện thoại nhanh nhất có thể trong phạm vi task, kể cả mock UI/admin. Bao gồm cold first load, route transition, data fetch/refetch, skeleton duration, asset/font/image load, hydration, API response và pending interaction. Một đường load nhanh không đủ nếu đường khác còn chậm; phải giảm bundle ban đầu, lazy-load form/modal/editor/chart/admin tool ít dùng, dùng server/initial data/prefetch/cache khi phù hợp, tránh mock delay mặc định, chỉ tải asset cần thiết, giữ formatter/sort hydration-safe và xử lý mismatch do browser/autofill ở primitive.
 - Hệ thống sẽ có chế độ chuyển theme sáng/tối; khi làm UI phải ưu tiên semantic token/CSS variable/dark variants, tránh hard-code màu chỉ hợp light mode và phải nghĩ trước contrast/state cho cả hai theme.
 - Mỗi khi làm UI, kết quả phải giống production thật cả về visual lẫn interaction: mock data được phép, nhưng control không được tĩnh giả bấm. Button/checkbox/tab/menu/input/toggle/modal/filter/pagination/upload/editor/icon có vẻ tương tác phải có semantic element, state/handler thật, feedback bấm và pending/disabled/loading/error/success khi phù hợp.
+- Button trong mọi modal/drawer phải đồng nhất màu theo vai trò action: action chính/lưu dùng cùng màu `primary` trong cùng hệ modal, mặc định xanh dương `sky-600`/`sky-700` với chữ trắng; hủy/đóng trung tính; destructive đỏ. Không để một modal action chính màu đen/tối nếu các modal cùng flow đang dùng xanh dương.
 - UI cho học sinh/phụ huynh phải thân thiện, chuyên nghiệp, ít lời và có năng lượng học tập: không dùng text kỹ thuật, không dùng panel/card chỉ để giải thích hệ thống, không để auth/register quá xám/lạnh; ưu tiên nền màu sáng, CTA nổi, ảnh/illustration học đường, font phù hợp và hành động chính rõ. Tránh ảnh người đi làm/coworking/corporate cho auth học sinh. Nếu auth dùng visual mạnh, ưu tiên split-screen desktop rõ ràng: trái visual/slogan dạng lời chào thương hiệu + câu định vị ngắn, phải form sạch. Có thể dùng display font riêng cho heading bên trái, nhưng form/body vẫn phải dễ đọc.
 - Auth visual bên trái không được để chữ quá to/toàn đen hoặc panel quá đục che mất nền. Ưu tiên headline gradient/accent vừa phải, lớp nền trong nhẹ, icon học tập ngắn gọn và chuyển động tinh tế có tôn trọng reduced motion.
 - Khi owner gửi ảnh reference UI, Codex phải trích phong cách phù hợp thay vì copy nguyên bố cục. Với auth/register/login, reference dashboard chỉ nên truyền cảm hứng về màu, bo góc, card, icon và năng lượng thị giác; màn vẫn phải là auth flow rõ ràng.

@@ -32,6 +32,7 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/app/(auth)/register`        | Route đăng ký student/parent nối API thật cho `M2.4`                                                   |
 | `apps/web/app/(auth)/forgot-password` | Route quên mật khẩu nối API thật cho `M2.4`                                                            |
 | `apps/web/app/(auth)/reset-password`  | Route đặt lại mật khẩu nối API thật cho `M2.4`                                                         |
+| `apps/web/app/(admin)/layout.tsx`      | Layout riêng admin đọc cookie theme server-side để tránh flash sáng khi reload dark mode               |
 | `apps/web/app/(admin)/admin/courses`  | Route UI quản lý lộ trình/buổi học admin mock-first cho `M3.4`                                         |
 | `apps/web/app/globals.css`            | Tailwind/global styles                                                                                 |
 | `apps/web/app/toaster`                | Toaster wiring cho root layout, gom AppToaster, single-toast queue, constants và icon config           |
@@ -41,7 +42,7 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/features/auth`              | Auth feature barrel và các nhóm `api/components/data/layout/screens/schemas/session/utils` cho `M2.4`  |
 | `apps/web/features/auth/screens`      | Auth screen-level form flows, mỗi flow một file và chỉ compose shared primitives/helpers               |
 | `apps/web/features/admin-courses`     | Admin course/lesson UI cho `M3.4`, tách `screens/components/data/hooks/schemas/types/utils`            |
-| `apps/web/lib`                        | Client utilities/API client dùng chung, gồm `api-client.ts`                                            |
+| `apps/web/lib`                        | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
 | `apps/web/playwright.config.ts`       | Playwright config, tự build/start web và lưu report local                                              |
 | `apps/web/tests/auth-ui.spec.ts`      | E2E/screenshot smoke test cho auth UI `M2.4`                                                           |
 | `apps/web/tests`                      | Test front-end theo feature                                                                            |

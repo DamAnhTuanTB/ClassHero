@@ -2,7 +2,6 @@
 
 import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { AdminCourseStats } from "@/features/admin-courses/utils";
-import { cn } from "@/lib/utils";
 
 type AdminCoursesHeaderProps = {
   stats: AdminCourseStats;
@@ -14,46 +13,25 @@ type AdminCoursesHeaderProps = {
 
 export function AdminCoursesHeader({
   stats,
-  isDarkTheme,
   onCreatePath,
   onOpenArchiveDialog,
   onRetryLoad,
 }: AdminCoursesHeaderProps) {
   return (
-    <header
-      className={cn(
-        "flex flex-col gap-4 border-b pb-5 md:flex-row md:items-center md:justify-between",
-        isDarkTheme ? "border-slate-800" : "border-slate-200",
-      )}
-    >
-      <div>
-        <h1
-          className={cn(
-            "mt-1 text-2xl font-extrabold md:text-3xl",
-            isDarkTheme ? "text-white" : "text-slate-950",
-          )}
-        >
+    <header className="flex flex-col gap-4 border-b border-[var(--theme-border)] pb-5 md:flex-row md:items-center md:justify-between">
+      <div className="order-2 md:order-1">
+        <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
           Danh sách lộ trình
         </h1>
-        <p
-          className={cn(
-            "mt-2 max-w-2xl text-sm leading-6",
-            isDarkTheme ? "text-slate-400" : "text-slate-600",
-          )}
-        >
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
           Theo dõi lộ trình theo môn, lớp, giá và trạng thái hiển thị.
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="order-1 grid grid-cols-[0.8fr_1fr_1.15fr] gap-2 md:order-2 md:flex md:flex-wrap">
         <button
           type="button"
           onClick={onRetryLoad}
-          className={cn(
-            "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition",
-            isDarkTheme
-              ? "border-slate-700 bg-slate-900 text-slate-200 hover:border-sky-500/50 hover:text-sky-300"
-              : "border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700",
-          )}
+          className="theme-button-neutral inline-flex min-h-10 items-center justify-center gap-1 rounded-lg px-1.5 text-center text-[0.72rem] font-bold leading-tight transition sm:text-sm md:min-h-11 md:gap-2 md:px-3"
         >
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
           Tải lại
@@ -61,18 +39,13 @@ export function AdminCoursesHeader({
         <button
           type="button"
           onClick={onOpenArchiveDialog}
-          className={cn(
-            "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition",
-            isDarkTheme
-              ? "border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15"
-              : "border-rose-200 bg-white text-rose-600 hover:bg-rose-50",
-          )}
+          className="theme-button-danger-subtle inline-flex min-h-10 items-center justify-center gap-1 rounded-lg px-1.5 text-center text-[0.72rem] font-bold leading-tight transition sm:text-sm md:min-h-11 md:gap-2 md:px-3"
           aria-label="Mở lộ trình lưu trữ"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">Thùng rác</span>
+          <span>Thùng rác</span>
           {stats.archived > 0 ? (
-            <span className="grid min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 py-0.5 text-xs font-extrabold text-white">
+            <span className="grid min-w-5 place-items-center rounded-full bg-[var(--theme-danger)] px-1.5 py-0.5 text-xs font-extrabold text-[var(--theme-danger-foreground)]">
               {stats.archived}
             </span>
           ) : null}
@@ -80,7 +53,7 @@ export function AdminCoursesHeader({
         <button
           type="button"
           onClick={onCreatePath}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 text-sm font-extrabold text-white shadow-sm shadow-sky-900/15 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="theme-button-primary inline-flex min-h-10 items-center justify-center gap-1 rounded-lg px-1.5 text-center text-[0.72rem] font-extrabold leading-tight transition disabled:cursor-not-allowed sm:text-sm md:min-h-11 md:gap-2 md:px-4"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Thêm lộ trình

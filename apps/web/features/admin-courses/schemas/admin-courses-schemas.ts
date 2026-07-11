@@ -118,7 +118,7 @@ export const emptyLessonValues: LessonFormValues = {
   examOpenAt: "",
   videoUrl: "",
   completionMinScore: 7,
-  status: "DRAFT",
+  status: "PUBLISHED",
 };
 
 export const emptyChapterValues: ChapterFormValues = {

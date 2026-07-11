@@ -10,7 +10,10 @@ export function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-3 py-2 text-xs font-extrabold text-slate-500", className)}
+      className={cn(
+        "px-3 py-2 text-xs font-extrabold text-[var(--theme-text-muted)]",
+        className,
+      )}
       {...props}
     />
   );

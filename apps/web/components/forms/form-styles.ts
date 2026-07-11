@@ -1,8 +1,11 @@
 export const formFocusClass =
-  "focus:border-[var(--form-primary,var(--auth-primary,#4f46e5))] focus:ring-indigo-100";
+  "focus:border-[var(--theme-focus-border)] focus:ring-[var(--theme-focus-ring)]";
 
 export const statusToneClass = {
-  success: "border-emerald-200 bg-emerald-50 text-emerald-950",
-  error: "border-red-200 bg-red-50 text-red-950",
-  info: "border-violet-100 bg-violet-50 text-violet-950",
+  success:
+    "border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] text-[var(--theme-success-text)]",
+  error:
+    "border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] text-[var(--theme-error-text)]",
+  info:
+    "border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] text-[var(--theme-info-text)]",
 };

@@ -15,7 +15,6 @@ export function SortHeaderButton({
   label,
   isActive,
   direction,
-  isDarkTheme = false,
   align = "left",
   onClick,
 }: SortHeaderButtonProps) {
@@ -30,16 +29,11 @@ export function SortHeaderButton({
         isActive ? `${label}, đang sắp xếp ${directionLabel}` : `Sắp xếp theo ${label}`
       }
       className={cn(
-        "inline-flex min-h-8 items-center gap-1.5 rounded-md text-left text-xs font-extrabold uppercase transition-colors focus:outline-none focus-visible:bg-sky-500/10 focus-visible:text-sky-700",
+        "inline-flex min-h-8 items-center gap-1.5 rounded-md text-left text-xs font-extrabold uppercase transition-colors focus:outline-none focus-visible:bg-[var(--theme-primary-soft)] focus-visible:text-[var(--theme-primary)]",
         align === "right" && "justify-end text-right",
         isActive
-          ? isDarkTheme
-            ? "text-sky-300"
-            : "text-sky-700"
-          : isDarkTheme
-            ? "text-slate-400 hover:text-slate-100"
-            : "text-slate-500 hover:text-slate-800",
-        isDarkTheme && "focus-visible:text-sky-300",
+          ? "text-[var(--theme-primary)]"
+          : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]",
       )}
     >
       <span>{label}</span>

@@ -110,7 +110,7 @@ export function ResetPasswordForm() {
         Đặt lại mật khẩu
       </SubmitButton>
       <Link
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-700 hover:text-sky-800"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--theme-primary)] hover:text-[var(--theme-primary-hover)]"
         href="/login"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />

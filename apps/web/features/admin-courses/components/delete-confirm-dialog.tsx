@@ -1,4 +1,7 @@
-import { AlertTriangle, Trash2 } from "lucide-react";
+"use client";
+
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AlertTriangle, Trash2, X } from "lucide-react";
 
 export function DeleteConfirmDialog({
   confirmLabel = "Xóa",
@@ -17,53 +20,86 @@ export function DeleteConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  if (!isOpen) {
-    return null;
-  }
+  const shouldReduceMotion = useReducedMotion();
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 cursor-default"
-        onClick={onCancel}
-      />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="relative z-10 w-full max-w-md rounded-lg bg-white p-5 shadow-xl ring-1 ring-rose-900/10"
-      >
-        <div className="flex items-start gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600">
-            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-lg font-extrabold text-slate-950">{title}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {description ?? `Bạn có thực sự muốn xóa ${itemName} không?`}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          className="theme-dialog-overlay fixed inset-0 z-[60] flex items-center justify-center px-4 py-6 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.18, ease: "easeOut" }}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 cursor-default"
             onClick={onCancel}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-sky-200 hover:text-sky-700"
+          />
+          <motion.section
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            className="theme-dialog-panel relative z-10 flex max-h-[calc(100dvh-3rem)] w-full max-w-md flex-col overflow-hidden rounded-lg"
+            initial={
+              shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }
+            }
+            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={
+              shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.985 }
+            }
+            transition={{
+              duration: shouldReduceMotion ? 0 : 0.2,
+              ease: [0.22, 1, 0.36, 1],
+            }}
           >
-            Hủy
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-extrabold text-white transition hover:bg-rose-700"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-            {confirmLabel}
-          </button>
-        </div>
-      </section>
-    </div>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="theme-button-primary-subtle absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-lg transition"
+              aria-label="Đóng"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+
+            <div className="theme-dialog-header flex shrink-0 items-center gap-3 p-4 pr-16">
+              <span className="theme-button-danger-subtle grid h-10 w-10 shrink-0 place-items-center rounded-lg">
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+                  {title}
+                </h2>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <p className="text-sm leading-6 text-[var(--theme-text)]">
+                {description ?? `Bạn có thực sự muốn xóa ${itemName} không?`}
+              </p>
+            </div>
+
+            <div className="theme-dialog-footer grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="theme-button-neutral inline-flex min-h-11 min-w-0 items-center justify-center whitespace-nowrap rounded-lg px-4 text-center text-sm font-extrabold transition sm:w-auto"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className="theme-button-danger inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-center text-sm font-extrabold transition sm:w-auto"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {confirmLabel}
+              </button>
+            </div>
+          </motion.section>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }

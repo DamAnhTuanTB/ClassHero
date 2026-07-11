@@ -58,10 +58,14 @@ export const statusLabels: Record<AdminPublishStatus, string> = {
 };
 
 export const statusStyles: Record<AdminPublishStatus, string> = {
-  DRAFT: "border-slate-200 bg-slate-100 text-slate-700",
-  PUBLISHED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  HIDDEN: "border-amber-200 bg-amber-50 text-amber-700",
-  ARCHIVED: "border-rose-200 bg-rose-50 text-rose-700",
+  DRAFT:
+    "border-[var(--theme-border)] bg-[var(--theme-surface-soft)] text-[var(--theme-text)]",
+  PUBLISHED:
+    "border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] text-[var(--theme-success-text)]",
+  HIDDEN:
+    "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]",
+  ARCHIVED:
+    "border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] text-[var(--theme-danger)]",
 };
 
 export const adminSubjects = Object.keys(subjectLabels) as AdminSubject[];

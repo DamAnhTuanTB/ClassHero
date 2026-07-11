@@ -33,6 +33,15 @@ Với upload ảnh mock/local, preview không nên lưu bằng `URL.createObject
 - Lỗi: mở modal tạo chương học đã thấy lỗi required dù người dùng chưa nhập gì.
 - Nguyên nhân: gọi validate toàn form ngay sau `reset()` để tính `isValid`, rồi truyền thẳng `formState.errors` vào field. Validation state và error visibility bị trộn làm một.
 - Cách tránh trong modal form: bám pattern form chuẩn đã duyệt hoặc form tương tự đang chạy ổn; dùng `mode: "onChange"` và truyền thẳng `formState.errors.<field>` vào primitive field; không gọi `trigger()` ngay sau `reset()` khi mở modal. Không tự bọc bằng `dirtyFields/touchedFields` trong component, vì nhập rồi xóa về default có thể làm `dirty` quay về false và mất validate realtime.
+- Lỗi: trên điện thoại hiện hydration mismatch ở input dù HTML/app state không đổi.
+- Nguyên nhân: một số trình duyệt, autofill hoặc extension có thể chèn attribute riêng vào input trước khi React hydrate, ví dụ `__gcruniqueid`; React thấy DOM client khác HTML server nên báo overlay đỏ trong dev.
+- Cách tránh: với input primitive dùng chung, đặt `suppressHydrationWarning` trên chính element input để bỏ qua attribute ngoài ý muốn từ browser. Không dùng cách này để che mismatch do app tự tạo bằng `Date.now()`, `Math.random()` hoặc format ngày/tiền khác giữa server và client.
+- Lỗi: bật giao diện tối ở trang danh sách, chuyển sang trang chi tiết thì giao diện quay về sáng hoặc card vẫn trắng.
+- Nguyên nhân: theme là state cục bộ trong từng manager hook, nên route mới mount lại với default `false`; một số panel detail, modal shell, footer form, textarea/upload và checkbox native còn hard-code `bg-white`, `bg-slate-50`, `text-slate-950` hoặc dùng browser style mặc định.
+- Cách tránh: theme phải là state chung của app, lưu bền bằng `localStorage` và được hydrate ở provider/root layout; component admin nhận `isDarkTheme` từ cùng store và mọi surface chính phải có variant dark hoặc dùng semantic token. Modal cần xử lý cả shell/header/body/footer, form primitive cần nhận `isDarkTheme`, còn checkbox native nên có class style riêng để không phụ thuộc nền trắng mặc định của trình duyệt.
+- Lỗi: reload khi đang ở giao diện tối bị nháy sáng trước khi chuyển về tối.
+- Nguyên nhân: theme được hydrate sau paint hoặc script khởi tạo theme đặt sai chỗ; nếu client store đọc `localStorage` ngay khi module load thì server render light còn client render dark, gây hydration mismatch.
+- Cách tránh: lưu theme vào cookie cùng key với `localStorage` để admin layout và admin pages server đọc theme ngay từ request đầu tiên. Screen/hook nhận `initialThemeMode` từ server để render frame đầu đúng theme, sau đó Zustand hydrate bằng `useLayoutEffect` và tiếp quản trạng thái. Vẫn dùng `next/script` với `strategy="beforeInteractive"` để đồng bộ localStorage/cookie/system preference trước hydrate. Các vùng admin cần CSS bridge theo `.dark [data-admin-theme]` để HTML render sáng từ server vẫn hiển thị tối trước khi store hydrate. Nếu server layout bọc một wrapper `.dark`, client theme store phải cập nhật cả wrapper `[data-theme-root]`; nếu chỉ gỡ `dark` trên `<html>`, CSS bridge vẫn ép giao diện ở theme tối khi người dùng bấm chuyển sáng.
 
 ## File quan trọng
 
@@ -40,10 +49,18 @@ Với upload ảnh mock/local, preview không nên lưu bằng `URL.createObject
 - `apps/web/features/admin-courses/hooks/use-admin-course-queries.ts`
 - `apps/web/features/admin-courses/hooks/use-admin-courses-manager.ts`
 - `apps/web/features/admin-courses/hooks/use-admin-course-detail-manager.ts`
+- `apps/web/lib/theme-store.ts`
+- `apps/web/features/admin-courses/components/editor-dialog-shell.tsx`
+- `apps/web/features/admin-courses/components/delete-confirm-dialog.tsx`
 - `apps/web/features/admin-courses/components/chapter-editor.tsx`
+- `apps/web/features/admin-courses/components/chapter-lesson-panel.tsx`
+- `apps/web/features/admin-courses/components/learning-path-summary-panel.tsx`
+- `apps/web/features/admin-courses/components/learning-path-row.tsx`
+- `apps/web/features/admin-courses/components/learning-paths-table.tsx`
 - `apps/web/features/admin-courses/components/path-cover-upload.tsx`
 - `apps/web/features/admin-courses/components/path-editor.tsx`
 - `apps/web/features/admin-courses/schemas/admin-courses-schemas.ts`
+- `apps/web/components/forms/text-field.tsx`
 
 ## Task liên quan
 

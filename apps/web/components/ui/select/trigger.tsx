@@ -13,14 +13,14 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "group/select-trigger flex min-h-[3.35rem] w-full touch-manipulation items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-0 text-left text-base font-semibold text-slate-950 outline-none transition hover:border-indigo-200 focus:border-[var(--auth-primary)] focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 data-[placeholder]:text-slate-400 lg:text-sm",
+        "group/select-trigger flex min-h-[3.35rem] w-full touch-manipulation items-center justify-between gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 py-0 text-left text-base font-semibold text-[var(--theme-text-strong)] outline-none transition hover:border-[var(--theme-input-hover-border)] focus:border-[var(--theme-focus-border)] focus:bg-[var(--theme-input-bg)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] disabled:text-[var(--theme-input-text-disabled)] data-[placeholder]:text-[var(--theme-text-placeholder)] lg:text-sm",
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="h-5 w-5 shrink-0 text-slate-500 transition-transform duration-200 ease-out group-data-[state=open]/select-trigger:rotate-180" />
+        <ChevronDownIcon className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)] transition-transform duration-200 ease-out group-data-[state=open]/select-trigger:rotate-180" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );

@@ -14,7 +14,7 @@ export function AuthDevHydrationBoundary({ children }: { children: ReactNode }) 
       <div
         aria-hidden="true"
         suppressHydrationWarning
-        className="min-h-[30rem] rounded-[1.25rem] bg-slate-100/60"
+        className="min-h-[30rem] rounded-[1.25rem] bg-[var(--theme-surface-soft)]"
       />
     );
   }

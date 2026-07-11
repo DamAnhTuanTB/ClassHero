@@ -126,7 +126,7 @@ export function ForgotPasswordForm() {
         Tiếp tục
       </SubmitButton>
 
-      <div className="text-sm text-slate-600">
+      <div className="text-sm text-[var(--theme-text)]">
         <Link
           className="inline-flex items-center gap-1.5 font-medium text-[var(--auth-primary)] hover:brightness-90"
           href="/login"

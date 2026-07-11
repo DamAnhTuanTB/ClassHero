@@ -1,28 +1,75 @@
-import type { UseFormReturn } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
+import { useForm, type Resolver } from "react-hook-form";
 import { ChapterEditor } from "@/features/admin-courses/components/chapter-editor";
 import { EditorDialogShell } from "@/features/admin-courses/components/editor-dialog-shell";
-import type { ChapterFormValues } from "@/features/admin-courses/schemas";
+import type { AdminChapter } from "@/features/admin-courses/data";
+import {
+  chapterSchema,
+  emptyChapterValues,
+  type ChapterFormValues,
+} from "@/features/admin-courses/schemas";
 import type { EditorMode } from "@/features/admin-courses/types";
+import { toChapterFormValues } from "@/features/admin-courses/utils";
 
 export function ChapterEditorDialog({
   disabled,
-  form,
+  defaultOrderIndex,
   isOpen,
   isSaving,
   mode,
+  selectedChapter,
   onClose,
-  onCreateMode,
   onSubmit,
 }: {
   disabled: boolean;
-  form: UseFormReturn<ChapterFormValues>;
+  defaultOrderIndex: number;
   isOpen: boolean;
   isSaving: boolean;
   mode: EditorMode;
+  selectedChapter: AdminChapter | null;
   onClose: () => void;
-  onCreateMode: () => void;
   onSubmit: (values: ChapterFormValues) => void | Promise<void>;
 }) {
+  const form = useForm<ChapterFormValues>({
+    resolver: zodResolver(chapterSchema) as Resolver<ChapterFormValues>,
+    mode: "onChange",
+    reValidateMode: "onChange",
+    defaultValues: emptyChapterValues,
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    form.reset(
+      mode === "edit" && selectedChapter
+        ? toChapterFormValues(selectedChapter)
+        : {
+            ...emptyChapterValues,
+            orderIndex: defaultOrderIndex,
+            status: "PUBLISHED",
+          },
+    );
+  }, [defaultOrderIndex, form, isOpen, mode, selectedChapter]);
+
+  async function submit(values: ChapterFormValues) {
+    try {
+      await onSubmit(values);
+    } catch (error) {
+      if (error instanceof Error && error.message === "DUPLICATED_CHAPTER_ORDER") {
+        form.setError("orderIndex", {
+          type: "manual",
+          message: "Thứ tự này đã có trong lộ trình",
+        });
+        return;
+      }
+
+      throw error;
+    }
+  }
+
   return (
     <EditorDialogShell
       ariaLabel={mode === "create" ? "Thêm chương học" : "Sửa chương học"}
@@ -34,8 +81,8 @@ export function ChapterEditorDialog({
         form={form}
         isSaving={isSaving}
         disabled={disabled}
-        onSubmit={onSubmit}
-        onCreateMode={onCreateMode}
+        onClose={onClose}
+        onSubmit={submit}
       />
     </EditorDialogShell>
   );

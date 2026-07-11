@@ -17,7 +17,7 @@ export function SelectContent({
         data-slot="select-content"
         position={position}
         className={cn(
-          "z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-950 shadow-xl shadow-slate-900/12",
+          "z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-1.5 text-[var(--theme-text-strong)] shadow-[var(--theme-shadow-lg)]",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className,

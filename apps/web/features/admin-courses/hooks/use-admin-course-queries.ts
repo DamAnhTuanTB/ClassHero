@@ -5,6 +5,7 @@ import {
   getAdminLearningPath,
   listAdminLearningPaths,
 } from "@/features/admin-courses/api";
+import type { AdminLearningPath } from "@/features/admin-courses/data";
 
 export const adminCourseQueryKeys = {
   all: ["admin-courses"] as const,
@@ -13,16 +14,21 @@ export const adminCourseQueryKeys = {
     [...adminCourseQueryKeys.learningPaths(), pathId] as const,
 };
 
-export function useAdminLearningPathsQuery() {
+export function useAdminLearningPathsQuery(initialData?: AdminLearningPath[]) {
   return useQuery({
     queryKey: adminCourseQueryKeys.learningPaths(),
     queryFn: listAdminLearningPaths,
+    initialData,
   });
 }
 
-export function useAdminLearningPathQuery(pathId: string) {
+export function useAdminLearningPathQuery(
+  pathId: string,
+  initialData?: AdminLearningPath | null,
+) {
   return useQuery({
     queryKey: adminCourseQueryKeys.learningPath(pathId),
     queryFn: () => getAdminLearningPath(pathId),
+    initialData,
   });
 }

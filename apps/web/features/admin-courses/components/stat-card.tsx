@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 
 export function StatCard({
-  isDarkTheme = false,
   label,
   value,
   tone,
@@ -11,27 +10,16 @@ export function StatCard({
   value: number;
   tone: "sky" | "emerald" | "amber";
 }) {
-  const toneClass = isDarkTheme
-    ? {
-        sky: "bg-sky-500/10 text-sky-200 border-sky-500/20",
-        emerald: "bg-emerald-500/10 text-emerald-200 border-emerald-500/20",
-        amber: "bg-amber-500/10 text-amber-200 border-amber-500/20",
-      }[tone]
-    : {
-        sky: "bg-sky-50 text-sky-700 border-sky-100",
-        emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
-        amber: "bg-amber-50 text-amber-700 border-amber-100",
-      }[tone];
+  const toneClass = {
+    sky: "border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]",
+    emerald:
+      "border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] text-[var(--theme-success-text)]",
+    amber:
+      "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]",
+  }[tone];
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border p-4",
-        isDarkTheme
-          ? "border-slate-800 bg-slate-900"
-          : "border-slate-200 bg-white",
-      )}
-    >
+    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
       <div
         className={cn(
           "inline-flex rounded-lg border px-2 py-1 text-xs font-bold",
@@ -40,12 +28,7 @@ export function StatCard({
       >
         {label}
       </div>
-      <p
-        className={cn(
-          "mt-3 text-3xl font-extrabold",
-          isDarkTheme ? "text-white" : "text-slate-950",
-        )}
-      >
+      <p className="mt-3 text-3xl font-extrabold text-[var(--theme-text-strong)]">
         {value}
       </p>
     </div>

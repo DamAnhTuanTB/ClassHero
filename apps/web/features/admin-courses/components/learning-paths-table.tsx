@@ -48,26 +48,13 @@ export function LearningPathsTable({
       />
       <div
         className={cn(
-          "overflow-hidden rounded-lg border border-slate-200 bg-white",
-          isDarkTheme && "border-slate-800 bg-slate-900",
+          "overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]",
           selectedPathIds.length > 0 ? "mt-3" : "mt-4",
         )}
       >
-        <div
-          className={cn(
-            "hidden grid-cols-[2.75rem_1.2fr_0.42fr_0.42fr_0.75fr_0.55fr_7rem] items-center gap-3 border-b px-4 py-3 text-xs font-extrabold uppercase lg:grid",
-            isDarkTheme
-              ? "border-slate-800 bg-slate-950 text-slate-400"
-              : "border-slate-200 bg-slate-50 text-slate-500",
-          )}
-        >
+        <div className="hidden grid-cols-[2.75rem_1.2fr_0.42fr_0.42fr_0.75fr_0.55fr_7rem] items-center gap-3 border-b border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-3 text-xs font-extrabold uppercase text-[var(--theme-text-muted)] lg:grid">
           <label
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-md border text-sky-600 transition",
-              isDarkTheme
-                ? "border-slate-700 bg-slate-900 hover:border-sky-500/50"
-                : "border-slate-200 bg-white hover:border-sky-200",
-            )}
+            className="flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-primary)] transition hover:border-[var(--theme-primary-border)]"
           >
             <input
               type="checkbox"
@@ -79,7 +66,7 @@ export function LearningPathsTable({
                   ? "mixed"
                   : allFilteredPathsSelected
               }
-              className="h-4 w-4 rounded border-slate-300 text-sky-600 accent-sky-600"
+              className="admin-theme-checkbox"
             />
           </label>
           <SortHeaderButton

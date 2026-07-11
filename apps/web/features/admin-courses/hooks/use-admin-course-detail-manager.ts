@@ -1,32 +1,37 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
-import { useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
-import { type AdminChapter, type AdminLesson } from "@/features/admin-courses/data";
-import { useAdminLearningPathQuery } from "@/features/admin-courses/hooks/use-admin-course-queries";
 import {
-  chapterSchema,
-  emptyChapterValues,
-  emptyLessonValues,
-  lessonSchema,
-  type ChapterFormValues,
-  type LessonFormValues,
-} from "@/features/admin-courses/schemas";
+  type AdminChapter,
+  type AdminLearningPath,
+  type AdminLesson,
+} from "@/features/admin-courses/data";
+import { useAdminLearningPathQuery } from "@/features/admin-courses/hooks/use-admin-course-queries";
+import type { ChapterFormValues, LessonFormValues } from "@/features/admin-courses/schemas";
 import type { EditorMode, ViewState } from "@/features/admin-courses/types";
 import {
   byChapterOrder,
   byLessonOrder,
   findLessonMatch,
   getAdminCourseDetailStats,
-  toChapterFormValues,
+  moveItemById,
+  reindexChapters,
+  reindexLessons,
   toChapterPayload,
-  toLessonFormValues,
   toLessonPayload,
   wait,
 } from "@/features/admin-courses/utils";
+import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 
-export function useAdminCourseDetailManager(pathId: string) {
-  const learningPathQuery = useAdminLearningPathQuery(pathId);
+export function useAdminCourseDetailManager(
+  pathId: string,
+  initialLearningPath?: AdminLearningPath | null,
+  initialThemeMode: AppThemeMode = "light",
+) {
+  const learningPathQuery = useAdminLearningPathQuery(pathId, initialLearningPath);
+  const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
+  const isThemeHydrated = useThemeStore((state) => state.isHydrated);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
   const [path, setPath] = useState(learningPathQuery.data ?? null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -38,6 +43,7 @@ export function useAdminCourseDetailManager(pathId: string) {
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
   const [isSavingChapter, setIsSavingChapter] = useState(false);
   const [isSavingLesson, setIsSavingLesson] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const selectedChapter =
     path?.chapters.find((chapter) => chapter.id === selectedChapterId) ?? null;
@@ -47,19 +53,6 @@ export function useAdminCourseDetailManager(pathId: string) {
     path?.chapters.find((chapter) => chapter.id === deletingChapterId) ?? null;
   const deletingLessonMatch = findLessonMatch(path, deletingLessonId);
   const deletingLesson = deletingLessonMatch?.lesson ?? null;
-
-  const chapterForm = useForm<ChapterFormValues>({
-    resolver: zodResolver(chapterSchema) as Resolver<ChapterFormValues>,
-    mode: "onChange",
-    reValidateMode: "onChange",
-    defaultValues: emptyChapterValues,
-  });
-  const lessonForm = useForm<LessonFormValues>({
-    resolver: zodResolver(lessonSchema) as Resolver<LessonFormValues>,
-    mode: "onChange",
-    reValidateMode: "onChange",
-    defaultValues: emptyLessonValues,
-  });
 
   useEffect(() => {
     if (learningPathQuery.data !== undefined) {
@@ -80,11 +73,6 @@ export function useAdminCourseDetailManager(pathId: string) {
   function startCreateChapter() {
     setChapterEditorMode("create");
     setSelectedChapterId(null);
-    chapterForm.reset({
-      ...emptyChapterValues,
-      orderIndex: (path?.chapters.length ?? 0) + 1,
-      status: "PUBLISHED",
-    });
     setIsChapterEditorOpen(true);
   }
 
@@ -96,7 +84,6 @@ export function useAdminCourseDetailManager(pathId: string) {
 
     setSelectedChapterId(chapter.id);
     setChapterEditorMode("edit");
-    chapterForm.reset(toChapterFormValues(chapter));
     setIsChapterEditorOpen(true);
   }
 
@@ -112,11 +99,7 @@ export function useAdminCourseDetailManager(pathId: string) {
     );
 
     if (duplicatedOrder) {
-      chapterForm.setError("orderIndex", {
-        type: "manual",
-        message: "Thứ tự này đã có trong lộ trình",
-      });
-      return;
+      throw new Error("DUPLICATED_CHAPTER_ORDER");
     }
 
     setIsSavingChapter(true);
@@ -184,10 +167,6 @@ export function useAdminCourseDetailManager(pathId: string) {
     setLessonEditorMode("create");
     setSelectedChapterId(targetChapter.id);
     setSelectedLessonId(null);
-    lessonForm.reset({
-      ...emptyLessonValues,
-      orderIndex: targetChapter.lessons.length + 1,
-    });
     setIsLessonEditorOpen(true);
   }
 
@@ -200,7 +179,6 @@ export function useAdminCourseDetailManager(pathId: string) {
     setSelectedChapterId(match.chapter.id);
     setSelectedLessonId(match.lesson.id);
     setLessonEditorMode("edit");
-    lessonForm.reset(toLessonFormValues(match.lesson));
     setIsLessonEditorOpen(true);
   }
 
@@ -223,11 +201,7 @@ export function useAdminCourseDetailManager(pathId: string) {
     );
 
     if (duplicatedOrder) {
-      lessonForm.setError("orderIndex", {
-        type: "manual",
-        message: "Thứ tự này đã có trong chương",
-      });
-      return;
+      throw new Error("DUPLICATED_LESSON_ORDER");
     }
 
     setIsSavingLesson(true);
@@ -376,6 +350,78 @@ export function useAdminCourseDetailManager(pathId: string) {
     setDeletingLessonId(null);
   }
 
+  function reorderChapters(sourceChapterId: string, targetChapterId: string) {
+    if (sourceChapterId === targetChapterId) {
+      return;
+    }
+
+    setPath((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const reorderedChapters = moveItemById(
+        current.chapters,
+        sourceChapterId,
+        targetChapterId,
+      );
+
+      if (reorderedChapters === current.chapters) {
+        return current;
+      }
+
+      return {
+        ...current,
+        updatedAt: new Date().toISOString(),
+        chapters: reindexChapters(reorderedChapters),
+      };
+    });
+    setSelectedChapterId(sourceChapterId);
+  }
+
+  function reorderLessons(
+    chapterId: string,
+    sourceLessonId: string,
+    targetLessonId: string,
+  ) {
+    if (sourceLessonId === targetLessonId) {
+      return;
+    }
+
+    setPath((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        updatedAt: new Date().toISOString(),
+        chapters: current.chapters.map((chapter) => {
+          if (chapter.id !== chapterId) {
+            return chapter;
+          }
+
+          const reorderedLessons = moveItemById(
+            chapter.lessons,
+            sourceLessonId,
+            targetLessonId,
+          );
+
+          if (reorderedLessons === chapter.lessons) {
+            return chapter;
+          }
+
+          return {
+            ...chapter,
+            lessons: reindexLessons(reorderedLessons),
+          };
+        }),
+      };
+    });
+    setSelectedChapterId(chapterId);
+    setSelectedLessonId(sourceLessonId);
+  }
+
   function retryLoad() {
     void learningPathQuery.refetch();
   }
@@ -388,16 +434,18 @@ export function useAdminCourseDetailManager(pathId: string) {
 
   return {
     chapterEditorMode,
-    chapterForm,
     courseStats,
     deletingChapter,
     deletingLesson,
+    selectedChapter,
+    selectedLesson,
     isChapterEditorOpen,
     isLessonEditorOpen,
     isSavingChapter,
     isSavingLesson,
+    isDarkTheme,
+    isSidebarCollapsed,
     lessonEditorMode,
-    lessonForm,
     path,
     selectedChapterId,
     selectedLessonId,
@@ -412,12 +460,16 @@ export function useAdminCourseDetailManager(pathId: string) {
       requestDeleteChapter,
       requestDeleteLesson,
       retryLoad,
+      reorderChapters,
+      reorderLessons,
       saveChapter,
       saveLesson,
       startCreateChapter,
       startCreateLesson,
       startEditChapter,
       startEditLesson,
+      toggleDarkTheme: toggleTheme,
+      toggleSidebarCollapsed: () => setIsSidebarCollapsed((current) => !current),
     },
   };
 }

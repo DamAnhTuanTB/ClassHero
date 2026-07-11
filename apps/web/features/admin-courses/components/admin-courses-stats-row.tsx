@@ -8,7 +8,7 @@ type AdminCoursesStatsRowProps = {
 
 export function AdminCoursesStatsRow({ isDarkTheme, stats }: AdminCoursesStatsRowProps) {
   return (
-    <section className="mt-5 grid gap-3 sm:grid-cols-3">
+    <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
       <StatCard
         isDarkTheme={isDarkTheme}
         label="Tổng lộ trình"

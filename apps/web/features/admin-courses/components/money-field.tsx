@@ -3,11 +3,10 @@
 import { CircleDollarSign } from "lucide-react";
 import type { FieldError } from "react-hook-form";
 import { FieldLabel } from "@/components/forms/field-label";
-import { formFocusClass } from "@/components/forms/form-styles";
-import { cn } from "@/lib/utils";
 
 export function MoneyField({
   id,
+  isDarkTheme = false,
   label,
   isOptional = false,
   optionalLabel,
@@ -16,6 +15,7 @@ export function MoneyField({
   onChange,
 }: {
   id: string;
+  isDarkTheme?: boolean;
   label: string;
   isOptional?: boolean;
   optionalLabel?: string;
@@ -30,11 +30,14 @@ export function MoneyField({
       <FieldLabel
         id={id}
         label={label}
+        isDarkTheme={isDarkTheme}
         isOptional={isOptional}
         optionalLabel={optionalLabel}
       />
       <div className="relative mt-2">
-        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+        <span
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
+        >
           <CircleDollarSign className="h-5 w-5" aria-hidden="true" />
         </span>
         <input
@@ -59,17 +62,16 @@ export function MoneyField({
           }}
           aria-invalid={error ? "true" : "false"}
           aria-describedby={error ? `${id}-error` : undefined}
-          className={cn(
-            "min-h-[3.35rem] w-full rounded-xl border border-slate-200 bg-white py-0 pl-12 pr-16 text-base font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-indigo-200 focus:bg-white focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 lg:text-sm",
-            formFocusClass,
-          )}
+          className="theme-form-control min-h-[3.35rem] w-full rounded-xl py-0 pl-12 pr-16 text-base font-semibold outline-none transition disabled:cursor-not-allowed lg:text-sm"
         />
-        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-slate-400">
+        <span
+          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[var(--theme-text-subtle)]"
+        >
           đ
         </span>
       </div>
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-red-600">
+        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]">
           {error.message}
         </p>
       ) : null}
