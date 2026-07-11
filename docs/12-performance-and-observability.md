@@ -56,6 +56,25 @@ Codex phải ưu tiên:
 - Không render toàn bộ data lớn trong client component.
 - Không dùng animation trên thuộc tính gây layout/reflow nặng; ưu tiên transform/opacity.
 
+### 3.1. Bundle isolation khi admin và client chung Next app
+
+Khi admin, public, student và parent cùng nằm trong `apps/web`, Codex phải kiểm tra bundle theo route thật, không kết luận dựa trên tên folder.
+
+Rules:
+
+- Root `app/layout.tsx` chỉ được chứa provider, CSS, script và shell thật sự cần cho mọi route. Toaster, admin shell, editor, chart, export tool, upload tool hoặc panel nặng chỉ nên mount trong route group cần dùng như `(auth)`, `(admin)`, `(student)` hoặc lazy-load theo tương tác.
+- CSS global chỉ giữ reset/base, theme token và utility dùng chung. CSS chỉ phục vụ admin phải nằm ở route group admin hoặc stylesheet scoped và import từ `(admin)/layout.tsx`; không để selector admin nằm trong `globals.css` nếu public route không cần.
+- Route page nên import trực tiếp screen entry cần render, ví dụ `@/features/admin-courses/screens/admin-courses-manager`, thay vì import từ barrel feature nếu barrel đó export nhiều screen/admin tool khác. Barrel vẫn dùng được cho type, constant nhỏ hoặc export thật sự nhẹ.
+- Component admin ít dùng như modal form, archive dialog, editor, chart hoặc export panel phải dùng `next/dynamic`/lazy-load khi có thể, đặc biệt nếu phụ thuộc `react-hook-form`, editor, chart, PDF/Excel/CSV hoặc animation library.
+- Không đặt dependency chỉ dành cho admin trong shared component/provider dùng bởi public route. Nếu shared component bắt buộc cần icon/toast/editor nặng, tách phần nặng thành component con lazy-loaded hoặc route-specific wrapper.
+- Asset/ảnh/font chỉ dành cho auth/admin không preload ở root layout. Dùng import/`img`/`next/image` tại route cần hiển thị và kiểm HTML output để chắc public page không preload asset không liên quan.
+
+Verification khi chạm bundle hoặc layout:
+
+- Chạy production build và đọc route manifest/client reference manifest hoặc curl HTML production để so `/` với route admin chính.
+- Kiểm route public không có module/chunk tên feature admin, CSS admin hoặc asset admin/auth không liên quan.
+- Ghi số đo trước/sau theo raw/gzip nếu task mục tiêu là giảm tải, ví dụ tổng JS+CSS của `/` và phần extra của `/admin/courses`.
+
 Khi connect API:
 
 - UI phải có pending state ngay khi mutation bắt đầu.

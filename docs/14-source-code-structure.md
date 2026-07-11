@@ -50,6 +50,9 @@ Rules:
 - Layout dùng `layout.tsx` của Next.js khi nhiều route cùng shell/guard/provider. Không tạo thêm shell wrapper tách rời nếu layout có thể chứa trực tiếp logic layout hợp lý.
 - Auth route nằm trong `(auth)`, không nằm trong `(public)`. Public route là landing/course/news/event có thể index hoặc phục vụ visitor chưa đăng nhập.
 - Admin/student/parent route phải có guard ở UI khi cần, nhưng backend vẫn enforce RBAC/ownership.
+- Root `app/layout.tsx` không được trở thành app shell nặng cho mọi route. Shell, toaster, CSS, nav, guard hoặc provider chỉ dùng cho một role phải đặt ở route group layout tương ứng như `(auth)/layout.tsx`, `(admin)/layout.tsx`, `(student)/layout.tsx` hoặc `(parent)/layout.tsx`.
+- CSS chỉ dành cho một role phải đặt gần route group đó, ví dụ `apps/web/app/(admin)/admin-theme.css`, và import từ role layout. `globals.css` chỉ giữ token/base/utility dùng chung thật sự cho mọi route.
+- Route page nên import trực tiếp screen entry cần dùng. Tránh import từ barrel feature ở route boundary nếu barrel export nhiều screen, dialog, editor hoặc admin tool khác vì có thể làm route chunk rộng hơn cần thiết.
 
 ### 2.2. Feature folders
 
@@ -121,6 +124,8 @@ Trước khi tạo hoặc sửa UI lớn, Codex phải tự kiểm:
 - Import nội bộ đã dùng `@/...` chưa?
 - UI có loading, empty, error, disabled/pending state phù hợp chưa?
 - Mock data có dễ xóa khi `/task-connect` không?
+- Route boundary có kéo nhầm code role khác qua root layout, shared provider, CSS global hoặc feature barrel không?
+- Nếu admin/client chung app, đã build/curl route public chính và route admin chính để xác nhận public route không tải chunk/CSS/asset admin chưa?
 
 ---
 

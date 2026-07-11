@@ -10,5 +10,6 @@ Chỉ ghi vào đây khi chủ đề không thuộc riêng một feature end-to-
 - shared package,
 - environment/config,
 - testing strategy.
+- frontend bundle isolation giữa public/client/admin route khi cùng một Next app.
 
 Nếu một chủ đề đã được dùng trực tiếp trong feature, note feature nên link tới note foundation thay vì lặp lại toàn bộ.

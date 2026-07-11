@@ -1,3 +1,4 @@
 - 2026-07-11: Chuẩn hóa theme sáng/tối bằng token và utility dùng chung cho web UI, áp dụng cho auth/admin/forms/modal/checkbox, đồng thời lưu theme qua cookie để server render đúng trạng thái tối khi reload và tránh nháy sáng.
 - 2026-07-11: Căn giữa nút đóng trong header modal admin course, tinh gọn action một lần trong modal lộ trình/buổi học, ghi nhận UI M3.4 đã được duyệt cùng các pattern code tái sử dụng cho admin CRUD, và thêm skill `/accept-ui` để lưu approved UI/pattern đúng phạm vi.
 - 2026-07-11: Giảm tải bundle public bằng cách chuyển toaster khỏi root layout, tách CSS theme riêng cho admin route và import trực tiếp admin course screen thay vì đi qua barrel chung.
+- 2026-07-11: Ghi lại chuẩn bundle isolation cho web app dùng chung admin/client, bổ sung checklist performance/source-structure, cập nhật context/code index theo route-specific toaster/admin CSS và thêm learning note để Codex tái áp dụng kỹ thuật giảm tải trang.

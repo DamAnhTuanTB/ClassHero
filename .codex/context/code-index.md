@@ -1,6 +1,6 @@
 # Code Index
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 File này là bản đồ nhanh của code hiện tại để Codex tìm đúng nơi sửa. Nó chỉ mô tả code đang có hoặc vị trí dự kiến đã được docs chốt; không thay thế việc đọc file thật trước khi sửa.
 
@@ -23,31 +23,32 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 
 ## 2. Front-end
 
-| Path                                  | Vai trò                                                                                                |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `apps/web`                            | Next.js App Router front-end                                                                           |
-| `apps/web/app/(public)/page.tsx`      | Landing page tạm thời, có link vào auth UI                                                             |
-| `apps/web/app/(auth)/layout.tsx`      | Next.js layout chung cho auth flow, bọc visual/form layout theo route variant                          |
-| `apps/web/app/(auth)/login`           | Route đăng nhập nối API thật cho `M2.4`                                                                |
-| `apps/web/app/(auth)/register`        | Route đăng ký student/parent nối API thật cho `M2.4`                                                   |
-| `apps/web/app/(auth)/forgot-password` | Route quên mật khẩu nối API thật cho `M2.4`                                                            |
-| `apps/web/app/(auth)/reset-password`  | Route đặt lại mật khẩu nối API thật cho `M2.4`                                                         |
-| `apps/web/app/(admin)/layout.tsx`      | Layout riêng admin đọc cookie theme server-side để tránh flash sáng khi reload dark mode               |
-| `apps/web/app/(admin)/admin/courses`  | Route UI quản lý lộ trình/buổi học admin mock-first cho `M3.4`                                         |
-| `apps/web/app/globals.css`            | Tailwind/global styles                                                                                 |
-| `apps/web/app/toaster`                | Toaster wiring cho root layout, gom AppToaster, single-toast queue, constants và icon config           |
-| `apps/web/components`                 | Component dùng chung, gồm primitive UI như select                                                      |
-| `apps/web/components/forms`           | Form primitives dùng chung, mỗi component một file và barrel re-export, nâng từ auth pattern đã duyệt  |
-| `apps/web/components/ui/select`       | Radix/shadcn select wrappers, mỗi wrapper một file; `components/ui/select.tsx` là compatibility barrel |
-| `apps/web/features/auth`              | Auth feature barrel và các nhóm `api/components/data/layout/screens/schemas/session/utils` cho `M2.4`  |
-| `apps/web/features/auth/screens`      | Auth screen-level form flows, mỗi flow một file và chỉ compose shared primitives/helpers               |
-| `apps/web/features/admin-courses`     | Admin course/lesson UI cho `M3.4`, tách `screens/components/data/hooks/schemas/types/utils`            |
-| `apps/web/lib`                        | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
-| `apps/web/playwright.config.ts`       | Playwright config, tự build/start web và lưu report local                                              |
-| `apps/web/tests/auth-ui.spec.ts`      | E2E/screenshot smoke test cho auth UI `M2.4`                                                           |
-| `apps/web/tests`                      | Test front-end theo feature                                                                            |
+| Path                                   | Vai trò                                                                                                         |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                             | Next.js App Router front-end                                                                                    |
+| `apps/web/app/(public)/page.tsx`       | Landing page tạm thời, có link vào auth UI                                                                      |
+| `apps/web/app/(auth)/layout.tsx`       | Next.js layout chung cho auth flow, bọc visual/form layout theo route variant và mount `AppToaster`             |
+| `apps/web/app/(auth)/login`            | Route đăng nhập nối API thật cho `M2.4`                                                                         |
+| `apps/web/app/(auth)/register`         | Route đăng ký student/parent nối API thật cho `M2.4`                                                            |
+| `apps/web/app/(auth)/forgot-password`  | Route quên mật khẩu nối API thật cho `M2.4`                                                                     |
+| `apps/web/app/(auth)/reset-password`   | Route đặt lại mật khẩu nối API thật cho `M2.4`                                                                  |
+| `apps/web/app/(admin)/layout.tsx`      | Layout riêng admin đọc cookie theme server-side, import admin theme CSS và mount `AppToaster`                   |
+| `apps/web/app/(admin)/admin-theme.css` | CSS scoped cho admin theme/checkbox/dark bridge, chỉ import từ admin layout                                     |
+| `apps/web/app/(admin)/admin/courses`   | Route UI quản lý lộ trình/buổi học admin mock-first cho `M3.4`                                                  |
+| `apps/web/app/globals.css`             | Tailwind/global styles dùng chung thật sự cho mọi route, không chứa CSS chỉ dành cho admin                      |
+| `apps/web/app/toaster`                 | Toaster wiring route-specific cho auth/admin, gom AppToaster, single-toast queue, constants và icon config      |
+| `apps/web/components`                  | Component dùng chung, gồm primitive UI như select                                                               |
+| `apps/web/components/forms`            | Form primitives dùng chung, mỗi component một file và barrel re-export, nâng từ auth pattern đã duyệt           |
+| `apps/web/components/ui/select`        | Radix/shadcn select wrappers, mỗi wrapper một file; `components/ui/select.tsx` là compatibility barrel          |
+| `apps/web/features/auth`               | Auth feature barrel và các nhóm `api/components/data/layout/screens/schemas/session/utils` cho `M2.4`           |
+| `apps/web/features/auth/screens`       | Auth screen-level form flows, mỗi flow một file và chỉ compose shared primitives/helpers                        |
+| `apps/web/features/admin-courses`      | Admin course/lesson UI cho `M3.4`, tách `screens/components/data/hooks/schemas/types/utils`                     |
+| `apps/web/lib`                         | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
+| `apps/web/playwright.config.ts`        | Playwright config, tự build/start web và lưu report local                                                       |
+| `apps/web/tests/auth-ui.spec.ts`       | E2E/screenshot smoke test cho auth UI `M2.4`                                                                    |
+| `apps/web/tests`                       | Test front-end theo feature                                                                                     |
 
-Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<feature>/` và route trong `apps/web/app/...`.
+Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<feature>/` và route trong `apps/web/app/...`. Root `apps/web/app/layout.tsx` chỉ giữ provider/script/CSS cần cho mọi route; shell, toaster, CSS hoặc tool riêng role phải đặt ở route group layout hoặc lazy-load để public/client route không tải nhầm bundle admin.
 
 ## 3. Back-end
 
