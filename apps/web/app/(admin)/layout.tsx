@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { AppToaster } from "@/app/toaster";
 import { getServerThemeMode } from "@/lib/server-theme";
+import "@/app/(admin)/admin-theme.css";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const initialThemeMode = await getServerThemeMode();
@@ -11,6 +13,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       data-theme-root="true"
     >
       {children}
+      <AppToaster />
     </div>
   );
 }

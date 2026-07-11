@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Baloo_2, Be_Vietnam_Pro } from "next/font/google";
 import { Providers } from "@/app/providers";
-import { AppToaster } from "@/app/toaster";
 import { getServerThemeMode } from "@/lib/server-theme";
 import { themeCookieMaxAgeSeconds, themeStorageKey } from "@/lib/theme-constants";
 import "@/app/globals.css";
@@ -97,7 +96,6 @@ export default async function RootLayout({
         }`}
       >
         <Providers>{children}</Providers>
-        <AppToaster />
       </body>
     </html>
   );
