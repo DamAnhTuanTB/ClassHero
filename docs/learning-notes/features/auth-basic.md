@@ -51,6 +51,8 @@ UI tách thành:
 - Zod schema trong `apps/web/features/auth/schemas/`,
 - auth API wrappers trong `apps/web/features/auth/api/`,
 - auth session store trong `apps/web/features/auth/session/`,
+- protected route guard dùng chung trong `apps/web/features/auth/components/authenticated-route-guard.tsx` và hook `useAuthGuard`,
+- guest route guard trong `apps/web/features/auth/components/guest-route-guard.tsx` để chặn user đã đăng nhập quay lại login/register/forgot/reset,
 - API envelope/error parser dùng chung trong `apps/web/lib/api-client.ts`,
 - TanStack Query provider trong `apps/web/app/providers.tsx`.
 
@@ -102,6 +104,11 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - Reset password token raw cũng không lưu DB. Khi reset thành công, backend set `used_at` và revoke toàn bộ refresh token cũ của user.
 - Với forgot password dùng họ tên để xác minh, backend chuẩn hóa tên bằng trim, gộp khoảng trắng, chuẩn Unicode và lower-case tiếng Việt trước khi so sánh. Vì vậy user nhập sai hoa/thường vẫn hợp lệ, nhưng thiếu dấu hoặc sai ký tự vẫn bị từ chối.
 - RBAC phải nằm ở backend guard/service, không được chỉ ẩn nút trên UI.
+- Protected route trên client không được tự vá từng màn. Dùng `AuthenticatedRouteGuard` ở route-group layout cho role lớn như admin/student/parent, và dùng `useAuthGuard({ allowedRoles, authError })` trong hook màn hình khi cần bắt thêm lỗi API 401/403 từ TanStack Query.
+- Phân biệt lỗi auth trên client: thiếu session hoặc 401/token hết hạn thì clear session vì token không dùng được nữa; sai role/403 thì redirect khỏi route không hợp lệ, nhưng không nhất thiết xóa token nếu session vẫn hợp lệ cho role khác.
+- `apps/web/app/providers.tsx` có QueryCache/MutationCache bắt lỗi 401 hết hạn token ở mức toàn cục. Nhờ vậy mutation như tạo/sửa/xóa cũng không phải tự viết logic clear session riêng.
+- Auth route cũng cần guard ngược. `GuestRouteGuard` bọc toàn bộ `(auth)` nên user đã đăng nhập không quay lại `/login`, `/register/student`, `/register/parent`, `/forgot-password` hoặc `/reset-password`; guard gọi `GET /me` để xác thực token với backend trước khi redirect theo role.
+- Không chỉ tin vào việc browser storage có token. Client có thể đọc `exp` trong JWT để clear token hết hạn sớm, nhưng token còn hạn vẫn phải được backend xác nhận qua `/me` khi dùng nó để quyết định chuyển khỏi màn auth.
 - Với NestJS chạy bằng `tsx` trong dev, không nên phụ thuộc hoàn toàn vào `design:paramtypes` metadata cho DTO validation hoặc dependency injection. Auth controller dùng `createDtoValidationPipe(DtoClass)` để truyền DTO class trực tiếp cho `ValidationPipe`, còn guard/service/controller dùng `@Inject(...)` cho dependency quan trọng.
 - Với auth form trên mobile/iOS, không nên tự dựng dropdown bằng `button + listbox` nếu thư viện UI đã có control tương ứng. Ưu tiên shadcn/Radix Select để có hành vi focus, portal, keyboard và touch ổn định hơn. Nếu Safari iOS không kích hoạt `click` ổn định trên trigger custom, giữ Radix Select nhưng điều khiển `open` chủ động bằng touch/pointer handler; không quay về giao diện native khi owner đã chốt custom UI.
 - Nếu text input vẫn nhập được nhưng checkbox/select custom/validate/submit đều không chạy và form bị reload, cần nghi ngờ client JS chưa hydrate trên thiết bị đó. Với Next dev local trên iPhone, ưu tiên chạy webpack dev server thay vì Turbopack dev để giảm rủi ro chunk dev/HMR không chạy trên iOS; đây là vấn đề dev runtime, không phải lỗi riêng từng form control.
@@ -112,6 +119,8 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 
 - Nếu request auth thiếu field bắt buộc trả `500` thay vì `400 VALIDATION_ERROR`, kiểm tra controller đã dùng `createDtoValidationPipe(DtoClass)` chưa. Khi DTO validation không chạy, body thiếu field có thể đi thẳng vào service và gây lỗi kiểu `undefined.trim()`.
 - Nếu route có `RolesGuard` trả `500` với lỗi `getAllAndOverride` trên `undefined`, kiểm tra guard có inject `Reflector` bằng `@Inject(Reflector)` chưa. Trong dev runtime thiếu metadata, constructor DI không explicit có thể nhận `undefined`.
+- Nếu màn protected hiện error state như "Chưa tải được danh sách" sau khi để máy lâu, kiểm tra access token đã hết hạn chưa. Đúng flow là Query/Mutation nhận 401, provider clear session, route guard đưa về `/login`; không để từng feature tự kiểm `statusCode === 401` rải rác.
+- Nếu đã đăng nhập mà browser Back hoặc gõ tay `/login`/`/register/...` vẫn thấy form auth, thiếu guard ở `(auth)/layout.tsx`. Đúng flow là auth layout kiểm session, gọi `/me`, rồi redirect user hợp lệ về màn theo role.
 
 ## File quan trọng
 
@@ -123,12 +132,17 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - `apps/api/src/modules/auth/dto/*.ts`
 - `apps/api/src/common/auth/*.ts`
 - `apps/web/app/(auth)/login/page.tsx`
+- `apps/web/app/(auth)/layout.tsx`
 - `apps/web/app/(auth)/register/student/page.tsx`
 - `apps/web/app/(auth)/register/parent/page.tsx`
 - `apps/web/app/(auth)/forgot-password/page.tsx`
 - `apps/web/app/(auth)/reset-password/page.tsx`
 - `apps/web/features/auth/screens/`
 - `apps/web/features/auth/api/`, `components/`, `data/`, `schemas/`, `session/`, `layout/`, `utils/`
+- `apps/web/features/auth/components/authenticated-route-guard.tsx`
+- `apps/web/features/auth/components/guest-route-guard.tsx`
+- `apps/web/features/auth/session/use-auth-guard.ts`
+- `apps/web/features/auth/session/auth-session-errors.ts`
 - `apps/web/lib/api-client.ts`
 - `apps/web/app/providers.tsx`
 - `docs/api/auth-profile.md`

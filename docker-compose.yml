@@ -27,6 +27,24 @@ services:
       timeout: 3s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: learning-path-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   api:
     build:
       context: .
@@ -40,6 +58,15 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
       DIRECT_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
       REDIS_URL: redis://redis:6379
+      FILE_STORAGE_PROVIDER: minio_local
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: auto
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET_NAME: learning-path-dev
+      S3_FORCE_PATH_STYLE: "true"
+      FILE_PUBLIC_BASE_URL:
+      FILE_SIGNED_URL_TTL_SECONDS: 900
     ports:
       - "4000:4000"
     volumes:
@@ -52,6 +79,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   web:
@@ -77,3 +106,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

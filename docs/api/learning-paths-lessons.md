@@ -75,6 +75,7 @@ Query: `status`, `subject`, `grade`, `search`, pagination.
 Behavior:
 
 - Mặc định không trả lộ trình `ARCHIVED`; màn thùng rác quản trị lấy riêng bằng `status=ARCHIVED`.
+- Response item có `totalChapterCount`, `totalLessonCount`, `enrolledStudentCount` và `thumbnailFile`/signed URL nếu có file ảnh.
 
 ### `GET /admin/learning-paths/:id`
 
@@ -83,7 +84,7 @@ Role: `ADMIN`.
 Behavior:
 
 - Trả chi tiết learning path chưa bị soft delete.
-- Response có thể include `chapters` và lesson count để admin dựng màn chi tiết.
+- Response include `totalChapterCount`, `totalLessonCount`, `enrolledStudentCount`, `thumbnailFile` và `chapters`; mỗi chapter chứa lesson metadata để admin dựng màn chi tiết.
 
 ### `POST /admin/learning-paths`
 
@@ -110,6 +111,7 @@ Ghi chú:
 
 - `slug` optional; nếu không gửi, backend tự tạo từ `title` và đảm bảo unique.
 - `status` default là `DRAFT`.
+- `thumbnailFileId` phải trỏ tới file upload purpose `EDITOR_IMAGE` trong Files API. Nếu chưa có purpose thumbnail riêng, admin course cover tạm dùng `EDITOR_IMAGE`.
 
 Side effects:
 
@@ -453,7 +455,7 @@ Role: authenticated.
 Behavior:
 
 - Kiểm tra quyền dựa trên purpose, owner và entity tham chiếu.
-- Trả signed URL ngắn hạn.
+- Trả signed URL ngắn hạn để UI đọc file private/local MinIO/R2 mà không public bucket.
 
 ### `POST /admin/lessons/:lessonId/documents`
 

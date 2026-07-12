@@ -1,25 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import type { AdminLearningPath } from "@/features/admin-courses/data";
 import {
-  type AdminChapter,
-  type AdminLearningPath,
-  type AdminLesson,
-} from "@/features/admin-courses/data";
-import { useAdminLearningPathQuery } from "@/features/admin-courses/hooks/use-admin-course-queries";
-import type { ChapterFormValues, LessonFormValues } from "@/features/admin-courses/schemas";
+  useAdminCourseMutations,
+  useAdminLearningPathQuery,
+} from "@/features/admin-courses/hooks/use-admin-course-queries";
+import type {
+  ChapterFormValues,
+  LessonFormValues,
+} from "@/features/admin-courses/schemas";
 import type { EditorMode, ViewState } from "@/features/admin-courses/types";
 import {
-  byChapterOrder,
-  byLessonOrder,
   findLessonMatch,
   getAdminCourseDetailStats,
-  moveItemById,
-  reindexChapters,
-  reindexLessons,
-  toChapterPayload,
-  toLessonPayload,
-  wait,
 } from "@/features/admin-courses/utils";
+import { useAuthGuard } from "@/features/auth/session";
+import { ApiRequestError } from "@/lib/api-client";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 
 export function useAdminCourseDetailManager(
@@ -28,6 +24,15 @@ export function useAdminCourseDetailManager(
   initialThemeMode: AppThemeMode = "light",
 ) {
   const learningPathQuery = useAdminLearningPathQuery(pathId, initialLearningPath);
+  const {
+    isAuthHydrated,
+    isAuthorized: hasAdminAccess,
+    session,
+  } = useAuthGuard({
+    allowedRoles: ["ADMIN"],
+    authError: learningPathQuery.error,
+  });
+  const mutations = useAdminCourseMutations();
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -41,8 +46,6 @@ export function useAdminCourseDetailManager(
   const [lessonEditorMode, setLessonEditorMode] = useState<EditorMode>("create");
   const [isChapterEditorOpen, setIsChapterEditorOpen] = useState(false);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
-  const [isSavingChapter, setIsSavingChapter] = useState(false);
-  const [isSavingLesson, setIsSavingLesson] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const selectedChapter =
@@ -53,6 +56,10 @@ export function useAdminCourseDetailManager(
     path?.chapters.find((chapter) => chapter.id === deletingChapterId) ?? null;
   const deletingLessonMatch = findLessonMatch(path, deletingLessonId);
   const deletingLesson = deletingLessonMatch?.lesson ?? null;
+  const isSavingChapter =
+    mutations.createChapter.isPending || mutations.updateChapter.isPending;
+  const isSavingLesson =
+    mutations.createLesson.isPending || mutations.updateLesson.isPending;
 
   useEffect(() => {
     if (learningPathQuery.data !== undefined) {
@@ -102,54 +109,39 @@ export function useAdminCourseDetailManager(
       throw new Error("DUPLICATED_CHAPTER_ORDER");
     }
 
-    setIsSavingChapter(true);
-    await wait(320);
-    const payload = toChapterPayload(values);
-    const createdChapterId = `chapter-${Date.now()}`;
-
-    setPath((current) => {
-      if (!current) {
-        return current;
-      }
-
+    try {
       if (chapterEditorMode === "create") {
-        const createdChapter: AdminChapter = {
-          ...payload,
-          id: createdChapterId,
-          lessons: [],
-        };
-
-        return {
-          ...current,
-          totalChapterCount: current.chapters.length + 1,
-          updatedAt: new Date().toISOString(),
-          chapters: [...current.chapters, createdChapter].sort(byChapterOrder),
-        };
+        const createdChapter = await mutations.createChapter.mutateAsync({
+          pathId: path.id,
+          values,
+        });
+        setSelectedChapterId(createdChapter.id);
+      } else if (selectedChapter) {
+        await mutations.updateChapter.mutateAsync({
+          chapterId: selectedChapter.id,
+          values,
+        });
       }
 
-      return {
-        ...current,
-        updatedAt: new Date().toISOString(),
-        chapters: current.chapters
-          .map((chapter) =>
-            chapter.id === selectedChapter?.id ? { ...chapter, ...payload } : chapter,
-          )
-          .sort(byChapterOrder),
-      };
-    });
+      await mutations.invalidateLearningPath(path.id);
+      await learningPathQuery.refetch();
+      toast.success(
+        chapterEditorMode === "create" ? "Đã thêm chương học" : "Đã lưu chương học",
+        {
+          description: "Cấu trúc chương học của lộ trình đã được cập nhật.",
+        },
+      );
+      setChapterEditorMode("create");
+      setIsChapterEditorOpen(false);
+    } catch (error) {
+      if (isConflictError(error)) {
+        throw new Error("DUPLICATED_CHAPTER_ORDER", { cause: error });
+      }
 
-    if (chapterEditorMode === "create") {
-      setSelectedChapterId(createdChapterId);
+      toast.error("Chưa lưu được chương học", {
+        description: getErrorMessage(error),
+      });
     }
-    toast.success(
-      chapterEditorMode === "create" ? "Đã thêm chương học" : "Đã lưu chương học",
-      {
-        description: "Cấu trúc chương học của lộ trình đã được cập nhật.",
-      },
-    );
-    setChapterEditorMode("create");
-    setIsChapterEditorOpen(false);
-    setIsSavingChapter(false);
   }
 
   function startCreateLesson(chapterId?: string) {
@@ -204,67 +196,39 @@ export function useAdminCourseDetailManager(
       throw new Error("DUPLICATED_LESSON_ORDER");
     }
 
-    setIsSavingLesson(true);
-    await wait(360);
-    const payload = toLessonPayload(values);
-    const createdLessonId = `lesson-${Date.now()}`;
-
-    setPath((current) => {
-      if (!current) {
-        return current;
-      }
-
+    try {
       if (lessonEditorMode === "create") {
-        const createdLesson: AdminLesson = {
-          ...payload,
-          id: createdLessonId,
-        };
-
-        return {
-          ...current,
-          totalLessonCount: current.totalLessonCount + 1,
-          updatedAt: new Date().toISOString(),
-          chapters: current.chapters.map((chapter) =>
-            chapter.id === selectedChapterId
-              ? {
-                  ...chapter,
-                  lessons: [...chapter.lessons, createdLesson].sort(byLessonOrder),
-                }
-              : chapter,
-          ),
-        };
+        const createdLesson = await mutations.createLesson.mutateAsync({
+          chapterId: selectedChapterId,
+          values,
+        });
+        setSelectedLessonId(createdLesson.id);
+      } else if (selectedLesson) {
+        await mutations.updateLesson.mutateAsync({
+          lessonId: selectedLesson.id,
+          values,
+        });
       }
 
-      return {
-        ...current,
-        updatedAt: new Date().toISOString(),
-        chapters: current.chapters.map((chapter) =>
-          chapter.id === selectedChapterId
-            ? {
-                ...chapter,
-                lessons: chapter.lessons
-                  .map((lesson) =>
-                    lesson.id === selectedLesson?.id ? { ...lesson, ...payload } : lesson,
-                  )
-                  .sort(byLessonOrder),
-              }
-            : chapter,
-        ),
-      };
-    });
+      await mutations.invalidateLearningPath(path.id);
+      await learningPathQuery.refetch();
+      toast.success(
+        lessonEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
+        {
+          description: "Danh sách buổi học trong chương đã được cập nhật.",
+        },
+      );
+      setLessonEditorMode("create");
+      setIsLessonEditorOpen(false);
+    } catch (error) {
+      if (isConflictError(error)) {
+        throw new Error("DUPLICATED_LESSON_ORDER", { cause: error });
+      }
 
-    if (lessonEditorMode === "create") {
-      setSelectedLessonId(createdLessonId);
+      toast.error("Chưa lưu được buổi học", {
+        description: getErrorMessage(error),
+      });
     }
-    toast.success(
-      lessonEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
-      {
-        description: "Danh sách buổi học trong chương đã được cập nhật.",
-      },
-    );
-    setLessonEditorMode("create");
-    setIsLessonEditorOpen(false);
-    setIsSavingLesson(false);
   }
 
   function requestDeleteChapter(chapterId: string) {
@@ -276,37 +240,26 @@ export function useAdminCourseDetailManager(
     setDeletingChapterId(chapter.id);
   }
 
-  function confirmDeleteChapter() {
+  async function confirmDeleteChapter() {
     if (!deletingChapter) {
       return;
     }
 
-    setPath((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        updatedAt: new Date().toISOString(),
-        chapters: current.chapters.map((chapter) =>
-          chapter.id === deletingChapter.id
-            ? {
-                ...chapter,
-                status: "ARCHIVED",
-                lessons: chapter.lessons.map((lesson) => ({
-                  ...lesson,
-                  status: "ARCHIVED",
-                })),
-              }
-            : chapter,
-        ),
-      };
-    });
-    toast.info("Đã xóa chương học", {
-      description: "Các buổi học trong chương cũng được chuyển sang lưu trữ.",
-    });
-    setDeletingChapterId(null);
+    try {
+      await mutations.archiveChapter.mutateAsync({
+        chapterId: deletingChapter.id,
+      });
+      await mutations.invalidateLearningPath(pathId);
+      await learningPathQuery.refetch();
+      toast.info("Đã xóa chương học", {
+        description: "Các buổi học trong chương cũng được chuyển sang lưu trữ.",
+      });
+      setDeletingChapterId(null);
+    } catch (error) {
+      toast.error("Chưa xóa được chương học", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
   function requestDeleteLesson(lessonId: string) {
@@ -319,67 +272,56 @@ export function useAdminCourseDetailManager(
     setDeletingLessonId(match.lesson.id);
   }
 
-  function confirmDeleteLesson() {
+  async function confirmDeleteLesson() {
     if (!deletingLesson || !deletingLessonMatch) {
       return;
     }
 
-    setPath((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        updatedAt: new Date().toISOString(),
-        chapters: current.chapters.map((chapter) =>
-          chapter.id === deletingLessonMatch.chapter.id
-            ? {
-                ...chapter,
-                lessons: chapter.lessons.map((lesson) =>
-                  lesson.id === deletingLesson.id
-                    ? { ...lesson, status: "ARCHIVED" }
-                    : lesson,
-                ),
-              }
-            : chapter,
-        ),
-      };
-    });
-    toast.info("Đã xóa buổi học");
-    setDeletingLessonId(null);
+    try {
+      await mutations.archiveLesson.mutateAsync({
+        lessonId: deletingLesson.id,
+      });
+      await mutations.invalidateLearningPath(pathId);
+      await learningPathQuery.refetch();
+      toast.info("Đã xóa buổi học");
+      setDeletingLessonId(null);
+    } catch (error) {
+      toast.error("Chưa xóa được buổi học", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
-  function reorderChapters(sourceChapterId: string, targetChapterId: string) {
+  async function reorderChapters(sourceChapterId: string, targetChapterId: string) {
     if (sourceChapterId === targetChapterId) {
       return;
     }
 
-    setPath((current) => {
-      if (!current) {
-        return current;
-      }
+    const targetChapter = path?.chapters.find(
+      (chapter) => chapter.id === targetChapterId,
+    );
+    if (!targetChapter) {
+      return;
+    }
 
-      const reorderedChapters = moveItemById(
-        current.chapters,
-        sourceChapterId,
-        targetChapterId,
-      );
-
-      if (reorderedChapters === current.chapters) {
-        return current;
-      }
-
-      return {
-        ...current,
-        updatedAt: new Date().toISOString(),
-        chapters: reindexChapters(reorderedChapters),
-      };
-    });
-    setSelectedChapterId(sourceChapterId);
+    try {
+      await mutations.updateChapter.mutateAsync({
+        chapterId: sourceChapterId,
+        values: {
+          orderIndex: targetChapter.orderIndex,
+        },
+      });
+      await mutations.invalidateLearningPath(pathId);
+      await learningPathQuery.refetch();
+      setSelectedChapterId(sourceChapterId);
+    } catch (error) {
+      toast.error("Chưa đổi được thứ tự chương", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
-  function reorderLessons(
+  async function reorderLessons(
     chapterId: string,
     sourceLessonId: string,
     targetLessonId: string,
@@ -388,49 +330,41 @@ export function useAdminCourseDetailManager(
       return;
     }
 
-    setPath((current) => {
-      if (!current) {
-        return current;
-      }
+    const targetLesson = path?.chapters
+      .find((chapter) => chapter.id === chapterId)
+      ?.lessons.find((lesson) => lesson.id === targetLessonId);
+    if (!targetLesson) {
+      return;
+    }
 
-      return {
-        ...current,
-        updatedAt: new Date().toISOString(),
-        chapters: current.chapters.map((chapter) => {
-          if (chapter.id !== chapterId) {
-            return chapter;
-          }
-
-          const reorderedLessons = moveItemById(
-            chapter.lessons,
-            sourceLessonId,
-            targetLessonId,
-          );
-
-          if (reorderedLessons === chapter.lessons) {
-            return chapter;
-          }
-
-          return {
-            ...chapter,
-            lessons: reindexLessons(reorderedLessons),
-          };
-        }),
-      };
-    });
-    setSelectedChapterId(chapterId);
-    setSelectedLessonId(sourceLessonId);
+    try {
+      await mutations.updateLesson.mutateAsync({
+        lessonId: sourceLessonId,
+        values: {
+          orderIndex: targetLesson.orderIndex,
+        },
+      });
+      await mutations.invalidateLearningPath(pathId);
+      await learningPathQuery.refetch();
+      setSelectedChapterId(chapterId);
+      setSelectedLessonId(sourceLessonId);
+    } catch (error) {
+      toast.error("Chưa đổi được thứ tự buổi học", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
   function retryLoad() {
     void learningPathQuery.refetch();
   }
 
-  const viewState: ViewState = learningPathQuery.isLoading
-    ? "loading"
-    : learningPathQuery.isError || !path
-      ? "error"
-      : "ready";
+  const viewState: ViewState =
+    !isAuthHydrated || !hasAdminAccess || learningPathQuery.isLoading
+      ? "loading"
+      : learningPathQuery.isError || !path || !session?.accessToken
+        ? "error"
+        : "ready";
 
   return {
     chapterEditorMode,
@@ -450,6 +384,8 @@ export function useAdminCourseDetailManager(
     selectedChapterId,
     selectedLessonId,
     viewState,
+    isDeletingChapter: mutations.archiveChapter.isPending,
+    isDeletingLesson: mutations.archiveLesson.isPending,
     actions: {
       closeChapterEditor: () => setIsChapterEditorOpen(false),
       closeDeleteChapterConfirm: () => setDeletingChapterId(null),
@@ -472,4 +408,16 @@ export function useAdminCourseDetailManager(
       toggleSidebarCollapsed: () => setIsSidebarCollapsed((current) => !current),
     },
   };
+}
+
+function isConflictError(error: unknown) {
+  return error instanceof ApiRequestError && error.code === "CONFLICT";
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    return error.message;
+  }
+
+  return "Vui lòng thử lại sau ít phút.";
 }

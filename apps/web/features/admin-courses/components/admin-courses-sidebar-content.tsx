@@ -70,9 +70,7 @@ export function AdminCoursesSidebarContent({
               isCollapsed && "lg:justify-center lg:gap-0",
             )}
           >
-            <div
-              className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg"
-            >
+            <div className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
               <UserRound className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>

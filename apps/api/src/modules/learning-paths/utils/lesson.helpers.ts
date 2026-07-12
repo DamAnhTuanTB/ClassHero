@@ -72,6 +72,10 @@ export function throwLearningPathNotFound(): never {
   throwNotFound("NOT_FOUND", "Không tìm thấy lộ trình học");
 }
 
+export function throwChapterNotFound(): never {
+  throwNotFound("NOT_FOUND", "Không tìm thấy chương học");
+}
+
 export function throwLessonNotFound(): never {
   throwNotFound("NOT_FOUND", "Không tìm thấy buổi học");
 }
@@ -94,7 +98,7 @@ export function getStatusAuditAction(defaultAction: string, status: PublishStatu
 
 export function handleKnownPrismaError(error: unknown): never {
   if (isPrismaUniqueConstraintError(error)) {
-    throwConflict("CONFLICT", "Thứ tự buổi học đã tồn tại trong lộ trình");
+    throwConflict("CONFLICT", "Thứ tự buổi học đã tồn tại trong chương");
   }
 
   if (isPrismaRecordNotFoundError(error)) {

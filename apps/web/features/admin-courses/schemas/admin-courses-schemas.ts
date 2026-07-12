@@ -10,6 +10,7 @@ import { requiredTrimmedText } from "@/lib/form-validation";
 export const learningPathSchema = z.object({
   title: requiredTrimmedText({ requiredMessage: "Nhập tên lộ trình" }),
   slug: requiredTrimmedText({ requiredMessage: "Nhập slug" }),
+  thumbnailFileId: z.string().trim().optional(),
   thumbnailFileName: z.string().trim().max(180).optional(),
   thumbnailImageUrl: z.string().trim().optional(),
   description: z.string().trim().max(600, "Mô tả tối đa 600 ký tự"),
@@ -66,6 +67,7 @@ export const chapterSchema = z.object({
 export type LearningPathFormValues = {
   title: string;
   slug: string;
+  thumbnailFileId: string;
   thumbnailFileName: string;
   thumbnailImageUrl: string;
   description: string;
@@ -99,6 +101,7 @@ export type ChapterFormValues = {
 export const emptyPathValues: LearningPathFormValues = {
   title: "",
   slug: "",
+  thumbnailFileId: "",
   thumbnailFileName: "",
   thumbnailImageUrl: "",
   description: "",

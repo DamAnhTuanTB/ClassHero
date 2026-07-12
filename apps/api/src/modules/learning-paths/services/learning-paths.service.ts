@@ -1,11 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { Prisma, PublishStatus } from "@prisma/client";
+import { FilePurpose, Prisma, PublishStatus } from "@prisma/client";
 import {
   throwBadRequest,
   throwConflict,
   throwNotFound as throwApiNotFound,
 } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import { FilesService } from "#api/modules/files/services/files.service";
 import { CreateLearningPathDto } from "#api/modules/learning-paths/dto/create-learning-path.dto";
 import { LearningPathQueryDto } from "#api/modules/learning-paths/dto/learning-path-query.dto";
 import { UpdateLearningPathDto } from "#api/modules/learning-paths/dto/update-learning-path.dto";
@@ -18,20 +19,33 @@ import {
   throwNotFound,
   toInputJson,
 } from "#api/modules/learning-paths/utils/learning-path.helpers";
-import { learningPathSelect } from "#api/modules/learning-paths/selectors/learning-path.selects";
+import {
+  learningPathDetailSelect,
+  learningPathSelect,
+} from "#api/modules/learning-paths/selectors/learning-path.selects";
 import { serializeLearningPath } from "#api/modules/learning-paths/serializers/learning-path.serializers";
-import type { RequestContext } from "#api/modules/learning-paths/types/learning-path.types";
+import type {
+  LearningPathDetailRecord,
+  LearningPathRecord,
+  RequestContext,
+} from "#api/modules/learning-paths/types/learning-path.types";
 
 @Injectable()
 export class LearningPathsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(FilesService) private readonly filesService: FilesService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+  ) {}
 
   async listForAdmin(query: LearningPathQueryDto) {
     const page = query.page;
     const pageSize = query.pageSize;
+    const shouldListArchived = query.status === PublishStatus.ARCHIVED;
     const where: Prisma.LearningPathWhereInput = {
-      deletedAt: null,
-      ...(query.status ? { status: query.status } : {}),
+      deletedAt: shouldListArchived ? { not: null } : null,
+      ...(query.status
+        ? { status: query.status }
+        : { status: { not: PublishStatus.ARCHIVED } }),
       ...(query.subject ? { subject: query.subject } : {}),
       ...(query.grade ? { grade: query.grade } : {}),
       ...(query.search
@@ -56,7 +70,9 @@ export class LearningPathsService {
     ]);
 
     return {
-      data: items.map(serializeLearningPath),
+      data: await Promise.all(
+        items.map((item) => this.serializeLearningPathWithFiles(item)),
+      ),
       meta: {
         page,
         pageSize,
@@ -68,7 +84,7 @@ export class LearningPathsService {
 
   async getForAdmin(id: string) {
     const learningPath = await this.findActiveById(id);
-    return serializeLearningPath(learningPath);
+    return this.serializeLearningPathWithFiles(learningPath);
   }
 
   async create(
@@ -120,7 +136,7 @@ export class LearningPathsService {
         return created;
       });
 
-      return serializeLearningPath(learningPath);
+      return this.serializeLearningPathWithFiles(learningPath);
     } catch (error) {
       handleKnownPrismaError(error);
     }
@@ -212,7 +228,7 @@ export class LearningPathsService {
         return updated;
       });
 
-      return serializeLearningPath(learningPath);
+      return this.serializeLearningPathWithFiles(learningPath);
     } catch (error) {
       handleKnownPrismaError(error);
     }
@@ -261,6 +277,98 @@ export class LearningPathsService {
     return { success: true };
   }
 
+  async restore(id: string, actorUserId: string, context: RequestContext = {}) {
+    try {
+      const learningPath = await this.prisma.$transaction(async (tx) => {
+        const before = await tx.learningPath.findFirst({
+          where: {
+            id,
+            status: PublishStatus.ARCHIVED,
+            deletedAt: {
+              not: null,
+            },
+          },
+          select: learningPathSelect,
+        });
+
+        if (!before) {
+          throwNotFound();
+        }
+
+        const restored = await tx.learningPath.update({
+          where: { id },
+          data: {
+            status: PublishStatus.DRAFT,
+            publishedAt: null,
+            deletedAt: null,
+            updatedById: actorUserId,
+          },
+          select: learningPathSelect,
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: "LEARNING_PATH_RESTORED",
+            entityType: "LearningPath",
+            entityId: restored.id,
+            before: toInputJson(serializeLearningPath(before)),
+            after: toInputJson(serializeLearningPath(restored)),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return restored;
+      });
+
+      return this.serializeLearningPathWithFiles(learningPath);
+    } catch (error) {
+      handleKnownPrismaError(error);
+    }
+  }
+
+  async permanentDelete(id: string, actorUserId: string, context: RequestContext = {}) {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const before = await tx.learningPath.findFirst({
+          where: {
+            id,
+            status: PublishStatus.ARCHIVED,
+            deletedAt: {
+              not: null,
+            },
+          },
+          select: learningPathSelect,
+        });
+
+        if (!before) {
+          throwNotFound();
+        }
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: "LEARNING_PATH_PERMANENT_DELETED",
+            entityType: "LearningPath",
+            entityId: before.id,
+            before: toInputJson(serializeLearningPath(before)),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        await tx.learningPath.delete({
+          where: { id },
+        });
+      });
+    } catch (error) {
+      handleKnownPrismaError(error);
+    }
+
+    return { success: true };
+  }
+
   async publish(id: string, actorUserId: string, context: RequestContext = {}) {
     try {
       const learningPath = await this.prisma.$transaction(async (tx) => {
@@ -299,7 +407,7 @@ export class LearningPathsService {
         return updated;
       });
 
-      return serializeLearningPath(learningPath);
+      return this.serializeLearningPathWithFiles(learningPath);
     } catch (error) {
       handleKnownPrismaError(error);
     }
@@ -308,7 +416,7 @@ export class LearningPathsService {
   private async findActiveById(id: string) {
     const learningPath = await this.prisma.learningPath.findFirst({
       where: { id, deletedAt: null },
-      select: learningPathSelect,
+      select: learningPathDetailSelect,
     });
 
     if (!learningPath) {
@@ -316,6 +424,16 @@ export class LearningPathsService {
     }
 
     return learningPath;
+  }
+
+  private async serializeLearningPathWithFiles(
+    learningPath: LearningPathRecord | LearningPathDetailRecord,
+  ) {
+    const thumbnailUrl = await this.filesService.resolveAccessUrl(
+      learningPath.thumbnailFile,
+    );
+
+    return serializeLearningPath(learningPath, thumbnailUrl);
   }
 
   private async createUniqueSlug(title: string) {
@@ -346,7 +464,7 @@ export class LearningPathsService {
     throwConflict("CONFLICT", "Không thể tạo slug duy nhất cho lộ trình");
   }
 
-  private async assertThumbnailFileAllowed(fileId: string | undefined) {
+  private async assertThumbnailFileAllowed(fileId: string | null | undefined) {
     if (!fileId) {
       return;
     }
@@ -358,11 +476,19 @@ export class LearningPathsService {
       },
       select: {
         id: true,
+        purpose: true,
       },
     });
 
     if (!file) {
       throwApiNotFound("NOT_FOUND", "Không tìm thấy ảnh đại diện lộ trình");
+    }
+
+    if (file.purpose !== FilePurpose.EDITOR_IMAGE) {
+      throwBadRequest(
+        "FILE_PURPOSE_NOT_ALLOWED",
+        "Ảnh đại diện lộ trình phải dùng purpose EDITOR_IMAGE",
+      );
     }
   }
 }

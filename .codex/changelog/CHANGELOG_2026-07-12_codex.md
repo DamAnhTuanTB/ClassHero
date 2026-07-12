@@ -1,0 +1,1 @@
+- 2026-07-12: Nối M3.4 admin course management với API thật: bổ sung chapter schema/migration/API, chuyển lesson CRUD theo chapter, thêm FilesModule S3/MinIO cho upload ảnh đại diện, thay mock web bằng TanStack Query mutations/auth guards, và cập nhật docs/context tương ứng.

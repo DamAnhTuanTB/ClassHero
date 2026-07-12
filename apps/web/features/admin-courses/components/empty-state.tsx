@@ -3,7 +3,10 @@ import { Eye, Plus } from "lucide-react";
 export function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="mt-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-8 text-center">
-      <Eye className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]" aria-hidden="true" />
+      <Eye
+        className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]"
+        aria-hidden="true"
+      />
       <h2 className="mt-3 text-lg font-extrabold text-[var(--theme-text-strong)]">
         Không có lộ trình phù hợp
       </h2>

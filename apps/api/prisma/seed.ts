@@ -53,6 +53,7 @@ const ids = {
   parentProfile: "00000000-0000-4000-8000-000000000005",
   parentLink: "00000000-0000-4000-8000-000000000006",
   learningPath: "00000000-0000-4000-8000-000000000010",
+  chapter1: "00000000-0000-4000-8000-000000000070",
   lesson1: "00000000-0000-4000-8000-000000000011",
   lesson2: "00000000-0000-4000-8000-000000000012",
   material1: "00000000-0000-4000-8000-000000000013",
@@ -283,6 +284,7 @@ async function seedLearningContent(adminId: string) {
       title: "Toán 7",
       originalPriceVnd: 2_000_000,
       salePriceVnd: 1_500_000,
+      totalChapterCount: 1,
       totalLessonCount: 2,
       status: PublishStatus.PUBLISHED,
       trialEnabled: true,
@@ -298,6 +300,7 @@ async function seedLearningContent(adminId: string) {
       slug: "toan-7",
       originalPriceVnd: 2_000_000,
       salePriceVnd: 1_500_000,
+      totalChapterCount: 1,
       totalLessonCount: 2,
       descriptionJson: docText(
         "Lộ trình Toán 7 mẫu để kiểm tra luồng học, quiz và payment.",
@@ -311,7 +314,7 @@ async function seedLearningContent(adminId: string) {
     },
   });
 
-  const lesson1 = await prisma.lesson.upsert({
+  const chapter1 = await prisma.learningPathChapter.upsert({
     where: {
       learningPathId_orderIndex: {
         learningPathId: learningPath.id,
@@ -319,6 +322,39 @@ async function seedLearningContent(adminId: string) {
       },
     },
     update: {
+      title: "Chương 1 - Số hữu tỉ",
+      overview: "Tổng quan số hữu tỉ và các phép toán nền tảng.",
+      objectivesJson: {
+        text: "Nhận biết số hữu tỉ; thực hiện phép tính cơ bản.",
+      },
+      status: PublishStatus.PUBLISHED,
+      updatedById: adminId,
+    },
+    create: {
+      id: ids.chapter1,
+      learningPathId: learningPath.id,
+      orderIndex: 1,
+      title: "Chương 1 - Số hữu tỉ",
+      overview: "Tổng quan số hữu tỉ và các phép toán nền tảng.",
+      objectivesJson: {
+        text: "Nhận biết số hữu tỉ; thực hiện phép tính cơ bản.",
+      },
+      status: PublishStatus.PUBLISHED,
+      createdById: adminId,
+      updatedById: adminId,
+    },
+  });
+
+  const lesson1 = await prisma.lesson.upsert({
+    where: {
+      chapterId_orderIndex: {
+        chapterId: chapter1.id,
+        orderIndex: 1,
+      },
+    },
+    update: {
+      learningPathId: learningPath.id,
+      chapterId: chapter1.id,
       title: "Buổi 1 - Số hữu tỉ",
       shortDescription: "Khái niệm số hữu tỉ và cách biểu diễn trên trục số.",
       examOpenAt: addDays(now, -1),
@@ -330,6 +366,7 @@ async function seedLearningContent(adminId: string) {
     create: {
       id: ids.lesson1,
       learningPathId: learningPath.id,
+      chapterId: chapter1.id,
       orderIndex: 1,
       title: "Buổi 1 - Số hữu tỉ",
       shortDescription: "Khái niệm số hữu tỉ và cách biểu diễn trên trục số.",
@@ -344,12 +381,14 @@ async function seedLearningContent(adminId: string) {
 
   const lesson2 = await prisma.lesson.upsert({
     where: {
-      learningPathId_orderIndex: {
-        learningPathId: learningPath.id,
+      chapterId_orderIndex: {
+        chapterId: chapter1.id,
         orderIndex: 2,
       },
     },
     update: {
+      learningPathId: learningPath.id,
+      chapterId: chapter1.id,
       title: "Buổi 2 - Lũy thừa của số hữu tỉ",
       shortDescription: "Quy tắc nhân, chia và lũy thừa của số hữu tỉ.",
       examOpenAt: addDays(now, 7),
@@ -361,6 +400,7 @@ async function seedLearningContent(adminId: string) {
     create: {
       id: ids.lesson2,
       learningPathId: learningPath.id,
+      chapterId: chapter1.id,
       orderIndex: 2,
       title: "Buổi 2 - Lũy thừa của số hữu tỉ",
       shortDescription: "Quy tắc nhân, chia và lũy thừa của số hữu tỉ.",

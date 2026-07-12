@@ -2,10 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { StatusBadge } from "@/features/admin-courses/components/badges";
 import { subjectLabels, type AdminLearningPath } from "@/features/admin-courses/data";
-import {
-  formatPrice,
-  getPriceChangePercent,
-} from "@/features/admin-courses/utils";
+import { formatPrice, getPriceChangePercent } from "@/features/admin-courses/utils";
 import { cn } from "@/lib/utils";
 
 export function LearningPathRow({
@@ -35,12 +32,12 @@ export function LearningPathRow({
       className={cn(
         "grid grid-cols-[2.75rem_minmax(0,1fr)_auto] gap-3 border-b px-4 py-4 transition-colors last:border-b-0 lg:grid-cols-[2.75rem_1.2fr_0.42fr_0.42fr_0.75fr_0.55fr_7rem] lg:items-center",
         "border-[var(--theme-border)]",
-        isSelected ? "bg-[var(--theme-primary-soft)]" : "hover:bg-[var(--theme-surface-soft)]",
+        isSelected
+          ? "bg-[var(--theme-primary-soft)]"
+          : "hover:bg-[var(--theme-surface-soft)]",
       )}
     >
-      <label
-        className="order-1 flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-primary)] transition hover:border-[var(--theme-primary-border)] hover:bg-[var(--theme-primary-soft)] lg:order-1"
-      >
+      <label className="order-1 flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-primary)] transition hover:border-[var(--theme-primary-border)] hover:bg-[var(--theme-primary-soft)] lg:order-1">
         <input
           type="checkbox"
           checked={isSelected}
@@ -58,9 +55,7 @@ export function LearningPathRow({
             className="group relative inline-flex min-w-0 max-w-full items-center"
             title={path.title}
           >
-            <span
-              className="truncate text-base font-extrabold text-[var(--theme-text-strong)]"
-            >
+            <span className="truncate text-base font-extrabold text-[var(--theme-text-strong)]">
               {path.title}
             </span>
             <span
@@ -85,12 +80,8 @@ export function LearningPathRow({
           mobileCellClass,
         )}
       >
-        <span className={mobileLabelClass}>
-          Môn học
-        </span>
-        <span className={mobileValueClass}>
-          {subjectLabels[path.subject]}
-        </span>
+        <span className={mobileLabelClass}>Môn học</span>
+        <span className={mobileValueClass}>{subjectLabels[path.subject]}</span>
       </div>
       <div
         className={cn(
@@ -98,12 +89,8 @@ export function LearningPathRow({
           mobileCellClass,
         )}
       >
-        <span className={mobileLabelClass}>
-          Khối lớp
-        </span>
-        <span className={mobileValueClass}>
-          Lớp {path.grade}
-        </span>
+        <span className={mobileLabelClass}>Khối lớp</span>
+        <span className={mobileValueClass}>Lớp {path.grade}</span>
       </div>
       <div
         className={cn(
@@ -111,9 +98,7 @@ export function LearningPathRow({
           mobileCellClass,
         )}
       >
-        <span className={mobileLabelClass}>
-          Giá hiển thị
-        </span>
+        <span className={mobileLabelClass}>Giá hiển thị</span>
         <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
           {formatPrice(currentPrice)}
         </p>
@@ -136,8 +121,7 @@ export function LearningPathRow({
                   : "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]",
               )}
             >
-              {priceChangePercent < 0 ? "Giảm" : "Tăng"}{" "}
-              {Math.abs(priceChangePercent)}%
+              {priceChangePercent < 0 ? "Giảm" : "Tăng"} {Math.abs(priceChangePercent)}%
             </span>
           ) : null}
         </div>
@@ -148,9 +132,7 @@ export function LearningPathRow({
           mobileCellClass,
         )}
       >
-        <span className={mobileLabelClass}>
-          Trạng thái
-        </span>
+        <span className={mobileLabelClass}>Trạng thái</span>
         <StatusBadge status={path.status} />
       </div>
       <div className="order-2 col-span-2 flex justify-end gap-1.5 lg:order-7 lg:col-span-1 lg:gap-2">

@@ -54,6 +54,8 @@ export function AdminCourseDetailManager({
     deletingChapter,
     deletingLesson,
     isChapterEditorOpen,
+    isDeletingChapter,
+    isDeletingLesson,
     isDarkTheme,
     isLessonEditorOpen,
     isSavingChapter,
@@ -69,10 +71,7 @@ export function AdminCourseDetailManager({
   } = useAdminCourseDetailManager(pathId, initialLearningPath, initialThemeMode);
 
   return (
-    <main
-      data-admin-theme="true"
-      className="theme-page"
-    >
+    <main data-admin-theme="true" className="theme-page">
       <div
         className={cn(
           "grid min-h-screen transition-[grid-template-columns] duration-200",
@@ -92,9 +91,7 @@ export function AdminCourseDetailManager({
         />
 
         <section className="min-w-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-          <header
-            className="flex flex-col gap-4 border-b border-[var(--theme-border)] pb-5 md:flex-row md:items-center md:justify-between"
-          >
+          <header className="flex flex-col gap-4 border-b border-[var(--theme-border)] pb-5 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <Link
                 href="/admin/courses"
@@ -191,6 +188,7 @@ export function AdminCourseDetailManager({
           title="Xóa chương học"
           confirmLabel="Xóa chương"
           isOpen={Boolean(deletingChapter)}
+          isConfirming={isDeletingChapter}
           itemName={deletingChapter.title}
           onCancel={actions.closeDeleteChapterConfirm}
           onConfirm={actions.confirmDeleteChapter}
@@ -201,6 +199,7 @@ export function AdminCourseDetailManager({
           title="Xóa buổi học"
           confirmLabel="Xóa buổi học"
           isOpen={Boolean(deletingLesson)}
+          isConfirming={isDeletingLesson}
           itemName={deletingLesson.title}
           onCancel={actions.closeDeleteLessonConfirm}
           onConfirm={actions.confirmDeleteLesson}

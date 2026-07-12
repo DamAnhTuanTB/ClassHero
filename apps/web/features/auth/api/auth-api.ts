@@ -18,6 +18,12 @@ export type AuthTokenResponse = {
   user: AuthUser;
 };
 
+export type CurrentUserResponse = {
+  user: AuthUser;
+  studentProfile: unknown | null;
+  parentProfile: unknown | null;
+};
+
 export type RegisterStudentResponse = {
   user: AuthUser;
   studentProfile: {
@@ -104,6 +110,12 @@ export function resetPassword(request: ResetPasswordRequest) {
   return apiRequest<SuccessResponse>("/auth/reset-password", {
     method: "POST",
     body: request,
+  });
+}
+
+export function getCurrentUser(token: string) {
+  return apiRequest<CurrentUserResponse>("/me", {
+    token,
   });
 }
 

@@ -21,6 +21,7 @@ export function PathEditorDialog({
   selectedPath,
   onClose,
   onSubmit,
+  onUploadCover,
 }: {
   isOpen: boolean;
   isSaving: boolean;
@@ -28,6 +29,11 @@ export function PathEditorDialog({
   selectedPath: AdminLearningPath | null;
   onClose: () => void;
   onSubmit: (values: LearningPathFormValues) => void | Promise<void>;
+  onUploadCover: (file: File) => Promise<{
+    fileId: string;
+    fileName: string;
+    imageUrl: string;
+  }>;
 }) {
   const form = useForm<LearningPathFormValues>({
     mode: "onChange",
@@ -58,6 +64,7 @@ export function PathEditorDialog({
         isSaving={isSaving}
         onClose={onClose}
         onSubmit={onSubmit}
+        onUploadCover={onUploadCover}
       />
     </EditorDialogShell>
   );

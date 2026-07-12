@@ -1,11 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, Trash2, X } from "lucide-react";
+import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
 
 export function DeleteConfirmDialog({
   confirmLabel = "Xóa",
   description,
+  isConfirming = false,
   isOpen,
   itemName,
   title = "Xóa mục này",
@@ -14,6 +15,7 @@ export function DeleteConfirmDialog({
 }: {
   confirmLabel?: string;
   description?: string;
+  isConfirming?: boolean;
   isOpen: boolean;
   itemName: string;
   title?: string;
@@ -86,6 +88,7 @@ export function DeleteConfirmDialog({
               <button
                 type="button"
                 onClick={onCancel}
+                disabled={isConfirming}
                 className="theme-button-neutral inline-flex min-h-11 min-w-0 items-center justify-center whitespace-nowrap rounded-lg px-4 text-center text-sm font-extrabold transition sm:w-auto"
               >
                 Hủy
@@ -93,10 +96,15 @@ export function DeleteConfirmDialog({
               <button
                 type="button"
                 onClick={onConfirm}
+                disabled={isConfirming}
                 className="theme-button-danger inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-center text-sm font-extrabold transition sm:w-auto"
               >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-                {confirmLabel}
+                {isConfirming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                )}
+                {isConfirming ? "Đang xử lý" : confirmLabel}
               </button>
             </div>
           </motion.section>

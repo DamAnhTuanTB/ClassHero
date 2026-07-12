@@ -4,6 +4,7 @@ export type AdminEditableStatus = Exclude<AdminPublishStatus, "ARCHIVED">;
 
 export type AdminLesson = {
   id: string;
+  chapterId?: string;
   orderIndex: number;
   title: string;
   shortDescription: string;
@@ -28,6 +29,7 @@ export type AdminLearningPath = {
   id: string;
   title: string;
   slug: string;
+  thumbnailFileId?: string | null;
   thumbnailFileName?: string;
   thumbnailImageUrl: string;
   description: string;
@@ -97,7 +99,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
         orderIndex: 1,
         title: "Chương 1: Số hữu tỉ",
         overview: "Tổng quan số hữu tỉ, thứ tự và các phép tính nền tảng.",
-        objectives: "Nhận biết số hữu tỉ; thực hiện phép tính cơ bản; đọc hiểu bài toán vận dụng.",
+        objectives:
+          "Nhận biết số hữu tỉ; thực hiện phép tính cơ bản; đọc hiểu bài toán vận dụng.",
         status: "PUBLISHED",
         lessons: [
           {
@@ -129,7 +132,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
         orderIndex: 2,
         title: "Chương 2: Biểu thức đại số",
         overview: "Chuẩn bị nền tảng biểu thức, giá trị biểu thức và quy tắc biến đổi.",
-        objectives: "Nhận diện biểu thức đại số; thay giá trị biến; luyện bài tập rút gọn cơ bản.",
+        objectives:
+          "Nhận diện biểu thức đại số; thay giá trị biến; luyện bài tập rút gọn cơ bản.",
         status: "DRAFT",
         lessons: [],
       },
@@ -159,7 +163,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
         orderIndex: 1,
         title: "Chương 1: Cơ học cơ bản",
         overview: "Khái quát chuyển động, vận tốc và các đại lượng cơ học mở đầu.",
-        objectives: "Phân biệt chuyển động và đứng yên; tính vận tốc; đọc dữ liệu từ bảng và đồ thị.",
+        objectives:
+          "Phân biệt chuyển động và đứng yên; tính vận tốc; đọc dữ liệu từ bảng và đồ thị.",
         status: "DRAFT",
         lessons: [
           {
@@ -201,7 +206,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
         orderIndex: 1,
         title: "Chương 1: Hợp chất vô cơ",
         overview: "Tổng quan oxit, axit, bazơ và muối trong chương trình Hóa 9.",
-        objectives: "Phân loại hợp chất; nhận biết tính chất hóa học; luyện bài tập nhận biết.",
+        objectives:
+          "Phân loại hợp chất; nhận biết tính chất hóa học; luyện bài tập nhận biết.",
         status: "HIDDEN",
         lessons: [
           {

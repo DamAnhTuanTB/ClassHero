@@ -51,6 +51,7 @@ export function toPathFormValues(path: AdminLearningPath): LearningPathFormValue
   return {
     title: path.title,
     slug: path.slug,
+    thumbnailFileId: path.thumbnailFileId ?? "",
     thumbnailFileName: path.thumbnailFileName ?? "",
     thumbnailImageUrl: path.thumbnailImageUrl,
     description: path.description,
@@ -71,6 +72,7 @@ export function toLearningPathPayload(values: LearningPathFormValues) {
   return {
     title: values.title.trim(),
     slug: values.slug.trim(),
+    thumbnailFileId: values.thumbnailFileId.trim(),
     thumbnailFileName: values.thumbnailFileName.trim(),
     thumbnailImageUrl: values.thumbnailImageUrl.trim(),
     description: values.description.trim(),

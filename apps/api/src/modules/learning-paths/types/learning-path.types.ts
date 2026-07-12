@@ -1,12 +1,18 @@
 import { EnrollmentStatus, Prisma, PublishStatus } from "@prisma/client";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import {
+  learningPathDetailSelect,
   learningPathSelect,
   publicLearningPathSelect,
 } from "#api/modules/learning-paths/selectors/learning-path.selects";
+import type { ChapterDetailResponse } from "#api/modules/learning-paths/types/chapter.types";
 
 export type LearningPathRecord = Prisma.LearningPathGetPayload<{
   select: typeof learningPathSelect;
+}>;
+
+export type LearningPathDetailRecord = Prisma.LearningPathGetPayload<{
+  select: typeof learningPathDetailSelect;
 }>;
 
 export type LearningPathResponse = {
@@ -17,8 +23,15 @@ export type LearningPathResponse = {
   slug: string;
   originalPriceVnd: number;
   salePriceVnd: number | null;
+  enrolledStudentCount: number;
+  totalChapterCount: number;
   totalLessonCount: number;
   thumbnailFileId: string | null;
+  thumbnailFile: {
+    id: string;
+    originalName: string;
+    url: string | null;
+  } | null;
   descriptionJson: Prisma.JsonValue | null;
   status: PublishStatus;
   trialEnabled: boolean;
@@ -28,6 +41,7 @@ export type LearningPathResponse = {
   updatedById: string | null;
   createdAt: Date;
   updatedAt: Date;
+  chapters?: ChapterDetailResponse[];
 };
 
 export type PublicLearningPathRecord = Prisma.LearningPathGetPayload<{

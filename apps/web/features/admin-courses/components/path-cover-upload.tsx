@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Trash2, Upload } from "lucide-react";
+import { ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FieldLabel } from "@/components/forms/field-label";
 
@@ -11,20 +11,29 @@ export function PathCoverUpload({
   imageUrl,
   isDarkTheme = false,
   onChange,
+  onUploadFile,
 }: {
   fileName: string;
   imageUrl: string;
   isDarkTheme?: boolean;
-  onChange: (value: { fileName: string; imageUrl: string }) => void;
+  onChange: (value: { fileId: string; fileName: string; imageUrl: string }) => void;
+  onUploadFile: (file: File) => Promise<{
+    fileId: string;
+    fileName: string;
+    imageUrl: string;
+  }>;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [localError, setLocalError] = useState("");
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
-  const shouldShowImage = Boolean(imageUrl) && !imageLoadFailed;
+  const [localPreviewUrl, setLocalPreviewUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const visibleImageUrl = localPreviewUrl || imageUrl;
+  const shouldShowImage = Boolean(visibleImageUrl) && !imageLoadFailed;
 
   useEffect(() => {
     setImageLoadFailed(false);
-  }, [imageUrl]);
+  }, [visibleImageUrl]);
 
   return (
     <section className="grid gap-2">
@@ -43,7 +52,7 @@ export function PathCoverUpload({
         <div className="relative aspect-[16/10] overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]">
           {shouldShowImage ? (
             <img
-              src={imageUrl}
+              src={visibleImageUrl}
               alt="Ảnh đại diện lộ trình"
               onError={() => setImageLoadFailed(true)}
               className="h-full w-full object-cover"
@@ -63,18 +72,25 @@ export function PathCoverUpload({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
+              disabled={isUploading}
               className="theme-button-success inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
             >
-              <Upload className="h-4 w-4" aria-hidden="true" />
-              Chọn ảnh
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Upload className="h-4 w-4" aria-hidden="true" />
+              )}
+              {isUploading ? "Đang tải" : "Chọn ảnh"}
             </button>
-            {imageUrl ? (
+            {visibleImageUrl ? (
               <button
                 type="button"
+                disabled={isUploading}
                 onClick={() => {
                   setLocalError("");
                   setImageLoadFailed(false);
-                  onChange({ fileName: "", imageUrl: "" });
+                  setLocalPreviewUrl("");
+                  onChange({ fileId: "", fileName: "", imageUrl: "" });
                   if (inputRef.current) {
                     inputRef.current.value = "";
                   }
@@ -113,12 +129,23 @@ export function PathCoverUpload({
 
               try {
                 const nextImageUrl = await readFileAsDataUrl(file);
+                setLocalPreviewUrl(nextImageUrl);
+                setIsUploading(true);
                 setImageLoadFailed(false);
                 setLocalError("");
-                onChange({ fileName: file.name, imageUrl: nextImageUrl });
-              } catch {
-                setLocalError("Không đọc được ảnh. Vui lòng chọn ảnh khác.");
+                const uploadedFile = await onUploadFile(file);
+                setLocalPreviewUrl("");
+                onChange(uploadedFile);
+              } catch (error) {
+                setLocalPreviewUrl("");
+                setLocalError(
+                  error instanceof Error
+                    ? error.message
+                    : "Không upload được ảnh. Vui lòng thử lại.",
+                );
                 event.currentTarget.value = "";
+              } finally {
+                setIsUploading(false);
               }
             }}
           />

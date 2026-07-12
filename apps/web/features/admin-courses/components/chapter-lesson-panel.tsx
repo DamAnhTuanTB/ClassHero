@@ -155,7 +155,10 @@ export function ChapterLessonPanel({
       <div className="mt-4 grid gap-4">
         {path.chapters.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
-            <Layers3 className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]" aria-hidden="true" />
+            <Layers3
+              className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]"
+              aria-hidden="true"
+            />
             <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
               Chưa có chương học
             </p>
@@ -201,9 +204,7 @@ export function ChapterLessonPanel({
                   >
                     <GripVertical className="h-5 w-5" aria-hidden="true" />
                   </button>
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--theme-primary-soft)] text-sm font-extrabold text-[var(--theme-primary)] ring-1 ring-[var(--theme-primary-border)]"
-                  >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--theme-primary-soft)] text-sm font-extrabold text-[var(--theme-primary)] ring-1 ring-[var(--theme-primary-border)]">
                     {chapter.orderIndex}
                   </div>
                 </div>
@@ -212,9 +213,7 @@ export function ChapterLessonPanel({
                 </div>
                 <div className="col-span-2 min-w-0 md:col-span-1">
                   <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
-                    <h3
-                      className="w-full text-base font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0"
-                    >
+                    <h3 className="w-full text-base font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0">
                       {chapter.title}
                     </h3>
                     <span className="hidden shrink-0 md:inline-flex">
@@ -266,9 +265,7 @@ export function ChapterLessonPanel({
                 </div>
               </div>
 
-              <div
-                className="border-t border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
-              >
+              <div className="border-t border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
                 {chapter.lessons.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-4 text-center">
                     <ListChecks
@@ -321,9 +318,7 @@ export function ChapterLessonPanel({
                           >
                             <GripVertical className="h-5 w-5" aria-hidden="true" />
                           </button>
-                          <div
-                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--theme-surface-soft)] text-sm font-extrabold text-[var(--theme-text)]"
-                          >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--theme-surface-soft)] text-sm font-extrabold text-[var(--theme-text)]">
                             {lesson.orderIndex}
                           </div>
                         </div>
@@ -332,9 +327,7 @@ export function ChapterLessonPanel({
                         </div>
                         <div className="col-span-2 min-w-0 md:col-span-1">
                           <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
-                            <h4
-                              className="w-full text-sm font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0"
-                            >
+                            <h4 className="w-full text-sm font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0">
                               {lesson.title}
                             </h4>
                             <span className="hidden shrink-0 md:inline-flex">

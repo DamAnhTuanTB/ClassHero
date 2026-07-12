@@ -81,6 +81,30 @@ export class AdminLearningPathsController {
     return this.learningPathsService.softDelete(id, user.id, getRequestContext(request));
   }
 
+  @Post(":id/restore")
+  @ApiOperation({ summary: "Restore an archived learning path" })
+  restore(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.learningPathsService.restore(id, user.id, getRequestContext(request));
+  }
+
+  @Delete(":id/permanent")
+  @ApiOperation({ summary: "Permanently delete an archived learning path" })
+  permanentDelete(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.learningPathsService.permanentDelete(
+      id,
+      user.id,
+      getRequestContext(request),
+    );
+  }
+
   @Post(":id/publish")
   @ApiOperation({ summary: "Publish a learning path" })
   publish(

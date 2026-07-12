@@ -20,6 +20,20 @@ const envSchema = z
     REDIS_URL: z.string().min(1),
     CORS_ORIGINS: z.string().min(1).default("http://localhost:3000"),
     LOG_LEVEL: z.enum(["error", "warn", "log", "debug", "verbose"]).default("debug"),
+    FILE_STORAGE_PROVIDER: z
+      .enum(["minio_local", "cloudflare_r2"])
+      .default("minio_local"),
+    S3_ENDPOINT: z.string().url(),
+    S3_REGION: z.string().min(1).default("auto"),
+    S3_ACCESS_KEY_ID: z.string().min(1),
+    S3_SECRET_ACCESS_KEY: z.string().min(1),
+    S3_BUCKET_NAME: z.string().min(1),
+    S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
+    FILE_PUBLIC_BASE_URL: z.string().url().optional().or(z.literal("")),
+    FILE_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    MAX_PDF_UPLOAD_MB: z.coerce.number().positive().default(50),
+    MAX_IMAGE_UPLOAD_MB: z.coerce.number().positive().default(10),
+    MAX_AVATAR_UPLOAD_MB: z.coerce.number().positive().default(5),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {

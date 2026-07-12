@@ -35,9 +35,7 @@ export function MoneyField({
         optionalLabel={optionalLabel}
       />
       <div className="relative mt-2">
-        <span
-          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
-        >
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]">
           <CircleDollarSign className="h-5 w-5" aria-hidden="true" />
         </span>
         <input
@@ -64,14 +62,15 @@ export function MoneyField({
           aria-describedby={error ? `${id}-error` : undefined}
           className="theme-form-control min-h-[3.35rem] w-full rounded-xl py-0 pl-12 pr-16 text-base font-semibold outline-none transition disabled:cursor-not-allowed lg:text-sm"
         />
-        <span
-          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[var(--theme-text-subtle)]"
-        >
+        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[var(--theme-text-subtle)]">
           đ
         </span>
       </div>
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]">
+        <p
+          id={`${id}-error`}
+          className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]"
+        >
           {error.message}
         </p>
       ) : null}

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Check,
-  FileText,
-  ListOrdered,
-  Loader2,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Check, FileText, ListOrdered, Loader2, SlidersHorizontal } from "lucide-react";
 import type { ChangeEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/forms/field-label";
@@ -80,11 +74,7 @@ export function ChapterEditor({
         </div>
 
         <div>
-          <FieldLabel
-            id="admin-chapter-overview"
-            label="Tổng quan chương"
-            isOptional
-          />
+          <FieldLabel id="admin-chapter-overview" label="Tổng quan chương" isOptional />
           <textarea
             id="admin-chapter-overview"
             rows={4}
@@ -93,7 +83,9 @@ export function ChapterEditor({
               "theme-form-control mt-2 min-h-28 w-full resize-y rounded-xl px-4 py-3 text-base font-semibold leading-6 outline-none transition disabled:cursor-not-allowed lg:text-sm",
             )}
             aria-invalid={errors.overview ? "true" : "false"}
-            aria-describedby={errors.overview ? "admin-chapter-overview-error" : undefined}
+            aria-describedby={
+              errors.overview ? "admin-chapter-overview-error" : undefined
+            }
             {...form.register("overview")}
           />
           {errors.overview ? (

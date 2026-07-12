@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 export const lessonSelect = {
   id: true,
   learningPathId: true,
+  chapterId: true,
   orderIndex: true,
   title: true,
   shortDescription: true,

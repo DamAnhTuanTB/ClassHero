@@ -86,6 +86,7 @@ In plan mode, stop after this plan and wait for approval.
 - Do not do broad visual redesign or polish unless needed to handle real states.
 - If the approved UI and existing API contract/database schema do not match, adapt the backend/API contract/database or add a clearly documented payload mapping. Do not force the approved UI to fit the old API unless the owner explicitly asks to change the UI.
 - If the needed API endpoint does not exist, implement the complete backend API required by the requested subtask and `docs/05-api-contract.md` plus the matching `docs/api/` file.
+- Every visible, interactive UI feature in the approved screen is part of the connection contract. Implement the matching backend API/storage behavior in the same task, or explicitly disable/hide/mark that control as unavailable when it is outside scope; do not leave fake client-only success, fake upload, fake delete/restore, or local-only persistence in a production-connected flow.
 - If the API contract is missing or incomplete, update `docs/05-api-contract.md` and/or the matching `docs/api/` file with the implemented contract.
 - Backend work must fully satisfy the requested subtask's API scope, but must not expand into unrelated feature work.
 - Database schema changes are allowed only when required by the subtask/docs; update `docs/04-database-model.md`, the matching `docs/database/` file, and migrations when that happens.

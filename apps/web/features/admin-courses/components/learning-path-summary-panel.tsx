@@ -8,10 +8,7 @@ import {
   Layers3,
 } from "lucide-react";
 import { StatusBadge } from "@/features/admin-courses/components/badges";
-import {
-  subjectLabels,
-  type AdminLearningPath,
-} from "@/features/admin-courses/data";
+import { subjectLabels, type AdminLearningPath } from "@/features/admin-courses/data";
 import {
   formatDateTime,
   formatPrice,
@@ -80,7 +77,9 @@ export function LearningPathSummaryPanel({
               <p className={valueClass}>{formatPrice(price)}</p>
               {path.salePriceVnd !== null ? (
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-bold text-[var(--theme-text-muted)]">
-                  <span className="line-through">{formatPrice(path.originalPriceVnd)}</span>
+                  <span className="line-through">
+                    {formatPrice(path.originalPriceVnd)}
+                  </span>
                   {priceChangePercent !== null ? (
                     <span className="text-[var(--theme-primary)]">
                       {priceChangePercent < 0 ? "Giảm" : "Tăng"}{" "}

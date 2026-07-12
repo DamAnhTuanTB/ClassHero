@@ -1,4 +1,12 @@
-import { Prisma, PublishStatus } from "@prisma/client";
+import { EnrollmentStatus, Prisma, PublishStatus } from "@prisma/client";
+import { chapterDetailSelect } from "#api/modules/learning-paths/selectors/chapter.selects";
+
+const thumbnailFileSelect = {
+  id: true,
+  originalName: true,
+  objectKey: true,
+  publicUrl: true,
+} satisfies Prisma.FileSelect;
 
 export const learningPathSelect = {
   id: true,
@@ -8,8 +16,12 @@ export const learningPathSelect = {
   slug: true,
   originalPriceVnd: true,
   salePriceVnd: true,
+  totalChapterCount: true,
   totalLessonCount: true,
   thumbnailFileId: true,
+  thumbnailFile: {
+    select: thumbnailFileSelect,
+  },
   descriptionJson: true,
   status: true,
   trialEnabled: true,
@@ -19,6 +31,26 @@ export const learningPathSelect = {
   updatedById: true,
   createdAt: true,
   updatedAt: true,
+  _count: {
+    select: {
+      enrollments: {
+        where: {
+          status: EnrollmentStatus.ACTIVE,
+        },
+      },
+    },
+  },
+} satisfies Prisma.LearningPathSelect;
+
+export const learningPathDetailSelect = {
+  ...learningPathSelect,
+  chapters: {
+    where: {
+      deletedAt: null,
+    },
+    select: chapterDetailSelect,
+    orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+  },
 } satisfies Prisma.LearningPathSelect;
 
 export const publicLearningPathSelect = {
@@ -29,6 +61,7 @@ export const publicLearningPathSelect = {
   slug: true,
   originalPriceVnd: true,
   salePriceVnd: true,
+  totalChapterCount: true,
   totalLessonCount: true,
   thumbnailFileId: true,
   descriptionJson: true,

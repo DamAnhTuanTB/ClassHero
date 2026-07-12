@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  GraduationCap,
-  PanelLeftOpen,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { GraduationCap, PanelLeftOpen, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 import { AdminCoursesSidebarContent } from "@/features/admin-courses/components/admin-courses-sidebar-content";
 import { cn } from "@/lib/utils";
@@ -162,22 +157,22 @@ export function AdminCoursesSidebar({
               "relative z-10 flex h-full w-[min(18rem,calc(100vw-2.5rem))] flex-col overflow-y-auto border-r border-[var(--theme-border)] bg-[var(--theme-surface)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-[var(--theme-shadow-lg)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             )}
           >
-              <button
-                type="button"
-                onClick={closeMobileSidebar}
-                className="theme-button-neutral absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-lg transition"
-                aria-label="Đóng sidebar"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <AdminCoursesSidebarContent
-                subtitle={subtitle}
-                items={items}
-                isDarkTheme={isDarkTheme}
-                isCollapsed={false}
-                showAdminProfileTools={showAdminProfileTools}
-                onToggleDarkTheme={onToggleDarkTheme}
-              />
+            <button
+              type="button"
+              onClick={closeMobileSidebar}
+              className="theme-button-neutral absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-lg transition"
+              aria-label="Đóng sidebar"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <AdminCoursesSidebarContent
+              subtitle={subtitle}
+              items={items}
+              isDarkTheme={isDarkTheme}
+              isCollapsed={false}
+              showAdminProfileTools={showAdminProfileTools}
+              onToggleDarkTheme={onToggleDarkTheme}
+            />
           </aside>
         </div>
       ) : null}

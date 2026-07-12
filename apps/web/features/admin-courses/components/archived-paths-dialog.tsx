@@ -9,12 +9,14 @@ import { formatDateTime, formatPrice } from "@/features/admin-courses/utils";
 
 export function ArchivedPathsDialog({
   isOpen,
+  isRestoring = false,
   paths,
   onClose,
   onPermanentDelete,
   onRestore,
 }: {
   isOpen: boolean;
+  isRestoring?: boolean;
   paths: AdminLearningPath[];
   onClose: () => void;
   onPermanentDelete: (pathIds: string[]) => void;
@@ -52,11 +54,7 @@ export function ArchivedPathsDialog({
   }
 
   return (
-    <EditorDialogShell
-      ariaLabel="Lộ trình lưu trữ"
-      isOpen={isOpen}
-      onClose={onClose}
-    >
+    <EditorDialogShell ariaLabel="Lộ trình lưu trữ" isOpen={isOpen} onClose={onClose}>
       <section className="flex min-h-0 flex-1 flex-col">
         <div className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5 sm:py-3 sm:pr-20">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
@@ -103,19 +101,17 @@ export function ArchivedPathsDialog({
                   </label>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p
-                        className="truncate text-sm font-extrabold text-[var(--theme-text-strong)]"
-                      >
+                      <p className="truncate text-sm font-extrabold text-[var(--theme-text-strong)]">
                         {path.title}
                       </p>
                       <StatusBadge status={path.status} />
                     </div>
-                    <div
-                      className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]"
-                    >
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                       <Badge>{subjectLabels[path.subject]}</Badge>
                       <Badge>Lớp {path.grade}</Badge>
-                      <Badge>{formatPrice(path.salePriceVnd ?? path.originalPriceVnd)}</Badge>
+                      <Badge>
+                        {formatPrice(path.salePriceVnd ?? path.originalPriceVnd)}
+                      </Badge>
                       <Badge>Cập nhật {formatDateTime(path.updatedAt)}</Badge>
                     </div>
                   </div>
@@ -123,6 +119,7 @@ export function ArchivedPathsDialog({
                     <button
                       type="button"
                       onClick={() => onRestore([path.id])}
+                      disabled={isRestoring}
                       className="theme-button-success-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition"
                     >
                       <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -156,6 +153,7 @@ export function ArchivedPathsDialog({
               <button
                 type="button"
                 onClick={restoreSelected}
+                disabled={isRestoring}
                 className="theme-button-success inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 text-center text-xs font-extrabold leading-5 transition sm:w-auto sm:px-4 sm:text-sm"
               >
                 <RotateCcw className="h-4 w-4 shrink-0" aria-hidden="true" />

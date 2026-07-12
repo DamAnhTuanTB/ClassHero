@@ -5,7 +5,10 @@ import {
   type AdminPublishStatus,
   type AdminSubject,
 } from "@/features/admin-courses/data";
-import { useAdminLearningPathsQuery } from "@/features/admin-courses/hooks/use-admin-course-queries";
+import {
+  useAdminCourseMutations,
+  useAdminLearningPathsQuery,
+} from "@/features/admin-courses/hooks/use-admin-course-queries";
 import type { LearningPathFormValues } from "@/features/admin-courses/schemas";
 import type {
   EditorMode,
@@ -18,9 +21,9 @@ import {
   getActiveLearningPaths,
   getAdminCourseStats,
   getArchivedLearningPaths,
-  toLearningPathPayload,
-  wait,
 } from "@/features/admin-courses/utils";
+import { useAuthGuard } from "@/features/auth/session";
+import { ApiRequestError } from "@/lib/api-client";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 
 export function useAdminCoursesManager(
@@ -28,6 +31,15 @@ export function useAdminCoursesManager(
   initialThemeMode: AppThemeMode = "light",
 ) {
   const learningPathsQuery = useAdminLearningPathsQuery(initialLearningPaths);
+  const {
+    isAuthHydrated,
+    isAuthorized: hasAdminAccess,
+    session,
+  } = useAuthGuard({
+    allowedRoles: ["ADMIN"],
+    authError: learningPathsQuery.error,
+  });
+  const mutations = useAdminCourseMutations();
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -49,9 +61,9 @@ export function useAdminCoursesManager(
   const [gradeFilter, setGradeFilter] = useState<number | "ALL">("ALL");
   const [sortKey, setSortKey] = useState<LearningPathSortKey>("title");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [isSavingPath, setIsSavingPath] = useState(false);
 
   const editingPath = paths.find((path) => path.id === editingPathId) ?? null;
+  const isSavingPath = mutations.createPath.isPending || mutations.updatePath.isPending;
 
   useEffect(() => {
     if (learningPathsQuery.data) {
@@ -131,42 +143,30 @@ export function useAdminCoursesManager(
   }
 
   async function savePath(values: LearningPathFormValues) {
-    setIsSavingPath(true);
-    await wait(420);
-    const payload = toLearningPathPayload(values);
-
-    if (pathEditorMode === "create") {
-      const createdPath: AdminLearningPath = {
-        ...payload,
-        id: `path-${Date.now()}`,
-        enrolledStudentCount: 0,
-        totalChapterCount: 0,
-        totalLessonCount: 0,
-        updatedAt: new Date().toISOString(),
-        chapters: [],
-      };
-      setPaths((current) => [createdPath, ...current]);
-      setEditingPathId(createdPath.id);
-      setPathEditorMode("edit");
-      setIsPathEditorOpen(false);
-      toast.success("Đã tạo lộ trình", {
-        description: "Mở chi tiết lộ trình để thêm chương học và buổi học.",
-      });
-    } else if (editingPath) {
-      setPaths((current) =>
-        current.map((path) =>
-          path.id === editingPath.id
-            ? { ...path, ...payload, updatedAt: new Date().toISOString() }
-            : path,
-        ),
-      );
-      setIsPathEditorOpen(false);
-      toast.success("Đã lưu lộ trình", {
-        description: "Thông tin quản trị đã được cập nhật trên màn hình.",
+    try {
+      if (pathEditorMode === "create") {
+        const createdPath = await mutations.createPath.mutateAsync(values);
+        setEditingPathId(createdPath.id);
+        setPathEditorMode("edit");
+        setIsPathEditorOpen(false);
+        toast.success("Đã tạo lộ trình", {
+          description: "Mở chi tiết lộ trình để thêm chương học và buổi học.",
+        });
+      } else if (editingPath) {
+        await mutations.updatePath.mutateAsync({
+          pathId: editingPath.id,
+          values,
+        });
+        setIsPathEditorOpen(false);
+        toast.success("Đã lưu lộ trình", {
+          description: "Thông tin quản trị đã được cập nhật.",
+        });
+      }
+    } catch (error) {
+      toast.error("Chưa lưu được lộ trình", {
+        description: getErrorMessage(error),
       });
     }
-
-    setIsSavingPath(false);
   }
 
   function toggleSelectPath(pathId: string) {
@@ -212,7 +212,7 @@ export function useAdminCoursesManager(
     requestDeletePaths(selectedPathIds);
   }
 
-  function confirmDeletePath() {
+  async function confirmDeletePath() {
     if (deletingPaths.length === 0) {
       return;
     }
@@ -220,46 +220,58 @@ export function useAdminCoursesManager(
     const pathIdSet = new Set(deletingPaths.map((path) => path.id));
     const deletedCount = deletingPaths.length;
 
-    setPaths((current) =>
-      current.map((path) =>
-        pathIdSet.has(path.id)
-          ? { ...path, status: "ARCHIVED", updatedAt: new Date().toISOString() }
-          : path,
-      ),
-    );
-    toast.info(
-      deletedCount === 1 ? "Đã xóa lộ trình" : `Đã xóa ${deletedCount} lộ trình`,
-      {
-        description: "Lộ trình đã được chuyển vào thùng rác.",
-      },
-    );
-    setIsPathEditorOpen(false);
-    setSelectedPathIds((current) => current.filter((pathId) => !pathIdSet.has(pathId)));
-    setDeletingPathIds([]);
+    try {
+      await Promise.all(
+        deletingPaths.map((path) =>
+          mutations.archivePath.mutateAsync({
+            pathId: path.id,
+          }),
+        ),
+      );
+      toast.info(
+        deletedCount === 1 ? "Đã xóa lộ trình" : `Đã xóa ${deletedCount} lộ trình`,
+        {
+          description: "Lộ trình đã được chuyển vào thùng rác.",
+        },
+      );
+      setIsPathEditorOpen(false);
+      setSelectedPathIds((current) => current.filter((pathId) => !pathIdSet.has(pathId)));
+      setDeletingPathIds([]);
+    } catch (error) {
+      toast.error("Chưa xóa được lộ trình", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
-  function restorePaths(pathIds: string[]) {
+  async function restorePaths(pathIds: string[]) {
     const pathIdSet = new Set(pathIds);
     const restoredCount = archivedPaths.filter((path) => pathIdSet.has(path.id)).length;
     if (restoredCount === 0) {
       return;
     }
 
-    setPaths((current) =>
-      current.map((path) =>
-        pathIdSet.has(path.id) && path.status === "ARCHIVED"
-          ? { ...path, status: "DRAFT", updatedAt: new Date().toISOString() }
-          : path,
-      ),
-    );
-    toast.success(
-      restoredCount === 1
-        ? "Đã khôi phục lộ trình"
-        : `Đã khôi phục ${restoredCount} lộ trình`,
-      {
-        description: "Lộ trình trở lại danh sách ở trạng thái Nháp.",
-      },
-    );
+    try {
+      await Promise.all(
+        pathIds.map((pathId) =>
+          mutations.restorePath.mutateAsync({
+            pathId,
+          }),
+        ),
+      );
+      toast.success(
+        restoredCount === 1
+          ? "Đã khôi phục lộ trình"
+          : `Đã khôi phục ${restoredCount} lộ trình`,
+        {
+          description: "Lộ trình trở lại danh sách ở trạng thái Nháp.",
+        },
+      );
+    } catch (error) {
+      toast.error("Chưa khôi phục được lộ trình", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
   function requestPermanentDeletePaths(pathIds: string[]) {
@@ -275,24 +287,35 @@ export function useAdminCoursesManager(
     setPermanentDeletingPathIds(archivedIds);
   }
 
-  function confirmPermanentDeletePaths() {
+  async function confirmPermanentDeletePaths() {
     if (permanentDeletingPaths.length === 0) {
       return;
     }
 
-    const pathIdSet = new Set(permanentDeletingPaths.map((path) => path.id));
     const deletedCount = permanentDeletingPaths.length;
 
-    setPaths((current) => current.filter((path) => !pathIdSet.has(path.id)));
-    toast.success(
-      deletedCount === 1
-        ? "Đã xóa vĩnh viễn lộ trình"
-        : `Đã xóa vĩnh viễn ${deletedCount} lộ trình`,
-      {
-        description: "Lộ trình đã được gỡ khỏi thùng rác.",
-      },
-    );
-    setPermanentDeletingPathIds([]);
+    try {
+      await Promise.all(
+        permanentDeletingPaths.map((path) =>
+          mutations.deletePathPermanently.mutateAsync({
+            pathId: path.id,
+          }),
+        ),
+      );
+      toast.success(
+        deletedCount === 1
+          ? "Đã xóa vĩnh viễn lộ trình"
+          : `Đã xóa vĩnh viễn ${deletedCount} lộ trình`,
+        {
+          description: "Lộ trình đã được gỡ khỏi thùng rác.",
+        },
+      );
+      setPermanentDeletingPathIds([]);
+    } catch (error) {
+      toast.error("Chưa xóa vĩnh viễn được lộ trình", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
   function closePermanentDeleteConfirm() {
@@ -303,11 +326,12 @@ export function useAdminCoursesManager(
     void learningPathsQuery.refetch();
   }
 
-  const viewState: ViewState = learningPathsQuery.isLoading
-    ? "loading"
-    : learningPathsQuery.isError
-      ? "error"
-      : "ready";
+  const viewState: ViewState =
+    !isAuthHydrated || !hasAdminAccess || learningPathsQuery.isLoading
+      ? "loading"
+      : learningPathsQuery.isError || !session?.accessToken
+        ? "error"
+        : "ready";
 
   return {
     allFilteredPathsSelected,
@@ -358,5 +382,17 @@ export function useAdminCoursesManager(
       toggleSelectPath,
       toggleSort,
     },
+    uploadCover: (file: File) => mutations.uploadCover.mutateAsync(file),
+    isDeletingPath: mutations.archivePath.isPending,
+    isPermanentDeletingPath: mutations.deletePathPermanently.isPending,
+    isRestoringPath: mutations.restorePath.isPending,
   };
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    return error.message;
+  }
+
+  return "Vui lòng thử lại sau ít phút.";
 }

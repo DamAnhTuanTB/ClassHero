@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { HomeAuthActions } from "@/features/public-home/components/home-auth-actions";
 
 export default function HomePage() {
   return (
@@ -13,26 +13,7 @@ export default function HomePage() {
         Nền Next.js App Router đã sẵn sàng cho các màn hình public, student, parent và
         admin trong các subtask tiếp theo.
       </p>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <Link
-          href="/login"
-          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--theme-primary)] px-4 text-sm font-semibold text-[var(--theme-primary-foreground)] transition hover:bg-[var(--theme-primary-hover)]"
-        >
-          Đăng nhập
-        </Link>
-        <Link
-          href="/register/student"
-          className="theme-button-subtle inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition"
-        >
-          Đăng ký học sinh
-        </Link>
-        <Link
-          href="/register/parent"
-          className="theme-button-subtle inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition"
-        >
-          Đăng ký phụ huynh
-        </Link>
-      </div>
+      <HomeAuthActions />
     </main>
   );
 }

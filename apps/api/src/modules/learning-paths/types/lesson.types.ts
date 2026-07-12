@@ -8,6 +8,7 @@ export type LessonRecord = Prisma.LessonGetPayload<{
 export type LessonResponse = {
   id: string;
   learningPathId: string;
+  chapterId: string;
   orderIndex: number;
   title: string;
   shortDescription: string | null;

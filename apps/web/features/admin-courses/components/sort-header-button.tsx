@@ -38,10 +38,7 @@ export function SortHeaderButton({
     >
       <span>{label}</span>
       <Icon
-        className={cn(
-          "h-3.5 w-3.5 shrink-0",
-          isActive ? "opacity-100" : "opacity-70",
-        )}
+        className={cn("h-3.5 w-3.5 shrink-0", isActive ? "opacity-100" : "opacity-70")}
         aria-hidden="true"
       />
     </button>

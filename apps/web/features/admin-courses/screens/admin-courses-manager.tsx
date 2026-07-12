@@ -53,7 +53,10 @@ export function AdminCoursesManager({
     gradeFilter,
     isArchiveDialogOpen,
     isDarkTheme,
+    isDeletingPath,
+    isPermanentDeletingPath,
     isPathEditorOpen,
+    isRestoringPath,
     isSidebarCollapsed,
     isSavingPath,
     pathEditorMode,
@@ -66,6 +69,7 @@ export function AdminCoursesManager({
     statusFilter,
     subjectFilter,
     viewState,
+    uploadCover,
   } = useAdminCoursesManager(initialLearningPaths, initialThemeMode);
   const deleteTargetLabel =
     deletingPaths.length === 1
@@ -73,10 +77,7 @@ export function AdminCoursesManager({
       : `${deletingPaths.length} lộ trình đã chọn`;
 
   return (
-    <main
-      data-admin-theme="true"
-      className="theme-page"
-    >
+    <main data-admin-theme="true" className="theme-page">
       <div
         className={cn(
           "grid min-h-screen transition-[grid-template-columns] duration-200",
@@ -139,6 +140,7 @@ export function AdminCoursesManager({
           isSaving={isSavingPath}
           selectedPath={editingPath}
           onSubmit={actions.savePath}
+          onUploadCover={uploadCover}
           onClose={actions.closePathEditor}
         />
       ) : null}
@@ -148,6 +150,7 @@ export function AdminCoursesManager({
           confirmLabel={deletingPaths.length > 1 ? "Xóa các lộ trình" : "Xóa lộ trình"}
           description={`Bạn có thực sự muốn xóa ${deleteTargetLabel} không? Lộ trình sẽ được chuyển vào thùng rác.`}
           isOpen={deletingPaths.length > 0}
+          isConfirming={isDeletingPath}
           itemName={deleteTargetLabel}
           onCancel={actions.closeDeleteConfirm}
           onConfirm={actions.confirmDeletePath}
@@ -156,6 +159,7 @@ export function AdminCoursesManager({
       {isArchiveDialogOpen ? (
         <ArchivedPathsDialog
           isOpen={isArchiveDialogOpen}
+          isRestoring={isRestoringPath}
           paths={archivedPaths}
           onClose={actions.closeArchiveDialog}
           onPermanentDelete={actions.requestPermanentDeletePaths}
@@ -172,6 +176,7 @@ export function AdminCoursesManager({
               : `${permanentDeletingPaths.length} lộ trình đã chọn`
           } không? Hành động này không thể khôi phục.`}
           isOpen={permanentDeletingPaths.length > 0}
+          isConfirming={isPermanentDeletingPath}
           itemName={
             permanentDeletingPaths.length === 1
               ? (permanentDeletingPaths[0]?.title ?? "lộ trình này")

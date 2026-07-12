@@ -30,12 +30,18 @@ export function PathEditor({
   isSaving,
   onClose,
   onSubmit,
+  onUploadCover,
 }: {
   mode: EditorMode;
   form: UseFormReturn<LearningPathFormValues>;
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (values: LearningPathFormValues) => void | Promise<void>;
+  onUploadCover: (file: File) => Promise<{
+    fileId: string;
+    fileName: string;
+    imageUrl: string;
+  }>;
 }) {
   return (
     <form
@@ -68,7 +74,13 @@ export function PathEditor({
           <PathCoverUpload
             fileName={form.watch("thumbnailFileName")}
             imageUrl={form.watch("thumbnailImageUrl")}
+            onUploadFile={onUploadCover}
             onChange={(value) => {
+              form.setValue("thumbnailFileId", value.fileId, {
+                shouldDirty: true,
+                shouldTouch: true,
+                shouldValidate: true,
+              });
               form.setValue("thumbnailFileName", value.fileName, {
                 shouldDirty: true,
                 shouldTouch: true,

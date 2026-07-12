@@ -22,9 +22,7 @@ export function PathDescriptionField({
         isOptional
       />
       <div className="relative mt-2">
-        <span
-          className="pointer-events-none absolute left-4 top-4 text-[var(--theme-text-muted)]"
-        >
+        <span className="pointer-events-none absolute left-4 top-4 text-[var(--theme-text-muted)]">
           <FileText className="h-5 w-5" aria-hidden="true" />
         </span>
         <textarea

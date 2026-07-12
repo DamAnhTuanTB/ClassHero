@@ -36,22 +36,22 @@ export class AdminLessonsController {
     private readonly lessonsService: LessonsService,
   ) {}
 
-  @Get("admin/learning-paths/:learningPathId/lessons")
-  @ApiOperation({ summary: "List lessons in one learning path for admin" })
-  listByLearningPath(@Param("learningPathId") learningPathId: string) {
-    return this.lessonsService.listForAdmin(learningPathId);
+  @Get("admin/chapters/:chapterId/lessons")
+  @ApiOperation({ summary: "List lessons in one chapter for admin" })
+  listByChapter(@Param("chapterId") chapterId: string) {
+    return this.lessonsService.listForAdmin(chapterId);
   }
 
-  @Post("admin/learning-paths/:learningPathId/lessons")
-  @ApiOperation({ summary: "Create a lesson in one learning path" })
+  @Post("admin/chapters/:chapterId/lessons")
+  @ApiOperation({ summary: "Create a lesson in one chapter" })
   create(
-    @Param("learningPathId") learningPathId: string,
+    @Param("chapterId") chapterId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateLessonDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.lessonsService.create(
-      learningPathId,
+      chapterId,
       user.id,
       dto,
       getRequestContext(request),

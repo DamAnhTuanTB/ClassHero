@@ -2,7 +2,7 @@ const defaultApiBaseUrl = "http://localhost:4000/api/v1";
 
 export type ApiRequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
-  body?: unknown;
+  body?: BodyInit | unknown;
   token?: string;
   headers?: HeadersInit;
 };
@@ -93,8 +93,10 @@ export async function apiRequest<TData>(
   options: ApiRequestOptions = {},
 ): Promise<TData> {
   const headers = new Headers(options.headers);
+  const isFormDataBody =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
 
-  if (options.body !== undefined && !headers.has("Content-Type")) {
+  if (options.body !== undefined && !isFormDataBody && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -102,10 +104,17 @@ export async function apiRequest<TData>(
     headers.set("Authorization", `Bearer ${options.token}`);
   }
 
+  const requestBody: BodyInit | undefined =
+    options.body === undefined
+      ? undefined
+      : isFormDataBody
+        ? (options.body as BodyInit)
+        : JSON.stringify(options.body);
+
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method: options.method ?? "GET",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: requestBody,
   });
   const payload = await readJsonResponse(response);
 

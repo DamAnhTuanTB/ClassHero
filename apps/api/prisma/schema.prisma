@@ -87,6 +87,7 @@ enum DiscountType {
 }
 
 enum FileProvider {
+  MINIO_LOCAL
   CLOUDFLARE_R2
 }
 
@@ -261,69 +262,71 @@ enum BackgroundJobStatus {
 }
 
 model User {
-  id                     String               @id @default(uuid()) @db.Uuid
-  role                   UserRole
-  status                 UserStatus           @default(ACTIVE)
-  email                  String?              @unique
-  phone                  String?              @unique
-  username               String?              @unique
-  passwordHash           String               @map("password_hash")
-  fullName               String?              @map("full_name")
-  gender                 Gender               @default(UNKNOWN)
-  dateOfBirth            DateTime?            @map("date_of_birth") @db.Date
-  avatarFileId           String?              @map("avatar_file_id") @db.Uuid
-  avatarFile             File?                @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
-  lastLoginAt            DateTime?            @map("last_login_at")
-  emailVerifiedAt        DateTime?            @map("email_verified_at")
-  phoneVerifiedAt        DateTime?            @map("phone_verified_at")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-  deletedAt              DateTime?            @map("deleted_at")
-  studentProfile         StudentProfile?
-  parentProfile          ParentProfile?
-  uploadedFiles          File[]               @relation("FileUploadedBy")
-  refreshTokens          RefreshToken[]
-  passwordResetTokens    PasswordResetToken[]
-  parentLinksAsParent    ParentStudentLink[]  @relation("ParentStudentLinksParent")
-  parentLinksAsStudent   ParentStudentLink[]  @relation("ParentStudentLinksStudent")
-  backgroundJobs         BackgroundJob[]      @relation("BackgroundJobOwner")
-  auditLogs              AuditLog[]           @relation("AuditLogActor")
-  createdLearningPaths   LearningPath[]       @relation("LearningPathCreatedBy")
-  updatedLearningPaths   LearningPath[]       @relation("LearningPathUpdatedBy")
-  createdLessons         Lesson[]             @relation("LessonCreatedBy")
-  updatedLessons         Lesson[]             @relation("LessonUpdatedBy")
-  createdLessonSummaries LessonSummary[]      @relation("LessonSummaryCreatedBy")
-  updatedLessonSummaries LessonSummary[]      @relation("LessonSummaryUpdatedBy")
-  enrollmentsAsStudent   Enrollment[]         @relation("EnrollmentStudent")
-  enrollmentsPaid        Enrollment[]         @relation("EnrollmentPaidBy")
-  lessonProgress         LessonProgress[]     @relation("LessonProgressStudent")
-  generatedQuizSets      QuizSet[]            @relation("QuizSetGeneratedBy")
-  createdQuizSets        QuizSet[]            @relation("QuizSetCreatedBy")
-  updatedQuizSets        QuizSet[]            @relation("QuizSetUpdatedBy")
-  quizAttempts           QuizAttempt[]        @relation("QuizAttemptStudent")
-  generatedFlashcardSets FlashcardSet[]       @relation("FlashcardSetGeneratedBy")
-  createdFlashcardSets   FlashcardSet[]       @relation("FlashcardSetCreatedBy")
-  updatedFlashcardSets   FlashcardSet[]       @relation("FlashcardSetUpdatedBy")
-  flashcardProgress      FlashcardProgress[]  @relation("FlashcardProgressStudent")
-  generatedTestSets      TestSet[]            @relation("TestSetGeneratedBy")
-  createdTestSets        TestSet[]            @relation("TestSetCreatedBy")
-  updatedTestSets        TestSet[]            @relation("TestSetUpdatedBy")
-  testAttempts           TestAttempt[]        @relation("TestAttemptStudent")
-  studentNotes           StudentNote[]        @relation("StudentNoteStudent")
-  lessonVideoComments    LessonVideoComment[] @relation("LessonVideoCommentStudent")
-  favorites              Favorite[]           @relation("FavoriteStudent")
-  createdDiscountCodes   DiscountCode[]       @relation("DiscountCodeCreatedBy")
-  paymentsAsPayer        Payment[]            @relation("PaymentPayer")
-  paymentsAsStudent      Payment[]            @relation("PaymentStudent")
-  notificationsReceived  Notification[]       @relation("NotificationRecipient")
-  notificationsActed     Notification[]       @relation("NotificationActor")
-  reportsSubmitted       Report[]             @relation("ReportReporter")
-  reportActions          ReportAction[]       @relation("ReportActionAdmin")
-  aiGenerationsCreated   AiGeneration[]       @relation("AiGenerationCreatedBy")
-  aiChatSessions         AiChatSession[]      @relation("AiChatSessionStudent")
-  xpEvents               XpEvent[]            @relation("XpEventStudent")
-  createdNewsItems       NewsItem[]           @relation("NewsItemCreatedBy")
-  updatedNewsItems       NewsItem[]           @relation("NewsItemUpdatedBy")
+  id                          String                @id @default(uuid()) @db.Uuid
+  role                        UserRole
+  status                      UserStatus            @default(ACTIVE)
+  email                       String?               @unique
+  phone                       String?               @unique
+  username                    String?               @unique
+  passwordHash                String                @map("password_hash")
+  fullName                    String?               @map("full_name")
+  gender                      Gender                @default(UNKNOWN)
+  dateOfBirth                 DateTime?             @map("date_of_birth") @db.Date
+  avatarFileId                String?               @map("avatar_file_id") @db.Uuid
+  avatarFile                  File?                 @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  lastLoginAt                 DateTime?             @map("last_login_at")
+  emailVerifiedAt             DateTime?             @map("email_verified_at")
+  phoneVerifiedAt             DateTime?             @map("phone_verified_at")
+  createdAt                   DateTime              @default(now()) @map("created_at")
+  updatedAt                   DateTime              @updatedAt @map("updated_at")
+  deletedAt                   DateTime?             @map("deleted_at")
+  studentProfile              StudentProfile?
+  parentProfile               ParentProfile?
+  uploadedFiles               File[]                @relation("FileUploadedBy")
+  refreshTokens               RefreshToken[]
+  passwordResetTokens         PasswordResetToken[]
+  parentLinksAsParent         ParentStudentLink[]   @relation("ParentStudentLinksParent")
+  parentLinksAsStudent        ParentStudentLink[]   @relation("ParentStudentLinksStudent")
+  backgroundJobs              BackgroundJob[]       @relation("BackgroundJobOwner")
+  auditLogs                   AuditLog[]            @relation("AuditLogActor")
+  createdLearningPaths        LearningPath[]        @relation("LearningPathCreatedBy")
+  updatedLearningPaths        LearningPath[]        @relation("LearningPathUpdatedBy")
+  createdLearningPathChapters LearningPathChapter[] @relation("LearningPathChapterCreatedBy")
+  updatedLearningPathChapters LearningPathChapter[] @relation("LearningPathChapterUpdatedBy")
+  createdLessons              Lesson[]              @relation("LessonCreatedBy")
+  updatedLessons              Lesson[]              @relation("LessonUpdatedBy")
+  createdLessonSummaries      LessonSummary[]       @relation("LessonSummaryCreatedBy")
+  updatedLessonSummaries      LessonSummary[]       @relation("LessonSummaryUpdatedBy")
+  enrollmentsAsStudent        Enrollment[]          @relation("EnrollmentStudent")
+  enrollmentsPaid             Enrollment[]          @relation("EnrollmentPaidBy")
+  lessonProgress              LessonProgress[]      @relation("LessonProgressStudent")
+  generatedQuizSets           QuizSet[]             @relation("QuizSetGeneratedBy")
+  createdQuizSets             QuizSet[]             @relation("QuizSetCreatedBy")
+  updatedQuizSets             QuizSet[]             @relation("QuizSetUpdatedBy")
+  quizAttempts                QuizAttempt[]         @relation("QuizAttemptStudent")
+  generatedFlashcardSets      FlashcardSet[]        @relation("FlashcardSetGeneratedBy")
+  createdFlashcardSets        FlashcardSet[]        @relation("FlashcardSetCreatedBy")
+  updatedFlashcardSets        FlashcardSet[]        @relation("FlashcardSetUpdatedBy")
+  flashcardProgress           FlashcardProgress[]   @relation("FlashcardProgressStudent")
+  generatedTestSets           TestSet[]             @relation("TestSetGeneratedBy")
+  createdTestSets             TestSet[]             @relation("TestSetCreatedBy")
+  updatedTestSets             TestSet[]             @relation("TestSetUpdatedBy")
+  testAttempts                TestAttempt[]         @relation("TestAttemptStudent")
+  studentNotes                StudentNote[]         @relation("StudentNoteStudent")
+  lessonVideoComments         LessonVideoComment[]  @relation("LessonVideoCommentStudent")
+  favorites                   Favorite[]            @relation("FavoriteStudent")
+  createdDiscountCodes        DiscountCode[]        @relation("DiscountCodeCreatedBy")
+  paymentsAsPayer             Payment[]             @relation("PaymentPayer")
+  paymentsAsStudent           Payment[]             @relation("PaymentStudent")
+  notificationsReceived       Notification[]        @relation("NotificationRecipient")
+  notificationsActed          Notification[]        @relation("NotificationActor")
+  reportsSubmitted            Report[]              @relation("ReportReporter")
+  reportActions               ReportAction[]        @relation("ReportActionAdmin")
+  aiGenerationsCreated        AiGeneration[]        @relation("AiGenerationCreatedBy")
+  aiChatSessions              AiChatSession[]       @relation("AiChatSessionStudent")
+  xpEvents                    XpEvent[]             @relation("XpEventStudent")
+  createdNewsItems            NewsItem[]            @relation("NewsItemCreatedBy")
+  updatedNewsItems            NewsItem[]            @relation("NewsItemUpdatedBy")
 
   @@index([role, status])
   @@map("users")
@@ -462,31 +465,33 @@ model BackgroundJob {
 }
 
 model LearningPath {
-  id               String        @id @default(uuid()) @db.Uuid
-  subject          Subject
-  grade            Int
-  title            String
-  slug             String        @unique
-  originalPriceVnd Int           @map("original_price_vnd")
-  salePriceVnd     Int?          @map("sale_price_vnd")
-  totalLessonCount Int           @default(0) @map("total_lesson_count")
-  thumbnailFileId  String?       @map("thumbnail_file_id") @db.Uuid
-  thumbnailFile    File?         @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
-  descriptionJson  Json?         @map("description_json")
-  status           PublishStatus @default(DRAFT)
-  trialEnabled     Boolean       @default(true) @map("trial_enabled")
-  publishedAt      DateTime?     @map("published_at")
-  sortOrder        Int           @default(0) @map("sort_order")
-  createdById      String?       @map("created_by_id") @db.Uuid
-  createdBy        User?         @relation("LearningPathCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById      String?       @map("updated_by_id") @db.Uuid
-  updatedBy        User?         @relation("LearningPathUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
-  deletedAt        DateTime?     @map("deleted_at")
-  lessons          Lesson[]
-  enrollments      Enrollment[]
-  payments         Payment[]
+  id                String                @id @default(uuid()) @db.Uuid
+  subject           Subject
+  grade             Int
+  title             String
+  slug              String                @unique
+  originalPriceVnd  Int                   @map("original_price_vnd")
+  salePriceVnd      Int?                  @map("sale_price_vnd")
+  totalChapterCount Int                   @default(0) @map("total_chapter_count")
+  totalLessonCount  Int                   @default(0) @map("total_lesson_count")
+  thumbnailFileId   String?               @map("thumbnail_file_id") @db.Uuid
+  thumbnailFile     File?                 @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
+  descriptionJson   Json?                 @map("description_json")
+  status            PublishStatus         @default(DRAFT)
+  trialEnabled      Boolean               @default(true) @map("trial_enabled")
+  publishedAt       DateTime?             @map("published_at")
+  sortOrder         Int                   @default(0) @map("sort_order")
+  createdById       String?               @map("created_by_id") @db.Uuid
+  createdBy         User?                 @relation("LearningPathCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById       String?               @map("updated_by_id") @db.Uuid
+  updatedBy         User?                 @relation("LearningPathUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  deletedAt         DateTime?             @map("deleted_at")
+  chapters          LearningPathChapter[]
+  lessons           Lesson[]
+  enrollments       Enrollment[]
+  payments          Payment[]
 
   @@index([subject, grade])
   @@index([status])
@@ -497,10 +502,37 @@ model LearningPath {
   @@map("learning_paths")
 }
 
+model LearningPathChapter {
+  id             String        @id @default(uuid()) @db.Uuid
+  learningPathId String        @map("learning_path_id") @db.Uuid
+  learningPath   LearningPath  @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  orderIndex     Int           @map("order_index")
+  title          String
+  overview       String?
+  objectivesJson Json?         @map("objectives_json")
+  status         PublishStatus @default(DRAFT)
+  createdById    String?       @map("created_by_id") @db.Uuid
+  createdBy      User?         @relation("LearningPathChapterCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById    String?       @map("updated_by_id") @db.Uuid
+  updatedBy      User?         @relation("LearningPathChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
+  lessons        Lesson[]
+
+  @@unique([learningPathId, orderIndex])
+  @@index([learningPathId, status])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("learning_path_chapters")
+}
+
 model Lesson {
   id                 String               @id @default(uuid()) @db.Uuid
   learningPathId     String               @map("learning_path_id") @db.Uuid
   learningPath       LearningPath         @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  chapterId          String               @map("chapter_id") @db.Uuid
+  chapter            LearningPathChapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   orderIndex         Int                  @map("order_index")
   title              String
   shortDescription   String?              @map("short_description")
@@ -541,7 +573,8 @@ model Lesson {
   aiChatSessions     AiChatSession[]
   xpEvents           XpEvent[]
 
-  @@unique([learningPathId, orderIndex])
+  @@unique([chapterId, orderIndex])
+  @@index([chapterId, status])
   @@index([learningPathId, status])
   @@index([scheduledAt])
   @@index([examOpenAt])

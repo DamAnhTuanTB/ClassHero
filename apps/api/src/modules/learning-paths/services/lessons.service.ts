@@ -10,7 +10,7 @@ import {
   handleKnownPrismaError,
   normalizeOptionalText,
   normalizeText,
-  throwLearningPathNotFound,
+  throwChapterNotFound,
   throwLessonNotFound,
   toInputJson,
 } from "#api/modules/learning-paths/utils/lesson.helpers";
@@ -22,12 +22,12 @@ import type { RequestContext } from "#api/modules/learning-paths/types/lesson.ty
 export class LessonsService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async listForAdmin(learningPathId: string) {
-    await this.assertLearningPathExists(learningPathId);
+  async listForAdmin(chapterId: string) {
+    await this.assertChapterExists(chapterId);
 
     const lessons = await this.prisma.lesson.findMany({
       where: {
-        learningPathId,
+        chapterId,
         deletedAt: null,
       },
       select: lessonSelect,
@@ -43,7 +43,7 @@ export class LessonsService {
   }
 
   async create(
-    learningPathId: string,
+    chapterId: string,
     actorUserId: string,
     dto: CreateLessonDto,
     context: RequestContext = {},
@@ -52,19 +52,29 @@ export class LessonsService {
 
     try {
       const lesson = await this.prisma.$transaction(async (tx) => {
-        const learningPath = await tx.learningPath.findFirst({
-          where: { id: learningPathId, deletedAt: null },
-          select: { id: true },
+        const chapter = await tx.learningPathChapter.findFirst({
+          where: {
+            id: chapterId,
+            deletedAt: null,
+            learningPath: {
+              deletedAt: null,
+            },
+          },
+          select: {
+            id: true,
+            learningPathId: true,
+          },
         });
 
-        if (!learningPath) {
-          throwLearningPathNotFound();
+        if (!chapter) {
+          throwChapterNotFound();
         }
 
         const status = dto.status ?? PublishStatus.DRAFT;
         const created = await tx.lesson.create({
           data: {
-            learningPathId,
+            learningPathId: chapter.learningPathId,
+            chapterId: chapter.id,
             orderIndex: dto.orderIndex,
             title: normalizeText(dto.title),
             shortDescription: normalizeOptionalText(dto.shortDescription),
@@ -80,7 +90,7 @@ export class LessonsService {
         });
 
         await tx.learningPath.update({
-          where: { id: learningPathId },
+          where: { id: chapter.learningPathId },
           data: {
             totalLessonCount: {
               increment: 1,
@@ -128,6 +138,9 @@ export class LessonsService {
           where: {
             id: lessonId,
             deletedAt: null,
+            chapter: {
+              deletedAt: null,
+            },
             learningPath: {
               deletedAt: null,
             },
@@ -139,11 +152,14 @@ export class LessonsService {
           throwLessonNotFound();
         }
 
+        if (dto.orderIndex !== undefined && dto.orderIndex !== before.orderIndex) {
+          await this.moveLessonOrder(tx, before, dto.orderIndex);
+        }
+
         const status = dto.status ?? before.status;
         const updated = await tx.lesson.update({
           where: { id: lessonId },
           data: {
-            ...(dto.orderIndex !== undefined ? { orderIndex: dto.orderIndex } : {}),
             ...(dto.title !== undefined ? { title: normalizeText(dto.title) } : {}),
             ...(dto.shortDescription !== undefined
               ? { shortDescription: normalizeOptionalText(dto.shortDescription) }
@@ -195,6 +211,9 @@ export class LessonsService {
           where: {
             id: lessonId,
             deletedAt: null,
+            chapter: {
+              deletedAt: null,
+            },
             learningPath: {
               deletedAt: null,
             },
@@ -208,7 +227,7 @@ export class LessonsService {
 
         const archivedOrderIndex = await this.getNextArchivedOrderIndex(
           tx,
-          before.learningPathId,
+          before.chapterId,
         );
         const deleted = await tx.lesson.update({
           where: { id: lessonId },
@@ -258,6 +277,9 @@ export class LessonsService {
           where: {
             id: lessonId,
             deletedAt: null,
+            chapter: {
+              deletedAt: null,
+            },
             learningPath: {
               deletedAt: null,
             },
@@ -300,14 +322,20 @@ export class LessonsService {
     }
   }
 
-  private async assertLearningPathExists(learningPathId: string) {
-    const learningPath = await this.prisma.learningPath.findFirst({
-      where: { id: learningPathId, deletedAt: null },
+  private async assertChapterExists(chapterId: string) {
+    const chapter = await this.prisma.learningPathChapter.findFirst({
+      where: {
+        id: chapterId,
+        deletedAt: null,
+        learningPath: {
+          deletedAt: null,
+        },
+      },
       select: { id: true },
     });
 
-    if (!learningPath) {
-      throwLearningPathNotFound();
+    if (!chapter) {
+      throwChapterNotFound();
     }
   }
 
@@ -316,6 +344,9 @@ export class LessonsService {
       where: {
         id: lessonId,
         deletedAt: null,
+        chapter: {
+          deletedAt: null,
+        },
         learningPath: {
           deletedAt: null,
         },
@@ -332,14 +363,11 @@ export class LessonsService {
 
   private async getNextArchivedOrderIndex(
     tx: Prisma.TransactionClient,
-    learningPathId: string,
+    chapterId: string,
   ) {
     const lesson = await tx.lesson.findFirst({
       where: {
-        learningPathId,
-        deletedAt: {
-          not: null,
-        },
+        chapterId,
         orderIndex: {
           lt: 0,
         },
@@ -353,5 +381,72 @@ export class LessonsService {
     });
 
     return lesson ? lesson.orderIndex - 1 : -1;
+  }
+
+  private async moveLessonOrder(
+    tx: Prisma.TransactionClient,
+    before: Prisma.LessonGetPayload<{ select: typeof lessonSelect }>,
+    targetOrderIndex: number,
+  ) {
+    const maxOrder = await tx.lesson.count({
+      where: {
+        chapterId: before.chapterId,
+        deletedAt: null,
+      },
+    });
+    const normalizedTarget = Math.min(Math.max(targetOrderIndex, 1), maxOrder);
+
+    if (normalizedTarget === before.orderIndex) {
+      return;
+    }
+
+    const temporaryOrderIndex = await this.getNextArchivedOrderIndex(
+      tx,
+      before.chapterId,
+    );
+
+    await tx.lesson.update({
+      where: { id: before.id },
+      data: { orderIndex: temporaryOrderIndex },
+    });
+
+    if (normalizedTarget < before.orderIndex) {
+      await tx.lesson.updateMany({
+        where: {
+          chapterId: before.chapterId,
+          deletedAt: null,
+          orderIndex: {
+            gte: normalizedTarget,
+            lt: before.orderIndex,
+          },
+        },
+        data: {
+          orderIndex: {
+            increment: 1,
+          },
+        },
+      });
+    } else {
+      await tx.lesson.updateMany({
+        where: {
+          chapterId: before.chapterId,
+          deletedAt: null,
+          orderIndex: {
+            gt: before.orderIndex,
+            lte: normalizedTarget,
+          },
+        },
+        data: {
+          orderIndex: {
+            decrement: 1,
+          },
+        },
+      });
+    }
+
+    await tx.lesson.update({
+      where: { id: before.id },
+      data: { orderIndex: normalizedTarget },
+    });
   }
 }

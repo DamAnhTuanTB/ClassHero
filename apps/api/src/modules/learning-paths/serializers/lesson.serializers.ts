@@ -7,6 +7,7 @@ export function serializeLesson(record: LessonRecord): LessonResponse {
   return {
     id: record.id,
     learningPathId: record.learningPathId,
+    chapterId: record.chapterId,
     orderIndex: record.orderIndex,
     title: record.title,
     shortDescription: record.shortDescription,

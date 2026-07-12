@@ -76,6 +76,7 @@ Rules:
 
 ```txt
 id uuid pk
+learning_path_id uuid fk learning_paths.id
 chapter_id uuid fk learning_path_chapters.id
 order_index int
 title string
@@ -101,8 +102,9 @@ Constraint:
 Rules:
 
 - Buổi học luôn thuộc một chương học.
+- `learning_path_id` trên `lessons` được giữ như denormalized compatibility/filter field trong giai đoạn nối M3.4; source of truth phân cấp vẫn là `chapter_id -> learning_path_chapters.learning_path_id`.
 - Quiz, flashcard, test, document, summary, progress và AI chat vẫn gắn với `lesson_id`.
-- Nếu cần lọc nhanh lesson theo lộ trình, service query qua `learning_path_chapters.learning_path_id` hoặc thêm denormalized index sau khi có nhu cầu hiệu năng thật.
+- Counter `learning_paths.total_chapter_count` và `learning_paths.total_lesson_count` phải được service cập nhật khi tạo/xóa mềm phần tử liên quan.
 
 ### 5.4. `lesson_materials`
 
