@@ -9,6 +9,7 @@
 - Không copy nguyên văn final response của Codex. Chỉ giữ kiến thức có giá trị lâu dài.
 - Hạn chế trùng lặp: nếu kiến thức đã có, cập nhật hoặc link tới mục cũ thay vì viết lại.
 - Viết dễ hiểu, có luồng code rõ ràng, nhưng không biến thành nhật ký diff.
+- Với kiến thức dạng luồng xử lý, phân quyền, API, kiến trúc hoặc state flow, phải có thêm sơ đồ dễ hiểu. Ưu tiên Mermaid ngắn gọn, tách nhánh quyết định trước khi kiểm điều kiện chi tiết, đặt tên node bằng ngôn ngữ đời thường và chỉ ghi các điểm chính.
 
 ## Cấu trúc
 
@@ -45,6 +46,8 @@ Không bắt buộc cập nhật nếu thay đổi quá nhỏ, chỉ là wording
 
 ## Bức tranh tổng thể
 
+## Sơ đồ luồng dễ hiểu
+
 ## Luồng code end-to-end
 
 ## Front-end
@@ -72,6 +75,8 @@ Không bắt buộc cập nhật nếu thay đổi quá nhỏ, chỉ là wording
 ## Chủ đề này dùng để làm gì?
 
 ## Cách nó hoạt động trong repo
+
+## Sơ đồ luồng dễ hiểu
 
 ## Luồng kỹ thuật
 

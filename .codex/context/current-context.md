@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên làm việc nhanh hơn. Nó không thay thế `AGENTS.md` hoặc docs gốc trong `docs/`.
 
@@ -51,6 +51,9 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - Sau khi sửa backend/API cho UI owner đang test, phải verify đúng API origin web đang gọi, thường là `localhost:4000`; nếu cổng này đang có dev server cũ thì restart server đó rồi curl lại payload lỗi. Không chỉ verify trên cổng tạm như `4001` rồi để owner tiếp tục hit bản cũ ở `4000`.
 - Khi làm public page có mục tiêu xuất hiện Google, Codex phải đọc SEO docs bên cạnh UI/performance docs.
 - Khi owner không hài lòng và Codex đưa ra giải pháp/quy tắc mới có thể tái sử dụng, Codex phải tự ghi lại ngay vào docs/skill/context phù hợp, không chờ owner hỏi lại đã note chưa.
+- Khi giải thích auth/front-end cho owner, tránh thả thuật ngữ React/Next như "hydrate" một mình. Nói bằng tiếng dễ hiểu trước, ví dụ "đọc lại session/token đã lưu trong trình duyệt", nếu cần mới ghi thêm thuật ngữ kỹ thuật trong ngoặc.
+- Khi vẽ sơ đồ phân quyền front-end, phải tách nhánh protected route và auth route trước khi kiểm điều kiện riêng của từng nhánh. Không vẽ kiểu đã xác nhận token còn hạn rồi mới hỏi auth route "đã đăng nhập chưa", vì điều đó gây dư logic; auth route nên kiểm session/token của chính nó rồi redirect hoặc hiện form.
+- Khi cập nhật `docs/learning-notes/`, nếu kiến thức là flow phân quyền/API/kiến trúc/state, phải thêm sơ đồ Mermaid ngắn, dễ hiểu như sơ đồ owner vừa chốt; không chỉ ghi mô tả chữ.
 - Task có sửa code phải đọc `docs/14-source-code-structure.md` và nêu rõ source layer dự kiến trước khi edit: front-end route/page -> feature screen/hook/component/schema/data/utils/shared component, back-end controller/service/DTO/select/serializer/utils/types/common errors.
 - Với các skill có làm UI, screenshot/browser/Playwright/kiểm tương tác thật là opt-in: chỉ chạy khi owner yêu cầu rõ, ví dụ command có từ `screenshot` hoặc nói "kiểm bằng browser"; nếu không có yêu cầu đó thì dùng check code tĩnh/focused và để owner tự kiểm UI/tương tác.
 - Với micro UI tweak như dịch vị trí ảnh, đổi một khoảng cách hoặc chỉnh một màu, phải dùng fast path: đọc đúng file liên quan, patch thuộc tính nhỏ nhất, không cập nhật changelog, check nhẹ tối đa; không gộp cleanup workflow/docs không liên quan vào cùng lượt sửa UI nếu owner không yêu cầu.
