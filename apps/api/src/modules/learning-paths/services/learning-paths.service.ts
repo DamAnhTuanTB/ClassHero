@@ -109,14 +109,30 @@ export class LearningPathsService {
             slug,
             originalPriceVnd: dto.originalPriceVnd,
             salePriceVnd: dto.salePriceVnd ?? null,
-            thumbnailFileId: dto.thumbnailFileId ?? null,
+            ...(dto.thumbnailFileId
+              ? {
+                  thumbnailFile: {
+                    connect: {
+                      id: dto.thumbnailFileId,
+                    },
+                  },
+                }
+              : {}),
             descriptionJson: toInputJson(dto.descriptionJson),
             status,
             trialEnabled: dto.trialEnabled ?? true,
             publishedAt: status === PublishStatus.PUBLISHED ? now : null,
             sortOrder: dto.sortOrder ?? 0,
-            createdById: actorUserId,
-            updatedById: actorUserId,
+            createdBy: {
+              connect: {
+                id: actorUserId,
+              },
+            },
+            updatedBy: {
+              connect: {
+                id: actorUserId,
+              },
+            },
           },
           select: learningPathSelect,
         });
@@ -184,7 +200,17 @@ export class LearningPathsService {
             ? { salePriceVnd: dto.salePriceVnd ?? null }
             : {}),
           ...(dto.thumbnailFileId !== undefined
-            ? { thumbnailFileId: dto.thumbnailFileId ?? null }
+            ? {
+                thumbnailFile: dto.thumbnailFileId
+                  ? {
+                      connect: {
+                        id: dto.thumbnailFileId,
+                      },
+                    }
+                  : {
+                      disconnect: true,
+                    },
+              }
             : {}),
           ...(dto.descriptionJson !== undefined
             ? { descriptionJson: toInputJson(dto.descriptionJson) }
@@ -252,7 +278,11 @@ export class LearningPathsService {
             status: PublishStatus.ARCHIVED,
             publishedAt: null,
             deletedAt: new Date(),
-            updatedById: actorUserId,
+            updatedBy: {
+              connect: {
+                id: actorUserId,
+              },
+            },
           },
           select: learningPathSelect,
         });
@@ -301,7 +331,11 @@ export class LearningPathsService {
             status: PublishStatus.DRAFT,
             publishedAt: null,
             deletedAt: null,
-            updatedById: actorUserId,
+            updatedBy: {
+              connect: {
+                id: actorUserId,
+              },
+            },
           },
           select: learningPathSelect,
         });
@@ -386,7 +420,11 @@ export class LearningPathsService {
           data: {
             status: PublishStatus.PUBLISHED,
             publishedAt: before.publishedAt ?? new Date(),
-            updatedById: actorUserId,
+            updatedBy: {
+              connect: {
+                id: actorUserId,
+              },
+            },
           },
           select: learningPathSelect,
         });

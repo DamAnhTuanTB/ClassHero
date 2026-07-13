@@ -4,6 +4,19 @@
 
 Admin dùng màn quản lý lộ trình để tạo/sửa lộ trình học, nhập thông tin cơ bản như tên, slug, môn, lớp, giá, ảnh đại diện và mô tả. `M3.4` hiện đã được nối với API thật cho lộ trình/chương/buổi học; upload ảnh đại diện đi qua Files API và lưu object bằng adapter S3-compatible local MinIO.
 
+## Sơ đồ luồng dễ hiểu
+
+```mermaid
+flowchart TD
+  A[Admin chọn/sửa ảnh và thông tin lộ trình] --> B[Upload ảnh qua Files API nếu có ảnh mới]
+  B --> C[Lưu fileId vào form]
+  C --> D[PATCH /admin/learning-paths/:id]
+  D --> E[Service kiểm file ảnh hợp lệ]
+  E --> F[Prisma update learning path]
+  F --> G[Backend trả dữ liệu mới cho UI]
+  G --> H[TanStack Query cập nhật lại danh sách/chi tiết]
+```
+
 ## Front-end
 
 Modal lộ trình được compose từ `PathEditor`. Các field nhỏ tách thành component riêng trong `apps/web/features/admin-courses/components/` để tránh dồn logic upload, textarea và form state vào một file lớn.
@@ -42,6 +55,9 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - Lỗi: reload khi đang ở giao diện tối bị nháy sáng trước khi chuyển về tối.
 - Nguyên nhân: theme được hydrate sau paint hoặc script khởi tạo theme đặt sai chỗ; nếu client store đọc `localStorage` ngay khi module load thì server render light còn client render dark, gây hydration mismatch.
 - Cách tránh: lưu theme vào cookie cùng key với `localStorage` để admin layout và admin pages server đọc theme ngay từ request đầu tiên. Screen/hook nhận `initialThemeMode` từ server để render frame đầu đúng theme, sau đó Zustand hydrate bằng `useLayoutEffect` và tiếp quản trạng thái. Vẫn dùng `next/script` với `strategy="beforeInteractive"` để đồng bộ localStorage/cookie/system preference trước hydrate. Các vùng admin cần CSS bridge theo `.dark [data-admin-theme]` để HTML render sáng từ server vẫn hiển thị tối trước khi store hydrate. Nếu server layout bọc một wrapper `.dark`, client theme store phải cập nhật cả wrapper `[data-theme-root]`; nếu chỉ gỡ `dark` trên `<html>`, CSS bridge vẫn ép giao diện ở theme tối khi người dùng bấm chuyển sáng.
+- Lỗi: edit lộ trình kèm `thumbnailFileId` trả `500 INTERNAL_SERVER_ERROR`.
+- Nguyên nhân: service đưa trực tiếp foreign key scalar như `thumbnailFileId` hoặc `updatedById` vào Prisma checked update input. Với relation trong Prisma, update chuẩn phải đi qua relation field, ví dụ `thumbnailFile.connect/disconnect` hoặc `updatedBy.connect`.
+- Cách tránh: khi API nhận một id quan hệ từ UI, service vẫn validate id trước, nhưng lúc ghi DB phải map sang relation operation. Dùng `connect` khi gắn file/user mới và `disconnect` khi muốn bỏ ảnh đại diện; không đưa trực tiếp scalar foreign key vào `LearningPathUpdateInput` nếu Prisma không cho phép.
 
 ## File quan trọng
 
@@ -50,6 +66,7 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - `apps/web/features/admin-courses/hooks/use-admin-courses-manager.ts`
 - `apps/web/features/admin-courses/hooks/use-admin-course-detail-manager.ts`
 - `apps/api/src/modules/files`
+- `apps/api/src/modules/learning-paths/services/learning-paths.service.ts`
 - `apps/api/src/modules/learning-paths/controllers/admin-chapters.controller.ts`
 - `apps/api/src/modules/learning-paths/services/chapters.service.ts`
 - `apps/web/lib/theme-store.ts`
