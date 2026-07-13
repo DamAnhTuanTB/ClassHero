@@ -11,7 +11,7 @@ export function SelectScrollDownButton({
   return (
     <SelectPrimitive.ScrollDownButton
       data-slot="select-scroll-down-button"
-      className={cn("flex cursor-default items-center justify-center py-1", className)}
+      className={cn("flex cursor-pointer items-center justify-center py-1", className)}
       {...props}
     >
       <ChevronDownIcon className="h-4 w-4" />

@@ -13,7 +13,7 @@ export function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex min-h-10 w-full cursor-default select-none items-center rounded-lg py-2 pl-9 pr-3 text-base font-bold text-[var(--theme-text)] outline-none transition focus:bg-[var(--theme-primary-soft)] focus:text-[var(--theme-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-[var(--theme-primary)] lg:text-sm",
+        "relative flex min-h-10 w-full cursor-pointer select-none items-center rounded-lg py-2 pl-9 pr-3 text-base font-bold text-[var(--theme-text)] outline-none transition focus:bg-[var(--theme-primary-soft)] focus:text-[var(--theme-primary)] data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[state=checked]:text-[var(--theme-primary)] lg:text-sm",
         className,
       )}
       {...props}

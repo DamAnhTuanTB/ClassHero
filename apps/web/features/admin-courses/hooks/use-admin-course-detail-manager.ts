@@ -67,14 +67,6 @@ export function useAdminCourseDetailManager(
     }
   }, [learningPathQuery.data]);
 
-  useEffect(() => {
-    if (!path || selectedChapterId) {
-      return;
-    }
-
-    setSelectedChapterId(path.chapters[0]?.id ?? null);
-  }, [path, selectedChapterId]);
-
   const courseStats = useMemo(() => getAdminCourseDetailStats(path), [path]);
 
   function startCreateChapter() {

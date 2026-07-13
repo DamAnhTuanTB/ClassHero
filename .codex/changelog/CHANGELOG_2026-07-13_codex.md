@@ -1,1 +1,2 @@
 - 2026-07-13: Sửa lỗi API admin cập nhật lộ trình trả 500 khi ghi quan hệ ảnh đại diện/người cập nhật bằng Prisma relation operations thay vì set trực tiếp foreign key, đồng thời bổ sung ghi chú học tập về luồng edit/upload ảnh và cách tránh lỗi relation input.
+- 2026-07-13: Sửa UI admin course detail không tự highlight border chương đầu tiên khi vừa mở màn, đồng thời chuẩn hóa cursor pointer cho các nút/link/control click được trong web app và ghi rule này vào tài liệu làm việc/UI.

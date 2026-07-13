@@ -11,7 +11,7 @@ export function SelectScrollUpButton({
   return (
     <SelectPrimitive.ScrollUpButton
       data-slot="select-scroll-up-button"
-      className={cn("flex cursor-default items-center justify-center py-1", className)}
+      className={cn("flex cursor-pointer items-center justify-center py-1", className)}
       {...props}
     >
       <ChevronUpIcon className="h-4 w-4" />

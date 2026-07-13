@@ -36,7 +36,7 @@ export function DeleteConfirmDialog({
         >
           <div
             aria-hidden="true"
-            className="absolute inset-0 cursor-default"
+            className="absolute inset-0 cursor-pointer"
             onClick={onCancel}
           />
           <motion.section

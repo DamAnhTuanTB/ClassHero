@@ -148,7 +148,7 @@ export function AdminCoursesSidebar({
           style={mobileViewportStyle}
         >
           <div
-            className="theme-dialog-overlay absolute inset-0 cursor-default backdrop-blur-sm"
+            className="theme-dialog-overlay absolute inset-0 cursor-pointer backdrop-blur-sm"
             aria-hidden="true"
             onClick={closeMobileSidebar}
           />

@@ -53,7 +53,7 @@ export function EditorDialogShell({
         >
           <div
             aria-hidden="true"
-            className="absolute inset-0 cursor-default"
+            className="absolute inset-0 cursor-pointer"
             onClick={onClose}
           />
           <motion.div
