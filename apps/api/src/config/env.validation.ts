@@ -13,7 +13,7 @@ const envSchema = z
     DIRECT_URL: z.string().min(1).optional(),
     JWT_ACCESS_SECRET: z.string().min(8),
     JWT_REFRESH_SECRET: z.string().min(8),
-    JWT_ACCESS_EXPIRES_IN: z.string().min(1).default("15m"),
+    JWT_ACCESS_EXPIRES_IN: z.string().min(1).default("30d"),
     JWT_REFRESH_EXPIRES_IN: z.string().min(1).default("30d"),
     RESEND_API_KEY: z.string().min(1).optional(),
     RESEND_FROM_EMAIL: z.string().email().optional(),

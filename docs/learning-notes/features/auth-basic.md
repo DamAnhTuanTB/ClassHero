@@ -8,8 +8,8 @@
 
 Auth trong repo tách thành 2 loại token:
 
-- Access token là JWT ngắn hạn, dùng về sau cho header `Authorization: Bearer ...`.
-- Refresh token là chuỗi ngẫu nhiên dài hạn hơn. Backend chỉ lưu hash, không lưu raw token.
+- Access token là JWT dùng về sau cho header `Authorization: Bearer ...`; TTL mặc định hiện tại là 30 ngày theo env.
+- Refresh token là chuỗi ngẫu nhiên, TTL mặc định hiện tại cũng là 30 ngày. Backend chỉ lưu hash, không lưu raw token.
 - Reset password token cũng là chuỗi ngẫu nhiên. Backend chỉ lưu SHA-256 hash trong `password_reset_tokens`.
 
 Register chỉ tạo tài khoản và profile. Login mới cấp cặp access/refresh token.

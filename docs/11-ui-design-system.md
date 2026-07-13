@@ -227,11 +227,16 @@ Rules:
 
 ## 8. Responsive rules
 
-UI của dự án là mobile-first nhưng phải ổn trên 3 nhóm:
+UI của dự án ưu tiên viewport theo role, nhưng phải ổn trên 3 nhóm:
 
 - Mobile: `375px-430px`.
 - Tablet/iPad: `768px-1024px`.
 - Laptop/desktop: `1366px-1440px`.
+
+Priority:
+
+- Admin: laptop-first trước. Thiết kế từ layout quản trị trên laptop/desktop, ưu tiên mật độ thông tin, bảng/list, filter, sidebar, split view, bulk action và thao tác lặp lại; sau đó đảm bảo tablet/iPad và mobile không vỡ layout, CTA vẫn bấm được và flow chính vẫn hoàn tất được.
+- Public/student/parent: mobile-first trước. Thiết kế từ điện thoại, ưu tiên đọc nội dung, thao tác chạm, form ít ma sát và tốc độ cảm nhận; sau đó mở rộng layout cho tablet/iPad và laptop/desktop.
 
 Rules:
 
@@ -403,6 +408,7 @@ Mục tiêu: <người dùng cần làm gì>
 Dữ liệu hiển thị: <các trường/chỉ số chính>
 Hành động chính: <CTA hoặc workflow>
 Cảm giác UI: <sáng/gọn/học tập/tin cậy/...>
+Ưu tiên viewport: admin laptop-first; public/student/parent mobile-first
 Thiết bị cần ổn: mobile, tablet/iPad, laptop/desktop
 Ưu tiên hiệu năng: mượt trên mobile, phản hồi nhanh, độ trễ thấp
 Phạm vi: chỉ UI với mock data / connect API / polish UI

@@ -52,7 +52,7 @@ DIRECT_URL=postgresql://postgres:postgres@localhost:5432/learning_path_dev?schem
 # JWT
 JWT_ACCESS_SECRET=change-me
 JWT_REFRESH_SECRET=change-me
-JWT_ACCESS_EXPIRES_IN=15m
+JWT_ACCESS_EXPIRES_IN=30d
 JWT_REFRESH_EXPIRES_IN=30d
 
 # Redis / BullMQ

@@ -22,7 +22,7 @@ Front-end dùng Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, Tan
 - Rich text dùng Tiptap.
 - Công thức Toán/Lý/Hóa render bằng KaTeX + mhchem.
 - Các màn học nên ưu tiên rõ ràng, ít nhiễu, phù hợp học sinh.
-- Thiết kế UI theo mobile-first: ưu tiên trải nghiệm trên điện thoại trước, sau đó mở rộng layout cho tablet/iPad và laptop/desktop.
+- Ưu tiên viewport theo role: admin dùng laptop-first trước, sau đó đảm bảo tablet/iPad và mobile vẫn dùng được; public/student/parent dùng mobile-first trước, sau đó mở rộng layout cho tablet/iPad và laptop/desktop.
 - Tablet/iPad phải có layout trung gian hợp lý, không chỉ phóng to mobile hoặc ép dùng desktop layout.
 - Laptop/desktop vẫn phải dễ dùng: tận dụng chiều ngang cho sidebar, bảng, split view hoặc panel phụ khi phù hợp.
 - Không tạo layout chỉ hoạt động tốt ở một nhóm thiết bị; các CTA, form, quiz, flashcard, test và payment phải dùng tốt trên mobile, tablet/iPad và laptop/desktop.

@@ -308,7 +308,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Rich text dùng Tiptap; công thức lưu LaTeX trong Tiptap JSON.
 - Không xử lý permission chỉ bằng UI; backend vẫn enforce RBAC.
 - Route admin/student/parent phải có guard.
-- UI mobile-first, nhưng phải ổn trên tablet/iPad và laptop/desktop.
+- Ưu tiên viewport khi thiết kế UI phụ thuộc role: màn admin ưu tiên laptop-first trước vì admin thường dùng bảng, sidebar, bulk action và quản trị dữ liệu trên laptop/desktop; các role không phải admin như public/student/parent ưu tiên mobile-first trước. Dù ưu tiên role khác nhau, mọi UI vẫn phải ổn trên mobile, tablet/iPad và laptop/desktop.
 - UI phải mượt trên mobile, phản hồi nhanh, độ trễ cảm nhận thấp; đọc `docs/11-ui-design-system.md` phần performance khi làm UI.
 - Tốc độ load trên điện thoại là tiêu chí hiệu năng mặc định của mọi UI, kể cả mock UI và trang admin. Codex phải tối ưu mọi đường load để nhanh nhất có thể trong phạm vi task: cold first load, route transition, data fetch/refetch, skeleton duration, asset/font/image load, hydration, API response và các tương tác có pending. Cần giảm client bundle ban đầu, server render/initial data khi có thể, lazy-load form/modal/editor/chart/admin tool ít dùng, prefetch/cache hợp lý, tránh mock delay mặc định, giữ formatter/sort deterministic giữa server-client và không để hydration mismatch/overlay làm chậm cảm giác tải. Một đường load nhanh không đủ để kết luận UI đã tối ưu nếu đường load khác trên điện thoại còn chậm.
 - Mọi UI mới hoặc UI được sửa phải hỗ trợ đầy đủ cả theme sáng và theme tối trong cùng phạm vi task. Không được chỉ làm đẹp ở một theme rồi bỏ theme còn lại; text, surface, border, shadow, icon, button, label, form control, modal, table, badge/status, loading/empty/error state và media/overlay phải có contrast/state đúng ở cả hai theme, ưu tiên token/utility semantic thay vì màu thủ công trong component.
@@ -343,7 +343,7 @@ Không đổi cấu trúc lớn nếu chưa được owner yêu cầu.
 - Base path API: `/api/v1`.
 - Swagger/OpenAPI bật ở dev/staging; không public production nếu chưa bảo vệ.
 - Admin endpoint dùng prefix `/admin`; parent dùng `/parent`; student dùng `/student` khi cần phân biệt rõ.
-- Auth dùng JWT access token ngắn hạn và refresh token dài hạn.
+- Auth dùng JWT access token và refresh token; TTL mặc định hiện tại là 30 ngày cho cả hai theo env.
 - Refresh/reset token phải hash trước khi lưu DB.
 - Backend enforce RBAC/ownership, không tin UI guard.
 - Controller chỉ xử lý HTTP boundary; service chứa nghiệp vụ; DB/provider đi qua service/repository phù hợp.
