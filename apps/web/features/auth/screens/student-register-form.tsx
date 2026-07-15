@@ -223,7 +223,7 @@ export function StudentRegisterForm() {
                 className="peer sr-only"
               />
               <span
-                className={`flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded border transition peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--theme-focus-ring)] peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+                className={`flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded border transition peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--theme-focus-ring)] dark:peer-focus-visible:ring-1 dark:peer-focus-visible:ring-sky-500/15 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
                   hasNoPhone
                     ? "border-[var(--auth-primary,var(--theme-primary))] bg-[var(--auth-primary,var(--theme-primary))] text-[var(--theme-primary-foreground)]"
                     : "border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-transparent"

@@ -134,7 +134,7 @@ export function TextField({
             error ? `${id}-error` : helperText ? `${id}-helper` : undefined
           }
           className={cn(
-            "min-h-[3.35rem] w-full rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] py-0 text-base font-semibold text-[var(--theme-text-strong)] outline-none transition placeholder:text-[var(--theme-text-placeholder)] hover:border-[var(--theme-input-hover-border)] focus:bg-[var(--theme-input-bg)] focus:ring-4 disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] disabled:text-[var(--theme-input-text-disabled)] lg:text-sm",
+            "min-h-[3.35rem] w-full rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] py-0 text-base font-semibold text-[var(--theme-text-strong)] outline-none transition placeholder:text-[var(--theme-text-placeholder)] hover:border-[var(--theme-input-hover-border)] focus:bg-[var(--theme-input-bg)] disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] disabled:text-[var(--theme-input-text-disabled)] lg:text-sm",
             formFocusClass,
             resolvedIcon ? "pl-12" : "pl-4",
             isPasswordField ? "pr-14" : "pr-4",
@@ -149,7 +149,7 @@ export function TextField({
             disabled={inputProps.disabled}
             onClick={() => setIsPasswordVisible((visible) => !visible)}
             className={cn(
-              "absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:pointer-events-none disabled:opacity-50",
+              "absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] dark:focus:ring-1 dark:focus:ring-sky-500/15 disabled:pointer-events-none disabled:opacity-50",
             )}
           >
             {isPasswordVisible ? (

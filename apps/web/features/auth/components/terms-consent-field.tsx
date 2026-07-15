@@ -24,7 +24,7 @@ export function TermsConsentField({
             className="peer sr-only"
           />
           <span
-            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--theme-focus-ring)] peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--theme-focus-ring)] dark:peer-focus-visible:ring-1 dark:peer-focus-visible:ring-sky-500/15 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
               checked
                 ? "border-[var(--auth-primary,var(--theme-primary))] bg-[var(--auth-primary,var(--theme-primary))] text-[var(--theme-primary-foreground)] shadow-[var(--theme-shadow-sm)]"
                 : "border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-transparent"

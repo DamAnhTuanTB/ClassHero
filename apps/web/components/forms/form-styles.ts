@@ -1,5 +1,8 @@
 export const formFocusClass =
-  "focus:border-[var(--theme-focus-border)] focus:ring-[var(--theme-focus-ring)]";
+  "focus:border-[var(--theme-focus-border)] focus:ring-2 focus:ring-[var(--theme-focus-ring)] dark:focus:border-sky-500/40 dark:focus:ring-1 dark:focus:ring-sky-500/15";
+
+export const formFocusVisibleClass =
+  "focus-visible:border-[var(--theme-focus-border)] focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] dark:focus-visible:border-sky-500/40 dark:focus-visible:ring-1 dark:focus-visible:ring-sky-500/15";
 
 export const statusToneClass = {
   success:

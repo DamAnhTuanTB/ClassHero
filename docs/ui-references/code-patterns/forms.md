@@ -2,6 +2,24 @@
 
 Dùng file này cho form, modal/drawer form, text validation, numeric input và select/dropdown thuộc form.
 
+## 0. Focus Và Select Chuẩn
+
+Áp dụng cho mọi form control trong dự án: text input, select/listbox, checkbox và icon button nằm bên trong field.
+
+### Pattern chuẩn
+
+- Dùng shared focus class từ `apps/web/components/forms/form-styles.ts` cho form primitives.
+- Focus ring của form control phải mảnh: light mode dùng tối đa `ring-2`; dark mode dùng `ring-1` và opacity dịu hơn để không bị chói trên nền tối.
+- Không thêm `focus:shadow-*` hoặc box-shadow riêng cho input/select. Trạng thái focus chỉ nên thể hiện bằng border + ring mảnh.
+- Select/listbox sau khi chọn option phải đóng dropdown và blur trigger nếu owner muốn ô mất trạng thái focus sau khi chọn.
+- Nếu cùng một màu token nhưng dark mode nhìn khác do kích thước/shape, được phép giảm riêng opacity của select để cân bằng thị giác.
+
+### Không làm
+
+- Không dùng `focus:ring-4`, `focus-visible:ring-4` hoặc `peer-focus-visible:ring-4` cho form control.
+- Không để input và select cùng một nhóm filter dùng hai tông border focus khác nhau trong cùng theme.
+- Không giữ focus trên select trigger sau khi chọn option nếu UX mong muốn field trở về trạng thái nghỉ.
+
 ## 1. React Hook Form Modal Form
 
 Dùng cho modal/drawer tạo/sửa có React Hook Form + Zod.
@@ -156,3 +174,79 @@ Dùng cho select/dropdown trong form.
 
 - Không set value mà thiếu `shouldValidate` khi field thuộc form validation.
 - Không dựng dropdown custom mới nếu `OptionField` đủ dùng.
+
+## 5. Mobile-Safe Select Trigger
+
+Dùng cho select/dropdown filter trên mobile khi người dùng có thể bấm lại trigger đang mở để đóng dropdown. Với filter ngắn như lớp/môn học, ưu tiên custom `button + listbox` local thay vì Radix/shadcn Select nếu từng gặp lỗi đóng rồi mở lại rất nhanh trên điện thoại thật.
+
+### Pattern chuẩn
+
+```tsx
+const [isOpen, setIsOpen] = useState(false);
+
+<div
+  className="relative"
+  onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsOpen(false);
+    }
+  }}
+>
+  <button
+    type="button"
+    aria-haspopup="listbox"
+    aria-expanded={isOpen}
+    onClick={() => setIsOpen((open) => !open)}
+    onKeyDown={(event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+
+      if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setIsOpen(true);
+      }
+    }}
+  >
+    {selectedOption.label}
+  </button>
+
+  {isOpen ? (
+    <div role="listbox">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="option"
+          aria-selected={option.value === value}
+          onClick={() => {
+            onChange(option.value);
+            setIsOpen(false);
+          }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ) : null}
+</div>
+```
+
+Nếu bắt buộc dùng Radix/shadcn Select, phải test trên điện thoại thật. Chỉ thêm `onPointerDownCapture` để `setIsOpen(false)` là chưa đủ, vì mobile có thể vẫn phát tiếp chuỗi event làm dropdown mở lại.
+
+```tsx
+onOpenChange={(nextOpen) => {
+  if (nextOpen && suppressReopenRef.current) {
+    return;
+  }
+
+  setIsOpen(nextOpen);
+}}
+```
+
+### Không làm
+
+- Không dùng Radix/shadcn Select cho filter mobile đã từng lỗi đóng rồi mở lại nhanh nếu custom listbox local đủ dùng.
+- Không chỉ gọi `setIsOpen(false)` trong `onPointerDownCapture` rồi để `onOpenChange` tự xử lý. Trên mobile, chuỗi pointer/click/open event có thể làm dropdown đóng rồi mở lại rất nhanh.
+- Không thêm `touchstart`/`touchend` handler riêng để vá cảm giác; ưu tiên một trigger `button` semantic với `onClick` toggle thật và `onBlur` đóng khi focus rời khỏi wrapper.
+- Không bỏ keyboard cơ bản: `Escape` đóng, `Enter`/`Space`/`ArrowDown` mở, item dùng `role="option"` và `aria-selected`.

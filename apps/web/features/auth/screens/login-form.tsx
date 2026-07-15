@@ -123,7 +123,7 @@ export function LoginForm() {
             className="peer sr-only"
           />
           <span
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--theme-focus-ring)] peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--theme-focus-ring)] dark:peer-focus-visible:ring-1 dark:peer-focus-visible:ring-sky-500/15 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
               rememberLogin
                 ? "border-[var(--auth-primary,var(--theme-primary))] bg-[var(--auth-primary,var(--theme-primary))] text-[var(--theme-primary-foreground)] shadow-[var(--theme-shadow-sm)]"
                 : "border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-transparent"
@@ -146,7 +146,7 @@ export function LoginForm() {
         <div className="mt-2 grid grid-cols-2 gap-2">
           <Link
             aria-label="Đăng ký tài khoản học sinh"
-            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--theme-primary-border)] bg-[var(--theme-surface)] px-2 text-[13px] font-extrabold leading-none text-[var(--theme-primary)] shadow-[var(--theme-shadow-sm)] transition hover:bg-[var(--theme-primary-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--theme-focus-ring)] sm:text-sm"
+            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--theme-primary-border)] bg-[var(--theme-surface)] px-2 text-[13px] font-extrabold leading-none text-[var(--theme-primary)] shadow-[var(--theme-shadow-sm)] transition hover:bg-[var(--theme-primary-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] dark:focus-visible:ring-1 dark:focus-visible:ring-sky-500/15 sm:text-sm"
             href="/register/student"
           >
             <GraduationCap className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -154,7 +154,7 @@ export function LoginForm() {
           </Link>
           <Link
             aria-label="Đăng ký tài khoản phụ huynh"
-            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-surface)] px-2 text-[13px] font-extrabold leading-none text-[var(--theme-success-text)] shadow-[var(--theme-shadow-sm)] transition hover:bg-[var(--theme-success-bg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--theme-focus-ring)] sm:text-sm"
+            className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-surface)] px-2 text-[13px] font-extrabold leading-none text-[var(--theme-success-text)] shadow-[var(--theme-shadow-sm)] transition hover:bg-[var(--theme-success-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] dark:focus-visible:ring-1 dark:focus-visible:ring-sky-500/15 sm:text-sm"
             href="/register/parent"
           >
             <UsersRound className="h-4 w-4 shrink-0" aria-hidden="true" />

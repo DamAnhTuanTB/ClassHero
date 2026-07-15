@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { CircleHelp } from "lucide-react";
+import { formFocusVisibleClass } from "@/components/forms/form-styles";
 import { cn } from "@/lib/utils";
 
 export function FieldLabel({
@@ -36,7 +37,10 @@ export function FieldLabel({
           <span
             tabIndex={0}
             aria-label={optionalLabel}
-            className="group relative inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--theme-text-muted)] outline-none transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-primary)] focus-visible:bg-[var(--theme-surface-soft)] focus-visible:text-[var(--theme-primary)] focus-visible:ring-4 focus-visible:ring-[var(--theme-focus-ring)]"
+            className={cn(
+              "group relative inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--theme-text-muted)] outline-none transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-primary)] focus-visible:bg-[var(--theme-surface-soft)] focus-visible:text-[var(--theme-primary)]",
+              formFocusVisibleClass,
+            )}
           >
             <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
             <span

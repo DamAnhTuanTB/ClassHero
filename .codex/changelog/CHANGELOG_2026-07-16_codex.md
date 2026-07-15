@@ -1,1 +1,2 @@
 - 2026-07-16: Thêm giao diện student course explorer với layout Khám phá/Học tập, sidebar responsive có lưu trạng thái thu gọn, theme sáng/tối được tinh chỉnh bằng runtime screenshots, và note kỹ thuật về khôi phục UI state trước khung hình đầu tiên.
+- 2026-07-16: Chuẩn hóa focus ring cho form controls ở light/dark mode, sửa submit button auth thành submit thật để phím Enter đi đúng luồng CTA, làm select blur sau khi chọn và ghi lại pattern mobile-safe select trigger.

@@ -114,6 +114,7 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - Nếu text input vẫn nhập được nhưng checkbox/select custom/validate/submit đều không chạy và form bị reload, cần nghi ngờ client JS chưa hydrate trên thiết bị đó. Với Next dev local trên iPhone, ưu tiên chạy webpack dev server thay vì Turbopack dev để giảm rủi ro chunk dev/HMR không chạy trên iOS; đây là vấn đề dev runtime, không phải lỗi riêng từng form control.
 - Khi test Next dev từ iPhone qua IP LAN, nếu terminal báo chặn `/_next/webpack-hmr` từ IP của máy dev, thêm IP LAN vào `allowedDevOrigins` trong `next.config.ts` và restart dev server. Repo đang tự lấy IPv4 LAN của máy khi server khởi động để tránh lỗi này khi đổi Wi-Fi/IP.
 - Nếu Safari ổn nhưng Chrome/Google iOS hiện Next dev overlay `A tree hydrated...` trong khi tương tác vẫn chạy, cần kiểm tra browser có chèn attribute lạ vào HTML trước hydration hay không. Với auth form ở local dev, repo dùng một dev-only hydration boundary để không SSR form controls ban đầu; production vẫn render bình thường.
+- Nút hành động chính trong auth form phải là submit button thật (`type="submit"`) để phím Enter trong input một dòng đi cùng luồng như click CTA. Không gắn handler global cho Enter; ô nhiều dòng `textarea` phải giữ hành vi Enter để xuống dòng, không kích hoạt submit.
 
 ## Luồng lỗi thường gặp
 

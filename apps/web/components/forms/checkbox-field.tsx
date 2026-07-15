@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { CheckboxFieldProps } from "@/components/forms/form-types";
+import { formFocusClass } from "@/components/forms/form-styles";
 
 export function CheckboxField({
   id,
@@ -28,7 +29,8 @@ export function CheckboxField({
           aria-invalid={error ? "true" : "false"}
           aria-describedby={error ? `${id}-error` : undefined}
           className={cn(
-            "h-5 w-5 rounded-md border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-[var(--form-primary,var(--auth-primary,var(--theme-primary)))] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60",
+            "h-5 w-5 rounded-md border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] text-[var(--form-primary,var(--auth-primary,var(--theme-primary)))] disabled:cursor-not-allowed disabled:opacity-60",
+            formFocusClass,
             className,
           )}
         />

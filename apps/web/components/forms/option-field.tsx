@@ -93,7 +93,7 @@ export function OptionField({
             }
           }}
           className={cn(
-            "flex min-h-[3.35rem] w-full touch-manipulation items-center justify-between gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 py-0 text-left text-base font-semibold text-[var(--theme-text-strong)] outline-none transition hover:border-[var(--theme-input-hover-border)] focus:bg-[var(--theme-input-bg)] focus:ring-4 disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] disabled:text-[var(--theme-input-text-disabled)] lg:text-sm",
+            "flex min-h-[3.35rem] w-full touch-manipulation items-center justify-between gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 py-0 text-left text-base font-semibold text-[var(--theme-text-strong)] outline-none transition hover:border-[var(--theme-input-hover-border)] focus:bg-[var(--theme-input-bg)] disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] disabled:text-[var(--theme-input-text-disabled)] lg:text-sm",
             formFocusClass,
           )}
         >
@@ -143,7 +143,7 @@ export function OptionField({
                 onClick={() => {
                   onChange(option.value);
                   setIsOpen(false);
-                  triggerRef.current?.focus();
+                  triggerRef.current?.blur();
                 }}
                 className={cn(
                   "relative flex min-h-10 w-full items-center rounded-lg py-2 pl-9 pr-3 text-left font-bold outline-none transition",
