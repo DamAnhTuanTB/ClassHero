@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Baloo_2, Be_Vietnam_Pro } from "next/font/google";
 import { Providers } from "@/app/providers";
 import { getServerThemeMode } from "@/lib/server-theme";
+import {
+  adminSidebarCollapsedDatasetKey,
+  adminSidebarCollapsedStorageKey,
+  studentSidebarCollapsedDatasetKey,
+  studentSidebarCollapsedStorageKey,
+} from "@/lib/sidebar-collapse-state";
 import { themeCookieMaxAgeSeconds, themeStorageKey } from "@/lib/theme-constants";
 import "@/app/globals.css";
 
@@ -46,21 +51,34 @@ const themeInitScript = `
         : "light";
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle("dark", theme === "dark");
-    const syncThemeRoots = () => {
-      document.querySelectorAll("[data-theme-root]").forEach((themeRoot) => {
-        themeRoot.dataset.theme = theme;
-        themeRoot.classList.toggle("dark", theme === "dark");
-      });
-    };
-    syncThemeRoots();
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", syncThemeRoots, { once: true });
-    }
     try {
       window.localStorage.setItem(themeStorageKey, theme);
     } catch {
     }
     document.cookie = themeStorageKey + "=" + theme + "; path=/; max-age=${themeCookieMaxAgeSeconds}; SameSite=Lax";
+
+    [
+      ["${adminSidebarCollapsedStorageKey}", "${adminSidebarCollapsedDatasetKey}"],
+      ["${studentSidebarCollapsedStorageKey}", "${studentSidebarCollapsedDatasetKey}"],
+    ].forEach(([storageKey, datasetKey]) => {
+      let isCollapsed = false;
+      try {
+        isCollapsed = window.localStorage.getItem(storageKey) === "true";
+      } catch {
+      }
+      document.documentElement.dataset[datasetKey] = String(isCollapsed);
+    });
+  } catch {
+  }
+})();
+`;
+
+const themeBodySyncScript = `
+(() => {
+  try {
+    const theme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    document.body.dataset.theme = theme;
+    document.body.classList.toggle("dark", theme === "dark");
   } catch {
   }
 })();
@@ -81,9 +99,8 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <Script
+        <script
           id="classhero-theme-init"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
       </head>
@@ -95,6 +112,10 @@ export default async function RootLayout({
           initialThemeMode === "dark" ? "dark" : ""
         }`}
       >
+        <script
+          id="classhero-theme-body-sync"
+          dangerouslySetInnerHTML={{ __html: themeBodySyncScript }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

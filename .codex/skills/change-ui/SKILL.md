@@ -112,6 +112,7 @@ Run checks proportional to the UI change:
 - Small CSS/layout/text/color/spacing/icon/image-position changes: `git diff --check`, a targeted format check, or manual visual reasoning may be enough.
 - Component/page changes: run focused typecheck/lint/build only when the change touches shared primitives, form/state logic, route structure, conditional rendering, or likely TypeScript errors.
 - Visual change: check by code reasoning/static inspection by default; do not run browser/mobile/desktop checks unless the owner explicitly asks.
+- For repeated CSS/visual tweaks on the same screen, do not treat `git diff --check`, typecheck, or a successful patch as proof that the browser UI now looks correct. Theme tokens, dark mode, route-group CSS, global overrides, `!important`, HMR/cache, or the wrong rendered component can hide the intended change. If browser/screenshot/computed-style verification was not explicitly requested, say the change was patched and static checks passed, not that the visual result was verified. If the owner says the UI still did not change, first inspect the rendered route/component, dev server/HMR/cache, active theme, and CSS cascade/computed style before changing more classes.
 - In screenshot mode only: save review screenshots under `.codex/screenshots/`.
 - Interaction change: verify by code reasoning/typecheck/static inspection by default; owner will test real interaction.
 - Do not state inability to run browser checks as a gap unless the owner explicitly requested browser verification.
@@ -127,7 +128,7 @@ Before the final response, call `.codex/scripts/notify-task.sh` from the repo ro
 - `blocked` when owner input is needed before continuing.
 - `failed` when implementation or checks fail and the task cannot be finished in this turn.
 
-Use a concrete task label such as `/change-ui <screen/topic>`. Keep the message short, outcome-focused, and free of secrets. Notification failure must not block the final response.
+Use a concrete task label such as `/change-ui <screen/topic>`. Keep the message short, outcome-focused, and free of secrets. For CSS/visual tweaks verified only by static checks, phrase the message as code-level completion (for example "Đã patch class và check tĩnh") instead of implying browser visual verification. Notification failure must not block the final response.
 
 ## Final Response
 

@@ -24,7 +24,12 @@ import {
 } from "@/features/admin-courses/utils";
 import { useAuthGuard } from "@/features/auth/session";
 import { ApiRequestError } from "@/lib/api-client";
+import {
+  adminSidebarCollapsedDatasetKey,
+  adminSidebarCollapsedStorageKey,
+} from "@/lib/sidebar-collapse-state";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
+import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
 
 export function useAdminCoursesManager(
   initialLearningPaths?: AdminLearningPath[],
@@ -54,7 +59,11 @@ export function useAdminCoursesManager(
   const [deletingPathIds, setDeletingPathIds] = useState<string[]>([]);
   const [permanentDeletingPathIds, setPermanentDeletingPathIds] = useState<string[]>([]);
   const [selectedPathIds, setSelectedPathIds] = useState<string[]>([]);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
+    adminSidebarCollapsedStorageKey,
+    false,
+    adminSidebarCollapsedDatasetKey,
+  );
   const [query, setQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<AdminSubject | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<AdminPublishStatus | "ALL">("ALL");

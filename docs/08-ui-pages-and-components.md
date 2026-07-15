@@ -79,6 +79,7 @@ apps/web/app/
 ├── (student)/student/
 │   ├── dashboard/page.tsx
 │   ├── courses/page.tsx
+│   ├── explore/page.tsx
 │   ├── courses/[id]/page.tsx
 │   ├── lessons/[lessonId]/page.tsx
 │   ├── notifications/page.tsx
@@ -211,9 +212,11 @@ Hiển thị:
 
 Hiển thị:
 
-- Lộ trình theo lớp, ưu tiên lớp của student.
-- Trạng thái: chưa mua, đã mua, hết hạn, học thử.
-- CTA mua/học thử/vào học.
+- `/student/courses`: chỉ hiển thị lộ trình học sinh đã mua/đang có enrollment, ưu tiên tiến độ, buổi tiếp theo và CTA vào học.
+- `/student/explore`: hiển thị tất cả lộ trình published để học sinh khám phá thêm; route này là sibling của `/student/courses`, không lồng trong `courses`.
+- Màn tất cả lộ trình có filter theo lớp và môn. Mặc định lớp chọn theo lớp của student, môn học chọn `Tất cả`.
+- Trạng thái: chưa mua, đã mua/đang học, sắp hết hạn, học thử.
+- CTA mua/học thử/vào học hoặc xem chi tiết theo trạng thái.
 
 ### 4.3. Chi tiết lộ trình student
 

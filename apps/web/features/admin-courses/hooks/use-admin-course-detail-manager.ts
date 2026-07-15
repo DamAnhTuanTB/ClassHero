@@ -16,7 +16,12 @@ import {
 } from "@/features/admin-courses/utils";
 import { useAuthGuard } from "@/features/auth/session";
 import { ApiRequestError } from "@/lib/api-client";
+import {
+  adminSidebarCollapsedDatasetKey,
+  adminSidebarCollapsedStorageKey,
+} from "@/lib/sidebar-collapse-state";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
+import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
 
 export function useAdminCourseDetailManager(
   pathId: string,
@@ -46,7 +51,11 @@ export function useAdminCourseDetailManager(
   const [lessonEditorMode, setLessonEditorMode] = useState<EditorMode>("create");
   const [isChapterEditorOpen, setIsChapterEditorOpen] = useState(false);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
+    adminSidebarCollapsedStorageKey,
+    false,
+    adminSidebarCollapsedDatasetKey,
+  );
 
   const selectedChapter =
     path?.chapters.find((chapter) => chapter.id === selectedChapterId) ?? null;

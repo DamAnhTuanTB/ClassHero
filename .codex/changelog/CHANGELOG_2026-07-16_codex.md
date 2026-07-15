@@ -1,0 +1,1 @@
+- 2026-07-16: Thêm giao diện student course explorer với layout Khám phá/Học tập, sidebar responsive có lưu trạng thái thu gọn, theme sáng/tối được tinh chỉnh bằng runtime screenshots, và note kỹ thuật về khôi phục UI state trước khung hình đầu tiên.

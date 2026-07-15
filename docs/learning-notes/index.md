@@ -18,6 +18,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Frontend bundle isolation](foundation/frontend-bundle-isolation.md)                     | Tách bundle/CSS/provider theo route group khi admin và client chung Next app | Performance audit | Đã cập nhật |
 | [Playwright UI checks](foundation/playwright-ui-checks.md)                               | Browser E2E, responsive screenshot và UI review local                        | `M2.4`, `M14.3`   | Đã cập nhật |
 | [Prisma database foundation](foundation/prisma-database.md)                              | Prisma, migration, pgvector, PrismaService, seed dev và foundation models    | `M1.1`-`M1.6`     | Đã cập nhật |
+| [UI state persistence](foundation/ui-state-persistence.md)                               | Lưu trạng thái UI local như sidebar collapse qua refresh bằng browser storage | `M3.4`, `M3.5`    | Đã cập nhật |
 
 ## Glossary
 

@@ -794,3 +794,11 @@ button {
   font-size: 12px !important;
   font-weight: 700 !important;
 }
+
+@media (min-width: 1024px) {
+  html[data-admin-sidebar-collapsed="true"]
+    [data-admin-theme="true"]
+    .admin-course-shell-grid {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+  }
+}

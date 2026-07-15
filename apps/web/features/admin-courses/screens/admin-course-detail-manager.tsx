@@ -74,7 +74,7 @@ export function AdminCourseDetailManager({
     <main data-admin-theme="true" className="theme-page">
       <div
         className={cn(
-          "grid min-h-screen transition-[grid-template-columns] duration-200",
+          "admin-course-shell-grid grid min-h-screen transition-[grid-template-columns] duration-200",
           isSidebarCollapsed
             ? "lg:grid-cols-[5.5rem_minmax(0,1fr)]"
             : "lg:grid-cols-[17rem_minmax(0,1fr)]",

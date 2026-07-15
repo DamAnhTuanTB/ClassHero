@@ -2,6 +2,8 @@
 
 import {
   GraduationCap,
+  Loader2,
+  LogOut,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -9,6 +11,11 @@ import {
   Sun,
   UserRound,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { logout } from "@/features/auth/api";
+import { clearAuthSession, useAuthSessionStore } from "@/features/auth/session";
 import type { AdminCoursesSidebarItem } from "@/features/admin-courses/components/admin-courses-sidebar";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +38,37 @@ export function AdminCoursesSidebarContent({
   onToggleCollapsed,
   onToggleDarkTheme,
 }: AdminCoursesSidebarContentProps) {
+  const router = useRouter();
+  const session = useAuthSessionStore((state) => state.session);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    try {
+      if (session) {
+        await logout(
+          {
+            refreshToken: session.refreshToken,
+          },
+          session.accessToken,
+        );
+      }
+    } catch {
+      toast.warning("Đã đăng xuất khỏi thiết bị này", {
+        description: "Chưa xác nhận được phiên máy chủ. Vui lòng đăng nhập lại nếu cần.",
+      });
+    } finally {
+      clearAuthSession();
+      router.replace("/login");
+      router.refresh();
+    }
+  }
+
   return (
     <div className="flex flex-col lg:min-h-0 lg:flex-1">
       <div
@@ -102,6 +140,25 @@ export function AdminCoursesSidebarContent({
             )}
             <span className={cn("min-w-0 truncate", isCollapsed && "lg:hidden")}>
               {isDarkTheme ? "Giao diện tối" : "Giao diện sáng"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className={cn(
+              "theme-button-danger-subtle inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-2 text-sm font-bold transition disabled:cursor-wait disabled:opacity-70",
+              isCollapsed && "lg:w-10 lg:px-0",
+            )}
+            aria-label="Đăng xuất khỏi tài khoản admin"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+            ) : (
+              <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+            )}
+            <span className={cn("min-w-0 truncate", isCollapsed && "lg:hidden")}>
+              {isLoggingOut ? "Đang đăng xuất" : "Đăng xuất"}
             </span>
           </button>
         </div>

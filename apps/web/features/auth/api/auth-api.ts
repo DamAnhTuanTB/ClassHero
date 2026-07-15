@@ -78,6 +78,10 @@ export type ResetPasswordRequest = {
   newPassword: string;
 };
 
+export type LogoutRequest = {
+  refreshToken: string;
+};
+
 export function login(request: LoginRequest) {
   return apiRequest<AuthTokenResponse>("/auth/login", {
     method: "POST",
@@ -109,6 +113,14 @@ export function forgotPassword(request: ForgotPasswordRequest) {
 export function resetPassword(request: ResetPasswordRequest) {
   return apiRequest<SuccessResponse>("/auth/reset-password", {
     method: "POST",
+    body: request,
+  });
+}
+
+export function logout(request: LogoutRequest, token?: string) {
+  return apiRequest<SuccessResponse>("/auth/logout", {
+    method: "POST",
+    token,
     body: request,
   });
 }

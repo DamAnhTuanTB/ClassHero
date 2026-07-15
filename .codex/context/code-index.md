@@ -35,6 +35,9 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/app/(admin)/layout.tsx`      | Layout riêng admin đọc cookie theme server-side, import admin theme CSS, bọc `AuthenticatedRouteGuard` role `ADMIN` và mount `AppToaster` |
 | `apps/web/app/(admin)/admin-theme.css` | CSS scoped cho admin theme/checkbox/dark bridge, chỉ import từ admin layout                                     |
 | `apps/web/app/(admin)/admin/courses`   | Route UI quản lý lộ trình/chương/buổi học admin, đã nối API thật và upload ảnh cho `M3.4`                       |
+| `apps/web/app/(student)/layout.tsx`     | Layout riêng student và shell/sidebar điều hướng student course; guard role `STUDENT` đang bypass tạm để owner test mobile |
+| `apps/web/app/(student)/student/courses` | Route `M3.5` màn lộ trình đã mua của học sinh                                                                      |
+| `apps/web/app/(student)/student/explore` | Route `M3.5` màn tất cả lộ trình published với filter lớp/môn local mock, tách riêng khỏi `/student/courses`      |
 | `apps/web/app/globals.css`             | Tailwind/global styles dùng chung thật sự cho mọi route, không chứa CSS chỉ dành cho admin                      |
 | `apps/web/app/toaster`                 | Toaster wiring route-specific cho auth/admin, gom AppToaster, single-toast queue, constants và icon config      |
 | `apps/web/components`                  | Component dùng chung, gồm primitive UI như select                                                               |
@@ -43,6 +46,7 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/features/auth`               | Auth feature barrel và các nhóm `api/components/data/layout/screens/schemas/session/utils` cho `M2.4`, gồm protected guard, guest guard cho login/register và lỗi token hết hạn |
 | `apps/web/features/auth/screens`       | Auth screen-level form flows, mỗi flow một file và chỉ compose shared primitives/helpers                        |
 | `apps/web/features/admin-courses`      | Admin course/chapter/lesson UI cho `M3.4`, tách `api/hooks/screens/components/schemas/types/utils` và gọi API thật |
+| `apps/web/features/student-courses`    | Student course browsing UI cho `M3.5`, tách `layout/screens/components/data/hooks/types/utils`; mock data local cho lộ trình đã mua và tất cả lộ trình |
 | `apps/web/lib`                         | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
 | `apps/web/playwright.config.ts`        | Playwright config, tự build/start web và lưu report local                                                       |
 | `apps/web/tests/auth-ui.spec.ts`       | E2E/screenshot smoke test cho auth UI `M2.4`                                                                    |
