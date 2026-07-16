@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ResetPasswordForm } from "@/features/auth";
+import { ResetPasswordForm } from "@/features/auth/screens/reset-password";
 
 export const metadata: Metadata = {
   title: "Đặt lại mật khẩu | Hệ thống học theo lộ trình",

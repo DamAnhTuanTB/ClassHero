@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AppToaster } from "@/app/toaster";
-import { AuthenticatedRouteGuard } from "@/features/auth/components/authenticated-route-guard";
+import { AuthenticatedRouteGuard } from "@/components/common/auth/authenticated-route-guard";
 import { getServerThemeMode } from "@/lib/server-theme";
 import "@/app/(admin)/admin-theme.css";
 

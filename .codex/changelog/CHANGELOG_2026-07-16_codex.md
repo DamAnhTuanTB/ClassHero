@@ -2,3 +2,4 @@
 - 2026-07-16: Chuẩn hóa focus ring cho form controls ở light/dark mode, sửa submit button auth thành submit thật để phím Enter đi đúng luồng CTA, làm select blur sau khi chọn và ghi lại pattern mobile-safe select trigger.
 - 2026-07-16: Hoàn thiện UI chi tiết khóa học học sinh với header ClassHero đồng bộ, tiến độ/lộ trình responsive, trạng thái đang học/học thử/chưa mua, dữ liệu mock nhiều tình huống và tinh chỉnh layout danh sách khóa học trên mobile/laptop.
 - 2026-07-16: Ghi nhận UI chi tiết khóa học đã được duyệt và bổ sung pattern tái sử dụng cho header detail, progress CTA, curriculum accordion, lesson timeline cùng các trạng thái học thử/chưa mua/đang học.
+- 2026-07-16: Tái cấu trúc front-end theo role, route feature và từng screen, đưa component dùng chung về `apps/web/components/{common,admin,student,parent}`, loại bỏ file re-export/barrel thừa, cập nhật import alias cùng docs/skills/context để giữ quy tắc tổ chức code rõ ràng cho các task sau.

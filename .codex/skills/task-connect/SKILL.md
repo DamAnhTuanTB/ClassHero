@@ -99,8 +99,8 @@ In plan mode, stop after this plan and wait for approval.
 - Use mutation invalidation where relevant.
 - Use pending state immediately for mutations; use optimistic UI only when rollback is safe and not payment/auth/security-sensitive.
 - Preserve production-like interaction when replacing mock data with APIs. Do not regress working local/mock interactions into static controls; buttons, checkbox/toggle state, tabs, menus, filters, pagination, modals, uploads, and form flows must keep semantic elements, state/handlers, and feedback.
-- Preserve the frontend file boundary: one React component implementation per `.tsx` file, with barrel files only for re-exports and no JSX implementation.
-- In `apps/web`, use absolute alias imports/exports with `@/...` for internal source files. Do not use `../` or `./` between route, feature, component, hook, schema, data, utility, or barrel files, except framework-generated files or tool-required relative imports.
+- Preserve the frontend file boundary: one React component implementation per `.tsx` file; avoid barrel/re-export-only files unless framework/tooling requires them.
+- In `apps/web`, use absolute alias imports/exports with `@/...` for internal source files. Do not use `../` or `./` between route, feature, component, hook, schema, data, or utility files, except framework-generated files or tool-required relative imports.
 - In `apps/api`, use native Node package-import aliases with `#api/...` for internal source files. Do not use `../` or `./` between controller, service, DTO, guard, common provider, config, module, or helper files unless a tool explicitly requires it.
 - Follow `docs/14-source-code-structure.md` for both sides of the connection. Do not connect an approved UI by stuffing API calls into deep components or by adding flat backend files beside a module file.
 - Debounce search/filter calls and use pagination/infinite query for long lists when relevant.

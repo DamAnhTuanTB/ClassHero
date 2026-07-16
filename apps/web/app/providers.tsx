@@ -7,7 +7,10 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { useLayoutEffect, useState, type ReactNode } from "react";
-import { clearExpiredAuthSession, hydrateAuthSession } from "@/features/auth/session";
+import {
+  clearExpiredAuthSession,
+  hydrateAuthSession,
+} from "@/features/auth/session/auth-session";
 import { useThemeStore } from "@/lib/theme-store";
 
 export function Providers({ children }: { children: ReactNode }) {

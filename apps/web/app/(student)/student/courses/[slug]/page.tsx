@@ -1,4 +1,4 @@
-import { StudentCourseDetailScreen } from "@/features/student-courses/screens/student-course-detail-screen";
+import { StudentCourseDetailScreen } from "@/features/student/courses/screens/student-course-detail-screen";
 import { getServerThemeMode } from "@/lib/server-theme";
 
 export default async function StudentCourseDetailPage({

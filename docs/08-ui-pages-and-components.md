@@ -532,9 +532,9 @@ CRUD:
 Chi tiết bắt buộc nằm ở `docs/14-source-code-structure.md`. Tóm tắt cho UI:
 
 - Route/page trong `apps/web/app` chỉ compose screen/layout; không chứa nhiều subcomponent/helper/schema/mock data.
-- Feature UI đặt trong `apps/web/features/<feature>/` với các folder trách nhiệm như `screens/`, `components/`, `hooks/`, `api/`, `data/`, `schemas/`, `types/`, `utils/`.
-- Component dùng lại nhiều màn đặt ở `apps/web/components`; component chỉ dùng riêng feature đặt trong feature đó.
-- Mỗi file `.tsx` chỉ có một component implementation chính. Barrel `index.ts` chỉ re-export.
+- Feature UI đặt trong `apps/web/features/<feature>/` với các folder trách nhiệm như `screens/`, `hooks/`, `api/`, `data/`, `schemas/`, `types/`, `utils/`; component local nằm trong `screens/<screen>/components`.
+- Component dùng lại nhiều màn đặt ở `apps/web/components`; component chỉ dùng riêng một màn đặt cạnh screen tương ứng.
+- Mỗi file `.tsx` chỉ có một component implementation chính. Tránh tạo file barrel `index.ts` chỉ để re-export; import thẳng file thật khi có thể.
 - Form/input/select/checkbox/button pattern đã được owner duyệt phải được tái sử dụng hoặc nâng thành shared component trước khi tạo biến thể mới.
 - Mock data, option list, mapper/formatter/helper và schema phải tách khỏi JSX khi màn hình không nhỏ.
 - Import nội bộ trong `apps/web` dùng `@/...`.

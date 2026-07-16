@@ -1,4 +1,4 @@
-import { AdminCourseDetailManager } from "@/features/admin-courses/screens/admin-course-detail-manager";
+import { AdminCourseDetailManager } from "@/features/admin/courses/screens/admin-course-detail-manager";
 import { getServerThemeMode } from "@/lib/server-theme";
 
 export default async function AdminCourseDetailPage({

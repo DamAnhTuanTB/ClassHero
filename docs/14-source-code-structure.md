@@ -15,7 +15,7 @@ Khi làm task có sửa code, Codex phải đọc file này cùng `AGENTS.md`, d
 - Không tạo lại component/pattern đã được owner duyệt với style khác. Phải kiểm tra shared components, feature tương tự và `docs/ui-references/approved-patterns.md` trước khi tạo mới.
 - Khi tạo/sửa UI, phải đọc routing index trong `docs/ui-references/code-patterns.md` rồi chọn file/section pattern gần nhất trong `docs/ui-references/code-patterns/` cho form, modal, detail grid, action, upload hoặc state view trước khi tự viết biến thể mới.
 - Import nội bộ phải dùng alias chuẩn: `@/...` trong `apps/web`, `#api/...` trong `apps/api`.
-- File barrel `index.ts` chỉ re-export; không chứa JSX/component implementation hoặc logic nghiệp vụ.
+- Không tạo file barrel/re-export chỉ để gom import cho tiện, ví dụ `states.tsx`, `badges.tsx`, `index.ts` chỉ export lại file khác. Import thẳng file thật để cấu trúc dễ đọc và tránh file thừa.
 - Không cập nhật changelog khi sửa code thường; changelog chỉ ghi trong workflow `/commit`.
 
 ---
@@ -52,7 +52,7 @@ Rules:
 - Admin/student/parent route phải có guard ở UI khi cần, nhưng backend vẫn enforce RBAC/ownership.
 - Root `app/layout.tsx` không được trở thành app shell nặng cho mọi route. Shell, toaster, CSS, nav, guard hoặc provider chỉ dùng cho một role phải đặt ở route group layout tương ứng như `(auth)/layout.tsx`, `(admin)/layout.tsx`, `(student)/layout.tsx` hoặc `(parent)/layout.tsx`.
 - CSS chỉ dành cho một role phải đặt gần route group đó, ví dụ `apps/web/app/(admin)/admin-theme.css`, và import từ role layout. `globals.css` chỉ giữ token/base/utility dùng chung thật sự cho mọi route.
-- Route page nên import trực tiếp screen entry cần dùng. Tránh import từ barrel feature ở route boundary nếu barrel export nhiều screen, dialog, editor hoặc admin tool khác vì có thể làm route chunk rộng hơn cần thiết.
+- Route page nên import trực tiếp screen entry cần dùng. Tránh import qua file re-export ở route boundary vì có thể làm route chunk rộng hơn cần thiết và tạo thêm file không mang ý nghĩa sở hữu.
 
 ### 2.2. Feature folders
 
@@ -61,24 +61,29 @@ Feature code đặt trong `apps/web/features/<feature>/`.
 ```txt
 features/<feature>/
 ├── api/          # API client hoặc query/mutation function riêng feature
-├── components/   # Component nhỏ chỉ dùng trong feature
 ├── data/         # Mock data, option list, constant dữ liệu hiển thị
 ├── hooks/        # Hook orchestration/state/query cho feature
-├── layout/       # Layout/shell riêng feature khi không phải Next route layout
 ├── schemas/      # Zod schema, form schema, validation helper
-├── screens/      # Screen/manager component cấp trang
+├── screens/      # Mỗi screen là một folder riêng
+│   └── <screen-name>/
+│       ├── index.tsx
+│       └── components/
 ├── session/      # Session/store feature-specific nếu có
 ├── types/        # Type riêng feature
-├── utils/        # Mapper, formatter, normalizer, pure helper
-└── index.ts      # Barrel re-export, không chứa implementation
+└── utils/        # Mapper, formatter, normalizer, pure helper
 ```
 
 Không phải feature nào cũng cần đủ mọi folder. Chỉ tạo folder khi thật sự có file thuộc trách nhiệm đó.
 
 Rules:
 
-- `screens/` chứa component cấp màn hình/manager. Screen được phép compose nhiều component và hook, nhưng không chứa danh sách dài subcomponent/helper inline.
-- `components/` chứa component JSX nhỏ. Mỗi file `.tsx` chỉ có một component implementation chính.
+- Cấu trúc feature phải ưu tiên dễ quét bằng mắt: root feature chỉ giữ các folder trách nhiệm thật sự cần thiết, không tạo folder chỉ để chứa một file, không lồng thêm tầng khi tên folder không làm rõ ownership hơn.
+- Khi route trong `apps/web/app` có sibling quan trọng theo role, feature code phải mirror sibling đó thay vì gộp vào một feature rộng. Ví dụ `app/(student)/student/courses` map về `features/student/courses`, còn `app/(student)/student/explore` map về `features/student/explore`.
+- Nếu route là màn trực tiếp của role và không có feature con rõ ràng, đặt màn dưới `features/<role>/screens/<screen-name>/`. Ví dụ public home dùng `features/public/screens/home/index.tsx`, không tạo lặp `features/public/home/screens/home`.
+- Mỗi màn hình trong feature phải là một folder dưới `screens/`, ví dụ `screens/admin-courses-manager/index.tsx` hoặc `screens/student-course-detail-screen/index.tsx`.
+- Component chỉ phục vụ một màn hình phải đặt cạnh màn hình đó trong `screens/<screen-name>/components/`. Không tạo `features/<feature>/components/`, không tạo `components/<screen-key>/` ở root feature.
+- `index.tsx` của screen được phép compose nhiều component và hook, nhưng không chứa danh sách dài subcomponent/helper inline.
+- Component dùng chung giữa nhiều màn, nhiều feature hoặc nhiều route phải đưa ra `apps/web/components` theo đúng scope role; không để trong `features/**/shared/components`.
 - `hooks/` giữ orchestration: local state, form wiring, query/mutation wiring, derived state phức tạp.
 - `api/` giữ function gọi API hoặc query/mutation function; không gọi fetch rải rác trong component sâu.
 - `schemas/` giữ Zod schema và type suy ra từ schema.
@@ -90,8 +95,13 @@ Rules:
 
 ```txt
 apps/web/components/
-├── forms/        # Form primitives dùng chung
-└── ui/           # shadcn/Radix wrapper và primitive UI
+├── common/       # Component dùng chung mọi role
+│   ├── auth/
+│   ├── forms/
+│   └── ui/
+├── admin/        # Component dùng chung riêng role admin
+├── student/      # Component dùng chung riêng role student
+└── parent/       # Component dùng chung riêng role phụ huynh
 
 apps/web/lib/
 ├── api-client.ts # API client wrapper dùng chung
@@ -101,12 +111,13 @@ apps/web/lib/
 Rules:
 
 - Shared component phải đủ generic để dùng lại nhiều màn, nhưng vẫn giữ style nhất quán của hệ thống.
-- Form input/select/checkbox/submit/status/header đã được owner ưng phải được tái sử dụng hoặc nâng cấp tại `apps/web/components/forms`.
-- Khi một form/control đã được owner duyệt hoặc dùng lặp lại từ hai nơi trở lên, không để mỗi feature tự dựng lại biến thể riêng; phải nâng cấp thành primitive/hook/helper trong `apps/web/components/forms` hoặc shared layer phù hợp rồi cho màn mới reuse.
+- Toàn bộ shared component của front-end chỉ đặt trong một root duy nhất là `apps/web/components`, chia theo scope `common`, `admin`, `student`, `parent`.
+- Form input/select/checkbox/submit/status/header đã được owner ưng phải được tái sử dụng hoặc nâng cấp tại `apps/web/components/common/forms`.
+- Khi một form/control đã được owner duyệt hoặc dùng lặp lại từ hai nơi trở lên, không để mỗi feature tự dựng lại biến thể riêng; phải nâng cấp thành primitive/hook/helper trong `apps/web/components/common/forms` hoặc shared layer phù hợp rồi cho màn mới reuse.
 - Validation helper dùng chung cho form text nên đặt ở shared web layer như `apps/web/lib/form-validation.ts`; form schema không nên lặp lại chuỗi Zod required/min/max dễ sai message ở từng feature.
 - Form numeric dùng chung như tiền, thứ tự, phần trăm hoặc số lượng phải có primitive/style thống nhất, không để từng màn dùng `type="number"` native với spinner/default UI riêng của browser.
-- shadcn/Radix wrapper cũng phải tách mỗi wrapper một file khi có nhiều component con; file compatibility như `components/ui/select.tsx` chỉ re-export.
-- Không đặt component chỉ dùng một feature vào shared layer.
+- shadcn/Radix wrapper cũng phải tách mỗi wrapper một file khi có nhiều component con; không tạo thêm file compatibility chỉ re-export nếu không có call site bắt buộc.
+- Không đặt component chỉ dùng một screen vào shared layer.
 - Không tạo component shared mới nếu chỉ một màn dùng và chưa thấy nhu cầu tái sử dụng rõ.
 
 ### 2.4. Front-end file boundary checklist
@@ -124,7 +135,7 @@ Trước khi tạo hoặc sửa UI lớn, Codex phải tự kiểm:
 - Import nội bộ đã dùng `@/...` chưa?
 - UI có loading, empty, error, disabled/pending state phù hợp chưa?
 - Mock data có dễ xóa khi `/task-connect` không?
-- Route boundary có kéo nhầm code role khác qua root layout, shared provider, CSS global hoặc feature barrel không?
+- Route boundary có kéo nhầm code role khác qua root layout, shared provider, CSS global hoặc re-export file không?
 - Nếu admin/client chung app, đã build/curl route public chính và route admin chính để xác nhận public route không tải chunk/CSS/asset admin chưa?
 
 ---

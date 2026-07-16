@@ -8,7 +8,7 @@ Dùng file này cho form, modal/drawer form, text validation, numeric input và 
 
 ### Pattern chuẩn
 
-- Dùng shared focus class từ `apps/web/components/forms/form-styles.ts` cho form primitives.
+- Dùng shared focus class từ `apps/web/components/common/forms/form-styles.ts` cho form primitives.
 - Focus ring của form control phải mảnh: light mode dùng tối đa `ring-2`; dark mode dùng `ring-1` và opacity dịu hơn để không bị chói trên nền tối.
 - Không thêm `focus:shadow-*` hoặc box-shadow riêng cho input/select. Trạng thái focus chỉ nên thể hiện bằng border + ring mảnh.
 - Select/listbox sau khi chọn option phải đóng dropdown và blur trigger nếu owner muốn ô mất trạng thái focus sau khi chọn.
@@ -78,7 +78,7 @@ function openCreateModal() {
 - Không disable nút submit/action trong modal chỉ vì form đang invalid, pristine hoặc field bắt buộc còn trống. Cho nút bấm được để `handleSubmit`/validation hiển thị lỗi inline; chỉ disable khi pending/saving hoặc thiếu prerequisite cứng khiến action không thể chạy.
 - Không gọi `form.trigger()` ngay sau `form.reset()` khi mở modal, vì sẽ hiện lỗi ở trạng thái pristine.
 - Không tự bọc error bằng `dirtyFields`/`touchedFields` trong từng form nếu chưa có test/logic rõ; nhập rồi xóa về default có thể làm `dirty` quay về false và mất realtime validation.
-- Không tự dựng input/select/submit mới nếu `apps/web/components/forms` đã có primitive phù hợp.
+- Không tự dựng input/select/submit mới nếu `apps/web/components/common/forms` đã có primitive phù hợp.
 
 ### Checklist
 

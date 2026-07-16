@@ -45,14 +45,14 @@ Các route UI auth hiện có:
 UI tách thành:
 
 - route/page trong `apps/web/app/(auth)/...`,
-- layout chung trong `apps/web/app/(auth)/layout.tsx`, với implementation visual/form frame ở `apps/web/features/auth/layout/`,
-- form client cấp màn hình trong `apps/web/features/auth/screens/`, export qua `apps/web/features/auth/index.ts`,
-- field/helper/option nội bộ lần lượt nằm trong `apps/web/features/auth/components/`, `apps/web/features/auth/utils/`, `apps/web/features/auth/data/`,
-- Zod schema trong `apps/web/features/auth/schemas/`,
+- layout chung trong `apps/web/app/(auth)/layout.tsx`, với implementation visual/form frame ở `apps/web/components/common/auth/auth-route-layout.tsx`,
+- form client cấp màn hình trong `apps/web/features/auth/screens/<screen>/index.tsx`, route import trực tiếp screen cần dùng,
+- field/helper/option nội bộ lần lượt nằm trong `apps/web/components/common/auth/`, `apps/web/features/auth/utils/`, `apps/web/features/auth/auth-form-options.ts`,
+- Zod schema trong `apps/web/features/auth/auth-schemas.ts`,
 - auth API wrappers trong `apps/web/features/auth/api/`,
 - auth session store trong `apps/web/features/auth/session/`,
-- protected route guard dùng chung trong `apps/web/features/auth/components/authenticated-route-guard.tsx` và hook `useAuthGuard`,
-- guest route guard trong `apps/web/features/auth/components/guest-route-guard.tsx` để chặn user đã đăng nhập quay lại login/register/forgot/reset,
+- protected route guard dùng chung trong `apps/web/components/common/auth/authenticated-route-guard.tsx` và hook `useAuthGuard`,
+- guest route guard trong `apps/web/components/common/auth/guest-route-guard.tsx` để chặn user đã đăng nhập quay lại login/register/forgot/reset,
 - API envelope/error parser dùng chung trong `apps/web/lib/api-client.ts`,
 - TanStack Query provider trong `apps/web/app/providers.tsx`.
 
@@ -140,8 +140,8 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - `apps/web/app/(auth)/reset-password/page.tsx`
 - `apps/web/features/auth/screens/`
 - `apps/web/features/auth/api/`, `components/`, `data/`, `schemas/`, `session/`, `layout/`, `utils/`
-- `apps/web/features/auth/components/authenticated-route-guard.tsx`
-- `apps/web/features/auth/components/guest-route-guard.tsx`
+- `apps/web/components/common/auth/authenticated-route-guard.tsx`
+- `apps/web/components/common/auth/guest-route-guard.tsx`
 - `apps/web/features/auth/session/use-auth-guard.ts`
 - `apps/web/features/auth/session/auth-session-errors.ts`
 - `apps/web/lib/api-client.ts`

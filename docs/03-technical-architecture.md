@@ -135,9 +135,9 @@ apps/web/app/
 Cấu trúc source front-end bắt buộc theo `docs/14-source-code-structure.md`.
 
 - Route/page chỉ compose screen/layout và xử lý boundary của Next.js.
-- Feature code đặt trong `apps/web/features/<feature>/` theo nhóm `api/components/data/hooks/layout/screens/schemas/session/types/utils` khi cần.
-- Component/shared primitive dùng lại nhiều màn đặt trong `apps/web/components`; component chỉ dùng một feature đặt trong feature đó.
-- Mỗi file `.tsx` chỉ có một component implementation chính; barrel chỉ re-export, không chứa JSX implementation.
+- Feature code đặt trong `apps/web/features/<feature>/` theo nhóm `api/data/hooks/screens/schemas/session/types/utils` khi cần; component local nằm trong `screens/<screen>/components`, shared component nằm trong `apps/web/components/{common,admin,student,parent}`.
+- Component/shared primitive dùng lại nhiều màn đặt trong `apps/web/components`; component chỉ dùng một màn đặt trong `screens/<screen>/components`.
+- Mỗi file `.tsx` chỉ có một component implementation chính; tránh file barrel/re-export nếu không có nhu cầu bắt buộc từ framework/tooling.
 - Import nội bộ dùng `@/...`.
 
 Chi tiết performance budget, cache, pagination, query, worker latency và observability nằm ở `docs/12-performance-and-observability.md`.

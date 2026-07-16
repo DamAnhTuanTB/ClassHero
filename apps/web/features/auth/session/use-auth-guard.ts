@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { AuthRole } from "@/features/auth/api";
+import type { AuthRole } from "@/features/auth/api/auth-api";
 import {
   clearAuthSession,
   isAuthSessionAccessTokenExpired,
@@ -11,10 +11,7 @@ import {
 import { getAuthSessionErrorReason } from "@/features/auth/session/auth-session-errors";
 
 export type AuthGuardFailureReason =
-  | "missing-session"
-  | "forbidden-role"
-  | "expired-session"
-  | "forbidden";
+  "missing-session" | "forbidden-role" | "expired-session" | "forbidden";
 
 export type UseAuthGuardOptions = {
   allowedRoles?: readonly AuthRole[];

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { StudentRegisterForm } from "@/features/auth";
+import { StudentRegisterForm } from "@/features/auth/screens/student-register";
 
 export const metadata: Metadata = {
   title: "Đăng ký học sinh | Hệ thống học theo lộ trình",

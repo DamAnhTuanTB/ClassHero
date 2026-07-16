@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LoginForm } from "@/features/auth";
+import { LoginForm } from "@/features/auth/screens/login";
 
 export const metadata: Metadata = {
   title: "Đăng nhập | Hệ thống học theo lộ trình",

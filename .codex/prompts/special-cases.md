@@ -53,7 +53,7 @@ Ghi nhớ:
 - `/task-connect`: nếu API chưa có thì code API đầy đủ theo task rồi nối UI.
 - UI phải mobile-first và ổn trên tablet/iPad, desktop.
 - UI public/indexable phải giữ cấu trúc SEO; flow nhạy độ trễ phải đọc performance docs.
-- UI code phải tuân thủ `docs/14-source-code-structure.md`: route/page compose screen, feature tách `screens/components/hooks/api/data/schemas/utils`, shared component tái sử dụng trước khi tạo mới, mỗi `.tsx` một component implementation chính.
+- UI code phải tuân thủ `docs/14-source-code-structure.md`: route/page compose screen, mỗi screen dùng `screens/<screen>/index.tsx` và component local trong `screens/<screen>/components`, shared component nằm ở `apps/web/components/{common,admin,student,parent}`, mỗi `.tsx` một component implementation chính.
 - UI form, modal, detail grid, action control, upload preview, badge/status và loading/empty/error state phải đối chiếu routing index trong `docs/ui-references/code-patterns.md` và file/section phù hợp trong `docs/ui-references/code-patterns/` trước khi tự viết biến thể mới.
 
 ## 4. Bug, Refactor, Commit

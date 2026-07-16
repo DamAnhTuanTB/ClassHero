@@ -54,9 +54,9 @@ flowchart TD
 apps/web/lib/use-persistent-boolean-state.ts
 apps/web/lib/sidebar-collapse-state.ts
 apps/web/app/layout.tsx
-apps/web/features/admin-courses/hooks/use-admin-courses-manager.ts
-apps/web/features/admin-courses/hooks/use-admin-course-detail-manager.ts
-apps/web/features/student-courses/layout/student-courses-shell.tsx
+apps/web/features/admin/courses/hooks/use-admin-courses-manager.ts
+apps/web/features/admin/courses/hooks/use-admin-course-detail-manager.ts
+apps/web/components/student/layout/student-shell.tsx
 ```
 
 ## Khi nào cần nhớ lại?

@@ -11,11 +11,14 @@ export function usePersistentBooleanState(
 ) {
   const [value, setValue] = useState(defaultValue);
 
-  const syncDocumentDataset = useCallback((nextValue: boolean) => {
-    if (datasetKey) {
-      document.documentElement.dataset[datasetKey] = String(nextValue);
-    }
-  }, [datasetKey]);
+  const syncDocumentDataset = useCallback(
+    (nextValue: boolean) => {
+      if (datasetKey) {
+        document.documentElement.dataset[datasetKey] = String(nextValue);
+      }
+    },
+    [datasetKey],
+  );
 
   useLayoutEffect(() => {
     try {

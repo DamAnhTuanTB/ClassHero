@@ -1,4 +1,4 @@
-import { PurchasedCoursesScreen } from "@/features/student-courses/screens/purchased-courses-screen";
+import { PurchasedCoursesScreen } from "@/features/student/courses/screens/purchased-courses-screen";
 import { getServerThemeMode } from "@/lib/server-theme";
 
 export default async function StudentPurchasedCoursesPage() {

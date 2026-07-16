@@ -4,9 +4,7 @@ import { ApiRequestError } from "@/lib/api-client";
 
 export type AuthSessionErrorReason = "expired-session" | "forbidden";
 
-export function getAuthSessionErrorReason(
-  error: unknown,
-): AuthSessionErrorReason | null {
+export function getAuthSessionErrorReason(error: unknown): AuthSessionErrorReason | null {
   if (!(error instanceof ApiRequestError)) {
     return null;
   }

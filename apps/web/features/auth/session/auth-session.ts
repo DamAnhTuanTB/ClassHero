@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { AuthTokenResponse, AuthUser } from "@/features/auth/api";
+import type { AuthTokenResponse, AuthUser } from "@/features/auth/api/auth-api";
 import { getAuthSessionErrorReason } from "@/features/auth/session/auth-session-errors";
 
 const authSessionStorageKey = "classhero.auth.session";

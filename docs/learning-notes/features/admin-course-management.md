@@ -19,7 +19,7 @@ flowchart TD
 
 ## Front-end
 
-Modal lộ trình được compose từ `PathEditor`. Các field nhỏ tách thành component riêng trong `apps/web/features/admin-courses/components/` để tránh dồn logic upload, textarea và form state vào một file lớn.
+Modal lộ trình được compose từ `PathEditor`. Các field nhỏ tách thành component riêng trong `apps/web/features/admin/courses/screens/admin-courses-manager/components/` để tránh dồn logic upload, textarea và form state vào một file lớn.
 
 Luồng đọc dữ liệu của admin course nên đi qua 4 lớp:
 
@@ -61,26 +61,26 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 
 ## File quan trọng
 
-- `apps/web/features/admin-courses/api/admin-courses-api.ts`
-- `apps/web/features/admin-courses/hooks/use-admin-course-queries.ts`
-- `apps/web/features/admin-courses/hooks/use-admin-courses-manager.ts`
-- `apps/web/features/admin-courses/hooks/use-admin-course-detail-manager.ts`
+- `apps/web/features/admin/courses/api/admin-courses-api.ts`
+- `apps/web/features/admin/courses/hooks/use-admin-course-queries.ts`
+- `apps/web/features/admin/courses/hooks/use-admin-courses-manager.ts`
+- `apps/web/features/admin/courses/hooks/use-admin-course-detail-manager.ts`
 - `apps/api/src/modules/files`
 - `apps/api/src/modules/learning-paths/services/learning-paths.service.ts`
 - `apps/api/src/modules/learning-paths/controllers/admin-chapters.controller.ts`
 - `apps/api/src/modules/learning-paths/services/chapters.service.ts`
 - `apps/web/lib/theme-store.ts`
-- `apps/web/features/admin-courses/components/editor-dialog-shell.tsx`
-- `apps/web/features/admin-courses/components/delete-confirm-dialog.tsx`
-- `apps/web/features/admin-courses/components/chapter-editor.tsx`
-- `apps/web/features/admin-courses/components/chapter-lesson-panel.tsx`
-- `apps/web/features/admin-courses/components/learning-path-summary-panel.tsx`
-- `apps/web/features/admin-courses/components/learning-path-row.tsx`
-- `apps/web/features/admin-courses/components/learning-paths-table.tsx`
-- `apps/web/features/admin-courses/components/path-cover-upload.tsx`
-- `apps/web/features/admin-courses/components/path-editor.tsx`
-- `apps/web/features/admin-courses/schemas/admin-courses-schemas.ts`
-- `apps/web/components/forms/text-field.tsx`
+- `apps/web/components/admin/courses/editor-dialog-shell.tsx`
+- `apps/web/components/admin/courses/delete-confirm-dialog.tsx`
+- `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/chapter-editor.tsx`
+- `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/chapter-lesson-panel.tsx`
+- `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/learning-path-summary-panel.tsx`
+- `apps/web/features/admin/courses/screens/admin-courses-manager/components/learning-path-row.tsx`
+- `apps/web/features/admin/courses/screens/admin-courses-manager/components/learning-paths-table.tsx`
+- `apps/web/features/admin/courses/screens/admin-courses-manager/components/path-cover-upload.tsx`
+- `apps/web/features/admin/courses/screens/admin-courses-manager/components/path-editor.tsx`
+- `apps/web/features/admin/courses/admin-courses-schemas.ts`
+- `apps/web/components/common/forms/text-field.tsx`
 
 ## Task liên quan
 

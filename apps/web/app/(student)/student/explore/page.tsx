@@ -1,4 +1,4 @@
-import { ExploreCoursesScreen } from "@/features/student-courses/screens/explore-courses-screen";
+import { ExploreCoursesScreen } from "@/features/student/explore/screens/explore-courses-screen";
 import { getServerThemeMode } from "@/lib/server-theme";
 
 export default async function StudentExploreCoursesPage() {

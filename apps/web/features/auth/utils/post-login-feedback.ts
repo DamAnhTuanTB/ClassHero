@@ -1,4 +1,4 @@
-import type { AuthRole } from "@/features/auth/api";
+import type { AuthRole } from "@/features/auth/api/auth-api";
 
 type PostLoginToast = {
   title: string;

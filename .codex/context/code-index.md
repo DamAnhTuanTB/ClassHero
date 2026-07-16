@@ -26,7 +26,7 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | Path                                   | Vai trò                                                                                                         |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `apps/web`                             | Next.js App Router front-end                                                                                    |
-| `apps/web/app/(public)/page.tsx`       | Landing page tạm thời, có link vào auth UI                                                                      |
+| `apps/web/app/(public)/page.tsx`       | Route boundary landing page tạm thời, compose `HomeScreen` từ feature public home                               |
 | `apps/web/app/(auth)/layout.tsx`       | Next.js layout chung cho auth flow, bọc `GuestRouteGuard`, visual/form layout theo route variant và mount `AppToaster` |
 | `apps/web/app/(auth)/login`            | Route đăng nhập nối API thật cho `M2.4`                                                                         |
 | `apps/web/app/(auth)/register`         | Route đăng ký student/parent nối API thật cho `M2.4`                                                            |
@@ -40,13 +40,15 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/app/(student)/student/explore` | Route `M3.5` màn tất cả lộ trình published với filter lớp/môn local mock, tách riêng khỏi `/student/courses`      |
 | `apps/web/app/globals.css`             | Tailwind/global styles dùng chung thật sự cho mọi route, không chứa CSS chỉ dành cho admin                      |
 | `apps/web/app/toaster`                 | Toaster wiring route-specific cho auth/admin, gom AppToaster, single-toast queue, constants và icon config      |
-| `apps/web/components`                  | Component dùng chung, gồm primitive UI như select                                                               |
-| `apps/web/components/forms`            | Form primitives dùng chung, mỗi component một file và barrel re-export, nâng từ auth pattern đã duyệt           |
-| `apps/web/components/ui/select`        | Radix/shadcn select wrappers, mỗi wrapper một file; `components/ui/select.tsx` là compatibility barrel          |
-| `apps/web/features/auth`               | Auth feature barrel và các nhóm `api/components/data/layout/screens/schemas/session/utils` cho `M2.4`, gồm protected guard, guest guard cho login/register và lỗi token hết hạn |
-| `apps/web/features/auth/screens`       | Auth screen-level form flows, mỗi flow một file và chỉ compose shared primitives/helpers                        |
-| `apps/web/features/admin-courses`      | Admin course/chapter/lesson UI cho `M3.4`, tách `api/hooks/screens/components/schemas/types/utils` và gọi API thật |
-| `apps/web/features/student-courses`    | Student course browsing UI cho `M3.5`, tách `layout/screens/components/data/hooks/types/utils`; mock data local cho lộ trình đã mua và tất cả lộ trình |
+| `apps/web/components`                  | Root component dùng chung duy nhất, chia scope `common`, `admin`, `student`, `parent`                          |
+| `apps/web/components/common/forms`     | Form primitives dùng chung mọi role, mỗi component một file, import trực tiếp file thật                        |
+| `apps/web/components/common/ui/select` | Radix/shadcn select wrappers, mỗi wrapper một file, import trực tiếp, không qua file re-export trung gian      |
+| `apps/web/features/auth`               | Auth domain cho API/session/schema/options/utils; mỗi form là `screens/<screen>/index.tsx`                     |
+| `apps/web/features/public`             | Public home feature; màn chính ở `screens/home/index.tsx`, component local ở `screens/home/components`         |
+| `apps/web/features/admin/courses`      | Admin course/chapter/lesson UI; mỗi màn nằm trong `screens/<screen>/index.tsx`, component local nằm cạnh màn trong `components/` |
+| `apps/web/features/student`            | Role folder student: route feature `courses`, `explore` và shared non-component data/types/utils               |
+| `apps/web/features/student/courses`    | Feature route `/student/courses`: `purchased-courses-screen` và `student-course-detail-screen`, component local nằm dưới từng screen |
+| `apps/web/features/student/explore`    | Feature route `/student/explore`: `screens/explore-courses-screen/index.tsx`, component filter local nằm cạnh screen |
 | `apps/web/lib`                         | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
 | `apps/web/playwright.config.ts`        | Playwright config, tự build/start web và lưu report local                                                       |
 | `apps/web/tests/auth-ui.spec.ts`       | E2E/screenshot smoke test cho auth UI `M2.4`                                                                    |

@@ -16,8 +16,8 @@ Các workflow code-producing phải đọc file này trước khi sửa code ho�
 Quy tắc cốt lõi:
 
 - Front-end tách theo route/page, feature screen, component, hook, API client, schema, data, type và utility.
-- Component dùng chung đặt ở shared layer; component chỉ dùng một feature đặt trong feature đó.
-- Mỗi file `.tsx` chỉ chứa một component implementation chính; barrel chỉ re-export.
+- Component dùng chung đặt ở shared layer; component chỉ dùng một màn đặt trong `screens/<screen>/components`.
+- Mỗi file `.tsx` chỉ chứa một component implementation chính; tránh barrel/re-export file nếu chỉ dùng để gom import cho tiện. Screen entry `index.tsx` là ngoại lệ hợp lệ vì nó là file màn hình chính, không phải file chỉ export lại.
 - Back-end module root chỉ giữ `*.module.ts`; controller/service/DTO/select/serializer/utils/types tách theo folder trách nhiệm.
 - HTTP exception và Prisma error mapping dùng `apps/api/src/common/errors`.
 - Import nội bộ dùng `@/...` trong web và `#api/...` trong API.
