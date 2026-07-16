@@ -1,3 +1,4 @@
 - 2026-07-16: Thêm giao diện student course explorer với layout Khám phá/Học tập, sidebar responsive có lưu trạng thái thu gọn, theme sáng/tối được tinh chỉnh bằng runtime screenshots, và note kỹ thuật về khôi phục UI state trước khung hình đầu tiên.
 - 2026-07-16: Chuẩn hóa focus ring cho form controls ở light/dark mode, sửa submit button auth thành submit thật để phím Enter đi đúng luồng CTA, làm select blur sau khi chọn và ghi lại pattern mobile-safe select trigger.
 - 2026-07-16: Hoàn thiện UI chi tiết khóa học học sinh với header ClassHero đồng bộ, tiến độ/lộ trình responsive, trạng thái đang học/học thử/chưa mua, dữ liệu mock nhiều tình huống và tinh chỉnh layout danh sách khóa học trên mobile/laptop.
+- 2026-07-16: Ghi nhận UI chi tiết khóa học đã được duyệt và bổ sung pattern tái sử dụng cho header detail, progress CTA, curriculum accordion, lesson timeline cùng các trạng thái học thử/chưa mua/đang học.

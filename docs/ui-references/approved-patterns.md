@@ -140,3 +140,32 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
   - Public course list/detail có thể mượn card/filter/progress direction, nhưng phải giữ SEO/crawlable text và CTA public rõ.
 - Evidence:
   - Files: `apps/web/app/(student)/student-theme.css`, `apps/web/features/student-courses/layout/student-courses-shell.tsx`, `apps/web/features/student-courses/screens/explore-courses-screen.tsx`, `apps/web/features/student-courses/components/course-search-filter-panel.tsx`, `apps/web/features/student-courses/components/course-filter-select.tsx`, `apps/web/features/student-courses/components/explore-course-card.tsx`, `apps/web/features/student-courses/components/course-illustration.tsx`, `apps/web/features/student-courses/components/course-status-badge.tsx`, `apps/web/features/student-courses/components/course-subject-badge.tsx`, `apps/web/features/student-courses/components/course-progress-bar.tsx`, `apps/web/features/student-courses/components/empty-course-state.tsx`.
+
+## Student Course Detail - 2026-07-16
+
+- Context: `M3.5` student course detail UI tại `/student/courses/[slug]`, gồm summary khóa học, tiến độ học tập, lộ trình chương/buổi, trạng thái đang học/học thử/chưa mua và responsive mobile/laptop.
+- Approved:
+  - Detail course bám cùng visual system với màn Khám phá/Học tập: nền xanh trời nhẹ ở content, card trắng thoáng, gần như không dùng shadow xám, desktop/laptop giữ content `max-w-3xl` và không có right sidebar phụ.
+  - Header luôn dùng cùng brand `ClassHero` đã chuẩn hóa. Mobile detail có icon back sát trái, logo/text sát icon, header full-width liền mạch không bo góc và giữ hiệu ứng trượt ẩn khi cuộn xuống, hiện lại khi cuộn lên; laptop vẫn có header sticky giống các màn học sinh khác.
+  - Hero summary ưu tiên hình minh họa môn học lớn, title vừa phải, badge môn/lớp/trạng thái cùng hàng ổn định; trạng thái `Đang học` dùng icon play tròn đồng bộ màu xanh hiện tại.
+  - Khóa chưa mua hiển thị badge `Chưa mua`, giá sale, giá gốc, phần trăm giảm và CTA `Mua ngay`; đồng thời ẩn card tiến độ học tập và ẩn phần trăm hoàn thành ở từng chương.
+  - Card tiến độ chỉ hiện cho khóa đã có quyền học; gồm icon mục tiêu đỏ, title bớt đen đặc, phần trăm/thanh progress/marker sao đồng màu CTA, tên buổi học tách dòng riêng và không truncate.
+  - Copy tiến độ đổi theo ngữ cảnh: bài đầu tiên, bài đang học, bài tiếp theo hoặc bài cuối cùng; CTA chính đổi giữa `Vào học` và `Học tiếp` theo đúng trạng thái.
+  - Lộ trình dùng accordion chương có animation mượt, cho phép mở nhiều chương cùng lúc và không tự đóng chương khác. Chapter card có viền trái 3px theo màu chương; số chương nhỏ gọn, sát mép trái; icon đóng/mở sát mép phải để dành không gian cho tên chương.
+  - Lesson list dùng timeline dọc nối các icon bằng gradient theo màu chương, có separator mảnh giữa các buổi, không có cột icon thừa bên phải. Icon trạng thái đặt ở đầu hàng, lesson CTA nhỏ gọn nằm bên phải chỉ cho buổi hiện tại/học thử.
+  - Buổi học thử luôn có badge `Học thử`, icon play nằm trong vòng tròn và CTA `Vào học`. Trạng thái khóa chỉ xuất hiện ở buổi học, không đặt badge `Đang khóa` ở cấp chương.
+  - Text dài phải wrap tự nhiên, không truncate tên buổi/tên chương quan trọng; nếu cần, đặt nhãn trạng thái ở dòng riêng và tên buổi ở dòng riêng với size lớn hơn.
+- Avoid:
+  - Không dựng header mobile thành card bo góc hoặc width không full; không dùng logo chữ tắt `CH` hay tự đổi màu/font brand.
+  - Không đặt card phụ bên phải ở layout laptop của detail course nếu không có nhu cầu nghiệp vụ rõ.
+  - Không để progress card có border xanh nhẹ hoặc box-shadow xám nặng khi màn đang theo style card phẳng.
+  - Không dùng chấm tròn đen cho trạng thái học, không dùng icon radio/wifi cho bài có CTA `Vào học`; icon học phải là play trong vòng tròn.
+  - Không truncate tên bài học trong card tiến độ hoặc timeline; không để CTA làm xô layout.
+  - Không tự động collapse các chương khác khi mở một chương; không đặt khóa ở cấp chương khi khóa chỉ áp dụng cho buổi học.
+- Reuse for:
+  - Student lesson detail entry, course package detail, public/parent course detail khi cần summary + progress/price + curriculum.
+  - Các màn học sinh có timeline bài học, chapter accordion, progress CTA hoặc trạng thái locked/trial/enrolled.
+  - Các detail screen cần mobile header có back + brand đồng bộ và desktop sticky header trong student shell.
+- Evidence:
+  - Screenshot: `docs/ui-references/designs/student-course-detail/student-course-detail-mobile-v1.png`
+  - Files: `apps/web/app/(student)/student/courses/[slug]/page.tsx`, `apps/web/features/student-courses/screens/student-course-detail-screen.tsx`, `apps/web/features/student-courses/components/student-course-mobile-brand-bar.tsx`, `apps/web/features/student-courses/components/student-course-detail-progress-card.tsx`, `apps/web/features/student-courses/components/student-course-chapter-card.tsx`, `apps/web/features/student-courses/components/student-course-lesson-row.tsx`, `apps/web/features/student-courses/data/student-courses-data.ts`, `apps/web/app/(student)/student-theme.css`.
