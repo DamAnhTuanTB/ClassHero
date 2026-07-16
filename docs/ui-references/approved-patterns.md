@@ -113,3 +113,30 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
   - Các detail page cần summary media + metadata grid + child entity manager.
 - Evidence:
   - Files: `apps/web/features/admin-courses/screens/admin-courses-manager.tsx`, `apps/web/features/admin-courses/screens/admin-course-detail-manager.tsx`, `apps/web/features/admin-courses/components/editor-dialog-shell.tsx`, `apps/web/features/admin-courses/components/path-editor.tsx`, `apps/web/features/admin-courses/components/chapter-editor.tsx`, `apps/web/features/admin-courses/components/lesson-editor.tsx`, `apps/web/features/admin-courses/components/delete-confirm-dialog.tsx`, `apps/web/features/admin-courses/components/archived-paths-dialog.tsx`, `apps/web/features/admin-courses/components/chapter-lesson-panel.tsx`, `apps/web/features/admin-courses/components/learning-path-summary-panel.tsx`, `apps/web/features/admin-courses/components/learning-path-row.tsx`.
+
+## Student Explore Courses - 2026-07-16
+
+- Context: `M3.5` student course browsing UI, trọng tâm là màn Khám phá `/student/explore` và student shell/navigation dùng chung quanh màn này.
+- Approved:
+  - Màn học sinh dùng hướng mobile-first sáng, vui và rõ nhiệm vụ: nền xanh trời rất nhẹ, card trắng nổi bằng khoảng thở/border tinh tế thay vì shadow dày; dark mode vẫn có token riêng, không chỉ đảo màu thủ công.
+  - Shell học sinh giữ desktop/laptop sidebar cố định và mobile bottom nav. Sidebar laptop dùng active pill xanh nhạt, icon Lucide lớn, padding item dày vừa phải, gap vừa đủ để dễ quét; mobile bottom nav dùng icon + label ngắn, trạng thái active rõ.
+  - Header/search/filter đặt trước list, gồm ô tìm kiếm có icon, nút clear thật, select lớp/môn có state thật, focus ring nhẹ và không làm mobile bị zoom/nhảy layout.
+  - Danh sách khóa học chia nhóm bằng ribbon section nổi bật nhưng không biến thành hero. Count hint dùng icon nhỏ và copy ngắn.
+  - Course card dùng bố cục media trái, thông tin phải trên mobile; ảnh/minh họa môn học là tín hiệu thị giác chính nhưng không lấn át tên khóa học, badge môn/lớp/trạng thái.
+  - Card có accent strip theo môn/khóa, badge trạng thái rõ, grade color theo lớp, title/description line-clamp, metadata bằng icon nhỏ và copy ngắn để quét nhanh.
+  - Trạng thái enrolled/locked/trial/expiring có panel riêng: tiến độ + bài tiếp theo + CTA học, giá + CTA chi tiết, học thử + CTA học thử, sắp hết hạn. CTA có feedback bấm rõ, text một dòng và không giả thành công.
+  - Progress dùng label, số phần trăm cùng nhịp size trên mobile, thanh progress có fill/marker sao nhẹ; animation chỉ trang trí nhỏ và có fallback khi reduced motion.
+  - Empty state dùng copy sản phẩm thật và gợi ý hành động rõ, không lộ chữ mock/technical.
+  - Light/dark theme phải đi qua class/token của student shell như `--student-screen-bg`, `student-soft-bold-text`, `student-mobile-border`, `student-filter-select-3d`, không hard-code một theme duy nhất trong từng component.
+- Avoid:
+  - Không làm màn học sinh thành dashboard SaaS xám/lạnh hoặc một màu; phải có năng lượng học tập qua icon, badge, progress, CTA và minh họa môn học.
+  - Không dùng card lồng card quá nặng, shadow dày hoặc gradient quá nhiều trong list khóa học.
+  - Không để filter/select/search chỉ là UI tĩnh; mọi control nhìn bấm được phải có state/handler thật.
+  - Không để button CTA wrap chữ, card overflow ngang, badge chen title, hoặc progress percent mỗi card một size trên mobile.
+  - Không copy y nguyên text/dữ liệu của màn Khám phá sang màn khác; chỉ reuse cấu trúc, nhịp màu, spacing, state và interaction.
+- Reuse for:
+  - Student course list, course detail summary, lesson entry/dashboard, leaderboard/profile learning summary và các màn học sinh cần list/filter/card/progress/CTA.
+  - Parent course browsing hoặc progress summary nếu cần cảm giác thân thiện hơn, nhưng giảm độ vui và tăng độ tin cậy/gọn theo role parent.
+  - Public course list/detail có thể mượn card/filter/progress direction, nhưng phải giữ SEO/crawlable text và CTA public rõ.
+- Evidence:
+  - Files: `apps/web/app/(student)/student-theme.css`, `apps/web/features/student-courses/layout/student-courses-shell.tsx`, `apps/web/features/student-courses/screens/explore-courses-screen.tsx`, `apps/web/features/student-courses/components/course-search-filter-panel.tsx`, `apps/web/features/student-courses/components/course-filter-select.tsx`, `apps/web/features/student-courses/components/explore-course-card.tsx`, `apps/web/features/student-courses/components/course-illustration.tsx`, `apps/web/features/student-courses/components/course-status-badge.tsx`, `apps/web/features/student-courses/components/course-subject-badge.tsx`, `apps/web/features/student-courses/components/course-progress-bar.tsx`, `apps/web/features/student-courses/components/empty-course-state.tsx`.

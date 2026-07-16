@@ -4,6 +4,7 @@ import type {
   StudentCourseSubject,
   StudentCourseSubjectFilter,
 } from "@/features/student-courses/types";
+import { studentCourses } from "@/features/student-courses/data/student-courses-data";
 
 export const subjectLabels: Record<StudentCourseSubject, string> = {
   CHEMISTRY: "HÓA",
@@ -20,17 +21,15 @@ export const subjectDisplayLabels: Record<StudentCourseSubject, string> = {
 const subjectBadgeClasses: Record<StudentCourseSubject, string> = {
   CHEMISTRY:
     "bg-orange-50 text-orange-700 dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]",
-  MATH:
-    "bg-blue-50 text-blue-700 dark:bg-[var(--theme-primary-soft)] dark:text-[var(--theme-primary)]",
+  MATH: "bg-blue-50 text-blue-700 dark:bg-[var(--theme-primary-soft)] dark:text-[var(--theme-primary)]",
   PHYSICS:
     "bg-teal-50 text-teal-700 dark:bg-[var(--theme-success-bg)] dark:text-teal-300",
 };
 
 export const accessLabels: Record<StudentCourseAccess, string> = {
+  completed: "Đã hoàn thành",
   enrolled: "Đang học",
-  expiring: "Sắp hết hạn",
   locked: "Chưa mua",
-  trial: "Có học thử",
 };
 
 const gradeTextClasses: Record<number, string> = {
@@ -66,14 +65,14 @@ export function getCoursePrice(course: StudentCourse) {
 
 export function getPurchasedCourses(courses: StudentCourse[]) {
   return courses.filter(
-    (course) => course.access === "enrolled" || course.access === "expiring",
+    (course) => course.access === "completed" || course.access === "enrolled",
   );
 }
 
 export function getExploreCourseGroups(courses: StudentCourse[]) {
   const purchasedCourses = getPurchasedCourses(courses);
   const otherCourses = courses.filter(
-    (course) => course.access !== "enrolled" && course.access !== "expiring",
+    (course) => course.access !== "completed" && course.access !== "enrolled",
   );
 
   return {
@@ -120,6 +119,10 @@ export function getAverageProgress(courses: StudentCourse[]) {
   return Math.round(
     progressValues.reduce((total, value) => total + value, 0) / progressValues.length,
   );
+}
+
+export function findStudentCourseBySlug(slug: string) {
+  return studentCourses.find((course) => course.slug === slug);
 }
 
 function normalizeSearchableText(value: string) {

@@ -1,14 +1,6 @@
-import {
-  Atom,
-  Calculator,
-  FlaskConical,
-  type LucideIcon,
-} from "lucide-react";
+import { Atom, Calculator, FlaskConical, type LucideIcon } from "lucide-react";
 import type { StudentCourseSubject } from "@/features/student-courses/types";
-import {
-  getSubjectBadgeClass,
-  subjectLabels,
-} from "@/features/student-courses/utils";
+import { getSubjectBadgeClass, subjectLabels } from "@/features/student-courses/utils";
 import { cn } from "@/lib/utils";
 
 const subjectIconBySubject: Record<StudentCourseSubject, LucideIcon> = {
@@ -17,11 +9,7 @@ const subjectIconBySubject: Record<StudentCourseSubject, LucideIcon> = {
   PHYSICS: Atom,
 };
 
-export function CourseSubjectBadge({
-  subject,
-}: {
-  subject: StudentCourseSubject;
-}) {
+export function CourseSubjectBadge({ subject }: { subject: StudentCourseSubject }) {
   const SubjectIcon = subjectIconBySubject[subject];
 
   return (
@@ -31,10 +19,7 @@ export function CourseSubjectBadge({
         getSubjectBadgeClass(subject),
       )}
     >
-      <SubjectIcon
-        className="hidden h-4 w-4 shrink-0 lg:block"
-        aria-hidden="true"
-      />
+      <SubjectIcon className="hidden h-4 w-4 shrink-0 lg:block" aria-hidden="true" />
       {subjectLabels[subject]}
     </span>
   );

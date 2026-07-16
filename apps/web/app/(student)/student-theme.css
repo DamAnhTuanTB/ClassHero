@@ -4,12 +4,200 @@
   --student-screen-bg: #e0f2fe;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark)
-  [data-student-shell="true"],
+:where(.dark [data-theme-root], [data-theme-root].dark) [data-student-shell="true"],
 [data-student-shell="true"].dark {
   --student-discount-badge-text: rgb(252 165 165);
   --student-sale-price-text: var(--theme-text-strong);
   --student-screen-bg: var(--theme-bg);
+}
+
+[data-student-shell="true"] .student-goal-item--sky {
+  background: rgb(240 249 255 / 70%);
+}
+
+[data-student-shell="true"] .student-goal-item--emerald {
+  background: rgb(236 253 245 / 70%);
+}
+
+[data-student-shell="true"] .student-goal-item--amber {
+  background: rgb(255 251 235 / 70%);
+}
+
+[data-student-shell="true"] .student-goal-item--indigo {
+  background: rgb(238 242 255 / 70%);
+}
+
+[data-student-shell="true"] .student-goal-icon--sky {
+  background: rgb(224 242 254);
+  color: rgb(2 132 199);
+  box-shadow: inset 0 0 0 1px rgb(14 165 233 / 12%);
+}
+
+[data-student-shell="true"] .student-goal-icon--emerald {
+  background: rgb(236 253 245);
+  color: rgb(5 150 105);
+}
+
+[data-student-shell="true"] .student-goal-icon--amber {
+  background: rgb(255 251 235);
+  color: rgb(217 119 6);
+}
+
+[data-student-shell="true"] .student-goal-icon--indigo {
+  background: rgb(224 231 255);
+  color: rgb(79 70 229);
+}
+
+[data-student-shell="true"] .student-goal-metric--sky {
+  background: rgb(224 242 254);
+  color: rgb(3 105 161);
+}
+
+[data-student-shell="true"] .student-goal-metric--emerald {
+  background: rgb(209 250 229);
+  color: rgb(4 120 87);
+}
+
+[data-student-shell="true"] .student-goal-metric--amber {
+  background: rgb(254 243 199);
+  color: rgb(180 83 9);
+}
+
+[data-student-shell="true"] .student-streak-stat {
+  background: rgb(255 251 235);
+  color: rgb(180 83 9);
+}
+
+[data-student-shell="true"] .student-streak-icon {
+  background: rgb(255 255 255);
+  color: rgb(245 158 11);
+}
+
+[data-student-shell="true"] .student-streak-label {
+  color: rgb(217 119 6);
+}
+
+[data-student-shell="true"] .student-streak-value {
+  color: rgb(51 65 85);
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-item--sky,
+[data-student-shell="true"].dark .student-goal-item--sky {
+  background: rgb(7 89 133 / 22%) !important;
+  box-shadow: inset 0 0 0 1px rgb(125 211 252 / 10%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-item--emerald,
+[data-student-shell="true"].dark .student-goal-item--emerald {
+  background: rgb(4 120 87 / 20%) !important;
+  box-shadow: inset 0 0 0 1px rgb(110 231 183 / 10%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-item--amber,
+[data-student-shell="true"].dark .student-goal-item--amber {
+  background: rgb(146 64 14 / 20%) !important;
+  box-shadow: inset 0 0 0 1px rgb(252 211 77 / 10%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-item--indigo,
+[data-student-shell="true"].dark .student-goal-item--indigo {
+  background: rgb(67 56 202 / 20%) !important;
+  box-shadow: inset 0 0 0 1px rgb(165 180 252 / 12%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-icon--sky,
+[data-student-shell="true"].dark .student-goal-icon--sky {
+  background: rgb(7 89 133 / 34%) !important;
+  color: rgb(125 211 252) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-icon--emerald,
+[data-student-shell="true"].dark .student-goal-icon--emerald {
+  background: rgb(4 120 87 / 32%) !important;
+  color: rgb(110 231 183) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-icon--amber,
+[data-student-shell="true"].dark .student-goal-icon--amber {
+  background: rgb(146 64 14 / 32%) !important;
+  color: rgb(252 211 77) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-icon--indigo,
+[data-student-shell="true"].dark .student-goal-icon--indigo {
+  background: rgb(67 56 202 / 34%) !important;
+  color: rgb(199 210 254) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-metric--sky,
+[data-student-shell="true"].dark .student-goal-metric--sky {
+  background: rgb(7 89 133 / 36%) !important;
+  color: rgb(186 230 253) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-metric--emerald,
+[data-student-shell="true"].dark .student-goal-metric--emerald {
+  background: rgb(4 120 87 / 34%) !important;
+  color: rgb(167 243 208) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-goal-metric--amber,
+[data-student-shell="true"].dark .student-goal-metric--amber {
+  background: rgb(146 64 14 / 34%) !important;
+  color: rgb(254 240 138) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-streak-stat,
+[data-student-shell="true"].dark .student-streak-stat {
+  background: rgb(146 64 14 / 22%) !important;
+  color: rgb(252 211 77) !important;
+  box-shadow: inset 0 0 0 1px rgb(252 211 77 / 10%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-streak-icon,
+[data-student-shell="true"].dark .student-streak-icon {
+  background: rgb(146 64 14 / 34%) !important;
+  color: rgb(252 211 77) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-streak-label,
+[data-student-shell="true"].dark .student-streak-label {
+  color: rgb(252 211 77) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-streak-value,
+[data-student-shell="true"].dark .student-streak-value {
+  color: var(--theme-text-strong) !important;
 }
 
 :where(.dark [data-theme-root], [data-theme-root].dark)
@@ -41,8 +229,7 @@
   [data-student-shell="true"]
   .student-course-price-box,
 [data-student-shell="true"].dark .student-course-price-box {
-  background:
-    linear-gradient(135deg, rgb(6 78 59 / 34%), rgb(15 23 42 / 88%)) !important;
+  background: linear-gradient(135deg, rgb(6 78 59 / 34%), rgb(15 23 42 / 88%)) !important;
   border-color: rgb(52 211 153 / 36%) !important;
 }
 
@@ -50,8 +237,11 @@
   [data-student-shell="true"]
   .student-course-trial-box,
 [data-student-shell="true"].dark .student-course-trial-box {
-  background:
-    linear-gradient(135deg, rgb(120 53 15 / 30%), rgb(15 23 42 / 90%)) !important;
+  background: linear-gradient(
+    135deg,
+    rgb(120 53 15 / 30%),
+    rgb(15 23 42 / 90%)
+  ) !important;
   border-color: rgb(251 191 36 / 34%) !important;
 }
 
@@ -384,7 +574,8 @@
   .student-sidebar-profile-card
   .student-sidebar-profile-text
   p:first-child,
-[data-student-shell="true"].dark .student-sidebar-profile-card
+[data-student-shell="true"].dark
+  .student-sidebar-profile-card
   .student-sidebar-profile-text
   p:first-child {
   color: var(--theme-text-strong) !important;
@@ -682,6 +873,22 @@
   border-width: 1px !important;
 }
 
+[data-student-shell="true"] .student-chapter-card {
+  border-left-width: 3px !important;
+}
+
+[data-student-shell="true"] .student-chapter-card--amber {
+  border-left-color: rgb(251 146 60) !important;
+}
+
+[data-student-shell="true"] .student-chapter-card--emerald {
+  border-left-color: rgb(16 185 129) !important;
+}
+
+[data-student-shell="true"] .student-chapter-card--violet {
+  border-left-color: rgb(139 92 246) !important;
+}
+
 [data-student-shell="true"] .student-section-ribbon {
   --student-ribbon-strip: rgb(14 165 233);
   --student-ribbon-shadow: rgb(7 89 133 / 26%);
@@ -862,6 +1069,10 @@
   color: rgb(51 65 85) !important;
 }
 
+[data-student-shell="true"] .student-goals-title {
+  color: rgb(8 145 178) !important;
+}
+
 [data-student-shell="true"] .student-course-count-text {
   color: rgb(2 132 199) !important;
 }
@@ -874,6 +1085,11 @@
 .dark [data-student-shell="true"] .student-soft-bold-text,
 [data-student-shell="true"].dark .student-soft-bold-text {
   color: var(--theme-text-strong) !important;
+}
+
+.dark [data-student-shell="true"] .student-goals-title,
+[data-student-shell="true"].dark .student-goals-title {
+  color: rgb(103 232 249) !important;
 }
 
 [data-student-shell="true"] .font-extrabold {

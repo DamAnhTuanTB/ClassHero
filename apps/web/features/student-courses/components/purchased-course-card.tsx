@@ -44,7 +44,10 @@ function ProminentPurchasedCourseCard({ course }: { course: StudentCourse }) {
           {course.nextLesson ? (
             <div className="mt-4 grid gap-2 text-sm">
               <div className="flex min-w-0 items-center gap-2 font-bold text-slate-700 dark:text-[var(--theme-text)]">
-                <BookOpen className="h-5 w-5 shrink-0 text-slate-500" aria-hidden="true" />
+                <BookOpen
+                  className="h-5 w-5 shrink-0 text-slate-500"
+                  aria-hidden="true"
+                />
                 <span className="truncate">{course.nextLesson.title}</span>
                 <ChevronRight className="ml-auto h-5 w-5 shrink-0 text-slate-400" />
               </div>
@@ -94,22 +97,12 @@ function CompactPurchasedCourseCard({ course }: { course: StudentCourse }) {
               <span className="truncate">{course.nextLesson.title}</span>
             </div>
           ) : null}
-          {course.access === "expiring" && course.expiresInDays ? (
-            <p className="mt-2 text-sm font-bold text-orange-500">
-              Còn {course.expiresInDays} ngày
-            </p>
-          ) : null}
           {course.nextLesson ? (
             <Link
               href={`/student/lessons/${course.nextLesson.id}`}
-              className={cn(
-                "mt-3 inline-flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4 sm:text-sm",
-                course.access === "expiring"
-                  ? "border-blue-600 bg-white text-blue-600 hover:bg-blue-50"
-                  : "border-blue-600 bg-white text-blue-600 hover:bg-blue-50",
-              )}
+              className="mt-3 inline-flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-white px-3 text-xs font-extrabold text-blue-600 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4 sm:text-sm"
             >
-              {course.access === "expiring" ? "Vào học" : "Tiếp tục"}
+              Tiếp tục
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : null}
@@ -141,13 +134,7 @@ function CourseCardBadges({ course }: { course: StudentCourse }) {
   );
 }
 
-function ProgressLine({
-  compact = false,
-  value,
-}: {
-  compact?: boolean;
-  value: number;
-}) {
+function ProgressLine({ compact = false, value }: { compact?: boolean; value: number }) {
   const markerLeft = Math.min(Math.max(value, 4), 96);
   const progressStyle = {
     "--student-progress-marker": `${markerLeft}%`,
@@ -167,7 +154,7 @@ function ProgressLine({
       <span
         className={cn(
           "student-progress-accent-text font-extrabold text-sky-600 dark:text-sky-300",
-          compact ? "text-sm" : "text-2xl",
+          compact ? "text-sm" : "text-sm sm:text-2xl",
         )}
       >
         {value}%

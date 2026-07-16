@@ -24,9 +24,7 @@ export function StudentCoursesHeader({
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
-  const isDarkTheme = isThemeHydrated
-    ? storeIsDarkTheme
-    : initialThemeMode === "dark";
+  const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
   const themeToggleLabel = isDarkTheme
     ? "Chuyển sang giao diện sáng"
     : "Chuyển sang giao diện tối";
@@ -138,7 +136,7 @@ export function StudentCoursesHeader({
       <div className="h-16 w-full shrink-0" aria-hidden="true" />
       <header
         ref={headerRef}
-        className="fixed inset-x-0 top-0 z-40 flex min-h-16 w-full min-w-0 translate-y-0 items-center gap-3 border-b border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-surface)_96%,transparent)] px-3 py-2 shadow-[0_8px_22px_rgb(15_23_42_/_5%)] backdrop-blur transition-[transform,left] duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none sm:px-6 lg:left-[var(--student-sidebar-offset)] lg:w-auto lg:duration-300 lg:ease-out"
+        className="fixed inset-x-0 top-0 z-40 flex min-h-16 w-full min-w-0 translate-y-0 items-center gap-3 border-b border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-surface)_96%,transparent)] px-3 py-2 shadow-[0_8px_22px_rgb(15_23_42_/_5%)] backdrop-blur transition-[translate,left] duration-[650ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[translate] motion-reduce:transition-none sm:px-6 lg:left-[var(--student-sidebar-offset)] lg:w-auto lg:duration-300 lg:ease-out"
       >
         <Link
           href="/student/explore"

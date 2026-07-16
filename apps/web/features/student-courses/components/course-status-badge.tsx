@@ -3,14 +3,9 @@ import { accessLabels } from "@/features/student-courses/utils";
 import { cn } from "@/lib/utils";
 
 const badgeStyles: Record<StudentCourseAccess, string> = {
-  enrolled:
-    "border-sky-100 bg-sky-50 text-sky-600",
-  expiring:
-    "border-orange-100 bg-orange-50 text-orange-500",
-  locked:
-    "border-emerald-100 bg-emerald-50 text-emerald-600",
-  trial:
-    "border-amber-100 bg-amber-50 text-orange-500",
+  completed: "border-emerald-100 bg-emerald-50 text-emerald-600",
+  enrolled: "border-sky-100 bg-sky-50 text-sky-600",
+  locked: "border-slate-200 bg-slate-50 text-slate-500",
 };
 
 export function CourseStatusBadge({ access }: { access: StudentCourseAccess }) {

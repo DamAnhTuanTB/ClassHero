@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --background: #f8fafc;
@@ -63,11 +64,8 @@
   --theme-overlay: rgb(2 6 23 / 45%);
   --theme-tooltip-bg: #020617;
   --theme-tooltip-text: #ffffff;
-  --theme-auth-ambient: radial-gradient(
-      circle at 14% 12%,
-      rgb(79 70 229 / 8%),
-      transparent 28%
-    ),
+  --theme-auth-ambient:
+    radial-gradient(circle at 14% 12%, rgb(79 70 229 / 8%), transparent 28%),
     radial-gradient(circle at 88% 18%, rgb(16 185 129 / 8%), transparent 26%);
   color-scheme: light;
 }
@@ -135,11 +133,8 @@ html.dark {
   --theme-overlay: rgb(2 6 23 / 58%);
   --theme-tooltip-bg: #f8fafc;
   --theme-tooltip-text: #020617;
-  --theme-auth-ambient: radial-gradient(
-      circle at 14% 12%,
-      rgb(56 189 248 / 10%),
-      transparent 30%
-    ),
+  --theme-auth-ambient:
+    radial-gradient(circle at 14% 12%, rgb(56 189 248 / 10%), transparent 30%),
     radial-gradient(circle at 88% 18%, rgb(16 185 129 / 8%), transparent 28%);
   color-scheme: dark;
 }
@@ -461,61 +456,55 @@ button {
   color: var(--theme-text) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.bg-white, .bg-slate-50, .bg-slate-100) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.bg-white, .bg-slate-50, .bg-slate-100) {
   background-color: var(--theme-surface) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.bg-slate-200, .bg-slate-300) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.bg-slate-200, .bg-slate-300) {
   background-color: var(--theme-surface-muted) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .border-slate-100,
-    .border-slate-200,
-    .border-slate-300
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.border-slate-100, .border-slate-200, .border-slate-300) {
   border-color: var(--theme-border) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .ring-slate-100,
-    .ring-slate-200,
-    .ring-slate-300
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.ring-slate-100, .ring-slate-200, .ring-slate-300) {
   --tw-ring-color: var(--theme-ring) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .text-slate-950,
-    .text-slate-900,
-    .text-slate-800
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.text-slate-950, .text-slate-900, .text-slate-800) {
   color: var(--theme-text-strong) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.text-slate-700, .text-slate-600) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.text-slate-700, .text-slate-600) {
   color: var(--theme-text) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.text-slate-500, .text-slate-400) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.text-slate-500, .text-slate-400) {
   color: var(--theme-text-muted) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.placeholder\:text-slate-400)::placeholder,
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.placeholder\:text-slate-500)::placeholder {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.placeholder\:text-slate-400)::placeholder,
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.placeholder\:text-slate-500)::placeholder {
   color: var(--theme-text-placeholder) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .bg-sky-50,
-    .bg-blue-50,
-    .bg-indigo-50,
-    .bg-violet-50
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.bg-sky-50, .bg-blue-50, .bg-indigo-50, .bg-violet-50) {
   background-color: var(--theme-primary-soft) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(
     .border-sky-100,
     .border-sky-200,
     .border-blue-100,
@@ -526,7 +515,8 @@ button {
   border-color: var(--theme-primary-border) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(
     .text-sky-700,
     .text-sky-600,
     .text-blue-700,
@@ -543,43 +533,28 @@ button {
   background-color: var(--theme-error-bg) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .border-rose-100,
-    .border-rose-200,
-    .border-red-100,
-    .border-red-200
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.border-rose-100, .border-rose-200, .border-red-100, .border-red-200) {
   border-color: var(--theme-error-border) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .text-rose-700,
-    .text-rose-600,
-    .text-red-700,
-    .text-red-600
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.text-rose-700, .text-rose-600, .text-red-700, .text-red-600) {
   color: var(--theme-error-text) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(.bg-emerald-50, .bg-green-50) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.bg-emerald-50, .bg-green-50) {
   background-color: var(--theme-success-bg) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .border-emerald-100,
-    .border-emerald-200,
-    .border-green-100,
-    .border-green-200
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.border-emerald-100, .border-emerald-200, .border-green-100, .border-green-200) {
   border-color: var(--theme-success-border) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .text-emerald-700,
-    .text-emerald-600,
-    .text-green-700,
-    .text-green-600
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.text-emerald-700, .text-emerald-600, .text-green-700, .text-green-600) {
   color: var(--theme-success-text) !important;
 }
 
@@ -587,21 +562,13 @@ button {
   background-color: var(--theme-warning-bg) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .border-amber-100,
-    .border-amber-200,
-    .border-orange-100,
-    .border-orange-200
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.border-amber-100, .border-amber-200, .border-orange-100, .border-orange-200) {
   border-color: var(--theme-warning-border) !important;
 }
 
-:where(.dark [data-theme-root], [data-theme-root].dark) :is(
-    .text-amber-700,
-    .text-amber-600,
-    .text-orange-700,
-    .text-orange-600
-  ) {
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  :is(.text-amber-700, .text-amber-600, .text-orange-700, .text-orange-600) {
   color: var(--theme-warning-text) !important;
 }
 

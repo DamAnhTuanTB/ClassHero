@@ -83,9 +83,7 @@ export function StudentCoursesShell({
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
-  const isDarkTheme = isThemeHydrated
-    ? storeIsDarkTheme
-    : initialThemeMode === "dark";
+  const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
   const session = useAuthSessionStore((state) => state.session);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
@@ -156,7 +154,7 @@ export function StudentCoursesShell({
         </div>
 
         <nav
-          className="student-sidebar-nav mt-5 grid min-h-0 flex-1 content-start gap-1 overflow-x-hidden overflow-y-auto pb-4 pr-1"
+          className="student-sidebar-nav mt-5 grid min-h-0 flex-1 content-start gap-1.5 overflow-x-hidden overflow-y-auto pb-4 pr-1"
           aria-label="Điều hướng học tập học sinh"
         >
           {navItems.map((item) => {
@@ -170,7 +168,7 @@ export function StudentCoursesShell({
                 aria-current={isActive ? "page" : undefined}
                 title={item.label}
                 className={cn(
-                  "student-sidebar-nav-item group relative flex min-h-10 w-full items-center gap-3 overflow-hidden rounded-2xl border border-l-4 px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--theme-focus-ring)]",
+                  "student-sidebar-nav-item group relative flex min-h-11 w-full items-center gap-3 overflow-hidden rounded-2xl border border-l-4 px-4 py-1.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--theme-focus-ring)]",
                   isActive
                     ? "border-sky-100 border-l-sky-300 bg-sky-50 text-sky-700 shadow-none dark:border-[var(--theme-primary-border)] dark:border-l-sky-400/70 dark:bg-[var(--theme-primary-soft)] dark:text-[var(--theme-primary)]"
                     : "border-transparent border-l-transparent text-[var(--theme-text-muted)] hover:border-sky-100 hover:border-l-sky-200/70 hover:bg-sky-50/70 hover:text-sky-700 dark:hover:border-[var(--theme-border)] dark:hover:border-l-[var(--theme-primary-border)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-[var(--theme-text-strong)]",
@@ -178,7 +176,7 @@ export function StudentCoursesShell({
               >
                 <Icon
                   className={cn(
-                    "h-5 w-5 shrink-0 transition",
+                    "h-6 w-6 shrink-0 transition",
                     isActive ? "text-sky-600" : "text-inherit",
                   )}
                   aria-hidden="true"
@@ -191,9 +189,7 @@ export function StudentCoursesShell({
           })}
         </nav>
 
-        <div
-          className="student-sidebar-profile-card sticky bottom-0 mt-4 grid gap-2 rounded-2xl border border-[#bae6fd] bg-white p-2 shadow-none dark:border-sky-400/35 dark:bg-[var(--theme-surface-soft)]"
-        >
+        <div className="student-sidebar-profile-card sticky bottom-0 mt-4 grid gap-2 rounded-2xl border border-[#bae6fd] bg-white p-2 shadow-none dark:border-sky-400/35 dark:bg-[var(--theme-surface-soft)]">
           <div className="student-sidebar-profile flex items-center gap-2.5">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-sky-200 bg-white text-sky-700 shadow-[0_8px_18px_-16px_rgb(2_132_199_/_52%)] dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] dark:text-[var(--theme-primary)]">
               <UserRound className="h-4 w-4" aria-hidden="true" />

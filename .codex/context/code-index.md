@@ -1,6 +1,6 @@
 # Code Index
 
-Last updated: 2026-07-11
+Last updated: 2026-07-16
 
 File này là bản đồ nhanh của code hiện tại để Codex tìm đúng nơi sửa. Nó chỉ mô tả code đang có hoặc vị trí dự kiến đã được docs chốt; không thay thế việc đọc file thật trước khi sửa.
 

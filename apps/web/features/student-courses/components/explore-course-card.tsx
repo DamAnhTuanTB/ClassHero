@@ -28,7 +28,6 @@ const courseAccentStripClassBySlug: Record<string, string> = {
   "toan-7-nang-cao": "bg-indigo-500 dark:bg-indigo-400",
   "toan-7-nen-tang": "bg-sky-500 dark:bg-sky-400",
   "toan-7-tang-toc": "bg-cyan-500 dark:bg-cyan-400",
-  "vat-ly-8-nhap-mon": "bg-teal-600 dark:bg-teal-400",
   "vat-ly-8-nhap-mon-trial": "bg-emerald-500 dark:bg-emerald-400",
 };
 
@@ -61,17 +60,27 @@ function getCourseAccentStripClass(course: StudentCourse) {
 }
 
 export function ExploreCourseCard({ course }: { course: StudentCourse }) {
-  const isEnrolled = course.access === "enrolled" || course.access === "expiring";
+  const isEnrolled = course.access === "completed" || course.access === "enrolled";
   const isStudying = course.access === "enrolled";
   const hasFreeTrial = !isEnrolled && typeof course.trialLessonCount === "number";
-  const ctaLabel = isEnrolled ? "Vào học" : "Chi tiết";
+  const ctaLabel =
+    course.access === "completed" ? "Xem lại" : isEnrolled ? "Vào học" : "Chi tiết";
+  const isCurrentLessonInProgress = course.nextLesson?.kind === "inProgress";
+  const nextLessonLabel =
+    course.nextLesson?.kind === "first"
+      ? "Buổi đầu tiên"
+      : course.nextLesson?.kind === "last"
+        ? "Buổi cuối cùng"
+        : isCurrentLessonInProgress
+          ? "Buổi đang học"
+          : "Buổi tiếp theo";
+  const nextLessonCtaLabel = isCurrentLessonInProgress ? "Học tiếp" : "Vào học";
   const coursePrice = getCoursePrice(course);
   const discountPercent =
     typeof course.salePriceVnd === "number" &&
     course.salePriceVnd < course.originalPriceVnd
       ? Math.round(
-          ((course.originalPriceVnd - course.salePriceVnd) /
-            course.originalPriceVnd) *
+          ((course.originalPriceVnd - course.salePriceVnd) / course.originalPriceVnd) *
             100,
         )
       : 0;
@@ -88,9 +97,11 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
       : undefined;
 
   return (
-    <article
+    <Link
       id={course.slug}
-      className="relative min-w-0 overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-5 shadow-none dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-6 sm:pl-7"
+      href={`/student/courses/${course.slug}`}
+      aria-label={`Xem chi tiết ${course.title}`}
+      className="group relative block min-w-0 cursor-pointer overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-5 shadow-none transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-6 sm:pl-7"
     >
       <span
         className={cn(
@@ -141,14 +152,20 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
             Hình thức:
           </span>{" "}
           <span className="inline-flex min-w-0 items-center gap-1">
-            <Video className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300 sm:h-5 sm:w-5" aria-hidden="true" />
+            <Video
+              className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300 sm:h-5 sm:w-5"
+              aria-hidden="true"
+            />
             <span>Học online trực tiếp</span>
           </span>
           <span className="shrink-0 text-slate-400 dark:text-[var(--theme-text-muted)]">
             +
           </span>
           <span className="inline-flex shrink-0 items-center gap-1">
-            <Globe2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300 sm:h-5 sm:w-5" aria-hidden="true" />
+            <Globe2
+              className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300 sm:h-5 sm:w-5"
+              aria-hidden="true"
+            />
             Website
           </span>
         </p>
@@ -187,7 +204,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                 </span>
                 <div className="min-w-0">
                   <p className="student-progress-accent-text text-[11px] font-bold leading-4 text-sky-600 dark:text-sky-300 sm:text-sm sm:leading-5">
-                    Buổi tiếp theo
+                    {nextLessonLabel}
                   </p>
                   <p className="student-soft-bold-text line-clamp-2 text-sm font-extrabold leading-5 text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-base sm:leading-6">
                     {course.nextLesson.title}
@@ -195,13 +212,13 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                 </div>
               </div>
 
-              <Link
-                href={`/student/courses/${course.slug}`}
-                className="student-learn-cta-3d inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-500 px-3 text-sm font-extrabold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-              >
-                <PlayCircle className="h-6 w-6 shrink-0 sm:h-5 sm:w-5" aria-hidden="true" />
-                Vào học
-              </Link>
+              <span className="student-learn-cta-3d inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-500 px-3 text-sm font-extrabold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100">
+                <PlayCircle
+                  className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
+                  aria-hidden="true"
+                />
+                {nextLessonCtaLabel}
+              </span>
             </div>
           </div>
         </div>
@@ -233,8 +250,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                           className="inline-flex h-5 shrink-0 items-center rounded-md border border-rose-200 bg-rose-50 px-1.5 text-[11px] font-black leading-none tracking-wide shadow-sm dark:border-rose-300/40 dark:bg-rose-500/20"
                           style={{
                             color: "var(--student-discount-badge-text)",
-                            WebkitTextFillColor:
-                              "var(--student-discount-badge-text)",
+                            WebkitTextFillColor: "var(--student-discount-badge-text)",
                           }}
                         >
                           Giảm {discountPercent}%
@@ -261,8 +277,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                 </div>
               )}
 
-              <Link
-                href={`/student/courses/${course.slug}`}
+              <span
                 className={cn(
                   "inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4",
                   isEnrolled
@@ -272,11 +287,17 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
               >
                 {ctaLabel}
                 {isEnrolled ? (
-                  <PlayCircle className="h-6 w-6 shrink-0 sm:h-5 sm:w-5" aria-hidden="true" />
+                  <PlayCircle
+                    className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <ArrowRight className="h-6 w-6 shrink-0 sm:h-5 sm:w-5" aria-hidden="true" />
+                  <ArrowRight
+                    className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
+                    aria-hidden="true"
+                  />
                 )}
-              </Link>
+              </span>
             </div>
           </div>
 
@@ -296,17 +317,17 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                 </div>
               </div>
 
-              <Link
-                href={`/student/courses/${course.slug}`}
-                className="student-trial-cta-3d inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-amber-400 px-3 text-sm font-extrabold text-white transition hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-100"
-              >
-                <PlayCircle className="h-6 w-6 shrink-0 sm:h-5 sm:w-5" aria-hidden="true" />
+              <span className="student-trial-cta-3d inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-amber-400 px-3 text-sm font-extrabold text-white transition hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-100">
+                <PlayCircle
+                  className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
+                  aria-hidden="true"
+                />
                 Học thử
-              </Link>
+              </span>
             </div>
           ) : null}
         </>
       )}
-    </article>
+    </Link>
   );
 }

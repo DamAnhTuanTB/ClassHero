@@ -14,7 +14,9 @@ export function CourseProgressBar({ value }: { value: number }) {
         <span className="student-progress-label text-sky-700 dark:text-sky-300">
           Tiến độ
         </span>
-        <span className="student-progress-accent-text text-sky-600 dark:text-sky-300">{value}%</span>
+        <span className="student-progress-accent-text text-sky-600 dark:text-sky-300">
+          {value}%
+        </span>
       </div>
       <div className="relative h-4">
         <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-slate-400/60 dark:bg-[var(--theme-surface-muted)]">

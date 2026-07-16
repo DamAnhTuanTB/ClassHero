@@ -141,6 +141,7 @@ Spacing/radius mặc định:
 - Dashboard cần thấy nhanh: đang học gì, tiến độ, bài tiếp theo, thông báo.
 - Lesson page ưu tiên video/tài liệu/nội dung chính; quiz, flashcard, test và AI chat không làm rối màn hình.
 - Trạng thái khóa, học thử, hoàn thành phải rõ.
+- Các màn học sinh dạng khám phá/list/progress nên bám direction đã duyệt của màn Khám phá: mobile-first, nền học tập sáng nhẹ, card trắng thoáng, minh họa môn học rõ, badge/status/progress/CTA có năng lượng nhưng không game hóa quá mức; desktop/laptop dùng sidebar role học sinh gọn, mobile dùng bottom nav. Khi làm màn tương tự, đọc `docs/ui-references/approved-patterns.md#student-explore-courses---2026-07-16` và `docs/ui-references/code-patterns/student-learning-surfaces.md` trước khi tự tạo biến thể mới.
 
 ### Parent
 
@@ -180,6 +181,7 @@ Spacing/radius mặc định:
 - Mọi ô input nhập liệu phải tắt gợi ý trình duyệt/autofill bằng cấu hình input chung; không dùng `autoComplete` semantic như `username`, `name`, `tel`, `street-address` hoặc `new-password` trong UI trừ khi owner yêu cầu rõ.
 - Dialog, Drawer, Sheet, Tabs, Card, Table, Badge, Alert ưu tiên shadcn/ui.
 - Icon button phải có `aria-label` hoặc tooltip nếu không hiển nhiên.
+- Logo và text logo `ClassHero` là brand component dùng chung, không được tự dựng biến thể mới theo từng màn. Mọi header, app bar, auth brand, sidebar hoặc mobile bar khi cần hiển thị thương hiệu phải dùng cùng cấu trúc/logo/text/token đã có ở header chuẩn gần nhất, hiện là icon `GraduationCap` trên nền gradient `theme-brand` và chữ `Class`/`Hero` tách màu theo `--theme-brand-primary`/`--theme-brand-secondary`. Không dùng logo chữ tắt như `CH`, không đổi font, màu, khoảng cách hoặc icon brand nếu chưa có yêu cầu đổi brand toàn hệ thống.
 - Loading, empty, error, disabled state phải được thiết kế cùng component/màn hình.
 - Toast/notification ngắn hạn phải dùng thư viện toast chung của web app, hiện là `sonner`; không hand-roll toast cục bộ trong từng form/page.
 - Toast phải giữ màu chủ đạo theo trạng thái trên nền/border/text, không chỉ ở icon: success dùng xanh lá, error dùng đỏ, warning dùng vàng/cam, info dùng xanh dương; icon phải có vùng/cột riêng và không được đè chữ; close button không được nổi lệch ra ngoài khối toast, không dùng biểu tượng trùng lặp với icon trạng thái và không làm toast quá thưa.

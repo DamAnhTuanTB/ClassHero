@@ -5,15 +5,13 @@ import { cn } from "@/lib/utils";
 const toneStyles: Record<StudentCourseTone, string> = {
   chemistry:
     "from-violet-100 via-sky-50 to-rose-50 text-violet-700 dark:from-violet-950 dark:via-slate-900 dark:to-rose-950",
-  math:
-    "from-sky-100 via-blue-50 to-amber-50 text-sky-700 dark:from-sky-950 dark:via-slate-900 dark:to-amber-950",
+  math: "from-sky-100 via-blue-50 to-amber-50 text-sky-700 dark:from-sky-950 dark:via-slate-900 dark:to-amber-950",
   physics:
     "from-emerald-100 via-cyan-50 to-sky-50 text-emerald-700 dark:from-emerald-950 dark:via-slate-900 dark:to-sky-950",
 };
 
 const visualToneStyles = {
-  blue:
-    "from-sky-100 via-blue-50 to-cyan-50 text-blue-700 dark:from-sky-950 dark:via-slate-900 dark:to-cyan-950",
+  blue: "from-sky-100 via-blue-50 to-cyan-50 text-blue-700 dark:from-sky-950 dark:via-slate-900 dark:to-cyan-950",
 };
 
 export function CourseIllustration({
@@ -25,8 +23,7 @@ export function CourseIllustration({
   tone: StudentCourseTone;
   visualTone?: keyof typeof visualToneStyles;
 }) {
-  const Icon =
-    tone === "math" ? Calculator : tone === "physics" ? Atom : FlaskConical;
+  const Icon = tone === "math" ? Calculator : tone === "physics" ? Atom : FlaskConical;
 
   return (
     <div
