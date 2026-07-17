@@ -1,170 +1,71 @@
-import { apiRequest, apiRequestEnvelope } from "@/lib/api-client";
+import type {
+  PublicLearningPathApi,
+  PublicLearningPathChapterApi,
+  PublicLearningPathLessonApi,
+  StudentCoursesListMeta,
+} from "@/features/student/shared/types/student-course-api-types";
 import type {
   StudentCourse,
   StudentCourseAccess,
-  StudentCourseDetail,
   StudentCourseDetailChapter,
-  StudentCourseDetailChapterStatus,
   StudentCourseDetailChapterTone,
-  StudentCourseDetailContinueKind,
   StudentCourseDetailLessonStatus,
   StudentCourseSubject,
   StudentCourseTone,
 } from "@/features/student/shared/student-courses-types";
+import type {
+  StudentCourseDetailResult,
+  StudentCoursesListResult,
+} from "@/features/student/shared/types/student-course-api-results";
 
-type PublicLearningPathSubject = "MATH" | "PHYSICS" | "CHEMISTRY";
-type PublicLearningPathPublishStatus = StudentCourseDetailChapterStatus;
-
-type PublicLearningPathProgressApi = {
-  completedLessonCount: number;
-  progressPercent: number;
-  continueLessonId: string | null;
-  continueLessonKind: StudentCourseDetailContinueKind;
-  continueLessonTitle: string | null;
-};
-
-type PublicLearningPathAccessApi = {
-  hasActiveEnrollment: boolean;
-  enrollment: {
-    id: string;
-    status: string;
-    startsAt: string;
-    expiresAt: string;
-  } | null;
-  trialAvailable: boolean;
-  trialLessonId: string | null;
-};
-
-type PublicLearningPathLessonApi = {
-  id: string;
-  orderIndex: number;
-  title: string;
-  shortDescription: string | null;
-  examOpenAt: string | null;
-  status: PublicLearningPathPublishStatus;
-  trialEnabled: boolean;
-};
-
-type PublicLearningPathChapterApi = {
-  id: string;
-  orderIndex: number;
-  title: string;
-  overview: string | null;
-  status: PublicLearningPathPublishStatus;
-  lessons: PublicLearningPathLessonApi[];
-};
-
-type PublicLearningPathThumbnailApi = {
-  id: string;
-  originalName: string;
-  url: string | null;
-};
-
-type PublicLearningPathApi = {
-  id: string;
-  subject: PublicLearningPathSubject;
-  grade: number;
-  title: string;
-  slug: string;
-  status: PublicLearningPathPublishStatus;
-  originalPriceVnd: number;
-  salePriceVnd: number | null;
-  totalChapterCount: number;
-  totalLessonCount: number;
-  thumbnailFileId: string | null;
-  thumbnailFile: PublicLearningPathThumbnailApi | null;
-  descriptionJson: unknown;
-  trialEnabled: boolean;
-  publishedAt: string | null;
-  summary: {
-    chapterCount: number;
-    lessonCount: number;
-    firstLessonId: string | null;
-    effectivePriceVnd: number;
-    hasDiscount: boolean;
-  };
-  access: PublicLearningPathAccessApi;
-  progress: PublicLearningPathProgressApi | null;
-  lessons: PublicLearningPathLessonApi[];
-  chapters?: PublicLearningPathChapterApi[];
-};
-
-type StudentCoursesListMeta = Record<string, unknown> & {
-  page?: number;
-  pageSize?: number;
-  total?: number;
-  totalPages?: number;
-  priorityGrade?: number | null;
-  gradeGroups?: Array<{
-    grade: number;
-    count: number;
-  }>;
-};
-
-export type StudentCoursesListResult = {
-  courses: StudentCourse[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    priorityGrade: number | null;
-    gradeGroups: Array<{
-      grade: number;
-      count: number;
-    }>;
-  };
-};
-
-export type StudentCourseDetailResult = {
-  course: StudentCourse;
-  detail: StudentCourseDetail;
-};
-
-export type MockPurchaseResult = {
-  mode: "MOCK_SUCCESS" | "ALREADY_ENROLLED";
-  learningPathId: string;
-  payment: {
-    id: string;
-    status: string;
-    amountVnd: number;
-    paidAt: string | null;
-  } | null;
-  enrollment: {
-    id: string;
-    status: string;
-    startsAt: string;
-    expiresAt: string;
-  };
-};
-
-export async function listStudentLearningPaths(token?: string) {
-  const response = await apiRequestEnvelope<PublicLearningPathApi[], StudentCoursesListMeta>(
-    "/learning-paths?pageSize=100",
-    { token },
-  );
-
+export function mapLearningPathsToCoursesList(
+  learningPaths: PublicLearningPathApi[],
+  meta: StudentCoursesListMeta | undefined,
+) {
   return {
-    courses: response.data.map(mapLearningPathToCourse),
-    meta: normalizeListMeta(response.meta),
+    courses: learningPaths.map(mapLearningPathToCourse),
+    meta: normalizeListMeta(meta),
   } satisfies StudentCoursesListResult;
 }
 
-export async function getStudentLearningPathDetail(slug: string, token?: string) {
-  const learningPath = await apiRequest<PublicLearningPathApi>(
-    `/learning-paths/${encodeURIComponent(slug)}`,
-    { token },
-  );
+export function mapLearningPathToCourseDetail(
+  learningPath: PublicLearningPathApi,
+): StudentCourseDetailResult {
+  const course = mapLearningPathToCourse(learningPath);
+  const orderedLessons = learningPath.lessons;
+  const isCoursePublished = learningPath.status === "PUBLISHED";
+  const completedLessonCount = learningPath.progress?.completedLessonCount ?? 0;
+  const continueLessonId = isCoursePublished
+    ? learningPath.progress?.continueLessonId ?? learningPath.access.trialLessonId ?? ""
+    : "";
+  const continueLessonTitle = isCoursePublished
+    ? learningPath.progress?.continueLessonTitle ??
+      orderedLessons.find((lesson) => lesson.id === continueLessonId)?.title ??
+      ""
+    : "";
+  const continueLessonKind = learningPath.progress?.continueLessonKind ?? "first";
+  const chapterSource = learningPath.chapters ?? [];
 
-  return mapLearningPathToCourseDetail(learningPath);
-}
-
-export function mockPurchaseLearningPath(learningPathId: string, token?: string) {
-  return apiRequest<MockPurchaseResult>("/student/payments/mock-success", {
-    method: "POST",
-    body: { learningPathId },
-    token,
-  });
+  return {
+    course,
+    detail: {
+      chapters: chapterSource.map((chapter, chapterIndex) =>
+        mapChapterToDetail({
+          chapter,
+          chapterIndex,
+          completedLessonCount,
+          continueLessonId,
+          hasActiveEnrollment: learningPath.access.hasActiveEnrollment,
+          isCoursePublished,
+          orderedLessons,
+        }),
+      ),
+      continueLessonId,
+      continueLessonKind,
+      continueLessonTitle,
+      totalHours: Math.ceil((orderedLessons.length * 40) / 60),
+    },
+  };
 }
 
 function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCourse {
@@ -209,46 +110,6 @@ function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCo
       : learningPath.publishedAt
         ? "Đã xuất bản"
         : undefined,
-  };
-}
-
-function mapLearningPathToCourseDetail(
-  learningPath: PublicLearningPathApi,
-): StudentCourseDetailResult {
-  const course = mapLearningPathToCourse(learningPath);
-  const orderedLessons = learningPath.lessons;
-  const isCoursePublished = learningPath.status === "PUBLISHED";
-  const completedLessonCount = learningPath.progress?.completedLessonCount ?? 0;
-  const continueLessonId = isCoursePublished
-    ? learningPath.progress?.continueLessonId ?? learningPath.access.trialLessonId ?? ""
-    : "";
-  const continueLessonTitle = isCoursePublished
-    ? learningPath.progress?.continueLessonTitle ??
-      orderedLessons.find((lesson) => lesson.id === continueLessonId)?.title ??
-      ""
-    : "";
-  const continueLessonKind = learningPath.progress?.continueLessonKind ?? "first";
-  const chapterSource = learningPath.chapters ?? [];
-
-  return {
-    course,
-    detail: {
-      chapters: chapterSource.map((chapter, chapterIndex) =>
-        mapChapterToDetail({
-          chapter,
-          chapterIndex,
-          completedLessonCount,
-          continueLessonId,
-          hasActiveEnrollment: learningPath.access.hasActiveEnrollment,
-          isCoursePublished,
-          orderedLessons,
-        }),
-      ),
-      continueLessonId,
-      continueLessonKind,
-      continueLessonTitle,
-      totalHours: Math.ceil((orderedLessons.length * 40) / 60),
-    },
   };
 }
 

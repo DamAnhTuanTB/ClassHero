@@ -2,21 +2,27 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  archiveAdminChapter,
   archiveAdminLearningPath,
-  archiveAdminLesson,
-  createAdminChapter,
   createAdminLearningPath,
-  createAdminLesson,
   getAdminLearningPath,
   listAdminLearningPaths,
   permanentlyDeleteAdminLearningPath,
   restoreAdminLearningPath,
-  updateAdminChapter,
   updateAdminLearningPath,
+} from "@/features/admin/courses/api/admin-learning-paths-api";
+import {
+  archiveAdminChapter,
+  createAdminChapter,
+  updateAdminChapter,
+} from "@/features/admin/courses/api/admin-chapters-api";
+import {
+  archiveAdminLesson,
+  createAdminLesson,
   updateAdminLesson,
+} from "@/features/admin/courses/api/admin-lessons-api";
+import {
   uploadAdminCourseCover,
-} from "@/features/admin/courses/api/admin-courses-api";
+} from "@/features/admin/courses/api/admin-course-files-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import type {
   ChapterFormValues,

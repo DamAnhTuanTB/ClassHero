@@ -11,11 +11,9 @@ import { FormHeader } from "@/components/common/forms/form-header";
 import { OptionField } from "@/components/common/forms/option-field";
 import { SubmitButton } from "@/components/common/forms/submit-button";
 import { TextField } from "@/components/common/forms/text-field";
-import {
-  getAuthErrorMessage,
-  registerStudent,
-  type AuthGender,
-} from "@/features/auth/api/auth-api";
+import { registerStudent } from "@/features/auth/api/auth-api";
+import type { AuthGender } from "@/features/auth/types/auth-api-types";
+import { getAuthErrorMessage } from "@/features/auth/utils/auth-api-errors";
 import { TermsConsentField } from "@/components/common/auth/terms-consent-field";
 import {
   birthYearOptions,

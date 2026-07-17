@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { FormHeader } from "@/components/common/forms/form-header";
 import { SubmitButton } from "@/components/common/forms/submit-button";
 import { TextField } from "@/components/common/forms/text-field";
-import { getAuthErrorMessage, registerParent } from "@/features/auth/api/auth-api";
+import { registerParent } from "@/features/auth/api/auth-api";
+import { getAuthErrorMessage } from "@/features/auth/utils/auth-api-errors";
 import { TermsConsentField } from "@/components/common/auth/terms-consent-field";
 import {
   parentRegisterSchema,

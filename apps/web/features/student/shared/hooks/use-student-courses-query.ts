@@ -5,7 +5,7 @@ import {
   getStudentLearningPathDetail,
   listStudentLearningPaths,
   mockPurchaseLearningPath,
-} from "@/features/student/shared/student-courses-api";
+} from "@/features/student/shared/api/student-learning-paths-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
 const studentLearningPathsQueryKey = (userId?: string) => [

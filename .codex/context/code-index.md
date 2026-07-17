@@ -1,6 +1,6 @@
 # Code Index
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 File này là bản đồ nhanh của code hiện tại để Codex tìm đúng nơi sửa. Nó chỉ mô tả code đang có hoặc vị trí dự kiến đã được docs chốt; không thay thế việc đọc file thật trước khi sửa.
 
@@ -43,13 +43,13 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/components`                  | Root component dùng chung duy nhất, chia scope `common`, `admin`, `student`, `parent`                          |
 | `apps/web/components/common/forms`     | Form primitives dùng chung mọi role, mỗi component một file, import trực tiếp file thật                        |
 | `apps/web/components/common/ui/select` | Radix/shadcn select wrappers, mỗi wrapper một file, import trực tiếp, không qua file re-export trung gian      |
-| `apps/web/features/auth`               | Auth domain cho API/session/schema/options/utils; mỗi form là `screens/<screen>/index.tsx`                     |
+| `apps/web/features/auth`               | Auth domain cho API/session/schema/options/types/utils; `api/auth-api.ts` chỉ giữ request function, type API nằm trong `types/auth-api-types.ts`, error copy nằm trong `utils/auth-api-errors.ts` |
 | `apps/web/features/public`             | Public home feature; màn chính ở `screens/home/index.tsx`, component local ở `screens/home/components`         |
-| `apps/web/features/admin/courses`      | Admin course/chapter/lesson UI; mỗi màn nằm trong `screens/<screen>/index.tsx`, component local nằm cạnh màn trong `components/` |
+| `apps/web/features/admin/courses`      | Admin course/chapter/lesson UI; mỗi màn nằm trong `screens/<screen>/index.tsx`, component local nằm cạnh màn trong `components/`; API client tách theo endpoint group trong `api/`, mapper trong `mappers/`, payload transformer trong `payloads/`, API DTO type trong `types/` |
 | `apps/web/features/student`            | Role folder student: route feature `courses`, `explore` và shared non-component API/hooks/data/types/utils               |
 | `apps/web/features/student/courses`    | Feature route `/student/courses`: `purchased-courses-screen` và `student-course-detail-screen`, component local nằm dưới từng screen |
 | `apps/web/features/student/explore`    | Feature route `/student/explore`: `screens/explore-courses-screen/index.tsx`, component filter local nằm cạnh screen |
-| `apps/web/features/student/shared/student-courses-api.ts` | API mapper cho `GET /learning-paths` và `GET /learning-paths/:slug`, chuyển public DTO sang type UI student course |
+| `apps/web/features/student/shared/api/student-learning-paths-api.ts` | API client cho `GET /learning-paths`, `GET /learning-paths/:slug` và mock purchase; mapper/type tách sang `shared/mappers` và `shared/types` |
 | `apps/web/features/student/shared/hooks/use-student-courses-query.ts` | TanStack Query hook cho list/detail student course, tự truyền access token sau khi đọc session/token đã lưu trong trình duyệt |
 | `apps/web/lib`                         | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
 | `apps/web/playwright.config.ts`        | Playwright config, tự build/start web và lưu report local                                                       |
@@ -77,11 +77,13 @@ Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<fe
 | `apps/api/src/modules/auth`           | Auth/profile API cho register/login/refresh/logout, `/me`, RBAC và reset password; module root chỉ giữ `auth.module.ts`, code tách theo `controllers/services/dto/selectors/serializers/utils/types`                                                                          |
 | `apps/api/src/modules/auth/dto`       | DTO validation cho auth request bodies                                                                                                                                                                                                                                        |
 | `apps/api/src/modules/files`          | Files API/storage service cho upload authenticated, signed URL, local MinIO dev và S3-compatible adapter cho R2 |
-| `apps/api/src/modules/learning-paths` | Public/student learning path list/detail API `M3.1`/`M3.3`/`M3.5` có optional auth, enrollment/trial state, chapters detail và progress cơ bản; admin learning path CRUD/publish/archive/restore/permanent delete, admin chapter CRUD, và admin lesson CRUD theo chapter cho `M3.4`; module root chỉ giữ `learning-paths.module.ts`, code tách theo `controllers/services/dto/selectors/serializers/utils/types` |
+| `apps/api/src/modules/learning-paths` | Public/student learning path list/detail API `M3.1`/`M3.3`/`M3.5` có optional auth, enrollment/trial state, chapters detail và progress cơ bản; admin learning path CRUD/publish/archive/restore/permanent delete, admin chapter CRUD, admin lesson CRUD theo chapter cho `M3.4`, và source document/page range/lesson document APIs cho `M4.2`; module root chỉ giữ `learning-paths.module.ts`, code tách theo `controllers/services/dto/selectors/serializers/utils/types` |
+| `apps/api/src/modules/jobs`           | Job status API `GET /jobs/:jobId` đọc `background_jobs`, enforce admin/owner permission và trả trạng thái job cho UI polling |
 | `apps/api/src/modules/payments`       | Payment/enrollment API layer; hiện có endpoint mock `POST /student/payments/mock-success` để nút student `Mua ngay` tạo payment `PAID` giả và enrollment active 12 tháng trong dev/MVP |
 | `apps/api/src/jobs`                   | Queue/job definitions                                                                                                                                                                                                                                                         |
 | `apps/api/src/workers`                | Worker entrypoints/processors                                                                                                                                                                                                                                                 |
-| `apps/api/test`                       | Backend tests                                                                                                                                                                                                                                                                 |
+| `apps/api/test`                       | Backend tests; hiện có focused/unit + integration tests cho `M4.2` document APIs chạy bằng Vitest                                                                                                                                                                             |
+| `apps/api/vitest.config.ts`           | Vitest config cho API tests, alias `#api/*` về `src/*` để test TypeScript source                                                                                                                                                                                              |
 
 Khi làm API mới, ưu tiên tạo module trong `apps/api/src/modules/<domain>/` với controller/service/DTO/guard theo NestJS.
 

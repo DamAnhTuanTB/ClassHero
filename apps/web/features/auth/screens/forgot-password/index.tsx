@@ -11,7 +11,8 @@ import { FormHeader } from "@/components/common/forms/form-header";
 import { OptionField } from "@/components/common/forms/option-field";
 import { SubmitButton } from "@/components/common/forms/submit-button";
 import { TextField } from "@/components/common/forms/text-field";
-import { forgotPassword, getAuthErrorMessage } from "@/features/auth/api/auth-api";
+import { forgotPassword } from "@/features/auth/api/auth-api";
+import { getAuthErrorMessage } from "@/features/auth/utils/auth-api-errors";
 import { gradeOptions } from "@/features/auth/auth-form-options";
 import {
   forgotPasswordSchema,

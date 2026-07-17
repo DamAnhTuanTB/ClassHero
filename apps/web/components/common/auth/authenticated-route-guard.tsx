@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { AuthRole } from "@/features/auth/api/auth-api";
+import type { AuthRole } from "@/features/auth/types/auth-api-types";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 
 export function AuthenticatedRouteGuard({

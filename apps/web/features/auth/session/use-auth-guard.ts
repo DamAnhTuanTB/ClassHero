@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { AuthRole } from "@/features/auth/api/auth-api";
+import type { AuthRole } from "@/features/auth/types/auth-api-types";
 import {
   clearAuthSession,
   isAuthSessionAccessTokenExpired,
