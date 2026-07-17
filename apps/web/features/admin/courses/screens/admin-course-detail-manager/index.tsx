@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, BookOpen, FileText, Layers3, Pencil, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Layers3, Pencil, Trash2 } from "lucide-react";
 import {
   AdminCoursesSidebar,
   type AdminCoursesSidebarItem,
@@ -39,7 +39,7 @@ const PathEditorDialog = dynamic(() =>
 );
 
 const adminNavItems: AdminCoursesSidebarItem[] = [
-  { label: "Lộ trình", icon: Layers3, active: true },
+  { label: "Khóa học", icon: Layers3, active: true },
   { label: "Bài học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
 ];
@@ -57,9 +57,11 @@ export function AdminCourseDetailManager({
     actions,
     chapterEditorMode,
     courseStats,
+    deletingPath,
     deletingChapter,
     deletingLesson,
     isChapterEditorOpen,
+    isDeletingPath,
     isDeletingChapter,
     isDeletingLesson,
     isDarkTheme,
@@ -108,16 +110,16 @@ export function AdminCourseDetailManager({
                 className="theme-button-neutral inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold transition"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Danh sách lộ trình
+                Danh sách khóa học
               </Link>
               <p className="mt-4 text-sm font-bold text-[var(--theme-primary)]">
-                Chi tiết lộ trình
+                Chi tiết khóa học
               </p>
               <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
-                {path?.title ?? "Không tìm thấy lộ trình"}
+                {path?.title ?? "Không tìm thấy khóa học"}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
-                Xem thông tin lộ trình, quản lý chương học tổng quan và các bài học trong
+                Xem thông tin khóa học, quản lý chương học tổng quan và các bài học trong
                 từng chương.
               </p>
             </div>
@@ -126,24 +128,31 @@ export function AdminCourseDetailManager({
                 type="button"
                 onClick={actions.startEditPath}
                 disabled={viewState !== "ready" || !path}
-                className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Pencil className="h-4 w-4" aria-hidden="true" />
-                Edit khóa học
+                Edit
               </button>
               <button
                 type="button"
-                onClick={actions.retryLoad}
-                className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
+                onClick={actions.requestDeletePath}
+                disabled={viewState !== "ready" || !path || isDeletingPath}
+                aria-label={path ? `Xóa khóa học ${path.title}` : "Xóa khóa học"}
+                className="theme-button-danger-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                Tải lại
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                Xóa
               </button>
             </div>
           </header>
 
           <section className="mt-5">
-            {viewState === "loading" ? <LoadingState /> : null}
+            {viewState === "loading" ? (
+              <LoadingState
+                title="Đang tải chi tiết khóa học"
+                description="ClassHero đang lấy thông tin chương học và bài học mới nhất."
+              />
+            ) : null}
             {viewState === "error" ? <ErrorState onRetry={actions.retryLoad} /> : null}
             {viewState === "ready" && path ? (
               <div className="grid gap-5">
@@ -211,6 +220,18 @@ export function AdminCourseDetailManager({
           onSubmit={actions.savePath}
           onUploadCover={uploadCover}
           onClose={actions.closePathEditor}
+        />
+      ) : null}
+      {deletingPath ? (
+        <DeleteConfirmDialog
+          title="Xóa khóa học"
+          confirmLabel="Xóa khóa học"
+          description={`Bạn có thực sự muốn xóa ${deletingPath.title} không? Khóa học sẽ được chuyển vào thùng rác.`}
+          isOpen={Boolean(deletingPath)}
+          isConfirming={isDeletingPath}
+          itemName={deletingPath.title}
+          onCancel={actions.closeDeletePathConfirm}
+          onConfirm={actions.confirmDeletePath}
         />
       ) : null}
       {deletingChapter ? (

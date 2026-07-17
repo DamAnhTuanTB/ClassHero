@@ -25,7 +25,7 @@ const baloo2 = Baloo_2({
 
 export const metadata: Metadata = {
   title: "Learning Path System",
-  description: "Learning path MVP front-end",
+  description: "Course MVP front-end",
 };
 
 const themeInitScript = `

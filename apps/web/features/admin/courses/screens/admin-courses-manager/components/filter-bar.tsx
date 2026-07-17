@@ -43,7 +43,7 @@ export function FilterBar({
       <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_0.6fr_0.7fr_0.7fr]">
         <TextField
           id="admin-course-filter-query"
-          label="Tìm lộ trình"
+          label="Tìm khóa học"
           hideLabel
           value={query}
           icon={<Search className="h-5 w-5" aria-hidden="true" />}

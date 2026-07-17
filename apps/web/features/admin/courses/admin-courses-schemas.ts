@@ -8,7 +8,7 @@ import { isAllowedVideoUrl } from "@/features/admin/courses/admin-courses-utils"
 import { requiredTrimmedText } from "@/lib/form-validation";
 
 export const learningPathSchema = z.object({
-  title: requiredTrimmedText({ requiredMessage: "Nhập tên lộ trình" }),
+  title: requiredTrimmedText({ requiredMessage: "Nhập tên khóa học" }),
   slug: z.string().trim().max(180).optional(),
   thumbnailFileId: z.string().trim().optional(),
   thumbnailFileName: z.string().trim().max(180).optional(),

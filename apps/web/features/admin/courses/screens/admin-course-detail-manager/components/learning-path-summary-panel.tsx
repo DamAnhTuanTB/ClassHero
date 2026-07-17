@@ -129,10 +129,10 @@ export function LearningPathSummaryPanel({
       <div className="mt-4 border-t border-[var(--theme-border)] pt-4">
         <div className={labelClass}>
           <FileText className="h-4 w-4" aria-hidden="true" />
-          Mô tả lộ trình
+          Mô tả khóa học
         </div>
         <p className="mt-1.5 text-sm leading-6 text-[var(--theme-text)]">
-          {path.description || "Chưa nhập mô tả cho lộ trình này."}
+          {path.description || "Chưa nhập mô tả cho khóa học này."}
         </p>
       </div>
     </section>

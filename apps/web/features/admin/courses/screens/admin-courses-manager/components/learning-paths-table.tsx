@@ -61,7 +61,7 @@ export function LearningPathsTable({
               type="checkbox"
               checked={allFilteredPathsSelected}
               onChange={onToggleSelectAll}
-              aria-label="Chọn tất cả lộ trình đang hiển thị"
+              aria-label="Chọn tất cả khóa học đang hiển thị"
               aria-checked={
                 selectedPathIds.length > 0 && !allFilteredPathsSelected
                   ? "mixed"
@@ -71,7 +71,7 @@ export function LearningPathsTable({
             />
           </label>
           <SortHeaderButton
-            label="Lộ trình"
+            label="Khóa học"
             isActive={sortKey === "title"}
             direction={sortDirection}
             isDarkTheme={isDarkTheme}

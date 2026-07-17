@@ -393,7 +393,7 @@ function extractDescriptionText(value: unknown) {
 
   return (
     text ??
-    "Lộ trình học theo từng chương, giúp em nắm chắc kiến thức và luyện tập đều đặn."
+    "Khóa học theo từng chương, giúp em nắm chắc kiến thức và luyện tập đều đặn."
   );
 }
 

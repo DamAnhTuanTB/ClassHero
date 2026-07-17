@@ -44,8 +44,9 @@ export function PurchasedCoursesScreen({
         {!isAuthHydrated || coursesQuery.isLoading ? (
           <div className="px-4 sm:px-6 lg:px-6">
             <EmptyCourseState
+              isLoading
               title="Đang tải khóa học"
-              description="ClassHero đang lấy danh sách lộ trình học của bạn."
+              description="ClassHero đang lấy danh sách khóa học của bạn."
             />
           </div>
         ) : coursesQuery.isError ? (

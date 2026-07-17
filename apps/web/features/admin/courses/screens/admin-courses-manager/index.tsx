@@ -31,7 +31,7 @@ const PathEditorDialog = dynamic(() =>
 );
 
 const adminNavItems: AdminCoursesSidebarItem[] = [
-  { label: "Lộ trình", icon: Layers3, active: true },
+  { label: "Khóa học", icon: Layers3, active: true },
   { label: "Bài học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
 ];
@@ -73,8 +73,8 @@ export function AdminCoursesManager({
   } = useAdminCoursesManager(initialLearningPaths, initialThemeMode);
   const deleteTargetLabel =
     deletingPaths.length === 1
-      ? (deletingPaths[0]?.title ?? "lộ trình này")
-      : `${deletingPaths.length} lộ trình đã chọn`;
+      ? (deletingPaths[0]?.title ?? "khóa học này")
+      : `${deletingPaths.length} khóa học đã chọn`;
 
   return (
     <main data-admin-theme="true" className="theme-page">
@@ -146,9 +146,9 @@ export function AdminCoursesManager({
       ) : null}
       {deletingPaths.length > 0 ? (
         <DeleteConfirmDialog
-          title="Xóa lộ trình"
-          confirmLabel={deletingPaths.length > 1 ? "Xóa các lộ trình" : "Xóa lộ trình"}
-          description={`Bạn có thực sự muốn xóa ${deleteTargetLabel} không? Lộ trình sẽ được chuyển vào thùng rác.`}
+          title="Xóa khóa học"
+          confirmLabel={deletingPaths.length > 1 ? "Xóa các khóa học" : "Xóa khóa học"}
+          description={`Bạn có thực sự muốn xóa ${deleteTargetLabel} không? Khóa học sẽ được chuyển vào thùng rác.`}
           isOpen={deletingPaths.length > 0}
           isConfirming={isDeletingPath}
           itemName={deleteTargetLabel}
@@ -173,14 +173,14 @@ export function AdminCoursesManager({
           description={`Bạn có thực sự muốn xóa vĩnh viễn ${
             permanentDeletingPaths.length === 1
               ? permanentDeletingPaths[0]?.title
-              : `${permanentDeletingPaths.length} lộ trình đã chọn`
+              : `${permanentDeletingPaths.length} khóa học đã chọn`
           } không? Hành động này không thể khôi phục.`}
           isOpen={permanentDeletingPaths.length > 0}
           isConfirming={isPermanentDeletingPath}
           itemName={
             permanentDeletingPaths.length === 1
-              ? (permanentDeletingPaths[0]?.title ?? "lộ trình này")
-              : `${permanentDeletingPaths.length} lộ trình đã chọn`
+              ? (permanentDeletingPaths[0]?.title ?? "khóa học này")
+              : `${permanentDeletingPaths.length} khóa học đã chọn`
           }
           onCancel={actions.closePermanentDeleteConfirm}
           onConfirm={actions.confirmPermanentDeletePaths}

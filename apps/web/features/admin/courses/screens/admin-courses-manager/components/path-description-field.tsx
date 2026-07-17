@@ -17,7 +17,7 @@ export function PathDescriptionField({
     <div>
       <FieldLabel
         id="admin-course-description"
-        label="Mô tả lộ trình"
+        label="Mô tả khóa học"
         isDarkTheme={isDarkTheme}
         isOptional
       />

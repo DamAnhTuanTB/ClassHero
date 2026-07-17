@@ -77,8 +77,9 @@ export function ExploreCoursesScreen({
         {isLoading ? (
           <div className="px-4 sm:px-6 lg:px-6">
             <EmptyCourseState
+              isLoading
               title="Đang tải danh sách khóa học"
-              description="ClassHero đang lấy các lộ trình đã xuất bản phù hợp với bạn."
+              description="ClassHero đang lấy các khóa học đã xuất bản phù hợp với bạn."
             />
           </div>
         ) : isError ? (
@@ -150,7 +151,7 @@ export function ExploreCoursesScreen({
               title="Chưa có khóa học phù hợp"
               description={
                 coursesQuery.data?.meta.total === 0
-                  ? "Hiện chưa có lộ trình published nào để hiển thị."
+                  ? "Hiện chưa có khóa học đã xuất bản nào để hiển thị."
                   : "Bạn thử đổi lớp, môn học hoặc từ khóa tìm kiếm để xem thêm khóa học khác nhé."
               }
             />

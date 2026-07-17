@@ -51,7 +51,7 @@ export function PathEditor({
     >
       <div className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5 sm:py-3 sm:pr-20">
         <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-          {mode === "create" ? "Tạo lộ trình" : "Thông tin lộ trình"}
+          {mode === "create" ? "Tạo khóa học" : "Thông tin khóa học"}
         </h2>
       </div>
 
@@ -60,7 +60,7 @@ export function PathEditor({
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_16rem]">
             <TextField
               id="admin-course-title"
-              label="Tên lộ trình"
+              label="Tên khóa học"
               icon={<BookOpen className="h-5 w-5" aria-hidden="true" />}
               error={form.formState.errors.title}
               {...form.register("title")}
@@ -105,7 +105,7 @@ export function PathEditor({
             }}
           />
           <PathDescriptionField
-            placeholder="Ví dụ: Lộ trình giúp học sinh nắm chắc kiến thức nền tảng và luyện bài theo từng chủ đề."
+            placeholder="Ví dụ: Khóa học giúp học sinh nắm chắc kiến thức nền tảng và luyện bài theo từng chủ đề."
             error={form.formState.errors.description}
             {...form.register("description")}
           />
@@ -198,7 +198,7 @@ export function PathEditor({
           ) : (
             <Save className="h-4 w-4" aria-hidden="true" />
           )}
-          {isSaving ? "Đang lưu" : "Lưu lộ trình"}
+          {isSaving ? "Đang lưu" : "Lưu khóa học"}
         </button>
       </div>
     </form>

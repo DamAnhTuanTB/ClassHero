@@ -98,7 +98,7 @@ export const studentCourses: StudentCourse[] = [
   {
     access: "enrolled",
     chapterCount: 6,
-    description: "Hệ thống hóa kiến thức quan trọng trước khi kết thúc lộ trình học kỳ.",
+    description: "Hệ thống hóa kiến thức quan trọng trước khi kết thúc học kỳ.",
     exerciseCount: 104,
     grade: 7,
     id: "course-math-7-final-review",
@@ -156,7 +156,7 @@ export const studentCourses: StudentCourse[] = [
   {
     access: "locked",
     chapterCount: 4,
-    description: "Lộ trình ôn thi vào 10 hiệu quả, hệ thống hóa kiến thức trọng tâm.",
+    description: "Khóa học ôn thi vào 10 hiệu quả, hệ thống hóa kiến thức trọng tâm.",
     exerciseCount: 128,
     grade: 9,
     id: "course-chemistry-9-exam",

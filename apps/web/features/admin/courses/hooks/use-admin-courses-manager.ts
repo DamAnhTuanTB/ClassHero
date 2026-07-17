@@ -158,8 +158,8 @@ export function useAdminCoursesManager(
         setEditingPathId(createdPath.id);
         setPathEditorMode("edit");
         setIsPathEditorOpen(false);
-        toast.success("Đã tạo lộ trình", {
-          description: "Mở chi tiết lộ trình để thêm chương học và bài học.",
+        toast.success("Đã tạo khóa học", {
+          description: "Mở chi tiết khóa học để thêm chương học và bài học.",
         });
       } else if (editingPath) {
         await mutations.updatePath.mutateAsync({
@@ -167,12 +167,12 @@ export function useAdminCoursesManager(
           values,
         });
         setIsPathEditorOpen(false);
-        toast.success("Đã lưu lộ trình", {
+        toast.success("Đã lưu khóa học", {
           description: "Thông tin quản trị đã được cập nhật.",
         });
       }
     } catch (error) {
-      toast.error("Chưa lưu được lộ trình", {
+      toast.error("Chưa lưu được khóa học", {
         description: getErrorMessage(error),
       });
     }
@@ -238,16 +238,16 @@ export function useAdminCoursesManager(
         ),
       );
       toast.info(
-        deletedCount === 1 ? "Đã xóa lộ trình" : `Đã xóa ${deletedCount} lộ trình`,
+        deletedCount === 1 ? "Đã xóa khóa học" : `Đã xóa ${deletedCount} khóa học`,
         {
-          description: "Lộ trình đã được chuyển vào thùng rác.",
+          description: "Khóa học đã được chuyển vào thùng rác.",
         },
       );
       setIsPathEditorOpen(false);
       setSelectedPathIds((current) => current.filter((pathId) => !pathIdSet.has(pathId)));
       setDeletingPathIds([]);
     } catch (error) {
-      toast.error("Chưa xóa được lộ trình", {
+      toast.error("Chưa xóa được khóa học", {
         description: getErrorMessage(error),
       });
     }
@@ -270,14 +270,14 @@ export function useAdminCoursesManager(
       );
       toast.success(
         restoredCount === 1
-          ? "Đã khôi phục lộ trình"
-          : `Đã khôi phục ${restoredCount} lộ trình`,
+          ? "Đã khôi phục khóa học"
+          : `Đã khôi phục ${restoredCount} khóa học`,
         {
-          description: "Lộ trình trở lại danh sách ở trạng thái Nháp.",
+          description: "Khóa học trở lại danh sách ở trạng thái Nháp.",
         },
       );
     } catch (error) {
-      toast.error("Chưa khôi phục được lộ trình", {
+      toast.error("Chưa khôi phục được khóa học", {
         description: getErrorMessage(error),
       });
     }
@@ -313,15 +313,15 @@ export function useAdminCoursesManager(
       );
       toast.success(
         deletedCount === 1
-          ? "Đã xóa vĩnh viễn lộ trình"
-          : `Đã xóa vĩnh viễn ${deletedCount} lộ trình`,
+          ? "Đã xóa vĩnh viễn khóa học"
+          : `Đã xóa vĩnh viễn ${deletedCount} khóa học`,
         {
-          description: "Lộ trình đã được gỡ khỏi thùng rác.",
+          description: "Khóa học đã được gỡ khỏi thùng rác.",
         },
       );
       setPermanentDeletingPathIds([]);
     } catch (error) {
-      toast.error("Chưa xóa vĩnh viễn được lộ trình", {
+      toast.error("Chưa xóa vĩnh viễn được khóa học", {
         description: getErrorMessage(error),
       });
     }

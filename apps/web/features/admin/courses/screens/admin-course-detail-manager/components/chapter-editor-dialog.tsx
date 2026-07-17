@@ -61,7 +61,7 @@ export function ChapterEditorDialog({
       if (error instanceof Error && error.message === "DUPLICATED_CHAPTER_ORDER") {
         form.setError("orderIndex", {
           type: "manual",
-          message: "Thứ tự này đã có trong lộ trình",
+          message: "Thứ tự này đã có trong khóa học",
         });
         return;
       }

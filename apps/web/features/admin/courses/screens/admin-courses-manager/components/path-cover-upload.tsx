@@ -53,7 +53,7 @@ export function PathCoverUpload({
           {shouldShowImage ? (
             <img
               src={visibleImageUrl}
-              alt="Ảnh đại diện lộ trình"
+              alt="Ảnh đại diện khóa học"
               onError={() => setImageLoadFailed(true)}
               className="h-full w-full object-cover"
             />

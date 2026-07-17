@@ -69,7 +69,7 @@ export function toPathFormValues(path: AdminLearningPath): LearningPathFormValue
 
 export function toLearningPathPayload(values: LearningPathFormValues) {
   if (!values.subject || values.grade === "") {
-    throw new Error("Learning path subject and grade are required");
+    throw new Error("Course subject and grade are required");
   }
 
   return {

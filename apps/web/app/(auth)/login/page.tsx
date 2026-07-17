@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/features/auth/screens/login";
 
 export const metadata: Metadata = {
-  title: "Đăng nhập | Hệ thống học theo lộ trình",
+  title: "Đăng nhập | Hệ thống khóa học",
   description: "Đăng nhập cho học sinh, phụ huynh và admin.",
   robots: {
     index: false,

@@ -71,7 +71,12 @@ export function AdminCoursesContent({
 }: AdminCoursesContentProps) {
   return (
     <section className="mt-5">
-      {viewState === "loading" ? <LoadingState /> : null}
+      {viewState === "loading" ? (
+        <LoadingState
+          title="Đang tải danh sách khóa học"
+          description="ClassHero đang lấy dữ liệu khóa học mới nhất."
+        />
+      ) : null}
       {viewState === "error" ? <ErrorState onRetry={onRetryLoad} /> : null}
       {viewState === "ready" ? (
         <div className="min-w-0">

@@ -83,7 +83,7 @@ export const adminLearningPaths: AdminLearningPath[] = [
     thumbnailFileName: "",
     thumbnailImageUrl: "",
     description:
-      "Lộ trình củng cố nền tảng Toán 7 theo từng bài học, giúp học sinh nắm chắc lý thuyết và luyện bài tập trọng tâm.",
+      "Khóa học củng cố nền tảng Toán 7 theo từng bài học, giúp học sinh nắm chắc lý thuyết và luyện bài tập trọng tâm.",
     subject: "MATH",
     grade: 7,
     originalPriceVnd: 2_000_000,
@@ -193,7 +193,7 @@ export const adminLearningPaths: AdminLearningPath[] = [
     thumbnailFileName: "",
     thumbnailImageUrl: "",
     description:
-      "Lộ trình ôn tập Hóa 9 theo chuyên đề, kết hợp lý thuyết ngắn gọn và bài tập nhận biết.",
+      "Khóa học ôn tập Hóa 9 theo chuyên đề, kết hợp lý thuyết ngắn gọn và bài tập nhận biết.",
     subject: "CHEMISTRY",
     grade: 9,
     originalPriceVnd: 2_200_000,

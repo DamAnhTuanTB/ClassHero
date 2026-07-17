@@ -21,7 +21,7 @@ export function SelectedPathsToolbar({
   return (
     <div className="mt-4 flex flex-col gap-3 rounded-lg border border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm font-extrabold text-[var(--theme-primary)]">
-        Đã chọn {selectedCount} lộ trình
+        Đã chọn {selectedCount} khóa học
       </p>
       <div className="flex flex-wrap gap-2">
         <button

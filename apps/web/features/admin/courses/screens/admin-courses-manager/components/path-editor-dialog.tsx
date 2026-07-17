@@ -54,7 +54,7 @@ export function PathEditorDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel={mode === "create" ? "Tạo lộ trình" : "Sửa lộ trình"}
+      ariaLabel={mode === "create" ? "Tạo khóa học" : "Sửa khóa học"}
       isOpen={isOpen}
       onClose={onClose}
     >

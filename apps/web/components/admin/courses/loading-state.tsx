@@ -1,22 +1,30 @@
-export function LoadingState() {
+import { Loader2 } from "lucide-react";
+
+type LoadingStateProps = {
+  description?: string;
+  title?: string;
+};
+
+export function LoadingState({
+  description = "ClassHero đang lấy dữ liệu mới nhất.",
+  title = "Đang tải dữ liệu",
+}: LoadingStateProps = {}) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
-      <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
-        <div className="h-11 rounded-lg bg-[var(--theme-surface-soft)]" />
-        <div className="mt-4 grid gap-3">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-20 rounded-lg bg-[var(--theme-surface-soft)]" />
-          ))}
+    <section
+      className="flex min-h-80 items-center justify-center rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center lg:min-h-[calc(100svh-16rem)]"
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="mx-auto max-w-md">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--theme-primary-soft)] text-[var(--theme-primary)] shadow-sm">
+          <Loader2 className="h-7 w-7 animate-spin" aria-hidden="true" />
         </div>
+        <h2 className="mt-4 text-lg font-extrabold text-[var(--theme-text-strong)]">
+          {title}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--theme-text)]">{description}</p>
       </div>
-      <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
-        <div className="h-6 w-40 rounded bg-[var(--theme-surface-soft)]" />
-        <div className="mt-4 grid gap-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="h-11 rounded-lg bg-[var(--theme-surface-soft)]" />
-          ))}
-        </div>
-      </div>
-    </div>
+    </section>
   );
 }

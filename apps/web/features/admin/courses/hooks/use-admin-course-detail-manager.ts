@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -29,6 +30,7 @@ export function useAdminCourseDetailManager(
   initialLearningPath?: AdminLearningPath | null,
   initialThemeMode: AppThemeMode = "light",
 ) {
+  const router = useRouter();
   const learningPathQuery = useAdminLearningPathQuery(pathId, initialLearningPath);
   const {
     isAuthHydrated,
@@ -46,6 +48,7 @@ export function useAdminCourseDetailManager(
   const [path, setPath] = useState(learningPathQuery.data ?? null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [deletingPathId, setDeletingPathId] = useState<string | null>(null);
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [pathEditorMode, setPathEditorMode] = useState<EditorMode>("edit");
@@ -64,6 +67,7 @@ export function useAdminCourseDetailManager(
     path?.chapters.find((chapter) => chapter.id === selectedChapterId) ?? null;
   const selectedLessonMatch = findLessonMatch(path, selectedLessonId);
   const selectedLesson = selectedLessonMatch?.lesson ?? null;
+  const deletingPath = path?.id === deletingPathId ? path : null;
   const deletingChapter =
     path?.chapters.find((chapter) => chapter.id === deletingChapterId) ?? null;
   const deletingLessonMatch = findLessonMatch(path, deletingLessonId);
@@ -102,12 +106,42 @@ export function useAdminCourseDetailManager(
         values,
       });
       await learningPathQuery.refetch();
-      toast.success("Đã lưu lộ trình", {
+      toast.success("Đã lưu khóa học", {
         description: "Thông tin khóa học đã được cập nhật.",
       });
       setIsPathEditorOpen(false);
     } catch (error) {
-      toast.error("Chưa lưu được lộ trình", {
+      toast.error("Chưa lưu được khóa học", {
+        description: getErrorMessage(error),
+      });
+    }
+  }
+
+  function requestDeletePath() {
+    if (!path) {
+      return;
+    }
+
+    setDeletingPathId(path.id);
+  }
+
+  async function confirmDeletePath() {
+    if (!deletingPath) {
+      return;
+    }
+
+    try {
+      await mutations.archivePath.mutateAsync({
+        pathId: deletingPath.id,
+      });
+      await mutations.invalidateLearningPath(deletingPath.id);
+      toast.info("Đã xóa khóa học", {
+        description: "Khóa học đã được chuyển vào thùng rác.",
+      });
+      setDeletingPathId(null);
+      router.push("/admin/courses");
+    } catch (error) {
+      toast.error("Chưa xóa được khóa học", {
         description: getErrorMessage(error),
       });
     }
@@ -164,7 +198,7 @@ export function useAdminCourseDetailManager(
       toast.success(
         chapterEditorMode === "create" ? "Đã thêm chương học" : "Đã lưu chương học",
         {
-          description: "Cấu trúc chương học của lộ trình đã được cập nhật.",
+          description: "Cấu trúc chương học của khóa học đã được cập nhật.",
         },
       );
       setChapterEditorMode("create");
@@ -405,6 +439,7 @@ export function useAdminCourseDetailManager(
   return {
     chapterEditorMode,
     courseStats,
+    deletingPath,
     deletingChapter,
     deletingLesson,
     selectedChapter,
@@ -423,10 +458,12 @@ export function useAdminCourseDetailManager(
     selectedChapterId,
     selectedLessonId,
     viewState,
+    isDeletingPath: mutations.archivePath.isPending,
     isDeletingChapter: mutations.archiveChapter.isPending,
     isDeletingLesson: mutations.archiveLesson.isPending,
     actions: {
       closeChapterEditor: () => setIsChapterEditorOpen(false),
+      closeDeletePathConfirm: () => setDeletingPathId(null),
       closeDeleteChapterConfirm: () => setDeletingChapterId(null),
       closeDeleteLessonConfirm: () => setDeletingLessonId(null),
       closeLessonEditor: () => {
@@ -434,8 +471,10 @@ export function useAdminCourseDetailManager(
         setSelectedLessonId(null);
       },
       closePathEditor: () => setIsPathEditorOpen(false),
+      confirmDeletePath,
       confirmDeleteChapter,
       confirmDeleteLesson,
+      requestDeletePath,
       requestDeleteChapter,
       requestDeleteLesson,
       retryLoad,

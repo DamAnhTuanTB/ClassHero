@@ -39,8 +39,7 @@ export function StudentCourseDetailScreen({
   initialThemeMode: AppThemeMode;
   slug: string;
 }) {
-  const { isAuthHydrated, query: courseDetailQuery } =
-    useStudentCourseDetailQuery(slug);
+  const { isAuthHydrated, query: courseDetailQuery } = useStudentCourseDetailQuery(slug);
   const mockPurchaseMutation = useStudentMockPurchaseMutation(slug);
   const course = courseDetailQuery.data?.course;
   const detail = courseDetailQuery.data?.detail;
@@ -67,7 +66,8 @@ export function StudentCourseDetailScreen({
       >
         <div className="mx-auto max-w-3xl">
           <EmptyCourseState
-            title="Đang tải lộ trình"
+            isLoading
+            title="Đang tải khóa học"
             description="ClassHero đang lấy thông tin chương học và bài học mới nhất."
           />
         </div>
@@ -84,8 +84,8 @@ export function StudentCourseDetailScreen({
       >
         <div className="mx-auto max-w-3xl">
           <EmptyCourseState
-            title="Chưa tìm thấy lộ trình này"
-            description="Bạn quay lại danh sách học tập để chọn lộ trình đang học nhé."
+            title="Chưa tìm thấy khóa học này"
+            description="Bạn quay lại danh sách học tập để chọn khóa học đang học nhé."
           />
         </div>
       </main>
@@ -111,18 +111,16 @@ export function StudentCourseDetailScreen({
         ((course.originalPriceVnd - coursePrice) / course.originalPriceVnd) * 100,
       )
     : 0;
-  const CourseStatusIcon =
-    isCourseUnderMaintenance
-      ? LockKeyhole
-      : course.access === "locked"
+  const CourseStatusIcon = isCourseUnderMaintenance
+    ? LockKeyhole
+    : course.access === "locked"
       ? LockKeyhole
       : course.access === "completed"
         ? BadgeCheck
         : Play;
-  const courseStatusLabel =
-    isCourseUnderMaintenance
-      ? "Đang bảo trì"
-      : course.access === "locked"
+  const courseStatusLabel = isCourseUnderMaintenance
+    ? "Đang bảo trì"
+    : course.access === "locked"
       ? "Chưa mua"
       : course.access === "completed"
         ? "Đã hoàn thành"
@@ -145,7 +143,7 @@ export function StudentCourseDetailScreen({
           ? "Bạn đã có quyền học khóa này"
           : "Mua khóa học thành công",
         {
-          description: "ClassHero đã mở khóa lộ trình cho bạn.",
+          description: "ClassHero đã mở quyền học cho bạn.",
         },
       );
     } catch (error) {
@@ -192,10 +190,10 @@ export function StudentCourseDetailScreen({
                     isCourseUnderMaintenance
                       ? "border-amber-100 bg-amber-50 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]"
                       : course.access === "locked"
-                      ? "border-slate-200 bg-slate-50 text-slate-500 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)]"
-                      : course.access === "completed"
-                        ? "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)] dark:text-[var(--theme-success-text)]"
-                        : "border-sky-100 bg-sky-50 text-sky-600 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] dark:text-sky-300",
+                        ? "border-slate-200 bg-slate-50 text-slate-500 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)]"
+                        : course.access === "completed"
+                          ? "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)] dark:text-[var(--theme-success-text)]"
+                          : "border-sky-100 bg-sky-50 text-sky-600 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] dark:text-sky-300",
                   )}
                 >
                   <span
@@ -204,10 +202,10 @@ export function StudentCourseDetailScreen({
                       isCourseUnderMaintenance
                         ? "bg-amber-500"
                         : course.access === "locked"
-                        ? "bg-slate-400"
-                        : course.access === "completed"
-                          ? "bg-emerald-500"
-                          : "bg-sky-600 dark:bg-sky-300 dark:text-slate-950",
+                          ? "bg-slate-400"
+                          : course.access === "completed"
+                            ? "bg-emerald-500"
+                            : "bg-sky-600 dark:bg-sky-300 dark:text-slate-950",
                     )}
                   >
                     <CourseStatusIcon
@@ -231,13 +229,11 @@ export function StudentCourseDetailScreen({
               {isCourseUnderMaintenance ? (
                 <div className="mt-3 inline-flex min-h-9 max-w-full items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-black leading-5 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]">
                   <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 break-words">
-                    Khóa học đang được bảo trì
-                  </span>
+                  <span className="min-w-0 break-words">Khóa học đang được bảo trì</span>
                 </div>
               ) : null}
               <p className="mt-4 text-base font-medium leading-7 text-slate-600 dark:text-[var(--theme-text-muted)]">
-                Lộ trình giúp bạn nắm vững kiến thức trọng tâm, rèn luyện kỹ năng giải bài
+                Khóa học giúp bạn nắm vững kiến thức trọng tâm, rèn luyện kỹ năng giải bài
                 tập và tự tin bứt phá điểm số.
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-slate-700 dark:text-[var(--theme-text)]">
@@ -306,7 +302,7 @@ export function StudentCourseDetailScreen({
                 <Calculator className="h-6 w-6" aria-hidden="true" />
               </span>
               <h2 className="min-w-0 flex-1 truncate text-xl font-extrabold text-slate-800 dark:text-[var(--theme-text)]">
-                Nội dung lộ trình
+                Nội dung khóa học
               </h2>
               <p className="student-course-count-text hidden shrink-0 text-sm font-black sm:block">
                 {course.chapterCount} chương · {course.lessonCount} bài học

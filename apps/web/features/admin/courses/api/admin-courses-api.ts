@@ -339,7 +339,7 @@ function toLearningPathApiPayload(
   mode: "create" | "update",
 ): AdminLearningPathPayload {
   if (!values.subject || values.grade === "") {
-    throw new Error("Learning path subject and grade are required");
+    throw new Error("Course subject and grade are required");
   }
 
   const thumbnailFileId = values.thumbnailFileId.trim();

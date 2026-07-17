@@ -60,11 +60,11 @@ export function ArchivedPathsDialog({
   }
 
   return (
-    <EditorDialogShell ariaLabel="Lộ trình lưu trữ" isOpen={isOpen} onClose={onClose}>
+    <EditorDialogShell ariaLabel="Khóa học lưu trữ" isOpen={isOpen} onClose={onClose}>
       <section className="flex min-h-0 flex-1 flex-col">
         <div className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5 sm:py-3 sm:pr-20">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Lộ trình lưu trữ
+            Khóa học lưu trữ
           </h2>
         </div>
 
@@ -75,7 +75,7 @@ export function ArchivedPathsDialog({
                 <Trash2 className="h-5 w-5" aria-hidden="true" />
               </div>
               <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
-                Chưa có lộ trình lưu trữ
+                Chưa có khóa học lưu trữ
               </p>
             </div>
           ) : (
