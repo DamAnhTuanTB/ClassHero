@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Clock3,
+  Crown,
   GripVertical,
   Layers3,
   ListChecks,
@@ -139,7 +140,7 @@ export function ChapterLessonPanel({
             Cấu trúc lộ trình
           </h2>
           <p className="mt-1 text-sm font-semibold text-[var(--theme-text-muted)]">
-            {path.chapters.length} chương, {path.totalLessonCount} buổi học
+            {path.chapters.length} chương, {path.totalLessonCount} bài học
           </p>
         </div>
         <button
@@ -163,7 +164,7 @@ export function ChapterLessonPanel({
               Chưa có chương học
             </p>
             <p className="mt-1 text-sm text-[var(--theme-text-muted)]">
-              Tạo chương học trước, sau đó thêm các buổi học vào từng chương.
+              Tạo chương học trước, sau đó thêm các bài học vào từng chương.
             </p>
             <button
               type="button"
@@ -226,7 +227,7 @@ export function ChapterLessonPanel({
                   <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                     <span className="inline-flex items-center gap-1">
                       <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                      {chapter.lessons.length} buổi học
+                      {chapter.lessons.length} bài học
                     </span>
                     {chapter.objectives ? (
                       <span className="inline-flex min-w-0 items-center gap-1">
@@ -243,7 +244,7 @@ export function ChapterLessonPanel({
                     className="theme-button-success inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
                   >
                     <Plus className="h-4 w-4" aria-hidden="true" />
-                    Thêm buổi
+                    Thêm bài học
                   </button>
                   <button
                     type="button"
@@ -273,7 +274,7 @@ export function ChapterLessonPanel({
                       aria-hidden="true"
                     />
                     <p className="mt-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
-                      Chưa có buổi học trong chương này
+                      Chưa có bài học trong chương này
                     </p>
                     <button
                       type="button"
@@ -281,7 +282,7 @@ export function ChapterLessonPanel({
                       className="theme-button-success mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
-                      Thêm buổi học
+                      Thêm bài học
                     </button>
                   </div>
                 ) : (
@@ -314,7 +315,7 @@ export function ChapterLessonPanel({
                             onDragEnd={clearDragState}
                             className="grid h-10 w-5 cursor-grab place-items-center rounded-md text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] active:cursor-grabbing"
                             aria-label={`Kéo để đổi vị trí ${lesson.title}`}
-                            title="Kéo để đổi vị trí buổi học"
+                            title="Kéo để đổi vị trí bài học"
                           >
                             <GripVertical className="h-5 w-5" aria-hidden="true" />
                           </button>
@@ -322,8 +323,14 @@ export function ChapterLessonPanel({
                             {lesson.orderIndex}
                           </div>
                         </div>
-                        <div className="flex items-center justify-end md:hidden">
+                        <div className="flex flex-wrap items-center justify-end gap-2 md:hidden">
                           <StatusBadge status={lesson.status} />
+                          {lesson.trialEnabled ? (
+                            <span className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-2.5 text-xs font-extrabold text-[var(--theme-warning-text)]">
+                              <Crown className="h-3.5 w-3.5" aria-hidden="true" />
+                              Học thử
+                            </span>
+                          ) : null}
                         </div>
                         <div className="col-span-2 min-w-0 md:col-span-1">
                           <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
@@ -333,6 +340,12 @@ export function ChapterLessonPanel({
                             <span className="hidden shrink-0 md:inline-flex">
                               <StatusBadge status={lesson.status} />
                             </span>
+                            {lesson.trialEnabled ? (
+                              <span className="hidden min-h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-2.5 text-xs font-extrabold text-[var(--theme-warning-text)] md:inline-flex">
+                                <Crown className="h-3.5 w-3.5" aria-hidden="true" />
+                                Học thử
+                              </span>
+                            ) : null}
                           </div>
                           <p className="mt-1 text-sm leading-6 text-[var(--theme-text)]">
                             {lesson.shortDescription || "Chưa có mô tả ngắn."}

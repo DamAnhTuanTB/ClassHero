@@ -120,7 +120,6 @@ export class LearningPathsService {
               : {}),
             descriptionJson: toInputJson(dto.descriptionJson),
             status,
-            trialEnabled: dto.trialEnabled ?? true,
             publishedAt: status === PublishStatus.PUBLISHED ? now : null,
             sortOrder: dto.sortOrder ?? 0,
             createdBy: {
@@ -215,7 +214,6 @@ export class LearningPathsService {
           ...(dto.descriptionJson !== undefined
             ? { descriptionJson: toInputJson(dto.descriptionJson) }
             : {}),
-          ...(dto.trialEnabled !== undefined ? { trialEnabled: dto.trialEnabled } : {}),
           ...(dto.status !== undefined ? { status } : {}),
           ...(dto.status === PublishStatus.PUBLISHED &&
           before.status !== PublishStatus.PUBLISHED

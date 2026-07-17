@@ -1,11 +1,24 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { EnrollmentStatus, Prisma, PublishStatus, UserRole } from "@prisma/client";
+import {
+  EnrollmentStatus,
+  Prisma,
+  PublishStatus,
+  UserRole,
+} from "@prisma/client";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { PublicLearningPathQueryDto } from "#api/modules/learning-paths/dto/public-learning-path-query.dto";
-import { publicLearningPathSelect } from "#api/modules/learning-paths/selectors/learning-path.selects";
+import { FilesService } from "#api/modules/files/services/files.service";
+import {
+  publicLearningPathDetailSelect,
+  publicLearningPathSelect,
+} from "#api/modules/learning-paths/selectors/learning-path.selects";
 import { serializePublicLearningPath } from "#api/modules/learning-paths/serializers/learning-path.serializers";
-import type { PublicViewerContext } from "#api/modules/learning-paths/types/learning-path.types";
+import type {
+  PublicLearningPathDetailRecord,
+  PublicLearningPathRecord,
+  PublicViewerContext,
+} from "#api/modules/learning-paths/types/learning-path.types";
 import {
   getIdOrSlugWhere,
   getPublicLearningPathOrderBy,
@@ -14,21 +27,40 @@ import {
 
 @Injectable()
 export class PublicLearningPathsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(FilesService) private readonly filesService: FilesService,
+  ) {}
 
   async listPublished(query: PublicLearningPathQueryDto, user?: AuthenticatedUser) {
     const page = query.page;
     const pageSize = query.pageSize;
     const viewer = await this.createViewerContext(user);
+    const enrolledLearningPathIds =
+      await this.findActiveEnrollmentLearningPathIds(viewer);
     const where: Prisma.LearningPathWhereInput = {
       deletedAt: null,
-      status: PublishStatus.PUBLISHED,
       ...(query.subject ? { subject: query.subject } : {}),
       ...(query.grade ? { grade: query.grade } : {}),
+      ...(enrolledLearningPathIds.length > 0
+        ? {
+            OR: [
+              { status: PublishStatus.PUBLISHED },
+              {
+                id: {
+                  in: enrolledLearningPathIds,
+                },
+                status: {
+                  not: PublishStatus.ARCHIVED,
+                },
+              },
+            ],
+          }
+        : { status: PublishStatus.PUBLISHED }),
     };
 
     const [items, total, gradeGroups] = await Promise.all([
-      this.findPublishedPage(where, query.grade, viewer.studentGrade, page, pageSize),
+      this.findVisiblePage(where, query.grade, viewer.studentGrade, page, pageSize),
       this.prisma.learningPath.count({ where }),
       this.prisma.learningPath.groupBy({
         by: ["grade"],
@@ -42,13 +74,20 @@ export class PublicLearningPathsService {
       }),
     ]);
 
-    await this.attachActiveEnrollments(
-      viewer,
-      items.map((item) => item.id),
+    await this.attachStudentLearningState(viewer, items);
+
+    const data = await Promise.all(
+      items.map(async (item) =>
+        serializePublicLearningPath(
+          item,
+          viewer,
+          await this.filesService.resolveAccessUrl(item.thumbnailFile),
+        ),
+      ),
     );
 
     return {
-      data: items.map((item) => serializePublicLearningPath(item, viewer)),
+      data,
       meta: {
         page,
         pageSize,
@@ -69,21 +108,34 @@ export class PublicLearningPathsService {
       where: {
         ...getIdOrSlugWhere(idOrSlug),
         deletedAt: null,
-        status: PublishStatus.PUBLISHED,
+        status: {
+          not: PublishStatus.ARCHIVED,
+        },
       },
-      select: publicLearningPathSelect,
+      select: publicLearningPathDetailSelect,
     });
 
     if (!learningPath) {
       throwNotFound();
     }
 
-    await this.attachActiveEnrollments(viewer, [learningPath.id]);
+    await this.attachStudentLearningState(viewer, [learningPath]);
 
-    return serializePublicLearningPath(learningPath, viewer);
+    const hasActiveEnrollment = viewer.activeEnrollmentByLearningPathId.has(
+      learningPath.id,
+    );
+    if (learningPath.status !== PublishStatus.PUBLISHED && !hasActiveEnrollment) {
+      throwNotFound();
+    }
+
+    return serializePublicLearningPath(
+      learningPath,
+      viewer,
+      await this.filesService.resolveAccessUrl(learningPath.thumbnailFile),
+    );
   }
 
-  private async findPublishedPage(
+  private async findVisiblePage(
     where: Prisma.LearningPathWhereInput,
     explicitGrade: number | undefined,
     priorityGrade: number | undefined,
@@ -150,6 +202,37 @@ export class PublicLearningPathsService {
     return [...priorityItems, ...otherItems];
   }
 
+  private async findActiveEnrollmentLearningPathIds(viewer: PublicViewerContext) {
+    if (!viewer.user || viewer.user.role !== UserRole.STUDENT) {
+      return [];
+    }
+
+    const now = new Date();
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        studentUserId: viewer.user.id,
+        status: EnrollmentStatus.ACTIVE,
+        startsAt: {
+          lte: now,
+        },
+        expiresAt: {
+          gt: now,
+        },
+        learningPath: {
+          deletedAt: null,
+          status: {
+            not: PublishStatus.ARCHIVED,
+          },
+        },
+      },
+      select: {
+        learningPathId: true,
+      },
+    });
+
+    return enrollments.map((enrollment) => enrollment.learningPathId);
+  }
+
   private async createViewerContext(
     user: AuthenticatedUser | undefined,
   ): Promise<PublicViewerContext> {
@@ -157,6 +240,7 @@ export class PublicLearningPathsService {
       return {
         user,
         activeEnrollmentByLearningPathId: new Map(),
+        lessonProgressByLessonId: new Map(),
       };
     }
 
@@ -173,7 +257,25 @@ export class PublicLearningPathsService {
       user,
       studentGrade: studentProfile?.grade,
       activeEnrollmentByLearningPathId: new Map(),
+      lessonProgressByLessonId: new Map(),
     };
+  }
+
+  private async attachStudentLearningState(
+    viewer: PublicViewerContext,
+    learningPaths: Array<PublicLearningPathRecord | PublicLearningPathDetailRecord>,
+  ) {
+    await this.attachActiveEnrollments(
+      viewer,
+      learningPaths.map((learningPath) => learningPath.id),
+    );
+
+    await this.attachLessonProgress(
+      viewer,
+      learningPaths.flatMap((learningPath) =>
+        learningPath.lessons.map((lesson) => lesson.id),
+      ),
+    );
   }
 
   private async attachActiveEnrollments(
@@ -219,6 +321,34 @@ export class PublicLearningPathsService {
         startsAt: enrollment.startsAt,
         expiresAt: enrollment.expiresAt,
       });
+    }
+  }
+
+  private async attachLessonProgress(viewer: PublicViewerContext, lessonIds: string[]) {
+    if (
+      !viewer.user ||
+      viewer.user.role !== UserRole.STUDENT ||
+      lessonIds.length === 0
+    ) {
+      return;
+    }
+
+    const progressRows = await this.prisma.lessonProgress.findMany({
+      where: {
+        studentUserId: viewer.user.id,
+        lessonId: {
+          in: lessonIds,
+        },
+      },
+      select: {
+        lessonId: true,
+        status: true,
+        completedAt: true,
+      },
+    });
+
+    for (const progress of progressRows) {
+      viewer.lessonProgressByLessonId.set(progress.lessonId, progress);
     }
   }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, BookOpen, FileText, Layers3, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Layers3, Pencil, RefreshCw } from "lucide-react";
 import {
   AdminCoursesSidebar,
   type AdminCoursesSidebarItem,
@@ -32,10 +32,15 @@ const LessonEditorDialog = dynamic(() =>
     (module) => module.LessonEditorDialog,
   ),
 );
+const PathEditorDialog = dynamic(() =>
+  import("@/features/admin/courses/screens/admin-courses-manager/components/path-editor-dialog").then(
+    (module) => module.PathEditorDialog,
+  ),
+);
 
 const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Lộ trình", icon: Layers3, active: true },
-  { label: "Buổi học", icon: BookOpen, active: false },
+  { label: "Bài học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
 ];
 
@@ -59,15 +64,19 @@ export function AdminCourseDetailManager({
     isDeletingLesson,
     isDarkTheme,
     isLessonEditorOpen,
+    isPathEditorOpen,
     isSavingChapter,
     isSavingLesson,
+    isSavingPath,
     isSidebarCollapsed,
     lessonEditorMode,
     path,
+    pathEditorMode,
     selectedChapter,
     selectedChapterId,
     selectedLesson,
     selectedLessonId,
+    uploadCover,
     viewState,
   } = useAdminCourseDetailManager(pathId, initialLearningPath, initialThemeMode);
 
@@ -108,11 +117,20 @@ export function AdminCourseDetailManager({
                 {path?.title ?? "Không tìm thấy lộ trình"}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
-                Xem thông tin lộ trình, quản lý chương học tổng quan và các buổi học trong
+                Xem thông tin lộ trình, quản lý chương học tổng quan và các bài học trong
                 từng chương.
               </p>
             </div>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={actions.startEditPath}
+                disabled={viewState !== "ready" || !path}
+                className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Edit khóa học
+              </button>
               <button
                 type="button"
                 onClick={actions.retryLoad}
@@ -184,6 +202,17 @@ export function AdminCourseDetailManager({
           onClose={actions.closeLessonEditor}
         />
       ) : null}
+      {isPathEditorOpen ? (
+        <PathEditorDialog
+          mode={pathEditorMode}
+          isOpen={isPathEditorOpen}
+          isSaving={isSavingPath}
+          selectedPath={path}
+          onSubmit={actions.savePath}
+          onUploadCover={uploadCover}
+          onClose={actions.closePathEditor}
+        />
+      ) : null}
       {deletingChapter ? (
         <DeleteConfirmDialog
           title="Xóa chương học"
@@ -197,8 +226,8 @@ export function AdminCourseDetailManager({
       ) : null}
       {deletingLesson ? (
         <DeleteConfirmDialog
-          title="Xóa buổi học"
-          confirmLabel="Xóa buổi học"
+          title="Xóa bài học"
+          confirmLabel="Xóa bài học"
           isOpen={Boolean(deletingLesson)}
           isConfirming={isDeletingLesson}
           itemName={deletingLesson.title}

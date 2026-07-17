@@ -71,7 +71,7 @@ export function LessonEditorDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel={mode === "create" ? "Thêm buổi học" : "Sửa buổi học"}
+      ariaLabel={mode === "create" ? "Thêm bài học" : "Sửa bài học"}
       isOpen={isOpen}
       onClose={onClose}
     >

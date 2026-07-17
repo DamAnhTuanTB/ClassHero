@@ -53,6 +53,46 @@ export const learningPathDetailSelect = {
   },
 } satisfies Prisma.LearningPathSelect;
 
+const publicLessonMetadataSelect = {
+  id: true,
+  orderIndex: true,
+  title: true,
+  shortDescription: true,
+  examOpenAt: true,
+  trialEnabled: true,
+  status: true,
+} satisfies Prisma.LessonSelect;
+
+const publicLessonMetadataOrderBy = [
+  { orderIndex: "asc" },
+  { createdAt: "asc" },
+] satisfies Prisma.LessonOrderByWithRelationInput[];
+
+const publicLessonMetadataRelation = {
+  where: {
+    deletedAt: null,
+    status: PublishStatus.PUBLISHED,
+  },
+  select: publicLessonMetadataSelect,
+  orderBy: publicLessonMetadataOrderBy,
+} satisfies Prisma.LessonFindManyArgs;
+
+const publicFlatLessonMetadataRelation = {
+  where: {
+    deletedAt: null,
+    status: PublishStatus.PUBLISHED,
+    chapter: {
+      deletedAt: null,
+      status: PublishStatus.PUBLISHED,
+    },
+  },
+  select: publicLessonMetadataSelect,
+  orderBy: [
+    { chapter: { orderIndex: "asc" } },
+    ...publicLessonMetadataOrderBy,
+  ],
+} satisfies Prisma.LessonFindManyArgs;
+
 export const publicLearningPathSelect = {
   id: true,
   subject: true,
@@ -64,26 +104,31 @@ export const publicLearningPathSelect = {
   totalChapterCount: true,
   totalLessonCount: true,
   thumbnailFileId: true,
+  thumbnailFile: {
+    select: thumbnailFileSelect,
+  },
   descriptionJson: true,
   status: true,
   trialEnabled: true,
   publishedAt: true,
   sortOrder: true,
-  lessons: {
+  lessons: publicFlatLessonMetadataRelation,
+} satisfies Prisma.LearningPathSelect;
+
+export const publicLearningPathDetailSelect = {
+  ...publicLearningPathSelect,
+  chapters: {
     where: {
       deletedAt: null,
-      status: PublishStatus.PUBLISHED,
     },
     select: {
       id: true,
       orderIndex: true,
       title: true,
-      shortDescription: true,
-      examOpenAt: true,
+      overview: true,
       status: true,
+      lessons: publicLessonMetadataRelation,
     },
-    orderBy: {
-      orderIndex: "asc",
-    },
+    orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
   },
 } satisfies Prisma.LearningPathSelect;

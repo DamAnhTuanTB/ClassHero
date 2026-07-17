@@ -16,6 +16,7 @@ export type LessonResponse = {
   examOpenAt: Date | null;
   videoUrl: string | null;
   completionMinScore: number;
+  trialEnabled: boolean;
   status: PublishStatus;
   createdById: string | null;
   updatedById: string | null;

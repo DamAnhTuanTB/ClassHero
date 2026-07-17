@@ -6,7 +6,10 @@ import { EmptyCourseState } from "@/components/student/courses/empty-course-stat
 import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { useStudentCoursesFilter } from "@/features/student/explore/hooks/use-student-courses-filter";
-import { getExploreCourseGroups } from "@/features/student/shared/utils/student-courses-utils";
+import {
+  getExploreCourseGroups,
+  hasMixedExploreCourseAccess,
+} from "@/features/student/shared/utils/student-courses-utils";
 import type { AppThemeMode } from "@/lib/theme-store";
 
 export function ExploreCoursesScreen({
@@ -15,9 +18,13 @@ export function ExploreCoursesScreen({
   initialThemeMode?: AppThemeMode;
 }) {
   const {
+    coursesQuery,
     filteredCourses,
     grade,
+    isError,
+    isLoading,
     query,
+    refetch,
     setGrade,
     setQuery,
     setSubject,
@@ -25,6 +32,11 @@ export function ExploreCoursesScreen({
     total,
   } = useStudentCoursesFilter();
   const { otherCourses, purchasedCourses } = getExploreCourseGroups(filteredCourses);
+  const apiHasMixedCourseAccess = hasMixedExploreCourseAccess(
+    coursesQuery.data?.courses ?? [],
+  );
+  const visibleHasMixedCourseAccess = hasMixedExploreCourseAccess(filteredCourses);
+  const shouldShowCourseRibbons = apiHasMixedCourseAccess && visibleHasMixedCourseAccess;
   const screenBackground = "var(--student-screen-bg)";
 
   return (
@@ -57,53 +69,90 @@ export function ExploreCoursesScreen({
               aria-hidden="true"
             />
             <p className="student-course-count-text min-w-0 truncate text-base font-extrabold text-sky-700 dark:text-sky-300">
-              {Math.max(total, 12)} khóa học phù hợp
+              {total} khóa học phù hợp
             </p>
           </div>
         </div>
 
-        {filteredCourses.length > 0 ? (
+        {isLoading ? (
+          <div className="px-4 sm:px-6 lg:px-6">
+            <EmptyCourseState
+              title="Đang tải danh sách khóa học"
+              description="ClassHero đang lấy các lộ trình đã xuất bản phù hợp với bạn."
+            />
+          </div>
+        ) : isError ? (
+          <div className="grid gap-3 px-4 sm:px-6 lg:px-6">
+            <EmptyCourseState
+              title="Chưa tải được danh sách khóa học"
+              description="Bạn thử tải lại danh sách hoặc quay lại sau ít phút nhé."
+            />
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+            >
+              Tải lại
+            </button>
+          </div>
+        ) : filteredCourses.length > 0 ? (
           <section
             className="grid min-w-0 gap-5 px-4 pb-2 sm:px-6 lg:px-6"
             aria-label="Danh sách tất cả khóa học"
           >
-            {purchasedCourses.length > 0 ? (
-              <div className="grid min-w-0 gap-4">
-                <div className="relative z-10 -mb-2 flex min-w-0 items-center">
-                  <h2 className="student-section-ribbon relative min-w-0 overflow-visible text-base font-extrabold text-white">
-                    <span className="relative z-10 block truncate">Khóa học đã mua</span>
-                  </h2>
-                </div>
-                <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
-                  {purchasedCourses.map((course) => (
-                    <ExploreCourseCard key={course.id} course={course} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            {shouldShowCourseRibbons ? (
+              <>
+                {purchasedCourses.length > 0 ? (
+                  <div className="grid min-w-0 gap-4">
+                    <div className="relative z-10 -mb-2 flex min-w-0 items-center">
+                      <h2 className="student-section-ribbon relative min-w-0 overflow-visible text-base font-extrabold text-white">
+                        <span className="relative z-10 block truncate">
+                          Khóa học đã mua
+                        </span>
+                      </h2>
+                    </div>
+                    <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
+                      {purchasedCourses.map((course) => (
+                        <ExploreCourseCard key={course.id} course={course} />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
-            {otherCourses.length > 0 ? (
-              <div className="grid min-w-0 gap-4">
-                <div className="relative z-10 -mb-2 flex min-w-0 items-center">
-                  <h2 className="student-section-ribbon student-section-ribbon--emerald relative min-w-0 overflow-visible text-base font-extrabold text-white">
-                    <span className="relative z-10 block truncate">
-                      Các khóa học khác
-                    </span>
-                  </h2>
-                </div>
-                <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
-                  {otherCourses.map((course) => (
-                    <ExploreCourseCard key={course.id} course={course} />
-                  ))}
-                </div>
+                {otherCourses.length > 0 ? (
+                  <div className="grid min-w-0 gap-4">
+                    <div className="relative z-10 -mb-2 flex min-w-0 items-center">
+                      <h2 className="student-section-ribbon student-section-ribbon--emerald relative min-w-0 overflow-visible text-base font-extrabold text-white">
+                        <span className="relative z-10 block truncate">
+                          Các khóa học khác
+                        </span>
+                      </h2>
+                    </div>
+                    <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
+                      {otherCourses.map((course) => (
+                        <ExploreCourseCard key={course.id} course={course} />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
+                {filteredCourses.map((course) => (
+                  <ExploreCourseCard key={course.id} course={course} />
+                ))}
               </div>
-            ) : null}
+            )}
           </section>
         ) : (
           <div className="px-4 sm:px-6 lg:px-6">
             <EmptyCourseState
               title="Chưa có khóa học phù hợp"
-              description="Bạn thử đổi lớp, môn học hoặc từ khóa tìm kiếm để xem thêm khóa học khác nhé."
+              description={
+                coursesQuery.data?.meta.total === 0
+                  ? "Hiện chưa có lộ trình published nào để hiển thị."
+                  : "Bạn thử đổi lớp, môn học hoặc từ khóa tìm kiếm để xem thêm khóa học khác nhé."
+              }
             />
           </div>
         )}

@@ -15,6 +15,11 @@ export type StudentCourseLesson = {
 export type StudentCourseDetailLessonStatus = "completed" | "current" | "locked" | "next";
 
 export type StudentCourseDetailContinueKind = "first" | "inProgress" | "last" | "next";
+export type StudentCourseDetailChapterStatus =
+  | "DRAFT"
+  | "PUBLISHED"
+  | "HIDDEN"
+  | "ARCHIVED";
 
 export type StudentCourseDetailLesson = {
   durationMinutes: number;
@@ -32,6 +37,7 @@ export type StudentCourseDetailChapter = {
   lessons: StudentCourseDetailLesson[];
   order: number;
   progressPercent: number;
+  status?: StudentCourseDetailChapterStatus;
   title: string;
   tone: StudentCourseDetailChapterTone;
 };
@@ -51,6 +57,7 @@ export type StudentCourse = {
   exerciseCount: number;
   grade: number;
   id: string;
+  isUnderMaintenance?: boolean;
   lessonCount: number;
   nextLesson?: StudentCourseLesson;
   originalPriceVnd: number;
@@ -58,6 +65,7 @@ export type StudentCourse = {
   salePriceVnd?: number;
   slug: string;
   subject: StudentCourseSubject;
+  thumbnailImageUrl?: string;
   title: string;
   tone: StudentCourseTone;
   trialLessonCount?: number;

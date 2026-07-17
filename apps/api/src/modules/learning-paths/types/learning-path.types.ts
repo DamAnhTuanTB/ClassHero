@@ -1,6 +1,12 @@
-import { EnrollmentStatus, Prisma, PublishStatus } from "@prisma/client";
+import {
+  EnrollmentStatus,
+  LessonProgressStatus,
+  Prisma,
+  PublishStatus,
+} from "@prisma/client";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import {
+  publicLearningPathDetailSelect,
   learningPathDetailSelect,
   learningPathSelect,
   publicLearningPathSelect,
@@ -48,6 +54,10 @@ export type PublicLearningPathRecord = Prisma.LearningPathGetPayload<{
   select: typeof publicLearningPathSelect;
 }>;
 
+export type PublicLearningPathDetailRecord = Prisma.LearningPathGetPayload<{
+  select: typeof publicLearningPathDetailSelect;
+}>;
+
 export type ActiveEnrollmentRecord = {
   id: string;
   status: EnrollmentStatus;
@@ -55,10 +65,17 @@ export type ActiveEnrollmentRecord = {
   expiresAt: Date;
 };
 
+export type StudentLessonProgressRecord = {
+  lessonId: string;
+  status: LessonProgressStatus;
+  completedAt: Date | null;
+};
+
 export type PublicViewerContext = {
   user?: AuthenticatedUser;
   studentGrade?: number;
   activeEnrollmentByLearningPathId: Map<string, ActiveEnrollmentRecord>;
+  lessonProgressByLessonId: Map<string, StudentLessonProgressRecord>;
 };
 
 export type RequestContext = {

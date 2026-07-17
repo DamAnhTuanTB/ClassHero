@@ -29,6 +29,51 @@ Behavior:
 - Lưu payment `PENDING`.
 - Trả checkout/QR.
 
+### `POST /student/payments/mock-success`
+
+Role: `STUDENT`.
+
+Body:
+
+```json
+{
+  "learningPathId": "uuid"
+}
+```
+
+Behavior:
+
+- Endpoint giả để test nhanh nút `Mua ngay` trong môi trường dev/MVP.
+- Không gọi payOS và không dùng cho production payment thật.
+- Kiểm tra lộ trình published và student chưa có active enrollment còn hạn.
+- Nếu student đã có active enrollment, trả enrollment hiện có với `mode = "ALREADY_ENROLLED"`.
+- Nếu chưa có enrollment, tạo payment `PAID` nguồn mock và tạo enrollment active 12 tháng.
+- Server vẫn tự tính amount theo giá lộ trình, không nhận amount từ client.
+- Front-end invalidate/refetch danh sách hoặc chi tiết lộ trình để trạng thái chuyển sang đã mua.
+
+Response:
+
+```json
+{
+  "data": {
+    "mode": "MOCK_SUCCESS",
+    "learningPathId": "uuid",
+    "payment": {
+      "id": "uuid",
+      "status": "PAID",
+      "amountVnd": 4000000,
+      "paidAt": "2026-07-17T10:00:00.000Z"
+    },
+    "enrollment": {
+      "id": "uuid",
+      "status": "ACTIVE",
+      "startsAt": "2026-07-17T10:00:00.000Z",
+      "expiresAt": "2027-07-17T10:00:00.000Z"
+    }
+  }
+}
+```
+
 ### `GET /payments/:paymentId`
 
 Role: authenticated.

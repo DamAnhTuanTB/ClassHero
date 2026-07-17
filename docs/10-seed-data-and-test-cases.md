@@ -31,7 +31,7 @@ Seed data cần đủ để dev kiểm tra nhanh:
 ```txt
 email: admin@example.com
 username: admin
-password: Admin123!
+password: 123456
 role: ADMIN
 ```
 

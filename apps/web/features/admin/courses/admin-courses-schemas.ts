@@ -9,7 +9,7 @@ import { requiredTrimmedText } from "@/lib/form-validation";
 
 export const learningPathSchema = z.object({
   title: requiredTrimmedText({ requiredMessage: "Nhập tên lộ trình" }),
-  slug: requiredTrimmedText({ requiredMessage: "Nhập slug" }),
+  slug: z.string().trim().max(180).optional(),
   thumbnailFileId: z.string().trim().optional(),
   thumbnailFileName: z.string().trim().max(180).optional(),
   thumbnailImageUrl: z.string().trim().optional(),
@@ -35,7 +35,7 @@ export const learningPathSchema = z.object({
 export const lessonSchema = z.object({
   orderIndex: z.coerce.number().int().min(1, "Thứ tự bắt đầu từ 1").max(500),
   title: requiredTrimmedText({
-    requiredMessage: "Nhập tên buổi học",
+    requiredMessage: "Nhập tên bài học",
     maxLength: 180,
   }),
   shortDescription: z.string().trim().max(500).optional(),
@@ -50,6 +50,7 @@ export const lessonSchema = z.object({
       message: "Chỉ nhận YouTube hoặc Google Drive",
     }),
   completionMinScore: z.coerce.number().min(0).max(10),
+  trialEnabled: z.boolean(),
   status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"]),
 });
 
@@ -87,6 +88,7 @@ export type LessonFormValues = {
   examOpenAt?: string;
   videoUrl?: string;
   completionMinScore: number;
+  trialEnabled: boolean;
   status: AdminPublishStatus;
 };
 
@@ -121,6 +123,7 @@ export const emptyLessonValues: LessonFormValues = {
   examOpenAt: "",
   videoUrl: "",
   completionMinScore: 7,
+  trialEnabled: false,
   status: "PUBLISHED",
 };
 

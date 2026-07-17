@@ -191,7 +191,7 @@ export function StudentRegisterForm() {
         <TextField
           id="student-phone"
           label="Số điện thoại"
-          isOptional
+          isOptional={hasNoPhone}
           type="tel"
           placeholder="Nhập số điện thoại"
           autoComplete="off"

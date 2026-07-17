@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { PublishStatus } from "@prisma/client";
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -77,6 +78,11 @@ export class UpdateLessonDto {
   @Min(0)
   @Max(10)
   completionMinScore?: number;
+
+  @ApiPropertyOptional({ example: false })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsBoolean()
+  trialEnabled?: boolean;
 
   @ApiPropertyOptional({ enum: PublishStatus, example: PublishStatus.DRAFT })
   @ValidateIf((_, value: unknown) => value !== undefined)

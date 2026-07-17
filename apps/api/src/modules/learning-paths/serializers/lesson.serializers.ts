@@ -15,6 +15,7 @@ export function serializeLesson(record: LessonRecord): LessonResponse {
     examOpenAt: record.examOpenAt,
     videoUrl: record.videoUrl,
     completionMinScore: Number(record.completionMinScore),
+    trialEnabled: record.trialEnabled,
     status: record.status,
     createdById: record.createdById,
     updatedById: record.updatedById,

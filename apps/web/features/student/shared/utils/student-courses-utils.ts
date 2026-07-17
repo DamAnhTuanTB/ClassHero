@@ -1,10 +1,11 @@
 import type {
   StudentCourse,
   StudentCourseAccess,
+  StudentCourseStat,
   StudentCourseSubject,
   StudentCourseSubjectFilter,
+  StudentTodayGoal,
 } from "@/features/student/shared/student-courses-types";
-import { studentCourses } from "@/features/student/shared/student-courses-data";
 
 export const subjectLabels: Record<StudentCourseSubject, string> = {
   CHEMISTRY: "HÓA",
@@ -81,6 +82,12 @@ export function getExploreCourseGroups(courses: StudentCourse[]) {
   };
 }
 
+export function hasMixedExploreCourseAccess(courses: StudentCourse[]) {
+  const { otherCourses, purchasedCourses } = getExploreCourseGroups(courses);
+
+  return purchasedCourses.length > 0 && otherCourses.length > 0;
+}
+
 export function filterStudentCourses({
   courses,
   grade,
@@ -88,14 +95,14 @@ export function filterStudentCourses({
   subject,
 }: {
   courses: StudentCourse[];
-  grade: number;
+  grade: number | null;
   query: string;
   subject: StudentCourseSubjectFilter;
 }) {
   const normalizedQuery = normalizeSearchableText(query);
 
   return courses.filter((course) => {
-    const matchesGrade = course.grade === grade;
+    const matchesGrade = grade === null || course.grade === grade;
     const matchesSubject = subject === "ALL" || course.subject === subject;
     const matchesQuery =
       !normalizedQuery ||
@@ -121,8 +128,46 @@ export function getAverageProgress(courses: StudentCourse[]) {
   );
 }
 
-export function findStudentCourseBySlug(slug: string) {
-  return studentCourses.find((course) => course.slug === slug);
+export function getPurchasedCourseStats(courses: StudentCourse[]): StudentCourseStat[] {
+  const purchasedCourses = getPurchasedCourses(courses);
+  const averageProgress = getAverageProgress(purchasedCourses);
+  const nextLessonCount = purchasedCourses.filter((course) => course.nextLesson).length;
+
+  return [
+    { label: "đang học", value: String(purchasedCourses.length) },
+    { label: "tiến độ", value: `${averageProgress}%` },
+    { label: "bài học hôm nay", value: String(nextLessonCount) },
+  ];
+}
+
+export function buildTodayLearningGoals(courses: StudentCourse[]): StudentTodayGoal[] {
+  const purchasedCourses = getPurchasedCourses(courses);
+  const nextCourse = purchasedCourses.find((course) => course.nextLesson);
+
+  return [
+    {
+      completed: purchasedCourses.length > 0,
+      icon: "lesson",
+      id: "open-next-lesson",
+      metric: nextCourse?.nextLesson ? "Sẵn sàng" : "Chọn khóa học",
+      title: nextCourse?.nextLesson
+        ? `Mở ${nextCourse.nextLesson.title}`
+        : "Khám phá khóa học phù hợp",
+      tone: "sky",
+    },
+    {
+      completed: averageProgressIsStrong(purchasedCourses),
+      icon: "score",
+      id: "keep-study-progress",
+      metric: "Mục tiêu đều đặn",
+      title: "Giữ nhịp học để tăng tiến độ",
+      tone: "indigo",
+    },
+  ];
+}
+
+function averageProgressIsStrong(courses: StudentCourse[]) {
+  return courses.length > 0 && getAverageProgress(courses) >= 50;
 }
 
 function normalizeSearchableText(value: string) {

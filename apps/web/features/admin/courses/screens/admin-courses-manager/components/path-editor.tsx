@@ -4,7 +4,6 @@ import {
   BookOpen,
   Hash,
   Layers3,
-  LinkIcon,
   Loader2,
   Save,
   SlidersHorizontal,
@@ -58,20 +57,31 @@ export function PathEditor({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
         <div className="grid gap-3">
-          <TextField
-            id="admin-course-title"
-            label="Tên lộ trình"
-            icon={<BookOpen className="h-5 w-5" aria-hidden="true" />}
-            error={form.formState.errors.title}
-            {...form.register("title")}
-          />
-          <TextField
-            id="admin-course-slug"
-            label="Slug"
-            icon={<LinkIcon className="h-5 w-5" aria-hidden="true" />}
-            error={form.formState.errors.slug}
-            {...form.register("slug")}
-          />
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_16rem]">
+            <TextField
+              id="admin-course-title"
+              label="Tên lộ trình"
+              icon={<BookOpen className="h-5 w-5" aria-hidden="true" />}
+              error={form.formState.errors.title}
+              {...form.register("title")}
+            />
+            <OptionField
+              id="admin-course-status"
+              label="Trạng thái"
+              value={form.watch("status")}
+              icon={<SlidersHorizontal className="h-5 w-5" aria-hidden="true" />}
+              options={adminStatuses.map((status) => ({
+                value: status,
+                label: statusLabels[status],
+              }))}
+              onChange={(value) =>
+                form.setValue("status", value as LearningPathFormValues["status"], {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            />
+          </div>
           <PathCoverUpload
             fileName={form.watch("thumbnailFileName")}
             imageUrl={form.watch("thumbnailImageUrl")}
@@ -161,24 +171,6 @@ export function PathEditor({
                 form.setValue("salePriceVnd", value, {
                   shouldDirty: true,
                   shouldTouch: true,
-                  shouldValidate: true,
-                })
-              }
-            />
-          </div>
-          <div className="grid gap-3">
-            <OptionField
-              id="admin-course-status"
-              label="Trạng thái"
-              value={form.watch("status")}
-              icon={<SlidersHorizontal className="h-5 w-5" aria-hidden="true" />}
-              options={adminStatuses.map((status) => ({
-                value: status,
-                label: statusLabels[status],
-              }))}
-              onChange={(value) =>
-                form.setValue("status", value as LearningPathFormValues["status"], {
-                  shouldDirty: true,
                   shouldValidate: true,
                 })
               }

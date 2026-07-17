@@ -10,6 +10,7 @@ import {
   Video,
 } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
+import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
@@ -42,7 +43,7 @@ export function LessonEditor({
       <div className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-3 px-4 py-3 pr-16 sm:px-5 sm:py-3 sm:pr-16">
         <div>
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            {mode === "create" ? "Thêm buổi học" : "Sửa buổi học"}
+            {mode === "create" ? "Thêm bài học" : "Sửa bài học"}
           </h2>
         </div>
       </div>
@@ -62,7 +63,7 @@ export function LessonEditor({
           />
           <TextField
             id="admin-lesson-title"
-            label="Tên buổi học"
+            label="Tên bài học"
             icon={<FileText className="h-5 w-5" aria-hidden="true" />}
             error={form.formState.errors.title}
             {...form.register("title")}
@@ -71,13 +72,13 @@ export function LessonEditor({
         <div>
           <FieldLabel
             id="admin-lesson-description"
-            label="Tổng quan buổi học"
+            label="Tổng quan bài học"
             isOptional
           />
           <textarea
             id="admin-lesson-description"
             rows={4}
-            placeholder="Ví dụ: Nội dung chính, dạng bài trọng tâm hoặc ghi chú cho buổi học."
+            placeholder="Ví dụ: Nội dung chính, dạng bài trọng tâm hoặc ghi chú cho bài học."
             className={cn(
               "theme-form-control mt-2 min-h-28 w-full resize-y rounded-xl px-4 py-3 text-base font-semibold leading-6 outline-none transition disabled:cursor-not-allowed lg:text-sm",
             )}
@@ -133,6 +134,13 @@ export function LessonEditor({
             }
           />
         </div>
+        <CheckboxField
+          id="admin-lesson-trial-enabled"
+          label="Cho phép học thử bài học này"
+          labelClassName="!bg-transparent hover:!bg-transparent"
+          error={form.formState.errors.trialEnabled}
+          {...form.register("trialEnabled")}
+        />
       </fieldset>
 
       <div className="theme-dialog-footer grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">
@@ -154,7 +162,7 @@ export function LessonEditor({
           ) : (
             <Check className="h-4 w-4" aria-hidden="true" />
           )}
-          {isSaving ? "Đang lưu" : "Lưu buổi học"}
+          {isSaving ? "Đang lưu" : "Lưu bài học"}
         </button>
       </div>
     </form>

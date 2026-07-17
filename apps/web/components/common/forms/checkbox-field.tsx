@@ -9,6 +9,7 @@ export function CheckboxField({
   label,
   error,
   wrapperClassName,
+  labelClassName,
   className,
   ...inputProps
 }: CheckboxFieldProps) {
@@ -16,7 +17,10 @@ export function CheckboxField({
     <div className={wrapperClassName}>
       <label
         htmlFor={id}
-        className="flex min-h-[3.35rem] cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-surface-soft)] px-4 transition hover:border-[var(--theme-input-hover-border)] hover:bg-[var(--theme-input-bg)]"
+        className={cn(
+          "flex min-h-[3.35rem] cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--theme-input-border)] bg-transparent px-4 transition hover:border-[var(--theme-input-hover-border)]",
+          labelClassName,
+        )}
       >
         <span className="text-sm font-extrabold text-[var(--theme-text-strong)]">
           {label}

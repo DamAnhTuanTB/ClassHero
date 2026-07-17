@@ -1,0 +1,1 @@
+- 2026-07-17: Hoàn thiện luồng khóa học student/admin gồm nối course list/detail với API thật, mock mua ngay tạo enrollment, trạng thái khóa/bảo trì cho khóa đã mua nhưng chưa phát hành, lesson trial/lock theo chương, UI admin edit lộ trình và form lộ trình tự sinh slug khi ẩn field slug.

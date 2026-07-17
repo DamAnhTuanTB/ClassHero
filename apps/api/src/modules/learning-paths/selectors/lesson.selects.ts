@@ -11,6 +11,7 @@ export const lessonSelect = {
   examOpenAt: true,
   videoUrl: true,
   completionMinScore: true,
+  trialEnabled: true,
   status: true,
   createdById: true,
   updatedById: true,

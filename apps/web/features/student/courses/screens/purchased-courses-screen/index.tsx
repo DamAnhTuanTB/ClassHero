@@ -1,10 +1,15 @@
+"use client";
+
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
 import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
 import { StudentLearningGreetingPanel } from "@/features/student/courses/screens/purchased-courses-screen/components/student-learning-greeting-panel";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { TodayLearningGoalsPanel } from "@/features/student/courses/screens/purchased-courses-screen/components/today-learning-goals-panel";
-import { studentCourses } from "@/features/student/shared/student-courses-data";
-import { getPurchasedCourses } from "@/features/student/shared/utils/student-courses-utils";
+import { useStudentCoursesQuery } from "@/features/student/shared/hooks/use-student-courses-query";
+import {
+  buildTodayLearningGoals,
+  getPurchasedCourses,
+} from "@/features/student/shared/utils/student-courses-utils";
 import type { AppThemeMode } from "@/lib/theme-store";
 
 export function PurchasedCoursesScreen({
@@ -12,7 +17,11 @@ export function PurchasedCoursesScreen({
 }: {
   initialThemeMode?: AppThemeMode;
 }) {
-  const purchasedCourses = getPurchasedCourses(studentCourses);
+  const { isAuthHydrated, query: coursesQuery, session } = useStudentCoursesQuery();
+  const courses = coursesQuery.data?.courses ?? [];
+  const purchasedCourses = getPurchasedCourses(courses);
+  const studentName = session?.user.fullName ?? "bạn";
+  const todayGoals = buildTodayLearningGoals(courses);
   const screenBackground = "var(--student-screen-bg)";
 
   return (
@@ -27,12 +36,26 @@ export function PurchasedCoursesScreen({
         <StudentCoursesHeader title="Học tập" initialThemeMode={initialThemeMode} />
 
         <div className="grid min-w-0 gap-4 px-4 sm:px-6 lg:px-6">
-          <StudentLearningGreetingPanel />
+          <StudentLearningGreetingPanel studentName={studentName} />
 
-          <TodayLearningGoalsPanel />
+          <TodayLearningGoalsPanel goals={todayGoals} />
         </div>
 
-        {purchasedCourses.length > 0 ? (
+        {!isAuthHydrated || coursesQuery.isLoading ? (
+          <div className="px-4 sm:px-6 lg:px-6">
+            <EmptyCourseState
+              title="Đang tải khóa học"
+              description="ClassHero đang lấy danh sách lộ trình học của bạn."
+            />
+          </div>
+        ) : coursesQuery.isError ? (
+          <div className="px-4 sm:px-6 lg:px-6">
+            <EmptyCourseState
+              title="Chưa tải được khóa học"
+              description="Bạn thử tải lại trang hoặc kiểm tra kết nối mạng rồi quay lại nhé."
+            />
+          </div>
+        ) : purchasedCourses.length > 0 ? (
           <section
             className="grid min-w-0 gap-4 px-4 pb-2 sm:px-6 lg:px-6"
             aria-label="Danh sách khóa học của tôi"

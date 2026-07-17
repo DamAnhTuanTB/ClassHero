@@ -47,6 +47,9 @@ export function StudentCourseChapterCard({
   showProgress: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const lessonCountLabel = `${chapter.lessons.length} bài học`;
+  const isUnpublishedChapter =
+    chapter.status !== undefined && chapter.status !== "PUBLISHED";
 
   return (
     <article
@@ -58,7 +61,10 @@ export function StudentCourseChapterCard({
       <button
         type="button"
         onClick={onToggle}
-        className="relative grid min-h-[5.7rem] w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-2 whitespace-normal py-3 pl-2 pr-9 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+        className={cn(
+          "relative grid w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-2 whitespace-normal pl-2 pr-9 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100",
+          showProgress ? "min-h-[5.7rem] py-3" : "min-h-[4.35rem] pb-2.5 pt-3",
+        )}
         aria-expanded={expanded}
       >
         <span
@@ -73,8 +79,13 @@ export function StudentCourseChapterCard({
           <span className="student-soft-bold-text block break-words text-base font-black leading-6 text-slate-950 whitespace-normal dark:text-[var(--theme-text-strong)]">
             Chương {chapter.order}. {chapter.title}
           </span>
-          <span className="mt-1 block break-words text-sm font-medium leading-5 text-slate-500 whitespace-normal dark:text-[var(--theme-text-muted)]">
-            {chapter.description}
+          <span className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium leading-5 text-slate-500 dark:text-[var(--theme-text-muted)]">
+            <span className="break-words whitespace-normal">{lessonCountLabel}</span>
+            {isUnpublishedChapter ? (
+              <span className="inline-flex min-h-6 shrink-0 items-center rounded-full bg-slate-100 px-2 text-[11px] font-black text-slate-600 ring-1 ring-slate-200 dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)] dark:ring-[var(--theme-border)]">
+                Chưa phát hành
+              </span>
+            ) : null}
           </span>
           {showProgress ? (
             <span className="mt-2 flex flex-wrap items-center gap-2">

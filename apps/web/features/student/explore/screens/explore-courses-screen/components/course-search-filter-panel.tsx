@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 import { CourseFilterSelect } from "@/features/student/explore/screens/explore-courses-screen/components/course-filter-select";
+import type { StudentCourseGradeFilter } from "@/features/student/explore/hooks/use-student-courses-filter";
 import {
   gradeOptions,
   subjectOptions,
@@ -18,17 +19,20 @@ export function CourseSearchFilterPanel({
   onQueryChange,
   onSubjectChange,
 }: {
-  grade: number;
+  grade: StudentCourseGradeFilter;
   query: string;
   subject: StudentCourseSubjectFilter;
-  onGradeChange: (grade: number) => void;
+  onGradeChange: (grade: Exclude<StudentCourseGradeFilter, null>) => void;
   onQueryChange: (query: string) => void;
   onSubjectChange: (subject: StudentCourseSubjectFilter) => void;
 }) {
-  const gradeSelectOptions = gradeOptions.map((option) => ({
-    label: `Lớp ${option}`,
-    value: String(option),
-  }));
+  const gradeSelectOptions = [
+    { label: "Tất cả", value: "ALL" },
+    ...gradeOptions.map((option) => ({
+      label: `Lớp ${option}`,
+      value: String(option),
+    })),
+  ];
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const isClearVisible = isSearchFocused || Boolean(query);
 
@@ -98,9 +102,21 @@ export function CourseSearchFilterPanel({
           <CourseFilterSelect
             ariaLabel="Chọn khối lớp"
             className="student-filter-select-3d"
-            value={String(grade)}
+            disabled={grade === null}
+            value={grade === null ? "loading-grade" : String(grade)}
             options={gradeSelectOptions}
-            onChange={(nextGrade) => onGradeChange(Number(nextGrade))}
+            onChange={(nextGrade) => {
+              if (nextGrade === "ALL") {
+                onGradeChange("ALL");
+                return;
+              }
+
+              const parsedGrade = Number(nextGrade);
+
+              if (Number.isFinite(parsedGrade)) {
+                onGradeChange(parsedGrade);
+              }
+            }}
           />
         </div>
 

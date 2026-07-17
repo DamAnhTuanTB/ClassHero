@@ -98,6 +98,7 @@ export function toLessonFormValues(lesson: AdminLesson): LessonFormValues {
     examOpenAt: lesson.examOpenAt,
     videoUrl: lesson.videoUrl,
     completionMinScore: lesson.completionMinScore,
+    trialEnabled: lesson.trialEnabled,
     status: lesson.status,
   };
 }
@@ -111,6 +112,7 @@ export function toLessonPayload(values: LessonFormValues): Omit<AdminLesson, "id
     examOpenAt: values.examOpenAt ?? "",
     videoUrl: values.videoUrl?.trim() ?? "",
     completionMinScore: Number(values.completionMinScore),
+    trialEnabled: values.trialEnabled,
     status: values.status,
   };
 }

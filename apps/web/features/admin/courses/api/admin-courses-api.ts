@@ -57,6 +57,7 @@ type AdminLessonApi = {
   examOpenAt: string | null;
   videoUrl: string | null;
   completionMinScore: number;
+  trialEnabled: boolean;
   status: AdminPublishStatus;
 };
 
@@ -76,7 +77,7 @@ type AdminLearningPathPayload = {
   grade: number;
   originalPriceVnd: number;
   salePriceVnd?: number | null;
-  slug: string;
+  slug?: string;
   sortOrder: number;
   status: Exclude<AdminPublishStatus, "ARCHIVED">;
   subject: AdminSubject;
@@ -100,6 +101,7 @@ type AdminLessonPayload = {
   shortDescription?: string | null;
   status?: AdminPublishStatus;
   title?: string;
+  trialEnabled?: boolean;
   videoUrl?: string | null;
 };
 
@@ -327,6 +329,7 @@ function mapLesson(lesson: AdminLessonApi): AdminLesson {
     examOpenAt: toDateTimeLocalValue(lesson.examOpenAt),
     videoUrl: lesson.videoUrl ?? "",
     completionMinScore: lesson.completionMinScore,
+    trialEnabled: lesson.trialEnabled ?? false,
     status: lesson.status,
   };
 }
@@ -340,10 +343,11 @@ function toLearningPathApiPayload(
   }
 
   const thumbnailFileId = values.thumbnailFileId.trim();
+  const slug = values.slug.trim();
 
   return {
     title: values.title.trim(),
-    slug: values.slug.trim(),
+    ...(slug ? { slug } : {}),
     subject: values.subject,
     grade: Number(values.grade),
     originalPriceVnd:
@@ -389,6 +393,7 @@ function toLessonApiPayload(values: Partial<LessonFormValues>): AdminLessonPaylo
     ...(values.completionMinScore !== undefined
       ? { completionMinScore: Number(values.completionMinScore) }
       : {}),
+    ...(values.trialEnabled !== undefined ? { trialEnabled: values.trialEnabled } : {}),
     ...(values.status !== undefined ? { status: values.status } : {}),
   };
 }

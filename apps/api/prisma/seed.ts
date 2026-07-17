@@ -147,7 +147,7 @@ function multipleChoiceOptions(
 
 async function seedUsers() {
   const passwordHash = {
-    admin: devPasswordHash("Admin123!"),
+    admin: devPasswordHash("123456"),
     student: devPasswordHash("Student123!"),
     parent: devPasswordHash("Parent123!"),
   };
@@ -287,7 +287,7 @@ async function seedLearningContent(adminId: string) {
       totalChapterCount: 1,
       totalLessonCount: 2,
       status: PublishStatus.PUBLISHED,
-      trialEnabled: true,
+      trialEnabled: false,
       publishedAt: addDays(now, -7),
       sortOrder: 1,
       updatedById: adminId,
@@ -306,7 +306,7 @@ async function seedLearningContent(adminId: string) {
         "Lộ trình Toán 7 mẫu để kiểm tra luồng học, quiz và payment.",
       ),
       status: PublishStatus.PUBLISHED,
-      trialEnabled: true,
+      trialEnabled: false,
       publishedAt: addDays(now, -7),
       sortOrder: 1,
       createdById: adminId,
@@ -360,6 +360,7 @@ async function seedLearningContent(adminId: string) {
       examOpenAt: addDays(now, -1),
       videoUrl: "https://youtube.com/example-toan7-buoi1",
       completionMinScore: new Prisma.Decimal("7"),
+      trialEnabled: true,
       status: PublishStatus.PUBLISHED,
       updatedById: adminId,
     },
@@ -373,6 +374,7 @@ async function seedLearningContent(adminId: string) {
       examOpenAt: addDays(now, -1),
       videoUrl: "https://youtube.com/example-toan7-buoi1",
       completionMinScore: new Prisma.Decimal("7"),
+      trialEnabled: true,
       status: PublishStatus.PUBLISHED,
       createdById: adminId,
       updatedById: adminId,
@@ -394,6 +396,7 @@ async function seedLearningContent(adminId: string) {
       examOpenAt: addDays(now, 7),
       videoUrl: "https://youtube.com/example-toan7-buoi2",
       completionMinScore: new Prisma.Decimal("7"),
+      trialEnabled: false,
       status: PublishStatus.PUBLISHED,
       updatedById: adminId,
     },
@@ -407,6 +410,7 @@ async function seedLearningContent(adminId: string) {
       examOpenAt: addDays(now, 7),
       videoUrl: "https://youtube.com/example-toan7-buoi2",
       completionMinScore: new Prisma.Decimal("7"),
+      trialEnabled: false,
       status: PublishStatus.PUBLISHED,
       createdById: adminId,
       updatedById: adminId,
@@ -1404,7 +1408,7 @@ async function main() {
   await seedNews(admin.id);
 
   console.log("Seed data ready:");
-  console.log("- admin@example.com / Admin123!");
+  console.log("- admin@example.com / 123456");
   console.log("- student1@example.com / Student123!");
   console.log("- parent1@example.com / Parent123!");
   console.log("- Learning path: Toán 7");

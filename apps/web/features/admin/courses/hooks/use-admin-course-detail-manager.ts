@@ -7,6 +7,7 @@ import {
 } from "@/features/admin/courses/hooks/use-admin-course-queries";
 import type {
   ChapterFormValues,
+  LearningPathFormValues,
   LessonFormValues,
 } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode, ViewState } from "@/features/admin/courses/admin-courses-types";
@@ -47,8 +48,10 @@ export function useAdminCourseDetailManager(
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
+  const [pathEditorMode, setPathEditorMode] = useState<EditorMode>("edit");
   const [chapterEditorMode, setChapterEditorMode] = useState<EditorMode>("create");
   const [lessonEditorMode, setLessonEditorMode] = useState<EditorMode>("create");
+  const [isPathEditorOpen, setIsPathEditorOpen] = useState(false);
   const [isChapterEditorOpen, setIsChapterEditorOpen] = useState(false);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
@@ -65,6 +68,7 @@ export function useAdminCourseDetailManager(
     path?.chapters.find((chapter) => chapter.id === deletingChapterId) ?? null;
   const deletingLessonMatch = findLessonMatch(path, deletingLessonId);
   const deletingLesson = deletingLessonMatch?.lesson ?? null;
+  const isSavingPath = mutations.updatePath.isPending;
   const isSavingChapter =
     mutations.createChapter.isPending || mutations.updateChapter.isPending;
   const isSavingLesson =
@@ -77,6 +81,37 @@ export function useAdminCourseDetailManager(
   }, [learningPathQuery.data]);
 
   const courseStats = useMemo(() => getAdminCourseDetailStats(path), [path]);
+
+  function startEditPath() {
+    if (!path) {
+      return;
+    }
+
+    setPathEditorMode("edit");
+    setIsPathEditorOpen(true);
+  }
+
+  async function savePath(values: LearningPathFormValues) {
+    if (!path) {
+      return;
+    }
+
+    try {
+      await mutations.updatePath.mutateAsync({
+        pathId: path.id,
+        values,
+      });
+      await learningPathQuery.refetch();
+      toast.success("Đã lưu lộ trình", {
+        description: "Thông tin khóa học đã được cập nhật.",
+      });
+      setIsPathEditorOpen(false);
+    } catch (error) {
+      toast.error("Chưa lưu được lộ trình", {
+        description: getErrorMessage(error),
+      });
+    }
+  }
 
   function startCreateChapter() {
     setChapterEditorMode("create");
@@ -199,11 +234,10 @@ export function useAdminCourseDetailManager(
 
     try {
       if (lessonEditorMode === "create") {
-        const createdLesson = await mutations.createLesson.mutateAsync({
+        await mutations.createLesson.mutateAsync({
           chapterId: selectedChapterId,
           values,
         });
-        setSelectedLessonId(createdLesson.id);
       } else if (selectedLesson) {
         await mutations.updateLesson.mutateAsync({
           lessonId: selectedLesson.id,
@@ -214,19 +248,20 @@ export function useAdminCourseDetailManager(
       await mutations.invalidateLearningPath(path.id);
       await learningPathQuery.refetch();
       toast.success(
-        lessonEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
+        lessonEditorMode === "create" ? "Đã thêm bài học" : "Đã lưu bài học",
         {
-          description: "Danh sách buổi học trong chương đã được cập nhật.",
+          description: "Danh sách bài học trong chương đã được cập nhật.",
         },
       );
       setLessonEditorMode("create");
+      setSelectedLessonId(null);
       setIsLessonEditorOpen(false);
     } catch (error) {
       if (isConflictError(error)) {
         throw new Error("DUPLICATED_LESSON_ORDER", { cause: error });
       }
 
-      toast.error("Chưa lưu được buổi học", {
+      toast.error("Chưa lưu được bài học", {
         description: getErrorMessage(error),
       });
     }
@@ -253,7 +288,7 @@ export function useAdminCourseDetailManager(
       await mutations.invalidateLearningPath(pathId);
       await learningPathQuery.refetch();
       toast.info("Đã xóa chương học", {
-        description: "Các buổi học trong chương cũng được chuyển sang lưu trữ.",
+        description: "Các bài học trong chương cũng được chuyển sang lưu trữ.",
       });
       setDeletingChapterId(null);
     } catch (error) {
@@ -284,10 +319,10 @@ export function useAdminCourseDetailManager(
       });
       await mutations.invalidateLearningPath(pathId);
       await learningPathQuery.refetch();
-      toast.info("Đã xóa buổi học");
+      toast.info("Đã xóa bài học");
       setDeletingLessonId(null);
     } catch (error) {
-      toast.error("Chưa xóa được buổi học", {
+      toast.error("Chưa xóa được bài học", {
         description: getErrorMessage(error),
       });
     }
@@ -350,7 +385,7 @@ export function useAdminCourseDetailManager(
       setSelectedChapterId(chapterId);
       setSelectedLessonId(sourceLessonId);
     } catch (error) {
-      toast.error("Chưa đổi được thứ tự buổi học", {
+      toast.error("Chưa đổi được thứ tự bài học", {
         description: getErrorMessage(error),
       });
     }
@@ -376,12 +411,15 @@ export function useAdminCourseDetailManager(
     selectedLesson,
     isChapterEditorOpen,
     isLessonEditorOpen,
+    isPathEditorOpen,
     isSavingChapter,
     isSavingLesson,
+    isSavingPath,
     isDarkTheme,
     isSidebarCollapsed,
     lessonEditorMode,
     path,
+    pathEditorMode,
     selectedChapterId,
     selectedLessonId,
     viewState,
@@ -391,7 +429,11 @@ export function useAdminCourseDetailManager(
       closeChapterEditor: () => setIsChapterEditorOpen(false),
       closeDeleteChapterConfirm: () => setDeletingChapterId(null),
       closeDeleteLessonConfirm: () => setDeletingLessonId(null),
-      closeLessonEditor: () => setIsLessonEditorOpen(false),
+      closeLessonEditor: () => {
+        setIsLessonEditorOpen(false);
+        setSelectedLessonId(null);
+      },
+      closePathEditor: () => setIsPathEditorOpen(false),
       confirmDeleteChapter,
       confirmDeleteLesson,
       requestDeleteChapter,
@@ -401,13 +443,16 @@ export function useAdminCourseDetailManager(
       reorderLessons,
       saveChapter,
       saveLesson,
+      savePath,
       startCreateChapter,
       startCreateLesson,
       startEditChapter,
       startEditLesson,
+      startEditPath,
       toggleDarkTheme: toggleTheme,
       toggleSidebarCollapsed: () => setIsSidebarCollapsed((current) => !current),
     },
+    uploadCover: (file: File) => mutations.uploadCover.mutateAsync(file),
   };
 }
 

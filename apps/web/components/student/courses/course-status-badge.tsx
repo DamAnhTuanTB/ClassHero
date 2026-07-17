@@ -8,15 +8,23 @@ const badgeStyles: Record<StudentCourseAccess, string> = {
   locked: "border-slate-200 bg-slate-50 text-slate-500",
 };
 
-export function CourseStatusBadge({ access }: { access: StudentCourseAccess }) {
+export function CourseStatusBadge({
+  access,
+  isUnderMaintenance = false,
+}: {
+  access: StudentCourseAccess;
+  isUnderMaintenance?: boolean;
+}) {
   return (
     <span
       className={cn(
         "inline-flex min-h-7 items-center rounded-xl border px-2.5 text-xs font-bold lg:min-h-9 lg:px-4 lg:text-sm lg:font-extrabold",
-        badgeStyles[access],
+        isUnderMaintenance
+          ? "border-amber-100 bg-amber-50 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]"
+          : badgeStyles[access],
       )}
     >
-      {accessLabels[access]}
+      {isUnderMaintenance ? "Bảo trì" : accessLabels[access]}
     </span>
   );
 }

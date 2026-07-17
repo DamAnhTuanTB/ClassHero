@@ -12,6 +12,7 @@ export type AdminLesson = {
   examOpenAt: string;
   videoUrl: string;
   completionMinScore: number;
+  trialEnabled: boolean;
   status: AdminPublishStatus;
 };
 
@@ -82,7 +83,7 @@ export const adminLearningPaths: AdminLearningPath[] = [
     thumbnailFileName: "",
     thumbnailImageUrl: "",
     description:
-      "Lộ trình củng cố nền tảng Toán 7 theo từng buổi học, giúp học sinh nắm chắc lý thuyết và luyện bài tập trọng tâm.",
+      "Lộ trình củng cố nền tảng Toán 7 theo từng bài học, giúp học sinh nắm chắc lý thuyết và luyện bài tập trọng tâm.",
     subject: "MATH",
     grade: 7,
     originalPriceVnd: 2_000_000,
@@ -106,23 +107,25 @@ export const adminLearningPaths: AdminLearningPath[] = [
           {
             id: "lesson-math-7-1",
             orderIndex: 1,
-            title: "Buổi 1: Số hữu tỉ",
+            title: "Bài học 1: Số hữu tỉ",
             shortDescription: "Ôn tập số hữu tỉ, thứ tự và phép tính cơ bản.",
             scheduledAt: "2026-08-01T12:00",
             examOpenAt: "2026-08-01T13:00",
             videoUrl: "https://youtube.com/watch?v=toan7-01",
             completionMinScore: 7,
+            trialEnabled: true,
             status: "PUBLISHED",
           },
           {
             id: "lesson-math-7-2",
             orderIndex: 2,
-            title: "Buổi 2: Lũy thừa",
+            title: "Bài học 2: Lũy thừa",
             shortDescription: "Lũy thừa với số mũ tự nhiên và bài tập vận dụng.",
             scheduledAt: "2026-08-05T12:00",
             examOpenAt: "2026-08-05T13:00",
             videoUrl: "https://drive.google.com/file/d/toan7-02/view",
             completionMinScore: 7,
+            trialEnabled: false,
             status: "DRAFT",
           },
         ],
@@ -170,12 +173,13 @@ export const adminLearningPaths: AdminLearningPath[] = [
           {
             id: "lesson-physics-8-1",
             orderIndex: 1,
-            title: "Buổi 1: Chuyển động cơ học",
+            title: "Bài học 1: Chuyển động cơ học",
             shortDescription: "Khái niệm chuyển động, vận tốc và bài tập đọc đồ thị.",
             scheduledAt: "2026-08-03T12:00",
             examOpenAt: "2026-08-03T13:00",
             videoUrl: "https://youtube.com/watch?v=ly8-01",
             completionMinScore: 7,
+            trialEnabled: true,
             status: "DRAFT",
           },
         ],
@@ -213,12 +217,13 @@ export const adminLearningPaths: AdminLearningPath[] = [
           {
             id: "lesson-chemistry-9-1",
             orderIndex: 1,
-            title: "Buổi 1: Oxit",
+            title: "Bài học 1: Oxit",
             shortDescription: "Phân loại oxit, tính chất hóa học và bài tập nhận biết.",
             scheduledAt: "2026-08-07T12:00",
             examOpenAt: "2026-08-07T13:00",
             videoUrl: "https://youtube.com/watch?v=hoa9-01",
             completionMinScore: 7,
+            trialEnabled: false,
             status: "HIDDEN",
           },
         ],

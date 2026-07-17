@@ -58,6 +58,12 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - Lỗi: edit lộ trình kèm `thumbnailFileId` trả `500 INTERNAL_SERVER_ERROR`.
 - Nguyên nhân: service đưa trực tiếp foreign key scalar như `thumbnailFileId` hoặc `updatedById` vào Prisma checked update input. Với relation trong Prisma, update chuẩn phải đi qua relation field, ví dụ `thumbnailFile.connect/disconnect` hoặc `updatedBy.connect`.
 - Cách tránh: khi API nhận một id quan hệ từ UI, service vẫn validate id trước, nhưng lúc ghi DB phải map sang relation operation. Dùng `connect` khi gắn file/user mới và `disconnect` khi muốn bỏ ảnh đại diện; không đưa trực tiếp scalar foreign key vào `LearningPathUpdateInput` nếu Prisma không cho phép.
+- Lỗi: tạo khóa học xong tự có học thử ở buổi đầu dù admin chưa bật checkbox buổi học.
+- Nguyên nhân: code cũ còn default `learning_paths.trial_enabled = true` và migration có thể backfill trạng thái đó sang lesson đầu tiên. Điều này sai rule sản phẩm vì học thử thuộc từng buổi học, không thuộc lộ trình.
+- Cách tránh: khóa học phải default không học thử; chỉ `lessons.trial_enabled` mới quyết định quyền học thử. UI admin chỉ đặt checkbox trong modal thêm/sửa buổi học, API create/update lesson lưu field này, public/student serializer chọn `trialLessonId` từ lesson được bật flag.
+- Lỗi: bấm `Sửa` buổi học rồi đóng modal ngay làm card buổi học vẫn có nền xanh như đang focus.
+- Nguyên nhân: hook dùng `selectedLessonId` vừa để chọn lesson đưa vào modal edit, vừa để tô selected state trên card. Khi đóng modal không lưu, state này không được dọn nên card vẫn nhận class nền primary.
+- Cách tránh: state dùng tạm cho editor phải được dọn khi cancel/close modal. Chỉ giữ selected/highlight sau các thao tác có chủ ý như tạo mới, lưu thành công hoặc reorder nếu UI thật sự cần báo item vừa tác động.
 
 ## File quan trọng
 

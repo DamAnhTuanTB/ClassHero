@@ -38,7 +38,7 @@ export const studentCourses: StudentCourse[] = [
       examOpenLabel: "Mở bài kiểm tra lúc 19:30",
       id: "lesson-math-7-ratio",
       kind: "inProgress",
-      title: "Buổi 5: Tỉ lệ thức",
+      title: "Bài học 5: Tỉ lệ thức",
     },
     originalPriceVnd: 2_000_000,
     progressPercent: 42,
@@ -61,7 +61,7 @@ export const studentCourses: StudentCourse[] = [
     nextLesson: {
       id: "lesson-math-7-functions",
       kind: "first",
-      title: "Buổi 1: Hàm số",
+      title: "Bài học 1: Hàm số",
     },
     originalPriceVnd: 1_900_000,
     progressPercent: 0,
@@ -84,7 +84,7 @@ export const studentCourses: StudentCourse[] = [
     nextLesson: {
       id: "lesson-math-7-practice-polynomial",
       kind: "next",
-      title: "Buổi 6: Đa thức một biến",
+      title: "Bài học 6: Đa thức một biến",
     },
     originalPriceVnd: 1_750_000,
     progressPercent: 58,
@@ -106,7 +106,7 @@ export const studentCourses: StudentCourse[] = [
     nextLesson: {
       id: "lesson-math-7-final-review",
       kind: "last",
-      title: "Buổi 36: Tổng ôn cuối khóa",
+      title: "Bài học 36: Tổng ôn cuối khóa",
     },
     originalPriceVnd: 1_950_000,
     progressPercent: 92,
@@ -143,7 +143,7 @@ export const studentCourses: StudentCourse[] = [
     lessonCount: 18,
     nextLesson: {
       id: "lesson-physics-8-motion",
-      title: "Buổi 1: Chuyển động cơ học",
+      title: "Bài học 1: Chuyển động cơ học",
     },
     originalPriceVnd: 1_800_000,
     salePriceVnd: 1_450_000,
@@ -261,7 +261,7 @@ export const studentCourseDetails: Partial<Record<string, StudentCourseDetail>> 
     ],
     continueLessonId: "lesson-math-7-ratio",
     continueLessonKind: "inProgress",
-    continueLessonTitle: "Buổi 5: Tỉ lệ thức",
+    continueLessonTitle: "Bài học 5: Tỉ lệ thức",
     totalHours: 18,
   },
   "toan-7-nang-cao": {
@@ -313,7 +313,7 @@ export const studentCourseDetails: Partial<Record<string, StudentCourseDetail>> 
     ],
     continueLessonId: "lesson-math-7-functions",
     continueLessonKind: "first",
-    continueLessonTitle: "Buổi 1: Hàm số",
+    continueLessonTitle: "Bài học 1: Hàm số",
     totalHours: 12,
   },
   "toan-7-luyen-tap": {
@@ -383,7 +383,7 @@ export const studentCourseDetails: Partial<Record<string, StudentCourseDetail>> 
     ],
     continueLessonId: "lesson-math-7-practice-polynomial",
     continueLessonKind: "next",
-    continueLessonTitle: "Buổi 6: Đa thức một biến",
+    continueLessonTitle: "Bài học 6: Đa thức một biến",
     totalHours: 10,
   },
   "toan-7-tong-on": {
@@ -419,7 +419,7 @@ export const studentCourseDetails: Partial<Record<string, StudentCourseDetail>> 
     ],
     continueLessonId: "lesson-math-7-final-review",
     continueLessonKind: "last",
-    continueLessonTitle: "Buổi 36: Tổng ôn cuối khóa",
+    continueLessonTitle: "Bài học 36: Tổng ôn cuối khóa",
     totalHours: 14,
   },
   "toan-7-tang-toc": {
@@ -485,7 +485,7 @@ export const studentCourseDetails: Partial<Record<string, StudentCourseDetail>> 
     ],
     continueLessonId: "lesson-math-7-speed-trial-rational",
     continueLessonKind: "first",
-    continueLessonTitle: "Buổi 1: Học thử - Ôn số hữu tỉ",
+    continueLessonTitle: "Bài học 1: Học thử - Ôn số hữu tỉ",
     totalHours: 9,
   },
 };
@@ -493,7 +493,7 @@ export const studentCourseDetails: Partial<Record<string, StudentCourseDetail>> 
 export const purchasedStats: StudentCourseStat[] = [
   { label: "đang học", value: "4" },
   { label: "tiến độ", value: "42%" },
-  { label: "buổi hôm nay", value: "1" },
+  { label: "bài học hôm nay", value: "1" },
 ];
 
 export const learningStreakStat = {
@@ -507,8 +507,8 @@ export const todayLearningGoals: StudentTodayGoal[] = [
     completed: true,
     icon: "lesson",
     id: "complete-one-lesson",
-    metric: "1/1 buổi",
-    title: "Hoàn thành 1 buổi học",
+    metric: "1/1 bài học",
+    title: "Hoàn thành 1 bài học",
     tone: "sky",
   },
   {

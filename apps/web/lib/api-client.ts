@@ -7,9 +7,12 @@ export type ApiRequestOptions = {
   headers?: HeadersInit;
 };
 
-type ApiSuccessEnvelope<TData> = {
+export type ApiSuccessEnvelope<
+  TData,
+  TMeta extends Record<string, unknown> = Record<string, unknown>,
+> = {
   data: TData;
-  meta?: Record<string, unknown>;
+  meta?: TMeta;
 };
 
 type ApiErrorEnvelope = {
@@ -92,6 +95,18 @@ export async function apiRequest<TData>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<TData> {
+  const envelope = await apiRequestEnvelope<TData>(path, options);
+
+  return envelope.data;
+}
+
+export async function apiRequestEnvelope<
+  TData,
+  TMeta extends Record<string, unknown> = Record<string, unknown>,
+>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<ApiSuccessEnvelope<TData, TMeta>> {
   const headers = new Headers(options.headers);
   const isFormDataBody =
     typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -129,8 +144,8 @@ export async function apiRequest<TData>(
   }
 
   if (isSuccessEnvelope<TData>(payload)) {
-    return payload.data;
+    return payload as ApiSuccessEnvelope<TData, TMeta>;
   }
 
-  return payload as TData;
+  return { data: payload as TData };
 }

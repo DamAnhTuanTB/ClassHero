@@ -19,10 +19,12 @@ subject=MATH&grade=7&page=1&pageSize=20
 Behavior:
 
 - Chỉ trả `PUBLISHED`.
-- M3.1 trả public list tối thiểu theo `subject`, `grade`, pagination để bảo đảm student/public không thấy `DRAFT`, `HIDDEN`, `ARCHIVED` hoặc soft-deleted.
+- M3.1 trả public list tối thiểu theo `subject`, `grade`, pagination để bảo đảm student/public không thấy `DRAFT`, `HIDDEN`, `ARCHIVED` hoặc soft-deleted, trừ ngoại lệ lộ trình `DRAFT`/`HIDDEN` mà authenticated student đã mua.
 - M3.3 bổ sung ưu tiên lộ trình theo grade của student và enrollment/trial state khi authenticated.
 - Nếu request có `Authorization: Bearer <access_token>` hợp lệ của student, danh sách ưu tiên lộ trình cùng `student_profiles.grade` khi query không truyền `grade`.
 - Response item có `summary` cho course card/detail và `access` gồm active enrollment/trial state an toàn cho UI.
+- Nếu authenticated student đã có enrollment active, response item có thêm `progress` để UI dựng tiến độ và buổi học tiếp theo; guest hoặc user chưa mua nhận `progress: null`.
+- Nếu authenticated student đã mua một lộ trình đang `DRAFT` hoặc `HIDDEN`, list được phép trả thêm chính lộ trình đó để màn Học tập/Khám phá hiển thị nhãn bảo trì; không trả các lộ trình chưa phát hành cho học sinh chưa mua.
 - Response `meta` có `priorityGrade` và `gradeGroups` để UI group/filter theo grade.
 
 ### `GET /learning-paths/:idOrSlug`
@@ -33,8 +35,9 @@ Behavior:
 
 - Trả thông tin lộ trình.
 - Trả chapters public metadata, mỗi chapter chứa lessons public metadata theo thứ tự.
-- Chỉ trả lộ trình `PUBLISHED`.
-- M3.3 bổ sung trạng thái enrollment/trial nếu authenticated.
+- Mặc định chỉ trả lộ trình `PUBLISHED`.
+- Nếu authenticated student đã có active enrollment với lộ trình đó, detail vẫn trả lộ trình `DRAFT` hoặc `HIDDEN` chưa bị xóa mềm để học sinh thấy khóa học đã mua; UI phải coi `status != PUBLISHED` là trạng thái bảo trì và khóa toàn bộ lesson.
+- M3.3 bổ sung trạng thái enrollment/trial nếu authenticated; M3.5 bổ sung progress cơ bản từ `lesson_progress` cho authenticated student đã mua lộ trình.
 - `idOrSlug` nhận UUID hoặc slug public ổn định.
 
 Response item fields bổ sung từ M3.3:
@@ -53,13 +56,58 @@ Response item fields bổ sung từ M3.3:
     "enrollment": null,
     "trialAvailable": true,
     "trialLessonId": "uuid"
-  }
+  },
+  "progress": null
+}
+```
+
+Nếu authenticated student đã có enrollment active, `progress` có shape:
+
+```json
+{
+  "completedLessonCount": 1,
+  "progressPercent": 25,
+  "continueLessonId": "uuid",
+  "continueLessonKind": "next",
+  "continueLessonTitle": "Buổi 2: Biểu thức đại số"
+}
+```
+
+Response detail có thêm `chapters`:
+
+```json
+{
+  "chapters": [
+    {
+      "id": "uuid",
+      "orderIndex": 1,
+      "title": "Chương 1: Số hữu tỉ",
+      "overview": "Tổng quan chương học",
+      "status": "PUBLISHED",
+      "lessons": [
+        {
+          "id": "uuid",
+          "orderIndex": 1,
+          "title": "Buổi 1: Số hữu tỉ",
+          "shortDescription": "Ôn tập số hữu tỉ",
+          "examOpenAt": null,
+          "trialEnabled": true,
+          "status": "PUBLISHED"
+        }
+      ]
+    }
+  ]
 }
 ```
 
 Ghi chú:
 
+- Response item trả `thumbnailFileId` và `thumbnailFile: { id, originalName, url } | null`. `url` là public URL hoặc signed URL đã resolve từ Files API để màn student/public hiển thị ảnh khóa học thật.
+- Response item có `status`; list public/student vẫn chỉ trả `PUBLISHED`, còn detail có thể trả `DRAFT`/`HIDDEN` cho student đã mua để hiển thị nhãn "Khóa học đang được bảo trì".
+- Response detail vẫn trả chapter chưa bị xóa mềm kể cả khi `status` là `DRAFT` hoặc `HIDDEN`; front-end phải hiển thị chapter đó nhưng khóa toàn bộ lesson bên trong nếu chapter không phải `PUBLISHED`.
+- Nếu learning path `status != PUBLISHED`, front-end phải khóa toàn bộ lesson dù từng chapter/lesson đang `PUBLISHED`, ẩn progress/CTA học và hiển thị nhãn bảo trì.
 - `hasActiveEnrollment` chỉ tính cho authenticated student và yêu cầu enrollment `ACTIVE`, `startsAt <= now`, `expiresAt > now`.
+- `progress.progressPercent` tính theo số lesson `COMPLETED` trên tổng lesson published thuộc chapter `PUBLISHED`; `continueLessonKind` chỉ là gợi ý UI để chọn copy CTA, không thay thế permission học thật ở API lesson sau này.
 - Parent selected child/enrollment state sẽ nối ở milestone parent/payment sau; hiện parent token vẫn xem được dữ liệu public an toàn như guest.
 
 ---

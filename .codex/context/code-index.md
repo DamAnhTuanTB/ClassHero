@@ -35,9 +35,9 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/app/(admin)/layout.tsx`      | Layout riêng admin đọc cookie theme server-side, import admin theme CSS, bọc `AuthenticatedRouteGuard` role `ADMIN` và mount `AppToaster` |
 | `apps/web/app/(admin)/admin-theme.css` | CSS scoped cho admin theme/checkbox/dark bridge, chỉ import từ admin layout                                     |
 | `apps/web/app/(admin)/admin/courses`   | Route UI quản lý lộ trình/chương/buổi học admin, đã nối API thật và upload ảnh cho `M3.4`                       |
-| `apps/web/app/(student)/layout.tsx`     | Layout riêng student và shell/sidebar điều hướng student course; guard role `STUDENT` đang bypass tạm để owner test mobile |
-| `apps/web/app/(student)/student/courses` | Route `M3.5` màn lộ trình đã mua của học sinh                                                                      |
-| `apps/web/app/(student)/student/explore` | Route `M3.5` màn tất cả lộ trình published với filter lớp/môn local mock, tách riêng khỏi `/student/courses`      |
+| `apps/web/app/(student)/layout.tsx`     | Layout riêng student, bọc `AuthenticatedRouteGuard` role `STUDENT`, rồi render `StudentShell`/sidebar điều hướng student course |
+| `apps/web/app/(student)/student/courses` | Route `M3.5` màn lộ trình đã mua của học sinh, lấy dữ liệu từ public learning path API kèm session token nếu có                                                                      |
+| `apps/web/app/(student)/student/explore` | Route `M3.5` màn tất cả lộ trình published với filter lớp/môn client-side trên dữ liệu API, tách riêng khỏi `/student/courses`      |
 | `apps/web/app/globals.css`             | Tailwind/global styles dùng chung thật sự cho mọi route, không chứa CSS chỉ dành cho admin                      |
 | `apps/web/app/toaster`                 | Toaster wiring route-specific cho auth/admin, gom AppToaster, single-toast queue, constants và icon config      |
 | `apps/web/components`                  | Root component dùng chung duy nhất, chia scope `common`, `admin`, `student`, `parent`                          |
@@ -46,9 +46,11 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/features/auth`               | Auth domain cho API/session/schema/options/utils; mỗi form là `screens/<screen>/index.tsx`                     |
 | `apps/web/features/public`             | Public home feature; màn chính ở `screens/home/index.tsx`, component local ở `screens/home/components`         |
 | `apps/web/features/admin/courses`      | Admin course/chapter/lesson UI; mỗi màn nằm trong `screens/<screen>/index.tsx`, component local nằm cạnh màn trong `components/` |
-| `apps/web/features/student`            | Role folder student: route feature `courses`, `explore` và shared non-component data/types/utils               |
+| `apps/web/features/student`            | Role folder student: route feature `courses`, `explore` và shared non-component API/hooks/data/types/utils               |
 | `apps/web/features/student/courses`    | Feature route `/student/courses`: `purchased-courses-screen` và `student-course-detail-screen`, component local nằm dưới từng screen |
 | `apps/web/features/student/explore`    | Feature route `/student/explore`: `screens/explore-courses-screen/index.tsx`, component filter local nằm cạnh screen |
+| `apps/web/features/student/shared/student-courses-api.ts` | API mapper cho `GET /learning-paths` và `GET /learning-paths/:slug`, chuyển public DTO sang type UI student course |
+| `apps/web/features/student/shared/hooks/use-student-courses-query.ts` | TanStack Query hook cho list/detail student course, tự truyền access token sau khi đọc session/token đã lưu trong trình duyệt |
 | `apps/web/lib`                         | Utilities/API client dùng chung, gồm `api-client.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts` |
 | `apps/web/playwright.config.ts`        | Playwright config, tự build/start web và lưu report local                                                       |
 | `apps/web/tests/auth-ui.spec.ts`       | E2E/screenshot smoke test cho auth UI `M2.4`                                                                    |
@@ -75,7 +77,8 @@ Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<fe
 | `apps/api/src/modules/auth`           | Auth/profile API cho register/login/refresh/logout, `/me`, RBAC và reset password; module root chỉ giữ `auth.module.ts`, code tách theo `controllers/services/dto/selectors/serializers/utils/types`                                                                          |
 | `apps/api/src/modules/auth/dto`       | DTO validation cho auth request bodies                                                                                                                                                                                                                                        |
 | `apps/api/src/modules/files`          | Files API/storage service cho upload authenticated, signed URL, local MinIO dev và S3-compatible adapter cho R2 |
-| `apps/api/src/modules/learning-paths` | Public/student learning path list/detail API `M3.1`/`M3.3`, admin learning path CRUD/publish/archive/restore/permanent delete, admin chapter CRUD, và admin lesson CRUD theo chapter cho `M3.4`; module root chỉ giữ `learning-paths.module.ts`, code tách theo `controllers/services/dto/selectors/serializers/utils/types` |
+| `apps/api/src/modules/learning-paths` | Public/student learning path list/detail API `M3.1`/`M3.3`/`M3.5` có optional auth, enrollment/trial state, chapters detail và progress cơ bản; admin learning path CRUD/publish/archive/restore/permanent delete, admin chapter CRUD, và admin lesson CRUD theo chapter cho `M3.4`; module root chỉ giữ `learning-paths.module.ts`, code tách theo `controllers/services/dto/selectors/serializers/utils/types` |
+| `apps/api/src/modules/payments`       | Payment/enrollment API layer; hiện có endpoint mock `POST /student/payments/mock-success` để nút student `Mua ngay` tạo payment `PAID` giả và enrollment active 12 tháng trong dev/MVP |
 | `apps/api/src/jobs`                   | Queue/job definitions                                                                                                                                                                                                                                                         |
 | `apps/api/src/workers`                | Worker entrypoints/processors                                                                                                                                                                                                                                                 |
 | `apps/api/test`                       | Backend tests                                                                                                                                                                                                                                                                 |

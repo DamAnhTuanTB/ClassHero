@@ -1,11 +1,17 @@
+import { LessonProgressStatus } from "@prisma/client";
 import { serializeChapterDetail } from "#api/modules/learning-paths/serializers/chapter.serializers";
 import type {
+  PublicLearningPathDetailRecord,
   LearningPathDetailRecord,
   LearningPathRecord,
   LearningPathResponse,
   PublicLearningPathRecord,
   PublicViewerContext,
 } from "#api/modules/learning-paths/types/learning-path.types";
+
+type PublicLearningPathAnyRecord = PublicLearningPathRecord | PublicLearningPathDetailRecord;
+type PublicLessonRecord = PublicLearningPathRecord["lessons"][number];
+type PublicChapterRecord = PublicLearningPathDetailRecord["chapters"][number];
 
 export function serializeLearningPath(
   record: LearningPathRecord | LearningPathDetailRecord,
@@ -46,12 +52,15 @@ export function serializeLearningPath(
 }
 
 export function serializePublicLearningPath(
-  record: PublicLearningPathRecord,
+  record: PublicLearningPathAnyRecord,
   viewer: PublicViewerContext,
+  thumbnailUrl: string | null = null,
 ) {
   const activeEnrollment = viewer.activeEnrollmentByLearningPathId.get(record.id);
   const firstLesson = record.lessons[0];
-  const trialLessonId = record.trialEnabled && !activeEnrollment ? firstLesson?.id : null;
+  const trialLesson = record.lessons.find((lesson) => lesson.trialEnabled);
+  const trialLessonId = !activeEnrollment ? trialLesson?.id : null;
+  const learningProgress = getStudentLearningProgress(record, viewer);
 
   return {
     id: record.id,
@@ -64,9 +73,16 @@ export function serializePublicLearningPath(
     totalChapterCount: record.totalChapterCount,
     totalLessonCount: record.totalLessonCount,
     thumbnailFileId: record.thumbnailFileId,
+    thumbnailFile: record.thumbnailFile
+      ? {
+          id: record.thumbnailFile.id,
+          originalName: record.thumbnailFile.originalName,
+          url: thumbnailUrl,
+        }
+      : null,
     descriptionJson: record.descriptionJson,
     status: record.status,
-    trialEnabled: record.trialEnabled,
+    trialEnabled: Boolean(trialLesson),
     publishedAt: record.publishedAt,
     sortOrder: record.sortOrder,
     summary: {
@@ -89,13 +105,81 @@ export function serializePublicLearningPath(
       trialAvailable: Boolean(trialLessonId),
       trialLessonId,
     },
-    lessons: record.lessons.map((lesson) => ({
-      id: lesson.id,
-      orderIndex: lesson.orderIndex,
-      title: lesson.title,
-      shortDescription: lesson.shortDescription,
-      examOpenAt: lesson.examOpenAt,
-      status: lesson.status,
-    })),
+    progress: learningProgress,
+    lessons: record.lessons.map(serializePublicLesson),
+    ...("chapters" in record ? { chapters: record.chapters.map(serializePublicChapter) } : {}),
+  };
+}
+
+function serializePublicChapter(chapter: PublicChapterRecord) {
+  return {
+    id: chapter.id,
+    orderIndex: chapter.orderIndex,
+    title: chapter.title,
+    overview: chapter.overview,
+    status: chapter.status,
+    lessons: chapter.lessons.map(serializePublicLesson),
+  };
+}
+
+function serializePublicLesson(lesson: PublicLessonRecord) {
+  return {
+    id: lesson.id,
+    orderIndex: lesson.orderIndex,
+    title: lesson.title,
+    shortDescription: lesson.shortDescription,
+    examOpenAt: lesson.examOpenAt,
+    status: lesson.status,
+    trialEnabled: lesson.trialEnabled,
+  };
+}
+
+function getStudentLearningProgress(
+  record: PublicLearningPathAnyRecord,
+  viewer: PublicViewerContext,
+) {
+  const activeEnrollment = viewer.activeEnrollmentByLearningPathId.get(record.id);
+
+  if (!activeEnrollment || record.lessons.length === 0) {
+    return null;
+  }
+
+  const completedLessons = record.lessons.filter(
+    (lesson) =>
+      viewer.lessonProgressByLessonId.get(lesson.id)?.status ===
+      LessonProgressStatus.COMPLETED,
+  );
+  const inProgressLesson = record.lessons.find(
+    (lesson) =>
+      viewer.lessonProgressByLessonId.get(lesson.id)?.status ===
+      LessonProgressStatus.IN_PROGRESS,
+  );
+  const firstIncompleteLesson =
+    inProgressLesson ??
+    record.lessons.find(
+      (lesson) =>
+        viewer.lessonProgressByLessonId.get(lesson.id)?.status !==
+        LessonProgressStatus.COMPLETED,
+    ) ??
+    record.lessons.at(-1);
+  const completedLessonCount = completedLessons.length;
+  const progressPercent = Math.round(
+    (completedLessonCount / record.lessons.length) * 100,
+  );
+  const continueLessonKind =
+    progressPercent >= 100
+      ? "last"
+      : inProgressLesson
+        ? "inProgress"
+        : completedLessonCount === 0
+          ? "first"
+          : "next";
+
+  return {
+    completedLessonCount,
+    progressPercent,
+    continueLessonId: firstIncompleteLesson?.id ?? null,
+    continueLessonKind,
+    continueLessonTitle: firstIncompleteLesson?.title ?? null,
   };
 }

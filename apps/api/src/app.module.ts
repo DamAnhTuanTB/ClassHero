@@ -7,6 +7,7 @@ import { validateEnv } from "#api/config/env.validation";
 import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
 import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
+import { PaymentsModule } from "#api/modules/payments/payments.module";
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.
     AuthModule,
     FilesModule,
     LearningPathsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -102,9 +102,9 @@ export function LearningPathSummaryPanel({
             <div className={cellClass}>
               <div className={labelClass}>
                 <FileText className="h-4 w-4" aria-hidden="true" />
-                Buổi học
+                Bài học
               </div>
-              <p className={valueClass}>{path.totalLessonCount} buổi</p>
+              <p className={valueClass}>{path.totalLessonCount} bài học</p>
             </div>
             <div className={cellClass}>
               <div className={labelClass}>

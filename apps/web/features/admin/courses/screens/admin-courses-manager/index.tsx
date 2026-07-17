@@ -32,7 +32,7 @@ const PathEditorDialog = dynamic(() =>
 
 const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Lộ trình", icon: Layers3, active: true },
-  { label: "Buổi học", icon: BookOpen, active: false },
+  { label: "Bài học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
 ];
 

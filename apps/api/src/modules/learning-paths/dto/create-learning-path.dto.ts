@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PublishStatus, Subject } from "@prisma/client";
 import {
-  IsBoolean,
   IsEnum,
   IsInt,
   IsObject,
@@ -67,11 +66,6 @@ export class CreateLearningPathDto {
   @IsOptional()
   @IsObject()
   descriptionJson?: Record<string, unknown>;
-
-  @ApiPropertyOptional({ example: true, default: true })
-  @IsOptional()
-  @IsBoolean()
-  trialEnabled?: boolean;
 
   @ApiPropertyOptional({ enum: PublishStatus, example: PublishStatus.DRAFT })
   @IsOptional()

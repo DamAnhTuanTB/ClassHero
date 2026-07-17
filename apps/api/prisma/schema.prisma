@@ -478,7 +478,7 @@ model LearningPath {
   thumbnailFile     File?                 @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
   descriptionJson   Json?                 @map("description_json")
   status            PublishStatus         @default(DRAFT)
-  trialEnabled      Boolean               @default(true) @map("trial_enabled")
+  trialEnabled      Boolean               @default(false) @map("trial_enabled")
   publishedAt       DateTime?             @map("published_at")
   sortOrder         Int                   @default(0) @map("sort_order")
   createdById       String?               @map("created_by_id") @db.Uuid
@@ -541,6 +541,7 @@ model Lesson {
   examOpenAt         DateTime?            @map("exam_open_at")
   videoUrl           String?              @map("video_url")
   completionMinScore Decimal              @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  trialEnabled       Boolean              @default(false) @map("trial_enabled")
   status             PublishStatus        @default(DRAFT)
   createdById        String?              @map("created_by_id") @db.Uuid
   createdBy          User?                @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)

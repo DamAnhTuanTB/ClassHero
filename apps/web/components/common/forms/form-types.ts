@@ -52,6 +52,7 @@ export type CheckboxFieldProps = {
   label: string;
   error?: FieldError;
   wrapperClassName?: string;
+  labelClassName?: string;
 } & InputHTMLAttributes<HTMLInputElement>;
 
 export type FormStatusProps = {

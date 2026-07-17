@@ -75,7 +75,7 @@ export function StudentCourseLessonRow({
         />
       </span>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
           <Link
             href={isLocked ? "#" : `/student/lessons/${lesson.id}`}
             aria-disabled={isLocked}

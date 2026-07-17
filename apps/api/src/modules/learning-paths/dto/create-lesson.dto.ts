@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { PublishStatus } from "@prisma/client";
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -60,6 +61,11 @@ export class CreateLessonDto {
   @Min(0)
   @Max(10)
   completionMinScore?: number;
+
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  trialEnabled?: boolean;
 
   @ApiPropertyOptional({ enum: PublishStatus, example: PublishStatus.DRAFT })
   @IsOptional()

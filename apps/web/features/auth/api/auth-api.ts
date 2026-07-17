@@ -20,7 +20,15 @@ export type AuthTokenResponse = {
 
 export type CurrentUserResponse = {
   user: AuthUser;
-  studentProfile: unknown | null;
+  studentProfile: {
+    id: string;
+    grade: number;
+    childCode: string;
+    address: string | null;
+    displayName: string | null;
+    totalXp: number;
+    level: number;
+  } | null;
   parentProfile: unknown | null;
 };
 

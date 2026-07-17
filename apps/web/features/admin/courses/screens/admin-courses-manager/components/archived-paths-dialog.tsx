@@ -3,7 +3,6 @@
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/admin/courses/badge";
-import { StatusBadge } from "@/components/admin/courses/status-badge";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import {
   subjectLabels,
@@ -111,7 +110,6 @@ export function ArchivedPathsDialog({
                       <p className="truncate text-sm font-extrabold text-[var(--theme-text-strong)]">
                         {path.title}
                       </p>
-                      <StatusBadge status={path.status} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                       <Badge>{subjectLabels[path.subject]}</Badge>

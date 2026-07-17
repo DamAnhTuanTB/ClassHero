@@ -16,9 +16,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { logout } from "@/features/auth/api/auth-api";
+import { getCurrentUser, logout } from "@/features/auth/api/auth-api";
 import {
   clearAuthSession,
   useAuthSessionStore,
@@ -97,6 +98,14 @@ export function StudentShell({
   const studentFullName =
     session?.user.role === "STUDENT" ? session.user.fullName?.trim() : "";
   const studentDisplayName = studentFullName || studentProfile.name;
+  const currentUserQuery = useQuery({
+    queryKey: ["auth", "current-user", session?.user.id ?? "guest"],
+    queryFn: () => getCurrentUser(session?.accessToken ?? ""),
+    enabled: session?.user.role === "STUDENT" && Boolean(session.accessToken),
+  });
+  const studentGrade = currentUserQuery.data?.studentProfile?.grade ?? null;
+  const studentGradeLabel =
+    studentGrade !== null ? `Học sinh lớp ${studentGrade}` : "Học sinh";
 
   async function handleLogout() {
     if (isLoggingOut) {
@@ -205,7 +214,7 @@ export function StudentShell({
                 className="inline-flex min-w-0 items-center text-[13px] font-semibold leading-tight"
                 style={{ color: "var(--student-profile-role-color, #0369a1)" }}
               >
-                <span className="truncate">Học sinh lớp {studentProfile.grade}</span>
+                <span className="truncate">{studentGradeLabel}</span>
               </p>
             </div>
           </div>

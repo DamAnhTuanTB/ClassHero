@@ -82,6 +82,7 @@ export class LessonsService {
             examOpenAt: dto.examOpenAt ?? null,
             videoUrl: normalizeOptionalText(dto.videoUrl),
             completionMinScore: dto.completionMinScore ?? 7,
+            trialEnabled: dto.trialEnabled ?? false,
             status,
             createdById: actorUserId,
             updatedById: actorUserId,
@@ -175,6 +176,9 @@ export class LessonsService {
               : {}),
             ...(dto.completionMinScore !== undefined
               ? { completionMinScore: dto.completionMinScore }
+              : {}),
+            ...(dto.trialEnabled !== undefined
+              ? { trialEnabled: dto.trialEnabled }
               : {}),
             ...(dto.status !== undefined ? { status } : {}),
             updatedById: actorUserId,

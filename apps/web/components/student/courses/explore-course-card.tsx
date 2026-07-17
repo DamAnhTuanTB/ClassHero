@@ -61,19 +61,24 @@ function getCourseAccentStripClass(course: StudentCourse) {
 
 export function ExploreCourseCard({ course }: { course: StudentCourse }) {
   const isEnrolled = course.access === "completed" || course.access === "enrolled";
-  const isStudying = course.access === "enrolled";
+  const isUnderMaintenance = course.isUnderMaintenance === true;
+  const isStudying = course.access === "enrolled" && !isUnderMaintenance;
   const hasFreeTrial = !isEnrolled && typeof course.trialLessonCount === "number";
   const ctaLabel =
-    course.access === "completed" ? "Xem lại" : isEnrolled ? "Vào học" : "Chi tiết";
+    course.access === "completed" && !isUnderMaintenance
+      ? "Xem lại"
+      : isEnrolled && !isUnderMaintenance
+        ? "Vào học"
+        : "Chi tiết";
   const isCurrentLessonInProgress = course.nextLesson?.kind === "inProgress";
   const nextLessonLabel =
     course.nextLesson?.kind === "first"
-      ? "Buổi đầu tiên"
+      ? "Bài học đầu tiên"
       : course.nextLesson?.kind === "last"
-        ? "Buổi cuối cùng"
+        ? "Bài học cuối cùng"
         : isCurrentLessonInProgress
-          ? "Buổi đang học"
-          : "Buổi tiếp theo";
+          ? "Bài học đang học"
+          : "Bài học tiếp theo";
   const nextLessonCtaLabel = isCurrentLessonInProgress ? "Học tiếp" : "Vào học";
   const coursePrice = getCoursePrice(course);
   const discountPercent =
@@ -111,11 +116,21 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
         aria-hidden="true"
       />
       <div className="grid min-w-0 grid-cols-[40%_minmax(0,1fr)] gap-3">
-        <CourseIllustration
-          tone={course.tone}
-          visualTone={course.access === "locked" ? "blue" : undefined}
-          className="h-auto min-h-0 w-full"
-        />
+        {course.thumbnailImageUrl ? (
+          <img
+            src={course.thumbnailImageUrl}
+            alt={`Ảnh khóa học ${course.title}`}
+            loading="lazy"
+            decoding="async"
+            className="aspect-square h-auto min-h-0 w-full rounded-2xl object-cover"
+          />
+        ) : (
+          <CourseIllustration
+            tone={course.tone}
+            visualTone={course.access === "locked" ? "blue" : undefined}
+            className="h-auto min-h-0 w-full"
+          />
+        )}
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
@@ -131,7 +146,10 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
               </span>
             </div>
             <span className="ml-auto shrink-0">
-              <CourseStatusBadge access={course.access} />
+              <CourseStatusBadge
+                access={course.access}
+                isUnderMaintenance={isUnderMaintenance}
+              />
             </span>
           </div>
           <h2 className="student-soft-bold-text mt-2 line-clamp-2 text-base font-extrabold leading-snug text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-lg">
@@ -224,16 +242,40 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
         </div>
       ) : (
         <>
+          {isUnderMaintenance ? (
+            <div className="student-mobile-border mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-black leading-5 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]">
+              <LockKeyhole className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 break-words">
+                Khóa học đang được bảo trì
+              </span>
+            </div>
+          ) : null}
           <div
             className={cn(
               "student-mobile-border mt-3 rounded-xl border p-3",
-              isEnrolled
+              isUnderMaintenance
+                ? "border-amber-200 bg-amber-50/75 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)]"
+                : isEnrolled
                 ? "border-slate-100 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
                 : "student-course-price-box border border-emerald-200/80 bg-emerald-50/70 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)]",
             )}
           >
             <div className="grid min-w-0 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_6.75rem] min-[400px]:items-center sm:grid-cols-[minmax(0,1fr)_8.25rem]">
-              {isEnrolled && typeof course.progressPercent === "number" ? (
+              {isUnderMaintenance ? (
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm dark:bg-[var(--theme-surface)] dark:text-[var(--theme-warning-text)]">
+                    <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div className="grid min-w-0 gap-0.5">
+                    <p className="truncate text-xs font-bold text-amber-700 dark:text-[var(--theme-warning-text)] sm:text-sm">
+                      Nội dung tạm khóa
+                    </p>
+                    <p className="truncate text-sm font-extrabold leading-tight text-slate-700 dark:text-[var(--theme-text)] sm:text-base">
+                      Chờ lớp học mở lại
+                    </p>
+                  </div>
+                </div>
+              ) : isEnrolled && typeof course.progressPercent === "number" ? (
                 <CourseProgressBar value={course.progressPercent} />
               ) : (
                 <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -241,7 +283,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                     <LockKeyhole className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <div className="grid min-w-0 gap-0.5">
-                    <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                    <div className="flex w-fit max-w-full min-w-0 flex-nowrap items-center gap-1.5">
                       <p className="shrink-0 text-xs font-bold text-emerald-700 dark:text-[var(--theme-success-text)] sm:text-sm">
                         Giá khóa học
                       </p>
@@ -280,13 +322,13 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
               <span
                 className={cn(
                   "inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4",
-                  isEnrolled
+                  isEnrolled && !isUnderMaintenance
                     ? "student-learn-cta-3d bg-sky-500 text-white hover:bg-sky-600 focus-visible:ring-sky-100"
                     : "student-detail-cta-outline border border-emerald-400/70 bg-white text-emerald-700 hover:border-emerald-500/80 hover:bg-emerald-50 focus-visible:ring-emerald-100 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-success-text)]",
                 )}
               >
                 {ctaLabel}
-                {isEnrolled ? (
+                {isEnrolled && !isUnderMaintenance ? (
                   <PlayCircle
                     className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
                     aria-hidden="true"
@@ -312,7 +354,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                     Học thử miễn phí
                   </p>
                   <p className="student-soft-bold-text truncate text-sm font-extrabold text-slate-600 dark:text-[var(--theme-text-strong)]">
-                    {course.trialLessonCount} buổi
+                    {course.trialLessonCount} bài học
                   </p>
                 </div>
               </div>
