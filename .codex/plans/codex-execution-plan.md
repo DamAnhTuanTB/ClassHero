@@ -111,7 +111,7 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 17. `M4.1` - FilesModule và R2 service.
 18. `M4.2` - Lesson document API.
 19. `M4.3` - BullMQ worker foundation.
-20. `M4.4` - PDF extract và chunking.
+20. `M4.4` - Paid OCR artifact và chunking.
 21. `M6.1` - Rich text JSON và shared content schema.
 22. `M6.2` - Quiz CRUD API và admin UI tối thiểu.
 23. `M6.3` - Flashcard CRUD API và admin UI tối thiểu.

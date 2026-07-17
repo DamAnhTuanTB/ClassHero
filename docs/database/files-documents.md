@@ -71,8 +71,9 @@ Index:
 Rules:
 
 - Source document không dùng trực tiếp cho retrieval của học sinh.
-- Source document chỉ là nguồn extract/OCR page-level và tạo mapping sang lesson.
-- Nếu source document thay đổi, page text, lesson mappings, chunks, embedding và explanation liên quan có thể stale.
+- Source document là nguồn paid OCR artifact/page-level content, visual refs và mapping sang lesson.
+- File gốc vẫn phải được giữ trong object storage để học sinh xem tài liệu chuẩn và để backend render/crop page image fallback khi visual Q&A cần.
+- Nếu source document thay đổi, OCR artifact, page text, lesson mappings, chunks, embedding và explanation liên quan có thể stale.
 
 ### 4.3. `source_document_pages`
 
@@ -84,7 +85,7 @@ source_document_id uuid fk source_documents.id
 page_number int
 status DocumentStatus default UPLOADED
 text text?
-text_source string? -- text_layer | ocr | mixed
+text_source string? -- paid_ocr | text_layer | free_ocr | mixed
 quality_score float?
 thumbnail_file_id uuid? fk files.id
 extract_error string?
@@ -102,7 +103,11 @@ Index/constraint:
 Rules:
 
 - Worker tạo page records sau khi biết tổng số trang.
+- Page text/Markdown/LaTeX được import từ paid OCR artifact khi production bật OCR paid; text layer/free OCR chỉ là metadata/fallback local hoặc vận hành có kiểm soát.
 - Page text được dùng để chunk theo lesson sau khi admin gán page range.
+- `metadata_json` lưu thông tin provider/model/options, artifact key, layout/line refs, bbox/region refs, confidence/quality flags và visual asset refs nếu provider trả về.
+- `thumbnail_file_id`/metadata có thể trỏ tới thumbnail hoặc page image cache tạo từ PDF gốc; không cần tự crop mọi hình thành file riêng nếu paid OCR provider không trả crop phù hợp.
+- Với visual Q&A, backend ưu tiên dùng crop/region/image provider trả về nếu đã lưu nội bộ. Nếu thiếu crop phù hợp, backend có thể render/crop page image từ PDF gốc on demand và cache bằng file purpose phù hợp, miễn là quyền truy cập vẫn kiểm tra qua source document/lesson.
 - OCR lỗi ở một trang không được làm mất trạng thái của các trang khác; lưu lỗi theo trang.
 
 ### 4.4. `lesson_document_page_ranges`
@@ -137,7 +142,7 @@ Rules:
 
 ### 4.5. `lesson_documents`
 
-Dùng cho PDF/tài liệu nguồn cần extract/chunk/embedding.
+Dùng cho PDF/tài liệu nguồn cần paid OCR artifact/chunk/embedding.
 
 ```txt
 id uuid pk

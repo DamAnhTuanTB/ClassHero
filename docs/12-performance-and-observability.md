@@ -136,7 +136,7 @@ Rules:
 
 Tác vụ nên dùng worker/job:
 
-- PDF extract/chunking.
+- Paid OCR artifact import/chunking.
 - Embedding.
 - AI generate quiz/flashcard/test/summary.
 - Email/Zalo notification.

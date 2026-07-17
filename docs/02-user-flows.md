@@ -154,7 +154,7 @@ Các bước:
 5. Backend upload file lên object storage theo môi trường: MinIO local/dev hoặc Cloudflare R2 staging/production.
 6. Backend lưu metadata vào `files`.
 7. Backend tạo source document và enqueue job xử lý PDF nếu là PDF.
-8. Worker extract/OCR theo từng trang, lưu page text, snapshot/thumbnail nếu có và quality status.
+8. Worker kiểm tra OCR artifact cache theo `content_hash`; nếu chưa có thì gọi paid OCR provider từ file gốc, rồi lưu page text/Markdown/LaTeX, layout/region refs, visual refs nếu có, snapshot/thumbnail và quality status.
 9. Admin gán khoảng trang cho từng buổi học.
 10. Backend validate page range và tạo mapping `lesson -> page ranges`.
 11. Worker chunk nội dung theo từng lesson dựa trên page range.
@@ -169,7 +169,7 @@ Fallback:
 Acceptance Criteria:
 
 - File chính không lưu trong disk app/VPS.
-- PDF processing chạy background theo page-level trước, chunking theo lesson sau khi có page range.
+- PDF processing chạy background theo paid OCR artifact/page-level trước, chunking theo lesson sau khi có page range.
 - Nếu xử lý lỗi, document status là `FAILED`.
 - Admin thấy trạng thái xử lý tài liệu nguồn, từng trang, từng lesson mapping và tài liệu bổ sung nếu có.
 

@@ -119,7 +119,8 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Context: `M4.5` admin lesson document upload/status flow trong màn quản lý lộ trình/chương/buổi học.
 - Approved:
   - Flow chính sau khi chốt ngày 2026-07-17: tạo buổi học bằng metadata thô trước, upload một PDF/tài liệu nguồn dài ở cấp lộ trình, rồi gán khoảng trang vào từng buổi học.
-  - Hệ thống extract/OCR tài liệu nguồn theo từng trang trước; chunk theo lesson chỉ chạy sau khi admin gán page range.
+  - Hệ thống chạy/import paid OCR artifact tài liệu nguồn theo từng trang trước; chunk theo lesson chỉ chạy sau khi admin gán page range.
+  - UI nên hiển thị provider, cost estimate, OCR artifact cache status, page/job status, quality summary và visual asset refs nếu backend trả.
   - UI gán trang hiển thị danh sách buổi học, mỗi dòng có `fromPage`/`toPage`, trạng thái xử lý và preview/warning nếu có.
   - Mỗi buổi học có hai action riêng: `Upload/Thay thế tài liệu gốc` và `Upload tài liệu bổ sung`.
   - Khi chưa có tài liệu chính, action tài liệu gốc là upload tài liệu gốc cho buổi; khi đã có tài liệu chính thì là thay thế.

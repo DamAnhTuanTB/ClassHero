@@ -6,7 +6,7 @@ MVP không upload từng file rời rạc cho từng chương. Admin tạo sẵn
 
 ## Bức tranh tổng thể
 
-`M4.2` tạo lớp API và database mapping. API biết tài liệu nguồn, trang, page range và lesson document nào cần xử lý. `M4.3` nối BullMQ worker foundation: API enqueue durable job row vào Redis/BullMQ, worker chạy tách API nhận job và cập nhật `background_jobs`. `M4.4` mới thay processor foundation bằng extract/OCR và chunk thật.
+`M4.2` tạo lớp API và database mapping. API biết tài liệu nguồn, trang, page range và lesson document nào cần xử lý. `M4.3` nối BullMQ worker foundation: API enqueue durable job row vào Redis/BullMQ, worker chạy tách API nhận job và cập nhật `background_jobs`. `M4.4` mới thay processor foundation bằng paid OCR artifact import và chunk thật.
 
 ## Sơ đồ luồng dễ hiểu
 
@@ -16,7 +16,7 @@ flowchart TD
   B --> C[Tạo DOCUMENT_PROCESSING job row]
   C --> D[API enqueue BullMQ job]
   D --> E[Worker M4.3 cập nhật job status]
-  E --> F[Worker M4.4 extract/OCR từng trang]
+  E --> F[Worker M4.4 import paid OCR artifact từng trang]
   F --> G[Admin gán page range cho lesson]
   G --> H[Tạo/cập nhật lesson document chính]
   H --> I[Tạo job chunk theo lesson_id]
@@ -32,7 +32,7 @@ flowchart TD
 3. API lưu `source_documents`, set status processing và tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
 4. Sau khi transaction commit, `BackgroundJobQueueService` enqueue job vào BullMQ và lưu `bullmq_job_id`.
 5. Worker document-processing nhận job, set `RUNNING`, ghi `attempts/started_at`, rồi foundation processor set `SUCCEEDED` với `result_json` an toàn.
-6. Ở `M4.4`, worker sẽ tạo `source_document_pages` khi biết số trang và text/thumbnail từng trang.
+6. Ở `M4.4`, worker sẽ tạo `source_document_pages` khi biết số trang, kiểm tra OCR artifact cache theo `content_hash`, gọi/import paid OCR artifact nếu cần, rồi lưu text/Markdown/LaTeX/thumbnail/layout/visual refs từng trang.
 7. Admin gọi `PUT /admin/source-documents/:sourceDocumentId/lesson-page-ranges`.
 8. API validate lesson cùng lộ trình, page range hợp lệ, cảnh báo overlap/gap, rồi tạo `lesson_document_page_ranges`.
 9. API tạo hoặc cập nhật `lesson_documents` loại `PRIMARY_FROM_SOURCE` và tạo job chunking theo `lesson_id`.
@@ -62,9 +62,9 @@ Worker foundation hiện làm ba việc:
 
 - Nhận job từ Redis/BullMQ bằng `backgroundJobId`.
 - Cập nhật DB status `QUEUED -> RUNNING -> SUCCEEDED/FAILED`, kèm `attempts`, `error_message`, `started_at`, `finished_at`.
-- Ghi result placeholder để chứng minh worker đã nhận job; extract/OCR/chunk thật vẫn thuộc `M4.4`.
+- Ghi result placeholder để chứng minh worker đã nhận job; paid OCR artifact import/chunk thật vẫn thuộc `M4.4`.
 
-`M4.4` sẽ extract/OCR và chunk. `M5.x` mới tạo embedding bằng pgvector. Vì vậy foundation worker không gọi AI và không parse PDF thật.
+`M4.4` sẽ dùng paid OCR-first, ban đầu là Mathpix, để tạo/import artifact page-level rồi chunk. `pdf-parse` chỉ còn dùng cho page count, metadata, preview/thumbnail hoặc fallback local/dev. `M5.x` mới tạo embedding bằng pgvector. Vì vậy foundation worker không gọi AI và không parse PDF thật.
 
 ## File quan trọng
 
@@ -81,7 +81,9 @@ Worker foundation hiện làm ba việc:
 
 ## Kiến thức cần nhớ
 
-- Source document là nguồn để extract/OCR theo trang, không dùng trực tiếp cho student retrieval.
+- Source document là nguồn để tạo/import paid OCR artifact theo trang, không dùng trực tiếp cho student retrieval.
+- OCR artifact là tài sản lâu dài của hệ thống: cần giữ plain text, Markdown/MMD, LaTeX, layout/bbox/region, confidence và visual refs nếu provider trả để dùng lại cho Q&A, quiz, flashcard, bài thi, search và visual Q&A.
+- File PDF gốc vẫn được giữ để học sinh xem đúng tài liệu và để backend render/crop page image fallback khi visual refs của provider chưa đủ.
 - Retrieval/RAG sau này phải filter theo `lesson_id`, nên chunk cuối cùng luôn gắn với lesson.
 - Tài liệu chính và tài liệu bổ sung là hai luồng khác nhau; thay tài liệu chính không được xóa supplemental.
 - `background_jobs.id` là `jobId` cho UI poll và cũng được dùng làm BullMQ `jobId` để enqueue idempotent hơn.
@@ -92,5 +94,5 @@ Worker foundation hiện làm ba việc:
 - `M4.1`: FilesModule và storage service.
 - `M4.2`: Source document và lesson page mapping API.
 - `M4.3`: BullMQ worker foundation.
-- `M4.4`: PDF extract và chunking.
+- `M4.4`: Paid OCR artifact và chunking.
 - `M4.5`: Lesson document upload UI/status.

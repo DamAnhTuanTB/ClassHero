@@ -23,7 +23,7 @@ Dùng cho admin upload một tài liệu nguồn dài rồi gán khoảng trang 
 ### Pattern chuẩn
 
 - Entity con phải có id thật trước khi upload; không upload file tài liệu trong modal tạo entity con nếu chưa có yêu cầu rõ.
-- Màn quản lý tổng upload source document ở cấp entity cha, hiển thị tổng số trang và trạng thái extract/OCR page-level.
+- Màn quản lý tổng upload source document ở cấp entity cha, hiển thị tổng số trang, provider/cost estimate nếu có và trạng thái paid OCR artifact/page-level.
 - Danh sách entity con có field `fromPage`/`toPage`, preview thumbnail/text ngắn và warning range trùng/bỏ sót khi có.
 - Khi lưu mapping, API gắn page range vào đúng entity id và enqueue chunking cho entity con liên quan.
 - Mỗi entity con có hai action riêng: upload/thay thế tài liệu gốc và upload tài liệu bổ sung; hai action này không dùng chung handler/state.

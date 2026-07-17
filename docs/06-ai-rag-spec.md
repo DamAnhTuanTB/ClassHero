@@ -19,7 +19,7 @@ Mục tiêu: đủ rõ để Codex tạo NestJS AI module, AiProvider abstractio
 
 - AI chỉ được dùng tài liệu của buổi học hiện tại khi trả lời học sinh.
 - Không gửi toàn bộ PDF/tài liệu lên AI mỗi lần học sinh hỏi.
-- Tài liệu phải được extract text, chunk, embedding và lưu vào database.
+- Tài liệu phải được xử lý thành page-level OCR artifact/text, chunk, embedding và lưu vào database.
 - Retrieval phải filter theo `lesson_id`.
 - Không lấy chunk từ lesson khác.
 - Chapter chỉ là metadata tổng quan để nhóm lesson; MVP không có document chunks, summary generation, quiz/flashcard/test generation hoặc chat RAG ở cấp chapter.
@@ -143,12 +143,12 @@ Admin upload PDF dài ở cấp learning path/course
   -> Save files metadata với purpose LESSON_DOCUMENT
   -> Create source_document status UPLOADED, content_hash nếu tính được
   -> Create background_jobs queue DOCUMENT_PROCESSING
-  -> Enqueue BullMQ source-document page extraction job
+  -> Enqueue BullMQ source-document paid OCR/artifact import job
 ```
 
 Supplemental document: nếu một lesson cần thêm tài liệu riêng ngoài source PDF dài, admin có thể upload tài liệu lẻ trực tiếp cho lesson và hệ thống tạo `lesson_documents` loại bổ sung.
 
-### 3.2. Extract text
+### 3.2. Paid OCR artifact import
 
 Worker:
 
@@ -156,21 +156,67 @@ Worker:
 DOCUMENT_PROCESSING job
   -> update background_jobs.status RUNNING
   -> download/read file from R2
+  -> calculate content_hash
   -> detect page count
   -> create/update source_document_pages
-  -> extract text page-level bằng pdf-parse/pdfjs-dist
-  -> nếu page text quá ít, render page thành ảnh và chạy OCR/Vision fallback
+  -> lookup OCR artifact by content_hash + provider/options
+  -> nếu artifact chưa có, enqueue/call paid OCR provider async
+  -> import OCR page text/markdown/latex/confidence từ artifact
   -> lưu page text, text_source, quality_score, thumbnail/snapshot ref nếu có
   -> update source_document.status PAGE_EXTRACTED hoặc FAILED
 ```
 
-Nếu PDF scan hoặc text extract quá ít:
+Paid OCR-first rules:
 
-- Phải phát hiện bằng ngưỡng tối thiểu, ví dụ số ký tự trên mỗi trang hoặc tỉ lệ trang không có text.
-- Chạy OCR/Vision fallback theo cấu hình provider, ưu tiên đi qua abstraction nội bộ thay vì gọi provider trực tiếp trong worker.
-- OCR cần lưu metadata theo trang: nguồn text, page index, confidence nếu provider trả, lỗi trang nếu có.
-- Nếu OCR chưa bật hoặc thiếu cấu hình, job phải fail rõ lý do để admin biết PDF scan chưa xử lý được; không được âm thầm tạo chunks rỗng.
-- Không dùng OCR hàng loạt không giới hạn; phải áp dụng concurrency/rate limit/budget guard vì PDF scan nhiều trang có thể tốn chi phí.
+- OCR mặc định cho tài liệu học chính là paid OCR-first theo ADR-0007.
+- Provider chính ban đầu: Mathpix, vì bộ tài liệu có nhiều Toán/Lý/Hóa, công thức, bảng, ký hiệu và nội dung STEM.
+- `pdf-parse` vẫn dùng để lấy page count, metadata, preview/thumbnail và fallback local/dev, nhưng text layer miễn phí không phải nguồn production chính cho AI/RAG khi paid OCR được bật.
+- Mục tiêu là OCR một lần nhưng thu artifact đầy đủ nhất có thể để tái sử dụng dài hạn. Không chỉ lấy plain text.
+- MVP không tích hợp preprocess ảnh/PDF trong app flow. Worker gửi file gốc admin upload lên paid OCR provider.
+- Nếu file gốc quá mờ/xấu và OCR paid cho kết quả kém, owner xử lý file bằng công cụ ngoài hệ thống rồi upload lại như một file gốc mới.
+- Worker phải giữ khả năng render page image/thumbnail từ PDF gốc. OCR text/Markdown không thay thế tài liệu/hình gốc, nhất là khi chat cần giải thích hình, biểu đồ, bảng hoặc sơ đồ trong sách.
+- Nếu paid OCR provider trả cropped image URL, inline image URL, bounding box hoặc region metadata cho figures/diagrams/tables, worker phải tải về và lưu vào object storage nội bộ trước khi provider retention/CDN hết hạn. Các crop/region này là nguồn visual context ưu tiên.
+- Với PDF đã searchable, production vẫn được gửi paid OCR một lần nếu chưa có artifact hợp lệ, để chuẩn hóa output chất lượng cao hơn cho công thức/STEM.
+- Nếu thiếu paid OCR config trong production, job phải fail rõ lý do; không tự hạ cấp sang free OCR trừ khi admin/config cho phép.
+- Free OCR bằng OCRmyPDF/Tesseract chỉ là local/mock/fallback có kiểm soát, không phải đường mặc định.
+- OCR cần lưu metadata theo trang: nguồn text, page index, provider, model/version nếu có, confidence nếu provider trả, quality flags và lỗi trang nếu có.
+- Không dùng OCR hàng loạt không giới hạn; phải áp dụng concurrency/rate limit, timeout và budget guard vì paid OCR tính tiền theo trang.
+
+Paid OCR artifact must include, when provider supports it:
+
+- Plain text theo trang.
+- Mathpix Markdown/Markdown theo trang và toàn tài liệu.
+- LaTeX/math representation cho công thức.
+- Tables ở dạng Markdown/HTML/CSV/structured format nếu provider trả.
+- `lines.json` hoặc layout JSON: line/block ids, page index, region/bounding box, confidence, parent/children ids, element types.
+- Figures/diagrams/cropped image URLs hoặc inline image references.
+- Page width/height coordinate system để map crop/box về page image.
+- Searchable PDF hoặc converted output nếu cần lưu lâu dài.
+- Provider raw response đã sanitize để debug, nhưng không để app phụ thuộc trực tiếp vào raw shape nếu đã có normalized schema.
+
+Paid OCR cache rule:
+
+- Tính `content_hash` từ file gốc trước khi gọi provider trả phí.
+- Cache artifact theo khóa gồm `content_hash`, provider, model/version, language/options và output format.
+- Nếu artifact hợp lệ đã tồn tại ở local/staging/production hoặc object storage, import lại artifact thay vì gọi provider.
+- Chỉ gọi paid OCR lại khi file hash đổi, provider/model version đổi, options OCR đổi hoặc admin chủ động chọn reprocess.
+
+Paid OCR artifact format/import:
+
+- Artifact không được phụ thuộc `source_document_id`, `lesson_id` hoặc database id của môi trường local.
+- Artifact bundle dùng stable key `content_hash` và chứa tối thiểu:
+  - `manifest.json`: original filename, file size, content hash, page count, provider, model/version, language/options, createdAt, quality summary.
+  - `pages.jsonl` hoặc `pages.json`: page index, text/markdown, optional latex, confidence, quality flags, source.
+  - `layout.json` hoặc `lines.json`: provider layout/region data normalized hoặc raw sanitized.
+  - `assets/`: figures, diagrams, cropped images, page images/thumbnails nếu có.
+  - Optional: searchable PDF, converted output hoặc provider raw response đã sanitize.
+- Production import flow:
+  1. Upload original PDF hoặc tạo source document.
+  2. Tính `content_hash`.
+  3. Tìm artifact matching trong object storage/import bundle.
+  4. Nếu provider/options hợp lệ, ghi `source_document_pages` và processing metadata từ artifact.
+  5. Chunk/embedding vẫn chạy lại theo lesson/page range của production, vì mapping lesson có thể khác local.
+- Không import bằng cách copy raw DB rows từ local sang production trừ khi có migration/import script map bằng stable key. Copy DB trực tiếp dễ lệch id, user, course và lesson mapping.
 
 ### 3.2.1. Lesson page mapping
 
@@ -194,7 +240,7 @@ Chunking nên giữ ngữ cảnh giáo dục:
 
 - Chunking chạy sau khi có page range mapping.
 - Với source document dài, worker lấy page text trong range của từng lesson rồi mới chunk.
-- Với supplemental documents, worker extract/OCR/chunk trực tiếp theo file bổ sung và gắn chunks vào lesson sở hữu tài liệu.
+- Với supplemental documents, worker dùng cùng pipeline OCR artifact/chunk theo file bổ sung và gắn chunks vào lesson sở hữu tài liệu.
 - Retrieval theo lesson phải gom context từ cả tài liệu chính `PRIMARY_FROM_SOURCE` và tài liệu bổ sung `SUPPLEMENT`, nhưng vẫn không lấy chunk từ lesson khác.
 - Chunk theo heading/section nếu extract được.
 - Nếu không, chunk theo đoạn.
@@ -218,7 +264,7 @@ Metadata chunk nên có:
   "sourceFileId": "uuid",
   "sourceDocumentId": "uuid",
   "documentId": "uuid",
-  "textSource": "text_layer|ocr",
+  "textSource": "paid_ocr|text_layer|free_ocr|mixed",
   "qualityScore": 0.82
 }
 ```
@@ -329,6 +375,19 @@ Mình chưa tìm thấy phần tài liệu liên quan trong buổi học này. E
 
 ## 5. AI generation types
 
+### 5.0. Source grounding and originality rules
+
+AI generation dùng document chunks để bám đúng buổi học, nhưng không được xem chunks như kho câu hỏi để sao chép.
+
+Áp dụng cho quiz, flashcard và test:
+
+- Prompt phải yêu cầu tạo câu hỏi/thẻ mới dựa trên chuẩn kiến thức, khái niệm, kỹ năng và mức độ của lesson.
+- Không copy nguyên văn bài tập, ví dụ, câu hỏi hoặc ngữ cảnh đặc thù từ tài liệu nguồn, trừ khi admin chủ động chọn chế độ trích lại nội dung.
+- Với Toán, có thể biến đổi số liệu, ngữ cảnh, cách hỏi và mức độ nhận thức, nhưng vẫn giữ đúng kỹ năng của page range buổi học.
+- Lưu source chunk/page metadata ở mức item để truy vết nội bộ: generated item này dựa trên phần kiến thức nào, không phải để chứng minh đã copy từ trang đó.
+- UI cho học sinh không cần hiển thị source page cho quiz/test mặc định. Source page hữu ích hơn cho admin review, debug AI generation, report sai câu và chat Q&A theo tài liệu.
+- Validation/prompt guard cần reject hoặc yêu cầu regenerate nếu output lặp lại nguyên văn câu hỏi/bài tập từ context ở mức quá giống.
+
 ### 5.1. Summary generation
 
 Input:
@@ -407,6 +466,7 @@ Validation:
 - Multiple choice phải có ít nhất 2 options.
 - True/false chỉ có true/false.
 - Text input có đáp án dạng text hoặc accepted answers.
+- Câu hỏi phải là câu hỏi mới bám kiến thức lesson, không copy nguyên văn bài tập/ví dụ từ context.
 
 ### 5.3. Flashcard generation
 
@@ -476,6 +536,7 @@ Rules:
 - Tổng điểm bài thi là 10.
 - Nếu không set `points`, backend chia điểm đều.
 - Bài thi do AI tạo từ học sinh request-new có `review_status = NEEDS_REVIEW` nhưng vẫn được dùng.
+- Câu hỏi trong bài thi phải là câu hỏi mới bám kiến thức lesson, không copy nguyên văn bài tập/ví dụ từ context.
 
 ### 5.5. Explanation generation
 
@@ -612,9 +673,10 @@ Khi tài liệu nguồn đổi:
 ### 8.1. Scope
 
 - Mỗi buổi học có khung chat AI.
-- Input chỉ text.
-- Không upload ảnh/file.
+- Học sinh nhập text.
+- Không cho học sinh upload ảnh/file trong chat MVP.
 - Chat chỉ dựa trên tài liệu lesson hiện tại.
+- Nếu câu hỏi text nhắc tới hình, biểu đồ, bảng, sơ đồ hoặc trang cụ thể trong lesson, backend có thể tự lấy page image/crop từ PDF gốc đã lưu và gửi kèm cho model vision theo budget/rate limit. Đây là system-provided context, không phải user upload.
 
 ### 8.2. Runtime prompt building
 
@@ -630,9 +692,13 @@ Prompt nên gồm:
    - lớp,
    - tên buổi học.
 3. Retrieved chunks.
-4. Một số message gần nhất.
-5. Conversation summary nếu có.
-6. Câu hỏi mới của học sinh.
+4. Optional visual context:
+   - page image hoặc crop từ PDF gốc khi câu hỏi liên quan hình/trang/bảng/sơ đồ,
+   - metadata page number và source document,
+   - chỉ lấy trong page range của lesson hiện tại.
+5. Một số message gần nhất.
+6. Conversation summary nếu có.
+7. Câu hỏi mới của học sinh.
 
 Không gửi toàn bộ lịch sử chat.
 
@@ -662,6 +728,16 @@ Nếu cần ảnh:
 5. Trả file id/url.
 
 ASSUMPTION: Chat AI có thể xử lý sync trong request ở MVP. Các generation nặng như quiz/test/summary/explanation uncached phải async.
+
+Visual Q&A rules:
+
+- OCR output dùng để retrieval text, nhưng câu hỏi kiểu "giải thích hình 9.42", "biểu đồ này nghĩa là gì", "hình ở trang 79" cần visual context từ PDF gốc.
+- Backend chỉ được lấy page image/crop từ tài liệu lesson mà học sinh có quyền truy cập.
+- Nếu OCR artifact có Mathpix inline image/cropped image URL, bounding box hoặc region metadata thì dùng các crop/region đó trước.
+- Nếu provider không trả crop phù hợp hoặc câu hỏi nhắm vào vùng khác trên trang, MVP có thể render/crop từ PDF gốc on demand hoặc gửi cả page image đã downscale theo giới hạn provider.
+- Không cần admin crop thủ công. Crop là thao tác tự động của provider hoặc backend.
+- Không bắt buộc extract và lưu mọi hình thành asset riêng trước khi có nhu cầu, nhưng mọi crop/image provider trả về dùng cho Q&A phải được copy về object storage nội bộ trước khi hết hạn.
+- Nếu không có visual model configured hoặc vượt budget, AI phải trả lời dựa trên text context và nói rõ cần xem trang/hình gốc để chắc chắn.
 
 ---
 

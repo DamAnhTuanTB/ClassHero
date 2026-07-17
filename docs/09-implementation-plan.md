@@ -126,7 +126,7 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 19     | `M4.1`  | FilesModule và storage service                                     |
 | 20     | `M4.2`  | Source document và lesson page mapping API                         |
 | 21     | `M4.3`  | BullMQ worker foundation                                           |
-| 22     | `M4.4`  | PDF extract và chunking                                            |
+| 22     | `M4.4`  | Paid OCR artifact và chunking                                      |
 | 23     | `M4.5`  | Lesson document upload UI/status                                   |
 | 24     | `M6.1`  | Rich text JSON và shared content schema                            |
 | 25     | `M6.2`  | Quiz CRUD API và admin UI tối thiểu                                |

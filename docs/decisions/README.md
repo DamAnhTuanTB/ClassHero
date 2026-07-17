@@ -51,3 +51,5 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0003-local-dev-file-storage.md`         | Accepted | Chọn MinIO local/dev làm object storage S3-compatible, giữ Cloudflare R2 cho staging/production              |
 | `ADR-0004-learning-path-chapters.md`         | Accepted | Chốt cấu trúc lộ trình gồm chương học tổng quan, mỗi chương gồm nhiều buổi học chi tiết                      |
 | `ADR-0005-source-document-page-mapping.md`   | Accepted | Chốt flow upload tài liệu nguồn dài, gán page range theo lesson và tách tài liệu gốc/bổ sung                 |
+| `ADR-0006-free-pdf-ocr-pipeline.md`          | Superseded | Từng chọn `pdf-parse` + OCRmyPDF/Tesseract làm pipeline OCR miễn phí; đã bị ADR-0007 thay thế               |
+| `ADR-0007-paid-ocr-first-document-ingestion.md` | Accepted | Chọn paid OCR-first bằng Mathpix cho tài liệu học chính, cache artifact theo content hash để tránh gọi lại |

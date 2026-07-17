@@ -19,6 +19,7 @@ Không hard-code secret trong source code. Không commit `.env` thật vào repo
 - Resend dùng Free tier để test email.
 - payOS dùng môi trường test/sandbox.
 - AI vẫn cần ngân sách test.
+- Paid OCR local được phép bật để owner test vài cuốn đại diện. Mặc định `.env.example` để `OCR_PAID_ENABLED=false`; khi test thật thì đổi local `.env` thành `true`, đặt Mathpix key và giữ artifact cache bật để tránh gọi lại cùng file.
 
 ### Production ban đầu
 
@@ -83,6 +84,19 @@ OPENAI_EMBEDDING_DIMENSIONS=1536
 GEMINI_API_KEY=change-me
 GEMINI_STRUCTURED_MODEL=gemini-2.0-flash
 GEMINI_CHAT_MODEL=gemini-2.0-flash
+
+# Paid OCR
+OCR_PROVIDER=mathpix
+# Local/dev mặc định false; owner có thể bật true để test paid OCR thật vài cuốn đại diện.
+OCR_PAID_ENABLED=false
+OCR_ALLOW_FREE_FALLBACK=false
+OCR_ARTIFACT_CACHE_ENABLED=true
+OCR_ARTIFACT_PREFIX=ocr-artifacts
+MATHPIX_APP_ID=change-me
+MATHPIX_APP_KEY=change-me
+MATHPIX_LANGUAGE_HINTS=vi,en
+OCR_MAX_CONCURRENT_DOCUMENTS=2
+OCR_MONTHLY_BUDGET_VND=1000000
 
 # AI budget/rate limit
 AI_MONTHLY_BUDGET_VND=1500000

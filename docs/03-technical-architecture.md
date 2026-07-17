@@ -379,7 +379,8 @@ Upload PDF
   -> Save object storage
   -> lesson_documents status UPLOADED
   -> enqueue document-processing
-  -> extract text
+  -> paid OCR artifact lookup/import
+  -> import page text/Markdown/LaTeX/layout/visual refs
   -> chunk text
   -> create embeddings
   -> save document_chunks with lesson_id

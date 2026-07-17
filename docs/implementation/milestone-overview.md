@@ -76,7 +76,7 @@ Khi xong milestone này:
 - Local/dev dùng MinIO, production dùng Cloudflare R2.
 - Admin upload PDF/tài liệu vào buổi học.
 - Worker nhận job xử lý tài liệu.
-- PDF được extract text và chunk thành đoạn nhỏ để chuẩn bị cho AI/RAG.
+- PDF được xử lý bằng paid OCR artifact/page-level content rồi chunk thành đoạn nhỏ để chuẩn bị cho AI/RAG.
 
 Milestone này là cầu nối giữa “bài học có metadata” và “bài học có tài liệu thật để AI hiểu”.
 

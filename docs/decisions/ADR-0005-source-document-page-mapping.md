@@ -6,6 +6,8 @@ Date: 2026-07-17
 
 Accepted
 
+Amended by `ADR-0007-paid-ocr-first-document-ingestion.md`: page-level processing for main learning documents now uses paid OCR-first artifact import, with Mathpix as the initial primary provider.
+
 ## Context
 
 Tài liệu học thường đến từ sách/giáo trình PDF dài, có thể gồm nhiều bài học trong một file. Upload lẻ từng file cho từng buổi học đơn giản nhưng tốn thao tác và không khớp với nguồn tài liệu thật.
@@ -18,7 +20,7 @@ Flow chính của MVP cho tài liệu buổi học là:
 
 1. Admin tạo lesson bằng metadata thô trước.
 2. Admin upload một source PDF/tài liệu dài ở cấp learning path/course.
-3. Worker extract/OCR theo từng trang và lưu page text/status/quality.
+3. Worker chạy/import paid OCR artifact theo từng trang và lưu page text/Markdown/LaTeX, visual refs, status/quality.
 4. Admin gán page range cho từng lesson.
 5. Worker chunk nội dung theo từng lesson dựa trên page range đã xác nhận.
 6. Retrieval/chat chỉ dùng chunks đã gắn `lesson_id`.
@@ -28,7 +30,7 @@ Upload tài liệu lẻ trực tiếp cho từng lesson được giữ làm supp
 ## Consequences
 
 - Cần model/API cho source document, source document pages và lesson page ranges.
-- `M4.4` phải tách page-level extract/OCR khỏi lesson chunking.
+- `M4.4` phải tách page-level paid OCR artifact import khỏi lesson chunking.
 - Khi page range đổi, chunks/embedding/explanation của lesson liên quan phải được tạo lại hoặc đánh dấu stale.
 - UI `M4.5` cần màn gán trang theo lesson, không chỉ nút upload từng lesson.
 - UI/API cần phân biệt tài liệu chính `PRIMARY_FROM_SOURCE` với tài liệu bổ sung `SUPPLEMENT`.

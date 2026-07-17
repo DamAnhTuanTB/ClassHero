@@ -524,7 +524,7 @@ Side effects:
 
 - Tạo source document.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
-- `M4.2` tạo durable job record; `M4.3` nối BullMQ thật để worker nhận job extract/OCR page-level nếu PDF.
+- `M4.2` tạo durable job record; `M4.3` nối BullMQ thật để worker nhận job; `M4.4` import hoặc tạo paid OCR artifact page-level nếu PDF.
 
 ### `GET /admin/learning-paths/:learningPathId/source-documents`
 
@@ -550,7 +550,8 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả danh sách page records: `pageNumber`, `status`, `textSource`, `qualityScore`, `thumbnailFileId` nếu có, và text preview ngắn.
+- Trả danh sách page records: `pageNumber`, `status`, `textSource`, `ocrProvider`, `artifactKey` hoặc artifact status nếu có, `qualityScore`, `thumbnailFileId`, `hasVisualAssets`/`visualAssetCount` nếu có, và text preview ngắn.
+- `textSource` production mặc định là `paid_ocr` khi OCR paid đã bật; `text_layer`/`free_ocr` chỉ dùng cho fallback local hoặc vận hành có kiểm soát.
 
 ### `PUT /admin/source-documents/:sourceDocumentId/lesson-page-ranges`
 
@@ -608,7 +609,7 @@ Behavior:
 - Chỉ có một tài liệu chính active cho mỗi lesson.
 - Tài liệu chính cũ bị đánh dấu stale/archived theo schema thực tế, không xóa file gốc ngay.
 - Tài liệu bổ sung `SUPPLEMENT` của lesson không bị ảnh hưởng.
-- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` để extract/OCR/chunk lại cho lesson; `M4.3` nối BullMQ thật.
+- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` để import/tạo OCR artifact nếu cần rồi chunk lại cho lesson; `M4.3` nối BullMQ thật.
 
 ### `POST /admin/lessons/:lessonId/documents`
 
@@ -630,7 +631,7 @@ Side effects:
 
 - Tạo `lesson_documents` trực tiếp cho lesson với `kind = SUPPLEMENT`.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
-- `M4.3` nối BullMQ thật để worker nhận job nếu PDF.
+- `M4.3` nối BullMQ thật để worker nhận job nếu PDF; `M4.4` dùng paid OCR-first cho tài liệu học chính/supplement khi OCR paid được bật.
 
 ### `GET /admin/lessons/:lessonId/documents`
 
