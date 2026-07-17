@@ -21,7 +21,7 @@ Accept:
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when the user explicitly lists them.
 
-If `screenshot` appears after the command, enable screenshot mode only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code checks instead.
+If `screenshot` appears after the command, enable screenshot mode only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default for small/normal UI tasks. For large-scope `/task-ui` work, the thorough verification rule below overrides this default: run E2E/browser/runtime checks when practical, even without the `screenshot` keyword. Without the `screenshot` keyword or an explicit browser-check/debug need, do not create/save screenshot artifacts; use the appropriate test/runtime evidence instead.
 
 ## Plan Mode
 
@@ -111,7 +111,7 @@ In plan mode, stop after this plan and wait for approval.
 - Do not create desktop-only layouts.
 - For long lists/search/filter UI, use pagination/infinite/virtualized patterns or debounce in the mock flow when relevant.
 - For public/indexable UI, keep content structure SEO-friendly: one clear `h1`, meaningful headings/text, alt text for important images, and a layout that can later support metadata/canonical/Open Graph.
-- Do not run browser/mobile/desktop checks by default. Owner will self-check UI/tương tác; run browser/Playwright/screenshot only when explicitly requested.
+- Do not run browser/mobile/desktop checks by default for small/normal UI tasks. Owner will self-check UI/tương tác for those tasks; for large-scope UI tasks, run E2E/browser/runtime checks as part of verification.
 - Only create or save screenshots when screenshot mode is enabled by the command, for example `/task-ui screenshot M3.4`. If the command does not contain `screenshot`, do not run screenshot capture or leave new screenshot artifacts.
 
 ## Owner Approval Memory
@@ -128,7 +128,9 @@ When the owner says the UI is approved, for example "ưng rồi", "ok rồi", "�
 
 Run checks proportional to risk:
 
-- Default for UI-only work is speed-first lean verification per owner preference. Do not automatically run `typecheck`, `lint`, `build`, Playwright, or E2E after every UI task.
+- Default for small/normal UI-only work is speed-first lean verification per owner preference. Do not automatically run `typecheck`, `lint`, `build`, Playwright, or E2E after every small UI task.
+- For large-scope `/task-ui` work, do thorough verification before final. Large-scope means multiple screens/routes, shared UI primitives/components, complex form/state/session behavior, data-connected-ready flows, public/indexable UI, or a production user flow that needs real interaction confidence.
+- Large-scope UI verification must include affected web typecheck, lint/build when shared or production surface changed, focused unit/component tests when available or newly useful, and E2E/browser/runtime checks for key interactions plus responsive/runtime sanity when practical. If the repo lacks a needed E2E/unit harness, add a reasonable reusable test setup/package or focused tests when feasible.
 - If the owner writes `sửa nhanh`, `fast`, or `check nhẹ`, use the fastest safe path by default: inspect the smallest relevant scope, patch directly, avoid unrelated refactor/cleanup, do not update changelog, and skip typecheck/lint/build/Playwright/E2E unless the change touches shared logic, route guards, form/session/data behavior, or obvious TypeScript risk.
 - Micro UI tweaks such as moving one image, changing one spacing value, or adjusting one color must use the fastest path: inspect only the directly relevant file, patch the smallest property, do not update changelog, run at most a focused format/diff check, then report. Do not bundle unrelated workflow/docs cleanup into the same user-visible UI fix unless the owner explicitly asks for it.
 - Prefer `git diff --check`, a targeted format check, or manual visual reasoning for small UI/copy/spacing/color/mock-data changes.
@@ -152,6 +154,7 @@ Non-negotiable:
 
 - Keep mobile-first and no-overlap checks in mind even when manual.
 - Keep smooth interaction checks in mind: tap feedback, loading state, no obvious layout shift, no expensive animation.
+- Do not use lean mode for large-scope `/task-ui` work; run the thorough verification rule above and state `Not run: <reason>` for any layer that cannot be run.
 - Do not use lean mode for payment flows, data-connected UI, route guards, or multi-screen changes with state/business risk. For auth UI visual-only iteration, lean mode is acceptable; use broader checks only when changing form logic/session/data behavior.
 - If larger checks are skipped, state `Not run: <reason>` in the final response. Do not list skipped screenshots as a gap when the command did not request screenshot mode.
 

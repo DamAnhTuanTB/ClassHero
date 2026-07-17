@@ -44,5 +44,6 @@ Rules:
 - BullMQ job id có thể lưu ở `bullmq_job_id`.
 - Không lưu secret hoặc raw prompt quá dài trong `input_meta_json`.
 - `GET /jobs/:jobId` phải kiểm tra owner/role.
+- `M4.2` tạo job rows cho `DOCUMENT_PROCESSING` khi tạo source document, cập nhật page range, thay thế tài liệu chính hoặc upload supplemental document; `M4.3` chịu trách nhiệm enqueue BullMQ thật và cập nhật `bullmq_job_id`.
 
 ---

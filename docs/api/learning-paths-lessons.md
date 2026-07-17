@@ -524,7 +524,7 @@ Side effects:
 
 - Tạo source document.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
-- Enqueue job extract/OCR page-level nếu PDF.
+- `M4.2` tạo durable job record; `M4.3` nối BullMQ thật để worker nhận job extract/OCR page-level nếu PDF.
 
 ### `GET /admin/learning-paths/:learningPathId/source-documents`
 
@@ -533,6 +533,16 @@ Role: `ADMIN`.
 Behavior:
 
 - Trả source documents của lộ trình, tổng số trang, trạng thái xử lý và lỗi nếu có.
+
+### `DELETE /admin/source-documents/:sourceDocumentId`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Xóa mềm source document chưa được gán vào lesson.
+- Nếu source document còn page range hoặc lesson document active, trả `409 CONFLICT`.
+- Không xóa file gốc khỏi object storage trong request này.
 
 ### `GET /admin/source-documents/:sourceDocumentId/pages`
 
@@ -566,7 +576,7 @@ Behavior:
 - Validate page range nằm trong tổng số trang.
 - Trả warning nếu page range trùng hoặc có trang chưa gán.
 - Tạo/cập nhật lesson document mapping cho từng lesson.
-- Enqueue job chunking cho các lesson bị thay đổi range.
+- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` cho chunking các lesson bị thay đổi range; `M4.3` nối BullMQ thật.
 
 ### `POST /admin/lessons/:lessonId/primary-document/replace`
 
@@ -598,7 +608,7 @@ Behavior:
 - Chỉ có một tài liệu chính active cho mỗi lesson.
 - Tài liệu chính cũ bị đánh dấu stale/archived theo schema thực tế, không xóa file gốc ngay.
 - Tài liệu bổ sung `SUPPLEMENT` của lesson không bị ảnh hưởng.
-- Enqueue job extract/OCR/chunk lại cho lesson.
+- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` để extract/OCR/chunk lại cho lesson; `M4.3` nối BullMQ thật.
 
 ### `POST /admin/lessons/:lessonId/documents`
 
@@ -620,7 +630,7 @@ Side effects:
 
 - Tạo `lesson_documents` trực tiếp cho lesson với `kind = SUPPLEMENT`.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
-- Enqueue job nếu PDF.
+- `M4.3` nối BullMQ thật để worker nhận job nếu PDF.
 
 ### `GET /admin/lessons/:lessonId/documents`
 
@@ -630,6 +640,16 @@ Behavior:
 
 - Trả cả tài liệu chính từ source document/page range và tài liệu bổ sung upload trực tiếp.
 - Response cần phân biệt `kind = PRIMARY_FROM_SOURCE | PRIMARY_REPLACEMENT | SUPPLEMENT` để UI nhóm tài liệu rõ ràng.
+
+### `DELETE /admin/lessons/:lessonId/documents/:documentId`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Chỉ xóa tài liệu bổ sung `SUPPLEMENT` của lesson.
+- Không cho xóa tài liệu chính bằng endpoint này.
+- Không xóa file gốc khỏi object storage trong request này.
 
 ### `POST /admin/lessons/:lessonId/materials`
 

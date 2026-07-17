@@ -17,6 +17,7 @@ Behavior:
 - Parent chỉ xem job thuộc payment/child flow của mình nếu có.
 - Admin xem mọi job.
 - Không trả raw prompt hoặc secret trong result.
+- Từ `M4.2`, API document tạo `background_jobs` queue `DOCUMENT_PROCESSING` để UI poll trạng thái; BullMQ worker thật được nối ở `M4.3`.
 
 Response:
 

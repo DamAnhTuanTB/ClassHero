@@ -1,0 +1,641 @@
+import { Inject, Injectable } from "@nestjs/common";
+import {
+  BackgroundJobQueue,
+  BackgroundJobStatus,
+  DocumentStatus,
+  FilePurpose,
+  FileStatus,
+  LessonDocumentKind,
+  Prisma,
+} from "@prisma/client";
+import {
+  throwBadRequest,
+  throwConflict,
+  throwNotFound,
+} from "#api/common/errors/api-exception";
+import { PrismaService } from "#api/common/prisma/prisma.service";
+import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
+import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
+import {
+  lessonDocumentPageRangeSelect,
+  lessonDocumentSelect,
+  sourceDocumentPageSelect,
+  sourceDocumentSelect,
+} from "#api/modules/learning-paths/selectors/document.selects";
+import {
+  serializeLessonDocument,
+  serializeLessonDocumentPageRange,
+  serializeSourceDocument,
+  serializeSourceDocumentPage,
+} from "#api/modules/learning-paths/serializers/document.serializers";
+import type {
+  LessonDocumentRecord,
+  PageRangeSaveResponse,
+} from "#api/modules/learning-paths/types/document.types";
+import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
+import {
+  assertNoDuplicateLessonRanges,
+  assertPageRangeOrder,
+  buildPageRangeWarnings,
+  handleDocumentPrismaError,
+  normalizeOptionalTitle,
+  throwDocumentFileNotFound,
+  throwSourceDocumentNotFound,
+  toDocumentInputJson,
+} from "#api/modules/learning-paths/utils/document.helpers";
+
+@Injectable()
+export class SourceDocumentsService {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async createForLearningPath(
+    learningPathId: string,
+    actorUserId: string,
+    dto: CreateSourceDocumentDto,
+    context: RequestContext = {},
+  ) {
+    try {
+      const sourceDocument = await this.prisma.$transaction(async (tx) => {
+        await this.assertLearningPathExists(tx, learningPathId);
+        const file = await this.getLessonDocumentFile(tx, dto.fileId);
+
+        const created = await tx.sourceDocument.create({
+          data: {
+            learningPathId,
+            fileId: file.id,
+            title: normalizeOptionalTitle(dto.title),
+            status: DocumentStatus.PROCESSING,
+            contentHash: file.checksum,
+            metadataJson: toDocumentInputJson({
+              uploadSource: "api.admin.source_documents.create",
+            }),
+          },
+          select: sourceDocumentSelect,
+        });
+
+        const job = await this.createDocumentJob(tx, {
+          ownerUserId: actorUserId,
+          resourceType: "SOURCE_DOCUMENT",
+          resourceId: created.id,
+          inputMeta: {
+            action: "SOURCE_PAGE_EXTRACTION",
+            sourceDocumentId: created.id,
+            learningPathId,
+            fileId: file.id,
+          },
+        });
+
+        const withJob = await tx.sourceDocument.update({
+          where: { id: created.id },
+          data: {
+            processingJobId: job.id,
+          },
+          select: sourceDocumentSelect,
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: "SOURCE_DOCUMENT_CREATED",
+            entityType: "SourceDocument",
+            entityId: withJob.id,
+            after: toDocumentInputJson(serializeSourceDocument(withJob)),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return withJob;
+      });
+
+      return serializeSourceDocument(sourceDocument);
+    } catch (error) {
+      handleDocumentPrismaError(error);
+    }
+  }
+
+  async listForLearningPath(learningPathId: string) {
+    await this.assertLearningPathExists(this.prisma, learningPathId);
+
+    const documents = await this.prisma.sourceDocument.findMany({
+      where: {
+        learningPathId,
+        deletedAt: null,
+      },
+      select: sourceDocumentSelect,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+
+    return documents.map(serializeSourceDocument);
+  }
+
+  async deleteSourceDocument(
+    sourceDocumentId: string,
+    actorUserId: string,
+    context: RequestContext = {},
+  ) {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const sourceDocument = await tx.sourceDocument.findFirst({
+          where: {
+            id: sourceDocumentId,
+            deletedAt: null,
+            learningPath: {
+              deletedAt: null,
+            },
+          },
+          select: sourceDocumentSelect,
+        });
+
+        if (!sourceDocument) {
+          throwSourceDocumentNotFound();
+        }
+
+        const activeUsageCount = await tx.lessonDocument.count({
+          where: {
+            sourceDocumentId,
+            replacedAt: null,
+          },
+        });
+        const pageRangeCount = await tx.lessonDocumentPageRange.count({
+          where: {
+            sourceDocumentId,
+          },
+        });
+
+        if (activeUsageCount > 0 || pageRangeCount > 0) {
+          throwConflict(
+            "CONFLICT",
+            "Không thể xóa tài liệu nguồn đang được gán vào buổi học",
+          );
+        }
+
+        const deleted = await tx.sourceDocument.update({
+          where: { id: sourceDocument.id },
+          data: {
+            deletedAt: new Date(),
+          },
+          select: sourceDocumentSelect,
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: "SOURCE_DOCUMENT_DELETED",
+            entityType: "SourceDocument",
+            entityId: deleted.id,
+            before: toDocumentInputJson(serializeSourceDocument(sourceDocument)),
+            after: toDocumentInputJson(serializeSourceDocument(deleted)),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+      });
+
+      return { success: true };
+    } catch (error) {
+      handleDocumentPrismaError(error);
+    }
+  }
+
+  async listPages(sourceDocumentId: string) {
+    await this.findActiveSourceDocument(sourceDocumentId);
+
+    const pages = await this.prisma.sourceDocumentPage.findMany({
+      where: {
+        sourceDocumentId,
+      },
+      select: sourceDocumentPageSelect,
+      orderBy: {
+        pageNumber: "asc",
+      },
+    });
+
+    return pages.map(serializeSourceDocumentPage);
+  }
+
+  async updateLessonPageRanges(
+    sourceDocumentId: string,
+    actorUserId: string,
+    dto: UpdateLessonPageRangesDto,
+    context: RequestContext = {},
+  ): Promise<PageRangeSaveResponse> {
+    assertNoDuplicateLessonRanges(dto.ranges);
+
+    for (const range of dto.ranges) {
+      assertPageRangeOrder(range.pageStart, range.pageEnd);
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const sourceDocument = await this.findActiveSourceDocument(sourceDocumentId, tx);
+        const pageLimit = await this.resolvePageLimit(tx, sourceDocument);
+
+        for (const range of dto.ranges) {
+          if (range.pageEnd > pageLimit) {
+            throwBadRequest(
+              "VALIDATION_ERROR",
+              "Khoảng trang vượt quá số trang của tài liệu nguồn",
+              {
+                lessonId: range.lessonId,
+                pageStart: range.pageStart,
+                pageEnd: range.pageEnd,
+                pageCount: pageLimit,
+              },
+            );
+          }
+        }
+
+        const lessonIds = dto.ranges.map((range) => range.lessonId);
+        await this.assertLessonsBelongToLearningPath(
+          tx,
+          lessonIds,
+          sourceDocument.learningPathId,
+        );
+
+        const now = new Date();
+        const savedRanges = [];
+        const lessonDocuments: LessonDocumentRecord[] = [];
+
+        for (const range of dto.ranges) {
+          await tx.lessonDocumentPageRange.deleteMany({
+            where: {
+              lessonId: range.lessonId,
+              sourceDocumentId: {
+                not: sourceDocument.id,
+              },
+            },
+          });
+
+          const savedRange = await tx.lessonDocumentPageRange.upsert({
+            where: {
+              lessonId_sourceDocumentId: {
+                lessonId: range.lessonId,
+                sourceDocumentId: sourceDocument.id,
+              },
+            },
+            create: {
+              lessonId: range.lessonId,
+              sourceDocumentId: sourceDocument.id,
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
+              createdById: actorUserId,
+              metadataJson: toDocumentInputJson({
+                source: "admin_page_range_mapping",
+              }),
+            },
+            update: {
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
+              metadataJson: toDocumentInputJson({
+                source: "admin_page_range_mapping",
+              }),
+            },
+            select: lessonDocumentPageRangeSelect,
+          });
+
+          savedRanges.push(savedRange);
+
+          const lessonDocument = await this.upsertPrimaryFromSourceDocument(tx, {
+            actorUserId,
+            lessonId: range.lessonId,
+            sourceDocument,
+            pageStart: range.pageStart,
+            pageEnd: range.pageEnd,
+            now,
+          });
+
+          lessonDocuments.push(lessonDocument);
+        }
+
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: "SOURCE_DOCUMENT_PAGE_RANGES_UPDATED",
+            entityType: "SourceDocument",
+            entityId: sourceDocument.id,
+            after: toDocumentInputJson({
+              ranges: savedRanges.map(serializeLessonDocumentPageRange),
+              lessonDocumentIds: lessonDocuments.map((item) => item.id),
+            }),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return {
+          sourceDocument,
+          ranges: savedRanges,
+          lessonDocuments,
+          warnings: buildPageRangeWarnings(dto.ranges, pageLimit),
+        };
+      });
+
+      return {
+        sourceDocument: serializeSourceDocument(result.sourceDocument),
+        ranges: result.ranges.map(serializeLessonDocumentPageRange),
+        lessonDocuments: result.lessonDocuments.map(serializeLessonDocument),
+        warnings: result.warnings,
+      };
+    } catch (error) {
+      handleDocumentPrismaError(error);
+    }
+  }
+
+  private async assertLearningPathExists(
+    tx: Pick<PrismaService, "learningPath"> | Prisma.TransactionClient,
+    learningPathId: string,
+  ) {
+    const learningPath = await tx.learningPath.findFirst({
+      where: {
+        id: learningPathId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!learningPath) {
+      throwNotFound("NOT_FOUND", "Không tìm thấy lộ trình học");
+    }
+  }
+
+  private async getLessonDocumentFile(
+    tx: Prisma.TransactionClient,
+    fileId: string,
+  ) {
+    const file = await tx.file.findFirst({
+      where: {
+        id: fileId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        purpose: true,
+        status: true,
+        checksum: true,
+      },
+    });
+
+    if (!file) {
+      throwDocumentFileNotFound();
+    }
+
+    if (file.purpose !== FilePurpose.LESSON_DOCUMENT) {
+      throwBadRequest("FILE_PURPOSE_NOT_ALLOWED", "File phải là tài liệu bài học");
+    }
+
+    if (file.status === FileStatus.DELETED) {
+      throwDocumentFileNotFound();
+    }
+
+    return file;
+  }
+
+  private async findActiveSourceDocument(
+    sourceDocumentId: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const sourceDocument = await tx.sourceDocument.findFirst({
+      where: {
+        id: sourceDocumentId,
+        deletedAt: null,
+        learningPath: {
+          deletedAt: null,
+        },
+      },
+      select: sourceDocumentSelect,
+    });
+
+    if (!sourceDocument) {
+      throwSourceDocumentNotFound();
+    }
+
+    return sourceDocument;
+  }
+
+  private async resolvePageLimit(
+    tx: Prisma.TransactionClient,
+    sourceDocument: Awaited<ReturnType<SourceDocumentsService["findActiveSourceDocument"]>>,
+  ) {
+    if (sourceDocument.pageCount) {
+      return sourceDocument.pageCount;
+    }
+
+    const latestPage = await tx.sourceDocumentPage.findFirst({
+      where: {
+        sourceDocumentId: sourceDocument.id,
+      },
+      select: {
+        pageNumber: true,
+      },
+      orderBy: {
+        pageNumber: "desc",
+      },
+    });
+
+    if (!latestPage) {
+      throwBadRequest(
+        "VALIDATION_ERROR",
+        "Tài liệu nguồn chưa có thông tin số trang để gán page range",
+      );
+    }
+
+    return latestPage.pageNumber;
+  }
+
+  private async assertLessonsBelongToLearningPath(
+    tx: Prisma.TransactionClient,
+    lessonIds: string[],
+    learningPathId: string,
+  ) {
+    if (lessonIds.length === 0) {
+      return;
+    }
+
+    const lessons = await tx.lesson.findMany({
+      where: {
+        id: {
+          in: lessonIds,
+        },
+        learningPathId,
+        deletedAt: null,
+        chapter: {
+          deletedAt: null,
+        },
+        learningPath: {
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    const foundIds = new Set(lessons.map((lesson) => lesson.id));
+    const missingIds = lessonIds.filter((lessonId) => !foundIds.has(lessonId));
+
+    if (missingIds.length > 0) {
+      throwBadRequest(
+        "VALIDATION_ERROR",
+        "Buổi học phải thuộc cùng lộ trình với tài liệu nguồn",
+        { lessonIds: missingIds },
+      );
+    }
+  }
+
+  private async upsertPrimaryFromSourceDocument(
+    tx: Prisma.TransactionClient,
+    {
+      actorUserId,
+      lessonId,
+      sourceDocument,
+      pageStart,
+      pageEnd,
+      now,
+    }: {
+      actorUserId: string;
+      lessonId: string;
+      sourceDocument: Awaited<ReturnType<SourceDocumentsService["findActiveSourceDocument"]>>;
+      pageStart: number;
+      pageEnd: number;
+      now: Date;
+    },
+  ) {
+    const activePrimary = await tx.lessonDocument.findFirst({
+      where: {
+        lessonId,
+        kind: {
+          in: [
+            LessonDocumentKind.PRIMARY_FROM_SOURCE,
+            LessonDocumentKind.PRIMARY_REPLACEMENT,
+          ],
+        },
+        replacedAt: null,
+      },
+      select: {
+        id: true,
+        kind: true,
+        sourceDocumentId: true,
+      },
+    });
+
+    let lessonDocumentId = activePrimary?.id;
+
+    if (
+      activePrimary &&
+      (activePrimary.kind !== LessonDocumentKind.PRIMARY_FROM_SOURCE ||
+        activePrimary.sourceDocumentId !== sourceDocument.id)
+    ) {
+      await tx.lessonDocument.updateMany({
+        where: {
+          lessonId,
+          kind: {
+            in: [
+              LessonDocumentKind.PRIMARY_FROM_SOURCE,
+              LessonDocumentKind.PRIMARY_REPLACEMENT,
+            ],
+          },
+          replacedAt: null,
+        },
+        data: {
+          replacedAt: now,
+        },
+      });
+      lessonDocumentId = undefined;
+    }
+
+    const metadataJson = toDocumentInputJson({
+      source: "source_document_page_range",
+      pageStart,
+      pageEnd,
+    });
+    const title =
+      sourceDocument.title ?? `Trang ${pageStart}-${pageEnd} từ tài liệu nguồn`;
+
+    const lessonDocument = lessonDocumentId
+      ? await tx.lessonDocument.update({
+          where: { id: lessonDocumentId },
+          data: {
+            fileId: sourceDocument.fileId,
+            sourceDocumentId: sourceDocument.id,
+            title,
+            status: DocumentStatus.PROCESSING,
+            extractError: null,
+            contentHash: sourceDocument.contentHash,
+            chunkCount: 0,
+            processedAt: null,
+            metadataJson,
+          },
+          select: lessonDocumentSelect,
+        })
+      : await tx.lessonDocument.create({
+          data: {
+            lessonId,
+            fileId: sourceDocument.fileId,
+            sourceDocumentId: sourceDocument.id,
+            kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
+            title,
+            status: DocumentStatus.PROCESSING,
+            contentHash: sourceDocument.contentHash,
+            metadataJson,
+          },
+          select: lessonDocumentSelect,
+        });
+
+    const job = await this.createDocumentJob(tx, {
+      ownerUserId: actorUserId,
+      lessonId,
+      resourceType: "LESSON_DOCUMENT",
+      resourceId: lessonDocument.id,
+      inputMeta: {
+        action: "LESSON_CHUNKING_FROM_SOURCE",
+        lessonId,
+        lessonDocumentId: lessonDocument.id,
+        sourceDocumentId: sourceDocument.id,
+        pageStart,
+        pageEnd,
+      },
+    });
+
+    return tx.lessonDocument.update({
+      where: { id: lessonDocument.id },
+      data: {
+        processingJobId: job.id,
+      },
+      select: lessonDocumentSelect,
+    });
+  }
+
+  private createDocumentJob(
+    tx: Prisma.TransactionClient,
+    {
+      ownerUserId,
+      lessonId,
+      resourceType,
+      resourceId,
+      inputMeta,
+    }: {
+      ownerUserId: string;
+      lessonId?: string;
+      resourceType: string;
+      resourceId: string;
+      inputMeta: Record<string, unknown>;
+    },
+  ) {
+    return tx.backgroundJob.create({
+      data: {
+        queue: BackgroundJobQueue.DOCUMENT_PROCESSING,
+        status: BackgroundJobStatus.QUEUED,
+        ownerUserId,
+        lessonId,
+        resourceType,
+        resourceId,
+        inputMeta: toDocumentInputJson(inputMeta),
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+}

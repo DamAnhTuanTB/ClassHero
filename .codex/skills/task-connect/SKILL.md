@@ -21,7 +21,7 @@ Accept:
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed.
 
-If `screenshot` appears after the command, enable screenshot mode for UI states only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code/API checks instead.
+If `screenshot` appears after the command, enable screenshot mode for UI states only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default for small/normal connection tasks. For large-scope `/task-connect` work, the thorough verification rule below overrides this default: run E2E/browser/runtime checks for the connected UI/API flow when practical, even without the `screenshot` keyword. Without the `screenshot` keyword or an explicit browser-check/debug need, do not create/save screenshot artifacts; use the appropriate test/runtime evidence instead.
 
 ## Plan Mode
 
@@ -125,14 +125,22 @@ Run focused checks:
 
 - Typecheck for touched web/shared/api code.
 - Focused API/client tests if available.
-- Curl/API check if practical for API/backend behavior; do not run browser checks unless explicitly requested.
+- Curl/API check if practical for API/backend behavior; do not run browser checks unless explicitly requested or the connection task is large-scope.
 - If a new API endpoint is implemented, verify it with a focused API test or curl when local services allow it.
 - When backend/API behavior is fixed for a UI the owner is actively testing, verify the actual API origin that the web app calls, usually `localhost:4000`, and restart any stale dev server on that port before saying the UI is ready. Do not rely only on a temporary alternate port if the owner will test against `4000`.
 - If API cannot run locally, state what was checked statically.
-- For UI states changed by real data, use static/focused checks by default; owner will self-check mobile/desktop layout and interaction.
+- For UI states changed by real data, use static/focused checks by default only for small/normal connection tasks; owner will self-check mobile/desktop layout and interaction for those tasks.
 - Only create or save screenshots when screenshot mode is enabled by the command, for example `/task-connect screenshot M3.4`.
 - For data-connected UI, mention whether perceived latency, pending state, cache/invalidation, and list/search performance were checked or skipped.
 - For public/indexable UI, mention whether metadata/slug/published/canonical/sitemap impact was handled or not in scope.
+
+For large-scope `/task-connect` work, do thorough verification before final:
+
+- Treat as large-scope when the task connects multiple screens/routes, adds or changes backend endpoints, database/schema, auth/RBAC/session, storage/upload, worker/queue, shared API clients/hooks, route guards, or a production user flow end to end.
+- Run affected web/api/shared typecheck, lint/build when production or shared surfaces changed, focused API/integration tests for backend behavior, focused client/hook/unit tests where useful, curl against the actual API origin when practical, and E2E/browser/runtime checks for the connected UI flow.
+- Verify pending state, error state, cache invalidation/refetch, perceived latency, and list/search/pagination behavior when those surfaces are touched.
+- If the repo lacks a needed test harness, add a reasonable reusable test setup/package or focused tests when feasible.
+- If any layer cannot be run, state `Not run: <reason>` clearly in the final response.
 
 ## Lean Mode For Small Connection Tasks
 
@@ -146,6 +154,7 @@ Allowed reductions:
 
 Non-negotiable:
 
+- Do not use lean mode for large-scope `/task-connect` work.
 - Do not use lean mode when adding/changing auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior.
 - If the owner writes `fast`, `check nhẹ`, or `sửa nhanh`, use lean verification only when the connection change is low risk; keep the full workflow when connecting auth/session, permissions, payment, database writes, API contracts, or multi-screen data behavior.
 - Do not skip backend permission reasoning when real data is connected.

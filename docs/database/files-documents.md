@@ -56,6 +56,7 @@ processed_at timestamp?
 metadata_json jsonb?
 created_at timestamp
 updated_at timestamp
+deleted_at timestamp?
 ```
 
 Index:
@@ -63,6 +64,9 @@ Index:
 - `learning_path_id`.
 - `status`.
 - `content_hash`.
+- `file_id`.
+- `processing_job_id`.
+- `deleted_at`.
 
 Rules:
 
@@ -93,6 +97,7 @@ Index/constraint:
 
 - unique `(source_document_id, page_number)`.
 - index `(source_document_id, status)`.
+- index `thumbnail_file_id`.
 
 Rules:
 
@@ -118,8 +123,10 @@ updated_at timestamp
 
 Index/constraint:
 
+- unique `(lesson_id, source_document_id)`.
 - index `lesson_id`.
 - index `source_document_id`.
+- index `created_by_id`.
 
 Rules:
 
@@ -152,13 +159,19 @@ embedding_dimensions int?
 metadata_json jsonb?
 created_at timestamp
 updated_at timestamp
+replaced_at timestamp?
 ```
 
 Index:
 
 - `lesson_id`.
+- `(lesson_id, kind)`.
 - `status`.
 - `content_hash`.
+- `file_id`.
+- `source_document_id`.
+- `processing_job_id`.
+- `replaced_at`.
 
 Rules:
 
@@ -169,7 +182,7 @@ Rules:
 - `PRIMARY_FROM_SOURCE` là tài liệu chính của lesson được tạo từ source document + page range.
 - `PRIMARY_REPLACEMENT` là tài liệu chính thay thế của lesson, có thể đến từ page range mới hoặc file upload riêng.
 - `SUPPLEMENT` là tài liệu bổ sung upload trực tiếp cho lesson, ví dụ phiếu bài tập riêng, đáp án, ảnh công thức hoặc tài liệu tham khảo.
-- Mỗi lesson chỉ có một tài liệu chính active tại một thời điểm; thay thế tài liệu chính không được xóa hoặc làm mất supplemental documents.
+- Mỗi lesson chỉ có một tài liệu chính active tại một thời điểm; tài liệu chính cũ được đánh dấu bằng `replaced_at`, thay thế tài liệu chính không được xóa hoặc làm mất supplemental documents.
 - Một lesson có thể có một hoặc nhiều supplemental documents; tất cả chunks cuối cùng vẫn phải gắn `lesson_id`.
 
 ### 4.6. `document_chunks`

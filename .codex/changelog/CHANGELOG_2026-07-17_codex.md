@@ -2,3 +2,4 @@
 - 2026-07-17: Chốt lại tài liệu M4 theo hướng upload source PDF/tài liệu dài ở cấp lộ trình, extract/OCR theo trang, admin gán page range cho lesson rồi chunk theo `lesson_id`; bổ sung contract API/database, pattern UI, context và ADR cho tài liệu gốc/tài liệu bổ sung.
 - 2026-07-17: Cập nhật auth UI để student đăng nhập xong vào màn học tập, admin vào quản lý khóa học, đồng thời nới layout form đăng ký học sinh/phụ huynh để placeholder mật khẩu không bị cắt ở khung hẹp.
 - 2026-07-17: Chuẩn hóa UI khóa học trong web app bằng cách đổi copy lộ trình sang khóa học, thống nhất mô tả trống cho chương/bài học, thêm spinner loading căn giữa cho trạng thái chờ dữ liệu và chỉnh action chi tiết khóa học sang Edit/Xóa mềm.
+- 2026-07-17: Thêm M4.2 source document/page range API với schema Prisma, job status API, Vitest/Supertest focused tests và docs/learning notes; đồng thời ghi rule Codex buộc task-ui/task-connect/task-full quy mô lớn phải chạy verification sâu.

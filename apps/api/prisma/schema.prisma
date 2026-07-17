@@ -120,6 +120,12 @@ enum DocumentStatus {
   FAILED
 }
 
+enum LessonDocumentKind {
+  PRIMARY_FROM_SOURCE
+  PRIMARY_REPLACEMENT
+  SUPPLEMENT
+}
+
 enum LessonMaterialType {
   PDF
   IMAGE
@@ -262,71 +268,72 @@ enum BackgroundJobStatus {
 }
 
 model User {
-  id                          String                @id @default(uuid()) @db.Uuid
+  id                          String                    @id @default(uuid()) @db.Uuid
   role                        UserRole
-  status                      UserStatus            @default(ACTIVE)
-  email                       String?               @unique
-  phone                       String?               @unique
-  username                    String?               @unique
-  passwordHash                String                @map("password_hash")
-  fullName                    String?               @map("full_name")
-  gender                      Gender                @default(UNKNOWN)
-  dateOfBirth                 DateTime?             @map("date_of_birth") @db.Date
-  avatarFileId                String?               @map("avatar_file_id") @db.Uuid
-  avatarFile                  File?                 @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
-  lastLoginAt                 DateTime?             @map("last_login_at")
-  emailVerifiedAt             DateTime?             @map("email_verified_at")
-  phoneVerifiedAt             DateTime?             @map("phone_verified_at")
-  createdAt                   DateTime              @default(now()) @map("created_at")
-  updatedAt                   DateTime              @updatedAt @map("updated_at")
-  deletedAt                   DateTime?             @map("deleted_at")
+  status                      UserStatus                @default(ACTIVE)
+  email                       String?                   @unique
+  phone                       String?                   @unique
+  username                    String?                   @unique
+  passwordHash                String                    @map("password_hash")
+  fullName                    String?                   @map("full_name")
+  gender                      Gender                    @default(UNKNOWN)
+  dateOfBirth                 DateTime?                 @map("date_of_birth") @db.Date
+  avatarFileId                String?                   @map("avatar_file_id") @db.Uuid
+  avatarFile                  File?                     @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  lastLoginAt                 DateTime?                 @map("last_login_at")
+  emailVerifiedAt             DateTime?                 @map("email_verified_at")
+  phoneVerifiedAt             DateTime?                 @map("phone_verified_at")
+  createdAt                   DateTime                  @default(now()) @map("created_at")
+  updatedAt                   DateTime                  @updatedAt @map("updated_at")
+  deletedAt                   DateTime?                 @map("deleted_at")
   studentProfile              StudentProfile?
   parentProfile               ParentProfile?
-  uploadedFiles               File[]                @relation("FileUploadedBy")
+  uploadedFiles               File[]                    @relation("FileUploadedBy")
   refreshTokens               RefreshToken[]
   passwordResetTokens         PasswordResetToken[]
-  parentLinksAsParent         ParentStudentLink[]   @relation("ParentStudentLinksParent")
-  parentLinksAsStudent        ParentStudentLink[]   @relation("ParentStudentLinksStudent")
-  backgroundJobs              BackgroundJob[]       @relation("BackgroundJobOwner")
-  auditLogs                   AuditLog[]            @relation("AuditLogActor")
-  createdLearningPaths        LearningPath[]        @relation("LearningPathCreatedBy")
-  updatedLearningPaths        LearningPath[]        @relation("LearningPathUpdatedBy")
-  createdLearningPathChapters LearningPathChapter[] @relation("LearningPathChapterCreatedBy")
-  updatedLearningPathChapters LearningPathChapter[] @relation("LearningPathChapterUpdatedBy")
-  createdLessons              Lesson[]              @relation("LessonCreatedBy")
-  updatedLessons              Lesson[]              @relation("LessonUpdatedBy")
-  createdLessonSummaries      LessonSummary[]       @relation("LessonSummaryCreatedBy")
-  updatedLessonSummaries      LessonSummary[]       @relation("LessonSummaryUpdatedBy")
-  enrollmentsAsStudent        Enrollment[]          @relation("EnrollmentStudent")
-  enrollmentsPaid             Enrollment[]          @relation("EnrollmentPaidBy")
-  lessonProgress              LessonProgress[]      @relation("LessonProgressStudent")
-  generatedQuizSets           QuizSet[]             @relation("QuizSetGeneratedBy")
-  createdQuizSets             QuizSet[]             @relation("QuizSetCreatedBy")
-  updatedQuizSets             QuizSet[]             @relation("QuizSetUpdatedBy")
-  quizAttempts                QuizAttempt[]         @relation("QuizAttemptStudent")
-  generatedFlashcardSets      FlashcardSet[]        @relation("FlashcardSetGeneratedBy")
-  createdFlashcardSets        FlashcardSet[]        @relation("FlashcardSetCreatedBy")
-  updatedFlashcardSets        FlashcardSet[]        @relation("FlashcardSetUpdatedBy")
-  flashcardProgress           FlashcardProgress[]   @relation("FlashcardProgressStudent")
-  generatedTestSets           TestSet[]             @relation("TestSetGeneratedBy")
-  createdTestSets             TestSet[]             @relation("TestSetCreatedBy")
-  updatedTestSets             TestSet[]             @relation("TestSetUpdatedBy")
-  testAttempts                TestAttempt[]         @relation("TestAttemptStudent")
-  studentNotes                StudentNote[]         @relation("StudentNoteStudent")
-  lessonVideoComments         LessonVideoComment[]  @relation("LessonVideoCommentStudent")
-  favorites                   Favorite[]            @relation("FavoriteStudent")
-  createdDiscountCodes        DiscountCode[]        @relation("DiscountCodeCreatedBy")
-  paymentsAsPayer             Payment[]             @relation("PaymentPayer")
-  paymentsAsStudent           Payment[]             @relation("PaymentStudent")
-  notificationsReceived       Notification[]        @relation("NotificationRecipient")
-  notificationsActed          Notification[]        @relation("NotificationActor")
-  reportsSubmitted            Report[]              @relation("ReportReporter")
-  reportActions               ReportAction[]        @relation("ReportActionAdmin")
-  aiGenerationsCreated        AiGeneration[]        @relation("AiGenerationCreatedBy")
-  aiChatSessions              AiChatSession[]       @relation("AiChatSessionStudent")
-  xpEvents                    XpEvent[]             @relation("XpEventStudent")
-  createdNewsItems            NewsItem[]            @relation("NewsItemCreatedBy")
-  updatedNewsItems            NewsItem[]            @relation("NewsItemUpdatedBy")
+  parentLinksAsParent         ParentStudentLink[]       @relation("ParentStudentLinksParent")
+  parentLinksAsStudent        ParentStudentLink[]       @relation("ParentStudentLinksStudent")
+  backgroundJobs              BackgroundJob[]           @relation("BackgroundJobOwner")
+  createdDocumentPageRanges   LessonDocumentPageRange[] @relation("LessonDocumentPageRangeCreatedBy")
+  auditLogs                   AuditLog[]                @relation("AuditLogActor")
+  createdLearningPaths        LearningPath[]            @relation("LearningPathCreatedBy")
+  updatedLearningPaths        LearningPath[]            @relation("LearningPathUpdatedBy")
+  createdLearningPathChapters LearningPathChapter[]     @relation("LearningPathChapterCreatedBy")
+  updatedLearningPathChapters LearningPathChapter[]     @relation("LearningPathChapterUpdatedBy")
+  createdLessons              Lesson[]                  @relation("LessonCreatedBy")
+  updatedLessons              Lesson[]                  @relation("LessonUpdatedBy")
+  createdLessonSummaries      LessonSummary[]           @relation("LessonSummaryCreatedBy")
+  updatedLessonSummaries      LessonSummary[]           @relation("LessonSummaryUpdatedBy")
+  enrollmentsAsStudent        Enrollment[]              @relation("EnrollmentStudent")
+  enrollmentsPaid             Enrollment[]              @relation("EnrollmentPaidBy")
+  lessonProgress              LessonProgress[]          @relation("LessonProgressStudent")
+  generatedQuizSets           QuizSet[]                 @relation("QuizSetGeneratedBy")
+  createdQuizSets             QuizSet[]                 @relation("QuizSetCreatedBy")
+  updatedQuizSets             QuizSet[]                 @relation("QuizSetUpdatedBy")
+  quizAttempts                QuizAttempt[]             @relation("QuizAttemptStudent")
+  generatedFlashcardSets      FlashcardSet[]            @relation("FlashcardSetGeneratedBy")
+  createdFlashcardSets        FlashcardSet[]            @relation("FlashcardSetCreatedBy")
+  updatedFlashcardSets        FlashcardSet[]            @relation("FlashcardSetUpdatedBy")
+  flashcardProgress           FlashcardProgress[]       @relation("FlashcardProgressStudent")
+  generatedTestSets           TestSet[]                 @relation("TestSetGeneratedBy")
+  createdTestSets             TestSet[]                 @relation("TestSetCreatedBy")
+  updatedTestSets             TestSet[]                 @relation("TestSetUpdatedBy")
+  testAttempts                TestAttempt[]             @relation("TestAttemptStudent")
+  studentNotes                StudentNote[]             @relation("StudentNoteStudent")
+  lessonVideoComments         LessonVideoComment[]      @relation("LessonVideoCommentStudent")
+  favorites                   Favorite[]                @relation("FavoriteStudent")
+  createdDiscountCodes        DiscountCode[]            @relation("DiscountCodeCreatedBy")
+  paymentsAsPayer             Payment[]                 @relation("PaymentPayer")
+  paymentsAsStudent           Payment[]                 @relation("PaymentStudent")
+  notificationsReceived       Notification[]            @relation("NotificationRecipient")
+  notificationsActed          Notification[]            @relation("NotificationActor")
+  reportsSubmitted            Report[]                  @relation("ReportReporter")
+  reportActions               ReportAction[]            @relation("ReportActionAdmin")
+  aiGenerationsCreated        AiGeneration[]            @relation("AiGenerationCreatedBy")
+  aiChatSessions              AiChatSession[]           @relation("AiChatSessionStudent")
+  xpEvents                    XpEvent[]                 @relation("XpEventStudent")
+  createdNewsItems            NewsItem[]                @relation("NewsItemCreatedBy")
+  updatedNewsItems            NewsItem[]                @relation("NewsItemUpdatedBy")
 
   @@index([role, status])
   @@map("users")
@@ -402,30 +409,32 @@ model PasswordResetToken {
 }
 
 model File {
-  id                     String           @id @default(uuid()) @db.Uuid
-  provider               FileProvider     @default(CLOUDFLARE_R2)
+  id                     String               @id @default(uuid()) @db.Uuid
+  provider               FileProvider         @default(CLOUDFLARE_R2)
   purpose                FilePurpose
   bucket                 String
-  objectKey              String           @unique @map("object_key")
-  originalName           String           @map("original_name")
-  mimeType               String           @map("mime_type")
-  sizeBytes              BigInt           @map("size_bytes")
-  visibility             FileVisibility   @default(PRIVATE)
-  status                 FileStatus       @default(UPLOADED)
-  uploadedById           String?          @map("uploaded_by_id") @db.Uuid
-  uploadedBy             User?            @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
-  avatarUsers            User[]           @relation("UserAvatar")
-  thumbnailLearningPaths LearningPath[]   @relation("LearningPathThumbnail")
-  lessonMaterials        LessonMaterial[] @relation("LessonMaterialFile")
-  lessonDocuments        LessonDocument[] @relation("LessonDocumentFile")
-  aiExplanationImages    AiExplanation[]  @relation("AiExplanationImageFile")
-  newsItemCovers         NewsItem[]       @relation("NewsItemCoverFile")
-  publicUrl              String?          @map("public_url")
+  objectKey              String               @unique @map("object_key")
+  originalName           String               @map("original_name")
+  mimeType               String               @map("mime_type")
+  sizeBytes              BigInt               @map("size_bytes")
+  visibility             FileVisibility       @default(PRIVATE)
+  status                 FileStatus           @default(UPLOADED)
+  uploadedById           String?              @map("uploaded_by_id") @db.Uuid
+  uploadedBy             User?                @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  avatarUsers            User[]               @relation("UserAvatar")
+  thumbnailLearningPaths LearningPath[]       @relation("LearningPathThumbnail")
+  sourceDocuments        SourceDocument[]     @relation("SourceDocumentFile")
+  sourcePageThumbnails   SourceDocumentPage[] @relation("SourceDocumentPageThumbnail")
+  lessonMaterials        LessonMaterial[]     @relation("LessonMaterialFile")
+  lessonDocuments        LessonDocument[]     @relation("LessonDocumentFile")
+  aiExplanationImages    AiExplanation[]      @relation("AiExplanationImageFile")
+  newsItemCovers         NewsItem[]           @relation("NewsItemCoverFile")
+  publicUrl              String?              @map("public_url")
   checksum               String?
-  metadataJson           Json?            @map("metadata_json")
-  createdAt              DateTime         @default(now()) @map("created_at")
-  updatedAt              DateTime         @updatedAt @map("updated_at")
-  deletedAt              DateTime?        @map("deleted_at")
+  metadataJson           Json?                @map("metadata_json")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  deletedAt              DateTime?            @map("deleted_at")
 
   @@index([purpose, status])
   @@index([uploadedById])
@@ -443,6 +452,7 @@ model BackgroundJob {
   lessonId        String?             @map("lesson_id") @db.Uuid
   lesson          Lesson?             @relation("BackgroundJobLesson", fields: [lessonId], references: [id], onDelete: SetNull)
   lessonDocuments LessonDocument[]    @relation("LessonDocumentProcessingJob")
+  sourceDocuments SourceDocument[]    @relation("SourceDocumentProcessingJob")
   aiGenerations   AiGeneration[]      @relation("AiGenerationBackgroundJob")
   resourceType    String?             @map("resource_type")
   resourceId      String?             @map("resource_id") @db.Uuid
@@ -490,6 +500,7 @@ model LearningPath {
   deletedAt         DateTime?             @map("deleted_at")
   chapters          LearningPathChapter[]
   lessons           Lesson[]
+  sourceDocuments   SourceDocument[]
   enrollments       Enrollment[]
   payments          Payment[]
 
@@ -528,30 +539,31 @@ model LearningPathChapter {
 }
 
 model Lesson {
-  id                 String               @id @default(uuid()) @db.Uuid
-  learningPathId     String               @map("learning_path_id") @db.Uuid
-  learningPath       LearningPath         @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  chapterId          String               @map("chapter_id") @db.Uuid
-  chapter            LearningPathChapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  orderIndex         Int                  @map("order_index")
+  id                 String                    @id @default(uuid()) @db.Uuid
+  learningPathId     String                    @map("learning_path_id") @db.Uuid
+  learningPath       LearningPath              @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  chapterId          String                    @map("chapter_id") @db.Uuid
+  chapter            LearningPathChapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  orderIndex         Int                       @map("order_index")
   title              String
-  shortDescription   String?              @map("short_description")
-  prepMaterialJson   Json?                @map("prep_material_json")
-  scheduledAt        DateTime?            @map("scheduled_at")
-  examOpenAt         DateTime?            @map("exam_open_at")
-  videoUrl           String?              @map("video_url")
-  completionMinScore Decimal              @default(7) @map("completion_min_score") @db.Decimal(5, 2)
-  trialEnabled       Boolean              @default(false) @map("trial_enabled")
-  status             PublishStatus        @default(DRAFT)
-  createdById        String?              @map("created_by_id") @db.Uuid
-  createdBy          User?                @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById        String?              @map("updated_by_id") @db.Uuid
-  updatedBy          User?                @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
-  deletedAt          DateTime?            @map("deleted_at")
+  shortDescription   String?                   @map("short_description")
+  prepMaterialJson   Json?                     @map("prep_material_json")
+  scheduledAt        DateTime?                 @map("scheduled_at")
+  examOpenAt         DateTime?                 @map("exam_open_at")
+  videoUrl           String?                   @map("video_url")
+  completionMinScore Decimal                   @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  trialEnabled       Boolean                   @default(false) @map("trial_enabled")
+  status             PublishStatus             @default(DRAFT)
+  createdById        String?                   @map("created_by_id") @db.Uuid
+  createdBy          User?                     @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById        String?                   @map("updated_by_id") @db.Uuid
+  updatedBy          User?                     @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+  deletedAt          DateTime?                 @map("deleted_at")
   materials          LessonMaterial[]
   documents          LessonDocument[]
+  documentPageRanges LessonDocumentPageRange[]
   documentChunks     DocumentChunk[]
   summary            LessonSummary?
   progressEntries    LessonProgress[]
@@ -567,9 +579,9 @@ model Lesson {
   studentNotes       StudentNote[]
   videoComments      LessonVideoComment[]
   favorites          Favorite[]
-  backgroundJobs     BackgroundJob[]      @relation("BackgroundJobLesson")
+  backgroundJobs     BackgroundJob[]           @relation("BackgroundJobLesson")
   reports            Report[]
-  aiGenerations      AiGeneration[]       @relation("AiGenerationLesson")
+  aiGenerations      AiGeneration[]            @relation("AiGenerationLesson")
   aiExplanations     AiExplanation[]
   aiChatSessions     AiChatSession[]
   xpEvents           XpEvent[]
@@ -604,34 +616,114 @@ model LessonMaterial {
   @@map("lesson_materials")
 }
 
-model LessonDocument {
-  id                  String          @id @default(uuid()) @db.Uuid
-  lessonId            String          @map("lesson_id") @db.Uuid
-  lesson              Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  fileId              String          @map("file_id") @db.Uuid
-  file                File            @relation("LessonDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
-  title               String?
-  status              DocumentStatus  @default(UPLOADED)
-  extractedText       String?         @map("extracted_text") @db.Text
-  extractError        String?         @map("extract_error") @db.Text
-  contentHash         String?         @map("content_hash")
-  chunkCount          Int             @default(0) @map("chunk_count")
-  processingJobId     String?         @map("processing_job_id") @db.Uuid
-  processingJob       BackgroundJob?  @relation("LessonDocumentProcessingJob", fields: [processingJobId], references: [id], onDelete: SetNull)
-  processedAt         DateTime?       @map("processed_at")
-  embeddingProvider   AiProviderName? @map("embedding_provider")
-  embeddingModel      String?         @map("embedding_model")
-  embeddingDimensions Int?            @map("embedding_dimensions")
-  metadataJson        Json?           @map("metadata_json")
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-  chunks              DocumentChunk[]
+model SourceDocument {
+  id              String                    @id @default(uuid()) @db.Uuid
+  learningPathId  String                    @map("learning_path_id") @db.Uuid
+  learningPath    LearningPath              @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  fileId          String                    @map("file_id") @db.Uuid
+  file            File                      @relation("SourceDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  title           String?
+  status          DocumentStatus            @default(UPLOADED)
+  pageCount       Int?                      @map("page_count")
+  contentHash     String?                   @map("content_hash")
+  processingJobId String?                   @map("processing_job_id") @db.Uuid
+  processingJob   BackgroundJob?            @relation("SourceDocumentProcessingJob", fields: [processingJobId], references: [id], onDelete: SetNull)
+  processedAt     DateTime?                 @map("processed_at")
+  metadataJson    Json?                     @map("metadata_json")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+  deletedAt       DateTime?                 @map("deleted_at")
+  pages           SourceDocumentPage[]
+  pageRanges      LessonDocumentPageRange[]
+  lessonDocuments LessonDocument[]          @relation("LessonDocumentSourceDocument")
 
-  @@index([lessonId])
+  @@index([learningPathId])
   @@index([status])
   @@index([contentHash])
   @@index([fileId])
   @@index([processingJobId])
+  @@index([deletedAt])
+  @@map("source_documents")
+}
+
+model SourceDocumentPage {
+  id               String         @id @default(uuid()) @db.Uuid
+  sourceDocumentId String         @map("source_document_id") @db.Uuid
+  sourceDocument   SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  pageNumber       Int            @map("page_number")
+  status           DocumentStatus @default(UPLOADED)
+  text             String?        @db.Text
+  textSource       String?        @map("text_source")
+  qualityScore     Float?         @map("quality_score")
+  thumbnailFileId  String?        @map("thumbnail_file_id") @db.Uuid
+  thumbnailFile    File?          @relation("SourceDocumentPageThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
+  extractError     String?        @map("extract_error") @db.Text
+  metadataJson     Json?          @map("metadata_json")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@unique([sourceDocumentId, pageNumber])
+  @@index([sourceDocumentId, status])
+  @@index([thumbnailFileId])
+  @@map("source_document_pages")
+}
+
+model LessonDocumentPageRange {
+  id               String         @id @default(uuid()) @db.Uuid
+  lessonId         String         @map("lesson_id") @db.Uuid
+  lesson           Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  sourceDocumentId String         @map("source_document_id") @db.Uuid
+  sourceDocument   SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  pageStart        Int            @map("page_start")
+  pageEnd          Int            @map("page_end")
+  createdById      String?        @map("created_by_id") @db.Uuid
+  createdBy        User?          @relation("LessonDocumentPageRangeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  metadataJson     Json?          @map("metadata_json")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@unique([lessonId, sourceDocumentId])
+  @@index([lessonId])
+  @@index([sourceDocumentId])
+  @@index([createdById])
+  @@map("lesson_document_page_ranges")
+}
+
+model LessonDocument {
+  id                  String             @id @default(uuid()) @db.Uuid
+  lessonId            String             @map("lesson_id") @db.Uuid
+  lesson              Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileId              String             @map("file_id") @db.Uuid
+  file                File               @relation("LessonDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  sourceDocumentId    String?            @map("source_document_id") @db.Uuid
+  sourceDocument      SourceDocument?    @relation("LessonDocumentSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  kind                LessonDocumentKind @default(SUPPLEMENT)
+  title               String?
+  status              DocumentStatus     @default(UPLOADED)
+  extractedText       String?            @map("extracted_text") @db.Text
+  extractError        String?            @map("extract_error") @db.Text
+  contentHash         String?            @map("content_hash")
+  chunkCount          Int                @default(0) @map("chunk_count")
+  processingJobId     String?            @map("processing_job_id") @db.Uuid
+  processingJob       BackgroundJob?     @relation("LessonDocumentProcessingJob", fields: [processingJobId], references: [id], onDelete: SetNull)
+  processedAt         DateTime?          @map("processed_at")
+  embeddingProvider   AiProviderName?    @map("embedding_provider")
+  embeddingModel      String?            @map("embedding_model")
+  embeddingDimensions Int?               @map("embedding_dimensions")
+  metadataJson        Json?              @map("metadata_json")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  replacedAt          DateTime?          @map("replaced_at")
+  chunks              DocumentChunk[]
+
+  @@index([lessonId])
+  @@index([lessonId, kind])
+  @@index([status])
+  @@index([contentHash])
+  @@index([fileId])
+  @@index([sourceDocumentId])
+  @@index([processingJobId])
+  @@index([replacedAt])
   @@map("lesson_documents")
 }
 

@@ -17,7 +17,9 @@
     "lint": "eslint .",
     "prisma": "prisma --config prisma.config.ts",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:m4.2": "vitest run test/m4.2-document-helpers.test.ts test/m4.2-document-api.int.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1084.0",
@@ -38,10 +40,14 @@
     "zod": "4.2.1"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.1.28",
     "@types/node": "24.10.4",
+    "@types/supertest": "^7.2.1",
     "dotenv": "^17.4.2",
     "prisma": "^7.8.0",
+    "supertest": "^7.2.2",
     "tsx": "4.21.0",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "^4.1.10"
   }
 }

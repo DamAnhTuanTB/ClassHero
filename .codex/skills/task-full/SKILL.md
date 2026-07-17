@@ -21,7 +21,7 @@ Accept:
 
 Parse subtask IDs in order. If `plan` appears after the command and before the task IDs, enable plan mode. Multiple IDs are allowed only when explicitly listed. Execute sequentially and stop if one creates unresolved risk.
 
-If `screenshot` appears after the command, enable screenshot mode for UI portions only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default. Without the `screenshot` keyword or an explicit browser-check request, do not create/save screenshots and do not run browser/Playwright UI checks; use proportional static/focused code checks instead.
+If `screenshot` appears after the command, enable screenshot mode for UI portions only because the owner explicitly requested it. Per owner preference, do not run browser checks, Playwright UI, screenshots, or real interaction checks by default for small/normal tasks. For large-scope `/task-full` work, the thorough verification rule below overrides this default: run E2E/browser/runtime checks for UI or end-to-end flows when practical, even without the `screenshot` keyword. Without the `screenshot` keyword or an explicit browser-check/debug need, do not create/save screenshot artifacts; use the appropriate test/runtime evidence instead.
 
 ## Plan Mode
 
@@ -110,8 +110,18 @@ Run checks proportional to risk:
 - Focused tests where available.
 - Build/lint when shared or production surface changed.
 - Curl/API checks when practical for API/backend work.
-- For UI, use static/focused checks by default and mention that owner self-checks responsive/tương tác. Include screenshot paths only when screenshot mode created them.
+- For UI, use static/focused checks by default only for small/normal tasks and mention that owner self-checks responsive/tương tác. Include screenshot paths only when screenshot mode created them.
 - For performance-sensitive work, mention what was measured or why measurement was skipped.
+
+For large-scope `/task-full` work, do thorough verification before final:
+
+- Treat as large-scope when the task touches multiple screens/modules/packages, shared components/primitives, API/database/schema/worker/storage/auth/payment/AI, data-connected UI, route guards/session, or a production user flow end to end.
+- Run unit/focused tests for pure logic and serializers/helpers.
+- Run integration/API tests or focused curl checks for endpoint, service, auth/RBAC, database, storage, queue, or provider behavior.
+- Run E2E/browser/runtime checks for UI or end-to-end flows, including key interactions and responsive/runtime sanity when practical.
+- Run typecheck, lint, and build for affected packages when production surfaces or shared code changed.
+- If the repo lacks a needed test harness, add a reasonable reusable test setup/package or create focused tests when feasible.
+- If any layer cannot be run, state `Not run: <reason>` clearly in the final response.
 
 ## Lean Mode For Small Tasks
 
@@ -130,7 +140,7 @@ Non-negotiable:
 - Do not update changelog during implementation; `/commit` will record the commit's main changes.
 - If a larger check is skipped, state `Not run: <reason>` in the final response.
 - If the owner writes `fast`, `check nhẹ`, or `sửa nhanh`, use lean verification only when the requested change is low risk; keep the full workflow for auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior changes.
-- Do not use lean mode for auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior changes.
+- Do not use lean mode for large-scope `/task-full` work, auth/RBAC, payment, database/schema/migration, API contract, AI/RAG, worker/queue, storage, notification/realtime, security, or multi-module behavior changes.
 
 ## Learning Notes
 

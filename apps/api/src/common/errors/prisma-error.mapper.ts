@@ -18,6 +18,12 @@ export function isPrismaRecordNotFoundError(
   return isPrismaKnownRequestError(error) && error.code === "P2025";
 }
 
+export function isPrismaForeignKeyConstraintError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return isPrismaKnownRequestError(error) && error.code === "P2003";
+}
+
 export function getPrismaUniqueTarget(error: unknown): string[] {
   if (!isPrismaUniqueConstraintError(error)) {
     return [];

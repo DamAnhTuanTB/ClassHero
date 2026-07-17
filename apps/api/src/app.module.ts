@@ -6,6 +6,7 @@ import { PrismaModule } from "#api/common/prisma/prisma.module";
 import { validateEnv } from "#api/config/env.validation";
 import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
+import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
 import { PaymentsModule } from "#api/modules/payments/payments.module";
 
@@ -19,6 +20,7 @@ import { PaymentsModule } from "#api/modules/payments/payments.module";
     PrismaModule,
     AuthModule,
     FilesModule,
+    JobsModule,
     LearningPathsModule,
     PaymentsModule,
   ],

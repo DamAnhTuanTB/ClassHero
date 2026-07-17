@@ -381,8 +381,8 @@ Guard bắt buộc:
 
 ## 15. Testing
 
-- Unit test: Jest.
-- Backend API test: Jest + Supertest.
+- Unit/focused test: dùng test runner đã cấu hình trong package, ví dụ Jest hoặc Vitest.
+- Backend API/integration test: Jest/Vitest + Supertest theo package config.
 - Frontend E2E: Playwright.
 - AI output test: validate Zod/JSON Schema.
 - Payment webhook test phải kiểm tra idempotency.
@@ -391,11 +391,14 @@ Guard bắt buộc:
 
 Checks phải tỉ lệ với rủi ro:
 
+- Riêng `/task-ui`, `/task-connect` và `/task-full` quy mô lớn phải dùng verification kỹ sau khi làm xong, không dùng lean mode mặc định. Quy mô lớn gồm task chạm nhiều màn/module/package, shared component/primitive, API/database/schema/worker/storage/auth/payment/AI, data-connected UI, route guard/session, hoặc một user flow production end-to-end.
+- Với các task lớn này, Codex phải chạy bộ check phù hợp với bề mặt đã sửa: unit/focused test cho logic thuần; integration/API test cho endpoint/service/database behavior; E2E/browser/runtime check cho UI hoặc flow người dùng; typecheck/lint/build cho package bị ảnh hưởng; migration/worker/provider runtime check khi chạm database, queue, storage hoặc tích hợp. Nếu test harness còn thiếu, được cài thêm package test hợp lý và/hoặc tạo focused test có thể tái dùng, miễn không thêm phụ thuộc nặng vô ích.
+- Rule test kỹ của task lớn override preference "không tự chạy browser/Playwright" thông thường: nếu task lớn có UI hoặc flow end-to-end, phải chạy E2E/browser/runtime check khi khả thi, kể cả khi command không có `screenshot`. Screenshot artifact vẫn chỉ tạo khi cần bằng chứng debug hoặc owner yêu cầu screenshot.
 - Task nhỏ, docs-only, wording, UI-only nhỏ, config nhẹ hoặc sửa bug cô lập có thể dùng lean mode để tối đa tốc độ.
 - Lean mode nghĩa là không cần chạy full lint/build/test toàn repo nếu không cần thiết; chỉ chạy check nhỏ nhất đủ tin cậy như `git diff --check`, kiểm tra frontmatter skill/script validation nếu có, typecheck package liên quan, curl nhỏ hoặc kiểm tra thủ công có ghi chú.
 - Khi owner ghi `sửa nhanh`, `fast`, hoặc `check nhẹ`, Codex mặc định dùng fast path: đọc đúng phạm vi nhỏ nhất, patch trực tiếp, không refactor/cleanup lan, không cập nhật changelog, không chạy `typecheck`, `lint`, `build`, Playwright/E2E trừ khi thay đổi đụng auth/API/database/shared logic, route guard, form/session/data behavior hoặc có dấu hiệu lỗi TypeScript rõ ràng.
 - Với task làm UI hoặc owner yêu cầu "sửa UI", mặc định ưu tiên tốc độ: hạn chế chạy `typecheck`, `lint`, `build`, Playwright/E2E. Chỉ chạy các check này khi thay đổi chạm nhiều component/route, sửa shared UI primitive, đổi form/state phức tạp, nghi có lỗi TypeScript, hoặc owner yêu cầu rõ. Nếu chỉ chỉnh màu, spacing, copy, class Tailwind, vị trí ảnh/icon hoặc style nhỏ, dùng `git diff --check`, format check nhỏ hoặc kiểm tra thủ công là đủ.
-- Không tự chạy browser check/Playwright UI/kiểm tương tác thật như một bước verification mặc định, kể cả bug UI hoặc form interaction. Nếu cần xác minh hành vi, ưu tiên check tĩnh/focused như `git diff --check`, targeted format, typecheck package liên quan hoặc đọc code; owner sẽ tự kiểm tra trên app.
+- Với task UI nhỏ/thường, không tự chạy browser check/Playwright UI/kiểm tương tác thật như một bước verification mặc định, kể cả bug UI hoặc form interaction. Nếu cần xác minh hành vi, ưu tiên check tĩnh/focused như `git diff --check`, targeted format, typecheck package liên quan hoặc đọc code; owner sẽ tự kiểm tra trên app.
 - Với CSS/visual tweak nhỏ, "kiểm tra thủ công" phải ghi rõ là kiểm code/static hay kiểm browser thật. Nếu không mở browser/computed style, không được kết luận "UI đã đúng"; chỉ kết luận "code đã đổi và check tĩnh pass". Khi cần chứng minh visual đã đổi, phải dùng browser/screenshot/computed style sau khi owner cho phép, hoặc yêu cầu owner hard refresh/restart dev server nếu nghi HMR/cache.
 - Khi sửa backend/API cho UI owner đang test, phải verify đúng API origin mà web đang gọi, thường là `localhost:4000`. Nếu `localhost:4000` đang chạy dev server cũ hoặc không reload theo code mới, kiểm tra/restart đúng process đó rồi curl lại payload lỗi; không chỉ verify trên cổng tạm như `4001` rồi kết luận UI đã ổn.
 - Nếu bỏ qua check lớn, ghi rõ `Not run: <lý do>` trong final response.
