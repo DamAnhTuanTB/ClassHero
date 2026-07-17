@@ -72,6 +72,7 @@ export function AuthRouteLayout({ children }: { children: ReactNode }) {
   const variant = getAuthVariant(pathname);
   const currentTheme = theme[variant];
   const showBackLink = variant !== "login";
+  const isRegisterVariant = variant === "student" || variant === "parent";
 
   return (
     <main
@@ -80,7 +81,13 @@ export function AuthRouteLayout({ children }: { children: ReactNode }) {
     >
       <div className="theme-auth-ambient pointer-events-none absolute inset-0" />
 
-      <section className="theme-auth-shell relative mx-auto min-h-[calc(100vh-2rem)] max-w-[560px] overflow-hidden rounded-2xl sm:min-h-[calc(100vh-4rem)] lg:grid lg:max-w-[1280px] lg:grid-cols-[1fr_0.94fr] lg:rounded-[2.35rem]">
+      <section
+        className={`theme-auth-shell relative mx-auto min-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl sm:min-h-[calc(100vh-4rem)] lg:grid lg:rounded-[2.35rem] ${
+          isRegisterVariant
+            ? "max-w-[760px] lg:max-w-[1360px] lg:grid-cols-[0.82fr_1.18fr]"
+            : "max-w-[560px] lg:max-w-[1280px] lg:grid-cols-[1fr_0.94fr]"
+        }`}
+      >
         <div className="relative h-[25rem] px-6 pb-28 pt-6 sm:h-[26.125rem] sm:px-8 sm:pb-28 sm:pt-8 lg:h-auto lg:min-h-full lg:px-10 lg:pb-12 lg:pt-10 xl:px-14">
           <div className="flex items-center justify-between gap-4">
             <Link href="/" className="inline-flex items-center gap-3">
@@ -148,8 +155,16 @@ export function AuthRouteLayout({ children }: { children: ReactNode }) {
           />
         </div>
 
-        <div className="relative z-20 -mt-12 px-5 pb-5 sm:px-7 sm:pb-7 lg:mt-0 lg:flex lg:min-h-full lg:items-center lg:justify-center lg:bg-[var(--theme-surface)] lg:px-10 lg:py-10 xl:px-14">
-          <div className="theme-form-shell w-full rounded-[1.7rem] p-5 backdrop-blur sm:p-6 lg:max-w-[39rem] lg:p-8 xl:p-10">
+        <div
+          className={`relative z-20 -mt-12 px-5 pb-5 sm:px-7 sm:pb-7 lg:mt-0 lg:flex lg:min-h-full lg:items-center lg:justify-center lg:bg-[var(--theme-surface)] lg:py-10 ${
+            isRegisterVariant ? "lg:px-8 xl:px-10" : "lg:px-10 xl:px-14"
+          }`}
+        >
+          <div
+            className={`theme-form-shell w-full rounded-[1.7rem] p-5 backdrop-blur sm:p-6 lg:p-8 xl:p-10 ${
+              isRegisterVariant ? "lg:max-w-[46rem]" : "lg:max-w-[39rem]"
+            }`}
+          >
             <AuthDevHydrationBoundary>{children}</AuthDevHydrationBoundary>
           </div>
         </div>

@@ -115,7 +115,7 @@ export function StudentRegisterForm() {
     >
       <FormHeader title="Đăng ký" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <TextField
           id="student-full-name"
           label="Họ tên học sinh"
@@ -185,7 +185,7 @@ export function StudentRegisterForm() {
           error={form.formState.errors.address}
           disabled={isPending}
           suppressBrowserSuggestions
-          wrapperClassName="sm:col-span-2"
+          wrapperClassName="md:col-span-2"
           {...form.register("address")}
         />
         <TextField
@@ -198,7 +198,7 @@ export function StudentRegisterForm() {
           error={form.formState.errors.phone}
           disabled={isPending || hasNoPhone}
           suppressBrowserSuggestions
-          wrapperClassName="sm:col-span-2"
+          wrapperClassName="md:col-span-2"
           labelAction={
             <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-xs font-bold text-[var(--theme-text)] transition hover:text-[var(--theme-text-strong)]">
               <input
@@ -249,7 +249,7 @@ export function StudentRegisterForm() {
           error={form.formState.errors.username}
           disabled={isPending}
           suppressBrowserSuggestions
-          wrapperClassName="sm:col-span-2"
+          wrapperClassName="md:col-span-2"
           {...form.register("username")}
         />
         <TextField

@@ -76,14 +76,15 @@ Các bước:
 4. Backend tạo access token và refresh token.
 5. Backend hash refresh token rồi lưu DB.
 6. Front-end lưu access token theo cơ chế an toàn.
-7. Front-end điều hướng theo role sau khi đăng nhập thành công; Admin vào trang admin hiện có, Student/Parent vào trang phù hợp khi dashboard tương ứng đã triển khai.
+7. Front-end điều hướng theo role sau khi đăng nhập thành công; Admin vào `/admin/courses`, Student vào `/student/courses`, Parent vào trang phù hợp khi dashboard tương ứng đã triển khai.
 
 Acceptance Criteria:
 
 - Sai password trả lỗi chung, không tiết lộ tài khoản có tồn tại hay không.
 - Access token chứa user id và role.
 - Refresh token có thể revoke khi logout.
-- Admin đăng nhập thành công phải được chuyển vào trang admin, không ở lại màn login.
+- Admin đăng nhập thành công phải được chuyển vào màn quản lý khóa học, không ở lại màn login.
+- Student đăng nhập thành công phải được chuyển vào màn học tập/khóa học của tôi, không ở lại màn login.
 
 ---
 

@@ -5,8 +5,8 @@ export function getPostLoginRedirectPath(role: AuthRole) {
     case "ADMIN":
       return "/admin/courses";
     case "PARENT":
-    case "STUDENT":
-    default:
       return "/";
+    case "STUDENT":
+      return "/student/courses";
   }
 }

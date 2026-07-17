@@ -1,2 +1,3 @@
 - 2026-07-17: Hoàn thiện luồng khóa học student/admin gồm nối course list/detail với API thật, mock mua ngay tạo enrollment, trạng thái khóa/bảo trì cho khóa đã mua nhưng chưa phát hành, lesson trial/lock theo chương, UI admin edit lộ trình và form lộ trình tự sinh slug khi ẩn field slug.
 - 2026-07-17: Chốt lại tài liệu M4 theo hướng upload source PDF/tài liệu dài ở cấp lộ trình, extract/OCR theo trang, admin gán page range cho lesson rồi chunk theo `lesson_id`; bổ sung contract API/database, pattern UI, context và ADR cho tài liệu gốc/tài liệu bổ sung.
+- 2026-07-17: Cập nhật auth UI để student đăng nhập xong vào màn học tập, admin vào quản lý khóa học, đồng thời nới layout form đăng ký học sinh/phụ huynh để placeholder mật khẩu không bị cắt ở khung hẹp.

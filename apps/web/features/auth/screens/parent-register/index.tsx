@@ -83,7 +83,7 @@ export function ParentRegisterForm() {
     >
       <FormHeader title="Đăng ký" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <TextField
           id="parent-full-name"
           label="Họ tên phụ huynh"
@@ -110,7 +110,7 @@ export function ParentRegisterForm() {
           autoComplete="off"
           error={form.formState.errors.address}
           disabled={isPending}
-          wrapperClassName="sm:col-span-2"
+          wrapperClassName="md:col-span-2"
           {...form.register("address")}
         />
         <TextField
