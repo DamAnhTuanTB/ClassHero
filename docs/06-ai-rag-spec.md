@@ -137,14 +137,16 @@ Mục đích:
 Flow:
 
 ```txt
-Admin upload PDF
+Admin upload PDF dài ở cấp learning path/course
   -> API validate file
   -> Save file to Cloudflare R2
   -> Save files metadata với purpose LESSON_DOCUMENT
-  -> Create lesson_documents status UPLOADED, content_hash nếu tính được
+  -> Create source_document status UPLOADED, content_hash nếu tính được
   -> Create background_jobs queue DOCUMENT_PROCESSING
-  -> Enqueue BullMQ document-processing job
+  -> Enqueue BullMQ source-document page extraction job
 ```
+
+Supplemental document: nếu một lesson cần thêm tài liệu riêng ngoài source PDF dài, admin có thể upload tài liệu lẻ trực tiếp cho lesson và hệ thống tạo `lesson_documents` loại bổ sung.
 
 ### 3.2. Extract text
 
@@ -154,22 +156,46 @@ Worker:
 DOCUMENT_PROCESSING job
   -> update background_jobs.status RUNNING
   -> download/read file from R2
-  -> extract text bằng pdf-parse/pdfjs-dist
-  -> update lesson_documents.extracted_text
-  -> update lesson_documents.status PROCESSING
-  -> chunk tài liệu
-  -> enqueue EMBEDDING job
+  -> detect page count
+  -> create/update source_document_pages
+  -> extract text page-level bằng pdf-parse/pdfjs-dist
+  -> nếu page text quá ít, render page thành ảnh và chạy OCR/Vision fallback
+  -> lưu page text, text_source, quality_score, thumbnail/snapshot ref nếu có
+  -> update source_document.status PAGE_EXTRACTED hoặc FAILED
 ```
 
 Nếu PDF scan hoặc text extract quá ít:
 
-- TODO: dùng AI Vision/OCR qua AiProvider khi cần.
-- Không dùng OCR hàng loạt nếu chưa có budget/rule.
+- Phải phát hiện bằng ngưỡng tối thiểu, ví dụ số ký tự trên mỗi trang hoặc tỉ lệ trang không có text.
+- Chạy OCR/Vision fallback theo cấu hình provider, ưu tiên đi qua abstraction nội bộ thay vì gọi provider trực tiếp trong worker.
+- OCR cần lưu metadata theo trang: nguồn text, page index, confidence nếu provider trả, lỗi trang nếu có.
+- Nếu OCR chưa bật hoặc thiếu cấu hình, job phải fail rõ lý do để admin biết PDF scan chưa xử lý được; không được âm thầm tạo chunks rỗng.
+- Không dùng OCR hàng loạt không giới hạn; phải áp dụng concurrency/rate limit/budget guard vì PDF scan nhiều trang có thể tốn chi phí.
+
+### 3.2.1. Lesson page mapping
+
+Sau khi source document đã có page records, admin gán khoảng trang cho từng lesson:
+
+```txt
+lesson_id -> source_document_id + page_start + page_end
+```
+
+Rules:
+
+- Page range phải nằm trong tổng số trang.
+- Cho phép cảnh báo range trùng hoặc trang chưa gán, nhưng không tự đoán silently.
+- Khi admin sửa page range, chunks/embedding/explanation liên quan đến lesson đó phải được đánh dấu stale hoặc tạo lại.
+- Retrieval/chat vẫn chỉ dùng `lesson_id`; source document chỉ là nguồn tạo chunk.
+- Lesson có thể có thêm supplemental documents upload trực tiếp. Các tài liệu này không cần page range, nhưng chunks cuối cùng vẫn phải gắn cùng `lesson_id`.
 
 ### 3.3. Chunking
 
 Chunking nên giữ ngữ cảnh giáo dục:
 
+- Chunking chạy sau khi có page range mapping.
+- Với source document dài, worker lấy page text trong range của từng lesson rồi mới chunk.
+- Với supplemental documents, worker extract/OCR/chunk trực tiếp theo file bổ sung và gắn chunks vào lesson sở hữu tài liệu.
+- Retrieval theo lesson phải gom context từ cả tài liệu chính `PRIMARY_FROM_SOURCE` và tài liệu bổ sung `SUPPLEMENT`, nhưng vẫn không lấy chunk từ lesson khác.
 - Chunk theo heading/section nếu extract được.
 - Nếu không, chunk theo đoạn.
 - Có overlap vừa phải.
@@ -190,7 +216,10 @@ Metadata chunk nên có:
   "pageEnd": 2,
   "sectionTitle": "Số hữu tỉ",
   "sourceFileId": "uuid",
-  "documentId": "uuid"
+  "sourceDocumentId": "uuid",
+  "documentId": "uuid",
+  "textSource": "text_layer|ocr",
+  "qualityScore": 0.82
 }
 ```
 

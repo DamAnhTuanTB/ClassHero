@@ -142,27 +142,35 @@ Acceptance Criteria:
 
 Actor: Admin.
 
+Flow chính MVP: upload một tài liệu nguồn dài cho lộ trình rồi gán trang vào từng buổi học.
+
 Các bước:
 
-1. Admin chọn buổi học.
-2. Admin upload PDF/ảnh/tài liệu.
+1. Admin tạo trước các buổi học bằng metadata thô.
+2. Admin upload một PDF/tài liệu nguồn dài ở cấp lộ trình.
 3. Backend validate file type và size.
 4. Backend tạo object key.
 5. Backend upload file lên object storage theo môi trường: MinIO local/dev hoặc Cloudflare R2 staging/production.
 6. Backend lưu metadata vào `files`.
-7. Backend tạo `lesson_documents` hoặc `lesson_materials`.
-8. Backend enqueue job xử lý PDF nếu là PDF.
-9. Worker extract text.
-10. Worker chunk tài liệu.
-11. Worker tạo embedding.
-12. Worker lưu chunks/embedding vào database.
+7. Backend tạo source document và enqueue job xử lý PDF nếu là PDF.
+8. Worker extract/OCR theo từng trang, lưu page text, snapshot/thumbnail nếu có và quality status.
+9. Admin gán khoảng trang cho từng buổi học.
+10. Backend validate page range và tạo mapping `lesson -> page ranges`.
+11. Worker chunk nội dung theo từng lesson dựa trên page range.
+12. Worker tạo embedding.
+13. Worker lưu chunks/embedding vào database với `lesson_id` đúng.
+
+Fallback:
+
+- Admin vẫn có thể upload tài liệu lẻ trực tiếp cho từng buổi học nếu tài liệu không nằm trong một source PDF dài.
+- Sau khi đã gán trang từ source PDF dài, admin vẫn có thể upload thêm tài liệu bổ sung cho một vài buổi học, ví dụ phiếu bài tập riêng, file đáp án, ảnh công thức hoặc tài liệu tham khảo. Các tài liệu bổ sung này gắn trực tiếp vào `lesson_id` và được xử lý/chunk như nguồn context bổ sung của chính buổi học đó.
 
 Acceptance Criteria:
 
 - File chính không lưu trong disk app/VPS.
-- PDF processing chạy background.
+- PDF processing chạy background theo page-level trước, chunking theo lesson sau khi có page range.
 - Nếu xử lý lỗi, document status là `FAILED`.
-- Admin thấy trạng thái xử lý tài liệu.
+- Admin thấy trạng thái xử lý tài liệu nguồn, từng trang, từng lesson mapping và tài liệu bổ sung nếu có.
 
 ---
 

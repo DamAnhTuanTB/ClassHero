@@ -505,30 +505,131 @@ Behavior:
 - Kiểm tra quyền dựa trên purpose, owner và entity tham chiếu.
 - Trả signed URL ngắn hạn để UI đọc file private/local MinIO/R2 mà không public bucket.
 
-### `POST /admin/lessons/:lessonId/documents`
+### `POST /admin/learning-paths/:learningPathId/source-documents`
 
 Role: `ADMIN`.
 
-Ghi chú: Chapter không có document/material upload riêng ở MVP; upload tài liệu chỉ thực hiện ở cấp lesson.
+Ghi chú: Flow chính MVP là upload một PDF/tài liệu nguồn dài ở cấp lộ trình rồi gán page range vào từng lesson. Chapter không có document/material upload riêng.
 
 Body:
 
 ```json
 {
   "fileId": "uuid",
-  "title": "PDF bài học"
+  "title": "Toán 7 Tập 1"
 }
 ```
 
 Side effects:
 
-- Tạo `lesson_documents`.
+- Tạo source document.
+- Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
+- Enqueue job extract/OCR page-level nếu PDF.
+
+### `GET /admin/learning-paths/:learningPathId/source-documents`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả source documents của lộ trình, tổng số trang, trạng thái xử lý và lỗi nếu có.
+
+### `GET /admin/source-documents/:sourceDocumentId/pages`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả danh sách page records: `pageNumber`, `status`, `textSource`, `qualityScore`, `thumbnailFileId` nếu có, và text preview ngắn.
+
+### `PUT /admin/source-documents/:sourceDocumentId/lesson-page-ranges`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{
+  "ranges": [
+    {
+      "lessonId": "uuid",
+      "pageStart": 20,
+      "pageEnd": 22
+    }
+  ]
+}
+```
+
+Behavior:
+
+- Validate lesson thuộc cùng learning path với source document.
+- Validate page range nằm trong tổng số trang.
+- Trả warning nếu page range trùng hoặc có trang chưa gán.
+- Tạo/cập nhật lesson document mapping cho từng lesson.
+- Enqueue job chunking cho các lesson bị thay đổi range.
+
+### `POST /admin/lessons/:lessonId/primary-document/replace`
+
+Role: `ADMIN`.
+
+Ghi chú: Upload hoặc thay thế tài liệu gốc/chính của một lesson. Action này tách biệt với upload tài liệu bổ sung.
+
+Body khi dùng page range từ source document:
+
+```json
+{
+  "sourceDocumentId": "uuid",
+  "pageStart": 20,
+  "pageEnd": 22
+}
+```
+
+Body khi upload file riêng làm tài liệu chính thay thế:
+
+```json
+{
+  "fileId": "uuid",
+  "title": "PDF gốc của buổi học"
+}
+```
+
+Behavior:
+
+- Chỉ có một tài liệu chính active cho mỗi lesson.
+- Tài liệu chính cũ bị đánh dấu stale/archived theo schema thực tế, không xóa file gốc ngay.
+- Tài liệu bổ sung `SUPPLEMENT` của lesson không bị ảnh hưởng.
+- Enqueue job extract/OCR/chunk lại cho lesson.
+
+### `POST /admin/lessons/:lessonId/documents`
+
+Role: `ADMIN`.
+
+Ghi chú: Upload tài liệu bổ sung trực tiếp cho một lesson. Tài liệu chính của lesson vẫn ưu tiên đến từ source PDF dài + page range.
+
+Body:
+
+```json
+{
+  "fileId": "uuid",
+  "title": "Phiếu bài tập thêm",
+  "kind": "SUPPLEMENT"
+}
+```
+
+Side effects:
+
+- Tạo `lesson_documents` trực tiếp cho lesson với `kind = SUPPLEMENT`.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
 - Enqueue job nếu PDF.
 
 ### `GET /admin/lessons/:lessonId/documents`
 
 Role: `ADMIN`.
+
+Behavior:
+
+- Trả cả tài liệu chính từ source document/page range và tài liệu bổ sung upload trực tiếp.
+- Response cần phân biệt `kind = PRIMARY_FROM_SOURCE | PRIMARY_REPLACEMENT | SUPPLEMENT` để UI nhóm tài liệu rõ ràng.
 
 ### `POST /admin/lessons/:lessonId/materials`
 

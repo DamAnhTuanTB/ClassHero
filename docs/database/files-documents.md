@@ -39,7 +39,96 @@ Rules:
 - Không được chỉ dựa vào `file_id` để cấp signed URL.
 - Client không được upload trực tiếp `AI_DIAGRAM`; chỉ backend/worker tạo sau khi validate `diagram_spec_json`.
 
-### 4.2. `lesson_documents`
+### 4.2. `source_documents`
+
+Tài liệu nguồn dài ở cấp lộ trình/course, ví dụ một file sách giáo khoa hoặc giáo trình gồm nhiều bài học.
+
+```txt
+id uuid pk
+learning_path_id uuid fk learning_paths.id
+file_id uuid fk files.id
+title string?
+status DocumentStatus default UPLOADED
+page_count int?
+content_hash string?
+processing_job_id uuid? fk background_jobs.id
+processed_at timestamp?
+metadata_json jsonb?
+created_at timestamp
+updated_at timestamp
+```
+
+Index:
+
+- `learning_path_id`.
+- `status`.
+- `content_hash`.
+
+Rules:
+
+- Source document không dùng trực tiếp cho retrieval của học sinh.
+- Source document chỉ là nguồn extract/OCR page-level và tạo mapping sang lesson.
+- Nếu source document thay đổi, page text, lesson mappings, chunks, embedding và explanation liên quan có thể stale.
+
+### 4.3. `source_document_pages`
+
+Text/snapshot/quality theo từng trang của source document.
+
+```txt
+id uuid pk
+source_document_id uuid fk source_documents.id
+page_number int
+status DocumentStatus default UPLOADED
+text text?
+text_source string? -- text_layer | ocr | mixed
+quality_score float?
+thumbnail_file_id uuid? fk files.id
+extract_error string?
+metadata_json jsonb?
+created_at timestamp
+updated_at timestamp
+```
+
+Index/constraint:
+
+- unique `(source_document_id, page_number)`.
+- index `(source_document_id, status)`.
+
+Rules:
+
+- Worker tạo page records sau khi biết tổng số trang.
+- Page text được dùng để chunk theo lesson sau khi admin gán page range.
+- OCR lỗi ở một trang không được làm mất trạng thái của các trang khác; lưu lỗi theo trang.
+
+### 4.4. `lesson_document_page_ranges`
+
+Mapping thủ công từ lesson sang khoảng trang của source document.
+
+```txt
+id uuid pk
+lesson_id uuid fk lessons.id
+source_document_id uuid fk source_documents.id
+page_start int
+page_end int
+created_by_id uuid? fk users.id
+metadata_json jsonb?
+created_at timestamp
+updated_at timestamp
+```
+
+Index/constraint:
+
+- index `lesson_id`.
+- index `source_document_id`.
+
+Rules:
+
+- `page_start <= page_end`.
+- Lesson phải thuộc cùng learning path với source document.
+- Cho phép cảnh báo range trùng/bỏ sót ở API/UI; không tự động gán page nếu admin chưa xác nhận.
+- Khi mapping đổi, worker phải tạo lại chunks cho lesson liên quan.
+
+### 4.5. `lesson_documents`
 
 Dùng cho PDF/tài liệu nguồn cần extract/chunk/embedding.
 
@@ -47,6 +136,8 @@ Dùng cho PDF/tài liệu nguồn cần extract/chunk/embedding.
 id uuid pk
 lesson_id uuid fk lessons.id
 file_id uuid fk files.id
+source_document_id uuid? fk source_documents.id
+kind string default SUPPLEMENT -- PRIMARY_FROM_SOURCE | PRIMARY_REPLACEMENT | SUPPLEMENT
 title string?
 status DocumentStatus default UPLOADED
 extracted_text text?
@@ -74,8 +165,14 @@ Rules:
 - `content_hash` dùng để phát hiện tài liệu nguồn thay đổi và invalidate embedding/explanation liên quan.
 - Nếu tài liệu thay đổi, worker phải tạo lại chunks/embedding và các explanation liên quan có thể bị stale.
 - Chapter không có `chapter_documents` riêng ở MVP; tài liệu/chunk/embedding chỉ gắn với lesson.
+- Với source document dài, `lesson_documents` có thể trỏ tới `source_document_id` và dùng `lesson_document_page_ranges` để biết page range nguồn.
+- `PRIMARY_FROM_SOURCE` là tài liệu chính của lesson được tạo từ source document + page range.
+- `PRIMARY_REPLACEMENT` là tài liệu chính thay thế của lesson, có thể đến từ page range mới hoặc file upload riêng.
+- `SUPPLEMENT` là tài liệu bổ sung upload trực tiếp cho lesson, ví dụ phiếu bài tập riêng, đáp án, ảnh công thức hoặc tài liệu tham khảo.
+- Mỗi lesson chỉ có một tài liệu chính active tại một thời điểm; thay thế tài liệu chính không được xóa hoặc làm mất supplemental documents.
+- Một lesson có thể có một hoặc nhiều supplemental documents; tất cả chunks cuối cùng vẫn phải gắn `lesson_id`.
 
-### 4.3. `document_chunks`
+### 4.6. `document_chunks`
 
 ```txt
 id uuid pk

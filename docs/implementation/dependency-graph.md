@@ -54,7 +54,7 @@ M14 testing/hardening/deploy
 - `M2.4` auth UI có thể làm mock sau `M0.2`, nhưng nối API thật cần `M2.2` và `M2.3`.
 - `M3.5` public/student course UI cần `M3.3`; CTA mua thật cần `M8.4`.
 - Course detail từ M3.3/M3.5 hiển thị `chapters -> lessons`; chapter chỉ có metadata tổng quan.
-- `M4.5` upload UI cần `M4.1`, `M4.2`, `M4.3`; status extract/chunk đầy đủ cần `M4.4`.
+- `M4.5` source document upload/page mapping UI cần `M4.1`, `M4.2`, `M4.3`; page-level extract/OCR và chunk theo lesson đầy đủ cần `M4.4`.
 - `M7.1` lesson page skeleton cần `M6.5` để đọc lesson content.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3` và `M9.1`.
