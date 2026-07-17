@@ -1,19 +1,22 @@
 ---
 name: commit
-description: Create a git commit for the Vietnamese learning-path project when the user types "/commit", "commit giúp tôi", or asks Codex to commit current changes. Use when Codex must inspect the worktree, verify changelog requirements from AGENTS.md, avoid committing secrets or unrelated unsafe files, stage the intended project changes, write a short conventional commit message that still covers the main points, run lightweight checks when practical, execute git commit, and report the commit hash and included files.
+description: Create one or more git commits for the Vietnamese learning-path project when the user types "/commit", "/commit all", "commit giúp tôi", or asks Codex to commit current changes. Use when Codex must inspect the worktree, decide whether one commit or multiple consecutive commits best fits the diff, verify changelog requirements from AGENTS.md, avoid committing secrets or unrelated unsafe files, stage the intended project changes batch by batch, write short conventional commit messages, run lightweight checks when practical, execute git commit, and report commit hashes and included files.
 ---
 
 # Commit Runner
 
-Use this skill to turn the current repo changes into a clean git commit without making product changes.
+Use this skill to turn the current repo changes into one or more clean git commits without making product changes.
 
 ## Command Parsing
 
 Accept these forms:
 
 - `/commit`
+- `/commit all`
 - `/commit fast`
 - `/commit full`
+- `/commit all fast`
+- `/commit all full`
 - `/commit <optional hint>`
 - `commit giúp tôi`
 - `commit các thay đổi hiện tại`
@@ -26,6 +29,13 @@ Verification mode:
 
 If the user provides another hint, use it only as guidance. The diff and changelog remain the source of truth for the commit message.
 
+Commit scope:
+
+- Plain `/commit` may create one commit or multiple consecutive commits when the diff clearly contains separate safe scopes.
+- `/commit all` means attempt to commit every safe intentional source change in the worktree. If the remaining changes form multiple coherent scopes, split them into multiple commits automatically instead of forcing one giant commit.
+- Do not leave intentional changes uncommitted after `/commit all` unless a safety gate blocks them, the scope is unclear/risky, or a verification/commit command fails.
+- If a user hint conflicts with the diff, trust the diff and explain the chosen grouping.
+
 ## Required Startup
 
 Before committing:
@@ -34,7 +44,7 @@ Before committing:
 2. Read `AGENTS.md`, especially changelog and commit rules.
 3. Run `git status --short`.
 4. Inspect `git diff --stat`, `git diff --name-only`, staged diff if any, and file-level diffs needed to understand the change.
-5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for the commit being created. Add one short, coherent changelog entry for the whole commit.
+5. Update `.codex/changelog/CHANGELOG_YYYY-MM-DD_codex.md` for each commit being created. Add one short, coherent changelog entry for each commit's actual staged scope.
 6. Do not modify production code during `/commit`; only update changelog if needed for commit hygiene.
 
 Use a faster diff-reading path when the work happened in the same active conversation and the changed files are low-risk UI/docs/skill files: inspect status/stat/name-only, targeted hunks, changelog, and safety scan instead of rereading every unchanged context line in full. Still inspect enough diff to write an accurate commit message and catch unrelated or risky files.
@@ -48,24 +58,57 @@ Do not commit if:
 - Diff contains secrets, tokens, private keys, `.env` values, webhook signatures, or production credentials.
 - Diff contains merge conflict markers.
 - Files look generated, local, or accidental and are not meant for source control, such as `node_modules`, `.next`, `dist`, logs, coverage, or OS/editor files.
-- The intended commit scope is genuinely unclear or includes unrelated risky work that should not be bundled.
+- The intended commit scope is genuinely unclear or includes unrelated risky work that cannot be safely split into separate commits.
 
 When blocked, stop and explain the exact reason plus the command or decision needed.
 
 ## Commit Workflow
 
 1. Summarize the changed areas from diff and changelog.
-2. Choose verification mode and explain it briefly.
-3. Run verification according to the mode:
+2. Decide commit grouping:
+   - one commit when the diff is one coherent feature/fix/refactor,
+   - multiple consecutive commits when there are clearly separate scopes such as backend/schema, web UI/refactor, docs/skills/context, tests/tooling, or unrelated fixes,
+   - block and ask only when grouping cannot be inferred safely.
+3. Choose verification mode and explain it briefly.
+4. Run verification according to the mode and planned grouping:
 
 - `smart`: choose the smallest checks that cover the touched areas.
 - `fast`: run safety checks and minimal validation only.
 - `full`: run broad repo/package checks.
 
-4. Stage the intended files explicitly. Use `git add <files>` instead of broad staging when there are suspicious or unrelated files.
-5. Re-check `git diff --cached --stat` and `git diff --cached --name-only`.
-6. Create the commit with `git commit -m "<subject>"` and optional extra `-m "<body>"` paragraphs.
-7. After commit, run `git status --short` and `git log -1 --oneline`.
+5. For each planned commit batch:
+   - update changelog with one entry matching that batch,
+   - stage the intended files explicitly,
+   - re-check `git diff --cached --stat` and `git diff --cached --name-only`,
+   - run or confirm the relevant checks cover that batch,
+   - create the commit with `git commit -m "<subject>"` and optional extra `-m "<body>"` paragraphs,
+   - run `git status --short` and `git log -1 --oneline`.
+6. If `/commit all` still has uncommitted safe changes after one commit, continue with the next batch until the worktree is clean or blocked.
+7. Do not use `git add .` blindly. Broad staging is acceptable only after inspecting status/name-only and confirming every remaining changed/untracked file belongs to the current batch.
+
+## Multi-Commit Grouping
+
+Prefer multiple commits when it improves reviewability and avoids mixing unrelated intent.
+
+Good split examples:
+
+- `feat(api): ...` for backend endpoints, schema, migrations, API tests, and matching API docs.
+- `refactor(web): ...` for front-end source structure, API client split, imports, and code-index updates.
+- `docs(codex): ...` for AGENTS/skill/context workflow rule updates.
+- `test(api): ...` or `build(api): ...` for isolated test tooling/dependency changes.
+
+Keep one commit when:
+
+- files are tightly coupled and separating would make either commit fail checks,
+- a migration and service/controller/tests/docs are all one feature slice,
+- a small docs/context update only describes the same code change.
+
+Operational rules:
+
+- Stage by path per batch. If a single file contains changes for multiple batches, include it in the batch where it is safest and most truthful; if that would make history misleading, stop and explain the blocker instead of trying risky hunk surgery.
+- Run broad expensive checks once when they cover all planned batches; otherwise run focused checks before the affected batch. Never claim a later batch is covered by a check that ran before its staged files existed or changed.
+- If one batch commits successfully and a later batch fails, keep the successful commit(s), leave the rest uncommitted, notify `failed` or `blocked`, and report exactly what remains.
+- For `/commit all`, final status should ideally be clean. If not clean, list remaining files and the exact reason they were not committed.
 
 ## Verification Selection
 
@@ -154,7 +197,7 @@ Use a concrete task label such as `/commit` or the commit scope. Keep the messag
 
 After committing, report briefly:
 
-- Commit hash and message.
+- Commit hash and message. If multiple commits were created, list all hashes/messages in order.
 - Main files included.
 - Verification mode.
 - Checks run or skipped.
@@ -168,6 +211,8 @@ Do not amend, rebase, reset, or squash unless explicitly asked.
 During `/commit`, add or adjust changelog for the commit being created:
 
 - Add one short, coherent entry per commit: `- YYYY-MM-DD: <short paragraph summarizing the commit's main changes>`.
+- In a multi-commit run, add one changelog entry immediately before each commit batch and stage that entry with the matching commit.
 - Do not split one commit into multiple changelog bullets by feature unless the owner explicitly asks.
+- Do not use one changelog entry to cover multiple commits.
 - Do not add `Summary`, `Changed`, `Files`, `Tests`, or `Notes` sections.
 - Keep checks, skipped checks, file lists, and risk notes in the final response or the relevant docs instead of the changelog.

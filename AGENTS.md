@@ -427,6 +427,7 @@ Không ghi file list, test/check, notes dài, secret, token, API key, webhook si
 Khi owner yêu cầu commit:
 
 - Changelog phải nằm cùng commit với thay đổi liên quan và chỉ ghi cho commit đó.
+- Nếu owner yêu cầu `/commit all` hoặc worktree có nhiều nhóm thay đổi độc lập nhưng đều an toàn, Codex được tự tạo nhiều commit liên tiếp theo scope hợp lý thay vì ép vào một commit lớn. Mỗi commit phải có changelog entry riêng, stage file rõ ràng theo batch, chạy check phù hợp với batch, và tiếp tục cho đến khi worktree sạch hoặc gặp blocker rõ ràng.
 - Không stage file rác/generated/local nếu không thuộc task.
 - Commit message dùng:
 

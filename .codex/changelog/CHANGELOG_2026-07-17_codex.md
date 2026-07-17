@@ -4,3 +4,4 @@
 - 2026-07-17: Chuẩn hóa UI khóa học trong web app bằng cách đổi copy lộ trình sang khóa học, thống nhất mô tả trống cho chương/bài học, thêm spinner loading căn giữa cho trạng thái chờ dữ liệu và chỉnh action chi tiết khóa học sang Edit/Xóa mềm.
 - 2026-07-17: Thêm M4.2 source document/page range API với schema Prisma, job status API, Vitest/Supertest focused tests và docs/learning notes; đồng thời ghi rule Codex buộc task-ui/task-connect/task-full quy mô lớn phải chạy verification sâu.
 - 2026-07-17: Tách các web API client lớn thành API, type, mapper, payload và error helper theo feature cho auth, admin courses và student courses; cập nhật import sử dụng alias tuyệt đối và code-index để dễ bảo trì.
+- 2026-07-17: Cập nhật workflow Codex cho `/commit all`, cho phép tự tách nhiều commit an toàn theo scope rõ ràng, ghi changelog theo từng batch và tiếp tục commit đến khi worktree sạch hoặc gặp blocker.
