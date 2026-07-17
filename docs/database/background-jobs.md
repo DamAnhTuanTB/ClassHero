@@ -45,5 +45,7 @@ Rules:
 - Không lưu secret hoặc raw prompt quá dài trong `input_meta_json`.
 - `GET /jobs/:jobId` phải kiểm tra owner/role.
 - `M4.2` tạo job rows cho `DOCUMENT_PROCESSING` khi tạo source document, cập nhật page range, thay thế tài liệu chính hoặc upload supplemental document; `M4.3` chịu trách nhiệm enqueue BullMQ thật và cập nhật `bullmq_job_id`.
+- Từ `M4.3`, API enqueue job thật vào BullMQ sau khi DB transaction tạo durable row thành công. Worker chạy tách API, nhận job theo `bullmq_job_id`, cập nhật durable status `QUEUED -> RUNNING -> SUCCEEDED/FAILED`, ghi `attempts`, `started_at`, `finished_at`, `error_message` và `result_json` an toàn.
+- Processor `DOCUMENT_PROCESSING` ở `M4.3` mới là foundation: xác nhận worker nhận job và cập nhật trạng thái durable. Extract/OCR/chunk tài liệu thật được triển khai ở `M4.4`.
 
 ---

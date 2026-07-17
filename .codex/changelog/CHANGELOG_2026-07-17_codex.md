@@ -5,3 +5,4 @@
 - 2026-07-17: Thêm M4.2 source document/page range API với schema Prisma, job status API, Vitest/Supertest focused tests và docs/learning notes; đồng thời ghi rule Codex buộc task-ui/task-connect/task-full quy mô lớn phải chạy verification sâu.
 - 2026-07-17: Tách các web API client lớn thành API, type, mapper, payload và error helper theo feature cho auth, admin courses và student courses; cập nhật import sử dụng alias tuyệt đối và code-index để dễ bảo trì.
 - 2026-07-17: Cập nhật workflow Codex cho `/commit all`, cho phép tự tách nhiều commit an toàn theo scope rõ ràng, ghi changelog theo từng batch và tiếp tục commit đến khi worktree sạch hoặc gặp blocker.
+- 2026-07-17: Hoàn thiện M4.3 BullMQ worker foundation bằng cách thêm queue service enqueue durable background jobs, worker process riêng cho document-processing, Docker worker dev service, env concurrency, focused tests, runtime Redis smoke và docs/learning notes cho trạng thái job.

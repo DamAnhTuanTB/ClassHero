@@ -17,13 +17,14 @@ import {
   UserStatus,
 } from "@prisma/client";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { AppModule } from "#api/app.module";
 import { ApiResponseInterceptor } from "#api/common/api/api-response.interceptor";
 import { HttpExceptionFilter } from "#api/common/errors/http-exception.filter";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { createValidationException } from "#api/common/validation/validation-error";
 import { AuthTokenService } from "#api/modules/auth/services/auth-token.service";
+import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 
 const testRunId = randomUUID();
 const ids = {
@@ -42,6 +43,12 @@ const cleanupIds = {
   lessonDocumentIds: new Set<string>(),
   jobIds: new Set<string>(),
 };
+const backgroundJobQueueMock = {
+  enqueue: vi.fn(async (jobId: string) => ({ jobId })),
+  enqueueMany: vi.fn(async (jobIds: string[]) =>
+    jobIds.map((jobId) => ({ jobId })),
+  ),
+};
 
 describe("M4.2 document API integration", () => {
   let app: INestApplication;
@@ -52,7 +59,10 @@ describe("M4.2 document API integration", () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(BackgroundJobQueueService)
+      .useValue(backgroundJobQueueMock)
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");

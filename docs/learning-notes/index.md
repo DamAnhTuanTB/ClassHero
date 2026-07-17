@@ -8,7 +8,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | -------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------- | ----------- |
 | [Admin course management](features/admin-course-management.md) | Admin lộ trình/chương học/buổi học, API thật, upload ảnh qua MinIO     | `M3.4`, `M4.1` | Đã cập nhật |
 | [Basic Auth API](features/auth-basic.md)                       | Auth, RBAC, profile base, refresh/reset password, auth UI nối API thật | `M2.2`-`M2.4`  | Đã cập nhật |
-| [Lesson document processing](features/lesson-document-processing.md) | Source document, page range mapping, lesson documents và job status | `M4.2` | Đã cập nhật |
+| [Lesson document processing](features/lesson-document-processing.md) | Source document, page range mapping, lesson documents, BullMQ worker foundation và job status | `M4.2`, `M4.3` | Đã cập nhật |
 | [Student course browsing](features/student-course-browsing.md) | Student danh sách/khám phá/chi tiết lộ trình nối public API thật       | `M3.5`         | Đã cập nhật |
 
 ## Foundation Notes

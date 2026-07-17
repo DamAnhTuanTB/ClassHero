@@ -5,6 +5,7 @@ import { OptionalJwtAuthGuard } from "#api/common/auth/optional-jwt-auth.guard";
 import { RolesGuard } from "#api/common/auth/roles.guard";
 import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
+import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { AdminChaptersController } from "#api/modules/learning-paths/controllers/admin-chapters.controller";
 import { AdminLessonDocumentsController } from "#api/modules/learning-paths/controllers/admin-lesson-documents.controller";
 import { AdminLearningPathsController } from "#api/modules/learning-paths/controllers/admin-learning-paths.controller";
@@ -19,7 +20,7 @@ import { PublicLearningPathsController } from "#api/modules/learning-paths/contr
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
 
 @Module({
-  imports: [AuthModule, FilesModule, JwtModule.register({})],
+  imports: [AuthModule, FilesModule, JobsModule, JwtModule.register({})],
   controllers: [
     AdminChaptersController,
     AdminLessonDocumentsController,

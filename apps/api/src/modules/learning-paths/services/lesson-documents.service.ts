@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { throwBadRequest, throwConflict } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { CreateLessonDocumentDto } from "#api/modules/learning-paths/dto/create-lesson-document.dto";
 import { ReplacePrimaryLessonDocumentDto } from "#api/modules/learning-paths/dto/replace-primary-lesson-document.dto";
 import {
@@ -36,7 +37,11 @@ import { throwLessonNotFound } from "#api/modules/learning-paths/utils/lesson.he
 
 @Injectable()
 export class LessonDocumentsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(BackgroundJobQueueService)
+    private readonly backgroundJobQueue: BackgroundJobQueueService,
+  ) {}
 
   async listForLesson(lessonId: string) {
     await this.assertLessonExists(this.prisma, lessonId);
@@ -225,6 +230,8 @@ export class LessonDocumentsService {
         );
       });
 
+      await this.enqueueProcessingJobs([document.processingJobId]);
+
       return serializeLessonDocument(document);
     } catch (error) {
       handleDocumentPrismaError(error);
@@ -283,6 +290,8 @@ export class LessonDocumentsService {
 
         return withJob;
       });
+
+      await this.enqueueProcessingJobs([document.processingJobId]);
 
       return serializeLessonDocument(document);
     } catch (error) {
@@ -527,6 +536,11 @@ export class LessonDocumentsService {
         userAgent: context.userAgent,
       },
     });
+  }
+
+  private enqueueProcessingJobs(jobIds: Array<string | null>) {
+    const enqueueIds = jobIds.filter((jobId): jobId is string => Boolean(jobId));
+    return this.backgroundJobQueue.enqueueMany(enqueueIds);
   }
 
   private isSourceReplacement(

@@ -18,6 +18,7 @@ Behavior:
 - Admin xem mọi job.
 - Không trả raw prompt hoặc secret trong result.
 - Từ `M4.2`, API document tạo `background_jobs` queue `DOCUMENT_PROCESSING` để UI poll trạng thái; BullMQ worker thật được nối ở `M4.3`.
+- Từ `M4.3`, job document được enqueue vào BullMQ thật sau khi API tạo durable row. Worker tách API cập nhật `status`, `attempts`, `startedAt`, `finishedAt`, `error` và `result`; document processing foundation chỉ xác nhận job chạy, còn extract/OCR/chunk thật thuộc `M4.4`.
 
 Response:
 

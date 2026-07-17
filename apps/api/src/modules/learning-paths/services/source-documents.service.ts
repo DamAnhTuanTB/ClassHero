@@ -14,6 +14,7 @@ import {
   throwNotFound,
 } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
 import {
@@ -46,7 +47,11 @@ import {
 
 @Injectable()
 export class SourceDocumentsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(BackgroundJobQueueService)
+    private readonly backgroundJobQueue: BackgroundJobQueueService,
+  ) {}
 
   async createForLearningPath(
     learningPathId: string,
@@ -107,6 +112,8 @@ export class SourceDocumentsService {
 
         return withJob;
       });
+
+      await this.enqueueProcessingJobs([sourceDocument.processingJobId]);
 
       return serializeSourceDocument(sourceDocument);
     } catch (error) {
@@ -330,6 +337,10 @@ export class SourceDocumentsService {
           warnings: buildPageRangeWarnings(dto.ranges, pageLimit),
         };
       });
+
+      await this.enqueueProcessingJobs(
+        result.lessonDocuments.map((document) => document.processingJobId),
+      );
 
       return {
         sourceDocument: serializeSourceDocument(result.sourceDocument),
@@ -637,5 +648,10 @@ export class SourceDocumentsService {
         id: true,
       },
     });
+  }
+
+  private enqueueProcessingJobs(jobIds: Array<string | null>) {
+    const enqueueIds = jobIds.filter((jobId): jobId is string => Boolean(jobId));
+    return this.backgroundJobQueue.enqueueMany(enqueueIds);
   }
 }

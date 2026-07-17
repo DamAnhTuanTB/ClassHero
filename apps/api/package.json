@@ -17,9 +17,12 @@
     "lint": "eslint .",
     "prisma": "prisma --config prisma.config.ts",
     "start": "node dist/main.js",
+    "start:worker": "node dist/workers/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:m4.2": "vitest run test/m4.2-document-helpers.test.ts test/m4.2-document-api.int.test.ts"
+    "test:m4.2": "vitest run test/m4.2-document-helpers.test.ts test/m4.2-document-api.int.test.ts",
+    "test:m4.3": "vitest run test/m4.3-worker-foundation.test.ts",
+    "worker:dev": "tsx watch src/workers/main.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1084.0",
@@ -32,6 +35,7 @@
     "@nestjs/swagger": "^11.4.5",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "bullmq": "^5.80.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "reflect-metadata": "0.2.2",
