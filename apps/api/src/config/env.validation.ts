@@ -37,6 +37,14 @@ const envSchema = z
     MAX_PDF_UPLOAD_MB: z.coerce.number().positive().default(50),
     MAX_IMAGE_UPLOAD_MB: z.coerce.number().positive().default(10),
     MAX_AVATAR_UPLOAD_MB: z.coerce.number().positive().default(5),
+    OCR_PROVIDER: z.enum(["mathpix"]).default("mathpix"),
+    OCR_PAID_ENABLED: z.coerce.boolean().default(false),
+    OCR_ARTIFACT_CACHE_ENABLED: z.coerce.boolean().default(true),
+    OCR_ARTIFACT_PREFIX: z.string().min(1).default("ocr-artifacts"),
+    MATHPIX_APP_ID: z.string().min(1).optional(),
+    MATHPIX_APP_KEY: z.string().min(1).optional(),
+    MATHPIX_LANGUAGE_HINTS: z.string().default("vi,en"),
+    OCR_MAX_CONCURRENT_DOCUMENTS: z.coerce.number().int().positive().default(2),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {
@@ -63,7 +71,28 @@ const envSchema = z
         });
       }
     }
+
+    if (env.OCR_PAID_ENABLED) {
+      if (!env.MATHPIX_APP_ID) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["MATHPIX_APP_ID"],
+          message:
+            "MATHPIX_APP_ID is required when OCR_PAID_ENABLED is true.",
+        });
+      }
+
+      if (!env.MATHPIX_APP_KEY) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["MATHPIX_APP_KEY"],
+          message:
+            "MATHPIX_APP_KEY is required when OCR_PAID_ENABLED is true.",
+        });
+      }
+    }
   });
+
 
 export type EnvConfig = z.infer<typeof envSchema>;
 

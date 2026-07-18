@@ -3,6 +3,7 @@ import {
   CreateBucketCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -110,6 +111,69 @@ export class ObjectStorageService {
     }
 
     return `${publicBaseUrl.replace(/\/$/, "")}/${objectKey}`;
+  }
+
+  /**
+   * Download an object from storage and return its contents as a Buffer.
+   */
+  async downloadObject(objectKey: string): Promise<Buffer> {
+    const response = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: objectKey,
+      }),
+    );
+
+    if (!response.Body) {
+      throw new Error(`Object ${objectKey} has no body`);
+    }
+
+    const stream = response.Body as NodeJS.ReadableStream;
+    const chunks: Buffer[] = [];
+
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+
+    return Buffer.concat(chunks);
+  }
+
+  /**
+   * Check if an object exists in storage.
+   */
+  async headObject(objectKey: string): Promise<boolean> {
+    try {
+      await this.client.send(
+        new HeadObjectCommand({
+          Bucket: this.bucketName,
+          Key: objectKey,
+        }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Upload a Buffer to storage with the given key and content type.
+   */
+  async uploadBuffer(
+    objectKey: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<void> {
+    await this.ensureLocalBucket();
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: objectKey,
+        Body: buffer,
+        ContentLength: buffer.length,
+        ContentType: contentType,
+      }),
+    );
   }
 
   private async ensureLocalBucket() {

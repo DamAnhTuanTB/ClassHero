@@ -10,6 +10,6 @@ import { ObjectStorageService } from "#api/modules/files/services/object-storage
   imports: [PrismaModule, JwtModule.register({})],
   controllers: [FilesController],
   providers: [FilesService, ObjectStorageService, JwtAuthGuard],
-  exports: [FilesService],
+  exports: [FilesService, ObjectStorageService],
 })
 export class FilesModule {}

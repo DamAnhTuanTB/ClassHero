@@ -55,6 +55,7 @@ Nếu cần định tuyến nhanh bộ tài liệu, đọc `docs/00-docs-map.md`
 - Nếu thiếu thông tin để code an toàn, hỏi lại hoặc ghi rõ `TODO`/`ASSUMPTION`.
 - Nếu phát hiện mâu thuẫn lớn giữa docs, báo owner hoặc ghi rõ quyết định tạm thời; không âm thầm tự quyết.
 - Không cập nhật changelog trong task thường. Changelog chỉ được ghi khi owner yêu cầu commit và commit thật sự được thực hiện.
+- Khi hệ thống/IDE tự động duyệt (auto-approve) plan/artifact, Codex vẫn phải chờ owner xác nhận rõ ràng bằng lời (ví dụ "ok", "bắt đầu đi", "code đi") trước khi thực thi. Không được coi auto-approve là lệnh của owner.
 
 ### 2.1. Khi Owner Không Hài Lòng
 
