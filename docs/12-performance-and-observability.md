@@ -164,6 +164,7 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 - Validate structured output trước khi lưu.
 - Có fallback/error state thân thiện khi provider chậm/lỗi.
 - Ghi log usage/duration khi module AI log đã có.
+- Khi test runtime với provider trả phí, ưu tiên cache/sample trước; forced/full run phải có ước tính usage/chi phí và xác nhận rõ của owner trước khi chạy.
 
 ---
 

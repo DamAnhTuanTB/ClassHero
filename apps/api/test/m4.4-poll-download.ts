@@ -11,6 +11,14 @@ const appKey = process.env.MATHPIX_APP_KEY!;
 const MATHPIX_API = "https://api.mathpix.com";
 const PDF_ID = "ae177c55-83dc-4c94-a8f8-73b2c5ae18af";
 
+interface MathpixPollStatus {
+  status?: string;
+  num_pages?: number;
+  num_pages_completed?: number;
+  percent_done?: number;
+  conversion_status?: unknown;
+}
+
 async function main() {
   console.log(`=== Polling pdf_id=${PDF_ID} ===\n`);
 
@@ -22,7 +30,7 @@ async function main() {
     const res = await fetch(`${MATHPIX_API}/v3/pdf/${PDF_ID}`, {
       headers: { app_id: appId, app_key: appKey },
     });
-    const status = await res.json() as any;
+    const status = (await res.json()) as MathpixPollStatus;
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
     console.log(

@@ -105,7 +105,9 @@ Rules:
 - Worker tạo page records sau khi biết tổng số trang.
 - Page text/Markdown/LaTeX được import từ paid OCR artifact khi production bật OCR paid; text layer/free OCR chỉ là metadata/fallback local hoặc vận hành có kiểm soát.
 - Page text được dùng để chunk theo lesson sau khi admin gán page range.
-- `metadata_json` lưu thông tin provider/model/options, artifact key, layout/line refs, bbox/region refs, confidence/quality flags và visual asset refs nếu provider trả về.
+- `metadata_json` lưu thông tin provider/model/options, artifact key, layout/line refs, bbox/region refs, confidence/quality flags, `printedPage` và visual asset refs nếu provider trả về. `printedPage` lưu `pdfPageNumber`, `printedPageNumber`, `printedPageLabel`, `source`, `confidence`, `evidenceLineIds`, `evidenceText`, `warning`; nếu thiếu hoặc mơ hồ phải lưu rõ `warning` thay vì tự đoán.
+- Visual refs phải trỏ tới `image-manifest.json` khi có paid OCR artifact, kèm image entries theo trang gồm `imageId`, `orderInPage`, object key, raw/normalized bounding box, `printedPage`, nearby text/caption, kind heuristic, `qualityFlags` và `isUsableForAi` nếu đã normalize được.
+- `metadata_json.visual`/document metadata có thể lưu `artifactAuditKey`, `artifactAuditStatus` và `artifactAuditSummary` trỏ tới `artifact-audit.json`; audit này là nguồn kiểm tra chất lượng artifact trước khi dùng cho RAG, sinh quiz/flashcard/test hoặc visual Q&A.
 - `thumbnail_file_id`/metadata có thể trỏ tới thumbnail hoặc page image cache tạo từ PDF gốc; không cần tự crop mọi hình thành file riêng nếu paid OCR provider không trả crop phù hợp.
 - Với visual Q&A, backend ưu tiên dùng crop/region/image provider trả về nếu đã lưu nội bộ. Nếu thiếu crop phù hợp, backend có thể render/crop page image từ PDF gốc on demand và cache bằng file purpose phù hợp, miễn là quyền truy cập vẫn kiểm tra qua source document/lesson.
 - OCR lỗi ở một trang không được làm mất trạng thái của các trang khác; lưu lỗi theo trang.

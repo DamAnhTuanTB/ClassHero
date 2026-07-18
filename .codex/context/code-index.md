@@ -1,6 +1,6 @@
 # Code Index
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 File này là bản đồ nhanh của code hiện tại để Codex tìm đúng nơi sửa. Nó chỉ mô tả code đang có hoặc vị trí dự kiến đã được docs chốt; không thay thế việc đọc file thật trước khi sửa.
 
@@ -81,8 +81,14 @@ Khi làm UI mới, ưu tiên tạo code theo domain trong `apps/web/features/<fe
 | `apps/api/src/modules/jobs`           | Job status API `GET /jobs/:jobId` đọc `background_jobs`, enforce admin/owner permission và trả trạng thái job cho UI polling; `BackgroundJobQueueService` enqueue durable job rows vào BullMQ và lưu `bullmq_job_id` |
 | `apps/api/src/modules/payments`       | Payment/enrollment API layer; hiện có endpoint mock `POST /student/payments/mock-success` để nút student `Mua ngay` tạo payment `PAID` giả và enrollment active 12 tháng trong dev/MVP |
 | `apps/api/src/jobs`                   | Queue/job definitions, BullMQ queue-name mapping, Redis connection parser và JSON/error helper dùng chung cho API enqueue + worker |
-| `apps/api/src/workers`                | Worker entrypoint `workers/main.ts`, `WorkerModule`, document-processing processor/service cho `M4.3` chạy tách API và cập nhật durable job status |
-| `apps/api/test`                       | Backend tests; hiện có focused/unit + integration tests cho `M4.2` document APIs chạy bằng Vitest                                                                                                                                                                             |
+| `apps/api/src/workers`                | Worker entrypoint `workers/main.ts`, `WorkerModule`, document-processing processor/service cho `M4.3`; `DocumentProcessingProcessor` xử lý `M4.4` paid OCR artifact import, source page OCR, printed page mapping, visual manifest/audit, primary/supplement lesson chunking và failure status |
+| `apps/api/src/workers/utils/ocr-artifact-versions.ts` | Version constants cho derived OCR artifacts (`pages.json`, `image-manifest.json`, `artifact-audit.json`) |
+| `apps/api/src/workers/utils/ocr-artifact-normalizer.ts` | Utility normalize Mathpix artifacts thành page text/Markdown/confidence/layout refs/quality flags/`printedPage` dùng cho source pages và lesson chunks |
+| `apps/api/src/workers/utils/ocr-printed-page.ts` | Utility infer `printedPage` từ OCR boundary lines và offset rule toàn tài liệu để map `pdfPageNumber` sang `printedPageNumber`/`printedPageLabel`, kèm source/confidence/evidence/warning |
+| `apps/api/src/workers/utils/ocr-image-manifest.ts` | Utility normalize Mathpix crop/images thành `image-manifest.json` với page/order, `printedPage`, object key, raw/normalized bbox, page dimensions, nearby text/caption, kind heuristic, quality flags và `isUsableForAi` |
+| `apps/api/src/workers/utils/ocr-visual-resolver.ts` | Utility resolve câu hỏi visual theo `printedPageNumber`/`pdfPageNumber`/query/kind từ `image-manifest.json`, trả candidates và page fallback |
+| `apps/api/src/workers/utils/ocr-artifact-audit.ts` | Utility tạo `artifact-audit.json` cho page count, printed page mapping, visual bbox/object key/text/quality và resolver smoke tests |
+| `apps/api/test`                       | Backend tests; hiện có focused/unit + integration tests cho `M4.2`, worker foundation `M4.3`, worker artifact/chunking `M4.4` chạy bằng Vitest, và harness live `m4.4-live-mathpix-minio.ts` để verify Mathpix + MinIO artifact/image upload khi có env thật; script live build API trước vì `#api` runtime imports trỏ `dist` |
 | `apps/api/vitest.config.ts`           | Vitest config cho API tests, alias `#api/*` về `src/*` để test TypeScript source                                                                                                                                                                                              |
 
 Khi làm API mới, ưu tiên tạo module trong `apps/api/src/modules/<domain>/` với controller/service/DTO/guard theo NestJS.

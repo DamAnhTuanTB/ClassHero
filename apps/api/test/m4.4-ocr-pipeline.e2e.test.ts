@@ -8,24 +8,20 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { ConfigService } from "@nestjs/config";
+import { describe, it, expect, beforeAll } from "vitest";
 import { PdfMetadataService } from "../src/workers/services/pdf-metadata.service";
 
-// Only test PdfMetadataService directly — Mathpix requires live API calls.
 const TEST_PDF_PATH = resolve(
   __dirname,
   "Toan-7-Tap-1-lam-net.pdf",
 );
+const describePdfMetadata = existsSync(TEST_PDF_PATH) ? describe : describe.skip;
 
-describe("M4.4 OCR Pipeline - PdfMetadataService", () => {
+describePdfMetadata("M4.4 OCR Pipeline - PdfMetadataService", () => {
   let pdfMetadata: PdfMetadataService;
   let pdfBuffer: Buffer;
 
   beforeAll(() => {
-    if (!existsSync(TEST_PDF_PATH)) {
-      throw new Error(`Test PDF not found: ${TEST_PDF_PATH}`);
-    }
     pdfBuffer = readFileSync(TEST_PDF_PATH);
     pdfMetadata = new PdfMetadataService();
   });

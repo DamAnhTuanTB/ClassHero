@@ -19,7 +19,7 @@ Không hard-code secret trong source code. Không commit `.env` thật vào repo
 - Resend dùng Free tier để test email.
 - payOS dùng môi trường test/sandbox.
 - AI vẫn cần ngân sách test.
-- Paid OCR local được phép bật để owner test vài cuốn đại diện. Mặc định `.env.example` để `OCR_PAID_ENABLED=false`; khi test thật thì đổi local `.env` thành `true`, đặt Mathpix key và giữ artifact cache bật để tránh gọi lại cùng file.
+- Paid OCR local được phép bật để owner test vài cuốn đại diện. Mặc định `.env.example` để `OCR_PAID_ENABLED=false`; khi test thật thì đổi local `.env` thành `true`, đặt Mathpix key và giữ artifact cache bật để tránh gọi lại cùng file. Trước khi chạy forced OCR cả cuốn hoặc nhiều cuốn, phải báo số trang và ước tính chi phí cho owner xác nhận.
 
 ### Production ban đầu
 
@@ -275,6 +275,14 @@ Dùng phụ cho:
 - Log `ai_generations`.
 - Không gửi toàn bộ tài liệu mỗi lần học sinh hỏi.
 - Cần rate limit và budget guard.
+
+### Paid provider cost guard
+
+- Với provider tính phí theo usage như Mathpix/OpenAI/Gemini, không chạy forced/full runtime test mặc định nếu cache hoặc sample test đã đủ kiểm code.
+- Với Mathpix PDF OCR, ước tính chi phí trước khi chạy bằng `số trang PDF × đơn giá/page` theo pricing hiện hành của tài khoản/provider. Ví dụ 265 trang ở mức khoảng `$0.005/page` tương đương khoảng `$1.325` trước các yếu tố billing khác.
+- Trước khi OCR thật cả cuốn hoặc nhiều cuốn, Codex phải báo owner phạm vi, số trang, ước tính chi phí và xin xác nhận rõ, kể cả khi đang test local.
+- Sau khi đã có artifact cache theo `content_hash + provider/options`, mọi lần verify code/derived artifacts phải ưu tiên cache-hit rerun, không gọi Mathpix lại.
+- Final/report sau khi test thật phải ghi rõ `forceMathpix` hay cache hit, số trang đã xử lý, artifact key và chi phí/usage ước tính nếu biết.
 
 ---
 

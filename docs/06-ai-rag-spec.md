@@ -179,7 +179,7 @@ Paid OCR-first rules:
 - Với PDF đã searchable, production vẫn được gửi paid OCR một lần nếu chưa có artifact hợp lệ, để chuẩn hóa output chất lượng cao hơn cho công thức/STEM.
 - Nếu thiếu paid OCR config trong production, job phải fail rõ lý do; không tự hạ cấp sang free OCR trừ khi admin/config cho phép.
 - Free OCR bằng OCRmyPDF/Tesseract chỉ là local/mock/fallback có kiểm soát, không phải đường mặc định.
-- OCR cần lưu metadata theo trang: nguồn text, page index, provider, model/version nếu có, confidence nếu provider trả, quality flags và lỗi trang nếu có.
+- OCR cần lưu metadata theo trang: nguồn text, `pdfPageNumber`, `printedPageNumber`/`printedPageLabel` nếu infer/xác nhận được, provider, model/version nếu có, confidence nếu provider trả, quality flags và lỗi trang nếu có.
 - Không dùng OCR hàng loạt không giới hạn; phải áp dụng concurrency/rate limit, timeout và budget guard vì paid OCR tính tiền theo trang.
 
 Paid OCR artifact must include, when provider supports it:
@@ -191,6 +191,9 @@ Paid OCR artifact must include, when provider supports it:
 - `lines.json` hoặc layout JSON: line/block ids, page index, region/bounding box, confidence, parent/children ids, element types.
 - Figures/diagrams/cropped image URLs hoặc inline image references.
 - Page width/height coordinate system để map crop/box về page image.
+- `pages.json` phải lưu schema/version phái sinh và `printedPage`: `pdfPageNumber`, `printedPageNumber`, `printedPageLabel`, `source`, `confidence`, `evidenceLineIds`, `evidenceText`, `warning` (`missing|ambiguous|null`). Đây là mapping từ trang học sinh thấy trong sách sang trang vật lý PDF.
+- `image-manifest.json` normalized cho visual assets: schema/version phái sinh, `imageId`, page/order, `printedPage`, object key nội bộ, artifact path, raw/normalized bbox, page dimensions, nearby line ids/text, caption candidate, kind heuristic, `qualityFlags` và `isUsableForAi` để visual Q&A/viewer/quiz hình dùng lại.
+- `artifact-audit.json`: summary và issue list cho page count, empty pages, printed-page missing/ambiguous/duplicate, provider image object key, bbox, sanitized visual text, image quality flags và visual resolver smoke tests. Audit là dữ liệu vận hành/RAG để biết nên dùng crop, fallback page image hay yêu cầu admin kiểm tra.
 - Searchable PDF hoặc converted output nếu cần lưu lâu dài.
 - Provider raw response đã sanitize để debug, nhưng không để app phụ thuộc trực tiếp vào raw shape nếu đã có normalized schema.
 
@@ -206,8 +209,10 @@ Paid OCR artifact format/import:
 - Artifact không được phụ thuộc `source_document_id`, `lesson_id` hoặc database id của môi trường local.
 - Artifact bundle dùng stable key `content_hash` và chứa tối thiểu:
   - `manifest.json`: original filename, file size, content hash, page count, provider, model/version, language/options, createdAt, quality summary.
-  - `pages.jsonl` hoặc `pages.json`: page index, text/markdown, optional latex, confidence, quality flags, source.
+  - `pages.jsonl` hoặc `pages.json`: schema/version phái sinh, page index, text/markdown, optional latex, confidence, quality flags, source và `printedPage`.
   - `layout.json` hoặc `lines.json`: provider layout/region data normalized hoặc raw sanitized.
+  - `image-manifest.json`: visual asset manifest normalized, không phụ thuộc DB id, dùng stable `content_hash`/artifact key để import lại giữa môi trường.
+  - `artifact-audit.json`: audit artifact phái sinh để kiểm tra đủ dữ liệu OCR/visual trước khi sinh quiz, flashcard, test hoặc trả lời chat AI.
   - `assets/`: figures, diagrams, cropped images, page images/thumbnails nếu có.
   - Optional: searchable PDF, converted output hoặc provider raw response đã sanitize.
 - Production import flow:
@@ -230,6 +235,7 @@ Rules:
 
 - Page range phải nằm trong tổng số trang.
 - Cho phép cảnh báo range trùng hoặc trang chưa gán, nhưng không tự đoán silently.
+- Nếu tài liệu có số trang in lệch với trang PDF, AI/chat/viewer phải dùng mapping `printedPage` trong page metadata để resolve câu hỏi theo cách học sinh gọi trang. Nếu mapping `missing` hoặc `ambiguous`, service phải fallback có caveat hoặc hỏi lại, không tự coi `pdfPageNumber` là `printedPageNumber`.
 - Khi admin sửa page range, chunks/embedding/explanation liên quan đến lesson đó phải được đánh dấu stale hoặc tạo lại.
 - Retrieval/chat vẫn chỉ dùng `lesson_id`; source document chỉ là nguồn tạo chunk.
 - Lesson có thể có thêm supplemental documents upload trực tiếp. Các tài liệu này không cần page range, nhưng chunks cuối cùng vẫn phải gắn cùng `lesson_id`.
@@ -675,6 +681,7 @@ Khi tài liệu nguồn đổi:
 - Mỗi buổi học có khung chat AI.
 - Học sinh nhập text.
 - Không cho học sinh upload ảnh/file trong chat MVP.
+- Khi mở user-upload ở version sau, ảnh/file học sinh gửi trong chat phải là chat attachment riêng, lưu object storage riêng với permission/quota/rate limit theo user/session/message. Không trộn user-upload vào OCR artifact cache của tài liệu nguồn M4.4, vì artifact nguồn là kho dữ liệu chuẩn của course.
 - Chat chỉ dựa trên tài liệu lesson hiện tại.
 - Nếu câu hỏi text nhắc tới hình, biểu đồ, bảng, sơ đồ hoặc trang cụ thể trong lesson, backend có thể tự lấy page image/crop từ PDF gốc đã lưu và gửi kèm cho model vision theo budget/rate limit. Đây là system-provided context, không phải user upload.
 
@@ -694,7 +701,7 @@ Prompt nên gồm:
 3. Retrieved chunks.
 4. Optional visual context:
    - page image hoặc crop từ PDF gốc khi câu hỏi liên quan hình/trang/bảng/sơ đồ,
-   - metadata page number và source document,
+   - metadata `pdfPageNumber`, `printedPageNumber`/`printedPageLabel`, source document, image id/object key, bbox và caption/nearby text nếu có,
    - chỉ lấy trong page range của lesson hiện tại.
 5. Một số message gần nhất.
 6. Conversation summary nếu có.
@@ -734,6 +741,8 @@ Visual Q&A rules:
 - OCR output dùng để retrieval text, nhưng câu hỏi kiểu "giải thích hình 9.42", "biểu đồ này nghĩa là gì", "hình ở trang 79" cần visual context từ PDF gốc.
 - Backend chỉ được lấy page image/crop từ tài liệu lesson mà học sinh có quyền truy cập.
 - Nếu OCR artifact có Mathpix inline image/cropped image URL, bounding box hoặc region metadata thì dùng các crop/region đó trước.
+- Khi chọn crop/region cho câu hỏi visual, ưu tiên đọc `image-manifest.json` để map câu hỏi theo trang, thứ tự hình, bbox, caption/nearby text và object key nội bộ.
+- Resolver visual phải ưu tiên image có `isUsableForAi=true`, dùng `printedPage` để map câu hỏi theo số trang học sinh thấy, và đọc `artifact-audit.json` để biết dữ liệu đang `passed`, `warning` hay `failed` trước khi quyết định fallback.
 - Nếu provider không trả crop phù hợp hoặc câu hỏi nhắm vào vùng khác trên trang, MVP có thể render/crop từ PDF gốc on demand hoặc gửi cả page image đã downscale theo giới hạn provider.
 - Không cần admin crop thủ công. Crop là thao tác tự động của provider hoặc backend.
 - Không bắt buộc extract và lưu mọi hình thành asset riêng trước khi có nhu cầu, nhưng mọi crop/image provider trả về dùng cho Q&A phải được copy về object storage nội bộ trước khi hết hạn.

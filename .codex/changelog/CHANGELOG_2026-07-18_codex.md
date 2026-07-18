@@ -1,0 +1,1 @@
+- 2026-07-18: Hoàn thiện M4.4 paid OCR artifact/chunking với Mathpix artifact cache đầy đủ, normalized pages, image manifest, artifact audit, printed-page mapping, visual resolver, live Mathpix + MinIO harness và tài liệu/cost guard cho provider trả phí.

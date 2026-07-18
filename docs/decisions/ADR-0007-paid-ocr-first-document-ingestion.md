@@ -48,14 +48,12 @@ Preprocess ảnh/PDF không nằm trong MVP app flow. Nếu một file gốc qu�
 
 ## Mathpix v3 Artifact Collection (chi tiết kỹ thuật)
 
-Khi gọi `POST /v3/pdf`, request tất cả conversion formats trong 1 lần:
+Khi gọi `POST /v3/pdf`, request các conversion formats cần Mathpix convert trong 1 lần. `.mmd` và `lines.json` là output mặc định của `v3/pdf`, không đưa vào `conversion_formats` nhưng vẫn phải download và lưu:
 
 ```json
 {
   "conversion_formats": {
-    "mmd": true,
     "mmd.zip": true,
-    "lines.json": true,
     "md": true,
     "html.zip": true
   },
@@ -65,7 +63,7 @@ Khi gọi `POST /v3/pdf`, request tất cả conversion formats trong 1 lần:
 }
 ```
 
-Mathpix tính phí theo page processed, không theo số format. Request tất cả formats không tốn thêm chi phí.
+Mathpix tính phí theo page processed, không theo số format. Request các conversion formats cần thiết không tốn thêm chi phí theo từng artifact.
 
 Artifacts phải thu thập và lưu vào artifact cache (object storage):
 
@@ -76,17 +74,21 @@ Artifacts phải thu thập và lưu vào artifact cache (object storage):
 | `.lines.json` | Per-line bounding boxes, confidence, type (text/math) | ✅ |
 | `.md` | Plain Markdown fallback | ✅ |
 | `.html.zip` | HTML + embedded images — phục vụ lesson viewer tương lai | ✅ |
-| `metadata.json` | pdfId, numPages, processingTimeMs, createdAt | ✅ |
+| `metadata.json` / `manifest.json` | pdfId, numPages, processingTimeMs, provider, model/version, language/options, output formats, artifact keys, createdAt | ✅ |
+| `pages.json` | Normalized per-page text/Markdown/layout refs/confidence/quality summary importable across environments | ✅ |
+| `image-manifest.json` | Normalized visual asset manifest: page/order, raw + normalized bbox, page dimensions, storage object key, artifact paths, nearby line ids/text, caption candidate, kind heuristic | ✅ |
 
 Không thu thập `.tex.zip` (không có use case trong dự án), `.md.zip` (trùng `.md` + images đã có trong `.mmd.zip`).
 
 Lý do `.mmd.zip` bắt buộc: CDN Mathpix chỉ giữ ảnh crop (figures/diagrams) 30 ngày. Phải download zip và lưu images vĩnh viễn vào object storage để phục vụ visual Q&A, quiz hình, và hiển thị nội dung sau này.
 
+`image-manifest.json` là contract nội bộ cho mọi nhu cầu visual sau này. DB chỉ cần giữ refs/tóm tắt theo page/document/chunk; dữ liệu giàu hơn nằm trong artifact cache theo `content_hash + provider/options`. Nếu cần hỏi "hình thứ 2 trang 35", viewer click vào hình, sinh quiz từ hình/bảng hoặc highlight overlay, các task sau phải đọc manifest này trước khi fallback render/crop PDF gốc.
+
 Quality scoring per page dùng kết hợp:
 - `lines.json` confidence per line (trọng số 60%)
 - Heuristic trên text (replacement chars, text length, control chars) (trọng số 40%)
 
-Artifact cache key: `{OCR_ARTIFACT_PREFIX}/{provider}/{content_hash}/` — mỗi file artifact lưu riêng trong thư mục này.
+Artifact cache key: `{OCR_ARTIFACT_PREFIX}/{provider}/{content_hash}/{options_hash}/` — `options_hash` được tính từ provider, model/version, language hints, OCR options và output formats để không reuse nhầm artifact khi đổi cấu hình OCR. Mỗi file artifact lưu riêng trong thư mục này.
 
 ## Tính năng tương lai từ HTML artifact (ngoài MVP)
 
@@ -111,6 +113,7 @@ Artifact cache key: `{OCR_ARTIFACT_PREFIX}/{provider}/{content_hash}/` — mỗi
 - Cần admin UI/job status hiển thị OCR provider, page count, cost estimate, started/finished, failed pages và quality summary.
 - Cần lưu PDF gốc để học sinh xem tài liệu chuẩn, còn OCR output làm nguồn cho search/RAG/AI generation.
 - Cần xem OCR artifact như tài sản lâu dài của hệ thống, không phải output tạm: lưu đủ dữ liệu để phục vụ Q&A, quiz, flashcard, test generation, search, citation, visual Q&A và các tính năng tương lai mà không OCR lại.
+- Artifact chuẩn phải lưu được mapping giữa trang vật lý PDF và số trang in học sinh thấy (`printedPage`). Các câu hỏi theo "trang sách" phải resolve qua mapping này trước khi lấy crop/page image.
+- Ảnh/file học sinh upload trong chat sau này là runtime attachment theo user/session/message, không phải artifact nguồn của course và không được trộn vào cache OCR theo `content_hash`.
 - Không xây UI/API/worker riêng cho preview tiền xử lý trong MVP; hệ thống đơn giản hơn và tránh làm hỏng tài liệu bằng xử lý ảnh quá tay.
 - Quiz/flashcard/test vẫn phải sinh câu hỏi mới bám kiến thức, không copy nguyên văn bài tập/ví dụ từ OCR output.
-

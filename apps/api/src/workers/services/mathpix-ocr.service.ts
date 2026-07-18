@@ -6,6 +6,8 @@ import { EnvConfig } from "#api/config/env.validation";
 export interface OcrArtifactBundle {
   /** Mathpix Markdown — page-by-page text with \newpage separator. */
   mmd: Buffer;
+  /** Plain Markdown fallback from Mathpix. */
+  md: Buffer;
   /** MMD ZIP — contains MMD + embedded images/figures. */
   mmdZip: Buffer;
   /** Per-line bounding boxes, confidence, type (text/math). */
@@ -21,10 +23,6 @@ export interface OcrArtifactBundle {
   processingTimeMs: number;
 }
 
-interface MathpixSubmitResponse {
-  pdf_id: string;
-}
-
 interface MathpixStatusResponse {
   status: string;
   num_pages?: number;
@@ -33,6 +31,45 @@ interface MathpixStatusResponse {
 }
 
 const MATHPIX_API_BASE = "https://api.mathpix.com";
+export const MATHPIX_PDF_MODEL_VERSION = "mathpix-v3-pdf";
+export const MATHPIX_OUTPUT_FORMATS = [
+  "mmd",
+  "mmd.zip",
+  "lines.json",
+  "md",
+  "html.zip",
+] as const;
+export const MATHPIX_CONVERSION_FORMATS = [
+  "mmd.zip",
+  "md",
+  "html.zip",
+] as const;
+
+export type MathpixOutputFormat = (typeof MATHPIX_OUTPUT_FORMATS)[number];
+export type MathpixConversionFormat =
+  (typeof MATHPIX_CONVERSION_FORMATS)[number];
+
+export type MathpixPdfOptions = {
+  conversion_formats: Record<MathpixConversionFormat, true>;
+  languages: string[];
+  include_page_data: true;
+  enable_tables_fallback: true;
+};
+
+export function buildMathpixPdfOptions(
+  languageHints: string[],
+): MathpixPdfOptions {
+  return {
+    conversion_formats: {
+      "mmd.zip": true,
+      md: true,
+      "html.zip": true,
+    },
+    languages: languageHints,
+    include_page_data: true,
+    enable_tables_fallback: true,
+  };
+}
 
 @Injectable()
 export class MathpixOcrService {
@@ -71,17 +108,7 @@ export class MathpixOcrService {
     const blob = new Blob([ab], { type: "application/pdf" });
     formData.append("file", blob, fileName);
 
-    const options = {
-      // mmd and lines.json are ALWAYS available — don't request them
-      // Only request additional conversion formats
-      conversion_formats: {
-        "mmd.zip": true,
-        "html.zip": true,
-      },
-      languages: this.languageHints,
-      include_page_data: true,
-      enable_tables_fallback: true,
-    };
+    const options = buildMathpixPdfOptions(this.languageHints);
 
     formData.append("options_json", JSON.stringify(options));
 
@@ -105,10 +132,18 @@ export class MathpixOcrService {
       );
     }
 
-    const data = (await response.json()) as MathpixSubmitResponse;
-    this.logger.log(`Mathpix accepted PDF, pdf_id=${data.pdf_id}`);
+    const data = (await response.json()) as unknown;
+    const pdfId = isRecord(data) ? readString(data, "pdf_id") : null;
 
-    return { pdfId: data.pdf_id };
+    if (!pdfId) {
+      throw new Error(
+        `Mathpix submit did not return pdf_id${summarizeMathpixSubmitResponse(data)}`,
+      );
+    }
+
+    this.logger.log(`Mathpix accepted PDF, pdf_id=${pdfId}`);
+
+    return { pdfId };
   }
 
   /**
@@ -186,8 +221,9 @@ export class MathpixOcrService {
   ): Promise<OcrArtifactBundle> {
     this.logger.log(`Downloading all artifacts for pdf_id=${pdfId}...`);
 
-    const [mmd, mmdZip, linesJson, htmlZip] = await Promise.all([
+    const [mmd, md, mmdZip, linesJson, htmlZip] = await Promise.all([
       this.downloadArtifact(pdfId, "mmd"),
+      this.downloadArtifact(pdfId, "md"),
       this.downloadArtifact(pdfId, "mmd.zip"),
       this.downloadArtifact(pdfId, "lines.json"),
       this.downloadArtifact(pdfId, "html.zip"),
@@ -198,6 +234,7 @@ export class MathpixOcrService {
     this.logger.log(
       `All artifacts downloaded for pdf_id=${pdfId}: ` +
         `mmd=${(mmd.length / 1024).toFixed(0)}KB, ` +
+        `md=${(md.length / 1024).toFixed(0)}KB, ` +
         `mmd.zip=${(mmdZip.length / 1024).toFixed(0)}KB, ` +
         `lines.json=${(linesJson.length / 1024).toFixed(0)}KB, ` +
         `html.zip=${(htmlZip.length / 1024).toFixed(0)}KB`,
@@ -205,6 +242,7 @@ export class MathpixOcrService {
 
     return {
       mmd,
+      md,
       mmdZip,
       linesJson,
       htmlZip,
@@ -234,4 +272,34 @@ export class MathpixOcrService {
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+}
+
+function summarizeMathpixSubmitResponse(value: unknown) {
+  if (!isRecord(value)) {
+    return ": response body was not an object";
+  }
+
+  const error = readString(value, "error");
+  const errorInfo = isRecord(value.error_info) ? value.error_info : null;
+  const errorId = errorInfo ? readString(errorInfo, "id") : null;
+  const errorMessage = errorInfo ? readString(errorInfo, "message") : null;
+  const details = [errorId, errorMessage, error].filter(Boolean).join("; ");
+
+  if (details) {
+    return `: ${details}`;
+  }
+
+  return `: response keys=${Object.keys(value).join(",")}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(
+  value: Record<string, unknown>,
+  key: string,
+): string | null {
+  const raw = value[key];
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
 }

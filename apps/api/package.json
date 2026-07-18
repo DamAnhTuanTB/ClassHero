@@ -22,6 +22,8 @@
     "test": "vitest run",
     "test:m4.2": "vitest run test/m4.2-document-helpers.test.ts test/m4.2-document-api.int.test.ts",
     "test:m4.3": "vitest run test/m4.3-worker-foundation.test.ts",
+    "test:m4.4": "vitest run test/m4.4-document-processing.test.ts test/m4.4-ocr-pipeline.e2e.test.ts",
+    "test:m4.4:live": "pnpm build && tsx test/m4.4-live-mathpix-minio.ts",
     "worker:dev": "tsx watch src/workers/main.ts"
   },
   "dependencies": {

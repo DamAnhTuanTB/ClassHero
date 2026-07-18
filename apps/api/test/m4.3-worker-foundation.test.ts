@@ -18,6 +18,7 @@ import {
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
+import type { OcrArtifactBundle } from "#api/workers/services/mathpix-ocr.service";
 
 describe("M4.3 BullMQ worker foundation", () => {
   beforeEach(() => {
@@ -118,7 +119,7 @@ describe("M4.3 BullMQ worker foundation", () => {
 
   it("processes a document job and updates durable status lifecycle", async () => {
     const prisma = createProcessorPrismaMock();
-    const processor = new DocumentProcessingProcessor(prisma);
+    const processor = createProcessor(prisma);
     const job = createBullmqJob({
       id: "bullmq-job-3",
       data: { backgroundJobId: "durable-job-3" },
@@ -165,7 +166,7 @@ describe("M4.3 BullMQ worker foundation", () => {
         update: vi.fn(),
       },
     } as unknown as PrismaService;
-    const processor = new DocumentProcessingProcessor(prisma);
+    const processor = createProcessor(prisma);
 
     await expect(
       processor.process(
@@ -256,11 +257,138 @@ function createProcessorPrismaMock() {
         ...input.data,
       })),
     },
+    sourceDocument: {
+      findUniqueOrThrow: vi.fn(async () => ({
+        id: "source-document-1",
+        fileId: "file-1",
+        file: {
+          id: "file-1",
+          objectKey: "uploads/test/document.pdf",
+          originalName: "document.pdf",
+        },
+      })),
+      update: vi.fn(async (input: unknown) => input),
+    },
+    sourceDocumentPage: {
+      deleteMany: vi.fn(async () => ({ count: 0 })),
+      createMany: vi.fn(async () => ({ count: 1 })),
+      update: vi.fn(async (input: unknown) => input),
+      findUnique: vi.fn(async () => ({ metadataJson: {} })),
+      updateMany: vi.fn(async () => ({ count: 0 })),
+    },
   } as unknown as PrismaService & {
     backgroundJob: {
       findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
     };
+  };
+}
+
+function createProcessor(prisma: PrismaService) {
+  const bundle = createOcrBundle();
+  const descriptor = {
+    contentHash: "content-hash",
+    provider: "mathpix",
+    modelVersion: "mathpix-v3-pdf",
+    languageHints: ["vi", "en"],
+    options: {},
+    outputFormats: ["mmd", "mmd.zip", "lines.json", "md", "html.zip"],
+    optionsHash: "options-hash",
+    baseKey: "ocr-artifacts/mathpix/content-hash/options-hash",
+  };
+  const artifactKeys = {
+    mmd: `${descriptor.baseKey}/artifact.mmd`,
+    md: `${descriptor.baseKey}/artifact.md`,
+    mmdZip: `${descriptor.baseKey}/artifact.mmd.zip`,
+    linesJson: `${descriptor.baseKey}/lines.json`,
+    htmlZip: `${descriptor.baseKey}/artifact.html.zip`,
+    pagesJson: `${descriptor.baseKey}/pages.json`,
+    imageManifestJson: `${descriptor.baseKey}/image-manifest.json`,
+    artifactAuditJson: `${descriptor.baseKey}/artifact-audit.json`,
+    metadataJson: `${descriptor.baseKey}/metadata.json`,
+    manifestJson: `${descriptor.baseKey}/manifest.json`,
+  };
+  const manifest = {
+    schemaVersion: 1 as const,
+    contentHash: descriptor.contentHash,
+    provider: descriptor.provider,
+    modelVersion: descriptor.modelVersion,
+    languageHints: descriptor.languageHints,
+    options: descriptor.options,
+    outputFormats: descriptor.outputFormats,
+    optionsHash: descriptor.optionsHash,
+    baseKey: descriptor.baseKey,
+    artifactKeys,
+    pdfId: bundle.pdfId,
+    numPages: bundle.numPages,
+    processingTimeMs: bundle.processingTimeMs,
+    createdAt: new Date(0).toISOString(),
+  };
+
+  return new DocumentProcessingProcessor(
+    prisma,
+    {
+      get: vi.fn((key: keyof EnvConfig) => {
+        if (key === "OCR_PROVIDER") return "mathpix";
+        if (key === "OCR_PAID_ENABLED") return false;
+        return undefined;
+      }),
+    } as unknown as ConfigService<EnvConfig, true>,
+    {
+      downloadObject: vi.fn(async () => Buffer.from("pdf")),
+      uploadBuffer: vi.fn(async () => undefined),
+    } as never,
+    {
+      submitPdf: vi.fn(),
+      pollUntilComplete: vi.fn(),
+      downloadAllArtifacts: vi.fn(),
+    } as never,
+    {
+      getPageCount: vi.fn(async () => 1),
+      computeContentHash: vi.fn(() => "content-hash"),
+    } as never,
+    {
+      createDescriptor: vi.fn(() => descriptor),
+      buildArtifactKeys: vi.fn(() => artifactKeys),
+      hasArtifact: vi.fn(async () => true),
+      loadBundle: vi.fn(async () => ({ ...bundle, manifest })),
+      saveBundle: vi.fn(),
+      saveNormalizedPages: vi.fn(async () => artifactKeys.pagesJson),
+      saveImageManifest: vi.fn(async () => artifactKeys.imageManifestJson),
+      saveArtifactAudit: vi.fn(async () => artifactKeys.artifactAuditJson),
+    } as never,
+    {
+      extractImagesFromZip: vi.fn(async () => []),
+      groupByPage: vi.fn(() => new Map()),
+    } as never,
+  );
+}
+
+function createOcrBundle(): OcrArtifactBundle {
+  return {
+    mmd: Buffer.from("Nội dung trang 1"),
+    md: Buffer.from("Nội dung trang 1"),
+    mmdZip: Buffer.from("zip"),
+    linesJson: Buffer.from(
+      JSON.stringify({
+        pages: [
+          {
+            lines: [
+              {
+                id: "line-1",
+                text: "Nội dung trang 1",
+                confidence: 0.95,
+                type: "text",
+              },
+            ],
+          },
+        ],
+      }),
+    ),
+    htmlZip: Buffer.from("html"),
+    pdfId: "mathpix-pdf-1",
+    numPages: 1,
+    processingTimeMs: 123,
   };
 }
 

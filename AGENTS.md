@@ -79,6 +79,15 @@ Nếu Codex UI hiển thị lỗi tool dạng `{"detail":"Bad Request"}`, thư�
 - Không dùng shell command nối chuỗi kiểu `&&`, `;` hoặc nhiều lệnh trong một activity khi session vừa gặp `Bad Request`; chạy từng command đơn lẻ để activity UI không render lỗi. Vẫn có thể đọc song song các lệnh read-only ngắn khi an toàn.
 - Nếu lỗi vẫn xuất hiện, không được dừng task chỉ vì lỗi này. Kiểm tra xem command thực tế có chạy được không; nếu chưa rõ, retry bằng command đơn giản hơn hoặc đọc/sửa file bằng cách khác. Báo rõ với owner rằng đó là lỗi hiển thị của Codex tool rồi tiếp tục phần việc chính.
 
+### 2.3. Cảnh Báo Chi Phí Provider Trả Phí
+
+Khi task cần gọi provider trả phí thật như Mathpix, OpenAI/Gemini, email/SMS/Zalo hoặc dịch vụ tương tự, Codex phải kiểm soát chi phí trước khi chạy:
+
+- Ưu tiên cache, mock, unit/integration test local, sample nhỏ hoặc một vài trang trước khi chạy toàn bộ dữ liệu.
+- Trước khi chạy forced/full run có thể tốn tiền, Codex phải báo owner biết phạm vi và ước tính chi phí bằng con số cụ thể nếu có thể, ví dụ số trang PDF × đơn giá/page, rồi chỉ chạy khi owner xác nhận rõ. Nếu owner đã ghi rõ "test thật cả cuốn" hoặc "tôi cho phép" trong cùng ngữ cảnh, Codex vẫn phải nhắc ngắn chi phí ước tính trước khi bắt đầu nếu số tiền có thể đáng kể.
+- Không tự chạy lại forced paid provider nếu artifact/cache hợp lệ đã tồn tại; dùng cache-hit rerun để kiểm code/derived artifact khi có thể.
+- Final response sau khi gọi provider trả phí phải ghi rõ đã gọi thật hay dùng cache, số lượng đã xử lý và chi phí ước tính hoặc usage chính nếu biết.
+
 ---
 
 ## 3. Cách Đọc Tài Liệu

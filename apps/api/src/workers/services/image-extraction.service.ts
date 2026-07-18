@@ -10,7 +10,7 @@ export interface ExtractedImage {
   filename: string;
   /** 1-indexed page number parsed from the filename */
   pageNumber: number;
-  /** Bounding box from Mathpix (x, y, w, h in original PDF coordinates) */
+  /** Bounding box from Mathpix (x, y, w, h in page pixel coordinates) */
   boundingBox: { x: number; y: number; w: number; h: number };
   /** Raw image buffer */
   data: Buffer;
@@ -18,13 +18,18 @@ export interface ExtractedImage {
   mimeType: string;
 }
 
+export interface ParsedMathpixImageFilename {
+  pageNumber: number;
+  boundingBox: { x: number; y: number; w: number; h: number };
+}
+
 /**
  * Extract images from Mathpix mmd.zip bundle.
  *
- * Filename convention from Mathpix:
- *   {pdfId}-{pageNumber}_{x}_{y}_{w}_{h}.jpg
+ * Filename convention from Mathpix mmd.zip:
+ *   {pdfId}-{pageNumber}_{height}_{width}_{topLeftY}_{topLeftX}.jpg
  *
- * Where pageNumber is 3-digit zero-padded (001 = page 1).
+ * Mathpix can return pageNumber as either 1 or 001.
  */
 @Injectable()
 export class ImageExtractionService {
@@ -48,9 +53,7 @@ export class ImageExtractionService {
 
       const basename = entry.fileName.split("/").pop()!;
 
-      // Parse Mathpix filename convention:
-      // {pdfId}-{pageNumber}_{x}_{y}_{w}_{h}.{ext}
-      const parsed = this.parseImageFilename(basename);
+      const parsed = parseMathpixImageFilename(basename);
       if (!parsed) {
         this.logger.warn(`Could not parse image filename: ${basename}`);
         continue;
@@ -95,32 +98,6 @@ export class ImageExtractionService {
       map.set(img.pageNumber, list);
     }
     return map;
-  }
-
-  /**
-   * Parse Mathpix image filename to extract page number and bounding box.
-   * Format: {pdfId}-{pageNumber}_{x}_{y}_{w}_{h}.{ext}
-   */
-  private parseImageFilename(
-    filename: string,
-  ): { pageNumber: number; boundingBox: { x: number; y: number; w: number; h: number } } | null {
-    // Remove extension
-    const withoutExt = filename.replace(/\.[^.]+$/, "");
-
-    // Find the page-bbox suffix: -NNN_X_Y_W_H
-    // The pdfId contains hyphens, so match from the end
-    const match = withoutExt.match(/-(\d{3})_(\d+)_(\d+)_(\d+)_(\d+)$/);
-    if (!match) return null;
-
-    return {
-      pageNumber: parseInt(match[1]!, 10), // 001 → 1
-      boundingBox: {
-        x: parseInt(match[2]!, 10),
-        y: parseInt(match[3]!, 10),
-        w: parseInt(match[4]!, 10),
-        h: parseInt(match[5]!, 10),
-      },
-    };
   }
 
   /**
@@ -175,4 +152,28 @@ export class ImageExtractionService {
       });
     });
   }
+}
+
+/**
+ * Parse Mathpix image filename to extract page number and bounding box.
+ * Format: {pdfId}-{pageNumber}_{height}_{width}_{topLeftY}_{topLeftX}.{ext}
+ */
+export function parseMathpixImageFilename(
+  filename: string,
+): ParsedMathpixImageFilename | null {
+  const withoutExt = filename.replace(/\.[^.]+$/, "");
+
+  // The pdfId contains hyphens, so match the page-bbox suffix from the end.
+  const match = withoutExt.match(/-(\d{1,6})_(\d+)_(\d+)_(\d+)_(\d+)$/);
+  if (!match) return null;
+
+  return {
+    pageNumber: parseInt(match[1]!, 10),
+    boundingBox: {
+      x: parseInt(match[5]!, 10),
+      y: parseInt(match[4]!, 10),
+      w: parseInt(match[3]!, 10),
+      h: parseInt(match[2]!, 10),
+    },
+  };
 }
