@@ -105,3 +105,8 @@
   margin: 0.5rem 0;
   color: var(--theme-text-muted);
 }
+
+/* Reset Tailwind's SVG display: block which breaks inline MathJax equations */
+.mmd-content svg {
+  display: inline;
+}

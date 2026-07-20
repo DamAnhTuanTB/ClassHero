@@ -45,3 +45,9 @@
 - Cấu hình MinIO bucket `learning-path-dev` cho phép Public Read để render ảnh mà không cần token tạm thời.
 - Bổ sung logic `replaceMathpixImageUrls` vào `document-processing.processor.ts` để tự động thay thế toàn bộ URL CDN của Mathpix (`cdn.mathpix.com`) sang URL của MinIO (`http://localhost:9000/...`) nội bộ trước khi lưu vào database, loại bỏ rủi ro hết hạn CDN link.
 - Cập nhật biến môi trường `.env` (`FILE_PUBLIC_BASE_URL`).
+
+## fix(M4.3): OCR preview formatting and inline math rendering
+
+- Sửa lỗi hiển thị đứt gãy câu chữ, công thức toán bị ép xuống dòng vô cớ:
+  - Backend: Cập nhật `ocr-artifact-normalizer.ts` để lọc bỏ các block phụ trợ (`conversionOutput === false`) tránh lặp nội dung bảng biểu. Đồng thời nối các dòng bằng `.join("")` (thay vì `\n`) để tôn trọng khoảng trắng và cấu trúc dòng gốc do Mathpix sinh ra.
+  - Frontend: Ghi đè CSS `.mmd-content svg { display: inline; }` để loại bỏ ảnh hưởng từ bộ reset của TailwindCSS (vốn ép tất cả SVG thành `display: block`), giúp các công thức toán nội tuyến (inline math) hiển thị hoàn hảo trên cùng một dòng.

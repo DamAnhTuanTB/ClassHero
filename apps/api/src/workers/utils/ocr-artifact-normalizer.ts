@@ -16,6 +16,7 @@ export interface NormalizedOcrLine {
   type: string | null;
   confidence: number | null;
   region: unknown;
+  conversionOutput: boolean;
 }
 
 export interface NormalizedOcrPage {
@@ -56,9 +57,10 @@ export function normalizeOcrPages(
     const pageNumber = pageIndex + 1;
     const lines = linePages[pageIndex] ?? [];
     const textFromLines = lines
+      .filter((line) => line.conversionOutput)
       .map((line) => line.text)
       .filter(Boolean)
-      .join("\n")
+      .join("")
       .trim();
     const mathpixMarkdown = normalizeText(mmdPages[pageIndex]);
     const markdown = normalizeText(mdPages[pageIndex]);
@@ -218,6 +220,7 @@ function normalizeLine(
       line.bounding_box ??
       line.cnt ??
       null,
+    conversionOutput: readBoolean(line, "conversion_output") ?? true,
   };
 }
 
@@ -331,4 +334,12 @@ function readNumber(
 ): number | null {
   const raw = value[key];
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+}
+
+function readBoolean(
+  value: Record<string, unknown>,
+  key: string,
+): boolean | null {
+  const raw = value[key];
+  return typeof raw === "boolean" ? raw : null;
 }
