@@ -8,15 +8,27 @@ import {
 } from "@/features/admin/courses/admin-course-documents-utils";
 import { cn } from "@/lib/utils";
 
+const reviewRequiredView = {
+  label: "Cần xác nhận",
+  toneClass:
+    "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]",
+};
+
 export function DocumentStatusBadge({
+  hasPrintedPageWarning,
   jobStatus,
   status,
 }: {
+  hasPrintedPageWarning?: boolean;
   jobStatus?: AdminBackgroundJobStatus | null;
   status: AdminDocumentStatus;
 }) {
-  const statusView = getDocumentStatusView(status);
-  const label = status === "PROCESSING" ? getJobStatusLabel(jobStatus) : statusView.label;
+  const useWarningOverride = status === "READY" && hasPrintedPageWarning;
+  const statusView = useWarningOverride
+    ? reviewRequiredView
+    : getDocumentStatusView(status);
+  const label =
+    status === "PROCESSING" ? getJobStatusLabel(jobStatus) : statusView.label;
 
   return (
     <span
@@ -29,3 +41,4 @@ export function DocumentStatusBadge({
     </span>
   );
 }
+

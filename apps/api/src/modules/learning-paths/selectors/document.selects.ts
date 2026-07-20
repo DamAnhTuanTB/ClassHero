@@ -56,6 +56,7 @@ export const sourceDocumentPageSelect = {
   pageNumber: true,
   status: true,
   text: true,
+  mathpixMarkdown: true,
   textSource: true,
   qualityScore: true,
   thumbnailFileId: true,

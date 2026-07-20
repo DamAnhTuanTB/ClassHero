@@ -10,6 +10,11 @@ const localIpv4Origins = Object.values(networkInterfaces()).flatMap(
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: localIpv4Origins,
+  webpack: (config) => {
+    // Required for react-pdf / pdfjs-dist
+    config.resolve.alias.canvas = false;
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -653,6 +653,7 @@ model SourceDocumentPage {
   pageNumber       Int            @map("page_number")
   status           DocumentStatus @default(UPLOADED)
   text             String?        @db.Text
+  mathpixMarkdown  String?        @map("mathpix_markdown") @db.Text
   textSource       String?        @map("text_source")
   qualityScore     Float?         @map("quality_score")
   thumbnailFileId  String?        @map("thumbnail_file_id") @db.Uuid

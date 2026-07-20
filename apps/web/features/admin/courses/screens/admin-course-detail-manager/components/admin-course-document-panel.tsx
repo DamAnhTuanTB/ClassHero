@@ -2,21 +2,24 @@
 
 import {
   AlertTriangle,
+  CheckCircle,
   ExternalLink,
   FileText,
   Loader2,
   RefreshCw,
   Trash2,
   Upload,
+  XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import {
   formatFileSize,
   formatQualityPercent,
-  getPrintedPageView,
+  getOcrStatusSummary,
 } from "@/features/admin/courses/admin-course-documents-utils";
+import type { AdminSourceDocumentPageApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { AdminCourseDocumentStat } from "@/features/admin/courses/screens/admin-course-detail-manager/components/admin-course-document-stat";
 import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
@@ -31,12 +34,12 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
   const sourceDocument = manager.selectedSourceDocument;
   const canMapRanges = Boolean(
     sourceDocument &&
-      manager.pageLimit &&
-      manager.lessons.length &&
-      manager.rangeReadiness.isReady,
+    manager.pageLimit &&
+    manager.lessons.length &&
+    manager.rangeReadiness.isReady,
   );
   const isSourceProcessing = sourceDocument?.status === "PROCESSING";
-  const previewPages = manager.sourcePages.slice(0, 6);
+
   const uploadLessonKind =
     manager.dialogState?.type === "lesson-upload"
       ? manager.dialogState.kind
@@ -153,6 +156,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                     {sourceDocument.title ?? sourceDocument.file.originalName}
                   </h3>
                   <DocumentStatusBadge
+                    hasPrintedPageWarning={manager.rangeReadiness.warningPageCount > 0}
                     jobStatus={sourceDocument.processingJob?.status}
                     status={sourceDocument.status}
                   />
@@ -209,13 +213,6 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               </div>
             </div>
 
-            {manager.sourceStats.failedPages > 0 ? (
-              <div className="border-b border-[var(--theme-border)] bg-[var(--theme-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--theme-danger)]">
-                <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
-                {manager.sourceStats.failedPages} trang cần xử lý lại
-              </div>
-            ) : null}
-
             {manager.latestRangeWarnings.length > 0 ? (
               <div className="grid gap-2 border-b border-[var(--theme-border)] bg-[var(--theme-warning-bg)] px-4 py-3">
                 {manager.latestRangeWarnings.map((warning) => (
@@ -229,35 +226,13 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               </div>
             ) : null}
 
-            <div className="grid gap-3 p-4 lg:grid-cols-6">
-              {previewPages.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-4 text-sm font-semibold text-[var(--theme-text-muted)] lg:col-span-6">
-                  Chưa có trang xem nhanh.
+            <div className="p-4">
+              {manager.sourcePages.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-4 text-sm font-semibold text-[var(--theme-text-muted)]">
+                  Chưa có dữ liệu trang.
                 </p>
               ) : (
-                previewPages.map((page) => {
-                  const printedPage = getPrintedPageView(page);
-
-                  return (
-                    <div
-                      key={page.id}
-                      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3"
-                    >
-                      <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-                        PDF {page.pageNumber}
-                      </p>
-                      <p className="mt-1 text-sm font-extrabold text-[var(--theme-text-strong)]">
-                        Trang in{" "}
-                        {printedPage.printedPageLabel ??
-                          printedPage.printedPageNumber ??
-                          "chưa rõ"}
-                      </p>
-                      <p className="mt-2 line-clamp-2 min-h-10 text-xs font-semibold leading-5 text-[var(--theme-text-muted)]">
-                        {page.textPreview ?? page.extractError ?? "Đang chờ nội dung"}
-                      </p>
-                    </div>
-                  );
-                })
+                <OcrStatusSummaryView pages={manager.sourcePages} />
               )}
             </div>
           </div>
@@ -335,5 +310,106 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         onConfirm={() => void handleDeleteSourceDocument()}
       />
     </section>
+  );
+}
+
+function OcrStatusSummaryView({ pages }: { pages: AdminSourceDocumentPageApi[] }) {
+  const summary = useMemo(() => getOcrStatusSummary(pages), [pages]);
+
+  const failedIssues = summary.issues.filter((issue) => issue.type === "failed");
+  const warningIssues = summary.issues.filter((issue) => issue.type === "warning");
+  const processingIssues = summary.issues.filter((issue) => issue.type === "processing");
+  const successCount = summary.readyPages - summary.warningPages;
+
+  return (
+    <div className="grid gap-3">
+      {/* Success row */}
+      <div className="flex items-center gap-3 rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] px-4 py-3">
+        <CheckCircle
+          className="h-5 w-5 shrink-0 text-[var(--theme-success-text)]"
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold text-[var(--theme-success-text)]">
+            {successCount}/{summary.totalPages} trang OCR thành công
+          </p>
+          {successCount === summary.totalPages && summary.totalPages > 0 ? (
+            <p className="mt-0.5 text-xs font-semibold text-[var(--theme-success-text)]">
+              Tất cả trang đã sẵn sàng để gán vào buổi học.
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Failed pages */}
+      {failedIssues.length > 0 ? (
+        <div className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)]">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <XCircle
+              className="h-5 w-5 shrink-0 text-[var(--theme-danger)]"
+              aria-hidden="true"
+            />
+            <p className="text-sm font-extrabold text-[var(--theme-danger)]">
+              {failedIssues.length} trang gặp lỗi — cần xử lý lại
+            </p>
+          </div>
+          <div className="border-t border-[var(--theme-danger-border)] px-4 py-2">
+            {failedIssues.map((issue) => (
+              <p
+                key={issue.pageNumber}
+                className="py-1 text-sm font-semibold text-[var(--theme-danger)]"
+              >
+                <span className="font-extrabold">Trang {issue.pageNumber}:</span>{" "}
+                {issue.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Warning pages */}
+      {warningIssues.length > 0 ? (
+        <div className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)]">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <AlertTriangle
+              className="h-5 w-5 shrink-0 text-[var(--theme-warning-text)]"
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-[var(--theme-warning-text)]">
+                {warningIssues.length} trang cần admin xác nhận số trang in
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-[var(--theme-warning-text)]">
+                Không thể gán khoảng trang cho buổi học cho đến khi xác nhận xong.
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-[var(--theme-warning-border)] px-4 py-2">
+            {warningIssues.map((issue) => (
+              <p
+                key={issue.pageNumber}
+                className="py-1 text-sm font-semibold text-[var(--theme-warning-text)]"
+              >
+                <span className="font-extrabold">Trang {issue.pageNumber}:</span>{" "}
+                {issue.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Processing pages */}
+      {processingIssues.length > 0 ? (
+        <div className="flex items-center gap-3 rounded-lg border border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] px-4 py-3">
+          <Loader2
+            className="h-5 w-5 shrink-0 animate-spin text-[var(--theme-primary)]"
+            aria-hidden="true"
+          />
+          <p className="text-sm font-extrabold text-[var(--theme-primary)]">
+            {processingIssues.length} trang đang xử lý
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 }

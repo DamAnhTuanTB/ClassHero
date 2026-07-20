@@ -38,3 +38,10 @@
 - `.codex/skills/design/` skill cho thiết kế UI mockups.
 - `.codex/scripts/capture-final-screen-ui.mjs` script chụp screenshot responsive.
 - `.gitignore`: thêm `apps/api/test/*.pdf` (PDF test lớn không commit).
+
+## fix(M4.3): OCR mathpix extraction and local image replacement
+
+- Sửa lỗi tách trang OCR (Mathpix không tự sinh `\newpage` trong file `.mmd`) bằng cách dùng `text_display` từ `lines.json` để gom từng trang chuẩn xác, đảm bảo ảnh và công thức không bị dồn hết về trang 1.
+- Cấu hình MinIO bucket `learning-path-dev` cho phép Public Read để render ảnh mà không cần token tạm thời.
+- Bổ sung logic `replaceMathpixImageUrls` vào `document-processing.processor.ts` để tự động thay thế toàn bộ URL CDN của Mathpix (`cdn.mathpix.com`) sang URL của MinIO (`http://localhost:9000/...`) nội bộ trước khi lưu vào database, loại bỏ rủi ro hết hạn CDN link.
+- Cập nhật biến môi trường `.env` (`FILE_PUBLIC_BASE_URL`).

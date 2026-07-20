@@ -1,4 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import * as yauzl from "yauzl";
+import type { Entry as YauzlEntry } from "yauzl";
 import {
   BackgroundJobQueue,
   BackgroundJobStatus,
@@ -15,6 +17,7 @@ import {
 } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
+import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
 import {
@@ -48,10 +51,14 @@ import {
 
 @Injectable()
 export class SourceDocumentsService {
+  private readonly logger = new Logger(SourceDocumentsService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(BackgroundJobQueueService)
     private readonly backgroundJobQueue: BackgroundJobQueueService,
+    @Inject(ObjectStorageService)
+    private readonly storage: ObjectStorageService,
   ) {}
 
   async createForLearningPath(
@@ -806,6 +813,120 @@ export class SourceDocumentsService {
   private enqueueProcessingJobs(jobIds: Array<string | null>) {
     const enqueueIds = jobIds.filter((jobId): jobId is string => Boolean(jobId));
     return this.backgroundJobQueue.enqueueMany(enqueueIds);
+  }
+
+  /**
+   * Get rendered HTML output from Mathpix OCR html.zip artifact.
+   * Returns the full HTML string for rendering in the frontend.
+   */
+  async getOcrHtml(sourceDocumentId: string): Promise<{ html: string }> {
+    // Find a page with artifacts metadata to get the htmlZip key
+    const page = await this.prisma.sourceDocumentPage.findFirst({
+      where: {
+        sourceDocumentId,
+        metadataJson: { not: Prisma.DbNull },
+      },
+      select: { metadataJson: true },
+      orderBy: { pageNumber: "asc" },
+    });
+
+    if (!page?.metadataJson) {
+      throwNotFound("OCR_ARTIFACTS_NOT_FOUND", "OCR artifacts not found for this document");
+    }
+
+    const metadata = page.metadataJson as Record<string, unknown>;
+    const artifacts = metadata.artifacts as Record<string, unknown> | undefined;
+    const htmlZipKey = artifacts?.htmlZip as string | undefined;
+
+    if (!htmlZipKey) {
+      throwNotFound("HTML_ARTIFACT_NOT_FOUND", "HTML artifact not found for this document");
+    }
+
+    try {
+      const zipBuffer = await this.storage.downloadObject(htmlZipKey);
+      const htmlContent = await this.extractHtmlWithImagesFromZip(zipBuffer);
+      return { html: htmlContent };
+    } catch (error) {
+      this.logger.error(
+        `Failed to extract OCR HTML for ${sourceDocumentId}: ${error}`,
+      );
+      throwNotFound("OCR_HTML_EXTRACT_FAILED", "Failed to extract HTML from OCR artifacts");
+    }
+  }
+
+  /**
+   * Extract the main HTML file content and its images from a Mathpix html.zip buffer.
+   * Replaces image sources in the HTML with their base64 representations.
+   */
+  private extractHtmlWithImagesFromZip(zipBuffer: Buffer): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, zipfile) => {
+        if (err || !zipfile) return reject(err ?? new Error("No zipfile"));
+
+        let htmlContent = "";
+        const imageMap = new Map<string, string>();
+
+        zipfile.readEntry();
+
+        zipfile.on("entry", (entry: YauzlEntry) => {
+          if (entry.fileName.endsWith(".html") && !entry.fileName.startsWith("__MACOSX")) {
+            zipfile.openReadStream(entry, (readErr, readStream) => {
+              if (readErr || !readStream) return reject(readErr ?? new Error("No stream"));
+              const chunks: Buffer[] = [];
+              readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
+              readStream.on("end", () => {
+                htmlContent = Buffer.concat(chunks).toString("utf-8");
+                zipfile.readEntry();
+              });
+              readStream.on("error", reject);
+            });
+          } else if (entry.fileName.includes("images/") && !entry.fileName.endsWith("/")) {
+            zipfile.openReadStream(entry, (readErr, readStream) => {
+              if (readErr || !readStream) return reject(readErr ?? new Error("No stream"));
+              const chunks: Buffer[] = [];
+              readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
+              readStream.on("end", () => {
+                const imgBuffer = Buffer.concat(chunks);
+                const ext = entry.fileName.split(".").pop()?.toLowerCase() || "jpeg";
+                const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+                const base64 = imgBuffer.toString("base64");
+                
+                // Trích xuất phần "images/filename.ext" từ đường dẫn thật trong zip
+                // Mathpix HTML thường trỏ src="images/filename.ext"
+                const match = entry.fileName.match(/images\/[^/]+$/);
+                const srcKey = match ? match[0] : entry.fileName;
+                
+                imageMap.set(srcKey, `data:${mimeType};base64,${base64}`);
+                zipfile.readEntry();
+              });
+              readStream.on("error", reject);
+            });
+          } else {
+            zipfile.readEntry();
+          }
+        });
+
+        zipfile.on("end", () => {
+          if (!htmlContent) {
+            reject(new Error("No HTML file found in zip"));
+            return;
+          }
+
+          // Replace all image sources with their base64 representation
+          for (const [fileName, base64Url] of imageMap.entries()) {
+            htmlContent = htmlContent.split(`src="${fileName}"`).join(`src="${base64Url}"`);
+            htmlContent = htmlContent.split(`src='${fileName}'`).join(`src='${base64Url}'`);
+            
+            htmlContent = htmlContent.split(`src="./${fileName}"`).join(`src="${base64Url}"`);
+            htmlContent = htmlContent.split(`src='./${fileName}'`).join(`src='${base64Url}'`);
+          }
+
+          resolve(htmlContent);
+        });
+
+        zipfile.on("error", reject);
+      });
+    });
   }
 }
 

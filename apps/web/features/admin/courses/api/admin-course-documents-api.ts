@@ -76,6 +76,13 @@ export function listAdminSourceDocumentPages(sourceDocumentId: string, token: st
   );
 }
 
+export function getAdminSourceDocumentOcrHtml(sourceDocumentId: string, token: string) {
+  return apiRequest<{ html: string }>(
+    `/admin/source-documents/${sourceDocumentId}/ocr-html`,
+    { token },
+  );
+}
+
 export function saveAdminLessonPageRanges(
   sourceDocumentId: string,
   ranges: AdminLessonPageRangeInput[],

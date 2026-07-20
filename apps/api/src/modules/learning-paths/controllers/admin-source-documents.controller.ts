@@ -107,4 +107,10 @@ export class AdminSourceDocumentsController {
       getRequestContext(request),
     );
   }
+
+  @Get("admin/source-documents/:sourceDocumentId/ocr-html")
+  @ApiOperation({ summary: "Get rendered HTML from Mathpix OCR output" })
+  getOcrHtml(@Param("sourceDocumentId") sourceDocumentId: string) {
+    return this.sourceDocumentsService.getOcrHtml(sourceDocumentId);
+  }
 }

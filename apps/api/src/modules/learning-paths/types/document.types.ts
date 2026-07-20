@@ -99,6 +99,8 @@ export type SourceDocumentPageResponse = {
   thumbnailFileId: string | null;
   thumbnailFile: DocumentFileResponse | null;
   textPreview: string | null;
+  fullText: string | null;
+  mathpixMarkdown: string | null;
   extractError: string | null;
   metadataJson: unknown;
   createdAt: Date;

@@ -473,6 +473,73 @@ export function formatDocumentKind(kind: AdminLessonDocumentKind) {
   return "Từ sách nguồn";
 }
 
+export type OcrPageIssue = {
+  pageNumber: number;
+  type: "failed" | "warning" | "processing";
+  message: string;
+};
+
+export type OcrStatusSummary = {
+  totalPages: number;
+  readyPages: number;
+  failedPages: number;
+  processingPages: number;
+  warningPages: number;
+  issues: OcrPageIssue[];
+  isAllClear: boolean;
+};
+
+export function getOcrStatusSummary(
+  pages: AdminSourceDocumentPageApi[],
+): OcrStatusSummary {
+  const issues: OcrPageIssue[] = [];
+  let readyPages = 0;
+  let failedPages = 0;
+  let processingPages = 0;
+  let warningPages = 0;
+
+  for (const page of pages) {
+    if (page.status === "FAILED") {
+      failedPages += 1;
+      issues.push({
+        pageNumber: page.pageNumber,
+        type: "failed",
+        message: page.extractError ?? "Lỗi không xác định",
+      });
+    } else if (page.status === "PROCESSING") {
+      processingPages += 1;
+      issues.push({
+        pageNumber: page.pageNumber,
+        type: "processing",
+        message: "Đang xử lý",
+      });
+    } else if (page.status === "READY") {
+      const printedPage = getPrintedPageView(page);
+      if (printedPage.warning) {
+        warningPages += 1;
+        readyPages += 1;
+        issues.push({
+          pageNumber: page.pageNumber,
+          type: "warning",
+          message: `Trang in chưa rõ — ${printedPage.warning}`,
+        });
+      } else {
+        readyPages += 1;
+      }
+    }
+  }
+
+  return {
+    totalPages: pages.length,
+    readyPages,
+    failedPages,
+    processingPages,
+    warningPages,
+    issues,
+    isAllClear: issues.length === 0 && pages.length > 0,
+  };
+}
+
 function parsePositiveInteger(value: string) {
   if (!/^\d+$/.test(value.trim())) {
     return null;
@@ -495,3 +562,4 @@ function readNumber(value: unknown) {
 function readString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
+

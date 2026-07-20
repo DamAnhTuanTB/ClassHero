@@ -255,6 +255,7 @@ export class DocumentProcessingProcessor {
     const ocr = await this.processPdfWithPaidOcr({
       objectKey: sourceDoc.file.objectKey,
       originalName: sourceDoc.file.originalName ?? "document.pdf",
+      ownerId: sourceDocId,
     });
 
     await this.prisma.sourceDocument.update({
@@ -285,6 +286,7 @@ export class DocumentProcessingProcessor {
         },
         data: {
           text: page.text || null,
+          mathpixMarkdown: page.mathpixMarkdown || null,
           textSource: PAID_OCR_TEXT_SOURCE,
           qualityScore,
           status: DocumentStatus.READY,
@@ -673,6 +675,7 @@ export class DocumentProcessingProcessor {
     const ocr = await this.processPdfWithPaidOcr({
       objectKey: lessonDoc.file.objectKey,
       originalName: lessonDoc.file.originalName ?? lessonDoc.title ?? "lesson-document.pdf",
+      ownerId: lessonDoc.id,
     });
 
     const imageSummary = await this.extractAndStoreImages({
@@ -1059,9 +1062,11 @@ export class DocumentProcessingProcessor {
   private async processPdfWithPaidOcr({
     objectKey,
     originalName,
+    ownerId,
   }: {
     objectKey: string;
     originalName: string;
+    ownerId: string;
   }): Promise<OcrProcessingResult> {
     this.logger.log(`Downloading PDF from storage: ${objectKey}`);
     const pdfBuffer = await this.storage.downloadObject(objectKey);
@@ -1106,6 +1111,31 @@ export class DocumentProcessingProcessor {
     }
 
     const pages = normalizeOcrPages(bundle, pageCount);
+
+    const publicBaseUrl = this.configService.get("FILE_PUBLIC_BASE_URL", {
+      infer: true,
+    });
+    if (publicBaseUrl && ownerId) {
+      const baseUrl = publicBaseUrl.replace(/\/$/, "");
+      for (const page of pages) {
+        const replaceUrls = (text: string) => {
+          return text.replace(
+            /https:\/\/cdn\.mathpix\.com\/cropped\/([a-zA-Z0-9\-]+)-(\d+)\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)/g,
+            (match, pdfId, pageNumStr, height, width, y, x) => {
+              const pageNum = parseInt(pageNumStr, 10);
+              const paddedPage = String(pageNum).padStart(3, "0");
+              const filename = `${pdfId}-${pageNumStr}_${height}_${width}_${y}_${x}.jpg`;
+              return `${baseUrl}/document-images/${ownerId}/page-${paddedPage}/${filename}`;
+            },
+          );
+        };
+        if (page.text) page.text = replaceUrls(page.text);
+        if (page.mathpixMarkdown) {
+          page.mathpixMarkdown = replaceUrls(page.mathpixMarkdown);
+        }
+      }
+    }
+
     const normalizedPagesKey = await this.artifactCache.saveNormalizedPages(
       descriptor,
       pages.map((page) => ({

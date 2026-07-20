@@ -62,6 +62,8 @@ export type AdminSourceDocumentPageApi = {
   thumbnailFileId: string | null;
   thumbnailFile: AdminDocumentFileApi | null;
   textPreview: string | null;
+  fullText: string | null;
+  mathpixMarkdown: string | null;
   extractError: string | null;
   metadataJson: unknown;
   createdAt: string;

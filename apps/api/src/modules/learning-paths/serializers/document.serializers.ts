@@ -90,6 +90,8 @@ export function serializeSourceDocumentPage(
       ? serializeDocumentFile(record.thumbnailFile)
       : null,
     textPreview: record.text ? record.text.slice(0, textPreviewLength) : null,
+    fullText: record.text ?? null,
+    mathpixMarkdown: record.mathpixMarkdown ?? null,
     extractError: record.extractError,
     metadataJson: record.metadataJson,
     createdAt: record.createdAt,

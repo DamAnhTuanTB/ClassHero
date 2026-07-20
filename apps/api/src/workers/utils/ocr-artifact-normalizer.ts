@@ -208,7 +208,7 @@ function normalizeLine(
   return {
     lineIndex,
     lineId,
-    text: readString(line, "text") ?? "",
+    text: readString(line, "text_display") || readString(line, "text") || "",
     type: readString(line, "type"),
     confidence: readNumber(line, "confidence") ?? readNumber(line, "confidence_rate"),
     region:
@@ -252,6 +252,12 @@ function splitPageArtifact(buffer: Buffer, expectedPages: number): string[] {
 
   if (pages.length >= expectedPages) {
     return pages.slice(0, expectedPages);
+  }
+
+  // If we couldn't split the artifact into pages (e.g. Mathpix didn't insert \newpage)
+  // and we expect multiple pages, don't return the monolithic document as page 1.
+  if (pages.length === 1 && expectedPages > 1) {
+    return Array.from({ length: expectedPages }, () => "");
   }
 
   return [...pages, ...Array.from({ length: expectedPages - pages.length }, () => "")];

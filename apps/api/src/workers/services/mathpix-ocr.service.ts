@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { EnvConfig } from "#api/config/env.validation";
+import * as fs from "fs";
+import * as path from "path";
 
 /** All artifacts downloaded from a single Mathpix PDF OCR job. */
 export interface OcrArtifactBundle {
@@ -50,10 +52,11 @@ export type MathpixConversionFormat =
   (typeof MATHPIX_CONVERSION_FORMATS)[number];
 
 export type MathpixPdfOptions = {
-  conversion_formats: Record<MathpixConversionFormat, true>;
+  conversion_formats: Record<string, true | Record<string, unknown>>;
   languages: string[];
   include_page_data: true;
   enable_tables_fallback: true;
+  page_separator?: string;
 };
 
 export function buildMathpixPdfOptions(
@@ -62,12 +65,13 @@ export function buildMathpixPdfOptions(
   return {
     conversion_formats: {
       "mmd.zip": true,
-      md: true,
       "html.zip": true,
+      md: true,
     },
     languages: languageHints,
     include_page_data: true,
     enable_tables_fallback: true,
+    page_separator: "\\newpage",
   };
 }
 
@@ -239,6 +243,21 @@ export class MathpixOcrService {
         `lines.json=${(linesJson.length / 1024).toFixed(0)}KB, ` +
         `html.zip=${(htmlZip.length / 1024).toFixed(0)}KB`,
     );
+
+    try {
+      const debugDir = path.join(process.cwd(), "debug", "mathpix", pdfId);
+      if (!fs.existsSync(debugDir)) {
+        fs.mkdirSync(debugDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(debugDir, "artifact.mmd"), mmd);
+      fs.writeFileSync(path.join(debugDir, "artifact.md"), md);
+      fs.writeFileSync(path.join(debugDir, "artifact.mmd.zip"), mmdZip);
+      fs.writeFileSync(path.join(debugDir, "artifact.lines.json"), linesJson);
+      fs.writeFileSync(path.join(debugDir, "artifact.html.zip"), htmlZip);
+      this.logger.log(`[DEBUG] Saved raw Mathpix artifacts to ${debugDir}`);
+    } catch (err) {
+      this.logger.error("Failed to save debug Mathpix artifacts", err);
+    }
 
     return {
       mmd,
