@@ -4,6 +4,7 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import {
   BackgroundJobQueue,
+  BackgroundJobStatus,
   DocumentStatus,
   FileProvider,
   FilePurpose,
@@ -39,15 +40,14 @@ const ids = {
 };
 
 const cleanupIds = {
+  lessonIds: new Set<string>(),
   sourceDocumentIds: new Set<string>(),
   lessonDocumentIds: new Set<string>(),
   jobIds: new Set<string>(),
 };
 const backgroundJobQueueMock = {
   enqueue: vi.fn(async (jobId: string) => ({ jobId })),
-  enqueueMany: vi.fn(async (jobIds: string[]) =>
-    jobIds.map((jobId) => ({ jobId })),
-  ),
+  enqueueMany: vi.fn(async (jobIds: string[]) => jobIds.map((jobId) => ({ jobId }))),
 };
 
 describe("M4.2 document API integration", () => {
@@ -115,9 +115,38 @@ describe("M4.2 document API integration", () => {
     expect(sourceDocument.status).toBe(DocumentStatus.PROCESSING);
     expect(sourceDocument.processingJob.status).toBe("QUEUED");
 
+    await prisma.backgroundJob.update({
+      where: { id: sourceDocument.processingJobId },
+      data: {
+        status: BackgroundJobStatus.FAILED,
+        finishedAt: new Date(),
+        errorMessage: "Retry fixture",
+      },
+    });
     await prisma.sourceDocument.update({
       where: { id: sourceDocument.id },
-      data: { pageCount: 10 },
+      data: { status: DocumentStatus.FAILED },
+    });
+
+    const retryResponse = await request(httpServer)
+      .post(`/api/v1/admin/source-documents/${sourceDocument.id}/process`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(201);
+
+    cleanupIds.jobIds.add(retryResponse.body.data.processingJobId);
+    expect(retryResponse.body.data.status).toBe(DocumentStatus.PROCESSING);
+    expect(retryResponse.body.data.processingJob.status).toBe(BackgroundJobStatus.QUEUED);
+    expect(retryResponse.body.data.processingJobId).not.toBe(
+      sourceDocument.processingJobId,
+    );
+
+    await prisma.sourceDocument.update({
+      where: { id: sourceDocument.id },
+      data: {
+        pageCount: 10,
+        processedAt: new Date(),
+        status: DocumentStatus.READY,
+      },
     });
     await prisma.sourceDocumentPage.createMany({
       data: Array.from({ length: 10 }, (_, index) => ({
@@ -180,6 +209,41 @@ describe("M4.2 document API integration", () => {
     cleanupIds.jobIds.add(supplementResponse.body.data.processingJobId);
     expect(supplementResponse.body.data.kind).toBe(LessonDocumentKind.SUPPLEMENT);
 
+    backgroundJobQueueMock.enqueueMany.mockClear();
+    const storageOnlySupplementResponse = await request(httpServer)
+      .post(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        fileId: ids.supplementFile,
+        title: "Reference handout",
+        kind: LessonDocumentKind.SUPPLEMENT,
+        processingMode: "STORAGE_ONLY",
+      })
+      .expect(201);
+
+    cleanupIds.lessonDocumentIds.add(storageOnlySupplementResponse.body.data.id);
+    expect(storageOnlySupplementResponse.body.data.kind).toBe(
+      LessonDocumentKind.SUPPLEMENT,
+    );
+    expect(storageOnlySupplementResponse.body.data.status).toBe(DocumentStatus.READY);
+    expect(storageOnlySupplementResponse.body.data.processingJobId).toBeNull();
+    expect(storageOnlySupplementResponse.body.data.processingJob).toBeNull();
+    expect(storageOnlySupplementResponse.body.data.chunkCount).toBe(0);
+    expect(storageOnlySupplementResponse.body.data.metadataJson).toEqual(
+      expect.objectContaining({
+        processingMode: "storage_only",
+        source: "supplemental_lesson_document_upload",
+      }),
+    );
+
+    const storageOnlyJobCount = await prisma.backgroundJob.count({
+      where: {
+        resourceId: storageOnlySupplementResponse.body.data.id,
+      },
+    });
+    expect(storageOnlyJobCount).toBe(0);
+    expect(backgroundJobQueueMock.enqueueMany).not.toHaveBeenCalled();
+
     const replaceResponse = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lessonOne}/primary-document/replace`)
       .set("Authorization", `Bearer ${accessToken}`)
@@ -191,9 +255,7 @@ describe("M4.2 document API integration", () => {
 
     cleanupIds.lessonDocumentIds.add(replaceResponse.body.data.id);
     cleanupIds.jobIds.add(replaceResponse.body.data.processingJobId);
-    expect(replaceResponse.body.data.kind).toBe(
-      LessonDocumentKind.PRIMARY_REPLACEMENT,
-    );
+    expect(replaceResponse.body.data.kind).toBe(LessonDocumentKind.PRIMARY_REPLACEMENT);
 
     const lessonDocumentsResponse = await request(httpServer)
       .get(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
@@ -212,6 +274,28 @@ describe("M4.2 document API integration", () => {
           document.kind === LessonDocumentKind.PRIMARY_FROM_SOURCE,
       ),
     ).toHaveLength(0);
+
+    const learningPathDocumentsResponse = await request(httpServer)
+      .get(`/api/v1/admin/learning-paths/${ids.learningPath}/lesson-documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(learningPathDocumentsResponse.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          lessonId: ids.lessonOne,
+          kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
+        }),
+        expect.objectContaining({
+          lessonId: ids.lessonOne,
+          kind: LessonDocumentKind.SUPPLEMENT,
+        }),
+        expect.objectContaining({
+          lessonId: ids.lessonTwo,
+          kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
+        }),
+      ]),
+    );
 
     const jobResponse = await request(httpServer)
       .get(`/api/v1/jobs/${replaceResponse.body.data.processingJobId}`)
@@ -244,6 +328,136 @@ describe("M4.2 document API integration", () => {
 
     const rangeCount = await prisma.lessonDocumentPageRange.count({
       where: { sourceDocumentId: sourceDocument.id },
+    });
+    expect(rangeCount).toBe(0);
+  });
+
+  it("creates and updates a lesson with an optional source page range", async () => {
+    const sourceDocument = await createReadySourceDocument(prisma, {
+      pageCount: 6,
+      title: "Lesson editor ready source",
+    });
+
+    const createResponse = await request(httpServer)
+      .post(`/api/v1/admin/chapters/${ids.chapter}/lessons`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        completionMinScore: 7,
+        orderIndex: 3,
+        sourceDocumentPageRange: {
+          pageEnd: 2,
+          pageStart: 1,
+          sourceDocumentId: sourceDocument.id,
+        },
+        status: PublishStatus.DRAFT,
+        title: "Lesson with source pages",
+        trialEnabled: false,
+      })
+      .expect(201);
+
+    const createdLesson = createResponse.body.data;
+    cleanupIds.lessonIds.add(createdLesson.id);
+
+    const createdDocument = await prisma.lessonDocument.findFirstOrThrow({
+      where: {
+        lessonId: createdLesson.id,
+        replacedAt: null,
+      },
+      select: {
+        id: true,
+        kind: true,
+        processingJobId: true,
+        sourceDocumentId: true,
+        metadataJson: true,
+      },
+    });
+    cleanupIds.lessonDocumentIds.add(createdDocument.id);
+    cleanupIds.jobIds.add(createdDocument.processingJobId!);
+
+    expect(createdDocument.kind).toBe(LessonDocumentKind.PRIMARY_FROM_SOURCE);
+    expect(createdDocument.sourceDocumentId).toBe(sourceDocument.id);
+    expect(createdDocument.metadataJson).toEqual(
+      expect.objectContaining({ pageEnd: 2, pageStart: 1 }),
+    );
+
+    await request(httpServer)
+      .patch(`/api/v1/admin/lessons/${createdLesson.id}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        sourceDocumentPageRange: {
+          pageEnd: 4,
+          pageStart: 3,
+          sourceDocumentId: sourceDocument.id,
+        },
+      })
+      .expect(200);
+
+    const updatedRange = await prisma.lessonDocumentPageRange.findFirstOrThrow({
+      where: {
+        lessonId: createdLesson.id,
+        sourceDocumentId: sourceDocument.id,
+      },
+      select: {
+        pageEnd: true,
+        pageStart: true,
+      },
+    });
+
+    expect(updatedRange).toEqual({ pageEnd: 4, pageStart: 3 });
+  });
+
+  it("rejects page range mapping until the source document is fully ready", async () => {
+    const processingSourceDocument = await prisma.sourceDocument.create({
+      data: {
+        fileId: ids.sourceFile,
+        learningPathId: ids.learningPath,
+        pageCount: 2,
+        status: DocumentStatus.PROCESSING,
+        title: "Processing source",
+      },
+    });
+    cleanupIds.sourceDocumentIds.add(processingSourceDocument.id);
+
+    await request(httpServer)
+      .put(
+        `/api/v1/admin/source-documents/${processingSourceDocument.id}/lesson-page-ranges`,
+      )
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        ranges: [{ lessonId: ids.lessonOne, pageEnd: 1, pageStart: 1 }],
+      })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.error.code).toBe("SOURCE_DOCUMENT_NOT_READY");
+      });
+
+    const reviewSourceDocument = await createReadySourceDocument(prisma, {
+      pageCount: 2,
+      title: "Review source",
+      warningPageNumber: 2,
+    });
+
+    await request(httpServer)
+      .patch(`/api/v1/admin/lessons/${ids.lessonOne}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        sourceDocumentPageRange: {
+          pageEnd: 2,
+          pageStart: 1,
+          sourceDocumentId: reviewSourceDocument.id,
+        },
+      })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.error.code).toBe("SOURCE_DOCUMENT_PAGE_REVIEW_REQUIRED");
+      });
+
+    const rangeCount = await prisma.lessonDocumentPageRange.count({
+      where: {
+        sourceDocumentId: {
+          in: [processingSourceDocument.id, reviewSourceDocument.id],
+        },
+      },
     });
     expect(rangeCount).toBe(0);
   });
@@ -335,14 +549,64 @@ function buildLesson(id: string, orderIndex: number, title: string) {
   };
 }
 
+async function createReadySourceDocument(
+  prisma: PrismaClient,
+  {
+    pageCount,
+    title,
+    warningPageNumber,
+  }: { pageCount: number; title: string; warningPageNumber?: number },
+) {
+  const sourceDocument = await prisma.sourceDocument.create({
+    data: {
+      fileId: ids.sourceFile,
+      learningPathId: ids.learningPath,
+      pageCount,
+      processedAt: new Date(),
+      status: DocumentStatus.READY,
+      title,
+    },
+  });
+  cleanupIds.sourceDocumentIds.add(sourceDocument.id);
+
+  await prisma.sourceDocumentPage.createMany({
+    data: Array.from({ length: pageCount }, (_, index) => {
+      const pageNumber = index + 1;
+
+      return {
+        id: randomUUID(),
+        metadataJson: {
+          printedPage: {
+            confidence: 0.95,
+            pdfPageNumber: pageNumber,
+            printedPageLabel: String(pageNumber),
+            printedPageNumber: pageNumber,
+            source: "admin_verified",
+            warning: warningPageNumber === pageNumber ? "ambiguous" : null,
+          },
+        },
+        pageNumber,
+        sourceDocumentId: sourceDocument.id,
+        status: DocumentStatus.READY,
+        text: `Ready page ${pageNumber}`,
+        textSource: "paid_ocr",
+      };
+    }),
+  });
+
+  return sourceDocument;
+}
+
 async function cleanupFixtureData(prisma: PrismaClient) {
+  const lessonIds = [ids.lessonOne, ids.lessonTwo, ...cleanupIds.lessonIds];
+
   await prisma.documentChunk.deleteMany({
-    where: { lessonId: { in: [ids.lessonOne, ids.lessonTwo] } },
+    where: { lessonId: { in: lessonIds } },
   });
   await prisma.lessonDocumentPageRange.deleteMany({
     where: {
       OR: [
-        { lessonId: { in: [ids.lessonOne, ids.lessonTwo] } },
+        { lessonId: { in: lessonIds } },
         { sourceDocumentId: { in: [...cleanupIds.sourceDocumentIds] } },
       ],
     },
@@ -351,7 +615,7 @@ async function cleanupFixtureData(prisma: PrismaClient) {
     where: {
       OR: [
         { id: { in: [...cleanupIds.lessonDocumentIds] } },
-        { lessonId: { in: [ids.lessonOne, ids.lessonTwo] } },
+        { lessonId: { in: lessonIds } },
       ],
     },
   });
@@ -363,14 +627,11 @@ async function cleanupFixtureData(prisma: PrismaClient) {
   });
   await prisma.backgroundJob.deleteMany({
     where: {
-      OR: [
-        { id: { in: [...cleanupIds.jobIds] } },
-        { ownerUserId: ids.adminUser },
-      ],
+      OR: [{ id: { in: [...cleanupIds.jobIds] } }, { ownerUserId: ids.adminUser }],
     },
   });
   await prisma.lesson.deleteMany({
-    where: { id: { in: [ids.lessonOne, ids.lessonTwo] } },
+    where: { id: { in: lessonIds } },
   });
   await prisma.learningPathChapter.deleteMany({ where: { id: ids.chapter } });
   await prisma.learningPath.deleteMany({ where: { id: ids.learningPath } });

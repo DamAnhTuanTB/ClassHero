@@ -32,6 +32,32 @@ export const learningPathSchema = z.object({
   sortOrder: z.coerce.number().int().min(0),
 });
 
+const referenceDocumentSchema = z
+  .object({
+    title: z.string().trim().max(180, "Tên tài liệu tối đa 180 ký tự").optional(),
+    file: z.custom<File | null>().optional(),
+  })
+  .superRefine((value, context) => {
+    const hasTitle = Boolean(value.title?.trim());
+    const file = value.file ?? null;
+
+    if (hasTitle && !file) {
+      context.addIssue({
+        code: "custom",
+        message: "Chọn file tài liệu",
+        path: ["file"],
+      });
+    }
+
+    if (file?.type && file.type !== "application/pdf") {
+      context.addIssue({
+        code: "custom",
+        message: "File phải là PDF",
+        path: ["file"],
+      });
+    }
+  });
+
 export const lessonSchema = z.object({
   orderIndex: z.coerce.number().int().min(1, "Thứ tự bắt đầu từ 1").max(500),
   title: requiredTrimmedText({
@@ -52,6 +78,80 @@ export const lessonSchema = z.object({
   completionMinScore: z.coerce.number().min(0).max(10),
   trialEnabled: z.boolean(),
   status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"]),
+  sourceDocumentPageRange: z
+    .object({
+      sourceDocumentId: z.string().trim().optional(),
+      pageStart: z.string().trim().optional(),
+      pageEnd: z.string().trim().optional(),
+    })
+    .superRefine((value, context) => {
+      const hasStart = Boolean(value.pageStart?.trim());
+      const hasEnd = Boolean(value.pageEnd?.trim());
+
+      if (!hasStart && !hasEnd) {
+        return;
+      }
+
+      if (!value.sourceDocumentId?.trim()) {
+        context.addIssue({
+          code: "custom",
+          message: "Chọn tài liệu nguồn",
+          path: ["sourceDocumentId"],
+        });
+      }
+
+      if (!hasStart) {
+        context.addIssue({
+          code: "custom",
+          message: "Nhập trang bắt đầu",
+          path: ["pageStart"],
+        });
+      }
+
+      if (!hasEnd) {
+        context.addIssue({
+          code: "custom",
+          message: "Nhập trang kết thúc",
+          path: ["pageEnd"],
+        });
+      }
+
+      const pageStart = Number(value.pageStart);
+      const pageEnd = Number(value.pageEnd);
+
+      if (hasStart && (!Number.isInteger(pageStart) || pageStart < 1)) {
+        context.addIssue({
+          code: "custom",
+          message: "Trang bắt đầu phải là số nguyên dương",
+          path: ["pageStart"],
+        });
+      }
+
+      if (hasEnd && (!Number.isInteger(pageEnd) || pageEnd < 1)) {
+        context.addIssue({
+          code: "custom",
+          message: "Trang kết thúc phải là số nguyên dương",
+          path: ["pageEnd"],
+        });
+      }
+
+      if (
+        hasStart &&
+        hasEnd &&
+        Number.isInteger(pageStart) &&
+        Number.isInteger(pageEnd) &&
+        pageStart > pageEnd
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Trang bắt đầu không được lớn hơn trang kết thúc",
+          path: ["pageStart"],
+        });
+      }
+    }),
+  referenceDocuments: z
+    .array(referenceDocumentSchema)
+    .max(10, "Tối đa 10 tài liệu tham khảo"),
 });
 
 export const chapterSchema = z.object({
@@ -90,6 +190,15 @@ export type LessonFormValues = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
+  sourceDocumentPageRange: {
+    sourceDocumentId?: string;
+    pageStart?: string;
+    pageEnd?: string;
+  };
+  referenceDocuments: Array<{
+    title?: string;
+    file?: File | null;
+  }>;
 };
 
 export type ChapterFormValues = {
@@ -125,6 +234,12 @@ export const emptyLessonValues: LessonFormValues = {
   completionMinScore: 7,
   trialEnabled: false,
   status: "PUBLISHED",
+  sourceDocumentPageRange: {
+    sourceDocumentId: "",
+    pageStart: "",
+    pageEnd: "",
+  },
+  referenceDocuments: [],
 };
 
 export const emptyChapterValues: ChapterFormValues = {

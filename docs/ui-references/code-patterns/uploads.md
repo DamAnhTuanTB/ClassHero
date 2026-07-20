@@ -24,12 +24,14 @@ Dùng cho admin upload một tài liệu nguồn dài rồi gán khoảng trang 
 
 - Entity con phải có id thật trước khi upload; không upload file tài liệu trong modal tạo entity con nếu chưa có yêu cầu rõ.
 - Màn quản lý tổng upload source document ở cấp entity cha, hiển thị tổng số trang, provider/cost estimate nếu có và trạng thái paid OCR artifact/page-level.
+- Luồng happy case phải có state nhập khoảng trang riêng sau khi tài liệu nguồn sẵn sàng; không dùng màn lỗi hoặc màn summary làm đại diện cho bước nhập range.
 - Danh sách entity con có field `fromPage`/`toPage`, preview thumbnail/text ngắn và warning range trùng/bỏ sót khi có.
 - Khi lưu mapping, API gắn page range vào đúng entity id và enqueue chunking cho entity con liên quan.
 - Mỗi entity con có hai action riêng: upload/thay thế tài liệu gốc và upload tài liệu bổ sung; hai action này không dùng chung handler/state.
 - Mỗi dòng có pending/success/error/retry state riêng để một mapping/chunking lỗi không khóa toàn bộ danh sách.
 - Trạng thái tài liệu dùng badge/mapping chung: chưa có, đang xử lý, sẵn sàng, lỗi.
 - Upload lẻ từng dòng là tài liệu bổ sung; action phải phân biệt rõ `Upload tài liệu bổ sung`, `Upload/Thay thế tài liệu gốc`, `Xem trang` hoặc `Xử lý lại` theo trạng thái hiện tại.
+- Copy trong UI upload/mapping phải là copy sản phẩm thật, ngắn và hướng hành động; chi tiết kiểu `job`, `queue`, `artifact`, schema/provider internals chỉ đặt trong docs hoặc báo cáo kỹ thuật.
 
 ### Không làm
 
@@ -39,3 +41,4 @@ Dùng cho admin upload một tài liệu nguồn dài rồi gán khoảng trang 
 - Không để file tạm chưa gắn entity tồn tại âm thầm; nếu bắt buộc có staging thì phải có session, expiry và cleanup job.
 - Không chunk toàn bộ source document trước rồi đoán entity; phải chunk sau khi page range đã được xác nhận.
 - Không khóa cả panel khi một dòng đang mapping/chunking; chỉ disabled action của dòng đang pending.
+- Không nhét đoạn hướng dẫn sử dụng dài vào màn thao tác; hướng dẫn nhanh thuộc flow-board/HTML review, không thuộc UI production.

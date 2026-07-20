@@ -1,6 +1,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  createAdminLessonSupplementDocument,
+  uploadAdminLessonDocumentFile,
+} from "@/features/admin/courses/api/admin-course-documents-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import {
   useAdminCourseMutations,
@@ -15,6 +19,7 @@ import type { EditorMode, ViewState } from "@/features/admin/courses/admin-cours
 import {
   findLessonMatch,
   getAdminCourseDetailStats,
+  getLessonReferenceDocumentUploads,
 } from "@/features/admin/courses/admin-courses-utils";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
@@ -40,6 +45,7 @@ export function useAdminCourseDetailManager(
     allowedRoles: ["ADMIN"],
     authError: learningPathQuery.error,
   });
+  const accessToken = session?.accessToken ?? "";
   const mutations = useAdminCourseMutations();
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
@@ -57,6 +63,7 @@ export function useAdminCourseDetailManager(
   const [isPathEditorOpen, setIsPathEditorOpen] = useState(false);
   const [isChapterEditorOpen, setIsChapterEditorOpen] = useState(false);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
+  const [isSavingLessonReferences, setIsSavingLessonReferences] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
     adminSidebarCollapsedStorageKey,
     false,
@@ -76,7 +83,9 @@ export function useAdminCourseDetailManager(
   const isSavingChapter =
     mutations.createChapter.isPending || mutations.updateChapter.isPending;
   const isSavingLesson =
-    mutations.createLesson.isPending || mutations.updateLesson.isPending;
+    mutations.createLesson.isPending ||
+    mutations.updateLesson.isPending ||
+    isSavingLessonReferences;
 
   useEffect(() => {
     if (learningPathQuery.data !== undefined) {
@@ -267,11 +276,19 @@ export function useAdminCourseDetailManager(
     }
 
     try {
+      let referenceUploadError: unknown = null;
+
       if (lessonEditorMode === "create") {
-        await mutations.createLesson.mutateAsync({
+        const createdLesson = await mutations.createLesson.mutateAsync({
           chapterId: selectedChapterId,
           values,
         });
+
+        try {
+          await uploadLessonReferenceDocuments(createdLesson.id, values);
+        } catch (error) {
+          referenceUploadError = error;
+        }
       } else if (selectedLesson) {
         await mutations.updateLesson.mutateAsync({
           lessonId: selectedLesson.id,
@@ -281,12 +298,18 @@ export function useAdminCourseDetailManager(
 
       await mutations.invalidateLearningPath(path.id);
       await learningPathQuery.refetch();
-      toast.success(
-        lessonEditorMode === "create" ? "Đã thêm bài học" : "Đã lưu bài học",
-        {
-          description: "Danh sách bài học trong chương đã được cập nhật.",
-        },
-      );
+      if (referenceUploadError) {
+        toast.warning("Đã thêm bài học", {
+          description: getErrorMessage(referenceUploadError),
+        });
+      } else {
+        toast.success(
+          lessonEditorMode === "create" ? "Đã thêm bài học" : "Đã lưu bài học",
+          {
+            description: "Danh sách bài học trong chương đã được cập nhật.",
+          },
+        );
+      }
       setLessonEditorMode("create");
       setSelectedLessonId(null);
       setIsLessonEditorOpen(false);
@@ -298,6 +321,39 @@ export function useAdminCourseDetailManager(
       toast.error("Chưa lưu được bài học", {
         description: getErrorMessage(error),
       });
+    }
+  }
+
+  async function uploadLessonReferenceDocuments(
+    lessonId: string,
+    values: LessonFormValues,
+  ) {
+    const referenceDocuments = getLessonReferenceDocumentUploads(values);
+
+    if (referenceDocuments.length === 0) {
+      return;
+    }
+
+    setIsSavingLessonReferences(true);
+    try {
+      for (const document of referenceDocuments) {
+        const uploadedFile = await uploadAdminLessonDocumentFile(
+          document.file,
+          accessToken,
+        );
+        await createAdminLessonSupplementDocument(
+          lessonId,
+          {
+            fileId: uploadedFile.id,
+            kind: "SUPPLEMENT",
+            processingMode: "STORAGE_ONLY",
+            title: document.title || uploadedFile.originalName,
+          },
+          accessToken,
+        );
+      }
+    } finally {
+      setIsSavingLessonReferences(false);
     }
   }
 

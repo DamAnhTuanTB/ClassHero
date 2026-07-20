@@ -16,11 +16,17 @@ import {
 } from "#api/modules/learning-paths/utils/lesson.helpers";
 import { lessonSelect } from "#api/modules/learning-paths/selectors/lesson.selects";
 import { serializeLesson } from "#api/modules/learning-paths/serializers/lesson.serializers";
+import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
+import type { LessonDocumentRecord } from "#api/modules/learning-paths/types/document.types";
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
 
 @Injectable()
 export class LessonsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(SourceDocumentsService)
+    private readonly sourceDocumentsService: SourceDocumentsService,
+  ) {}
 
   async listForAdmin(chapterId: string) {
     await this.assertChapterExists(chapterId);
@@ -51,7 +57,7 @@ export class LessonsService {
     assertVideoUrlAllowed(dto.videoUrl);
 
     try {
-      const lesson = await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const chapter = await tx.learningPathChapter.findFirst({
           where: {
             id: chapterId,
@@ -112,10 +118,26 @@ export class LessonsService {
           },
         });
 
-        return created;
+        const lessonDocument = dto.sourceDocumentPageRange
+          ? await this.sourceDocumentsService.assignSingleLessonPageRangeInTransaction(
+              tx,
+              {
+                actorUserId,
+                context,
+                lessonId: created.id,
+                pageEnd: dto.sourceDocumentPageRange.pageEnd,
+                pageStart: dto.sourceDocumentPageRange.pageStart,
+                sourceDocumentId: dto.sourceDocumentPageRange.sourceDocumentId,
+              },
+            )
+          : null;
+
+        return { lesson: created, lessonDocument };
       });
 
-      return serializeLesson(lesson);
+      await this.enqueueOptionalLessonDocument(result.lessonDocument);
+
+      return serializeLesson(result.lesson);
     } catch (error) {
       handleKnownPrismaError(error);
     }
@@ -134,7 +156,7 @@ export class LessonsService {
     assertVideoUrlAllowed(dto.videoUrl);
 
     try {
-      const lesson = await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const before = await tx.lesson.findFirst({
           where: {
             id: lessonId,
@@ -199,10 +221,26 @@ export class LessonsService {
           },
         });
 
-        return updated;
+        const lessonDocument = dto.sourceDocumentPageRange
+          ? await this.sourceDocumentsService.assignSingleLessonPageRangeInTransaction(
+              tx,
+              {
+                actorUserId,
+                context,
+                lessonId: updated.id,
+                pageEnd: dto.sourceDocumentPageRange.pageEnd,
+                pageStart: dto.sourceDocumentPageRange.pageStart,
+                sourceDocumentId: dto.sourceDocumentPageRange.sourceDocumentId,
+              },
+            )
+          : null;
+
+        return { lesson: updated, lessonDocument };
       });
 
-      return serializeLesson(lesson);
+      await this.enqueueOptionalLessonDocument(result.lessonDocument);
+
+      return serializeLesson(result.lesson);
     } catch (error) {
       handleKnownPrismaError(error);
     }
@@ -385,6 +423,14 @@ export class LessonsService {
     });
 
     return lesson ? lesson.orderIndex - 1 : -1;
+  }
+
+  private enqueueOptionalLessonDocument(document: LessonDocumentRecord | null) {
+    if (!document) {
+      return Promise.resolve();
+    }
+
+    return this.sourceDocumentsService.enqueueLessonDocumentProcessingJobs([document]);
   }
 
   private async moveLessonOrder(

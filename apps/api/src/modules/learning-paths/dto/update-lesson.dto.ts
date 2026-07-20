@@ -14,7 +14,9 @@ import {
   Min,
   MinLength,
   ValidateIf,
+  ValidateNested,
 } from "class-validator";
+import { LessonSourceDocumentPageRangeDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
 
 export class UpdateLessonDto {
   @ApiPropertyOptional({ example: 1, minimum: 1 })
@@ -88,4 +90,10 @@ export class UpdateLessonDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsEnum(PublishStatus)
   status?: PublishStatus;
+
+  @ApiPropertyOptional({ type: LessonSourceDocumentPageRangeDto })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @ValidateNested()
+  @Type(() => LessonSourceDocumentPageRangeDto)
+  sourceDocumentPageRange?: LessonSourceDocumentPageRangeDto;
 }

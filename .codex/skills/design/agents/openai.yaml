@@ -1,0 +1,7 @@
+interface:
+  display_name: "/design"
+  short_description: "Tạo ảnh UI hoàn chỉnh từ pattern chốt."
+  default_prompt: "Use $design to create a complete production UI image for /design mobile M4.5."
+
+policy:
+  allow_implicit_invocation: true

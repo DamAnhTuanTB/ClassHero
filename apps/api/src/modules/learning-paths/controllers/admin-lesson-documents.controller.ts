@@ -89,3 +89,23 @@ export class AdminLessonDocumentsController {
     );
   }
 }
+
+@ApiTags("admin-lesson-documents")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
+@Controller("admin/learning-paths/:learningPathId")
+export class AdminLearningPathLessonDocumentsController {
+  constructor(
+    @Inject(LessonDocumentsService)
+    private readonly lessonDocumentsService: LessonDocumentsService,
+  ) {}
+
+  @Get("lesson-documents")
+  @ApiOperation({
+    summary: "List active lesson documents in one learning path",
+  })
+  listByLearningPath(@Param("learningPathId") learningPathId: string) {
+    return this.lessonDocumentsService.listForLearningPath(learningPathId);
+  }
+}

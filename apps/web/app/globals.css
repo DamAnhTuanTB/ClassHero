@@ -268,7 +268,7 @@ button {
 }
 
 .theme-dialog-footer {
-  background: color-mix(in srgb, var(--theme-bg-elevated) 76%, transparent);
+  background: var(--theme-bg-elevated);
   border-top: 1px solid var(--theme-border);
   padding-block: 0.625rem;
 }

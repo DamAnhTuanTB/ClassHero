@@ -143,28 +143,34 @@ Acceptance Criteria:
 
 Actor: Admin.
 
-Flow chính MVP: upload một tài liệu nguồn dài cho lộ trình rồi gán trang vào từng buổi học.
+Flow chính MVP: upload một tài liệu nguồn dài cho lộ trình rồi gán trang vào từng buổi học. Hệ thống hỗ trợ cả hai thứ tự thao tác phổ biến:
+
+- Tạo chương/buổi học trước, sau đó upload sách và gán page range hàng loạt.
+- Upload sách trước, sau đó tạo chương/buổi học và gán page range ngay trong modal tạo/sửa buổi học.
 
 Các bước:
 
-1. Admin tạo trước các buổi học bằng metadata thô.
-2. Admin upload một PDF/tài liệu nguồn dài ở cấp lộ trình.
+1. Admin upload một PDF/tài liệu nguồn dài ở cấp lộ trình, hoặc dùng source document đã upload trước đó.
+2. Admin tạo/sửa chương và buổi học.
 3. Backend validate file type và size.
 4. Backend tạo object key.
 5. Backend upload file lên object storage theo môi trường: MinIO local/dev hoặc Cloudflare R2 staging/production.
 6. Backend lưu metadata vào `files`.
 7. Backend tạo source document và enqueue job xử lý PDF nếu là PDF.
 8. Worker kiểm tra OCR artifact cache theo `content_hash`; nếu chưa có thì gọi paid OCR provider từ file gốc, rồi lưu page text/Markdown/LaTeX, layout/region refs, visual refs nếu có, snapshot/thumbnail và quality status.
-9. Admin gán khoảng trang cho từng buổi học.
-10. Backend validate page range và tạo mapping `lesson -> page ranges`.
-11. Worker chunk nội dung theo từng lesson dựa trên page range.
-12. Worker tạo embedding.
-13. Worker lưu chunks/embedding vào database với `lesson_id` đúng.
+9. Nếu source document đã có và đã xử lý xong, modal tạo/sửa buổi học cho admin chọn source document, nhập khoảng trang tùy chọn, xem preview trang/text ngắn và lưu mapping ngay cùng thao tác lesson; nếu chỉ muốn tạo metadata buổi học trước thì bỏ trống khoảng trang.
+10. Khi tạo buổi học, admin có thể thêm nhiều tài liệu tham khảo tùy chọn theo từng dòng gồm tên tài liệu và file PDF. Các file này chỉ lưu kèm buổi học, không chạy OCR/chunking.
+11. Nếu các buổi học đã tồn tại, admin bấm `Nhập khoảng trang` ở course detail để mở modal gán trang hàng loạt và nhập/chỉnh nhiều lesson cùng lúc.
+12. Backend validate page range và tạo mapping `lesson -> page ranges`.
+13. Worker chunk nội dung theo từng lesson dựa trên page range.
+14. Worker tạo embedding.
+15. Worker lưu chunks/embedding vào database với `lesson_id` đúng.
 
 Fallback:
 
 - Admin vẫn có thể upload tài liệu lẻ trực tiếp cho từng buổi học nếu tài liệu không nằm trong một source PDF dài.
 - Sau khi đã gán trang từ source PDF dài, admin vẫn có thể upload thêm tài liệu bổ sung cho một vài buổi học, ví dụ phiếu bài tập riêng, file đáp án, ảnh công thức hoặc tài liệu tham khảo. Các tài liệu bổ sung này gắn trực tiếp vào `lesson_id` và được xử lý/chunk như nguồn context bổ sung của chính buổi học đó.
+- Riêng tài liệu tham khảo thêm ngay trong modal tạo buổi học là storage-only: vẫn lưu file và `lesson_documents` để xem/tải lại theo lesson, nhưng không tạo OCR artifact, chunk hoặc embedding.
 
 Acceptance Criteria:
 
@@ -172,6 +178,10 @@ Acceptance Criteria:
 - PDF processing chạy background theo paid OCR artifact/page-level trước, chunking theo lesson sau khi có page range.
 - Nếu xử lý lỗi, document status là `FAILED`.
 - Admin thấy trạng thái xử lý tài liệu nguồn, từng trang, từng lesson mapping và tài liệu bổ sung nếu có.
+- Course detail không nhét toàn bộ form nhập khoảng trang vào màn chính; màn chính chỉ hiển thị danh sách/status gọn, còn chỉnh nhanh toàn bộ lesson nằm trong modal `Nhập khoảng trang`.
+- Upload source PDF vẫn nằm ở cấp lộ trình/course detail. Modal lesson không upload source PDF mới; modal chỉ gán page range từ source document đã có và preview nội dung để tránh chọn nhầm trang.
+- Các input khoảng trang trong modal lesson và modal `Nhập khoảng trang` phải disabled cho tới khi source document ở trạng thái sẵn sàng, đủ page records, tất cả page đã xử lý xong và không còn warning số trang in cần admin xác nhận.
+- Modal tạo buổi học có thể thêm nhiều tài liệu tham khảo storage-only; mỗi dòng cần tên hiển thị tùy chọn và một file PDF, các dòng trống không gửi lên API.
 
 ---
 

@@ -141,6 +141,31 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Evidence:
   - Files: `docs/implementation/M4.md`, `docs/ui-references/code-patterns/uploads.md`.
 
+## Admin Lesson Document Upload Final Flow - 2026-07-19
+
+- Context: UI production flow đã được owner chốt cho `M4.5`, trọng tâm là admin quản lý sách nguồn, OCR theo trang, nhập khoảng trang cho từng buổi học và xử lý tài liệu riêng của từng buổi.
+- Approved:
+  - Luồng happy case phải đi trước: chưa có sách nguồn -> upload PDF nguồn -> xác nhận xử lý -> xem tiến độ/trang -> trạng thái sẵn sàng gán -> nhập khoảng trang cho toàn bộ buổi học -> lưu -> thấy từng buổi học chuyển sang xử lý/sẵn sàng.
+  - Màn nhập khoảng trang là một state/panel riêng, không được thay bằng màn lỗi, màn summary hoặc mô tả kỹ thuật.
+  - Error/validation/loading/remove conflict là nhánh phụ của flow, đặt sau happy case để owner và developer đọc được hành trình chính trước.
+  - Copy trong app phải ngắn, giống sản phẩm thật và tránh thuật ngữ kỹ thuật như tên queue/job/artifact/schema. Hướng dẫn chi tiết chỉ nằm trong flow HTML hoặc tài liệu, không nhét vào UI.
+  - Tài liệu nguồn ở cấp khóa học dùng card/panel riêng, có trạng thái, tiến độ trang, nút upload/thay file, xem trang, xử lý lại và xóa khi hợp lệ.
+  - Danh sách buổi học cần thể hiện rõ khoảng trang, tài liệu chính và tài liệu bổ sung. Action `Thay tài liệu chính` và `Thêm tài liệu bổ sung` luôn là hai hành động riêng.
+  - Page preview ưu tiên thumbnail/text ngắn, hiển thị số trang PDF và số trang in khi dữ liệu có; thiếu số trang in phải có trạng thái để admin rà lại.
+  - Flow board tổng hợp và HTML xem trực tiếp phải giữ đủ ảnh, không crop ảnh, mỗi node có hướng dẫn nhanh theo cấu trúc: trước đó cần làm gì, màn này làm gì, kết quả nhận được là gì.
+- Avoid:
+  - Không biến UI thành bản giải thích kỹ thuật, không đưa đoạn hướng dẫn dài vào màn thao tác.
+  - Không dùng state lỗi như bước chính của happy path.
+  - Không gộp upload PDF nguồn với upload tài liệu bổ sung của từng buổi học.
+  - Không để UI nhìn như đã có feature nếu action chưa nối API hoặc chưa có disabled/pending/error state rõ.
+- Reuse for:
+  - Màn admin quản lý tài liệu theo khóa học/buổi học, các flow upload một file nguồn dài rồi map vào nhiều entity con, và các bản `/design` cần xuất cả case set, flow-board image và HTML flow map.
+- Evidence:
+  - Flow HTML: `docs/final-screen-ui/_designs/mobile/admin/m4-5/flow-board.html`
+  - Flow image: `docs/final-screen-ui/_designs/mobile/admin/m4-5/flow-board.png`
+  - Case screenshots: `docs/final-screen-ui/_designs/mobile/admin/m4-5/*/screen.png`
+  - Prototype source: `.codex/designs/m4-5-mobile/cases.html`, `.codex/designs/m4-5-mobile/flow-board.html`
+
 ## Student Explore Courses - 2026-07-16
 
 - Context: `M3.5` student course browsing UI, trọng tâm là màn Khám phá `/student/explore` và student shell/navigation dùng chung quanh màn này.

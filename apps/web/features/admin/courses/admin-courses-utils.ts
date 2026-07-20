@@ -50,6 +50,11 @@ export type LessonMatch = {
   lesson: AdminLesson;
 };
 
+export type LessonReferenceDocumentUpload = {
+  file: File;
+  title: string;
+};
+
 export function toPathFormValues(path: AdminLearningPath): LearningPathFormValues {
   return {
     title: path.title,
@@ -100,6 +105,12 @@ export function toLessonFormValues(lesson: AdminLesson): LessonFormValues {
     completionMinScore: lesson.completionMinScore,
     trialEnabled: lesson.trialEnabled,
     status: lesson.status,
+    sourceDocumentPageRange: {
+      sourceDocumentId: "",
+      pageStart: "",
+      pageEnd: "",
+    },
+    referenceDocuments: [],
   };
 }
 
@@ -115,6 +126,25 @@ export function toLessonPayload(values: LessonFormValues): Omit<AdminLesson, "id
     trialEnabled: values.trialEnabled,
     status: values.status,
   };
+}
+
+export function getLessonReferenceDocumentUploads(
+  values: LessonFormValues,
+): LessonReferenceDocumentUpload[] {
+  return values.referenceDocuments.flatMap((document) => {
+    const file = document.file ?? null;
+
+    if (!file) {
+      return [];
+    }
+
+    return [
+      {
+        file,
+        title: document.title?.trim() || file.name,
+      },
+    ];
+  });
 }
 
 export function toChapterFormValues(chapter: AdminChapter): ChapterFormValues {

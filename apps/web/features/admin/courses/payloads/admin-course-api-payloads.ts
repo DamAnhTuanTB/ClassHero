@@ -52,6 +52,10 @@ export function toChapterApiPayload(
 }
 
 export function toLessonApiPayload(values: Partial<LessonFormValues>): AdminLessonPayload {
+  const sourceDocumentPageRange = normalizeLessonSourceDocumentPageRange(
+    values.sourceDocumentPageRange,
+  );
+
   return {
     ...(values.orderIndex !== undefined ? { orderIndex: Number(values.orderIndex) } : {}),
     ...(values.title !== undefined ? { title: values.title.trim() } : {}),
@@ -72,6 +76,25 @@ export function toLessonApiPayload(values: Partial<LessonFormValues>): AdminLess
       : {}),
     ...(values.trialEnabled !== undefined ? { trialEnabled: values.trialEnabled } : {}),
     ...(values.status !== undefined ? { status: values.status } : {}),
+    ...(sourceDocumentPageRange ? { sourceDocumentPageRange } : {}),
+  };
+}
+
+function normalizeLessonSourceDocumentPageRange(
+  value: Partial<LessonFormValues>["sourceDocumentPageRange"],
+) {
+  const sourceDocumentId = value?.sourceDocumentId?.trim();
+  const pageStart = value?.pageStart?.trim();
+  const pageEnd = value?.pageEnd?.trim();
+
+  if (!sourceDocumentId || !pageStart || !pageEnd) {
+    return null;
+  }
+
+  return {
+    sourceDocumentId,
+    pageStart: Number(pageStart),
+    pageEnd: Number(pageEnd),
   };
 }
 

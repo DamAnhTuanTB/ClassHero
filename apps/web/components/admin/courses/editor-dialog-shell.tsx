@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 export function EditorDialogShell({
   ariaLabel,
@@ -10,12 +11,14 @@ export function EditorDialogShell({
   isOpen,
   leadingAction,
   onClose,
+  panelClassName,
 }: {
   ariaLabel: string;
   children: ReactNode;
   isOpen: boolean;
   leadingAction?: ReactNode;
   onClose: () => void;
+  panelClassName?: string;
 }) {
   const shouldReduceMotion = useReducedMotion();
 
@@ -60,7 +63,10 @@ export function EditorDialogShell({
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
-            className="theme-dialog-panel relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg"
+            className={cn(
+              "theme-dialog-panel relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg",
+              panelClassName,
+            )}
             initial={
               shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.98 }
             }

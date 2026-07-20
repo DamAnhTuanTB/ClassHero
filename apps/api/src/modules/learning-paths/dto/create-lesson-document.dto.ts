@@ -2,12 +2,18 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { LessonDocumentKind } from "@prisma/client";
 import {
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
 } from "class-validator";
+
+export const lessonDocumentProcessingModes = ["PROCESSING", "STORAGE_ONLY"] as const;
+
+export type LessonDocumentProcessingMode =
+  (typeof lessonDocumentProcessingModes)[number];
 
 export class CreateLessonDocumentDto {
   @ApiProperty({ example: "00000000-0000-0000-0000-000000000000" })
@@ -28,4 +34,12 @@ export class CreateLessonDocumentDto {
   @IsOptional()
   @IsEnum(LessonDocumentKind)
   kind?: LessonDocumentKind;
+
+  @ApiPropertyOptional({
+    enum: lessonDocumentProcessingModes,
+    example: "STORAGE_ONLY",
+  })
+  @IsOptional()
+  @IsIn(lessonDocumentProcessingModes)
+  processingMode?: LessonDocumentProcessingMode;
 }

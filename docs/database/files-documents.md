@@ -189,6 +189,7 @@ Rules:
 - `PRIMARY_FROM_SOURCE` là tài liệu chính của lesson được tạo từ source document + page range.
 - `PRIMARY_REPLACEMENT` là tài liệu chính thay thế của lesson, có thể đến từ page range mới hoặc file upload riêng.
 - `SUPPLEMENT` là tài liệu bổ sung upload trực tiếp cho lesson, ví dụ phiếu bài tập riêng, đáp án, ảnh công thức hoặc tài liệu tham khảo.
+- `SUPPLEMENT` có thể là tài liệu cần xử lý hoặc storage-only. Storage-only dùng cho tài liệu tham khảo thêm trong modal tạo lesson: lưu file/document, `status = READY`, `chunk_count = 0`, không có `processing_job_id`, và `metadata_json.processingMode = "storage_only"`.
 - Mỗi lesson chỉ có một tài liệu chính active tại một thời điểm; tài liệu chính cũ được đánh dấu bằng `replaced_at`, thay thế tài liệu chính không được xóa hoặc làm mất supplemental documents.
 - Một lesson có thể có một hoặc nhiều supplemental documents; tất cả chunks cuối cùng vẫn phải gắn `lesson_id`.
 

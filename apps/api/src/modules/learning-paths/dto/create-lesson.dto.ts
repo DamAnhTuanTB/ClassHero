@@ -9,11 +9,31 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
+
+export class LessonSourceDocumentPageRangeDto {
+  @ApiProperty({ example: "00000000-0000-0000-0000-000000000000" })
+  @IsUUID()
+  sourceDocumentId!: string;
+
+  @ApiProperty({ example: 20, minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageStart!: number;
+
+  @ApiProperty({ example: 22, minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pageEnd!: number;
+}
 
 export class CreateLessonDto {
   @ApiProperty({ example: 1, minimum: 1 })
@@ -71,4 +91,10 @@ export class CreateLessonDto {
   @IsOptional()
   @IsEnum(PublishStatus)
   status?: PublishStatus;
+
+  @ApiPropertyOptional({ type: LessonSourceDocumentPageRangeDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LessonSourceDocumentPageRangeDto)
+  sourceDocumentPageRange?: LessonSourceDocumentPageRangeDto;
 }

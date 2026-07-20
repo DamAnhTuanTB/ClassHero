@@ -387,6 +387,8 @@ AI generation dùng document chunks để bám đúng buổi học, nhưng khôn
 
 Áp dụng cho quiz, flashcard và test:
 
+- Mỗi lần sinh quiz/flashcard/test phải scoped bằng `lessonId`; retrieval chỉ lấy OCR chunks của đúng buổi học đó, gồm source PDF page range đã gán cho lesson và supplemental documents của chính lesson.
+- Không sinh nội dung từ toàn bộ sách, toàn bộ learning path hoặc chunk của lesson khác, trừ khi sau này có flow admin chọn rõ phạm vi mở rộng.
 - Prompt phải yêu cầu tạo câu hỏi/thẻ mới dựa trên chuẩn kiến thức, khái niệm, kỹ năng và mức độ của lesson.
 - Không copy nguyên văn bài tập, ví dụ, câu hỏi hoặc ngữ cảnh đặc thù từ tài liệu nguồn, trừ khi admin chủ động chọn chế độ trích lại nội dung.
 - Với Toán, có thể biến đổi số liệu, ngữ cảnh, cách hỏi và mức độ nhận thức, nhưng vẫn giữ đúng kỹ năng của page range buổi học.

@@ -31,3 +31,6 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Large test PDFs
+apps/api/test/*.pdf

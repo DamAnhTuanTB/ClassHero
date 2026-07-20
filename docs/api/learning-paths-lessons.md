@@ -327,7 +327,12 @@ Body:
   "videoUrl": "https://youtube.com/...",
   "completionMinScore": 7,
   "trialEnabled": false,
-  "status": "DRAFT"
+  "status": "DRAFT",
+  "sourceDocumentPageRange": {
+    "sourceDocumentId": "uuid",
+    "pageStart": 20,
+    "pageEnd": 22
+  }
 }
 ```
 
@@ -337,10 +342,14 @@ Behavior:
 - `trialEnabled` mặc định là `false`; học thử thuộc từng buổi học, không thuộc lộ trình.
 - `orderIndex` phải unique trong cùng chapter.
 - `videoUrl` chỉ chấp nhận YouTube hoặc Google Drive.
+- `sourceDocumentPageRange` là optional extension của flow M4.x, chỉ gửi khi learning path đã có source document sẵn sàng và admin muốn gán trang ngay trong modal tạo buổi học. Nếu admin chỉ muốn tạo metadata buổi học trước, client bỏ trống/không gửi object này.
 
 Side effects:
 
 - Tạo `lessons`.
+- Nếu có `sourceDocumentPageRange`, validate source document thuộc cùng learning path với chapter/lesson, validate page range và tạo lesson document mapping trong cùng transaction nếu có thể.
+- Nếu có `sourceDocumentPageRange`, backend chỉ nhận khi source document `READY`, đủ page records, mọi page `READY` và không còn `printedPage.warning`; nếu chưa đạt, trả lỗi validation thay vì lưu mapping sớm.
+- Nếu có `sourceDocumentPageRange`, enqueue chunking cho đúng `lesson_id`.
 - Tăng `learning_paths.total_lesson_count`.
 - Ghi `audit_logs`.
 
@@ -356,13 +365,14 @@ Behavior:
 
 Role: `ADMIN`.
 
-Body: partial của body create.
+Body: partial của body create. `sourceDocumentPageRange` có thể gửi để gán/đổi khoảng trang của tài liệu nguồn cho lesson hiện tại; bỏ qua field này khi chỉ sửa metadata lesson.
 
 Behavior:
 
 - Cho phép đổi `orderIndex`, metadata, thời điểm mở bài thi, video URL, completion score, `trialEnabled` và `status`.
 - `shortDescription`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
 - Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng chapter.
+- Nếu gửi `sourceDocumentPageRange`, backend dùng cùng rule với `POST /admin/lessons/:lessonId/primary-document/replace` dạng page range: validate source document cùng learning path, chỉ cho lưu khi source document/page đã sẵn sàng, cập nhật mapping/tài liệu chính của lesson và enqueue chunking khi range đổi.
 - Ghi `audit_logs`.
 
 ### `DELETE /admin/lessons/:lessonId`
@@ -526,6 +536,17 @@ Side effects:
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
 - `M4.2` tạo durable job record; `M4.3` nối BullMQ thật để worker nhận job; `M4.4` import hoặc tạo paid OCR artifact page-level nếu PDF.
 
+### `POST /admin/source-documents/:sourceDocumentId/process`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Tạo job xử lý lại tài liệu nguồn bằng file gốc đã upload.
+- Đưa source document về trạng thái `PROCESSING`, gắn `processingJobId` mới và enqueue `DOCUMENT_PROCESSING`.
+- Nếu job hiện tại vẫn đang `QUEUED` hoặc `RUNNING`, trả `409 CONFLICT` để tránh bấm trùng nhiều lần.
+- Dùng cho nút `Xử lý lại`/`Chạy xử lý` trong UI M4.5 khi tài liệu lỗi, bị hủy hoặc cần đọc lại sau khi cấu hình provider/cache đã sẵn sàng.
+
 ### `GET /admin/learning-paths/:learningPathId/source-documents`
 
 Role: `ADMIN`.
@@ -576,6 +597,7 @@ Behavior:
 
 - Validate lesson thuộc cùng learning path với source document.
 - Validate page range nằm trong tổng số trang.
+- Chỉ cho lưu khi source document `READY`, đủ page records, mọi page `READY` và không còn `printedPage.warning`; nếu không, trả lỗi để admin xử lý/xác nhận tài liệu trước.
 - Trả warning nếu page range trùng hoặc có trang chưa gán.
 - Tạo/cập nhật lesson document mapping cho từng lesson.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING` cho chunking các lesson bị thay đổi range; `M4.3` nối BullMQ thật.
@@ -610,6 +632,7 @@ Behavior:
 - Chỉ có một tài liệu chính active cho mỗi lesson.
 - Tài liệu chính cũ bị đánh dấu stale/archived theo schema thực tế, không xóa file gốc ngay.
 - Tài liệu bổ sung `SUPPLEMENT` của lesson không bị ảnh hưởng.
+- Nếu thay bằng page range từ source document, backend chỉ nhận khi source document/page đã sẵn sàng như rule của `PUT /admin/source-documents/:sourceDocumentId/lesson-page-ranges`.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING` để import/tạo OCR artifact nếu cần rồi chunk lại cho lesson; `M4.3` nối BullMQ thật.
 
 ### `POST /admin/lessons/:lessonId/documents`
@@ -624,14 +647,20 @@ Body:
 {
   "fileId": "uuid",
   "title": "Phiếu bài tập thêm",
-  "kind": "SUPPLEMENT"
+  "kind": "SUPPLEMENT",
+  "processingMode": "PROCESSING"
 }
 ```
+
+`processingMode` optional:
+
+- Không gửi hoặc gửi `PROCESSING`: tài liệu bổ sung được đưa vào pipeline xử lý/chunking như context bổ sung của lesson.
+- Gửi `STORAGE_ONLY`: dùng cho tài liệu tham khảo trong modal tạo lesson; backend chỉ lưu file/document kèm lesson, set document `READY`, `chunkCount = 0`, không tạo OCR artifact, chunk, embedding hoặc `background_jobs`.
 
 Side effects:
 
 - Tạo `lesson_documents` trực tiếp cho lesson với `kind = SUPPLEMENT`.
-- Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
+- Tạo `background_jobs` queue `DOCUMENT_PROCESSING` khi `processingMode` là `PROCESSING`.
 - `M4.3` nối BullMQ thật để worker nhận job nếu PDF; `M4.4` dùng paid OCR-first cho tài liệu học chính/supplement khi OCR paid được bật.
 
 ### `GET /admin/lessons/:lessonId/documents`
@@ -642,6 +671,16 @@ Behavior:
 
 - Trả cả tài liệu chính từ source document/page range và tài liệu bổ sung upload trực tiếp.
 - Response cần phân biệt `kind = PRIMARY_FROM_SOURCE | PRIMARY_REPLACEMENT | SUPPLEMENT` để UI nhóm tài liệu rõ ràng.
+
+### `GET /admin/learning-paths/:learningPathId/lesson-documents`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả toàn bộ lesson documents active của các lesson trong một learning path.
+- Dùng cho màn M4.5 để hiển thị tài liệu chính, tài liệu bổ sung, trạng thái chunking và lỗi theo từng buổi học bằng một request tổng hợp, tránh gọi `GET /admin/lessons/:lessonId/documents` lặp lại cho từng lesson.
+- Response item dùng cùng shape với `GET /admin/lessons/:lessonId/documents`.
 
 ### `DELETE /admin/lessons/:lessonId/documents/:documentId`
 

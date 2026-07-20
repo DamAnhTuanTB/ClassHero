@@ -8,7 +8,11 @@ import {
   LessonDocumentKind,
   Prisma,
 } from "@prisma/client";
-import { throwBadRequest, throwConflict } from "#api/common/errors/api-exception";
+import {
+  throwBadRequest,
+  throwConflict,
+  throwNotFound,
+} from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { CreateLessonDocumentDto } from "#api/modules/learning-paths/dto/create-lesson-document.dto";
@@ -26,6 +30,7 @@ import type { LessonDocumentRecord } from "#api/modules/learning-paths/types/doc
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
 import {
   assertPageRangeOrder,
+  assertSourceDocumentReadyForPageRanges,
   handleDocumentPrismaError,
   normalizeOptionalTitle,
   throwDocumentFileNotFound,
@@ -58,6 +63,42 @@ export class LessonDocumentsService {
     return documents.map(serializeLessonDocument);
   }
 
+  async listForLearningPath(learningPathId: string) {
+    const learningPath = await this.prisma.learningPath.findFirst({
+      where: {
+        id: learningPathId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!learningPath) {
+      throwNotFound("NOT_FOUND", "Không tìm thấy lộ trình học");
+    }
+
+    const documents = await this.prisma.lessonDocument.findMany({
+      where: {
+        replacedAt: null,
+        lesson: {
+          learningPathId,
+          deletedAt: null,
+          chapter: {
+            deletedAt: null,
+          },
+          learningPath: {
+            deletedAt: null,
+          },
+        },
+      },
+      select: lessonDocumentSelect,
+      orderBy: [{ lessonId: "asc" }, { kind: "asc" }, { createdAt: "desc" }],
+    });
+
+    return documents.map(serializeLessonDocument);
+  }
+
   async replacePrimaryDocument(
     lessonId: string,
     actorUserId: string,
@@ -85,7 +126,10 @@ export class LessonDocumentsService {
             throwSourceDocumentNotFound();
           }
 
-          const pageLimit = await this.resolvePageLimit(tx, sourceDocument);
+          const pageLimit = await assertSourceDocumentReadyForPageRanges(
+            tx,
+            sourceDocument,
+          );
           if (dto.pageEnd > pageLimit) {
             throwBadRequest(
               "VALIDATION_ERROR",
@@ -255,6 +299,7 @@ export class LessonDocumentsService {
       const document = await this.prisma.$transaction(async (tx) => {
         await this.assertLessonExists(tx, lessonId);
         const file = await this.getLessonDocumentFile(tx, dto.fileId);
+        const isStorageOnly = dto.processingMode === "STORAGE_ONLY";
 
         const created = await tx.lessonDocument.create({
           data: {
@@ -262,33 +307,37 @@ export class LessonDocumentsService {
             fileId: file.id,
             kind: LessonDocumentKind.SUPPLEMENT,
             title: normalizeOptionalTitle(dto.title),
-            status: DocumentStatus.PROCESSING,
+            status: isStorageOnly ? DocumentStatus.READY : DocumentStatus.PROCESSING,
             contentHash: file.checksum,
+            processedAt: isStorageOnly ? new Date() : undefined,
             metadataJson: toDocumentInputJson({
               source: "supplemental_lesson_document_upload",
+              processingMode: isStorageOnly ? "storage_only" : "processing",
             }),
           },
           select: lessonDocumentSelect,
         });
 
-        const withJob = await this.attachDocumentJob(tx, {
-          actorUserId,
-          lessonId,
-          document: created,
-          action: "LESSON_SUPPLEMENT_PROCESSING",
-          inputMeta: {
-            fileId: file.id,
-          },
-        });
+        const document = isStorageOnly
+          ? created
+          : await this.attachDocumentJob(tx, {
+              actorUserId,
+              lessonId,
+              document: created,
+              action: "LESSON_SUPPLEMENT_PROCESSING",
+              inputMeta: {
+                fileId: file.id,
+              },
+            });
 
         await this.auditDocumentChange(tx, {
           actorUserId,
           action: "LESSON_SUPPLEMENT_DOCUMENT_CREATED",
-          document: withJob,
+          document,
           context,
         });
 
-        return withJob;
+        return document;
       });
 
       await this.enqueueProcessingJobs([document.processingJobId]);
@@ -378,10 +427,7 @@ export class LessonDocumentsService {
     return lesson;
   }
 
-  private async getLessonDocumentFile(
-    tx: Prisma.TransactionClient,
-    fileId: string,
-  ) {
+  private async getLessonDocumentFile(tx: Prisma.TransactionClient, fileId: string) {
     const file = await tx.file.findFirst({
       where: {
         id: fileId,
@@ -408,38 +454,6 @@ export class LessonDocumentsService {
     }
 
     return file;
-  }
-
-  private async resolvePageLimit(
-    tx: Prisma.TransactionClient,
-    sourceDocument: Prisma.SourceDocumentGetPayload<{
-      select: typeof sourceDocumentSelect;
-    }>,
-  ) {
-    if (sourceDocument.pageCount) {
-      return sourceDocument.pageCount;
-    }
-
-    const latestPage = await tx.sourceDocumentPage.findFirst({
-      where: {
-        sourceDocumentId: sourceDocument.id,
-      },
-      select: {
-        pageNumber: true,
-      },
-      orderBy: {
-        pageNumber: "desc",
-      },
-    });
-
-    if (!latestPage) {
-      throwBadRequest(
-        "VALIDATION_ERROR",
-        "Tài liệu nguồn chưa có thông tin số trang để gán page range",
-      );
-    }
-
-    return latestPage.pageNumber;
   }
 
   private replaceActivePrimaryDocuments(
@@ -540,6 +554,10 @@ export class LessonDocumentsService {
 
   private enqueueProcessingJobs(jobIds: Array<string | null>) {
     const enqueueIds = jobIds.filter((jobId): jobId is string => Boolean(jobId));
+    if (enqueueIds.length === 0) {
+      return [];
+    }
+
     return this.backgroundJobQueue.enqueueMany(enqueueIds);
   }
 

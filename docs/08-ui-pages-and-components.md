@@ -132,7 +132,7 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Parent notifications/news                 | `M11.4`, `M12.5`       | `M10.1`, `M12.4`, `M12.5`         | `M1.5`                 | `M10.3`, `M10.6`                              | News/event/livestream public cho student/parent.                                                                                          |
 | Admin dashboard                           | `M13.5`                | `M13.5` hoặc API module liên quan | `M1.x` theo metric     | `M4.3`, `M10.5` nếu hiển thị job/notification | Cho phép placeholder với metric chưa có API.                                                                                              |
 | Admin course/chapter/lesson management    | `M3.4`                 | `M3.1`, `M3.2`                    | `M1.3`                 | -                                             | Quản lý lộ trình, chương học tổng quan và buổi học.                                                                                       |
-| Admin lesson document upload/status       | `M4.5`                 | `M4.2`                            | `M1.2`, `M1.3`         | `M4.1`, `M4.3`, `M4.4`                        | Flow chính: upload một source PDF dài ở cấp lộ trình, chạy/import paid OCR artifact theo trang, admin gán page range cho từng lesson rồi chunk theo lesson. UI hiển thị provider, cost estimate, job/page status, quality summary và visual refs nếu có. Mỗi lesson có nút upload/thay thế tài liệu gốc và có thể upload tài liệu bổ sung trực tiếp. |
+| Admin lesson document upload/status       | `M4.5`                 | `M4.2`                            | `M1.2`, `M1.3`         | `M4.1`, `M4.3`, `M4.4`                        | Flow chính: upload một source PDF dài ở cấp lộ trình, chạy/import paid OCR artifact theo trang, admin gán page range cho từng lesson rồi chunk theo lesson. UI hiển thị provider, cost estimate, job/page status, quality summary và visual refs nếu có. Mỗi lesson có nút upload/thay thế tài liệu gốc và có thể upload tài liệu bổ sung trực tiếp. Modal tạo lesson có thể thêm nhiều tài liệu tham khảo storage-only theo dòng tên + file PDF. |
 | Admin quiz/flashcard/test CRUD UI         | `M6.2`, `M6.3`, `M6.4` | `M6.2`, `M6.3`, `M6.4`            | `M1.4`                 | `M6.1` content schema                         | Rich text/LaTeX dùng schema chung.                                                                                                        |
 | Admin AI generation panel                 | `M9.8`                 | `M9.2`, `M9.3`                    | `M1.4`, `M1.5`         | `M5.x`, `M9.1`                                | Front-end không gọi AI trực tiếp.                                                                                                         |
 | Admin report moderation                   | `M12.2`                | `M12.2`                           | `M1.5`                 | -                                             | Student tạo report ở `M12.1`.                                                                                                             |
@@ -434,19 +434,33 @@ CRUD lesson:
 - Video URL.
 - Completion min score.
 - Materials/documents.
+- Optional source document page range nếu course đã có tài liệu nguồn: chọn source document, nhập page start/end, xem preview trang/text ngắn và cảnh báo range. Bỏ trống để chỉ lưu metadata buổi học trước; khóa input page range khi tài liệu nguồn chưa sẵn sàng hoặc còn trang cần xác nhận.
 - Summary.
 - Quiz.
 - Flashcard.
 - Test.
 
+Màn chi tiết buổi học admin:
+
+- Route chính: `/admin/lessons/[lessonId]`.
+- Đây là workspace theo từng buổi học, không phải màn cấp course/chapter.
+- Vào từ danh sách buổi học trong `/admin/courses/[id]`.
+- Hiển thị metadata buổi học, trạng thái tài liệu/OCR/chunk của riêng buổi đó và các khu vực Summary, Documents, Quiz, Flashcard, Test.
+- Course detail vẫn là nơi upload source PDF dài và xem status tài liệu theo buổi ở dạng gọn.
+- Course detail có nút `Nhập khoảng trang` mở modal gán trang hàng loạt cho nhiều lesson; không nhét toàn bộ form nhập range dài vào màn chính.
+- Modal tạo/sửa lesson và lesson detail là nơi gán/điều chỉnh page range tùy chọn của một lesson cụ thể để tránh thao tác vòng khi admin upload sách trước rồi mới tạo buổi học; phần nhập trang disabled tới khi source document xử lý xong và không còn page warning.
+- Là nơi admin thêm thủ công, sửa, xóa mềm, ẩn/hiện, duyệt lại quiz/flashcard/test; nội dung do AI sinh sau M9.3 cũng được quản trị tại đây.
+
 ### 6.5. AI generation panel
 
-Trong lesson detail, admin có panel:
+Trong lesson detail `/admin/lessons/[lessonId]`, admin có panel/nút:
 
 - Generate summary.
 - Generate quiz.
 - Generate flashcard.
 - Generate test.
+- Mỗi action dùng `lessonId` hiện tại và chỉ sinh từ OCR/chunks của đúng buổi học đó.
+- Nếu OCR/chunk/embedding chưa sẵn sàng, nút phải disabled hoặc hiện trạng thái cần xử lý tài liệu trước.
 - Xem job status.
 - Xem output.
 - Sửa output.

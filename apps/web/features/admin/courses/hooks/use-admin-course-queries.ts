@@ -89,6 +89,12 @@ export function useAdminCourseMutations() {
     ]);
   }
 
+  function invalidateDocumentState() {
+    return queryClient.invalidateQueries({
+      queryKey: ["admin-course-documents"],
+    });
+  }
+
   return {
     archiveChapter: useMutation({
       mutationFn: ({ chapterId }: { chapterId: string }) =>
@@ -116,6 +122,7 @@ export function useAdminCourseMutations() {
         chapterId: string;
         values: LessonFormValues;
       }) => createAdminLesson(chapterId, values, token),
+      onSuccess: () => invalidateDocumentState(),
     }),
     createPath: useMutation({
       mutationFn: (values: LearningPathFormValues) =>
@@ -149,6 +156,7 @@ export function useAdminCourseMutations() {
         lessonId: string;
         values: Partial<LessonFormValues>;
       }) => updateAdminLesson(lessonId, values, token),
+      onSuccess: () => invalidateDocumentState(),
     }),
     updatePath: useMutation({
       mutationFn: ({

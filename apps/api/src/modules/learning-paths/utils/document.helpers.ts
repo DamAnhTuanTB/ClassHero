@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { DocumentStatus, Prisma } from "@prisma/client";
 import {
   isPrismaForeignKeyConstraintError,
   isPrismaUniqueConstraintError,
@@ -10,6 +10,14 @@ import {
 } from "#api/common/errors/api-exception";
 import type { LessonPageRangeDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
 import type { PageRangeWarning } from "#api/modules/learning-paths/types/document.types";
+
+type SourceDocumentPageReader = Pick<Prisma.TransactionClient, "sourceDocumentPage">;
+
+type PageRangeSourceDocument = {
+  id: string;
+  pageCount: number | null;
+  status: DocumentStatus;
+};
 
 export function normalizeOptionalTitle(value: string | null | undefined) {
   if (value === undefined) {
@@ -57,6 +65,106 @@ export function assertNoDuplicateLessonRanges(ranges: LessonPageRangeDto[]) {
       duplicatedLessonIds: [...duplicatedLessonIds],
     });
   }
+}
+
+export async function assertSourceDocumentReadyForPageRanges(
+  tx: SourceDocumentPageReader,
+  sourceDocument: PageRangeSourceDocument,
+) {
+  if (sourceDocument.status !== DocumentStatus.READY) {
+    throwBadRequest("SOURCE_DOCUMENT_NOT_READY", "Tài liệu nguồn chưa xử lý xong");
+  }
+
+  const pageLimit = await resolveSourceDocumentPageLimit(tx, sourceDocument);
+  const totalPages = await tx.sourceDocumentPage.count({
+    where: {
+      sourceDocumentId: sourceDocument.id,
+    },
+  });
+
+  if (totalPages < pageLimit) {
+    throwBadRequest(
+      "SOURCE_DOCUMENT_NOT_READY",
+      "Tài liệu nguồn chưa có đủ dữ liệu trang",
+      {
+        expectedPageCount: pageLimit,
+        readyPageRows: totalPages,
+      },
+    );
+  }
+
+  const notReadyPageCount = await tx.sourceDocumentPage.count({
+    where: {
+      sourceDocumentId: sourceDocument.id,
+      status: {
+        not: DocumentStatus.READY,
+      },
+    },
+  });
+
+  if (notReadyPageCount > 0) {
+    throwBadRequest(
+      "SOURCE_DOCUMENT_NOT_READY",
+      "Tài liệu nguồn còn trang chưa sẵn sàng",
+      {
+        pageCount: notReadyPageCount,
+      },
+    );
+  }
+
+  const pageMetadata = await tx.sourceDocumentPage.findMany({
+    where: {
+      sourceDocumentId: sourceDocument.id,
+    },
+    select: {
+      metadataJson: true,
+    },
+  });
+  const printedPageWarningCount = pageMetadata.filter((page) =>
+    hasPrintedPageWarning(page.metadataJson),
+  ).length;
+
+  if (printedPageWarningCount > 0) {
+    throwBadRequest(
+      "SOURCE_DOCUMENT_PAGE_REVIEW_REQUIRED",
+      "Tài liệu nguồn còn trang cần xác nhận",
+      {
+        pageCount: printedPageWarningCount,
+      },
+    );
+  }
+
+  return pageLimit;
+}
+
+export async function resolveSourceDocumentPageLimit(
+  tx: SourceDocumentPageReader,
+  sourceDocument: Pick<PageRangeSourceDocument, "id" | "pageCount">,
+) {
+  if (sourceDocument.pageCount) {
+    return sourceDocument.pageCount;
+  }
+
+  const latestPage = await tx.sourceDocumentPage.findFirst({
+    where: {
+      sourceDocumentId: sourceDocument.id,
+    },
+    select: {
+      pageNumber: true,
+    },
+    orderBy: {
+      pageNumber: "desc",
+    },
+  });
+
+  if (!latestPage) {
+    throwBadRequest(
+      "VALIDATION_ERROR",
+      "Tài liệu nguồn chưa có thông tin số trang để gán page range",
+    );
+  }
+
+  return latestPage.pageNumber;
 }
 
 export function buildPageRangeWarnings(
@@ -144,4 +252,18 @@ export function handleDocumentPrismaError(error: unknown): never {
   }
 
   throw error;
+}
+
+function hasPrintedPageWarning(metadataJson: unknown) {
+  const metadata = readRecord(metadataJson);
+  const printedPage = readRecord(metadata?.printedPage);
+  const warning = printedPage?.warning;
+
+  return typeof warning === "string" && warning.trim().length > 0;
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }

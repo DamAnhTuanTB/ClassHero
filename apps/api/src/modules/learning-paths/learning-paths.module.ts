@@ -7,7 +7,10 @@ import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { AdminChaptersController } from "#api/modules/learning-paths/controllers/admin-chapters.controller";
-import { AdminLessonDocumentsController } from "#api/modules/learning-paths/controllers/admin-lesson-documents.controller";
+import {
+  AdminLearningPathLessonDocumentsController,
+  AdminLessonDocumentsController,
+} from "#api/modules/learning-paths/controllers/admin-lesson-documents.controller";
 import { AdminLearningPathsController } from "#api/modules/learning-paths/controllers/admin-learning-paths.controller";
 import { AdminLessonsController } from "#api/modules/learning-paths/controllers/admin-lessons.controller";
 import { AdminSourceDocumentsController } from "#api/modules/learning-paths/controllers/admin-source-documents.controller";
@@ -23,6 +26,7 @@ import { SourceDocumentsService } from "#api/modules/learning-paths/services/sou
   imports: [AuthModule, FilesModule, JobsModule, JwtModule.register({})],
   controllers: [
     AdminChaptersController,
+    AdminLearningPathLessonDocumentsController,
     AdminLessonDocumentsController,
     AdminLearningPathsController,
     AdminLessonsController,

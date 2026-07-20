@@ -92,6 +92,11 @@ export type AdminLessonPayload = {
   scheduledAt?: string | null;
   shortDescription?: string | null;
   status?: AdminPublishStatus;
+  sourceDocumentPageRange?: {
+    sourceDocumentId: string;
+    pageStart: number;
+    pageEnd: number;
+  };
   title?: string;
   trialEnabled?: boolean;
   videoUrl?: string | null;

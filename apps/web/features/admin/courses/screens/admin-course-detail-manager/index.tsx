@@ -9,6 +9,7 @@ import {
 } from "@/components/admin/courses/admin-courses-sidebar";
 import { ChapterLessonPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/chapter-lesson-panel";
 import { LearningPathSummaryPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/learning-path-summary-panel";
+import { AdminCourseDocumentPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/admin-course-document-panel";
 import { ErrorState } from "@/components/admin/courses/error-state";
 import { LoadingState } from "@/components/admin/courses/loading-state";
 import { StatCard } from "@/components/admin/courses/stat-card";
@@ -119,8 +120,8 @@ export function AdminCourseDetailManager({
                 {path?.title ?? "Không tìm thấy khóa học"}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
-                Xem thông tin khóa học, quản lý chương học tổng quan và các bài học trong
-                từng chương.
+                Xem thông tin khóa học, quản lý chương học, buổi học và tài liệu dùng
+                trong từng buổi.
               </p>
             </div>
             <div className="flex gap-2">
@@ -167,6 +168,8 @@ export function AdminCourseDetailManager({
 
                 <LearningPathSummaryPanel path={path} isDarkTheme={isDarkTheme} />
 
+                <AdminCourseDocumentPanel path={path} />
+
                 <ChapterLessonPanel
                   isDarkTheme={isDarkTheme}
                   path={path}
@@ -205,6 +208,7 @@ export function AdminCourseDetailManager({
           defaultOrderIndex={(selectedChapter?.lessons.length ?? 0) + 1}
           isOpen={isLessonEditorOpen}
           isSaving={isSavingLesson}
+          learningPath={path}
           selectedLesson={selectedLesson}
           disabled={!path}
           onSubmit={actions.saveLesson}

@@ -58,6 +58,20 @@ export class AdminSourceDocumentsController {
     return this.sourceDocumentsService.listForLearningPath(learningPathId);
   }
 
+  @Post("admin/source-documents/:sourceDocumentId/process")
+  @ApiOperation({ summary: "Request source document OCR processing" })
+  process(
+    @Param("sourceDocumentId") sourceDocumentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.sourceDocumentsService.requestProcessing(
+      sourceDocumentId,
+      user.id,
+      getRequestContext(request),
+    );
+  }
+
   @Delete("admin/source-documents/:sourceDocumentId")
   @ApiOperation({ summary: "Delete an unused source document" })
   remove(

@@ -1,0 +1,150 @@
+import { apiRequest } from "@/lib/api-client";
+import type {
+  AdminFileUploadApi,
+  AdminLessonDocumentApi,
+  AdminLessonPageRangeInput,
+  AdminPageRangeSaveResponseApi,
+  AdminSignedUrlApi,
+  AdminSourceDocumentApi,
+  AdminSourceDocumentPageApi,
+} from "@/features/admin/courses/types/admin-course-document-types";
+
+export async function uploadAdminLessonDocumentFile(file: File, token: string) {
+  const formData = new FormData();
+  formData.set("purpose", "LESSON_DOCUMENT");
+  formData.set("file", file);
+
+  return apiRequest<AdminFileUploadApi>("/files/upload", {
+    method: "POST",
+    body: formData,
+    token,
+  });
+}
+
+export function getAdminFileSignedUrl(fileId: string, token: string) {
+  return apiRequest<AdminSignedUrlApi>(`/files/${fileId}/signed-url`, {
+    token,
+  });
+}
+
+export function listAdminSourceDocuments(learningPathId: string, token: string) {
+  return apiRequest<AdminSourceDocumentApi[]>(
+    `/admin/learning-paths/${learningPathId}/source-documents`,
+    { token },
+  );
+}
+
+export function createAdminSourceDocument(
+  learningPathId: string,
+  payload: { fileId: string; title?: string },
+  token: string,
+) {
+  return apiRequest<AdminSourceDocumentApi>(
+    `/admin/learning-paths/${learningPathId}/source-documents`,
+    {
+      method: "POST",
+      body: payload,
+      token,
+    },
+  );
+}
+
+export function requestAdminSourceDocumentProcessing(
+  sourceDocumentId: string,
+  token: string,
+) {
+  return apiRequest<AdminSourceDocumentApi>(
+    `/admin/source-documents/${sourceDocumentId}/process`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
+
+export function deleteAdminSourceDocument(sourceDocumentId: string, token: string) {
+  return apiRequest<{ success: boolean }>(`/admin/source-documents/${sourceDocumentId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function listAdminSourceDocumentPages(sourceDocumentId: string, token: string) {
+  return apiRequest<AdminSourceDocumentPageApi[]>(
+    `/admin/source-documents/${sourceDocumentId}/pages`,
+    { token },
+  );
+}
+
+export function saveAdminLessonPageRanges(
+  sourceDocumentId: string,
+  ranges: AdminLessonPageRangeInput[],
+  token: string,
+) {
+  return apiRequest<AdminPageRangeSaveResponseApi>(
+    `/admin/source-documents/${sourceDocumentId}/lesson-page-ranges`,
+    {
+      method: "PUT",
+      body: { ranges },
+      token,
+    },
+  );
+}
+
+export function listAdminLearningPathLessonDocuments(
+  learningPathId: string,
+  token: string,
+) {
+  return apiRequest<AdminLessonDocumentApi[]>(
+    `/admin/learning-paths/${learningPathId}/lesson-documents`,
+    { token },
+  );
+}
+
+export function replaceAdminLessonPrimaryDocument(
+  lessonId: string,
+  payload:
+    | { fileId: string; title?: string }
+    | { sourceDocumentId: string; pageStart: number; pageEnd: number; title?: string },
+  token: string,
+) {
+  return apiRequest<AdminLessonDocumentApi>(
+    `/admin/lessons/${lessonId}/primary-document/replace`,
+    {
+      method: "POST",
+      body: payload,
+      token,
+    },
+  );
+}
+
+export function createAdminLessonSupplementDocument(
+  lessonId: string,
+  payload: {
+    fileId: string;
+    title?: string;
+    kind: "SUPPLEMENT";
+    processingMode?: "PROCESSING" | "STORAGE_ONLY";
+  },
+  token: string,
+) {
+  return apiRequest<AdminLessonDocumentApi>(`/admin/lessons/${lessonId}/documents`, {
+    method: "POST",
+    body: payload,
+    token,
+  });
+}
+
+export function deleteAdminLessonSupplementDocument(
+  lessonId: string,
+  documentId: string,
+  token: string,
+) {
+  return apiRequest<{ success: boolean }>(
+    `/admin/lessons/${lessonId}/documents/${documentId}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
+}
