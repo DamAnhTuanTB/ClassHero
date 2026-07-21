@@ -35,6 +35,7 @@ import type {
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { ApiRequestError } from "@/lib/api-client";
+import { computeAutofillRanges } from "@/features/admin/courses/utils/autofill-page-ranges";
 
 const EMPTY_ARRAY: any[] = [];
 
@@ -390,60 +391,18 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       return;
     }
 
-    const nextDraft: LessonRangeDraft = {};
-    const sortedPages = [...sourcePages].sort((a, b) => a.pageNumber - b.pageNumber);
+    const autofillLessons = lessons.map((item) => ({
+      lessonId: item.lesson.id,
+      title: item.lesson.title,
+    }));
 
-    // ─── MUST be identical to lesson-source-range-section.tsx ───
-    const normalizeText = (t: string) => t
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/[^a-z0-9]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const result = computeAutofillRanges(autofillLessons, sourcePages, pageLimit);
 
-    // Strip LaTeX/Mathpix commands so "section", "begin" etc. don't interfere
-    const stripLatex = (t: string) => t.replace(/\\[a-zA-Z]+\*?/g, " ");
-
-    // Pre-compute page info with TOC detection (same heuristic as single-lesson)
-    const pageInfos = sortedPages.map((page) => {
-      const raw = page.fullText ?? page.textPreview ?? page.mathpixMarkdown ?? "";
-      const rawText = stripLatex(raw).toLowerCase();
-      const normText = normalizeText(rawText);
-      const isTocPage =
-        /m[uụú]c\s*l[uụú][cg]/i.test(rawText) ||
-        (rawText.match(/\.{4,}/g) ?? []).length > 4 ||
-        (rawText.match(/(bài|chương|chủ đề|phần)\s+\d+/gi) ?? []).length > 6;
-      return { page, normText, isTocPage };
-    });
-
-    // For each lesson, find start page using same core-title extraction as single-lesson
-    const startPages: number[] = new Array(lessons.length).fill(0);
-
-    for (let i = 0; i < lessons.length; i++) {
-      const item = lessons[i]!;
-      const rawTitle = item.lesson.title.trim().toLowerCase();
-
-      // Extract core title (identical to single-lesson)
-      let searchStr = rawTitle.replace(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/, "").trim();
-      if (!searchStr || searchStr.length < 3) {
-        searchStr = rawTitle.replace(/[:\-\.]\s*$/, "");
-      }
-      const normSearchStr = normalizeText(searchStr);
-      if (!normSearchStr) continue;
-
-      // Find first matching non-TOC page
-      for (const info of pageInfos) {
-        if (info.isTocPage) continue;
-        if (info.normText.includes(normSearchStr)) {
-          startPages[i] = info.page.pageNumber;
-          break;
-        }
-      }
-    }
-
-    const foundAny = startPages.some((p) => p !== 0);
-    if (!foundAny) {
+    if (result) {
+      setRangeDraft(result);
+    } else {
       // Fallback: divide evenly
+      const nextDraft: LessonRangeDraft = {};
       const pageSpan = Math.max(1, Math.ceil(pageLimit / lessons.length));
       let cursor = 1;
       for (const item of lessons) {
@@ -456,42 +415,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         cursor = Math.min(pageLimit + 1, pageEnd + 1);
       }
       setRangeDraft(nextDraft);
-      setRangeSubmitAttempted(true);
-      return;
     }
 
-    // Force first lesson to start at 1 to absorb introductory pages
-    startPages[0] = 1;
-
-    // Fill gaps for lessons we couldn't find
-    for (let i = 1; i < lessons.length; i++) {
-      if (startPages[i] === 0) {
-        let nextKnown = pageLimit;
-        for (let j = i + 1; j < lessons.length; j++) {
-          if (startPages[j] !== 0) {
-            nextKnown = startPages[j]!;
-            break;
-          }
-        }
-        startPages[i] = Math.min(nextKnown, startPages[i - 1]! + 1);
-      }
-    }
-
-    // Compute ranges: end = next lesson's start - 1
-    for (let i = 0; i < lessons.length; i++) {
-      const item = lessons[i]!;
-      const pageStart = startPages[i]!;
-      let pageEnd = pageLimit;
-      if (i < lessons.length - 1) {
-        pageEnd = Math.max(pageStart, startPages[i + 1]! - 1);
-      }
-      nextDraft[item.lesson.id] = {
-        pageEnd: String(pageEnd),
-        pageStart: String(pageStart),
-      };
-    }
-
-    setRangeDraft(nextDraft);
     setRangeSubmitAttempted(true);
   }
 
