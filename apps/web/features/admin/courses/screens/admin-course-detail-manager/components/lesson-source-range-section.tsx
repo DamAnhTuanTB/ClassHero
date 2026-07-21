@@ -147,8 +147,13 @@ export function LessonSourceRangeSection({
        const p = matchedPages[i]!;
        if (i > 0) {
           const text = normalizeText(getSearchText(p));
-          const isStop = stopKeywords.some(k => text.includes(k));
-          if (isStop) {
+          // Check strict stop keywords (next lesson, chapter review) anywhere in text
+          const strictStopHit = stopKeywords.filter(k => k !== "luyen tap").some(k => text.includes(k));
+          // Check "luyen tap" as a standalone heading (first ~40 chars, NOT followed by a number)
+          // "Luyện tập 2" = part of lesson exercises → don't stop
+          // "Luyện tập" alone = separate section → stop
+          const isExerciseHeading = /luyen tap(?!\s*\d)/.test(text.substring(0, 40));
+          if (strictStopHit || isExerciseHeading) {
              break; // Dừng việc gộp trang nếu gặp trang của bài học tiếp theo hoặc phần ôn tập
           }
        }
@@ -173,7 +178,9 @@ export function LessonSourceRangeSection({
              const scanPage = pages[j];
              if (!scanPage) continue;
              const t = normalizeText(getSearchText(scanPage));
-             if (stopKeywords.some(k => t.includes(k))) {
+             const strictHit = stopKeywords.filter(k => k !== "luyen tap").some(k => t.includes(k));
+             const headingHit = /luyen tap(?!\s*\d)/.test(t.substring(0, 40));
+             if (strictHit || headingHit) {
                 foundStop = true;
                 stopIdx = j - 1;
                 break;
