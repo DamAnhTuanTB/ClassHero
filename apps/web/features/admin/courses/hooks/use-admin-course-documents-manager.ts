@@ -392,76 +392,52 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
 
     const nextDraft: LessonRangeDraft = {};
     const sortedPages = [...sourcePages].sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // ─── MUST be identical to lesson-source-range-section.tsx ───
+    const normalizeText = (t: string) => t
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/[^a-z0-9]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Strip LaTeX/Mathpix commands so "section", "begin" etc. don't interfere
+    const stripLatex = (t: string) => t.replace(/\\[a-zA-Z]+\*?/g, " ");
+
+    // Pre-compute page info with TOC detection (same heuristic as single-lesson)
+    const pageInfos = sortedPages.map((page) => {
+      const raw = page.fullText ?? page.textPreview ?? page.mathpixMarkdown ?? "";
+      const rawText = stripLatex(raw).toLowerCase();
+      const normText = normalizeText(rawText);
+      const isTocPage =
+        /m[uụú]c\s*l[uụú][cg]/i.test(rawText) ||
+        (rawText.match(/\.{4,}/g) ?? []).length > 4 ||
+        (rawText.match(/(bài|chương|chủ đề|phần)\s+\d+/gi) ?? []).length > 6;
+      return { page, normText, isTocPage };
+    });
+
+    // For each lesson, find start page using same core-title extraction as single-lesson
     const startPages: number[] = new Array(lessons.length).fill(0);
 
-    const normalize = (s: string) =>
-      s
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/đ/g, "d")
-        .replace(/[^a-z0-9]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    const lessonSignatures = lessons.map((item) => {
-      const normTitle = normalize(item.lesson.title);
-      const prefixMatch = normTitle.match(/^(bai|chuong|tiet|phan)\s+[0-9a-z]+/);
-      return {
-        normTitleRegex: normTitle ? new RegExp(`\\b${normTitle}\\b`) : null,
-        prefixRegex: prefixMatch ? new RegExp(`\\b${prefixMatch[0]}\\b`) : null,
-      };
-    });
-
-    const pageMatchCounts = sortedPages.map((page) => {
-      const pageText = page.mathpixMarkdown ?? page.fullText ?? page.textPreview ?? "";
-      if (!pageText) return 0;
-      const normPageText = normalize(pageText);
-      let count = 0;
-      for (const sig of lessonSignatures) {
-        if (
-          (sig.normTitleRegex && sig.normTitleRegex.test(normPageText)) ||
-          (sig.prefixRegex && sig.prefixRegex.test(normPageText))
-        ) {
-          count++;
-        }
-      }
-      return count;
-    });
-
-    let searchCursor = 1;
     for (let i = 0; i < lessons.length; i++) {
-      const sig = lessonSignatures[i]!;
-      let foundPage: number | null = null;
+      const item = lessons[i]!;
+      const rawTitle = item.lesson.title.trim().toLowerCase();
 
-      for (let pIdx = 0; pIdx < sortedPages.length; pIdx++) {
-        const page = sortedPages[pIdx]!;
-        if (page.pageNumber < searchCursor) continue;
-
-        // Skip likely Table of Contents pages
-        const pageText = page.mathpixMarkdown ?? page.fullText ?? page.textPreview ?? "";
-        if (!pageText) continue;
-        
-        const normPageText = normalize(pageText);
-        const isMucLuc = normPageText.includes("muc luc") || normPageText.includes("table of contents");
-        if (pageMatchCounts[pIdx]! >= 3 || (pageMatchCounts[pIdx]! >= 2 && isMucLuc)) {
-          continue;
-        }
-
-        if (sig.normTitleRegex && sig.normTitleRegex.test(normPageText)) {
-          foundPage = page.pageNumber;
-          break;
-        }
-        if (sig.prefixRegex && sig.prefixRegex.test(normPageText)) {
-          foundPage = page.pageNumber;
-          break;
-        }
+      // Extract core title (identical to single-lesson)
+      let searchStr = rawTitle.replace(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/, "").trim();
+      if (!searchStr || searchStr.length < 3) {
+        searchStr = rawTitle.replace(/[:\-\.]\s*$/, "");
       }
+      const normSearchStr = normalizeText(searchStr);
+      if (!normSearchStr) continue;
 
-      if (foundPage !== null) {
-        startPages[i] = foundPage;
-        searchCursor = foundPage;
+      // Find first matching non-TOC page
+      for (const info of pageInfos) {
+        if (info.isTocPage) continue;
+        if (info.normText.includes(normSearchStr)) {
+          startPages[i] = info.page.pageNumber;
+          break;
+        }
       }
     }
 
@@ -484,10 +460,10 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       return;
     }
 
-    // Force first lesson to start at 1 to absorb any introductory pages
-    // and avoid the "unassigned pages" warning.
+    // Force first lesson to start at 1 to absorb introductory pages
     startPages[0] = 1;
 
+    // Fill gaps for lessons we couldn't find
     for (let i = 1; i < lessons.length; i++) {
       if (startPages[i] === 0) {
         let nextKnown = pageLimit;
@@ -501,12 +477,12 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       }
     }
 
+    // Compute ranges: end = next lesson's start - 1
     for (let i = 0; i < lessons.length; i++) {
       const item = lessons[i]!;
       const pageStart = startPages[i]!;
       let pageEnd = pageLimit;
       if (i < lessons.length - 1) {
-        // Prevent overlap by ending the lesson 1 page before the next starts
         pageEnd = Math.max(pageStart, startPages[i + 1]! - 1);
       }
       nextDraft[item.lesson.id] = {

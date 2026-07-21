@@ -98,11 +98,22 @@ export function LessonSourceRangeSection({
     const normSearchStr = normalizeText(searchStr);
     if (!normSearchStr) return [];
 
+    // Strip LaTeX/Mathpix markdown commands so that command names like "section",
+    // "begin", "textbf" etc. don't interfere with text search.
+    // e.g. \section{Bài}\n\section{37 HÌNH...} → "{Bài}\n{37 HÌNH...}"
+    // After normalizeText: "bai 37 hinh..." (contiguous, searchable)
+    const stripLatex = (t: string) => t.replace(/\\[a-zA-Z]+\*?/g, " ");
+
+    const getSearchText = (page: NonNullable<typeof pages[0]>) => {
+      const raw = page.fullText ?? page.textPreview ?? page.mathpixMarkdown ?? "";
+      return stripLatex(raw).toLowerCase();
+    };
+
     const matchedPages: (NonNullable<typeof pages[0]> & { index: number })[] = [];
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
       if (!page) continue;
-      const text = (page.mathpixMarkdown ?? page.fullText ?? "").toLowerCase();
+      const text = getSearchText(page);
       
       const isTocPage = 
         /m[uụú]c\s*l[uụú][cg]/i.test(text) || 
@@ -125,6 +136,7 @@ export function LessonSourceRangeSection({
     }
     const stopKeywords = [
       nextLessonStr,
+      "luyen tap",
       "luyen tap chung",
       "bai tap cuoi chuong",
       "on tap chuong"
@@ -134,7 +146,7 @@ export function LessonSourceRangeSection({
     for (let i = 0; i < matchedPages.length; i++) {
        const p = matchedPages[i]!;
        if (i > 0) {
-          const text = normalizeText((p.mathpixMarkdown ?? p.fullText ?? "").toLowerCase());
+          const text = normalizeText(getSearchText(p));
           const isStop = stopKeywords.some(k => text.includes(k));
           if (isStop) {
              break; // Dừng việc gộp trang nếu gặp trang của bài học tiếp theo hoặc phần ôn tập
@@ -160,7 +172,7 @@ export function LessonSourceRangeSection({
           for (let j = endIdx + 1; j < maxScan; j++) {
              const scanPage = pages[j];
              if (!scanPage) continue;
-             const t = normalizeText((scanPage.mathpixMarkdown ?? scanPage.fullText ?? "").toLowerCase());
+             const t = normalizeText(getSearchText(scanPage));
              if (stopKeywords.some(k => t.includes(k))) {
                 foundStop = true;
                 stopIdx = j - 1;
@@ -229,10 +241,12 @@ export function LessonSourceRangeSection({
                           shouldValidate: true,
                           shouldDirty: true,
                         });
-                        form.setValue("sourceDocumentPageRange.pageEnd", range.end, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
+                        if (range.start !== range.end) {
+                          form.setValue("sourceDocumentPageRange.pageEnd", range.end, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }
                       }}
                       className="font-bold text-[var(--theme-primary)] hover:underline"
                     >
