@@ -67,6 +67,9 @@ export function LessonReferenceDocumentsSection({
               form.watch(`referenceDocuments.${index}.file`) ?? null;
             const fileError = form.formState.errors.referenceDocuments?.[index]?.file;
 
+            const isExisting = Boolean(form.watch(`referenceDocuments.${index}.id`));
+            const originalName = form.watch(`referenceDocuments.${index}.originalName`) as string | undefined;
+
             return (
               <div
                 key={field.id}
@@ -77,7 +80,7 @@ export function LessonReferenceDocumentsSection({
                   label={`Tên tài liệu ${displayIndex}`}
                   isOptional
                   icon={null}
-                  disabled={isDisabled}
+                  disabled={isDisabled || isExisting}
                   error={
                     form.formState.errors.referenceDocuments?.[index]?.title
                   }
@@ -87,38 +90,45 @@ export function LessonReferenceDocumentsSection({
 
                 <div>
                   <FieldLabel id={fileInputId} label={`File tài liệu ${displayIndex}`} />
-                  <label
-                    htmlFor={fileInputId}
-                    data-testid={`lesson-reference-file-control-${displayIndex}`}
-                    className={cn(
-                      "mt-2 flex min-h-[3.35rem] cursor-pointer items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-extrabold text-[var(--theme-text-strong)] transition hover:border-[var(--theme-input-hover-border)]",
-                      isDisabled &&
-                        "cursor-not-allowed bg-[var(--theme-input-bg-disabled)] text-[var(--theme-input-text-disabled)] opacity-70",
-                    )}
-                  >
-                    <Upload className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
-                    <span className="min-w-0 truncate">
-                      {selectedFile?.name ?? "Chọn file PDF"}
-                    </span>
-                    <input
-                      id={fileInputId}
-                      type="file"
-                      accept="application/pdf"
-                      aria-label={`File tài liệu ${displayIndex}`}
-                      disabled={isDisabled}
-                      className="sr-only"
-                      onChange={(event) => {
-                        form.setValue(
-                          `referenceDocuments.${index}.file`,
-                          event.target.files?.[0] ?? null,
-                          {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          },
-                        );
-                      }}
-                    />
-                  </label>
+                  {isExisting ? (
+                    <div className="mt-2 flex min-h-[3.35rem] items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg-disabled)] px-4 text-sm font-semibold text-[var(--theme-input-text-disabled)] opacity-70">
+                      <FilePlus2 className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
+                      <span className="min-w-0 truncate">{originalName ?? "Tài liệu gốc"}</span>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor={fileInputId}
+                      data-testid={`lesson-reference-file-control-${displayIndex}`}
+                      className={cn(
+                        "mt-2 flex min-h-[3.35rem] cursor-pointer items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-extrabold text-[var(--theme-text-strong)] transition hover:border-[var(--theme-input-hover-border)]",
+                        isDisabled &&
+                          "cursor-not-allowed bg-[var(--theme-input-bg-disabled)] text-[var(--theme-input-text-disabled)] opacity-70",
+                      )}
+                    >
+                      <Upload className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
+                      <span className="min-w-0 truncate">
+                        {selectedFile?.name ?? "Chọn file PDF"}
+                      </span>
+                      <input
+                        id={fileInputId}
+                        type="file"
+                        accept="application/pdf"
+                        aria-label={`File tài liệu ${displayIndex}`}
+                        disabled={isDisabled}
+                        className="hidden"
+                        onChange={(event) => {
+                          form.setValue(
+                            `referenceDocuments.${index}.file`,
+                            event.target.files?.[0] ?? null,
+                            {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            },
+                          );
+                        }}
+                      />
+                    </label>
+                  )}
                   {fileError ? (
                     <p className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]">
                       {fileError.message}
@@ -131,7 +141,7 @@ export function LessonReferenceDocumentsSection({
                   aria-label={`Xóa tài liệu ${displayIndex}`}
                   disabled={isDisabled}
                   onClick={() => remove(index)}
-                  className="theme-button-neutral inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--theme-danger)] transition disabled:cursor-not-allowed disabled:opacity-60 lg:mt-7"
+                  className="theme-button-danger-subtle inline-flex h-10 w-10 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60 lg:mt-[34px]"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>

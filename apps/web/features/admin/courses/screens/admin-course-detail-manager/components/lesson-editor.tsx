@@ -96,6 +96,23 @@ export function LessonEditor({
               {...form.register("title")}
             />
           </div>
+          <LessonSourceRangeSection
+            disabled={disabled}
+            form={form}
+            isRangeReady={isRangeReady}
+            isSaving={isSaving}
+            pageLimit={pageLimit}
+            pages={pages}
+            rangeDisabledReason={rangeDisabledReason}
+            selectedSourceDocument={selectedSourceDocument}
+            sourceDocuments={sourceDocuments}
+            onSelectSourceDocument={onSelectSourceDocument}
+          />
+          <LessonReferenceDocumentsSection
+            disabled={disabled}
+            form={form}
+            isSaving={isSaving}
+          />
           <div>
             <FieldLabel
               id="admin-lesson-description"
@@ -170,25 +187,6 @@ export function LessonEditor({
             error={form.formState.errors.trialEnabled}
             {...form.register("trialEnabled")}
           />
-          <LessonSourceRangeSection
-            disabled={disabled}
-            form={form}
-            isRangeReady={isRangeReady}
-            isSaving={isSaving}
-            pageLimit={pageLimit}
-            pages={pages}
-            rangeDisabledReason={rangeDisabledReason}
-            selectedSourceDocument={selectedSourceDocument}
-            sourceDocuments={sourceDocuments}
-            onSelectSourceDocument={onSelectSourceDocument}
-          />
-          {mode === "create" ? (
-            <LessonReferenceDocumentsSection
-              disabled={disabled}
-              form={form}
-              isSaving={isSaving}
-            />
-          ) : null}
         </fieldset>
       </div>
 

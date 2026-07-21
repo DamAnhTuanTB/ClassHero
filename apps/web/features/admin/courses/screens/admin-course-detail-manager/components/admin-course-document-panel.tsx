@@ -40,7 +40,8 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
   );
   const isSourceProcessing = 
     sourceDocument?.status === "PROCESSING" || 
-    sourceDocument?.processingJob?.status === "PROCESSING";
+    sourceDocument?.processingJob?.status === "RUNNING" ||
+    sourceDocument?.processingJob?.status === "QUEUED";
 
   const uploadLessonKind =
     manager.dialogState?.type === "lesson-upload"

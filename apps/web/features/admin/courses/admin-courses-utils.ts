@@ -18,6 +18,7 @@ import type {
   LearningPathSortKey,
   SortDirection,
 } from "@/features/admin/courses/admin-courses-types";
+import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admin-course-document-types";
 
 export type LearningPathFilterInput = {
   query: string;
@@ -94,7 +95,10 @@ export function toLearningPathPayload(values: LearningPathFormValues) {
   };
 }
 
-export function toLessonFormValues(lesson: AdminLesson): LessonFormValues {
+export function toLessonFormValues(
+  lesson: AdminLesson,
+  existingSupplements?: AdminLessonDocumentApi[],
+): LessonFormValues {
   return {
     orderIndex: lesson.orderIndex,
     title: lesson.title,
@@ -110,7 +114,11 @@ export function toLessonFormValues(lesson: AdminLesson): LessonFormValues {
       pageStart: "",
       pageEnd: "",
     },
-    referenceDocuments: [],
+    referenceDocuments: existingSupplements?.map(doc => ({
+      id: doc.id,
+      title: doc.title || "",
+      originalName: doc.file?.originalName || "Tài liệu",
+    })) || [],
   };
 }
 

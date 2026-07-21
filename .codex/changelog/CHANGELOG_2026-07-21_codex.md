@@ -10,3 +10,7 @@
   - Khắc phục lỗi "click xuyên qua" (click pass-through) trên thông báo toast bằng cách đổi `pointer-events: none` thành `pointer-events: auto` cho `.app-toast` trong `globals.css`.
 - **Workflow & Rules**:
   - Bổ sung quy tắc 2.4 vào `AGENTS.md`: Bắt buộc khởi động lại tiến trình worker (`pnpm dev`) sau khi sửa đổi các tệp trong `apps/api/src/workers/*` để code mới được áp dụng.
+- **Lesson Editor UI/UX**:
+  - Cải thiện logic gợi ý khoảng trang (`lesson-source-range-section.tsx`): Áp dụng chuẩn hoá tiếng Việt (normalize) và loại bỏ dấu câu thừa (ví dụ "Bài 20:"). Bổ sung thuật toán quét tiến (scan forward) thông minh và cơ chế chặt mốc kết thúc (early-stop) để phát hiện chính xác các trang của "Bài tiếp theo" hoặc "Luyện tập chung", tránh tình trạng lặp hoặc kéo dài khoảng trang sai lệch.
+  - Sửa lỗi không hiển thị đúng UI Modal khi lưu hoặc mở lại buổi học bằng việc force reset key ref (`resetKeyRef`) và trigger hàm reload UI (`reloadDocuments`).
+  - Chỉnh sửa thứ tự hiển thị: Chuyển block "Tài liệu tham khảo" lên trên khối "Tổng quan buổi học". Sửa lỗi khoảng trắng lớn thừa thãi bên dưới component bằng cách xử lý class `sr-only`. Căn giữa theo chiều dọc và đổi nút xóa (trash icon) sang màu đỏ (`theme-button-danger-subtle`) để trực quan hơn.

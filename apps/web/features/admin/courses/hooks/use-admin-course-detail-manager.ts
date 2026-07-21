@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   createAdminLessonSupplementDocument,
+  deleteAdminLessonSupplementDocument,
   uploadAdminLessonDocumentFile,
 } from "@/features/admin/courses/api/admin-course-documents-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -21,6 +22,7 @@ import {
   getAdminCourseDetailStats,
   getLessonReferenceDocumentUploads,
 } from "@/features/admin/courses/admin-courses-utils";
+import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
 import {
@@ -253,7 +255,13 @@ export function useAdminCourseDetailManager(
     setIsLessonEditorOpen(true);
   }
 
-  async function saveLesson(values: LessonFormValues) {
+  async function saveLesson(
+    values: LessonFormValues,
+    documentsManager: {
+      documentsByLessonId: Record<string, AdminLessonDocumentApi[]>;
+      actions: { reloadDocuments: () => void };
+    }
+  ) {
     if (!path || !selectedChapterId) {
       return;
     }
@@ -294,10 +302,39 @@ export function useAdminCourseDetailManager(
           lessonId: selectedLesson.id,
           values,
         });
+
+        try {
+          const originalSupplements =
+            documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
+              (doc) => doc.kind === "SUPPLEMENT",
+            ) || [];
+          
+          const remainingIds = values.referenceDocuments
+            .map((doc) => doc.id)
+            .filter(Boolean);
+            
+          const deletedDocs = originalSupplements.filter(
+            (doc) => !remainingIds.includes(doc.id),
+          );
+
+          for (const doc of deletedDocs) {
+            await deleteAdminLessonSupplementDocument(
+              selectedLesson.id,
+              doc.id,
+              accessToken,
+            );
+          }
+
+          await uploadLessonReferenceDocuments(selectedLesson.id, values);
+        } catch (error) {
+          referenceUploadError = error;
+        }
       }
 
       await mutations.invalidateLearningPath(path.id);
       await learningPathQuery.refetch();
+      // Ensure documents are re-fetched to reflect deleted/added supplements
+      documentsManager.actions.reloadDocuments();
       if (referenceUploadError) {
         toast.warning("Đã thêm bài học", {
           description: getErrorMessage(referenceUploadError),

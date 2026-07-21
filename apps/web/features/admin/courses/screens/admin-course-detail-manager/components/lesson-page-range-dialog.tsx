@@ -107,6 +107,18 @@ export function LessonPageRangeDialog({
             Gợi ý chia trang
           </button>
         </div>
+        {warnings.length > 0 ? (
+          <div className="mb-4 grid gap-2">
+            {warnings.map((warning) => (
+              <p
+                key={warning.code}
+                className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-warning-text)]"
+              >
+                {warning.message}
+              </p>
+            ))}
+          </div>
+        ) : null}
 
         <div className="grid gap-3">
           {lessons.map((item) => {
@@ -128,6 +140,7 @@ export function LessonPageRangeDialog({
                 issue={issue}
                 item={item}
                 pages={pages}
+                sourceDocument={sourceDocument}
                 rangeSubmitAttempted={rangeSubmitAttempted}
                 onDeleteSupplement={onDeleteSupplement}
                 onOpenPrimaryUpload={onOpenPrimaryUpload}
@@ -137,19 +150,6 @@ export function LessonPageRangeDialog({
             );
           })}
         </div>
-
-        {warnings.length > 0 ? (
-          <div className="mt-4 grid gap-2">
-            {warnings.map((warning) => (
-              <p
-                key={warning.code}
-                className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-warning-text)]"
-              >
-                {warning.message}
-              </p>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       <div className="theme-dialog-footer grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">

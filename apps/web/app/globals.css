@@ -582,7 +582,7 @@ button {
 
   display: grid !important;
   grid-template-columns: 28px minmax(0, 1fr) !important;
-  align-items: start !important;
+  align-items: center !important;
   column-gap: 7px !important;
   width: min(calc(100vw - 24px), 380px) !important;
   padding: 12px 32px 12px 10px !important;

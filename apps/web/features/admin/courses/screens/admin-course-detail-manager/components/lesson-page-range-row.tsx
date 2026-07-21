@@ -15,9 +15,11 @@ import {
 import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
 import type {
   AdminLessonDocumentApi,
+  AdminSourceDocumentApi,
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
+import { PdfPagePreview } from "@/components/shared/pdf-page-preview";
 
 export function LessonPageRangeRow({
   documents,
@@ -27,6 +29,7 @@ export function LessonPageRangeRow({
   issue,
   item,
   pages,
+  sourceDocument,
   rangeSubmitAttempted,
   onDeleteSupplement,
   onOpenPrimaryUpload,
@@ -40,6 +43,7 @@ export function LessonPageRangeRow({
   issue: LessonRangeValidationIssue | undefined;
   item: AdminLessonWithChapter;
   pages: AdminSourceDocumentPageApi[];
+  sourceDocument: AdminSourceDocumentApi | null;
   rangeSubmitAttempted: boolean;
   onDeleteSupplement: (lessonId: string, documentId: string) => void;
   onOpenPrimaryUpload: (lessonId: string) => void;
@@ -53,6 +57,7 @@ export function LessonPageRangeRow({
   const primaryDocument = getPrimaryLessonDocument(documents);
   const supplements = getSupplementLessonDocuments(documents);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
   const savedRange = getLessonDocumentRange(primaryDocument);
   const pdfPageStart = getPdfPageFromPrintedPage(draft.pageStart, pages);
   const pdfPageEnd = getPdfPageFromPrintedPage(draft.pageEnd, pages);
@@ -79,7 +84,7 @@ export function LessonPageRangeRow({
       data-testid={`lesson-document-row-${item.lesson.id}`}
       className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3"
     >
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_minmax(12rem,1fr)] xl:items-start">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem] xl:items-start">
         <div className="min-w-0">
           <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
             Chương {item.chapterOrder}
@@ -87,9 +92,6 @@ export function LessonPageRangeRow({
           <h3 className="mt-1 text-sm font-extrabold leading-6 text-[var(--theme-text-strong)]">
             {item.lesson.title}
           </h3>
-          <p className="mt-1 line-clamp-1 text-sm font-semibold text-[var(--theme-text-muted)]">
-            {item.chapterTitle}
-          </p>
         </div>
 
         <label className="block">
@@ -123,12 +125,40 @@ export function LessonPageRangeRow({
             className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
+      </div>
 
-        <div className="min-w-0 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2 transition-all">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-              Xem nhanh
-            </p>
+      <div className="min-w-0 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2 transition-all">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+            Xem nhanh
+          </p>
+          <div className="flex items-center gap-3">
+            {previewPages.length > 0 && (
+              <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode("ocr")}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
+                    previewMode === "ocr"
+                      ? "bg-[var(--theme-primary)] text-white"
+                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                  }`}
+                >
+                  Nội dung OCR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode("pdf")}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
+                    previewMode === "pdf"
+                      ? "bg-[var(--theme-primary)] text-white"
+                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                  }`}
+                >
+                  PDF gốc
+                </button>
+              </div>
+            )}
             {hasMultiplePages && (
               <button
                 type="button"
@@ -149,43 +179,59 @@ export function LessonPageRangeRow({
               </button>
             )}
           </div>
-          <div
-            className={`mt-2 text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
-              isExpanded
-                ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm"
-                : "max-h-[60px] overflow-hidden relative"
-            }`}
-          >
-            {previewPages.length > 0 ? (
-              isExpanded ? (
-                <div className="flex flex-col gap-4">
-                  {previewPages.map((page, index) => {
-                    const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
-                    const printed = getPrintedPageView(page);
-                    return (
-                      <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-4" : ""}>
-                        <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                          Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
-                        </div>
-                        {text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>}
+        </div>
+        <div
+          className={`mx-auto mt-2 w-full max-w-3xl text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
+            isExpanded
+              ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm"
+              : "max-h-[60px] overflow-hidden relative"
+          }`}
+        >
+          {previewPages.length > 0 ? (
+            isExpanded ? (
+              <div className="flex flex-col gap-4">
+                {previewPages.map((page, index) => {
+                  const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+                  const printed = getPrintedPageView(page);
+                  return (
+                    <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-4" : ""}>
+                      <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
+                        Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <MathpixMarkdownRenderer content={fullText} />
-              )
+                      {previewMode === "ocr" ? (
+                        text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>
+                      ) : (
+                        <div className="flex justify-center border border-[var(--theme-border)] rounded-md overflow-hidden bg-[var(--theme-surface-soft)]">
+                          {sourceDocument?.file?.publicUrl ? (
+                            <PdfPagePreview pdfUrl={sourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
+                          ) : (
+                            <p className="p-4 italic text-[var(--theme-text-muted)]">Không tìm thấy file PDF</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              <p>
-                {printedPage
-                  ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
-                  : "Chưa có trang xem nhanh"}
-              </p>
-            )}
-            {!isExpanded && fullText && (
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent" />
-            )}
-          </div>
+              previewMode === "ocr" ? (
+                <MathpixMarkdownRenderer content={fullText} />
+              ) : (
+                <div className="pointer-events-none py-2 opacity-50 flex items-center gap-2 italic text-[var(--theme-text-muted)]">
+                  <span>Mở rộng để xem bản PDF chi tiết</span>
+                </div>
+              )
+            )
+          ) : (
+            <p>
+              {printedPage
+                ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
+                : "Chưa có trang xem nhanh"}
+            </p>
+          )}
+          {!isExpanded && fullText && previewMode === "ocr" && (
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[var(--theme-surface-soft)] to-transparent" />
+          )}
         </div>
       </div>
 
@@ -209,13 +255,6 @@ export function LessonPageRangeRow({
                 {primaryDocument.title ??
                   primaryDocument.sourceDocument?.title ??
                   primaryDocument.file.originalName}
-              </p>
-              <p className="mt-1 text-xs font-bold text-[var(--theme-text-muted)]">
-                {formatDocumentKind(primaryDocument.kind)}
-                {savedRange ? ` · trang ${savedRange.pageStart}-${savedRange.pageEnd}` : ""}
-                {primaryDocument.chunkCount > 0
-                  ? ` · ${primaryDocument.chunkCount} đoạn`
-                  : ""}
               </p>
             </div>
           ) : (

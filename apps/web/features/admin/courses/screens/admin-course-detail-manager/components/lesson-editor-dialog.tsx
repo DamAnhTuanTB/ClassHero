@@ -39,7 +39,7 @@ export function LessonEditorDialog({
   mode: EditorMode;
   selectedLesson: AdminLesson | null;
   onClose: () => void;
-  onSubmit: (values: LessonFormValues) => void | Promise<void>;
+  onSubmit: (values: LessonFormValues, documentsManager: ReturnType<typeof useAdminCourseDocumentsManager>) => void | Promise<void>;
 }) {
   const documentsManager = useAdminCourseDocumentsManager(learningPath);
   const form = useForm<LessonFormValues>({
@@ -71,6 +71,11 @@ export function LessonEditorDialog({
       sourceDocumentPageRange.pageEnd,
     ].join(":");
 
+    if (!isOpen) {
+      resetKeyRef.current = null;
+      return;
+    }
+
     if (resetKeyRef.current === editorKey) {
       return;
     }
@@ -79,10 +84,17 @@ export function LessonEditorDialog({
       return;
     }
 
+    const existingSupplements =
+      mode === "edit" && selectedLesson
+        ? documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
+            (doc) => doc.kind === "SUPPLEMENT"
+          ) || []
+        : [];
+
     form.reset(
       mode === "edit" && selectedLesson
         ? {
-            ...toLessonFormValues(selectedLesson),
+            ...toLessonFormValues(selectedLesson, existingSupplements),
             sourceDocumentPageRange,
           }
         : {
@@ -149,7 +161,7 @@ export function LessonEditorDialog({
         values.sourceDocumentPageRange.pageStart = pdfPageStart ? String(pdfPageStart) : "";
         values.sourceDocumentPageRange.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
       }
-      await onSubmit(values);
+      await onSubmit(values, documentsManager);
     } catch (error) {
       if (error instanceof Error && error.message === "DUPLICATED_LESSON_ORDER") {
         form.setError("orderIndex", {

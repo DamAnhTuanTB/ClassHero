@@ -34,14 +34,17 @@ export const learningPathSchema = z.object({
 
 const referenceDocumentSchema = z
   .object({
+    id: z.string().optional(),
+    originalName: z.string().optional(),
     title: z.string().trim().max(180, "Tên tài liệu tối đa 180 ký tự").optional(),
     file: z.custom<File | null>().optional(),
   })
   .superRefine((value, context) => {
     const hasTitle = Boolean(value.title?.trim());
     const file = value.file ?? null;
+    const isExisting = Boolean(value.id);
 
-    if (hasTitle && !file) {
+    if (!isExisting && hasTitle && !file) {
       context.addIssue({
         code: "custom",
         message: "Chọn file tài liệu",
@@ -49,7 +52,7 @@ const referenceDocumentSchema = z
       });
     }
 
-    if (file?.type && file.type !== "application/pdf") {
+    if (!isExisting && file?.type && file.type !== "application/pdf") {
       context.addIssue({
         code: "custom",
         message: "File phải là PDF",
@@ -175,6 +178,8 @@ export type LessonFormValues = {
     pageEnd?: string;
   };
   referenceDocuments: Array<{
+    id?: string;
+    originalName?: string;
     title?: string;
     file?: File | null;
   }>;
