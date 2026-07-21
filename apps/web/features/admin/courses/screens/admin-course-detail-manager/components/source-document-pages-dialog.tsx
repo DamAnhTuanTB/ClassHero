@@ -83,33 +83,35 @@ export function SourceDocumentPagesDialog({
       onClose={onClose}
       panelClassName="h-[90dvh] w-[95vw] max-w-6xl"
     >
-      <div className="theme-dialog-header flex min-h-16 shrink-0 items-center gap-3 p-4 pr-16 sm:p-5 sm:pr-20">
-        <span className="theme-button-primary-subtle grid h-10 w-10 shrink-0 place-items-center rounded-lg">
-          <FileText className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Xem trang OCR
-          </h2>
-          <p className="mt-1 truncate text-sm font-semibold text-[var(--theme-text-muted)]">
-            {sourceDocument?.title ?? sourceDocument?.file.originalName ?? "Tài liệu nguồn"}
-          </p>
+      <div className="theme-dialog-header flex flex-col sm:flex-row min-h-16 shrink-0 sm:items-center gap-4 p-4 pr-14 sm:p-5 sm:pr-20">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="theme-button-primary-subtle grid h-10 w-10 shrink-0 place-items-center rounded-lg">
+            <FileText className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+              Xem trang OCR
+            </h2>
+            <p className="mt-1 truncate text-sm font-semibold text-[var(--theme-text-muted)]">
+              {sourceDocument?.title ?? sourceDocument?.file.originalName ?? "Tài liệu nguồn"}
+            </p>
+          </div>
         </div>
 
         {readyCount > 0 || failedCount > 0 ? (
-          <div className="ml-4 hidden items-center gap-2 sm:flex">
+          <div className="hidden items-center gap-2 lg:flex ml-4">
             {readyCount > 0 && <SummaryPill color="success" icon={null} label={`${readyCount} sẵn sàng`} />}
             {failedCount > 0 && <SummaryPill color="danger" icon={null} label={`${failedCount} lỗi`} />}
           </div>
         ) : null}
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
           <input
             type="text"
             value={searchPrintedPage}
             onChange={(e) => setSearchPrintedPage(e.target.value)}
             placeholder="Tìm số trang in..."
-            className="h-7 w-32 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-2 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
+            className="h-7 w-32 shrink-0 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-2 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
           />
 
           {/* View mode toggle */}
@@ -216,8 +218,8 @@ function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }
   }
 
   return (
-    <div className="flex-1 w-full bg-[var(--theme-surface-soft)] p-4 sm:p-6 lg:p-8 flex justify-center">
-      <div className="w-full max-w-3xl bg-white border border-[var(--theme-border)] rounded-md shadow-sm p-8">
+    <div className="flex-1 w-full bg-[var(--theme-surface-soft)] p-2 sm:p-4 lg:p-8 flex justify-center">
+      <div className="w-full max-w-3xl bg-white border border-[var(--theme-border)] rounded-md shadow-sm p-3 sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4">
           {pages.map((page, index) => {
             const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
@@ -260,7 +262,7 @@ function PageDetailRow({
 
   return (
     <div
-      className={`px-4 py-4 sm:px-5 ${
+      className={`px-3 py-4 sm:p-5 ${
         hasError
           ? "bg-[var(--theme-danger-soft)]"
           : hasWarning
@@ -327,10 +329,10 @@ function PageDetailRow({
       ) : null}
 
       {/* PDF preview + Text content side by side */}
-      <div className={`mt-3 ${pdfUrl ? "flex gap-4" : ""}`}>
+      <div className={`mt-3 ${pdfUrl ? "flex flex-col lg:flex-row gap-4 lg:items-start" : ""}`}>
         {/* PDF page image */}
         {pdfUrl ? (
-          <div className="shrink-0">
+          <div className="shrink-0 flex justify-center lg:block">
             <PdfPagePreview pageNumber={page.pageNumber} pdfUrl={pdfUrl} width={220} />
           </div>
         ) : null}
@@ -340,7 +342,7 @@ function PageDetailRow({
           {text ? (
             <div className="w-full max-w-3xl">
               <div
-                className={`rounded-md shadow-sm border border-[var(--theme-border)] bg-white p-8 ${
+                className={`rounded-md shadow-sm border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 ${
                   !isExpanded && isLongText ? "max-h-[310px] overflow-hidden relative" : ""
                 }`}
               >

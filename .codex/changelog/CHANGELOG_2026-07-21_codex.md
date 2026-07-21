@@ -15,3 +15,5 @@
 ### Sửa lỗi (Fixed)
 - Sửa lỗi vòng lặp render vô hạn (Maximum update depth exceeded) trong React do lỗi cấp phát reference mảng mới mỗi lần render của mảng `useQuery` ở trạng thái fallback (`?? []`). Thay thế bằng `EMPTY_ARRAY` cố định.
 - Sửa lỗi độ rộng modal thêm buổi học chưa khớp với độ rộng chuẩn của trang PDF.
+- Tối ưu hiển thị Responsive cho modal Xem trang OCR (header, thanh công cụ) và tự động xếp chồng ảnh PDF & Text trên giao diện điện thoại.
+- Khắc phục lỗi padding quá lớn (`p-8`) gây bóp nghẹt nội dung chữ trên màn hình nhỏ ở chế độ Xem trang và Xem nhanh (đã thay bằng padding tự động co giãn theo viewport).

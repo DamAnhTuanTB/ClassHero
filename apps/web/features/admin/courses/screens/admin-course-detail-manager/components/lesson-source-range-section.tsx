@@ -171,7 +171,7 @@ export function LessonSourceRangeSection({
             <div
               className={`mt-2 w-full max-w-3xl text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
                 isExpanded
-                  ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-8 shadow-sm"
+                  ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm"
                   : "max-h-[60px] overflow-hidden relative"
               }`}
             >
