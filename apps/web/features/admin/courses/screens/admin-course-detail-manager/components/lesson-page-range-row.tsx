@@ -94,37 +94,40 @@ export function LessonPageRangeRow({
           </h3>
         </div>
 
-        <label className="block">
-          <span className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-            Từ trang
-          </span>
-          <input
-            value={draft.pageStart}
-            inputMode="text"
-            disabled={isSaving}
-            aria-label={`Trang bắt đầu ${item.lesson.title}`}
-            onChange={(event) =>
-              onUpdateRange(item.lesson.id, "pageStart", event.target.value)
-            }
-            className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
-          />
-        </label>
+        {/* On mobile: side-by-side row. On xl+: each input is its own grid column */}
+        <div className="grid grid-cols-2 gap-3 xl:contents">
+          <label className="block">
+            <span className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+              Từ trang
+            </span>
+            <input
+              value={draft.pageStart}
+              inputMode="text"
+              disabled={isSaving}
+              aria-label={`Trang bắt đầu ${item.lesson.title}`}
+              onChange={(event) =>
+                onUpdateRange(item.lesson.id, "pageStart", event.target.value)
+              }
+              className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </label>
 
-        <label className="block">
-          <span className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-            Đến trang
-          </span>
-          <input
-            value={draft.pageEnd}
-            inputMode="text"
-            disabled={isSaving}
-            aria-label={`Trang kết thúc ${item.lesson.title}`}
-            onChange={(event) =>
-              onUpdateRange(item.lesson.id, "pageEnd", event.target.value)
-            }
-            className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
-          />
-        </label>
+          <label className="block">
+            <span className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+              Đến trang
+            </span>
+            <input
+              value={draft.pageEnd}
+              inputMode="text"
+              disabled={isSaving}
+              aria-label={`Trang kết thúc ${item.lesson.title}`}
+              onChange={(event) =>
+                onUpdateRange(item.lesson.id, "pageEnd", event.target.value)
+              }
+              className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="min-w-0 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2 transition-all">
@@ -132,9 +135,9 @@ export function LessonPageRangeRow({
           <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
             Xem nhanh
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {previewPages.length > 0 && (
-              <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+              <div className="hidden sm:flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
                 <button
                   type="button"
                   onClick={() => setPreviewMode("ocr")}
@@ -180,15 +183,46 @@ export function LessonPageRangeRow({
             )}
           </div>
         </div>
-        <div
-          className={`mx-auto mt-2 w-full max-w-3xl text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
-            isExpanded
-              ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm"
-              : "max-h-[60px] overflow-hidden relative"
-          }`}
-        >
-          {previewPages.length > 0 ? (
-            isExpanded ? (
+        {/* Mobile-only toggle row */}
+        {previewPages.length > 0 && (
+          <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
+            <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+              <button
+                type="button"
+                onClick={() => setPreviewMode("ocr")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
+                  previewMode === "ocr"
+                    ? "bg-[var(--theme-primary)] text-white"
+                    : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                }`}
+              >
+                Nội dung OCR
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode("pdf")}
+                className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
+                  previewMode === "pdf"
+                    ? "bg-[var(--theme-primary)] text-white"
+                    : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                }`}
+              >
+                PDF gốc
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Compact hint when collapsed */}
+        {!isExpanded && previewMode === "pdf" && (
+          <p className="mt-1 text-xs italic text-[var(--theme-text-muted)]">
+            Mở rộng để xem bản PDF chi tiết
+          </p>
+        )}
+        {isExpanded && (
+          <div
+            className="mx-auto mt-2 w-full max-w-3xl max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all"
+          >
+            {previewPages.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {previewPages.map((page, index) => {
                   const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
@@ -201,9 +235,11 @@ export function LessonPageRangeRow({
                       {previewMode === "ocr" ? (
                         text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>
                       ) : (
-                        <div className="flex justify-center border border-[var(--theme-border)] rounded-md overflow-hidden bg-[var(--theme-surface-soft)]">
+                        <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
                           {sourceDocument?.file?.publicUrl ? (
-                            <PdfPagePreview pdfUrl={sourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
+                            <div className="inline-block align-top">
+                              <PdfPagePreview pdfUrl={sourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
+                            </div>
                           ) : (
                             <p className="p-4 italic text-[var(--theme-text-muted)]">Không tìm thấy file PDF</p>
                           )}
@@ -214,25 +250,14 @@ export function LessonPageRangeRow({
                 })}
               </div>
             ) : (
-              previewMode === "ocr" ? (
-                <MathpixMarkdownRenderer content={fullText} />
-              ) : (
-                <div className="pointer-events-none py-2 opacity-50 flex items-center gap-2 italic text-[var(--theme-text-muted)]">
-                  <span>Mở rộng để xem bản PDF chi tiết</span>
-                </div>
-              )
-            )
-          ) : (
-            <p>
-              {printedPage
-                ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
-                : "Chưa có trang xem nhanh"}
-            </p>
-          )}
-          {!isExpanded && fullText && previewMode === "ocr" && (
-            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[var(--theme-surface-soft)] to-transparent" />
-          )}
-        </div>
+              <p>
+                {printedPage
+                  ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
+                  : "Chưa có trang xem nhanh"}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-start">

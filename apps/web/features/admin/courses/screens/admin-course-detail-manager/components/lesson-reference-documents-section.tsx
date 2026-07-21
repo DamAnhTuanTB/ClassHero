@@ -27,7 +27,7 @@ export function LessonReferenceDocumentsSection({
       data-testid="lesson-reference-documents-section"
       className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <span className="theme-button-primary-subtle mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg">
             <FilePlus2 className="h-4 w-4" aria-hidden="true" />
@@ -47,7 +47,7 @@ export function LessonReferenceDocumentsSection({
           type="button"
           disabled={isDisabled}
           onClick={() => append({ file: null, title: "" })}
-          className="theme-button-neutral inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           <FilePlus2 className="h-4 w-4" aria-hidden="true" />
           Thêm tài liệu

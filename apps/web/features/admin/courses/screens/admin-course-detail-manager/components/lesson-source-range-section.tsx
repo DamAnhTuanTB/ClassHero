@@ -324,36 +324,69 @@ export function LessonSourceRangeSection({
             />
           </div>
 
-          <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3 transition-all">
+          <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3 transition-all">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
                 Xem nhanh
               </p>
-              {hasMultiplePages && (
-                <button
-                  type="button"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
-                >
-                  {isExpanded ? (
-                    <>
-                      <Minimize2 className="h-3.5 w-3.5" />
-                      Thu gọn
-                    </>
-                  ) : (
-                    <>
-                      <Maximize2 className="h-3.5 w-3.5" />
-                      Mở rộng
-                    </>
-                  )}
-                </button>
-              )}
+              <div className="flex items-center gap-2 sm:gap-3">
+                {previewPages.length > 0 && (
+                  <div className="hidden sm:flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode("ocr")}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
+                        previewMode === "ocr"
+                          ? "bg-[var(--theme-primary)] text-white"
+                          : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                      }`}
+                    >
+                      Nội dung OCR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode("pdf")}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
+                        previewMode === "pdf"
+                          ? "bg-[var(--theme-primary)] text-white"
+                          : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                      }`}
+                    >
+                      PDF gốc
+                    </button>
+                  </div>
+                )}
+                {hasMultiplePages && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                  >
+                    {isExpanded ? (
+                      <>
+                        <Minimize2 className="h-3.5 w-3.5" />
+                        Thu gọn
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Mở rộng
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="mt-1 text-sm font-extrabold text-[var(--theme-primary)]">
+            
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p className="text-sm font-extrabold text-[var(--theme-primary)]">
                 {selectedTitle}
               </p>
-              {previewPages.length > 0 && (
+            </div>
+            
+            {/* Mobile-only toggle row */}
+            {previewPages.length > 0 && (
+              <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
                 <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
                   <button
                     type="button"
@@ -378,13 +411,19 @@ export function LessonSourceRangeSection({
                     PDF gốc
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+            {/* Compact hint when collapsed */}
+            {!isExpanded && previewMode === "pdf" && (
+              <p className="mt-1 text-xs italic text-[var(--theme-text-muted)]">
+                Mở rộng để xem bản PDF chi tiết
+              </p>
+            )}
             <div
               className={`mt-2 w-full max-w-3xl text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
                 isExpanded
-                  ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm"
-                  : "max-h-[60px] overflow-hidden relative"
+                  ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 shadow-sm"
+                  : "hidden"
               }`}
             >
               {previewPages.length > 0 ? (
@@ -401,9 +440,11 @@ export function LessonSourceRangeSection({
                           {previewMode === "ocr" ? (
                             text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung OCR</p>
                           ) : (
-                            <div className="flex justify-center border border-[var(--theme-border)] rounded-md overflow-hidden bg-[var(--theme-surface-soft)]">
+                            <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
                               {selectedSourceDocument?.file?.publicUrl ? (
-                                <PdfPagePreview pdfUrl={selectedSourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
+                                <div className="inline-block align-top">
+                                  <PdfPagePreview pdfUrl={selectedSourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
+                                </div>
                               ) : (
                                 <p className="p-4 italic text-[var(--theme-text-muted)]">Không tìm thấy file PDF</p>
                               )}
@@ -414,13 +455,7 @@ export function LessonSourceRangeSection({
                     })}
                   </div>
                 ) : (
-                  previewMode === "ocr" ? (
-                    <MathpixMarkdownRenderer content={fullText} />
-                  ) : (
-                    <div className="pointer-events-none py-2 opacity-50 flex items-center gap-2 italic text-[var(--theme-text-muted)]">
-                      <span>Mở rộng để xem bản PDF chi tiết</span>
-                    </div>
-                  )
+                  <div className="hidden"></div>
                 )
               ) : (
                 <p>

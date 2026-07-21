@@ -57,7 +57,7 @@ export function LessonEditor({
   return (
     <form
       className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-hidden",
+        "flex w-full min-w-0 min-h-0 flex-1 flex-col overflow-hidden",
         disabled && "opacity-65",
       )}
       onSubmit={form.handleSubmit(onSubmit)}
@@ -73,10 +73,9 @@ export function LessonEditor({
 
       <div
         data-testid="lesson-editor-scroll-area"
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto"
       >
-        <fieldset
-          disabled={disabled || isSaving}
+        <div
           className="min-w-0 space-y-3 p-4 sm:p-5"
         >
           <div className="grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
@@ -86,6 +85,7 @@ export function LessonEditor({
               inputMode="numeric"
               icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
               error={form.formState.errors.orderIndex}
+              disabled={disabled || isSaving}
               {...form.register("orderIndex", { setValueAs: toNumericFormValue })}
             />
             <TextField
@@ -93,6 +93,7 @@ export function LessonEditor({
               label="Tên bài học"
               icon={<FileText className="h-5 w-5" aria-hidden="true" />}
               error={form.formState.errors.title}
+              disabled={disabled || isSaving}
               {...form.register("title")}
             />
           </div>
@@ -126,6 +127,7 @@ export function LessonEditor({
               className={cn(
                 "theme-form-control mt-2 min-h-28 w-full resize-y rounded-xl px-4 py-3 text-base font-semibold leading-6 outline-none transition disabled:cursor-not-allowed lg:text-sm",
               )}
+              disabled={disabled || isSaving}
               aria-invalid={form.formState.errors.shortDescription ? "true" : "false"}
               aria-describedby={
                 form.formState.errors.shortDescription
@@ -149,6 +151,7 @@ export function LessonEditor({
             isOptional
             icon={<Video className="h-5 w-5" aria-hidden="true" />}
             error={form.formState.errors.videoUrl}
+            disabled={disabled || isSaving}
             {...form.register("videoUrl")}
           />
           <div className="grid gap-3 sm:grid-cols-2">
@@ -159,6 +162,7 @@ export function LessonEditor({
               step="0.5"
               icon={<Trophy className="h-5 w-5" aria-hidden="true" />}
               error={form.formState.errors.completionMinScore}
+              disabled={disabled || isSaving}
               {...form.register("completionMinScore", {
                 setValueAs: toNumericFormValue,
               })}
@@ -178,6 +182,7 @@ export function LessonEditor({
                   shouldValidate: true,
                 })
               }
+              disabled={disabled || isSaving}
             />
           </div>
           <CheckboxField
@@ -185,9 +190,10 @@ export function LessonEditor({
             label="Cho phép học thử bài học này"
             labelClassName="!bg-transparent hover:!bg-transparent"
             error={form.formState.errors.trialEnabled}
+            disabled={disabled || isSaving}
             {...form.register("trialEnabled")}
           />
-        </fieldset>
+        </div>
       </div>
 
       <div className="theme-dialog-footer relative z-10 grid shrink-0 grid-cols-2 gap-2 p-3 sm:flex sm:justify-end sm:p-4">

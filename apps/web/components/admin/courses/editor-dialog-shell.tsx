@@ -64,7 +64,7 @@ export function EditorDialogShell({
             aria-modal="true"
             aria-label={ariaLabel}
             className={cn(
-              "theme-dialog-panel relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg",
+              "theme-dialog-panel relative z-10 flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-lg",
               panelClassName,
             )}
             initial={
@@ -90,7 +90,7 @@ export function EditorDialogShell({
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+            <div className="flex w-full min-w-0 min-h-0 flex-1 flex-col">{children}</div>
           </motion.div>
         </motion.div>
       ) : null}
