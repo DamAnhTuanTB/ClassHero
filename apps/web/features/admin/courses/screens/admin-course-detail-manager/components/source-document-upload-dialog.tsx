@@ -3,6 +3,7 @@
 import { FileUp, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import { TextField } from "@/components/common/forms/text-field";
 
 export function SourceDocumentUploadDialog({
   isOpen,
@@ -17,28 +18,42 @@ export function SourceDocumentUploadDialog({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setFile(null);
       setTitle("");
-      setError(null);
+      setTitleError(null);
+      setTitleTouched(false);
+      setFileError(null);
     }
   }, [isOpen]);
 
   async function handleSubmit() {
+    let hasError = false;
+
     if (!file) {
-      setError("Chọn một file PDF.");
+      setFileError("Chọn một file PDF.");
+      hasError = true;
+    } else if (file.type !== "application/pdf") {
+      setFileError("File phải là PDF.");
+      hasError = true;
+    }
+
+    if (!title.trim()) {
+      setTitleError("Vui lòng nhập tên tài liệu.");
+      setTitleTouched(true);
+      hasError = true;
+    }
+
+    if (hasError) {
       return;
     }
 
-    if (file.type !== "application/pdf") {
-      setError("File phải là PDF.");
-      return;
-    }
-
-    setError(null);
+    setFileError(null);
     await onSubmit(file, title);
   }
 
@@ -69,33 +84,40 @@ export function SourceDocumentUploadDialog({
               type="file"
               accept="application/pdf"
               disabled={isSaving}
+              aria-invalid={fileError ? "true" : "false"}
               onChange={(event) => {
                 setFile(event.target.files?.[0] ?? null);
-                setError(null);
+                setFileError(null);
               }}
               className="mt-2 block w-full cursor-pointer rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] p-3 text-sm font-semibold text-[var(--theme-text)] file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[var(--theme-primary)] file:px-3 file:py-2 file:text-sm file:font-extrabold file:text-[var(--theme-primary-foreground)] disabled:cursor-not-allowed disabled:opacity-60"
             />
+            {fileError ? (
+              <p className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]">
+                {fileError}
+              </p>
+            ) : null}
           </label>
 
-          <label className="block">
-            <span className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-              Tên tài liệu
-            </span>
-            <input
-              value={title}
-              disabled={isSaving}
-              maxLength={180}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Ví dụ: Toán 7 Tập 1"
-              className="mt-2 min-h-12 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-bold text-[var(--theme-text-strong)] outline-none transition placeholder:text-[var(--theme-text-placeholder)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </label>
-
-          {error ? (
-            <p className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-2 text-sm font-bold text-[var(--theme-danger)]">
-              {error}
-            </p>
-          ) : null}
+          <TextField
+            id="source-document-title"
+            label="Tên tài liệu"
+            icon={null}
+            value={title}
+            disabled={isSaving}
+            maxLength={180}
+            onChange={(event) => {
+              const val = event.target.value;
+              setTitle(val);
+              setTitleTouched(true);
+              setTitleError(val.trim() ? null : "Vui lòng nhập tên tài liệu.");
+            }}
+            onBlur={() => {
+              setTitleTouched(true);
+              setTitleError(title.trim() ? null : "Vui lòng nhập tên tài liệu.");
+            }}
+            placeholder="Ví dụ: Toán 7 Tập 1"
+            error={titleError ? { message: titleError, type: "manual" } : undefined}
+          />
         </div>
       </div>
 

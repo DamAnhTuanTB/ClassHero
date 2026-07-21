@@ -35,7 +35,7 @@ export function LessonReferenceDocumentsSection({
           <div className="min-w-0">
             <FieldLabel
               id="admin-lesson-reference-documents"
-              label="Tài liệu tham khảo"
+              label="Tài liệu bổ sung"
               isOptional
             />
             <p className="mt-1 text-sm font-semibold leading-5 text-[var(--theme-text-muted)]">
