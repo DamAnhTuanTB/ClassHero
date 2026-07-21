@@ -116,6 +116,17 @@ export const lessonSchema = z.object({
         });
       }
 
+      if (hasStart && hasEnd) {
+        const startNum = parseInt(value.pageStart!, 10);
+        const endNum = parseInt(value.pageEnd!, 10);
+        if (!isNaN(startNum) && !isNaN(endNum) && endNum < startNum) {
+          context.addIssue({
+            code: "custom",
+            message: "Phải lớn hơn hoặc bằng Từ trang",
+            path: ["pageEnd"],
+          });
+        }
+      }
     }),
   referenceDocuments: z
     .array(referenceDocumentSchema)

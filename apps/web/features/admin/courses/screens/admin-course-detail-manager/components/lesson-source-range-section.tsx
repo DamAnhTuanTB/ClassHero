@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FileText, Layers3, Maximize2, Minimize2 } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
@@ -71,6 +71,34 @@ export function LessonSourceRangeSection({
     pageLimit && pageEndNumber !== null && pageEndNumber > pageLimit
       ? `Tài liệu chỉ có ${pageLimit} trang.`
       : null;
+
+  const lessonTitle = form.watch("title") ?? "";
+  
+  const suggestedPages = useMemo(() => {
+    if (!lessonTitle.trim() || !pages || pages.length === 0) return [];
+    
+    const normalizedTitle = lessonTitle.trim().toLowerCase();
+    
+    // Extract core title (e.g. "Bài 1: Tỉ lệ thức" -> "tỉ lệ thức")
+    let searchStr = normalizedTitle.replace(/^(bài|chủ đề|tiết|phần|unit|lesson)\s+\d+[:\-\.]?\s*/, "").trim();
+    if (!searchStr || searchStr.length < 3) {
+      // Fallback if there's no core title or it's too short
+      searchStr = normalizedTitle;
+    }
+
+    const matches: string[] = [];
+    for (const page of pages) {
+      const text = (page.mathpixMarkdown ?? page.fullText ?? "").toLowerCase();
+      if (text.includes(searchStr)) {
+        const printed = getPrintedPageView(page);
+        matches.push(printed.printedPageLabel ?? printed.printedPageNumber?.toString() ?? page.pageNumber.toString());
+      }
+    }
+    
+    // Return max 3 unique suggestions
+    return Array.from(new Set(matches)).slice(0, 3);
+  }, [lessonTitle, pages]);
+
   const isRangeInputDisabled = disabled || isSaving || !isRangeReady;
   const isSourceSelectDisabled = disabled || isSaving;
 
@@ -81,7 +109,32 @@ export function LessonSourceRangeSection({
           <FileText className="h-4 w-4" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <FieldLabel id="admin-lesson-source-range" label="Khoảng trang" isOptional />
+          <div className="flex items-center gap-2">
+            <FieldLabel id="admin-lesson-source-range" label="Khoảng trang" isOptional />
+            {suggestedPages.length > 0 ? (
+              <span className="flex items-center gap-1 text-xs text-[var(--theme-text-muted)]">
+                (Gợi ý: 
+                {suggestedPages.map((sp, idx) => (
+                  <span key={sp}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        form.setValue("sourceDocumentPageRange.pageStart", sp, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }}
+                      className="font-bold text-[var(--theme-primary)] hover:underline"
+                    >
+                      Trang {sp}
+                    </button>
+                    {idx < suggestedPages.length - 1 ? "," : ""}
+                  </span>
+                ))}
+                )
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 text-sm font-semibold leading-5 text-[var(--theme-text-muted)]">
             Bỏ trống nếu chỉ tạo thông tin buổi học.
           </p>

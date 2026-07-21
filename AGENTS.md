@@ -88,6 +88,10 @@ Khi task cần gọi provider trả phí thật như Mathpix, OpenAI/Gemini, ema
 - Không tự chạy lại forced paid provider nếu artifact/cache hợp lệ đã tồn tại; dùng cache-hit rerun để kiểm code/derived artifact khi có thể.
 - Final response sau khi gọi provider trả phí phải ghi rõ đã gọi thật hay dùng cache, số lượng đã xử lý và chi phí ước tính hoặc usage chính nếu biết.
 
+### 2.4. Khởi động lại Worker khi sửa code
+
+Mỗi khi sửa code liên quan đến phần Worker (`apps/api/src/workers/*` hoặc các module background jobs), Codex phải luôn có cơ chế khởi động lại worker hoặc nhắc nhở owner rõ ràng bằng một block lệnh để khởi động lại `pnpm dev`. Worker có thể không tự động hot-reload đúng cách, dẫn đến code mới không có tác dụng. Nếu cần thiết, có thể dùng `kill` hoặc các lệnh shell để ngắt process cũ.
+
 ---
 
 ## 3. Cách Đọc Tài Liệu

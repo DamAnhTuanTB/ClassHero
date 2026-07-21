@@ -592,7 +592,7 @@ button {
   box-shadow: var(--theme-shadow-sm) !important;
   backdrop-filter: blur(10px);
   overflow: hidden !important;
-  pointer-events: none !important;
+  pointer-events: auto !important;
   user-select: none;
 }
 

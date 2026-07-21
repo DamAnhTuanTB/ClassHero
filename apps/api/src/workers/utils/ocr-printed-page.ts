@@ -80,7 +80,7 @@ export function inferPrintedPageReference(
       ]),
     ],
     evidenceText: top.text,
-    warning: competingCandidates.length > 0 ? "ambiguous" : null,
+    warning: top.printedPageNumber === null || competingCandidates.length > 0 ? "ambiguous" : null,
   };
 }
 

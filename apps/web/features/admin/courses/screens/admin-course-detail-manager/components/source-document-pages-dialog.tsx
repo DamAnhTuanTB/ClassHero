@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileText, Eye, EyeOff, AlertTriangle, XCircle, ChevronDown, ChevronUp, ImageIcon, Check } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { FileText, Eye, EyeOff, AlertTriangle, XCircle, ChevronDown, ChevronUp, ImageIcon, Check, X } from "lucide-react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import {
   getPageVisualSummary,
@@ -42,6 +42,7 @@ export function SourceDocumentPagesDialog({
   const [viewMode, setViewMode] = useState<ViewMode>("html");
   const [filterMode, setFilterMode] = useState<"all" | "warnings">("all");
   const [searchPrintedPage, setSearchPrintedPage] = useState("");
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const filteredPages = pages.filter((page) => {
     if (filterMode === "warnings" && !getPrintedPageView(page).warning) {
@@ -70,10 +71,36 @@ export function SourceDocumentPagesDialog({
       setShowPdfPreview(initialFilter === "warnings");
       setViewMode(initialFilter === "warnings" ? "pages" : "html");
       setFilterMode(initialFilter ?? "all");
+      setSearchPrintedPage("");
     } else {
       setPdfUrl(null);
     }
   }, [isOpen, sourceDocument, initialFilter]);
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [filterMode, searchPrintedPage, viewMode, isOpen]);
+
+  const paginatedPages = filteredPages.slice(0, visibleCount);
+
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (observer.current) observer.current.disconnect();
+      if (node) {
+        observer.current = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) {
+              setVisibleCount((prev) => prev + 10);
+            }
+          },
+          { rootMargin: "400px" }
+        );
+        observer.current.observe(node);
+      }
+    },
+    []
+  );
 
 
   return (
@@ -106,13 +133,25 @@ export function SourceDocumentPagesDialog({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
-          <input
-            type="text"
-            value={searchPrintedPage}
-            onChange={(e) => setSearchPrintedPage(e.target.value)}
-            placeholder="Tìm số trang in..."
-            className="h-7 w-32 shrink-0 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-2 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={searchPrintedPage}
+              onChange={(e) => setSearchPrintedPage(e.target.value)}
+              placeholder="Tìm số trang in..."
+              className="h-7 w-32 shrink-0 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] pl-2 pr-6 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
+            />
+            {searchPrintedPage && (
+              <button
+                type="button"
+                onClick={() => setSearchPrintedPage("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]"
+                aria-label="Xóa"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
+          </div>
 
           {/* View mode toggle */}
           <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
@@ -178,7 +217,16 @@ export function SourceDocumentPagesDialog({
 
       <div className="min-h-0 flex-1 flex flex-col overflow-y-auto">
         {viewMode === "html" ? (
-          <OcrRenderedPagesView pages={filteredPages} />
+          <div className="flex flex-col">
+            <OcrRenderedPagesView pages={paginatedPages} />
+            {visibleCount < filteredPages.length && (
+              <div ref={lastElementRef} className="p-6 text-center pb-12">
+                <span className="text-sm font-semibold text-[var(--theme-text-muted)] animate-pulse">
+                  Đang tải thêm...
+                </span>
+              </div>
+            )}
+          </div>
         ) : filteredPages.length === 0 ? (
           <div className="m-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
             <FileText
@@ -190,14 +238,23 @@ export function SourceDocumentPagesDialog({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--theme-border)]">
-            {filteredPages.map((page) => (
-              <PageDetailRow
-                key={page.id}
-                page={page}
-                pdfUrl={showPdfPreview ? pdfUrl : null}
-              />
-            ))}
+          <div className="flex flex-col">
+            <div className="divide-y divide-[var(--theme-border)]">
+              {paginatedPages.map((page) => (
+                <PageDetailRow
+                  key={page.id}
+                  page={page}
+                  pdfUrl={showPdfPreview ? pdfUrl : null}
+                />
+              ))}
+            </div>
+            {visibleCount < filteredPages.length && (
+              <div ref={lastElementRef} className="p-6 text-center pb-12">
+                <span className="text-sm font-semibold text-[var(--theme-text-muted)] animate-pulse">
+                  Đang tải thêm...
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -251,6 +308,7 @@ function PageDetailRow({
   pdfUrl: string | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const printedPage = getPrintedPageView(page);
   const hasWarning = Boolean(printedPage.warning);
   const hasError = page.status === "FAILED";
@@ -333,7 +391,26 @@ function PageDetailRow({
         {/* PDF page image */}
         {pdfUrl ? (
           <div className="shrink-0 flex justify-center lg:block">
-            <PdfPagePreview pageNumber={page.pageNumber} pdfUrl={pdfUrl} width={220} />
+            <button
+              type="button"
+              className="hover:ring-2 hover:ring-[var(--theme-primary)] hover:ring-offset-2 transition-all rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+              onClick={() => setIsPreviewOpen(true)}
+              aria-label="Phóng to trang PDF"
+            >
+              <PdfPagePreview pageNumber={page.pageNumber} pdfUrl={pdfUrl} width={320} />
+            </button>
+            <EditorDialogShell
+              ariaLabel={`Trang PDF ${page.pageNumber}`}
+              isOpen={isPreviewOpen}
+              onClose={() => setIsPreviewOpen(false)}
+              panelClassName="max-w-4xl max-h-[90dvh] w-auto bg-transparent border-0 shadow-none p-0"
+            >
+              <div className="flex-1 overflow-auto bg-white rounded-md max-w-full p-4 pt-14">
+                 <div className="w-fit mx-auto">
+                   <PdfPagePreview pageNumber={page.pageNumber} pdfUrl={pdfUrl} width={800} />
+                 </div>
+              </div>
+            </EditorDialogShell>
           </div>
         ) : null}
 
