@@ -157,6 +157,7 @@ export class MathpixOcrService {
   async pollUntilComplete(
     pdfId: string,
     timeoutMs = 15 * 60 * 1000,
+    onProgress?: (progress: number) => void | Promise<void>,
   ): Promise<{ numPages: number }> {
     const startTime = Date.now();
     let pollInterval = 5_000; // start at 5s
@@ -181,6 +182,10 @@ export class MathpixOcrService {
           `pages=${status.num_pages_completed ?? "?"}/${status.num_pages ?? "?"}, ` +
           `${status.percent_done ?? 0}% done, elapsed=${elapsed}s`,
       );
+
+      if (onProgress && typeof status.percent_done === "number") {
+        await onProgress(status.percent_done);
+      }
 
       await this.sleep(pollInterval);
       // Exponential backoff: 5s → 10s → 15s (cap)

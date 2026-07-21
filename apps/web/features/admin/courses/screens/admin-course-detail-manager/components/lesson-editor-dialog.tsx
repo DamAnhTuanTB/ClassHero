@@ -13,7 +13,10 @@ import {
   type LessonFormValues,
 } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
-import { getLessonSourceRangeFormValues } from "@/features/admin/courses/admin-course-documents-utils";
+import {
+  getLessonSourceRangeFormValues,
+  getPdfPageFromPrintedPage,
+} from "@/features/admin/courses/admin-course-documents-utils";
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 
@@ -57,6 +60,7 @@ export function LessonEditorDialog({
       mode === "edit" ? selectedLesson?.id : null,
       documentsManager.documentsByLessonId,
       documentsManager.selectedSourceDocument?.id,
+      documentsManager.sourcePages
     );
     const editorKey = [
       mode,
@@ -99,6 +103,7 @@ export function LessonEditorDialog({
     documentsManager.actions,
     documentsManager.documentsByLessonId,
     documentsManager.selectedSourceDocument?.id,
+    documentsManager.sourcePages,
     form,
     form.formState.isDirty,
     isOpen,
@@ -108,6 +113,42 @@ export function LessonEditorDialog({
 
   async function submit(values: LessonFormValues) {
     try {
+      if (values.sourceDocumentPageRange?.sourceDocumentId) {
+        const { pageStart, pageEnd } = values.sourceDocumentPageRange;
+        const pdfPageStart = pageStart
+          ? getPdfPageFromPrintedPage(pageStart, documentsManager.sourcePages)
+          : null;
+        const pdfPageEnd = pageEnd
+          ? getPdfPageFromPrintedPage(pageEnd, documentsManager.sourcePages)
+          : null;
+
+        if (pageStart && !pdfPageStart) {
+          form.setError("sourceDocumentPageRange.pageStart", {
+            type: "manual",
+            message: "Trang bắt đầu không hợp lệ",
+          });
+          return;
+        }
+
+        if (pageEnd && !pdfPageEnd) {
+          form.setError("sourceDocumentPageRange.pageEnd", {
+            type: "manual",
+            message: "Trang kết thúc không hợp lệ",
+          });
+          return;
+        }
+        
+        if (pdfPageStart && pdfPageEnd && pdfPageStart > pdfPageEnd) {
+          form.setError("sourceDocumentPageRange.pageStart", {
+            type: "manual",
+            message: "Trang bắt đầu không được lớn hơn trang kết thúc",
+          });
+          return;
+        }
+
+        values.sourceDocumentPageRange.pageStart = pdfPageStart ? String(pdfPageStart) : "";
+        values.sourceDocumentPageRange.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
+      }
       await onSubmit(values);
     } catch (error) {
       if (error instanceof Error && error.message === "DUPLICATED_LESSON_ORDER") {
@@ -127,6 +168,7 @@ export function LessonEditorDialog({
       ariaLabel={mode === "create" ? "Thêm bài học" : "Sửa bài học"}
       isOpen={isOpen}
       onClose={onClose}
+      panelClassName="max-w-4xl"
     >
       <LessonEditor
         mode={mode}

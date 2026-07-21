@@ -256,6 +256,12 @@ export class DocumentProcessingProcessor {
       objectKey: sourceDoc.file.objectKey,
       originalName: sourceDoc.file.originalName ?? "document.pdf",
       ownerId: sourceDocId,
+      onProgress: async (progress) => {
+        await this.prisma.backgroundJob.update({
+          where: { id: record.id },
+          data: { result: { progress } },
+        });
+      },
     });
 
     await this.prisma.sourceDocument.update({
@@ -676,6 +682,12 @@ export class DocumentProcessingProcessor {
       objectKey: lessonDoc.file.objectKey,
       originalName: lessonDoc.file.originalName ?? lessonDoc.title ?? "lesson-document.pdf",
       ownerId: lessonDoc.id,
+      onProgress: async (progress) => {
+        await this.prisma.backgroundJob.update({
+          where: { id: record.id },
+          data: { result: { progress } },
+        });
+      },
     });
 
     const imageSummary = await this.extractAndStoreImages({
@@ -1063,10 +1075,12 @@ export class DocumentProcessingProcessor {
     objectKey,
     originalName,
     ownerId,
+    onProgress,
   }: {
     objectKey: string;
     originalName: string;
     ownerId: string;
+    onProgress?: (progress: number) => Promise<void>;
   }): Promise<OcrProcessingResult> {
     this.logger.log(`Downloading PDF from storage: ${objectKey}`);
     const pdfBuffer = await this.storage.downloadObject(objectKey);
@@ -1089,6 +1103,13 @@ export class DocumentProcessingProcessor {
 
     if (cacheHit) {
       this.logger.log("Loading OCR artifacts from cache...");
+      if (onProgress) {
+        // Giả lập tiến độ chạy % để UI có thể hiển thị khi lấy từ cache
+        for (let i = 10; i <= 100; i += 30) {
+          await onProgress(i);
+          await new Promise((resolve) => setTimeout(resolve, 600));
+        }
+      }
       const cached = await this.artifactCache.loadBundle(descriptor);
       bundle = cached;
       manifest = cached.manifest;
@@ -1096,7 +1117,11 @@ export class DocumentProcessingProcessor {
       this.logger.log("Cache miss — submitting to Mathpix...");
       const startTime = Date.now();
       const { pdfId } = await this.mathpixOcr.submitPdf(pdfBuffer, originalName);
-      const { numPages } = await this.mathpixOcr.pollUntilComplete(pdfId);
+      const { numPages } = await this.mathpixOcr.pollUntilComplete(
+        pdfId,
+        15 * 60 * 1000,
+        onProgress,
+      );
       bundle = await this.mathpixOcr.downloadAllArtifacts(
         pdfId,
         numPages || pageCount,

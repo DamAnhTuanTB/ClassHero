@@ -1,8 +1,10 @@
-import { FilePlus2, FileText, Trash2, Upload } from "lucide-react";
+import { useState } from "react";
+import { FilePlus2, FileText, Trash2, Upload, Maximize2, Minimize2 } from "lucide-react";
 import {
   formatDocumentKind,
   formatFileSize,
   getLessonDocumentRange,
+  getPdfPageFromPrintedPage,
   getPrimaryLessonDocument,
   getPrintedPageView,
   getSupplementLessonDocuments,
@@ -15,6 +17,7 @@ import type {
   AdminLessonDocumentApi,
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
+import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
 export function LessonPageRangeRow({
   documents,
@@ -49,9 +52,27 @@ export function LessonPageRangeRow({
 }) {
   const primaryDocument = getPrimaryLessonDocument(documents);
   const supplements = getSupplementLessonDocuments(documents);
+  const [isExpanded, setIsExpanded] = useState(false);
   const savedRange = getLessonDocumentRange(primaryDocument);
-  const previewPage = pages.find((page) => page.pageNumber === Number(draft.pageStart));
+  const pdfPageStart = getPdfPageFromPrintedPage(draft.pageStart, pages);
+  const pdfPageEnd = getPdfPageFromPrintedPage(draft.pageEnd, pages);
+  const previewPage = pdfPageStart !== null ? pages.find((page) => page.pageNumber === pdfPageStart) : null;
   const printedPage = previewPage ? getPrintedPageView(previewPage) : null;
+  
+  const previewPages =
+    pdfPageStart !== null && pdfPageEnd !== null && pdfPageStart <= pdfPageEnd
+      ? pages.filter(
+          (page) =>
+            page.pageNumber >= pdfPageStart && page.pageNumber <= pdfPageEnd,
+        )
+      : previewPage
+        ? [previewPage]
+        : [];
+  const fullText = previewPages
+    .map((page) => page.mathpixMarkdown ?? page.fullText ?? page.textPreview)
+    .filter(Boolean)
+    .join("\n\n");
+  const hasMultiplePages = previewPages.length > 1 || (fullText && fullText.length > 200);
 
   return (
     <article
@@ -77,7 +98,7 @@ export function LessonPageRangeRow({
           </span>
           <input
             value={draft.pageStart}
-            inputMode="numeric"
+            inputMode="text"
             disabled={isSaving}
             aria-label={`Trang bắt đầu ${item.lesson.title}`}
             onChange={(event) =>
@@ -93,7 +114,7 @@ export function LessonPageRangeRow({
           </span>
           <input
             value={draft.pageEnd}
-            inputMode="numeric"
+            inputMode="text"
             disabled={isSaving}
             aria-label={`Trang kết thúc ${item.lesson.title}`}
             onChange={(event) =>
@@ -103,16 +124,68 @@ export function LessonPageRangeRow({
           />
         </label>
 
-        <div className="min-w-0 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2">
-          <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-            Xem nhanh
-          </p>
-          <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[var(--theme-text)]">
-            {previewPage?.textPreview ??
-              (printedPage
-                ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
-                : "Chưa có trang xem nhanh")}
-          </p>
+        <div className="min-w-0 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2 transition-all">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+              Xem nhanh
+            </p>
+            {hasMultiplePages && (
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+              >
+                {isExpanded ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5" />
+                    Thu gọn
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    Mở rộng
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          <div
+            className={`mt-2 text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
+              isExpanded
+                ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-8 shadow-sm"
+                : "max-h-[60px] overflow-hidden relative"
+            }`}
+          >
+            {previewPages.length > 0 ? (
+              isExpanded ? (
+                <div className="flex flex-col gap-4">
+                  {previewPages.map((page, index) => {
+                    const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+                    const printed = getPrintedPageView(page);
+                    return (
+                      <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-4" : ""}>
+                        <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
+                          Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
+                        </div>
+                        {text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <MathpixMarkdownRenderer content={fullText} />
+              )
+            ) : (
+              <p>
+                {printedPage
+                  ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
+                  : "Chưa có trang xem nhanh"}
+              </p>
+            )}
+            {!isExpanded && fullText && (
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -125,6 +198,7 @@ export function LessonPageRangeRow({
             {primaryDocument ? (
               <DocumentStatusBadge
                 jobStatus={primaryDocument.processingJob?.status}
+                progress={primaryDocument.processingJob?.progress}
                 status={primaryDocument.status}
               />
             ) : null}
@@ -183,6 +257,7 @@ export function LessonPageRangeRow({
                   <div className="flex shrink-0 items-center gap-2">
                     <DocumentStatusBadge
                       jobStatus={document.processingJob?.status}
+                      progress={document.processingJob?.progress}
                       status={document.status}
                     />
                     <button

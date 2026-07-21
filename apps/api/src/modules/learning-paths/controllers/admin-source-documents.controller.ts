@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Patch,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -23,6 +24,7 @@ import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
+import { ConfirmPrintedPageDto } from "#api/modules/learning-paths/dto/confirm-printed-page.dto";
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
 
 @ApiTags("admin-source-documents")
@@ -112,5 +114,15 @@ export class AdminSourceDocumentsController {
   @ApiOperation({ summary: "Get rendered HTML from Mathpix OCR output" })
   getOcrHtml(@Param("sourceDocumentId") sourceDocumentId: string) {
     return this.sourceDocumentsService.getOcrHtml(sourceDocumentId);
+  }
+
+  @Patch("admin/learning-paths/source-documents/:sourceDocumentId/pages/:pageId/confirm-printed-page")
+  @ApiOperation({ summary: "Xác nhận số trang in cho trang bị lỗi" })
+  confirmPrintedPage(
+    @Param("sourceDocumentId") sourceDocumentId: string,
+    @Param("pageId") pageId: string,
+    @Body() dto: ConfirmPrintedPageDto,
+  ) {
+    return this.sourceDocumentsService.confirmPrintedPage(sourceDocumentId, pageId, dto);
   }
 }

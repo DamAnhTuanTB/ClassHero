@@ -116,38 +116,6 @@ export const lessonSchema = z.object({
         });
       }
 
-      const pageStart = Number(value.pageStart);
-      const pageEnd = Number(value.pageEnd);
-
-      if (hasStart && (!Number.isInteger(pageStart) || pageStart < 1)) {
-        context.addIssue({
-          code: "custom",
-          message: "Trang bắt đầu phải là số nguyên dương",
-          path: ["pageStart"],
-        });
-      }
-
-      if (hasEnd && (!Number.isInteger(pageEnd) || pageEnd < 1)) {
-        context.addIssue({
-          code: "custom",
-          message: "Trang kết thúc phải là số nguyên dương",
-          path: ["pageEnd"],
-        });
-      }
-
-      if (
-        hasStart &&
-        hasEnd &&
-        Number.isInteger(pageStart) &&
-        Number.isInteger(pageEnd) &&
-        pageStart > pageEnd
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "Trang bắt đầu không được lớn hơn trang kết thúc",
-          path: ["pageStart"],
-        });
-      }
     }),
   referenceDocuments: z
     .array(referenceDocumentSchema)

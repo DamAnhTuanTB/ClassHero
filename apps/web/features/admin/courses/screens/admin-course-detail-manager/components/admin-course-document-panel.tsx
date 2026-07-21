@@ -38,7 +38,9 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
     manager.lessons.length &&
     manager.rangeReadiness.isReady,
   );
-  const isSourceProcessing = sourceDocument?.status === "PROCESSING";
+  const isSourceProcessing = 
+    sourceDocument?.status === "PROCESSING" || 
+    sourceDocument?.processingJob?.status === "PROCESSING";
 
   const uploadLessonKind =
     manager.dialogState?.type === "lesson-upload"
@@ -77,7 +79,13 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
             type="button"
             disabled={!canMapRanges}
             onClick={manager.actions.openRangesDialog}
-            title={canMapRanges ? undefined : manager.rangeReadiness.reason}
+            title={
+              canMapRanges
+                ? undefined
+                : !manager.lessons.length
+                  ? "Cần tạo ít nhất 1 buổi học trước khi gán trang"
+                  : manager.rangeReadiness.reason
+            }
             className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
@@ -149,7 +157,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
 
         {sourceDocument ? (
           <div>
-            <div className="grid gap-4 border-b border-[var(--theme-border)] bg-[var(--theme-surface)] p-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="grid items-start gap-4 border-b border-[var(--theme-border)] bg-[var(--theme-surface)] p-4 lg:grid-cols-[minmax(0,1fr)_auto]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="min-w-0 text-lg font-extrabold text-[var(--theme-text-strong)]">
@@ -158,12 +166,24 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                   <DocumentStatusBadge
                     hasPrintedPageWarning={manager.rangeReadiness.warningPageCount > 0}
                     jobStatus={sourceDocument.processingJob?.status}
+                    progress={sourceDocument.processingJob?.progress}
                     status={sourceDocument.status}
                   />
                 </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--theme-text-muted)]">
-                  {sourceDocument.file.originalName} ·{" "}
-                  {formatFileSize(sourceDocument.file.sizeBytes)}
+                <p className="mt-2 text-sm font-semibold flex items-center min-w-0">
+                  <button
+                    type="button"
+                    title={sourceDocument.file.originalName}
+                    onClick={manager.actions.openSourceDocumentFile}
+                    disabled={manager.isOpeningFile}
+                    className="text-[var(--theme-primary)] hover:underline disabled:opacity-60 disabled:no-underline text-left truncate min-w-0"
+                  >
+                    {sourceDocument.file.originalName}
+                  </button>
+                  <span className="text-[var(--theme-text-muted)] mx-2 shrink-0">•</span>
+                  <span className="text-[var(--theme-text-muted)] shrink-0">
+                    {formatFileSize(sourceDocument.file.sizeBytes)}
+                  </span>
                 </p>
               </div>
 
@@ -179,12 +199,14 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                 </button>
                 <button
                   type="button"
+                  disabled={isSourceProcessing}
                   onClick={manager.actions.openPagesDialog}
-                  className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
+                  className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <FileText className="h-4 w-4" aria-hidden="true" />
                   Xem trang
                 </button>
+
                 <button
                   type="button"
                   disabled={isSourceProcessing || manager.isRetryingSourceDocument}
@@ -232,7 +254,10 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                   Chưa có dữ liệu trang.
                 </p>
               ) : (
-                <OcrStatusSummaryView pages={manager.sourcePages} />
+                <OcrStatusSummaryView 
+                  pages={manager.sourcePages} 
+                  onResolveWarning={manager.actions.openPagesDialogWithWarnings}
+                />
               )}
             </div>
           </div>
@@ -267,6 +292,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
       />
       <SourceDocumentPagesDialog
         isOpen={manager.dialogState?.type === "pages"}
+        initialFilter={manager.dialogState?.type === "pages" ? manager.dialogState.filter : undefined}
         pages={manager.sourcePages}
         sourceDocument={sourceDocument}
         onClose={manager.actions.closeDialog}
@@ -313,7 +339,13 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
   );
 }
 
-function OcrStatusSummaryView({ pages }: { pages: AdminSourceDocumentPageApi[] }) {
+function OcrStatusSummaryView({ 
+  pages,
+  onResolveWarning
+}: { 
+  pages: AdminSourceDocumentPageApi[];
+  onResolveWarning?: () => void;
+}) {
   const summary = useMemo(() => getOcrStatusSummary(pages), [pages]);
 
   const failedIssues = summary.issues.filter((issue) => issue.type === "failed");
@@ -370,19 +402,31 @@ function OcrStatusSummaryView({ pages }: { pages: AdminSourceDocumentPageApi[] }
       {/* Warning pages */}
       {warningIssues.length > 0 ? (
         <div className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)]">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <AlertTriangle
-              className="h-5 w-5 shrink-0 text-[var(--theme-warning-text)]"
-              aria-hidden="true"
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-extrabold text-[var(--theme-warning-text)]">
-                {warningIssues.length} trang cần admin xác nhận số trang in
-              </p>
-              <p className="mt-0.5 text-xs font-semibold text-[var(--theme-warning-text)]">
-                Không thể gán khoảng trang cho buổi học cho đến khi xác nhận xong.
-              </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <AlertTriangle
+                className="h-5 w-5 shrink-0 text-[var(--theme-warning-text)]"
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-extrabold text-[var(--theme-warning-text)]">
+                  {warningIssues.length} trang cần admin xác nhận số trang in
+                </p>
+                <p className="mt-0.5 text-xs font-semibold text-[var(--theme-warning-text)]">
+                  Không thể gán khoảng trang cho buổi học cho đến khi xác nhận xong.
+                </p>
+              </div>
             </div>
+            {onResolveWarning && (
+              <button
+                type="button"
+                onClick={onResolveWarning}
+                className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-surface)] px-3 text-sm font-bold text-[var(--theme-warning-text)] shadow-sm transition hover:bg-[var(--theme-surface-hover)]"
+              >
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                Xác nhận trang in
+              </button>
+            )}
           </div>
           <div className="border-t border-[var(--theme-warning-border)] px-4 py-2">
             {warningIssues.map((issue) => (

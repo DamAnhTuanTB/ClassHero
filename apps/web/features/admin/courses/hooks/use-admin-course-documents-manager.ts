@@ -36,6 +36,8 @@ import type {
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { ApiRequestError } from "@/lib/api-client";
 
+const EMPTY_ARRAY: any[] = [];
+
 type DialogState =
   | {
       type: "lesson-upload";
@@ -43,12 +45,12 @@ type DialogState =
       lessonId: string;
       returnTo?: "ranges";
     }
-  | { type: "pages" }
+  | { type: "pages"; filter?: "all" | "warnings" }
   | { type: "ranges" }
   | { type: "source-upload" }
   | null;
 
-const adminCourseDocumentQueryKeys = {
+export const adminCourseDocumentQueryKeys = {
   all: ["admin-course-documents"] as const,
   lessonDocuments: (userId: string | undefined, learningPathId: string) =>
     [
@@ -97,7 +99,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   });
-  const sourceDocuments = sourceDocumentsQuery.data ?? [];
+  const sourceDocuments = sourceDocumentsQuery.data ?? (EMPTY_ARRAY as typeof sourceDocumentsQuery.data & any[]);
   const selectedSourceDocument =
     sourceDocuments.find((document) => document.id === selectedSourceDocumentId) ??
     sourceDocuments[0] ??
@@ -113,7 +115,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: selectedSourceDocument?.status === "PROCESSING" ? 5_000 : false,
     refetchIntervalInBackground: false,
   });
-  const sourcePages = sourcePagesQuery.data ?? [];
+  const sourcePages = sourcePagesQuery.data ?? (EMPTY_ARRAY as typeof sourcePagesQuery.data & any[]);
 
   const lessonDocumentsQuery = useQuery({
     queryKey: adminCourseDocumentQueryKeys.lessonDocuments(userId, pathId),
@@ -122,15 +124,15 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   });
-  const lessonDocuments = lessonDocumentsQuery.data ?? [];
+  const lessonDocuments = lessonDocumentsQuery.data ?? (EMPTY_ARRAY as typeof lessonDocumentsQuery.data & any[]);
   const documentsByLessonId = useMemo(
     () => groupLessonDocumentsByLessonId(lessonDocuments),
     [lessonDocuments],
   );
   const pageLimit = getSourceDocumentPageLimit(selectedSourceDocument, sourcePages);
   const rangeValidation = useMemo(
-    () => validateLessonRangeDraft(lessons, rangeDraft, pageLimit),
-    [lessons, pageLimit, rangeDraft],
+    () => validateLessonRangeDraft(lessons, rangeDraft, pageLimit, sourcePages),
+    [lessons, pageLimit, rangeDraft, sourcePages],
   );
   const localRangeWarnings = useMemo(
     () => buildLocalPageRangeWarnings(rangeValidation.ranges, pageLimit),
@@ -171,10 +173,22 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         lessons,
         documentsByLessonId,
         selectedSourceDocument?.id ?? null,
+        sourcePages,
       ),
     );
     setRangeSubmitAttempted(false);
-  }, [documentsByLessonId, lessons, selectedSourceDocument?.id]);
+  }, [documentsByLessonId, lessons, selectedSourceDocument?.id, sourcePages]);
+
+  useEffect(() => {
+    if (selectedSourceDocument?.status === "READY") {
+      void queryClient.invalidateQueries({
+        queryKey: adminCourseDocumentQueryKeys.sourcePages(
+          userId,
+          selectedSourceDocument.id,
+        ),
+      });
+    }
+  }, [selectedSourceDocument?.status, selectedSourceDocument?.id, userId, queryClient]);
 
   async function invalidateDocumentQueries() {
     await Promise.all([
@@ -234,8 +248,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     mutationFn: () =>
       requestAdminSourceDocumentProcessing(selectedSourceDocument?.id ?? "", token),
     onSuccess: async () => {
-      toast.success("Đã bắt đầu xử lý lại");
       await invalidateDocumentQueries();
+      toast.success("Đã bắt đầu xử lý lại");
     },
     onError: (error) => {
       toast.error("Chưa xử lý lại được", {
@@ -248,8 +262,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     mutationFn: () => deleteAdminSourceDocument(selectedSourceDocument?.id ?? "", token),
     onSuccess: async () => {
       setSelectedSourceDocumentId(null);
-      toast.info("Đã xóa tài liệu nguồn");
       await invalidateDocumentQueries();
+      toast.info("Đã xóa tài liệu nguồn");
     },
     onError: (error) => {
       toast.error("Chưa xóa được tài liệu nguồn", {
@@ -268,8 +282,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     onSuccess: async (response) => {
       setLatestRangeWarnings(response.warnings);
       setDialogState(null);
-      toast.success("Đã lưu khoảng trang");
       await invalidateDocumentQueries();
+      toast.success("Đã lưu khoảng trang");
     },
     onError: (error) => {
       toast.error("Chưa lưu được khoảng trang", {
@@ -316,12 +330,12 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     },
     onSuccess: async (_document, variables) => {
       setDialogState(variables.returnTo === "ranges" ? { type: "ranges" } : null);
+      await invalidateDocumentQueries();
       toast.success(
         variables.kind === "PRIMARY_REPLACEMENT"
           ? "Đã thay tài liệu chính"
           : "Đã thêm tài liệu bổ sung",
       );
-      await invalidateDocumentQueries();
     },
     onError: (error) => {
       toast.error("Chưa upload được tài liệu", {
@@ -334,8 +348,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     mutationFn: ({ documentId, lessonId }: { documentId: string; lessonId: string }) =>
       deleteAdminLessonSupplementDocument(lessonId, documentId, token),
     onSuccess: async () => {
-      toast.info("Đã xóa tài liệu bổ sung");
       await invalidateDocumentQueries();
+      toast.info("Đã xóa tài liệu bổ sung");
     },
     onError: (error) => {
       toast.error("Chưa xóa được tài liệu bổ sung", {
@@ -346,11 +360,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
 
   const openFileMutation = useMutation({
     mutationFn: (fileId: string) => getAdminFileSignedUrl(fileId, token),
-    onSuccess: (signedUrl) => {
-      const popup = window.open(signedUrl.url, "_blank", "noopener,noreferrer");
-      if (!popup) {
-        window.location.assign(signedUrl.url);
-      }
+    onSuccess: () => {
+      // Logic is handled in the caller to avoid popup blockers
     },
     onError: (error) => {
       toast.error("Chưa mở được tài liệu", {
@@ -469,11 +480,24 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
           returnTo,
           type: "lesson-upload",
         }),
-      openPagesDialog: () => setDialogState({ type: "pages" }),
+      openPagesDialog: () => setDialogState({ type: "pages", filter: "all" }),
+      openPagesDialogWithWarnings: () => setDialogState({ type: "pages", filter: "warnings" }),
       openRangesDialog: () => setDialogState({ type: "ranges" }),
       openSourceDocumentFile: () => {
         if (selectedSourceDocument) {
-          openFileMutation.mutate(selectedSourceDocument.fileId);
+          const popup = window.open("", "_blank");
+          openFileMutation.mutate(selectedSourceDocument.fileId, {
+            onSuccess: (signedUrl) => {
+              if (popup) {
+                popup.location.href = signedUrl.url;
+              } else {
+                toast.error("Trình duyệt đã chặn cửa sổ bật lên. Vui lòng cấp quyền cho trang web.");
+              }
+            },
+            onError: () => {
+              if (popup) popup.close();
+            }
+          });
         }
       },
       openSourceUploadDialog: () => setDialogState({ type: "source-upload" }),

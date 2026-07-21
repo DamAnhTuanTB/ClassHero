@@ -65,6 +65,7 @@ export type DocumentJobResponse = {
   status: BackgroundJobStatus;
   resourceType: string | null;
   resourceId: string | null;
+  progress?: number;
   error: string | null;
   createdAt: Date;
   updatedAt: Date;

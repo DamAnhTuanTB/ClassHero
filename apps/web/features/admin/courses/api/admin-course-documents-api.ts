@@ -83,6 +83,22 @@ export function getAdminSourceDocumentOcrHtml(sourceDocumentId: string, token: s
   );
 }
 
+export function confirmAdminSourceDocumentPagePrintedPage(
+  sourceDocumentId: string,
+  pageId: string,
+  payload: { printedPageNumber: number | null; printedPageLabel: string | null },
+  token: string,
+) {
+  return apiRequest<AdminSourceDocumentPageApi>(
+    `/admin/learning-paths/source-documents/${sourceDocumentId}/pages/${pageId}/confirm-printed-page`,
+    {
+      method: "PATCH",
+      body: payload,
+      token,
+    },
+  );
+}
+
 export function saveAdminLessonPageRanges(
   sourceDocumentId: string,
   ranges: AdminLessonPageRangeInput[],

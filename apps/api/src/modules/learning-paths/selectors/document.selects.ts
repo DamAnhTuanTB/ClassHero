@@ -22,6 +22,7 @@ export const documentJobSelect = {
   status: true,
   resourceType: true,
   resourceId: true,
+  result: true,
   errorMessage: true,
   createdAt: true,
   updatedAt: true,

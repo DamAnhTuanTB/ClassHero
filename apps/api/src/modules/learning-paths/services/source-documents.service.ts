@@ -16,10 +16,13 @@ import {
   throwNotFound,
 } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
+import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
+import { ConfirmPrintedPageDto } from "#api/modules/learning-paths/dto/confirm-printed-page.dto";
 import {
   lessonDocumentPageRangeSelect,
   lessonDocumentSelect,
@@ -59,6 +62,10 @@ export class SourceDocumentsService {
     private readonly backgroundJobQueue: BackgroundJobQueueService,
     @Inject(ObjectStorageService)
     private readonly storage: ObjectStorageService,
+    @Inject(OcrArtifactCacheService)
+    private readonly cacheService: OcrArtifactCacheService,
+    @Inject(ConfigService)
+    private readonly configService: ConfigService,
   ) {}
 
   async createForLearningPath(
@@ -217,6 +224,8 @@ export class SourceDocumentsService {
     context: RequestContext = {},
   ) {
     try {
+      let contentHashToClear: string | null = null;
+
       await this.prisma.$transaction(async (tx) => {
         const sourceDocument = await tx.sourceDocument.findFirst({
           where: {
@@ -272,7 +281,17 @@ export class SourceDocumentsService {
             userAgent: context.userAgent,
           },
         });
+
+        contentHashToClear = sourceDocument.contentHash;
       });
+
+      if (contentHashToClear) {
+        const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+        const descriptor = this.cacheService.createDescriptor(contentHashToClear, provider);
+        await this.cacheService.invalidateCache(descriptor).catch((err) => {
+          this.logger.warn(`Failed to invalidate cache for ${contentHashToClear}: ${err.message}`);
+        });
+      }
 
       return { success: true };
     } catch (error) {
@@ -927,6 +946,58 @@ export class SourceDocumentsService {
         zipfile.on("error", reject);
       });
     });
+  }
+
+  async confirmPrintedPage(
+    sourceDocumentId: string,
+    pageId: string,
+    dto: ConfirmPrintedPageDto,
+  ) {
+    const page = await this.prisma.sourceDocumentPage.findUnique({
+      where: {
+        id: pageId,
+        sourceDocumentId,
+      },
+      select: {
+        id: true,
+        metadataJson: true,
+      },
+    });
+
+    if (!page) {
+      throwNotFound("PAGE_NOT_FOUND", "Trang tài liệu không tồn tại");
+    }
+
+    const metadata =
+      typeof page.metadataJson === "object" && page.metadataJson !== null
+        ? (page.metadataJson as Record<string, any>)
+        : {};
+
+    const printedPage = metadata.printedPage || {};
+    
+    const updatedPrintedPage = {
+      ...printedPage,
+      printedPageLabel: dto.printedPageLabel ?? null,
+      printedPageNumber: dto.printedPageNumber ?? null,
+      warning: null,
+      confidence: 1.0,
+      source: "manual",
+    };
+
+    const updatedMetadataJson = toDocumentInputJson({
+      ...metadata,
+      printedPage: updatedPrintedPage,
+    });
+
+    const updatedPageRow = await this.prisma.sourceDocumentPage.update({
+      where: { id: page.id },
+      data: {
+        metadataJson: updatedMetadataJson ?? Prisma.DbNull,
+      },
+      select: sourceDocumentPageSelect,
+    });
+
+    return serializeSourceDocumentPage(updatedPageRow);
   }
 }
 

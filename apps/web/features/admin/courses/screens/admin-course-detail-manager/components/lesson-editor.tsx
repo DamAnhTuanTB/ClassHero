@@ -73,11 +73,11 @@ export function LessonEditor({
 
       <div
         data-testid="lesson-editor-scroll-area"
-        className="min-h-0 flex-1 scroll-pb-28 overflow-y-auto"
+        className="min-h-0 flex-1 overflow-y-auto"
       >
         <fieldset
           disabled={disabled || isSaving}
-          className="min-w-0 space-y-3 px-4 pb-28 pt-4 sm:px-5 sm:pb-28 sm:pt-5"
+          className="min-w-0 space-y-3 p-4 sm:p-5"
         >
           <div className="grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
             <TextField

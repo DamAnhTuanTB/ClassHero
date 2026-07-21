@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
@@ -153,6 +154,18 @@ export class ObjectStorageService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Delete an object from storage.
+   */
+  async deleteObject(objectKey: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: objectKey,
+      }),
+    );
   }
 
   /**

@@ -21,6 +21,7 @@ import { LessonsService } from "#api/modules/learning-paths/services/lessons.ser
 import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 import { PublicLearningPathsController } from "#api/modules/learning-paths/controllers/public-learning-paths.controller";
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
+import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
 
 @Module({
   imports: [AuthModule, FilesModule, JobsModule, JwtModule.register({})],
@@ -43,6 +44,7 @@ import { SourceDocumentsService } from "#api/modules/learning-paths/services/sou
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     RolesGuard,
+    OcrArtifactCacheService,
   ],
   exports: [LearningPathsService],
 })

@@ -40,12 +40,19 @@ export function serializeDocumentJob(
     return null;
   }
 
+  const result = record.result as Record<string, unknown> | null;
+  const progress =
+    result && typeof result === "object" && typeof result.progress === "number"
+      ? result.progress
+      : undefined;
+
   return {
     jobId: record.id,
     queue: record.queue,
     status: record.status,
     resourceType: record.resourceType,
     resourceId: record.resourceId,
+    progress,
     error: record.errorMessage,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

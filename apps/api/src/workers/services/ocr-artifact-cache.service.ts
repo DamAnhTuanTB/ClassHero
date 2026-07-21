@@ -178,6 +178,18 @@ export class OcrArtifactCacheService {
   }
 
   /**
+   * Invalidate the cache by deleting the manifest.json file.
+   * This effectively causes a cache miss on the next lookup.
+   */
+  async invalidateCache(descriptor: OcrArtifactCacheDescriptor): Promise<void> {
+    const artifactKeys = this.buildArtifactKeys(descriptor);
+    await this.storage.deleteObject(artifactKeys.manifestJson);
+    this.logger.log(
+      `Cache INVALIDATED for ${descriptor.provider}/${descriptor.contentHash.substring(0, 12)}...`,
+    );
+  }
+
+  /**
    * Save a complete artifact bundle to cache.
    */
   async saveBundle(

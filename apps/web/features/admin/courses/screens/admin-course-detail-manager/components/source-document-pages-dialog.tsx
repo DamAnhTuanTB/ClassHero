@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Eye, EyeOff, AlertTriangle, XCircle, ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
+import { FileText, Eye, EyeOff, AlertTriangle, XCircle, ChevronDown, ChevronUp, ImageIcon, Check } from "lucide-react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import {
   getPageVisualSummary,
@@ -14,81 +14,74 @@ import type {
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
-import { getAdminSourceDocumentOcrHtml } from "@/features/admin/courses/api/admin-course-documents-api";
+import { confirmAdminSourceDocumentPagePrintedPage } from "@/features/admin/courses/api/admin-course-documents-api";
 import { PdfPagePreview } from "@/components/shared/pdf-page-preview";
+import { useQueryClient } from "@tanstack/react-query";
+import { adminCourseDocumentQueryKeys } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
+import { toast } from "sonner";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
 type ViewMode = "html" | "pages";
 
 export function SourceDocumentPagesDialog({
   isOpen,
+  initialFilter,
   pages,
   sourceDocument,
   onClose,
 }: {
   isOpen: boolean;
+  initialFilter?: "all" | "warnings";
   pages: AdminSourceDocumentPageApi[];
   sourceDocument: AdminSourceDocumentApi | null;
   onClose: () => void;
 }) {
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [showPdfPreview, setShowPdfPreview] = useState(true);
-  const [ocrHtml, setOcrHtml] = useState<string | null>(null);
-  const [htmlLoading, setHtmlLoading] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("html");
+  const [filterMode, setFilterMode] = useState<"all" | "warnings">("all");
+  const [searchPrintedPage, setSearchPrintedPage] = useState("");
+
+  const filteredPages = pages.filter((page) => {
+    if (filterMode === "warnings" && !getPrintedPageView(page).warning) {
+      return false;
+    }
+    if (searchPrintedPage) {
+      const printed = getPrintedPageView(page);
+      if (!printed.printedPageLabel?.toLowerCase().includes(searchPrintedPage.trim().toLowerCase())) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const readyCount = pages.filter((page) => page.status === "READY").length;
   const failedCount = pages.filter((page) => page.status === "FAILED").length;
 
   useEffect(() => {
-    if (isOpen && sourceDocument?.file?.publicUrl) {
-      setPdfUrl(sourceDocument.file.publicUrl);
+    if (isOpen) {
+      if (sourceDocument?.file?.publicUrl) {
+        setPdfUrl(sourceDocument.file.publicUrl);
+      } else {
+        setPdfUrl(null);
+      }
+      // Reset view state when opening
+      setShowPdfPreview(initialFilter === "warnings");
+      setViewMode(initialFilter === "warnings" ? "pages" : "html");
+      setFilterMode(initialFilter ?? "all");
     } else {
       setPdfUrl(null);
     }
-  }, [isOpen, sourceDocument]);
+  }, [isOpen, sourceDocument, initialFilter]);
 
-  // Fetch OCR HTML when dialog opens
-  useEffect(() => {
-    if (!isOpen || !sourceDocument || !token) {
-      setOcrHtml(null);
-      return;
-    }
-
-    let cancelled = false;
-    setHtmlLoading(true);
-
-    async function fetchHtml() {
-      try {
-        const response = await getAdminSourceDocumentOcrHtml(sourceDocument!.id, token);
-        if (!cancelled) {
-          setOcrHtml(response.html);
-        }
-      } catch {
-        // Fall back to page-by-page view
-        if (!cancelled) {
-          setViewMode("pages");
-        }
-      } finally {
-        if (!cancelled) {
-          setHtmlLoading(false);
-        }
-      }
-    }
-
-    void fetchHtml();
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, sourceDocument, token]);
 
   return (
     <EditorDialogShell
       ariaLabel="Xem trang tài liệu"
       isOpen={isOpen}
       onClose={onClose}
-      panelClassName="h-[90dvh] max-w-4xl"
+      panelClassName="h-[90dvh] w-[95vw] max-w-6xl"
     >
       <div className="theme-dialog-header flex min-h-16 shrink-0 items-center gap-3 p-4 pr-16 sm:p-5 sm:pr-20">
         <span className="theme-button-primary-subtle grid h-10 w-10 shrink-0 place-items-center rounded-lg">
@@ -111,6 +104,14 @@ export function SourceDocumentPagesDialog({
         ) : null}
 
         <div className="ml-auto flex items-center gap-3">
+          <input
+            type="text"
+            value={searchPrintedPage}
+            onChange={(e) => setSearchPrintedPage(e.target.value)}
+            placeholder="Tìm số trang in..."
+            className="h-7 w-32 rounded-md border border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-2 text-xs font-semibold text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)]"
+          />
+
           {/* View mode toggle */}
           <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
             <button
@@ -122,7 +123,7 @@ export function SourceDocumentPagesDialog({
                   : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
               }`}
             >
-              Rendered
+              Toàn bộ
             </button>
             <button
               type="button"
@@ -154,16 +155,29 @@ export function SourceDocumentPagesDialog({
               )}
             </button>
           ) : null}
+          {viewMode === "pages" ? (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-[var(--theme-text-strong)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterMode === "warnings"}
+                  onChange={(e) => setFilterMode(e.target.checked ? "warnings" : "all")}
+                  className="rounded border-[var(--theme-border-strong)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                />
+                Chỉ hiện trang cần xác nhận
+              </label>
+            </div>
+          ) : null}
           <span className="text-xs font-bold text-[var(--theme-text-muted)]">
-            {pages.length} trang
+            {filteredPages.length} trang
           </span>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 flex flex-col overflow-y-auto">
         {viewMode === "html" ? (
-          <OcrHtmlView html={ocrHtml} loading={htmlLoading} />
-        ) : pages.length === 0 ? (
+          <OcrRenderedPagesView pages={filteredPages} />
+        ) : filteredPages.length === 0 ? (
           <div className="m-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
             <FileText
               className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]"
@@ -175,7 +189,7 @@ export function SourceDocumentPagesDialog({
           </div>
         ) : (
           <div className="divide-y divide-[var(--theme-border)]">
-            {pages.map((page) => (
+            {filteredPages.map((page) => (
               <PageDetailRow
                 key={page.id}
                 page={page}
@@ -189,40 +203,40 @@ export function SourceDocumentPagesDialog({
   );
 }
 
-function OcrHtmlView({ html, loading }: { html: string | null; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--theme-border)] border-t-[var(--theme-primary)]" />
-        <span className="ml-3 text-sm font-semibold text-[var(--theme-text-muted)]">
-          Đang tải nội dung HTML...
-        </span>
-      </div>
-    );
-  }
-
-  if (!html) {
+function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }) {
+  if (pages.length === 0) {
     return (
       <div className="m-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
         <FileText className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]" aria-hidden="true" />
         <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
-          Chưa có nội dung Rendered (HTML)
-        </p>
-        <p className="mt-1 text-xs text-[var(--theme-text-muted)]">
-          Chuyển sang chế độ "Từng trang" để xem nội dung text
+          Chưa có nội dung
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 w-full relative">
-      <iframe
-        srcDoc={html}
-        title="Mathpix OCR HTML Preview"
-        className="absolute inset-0 h-full w-full border-0 bg-white"
-        sandbox="allow-same-origin allow-scripts"
-      />
+    <div className="flex-1 w-full bg-[var(--theme-surface-soft)] p-4 sm:p-6 lg:p-8 flex justify-center">
+      <div className="w-full max-w-3xl bg-white border border-[var(--theme-border)] rounded-md shadow-sm p-8">
+        <div className="flex flex-col gap-4">
+          {pages.map((page, index) => {
+            const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+            const printed = getPrintedPageView(page);
+            return (
+              <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-8" : ""}>
+                <div className="mb-4 text-xs font-bold text-[var(--theme-text-muted)]">
+                  Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
+                </div>
+                {text ? (
+                  <MathpixMarkdownRenderer content={text} />
+                ) : (
+                  <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -296,9 +310,12 @@ function PageDetailRow({
 
       {/* Warning/Error messages */}
       {hasWarning ? (
-        <div className="mt-2 flex items-center gap-2 rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-xs font-bold text-[var(--theme-warning-text)]">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          Cần xác nhận số trang in — {printedPage.warning}
+        <div className="mt-2 flex flex-col gap-2 rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-warning-text)]">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Cần xác nhận số trang in — {printedPage.warning}
+          </div>
+          <PrintedPageConfirmForm page={page} />
         </div>
       ) : null}
 
@@ -319,15 +336,18 @@ function PageDetailRow({
         ) : null}
 
         {/* OCR text content */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 flex justify-center">
           {text ? (
-            <div>
+            <div className="w-full max-w-3xl">
               <div
-                className={`rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 ${
-                  !isExpanded && isLongText ? "max-h-[310px] overflow-hidden" : ""
+                className={`rounded-md shadow-sm border border-[var(--theme-border)] bg-white p-8 ${
+                  !isExpanded && isLongText ? "max-h-[310px] overflow-hidden relative" : ""
                 }`}
               >
                 <MathpixMarkdownRenderer content={text} />
+                {!isExpanded && isLongText && (
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent" />
+                )}
               </div>
               {isLongText ? (
                 <button
@@ -383,5 +403,75 @@ function SummaryPill({
       {icon}
       {label}
     </span>
+  );
+}
+
+function PrintedPageConfirmForm({ page }: { page: AdminSourceDocumentPageApi }) {
+  const queryClient = useQueryClient();
+  const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
+  const printedPage = getPrintedPageView(page);
+  const [labelInput, setLabelInput] = useState(
+    printedPage.printedPageLabel ?? printedPage.printedPageNumber?.toString() ?? "",
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!labelInput.trim() || !page.sourceDocumentId) return;
+
+    try {
+      setIsSubmitting(true);
+      const val = labelInput.trim();
+      const numVal = parseInt(val, 10);
+      const isNum = !isNaN(numVal) && numVal.toString() === val;
+
+      const payload = {
+        printedPageLabel: val,
+        printedPageNumber: isNum ? numVal : null,
+      };
+
+      await confirmAdminSourceDocumentPagePrintedPage(
+        page.sourceDocumentId,
+        page.id,
+        payload,
+        token,
+      );
+
+      toast.success("Đã xác nhận trang in");
+      
+      // Mutate the pages list
+      queryClient.invalidateQueries({
+        queryKey: adminCourseDocumentQueryKeys.all, // invalidate all to refresh documents and pages
+      });
+    } catch (err) {
+      toast.error("Lỗi khi xác nhận trang in");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 mt-1">
+      <input
+        type="text"
+        placeholder="Nhập nhãn hoặc số trang in (VD: 4, iv)"
+        value={labelInput}
+        onChange={(e) => setLabelInput(e.target.value)}
+        disabled={isSubmitting}
+        className="block w-full sm:w-80 rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-1.5 text-sm font-medium text-[var(--theme-text-strong)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] disabled:opacity-50"
+      />
+      <button
+        type="submit"
+        disabled={!labelInput.trim() || isSubmitting}
+        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--theme-primary)] px-3 py-1.5 text-sm font-bold text-white shadow-sm hover:bg-[var(--theme-primary-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--theme-primary)] disabled:opacity-50 transition-colors"
+      >
+        {isSubmitting ? (
+          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+        ) : (
+          <Check className="h-3.5 w-3.5" />
+        )}
+        Xác nhận
+      </button>
+    </form>
   );
 }

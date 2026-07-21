@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import type {
   AdminBackgroundJobStatus,
   AdminDocumentStatus,
@@ -17,26 +18,32 @@ const reviewRequiredView = {
 export function DocumentStatusBadge({
   hasPrintedPageWarning,
   jobStatus,
+  progress,
   status,
 }: {
   hasPrintedPageWarning?: boolean;
   jobStatus?: AdminBackgroundJobStatus | null;
+  progress?: number;
   status: AdminDocumentStatus;
 }) {
   const useWarningOverride = status === "READY" && hasPrintedPageWarning;
   const statusView = useWarningOverride
     ? reviewRequiredView
     : getDocumentStatusView(status);
-  const label =
-    status === "PROCESSING" ? getJobStatusLabel(jobStatus) : statusView.label;
+  let label = status === "PROCESSING" ? getJobStatusLabel(jobStatus) : statusView.label;
+  if (status === "PROCESSING") {
+    const p = typeof progress === "number" ? progress : 0;
+    label = `${label} (${p}%)`;
+  }
 
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 shrink-0 items-center rounded-full border px-2.5 text-xs font-extrabold",
+        "inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-extrabold",
         statusView.toneClass,
       )}
     >
+      {status === "PROCESSING" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       {label}
     </span>
   );

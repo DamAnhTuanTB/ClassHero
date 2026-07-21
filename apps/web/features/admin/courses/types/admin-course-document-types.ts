@@ -28,6 +28,7 @@ export type AdminDocumentJobApi = {
   status: AdminBackgroundJobStatus;
   resourceType: string | null;
   resourceId: string | null;
+  progress?: number;
   error: string | null;
   createdAt: string;
   updatedAt: string;

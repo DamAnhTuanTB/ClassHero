@@ -145,7 +145,8 @@ export function getLessonDocumentRange(document: AdminLessonDocumentApi | null) 
 export function createInitialRangeDraft(
   lessons: AdminLessonWithChapter[],
   documentsByLessonId: Record<string, AdminLessonDocumentApi[]>,
-  sourceDocumentId: string | null,
+  sourceDocumentId: string | null | undefined,
+  sourcePages: AdminSourceDocumentPageApi[],
 ): LessonRangeDraft {
   return lessons.reduce<LessonRangeDraft>((draft, item) => {
     const primary = getPrimaryLessonDocument(documentsByLessonId[item.lesson.id] ?? []);
@@ -155,8 +156,8 @@ export function createInitialRangeDraft(
         : null;
 
     draft[item.lesson.id] = {
-      pageEnd: range ? String(range.pageEnd) : "",
-      pageStart: range ? String(range.pageStart) : "",
+      pageStart: range ? getPrintedPageFromPdfPage(range.pageStart, sourcePages) : "",
+      pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
     };
 
     return draft;
@@ -167,6 +168,7 @@ export function getLessonSourceRangeFormValues(
   lessonId: string | null | undefined,
   documentsByLessonId: Record<string, AdminLessonDocumentApi[]>,
   fallbackSourceDocumentId: string | null | undefined,
+  sourcePages: AdminSourceDocumentPageApi[],
 ) {
   if (!lessonId) {
     return {
@@ -181,8 +183,8 @@ export function getLessonSourceRangeFormValues(
 
   return {
     sourceDocumentId: primary?.sourceDocumentId ?? fallbackSourceDocumentId ?? "",
-    pageStart: range ? String(range.pageStart) : "",
-    pageEnd: range ? String(range.pageEnd) : "",
+    pageStart: range ? getPrintedPageFromPdfPage(range.pageStart, sourcePages) : "",
+    pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
   };
 }
 
@@ -190,14 +192,15 @@ export function validateLessonRangeDraft(
   lessons: AdminLessonWithChapter[],
   draft: LessonRangeDraft,
   pageLimit: number | null,
+  sourcePages: AdminSourceDocumentPageApi[],
 ): LessonRangeValidationResult {
   const issues: LessonRangeValidationIssue[] = [];
   const ranges: AdminLessonPageRangeInput[] = [];
 
   for (const item of lessons) {
     const values = draft[item.lesson.id] ?? { pageEnd: "", pageStart: "" };
-    const pageStart = parsePositiveInteger(values.pageStart);
-    const pageEnd = parsePositiveInteger(values.pageEnd);
+    const pageStart = getPdfPageFromPrintedPage(values.pageStart, sourcePages);
+    const pageEnd = getPdfPageFromPrintedPage(values.pageEnd, sourcePages);
 
     if (values.pageStart.trim() === "" || values.pageEnd.trim() === "") {
       issues.push({
@@ -561,5 +564,54 @@ function readNumber(value: unknown) {
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+export function getPdfPageFromPrintedPage(
+  printedPageStr: string,
+  sourcePages: AdminSourceDocumentPageApi[],
+): number | null {
+  if (!printedPageStr.trim()) {
+    return null;
+  }
+
+  const str = printedPageStr.trim().toLowerCase();
+
+  for (const page of sourcePages) {
+    const printedPage = getPrintedPageView(page);
+    if (printedPage.printedPageLabel?.toLowerCase() === str) {
+      return page.pageNumber;
+    }
+    if (printedPage.printedPageNumber?.toString() === str) {
+      return page.pageNumber;
+    }
+  }
+
+  const parsed = parsePositiveInteger(printedPageStr);
+  if (parsed !== null && sourcePages.some((p) => p.pageNumber === parsed)) {
+    return parsed;
+  }
+
+  return null;
+}
+
+export function getPrintedPageFromPdfPage(
+  pdfPageNum: number | null | undefined,
+  sourcePages: AdminSourceDocumentPageApi[],
+): string {
+  if (pdfPageNum == null) {
+    return "";
+  }
+
+  const page = sourcePages.find((p) => p.pageNumber === pdfPageNum);
+  if (!page) {
+    return String(pdfPageNum);
+  }
+
+  const printedPage = getPrintedPageView(page);
+  return (
+    printedPage.printedPageLabel ??
+    printedPage.printedPageNumber?.toString() ??
+    String(pdfPageNum)
+  );
 }
 
