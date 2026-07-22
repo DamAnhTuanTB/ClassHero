@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { LessonEditor } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-editor";
@@ -8,14 +8,15 @@ import type {
   AdminLesson,
 } from "@/features/admin/courses/admin-courses-data";
 import {
+  createLessonSchema,
   emptyLessonValues,
-  lessonSchema,
   type LessonFormValues,
 } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 import {
   getLessonSourceRangeFormValues,
   getPdfPageFromPrintedPage,
+  readRecord,
 } from "@/features/admin/courses/admin-course-documents-utils";
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
@@ -42,8 +43,10 @@ export function LessonEditorDialog({
   onSubmit: (values: LessonFormValues, documentsManager: ReturnType<typeof useAdminCourseDocumentsManager>) => void | Promise<void>;
 }) {
   const documentsManager = useAdminCourseDocumentsManager(learningPath);
+  const formSchema = useMemo(() => createLessonSchema(documentsManager.sourceDocuments), [documentsManager.sourceDocuments]);
+  
   const form = useForm<LessonFormValues>({
-    resolver: zodResolver(lessonSchema) as Resolver<LessonFormValues>,
+    resolver: zodResolver(formSchema) as Resolver<LessonFormValues>,
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: emptyLessonValues,
@@ -87,7 +90,13 @@ export function LessonEditorDialog({
     const existingSupplements =
       mode === "edit" && selectedLesson
         ? documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
-            (doc) => doc.kind === "SUPPLEMENT"
+            (doc) => {
+              const isSupplementOrPrimary =
+                doc.kind === "SUPPLEMENT" || doc.kind === "PRIMARY_REPLACEMENT";
+              const isSourceMapped =
+                readRecord(doc.metadataJson)?.source === "source_document_page_range";
+              return isSupplementOrPrimary && !isSourceMapped;
+            }
           ) || []
         : [];
 
@@ -122,6 +131,35 @@ export function LessonEditorDialog({
     mode,
     selectedLesson,
   ]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "edit" || !selectedLesson) return;
+    
+    const existingSupplements = documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
+      (doc) => doc.kind === "SUPPLEMENT"
+    ) || [];
+
+    const formDocs = form.getValues("referenceDocuments") || [];
+
+    formDocs.forEach((formDoc, index) => {
+      if (formDoc.id) {
+        const latestDoc = existingSupplements.find((d) => d.id === formDoc.id);
+        if (latestDoc) {
+          if (
+            formDoc.status !== latestDoc.status ||
+            formDoc.progress !== latestDoc.processingJob?.progress ||
+            formDoc.extractError !== latestDoc.extractError ||
+            formDoc.url !== latestDoc.file?.publicUrl
+          ) {
+            form.setValue(`referenceDocuments.${index}.status`, latestDoc.status);
+            form.setValue(`referenceDocuments.${index}.progress`, latestDoc.processingJob?.progress);
+            form.setValue(`referenceDocuments.${index}.extractError`, latestDoc.extractError || undefined);
+            form.setValue(`referenceDocuments.${index}.url`, latestDoc.file?.publicUrl || undefined);
+          }
+        }
+      }
+    });
+  }, [documentsManager.documentsByLessonId, isOpen, mode, selectedLesson, form]);
 
   async function submit(values: LessonFormValues) {
     try {
@@ -161,6 +199,7 @@ export function LessonEditorDialog({
         values.sourceDocumentPageRange.pageStart = pdfPageStart ? String(pdfPageStart) : "";
         values.sourceDocumentPageRange.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
       }
+      
       await onSubmit(values, documentsManager);
     } catch (error) {
       if (error instanceof Error && error.message === "DUPLICATED_LESSON_ORDER") {

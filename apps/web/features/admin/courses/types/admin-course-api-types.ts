@@ -96,6 +96,7 @@ export type AdminLessonPayload = {
     sourceDocumentId: string;
     pageStart: number;
     pageEnd: number;
+    isPrimary?: boolean;
   };
   title?: string;
   trialEnabled?: boolean;

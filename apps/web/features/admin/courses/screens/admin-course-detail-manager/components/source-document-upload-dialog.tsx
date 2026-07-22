@@ -49,7 +49,7 @@ export function SourceDocumentUploadDialog({
       hasError = true;
     }
 
-    if (hasError) {
+    if (hasError || !file) {
       return;
     }
 

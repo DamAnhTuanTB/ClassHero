@@ -38,6 +38,11 @@ const referenceDocumentSchema = z
     originalName: z.string().optional(),
     title: z.string().trim().max(180, "Tên tài liệu tối đa 180 ký tự").optional(),
     file: z.custom<File | null>().optional(),
+    isPrimary: z.boolean().default(false),
+    status: z.string().optional(),
+    extractError: z.string().optional(),
+    progress: z.number().optional(),
+    url: z.string().optional(),
   })
   .superRefine((value, context) => {
     const hasTitle = Boolean(value.title?.trim());
@@ -86,6 +91,7 @@ export const lessonSchema = z.object({
       sourceDocumentId: z.string().trim().optional(),
       pageStart: z.string().trim().optional(),
       pageEnd: z.string().trim().optional(),
+      isPrimary: z.boolean().default(true).optional(),
     })
     .superRefine((value, context) => {
       const hasStart = Boolean(value.pageStart?.trim());
@@ -133,8 +139,95 @@ export const lessonSchema = z.object({
     }),
   referenceDocuments: z
     .array(referenceDocumentSchema)
-    .max(10, "Tối đa 10 tài liệu tham khảo"),
+    .max(10, "Tối đa 10 tài liệu tham khảo")
+    .superRefine((docs, ctx) => {
+      const fileKeys = new Set<string>();
+      const titleKeys = new Set<string>();
+      docs.forEach((doc, index) => {
+        const name = doc.file ? doc.file.name : doc.originalName;
+        if (name) {
+          if (fileKeys.has(name)) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Tài liệu này đã được chọn",
+              path: [index, "file"],
+            });
+          } else {
+            fileKeys.add(name);
+          }
+        }
+        
+        if (doc.title) {
+          const titleKey = doc.title.trim().toLowerCase();
+          if (titleKey) {
+            if (titleKeys.has(titleKey)) {
+              ctx.addIssue({
+                code: "custom",
+                message: "Không được đặt tên tài liệu trùng nhau",
+                path: [index, "title"],
+              });
+            } else {
+              titleKeys.add(titleKey);
+            }
+          }
+        }
+      });
+    }),
 });
+
+export function createLessonSchema(sourceDocuments: Array<{ file: { originalName: string, sizeBytes: number } }> = []) {
+  return lessonSchema.extend({
+    referenceDocuments: z
+      .array(referenceDocumentSchema)
+      .max(10, "Tối đa 10 tài liệu tham khảo")
+      .superRefine((docs, ctx) => {
+        const fileKeys = new Set<string>();
+        const titleKeys = new Set<string>();
+        docs.forEach((doc, index) => {
+          const name = doc.file ? doc.file.name : doc.originalName;
+          if (name) {
+            if (fileKeys.has(name)) {
+              ctx.addIssue({
+                code: "custom",
+                message: "Tài liệu này đã được chọn",
+                path: [index, "file"],
+              });
+            } else {
+              fileKeys.add(name);
+            }
+            
+            if (doc.file) {
+              const isMatch = sourceDocuments.some((sd) => {
+                return sd.file.originalName === doc.file!.name && sd.file.sizeBytes === doc.file!.size;
+              });
+              if (isMatch) {
+                ctx.addIssue({
+                  code: "custom",
+                  message: "Tài liệu này trùng với file nguồn của khóa học",
+                  path: [index, "file"],
+                });
+              }
+            }
+          }
+          
+          if (doc.title) {
+            const titleKey = doc.title.trim().toLowerCase();
+            if (titleKey) {
+              if (titleKeys.has(titleKey)) {
+                ctx.addIssue({
+                  code: "custom",
+                  message: "Không được đặt tên tài liệu trùng nhau",
+                  path: [index, "title"],
+                });
+              } else {
+                titleKeys.add(titleKey);
+              }
+            }
+          }
+        });
+      }),
+  });
+}
 
 export const chapterSchema = z.object({
   orderIndex: z.coerce.number().int().min(1, "Thứ tự bắt đầu từ 1").max(200),
@@ -176,12 +269,18 @@ export type LessonFormValues = {
     sourceDocumentId?: string;
     pageStart?: string;
     pageEnd?: string;
+    isPrimary?: boolean;
   };
   referenceDocuments: Array<{
     id?: string;
     originalName?: string;
     title?: string;
     file?: File | null;
+    isPrimary?: boolean;
+    status?: string;
+    extractError?: string;
+    progress?: number;
+    url?: string;
   }>;
 };
 
@@ -222,6 +321,7 @@ export const emptyLessonValues: LessonFormValues = {
     sourceDocumentId: "",
     pageStart: "",
     pageEnd: "",
+    isPrimary: true,
   },
   referenceDocuments: [],
 };

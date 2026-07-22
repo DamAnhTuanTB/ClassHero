@@ -155,7 +155,7 @@ export function createAdminLessonSupplementDocument(
   payload: {
     fileId: string;
     title?: string;
-    kind: "SUPPLEMENT";
+    kind: "SUPPLEMENT" | "PRIMARY_REPLACEMENT";
     processingMode?: "PROCESSING" | "STORAGE_ONLY";
   },
   token: string,
@@ -165,6 +165,25 @@ export function createAdminLessonSupplementDocument(
     body: payload,
     token,
   });
+}
+
+export function updateAdminLessonSupplementDocument(
+  lessonId: string,
+  documentId: string,
+  payload: {
+    title?: string;
+    kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT";
+  },
+  token: string,
+) {
+  return apiRequest<AdminLessonDocumentApi>(
+    `/admin/lessons/${lessonId}/documents/${documentId}`,
+    {
+      method: "PATCH",
+      body: payload,
+      token,
+    },
+  );
 }
 
 export function deleteAdminLessonSupplementDocument(

@@ -17,3 +17,10 @@
 - **Responsive Layout Fixes**:
   - Tối ưu hóa UI cho di động: Các input "Từ trang", "Đến trang" và các nút toggle chế độ xem (OCR / PDF) hiển thị gọn gàng, tự động xuống dòng/căn giữa tùy theo kích thước màn hình trên các file `lesson-page-range-row.tsx`, `lesson-reference-documents-section.tsx`.
   - Khắc phục triệt để lỗi tràn width màn hình (overflow) đối với các Modal chỉnh sửa khóa học trên mobile. Xử lý Webkit bug bằng cách thay thế thẻ `<fieldset>` thành `<div>` (`lesson-editor.tsx`) kết hợp bổ sung class `min-w-0` để chặn các flex/grid items tự do giãn theo kích thước 650px của khối preview PDF (`editor-dialog-shell.tsx`, `lesson-source-range-section.tsx`). Bật tính năng cuộn ngang an toàn cho khung PDF.
+- **Document Upload Dialogs**:
+  - Đổi tên nhãn "Tài liệu tham khảo" thành "Tài liệu bổ sung".
+  - Thêm xác thực logic (validation) bắt buộc nhập cho trường "Tên tài liệu".
+  - Cải thiện UX báo lỗi: 
+    - Lỗi bỏ trống tên tài liệu giờ đây được hiển thị realtime (hiện ngay khi gõ và xóa, không cần đợi blur/submit) bằng việc áp dụng `TextField` với state `touched`.
+    - Lỗi chưa chọn file PDF được di chuyển hiển thị ngay bên dưới ô tải file thay vì hiển thị chung ở đáy form.
+    - Xóa bỏ icon hình người (user icon) mặc định thừa thãi bên trong ô `TextField` nhập tên tài liệu.

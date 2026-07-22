@@ -46,7 +46,7 @@ test.describe("M4.5 admin lesson documents", () => {
     await page.goto(`/admin/courses/${learningPathId}`);
 
     const panel = page.getByTestId("admin-course-document-panel");
-    await expect(panel.getByText("Chưa có tài liệu nguồn")).toBeVisible();
+    await expect(panel.getByText("Chưa có tài liệu chính")).toBeVisible();
     await captureM45Screenshot(page, testInfo.project.name, "01-empty-source");
 
     await panel.getByRole("button", { name: "Chọn file PDF" }).click();
@@ -71,11 +71,18 @@ test.describe("M4.5 admin lesson documents", () => {
     await panel.getByRole("button", { name: "Nhập khoảng trang" }).first().click();
     const rangeDialog = page.getByRole("dialog", { name: "Nhập khoảng trang" });
     await expect(
-      rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`),
-    ).toContainText("trang 1-4");
+      rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ")
+    ).toHaveValue("1");
     await expect(
-      rangeDialog.getByTestId(`lesson-document-row-${lessonTwoId}`),
-    ).toContainText("trang 5-8");
+      rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ")
+    ).toHaveValue("4");
+
+    await expect(
+      rangeDialog.getByTestId(`lesson-document-row-${lessonTwoId}`).getByLabel("Trang bắt đầu Bài học 2: Lũy thừa")
+    ).toHaveValue("5");
+    await expect(
+      rangeDialog.getByTestId(`lesson-document-row-${lessonTwoId}`).getByLabel("Trang kết thúc Bài học 2: Lũy thừa")
+    ).toHaveValue("8");
 
     const firstLessonRow = rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`);
     await firstLessonRow.getByRole("button", { name: "Thay tài liệu chính" }).click();
@@ -127,7 +134,7 @@ test.describe("M4.5 admin lesson documents", () => {
 
     await panel.getByRole("button", { name: "Xóa" }).click();
     await page.getByRole("button", { name: "Xóa tài liệu" }).click();
-    await expect(page.getByText("Chưa xóa được tài liệu nguồn")).toBeVisible();
+    await expect(page.getByText("Chưa xóa được tài liệu chính")).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await captureM45Screenshot(page, testInfo.project.name, "06-delete-conflict");
   });
@@ -243,8 +250,11 @@ test.describe("M4.5 admin lesson documents", () => {
       await expect(rangeDialog).toBeVisible();
       await expectDialogFitsViewport(page, rangeDialog);
       await expect(
-        rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`),
-      ).toContainText("trang 1-4");
+        rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ")
+      ).toHaveValue("1");
+      await expect(
+        rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ")
+      ).toHaveValue("4");
       await expectNoHorizontalOverflow(page);
       await rangeDialog.getByRole("button", { name: "Đóng" }).click();
 
@@ -506,22 +516,18 @@ async function setupM45ApiMock(
         processingMode?: string;
         title?: string;
       };
-      const isStorageOnly = body.processingMode === "STORAGE_ONLY";
+      const isStorageOnly = false; // Luôn PROCESSING theo logic mới
       const document = buildLessonDocument({
         fileId: body.fileId,
-        id: isStorageOnly
-          ? `reference-${state.fileCounter}`
-          : lessonId === lessonOneId
-            ? "supplement-1"
-            : `supplement-${state.fileCounter}`,
+        id: `reference-${state.fileCounter}`,
         kind: "SUPPLEMENT",
         lessonId,
         metadataJson: {
-          processingMode: isStorageOnly ? "storage_only" : "processing",
+          processingMode: "processing",
           source: "supplemental_lesson_document_upload",
         },
         sourceDocumentId: null,
-        storageOnly: isStorageOnly,
+        storageOnly: false,
         title: body.title ?? "Phiếu luyện thêm",
       });
       state.lessonDocuments = [...state.lessonDocuments, document];
@@ -544,7 +550,7 @@ async function setupM45ApiMock(
         return fulfillJson(route, 409, {
           error: {
             code: "CONFLICT",
-            message: "Không thể xóa tài liệu nguồn đang được gán vào buổi học",
+            message: "Không thể xóa tài liệu chính đang được gán vào buổi học",
           },
         });
       }

@@ -1,9 +1,10 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
   IsInt,
+  IsOptional,
   IsUUID,
   Min,
   ValidateNested,
@@ -25,6 +26,11 @@ export class LessonPageRangeDto {
   @IsInt()
   @Min(1)
   pageEnd!: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Type(() => Boolean)
+  isPrimary?: boolean;
 }
 
 export class UpdateLessonPageRangesDto {

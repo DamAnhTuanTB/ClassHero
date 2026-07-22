@@ -60,7 +60,7 @@ export function LessonDocumentUploadDialog({
       hasError = true;
     }
 
-    if (hasError) {
+    if (hasError || !file) {
       return;
     }
 

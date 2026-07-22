@@ -95,6 +95,7 @@ function normalizeLessonSourceDocumentPageRange(
     sourceDocumentId,
     pageStart: Number(pageStart),
     pageEnd: Number(pageEnd),
+    isPrimary: value?.isPrimary,
   };
 }
 

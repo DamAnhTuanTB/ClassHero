@@ -33,7 +33,7 @@ export function DocumentStatusBadge({
     ? reviewRequiredView
     : getDocumentStatusView(status);
     
-  let label = status === "PROCESSING" ? getJobStatusLabel(jobStatus) : statusView.label;
+  let label = status === "PROCESSING" && jobStatus ? getJobStatusLabel(jobStatus) : statusView.label;
   
   if (status === "PROCESSING") {
     if (jobStatus === "RUNNING") {

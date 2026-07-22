@@ -231,6 +231,7 @@ export class LessonsService {
                 pageEnd: dto.sourceDocumentPageRange.pageEnd,
                 pageStart: dto.sourceDocumentPageRange.pageStart,
                 sourceDocumentId: dto.sourceDocumentPageRange.sourceDocumentId,
+                isPrimary: dto.sourceDocumentPageRange.isPrimary,
               },
             )
           : null;

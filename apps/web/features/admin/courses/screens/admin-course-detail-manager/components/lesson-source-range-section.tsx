@@ -321,6 +321,39 @@ export function LessonSourceRangeSection({
             />
           </div>
 
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              type="checkbox"
+              id="admin-lesson-source-primary"
+              disabled={isRangeInputDisabled}
+              className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+              {...(() => {
+                const { onChange, ...rest } = form.register("sourceDocumentPageRange.isPrimary");
+                return {
+                  ...rest,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const checked = e.target.checked;
+                    if (checked) {
+                      const currentDocs = form.getValues("referenceDocuments") || [];
+                      currentDocs.forEach((_, i) => {
+                        form.setValue(`referenceDocuments.${i}.isPrimary`, false, { shouldDirty: true });
+                      });
+                    }
+                    onChange(e);
+                  },
+                };
+              })()}
+            />
+            <label
+              htmlFor="admin-lesson-source-primary"
+              className={`text-sm font-semibold text-[var(--theme-text-strong)] ${
+                isRangeInputDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+              }`}
+            >
+              Đánh dấu là tài liệu chính
+            </label>
+          </div>
+
           <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3 transition-all">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">

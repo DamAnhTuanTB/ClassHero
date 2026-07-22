@@ -459,12 +459,13 @@ export class SourceDocumentsService {
 
           savedRanges.push(savedRange);
 
-          const lessonDocument = await this.upsertPrimaryFromSourceDocument(tx, {
+          const lessonDocument = await this.upsertLessonDocumentFromSource(tx, {
             actorUserId,
             lessonId: range.lessonId,
             sourceDocument,
             pageStart: range.pageStart,
             pageEnd: range.pageEnd,
+            isPrimary: range.isPrimary,
             now,
           });
 
@@ -518,6 +519,7 @@ export class SourceDocumentsService {
       pageEnd,
       pageStart,
       sourceDocumentId,
+      isPrimary,
     }: {
       actorUserId: string;
       context?: RequestContext;
@@ -525,6 +527,7 @@ export class SourceDocumentsService {
       pageEnd: number;
       pageStart: number;
       sourceDocumentId: string;
+      isPrimary?: boolean;
     },
   ) {
     assertPageRangeOrder(pageStart, pageEnd);
@@ -587,13 +590,14 @@ export class SourceDocumentsService {
       select: lessonDocumentPageRangeSelect,
     });
 
-    const lessonDocument = await this.upsertPrimaryFromSourceDocument(tx, {
+    const lessonDocument = await this.upsertLessonDocumentFromSource(tx, {
       actorUserId,
       lessonId,
       now: new Date(),
       pageEnd,
       pageStart,
       sourceDocument,
+      isPrimary,
     });
 
     await tx.auditLog.create({
@@ -731,7 +735,7 @@ export class SourceDocumentsService {
     }
   }
 
-  private async upsertPrimaryFromSourceDocument(
+  private async upsertLessonDocumentFromSource(
     tx: Prisma.TransactionClient,
     {
       actorUserId,
@@ -739,6 +743,7 @@ export class SourceDocumentsService {
       sourceDocument,
       pageStart,
       pageEnd,
+      isPrimary,
       now,
     }: {
       actorUserId: string;
@@ -748,34 +753,28 @@ export class SourceDocumentsService {
       >;
       pageStart: number;
       pageEnd: number;
+      isPrimary?: boolean;
       now: Date;
     },
   ) {
-    const activePrimary = await tx.lessonDocument.findFirst({
+    const markAsPrimary = isPrimary ?? true;
+    const kind = markAsPrimary
+      ? LessonDocumentKind.PRIMARY_FROM_SOURCE
+      : LessonDocumentKind.SUPPLEMENT;
+
+    const existingDoc = await tx.lessonDocument.findFirst({
       where: {
         lessonId,
-        kind: {
-          in: [
-            LessonDocumentKind.PRIMARY_FROM_SOURCE,
-            LessonDocumentKind.PRIMARY_REPLACEMENT,
-          ],
-        },
+        sourceDocumentId: sourceDocument.id,
         replacedAt: null,
       },
       select: {
         id: true,
         kind: true,
-        sourceDocumentId: true,
       },
     });
 
-    let lessonDocumentId = activePrimary?.id;
-
-    if (
-      activePrimary &&
-      (activePrimary.kind !== LessonDocumentKind.PRIMARY_FROM_SOURCE ||
-        activePrimary.sourceDocumentId !== sourceDocument.id)
-    ) {
+    if (markAsPrimary) {
       await tx.lessonDocument.updateMany({
         where: {
           lessonId,
@@ -785,13 +784,13 @@ export class SourceDocumentsService {
               LessonDocumentKind.PRIMARY_REPLACEMENT,
             ],
           },
+          ...(existingDoc ? { id: { not: existingDoc.id } } : {}),
           replacedAt: null,
         },
         data: {
           replacedAt: now,
         },
       });
-      lessonDocumentId = undefined;
     }
 
     const metadataJson = toDocumentInputJson({
@@ -802,12 +801,12 @@ export class SourceDocumentsService {
     const title =
       sourceDocument.title ?? `Trang ${pageStart}-${pageEnd} từ tài liệu nguồn`;
 
-    const lessonDocument = lessonDocumentId
+    const lessonDocument = existingDoc
       ? await tx.lessonDocument.update({
-          where: { id: lessonDocumentId },
+          where: { id: existingDoc.id },
           data: {
             fileId: sourceDocument.fileId,
-            sourceDocumentId: sourceDocument.id,
+            kind,
             title,
             status: DocumentStatus.PROCESSING,
             extractError: null,
@@ -823,7 +822,7 @@ export class SourceDocumentsService {
             lessonId,
             fileId: sourceDocument.fileId,
             sourceDocumentId: sourceDocument.id,
-            kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
+            kind,
             title,
             status: DocumentStatus.PROCESSING,
             contentHash: sourceDocument.contentHash,

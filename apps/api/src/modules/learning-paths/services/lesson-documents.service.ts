@@ -27,6 +27,7 @@ import {
   serializeLessonDocumentPageRange,
 } from "#api/modules/learning-paths/serializers/document.serializers";
 import type { LessonDocumentRecord } from "#api/modules/learning-paths/types/document.types";
+import { UpdateLessonDocumentDto } from "#api/modules/learning-paths/dto/update-lesson-document.dto";
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
 import {
   assertPageRangeOrder,
@@ -57,7 +58,7 @@ export class LessonDocumentsService {
         replacedAt: null,
       },
       select: lessonDocumentSelect,
-      orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ createdAt: "asc" }],
     });
 
     return documents.map(serializeLessonDocument);
@@ -93,7 +94,7 @@ export class LessonDocumentsService {
         },
       },
       select: lessonDocumentSelect,
-      orderBy: [{ lessonId: "asc" }, { kind: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ lessonId: "asc" }, { createdAt: "asc" }],
     });
 
     return documents.map(serializeLessonDocument);
@@ -288,10 +289,14 @@ export class LessonDocumentsService {
     dto: CreateLessonDocumentDto,
     context: RequestContext = {},
   ) {
-    if (dto.kind && dto.kind !== LessonDocumentKind.SUPPLEMENT) {
+    if (
+      dto.kind &&
+      dto.kind !== LessonDocumentKind.SUPPLEMENT &&
+      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT
+    ) {
       throwBadRequest(
         "VALIDATION_ERROR",
-        "Endpoint này chỉ dùng để upload tài liệu bổ sung",
+        "Endpoint này chỉ dùng để upload tài liệu bổ sung hoặc tài liệu chính",
       );
     }
 
@@ -301,11 +306,31 @@ export class LessonDocumentsService {
         const file = await this.getLessonDocumentFile(tx, dto.fileId);
         const isStorageOnly = dto.processingMode === "STORAGE_ONLY";
 
+        const kind = dto.kind || LessonDocumentKind.SUPPLEMENT;
+
+        if (kind === LessonDocumentKind.PRIMARY_REPLACEMENT) {
+          await tx.lessonDocument.updateMany({
+            where: {
+              lessonId,
+              kind: {
+                in: [
+                  LessonDocumentKind.PRIMARY_FROM_SOURCE,
+                  LessonDocumentKind.PRIMARY_REPLACEMENT,
+                ],
+              },
+              replacedAt: null,
+            },
+            data: {
+              replacedAt: new Date(),
+            },
+          });
+        }
+
         const created = await tx.lessonDocument.create({
           data: {
             lessonId,
             fileId: file.id,
-            kind: LessonDocumentKind.SUPPLEMENT,
+            kind,
             title: normalizeOptionalTitle(dto.title),
             status: isStorageOnly ? DocumentStatus.READY : DocumentStatus.PROCESSING,
             contentHash: file.checksum,
@@ -341,6 +366,101 @@ export class LessonDocumentsService {
       });
 
       await this.enqueueProcessingJobs([document.processingJobId]);
+
+      return serializeLessonDocument(document);
+    } catch (error) {
+      handleDocumentPrismaError(error);
+    }
+  }
+
+  async updateSupplementalDocument(
+    lessonId: string,
+    documentId: string,
+    actorUserId: string,
+    dto: UpdateLessonDocumentDto,
+    context: RequestContext = {},
+  ) {
+    if (Object.keys(dto).length === 0) {
+      throwBadRequest("VALIDATION_ERROR", "Cần cung cấp dữ liệu cập nhật");
+    }
+
+    if (
+      dto.kind &&
+      dto.kind !== LessonDocumentKind.SUPPLEMENT &&
+      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT
+    ) {
+      throwBadRequest(
+        "VALIDATION_ERROR",
+        "Chỉ có thể đổi sang tài liệu bổ sung hoặc tài liệu chính",
+      );
+    }
+
+    try {
+      const document = await this.prisma.$transaction(async (tx) => {
+        await this.assertLessonExists(tx, lessonId);
+
+        const existing = await tx.lessonDocument.findFirst({
+          where: {
+            id: documentId,
+            lessonId,
+            kind: {
+              in: [
+                LessonDocumentKind.SUPPLEMENT,
+                LessonDocumentKind.PRIMARY_REPLACEMENT,
+              ],
+            },
+          },
+          select: lessonDocumentSelect,
+        });
+
+        if (!existing) {
+          throwLessonDocumentNotFound();
+        }
+
+        const kind = dto.kind ?? existing.kind;
+
+        if (
+          kind === LessonDocumentKind.PRIMARY_REPLACEMENT &&
+          existing.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT
+        ) {
+          await tx.lessonDocument.updateMany({
+            where: {
+              lessonId,
+              kind: {
+                in: [
+                  LessonDocumentKind.PRIMARY_FROM_SOURCE,
+                  LessonDocumentKind.PRIMARY_REPLACEMENT,
+                ],
+              },
+              replacedAt: null,
+            },
+            data: {
+              replacedAt: new Date(),
+            },
+          });
+        }
+
+        const updated = await tx.lessonDocument.update({
+          where: { id: documentId },
+          data: {
+            ...(dto.kind !== undefined ? { kind } : {}),
+            ...(dto.title !== undefined
+              ? { title: normalizeOptionalTitle(dto.title) }
+              : {}),
+            replacedAt: null,
+          },
+          select: lessonDocumentSelect,
+        });
+
+        await this.auditDocumentChange(tx, {
+          actorUserId,
+          action: "LESSON_SUPPLEMENT_DOCUMENT_UPDATED",
+          document: updated,
+          context,
+        });
+
+        return updated;
+      });
 
       return serializeLessonDocument(document);
     } catch (error) {

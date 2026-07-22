@@ -1,6 +1,7 @@
 "use client";
 
-import { FilePlus2, Trash2, Upload } from "lucide-react";
+import { FilePlus2, Trash2, Upload, Eye } from "lucide-react";
+import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
 import { useFieldArray, type UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { TextField } from "@/components/common/forms/text-field";
@@ -43,7 +44,7 @@ export function LessonReferenceDocumentsSection({
         <button
           type="button"
           disabled={isDisabled}
-          onClick={() => append({ file: null, title: "" })}
+          onClick={() => append({ file: null, title: "", isPrimary: false })}
           className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           <FilePlus2 className="h-4 w-4" aria-hidden="true" />
@@ -66,18 +67,22 @@ export function LessonReferenceDocumentsSection({
 
             const isExisting = Boolean(form.watch(`referenceDocuments.${index}.id`));
             const originalName = form.watch(`referenceDocuments.${index}.originalName`) as string | undefined;
+            const docStatus = form.watch(`referenceDocuments.${index}.status`) as string | undefined;
+            const docProgress = form.watch(`referenceDocuments.${index}.progress`) as number | undefined;
 
             return (
               <div
                 key={field.id}
-                className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_2.5rem]"
+                className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
               >
                 <TextField
                   id={`admin-lesson-reference-title-${field.id}`}
                   label={`Tên tài liệu ${displayIndex}`}
                   isOptional
                   icon={null}
-                  disabled={isDisabled || isExisting}
+                  disabled={isDisabled}
+                  readOnly={isExisting}
+                  title={form.watch(`referenceDocuments.${index}.title`)}
                   error={
                     form.formState.errors.referenceDocuments?.[index]?.title
                   }
@@ -85,12 +90,22 @@ export function LessonReferenceDocumentsSection({
                   {...form.register(`referenceDocuments.${index}.title`)}
                 />
 
-                <div>
+                <div className="min-w-0">
                   <FieldLabel id={fileInputId} label={`File tài liệu ${displayIndex}`} />
                   {isExisting ? (
-                    <div className="mt-2 flex min-h-[3.35rem] items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg-disabled)] px-4 text-sm font-semibold text-[var(--theme-input-text-disabled)] opacity-70">
+                    <div className="mt-2 flex min-h-[3.35rem] flex-1 items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] hover:border-[var(--theme-input-hover-border)] transition">
                       <FilePlus2 className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
-                      <span className="min-w-0 truncate">{originalName ?? "Tài liệu gốc"}</span>
+                      <span className="min-w-0 truncate" title={originalName ?? "Tài liệu gốc"}>
+                        {originalName ?? "Tài liệu gốc"}
+                      </span>
+                      {docStatus && (
+                        <div className="ml-auto flex shrink-0 items-center">
+                          <DocumentStatusBadge
+                            status={docStatus as any}
+                            progress={docProgress}
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <label
@@ -113,6 +128,8 @@ export function LessonReferenceDocumentsSection({
                         aria-label={`File tài liệu ${displayIndex}`}
                         disabled={isDisabled}
                         className="hidden"
+                        name={form.register(`referenceDocuments.${index}.file`).name}
+                        ref={form.register(`referenceDocuments.${index}.file`).ref}
                         onChange={(event) => {
                           form.setValue(
                             `referenceDocuments.${index}.file`,
@@ -133,15 +150,67 @@ export function LessonReferenceDocumentsSection({
                   ) : null}
                 </div>
 
-                <button
-                  type="button"
-                  aria-label={`Xóa tài liệu ${displayIndex}`}
-                  disabled={isDisabled}
-                  onClick={() => remove(index)}
-                  className="theme-button-danger-subtle inline-flex h-10 w-10 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60 lg:mt-[34px]"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <div className="flex items-center gap-2 lg:mt-[34px]">
+                  <button
+                    type="button"
+                    aria-label={`Xem tài liệu ${displayIndex}`}
+                    disabled={!field.url && !selectedFile}
+                    onClick={() => {
+                      if (field.url) {
+                        window.open(field.url as string, "_blank");
+                      } else if (selectedFile) {
+                        const objectUrl = URL.createObjectURL(selectedFile as File);
+                        window.open(objectUrl, "_blank");
+                      }
+                    }}
+                    className="theme-button-neutral inline-flex h-10 w-10 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Xóa tài liệu ${displayIndex}`}
+                    disabled={isDisabled}
+                    onClick={() => remove(index)}
+                    className="theme-button-danger-subtle inline-flex h-10 w-10 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="col-span-full mt-1 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`admin-lesson-reference-primary-${field.id}`}
+                    disabled={isDisabled}
+                    className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                    {...(() => {
+                      const { onChange, ...rest } = form.register(`referenceDocuments.${index}.isPrimary`);
+                      return {
+                        ...rest,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                          const checked = e.target.checked;
+                          if (checked) {
+                            const currentDocs = form.getValues("referenceDocuments") || [];
+                            currentDocs.forEach((_, i) => {
+                              if (i !== index) {
+                                form.setValue(`referenceDocuments.${i}.isPrimary`, false, { shouldDirty: true });
+                              }
+                            });
+                            form.setValue("sourceDocumentPageRange.isPrimary", false, { shouldDirty: true });
+                          }
+                          onChange(e);
+                        },
+                      };
+                    })()}
+                  />
+                  <label
+                    htmlFor={`admin-lesson-reference-primary-${field.id}`}
+                    className="text-sm font-semibold text-[var(--theme-text-strong)] cursor-pointer"
+                  >
+                    Đánh dấu là tài liệu chính
+                  </label>
+                </div>
               </div>
             );
           })}

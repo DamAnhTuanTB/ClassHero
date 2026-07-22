@@ -5,6 +5,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -21,6 +22,7 @@ import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
 import { CreateLessonDocumentDto } from "#api/modules/learning-paths/dto/create-lesson-document.dto";
+import { UpdateLessonDocumentDto } from "#api/modules/learning-paths/dto/update-lesson-document.dto";
 import { ReplacePrimaryLessonDocumentDto } from "#api/modules/learning-paths/dto/replace-primary-lesson-document.dto";
 import { LessonDocumentsService } from "#api/modules/learning-paths/services/lesson-documents.service";
 
@@ -67,6 +69,24 @@ export class AdminLessonDocumentsController {
   ) {
     return this.lessonDocumentsService.createSupplementalDocument(
       lessonId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Patch("documents/:documentId")
+  @ApiOperation({ summary: "Update a supplemental lesson document" })
+  updateSupplementalDocument(
+    @Param("lessonId") lessonId: string,
+    @Param("documentId") documentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateLessonDocumentDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.lessonDocumentsService.updateSupplementalDocument(
+      lessonId,
+      documentId,
       user.id,
       dto,
       getRequestContext(request),

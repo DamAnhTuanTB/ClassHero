@@ -175,16 +175,32 @@ export function getLessonSourceRangeFormValues(
       sourceDocumentId: fallbackSourceDocumentId ?? "",
       pageStart: "",
       pageEnd: "",
+      isPrimary: true,
     };
   }
 
-  const primary = getPrimaryLessonDocument(documentsByLessonId[lessonId] ?? []);
-  const range = getLessonDocumentRange(primary);
+  const documents = documentsByLessonId[lessonId] ?? [];
+  const sourceMappedDoc = documents.find(
+    (d) =>
+      d.sourceDocumentId === fallbackSourceDocumentId &&
+      readRecord(d.metadataJson)?.source === "source_document_page_range"
+  );
+  const primary = getPrimaryLessonDocument(documents);
+
+  const range = sourceMappedDoc ? getLessonDocumentRange(sourceMappedDoc) : null;
+
+  let isPrimary = true;
+  if (sourceMappedDoc) {
+    isPrimary = sourceMappedDoc.kind !== "SUPPLEMENT";
+  } else if (primary) {
+    isPrimary = false;
+  }
 
   return {
-    sourceDocumentId: primary?.sourceDocumentId ?? fallbackSourceDocumentId ?? "",
+    sourceDocumentId: sourceMappedDoc?.sourceDocumentId ?? fallbackSourceDocumentId ?? "",
     pageStart: range ? getPrintedPageFromPdfPage(range.pageStart, sourcePages) : "",
     pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
+    isPrimary,
   };
 }
 
@@ -552,7 +568,7 @@ function parsePositiveInteger(value: string) {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function readRecord(value: unknown): Record<string, unknown> | null {
+export function readRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   createAdminLessonSupplementDocument,
   deleteAdminLessonSupplementDocument,
+  updateAdminLessonSupplementDocument,
   uploadAdminLessonDocumentFile,
 } from "@/features/admin/courses/api/admin-course-documents-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -22,6 +23,10 @@ import {
   getAdminCourseDetailStats,
   getLessonReferenceDocumentUploads,
 } from "@/features/admin/courses/admin-courses-utils";
+import {
+  getLessonSourceRangeFormValues,
+  readRecord,
+} from "@/features/admin/courses/admin-course-documents-utils";
 import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
@@ -306,7 +311,13 @@ export function useAdminCourseDetailManager(
         try {
           const originalSupplements =
             documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
-              (doc) => doc.kind === "SUPPLEMENT",
+              (doc) => {
+                const isSupplementOrPrimary =
+                  doc.kind === "SUPPLEMENT" || doc.kind === "PRIMARY_REPLACEMENT";
+                const isSourceMapped =
+                  readRecord(doc.metadataJson)?.source === "source_document_page_range";
+                return isSupplementOrPrimary && !isSourceMapped;
+              }
             ) || [];
           
           const remainingIds = values.referenceDocuments
@@ -321,6 +332,44 @@ export function useAdminCourseDetailManager(
             await deleteAdminLessonSupplementDocument(
               selectedLesson.id,
               doc.id,
+              accessToken,
+            );
+          }
+
+          const existingDocsToUpdate = values.referenceDocuments
+            .filter((doc) => doc.id)
+            .map((doc) => {
+              const original = originalSupplements.find((o) => o.id === doc.id);
+              if (!original) return null;
+              
+              const isPrimary = doc.isPrimary ?? false;
+              const originalIsPrimary = original.kind === "PRIMARY_REPLACEMENT";
+              const titleChanged = doc.title !== original.title;
+              const primaryChanged = isPrimary !== originalIsPrimary;
+              
+              if (!titleChanged && !primaryChanged) return null;
+              
+              return {
+                id: doc.id!,
+                title: titleChanged ? doc.title : undefined,
+                kind: primaryChanged
+                  ? isPrimary
+                    ? "PRIMARY_REPLACEMENT"
+                    : "SUPPLEMENT"
+                  : undefined,
+              };
+            })
+            .filter(Boolean) as Array<{
+              id: string;
+              title?: string;
+              kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT";
+            }>;
+
+          for (const docUpdate of existingDocsToUpdate) {
+            await updateAdminLessonSupplementDocument(
+              selectedLesson.id,
+              docUpdate.id,
+              { title: docUpdate.title, kind: docUpdate.kind },
               accessToken,
             );
           }
@@ -382,8 +431,8 @@ export function useAdminCourseDetailManager(
           lessonId,
           {
             fileId: uploadedFile.id,
-            kind: "SUPPLEMENT",
-            processingMode: "STORAGE_ONLY",
+            kind: document.isPrimary ? "PRIMARY_REPLACEMENT" : "SUPPLEMENT",
+            processingMode: "PROCESSING",
             title: document.title || uploadedFile.originalName,
           },
           accessToken,

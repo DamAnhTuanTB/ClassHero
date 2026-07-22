@@ -33,6 +33,11 @@ export class LessonSourceDocumentPageRangeDto {
   @IsInt()
   @Min(1)
   pageEnd!: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
 }
 
 export class CreateLessonDto {
