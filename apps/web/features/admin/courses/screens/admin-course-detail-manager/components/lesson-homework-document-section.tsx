@@ -8,7 +8,7 @@ import { TextField } from "@/components/common/forms/text-field";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import { cn } from "@/lib/utils";
 
-export function LessonReferenceDocumentsSection({
+export function LessonHomeworkDocumentSection({
   disabled,
   form,
   isSaving,
@@ -22,6 +22,10 @@ export function LessonReferenceDocumentsSection({
     name: "referenceDocuments",
   });
   const isDisabled = disabled || isSaving;
+  const homeworkCount = form
+    .watch("referenceDocuments")
+    .filter((d) => d.type === "HOMEWORK").length;
+  const canAddMore = homeworkCount < 1;
 
   return (
     <section
@@ -36,15 +40,15 @@ export function LessonReferenceDocumentsSection({
           <div className="min-w-0">
             <FieldLabel
               id="admin-lesson-reference-documents"
-              label="Tài liệu bổ sung"
+              label="Bài tập về nhà"
               isOptional
             />
           </div>
         </div>
         <button
           type="button"
-          disabled={isDisabled}
-          onClick={() => append({ file: null, title: "", isPrimary: false })}
+          disabled={isDisabled || !canAddMore}
+          onClick={() => append({ file: null, title: "", type: "HOMEWORK" })}
           className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           <FilePlus2 className="h-4 w-4" aria-hidden="true" />
@@ -52,23 +56,29 @@ export function LessonReferenceDocumentsSection({
         </button>
       </div>
 
-      {fields.length === 0 ? (
+      {homeworkCount === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
-          Chưa thêm tài liệu tham khảo.
+          Chưa thêm bài tập về nhà.
         </div>
       ) : (
         <div className="mt-3 grid gap-3">
           {fields.map((field, index) => {
+            if (form.getValues(`referenceDocuments.${index}.type`) !== "HOMEWORK") {
+              return null;
+            }
             const displayIndex = index + 1;
             const fileInputId = `admin-lesson-reference-file-${field.id}`;
-            const selectedFile =
-              form.watch(`referenceDocuments.${index}.file`) ?? null;
+            const selectedFile = form.watch(`referenceDocuments.${index}.file`) ?? null;
             const fileError = form.formState.errors.referenceDocuments?.[index]?.file;
 
             const isExisting = Boolean(form.watch(`referenceDocuments.${index}.id`));
-            const originalName = form.watch(`referenceDocuments.${index}.originalName`) as string | undefined;
-            const docStatus = form.watch(`referenceDocuments.${index}.status`) as string | undefined;
-            const docProgress = form.watch(`referenceDocuments.${index}.progress`) as number | undefined;
+            const originalName = form.watch(
+              `referenceDocuments.${index}.originalName`,
+            ) as string | undefined;
+            const docStatus = form.watch(`referenceDocuments.${index}.status`) as
+              string | undefined;
+            const docProgress = form.watch(`referenceDocuments.${index}.progress`) as
+              number | undefined;
 
             return (
               <div
@@ -77,25 +87,25 @@ export function LessonReferenceDocumentsSection({
               >
                 <TextField
                   id={`admin-lesson-reference-title-${field.id}`}
-                  label={`Tên tài liệu ${displayIndex}`}
-                  isOptional
+                  label="Tên tài liệu"
                   icon={null}
                   disabled={isDisabled}
                   readOnly={isExisting}
                   title={form.watch(`referenceDocuments.${index}.title`)}
-                  error={
-                    form.formState.errors.referenceDocuments?.[index]?.title
-                  }
-                  placeholder="Ví dụ: Phiếu đọc thêm"
+                  error={form.formState.errors.referenceDocuments?.[index]?.title}
+                  placeholder="Ví dụ: Bài tập trắc nghiệm chương 1"
                   {...form.register(`referenceDocuments.${index}.title`)}
                 />
 
                 <div className="min-w-0">
-                  <FieldLabel id={fileInputId} label={`File tài liệu ${displayIndex}`} />
+                  <FieldLabel id={fileInputId} label="File tài liệu" />
                   {isExisting ? (
                     <div className="mt-2 flex min-h-[3.35rem] flex-1 items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] hover:border-[var(--theme-input-hover-border)] transition">
                       <FilePlus2 className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
-                      <span className="min-w-0 truncate" title={originalName ?? "Tài liệu gốc"}>
+                      <span
+                        className="min-w-0 truncate"
+                        title={originalName ?? "Tài liệu gốc"}
+                      >
                         {originalName ?? "Tài liệu gốc"}
                       </span>
                       {docStatus && (
@@ -125,7 +135,7 @@ export function LessonReferenceDocumentsSection({
                         id={fileInputId}
                         type="file"
                         accept="application/pdf"
-                        aria-label={`File tài liệu ${displayIndex}`}
+                        aria-label="File tài liệu"
                         disabled={isDisabled}
                         className="hidden"
                         name={form.register(`referenceDocuments.${index}.file`).name}
@@ -153,7 +163,7 @@ export function LessonReferenceDocumentsSection({
                 <div className="flex items-center gap-2 lg:mt-[34px]">
                   <button
                     type="button"
-                    aria-label={`Xem tài liệu ${displayIndex}`}
+                    aria-label="Xem tài liệu"
                     disabled={!field.url && !selectedFile}
                     onClick={() => {
                       if (field.url) {
@@ -169,47 +179,13 @@ export function LessonReferenceDocumentsSection({
                   </button>
                   <button
                     type="button"
-                    aria-label={`Xóa tài liệu ${displayIndex}`}
+                    aria-label="Xóa tài liệu"
                     disabled={isDisabled}
                     onClick={() => remove(index)}
                     className="theme-button-danger-subtle inline-flex h-10 w-10 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
-                </div>
-
-                <div className="col-span-full mt-1 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`admin-lesson-reference-primary-${field.id}`}
-                    disabled={isDisabled}
-                    className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
-                    {...(() => {
-                      const { onChange, ...rest } = form.register(`referenceDocuments.${index}.isPrimary`);
-                      return {
-                        ...rest,
-                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                          const checked = e.target.checked;
-                          if (checked) {
-                            const currentDocs = form.getValues("referenceDocuments") || [];
-                            currentDocs.forEach((_, i) => {
-                              if (i !== index) {
-                                form.setValue(`referenceDocuments.${i}.isPrimary`, false, { shouldDirty: true });
-                              }
-                            });
-                            form.setValue("sourceDocumentPageRange.isPrimary", false, { shouldDirty: true });
-                          }
-                          onChange(e);
-                        },
-                      };
-                    })()}
-                  />
-                  <label
-                    htmlFor={`admin-lesson-reference-primary-${field.id}`}
-                    className="text-sm font-semibold text-[var(--theme-text-strong)] cursor-pointer"
-                  >
-                    Đánh dấu là tài liệu chính
-                  </label>
                 </div>
               </div>
             );

@@ -78,7 +78,10 @@ export function listAdminSourceDocumentPages(sourceDocumentId: string, token: st
   );
 }
 
-export function getAdminSourceDocumentCacheStatus(sourceDocumentId: string, token: string) {
+export function getAdminSourceDocumentCacheStatus(
+  sourceDocumentId: string,
+  token: string,
+) {
   return apiRequest<{ hasCache: boolean }>(
     `/admin/source-documents/${sourceDocumentId}/cache-status`,
     { token },
@@ -155,7 +158,7 @@ export function createAdminLessonSupplementDocument(
   payload: {
     fileId: string;
     title?: string;
-    kind: "SUPPLEMENT" | "PRIMARY_REPLACEMENT";
+    kind: "SUPPLEMENT" | "PRIMARY_REPLACEMENT" | "HOMEWORK";
     processingMode?: "PROCESSING" | "STORAGE_ONLY";
   },
   token: string,
@@ -172,7 +175,7 @@ export function updateAdminLessonSupplementDocument(
   documentId: string,
   payload: {
     title?: string;
-    kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT";
+    kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT" | "HOMEWORK";
   },
   token: string,
 ) {

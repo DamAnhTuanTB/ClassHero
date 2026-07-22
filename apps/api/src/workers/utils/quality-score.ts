@@ -182,4 +182,3 @@ export function scorePageQualityWithConfidence(
   const combined = 0.6 * confidence + 0.4 * heuristicScore;
   return Math.round(combined * 100) / 100;
 }
-

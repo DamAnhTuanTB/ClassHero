@@ -40,8 +40,8 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
     manager.lessons.length &&
     manager.rangeReadiness.isReady,
   );
-  const isSourceProcessing = 
-    sourceDocument?.status === "PROCESSING" || 
+  const isSourceProcessing =
+    sourceDocument?.status === "PROCESSING" ||
     sourceDocument?.processingJob?.status === "RUNNING" ||
     sourceDocument?.processingJob?.status === "QUEUED";
 
@@ -264,8 +264,8 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                     Chưa có dữ liệu trang.
                   </p>
                 ) : (
-                  <OcrStatusSummaryView 
-                    pages={manager.sourcePages} 
+                  <OcrStatusSummaryView
+                    pages={manager.sourcePages}
                     onResolveWarning={manager.actions.openPagesDialogWithWarnings}
                   />
                 )}
@@ -303,7 +303,9 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
       />
       <SourceDocumentPagesDialog
         isOpen={manager.dialogState?.type === "pages"}
-        initialFilter={manager.dialogState?.type === "pages" ? manager.dialogState.filter : undefined}
+        initialFilter={
+          manager.dialogState?.type === "pages" ? manager.dialogState.filter : undefined
+        }
         pages={manager.sourcePages}
         sourceDocument={sourceDocument}
         onClose={manager.actions.closeDialog}
@@ -325,9 +327,6 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         onAutofill={manager.actions.autofillRanges}
         onClose={manager.actions.closeDialog}
         onDeleteSupplement={manager.actions.deleteSupplementDocument}
-        onOpenPrimaryUpload={(lessonId) =>
-          manager.actions.openLessonPrimaryUpload(lessonId, "ranges")
-        }
         onOpenSupplementUpload={(lessonId) =>
           manager.actions.openLessonSupplementUpload(lessonId, "ranges")
         }
@@ -361,10 +360,10 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
   );
 }
 
-function OcrStatusSummaryView({ 
+function OcrStatusSummaryView({
   pages,
-  onResolveWarning
-}: { 
+  onResolveWarning,
+}: {
   pages: AdminSourceDocumentPageApi[];
   onResolveWarning?: () => void;
 }) {

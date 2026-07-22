@@ -32,9 +32,12 @@ export function DocumentStatusBadge({
   const statusView = useWarningOverride
     ? reviewRequiredView
     : getDocumentStatusView(status);
-    
-  let label = status === "PROCESSING" && jobStatus ? getJobStatusLabel(jobStatus) : statusView.label;
-  
+
+  let label =
+    status === "PROCESSING" && jobStatus
+      ? getJobStatusLabel(jobStatus)
+      : statusView.label;
+
   if (status === "PROCESSING") {
     if (jobStatus === "RUNNING") {
       label = isCacheRun ? "Đang xử lý cache" : "Đang OCR mới";
@@ -55,4 +58,3 @@ export function DocumentStatusBadge({
     </span>
   );
 }
-

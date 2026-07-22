@@ -199,9 +199,7 @@ export class LessonsService {
             ...(dto.completionMinScore !== undefined
               ? { completionMinScore: dto.completionMinScore }
               : {}),
-            ...(dto.trialEnabled !== undefined
-              ? { trialEnabled: dto.trialEnabled }
-              : {}),
+            ...(dto.trialEnabled !== undefined ? { trialEnabled: dto.trialEnabled } : {}),
             ...(dto.status !== undefined ? { status } : {}),
             updatedById: actorUserId,
           },

@@ -24,6 +24,14 @@ export type LessonRangeDraft = Record<
   {
     pageEnd: string;
     pageStart: string;
+    isPrimary?: boolean;
+    primarySupplementId?: string | null;
+    newSupplements?: {
+      id: string;
+      file: File | null;
+      title: string;
+      isPrimary: boolean;
+    }[];
   }
 >;
 
@@ -123,11 +131,22 @@ export function groupLessonDocumentsByLessonId(documents: AdminLessonDocumentApi
 }
 
 export function getPrimaryLessonDocument(documents: AdminLessonDocumentApi[]) {
-  return documents.find((document) => document.kind !== "SUPPLEMENT") ?? null;
+  return (
+    documents.find(
+      (document) =>
+        document.kind === "PRIMARY_FROM_SOURCE" ||
+        document.kind === "PRIMARY_REPLACEMENT",
+    ) ?? null
+  );
 }
 
 export function getSupplementLessonDocuments(documents: AdminLessonDocumentApi[]) {
-  return documents.filter((document) => document.kind === "SUPPLEMENT");
+  return documents.filter(
+    (document) =>
+      document.kind === "SUPPLEMENT" ||
+      document.kind === "PRIMARY_REPLACEMENT" ||
+      document.kind === "HOMEWORK",
+  );
 }
 
 export function getLessonDocumentRange(document: AdminLessonDocumentApi | null) {
@@ -149,15 +168,29 @@ export function createInitialRangeDraft(
   sourcePages: AdminSourceDocumentPageApi[],
 ): LessonRangeDraft {
   return lessons.reduce<LessonRangeDraft>((draft, item) => {
-    const primary = getPrimaryLessonDocument(documentsByLessonId[item.lesson.id] ?? []);
-    const range =
-      primary?.sourceDocumentId === sourceDocumentId
-        ? getLessonDocumentRange(primary)
-        : null;
+    const documents = documentsByLessonId[item.lesson.id] ?? [];
+    const sourceMappedDoc = documents.find(
+      (d) =>
+        d.sourceDocumentId === sourceDocumentId &&
+        readRecord(d.metadataJson)?.source === "source_document_page_range",
+    );
+    const primary = getPrimaryLessonDocument(documents);
+
+    const range = sourceMappedDoc ? getLessonDocumentRange(sourceMappedDoc) : null;
+
+    let isPrimary = true;
+    if (sourceMappedDoc) {
+      isPrimary = sourceMappedDoc.kind !== "SUPPLEMENT";
+    } else if (primary) {
+      isPrimary = false;
+    }
 
     draft[item.lesson.id] = {
       pageStart: range ? getPrintedPageFromPdfPage(range.pageStart, sourcePages) : "",
       pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
+      isPrimary,
+      primarySupplementId:
+        primary && primary.kind === "PRIMARY_REPLACEMENT" ? primary.id : null,
     };
 
     return draft;
@@ -183,7 +216,7 @@ export function getLessonSourceRangeFormValues(
   const sourceMappedDoc = documents.find(
     (d) =>
       d.sourceDocumentId === fallbackSourceDocumentId &&
-      readRecord(d.metadataJson)?.source === "source_document_page_range"
+      readRecord(d.metadataJson)?.source === "source_document_page_range",
   );
   const primary = getPrimaryLessonDocument(documents);
 
@@ -209,14 +242,43 @@ export function validateLessonRangeDraft(
   draft: LessonRangeDraft,
   pageLimit: number | null,
   sourcePages: AdminSourceDocumentPageApi[],
+  documentsByLessonId: Record<string, AdminLessonDocumentApi[]>,
 ): LessonRangeValidationResult {
   const issues: LessonRangeValidationIssue[] = [];
   const ranges: AdminLessonPageRangeInput[] = [];
 
   for (const item of lessons) {
     const values = draft[item.lesson.id] ?? { pageEnd: "", pageStart: "" };
+
+    let isPrimary = true;
+    if (values.isPrimary !== undefined) {
+      isPrimary = values.isPrimary;
+    } else {
+      const documents = documentsByLessonId[item.lesson.id] ?? [];
+      const sourceMappedDoc = documents.find(
+        (d: AdminLessonDocumentApi) =>
+          d.sourceDocumentId === sourcePages[0]?.sourceDocumentId &&
+          readRecord(d.metadataJson)?.source === "source_document_page_range",
+      );
+      const primary = getPrimaryLessonDocument(documents);
+      if (sourceMappedDoc) {
+        isPrimary = sourceMappedDoc.kind !== "SUPPLEMENT";
+      } else if (primary) {
+        isPrimary = false;
+      }
+    }
     const pageStart = getPdfPageFromPrintedPage(values.pageStart, sourcePages);
     const pageEnd = getPdfPageFromPrintedPage(values.pageEnd, sourcePages);
+
+    if (values.pageStart.trim() === "" && values.pageEnd.trim() === "") {
+      if (isPrimary) {
+        issues.push({
+          lessonId: item.lesson.id,
+          message: "Phải nhập khoảng trang cho tài liệu chính.",
+        });
+      }
+      continue;
+    }
 
     if (values.pageStart.trim() === "" || values.pageEnd.trim() === "") {
       issues.push({
@@ -254,6 +316,7 @@ export function validateLessonRangeDraft(
       lessonId: item.lesson.id,
       pageEnd,
       pageStart,
+      isPrimary,
     });
   }
 
@@ -484,7 +547,9 @@ export function formatDocumentKind(kind: AdminLessonDocumentKind) {
   if (kind === "SUPPLEMENT") {
     return "Bổ sung";
   }
-
+  if (kind === "HOMEWORK") {
+    return "Bài tập về nhà";
+  }
   if (kind === "PRIMARY_REPLACEMENT") {
     return "Tài liệu chính";
   }
@@ -630,4 +695,3 @@ export function getPrintedPageFromPdfPage(
     String(pdfPageNum)
   );
 }
-

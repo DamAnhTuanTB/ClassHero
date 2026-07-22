@@ -81,7 +81,8 @@ export class SourceDocumentsService {
 
         let isCacheRun = false;
         if (file.checksum) {
-          const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+          const provider =
+            this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
           const descriptor = this.cacheService.createDescriptor(file.checksum, provider);
           isCacheRun = await this.cacheService.hasArtifact(descriptor);
         }
@@ -196,17 +197,27 @@ export class SourceDocumentsService {
         }
 
         if (options.forceNewOcr && current.contentHash) {
-          const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
-          const descriptor = this.cacheService.createDescriptor(current.contentHash, provider);
+          const provider =
+            this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+          const descriptor = this.cacheService.createDescriptor(
+            current.contentHash,
+            provider,
+          );
           await this.cacheService.invalidateCache(descriptor).catch((err) => {
-            this.logger.warn(`Failed to invalidate cache for ${current.contentHash}: ${err.message}`);
+            this.logger.warn(
+              `Failed to invalidate cache for ${current.contentHash}: ${err.message}`,
+            );
           });
         }
 
         let isCacheRun = false;
         if (!options.forceNewOcr && current.contentHash) {
-          const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
-          const descriptor = this.cacheService.createDescriptor(current.contentHash, provider);
+          const provider =
+            this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+          const descriptor = this.cacheService.createDescriptor(
+            current.contentHash,
+            provider,
+          );
           isCacheRun = await this.cacheService.hasArtifact(descriptor);
         }
 
@@ -328,10 +339,16 @@ export class SourceDocumentsService {
       });
 
       if (contentHashToClear) {
-        const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
-        const descriptor = this.cacheService.createDescriptor(contentHashToClear, provider);
+        const provider =
+          this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+        const descriptor = this.cacheService.createDescriptor(
+          contentHashToClear,
+          provider,
+        );
         await this.cacheService.invalidateCache(descriptor).catch((err) => {
-          this.logger.warn(`Failed to invalidate cache for ${contentHashToClear}: ${err.message}`);
+          this.logger.warn(
+            `Failed to invalidate cache for ${contentHashToClear}: ${err.message}`,
+          );
         });
       }
 
@@ -348,8 +365,12 @@ export class SourceDocumentsService {
         return { hasCache: false };
       }
 
-      const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
-      const descriptor = this.cacheService.createDescriptor(sourceDocument.contentHash, provider);
+      const provider =
+        this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+      const descriptor = this.cacheService.createDescriptor(
+        sourceDocument.contentHash,
+        provider,
+      );
       const hasCache = await this.cacheService.hasArtifact(descriptor);
 
       return { hasCache };
@@ -778,17 +799,24 @@ export class SourceDocumentsService {
       await tx.lessonDocument.updateMany({
         where: {
           lessonId,
-          kind: {
-            in: [
-              LessonDocumentKind.PRIMARY_FROM_SOURCE,
-              LessonDocumentKind.PRIMARY_REPLACEMENT,
-            ],
-          },
+          kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
           ...(existingDoc ? { id: { not: existingDoc.id } } : {}),
           replacedAt: null,
         },
         data: {
           replacedAt: now,
+        },
+      });
+
+      await tx.lessonDocument.updateMany({
+        where: {
+          lessonId,
+          kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
+          ...(existingDoc ? { id: { not: existingDoc.id } } : {}),
+          replacedAt: null,
+        },
+        data: {
+          kind: LessonDocumentKind.SUPPLEMENT,
         },
       });
     }
@@ -908,7 +936,10 @@ export class SourceDocumentsService {
     });
 
     if (!page?.metadataJson) {
-      throwNotFound("OCR_ARTIFACTS_NOT_FOUND", "OCR artifacts not found for this document");
+      throwNotFound(
+        "OCR_ARTIFACTS_NOT_FOUND",
+        "OCR artifacts not found for this document",
+      );
     }
 
     const metadata = page.metadataJson as Record<string, unknown>;
@@ -916,7 +947,10 @@ export class SourceDocumentsService {
     const htmlZipKey = artifacts?.htmlZip as string | undefined;
 
     if (!htmlZipKey) {
-      throwNotFound("HTML_ARTIFACT_NOT_FOUND", "HTML artifact not found for this document");
+      throwNotFound(
+        "HTML_ARTIFACT_NOT_FOUND",
+        "HTML artifact not found for this document",
+      );
     }
 
     try {
@@ -924,10 +958,11 @@ export class SourceDocumentsService {
       const htmlContent = await this.extractHtmlWithImagesFromZip(zipBuffer);
       return { html: htmlContent };
     } catch (error) {
-      this.logger.error(
-        `Failed to extract OCR HTML for ${sourceDocumentId}: ${error}`,
+      this.logger.error(`Failed to extract OCR HTML for ${sourceDocumentId}: ${error}`);
+      throwNotFound(
+        "OCR_HTML_EXTRACT_FAILED",
+        "Failed to extract HTML from OCR artifacts",
       );
-      throwNotFound("OCR_HTML_EXTRACT_FAILED", "Failed to extract HTML from OCR artifacts");
     }
   }
 
@@ -946,9 +981,13 @@ export class SourceDocumentsService {
         zipfile.readEntry();
 
         zipfile.on("entry", (entry: YauzlEntry) => {
-          if (entry.fileName.endsWith(".html") && !entry.fileName.startsWith("__MACOSX")) {
+          if (
+            entry.fileName.endsWith(".html") &&
+            !entry.fileName.startsWith("__MACOSX")
+          ) {
             zipfile.openReadStream(entry, (readErr, readStream) => {
-              if (readErr || !readStream) return reject(readErr ?? new Error("No stream"));
+              if (readErr || !readStream)
+                return reject(readErr ?? new Error("No stream"));
               const chunks: Buffer[] = [];
               readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
               readStream.on("end", () => {
@@ -957,9 +996,13 @@ export class SourceDocumentsService {
               });
               readStream.on("error", reject);
             });
-          } else if (entry.fileName.includes("images/") && !entry.fileName.endsWith("/")) {
+          } else if (
+            entry.fileName.includes("images/") &&
+            !entry.fileName.endsWith("/")
+          ) {
             zipfile.openReadStream(entry, (readErr, readStream) => {
-              if (readErr || !readStream) return reject(readErr ?? new Error("No stream"));
+              if (readErr || !readStream)
+                return reject(readErr ?? new Error("No stream"));
               const chunks: Buffer[] = [];
               readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
               readStream.on("end", () => {
@@ -967,12 +1010,12 @@ export class SourceDocumentsService {
                 const ext = entry.fileName.split(".").pop()?.toLowerCase() || "jpeg";
                 const mimeType = ext === "png" ? "image/png" : "image/jpeg";
                 const base64 = imgBuffer.toString("base64");
-                
+
                 // Trích xuất phần "images/filename.ext" từ đường dẫn thật trong zip
                 // Mathpix HTML thường trỏ src="images/filename.ext"
                 const match = entry.fileName.match(/images\/[^/]+$/);
                 const srcKey = match ? match[0] : entry.fileName;
-                
+
                 imageMap.set(srcKey, `data:${mimeType};base64,${base64}`);
                 zipfile.readEntry();
               });
@@ -991,11 +1034,19 @@ export class SourceDocumentsService {
 
           // Replace all image sources with their base64 representation
           for (const [fileName, base64Url] of imageMap.entries()) {
-            htmlContent = htmlContent.split(`src="${fileName}"`).join(`src="${base64Url}"`);
-            htmlContent = htmlContent.split(`src='${fileName}'`).join(`src='${base64Url}'`);
-            
-            htmlContent = htmlContent.split(`src="./${fileName}"`).join(`src="${base64Url}"`);
-            htmlContent = htmlContent.split(`src='./${fileName}'`).join(`src='${base64Url}'`);
+            htmlContent = htmlContent
+              .split(`src="${fileName}"`)
+              .join(`src="${base64Url}"`);
+            htmlContent = htmlContent
+              .split(`src='${fileName}'`)
+              .join(`src='${base64Url}'`);
+
+            htmlContent = htmlContent
+              .split(`src="./${fileName}"`)
+              .join(`src="${base64Url}"`);
+            htmlContent = htmlContent
+              .split(`src='./${fileName}'`)
+              .join(`src='${base64Url}'`);
           }
 
           resolve(htmlContent);
@@ -1032,7 +1083,7 @@ export class SourceDocumentsService {
         : {};
 
     const printedPage = metadata.printedPage || {};
-    
+
     const updatedPrintedPage = {
       ...printedPage,
       printedPageLabel: dto.printedPageLabel ?? null,

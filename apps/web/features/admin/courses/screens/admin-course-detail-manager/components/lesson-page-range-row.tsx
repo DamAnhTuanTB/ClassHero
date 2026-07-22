@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { FilePlus2, FileText, Trash2, Upload, Maximize2, Minimize2 } from "lucide-react";
 import {
-  formatDocumentKind,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Trash2,
+  FileText,
+  FilePlus2,
+  Upload,
+  Eye,
+} from "lucide-react";
+import {
   formatFileSize,
   getLessonDocumentRange,
   getPdfPageFromPrintedPage,
@@ -32,8 +40,6 @@ export function LessonPageRangeRow({
   sourceDocument,
   rangeSubmitAttempted,
   onDeleteSupplement,
-  onOpenPrimaryUpload,
-  onOpenSupplementUpload,
   onUpdateRange,
 }: {
   documents: AdminLessonDocumentApi[];
@@ -46,29 +52,32 @@ export function LessonPageRangeRow({
   sourceDocument: AdminSourceDocumentApi | null;
   rangeSubmitAttempted: boolean;
   onDeleteSupplement: (lessonId: string, documentId: string) => void;
-  onOpenPrimaryUpload: (lessonId: string) => void;
-  onOpenSupplementUpload: (lessonId: string) => void;
   onUpdateRange: (
     lessonId: string,
-    field: "pageEnd" | "pageStart",
-    value: string,
+    field:
+      "pageEnd" | "pageStart" | "isPrimary" | "primarySupplementId" | "newSupplements",
+    value:
+      | string
+      | boolean
+      | null
+      | { id: string; file: File | null; title: string; isPrimary: boolean }[],
   ) => void;
 }) {
   const primaryDocument = getPrimaryLessonDocument(documents);
   const supplements = getSupplementLessonDocuments(documents);
+  const newSupplements = draft.newSupplements ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
   const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
-  const savedRange = getLessonDocumentRange(primaryDocument);
   const pdfPageStart = getPdfPageFromPrintedPage(draft.pageStart, pages);
   const pdfPageEnd = getPdfPageFromPrintedPage(draft.pageEnd, pages);
-  const previewPage = pdfPageStart !== null ? pages.find((page) => page.pageNumber === pdfPageStart) : null;
+  const previewPage =
+    pdfPageStart !== null ? pages.find((page) => page.pageNumber === pdfPageStart) : null;
   const printedPage = previewPage ? getPrintedPageView(previewPage) : null;
-  
+
   const previewPages =
     pdfPageStart !== null && pdfPageEnd !== null && pdfPageStart <= pdfPageEnd
       ? pages.filter(
-          (page) =>
-            page.pageNumber >= pdfPageStart && page.pageNumber <= pdfPageEnd,
+          (page) => page.pageNumber >= pdfPageStart && page.pageNumber <= pdfPageEnd,
         )
       : previewPage
         ? [previewPage]
@@ -82,22 +91,32 @@ export function LessonPageRangeRow({
   return (
     <article
       data-testid={`lesson-document-row-${item.lesson.id}`}
-      className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3"
+      className="flex flex-col gap-4"
     >
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem] xl:items-start">
-        <div className="min-w-0">
-          <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-            Chương {item.chapterOrder}
-          </p>
-          <h3 className="mt-1 text-sm font-extrabold leading-6 text-[var(--theme-text-strong)]">
-            {item.lesson.title}
-          </h3>
+      <div className="min-w-0 pt-2">
+        <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+          Chương {item.chapterOrder}
+        </p>
+        <h3 className="mt-1 text-sm font-extrabold leading-tight text-[var(--theme-text-strong)]">
+          {item.lesson.title}
+        </h3>
+      </div>
+
+      <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+            <FileText className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+              Khoảng trang
+            </h3>
+          </div>
         </div>
 
-        {/* On mobile: side-by-side row. On xl+: each input is its own grid column */}
-        <div className="grid grid-cols-2 gap-3 xl:contents">
+        <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
           <label className="block">
-            <span className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+            <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
               Từ trang
             </span>
             <input
@@ -108,12 +127,12 @@ export function LessonPageRangeRow({
               onChange={(event) =>
                 onUpdateRange(item.lesson.id, "pageStart", event.target.value)
               }
-              className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-1 min-h-[2.75rem] w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-surface)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
 
           <label className="block">
-            <span className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+            <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
               Đến trang
             </span>
             <input
@@ -124,27 +143,109 @@ export function LessonPageRangeRow({
               onChange={(event) =>
                 onUpdateRange(item.lesson.id, "pageEnd", event.target.value)
               }
-              className="mt-1 min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-extrabold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-1 min-h-[2.75rem] w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-surface)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
         </div>
-      </div>
 
-      <div className="min-w-0 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2 transition-all">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-            Xem nhanh
-          </p>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {previewPages.length > 0 && (
-              <div className="hidden sm:flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+        <div className="mt-4 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id={`admin-lesson-source-primary-${item.lesson.id}`}
+            disabled={isSaving}
+            checked={draft.isPrimary ?? true}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onUpdateRange(item.lesson.id, "isPrimary", checked);
+              if (checked) {
+                onUpdateRange(item.lesson.id, "primarySupplementId", null);
+
+                // Uncheck new supplements if any
+                if (newSupplements.length > 0) {
+                  const updated = newSupplements.map((doc) => ({
+                    ...doc,
+                    isPrimary: false,
+                  }));
+                  onUpdateRange(item.lesson.id, "newSupplements", updated);
+                }
+              }
+            }}
+            className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+          <label
+            htmlFor={`admin-lesson-source-primary-${item.lesson.id}`}
+            className={`text-sm font-semibold text-[var(--theme-text-strong)] ${
+              isSaving ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+            }`}
+          >
+            Đánh dấu là tài liệu chính
+          </label>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 transition-all">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+              Xem nhanh
+            </p>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {previewPages.length > 0 && (
+                <div className="hidden sm:flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode("ocr")}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
+                      previewMode === "ocr"
+                        ? "bg-[var(--theme-primary)] text-white"
+                        : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                    }`}
+                  >
+                    Nội dung OCR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode("pdf")}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
+                      previewMode === "pdf"
+                        ? "bg-[var(--theme-primary)] text-white"
+                        : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                    }`}
+                  >
+                    PDF gốc
+                  </button>
+                </div>
+              )}
+              {hasMultiplePages && (
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                >
+                  {isExpanded ? (
+                    <>
+                      <Minimize2 className="h-3.5 w-3.5" />
+                      Thu gọn
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="h-3.5 w-3.5" />
+                      Mở rộng
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Mobile-only toggle row */}
+          {previewPages.length > 0 && (
+            <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
+              <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]">
                 <button
                   type="button"
                   onClick={() => setPreviewMode("ocr")}
                   className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
                     previewMode === "ocr"
                       ? "bg-[var(--theme-primary)] text-white"
-                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-hover)]"
                   }`}
                 >
                   Nội dung OCR
@@ -155,214 +256,336 @@ export function LessonPageRangeRow({
                   className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
                     previewMode === "pdf"
                       ? "bg-[var(--theme-primary)] text-white"
-                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
+                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-hover)]"
                   }`}
                 >
                   PDF gốc
                 </button>
               </div>
-            )}
-            {hasMultiplePages && (
-              <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
-              >
-                {isExpanded ? (
-                  <>
-                    <Minimize2 className="h-3.5 w-3.5" />
-                    Thu gọn
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="h-3.5 w-3.5" />
-                    Mở rộng
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Mobile-only toggle row */}
-        {previewPages.length > 0 && (
-          <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
-            <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
-              <button
-                type="button"
-                onClick={() => setPreviewMode("ocr")}
-                className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
-                  previewMode === "ocr"
-                    ? "bg-[var(--theme-primary)] text-white"
-                    : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
-                }`}
-              >
-                Nội dung OCR
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewMode("pdf")}
-                className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
-                  previewMode === "pdf"
-                    ? "bg-[var(--theme-primary)] text-white"
-                    : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
-                }`}
-              >
-                PDF gốc
-              </button>
             </div>
-          </div>
-        )}
-        {/* Compact hint when collapsed */}
-        {!isExpanded && previewMode === "pdf" && (
-          <p className="mt-1 text-xs italic text-[var(--theme-text-muted)]">
-            Mở rộng để xem bản PDF chi tiết
-          </p>
-        )}
-        {isExpanded && (
-          <div
-            className="mx-auto mt-2 w-full max-w-3xl max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all"
-          >
-            {previewPages.length > 0 ? (
-              <div className="flex flex-col gap-4">
-                {previewPages.map((page, index) => {
-                  const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
-                  const printed = getPrintedPageView(page);
-                  return (
-                    <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-4" : ""}>
-                      <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                        Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
-                      </div>
-                      {previewMode === "ocr" ? (
-                        text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>
-                      ) : (
-                        <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
-                          {sourceDocument?.file?.publicUrl ? (
-                            <div className="inline-block align-top">
-                              <PdfPagePreview pdfUrl={sourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
-                            </div>
-                          ) : (
-                            <p className="p-4 italic text-[var(--theme-text-muted)]">Không tìm thấy file PDF</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p>
-                {printedPage
-                  ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
-                  : "Chưa có trang xem nhanh"}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-start">
-        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-              Tài liệu chính
-            </p>
-            {primaryDocument ? (
-              <DocumentStatusBadge
-                jobStatus={primaryDocument.processingJob?.status}
-                progress={primaryDocument.processingJob?.progress}
-                status={primaryDocument.status}
-              />
-            ) : null}
-          </div>
-          {primaryDocument ? (
-            <div className="mt-2">
-              <p className="line-clamp-1 text-sm font-extrabold text-[var(--theme-text-strong)]">
-                {primaryDocument.title ??
-                  primaryDocument.sourceDocument?.title ??
-                  primaryDocument.file.originalName}
-              </p>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm font-semibold text-[var(--theme-text-muted)]">
-              Chưa có tài liệu chính
+          )}
+          {/* Compact hint when collapsed */}
+          {!isExpanded && previewMode === "pdf" && (
+            <p className="mt-1 text-xs italic text-[var(--theme-text-muted)]">
+              Mở rộng để xem bản PDF chi tiết
             </p>
           )}
+          {isExpanded && (
+            <div className="mx-auto mt-2 w-full max-w-3xl max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 shadow-sm text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all">
+              {previewPages.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {previewPages.map((page, index) => {
+                    const text =
+                      page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+                    const printed = getPrintedPageView(page);
+                    return (
+                      <div
+                        key={page.id}
+                        className={
+                          index > 0
+                            ? "border-t border-[var(--theme-border-strong)] pt-4"
+                            : ""
+                        }
+                      >
+                        <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
+                          Trang PDF {page.pageNumber}{" "}
+                          {printed.printedPageLabel
+                            ? `(Trang in: ${printed.printedPageLabel})`
+                            : ""}
+                        </div>
+                        {previewMode === "ocr" ? (
+                          text ? (
+                            <MathpixMarkdownRenderer content={text} />
+                          ) : (
+                            <p className="italic text-[var(--theme-text-muted)]">
+                              Không có nội dung
+                            </p>
+                          )
+                        ) : (
+                          <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
+                            {sourceDocument?.file?.publicUrl ? (
+                              <div className="inline-block align-top">
+                                <PdfPagePreview
+                                  pdfUrl={sourceDocument.file.publicUrl}
+                                  pageNumber={page.pageNumber}
+                                  width={650}
+                                />
+                              </div>
+                            ) : (
+                              <p className="p-4 italic text-[var(--theme-text-muted)]">
+                                Không tìm thấy file PDF
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p>
+                  {printedPage
+                    ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
+                    : "Chưa có trang xem nhanh"}
+                </p>
+              )}
+            </div>
+          )}
         </div>
+      </section>
 
-        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
+      <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <div className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+              <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
               Tài liệu bổ sung
-            </p>
-            <span className="rounded-full bg-[var(--theme-surface)] px-2 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
+            </h3>
+            <span className="rounded-full bg-[var(--theme-surface)] px-2 py-0.5 text-xs font-extrabold text-[var(--theme-text-muted)]">
               {supplements.length}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              onUpdateRange(item.lesson.id, "newSupplements", [
+                ...newSupplements,
+                { id: crypto.randomUUID(), file: null, title: "", isPrimary: false },
+              ]);
+            }}
+            disabled={isSaving}
+            className="theme-button-neutral inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Thêm tài liệu
+          </button>
+        </div>
 
-          {supplements.length === 0 ? (
-            <p className="mt-2 text-sm font-semibold text-[var(--theme-text-muted)]">
-              Chưa có file bổ sung
-            </p>
-          ) : (
-            <div className="mt-2 grid gap-2">
-              {supplements.map((document) => (
+        {supplements.length === 0 && newSupplements.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
+            Chưa thêm tài liệu tham khảo.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {supplements.map((document, index) => {
+              const displayIndex = index + 1;
+              return (
                 <div
                   key={document.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-[var(--theme-surface)] px-3 py-2"
+                  className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
                 >
-                  <div className="min-w-0">
-                    <p className="line-clamp-1 text-sm font-bold text-[var(--theme-text-strong)]">
-                      {document.title ?? document.file.originalName}
-                    </p>
-                    <p className="text-xs font-bold text-[var(--theme-text-muted)]">
-                      {formatFileSize(document.file.sizeBytes)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <DocumentStatusBadge
-                      jobStatus={document.processingJob?.status}
-                      progress={document.processingJob?.progress}
-                      status={document.status}
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      Tên tài liệu {displayIndex}
+                    </span>
+                    <input
+                      type="text"
+                      value={document.title ?? document.file.originalName}
+                      readOnly
+                      disabled
+                      className="min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg-disabled)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] opacity-70 outline-none cursor-not-allowed"
                     />
+                  </label>
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      File tài liệu {displayIndex}
+                    </span>
+                    <div className="mt-1 flex min-h-11 flex-1 items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] transition">
+                      <FilePlus2 className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
+                      <span
+                        className="min-w-0 truncate"
+                        title={document.file.originalName}
+                      >
+                        {document.file.originalName}
+                      </span>
+                      {document.status && (
+                        <div className="ml-auto flex shrink-0 items-center">
+                          <DocumentStatusBadge
+                            jobStatus={document.processingJob?.status}
+                            progress={document.processingJob?.progress}
+                            status={document.status}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:mt-[22px]">
+                    <button
+                      type="button"
+                      disabled={!document.file.publicUrl}
+                      onClick={() => {
+                        if (document.file.publicUrl) {
+                          window.open(document.file.publicUrl, "_blank");
+                        }
+                      }}
+                      className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    </button>
                     <button
                       type="button"
                       disabled={isDeletingSupplement}
                       onClick={() => onDeleteSupplement(item.lesson.id, document.id)}
                       aria-label={`Xóa ${document.title ?? document.file.originalName}`}
-                      className="theme-button-danger-subtle grid h-9 w-9 place-items-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                      className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row xl:flex-col">
-          <button
-            type="button"
-            onClick={() => onOpenPrimaryUpload(item.lesson.id)}
-            className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition"
-          >
-            {primaryDocument ? (
-              <Upload className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <FileText className="h-4 w-4" aria-hidden="true" />
-            )}
-            {primaryDocument ? "Thay tài liệu chính" : "Upload tài liệu chính"}
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenSupplementUpload(item.lesson.id)}
-            className="theme-button-success inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition"
-          >
-            <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-            Thêm tài liệu bổ sung
-          </button>
-        </div>
-      </div>
+                  <div className="col-span-full mt-1 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`admin-lesson-supplement-primary-${document.id}`}
+                      checked={draft.primarySupplementId === document.id}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        if (checked) {
+                          onUpdateRange(item.lesson.id, "isPrimary", false);
+                          onUpdateRange(
+                            item.lesson.id,
+                            "primarySupplementId",
+                            document.id,
+                          );
+
+                          // Uncheck new supplements if any
+                          if (newSupplements.length > 0) {
+                            const updated = newSupplements.map((doc) => ({
+                              ...doc,
+                              isPrimary: false,
+                            }));
+                            onUpdateRange(item.lesson.id, "newSupplements", updated);
+                          }
+                        } else {
+                          onUpdateRange(item.lesson.id, "primarySupplementId", null);
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                    />
+                    <label
+                      htmlFor={`admin-lesson-supplement-primary-${document.id}`}
+                      className="text-sm font-semibold text-[var(--theme-text-strong)] cursor-pointer"
+                    >
+                      Đánh dấu là tài liệu chính
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+
+            {newSupplements.map((newDoc, index) => (
+              <div
+                key={newDoc.id}
+                className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
+              >
+                <label className="block min-w-0">
+                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                    Tên tài liệu {supplements.length + index + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={newDoc.title}
+                    onChange={(e) => {
+                      const updated = [...newSupplements];
+                      updated[index] = { ...updated[index]!, title: e.target.value };
+                      onUpdateRange(item.lesson.id, "newSupplements", updated);
+                    }}
+                    placeholder="Ví dụ: Phiếu đọc thêm"
+                    className="min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+
+                <div className="min-w-0">
+                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                    File tài liệu {supplements.length + index + 1}
+                  </span>
+                  <label className="mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] transition hover:border-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]">
+                    <Upload className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
+                    <span className="min-w-0 truncate">
+                      {newDoc.file?.name ?? "Chọn file PDF"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      disabled={isSaving}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        const updated = [...newSupplements];
+                        updated[index] = { ...updated[index]!, file };
+                        onUpdateRange(item.lesson.id, "newSupplements", updated);
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2 lg:mt-[22px]">
+                  <button
+                    type="button"
+                    disabled={!newDoc.file}
+                    onClick={() => {
+                      if (newDoc.file) {
+                        const objectUrl = URL.createObjectURL(newDoc.file);
+                        window.open(objectUrl, "_blank");
+                      }
+                    }}
+                    className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => {
+                      const updated = newSupplements.filter((_, i) => i !== index);
+                      onUpdateRange(item.lesson.id, "newSupplements", updated);
+                      if (newDoc.isPrimary) {
+                        // Trả lại tài liệu chính cho khoảng trang nếu đang xóa cái chính
+                        onUpdateRange(item.lesson.id, "isPrimary", true);
+                      }
+                    }}
+                    className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="col-span-full mt-1 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`admin-lesson-new-supplement-primary-${newDoc.id}`}
+                    checked={newDoc.isPrimary}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      const updated = newSupplements.map((doc, i) => ({
+                        ...doc,
+                        isPrimary: i === index ? checked : false,
+                      }));
+                      onUpdateRange(item.lesson.id, "newSupplements", updated);
+
+                      if (checked) {
+                        onUpdateRange(item.lesson.id, "isPrimary", false);
+                        onUpdateRange(item.lesson.id, "primarySupplementId", null);
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                  />
+                  <label
+                    htmlFor={`admin-lesson-new-supplement-primary-${newDoc.id}`}
+                    className="text-sm font-semibold text-[var(--theme-text-strong)] cursor-pointer"
+                  >
+                    Đánh dấu là tài liệu chính
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {rangeSubmitAttempted && issue ? (
         <p className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-2 text-sm font-bold text-[var(--theme-danger)]">

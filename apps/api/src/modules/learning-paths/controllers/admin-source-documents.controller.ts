@@ -124,7 +124,9 @@ export class AdminSourceDocumentsController {
     return this.sourceDocumentsService.getOcrHtml(sourceDocumentId);
   }
 
-  @Patch("admin/learning-paths/source-documents/:sourceDocumentId/pages/:pageId/confirm-printed-page")
+  @Patch(
+    "admin/learning-paths/source-documents/:sourceDocumentId/pages/:pageId/confirm-printed-page",
+  )
   @ApiOperation({ summary: "Xác nhận số trang in cho trang bị lỗi" })
   confirmPrintedPage(
     @Param("sourceDocumentId") sourceDocumentId: string,

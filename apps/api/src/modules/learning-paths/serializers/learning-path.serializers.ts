@@ -9,7 +9,8 @@ import type {
   PublicViewerContext,
 } from "#api/modules/learning-paths/types/learning-path.types";
 
-type PublicLearningPathAnyRecord = PublicLearningPathRecord | PublicLearningPathDetailRecord;
+type PublicLearningPathAnyRecord =
+  PublicLearningPathRecord | PublicLearningPathDetailRecord;
 type PublicLessonRecord = PublicLearningPathRecord["lessons"][number];
 type PublicChapterRecord = PublicLearningPathDetailRecord["chapters"][number];
 
@@ -107,7 +108,9 @@ export function serializePublicLearningPath(
     },
     progress: learningProgress,
     lessons: record.lessons.map(serializePublicLesson),
-    ...("chapters" in record ? { chapters: record.chapters.map(serializePublicChapter) } : {}),
+    ...("chapters" in record
+      ? { chapters: record.chapters.map(serializePublicChapter) }
+      : {}),
   };
 }
 

@@ -57,9 +57,7 @@ export function resolveOcrVisualReference(
   const pageNumbers = new Set(pageFallbacks.map((page) => page.pageNumber));
   const queryTerms = tokenize(input.query);
 
-  let images = input.manifest.images.filter((image) =>
-    pageNumbers.has(image.pageNumber),
-  );
+  let images = input.manifest.images.filter((image) => pageNumbers.has(image.pageNumber));
 
   if (input.kind && input.kind !== "visual") {
     images = images.filter((image) => image.kind === input.kind);

@@ -8,6 +8,7 @@ import {
   createAdminSourceDocument,
   deleteAdminLessonSupplementDocument,
   deleteAdminSourceDocument,
+  updateAdminLessonSupplementDocument,
   getAdminFileSignedUrl,
   listAdminLearningPathLessonDocuments,
   listAdminSourceDocumentPages,
@@ -101,7 +102,9 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   });
-  const sourceDocuments = sourceDocumentsQuery.data ?? (EMPTY_ARRAY as typeof sourceDocumentsQuery.data & any[]);
+  const sourceDocuments =
+    sourceDocumentsQuery.data ??
+    (EMPTY_ARRAY as typeof sourceDocumentsQuery.data & any[]);
   const selectedSourceDocument =
     sourceDocuments.find((document) => document.id === selectedSourceDocumentId) ?? null;
 
@@ -115,7 +118,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: selectedSourceDocument?.status === "PROCESSING" ? 5_000 : false,
     refetchIntervalInBackground: false,
   });
-  const sourcePages = sourcePagesQuery.data ?? (EMPTY_ARRAY as typeof sourcePagesQuery.data & any[]);
+  const sourcePages =
+    sourcePagesQuery.data ?? (EMPTY_ARRAY as typeof sourcePagesQuery.data & any[]);
 
   const lessonDocumentsQuery = useQuery({
     queryKey: adminCourseDocumentQueryKeys.lessonDocuments(userId, pathId),
@@ -124,15 +128,24 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   });
-  const lessonDocuments = lessonDocumentsQuery.data ?? (EMPTY_ARRAY as typeof lessonDocumentsQuery.data & any[]);
+  const lessonDocuments =
+    lessonDocumentsQuery.data ??
+    (EMPTY_ARRAY as typeof lessonDocumentsQuery.data & any[]);
   const documentsByLessonId = useMemo(
     () => groupLessonDocumentsByLessonId(lessonDocuments),
     [lessonDocuments],
   );
   const pageLimit = getSourceDocumentPageLimit(selectedSourceDocument, sourcePages);
   const rangeValidation = useMemo(
-    () => validateLessonRangeDraft(lessons, rangeDraft, pageLimit, sourcePages),
-    [lessons, pageLimit, rangeDraft, sourcePages],
+    () =>
+      validateLessonRangeDraft(
+        lessons,
+        rangeDraft,
+        pageLimit,
+        sourcePages,
+        documentsByLessonId,
+      ),
+    [lessons, pageLimit, rangeDraft, sourcePages, documentsByLessonId],
   );
   const localRangeWarnings = useMemo(
     () => buildLocalPageRangeWarnings(rangeValidation.ranges, pageLimit),
@@ -243,7 +256,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         (old: any) => {
           if (!old) return [sourceDocument];
           return [sourceDocument, ...old];
-        }
+        },
       );
       setSelectedSourceDocumentId(sourceDocument.id);
       setDialogState(null);
@@ -259,7 +272,11 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
 
   const retrySourceDocumentMutation = useMutation({
     mutationFn: (forceNewOcr?: boolean) =>
-      requestAdminSourceDocumentProcessing(selectedSourceDocument?.id ?? "", token, forceNewOcr),
+      requestAdminSourceDocumentProcessing(
+        selectedSourceDocument?.id ?? "",
+        token,
+        forceNewOcr,
+      ),
     onSuccess: async () => {
       await invalidateDocumentQueries();
       toast.success("Đã bắt đầu xử lý lại");
@@ -279,7 +296,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         (old: any) => {
           if (!old) return [];
           return old.filter((doc: any) => doc.id !== selectedSourceDocumentId);
-        }
+        },
       );
       setSelectedSourceDocumentId(null);
       await invalidateDocumentQueries();
@@ -293,12 +310,90 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
   });
 
   const saveRangesMutation = useMutation({
-    mutationFn: () =>
-      saveAdminLessonPageRanges(
+    mutationFn: async () => {
+      const response = await saveAdminLessonPageRanges(
         selectedSourceDocument?.id ?? "",
         rangeValidation.ranges,
         token,
-      ),
+      );
+
+      const supplementUpdates = Object.entries(rangeDraft).flatMap(
+        ([lessonId, draft]) => {
+          const documents = documentsByLessonId[lessonId] ?? [];
+          const currentPrimaryDoc = documents.find(
+            (d) => d.kind === "PRIMARY_REPLACEMENT",
+          );
+          const calls = [];
+
+          if (currentPrimaryDoc && currentPrimaryDoc.id !== draft.primarySupplementId) {
+            calls.push(
+              updateAdminLessonSupplementDocument(
+                lessonId,
+                currentPrimaryDoc.id,
+                { kind: "SUPPLEMENT" },
+                token,
+              ),
+            );
+          }
+
+          if (
+            draft.primarySupplementId &&
+            draft.primarySupplementId !== currentPrimaryDoc?.id
+          ) {
+            calls.push(
+              updateAdminLessonSupplementDocument(
+                lessonId,
+                draft.primarySupplementId,
+                { kind: "PRIMARY_REPLACEMENT" },
+                token,
+              ),
+            );
+          }
+
+          if (draft.newSupplements && draft.newSupplements.length > 0) {
+            draft.newSupplements.forEach((newDoc) => {
+              if (newDoc.file) {
+                calls.push(
+                  (async () => {
+                    const uploadedFile = await uploadAdminLessonDocumentFile(
+                      newDoc.file!,
+                      token,
+                    );
+                    if (newDoc.isPrimary) {
+                      return replaceAdminLessonPrimaryDocument(
+                        lessonId,
+                        {
+                          fileId: uploadedFile.id,
+                          title: newDoc.title.trim() || uploadedFile.originalName,
+                        },
+                        token,
+                      );
+                    }
+                    return createAdminLessonSupplementDocument(
+                      lessonId,
+                      {
+                        fileId: uploadedFile.id,
+                        kind: "SUPPLEMENT",
+                        title: newDoc.title.trim() || uploadedFile.originalName,
+                      },
+                      token,
+                    );
+                  })(),
+                );
+              }
+            });
+          }
+
+          return calls;
+        },
+      );
+
+      if (supplementUpdates.length > 0) {
+        await Promise.all(supplementUpdates);
+      }
+
+      return response;
+    },
     onSuccess: async (response) => {
       setLatestRangeWarnings(response.warnings);
       setDialogState(null);
@@ -378,6 +473,33 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     },
   });
 
+  const updateSupplementMutation = useMutation({
+    mutationFn: ({
+      documentId,
+      lessonId,
+      isPrimary,
+    }: {
+      documentId: string;
+      lessonId: string;
+      isPrimary: boolean;
+    }) =>
+      updateAdminLessonSupplementDocument(
+        lessonId,
+        documentId,
+        { kind: isPrimary ? "PRIMARY_REPLACEMENT" : "SUPPLEMENT" },
+        token,
+      ),
+    onSuccess: async () => {
+      await invalidateDocumentQueries();
+      toast.info("Đã cập nhật tài liệu bổ sung");
+    },
+    onError: (error) => {
+      toast.error("Chưa cập nhật được tài liệu", {
+        description: getErrorMessage(error),
+      });
+    },
+  });
+
   const openFileMutation = useMutation({
     mutationFn: (fileId: string) => getAdminFileSignedUrl(fileId, token),
     onSuccess: () => {
@@ -392,14 +514,21 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
 
   function updateRangeDraft(
     lessonId: string,
-    field: "pageEnd" | "pageStart",
-    value: string,
+    field:
+      "pageEnd" | "pageStart" | "isPrimary" | "primarySupplementId" | "newSupplements",
+    value:
+      | string
+      | boolean
+      | null
+      | { id: string; file: File | null; title: string; isPrimary: boolean }[],
   ) {
     setRangeDraft((current) => ({
       ...current,
       [lessonId]: {
         pageEnd: current[lessonId]?.pageEnd ?? "",
         pageStart: current[lessonId]?.pageStart ?? "",
+        isPrimary: current[lessonId]?.isPrimary,
+        primarySupplementId: current[lessonId]?.primarySupplementId,
         [field]: value,
       },
     }));
@@ -474,6 +603,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     isOpeningFile: openFileMutation.isPending,
     isRetryingSourceDocument: retrySourceDocumentMutation.isPending,
     isSavingRanges: saveRangesMutation.isPending,
+    isUpdatingSupplement: updateSupplementMutation.isPending,
     isUploadingLessonDocument: uploadLessonDocumentMutation.isPending,
     isUploadingSourceDocument: uploadSourceDocumentMutation.isPending,
     latestRangeWarnings,
@@ -497,6 +627,11 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       deleteSourceDocument: () => deleteSourceDocumentMutation.mutateAsync(),
       deleteSupplementDocument: (lessonId: string, documentId: string) =>
         deleteSupplementMutation.mutateAsync({ documentId, lessonId }),
+      updateSupplementDocument: (
+        lessonId: string,
+        documentId: string,
+        isPrimary: boolean,
+      ) => updateSupplementMutation.mutateAsync({ documentId, lessonId, isPrimary }),
       openLessonPrimaryUpload: (lessonId: string, returnTo?: "ranges") =>
         setDialogState({
           kind: "PRIMARY_REPLACEMENT",
@@ -512,7 +647,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
           type: "lesson-upload",
         }),
       openPagesDialog: () => setDialogState({ type: "pages", filter: "all" }),
-      openPagesDialogWithWarnings: () => setDialogState({ type: "pages", filter: "warnings" }),
+      openPagesDialogWithWarnings: () =>
+        setDialogState({ type: "pages", filter: "warnings" }),
       openRangesDialog: () => setDialogState({ type: "ranges" }),
       openSourceDocumentFile: () => {
         if (selectedSourceDocument) {
@@ -522,12 +658,14 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
               if (popup) {
                 popup.location.href = signedUrl.url;
               } else {
-                toast.error("Trình duyệt đã chặn cửa sổ bật lên. Vui lòng cấp quyền cho trang web.");
+                toast.error(
+                  "Trình duyệt đã chặn cửa sổ bật lên. Vui lòng cấp quyền cho trang web.",
+                );
               }
             },
             onError: () => {
               if (popup) popup.close();
-            }
+            },
           });
         }
       },
@@ -536,7 +674,8 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         lessonDocumentsQuery.refetch();
         sourceDocumentsQuery.refetch();
       },
-      retrySourceDocument: (forceNewOcr?: boolean) => retrySourceDocumentMutation.mutateAsync(forceNewOcr),
+      retrySourceDocument: (forceNewOcr?: boolean) =>
+        retrySourceDocumentMutation.mutateAsync(forceNewOcr),
       saveRanges,
       selectSourceDocument: setSelectedSourceDocumentId,
       updateRangeDraft,

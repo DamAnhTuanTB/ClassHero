@@ -36,12 +36,12 @@ export function mapLearningPathToCourseDetail(
   const isCoursePublished = learningPath.status === "PUBLISHED";
   const completedLessonCount = learningPath.progress?.completedLessonCount ?? 0;
   const continueLessonId = isCoursePublished
-    ? learningPath.progress?.continueLessonId ?? learningPath.access.trialLessonId ?? ""
+    ? (learningPath.progress?.continueLessonId ?? learningPath.access.trialLessonId ?? "")
     : "";
   const continueLessonTitle = isCoursePublished
-    ? learningPath.progress?.continueLessonTitle ??
+    ? (learningPath.progress?.continueLessonTitle ??
       orderedLessons.find((lesson) => lesson.id === continueLessonId)?.title ??
-      ""
+      "")
     : "";
   const continueLessonKind = learningPath.progress?.continueLessonKind ?? "first";
   const chapterSource = learningPath.chapters ?? [];
@@ -95,7 +95,7 @@ function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCo
     originalPriceVnd: learningPath.originalPriceVnd,
     progressPercent:
       access !== "locked" && !isUnderMaintenance
-        ? progress?.progressPercent ?? 0
+        ? (progress?.progressPercent ?? 0)
         : undefined,
     salePriceVnd: learningPath.salePriceVnd ?? undefined,
     slug: learningPath.slug,
@@ -230,8 +230,7 @@ function normalizeListMeta(meta: StudentCoursesListMeta | undefined) {
     pageSize: typeof meta?.pageSize === "number" ? meta.pageSize : 100,
     total: typeof meta?.total === "number" ? meta.total : 0,
     totalPages: typeof meta?.totalPages === "number" ? meta.totalPages : 1,
-    priorityGrade:
-      typeof meta?.priorityGrade === "number" ? meta.priorityGrade : null,
+    priorityGrade: typeof meta?.priorityGrade === "number" ? meta.priorityGrade : null,
     gradeGroups: Array.isArray(meta?.gradeGroups)
       ? meta.gradeGroups.filter(isGradeGroup)
       : [],
@@ -253,8 +252,7 @@ function extractDescriptionText(value: unknown) {
   const text = findFirstTextNode(value);
 
   return (
-    text ??
-    "Khóa học theo từng chương, giúp em nắm chắc kiến thức và luyện tập đều đặn."
+    text ?? "Khóa học theo từng chương, giúp em nắm chắc kiến thức và luyện tập đều đặn."
   );
 }
 

@@ -11,10 +11,7 @@ import { resolve } from "node:path";
 import { describe, it, expect, beforeAll } from "vitest";
 import { PdfMetadataService } from "../src/workers/services/pdf-metadata.service";
 
-const TEST_PDF_PATH = resolve(
-  __dirname,
-  "Toan-7-Tap-1-lam-net.pdf",
-);
+const TEST_PDF_PATH = resolve(__dirname, "Toan-7-Tap-1-lam-net.pdf");
 const describePdfMetadata = existsSync(TEST_PDF_PATH) ? describe : describe.skip;
 
 describePdfMetadata("M4.4 OCR Pipeline - PdfMetadataService", () => {
@@ -45,9 +42,7 @@ describePdfMetadata("M4.4 OCR Pipeline - PdfMetadataService", () => {
 
 describe("M4.4 OCR Pipeline - Quality Scoring", () => {
   it("should score Vietnamese math text highly", async () => {
-    const { scorePageQuality } = await import(
-      "../src/workers/utils/quality-score"
-    );
+    const { scorePageQuality } = await import("../src/workers/utils/quality-score");
     const goodText = `
 Bài 1: Tập hợp Q các số hữu tỉ
 
@@ -63,18 +58,14 @@ Trên trục số, mỗi số hữu tỉ được biểu diễn bởi một đi�
   });
 
   it("should score empty text as 0", async () => {
-    const { scorePageQuality } = await import(
-      "../src/workers/utils/quality-score"
-    );
+    const { scorePageQuality } = await import("../src/workers/utils/quality-score");
     expect(scorePageQuality("")).toBe(0);
     expect(scorePageQuality(null)).toBe(0);
     expect(scorePageQuality(undefined)).toBe(0);
   });
 
   it("should penalize garbage text", async () => {
-    const { scorePageQuality } = await import(
-      "../src/workers/utils/quality-score"
-    );
+    const { scorePageQuality } = await import("../src/workers/utils/quality-score");
     const garbled = "\uFFFD\uFFFD\uFFFD\uFFFD\uFFFD abc \uFFFD\uFFFD";
     const score = scorePageQuality(garbled);
     console.log(`Garbage text score: ${score}`);

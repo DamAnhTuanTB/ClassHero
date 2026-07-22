@@ -71,17 +71,25 @@ test.describe("M4.5 admin lesson documents", () => {
     await panel.getByRole("button", { name: "Nhập khoảng trang" }).first().click();
     const rangeDialog = page.getByRole("dialog", { name: "Nhập khoảng trang" });
     await expect(
-      rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ")
+      rangeDialog
+        .getByTestId(`lesson-document-row-${lessonOneId}`)
+        .getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ"),
     ).toHaveValue("1");
     await expect(
-      rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ")
+      rangeDialog
+        .getByTestId(`lesson-document-row-${lessonOneId}`)
+        .getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ"),
     ).toHaveValue("4");
 
     await expect(
-      rangeDialog.getByTestId(`lesson-document-row-${lessonTwoId}`).getByLabel("Trang bắt đầu Bài học 2: Lũy thừa")
+      rangeDialog
+        .getByTestId(`lesson-document-row-${lessonTwoId}`)
+        .getByLabel("Trang bắt đầu Bài học 2: Lũy thừa"),
     ).toHaveValue("5");
     await expect(
-      rangeDialog.getByTestId(`lesson-document-row-${lessonTwoId}`).getByLabel("Trang kết thúc Bài học 2: Lũy thừa")
+      rangeDialog
+        .getByTestId(`lesson-document-row-${lessonTwoId}`)
+        .getByLabel("Trang kết thúc Bài học 2: Lũy thừa"),
     ).toHaveValue("8");
 
     const firstLessonRow = rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`);
@@ -250,10 +258,14 @@ test.describe("M4.5 admin lesson documents", () => {
       await expect(rangeDialog).toBeVisible();
       await expectDialogFitsViewport(page, rangeDialog);
       await expect(
-        rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ")
+        rangeDialog
+          .getByTestId(`lesson-document-row-${lessonOneId}`)
+          .getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ"),
       ).toHaveValue("1");
       await expect(
-        rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`).getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ")
+        rangeDialog
+          .getByTestId(`lesson-document-row-${lessonOneId}`)
+          .getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ"),
       ).toHaveValue("4");
       await expectNoHorizontalOverflow(page);
       await rangeDialog.getByRole("button", { name: "Đóng" }).click();

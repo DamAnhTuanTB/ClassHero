@@ -17,7 +17,8 @@ import { TextField } from "@/components/common/forms/text-field";
 import { adminStatuses, statusLabels } from "@/features/admin/courses/admin-courses-data";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
-import { LessonReferenceDocumentsSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-reference-documents-section";
+import { LessonSupplementDocumentsSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-supplement-documents-section";
+import { LessonHomeworkDocumentSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-homework-document-section";
 import { LessonSourceRangeSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-source-range-section";
 import type {
   AdminSourceDocumentApi,
@@ -75,9 +76,7 @@ export function LessonEditor({
         data-testid="lesson-editor-scroll-area"
         className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto"
       >
-        <div
-          className="min-w-0 space-y-3 p-4 sm:p-5"
-        >
+        <div className="min-w-0 space-y-3 p-4 sm:p-5">
           <div className="grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
             <TextField
               id="admin-lesson-order"
@@ -109,7 +108,12 @@ export function LessonEditor({
             sourceDocuments={sourceDocuments}
             onSelectSourceDocument={onSelectSourceDocument}
           />
-          <LessonReferenceDocumentsSection
+          <LessonSupplementDocumentsSection
+            disabled={disabled}
+            form={form}
+            isSaving={isSaving}
+          />
+          <LessonHomeworkDocumentSection
             disabled={disabled}
             form={form}
             isSaving={isSaving}

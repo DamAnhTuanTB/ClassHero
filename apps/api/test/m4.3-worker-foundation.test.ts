@@ -1,11 +1,7 @@
 import "reflect-metadata";
 import { InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import {
-  BackgroundJobQueue,
-  BackgroundJobStatus,
-  Prisma,
-} from "@prisma/client";
+import { BackgroundJobQueue, BackgroundJobStatus, Prisma } from "@prisma/client";
 import { Job, UnrecoverableError, type JobsOptions } from "bullmq";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "#api/common/prisma/prisma.service";
@@ -29,9 +25,7 @@ describe("M4.3 BullMQ worker foundation", () => {
     expect(getBullmqQueueName(BackgroundJobQueue.DOCUMENT_PROCESSING)).toBe(
       "document-processing",
     );
-    expect(getBullmqQueueName(BackgroundJobQueue.AI_GENERATION)).toBe(
-      "ai-generation",
-    );
+    expect(getBullmqQueueName(BackgroundJobQueue.AI_GENERATION)).toBe("ai-generation");
   });
 
   it("parses Redis URLs for BullMQ connection options", () => {
@@ -58,11 +52,9 @@ describe("M4.3 BullMQ worker foundation", () => {
     });
     const config = createConfigServiceMock();
     const queueAdd = vi.fn(
-      async (
-        _name: string,
-        _data: BackgroundJobBullmqData,
-        _opts: JobsOptions,
-      ) => ({ id: "bullmq-job-1" }),
+      async (_name: string, _data: BackgroundJobBullmqData, _opts: JobsOptions) => ({
+        id: "bullmq-job-1",
+      }),
     );
     const service = new TestBackgroundJobQueueService(config, prisma, queueAdd);
 

@@ -20,11 +20,7 @@ async function main() {
     pdfBuffer.byteOffset,
     pdfBuffer.byteOffset + pdfBuffer.byteLength,
   ) as ArrayBuffer;
-  formData.append(
-    "file",
-    new Blob([ab], { type: "application/pdf" }),
-    "test.pdf",
-  );
+  formData.append("file", new Blob([ab], { type: "application/pdf" }), "test.pdf");
   formData.append(
     "options_json",
     JSON.stringify({
@@ -57,10 +53,9 @@ async function main() {
       console.log(`\nFound ID: ${possibleId}`);
       console.log("Polling status...");
 
-      const statusRes = await fetch(
-        `https://api.mathpix.com/v3/pdf/${possibleId}`,
-        { headers: { app_id: appId, app_key: appKey } },
-      );
+      const statusRes = await fetch(`https://api.mathpix.com/v3/pdf/${possibleId}`, {
+        headers: { app_id: appId, app_key: appKey },
+      });
       const statusBody = await statusRes.text();
       console.log(`Status response: ${statusBody}`);
     }

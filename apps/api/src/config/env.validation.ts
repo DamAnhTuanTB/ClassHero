@@ -77,8 +77,7 @@ const envSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["MATHPIX_APP_ID"],
-          message:
-            "MATHPIX_APP_ID is required when OCR_PAID_ENABLED is true.",
+          message: "MATHPIX_APP_ID is required when OCR_PAID_ENABLED is true.",
         });
       }
 
@@ -86,13 +85,11 @@ const envSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["MATHPIX_APP_KEY"],
-          message:
-            "MATHPIX_APP_KEY is required when OCR_PAID_ENABLED is true.",
+          message: "MATHPIX_APP_KEY is required when OCR_PAID_ENABLED is true.",
         });
       }
     }
   });
-
 
 export type EnvConfig = z.infer<typeof envSchema>;
 

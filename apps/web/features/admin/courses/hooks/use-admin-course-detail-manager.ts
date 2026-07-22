@@ -265,7 +265,7 @@ export function useAdminCourseDetailManager(
     documentsManager: {
       documentsByLessonId: Record<string, AdminLessonDocumentApi[]>;
       actions: { reloadDocuments: () => void };
-    }
+    },
   ) {
     if (!path || !selectedChapterId) {
       return;
@@ -310,20 +310,18 @@ export function useAdminCourseDetailManager(
 
         try {
           const originalSupplements =
-            documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
-              (doc) => {
-                const isSupplementOrPrimary =
-                  doc.kind === "SUPPLEMENT" || doc.kind === "PRIMARY_REPLACEMENT";
-                const isSourceMapped =
-                  readRecord(doc.metadataJson)?.source === "source_document_page_range";
-                return isSupplementOrPrimary && !isSourceMapped;
-              }
-            ) || [];
-          
+            documentsManager.documentsByLessonId[selectedLesson.id]?.filter((doc) => {
+              const isSupplementOrHomework =
+                doc.kind === "SUPPLEMENT" || doc.kind === "HOMEWORK";
+              const isSourceMapped =
+                readRecord(doc.metadataJson)?.source === "source_document_page_range";
+              return isSupplementOrHomework && !isSourceMapped;
+            }) || [];
+
           const remainingIds = values.referenceDocuments
             .map((doc) => doc.id)
             .filter(Boolean);
-            
+
           const deletedDocs = originalSupplements.filter(
             (doc) => !remainingIds.includes(doc.id),
           );
@@ -341,29 +339,24 @@ export function useAdminCourseDetailManager(
             .map((doc) => {
               const original = originalSupplements.find((o) => o.id === doc.id);
               if (!original) return null;
-              
-              const isPrimary = doc.isPrimary ?? false;
-              const originalIsPrimary = original.kind === "PRIMARY_REPLACEMENT";
+
               const titleChanged = doc.title !== original.title;
-              const primaryChanged = isPrimary !== originalIsPrimary;
-              
-              if (!titleChanged && !primaryChanged) return null;
-              
+              const targetKind = doc.type ?? "SUPPLEMENT";
+              const typeChanged = targetKind !== original.kind;
+
+              if (!titleChanged && !typeChanged) return null;
+
               return {
                 id: doc.id!,
                 title: titleChanged ? doc.title : undefined,
-                kind: primaryChanged
-                  ? isPrimary
-                    ? "PRIMARY_REPLACEMENT"
-                    : "SUPPLEMENT"
-                  : undefined,
+                kind: typeChanged ? targetKind : undefined,
               };
             })
             .filter(Boolean) as Array<{
-              id: string;
-              title?: string;
-              kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT";
-            }>;
+            id: string;
+            title?: string;
+            kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT" | "HOMEWORK";
+          }>;
 
           for (const docUpdate of existingDocsToUpdate) {
             await updateAdminLessonSupplementDocument(
@@ -431,7 +424,7 @@ export function useAdminCourseDetailManager(
           lessonId,
           {
             fileId: uploadedFile.id,
-            kind: document.isPrimary ? "PRIMARY_REPLACEMENT" : "SUPPLEMENT",
+            kind: document.type === "HOMEWORK" ? "HOMEWORK" : "SUPPLEMENT",
             processingMode: "PROCESSING",
             title: document.title || uploadedFile.originalName,
           },

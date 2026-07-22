@@ -7,12 +7,7 @@ import {
 import type { PrintedPageReference } from "#api/workers/utils/ocr-printed-page";
 
 export type OcrVisualAssetKind =
-  | "figure"
-  | "diagram"
-  | "table"
-  | "equation"
-  | "image"
-  | "unknown";
+  "figure" | "diagram" | "table" | "equation" | "image" | "unknown";
 
 export interface OcrImageBox {
   x: number;
@@ -189,12 +184,8 @@ export function buildOcrImageManifest(
       dimensions: null,
       lines: [],
     };
-    const pageDimensions =
-      layout.dimensions ?? inferPageDimensions(image, layout.lines);
-    const normalizedBoundingBox = normalizeBox(
-      image.boundingBox,
-      pageDimensions,
-    );
+    const pageDimensions = layout.dimensions ?? inferPageDimensions(image, layout.lines);
+    const normalizedBoundingBox = normalizeBox(image.boundingBox, pageDimensions);
     const nearbyLines = findNearbyLines(image.boundingBox, layout.lines, pageDimensions);
     const nearbyText = buildNearbyText(nearbyLines);
     const captionCandidate = findCaptionCandidate(nearbyLines);
@@ -305,7 +296,11 @@ function extractPageLayouts(
     const parsed = JSON.parse(linesJson.toString("utf8")) as unknown;
     const pageRecords = extractPageRecords(parsed);
 
-    for (let pageIndex = 0; pageIndex < Math.max(expectedPages, pageRecords.length); pageIndex += 1) {
+    for (
+      let pageIndex = 0;
+      pageIndex < Math.max(expectedPages, pageRecords.length);
+      pageIndex += 1
+    ) {
       const pageRecord = pageRecords[pageIndex];
       const pageNumber = resolvePageNumber(pageRecord, pageIndex);
       const record = isRecord(pageRecord) ? pageRecord : {};
@@ -406,8 +401,7 @@ function normalizeLayoutLine(
       `p${pageNumber}:line${lineIndex + 1}`,
     text: sanitizeVisualText(rawText),
     type: readString(line, "type"),
-    confidence:
-      readNumber(line, "confidence") ?? readNumber(line, "confidence_rate"),
+    confidence: readNumber(line, "confidence") ?? readNumber(line, "confidence_rate"),
     boundingBox: readLineBox(line),
   };
 }
@@ -479,8 +473,8 @@ function boxFromPolygon(value: unknown[]): OcrImageBox | null {
       x: typeof point[0] === "number" ? point[0] : null,
       y: typeof point[1] === "number" ? point[1] : null,
     }))
-    .filter((point): point is { x: number; y: number } =>
-      point.x !== null && point.y !== null,
+    .filter(
+      (point): point is { x: number; y: number } => point.x !== null && point.y !== null,
     );
 
   if (points.length === 0) {
@@ -511,7 +505,12 @@ function findNearbyLines(
         ? verticalDistance(imageBox, line.boundingBox)
         : null;
       const horizontalOverlap = line.boundingBox
-        ? overlapRatio(imageBox.x, imageBox.x + imageBox.w, line.boundingBox.x, line.boundingBox.x + line.boundingBox.w)
+        ? overlapRatio(
+            imageBox.x,
+            imageBox.x + imageBox.w,
+            line.boundingBox.x,
+            line.boundingBox.x + line.boundingBox.w,
+          )
         : 0;
       const score =
         (distance ?? Number.MAX_SAFE_INTEGER) -
@@ -520,7 +519,10 @@ function findNearbyLines(
 
       return { line, relation, distance, score };
     })
-    .filter(({ line, distance }) => line.text.trim().length > 0 && (distance === null || distance <= maxDistance))
+    .filter(
+      ({ line, distance }) =>
+        line.text.trim().length > 0 && (distance === null || distance <= maxDistance),
+    )
     .sort((a, b) => a.score - b.score)
     .slice(0, 8);
 
@@ -550,9 +552,7 @@ function buildNearbyText(lines: OcrImageManifestNearbyLine[]): string | null {
   return text.length > 0 ? text : null;
 }
 
-function findCaptionCandidate(
-  lines: OcrImageManifestNearbyLine[],
-): string | null {
+function findCaptionCandidate(lines: OcrImageManifestNearbyLine[]): string | null {
   const captionPattern =
     /\b(h[iì]nh|figure|fig\.?|bi[eể]u\s*[dđ][oồ]|s[oơ]\s*[dđ][oồ]|b[aả]ng|table|diagram)\b/i;
   const explicit = lines.find((line) => captionPattern.test(line.text));
@@ -560,12 +560,16 @@ function findCaptionCandidate(
     return explicit.text;
   }
 
-  const below = lines.find((line) => line.relation === "below" && line.text.length <= 180);
+  const below = lines.find(
+    (line) => line.relation === "below" && line.text.length <= 180,
+  );
   if (below) {
     return below.text;
   }
 
-  const above = lines.find((line) => line.relation === "above" && line.text.length <= 180);
+  const above = lines.find(
+    (line) => line.relation === "above" && line.text.length <= 180,
+  );
   return above?.text ?? null;
 }
 
@@ -639,9 +643,7 @@ function summarizeByKind(
   return summary;
 }
 
-function summarizeQualityFlags(
-  images: OcrImageManifestImage[],
-): Record<string, number> {
+function summarizeQualityFlags(images: OcrImageManifestImage[]): Record<string, number> {
   const summary: Record<string, number> = {};
 
   for (const image of images) {
@@ -753,10 +755,7 @@ function computeAreaRatio(
   return roundRatio((box.w * box.h) / (pageDimensions.width * pageDimensions.height));
 }
 
-function resolvePosition(
-  box: OcrImageBox,
-  pageDimensions: OcrPageDimensions | null,
-) {
+function resolvePosition(box: OcrImageBox, pageDimensions: OcrPageDimensions | null) {
   if (!pageDimensions) {
     return { horizontal: "unknown" as const, vertical: "unknown" as const };
   }
@@ -766,9 +765,17 @@ function resolvePosition(
 
   return {
     horizontal:
-      centerX < 0.33 ? "left" as const : centerX > 0.66 ? "right" as const : "center" as const,
+      centerX < 0.33
+        ? ("left" as const)
+        : centerX > 0.66
+          ? ("right" as const)
+          : ("center" as const),
     vertical:
-      centerY < 0.33 ? "top" as const : centerY > 0.66 ? "bottom" as const : "middle" as const,
+      centerY < 0.33
+        ? ("top" as const)
+        : centerY > 0.66
+          ? ("bottom" as const)
+          : ("middle" as const),
   };
 }
 
@@ -894,10 +901,7 @@ function compareImages(
   return a.boundingBox.x - b.boundingBox.x;
 }
 
-function buildImageId(
-  contentHash: string,
-  image: OcrImageManifestInputImage,
-): string {
+function buildImageId(contentHash: string, image: OcrImageManifestInputImage): string {
   const hash = createHash("sha256")
     .update(
       [
@@ -933,18 +937,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readString(
-  value: Record<string, unknown>,
-  key: string,
-): string | null {
+function readString(value: Record<string, unknown>, key: string): string | null {
   const raw = value[key];
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
-function readNumber(
-  value: Record<string, unknown>,
-  key: string,
-): number | null {
+function readNumber(value: Record<string, unknown>, key: string): number | null {
   const raw = value[key];
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }

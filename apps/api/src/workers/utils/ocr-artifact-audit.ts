@@ -112,15 +112,14 @@ export function buildOcrArtifactAudit(
       (image.printedPage.printedPageNumber === null &&
         image.printedPage.printedPageLabel === null),
   );
-  const imagesWithInvalidNormalizedBox = input.imageManifest.images.filter(
-    (image) => hasInvalidNormalizedBox(image.normalizedBoundingBox),
+  const imagesWithInvalidNormalizedBox = input.imageManifest.images.filter((image) =>
+    hasInvalidNormalizedBox(image.normalizedBoundingBox),
   );
   const imagesWithBadVisualText = input.imageManifest.images.filter((image) =>
     hasBadVisualText(`${image.captionCandidate ?? ""}\n${image.nearbyText ?? ""}`),
   );
   const imagesWithInvalidPage = input.imageManifest.images.filter(
-    (image) =>
-      image.pageNumber < 1 || image.pageNumber > input.expectedPageCount,
+    (image) => image.pageNumber < 1 || image.pageNumber > input.expectedPageCount,
   );
   const imagesWithoutObjectKey = input.imageManifest.images.filter(
     (image) => image.objectKey.trim().length === 0,
@@ -304,8 +303,7 @@ function buildVisualSmokeTests(input: BuildOcrArtifactAuditInput) {
         ? {
             imageId: topCandidate.imageId,
             pageNumber: topCandidate.pageNumber,
-            printedPageNumber:
-              topCandidate.printedPage?.printedPageNumber ?? null,
+            printedPageNumber: topCandidate.printedPage?.printedPageNumber ?? null,
             objectKey: topCandidate.objectKey,
             kind: topCandidate.kind,
             isUsableForAi: topCandidate.isUsableForAi,
@@ -315,9 +313,7 @@ function buildVisualSmokeTests(input: BuildOcrArtifactAuditInput) {
   });
 }
 
-function resolveAuditStatus(
-  issues: OcrArtifactAuditIssue[],
-): OcrArtifactAuditStatus {
+function resolveAuditStatus(issues: OcrArtifactAuditIssue[]): OcrArtifactAuditStatus {
   if (issues.some((issue) => issue.severity === "error")) {
     return "failed";
   }

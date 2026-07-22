@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { FileText, Eye, EyeOff, AlertTriangle, XCircle, ChevronDown, ChevronUp, ImageIcon, Check, X } from "lucide-react";
+import {
+  FileText,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  XCircle,
+  ChevronDown,
+  ChevronUp,
+  ImageIcon,
+  Check,
+  X,
+} from "lucide-react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import {
   getPageVisualSummary,
@@ -50,7 +61,11 @@ export function SourceDocumentPagesDialog({
     }
     if (searchPrintedPage) {
       const printed = getPrintedPageView(page);
-      if (!printed.printedPageLabel?.toLowerCase().includes(searchPrintedPage.trim().toLowerCase())) {
+      if (
+        !printed.printedPageLabel
+          ?.toLowerCase()
+          .includes(searchPrintedPage.trim().toLowerCase())
+      ) {
         return false;
       }
     }
@@ -84,24 +99,20 @@ export function SourceDocumentPagesDialog({
   const paginatedPages = filteredPages.slice(0, visibleCount);
 
   const observer = useRef<IntersectionObserver | null>(null);
-  const lastElementRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (observer.current) observer.current.disconnect();
-      if (node) {
-        observer.current = new IntersectionObserver(
-          (entries) => {
-            if (entries[0]?.isIntersecting) {
-              setVisibleCount((prev) => prev + 10);
-            }
-          },
-          { rootMargin: "400px" }
-        );
-        observer.current.observe(node);
-      }
-    },
-    []
-  );
-
+  const lastElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (observer.current) observer.current.disconnect();
+    if (node) {
+      observer.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting) {
+            setVisibleCount((prev) => prev + 10);
+          }
+        },
+        { rootMargin: "400px" },
+      );
+      observer.current.observe(node);
+    }
+  }, []);
 
   return (
     <EditorDialogShell
@@ -120,15 +131,21 @@ export function SourceDocumentPagesDialog({
               Xem trang OCR
             </h2>
             <p className="mt-1 truncate text-sm font-semibold text-[var(--theme-text-muted)]">
-              {sourceDocument?.title ?? sourceDocument?.file.originalName ?? "Tài liệu chính"}
+              {sourceDocument?.title ??
+                sourceDocument?.file.originalName ??
+                "Tài liệu chính"}
             </p>
           </div>
         </div>
 
         {readyCount > 0 || failedCount > 0 ? (
           <div className="hidden items-center gap-2 lg:flex ml-4">
-            {readyCount > 0 && <SummaryPill color="success" icon={null} label={`${readyCount} sẵn sàng`} />}
-            {failedCount > 0 && <SummaryPill color="danger" icon={null} label={`${failedCount} lỗi`} />}
+            {readyCount > 0 && (
+              <SummaryPill color="success" icon={null} label={`${readyCount} sẵn sàng`} />
+            )}
+            {failedCount > 0 && (
+              <SummaryPill color="danger" icon={null} label={`${failedCount} lỗi`} />
+            )}
           </div>
         ) : null}
 
@@ -266,7 +283,10 @@ function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }
   if (pages.length === 0) {
     return (
       <div className="m-4 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-6 text-center">
-        <FileText className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]" aria-hidden="true" />
+        <FileText
+          className="mx-auto h-9 w-9 text-[var(--theme-text-muted)]"
+          aria-hidden="true"
+        />
         <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
           Chưa có nội dung
         </p>
@@ -282,14 +302,24 @@ function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }
             const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
             const printed = getPrintedPageView(page);
             return (
-              <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-8" : ""}>
+              <div
+                key={page.id}
+                className={
+                  index > 0 ? "border-t border-[var(--theme-border-strong)] pt-8" : ""
+                }
+              >
                 <div className="mb-4 text-xs font-bold text-[var(--theme-text-muted)]">
-                  Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
+                  Trang PDF {page.pageNumber}{" "}
+                  {printed.printedPageLabel
+                    ? `(Trang in: ${printed.printedPageLabel})`
+                    : ""}
                 </div>
                 {text ? (
                   <MathpixMarkdownRenderer content={text} />
                 ) : (
-                  <p className="italic text-[var(--theme-text-muted)]">Không có nội dung</p>
+                  <p className="italic text-[var(--theme-text-muted)]">
+                    Không có nội dung
+                  </p>
                 )}
               </div>
             );
@@ -387,7 +417,9 @@ function PageDetailRow({
       ) : null}
 
       {/* PDF preview + Text content side by side */}
-      <div className={`mt-3 ${pdfUrl ? "flex flex-col lg:flex-row gap-4 lg:items-start" : ""}`}>
+      <div
+        className={`mt-3 ${pdfUrl ? "flex flex-col lg:flex-row gap-4 lg:items-start" : ""}`}
+      >
         {/* PDF page image */}
         {pdfUrl ? (
           <div className="shrink-0 flex justify-center lg:block">
@@ -406,9 +438,13 @@ function PageDetailRow({
               panelClassName="max-w-4xl max-h-[90dvh] w-auto bg-transparent border-0 shadow-none p-0"
             >
               <div className="flex-1 overflow-auto bg-white rounded-md max-w-full p-4 pt-14">
-                 <div className="w-fit mx-auto">
-                   <PdfPagePreview pageNumber={page.pageNumber} pdfUrl={pdfUrl} width={800} />
-                 </div>
+                <div className="w-fit mx-auto">
+                  <PdfPagePreview
+                    pageNumber={page.pageNumber}
+                    pdfUrl={pdfUrl}
+                    width={800}
+                  />
+                </div>
               </div>
             </EditorDialogShell>
           </div>
@@ -420,7 +456,9 @@ function PageDetailRow({
             <div className="w-full max-w-3xl">
               <div
                 className={`rounded-md shadow-sm border border-[var(--theme-border)] bg-white p-3 sm:p-6 lg:p-8 ${
-                  !isExpanded && isLongText ? "max-h-[310px] overflow-hidden relative" : ""
+                  !isExpanded && isLongText
+                    ? "max-h-[310px] overflow-hidden relative"
+                    : ""
                 }`}
               >
                 <MathpixMarkdownRenderer content={text} />
@@ -517,7 +555,7 @@ function PrintedPageConfirmForm({ page }: { page: AdminSourceDocumentPageApi }) 
       );
 
       toast.success("Đã xác nhận trang in");
-      
+
       // Mutate the pages list
       queryClient.invalidateQueries({
         queryKey: adminCourseDocumentQueryKeys.all, // invalidate all to refresh documents and pages

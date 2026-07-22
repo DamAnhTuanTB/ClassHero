@@ -31,10 +31,7 @@ const DEFAULT_OPTIONS: Required<ChunkingOptions> = {
  * Chunk text by heading markers (##, ###, \section, etc.).
  * Falls back to paragraph-based chunking if no headings found.
  */
-export function chunkText(
-  text: string,
-  options?: ChunkingOptions,
-): TextChunk[] {
+export function chunkText(text: string, options?: ChunkingOptions): TextChunk[] {
   if (!text || text.trim().length === 0) {
     return [];
   }
@@ -64,8 +61,7 @@ export function chunkText(
  */
 function splitByHeadings(text: string): string[] {
   // Match markdown headings (## ...) or LaTeX section commands
-  const headingPattern =
-    /^(?:#{2,4}\s+.+|\\(?:sub)?section\{.+\})$/gm;
+  const headingPattern = /^(?:#{2,4}\s+.+|\\(?:sub)?section\{.+\})$/gm;
 
   const sections: string[] = [];
   let lastIndex = 0;
@@ -102,10 +98,7 @@ function splitByParagraphs(text: string): string[] {
 /**
  * Balance section sizes: merge too-small sections, split too-large ones.
  */
-function balanceSections(
-  sections: string[],
-  opts: Required<ChunkingOptions>,
-): string[] {
+function balanceSections(sections: string[], opts: Required<ChunkingOptions>): string[] {
   const result: string[] = [];
   let buffer = "";
 
@@ -165,10 +158,7 @@ function balanceSections(
 /**
  * Split an oversized section into chunks at sentence/paragraph boundaries.
  */
-function splitOversized(
-  text: string,
-  opts: Required<ChunkingOptions>,
-): string[] {
+function splitOversized(text: string, opts: Required<ChunkingOptions>): string[] {
   const sentences = text.split(/(?<=[.!?。])\s+|\n/);
   const chunks: string[] = [];
   let current = "";

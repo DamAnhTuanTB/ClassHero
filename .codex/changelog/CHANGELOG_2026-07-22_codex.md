@@ -5,3 +5,15 @@
   - Sửa lỗi "tài liệu phục sinh" (ghost document) khi xóa tài liệu: Tự động lưu trữ/xóa mềm (soft-delete) tất cả các bản ghi tài liệu chính cũ cùng lộ trình mỗi khi upload "Thay tài liệu chính". Điều này đảm bảo mỗi lộ trình chỉ có duy nhất một tài liệu chính hoạt động ở một thời điểm.
 - **Terminology & UI Consistency**:
   - Đồng nhất ngôn từ: Đổi toàn bộ các cụm từ "sách nguồn", "tài liệu nguồn", "PDF nguồn" thành "**Tài liệu chính**" trên toàn bộ giao diện panel, các modal (upload, chọn khoảng trang, xem trước trang OCR), thông báo toast, và các hàm tiện ích liên quan.
+- **Lesson Documents Management**:
+  - Chặn trùng lặp: Ngăn người dùng đặt tên trùng cho các tài liệu bổ sung bên trong cùng 1 bài học (cập nhật Validation Schema).
+  - Cập nhật tài liệu: Bổ sung API `PATCH /admin/lessons/:lessonId/documents/:documentId` để thay đổi tên hoặc trạng thái tài liệu chính của tài liệu bổ sung đã tồn tại.
+  - Sửa lỗi không lưu trạng thái: Khi thay đổi trạng thái "Đánh dấu là tài liệu chính" của một tài liệu bổ sung đã có sẵn, form giờ đây đã gọi API PATCH để đồng bộ chính xác lên backend.
+  - Sửa lỗi đánh nhau trạng thái: Tránh tình trạng khoảng trang (source page range) tự động nhận là tài liệu chính khi đã có tài liệu bổ sung đang giữ trạng thái này.
+  - Sửa lỗi mất tích tài liệu (Race Condition): Xử lý triệt để lỗi tài liệu bổ sung bị "biến mất" khỏi UI khi hủy đánh dấu là tài liệu chính do bị lưu trữ tự động. Backend nay đã có cơ chế tự động un-archive để khôi phục tài liệu về làm tài liệu bổ sung thường.
+  - Sửa lỗi UI "nhảy cóc": Chỉnh lại thứ tự sắp xếp tài liệu ở backend thành luôn giữ đúng trật tự upload theo thời gian tạo (cũ nhất -> mới nhất), loại bỏ việc các tài liệu chính tự ý vượt lên đầu danh sách.
+- **Lesson Documents UI/UX**:
+  - Gộp các trường nhập liệu khoảng trang thành khối "Tài liệu nền tảng", bắt buộc nhập nếu muốn thêm bài học. Chuyển thông báo gợi ý nhập khoảng trang lên trên.
+  - Tách bạch phần tải file thành 2 khối riêng biệt: "Tài liệu bổ sung" (cho phép nhiều file) và "Bài tập về nhà" (cho phép 1 file duy nhất). Bỏ đi tùy chọn "Đánh dấu là tài liệu chính" ở các file này.
+  - Sửa lỗi UI state: Ẩn cảnh báo "(tùy chọn)" ở ô tên tài liệu, bật realtime validation cho Tên tài liệu và File đính kèm để người dùng dễ dàng nhận biết lỗi trước khi lưu.
+  - Sửa lỗi logic backend & frontend gây ra thông báo lỗi "Chỉ được xóa tài liệu bổ sung bằng endpoint này" và tình trạng "mất tích" Bài tập về nhà trên UI sau khi lưu do nhầm lẫn logic ánh xạ (mapping).

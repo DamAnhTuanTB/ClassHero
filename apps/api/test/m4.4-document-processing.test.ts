@@ -1011,10 +1011,7 @@ function createProcessor(prisma: PrismaService) {
   return createProcessorWithBundle(prisma, createOcrBundle()).processor;
 }
 
-function createProcessorWithBundle(
-  prisma: PrismaService,
-  bundle: OcrArtifactBundle,
-) {
+function createProcessorWithBundle(prisma: PrismaService, bundle: OcrArtifactBundle) {
   const descriptor = {
     contentHash: "content-hash",
     provider: "mathpix",
@@ -1145,11 +1142,7 @@ function createOcrBundle(): OcrArtifactBundle {
   };
 }
 
-function createBullmqJob({
-  backgroundJobId,
-}: {
-  backgroundJobId: string;
-}) {
+function createBullmqJob({ backgroundJobId }: { backgroundJobId: string }) {
   return {
     id: backgroundJobId,
     data: { backgroundJobId },

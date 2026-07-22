@@ -17,12 +17,21 @@ import { config } from "dotenv";
 import { validateEnv, type EnvConfig } from "../src/config/env.validation";
 import { ObjectStorageService } from "../src/modules/files/services/object-storage.service";
 import { ImageExtractionService } from "../src/workers/services/image-extraction.service";
-import { MathpixOcrService, type OcrArtifactBundle } from "../src/workers/services/mathpix-ocr.service";
-import { OcrArtifactCacheService, type OcrArtifactCacheManifest } from "../src/workers/services/ocr-artifact-cache.service";
+import {
+  MathpixOcrService,
+  type OcrArtifactBundle,
+} from "../src/workers/services/mathpix-ocr.service";
+import {
+  OcrArtifactCacheService,
+  type OcrArtifactCacheManifest,
+} from "../src/workers/services/ocr-artifact-cache.service";
 import { buildOcrArtifactAudit } from "../src/workers/utils/ocr-artifact-audit";
 import { PdfMetadataService } from "../src/workers/services/pdf-metadata.service";
 import { buildOcrImageManifest } from "../src/workers/utils/ocr-image-manifest";
-import { normalizeOcrPages, summarizeOcrPage } from "../src/workers/utils/ocr-artifact-normalizer";
+import {
+  normalizeOcrPages,
+  summarizeOcrPage,
+} from "../src/workers/utils/ocr-artifact-normalizer";
 import { resolveOcrVisualReference } from "../src/workers/utils/ocr-visual-resolver";
 
 type UploadedImageSummary = {

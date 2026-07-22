@@ -20,9 +20,7 @@ import {
   createAdminLesson,
   updateAdminLesson,
 } from "@/features/admin/courses/api/admin-lessons-api";
-import {
-  uploadAdminCourseCover,
-} from "@/features/admin/courses/api/admin-course-files-api";
+import { uploadAdminCourseCover } from "@/features/admin/courses/api/admin-course-files-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import type {
   ChapterFormValues,

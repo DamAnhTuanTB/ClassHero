@@ -36,9 +36,12 @@ const referenceDocumentSchema = z
   .object({
     id: z.string().optional(),
     originalName: z.string().optional(),
-    title: z.string().trim().max(180, "Tên tài liệu tối đa 180 ký tự").optional(),
+    title: requiredTrimmedText({
+      requiredMessage: "Nhập tên tài liệu",
+      maxLength: 180,
+    }),
     file: z.custom<File | null>().optional(),
-    isPrimary: z.boolean().default(false),
+    type: z.enum(["SUPPLEMENT", "HOMEWORK"]).default("SUPPLEMENT"),
     status: z.string().optional(),
     extractError: z.string().optional(),
     progress: z.number().optional(),
@@ -49,10 +52,13 @@ const referenceDocumentSchema = z
     const file = value.file ?? null;
     const isExisting = Boolean(value.id);
 
-    if (!isExisting && hasTitle && !file) {
+    if (!isExisting && !file) {
       context.addIssue({
         code: "custom",
-        message: "Chọn file tài liệu",
+        message:
+          value.type === "HOMEWORK"
+            ? "Phải chọn file cho bài tập về nhà"
+            : "Phải chọn file cho tài liệu bổ sung",
         path: ["file"],
       });
     }
@@ -91,20 +97,24 @@ export const lessonSchema = z.object({
       sourceDocumentId: z.string().trim().optional(),
       pageStart: z.string().trim().optional(),
       pageEnd: z.string().trim().optional(),
-      isPrimary: z.boolean().default(true).optional(),
     })
     .superRefine((value, context) => {
       const hasStart = Boolean(value.pageStart?.trim());
       const hasEnd = Boolean(value.pageEnd?.trim());
 
       if (!hasStart && !hasEnd) {
+        context.addIssue({
+          code: "custom",
+          message: "Phải nhập khoảng trang cho tài liệu nền tảng",
+          path: ["pageStart"],
+        });
         return;
       }
 
       if (!value.sourceDocumentId?.trim()) {
         context.addIssue({
           code: "custom",
-          message: "Chọn tài liệu chính",
+          message: "Chọn tài liệu nền tảng",
           path: ["sourceDocumentId"],
         });
       }
@@ -156,7 +166,7 @@ export const lessonSchema = z.object({
             fileKeys.add(name);
           }
         }
-        
+
         if (doc.title) {
           const titleKey = doc.title.trim().toLowerCase();
           if (titleKey) {
@@ -172,10 +182,21 @@ export const lessonSchema = z.object({
           }
         }
       });
+
+      const homeworkCount = docs.filter((d) => d.type === "HOMEWORK").length;
+      if (homeworkCount > 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Chỉ được upload 1 bài tập về nhà",
+          path: [0, "file"],
+        });
+      }
     }),
 });
 
-export function createLessonSchema(sourceDocuments: Array<{ file: { originalName: string, sizeBytes: number } }> = []) {
+export function createLessonSchema(
+  sourceDocuments: Array<{ file: { originalName: string; sizeBytes: number } }> = [],
+) {
   return lessonSchema.extend({
     referenceDocuments: z
       .array(referenceDocumentSchema)
@@ -195,10 +216,13 @@ export function createLessonSchema(sourceDocuments: Array<{ file: { originalName
             } else {
               fileKeys.add(name);
             }
-            
+
             if (doc.file) {
               const isMatch = sourceDocuments.some((sd) => {
-                return sd.file.originalName === doc.file!.name && sd.file.sizeBytes === doc.file!.size;
+                return (
+                  sd.file.originalName === doc.file!.name &&
+                  sd.file.sizeBytes === doc.file!.size
+                );
               });
               if (isMatch) {
                 ctx.addIssue({
@@ -209,7 +233,7 @@ export function createLessonSchema(sourceDocuments: Array<{ file: { originalName
               }
             }
           }
-          
+
           if (doc.title) {
             const titleKey = doc.title.trim().toLowerCase();
             if (titleKey) {
@@ -225,6 +249,15 @@ export function createLessonSchema(sourceDocuments: Array<{ file: { originalName
             }
           }
         });
+
+        const homeworkCount = docs.filter((d) => d.type === "HOMEWORK").length;
+        if (homeworkCount > 1) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Chỉ được upload 1 bài tập về nhà",
+            path: [0, "file"],
+          });
+        }
       }),
   });
 }
@@ -269,14 +302,13 @@ export type LessonFormValues = {
     sourceDocumentId?: string;
     pageStart?: string;
     pageEnd?: string;
-    isPrimary?: boolean;
   };
   referenceDocuments: Array<{
     id?: string;
     originalName?: string;
     title?: string;
     file?: File | null;
-    isPrimary?: boolean;
+    type?: "SUPPLEMENT" | "HOMEWORK";
     status?: string;
     extractError?: string;
     progress?: number;
@@ -321,7 +353,6 @@ export const emptyLessonValues: LessonFormValues = {
     sourceDocumentId: "",
     pageStart: "",
     pageEnd: "",
-    isPrimary: true,
   },
   referenceDocuments: [],
 };

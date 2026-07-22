@@ -12,8 +12,7 @@ import {
 
 export const lessonDocumentProcessingModes = ["PROCESSING", "STORAGE_ONLY"] as const;
 
-export type LessonDocumentProcessingMode =
-  (typeof lessonDocumentProcessingModes)[number];
+export type LessonDocumentProcessingMode = (typeof lessonDocumentProcessingModes)[number];
 
 export class CreateLessonDocumentDto {
   @ApiProperty({ example: "00000000-0000-0000-0000-000000000000" })

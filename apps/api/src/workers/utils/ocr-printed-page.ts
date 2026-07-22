@@ -1,8 +1,5 @@
 export type PrintedPageReferenceSource =
-  | "ocr_inferred"
-  | "offset_rule"
-  | "admin_verified"
-  | "unknown";
+  "ocr_inferred" | "offset_rule" | "admin_verified" | "unknown";
 
 export type PrintedPageReferenceWarning = "missing" | "ambiguous" | null;
 
@@ -80,7 +77,10 @@ export function inferPrintedPageReference(
       ]),
     ],
     evidenceText: top.text,
-    warning: top.printedPageNumber === null || competingCandidates.length > 0 ? "ambiguous" : null,
+    warning:
+      top.printedPageNumber === null || competingCandidates.length > 0
+        ? "ambiguous"
+        : null,
   };
 }
 
@@ -99,8 +99,7 @@ export function applyPrintedPageSequenceMapping(
       return reference;
     }
 
-    const candidatePrintedPageNumber =
-      reference.pdfPageNumber + dominantOffset.offset;
+    const candidatePrintedPageNumber = reference.pdfPageNumber + dominantOffset.offset;
     if (candidatePrintedPageNumber <= 0) {
       return reference;
     }
@@ -155,9 +154,7 @@ function buildUnknownPrintedPageReference(pdfPageNumber: number): PrintedPageRef
   };
 }
 
-function collectBoundaryLines(
-  lines: InferPrintedPageLine[],
-): InferPrintedPageLine[] {
+function collectBoundaryLines(lines: InferPrintedPageLine[]): InferPrintedPageLine[] {
   const nonEmpty = lines.filter((line) => line.text.trim().length > 0);
   const boundaryLines = [
     ...nonEmpty.slice(0, BOUNDARY_LINE_LIMIT),
@@ -175,32 +172,34 @@ function collectBoundaryLines(
   });
 }
 
-function readPrintedPageCandidates(
-  line: InferPrintedPageLine,
-): PrintedPageCandidate[] {
+function readPrintedPageCandidates(line: InferPrintedPageLine): PrintedPageCandidate[] {
   if (shouldIgnorePageMarkerLine(line)) {
     return [];
   }
 
   const normalized = normalizePageMarkerText(line.text);
   const candidates: PrintedPageCandidate[] = [];
-  const explicit = /^(?:trang|page|p\.?|tr\.)\s*[:.]?\s*(\d{1,4})$/i.exec(
-    normalized,
-  );
+  const explicit = /^(?:trang|page|p\.?|tr\.)\s*[:.]?\s*(\d{1,4})$/i.exec(normalized);
   if (explicit) {
-    candidates.push(buildNumberCandidate(line, Number(explicit[1]), scoreLine(line, 0.93)));
+    candidates.push(
+      buildNumberCandidate(line, Number(explicit[1]), scoreLine(line, 0.93)),
+    );
   }
 
   const trailing = /(?:^|[|/-]\s*)(?:trang|page|p\.?|tr\.)\s*[:.]?\s*(\d{1,4})$/i.exec(
     normalized,
   );
   if (trailing && !explicit && normalized.length <= 48) {
-    candidates.push(buildNumberCandidate(line, Number(trailing[1]), scoreLine(line, 0.78)));
+    candidates.push(
+      buildNumberCandidate(line, Number(trailing[1]), scoreLine(line, 0.78)),
+    );
   }
 
   const exactNumber = /^-?\s*(\d{1,4})\s*-?$/.exec(normalized);
   if (exactNumber) {
-    candidates.push(buildNumberCandidate(line, Number(exactNumber[1]), scoreLine(line, 0.86)));
+    candidates.push(
+      buildNumberCandidate(line, Number(exactNumber[1]), scoreLine(line, 0.86)),
+    );
   }
 
   if (isRomanPageLabel(normalized)) {
@@ -240,15 +239,9 @@ function buildNumberCandidate(
 
 function shouldIgnorePageMarkerLine(line: InferPrintedPageLine): boolean {
   const type = line.type?.toLowerCase() ?? "";
-  return [
-    "cell",
-    "chart",
-    "column",
-    "diagram",
-    "equation",
-    "figure",
-    "table",
-  ].some((ignoredType) => type.includes(ignoredType));
+  return ["cell", "chart", "column", "diagram", "equation", "figure", "table"].some(
+    (ignoredType) => type.includes(ignoredType),
+  );
 }
 
 function scoreLine(line: InferPrintedPageLine, baseScore: number): number {

@@ -87,10 +87,7 @@ const publicFlatLessonMetadataRelation = {
     },
   },
   select: publicLessonMetadataSelect,
-  orderBy: [
-    { chapter: { orderIndex: "asc" } },
-    ...publicLessonMetadataOrderBy,
-  ],
+  orderBy: [{ chapter: { orderIndex: "asc" } }, ...publicLessonMetadataOrderBy],
 } satisfies Prisma.LessonFindManyArgs;
 
 export const publicLearningPathSelect = {

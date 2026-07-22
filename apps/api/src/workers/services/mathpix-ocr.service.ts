@@ -41,15 +41,10 @@ export const MATHPIX_OUTPUT_FORMATS = [
   "md",
   "html.zip",
 ] as const;
-export const MATHPIX_CONVERSION_FORMATS = [
-  "mmd.zip",
-  "md",
-  "html.zip",
-] as const;
+export const MATHPIX_CONVERSION_FORMATS = ["mmd.zip", "md", "html.zip"] as const;
 
 export type MathpixOutputFormat = (typeof MATHPIX_OUTPUT_FORMATS)[number];
-export type MathpixConversionFormat =
-  (typeof MATHPIX_CONVERSION_FORMATS)[number];
+export type MathpixConversionFormat = (typeof MATHPIX_CONVERSION_FORMATS)[number];
 
 export type MathpixPdfOptions = {
   conversion_formats: Record<string, true | Record<string, unknown>>;
@@ -59,9 +54,7 @@ export type MathpixPdfOptions = {
   page_separator?: string;
 };
 
-export function buildMathpixPdfOptions(
-  languageHints: string[],
-): MathpixPdfOptions {
+export function buildMathpixPdfOptions(languageHints: string[]): MathpixPdfOptions {
   return {
     conversion_formats: {
       "mmd.zip": true,
@@ -87,8 +80,7 @@ export class MathpixOcrService {
     private readonly configService: ConfigService<EnvConfig, true>,
   ) {
     this.appId = this.configService.get("MATHPIX_APP_ID", { infer: true }) ?? "";
-    this.appKey =
-      this.configService.get("MATHPIX_APP_KEY", { infer: true }) ?? "";
+    this.appKey = this.configService.get("MATHPIX_APP_KEY", { infer: true }) ?? "";
     const hints = this.configService.get("MATHPIX_LANGUAGE_HINTS", {
       infer: true,
     });
@@ -98,10 +90,7 @@ export class MathpixOcrService {
   /**
    * Submit a PDF buffer for processing and return the Mathpix pdf_id.
    */
-  async submitPdf(
-    fileBuffer: Buffer,
-    fileName: string,
-  ): Promise<{ pdfId: string }> {
+  async submitPdf(fileBuffer: Buffer, fileName: string): Promise<{ pdfId: string }> {
     const formData = new FormData();
 
     // Copy to a clean ArrayBuffer to avoid SharedArrayBuffer type conflict
@@ -131,9 +120,7 @@ export class MathpixOcrService {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(
-        `Mathpix submit failed (${response.status}): ${errorBody}`,
-      );
+      throw new Error(`Mathpix submit failed (${response.status}): ${errorBody}`);
     }
 
     const data = (await response.json()) as unknown;
@@ -166,9 +153,7 @@ export class MathpixOcrService {
       const status = await this.getStatus(pdfId);
 
       if (status.status === "completed") {
-        this.logger.log(
-          `Mathpix completed pdf_id=${pdfId}, pages=${status.num_pages}`,
-        );
+        this.logger.log(`Mathpix completed pdf_id=${pdfId}, pages=${status.num_pages}`);
         return { numPages: status.num_pages ?? 0 };
       }
 
@@ -192,9 +177,7 @@ export class MathpixOcrService {
       pollInterval = Math.min(pollInterval * 1.5, 15_000);
     }
 
-    throw new Error(
-      `Mathpix timeout after ${timeoutMs / 1000}s for pdf_id=${pdfId}`,
-    );
+    throw new Error(`Mathpix timeout after ${timeoutMs / 1000}s for pdf_id=${pdfId}`);
   }
 
   /**
@@ -320,10 +303,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readString(
-  value: Record<string, unknown>,
-  key: string,
-): string | null {
+function readString(value: Record<string, unknown>, key: string): string | null {
   const raw = value[key];
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }

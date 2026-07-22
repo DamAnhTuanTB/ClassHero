@@ -40,11 +40,17 @@ export function LessonEditorDialog({
   mode: EditorMode;
   selectedLesson: AdminLesson | null;
   onClose: () => void;
-  onSubmit: (values: LessonFormValues, documentsManager: ReturnType<typeof useAdminCourseDocumentsManager>) => void | Promise<void>;
+  onSubmit: (
+    values: LessonFormValues,
+    documentsManager: ReturnType<typeof useAdminCourseDocumentsManager>,
+  ) => void | Promise<void>;
 }) {
   const documentsManager = useAdminCourseDocumentsManager(learningPath);
-  const formSchema = useMemo(() => createLessonSchema(documentsManager.sourceDocuments), [documentsManager.sourceDocuments]);
-  
+  const formSchema = useMemo(
+    () => createLessonSchema(documentsManager.sourceDocuments),
+    [documentsManager.sourceDocuments],
+  );
+
   const form = useForm<LessonFormValues>({
     resolver: zodResolver(formSchema) as Resolver<LessonFormValues>,
     mode: "onChange",
@@ -63,7 +69,7 @@ export function LessonEditorDialog({
       mode === "edit" ? selectedLesson?.id : null,
       documentsManager.documentsByLessonId,
       documentsManager.selectedSourceDocument?.id,
-      documentsManager.sourcePages
+      documentsManager.sourcePages,
     );
     const editorKey = [
       mode,
@@ -89,15 +95,13 @@ export function LessonEditorDialog({
 
     const existingSupplements =
       mode === "edit" && selectedLesson
-        ? documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
-            (doc) => {
-              const isSupplementOrPrimary =
-                doc.kind === "SUPPLEMENT" || doc.kind === "PRIMARY_REPLACEMENT";
-              const isSourceMapped =
-                readRecord(doc.metadataJson)?.source === "source_document_page_range";
-              return isSupplementOrPrimary && !isSourceMapped;
-            }
-          ) || []
+        ? documentsManager.documentsByLessonId[selectedLesson.id]?.filter((doc) => {
+            const isSupplementOrHomework =
+              doc.kind === "SUPPLEMENT" || doc.kind === "HOMEWORK";
+            const isSourceMapped =
+              readRecord(doc.metadataJson)?.source === "source_document_page_range";
+            return isSupplementOrHomework && !isSourceMapped;
+          }) || []
         : [];
 
     form.reset(
@@ -134,10 +138,11 @@ export function LessonEditorDialog({
 
   useEffect(() => {
     if (!isOpen || mode !== "edit" || !selectedLesson) return;
-    
-    const existingSupplements = documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
-      (doc) => doc.kind === "SUPPLEMENT"
-    ) || [];
+
+    const existingSupplements =
+      documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
+        (doc) => doc.kind === "SUPPLEMENT" || doc.kind === "HOMEWORK",
+      ) || [];
 
     const formDocs = form.getValues("referenceDocuments") || [];
 
@@ -152,9 +157,18 @@ export function LessonEditorDialog({
             formDoc.url !== latestDoc.file?.publicUrl
           ) {
             form.setValue(`referenceDocuments.${index}.status`, latestDoc.status);
-            form.setValue(`referenceDocuments.${index}.progress`, latestDoc.processingJob?.progress);
-            form.setValue(`referenceDocuments.${index}.extractError`, latestDoc.extractError || undefined);
-            form.setValue(`referenceDocuments.${index}.url`, latestDoc.file?.publicUrl || undefined);
+            form.setValue(
+              `referenceDocuments.${index}.progress`,
+              latestDoc.processingJob?.progress,
+            );
+            form.setValue(
+              `referenceDocuments.${index}.extractError`,
+              latestDoc.extractError || undefined,
+            );
+            form.setValue(
+              `referenceDocuments.${index}.url`,
+              latestDoc.file?.publicUrl || undefined,
+            );
           }
         }
       }
@@ -187,7 +201,7 @@ export function LessonEditorDialog({
           });
           return;
         }
-        
+
         if (pdfPageStart && pdfPageEnd && pdfPageStart > pdfPageEnd) {
           form.setError("sourceDocumentPageRange.pageStart", {
             type: "manual",
@@ -196,10 +210,12 @@ export function LessonEditorDialog({
           return;
         }
 
-        values.sourceDocumentPageRange.pageStart = pdfPageStart ? String(pdfPageStart) : "";
+        values.sourceDocumentPageRange.pageStart = pdfPageStart
+          ? String(pdfPageStart)
+          : "";
         values.sourceDocumentPageRange.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
       }
-      
+
       await onSubmit(values, documentsManager);
     } catch (error) {
       if (error instanceof Error && error.message === "DUPLICATED_LESSON_ORDER") {

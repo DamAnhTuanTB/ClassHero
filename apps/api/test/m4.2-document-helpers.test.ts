@@ -38,12 +38,11 @@ describe("M4.2 document range helpers", () => {
   it("rejects duplicate lesson ranges in one source document payload", () => {
     const duplicateLessonId = "00000000-0000-0000-0000-000000000001";
 
-    expect(
-      () =>
-        assertNoDuplicateLessonRanges([
-          { lessonId: duplicateLessonId, pageStart: 1, pageEnd: 2 },
-          { lessonId: duplicateLessonId, pageStart: 3, pageEnd: 4 },
-        ]),
+    expect(() =>
+      assertNoDuplicateLessonRanges([
+        { lessonId: duplicateLessonId, pageStart: 1, pageEnd: 2 },
+        { lessonId: duplicateLessonId, pageStart: 3, pageEnd: 4 },
+      ]),
     ).toThrow(BadRequestException);
   });
 

@@ -335,9 +335,7 @@ export class DocumentProcessingProcessor {
           contentHash: ocr.contentHash,
           pageCount: ocr.pageCount,
           qualitySummary: this.buildQualitySummary(ocr.pages),
-          printedPageMappingSummary: this.buildPrintedPageMappingSummary(
-            ocr.pages,
-          ),
+          printedPageMappingSummary: this.buildPrintedPageMappingSummary(ocr.pages),
           visualAssets: {
             providerImageCount: imageSummary.totalImages,
             pagesWithImages: imageSummary.pagesWithImages,
@@ -405,15 +403,14 @@ export class DocumentProcessingProcessor {
       );
     }
 
-    const pageRange =
-      await this.prisma.lessonDocumentPageRange.findUniqueOrThrow({
-        where: {
-          lessonId_sourceDocumentId: {
-            lessonId,
-            sourceDocumentId: sourceDocId,
-          },
+    const pageRange = await this.prisma.lessonDocumentPageRange.findUniqueOrThrow({
+      where: {
+        lessonId_sourceDocumentId: {
+          lessonId,
+          sourceDocumentId: sourceDocId,
         },
-      });
+      },
+    });
 
     const lessonDoc = await this.prisma.lessonDocument.findFirstOrThrow({
       where: {
@@ -552,10 +549,7 @@ export class DocumentProcessingProcessor {
         qualityScore: averageNullable(pages.map((page) => page.qualityScore)),
         sourcePages: pages.map((page) => ({
           pageNumber: page.pageNumber,
-          printedPage: this.readSourcePagePrintedPage(
-            page.pageNumber,
-            page.metadataJson,
-          ),
+          printedPage: this.readSourcePagePrintedPage(page.pageNumber, page.metadataJson),
           qualityScore: page.qualityScore,
           textSource: page.textSource,
           artifactRefs: readNestedRecord(page.metadataJson, "artifacts"),
@@ -567,9 +561,7 @@ export class DocumentProcessingProcessor {
           sourceFileId: sourceDoc.fileId,
           sourceObjectKey: sourceDoc.file.objectKey,
         }),
-        printedPageMappingSummary: this.buildSourceRangePrintedPageMappingSummary(
-          pages,
-        ),
+        printedPageMappingSummary: this.buildSourceRangePrintedPageMappingSummary(pages),
       },
     });
 
@@ -680,7 +672,8 @@ export class DocumentProcessingProcessor {
 
     const ocr = await this.processPdfWithPaidOcr({
       objectKey: lessonDoc.file.objectKey,
-      originalName: lessonDoc.file.originalName ?? lessonDoc.title ?? "lesson-document.pdf",
+      originalName:
+        lessonDoc.file.originalName ?? lessonDoc.title ?? "lesson-document.pdf",
       ownerId: lessonDoc.id,
       onProgress: async (progress) => {
         await this.prisma.backgroundJob.update({
@@ -701,9 +694,7 @@ export class DocumentProcessingProcessor {
       .join("\n\n");
 
     if (fullText.trim().length === 0) {
-      this.logger.warn(
-        `No text content for lesson document ${lessonDoc.id}`,
-      );
+      this.logger.warn(`No text content for lesson document ${lessonDoc.id}`);
     }
 
     const chunks = chunkText(fullText);
@@ -777,9 +768,7 @@ export class DocumentProcessingProcessor {
             pageStart: 1,
             pageEnd: ocr.pageCount,
             qualitySummary: this.buildQualitySummary(ocr.pages),
-            printedPageMappingSummary: this.buildPrintedPageMappingSummary(
-              ocr.pages,
-            ),
+            printedPageMappingSummary: this.buildPrintedPageMappingSummary(ocr.pages),
           },
           visualAssets: {
             providerImageCount: imageSummary.totalImages,
@@ -843,8 +832,7 @@ export class DocumentProcessingProcessor {
     };
 
     try {
-      const images =
-        await this.imageExtraction.extractImagesFromZip(ocr.mmdZip);
+      const images = await this.imageExtraction.extractImagesFromZip(ocr.mmdZip);
 
       const imageBasePath = `document-images/${ownerId}`;
       const uploadPromises = images.map(async (img) => {
@@ -911,9 +899,7 @@ export class DocumentProcessingProcessor {
         this.logger.log(`No images found in mmd.zip for ${ownerId}`);
       }
 
-      this.logger.log(
-        `Uploaded ${uploadedImages.length} images to MinIO for ${ownerId}`,
-      );
+      this.logger.log(`Uploaded ${uploadedImages.length} images to MinIO for ${ownerId}`);
 
       if (sourceDocumentId) {
         await this.attachImageManifestToSourcePages({
@@ -925,9 +911,7 @@ export class DocumentProcessingProcessor {
         });
       }
 
-      this.logger.log(
-        `Image manifest saved for ${ownerId}: ${imageManifestKey}`,
-      );
+      this.logger.log(`Image manifest saved for ${ownerId}: ${imageManifestKey}`);
 
       return {
         ownerId,
@@ -1008,9 +992,7 @@ export class DocumentProcessingProcessor {
           artifactAudit,
         };
       } catch (manifestErr) {
-        this.logger.error(
-          `Image manifest save failed for ${ownerId}: ${manifestErr}`,
-        );
+        this.logger.error(`Image manifest save failed for ${ownerId}: ${manifestErr}`);
         return emptySummary;
       }
     }
@@ -1212,10 +1194,7 @@ export class DocumentProcessingProcessor {
     };
   }
 
-  private buildPageArtifactRefs(
-    ocr: OcrProcessingResult,
-    pageNumber: number,
-  ) {
+  private buildPageArtifactRefs(ocr: OcrProcessingResult, pageNumber: number) {
     return {
       pageNumber,
       textSource: PAID_OCR_TEXT_SOURCE,
@@ -1274,10 +1253,7 @@ export class DocumentProcessingProcessor {
       return "";
     }
 
-    return `${this.formatPageTextHeading(
-      page.pageNumber,
-      page.printedPage,
-    )}\n${text}`;
+    return `${this.formatPageTextHeading(page.pageNumber, page.printedPage)}\n${text}`;
   }
 
   private formatPageTextHeading(
@@ -1292,9 +1268,7 @@ export class DocumentProcessingProcessor {
   }
 
   private buildPrintedPageMappingSummary(pages: NormalizedOcrPage[]) {
-    return this.summarizePrintedPageReferences(
-      pages.map((page) => page.printedPage),
-    );
+    return this.summarizePrintedPageReferences(pages.map((page) => page.printedPage));
   }
 
   private buildSourceRangePrintedPageMappingSummary(
@@ -1355,32 +1329,25 @@ export class DocumentProcessingProcessor {
         (item): item is string => typeof item === "string" && item.length > 0,
       ),
       evidenceText: readString(value, "evidenceText"),
-      warning:
-        warning === "missing" || warning === "ambiguous" ? warning : null,
+      warning: warning === "missing" || warning === "ambiguous" ? warning : null,
     };
   }
 
   private summarizePrintedPageReferences(references: PrintedPageReference[]) {
     const known = references.filter(
-      (page) =>
-        page.printedPageNumber !== null || page.printedPageLabel !== null,
+      (page) => page.printedPageNumber !== null || page.printedPageLabel !== null,
     );
 
     return {
       pageCount: references.length,
       knownCount: known.length,
       unknownCount: references.length - known.length,
-      inferredCount: references.filter((page) => page.source === "ocr_inferred")
+      inferredCount: references.filter((page) => page.source === "ocr_inferred").length,
+      offsetRuleCount: references.filter((page) => page.source === "offset_rule").length,
+      adminVerifiedCount: references.filter((page) => page.source === "admin_verified")
         .length,
-      offsetRuleCount: references.filter((page) => page.source === "offset_rule")
-        .length,
-      adminVerifiedCount: references.filter(
-        (page) => page.source === "admin_verified",
-      ).length,
-      missingCount: references.filter((page) => page.warning === "missing")
-        .length,
-      ambiguousCount: references.filter((page) => page.warning === "ambiguous")
-        .length,
+      missingCount: references.filter((page) => page.warning === "missing").length,
+      ambiguousCount: references.filter((page) => page.warning === "ambiguous").length,
       pages: references.map((page) => ({
         pdfPageNumber: page.pdfPageNumber,
         printedPageNumber: page.printedPageNumber,
@@ -1433,16 +1400,12 @@ export class DocumentProcessingProcessor {
         providerImagesByPage[page.pageNumber] = images;
       }
 
-      const imageManifestKey = visual
-        ? readString(visual, "imageManifestKey")
-        : null;
+      const imageManifestKey = visual ? readString(visual, "imageManifestKey") : null;
       if (imageManifestKey) {
         imageManifestKeys.add(imageManifestKey);
       }
 
-      const artifactAuditKey = visual
-        ? readString(visual, "artifactAuditKey")
-        : null;
+      const artifactAuditKey = visual ? readString(visual, "artifactAuditKey") : null;
       if (artifactAuditKey) {
         artifactAuditKeys.add(artifactAuditKey);
       }
@@ -1526,10 +1489,7 @@ export class DocumentProcessingProcessor {
   /**
    * Create source_document_pages records for each page.
    */
-  private async createPageRecords(
-    sourceDocId: string,
-    pageCount: number,
-  ): Promise<void> {
+  private async createPageRecords(sourceDocId: string, pageCount: number): Promise<void> {
     // Delete existing pages (in case of re-processing)
     await this.prisma.sourceDocumentPage.deleteMany({
       where: { sourceDocumentId: sourceDocId },
@@ -1548,9 +1508,7 @@ export class DocumentProcessingProcessor {
     this.logger.log(`Created ${pageCount} page records for ${sourceDocId}`);
   }
 
-  private buildFoundationResult(
-    record: WorkerJobRecord,
-  ): BackgroundJobBullmqResult {
+  private buildFoundationResult(record: WorkerJobRecord): BackgroundJobBullmqResult {
     return {
       status: "SUCCEEDED",
       queue: record.queue,
@@ -1562,9 +1520,7 @@ export class DocumentProcessingProcessor {
     };
   }
 
-  private buildSkippedResult(
-    record: WorkerJobRecord,
-  ): BackgroundJobBullmqResult {
+  private buildSkippedResult(record: WorkerJobRecord): BackgroundJobBullmqResult {
     return {
       status: "SKIPPED",
       queue: record.queue,
@@ -1590,9 +1546,7 @@ export class DocumentProcessingProcessor {
         id: record.id,
       },
       data: {
-        status: hasRetryLeft
-          ? BackgroundJobStatus.QUEUED
-          : BackgroundJobStatus.FAILED,
+        status: hasRetryLeft ? BackgroundJobStatus.QUEUED : BackgroundJobStatus.FAILED,
         attempts: attempt,
         errorMessage: message,
         finishedAt: hasRetryLeft ? null : new Date(),
@@ -1604,10 +1558,7 @@ export class DocumentProcessingProcessor {
     }
   }
 
-  private async markDocumentResourceFailed(
-    record: WorkerJobRecord,
-    message: string,
-  ) {
+  private async markDocumentResourceFailed(record: WorkerJobRecord, message: string) {
     const action = getJobAction(record.inputMeta);
     const inputMeta = asRecord(record.inputMeta);
     const failedAt = new Date().toISOString();
@@ -1704,18 +1655,12 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function readString(
-  value: Record<string, unknown>,
-  key: string,
-): string | null {
+function readString(value: Record<string, unknown>, key: string): string | null {
   const raw = value[key];
   return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
-function readJsonNumber(
-  value: Record<string, unknown>,
-  key: string,
-): number | null {
+function readJsonNumber(value: Record<string, unknown>, key: string): number | null {
   const raw = value[key];
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
@@ -1729,10 +1674,7 @@ function readNestedRecord(value: unknown, key: string): Record<string, unknown> 
   return nested as Record<string, unknown>;
 }
 
-function readArray(
-  value: Record<string, unknown> | null,
-  key: string,
-): unknown[] {
+function readArray(value: Record<string, unknown> | null, key: string): unknown[] {
   const raw = value?.[key];
   return Array.isArray(raw) ? raw : [];
 }

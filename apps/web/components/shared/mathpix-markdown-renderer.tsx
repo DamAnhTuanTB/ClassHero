@@ -18,7 +18,7 @@ export function MathpixMarkdownRenderer({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    
+
     // Dynamic import to avoid SSR issues with mathpix-markdown-it
     import("mathpix-markdown-it").then(({ MathpixMarkdownModel }) => {
       const html = MathpixMarkdownModel.markdownToHTML(content, {
@@ -30,12 +30,5 @@ export function MathpixMarkdownRenderer({
     });
   }, [content]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={`mmd-content ${className ?? ""}`}
-    />
-  );
+  return <div ref={containerRef} className={`mmd-content ${className ?? ""}`} />;
 }
-
-

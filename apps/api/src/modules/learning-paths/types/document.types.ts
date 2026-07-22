@@ -34,10 +34,9 @@ export type SourceDocumentPageRecord = Prisma.SourceDocumentPageGetPayload<{
   select: typeof sourceDocumentPageSelect;
 }>;
 
-export type LessonDocumentPageRangeRecord =
-  Prisma.LessonDocumentPageRangeGetPayload<{
-    select: typeof lessonDocumentPageRangeSelect;
-  }>;
+export type LessonDocumentPageRangeRecord = Prisma.LessonDocumentPageRangeGetPayload<{
+  select: typeof lessonDocumentPageRangeSelect;
+}>;
 
 export type LessonDocumentRecord = Prisma.LessonDocumentGetPayload<{
   select: typeof lessonDocumentSelect;

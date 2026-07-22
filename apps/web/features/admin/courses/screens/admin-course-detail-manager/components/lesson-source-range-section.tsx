@@ -46,10 +46,11 @@ export function LessonSourceRangeSection({
   const pageEnd = form.watch("sourceDocumentPageRange.pageEnd") ?? "";
   const pageStartNumber = getPdfPageFromPrintedPage(pageStart, pages);
   const pageEndNumber = getPdfPageFromPrintedPage(pageEnd, pages);
-  const previewPage = pageStartNumber !== null
-    ? pages.find((page) => page.pageNumber === pageStartNumber)
-    : null;
-    
+  const previewPage =
+    pageStartNumber !== null
+      ? pages.find((page) => page.pageNumber === pageStartNumber)
+      : null;
+
   const previewPages =
     pageStartNumber !== null && pageEndNumber !== null && pageStartNumber <= pageEndNumber
       ? pages.filter(
@@ -75,25 +76,29 @@ export function LessonSourceRangeSection({
       : null;
 
   const lessonTitle = form.watch("title") ?? "";
-  
+
   const suggestedPages = useMemo(() => {
     if (!lessonTitle.trim() || !pages || pages.length === 0) return [];
-    
+
     const normalizedTitle = lessonTitle.trim().toLowerCase();
-    
+
     // Extract core title (e.g. "Bài 1: Tỉ lệ thức" -> "tỉ lệ thức")
-    let searchStr = normalizedTitle.replace(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/, "").trim();
+    let searchStr = normalizedTitle
+      .replace(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/, "")
+      .trim();
     if (!searchStr || searchStr.length < 3) {
       // Fallback if there's no core title or it's too short, strip trailing punctuations
       searchStr = normalizedTitle.replace(/[:\-\.]\s*$/, "");
     }
 
-    const normalizeText = (t: string) => t
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/[^a-z0-9]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const normalizeText = (t: string) =>
+      t
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/[^a-z0-9]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
     const normSearchStr = normalizeText(searchStr);
     if (!normSearchStr) return [];
@@ -104,22 +109,22 @@ export function LessonSourceRangeSection({
     // After normalizeText: "bai 37 hinh..." (contiguous, searchable)
     const stripLatex = (t: string) => t.replace(/\\[a-zA-Z]+\*?/g, " ");
 
-    const getSearchText = (page: NonNullable<typeof pages[0]>) => {
+    const getSearchText = (page: NonNullable<(typeof pages)[0]>) => {
       const raw = page.fullText ?? page.textPreview ?? page.mathpixMarkdown ?? "";
       return stripLatex(raw).toLowerCase();
     };
 
-    const matchedPages: (NonNullable<typeof pages[0]> & { index: number })[] = [];
+    const matchedPages: (NonNullable<(typeof pages)[0]> & { index: number })[] = [];
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
       if (!page) continue;
       const text = getSearchText(page);
-      
-      const isTocPage = 
-        /m[uụú]c\s*l[uụú][cg]/i.test(text) || 
+
+      const isTocPage =
+        /m[uụú]c\s*l[uụú][cg]/i.test(text) ||
         (text.match(/\.{4,}/g) ?? []).length > 4 ||
         (text.match(/(bài|chương|chủ đề|phần)\s+\d+/gi) ?? []).length > 6;
-        
+
       if (isTocPage) continue;
 
       if (normalizeText(text).includes(normSearchStr)) {
@@ -130,78 +135,93 @@ export function LessonSourceRangeSection({
     if (matchedPages.length === 0) return [];
 
     let nextLessonStr = "";
-    const prefixMatch = normalizedTitle.match(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+(\d+)[:\-\.]?\s*/);
+    const prefixMatch = normalizedTitle.match(
+      /^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+(\d+)[:\-\.]?\s*/,
+    );
     if (prefixMatch && prefixMatch[1] && prefixMatch[2]) {
-      nextLessonStr = normalizeText(`${prefixMatch[1]} ${parseInt(prefixMatch[2], 10) + 1}`);
+      nextLessonStr = normalizeText(
+        `${prefixMatch[1]} ${parseInt(prefixMatch[2], 10) + 1}`,
+      );
     }
     const stopKeywords = [
       nextLessonStr,
       "luyen tap",
       "luyen tap chung",
       "bai tap cuoi chuong",
-      "on tap chuong"
+      "on tap chuong",
     ].filter(Boolean);
 
     const validMatchedPages: typeof matchedPages = [];
     for (let i = 0; i < matchedPages.length; i++) {
-       const p = matchedPages[i]!;
-       if (i > 0) {
-          const text = normalizeText(getSearchText(p));
-          // Check strict stop keywords (next lesson, chapter review) anywhere in text
-          const strictStopHit = stopKeywords.filter(k => k !== "luyen tap").some(k => text.includes(k));
-          // Check "luyen tap" as a standalone heading (first ~40 chars, NOT followed by a number)
-          // "Luyện tập 2" = part of lesson exercises → don't stop
-          // "Luyện tập" alone = separate section → stop
-          const isExerciseHeading = /luyen tap(?!\s*\d)/.test(text.substring(0, 40));
-          if (strictStopHit || isExerciseHeading) {
-             break; // Dừng việc gộp trang nếu gặp trang của bài học tiếp theo hoặc phần ôn tập
-          }
-       }
-       validMatchedPages.push(p);
+      const p = matchedPages[i]!;
+      if (i > 0) {
+        const text = normalizeText(getSearchText(p));
+        // Check strict stop keywords (next lesson, chapter review) anywhere in text
+        const strictStopHit = stopKeywords
+          .filter((k) => k !== "luyen tap")
+          .some((k) => text.includes(k));
+        // Check "luyen tap" as a standalone heading (first ~40 chars, NOT followed by a number)
+        // "Luyện tập 2" = part of lesson exercises → don't stop
+        // "Luyện tập" alone = separate section → stop
+        const isExerciseHeading = /luyen tap(?!\s*\d)/.test(text.substring(0, 40));
+        if (strictStopHit || isExerciseHeading) {
+          break; // Dừng việc gộp trang nếu gặp trang của bài học tiếp theo hoặc phần ôn tập
+        }
+      }
+      validMatchedPages.push(p);
     }
 
     if (validMatchedPages.length === 0) return [];
 
     const resolveRange = (range: typeof validMatchedPages) => {
-       const firstMatch = range[0]!;
-       let lastMatch = range[range.length - 1]!;
-       
-       // Quét tiến để đoán điểm kết thúc nếu chỉ tìm thấy trang bắt đầu (như khi gõ "Bài 20:")
-       if (nextLessonStr) {
-          const startIdx = firstMatch.index;
-          const endIdx = lastMatch.index;
-          const maxScan = Math.min(endIdx + 15, pages.length);
-          let foundStop = false;
-          let stopIdx = endIdx;
-          
-          for (let j = endIdx + 1; j < maxScan; j++) {
-             const scanPage = pages[j];
-             if (!scanPage) continue;
-             const t = normalizeText(getSearchText(scanPage));
-             const strictHit = stopKeywords.filter(k => k !== "luyen tap").some(k => t.includes(k));
-             const headingHit = /luyen tap(?!\s*\d)/.test(t.substring(0, 40));
-             if (strictHit || headingHit) {
-                foundStop = true;
-                stopIdx = j - 1;
-                break;
-             }
+      const firstMatch = range[0]!;
+      let lastMatch = range[range.length - 1]!;
+
+      // Quét tiến để đoán điểm kết thúc nếu chỉ tìm thấy trang bắt đầu (như khi gõ "Bài 20:")
+      if (nextLessonStr) {
+        const startIdx = firstMatch.index;
+        const endIdx = lastMatch.index;
+        const maxScan = Math.min(endIdx + 15, pages.length);
+        let foundStop = false;
+        let stopIdx = endIdx;
+
+        for (let j = endIdx + 1; j < maxScan; j++) {
+          const scanPage = pages[j];
+          if (!scanPage) continue;
+          const t = normalizeText(getSearchText(scanPage));
+          const strictHit = stopKeywords
+            .filter((k) => k !== "luyen tap")
+            .some((k) => t.includes(k));
+          const headingHit = /luyen tap(?!\s*\d)/.test(t.substring(0, 40));
+          if (strictHit || headingHit) {
+            foundStop = true;
+            stopIdx = j - 1;
+            break;
           }
-          // Chỉ mở rộng range nếu tìm thấy chính xác điểm dừng
-          if (foundStop && stopIdx > endIdx) {
-              lastMatch = { ...pages[stopIdx]!, index: stopIdx };
-          }
-       }
-       
-       const startPrinted = getPrintedPageView(firstMatch);
-       const endPrinted = getPrintedPageView(lastMatch);
-       const startStr = startPrinted.printedPageLabel ?? startPrinted.printedPageNumber?.toString() ?? firstMatch.pageNumber.toString();
-       const endStr = endPrinted.printedPageLabel ?? endPrinted.printedPageNumber?.toString() ?? lastMatch.pageNumber.toString();
-       
-       return {
-         start: startStr,
-         end: endStr,
-         label: startStr === endStr ? `Trang ${startStr}` : `Trang ${startStr} - ${endStr}`
-       };
+        }
+        // Chỉ mở rộng range nếu tìm thấy chính xác điểm dừng
+        if (foundStop && stopIdx > endIdx) {
+          lastMatch = { ...pages[stopIdx]!, index: stopIdx };
+        }
+      }
+
+      const startPrinted = getPrintedPageView(firstMatch);
+      const endPrinted = getPrintedPageView(lastMatch);
+      const startStr =
+        startPrinted.printedPageLabel ??
+        startPrinted.printedPageNumber?.toString() ??
+        firstMatch.pageNumber.toString();
+      const endStr =
+        endPrinted.printedPageLabel ??
+        endPrinted.printedPageNumber?.toString() ??
+        lastMatch.pageNumber.toString();
+
+      return {
+        start: startStr,
+        end: endStr,
+        label:
+          startStr === endStr ? `Trang ${startStr}` : `Trang ${startStr} - ${endStr}`,
+      };
     };
 
     const ranges: { start: string; end: string; label: string }[] = [];
@@ -235,36 +255,7 @@ export function LessonSourceRangeSection({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <FieldLabel id="admin-lesson-source-range" label="Khoảng trang" isOptional />
-            {suggestedPages.length > 0 ? (
-              <span className="flex items-center gap-1 text-xs text-[var(--theme-text-muted)]">
-                (Gợi ý: 
-                {suggestedPages.map((range, idx) => (
-                  <span key={idx}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        form.setValue("sourceDocumentPageRange.pageStart", range.start, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                        if (range.start !== range.end) {
-                          form.setValue("sourceDocumentPageRange.pageEnd", range.end, {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          });
-                        }
-                      }}
-                      className="font-bold text-[var(--theme-primary)] hover:underline"
-                    >
-                      {range.label}
-                    </button>
-                    {idx < suggestedPages.length - 1 ? ", " : ""}
-                  </span>
-                ))}
-                )
-              </span>
-            ) : null}
+            <FieldLabel id="admin-lesson-source-range" label="Tài liệu nền tảng" />
           </div>
         </div>
       </div>
@@ -280,26 +271,35 @@ export function LessonSourceRangeSection({
               {rangeDisabledReason}
             </p>
           ) : null}
-          <OptionField
-            id="admin-lesson-source-document"
-            label="Tài liệu chính"
-            value={sourceDocumentId || selectedSourceDocument?.id || ""}
-            disabled={isSourceSelectDisabled}
-            icon={<Layers3 className="h-5 w-5" aria-hidden="true" />}
-            options={sourceDocuments.map((document) => ({
-              value: document.id,
-              label: document.title ?? document.file.originalName,
-            }))}
-            error={form.formState.errors.sourceDocumentPageRange?.sourceDocumentId}
-            onChange={(value) => {
-              form.setValue("sourceDocumentPageRange.sourceDocumentId", value, {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
-              onSelectSourceDocument(value || null);
-            }}
-          />
-
+          {suggestedPages.length > 0 ? (
+            <div className="flex items-center gap-1 text-xs text-[var(--theme-text-muted)]">
+              (Gợi ý:
+              {suggestedPages.map((range, idx) => (
+                <span key={idx}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      form.setValue("sourceDocumentPageRange.pageStart", range.start, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                      if (range.start !== range.end) {
+                        form.setValue("sourceDocumentPageRange.pageEnd", range.end, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }
+                    }}
+                    className="font-bold text-[var(--theme-primary)] hover:underline"
+                  >
+                    {range.label}
+                  </button>
+                  {idx < suggestedPages.length - 1 ? ", " : ""}
+                </span>
+              ))}
+              )
+            </div>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
               id="admin-lesson-page-start"
@@ -319,39 +319,6 @@ export function LessonSourceRangeSection({
               error={form.formState.errors.sourceDocumentPageRange?.pageEnd}
               {...form.register("sourceDocumentPageRange.pageEnd")}
             />
-          </div>
-
-          <div className="flex items-center gap-2 mt-1">
-            <input
-              type="checkbox"
-              id="admin-lesson-source-primary"
-              disabled={isRangeInputDisabled}
-              className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] disabled:opacity-60 disabled:cursor-not-allowed"
-              {...(() => {
-                const { onChange, ...rest } = form.register("sourceDocumentPageRange.isPrimary");
-                return {
-                  ...rest,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                    const checked = e.target.checked;
-                    if (checked) {
-                      const currentDocs = form.getValues("referenceDocuments") || [];
-                      currentDocs.forEach((_, i) => {
-                        form.setValue(`referenceDocuments.${i}.isPrimary`, false, { shouldDirty: true });
-                      });
-                    }
-                    onChange(e);
-                  },
-                };
-              })()}
-            />
-            <label
-              htmlFor="admin-lesson-source-primary"
-              className={`text-sm font-semibold text-[var(--theme-text-strong)] ${
-                isRangeInputDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-              }`}
-            >
-              Đánh dấu là tài liệu chính
-            </label>
           </div>
 
           <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3 transition-all">
@@ -407,13 +374,13 @@ export function LessonSourceRangeSection({
                 )}
               </div>
             </div>
-            
+
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <p className="text-sm font-extrabold text-[var(--theme-primary)]">
                 {selectedTitle}
               </p>
             </div>
-            
+
             {/* Mobile-only toggle row */}
             {previewPages.length > 0 && (
               <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
@@ -460,23 +427,46 @@ export function LessonSourceRangeSection({
                 isExpanded ? (
                   <div className="flex flex-col gap-4">
                     {previewPages.map((page, index) => {
-                      const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+                      const text =
+                        page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
                       const printed = getPrintedPageView(page);
                       return (
-                        <div key={page.id} className={index > 0 ? "border-t border-[var(--theme-border-strong)] pt-4" : ""}>
+                        <div
+                          key={page.id}
+                          className={
+                            index > 0
+                              ? "border-t border-[var(--theme-border-strong)] pt-4"
+                              : ""
+                          }
+                        >
                           <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                            Trang PDF {page.pageNumber} {printed.printedPageLabel ? `(Trang in: ${printed.printedPageLabel})` : ""}
+                            Trang PDF {page.pageNumber}{" "}
+                            {printed.printedPageLabel
+                              ? `(Trang in: ${printed.printedPageLabel})`
+                              : ""}
                           </div>
                           {previewMode === "ocr" ? (
-                            text ? <MathpixMarkdownRenderer content={text} /> : <p className="italic text-[var(--theme-text-muted)]">Không có nội dung OCR</p>
+                            text ? (
+                              <MathpixMarkdownRenderer content={text} />
+                            ) : (
+                              <p className="italic text-[var(--theme-text-muted)]">
+                                Không có nội dung OCR
+                              </p>
+                            )
                           ) : (
                             <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
                               {selectedSourceDocument?.file?.publicUrl ? (
                                 <div className="inline-block align-top">
-                                  <PdfPagePreview pdfUrl={selectedSourceDocument.file.publicUrl} pageNumber={page.pageNumber} width={650} />
+                                  <PdfPagePreview
+                                    pdfUrl={selectedSourceDocument.file.publicUrl}
+                                    pageNumber={page.pageNumber}
+                                    width={650}
+                                  />
                                 </div>
                               ) : (
-                                <p className="p-4 italic text-[var(--theme-text-muted)]">Không tìm thấy file PDF</p>
+                                <p className="p-4 italic text-[var(--theme-text-muted)]">
+                                  Không tìm thấy file PDF
+                                </p>
                               )}
                             </div>
                           )}

@@ -4,14 +4,18 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 
-const requireFromWeb = createRequire(new URL("../../apps/web/package.json", import.meta.url));
+const requireFromWeb = createRequire(
+  new URL("../../apps/web/package.json", import.meta.url),
+);
 const { chromium } = requireFromWeb("@playwright/test");
 
-const baseUrl = (process.env.FINAL_UI_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-const apiBaseUrl = (process.env.FINAL_UI_API_BASE_URL ?? "http://localhost:4000/api/v1").replace(
+const baseUrl = (process.env.FINAL_UI_BASE_URL ?? "http://localhost:3000").replace(
   /\/$/,
   "",
 );
+const apiBaseUrl = (
+  process.env.FINAL_UI_API_BASE_URL ?? "http://localhost:4000/api/v1"
+).replace(/\/$/, "");
 const outputDir = process.env.FINAL_UI_OUTPUT_DIR ?? "docs/final-screen-ui";
 const storageKey = "classhero.auth.session";
 
@@ -28,8 +32,18 @@ const routes = [
   { role: "public", path: "/register/parent", segments: ["register", "parent"] },
   { role: "public", path: "/forgot-password", segments: ["forgot-password"] },
   { role: "public", path: "/reset-password", segments: ["reset-password"] },
-  { role: "student", path: "/student/courses", segments: ["courses"], authRole: "student" },
-  { role: "student", path: "/student/explore", segments: ["explore"], authRole: "student" },
+  {
+    role: "student",
+    path: "/student/courses",
+    segments: ["courses"],
+    authRole: "student",
+  },
+  {
+    role: "student",
+    path: "/student/explore",
+    segments: ["explore"],
+    authRole: "student",
+  },
   {
     role: "student",
     path: "/student/courses/toan-7",
@@ -153,7 +167,9 @@ async function captureRoute(browser, viewport, route, sessions) {
 
   try {
     await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => undefined);
     await page.waitForTimeout(750);
     finalUrl = page.url();
     await mkdir(path.dirname(filePath), { recursive: true });
@@ -210,7 +226,9 @@ async function main() {
     apiBaseUrl,
     viewports,
     auth: {
-      admin: sessions.admin?.error ? { status: "failed", error: sessions.admin.error } : { status: "ok" },
+      admin: sessions.admin?.error
+        ? { status: "failed", error: sessions.admin.error }
+        : { status: "ok" },
       student: sessions.student?.error
         ? { status: "failed", error: sessions.student.error }
         : { status: "ok" },
@@ -227,7 +245,9 @@ async function main() {
   const failed = results.filter((result) => result.status === "failed");
 
   if (failed.length > 0) {
-    console.error(`Captured with ${failed.length} failed route(s). See ${outputDir}/manifest.json.`);
+    console.error(
+      `Captured with ${failed.length} failed route(s). See ${outputDir}/manifest.json.`,
+    );
     process.exitCode = 1;
     return;
   }

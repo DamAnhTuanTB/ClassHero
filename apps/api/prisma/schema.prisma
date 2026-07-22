@@ -124,6 +124,7 @@ enum LessonDocumentKind {
   PRIMARY_FROM_SOURCE
   PRIMARY_REPLACEMENT
   SUPPLEMENT
+  HOMEWORK
 }
 
 enum LessonMaterialType {

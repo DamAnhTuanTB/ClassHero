@@ -115,7 +115,10 @@ export function computeAutofillRanges(
     // Strategy 2: Fallback to core title search
     if (startPages[i] === null) {
       let coreTitle = rawTitle
-        .replace(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/, "")
+        .replace(
+          /^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/,
+          "",
+        )
         .trim();
       if (!coreTitle || coreTitle.length < 3) {
         coreTitle = rawTitle.replace(/[:\-\.]\s*$/, "");
@@ -142,7 +145,8 @@ export function computeAutofillRanges(
 
   // Use printed pageLimit
   const printedPageLimit =
-    getPrintedPageView(sortedPages[sortedPages.length - 1]!).printedPageNumber ?? pageLimit;
+    getPrintedPageView(sortedPages[sortedPages.length - 1]!).printedPageNumber ??
+    pageLimit;
 
   for (let i = 0; i < lessons.length; i++) {
     if (startPages[i] === null) {
@@ -184,10 +188,7 @@ export function computeAutofillRanges(
       hardLimit = startPages[i + 1]! - 1;
     } else {
       // Last lesson: estimate max range from average span of earlier lessons
-      const avgSpan =
-        i > 0
-          ? Math.ceil((startPages[i]! - startPages[0]!) / i)
-          : 10;
+      const avgSpan = i > 0 ? Math.ceil((startPages[i]! - startPages[0]!) / i) : 10;
       hardLimit = Math.min(printedPageLimit, pageStart + Math.max(avgSpan * 2, 10));
     }
 

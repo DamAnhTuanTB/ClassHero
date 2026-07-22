@@ -1,10 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import {
-  EnrollmentStatus,
-  Prisma,
-  PublishStatus,
-  UserRole,
-} from "@prisma/client";
+import { EnrollmentStatus, Prisma, PublishStatus, UserRole } from "@prisma/client";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { PublicLearningPathQueryDto } from "#api/modules/learning-paths/dto/public-learning-path-query.dto";
@@ -325,11 +320,7 @@ export class PublicLearningPathsService {
   }
 
   private async attachLessonProgress(viewer: PublicViewerContext, lessonIds: string[]) {
-    if (
-      !viewer.user ||
-      viewer.user.role !== UserRole.STUDENT ||
-      lessonIds.length === 0
-    ) {
+    if (!viewer.user || viewer.user.role !== UserRole.STUDENT || lessonIds.length === 0) {
       return;
     }
 

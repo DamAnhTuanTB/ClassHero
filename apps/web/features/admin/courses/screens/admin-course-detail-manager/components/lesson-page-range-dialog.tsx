@@ -32,7 +32,6 @@ export function LessonPageRangeDialog({
   onAutofill,
   onClose,
   onDeleteSupplement,
-  onOpenPrimaryUpload,
   onOpenSupplementUpload,
   onSave,
   onUpdateRange,
@@ -53,13 +52,17 @@ export function LessonPageRangeDialog({
   onAutofill: () => void;
   onClose: () => void;
   onDeleteSupplement: (lessonId: string, documentId: string) => void;
-  onOpenPrimaryUpload: (lessonId: string) => void;
   onOpenSupplementUpload: (lessonId: string) => void;
   onSave: () => Promise<unknown>;
   onUpdateRange: (
     lessonId: string,
-    field: "pageEnd" | "pageStart",
-    value: string,
+    field:
+      "pageEnd" | "pageStart" | "isPrimary" | "primarySupplementId" | "newSupplements",
+    value:
+      | string
+      | boolean
+      | null
+      | { id: string; file: File | null; title: string; isPrimary: boolean }[],
   ) => void;
 }) {
   const warnings = localWarnings.length > 0 ? localWarnings : latestWarnings;
@@ -143,8 +146,6 @@ export function LessonPageRangeDialog({
                 sourceDocument={sourceDocument}
                 rangeSubmitAttempted={rangeSubmitAttempted}
                 onDeleteSupplement={onDeleteSupplement}
-                onOpenPrimaryUpload={onOpenPrimaryUpload}
-                onOpenSupplementUpload={onOpenSupplementUpload}
                 onUpdateRange={onUpdateRange}
               />
             );

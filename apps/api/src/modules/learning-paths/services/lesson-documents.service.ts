@@ -292,11 +292,12 @@ export class LessonDocumentsService {
     if (
       dto.kind &&
       dto.kind !== LessonDocumentKind.SUPPLEMENT &&
-      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT
+      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT &&
+      dto.kind !== LessonDocumentKind.HOMEWORK
     ) {
       throwBadRequest(
         "VALIDATION_ERROR",
-        "Endpoint này chỉ dùng để upload tài liệu bổ sung hoặc tài liệu chính",
+        "Endpoint này chỉ dùng để upload tài liệu bổ sung, tài liệu chính hoặc bài tập về nhà",
       );
     }
 
@@ -387,11 +388,12 @@ export class LessonDocumentsService {
     if (
       dto.kind &&
       dto.kind !== LessonDocumentKind.SUPPLEMENT &&
-      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT
+      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT &&
+      dto.kind !== LessonDocumentKind.HOMEWORK
     ) {
       throwBadRequest(
         "VALIDATION_ERROR",
-        "Chỉ có thể đổi sang tài liệu bổ sung hoặc tài liệu chính",
+        "Endpoint này chỉ dùng để cập nhật tài liệu bổ sung, tài liệu chính hoặc bài tập về nhà",
       );
     }
 
@@ -407,6 +409,7 @@ export class LessonDocumentsService {
               in: [
                 LessonDocumentKind.SUPPLEMENT,
                 LessonDocumentKind.PRIMARY_REPLACEMENT,
+                LessonDocumentKind.HOMEWORK,
               ],
             },
           },
@@ -426,16 +429,22 @@ export class LessonDocumentsService {
           await tx.lessonDocument.updateMany({
             where: {
               lessonId,
-              kind: {
-                in: [
-                  LessonDocumentKind.PRIMARY_FROM_SOURCE,
-                  LessonDocumentKind.PRIMARY_REPLACEMENT,
-                ],
-              },
+              kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
               replacedAt: null,
             },
             data: {
               replacedAt: new Date(),
+            },
+          });
+
+          await tx.lessonDocument.updateMany({
+            where: {
+              lessonId,
+              kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
+              replacedAt: null,
+            },
+            data: {
+              kind: LessonDocumentKind.SUPPLEMENT,
             },
           });
         }
@@ -490,8 +499,14 @@ export class LessonDocumentsService {
           throwLessonDocumentNotFound();
         }
 
-        if (document.kind !== LessonDocumentKind.SUPPLEMENT) {
-          throwConflict("CONFLICT", "Chỉ được xóa tài liệu bổ sung bằng endpoint này");
+        if (
+          document.kind !== LessonDocumentKind.SUPPLEMENT &&
+          document.kind !== LessonDocumentKind.HOMEWORK
+        ) {
+          throwConflict(
+            "CONFLICT",
+            "Chỉ được xóa tài liệu bổ sung hoặc bài tập về nhà bằng endpoint này",
+          );
         }
 
         await tx.lessonDocument.delete({

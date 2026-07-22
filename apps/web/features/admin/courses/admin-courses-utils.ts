@@ -53,8 +53,8 @@ export type LessonMatch = {
 
 export type LessonReferenceDocumentUpload = {
   file: File;
-  title: string;
-  isPrimary: boolean;
+  title?: string;
+  type?: "SUPPLEMENT" | "HOMEWORK";
 };
 
 export function toPathFormValues(path: AdminLearningPath): LearningPathFormValues {
@@ -115,16 +115,17 @@ export function toLessonFormValues(
       pageStart: "",
       pageEnd: "",
     },
-    referenceDocuments: existingSupplements?.map(doc => ({
-      id: doc.id,
-      title: doc.title || "",
-      originalName: doc.file?.originalName || "Tài liệu",
-      isPrimary: doc.kind === "PRIMARY_REPLACEMENT",
-      status: doc.status,
-      extractError: doc.extractError || undefined,
-      progress: doc.processingJob?.progress || undefined,
-      url: doc.file?.publicUrl || undefined,
-    })) || [],
+    referenceDocuments:
+      existingSupplements?.map((doc) => ({
+        id: doc.id,
+        title: doc.title || "",
+        originalName: doc.file?.originalName || "Tài liệu",
+        type: doc.kind === "HOMEWORK" ? "HOMEWORK" : "SUPPLEMENT",
+        status: doc.status,
+        extractError: doc.extractError || undefined,
+        progress: doc.processingJob?.progress || undefined,
+        url: doc.file?.publicUrl || undefined,
+      })) || [],
   };
 }
 
@@ -156,7 +157,7 @@ export function getLessonReferenceDocumentUploads(
       {
         file,
         title: document.title?.trim() || file.name,
-        isPrimary: document.isPrimary ?? false,
+        type: document.type,
       },
     ];
   });

@@ -245,9 +245,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
           {isUnderMaintenance ? (
             <div className="student-mobile-border mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-black leading-5 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]">
               <LockKeyhole className="h-5 w-5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 break-words">
-                Khóa học đang được bảo trì
-              </span>
+              <span className="min-w-0 break-words">Khóa học đang được bảo trì</span>
             </div>
           ) : null}
           <div
@@ -256,8 +254,8 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
               isUnderMaintenance
                 ? "border-amber-200 bg-amber-50/75 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)]"
                 : isEnrolled
-                ? "border-slate-100 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
-                : "student-course-price-box border border-emerald-200/80 bg-emerald-50/70 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)]",
+                  ? "border-slate-100 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
+                  : "student-course-price-box border border-emerald-200/80 bg-emerald-50/70 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)]",
             )}
           >
             <div className="grid min-w-0 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_6.75rem] min-[400px]:items-center sm:grid-cols-[minmax(0,1fr)_8.25rem]">

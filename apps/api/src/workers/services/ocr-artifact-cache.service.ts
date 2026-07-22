@@ -103,10 +103,7 @@ export class OcrArtifactCacheService {
       .filter(Boolean);
   }
 
-  createDescriptor(
-    contentHash: string,
-    provider: string,
-  ): OcrArtifactCacheDescriptor {
+  createDescriptor(contentHash: string, provider: string): OcrArtifactCacheDescriptor {
     const normalizedProvider = provider.toLowerCase();
     const modelVersion =
       normalizedProvider === "mathpix" ? MATHPIX_PDF_MODEL_VERSION : "default";
@@ -221,23 +218,23 @@ export class OcrArtifactCacheService {
     await Promise.all([
       this.storage.uploadBuffer(artifactKeys.mmd, bundle.mmd, "text/markdown"),
       this.storage.uploadBuffer(artifactKeys.md, bundle.md, "text/markdown"),
-      this.storage.uploadBuffer(
-        artifactKeys.mmdZip,
-        bundle.mmdZip,
-        "application/zip",
-      ),
+      this.storage.uploadBuffer(artifactKeys.mmdZip, bundle.mmdZip, "application/zip"),
       this.storage.uploadBuffer(
         artifactKeys.linesJson,
         bundle.linesJson,
         "application/json",
       ),
+      this.storage.uploadBuffer(artifactKeys.htmlZip, bundle.htmlZip, "application/zip"),
       this.storage.uploadBuffer(
-        artifactKeys.htmlZip,
-        bundle.htmlZip,
-        "application/zip",
+        artifactKeys.metadataJson,
+        manifestBuffer,
+        "application/json",
       ),
-      this.storage.uploadBuffer(artifactKeys.metadataJson, manifestBuffer, "application/json"),
-      this.storage.uploadBuffer(artifactKeys.manifestJson, manifestBuffer, "application/json"),
+      this.storage.uploadBuffer(
+        artifactKeys.manifestJson,
+        manifestBuffer,
+        "application/json",
+      ),
     ]);
 
     this.logger.log(`Artifact bundle saved to cache: ${descriptor.baseKey}/`);
@@ -300,15 +297,14 @@ export class OcrArtifactCacheService {
     const artifactKeys = this.buildArtifactKeys(descriptor);
     this.logger.log(`Loading artifact bundle from cache: ${descriptor.baseKey}/`);
 
-    const [mmd, md, mmdZip, linesJson, htmlZip, manifestBuffer] =
-      await Promise.all([
-        this.storage.downloadObject(artifactKeys.mmd),
-        this.storage.downloadObject(artifactKeys.md),
-        this.storage.downloadObject(artifactKeys.mmdZip),
-        this.storage.downloadObject(artifactKeys.linesJson),
-        this.storage.downloadObject(artifactKeys.htmlZip),
-        this.storage.downloadObject(artifactKeys.manifestJson),
-      ]);
+    const [mmd, md, mmdZip, linesJson, htmlZip, manifestBuffer] = await Promise.all([
+      this.storage.downloadObject(artifactKeys.mmd),
+      this.storage.downloadObject(artifactKeys.md),
+      this.storage.downloadObject(artifactKeys.mmdZip),
+      this.storage.downloadObject(artifactKeys.linesJson),
+      this.storage.downloadObject(artifactKeys.htmlZip),
+      this.storage.downloadObject(artifactKeys.manifestJson),
+    ]);
 
     const manifest = JSON.parse(
       manifestBuffer.toString("utf8"),

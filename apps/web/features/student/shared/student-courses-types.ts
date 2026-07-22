@@ -16,10 +16,7 @@ export type StudentCourseDetailLessonStatus = "completed" | "current" | "locked"
 
 export type StudentCourseDetailContinueKind = "first" | "inProgress" | "last" | "next";
 export type StudentCourseDetailChapterStatus =
-  | "DRAFT"
-  | "PUBLISHED"
-  | "HIDDEN"
-  | "ARCHIVED";
+  "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED";
 
 export type StudentCourseDetailLesson = {
   durationMinutes: number;

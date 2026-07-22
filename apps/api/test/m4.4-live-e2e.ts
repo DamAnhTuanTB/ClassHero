@@ -26,7 +26,9 @@ async function main() {
 
   if (!appId || !appKey || ocrEnabled !== "true") {
     console.error("❌ Mathpix keys not configured or OCR not enabled.");
-    console.error("   Set MATHPIX_APP_ID, MATHPIX_APP_KEY and OCR_PAID_ENABLED=true in apps/api/.env");
+    console.error(
+      "   Set MATHPIX_APP_ID, MATHPIX_APP_KEY and OCR_PAID_ENABLED=true in apps/api/.env",
+    );
     process.exit(1);
   }
 
@@ -37,9 +39,8 @@ async function main() {
   console.log(`PDF file: ${pdfPath}`);
   console.log(`PDF size: ${(pdfBuffer.length / 1024 / 1024).toFixed(1)} MB`);
 
-  const { PdfMetadataService } = await import(
-    "../src/workers/services/pdf-metadata.service"
-  );
+  const { PdfMetadataService } =
+    await import("../src/workers/services/pdf-metadata.service");
   const pdfMeta = new PdfMetadataService();
 
   const contentHash = pdfMeta.computeContentHash(pdfBuffer);
@@ -184,22 +185,18 @@ async function main() {
 
   // --- 5. Quality scoring sample ---
   console.log("\n--- Step 5: Quality Scoring (first 3 pages) ---");
-  const { scorePageQuality } = await import(
-    "../src/workers/utils/quality-score"
-  );
+  const { scorePageQuality } = await import("../src/workers/utils/quality-score");
 
   const mmdRes = await fetch(`${MATHPIX_API}/v3/pdf/${pdfId}.mmd`, {
     headers: { app_id: appId, app_key: appKey },
   });
-  const mmdText = (await mmdRes.text());
+  const mmdText = await mmdRes.text();
   const mmdPages = mmdText.split("\\newpage");
 
   for (let i = 0; i < Math.min(3, mmdPages.length); i++) {
     const pageText = mmdPages[i]!.trim();
     const score = scorePageQuality(pageText);
-    console.log(
-      `  Page ${i + 1}: score=${score}, length=${pageText.length} chars`,
-    );
+    console.log(`  Page ${i + 1}: score=${score}, length=${pageText.length} chars`);
     if (pageText.length > 0) {
       console.log(`    Preview: ${pageText.substring(0, 150).replace(/\n/g, "\\n")}...`);
     }

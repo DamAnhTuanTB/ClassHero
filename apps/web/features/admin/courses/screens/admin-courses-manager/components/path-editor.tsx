@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  BookOpen,
-  Hash,
-  Layers3,
-  Loader2,
-  Save,
-  SlidersHorizontal,
-} from "lucide-react";
+import { BookOpen, Hash, Layers3, Loader2, Save, SlidersHorizontal } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";

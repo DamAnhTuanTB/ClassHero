@@ -104,11 +104,21 @@ export function RetrySourceDocumentConfirmDialog({
                   </div>
                 ) : hasCache === true ? (
                   <p className="text-sm leading-6 text-[var(--theme-text-muted)] font-semibold">
-                    Tài liệu này <span className="font-extrabold text-[var(--theme-success-text)]">đã có dữ liệu OCR trong cache</span>. Quá trình xử lý lại sẽ ưu tiên dùng dữ liệu cache để tiết kiệm chi phí và diễn ra rất nhanh.
+                    Tài liệu này{" "}
+                    <span className="font-extrabold text-[var(--theme-success-text)]">
+                      đã có dữ liệu OCR trong cache
+                    </span>
+                    . Quá trình xử lý lại sẽ ưu tiên dùng dữ liệu cache để tiết kiệm chi
+                    phí và diễn ra rất nhanh.
                   </p>
                 ) : hasCache === false ? (
                   <p className="text-sm leading-6 text-[var(--theme-text-muted)] font-semibold">
-                    Tài liệu này <span className="font-extrabold text-[var(--theme-danger)]">chưa có dữ liệu OCR trong cache</span>. Hệ thống sẽ bóc tách dữ liệu mới từ đầu và có thể tốn thêm chi phí (nếu dùng Mathpix) cũng như thời gian chờ.
+                    Tài liệu này{" "}
+                    <span className="font-extrabold text-[var(--theme-danger)]">
+                      chưa có dữ liệu OCR trong cache
+                    </span>
+                    . Hệ thống sẽ bóc tách dữ liệu mới từ đầu và có thể tốn thêm chi phí
+                    (nếu dùng Mathpix) cũng như thời gian chờ.
                   </p>
                 ) : null}
               </div>
@@ -123,7 +133,7 @@ export function RetrySourceDocumentConfirmDialog({
               >
                 Hủy
               </button>
-              
+
               {hasCache === true ? (
                 <button
                   type="button"

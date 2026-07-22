@@ -76,7 +76,9 @@ async function main() {
         const text = buf.toString("utf8");
         const pages = text.split("\\newpage");
         console.log(`     Pages in MMD: ${pages.length}`);
-        console.log(`     First 200 chars: ${text.substring(0, 200).replace(/\n/g, "\\n")}...`);
+        console.log(
+          `     First 200 chars: ${text.substring(0, 200).replace(/\n/g, "\\n")}...`,
+        );
       }
 
       if (ext === "lines.json") {
@@ -87,7 +89,9 @@ async function main() {
           } else {
             console.log(`     Keys: ${Object.keys(parsed).slice(0, 5).join(", ")}`);
           }
-        } catch { console.log("     (binary)"); }
+        } catch {
+          console.log("     (binary)");
+        }
       }
     } catch (err) {
       console.log(`  ❌ .${ext}: ${err}`);

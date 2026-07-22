@@ -16,7 +16,7 @@ export function useStudentCoursesFilter() {
     courses[0]?.grade ??
     null;
   const [grade, setGrade] = useState<StudentCourseGradeFilter>(null);
-  const activeGrade = grade === "ALL" ? null : grade ?? priorityGrade;
+  const activeGrade = grade === "ALL" ? null : (grade ?? priorityGrade);
   const [hasTouchedGrade, setHasTouchedGrade] = useState(false);
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState<StudentCourseSubjectFilter>("ALL");

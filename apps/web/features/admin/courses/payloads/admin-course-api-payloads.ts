@@ -51,7 +51,9 @@ export function toChapterApiPayload(
   };
 }
 
-export function toLessonApiPayload(values: Partial<LessonFormValues>): AdminLessonPayload {
+export function toLessonApiPayload(
+  values: Partial<LessonFormValues>,
+): AdminLessonPayload {
   const sourceDocumentPageRange = normalizeLessonSourceDocumentPageRange(
     values.sourceDocumentPageRange,
   );
@@ -95,7 +97,6 @@ function normalizeLessonSourceDocumentPageRange(
     sourceDocumentId,
     pageStart: Number(pageStart),
     pageEnd: Number(pageEnd),
-    isPrimary: value?.isPrimary,
   };
 }
 

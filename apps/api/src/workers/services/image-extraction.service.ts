@@ -39,9 +39,7 @@ export class ImageExtractionService {
    * Extract all images from an mmd.zip buffer.
    * Returns images sorted by page number then position.
    */
-  async extractImagesFromZip(
-    mmdZipBuffer: Buffer,
-  ): Promise<ExtractedImage[]> {
+  async extractImagesFromZip(mmdZipBuffer: Buffer): Promise<ExtractedImage[]> {
     const images: ExtractedImage[] = [];
 
     const entries = await this.readZipEntries(mmdZipBuffer);
@@ -103,9 +101,7 @@ export class ImageExtractionService {
   /**
    * Read all entries from a zip buffer using yauzl.
    */
-  private readZipEntries(
-    buffer: Buffer,
-  ): Promise<yauzl.Entry[]> {
+  private readZipEntries(buffer: Buffer): Promise<yauzl.Entry[]> {
     return new Promise((resolve, reject) => {
       yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
         if (err || !zipfile) return reject(err ?? new Error("No zipfile"));
@@ -125,10 +121,7 @@ export class ImageExtractionService {
   /**
    * Read the data for a single zip entry.
    */
-  private readEntryData(
-    buffer: Buffer,
-    entry: yauzl.Entry,
-  ): Promise<Buffer> {
+  private readEntryData(buffer: Buffer, entry: yauzl.Entry): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
         if (err || !zipfile) return reject(err ?? new Error("No zipfile"));
@@ -137,7 +130,8 @@ export class ImageExtractionService {
         zipfile.on("entry", (e: yauzl.Entry) => {
           if (e.fileName === entry.fileName) {
             zipfile.openReadStream(e, (readErr, readStream) => {
-              if (readErr || !readStream) return reject(readErr ?? new Error("No stream"));
+              if (readErr || !readStream)
+                return reject(readErr ?? new Error("No stream"));
 
               const chunks: Buffer[] = [];
               (readStream as Readable).on("data", (chunk: Buffer) => chunks.push(chunk));

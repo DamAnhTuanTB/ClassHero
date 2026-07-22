@@ -44,7 +44,11 @@ export function PdfPagePreview({
       className="overflow-hidden rounded-md border border-[var(--theme-border)] bg-white"
       style={{ width }}
     >
-      <Document file={pdfUrl} loading={<PdfPageSkeleton width={width} />} onLoadError={handleError}>
+      <Document
+        file={pdfUrl}
+        loading={<PdfPageSkeleton width={width} />}
+        onLoadError={handleError}
+      >
         <Page
           pageNumber={pageNumber}
           width={width}

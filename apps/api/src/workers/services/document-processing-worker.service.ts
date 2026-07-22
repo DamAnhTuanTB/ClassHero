@@ -21,14 +21,10 @@ const REMOVE_ON_COMPLETE_SECONDS = 7 * 24 * 60 * 60;
 const REMOVE_ON_FAIL_SECONDS = 30 * 24 * 60 * 60;
 
 @Injectable()
-export class DocumentProcessingWorkerService
-  implements OnModuleInit, OnModuleDestroy
-{
+export class DocumentProcessingWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DocumentProcessingWorkerService.name);
-  private worker: Worker<
-    BackgroundJobBullmqData,
-    BackgroundJobBullmqResult
-  > | null = null;
+  private worker: Worker<BackgroundJobBullmqData, BackgroundJobBullmqResult> | null =
+    null;
 
   constructor(
     @Inject(ConfigService)
@@ -64,17 +60,13 @@ export class DocumentProcessingWorkerService
     );
 
     this.worker.on("ready", () => {
-      this.logger.log(
-        `Worker ready for ${queueName} with concurrency ${concurrency}`,
-      );
+      this.logger.log(`Worker ready for ${queueName} with concurrency ${concurrency}`);
     });
     this.worker.on("completed", (job) => {
       this.logger.debug(`Completed BullMQ job ${job.id ?? "unknown"}`);
     });
     this.worker.on("failed", (job, error) => {
-      this.logger.warn(
-        `BullMQ job ${job?.id ?? "unknown"} failed: ${error.message}`,
-      );
+      this.logger.warn(`BullMQ job ${job?.id ?? "unknown"} failed: ${error.message}`);
     });
     this.worker.on("error", (error) => {
       this.logger.error(`Worker error: ${error.message}`);

@@ -1,8 +1,4 @@
-import {
-  BackgroundJobQueue,
-  BackgroundJobStatus,
-  Prisma,
-} from "@prisma/client";
+import { BackgroundJobQueue, BackgroundJobStatus, Prisma } from "@prisma/client";
 import { jobSelect } from "#api/modules/jobs/selectors/job.selects";
 
 export type JobRecord = Prisma.BackgroundJobGetPayload<{

@@ -150,9 +150,7 @@ function extractLinePages(
 
         pages[pageIndex] = rawLines
           .filter(isRecord)
-          .map((line, lineIndex) =>
-            normalizeLine(line, pageIndex + 1, lineIndex),
-          );
+          .map((line, lineIndex) => normalizeLine(line, pageIndex + 1, lineIndex));
       }
 
       return pages;
@@ -320,26 +318,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readString(
-  value: Record<string, unknown>,
-  key: string,
-): string | null {
+function readString(value: Record<string, unknown>, key: string): string | null {
   const raw = value[key];
   return typeof raw === "string" ? raw : null;
 }
 
-function readNumber(
-  value: Record<string, unknown>,
-  key: string,
-): number | null {
+function readNumber(value: Record<string, unknown>, key: string): number | null {
   const raw = value[key];
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
-function readBoolean(
-  value: Record<string, unknown>,
-  key: string,
-): boolean | null {
+function readBoolean(value: Record<string, unknown>, key: string): boolean | null {
   const raw = value[key];
   return typeof raw === "boolean" ? raw : null;
 }

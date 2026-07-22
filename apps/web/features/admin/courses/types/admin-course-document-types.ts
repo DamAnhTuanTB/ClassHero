@@ -4,7 +4,7 @@ export type AdminBackgroundJobStatus =
   "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
 export type AdminLessonDocumentKind =
-  "PRIMARY_FROM_SOURCE" | "PRIMARY_REPLACEMENT" | "SUPPLEMENT";
+  "PRIMARY_FROM_SOURCE" | "PRIMARY_REPLACEMENT" | "SUPPLEMENT" | "HOMEWORK";
 
 export type AdminDocumentFileApi = {
   id: string;
@@ -142,4 +142,5 @@ export type AdminLessonPageRangeInput = {
   lessonId: string;
   pageStart: number;
   pageEnd: number;
+  isPrimary?: boolean;
 };
