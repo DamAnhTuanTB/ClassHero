@@ -34,3 +34,4 @@ pnpm-debug.log*
 
 # Large test PDFs
 apps/api/test/*.pdf
+apps/api/debug/
