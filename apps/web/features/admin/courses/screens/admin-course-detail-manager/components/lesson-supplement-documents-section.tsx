@@ -47,7 +47,10 @@ export function LessonSupplementDocumentsSection({
         <button
           type="button"
           disabled={isDisabled}
-          onClick={() => append({ file: null, title: "", type: "SUPPLEMENT" })}
+          onClick={() => {
+            append({ file: null, title: "", type: "SUPPLEMENT" });
+            setTimeout(() => form.trigger(`referenceDocuments`), 0);
+          }}
           className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           <FilePlus2 className="h-4 w-4" aria-hidden="true" />

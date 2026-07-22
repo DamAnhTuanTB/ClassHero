@@ -62,7 +62,7 @@ export function LessonPageRangeDialog({
       | string
       | boolean
       | null
-      | { id: string; file: File | null; title: string; isPrimary: boolean }[],
+      | { id: string; file: File | null; title: string; isPrimary?: boolean; type?: "SUPPLEMENT" | "HOMEWORK" }[],
   ) => void;
 }) {
   const warnings = localWarnings.length > 0 ? localWarnings : latestWarnings;
@@ -129,7 +129,7 @@ export function LessonPageRangeDialog({
               pageEnd: "",
               pageStart: "",
             };
-            const issue = rangeValidation.issues.find(
+            const issues = rangeValidation.issues.filter(
               (rangeIssue) => rangeIssue.lessonId === item.lesson.id,
             );
 
@@ -140,7 +140,7 @@ export function LessonPageRangeDialog({
                 draft={draft}
                 isDeletingSupplement={isDeletingSupplement}
                 isSaving={isSaving}
-                issue={issue}
+                issues={issues}
                 item={item}
                 pages={pages}
                 sourceDocument={sourceDocument}

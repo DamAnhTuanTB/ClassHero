@@ -26,6 +26,7 @@ import type {
   AdminSourceDocumentApi,
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
+import { cn } from "@/lib/utils";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import { PdfPagePreview } from "@/components/shared/pdf-page-preview";
 
@@ -34,7 +35,7 @@ export function LessonPageRangeRow({
   draft,
   isDeletingSupplement,
   isSaving,
-  issue,
+  issues,
   item,
   pages,
   sourceDocument,
@@ -46,7 +47,7 @@ export function LessonPageRangeRow({
   draft: LessonRangeDraft[string];
   isDeletingSupplement: boolean;
   isSaving: boolean;
-  issue: LessonRangeValidationIssue | undefined;
+  issues: LessonRangeValidationIssue[];
   item: AdminLessonWithChapter;
   pages: AdminSourceDocumentPageApi[];
   sourceDocument: AdminSourceDocumentApi | null;
@@ -60,12 +61,21 @@ export function LessonPageRangeRow({
       | string
       | boolean
       | null
-      | { id: string; file: File | null; title: string; isPrimary: boolean }[],
+      | { id: string; file: File | null; title: string; isPrimary?: boolean; type?: "SUPPLEMENT" | "HOMEWORK" }[],
   ) => void;
 }) {
   const primaryDocument = getPrimaryLessonDocument(documents);
-  const supplements = getSupplementLessonDocuments(documents);
-  const newSupplements = draft.newSupplements ?? [];
+  const allSupplements = getSupplementLessonDocuments(documents);
+  const supplements = allSupplements.filter(
+    (d) => d.kind === "SUPPLEMENT" || d.kind === "PRIMARY_REPLACEMENT",
+  );
+  const homeworks = allSupplements.filter((d) => d.kind === "HOMEWORK");
+
+  const allNewSupplements = draft.newSupplements ?? [];
+  const newSupplements = allNewSupplements.filter(
+    (d) => d.type === "SUPPLEMENT" || !d.type,
+  );
+  const newHomeworks = allNewSupplements.filter((d) => d.type === "HOMEWORK");
   const [isExpanded, setIsExpanded] = useState(false);
   const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
   const pdfPageStart = getPdfPageFromPrintedPage(draft.pageStart, pages);
@@ -88,6 +98,19 @@ export function LessonPageRangeRow({
     .join("\n\n");
   const hasMultiplePages = previewPages.length > 1 || (fullText && fullText.length > 200);
 
+  const hasPageError = issues.some(
+    (issue) =>
+      issue.message.includes("trang") ||
+      issue.message.includes("số nguyên dương")
+  );
+
+  const inputClass = cn(
+    "mt-1 min-h-[2.75rem] w-full rounded-lg border bg-[var(--theme-surface)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
+    hasPageError
+      ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
+      : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]"
+  );
+
   return (
     <article
       data-testid={`lesson-document-row-${item.lesson.id}`}
@@ -109,10 +132,15 @@ export function LessonPageRangeRow({
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-              Khoảng trang
+              Tài liệu nền tảng
             </h3>
           </div>
         </div>
+
+        <p className="mb-4 text-sm font-medium text-[var(--theme-text-muted)]">
+          Gợi ý: Nhập khoảng trang để hệ thống tự động trích xuất nội dung bài học từ Tài
+          liệu nguồn.
+        </p>
 
         <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
           <label className="block">
@@ -127,7 +155,7 @@ export function LessonPageRangeRow({
               onChange={(event) =>
                 onUpdateRange(item.lesson.id, "pageStart", event.target.value)
               }
-              className="mt-1 min-h-[2.75rem] w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-surface)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+              className={inputClass}
             />
           </label>
 
@@ -143,42 +171,8 @@ export function LessonPageRangeRow({
               onChange={(event) =>
                 onUpdateRange(item.lesson.id, "pageEnd", event.target.value)
               }
-              className="mt-1 min-h-[2.75rem] w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-surface)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+              className={inputClass}
             />
-          </label>
-        </div>
-
-        <div className="mt-4 flex items-center gap-2">
-          <input
-            type="checkbox"
-            id={`admin-lesson-source-primary-${item.lesson.id}`}
-            disabled={isSaving}
-            checked={draft.isPrimary ?? true}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              onUpdateRange(item.lesson.id, "isPrimary", checked);
-              if (checked) {
-                onUpdateRange(item.lesson.id, "primarySupplementId", null);
-
-                // Uncheck new supplements if any
-                if (newSupplements.length > 0) {
-                  const updated = newSupplements.map((doc) => ({
-                    ...doc,
-                    isPrimary: false,
-                  }));
-                  onUpdateRange(item.lesson.id, "newSupplements", updated);
-                }
-              }
-            }}
-            className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] disabled:opacity-60 disabled:cursor-not-allowed"
-          />
-          <label
-            htmlFor={`admin-lesson-source-primary-${item.lesson.id}`}
-            className={`text-sm font-semibold text-[var(--theme-text-strong)] ${
-              isSaving ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-            }`}
-          >
-            Đánh dấu là tài liệu chính
           </label>
         </div>
 
@@ -351,8 +345,8 @@ export function LessonPageRangeRow({
             type="button"
             onClick={() => {
               onUpdateRange(item.lesson.id, "newSupplements", [
-                ...newSupplements,
-                { id: crypto.randomUUID(), file: null, title: "", isPrimary: false },
+                ...allNewSupplements,
+                { id: crypto.randomUUID(), file: null, title: "", type: "SUPPLEMENT" },
               ]);
             }}
             disabled={isSaving}
@@ -378,7 +372,7 @@ export function LessonPageRangeRow({
                 >
                   <label className="block min-w-0">
                     <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
-                      Tên tài liệu {displayIndex}
+                      Tên tài liệu
                     </span>
                     <input
                       type="text"
@@ -436,66 +430,39 @@ export function LessonPageRangeRow({
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
-
-                  <div className="col-span-full mt-1 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`admin-lesson-supplement-primary-${document.id}`}
-                      checked={draft.primarySupplementId === document.id}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        if (checked) {
-                          onUpdateRange(item.lesson.id, "isPrimary", false);
-                          onUpdateRange(
-                            item.lesson.id,
-                            "primarySupplementId",
-                            document.id,
-                          );
-
-                          // Uncheck new supplements if any
-                          if (newSupplements.length > 0) {
-                            const updated = newSupplements.map((doc) => ({
-                              ...doc,
-                              isPrimary: false,
-                            }));
-                            onUpdateRange(item.lesson.id, "newSupplements", updated);
-                          }
-                        } else {
-                          onUpdateRange(item.lesson.id, "primarySupplementId", null);
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
-                    />
-                    <label
-                      htmlFor={`admin-lesson-supplement-primary-${document.id}`}
-                      className="text-sm font-semibold text-[var(--theme-text-strong)] cursor-pointer"
-                    >
-                      Đánh dấu là tài liệu chính
-                    </label>
-                  </div>
                 </div>
               );
             })}
 
-            {newSupplements.map((newDoc, index) => (
+            {newSupplements.map((newDoc, index) => {
+              const hasTitleError = !newDoc.title.trim() && issues.some(issue => issue.message.includes("tên cho tất cả tài liệu mới"));
+              const hasFileError = !newDoc.file && issues.some(issue => issue.message.includes("file cho tất cả tài liệu mới"));
+
+              return (
               <div
                 key={newDoc.id}
                 className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
               >
                 <label className="block min-w-0">
                   <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
-                    Tên tài liệu {supplements.length + index + 1}
+                    Tên tài liệu
                   </span>
                   <input
                     type="text"
                     value={newDoc.title}
                     onChange={(e) => {
-                      const updated = [...newSupplements];
-                      updated[index] = { ...updated[index]!, title: e.target.value };
+                      const updated = allNewSupplements.map((doc) =>
+                        doc.id === newDoc.id ? { ...doc, title: e.target.value } : doc,
+                      );
                       onUpdateRange(item.lesson.id, "newSupplements", updated);
                     }}
                     placeholder="Ví dụ: Phiếu đọc thêm"
-                    className="min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className={cn(
+                      "min-h-11 w-full rounded-lg border bg-[var(--theme-input-bg)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
+                      hasTitleError
+                        ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
+                        : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]"
+                    )}
                   />
                 </label>
 
@@ -503,8 +470,15 @@ export function LessonPageRangeRow({
                   <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
                     File tài liệu {supplements.length + index + 1}
                   </span>
-                  <label className="mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] transition hover:border-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]">
-                    <Upload className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
+                  <label
+                    className={cn(
+                      "mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-[var(--theme-input-bg)] px-4 text-sm font-semibold transition hover:bg-[var(--theme-surface-hover)]",
+                      hasFileError
+                        ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] focus-within:border-[var(--theme-error-border)] focus-within:ring-4 focus-within:ring-[var(--theme-error-ring)]"
+                        : "border-[var(--theme-input-border)] text-[var(--theme-text-strong)] hover:border-[var(--theme-primary)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]"
+                    )}
+                  >
+                    <Upload className={cn("h-5 w-5 shrink-0", hasFileError ? "text-[var(--theme-error-text)]" : "text-[var(--theme-text-muted)]")} />
                     <span className="min-w-0 truncate">
                       {newDoc.file?.name ?? "Chọn file PDF"}
                     </span>
@@ -515,8 +489,9 @@ export function LessonPageRangeRow({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0] ?? null;
-                        const updated = [...newSupplements];
-                        updated[index] = { ...updated[index]!, file };
+                        const updated = allNewSupplements.map((doc) =>
+                          doc.id === newDoc.id ? { ...doc, file } : doc,
+                        );
                         onUpdateRange(item.lesson.id, "newSupplements", updated);
                       }}
                     />
@@ -541,56 +516,238 @@ export function LessonPageRangeRow({
                     type="button"
                     disabled={isSaving}
                     onClick={() => {
-                      const updated = newSupplements.filter((_, i) => i !== index);
+                      const updated = allNewSupplements.filter(
+                        (doc) => doc.id !== newDoc.id,
+                      );
                       onUpdateRange(item.lesson.id, "newSupplements", updated);
-                      if (newDoc.isPrimary) {
-                        // Trả lại tài liệu chính cho khoảng trang nếu đang xóa cái chính
-                        onUpdateRange(item.lesson.id, "isPrimary", true);
-                      }
                     }}
                     className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
-
-                <div className="col-span-full mt-1 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`admin-lesson-new-supplement-primary-${newDoc.id}`}
-                    checked={newDoc.isPrimary}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      const updated = newSupplements.map((doc, i) => ({
-                        ...doc,
-                        isPrimary: i === index ? checked : false,
-                      }));
-                      onUpdateRange(item.lesson.id, "newSupplements", updated);
-
-                      if (checked) {
-                        onUpdateRange(item.lesson.id, "isPrimary", false);
-                        onUpdateRange(item.lesson.id, "primarySupplementId", null);
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-[var(--theme-input-border)] text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
-                  />
-                  <label
-                    htmlFor={`admin-lesson-new-supplement-primary-${newDoc.id}`}
-                    className="text-sm font-semibold text-[var(--theme-text-strong)] cursor-pointer"
-                  >
-                    Đánh dấu là tài liệu chính
-                  </label>
-                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
 
-      {rangeSubmitAttempted && issue ? (
-        <p className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-2 text-sm font-bold text-[var(--theme-danger)]">
-          {issue.message}
-        </p>
+      <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <div className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+              <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+              Bài tập về nhà
+            </h3>
+            <span className="rounded-full bg-[var(--theme-surface)] px-2 py-0.5 text-xs font-extrabold text-[var(--theme-text-muted)]">
+              {homeworks.length + newHomeworks.length}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onUpdateRange(item.lesson.id, "newSupplements", [
+                ...allNewSupplements,
+                { id: crypto.randomUUID(), file: null, title: "", type: "HOMEWORK" },
+              ]);
+            }}
+            disabled={isSaving || homeworks.length + newHomeworks.length >= 1}
+            className="theme-button-neutral inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Thêm tài liệu
+          </button>
+        </div>
+
+        {homeworks.length === 0 && newHomeworks.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
+            Chưa thêm bài tập về nhà.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {homeworks.map((document, index) => {
+              return (
+                <div
+                  key={document.id}
+                  className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
+                >
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      Tên tài liệu
+                    </span>
+                    <input
+                      type="text"
+                      value={document.title ?? document.file.originalName}
+                      readOnly
+                      disabled
+                      className="min-h-11 w-full rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg-disabled)] px-3 text-sm font-semibold text-[var(--theme-text-strong)] opacity-70 outline-none cursor-not-allowed"
+                    />
+                  </label>
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      File tài liệu
+                    </span>
+                    <div className="mt-1 flex min-h-11 flex-1 items-center gap-3 rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] transition">
+                      <FilePlus2 className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" />
+                      <span
+                        className="min-w-0 truncate"
+                        title={document.file.originalName}
+                      >
+                        {document.file.originalName}
+                      </span>
+                      {document.status && (
+                        <div className="ml-auto flex shrink-0 items-center">
+                          <DocumentStatusBadge
+                            jobStatus={document.processingJob?.status}
+                            progress={document.processingJob?.progress}
+                            status={document.status}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:mt-[22px]">
+                    <button
+                      type="button"
+                      disabled={!document.file.publicUrl}
+                      onClick={() => {
+                        if (document.file.publicUrl) {
+                          window.open(document.file.publicUrl, "_blank");
+                        }
+                      }}
+                      className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeletingSupplement}
+                      onClick={() => onDeleteSupplement(item.lesson.id, document.id)}
+                      aria-label={`Xóa ${document.title ?? document.file.originalName}`}
+                      className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {newHomeworks.map((newDoc, index) => {
+              const hasTitleError = !newDoc.title.trim() && issues.some(issue => issue.message.includes("tên cho tất cả tài liệu mới"));
+              const hasFileError = !newDoc.file && issues.some(issue => issue.message.includes("file cho tất cả tài liệu mới"));
+              
+              return (
+              <div
+                key={newDoc.id}
+                className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
+              >
+                <label className="block min-w-0">
+                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                    Tên tài liệu
+                  </span>
+                  <input
+                    type="text"
+                    value={newDoc.title}
+                    onChange={(e) => {
+                      const updated = allNewSupplements.map((doc) =>
+                        doc.id === newDoc.id ? { ...doc, title: e.target.value } : doc,
+                      );
+                      onUpdateRange(item.lesson.id, "newSupplements", updated);
+                    }}
+                    placeholder="Ví dụ: Phiếu bài tập"
+                    className={cn(
+                      "min-h-11 w-full rounded-lg border bg-[var(--theme-input-bg)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
+                      hasTitleError
+                        ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
+                        : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]"
+                    )}
+                  />
+                </label>
+
+                <div className="min-w-0">
+                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                    File tài liệu
+                  </span>
+                  <label
+                    className={cn(
+                      "mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-[var(--theme-input-bg)] px-4 text-sm font-semibold transition hover:bg-[var(--theme-surface-hover)]",
+                      hasFileError
+                        ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] focus-within:border-[var(--theme-error-border)] focus-within:ring-4 focus-within:ring-[var(--theme-error-ring)]"
+                        : "border-[var(--theme-input-border)] text-[var(--theme-text-strong)] hover:border-[var(--theme-primary)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]"
+                    )}
+                  >
+                    <Upload className={cn("h-5 w-5 shrink-0", hasFileError ? "text-[var(--theme-error-text)]" : "text-[var(--theme-text-muted)]")} />
+                    <span className="min-w-0 truncate">
+                      {newDoc.file?.name ?? "Chọn file PDF"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      disabled={isSaving}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        const updated = allNewSupplements.map((doc) =>
+                          doc.id === newDoc.id ? { ...doc, file } : doc,
+                        );
+                        onUpdateRange(item.lesson.id, "newSupplements", updated);
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2 lg:mt-[22px]">
+                  <button
+                    type="button"
+                    disabled={!newDoc.file}
+                    onClick={() => {
+                      if (newDoc.file) {
+                        const objectUrl = URL.createObjectURL(newDoc.file);
+                        window.open(objectUrl, "_blank");
+                      }
+                    }}
+                    className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => {
+                      const updated = allNewSupplements.filter(
+                        (doc) => doc.id !== newDoc.id,
+                      );
+                      onUpdateRange(item.lesson.id, "newSupplements", updated);
+                    }}
+                    className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {issues.length > 0 ? (
+        <div className="grid gap-2">
+          {issues.map((issue, index) => (
+            <p
+              key={index}
+              className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-2 text-sm font-bold text-[var(--theme-danger)]"
+            >
+              {issue.message}
+            </p>
+          ))}
+        </div>
       ) : null}
     </article>
   );

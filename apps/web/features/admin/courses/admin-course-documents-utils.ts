@@ -30,7 +30,8 @@ export type LessonRangeDraft = Record<
       id: string;
       file: File | null;
       title: string;
-      isPrimary: boolean;
+      isPrimary?: boolean;
+      type?: "SUPPLEMENT" | "HOMEWORK";
     }[];
   }
 >;
@@ -270,52 +271,70 @@ export function validateLessonRangeDraft(
     const pageStart = getPdfPageFromPrintedPage(values.pageStart, sourcePages);
     const pageEnd = getPdfPageFromPrintedPage(values.pageEnd, sourcePages);
 
+    let hasPageError = false;
+
     if (values.pageStart.trim() === "" && values.pageEnd.trim() === "") {
       if (isPrimary) {
         issues.push({
           lessonId: item.lesson.id,
           message: "Phải nhập khoảng trang cho tài liệu chính.",
         });
+        hasPageError = true;
       }
-      continue;
-    }
-
-    if (values.pageStart.trim() === "" || values.pageEnd.trim() === "") {
+    } else if (values.pageStart.trim() === "" || values.pageEnd.trim() === "") {
       issues.push({
         lessonId: item.lesson.id,
         message: "Nhập đủ trang bắt đầu và kết thúc.",
       });
-      continue;
-    }
-
-    if (pageStart === null || pageEnd === null) {
+      hasPageError = true;
+    } else if (pageStart === null || pageEnd === null) {
       issues.push({
         lessonId: item.lesson.id,
         message: "Số trang phải là số nguyên dương.",
       });
-      continue;
-    }
-
-    if (pageStart > pageEnd) {
+      hasPageError = true;
+    } else if (pageStart > pageEnd) {
       issues.push({
         lessonId: item.lesson.id,
         message: "Trang bắt đầu không được lớn hơn trang kết thúc.",
       });
-      continue;
-    }
-
-    if (pageLimit !== null && pageEnd > pageLimit) {
+      hasPageError = true;
+    } else if (pageLimit !== null && pageEnd > pageLimit) {
       issues.push({
         lessonId: item.lesson.id,
         message: `Tài liệu chỉ có ${pageLimit} trang.`,
       });
+      hasPageError = true;
+    }
+
+    let hasInvalidNewSupplement = false;
+    if (values.newSupplements) {
+      for (const newDoc of values.newSupplements) {
+        if (!newDoc.title.trim()) {
+          issues.push({
+            lessonId: item.lesson.id,
+            message: "Phải nhập tên cho tất cả tài liệu mới.",
+          });
+          hasInvalidNewSupplement = true;
+        }
+        if (!newDoc.file) {
+          issues.push({
+            lessonId: item.lesson.id,
+            message: "Phải chọn file cho tất cả tài liệu mới.",
+          });
+          hasInvalidNewSupplement = true;
+        }
+      }
+    }
+
+    if (hasPageError || hasInvalidNewSupplement) {
       continue;
     }
 
     ranges.push({
       lessonId: item.lesson.id,
-      pageEnd,
-      pageStart,
+      pageEnd: pageEnd!,
+      pageStart: pageStart!,
       isPrimary,
     });
   }

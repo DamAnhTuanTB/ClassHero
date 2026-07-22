@@ -520,7 +520,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       | string
       | boolean
       | null
-      | { id: string; file: File | null; title: string; isPrimary: boolean }[],
+      | { id: string; file: File | null; title: string; isPrimary?: boolean; type?: "SUPPLEMENT" | "HOMEWORK" }[],
   ) {
     setRangeDraft((current) => ({
       ...current,

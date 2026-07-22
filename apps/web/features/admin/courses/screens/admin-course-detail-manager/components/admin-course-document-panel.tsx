@@ -67,11 +67,8 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-[var(--theme-primary)]">
-            Tài liệu buổi học
-          </p>
           <h2 className="mt-1 text-xl font-extrabold text-[var(--theme-text-strong)]">
-            Tài liệu chính và tài liệu bổ sung
+            Tài liệu nền tảng
           </h2>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -81,9 +78,9 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
             className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
-            {sourceDocument ? "Thay tài liệu chính" : "Upload tài liệu chính"}
+            {sourceDocument ? "Thay tài liệu nền tảng" : "Upload tài liệu nền tảng"}
           </button>
-          <button
+          {/* <button
             type="button"
             disabled={!canMapRanges}
             onClick={manager.actions.openRangesDialog}
@@ -98,7 +95,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
             Nhập khoảng trang
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -310,7 +307,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         sourceDocument={sourceDocument}
         onClose={manager.actions.closeDialog}
       />
-      <LessonPageRangeDialog
+      {/* <LessonPageRangeDialog
         isOpen={manager.dialogState?.type === "ranges"}
         documentsByLessonId={manager.documentsByLessonId}
         isDeletingSupplement={manager.isDeletingSupplement}
@@ -332,7 +329,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         }
         onSave={manager.actions.saveRanges}
         onUpdateRange={manager.actions.updateRangeDraft}
-      />
+      /> */}
       <DeleteConfirmDialog
         confirmLabel="Xóa tài liệu"
         description={

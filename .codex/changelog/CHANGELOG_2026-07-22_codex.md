@@ -17,3 +17,5 @@
   - Tách bạch phần tải file thành 2 khối riêng biệt: "Tài liệu bổ sung" (cho phép nhiều file) và "Bài tập về nhà" (cho phép 1 file duy nhất). Bỏ đi tùy chọn "Đánh dấu là tài liệu chính" ở các file này.
   - Sửa lỗi UI state: Ẩn cảnh báo "(tùy chọn)" ở ô tên tài liệu, bật realtime validation cho Tên tài liệu và File đính kèm để người dùng dễ dàng nhận biết lỗi trước khi lưu.
   - Sửa lỗi logic backend & frontend gây ra thông báo lỗi "Chỉ được xóa tài liệu bổ sung bằng endpoint này" và tình trạng "mất tích" Bài tập về nhà trên UI sau khi lưu do nhầm lẫn logic ánh xạ (mapping).
+  - Khắc phục lỗi thiếu đồng bộ trạng thái lỗi (realtime validation) bằng cách viết lại hàm validate để trả về mảng tất cả các lỗi thay vì ngắt sớm; bổ sung viền đỏ cho các ô nhập Tên tài liệu và File đính kèm khi để trống.
+  - Tạm ẩn chức năng "Nhập khoảng trang" (ẩn nút và các logic mở dialog liên quan) để làm gọn giao diện quản lý tài liệu theo yêu cầu hiện tại.
