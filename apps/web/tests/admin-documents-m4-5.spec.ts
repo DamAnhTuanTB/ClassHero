@@ -52,7 +52,7 @@ test.describe("M4.5 admin lesson documents", () => {
     await panel.getByRole("button", { name: "Chọn file PDF" }).click();
     await page.getByLabel("File PDF").setInputFiles(buildPdfFixture("toan-7-tap-1.pdf"));
     await page.getByLabel("Tên tài liệu").fill("Toán 7 Tập 1");
-    await page.getByRole("button", { name: "Upload và xử lý" }).click();
+    await page.getByRole("button", { name: "Xử lý OCR" }).click();
 
     await expect(panel.getByRole("heading", { name: "Toán 7 Tập 1" })).toBeVisible();
     await expect(panel.getByTestId("document-stat-total-pages")).toContainText("8");

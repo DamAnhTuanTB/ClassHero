@@ -20,18 +20,25 @@ export function DocumentStatusBadge({
   jobStatus,
   progress,
   status,
+  isCacheRun,
 }: {
   hasPrintedPageWarning?: boolean;
   jobStatus?: AdminBackgroundJobStatus | null;
   progress?: number;
   status: AdminDocumentStatus;
+  isCacheRun?: boolean | null;
 }) {
   const useWarningOverride = status === "READY" && hasPrintedPageWarning;
   const statusView = useWarningOverride
     ? reviewRequiredView
     : getDocumentStatusView(status);
+    
   let label = status === "PROCESSING" ? getJobStatusLabel(jobStatus) : statusView.label;
+  
   if (status === "PROCESSING") {
+    if (jobStatus === "RUNNING") {
+      label = isCacheRun ? "Đang xử lý cache" : "Đang OCR mới";
+    }
     const p = typeof progress === "number" ? progress : 0;
     label = `${label} (${p}%)`;
   }

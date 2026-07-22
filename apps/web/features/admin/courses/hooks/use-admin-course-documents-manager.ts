@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   createAdminLessonSupplementDocument,
@@ -87,6 +87,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
   const [selectedSourceDocumentId, setSelectedSourceDocumentId] = useState<string | null>(
     null,
   );
+  const hasAutoSelectedRef = useRef(false);
   const [rangeDraft, setRangeDraft] = useState<LessonRangeDraft>({});
   const [rangeSubmitAttempted, setRangeSubmitAttempted] = useState(false);
   const [latestRangeWarnings, setLatestRangeWarnings] = useState<
@@ -102,9 +103,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
   });
   const sourceDocuments = sourceDocumentsQuery.data ?? (EMPTY_ARRAY as typeof sourceDocumentsQuery.data & any[]);
   const selectedSourceDocument =
-    sourceDocuments.find((document) => document.id === selectedSourceDocumentId) ??
-    sourceDocuments[0] ??
-    null;
+    sourceDocuments.find((document) => document.id === selectedSourceDocumentId) ?? null;
 
   const sourcePagesQuery = useQuery({
     queryKey: adminCourseDocumentQueryKeys.sourcePages(
@@ -151,21 +150,27 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     dialogState?.type === "lesson-upload"
       ? (lessons.find((item) => item.lesson.id === dialogState.lessonId) ?? null)
       : null;
-
+  // Sync selected source document
   useEffect(() => {
     if (sourceDocuments.length === 0) {
-      setSelectedSourceDocumentId(null);
+      if (selectedSourceDocumentId !== null) {
+        setSelectedSourceDocumentId(null);
+      }
       return;
     }
 
     if (
       selectedSourceDocumentId &&
-      sourceDocuments.some((document) => document.id === selectedSourceDocumentId)
+      !sourceDocuments.some((document) => document.id === selectedSourceDocumentId)
     ) {
+      setSelectedSourceDocumentId(null);
       return;
     }
 
-    setSelectedSourceDocumentId(sourceDocuments[0]?.id ?? null);
+    if (!selectedSourceDocumentId && !hasAutoSelectedRef.current) {
+      setSelectedSourceDocumentId(sourceDocuments[0]?.id ?? null);
+      hasAutoSelectedRef.current = true;
+    }
   }, [selectedSourceDocumentId, sourceDocuments]);
 
   useEffect(() => {
@@ -233,21 +238,28 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       );
     },
     onSuccess: async (sourceDocument) => {
+      queryClient.setQueryData(
+        adminCourseDocumentQueryKeys.sourceDocuments(userId, pathId),
+        (old: any) => {
+          if (!old) return [sourceDocument];
+          return [sourceDocument, ...old];
+        }
+      );
       setSelectedSourceDocumentId(sourceDocument.id);
       setDialogState(null);
-      toast.success("Đã nhận tài liệu nguồn");
+      toast.success("Đã nhận tài liệu chính");
       await invalidateDocumentQueries();
     },
     onError: (error) => {
-      toast.error("Chưa upload được tài liệu nguồn", {
+      toast.error("Chưa upload được tài liệu chính", {
         description: getErrorMessage(error),
       });
     },
   });
 
   const retrySourceDocumentMutation = useMutation({
-    mutationFn: () =>
-      requestAdminSourceDocumentProcessing(selectedSourceDocument?.id ?? "", token),
+    mutationFn: (forceNewOcr?: boolean) =>
+      requestAdminSourceDocumentProcessing(selectedSourceDocument?.id ?? "", token, forceNewOcr),
     onSuccess: async () => {
       await invalidateDocumentQueries();
       toast.success("Đã bắt đầu xử lý lại");
@@ -262,12 +274,19 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
   const deleteSourceDocumentMutation = useMutation({
     mutationFn: () => deleteAdminSourceDocument(selectedSourceDocument?.id ?? "", token),
     onSuccess: async () => {
+      queryClient.setQueryData(
+        adminCourseDocumentQueryKeys.sourceDocuments(userId, pathId),
+        (old: any) => {
+          if (!old) return [];
+          return old.filter((doc: any) => doc.id !== selectedSourceDocumentId);
+        }
+      );
       setSelectedSourceDocumentId(null);
       await invalidateDocumentQueries();
-      toast.info("Đã xóa tài liệu nguồn");
+      toast.info("Đã xóa tài liệu chính");
     },
     onError: (error) => {
-      toast.error("Chưa xóa được tài liệu nguồn", {
+      toast.error("Chưa xóa được tài liệu chính", {
         description: getErrorMessage(error),
       });
     },
@@ -424,7 +443,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     setRangeSubmitAttempted(true);
 
     if (!selectedSourceDocument) {
-      toast.warning("Hãy upload tài liệu nguồn trước");
+      toast.warning("Hãy upload tài liệu chính trước");
       return;
     }
 
@@ -517,7 +536,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         lessonDocumentsQuery.refetch();
         sourceDocumentsQuery.refetch();
       },
-      retrySourceDocument: () => retrySourceDocumentMutation.mutateAsync(),
+      retrySourceDocument: (forceNewOcr?: boolean) => retrySourceDocumentMutation.mutateAsync(forceNewOcr),
       saveRanges,
       selectSourceDocument: setSelectedSourceDocumentId,
       updateRangeDraft,

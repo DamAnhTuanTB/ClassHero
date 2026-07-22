@@ -82,7 +82,7 @@ export function LessonPageRangeDialog({
           <p className="mt-1 truncate text-sm font-semibold text-[var(--theme-text-muted)]">
             {sourceDocument?.title ??
               sourceDocument?.file.originalName ??
-              "Tài liệu nguồn"}
+              "Tài liệu chính"}
           </p>
         </div>
       </div>

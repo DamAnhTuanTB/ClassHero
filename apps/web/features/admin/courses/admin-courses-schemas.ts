@@ -98,7 +98,7 @@ export const lessonSchema = z.object({
       if (!value.sourceDocumentId?.trim()) {
         context.addIssue({
           code: "custom",
-          message: "Chọn tài liệu nguồn",
+          message: "Chọn tài liệu chính",
           path: ["sourceDocumentId"],
         });
       }

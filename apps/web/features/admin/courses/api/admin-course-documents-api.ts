@@ -52,12 +52,14 @@ export function createAdminSourceDocument(
 export function requestAdminSourceDocumentProcessing(
   sourceDocumentId: string,
   token: string,
+  forceNewOcr?: boolean,
 ) {
   return apiRequest<AdminSourceDocumentApi>(
     `/admin/source-documents/${sourceDocumentId}/process`,
     {
       method: "POST",
       token,
+      body: { forceNewOcr },
     },
   );
 }
@@ -72,6 +74,13 @@ export function deleteAdminSourceDocument(sourceDocumentId: string, token: strin
 export function listAdminSourceDocumentPages(sourceDocumentId: string, token: string) {
   return apiRequest<AdminSourceDocumentPageApi[]>(
     `/admin/source-documents/${sourceDocumentId}/pages`,
+    { token },
+  );
+}
+
+export function getAdminSourceDocumentCacheStatus(sourceDocumentId: string, token: string) {
+  return apiRequest<{ hasCache: boolean }>(
+    `/admin/source-documents/${sourceDocumentId}/cache-status`,
     { token },
   );
 }

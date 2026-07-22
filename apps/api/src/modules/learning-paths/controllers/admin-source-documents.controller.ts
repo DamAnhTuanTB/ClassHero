@@ -66,12 +66,20 @@ export class AdminSourceDocumentsController {
     @Param("sourceDocumentId") sourceDocumentId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
+    @Body() body?: { forceNewOcr?: boolean },
   ) {
     return this.sourceDocumentsService.requestProcessing(
       sourceDocumentId,
       user.id,
       getRequestContext(request),
+      { forceNewOcr: body?.forceNewOcr },
     );
+  }
+
+  @Get("admin/source-documents/:sourceDocumentId/cache-status")
+  @ApiOperation({ summary: "Check source document OCR cache status" })
+  getCacheStatus(@Param("sourceDocumentId") sourceDocumentId: string) {
+    return this.sourceDocumentsService.getCacheStatus(sourceDocumentId);
   }
 
   @Delete("admin/source-documents/:sourceDocumentId")

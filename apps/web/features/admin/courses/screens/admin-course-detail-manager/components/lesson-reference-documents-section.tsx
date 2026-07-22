@@ -27,9 +27,9 @@ export function LessonReferenceDocumentsSection({
       data-testid="lesson-reference-documents-section"
       className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span className="theme-button-primary-subtle mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
             <FilePlus2 className="h-4 w-4" aria-hidden="true" />
           </span>
           <div className="min-w-0">
@@ -38,9 +38,6 @@ export function LessonReferenceDocumentsSection({
               label="Tài liệu bổ sung"
               isOptional
             />
-            <p className="mt-1 text-sm font-semibold leading-5 text-[var(--theme-text-muted)]">
-              Lưu kèm buổi học khi cần.
-            </p>
           </div>
         </div>
         <button

@@ -59,7 +59,7 @@ export function SourceDocumentUploadDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel="Upload tài liệu nguồn"
+      ariaLabel="Upload tài liệu chính"
       isOpen={isOpen}
       onClose={isSaving ? () => undefined : onClose}
     >
@@ -69,7 +69,7 @@ export function SourceDocumentUploadDialog({
         </span>
         <div className="min-w-0">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Upload PDF nguồn
+            Upload tài liệu chính
           </h2>
         </div>
       </div>
@@ -141,7 +141,7 @@ export function SourceDocumentUploadDialog({
           ) : (
             <FileUp className="h-4 w-4" aria-hidden="true" />
           )}
-          {isSaving ? "Đang tải lên" : "Upload và xử lý"}
+          {isSaving ? "Đang tải lên" : "Xử lý OCR"}
         </button>
       </div>
     </EditorDialogShell>

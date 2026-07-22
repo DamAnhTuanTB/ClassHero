@@ -120,7 +120,7 @@ export function SourceDocumentPagesDialog({
               Xem trang OCR
             </h2>
             <p className="mt-1 truncate text-sm font-semibold text-[var(--theme-text-muted)]">
-              {sourceDocument?.title ?? sourceDocument?.file.originalName ?? "Tài liệu nguồn"}
+              {sourceDocument?.title ?? sourceDocument?.file.originalName ?? "Tài liệu chính"}
             </p>
           </div>
         </div>

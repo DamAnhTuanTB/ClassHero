@@ -27,10 +27,12 @@ import { LessonDocumentUploadDialog } from "@/features/admin/courses/screens/adm
 import { LessonPageRangeDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-page-range-dialog";
 import { SourceDocumentPagesDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-pages-dialog";
 import { SourceDocumentUploadDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-upload-dialog";
+import { RetrySourceDocumentConfirmDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/retry-source-document-confirm-dialog";
 
 export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) {
   const manager = useAdminCourseDocumentsManager(path);
   const [isDeleteSourceConfirmOpen, setIsDeleteSourceConfirmOpen] = useState(false);
+  const [isRetrySourceConfirmOpen, setIsRetrySourceConfirmOpen] = useState(false);
   const sourceDocument = manager.selectedSourceDocument;
   const canMapRanges = Boolean(
     sourceDocument &&
@@ -53,6 +55,11 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
     setIsDeleteSourceConfirmOpen(false);
   }
 
+  async function handleRetrySourceDocument(forceNewOcr: boolean) {
+    await manager.actions.retrySourceDocument(forceNewOcr);
+    setIsRetrySourceConfirmOpen(false);
+  }
+
   return (
     <section
       data-testid="admin-course-document-panel"
@@ -64,7 +71,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
             Tài liệu buổi học
           </p>
           <h2 className="mt-1 text-xl font-extrabold text-[var(--theme-text-strong)]">
-            Sách nguồn và tài liệu từng buổi
+            Tài liệu chính và tài liệu bổ sung
           </h2>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -74,7 +81,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
             className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
-            {sourceDocument ? "Thay PDF nguồn" : "Upload PDF nguồn"}
+            {sourceDocument ? "Thay tài liệu chính" : "Upload tài liệu chính"}
           </button>
           <button
             type="button"
@@ -140,7 +147,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               aria-hidden="true"
             />
             <p className="text-base font-extrabold text-[var(--theme-text-strong)]">
-              Chưa có tài liệu nguồn
+              Chưa có tài liệu chính
             </p>
             <p className="mx-auto max-w-md text-sm font-semibold leading-6 text-[var(--theme-text-muted)]">
               Upload sách hoặc giáo trình chính để gán trang cho từng buổi học.
@@ -169,6 +176,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                     jobStatus={sourceDocument.processingJob?.status}
                     progress={sourceDocument.processingJob?.progress}
                     status={sourceDocument.status}
+                    isCacheRun={(sourceDocument.metadataJson as any)?.isCacheRun}
                   />
                 </div>
                 <p className="mt-2 text-sm font-semibold flex items-center min-w-0">
@@ -211,7 +219,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                 <button
                   type="button"
                   disabled={isSourceProcessing || manager.isRetryingSourceDocument}
-                  onClick={() => void manager.actions.retrySourceDocument()}
+                  onClick={() => setIsRetrySourceConfirmOpen(true)}
                   className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RefreshCw
@@ -249,18 +257,20 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               </div>
             ) : null}
 
-            <div className="p-4">
-              {manager.sourcePages.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-4 text-sm font-semibold text-[var(--theme-text-muted)]">
-                  Chưa có dữ liệu trang.
-                </p>
-              ) : (
-                <OcrStatusSummaryView 
-                  pages={manager.sourcePages} 
-                  onResolveWarning={manager.actions.openPagesDialogWithWarnings}
-                />
-              )}
-            </div>
+            {sourceDocument.status !== "PROCESSING" && (
+              <div className="p-4">
+                {manager.sourcePages.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] p-4 text-sm font-semibold text-[var(--theme-text-muted)]">
+                    Chưa có dữ liệu trang.
+                  </p>
+                ) : (
+                  <OcrStatusSummaryView 
+                    pages={manager.sourcePages} 
+                    onResolveWarning={manager.actions.openPagesDialogWithWarnings}
+                  />
+                )}
+              </div>
+            )}
           </div>
         ) : null}
       </div>
@@ -326,15 +336,26 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
       />
       <DeleteConfirmDialog
         confirmLabel="Xóa tài liệu"
-        description="Tài liệu đang được gán vào buổi học sẽ không thể xóa."
+        description={
+          manager.mappedLessonCount > 0
+            ? `Tài liệu này đang được gán cho ${manager.mappedLessonCount} buổi học. Nếu tiếp tục xóa, các buổi học này sẽ mất gán tài liệu và trở về trạng thái trống.`
+            : `Hành động này sẽ xóa hoàn toàn tài liệu chính.`
+        }
         isConfirming={manager.isDeletingSourceDocument}
         isOpen={isDeleteSourceConfirmOpen}
         itemName={
           sourceDocument?.title ?? sourceDocument?.file.originalName ?? "tài liệu"
         }
-        title="Xóa tài liệu nguồn"
+        title="Xóa tài liệu chính"
         onCancel={() => setIsDeleteSourceConfirmOpen(false)}
         onConfirm={() => void handleDeleteSourceDocument()}
+      />
+      <RetrySourceDocumentConfirmDialog
+        isConfirming={manager.isRetryingSourceDocument}
+        isOpen={isRetrySourceConfirmOpen}
+        sourceDocumentId={sourceDocument?.id ?? null}
+        onCancel={() => setIsRetrySourceConfirmOpen(false)}
+        onConfirm={(forceNewOcr) => void handleRetrySourceDocument(forceNewOcr)}
       />
     </section>
   );

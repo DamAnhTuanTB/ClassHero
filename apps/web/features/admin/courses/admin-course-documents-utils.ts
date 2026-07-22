@@ -304,7 +304,7 @@ export function buildLocalPageRangeWarnings(
       warnings.push({
         code: "PAGE_RANGE_GAP",
         details: gaps,
-        message: "Có trang trong tài liệu nguồn chưa được gán vào buổi học",
+        message: "Có trang trong tài liệu chính chưa được gán vào buổi học",
       });
     }
   }
@@ -351,7 +351,7 @@ export function getSourceDocumentRangeReadiness(
   if (!sourceDocument) {
     return {
       isReady: false,
-      reason: "Chưa có tài liệu nguồn.",
+      reason: "Chưa có tài liệu chính.",
       warningPageCount: 0,
     };
   }
@@ -473,7 +473,7 @@ export function formatDocumentKind(kind: AdminLessonDocumentKind) {
     return "Tài liệu chính";
   }
 
-  return "Từ sách nguồn";
+  return "Từ tài liệu chính";
 }
 
 export type OcrPageIssue = {

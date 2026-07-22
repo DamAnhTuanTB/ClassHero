@@ -79,6 +79,32 @@ export class SourceDocumentsService {
         await this.assertLearningPathExists(tx, learningPathId);
         const file = await this.getLessonDocumentFile(tx, dto.fileId);
 
+        let isCacheRun = false;
+        if (file.checksum) {
+          const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+          const descriptor = this.cacheService.createDescriptor(file.checksum, provider);
+          isCacheRun = await this.cacheService.hasArtifact(descriptor);
+        }
+
+        const existingDocs = await tx.sourceDocument.findMany({
+          where: { learningPathId, deletedAt: null },
+          select: { id: true },
+        });
+
+        for (const doc of existingDocs) {
+          await tx.lessonDocument.updateMany({
+            where: { sourceDocumentId: doc.id, replacedAt: null },
+            data: { replacedAt: new Date() },
+          });
+          await tx.lessonDocumentPageRange.deleteMany({
+            where: { sourceDocumentId: doc.id },
+          });
+          await tx.sourceDocument.update({
+            where: { id: doc.id },
+            data: { deletedAt: new Date() },
+          });
+        }
+
         const created = await tx.sourceDocument.create({
           data: {
             learningPathId,
@@ -88,6 +114,7 @@ export class SourceDocumentsService {
             contentHash: file.checksum,
             metadataJson: toDocumentInputJson({
               uploadSource: "api.admin.source_documents.create",
+              isCacheRun,
             }),
           },
           select: sourceDocumentSelect,
@@ -155,6 +182,7 @@ export class SourceDocumentsService {
     sourceDocumentId: string,
     actorUserId: string,
     context: RequestContext = {},
+    options: { forceNewOcr?: boolean } = {},
   ) {
     try {
       const sourceDocument = await this.prisma.$transaction(async (tx) => {
@@ -165,6 +193,21 @@ export class SourceDocumentsService {
           current.processingJob?.status === BackgroundJobStatus.RUNNING
         ) {
           throwConflict("CONFLICT", "Tài liệu nguồn đang được xử lý");
+        }
+
+        if (options.forceNewOcr && current.contentHash) {
+          const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+          const descriptor = this.cacheService.createDescriptor(current.contentHash, provider);
+          await this.cacheService.invalidateCache(descriptor).catch((err) => {
+            this.logger.warn(`Failed to invalidate cache for ${current.contentHash}: ${err.message}`);
+          });
+        }
+
+        let isCacheRun = false;
+        if (!options.forceNewOcr && current.contentHash) {
+          const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+          const descriptor = this.cacheService.createDescriptor(current.contentHash, provider);
+          isCacheRun = await this.cacheService.hasArtifact(descriptor);
         }
 
         const job = await this.createDocumentJob(tx, {
@@ -189,6 +232,8 @@ export class SourceDocumentsService {
             metadataJson: mergeDocumentMetadata(current.metadataJson, {
               processingRequestedAt: new Date().toISOString(),
               processingRequestSource: "api.admin.source_documents.process",
+              forceNewOcr: options.forceNewOcr ?? false,
+              isCacheRun,
             }),
           },
           select: sourceDocumentSelect,
@@ -242,24 +287,21 @@ export class SourceDocumentsService {
           throwSourceDocumentNotFound();
         }
 
-        const activeUsageCount = await tx.lessonDocument.count({
+        await tx.lessonDocument.updateMany({
           where: {
             sourceDocumentId,
             replacedAt: null,
           },
+          data: {
+            replacedAt: new Date(),
+          },
         });
-        const pageRangeCount = await tx.lessonDocumentPageRange.count({
+
+        await tx.lessonDocumentPageRange.deleteMany({
           where: {
             sourceDocumentId,
           },
         });
-
-        if (activeUsageCount > 0 || pageRangeCount > 0) {
-          throwConflict(
-            "CONFLICT",
-            "Không thể xóa tài liệu nguồn đang được gán vào buổi học",
-          );
-        }
 
         const deleted = await tx.sourceDocument.update({
           where: { id: sourceDocument.id },
@@ -294,6 +336,23 @@ export class SourceDocumentsService {
       }
 
       return { success: true };
+    } catch (error) {
+      handleDocumentPrismaError(error);
+    }
+  }
+
+  async getCacheStatus(sourceDocumentId: string) {
+    try {
+      const sourceDocument = await this.findActiveSourceDocument(sourceDocumentId);
+      if (!sourceDocument.contentHash) {
+        return { hasCache: false };
+      }
+
+      const provider = this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
+      const descriptor = this.cacheService.createDescriptor(sourceDocument.contentHash, provider);
+      const hasCache = await this.cacheService.hasArtifact(descriptor);
+
+      return { hasCache };
     } catch (error) {
       handleDocumentPrismaError(error);
     }

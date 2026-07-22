@@ -68,7 +68,7 @@ export function LessonSourceRangeSection({
   const selectedTitle =
     selectedSourceDocument?.title ??
     selectedSourceDocument?.file.originalName ??
-    "Tài liệu nguồn";
+    "Tài liệu chính";
   const rangeWarning =
     pageLimit && pageEndNumber !== null && pageEndNumber > pageLimit
       ? `Tài liệu chỉ có ${pageLimit} trang.`
@@ -229,8 +229,8 @@ export function LessonSourceRangeSection({
 
   return (
     <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-      <div className="flex items-start gap-3">
-        <span className="theme-button-primary-subtle mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+      <div className="flex items-center gap-3">
+        <span className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
           <FileText className="h-4 w-4" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
@@ -266,15 +266,12 @@ export function LessonSourceRangeSection({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm font-semibold leading-5 text-[var(--theme-text-muted)]">
-            Bỏ trống nếu chỉ tạo thông tin buổi học.
-          </p>
         </div>
       </div>
 
       {sourceDocuments.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
-          Chưa có tài liệu nguồn.
+          Chưa có tài liệu chính.
         </div>
       ) : (
         <div className="mt-3 grid gap-3">
@@ -285,7 +282,7 @@ export function LessonSourceRangeSection({
           ) : null}
           <OptionField
             id="admin-lesson-source-document"
-            label="Tài liệu nguồn"
+            label="Tài liệu chính"
             value={sourceDocumentId || selectedSourceDocument?.id || ""}
             disabled={isSourceSelectDisabled}
             icon={<Layers3 className="h-5 w-5" aria-hidden="true" />}
