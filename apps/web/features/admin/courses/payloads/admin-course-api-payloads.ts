@@ -78,7 +78,7 @@ export function toLessonApiPayload(
       : {}),
     ...(values.trialEnabled !== undefined ? { trialEnabled: values.trialEnabled } : {}),
     ...(values.status !== undefined ? { status: values.status } : {}),
-    ...(sourceDocumentPageRange ? { sourceDocumentPageRange } : {}),
+    ...(sourceDocumentPageRange !== undefined ? { sourceDocumentPageRange } : {}),
   };
 }
 
@@ -89,8 +89,12 @@ function normalizeLessonSourceDocumentPageRange(
   const pageStart = value?.pageStart?.trim();
   const pageEnd = value?.pageEnd?.trim();
 
-  if (!sourceDocumentId || !pageStart || !pageEnd) {
+  if (value?.isRangeEnabled === false) {
     return null;
+  }
+
+  if (!sourceDocumentId || !pageStart || !pageEnd) {
+    return undefined;
   }
 
   return {

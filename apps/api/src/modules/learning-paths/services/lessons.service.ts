@@ -232,7 +232,13 @@ export class LessonsService {
                 isPrimary: dto.sourceDocumentPageRange.isPrimary,
               },
             )
-          : null;
+          : dto.sourceDocumentPageRange === null
+            ? await this.sourceDocumentsService.removeSingleLessonPageRangeInTransaction(
+                tx,
+                updated.id,
+                actorUserId,
+              )
+            : null;
 
         return { lesson: updated, lessonDocument };
       });

@@ -97,7 +97,7 @@ export type AdminLessonPayload = {
     pageStart: number;
     pageEnd: number;
     isPrimary?: boolean;
-  };
+  } | null;
   title?: string;
   trialEnabled?: boolean;
   videoUrl?: string | null;

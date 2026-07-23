@@ -60,7 +60,7 @@ export function LessonSupplementDocumentsSection({
 
       {supplementCount === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
-          Chưa thêm tài liệu tham khảo.
+          Chưa thêm tài liệu bổ sung.
         </div>
       ) : (
         <div className="mt-3 grid gap-3">

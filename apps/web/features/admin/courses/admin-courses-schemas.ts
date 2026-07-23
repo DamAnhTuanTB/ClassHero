@@ -97,10 +97,15 @@ export const lessonSchema = z.object({
       sourceDocumentId: z.string().trim().optional(),
       pageStart: z.string().trim().optional(),
       pageEnd: z.string().trim().optional(),
+      isRangeEnabled: z.boolean().optional(),
     })
     .superRefine((value, context) => {
       const hasStart = Boolean(value.pageStart?.trim());
       const hasEnd = Boolean(value.pageEnd?.trim());
+
+      if (!value.isRangeEnabled) {
+        return;
+      }
 
       if (!hasStart && !hasEnd) {
         context.addIssue({
@@ -302,6 +307,7 @@ export type LessonFormValues = {
     sourceDocumentId?: string;
     pageStart?: string;
     pageEnd?: string;
+    isRangeEnabled?: boolean;
   };
   referenceDocuments: Array<{
     id?: string;
@@ -353,6 +359,7 @@ export const emptyLessonValues: LessonFormValues = {
     sourceDocumentId: "",
     pageStart: "",
     pageEnd: "",
+    isRangeEnabled: true,
   },
   referenceDocuments: [],
 };

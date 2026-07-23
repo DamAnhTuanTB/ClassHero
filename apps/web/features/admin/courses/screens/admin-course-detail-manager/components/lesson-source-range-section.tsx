@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { FileText, Layers3, Maximize2, Minimize2 } from "lucide-react";
+import { FileText, Layers3, Maximize2, Minimize2, FilePlus2, Trash2 } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -39,6 +39,7 @@ export function LessonSourceRangeSection({
   sourceDocuments: AdminSourceDocumentApi[];
   onSelectSourceDocument: (sourceDocumentId: string | null) => void;
 }) {
+  const isRangeVisible = form.watch("sourceDocumentPageRange.isRangeEnabled") ?? true;
   const [isExpanded, setIsExpanded] = useState(true);
   const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
   const sourceDocumentId = form.watch("sourceDocumentPageRange.sourceDocumentId") ?? "";
@@ -249,22 +250,31 @@ export function LessonSourceRangeSection({
 
   return (
     <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-      <div className="flex items-center gap-3">
-        <span className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
-          <FileText className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+            <FileText className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
             <FieldLabel id="admin-lesson-source-range" label="Tài liệu nền tảng" />
           </div>
         </div>
+        <button
+          type="button"
+          disabled={isRangeVisible || disabled || isSaving}
+          onClick={() => form.setValue("sourceDocumentPageRange.isRangeEnabled", true, { shouldValidate: true })}
+          className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        >
+          <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+          Thêm tài liệu
+        </button>
       </div>
 
       {sourceDocuments.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
           Chưa có tài liệu chính.
         </div>
-      ) : (
+      ) : isRangeVisible ? (
         <div className="mt-3 grid gap-3">
           {!isRangeReady ? (
             <p className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-warning-text)]">
@@ -300,7 +310,7 @@ export function LessonSourceRangeSection({
               )
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
             <TextField
               id="admin-lesson-page-start"
               label="Từ trang"
@@ -319,6 +329,26 @@ export function LessonSourceRangeSection({
               error={form.formState.errors.sourceDocumentPageRange?.pageEnd}
               {...form.register("sourceDocumentPageRange.pageEnd")}
             />
+            <div className="mt-0 flex items-start sm:mt-7">
+              <button
+                type="button"
+                disabled={disabled || isSaving}
+                onClick={() => {
+                  form.setValue("sourceDocumentPageRange.isRangeEnabled", false, { shouldValidate: true });
+                  form.setValue("sourceDocumentPageRange.pageStart", "", {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  form.setValue("sourceDocumentPageRange.pageEnd", "", {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                }}
+                className="theme-button-danger-subtle inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3 transition-all">
@@ -494,6 +524,10 @@ export function LessonSourceRangeSection({
               </p>
             ) : null}
           </div>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
+          Chưa thêm tài liệu nền tảng.
         </div>
       )}
     </section>

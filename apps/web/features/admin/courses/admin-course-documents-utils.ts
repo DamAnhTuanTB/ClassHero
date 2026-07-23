@@ -210,6 +210,7 @@ export function getLessonSourceRangeFormValues(
       pageStart: "",
       pageEnd: "",
       isPrimary: true,
+      isRangeEnabled: true,
     };
   }
 
@@ -235,6 +236,7 @@ export function getLessonSourceRangeFormValues(
     pageStart: range ? getPrintedPageFromPdfPage(range.pageStart, sourcePages) : "",
     pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
     isPrimary,
+    isRangeEnabled: !!range,
   };
 }
 

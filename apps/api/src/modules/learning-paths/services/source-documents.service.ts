@@ -639,6 +639,53 @@ export class SourceDocumentsService {
     return lessonDocument;
   }
 
+  async removeSingleLessonPageRangeInTransaction(
+    tx: any,
+    lessonId: string,
+    actorUserId: string,
+  ) {
+    // Soft delete the LessonDocument that was created from source_document_page_range
+    const mappedDocs = await tx.lessonDocument.findMany({
+      where: { lessonId, replacedAt: null },
+    });
+
+    const docToDelete = mappedDocs.find(
+      (d: any) =>
+        d.metadataJson &&
+        typeof d.metadataJson === "object" &&
+        (d.metadataJson as Record<string, unknown>).source === "source_document_page_range",
+    );
+
+    if (docToDelete) {
+      await tx.lessonDocument.update({
+        where: { id: docToDelete.id },
+        data: {
+          replacedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId,
+          action: "LESSON_PAGE_RANGE_REMOVED",
+          entityType: "Lesson",
+          entityId: lessonId,
+          after: toDocumentInputJson({
+            lessonDocumentId: docToDelete.id,
+            removed: true,
+          }),
+        },
+      });
+    }
+
+    // Delete the explicit mapping
+    await tx.lessonDocumentPageRange.deleteMany({
+      where: { lessonId },
+    });
+    
+    return null;
+  }
+
   enqueueLessonDocumentProcessingJobs(
     documents: Array<LessonDocumentRecord | null | undefined>,
   ) {

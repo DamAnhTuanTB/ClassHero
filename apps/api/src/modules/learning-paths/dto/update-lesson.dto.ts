@@ -91,9 +91,9 @@ export class UpdateLessonDto {
   @IsEnum(PublishStatus)
   status?: PublishStatus;
 
-  @ApiPropertyOptional({ type: LessonSourceDocumentPageRangeDto })
-  @ValidateIf((_, value: unknown) => value !== undefined)
+  @ApiPropertyOptional({ type: LessonSourceDocumentPageRangeDto, nullable: true })
+  @ValidateIf((_, value: unknown) => value !== undefined && value !== null)
   @ValidateNested()
   @Type(() => LessonSourceDocumentPageRangeDto)
-  sourceDocumentPageRange?: LessonSourceDocumentPageRangeDto;
+  sourceDocumentPageRange?: LessonSourceDocumentPageRangeDto | null;
 }

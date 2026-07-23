@@ -78,7 +78,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
             className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
-            {sourceDocument ? "Thay tài liệu nền tảng" : "Upload tài liệu nền tảng"}
+            {sourceDocument ? "Thay tài liệu" : "Upload tài liệu"}
           </button>
           {/* <button
             type="button"
