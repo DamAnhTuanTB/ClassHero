@@ -54,8 +54,9 @@ export function toChapterApiPayload(
 export function toLessonApiPayload(
   values: Partial<LessonFormValues>,
 ): AdminLessonPayload {
-  const sourceDocumentPageRange = normalizeLessonSourceDocumentPageRange(
-    values.sourceDocumentPageRange,
+  const sourceDocumentExtractions = normalizeLessonSourceDocumentExtractions(
+    values.sourceDocumentExtractions,
+    values.foundationDocumentOrder,
   );
 
   return {
@@ -78,30 +79,32 @@ export function toLessonApiPayload(
       : {}),
     ...(values.trialEnabled !== undefined ? { trialEnabled: values.trialEnabled } : {}),
     ...(values.status !== undefined ? { status: values.status } : {}),
-    ...(sourceDocumentPageRange !== undefined ? { sourceDocumentPageRange } : {}),
+    ...(sourceDocumentExtractions !== undefined
+      ? { sourceDocumentExtractions }
+      : {}),
   };
 }
 
-function normalizeLessonSourceDocumentPageRange(
-  value: Partial<LessonFormValues>["sourceDocumentPageRange"],
+function normalizeLessonSourceDocumentExtractions(
+  values: Partial<LessonFormValues>["sourceDocumentExtractions"],
+  foundationDocumentOrder: Partial<LessonFormValues>["foundationDocumentOrder"],
 ) {
-  const sourceDocumentId = value?.sourceDocumentId?.trim();
-  const pageStart = value?.pageStart?.trim();
-  const pageEnd = value?.pageEnd?.trim();
-
-  if (value?.isRangeEnabled === false) {
-    return null;
-  }
-
-  if (!sourceDocumentId || !pageStart || !pageEnd) {
+  if (values === undefined) {
     return undefined;
   }
 
-  return {
-    sourceDocumentId,
-    pageStart: Number(pageStart),
-    pageEnd: Number(pageEnd),
-  };
+  return values.map((value, index) => {
+    const orderKey = `EXTRACTION:${value.clientKey}`;
+    const explicitOrder = foundationDocumentOrder?.indexOf(orderKey) ?? -1;
+
+    return {
+      ...(value.id ? { id: value.id } : {}),
+      sourceDocumentId: value.sourceDocumentId.trim(),
+      pageStart: Number(value.pageStart),
+      pageEnd: Number(value.pageEnd),
+      sortOrder: explicitOrder >= 0 ? explicitOrder : index,
+    };
+  });
 }
 
 function toIsoDateTime(value: string | null | undefined) {

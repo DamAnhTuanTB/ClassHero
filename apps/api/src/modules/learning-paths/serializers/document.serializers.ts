@@ -132,7 +132,12 @@ export function serializeLessonDocument(
     file: serializeDocumentFile(record.file),
     sourceDocumentId: record.sourceDocumentId,
     sourceDocument: record.sourceDocument,
+    pageRangeId: record.pageRangeId,
+    pageRange: record.pageRange
+      ? serializeLessonDocumentPageRange(record.pageRange)
+      : null,
     kind: record.kind,
+    sortOrder: record.sortOrder,
     title: record.title,
     status: record.status,
     extractError: record.extractError,

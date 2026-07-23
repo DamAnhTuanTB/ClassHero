@@ -4,8 +4,77 @@ import type {
   AdminPublishStatus,
   AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
+import { getMaximumPrintedPageNumber } from "@/features/admin/courses/admin-course-documents-utils";
 import { isAllowedVideoUrl } from "@/features/admin/courses/admin-courses-utils";
+import type { AdminSourceDocumentPageApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { requiredTrimmedText } from "@/lib/form-validation";
+
+const positiveIntegerTextPattern = /^[1-9]\d*$/;
+
+const sourceDocumentExtractionSchema = z
+  .object({
+    id: z.string().optional(),
+    clientKey: z.string(),
+    sourceDocumentId: z.string().trim(),
+    pageStart: z.string().trim().optional(),
+    pageEnd: z.string().trim().optional(),
+    hasInteracted: z.boolean().optional(),
+  })
+  .superRefine((value, context) => {
+    const hasStart = Boolean(value.pageStart);
+    const hasEnd = Boolean(value.pageEnd);
+
+    if (!value.hasInteracted && !hasStart && !hasEnd) {
+      return;
+    }
+
+    if (!value.sourceDocumentId) {
+      context.addIssue({
+        code: "custom",
+        message: "Chọn tài liệu nguồn",
+        path: ["sourceDocumentId"],
+      });
+    }
+    if (!hasStart) {
+      context.addIssue({
+        code: "custom",
+        message: "Nhập trang bắt đầu",
+        path: ["pageStart"],
+      });
+    }
+    if (!hasEnd) {
+      context.addIssue({
+        code: "custom",
+        message: "Nhập trang kết thúc",
+        path: ["pageEnd"],
+      });
+    }
+
+    const isStartValid = hasStart && positiveIntegerTextPattern.test(value.pageStart!);
+    const isEndValid = hasEnd && positiveIntegerTextPattern.test(value.pageEnd!);
+
+    if (hasStart && !isStartValid) {
+      context.addIssue({
+        code: "custom",
+        message: "Trang bắt đầu phải là số nguyên dương",
+        path: ["pageStart"],
+      });
+    }
+    if (hasEnd && !isEndValid) {
+      context.addIssue({
+        code: "custom",
+        message: "Trang kết thúc phải là số nguyên dương",
+        path: ["pageEnd"],
+      });
+    }
+    if (isStartValid && isEndValid && Number(value.pageEnd) < Number(value.pageStart)) {
+      context.addIssue({
+        code: "custom",
+        message: "Phải lớn hơn hoặc bằng Từ trang",
+        path: ["pageEnd"],
+      });
+    }
+  });
 
 export const learningPathSchema = z.object({
   title: requiredTrimmedText({ requiredMessage: "Nhập tên khóa học" }),
@@ -35,20 +104,20 @@ export const learningPathSchema = z.object({
 const referenceDocumentSchema = z
   .object({
     id: z.string().optional(),
+    clientKey: z.string().optional(),
     originalName: z.string().optional(),
     title: requiredTrimmedText({
       requiredMessage: "Nhập tên tài liệu",
       maxLength: 180,
     }),
     file: z.custom<File | null>().optional(),
-    type: z.enum(["SUPPLEMENT", "HOMEWORK"]).default("SUPPLEMENT"),
+    type: z.enum(["PRIMARY_FROM_SOURCE", "SUPPLEMENT", "HOMEWORK"]).default("SUPPLEMENT"),
     status: z.string().optional(),
     extractError: z.string().optional(),
     progress: z.number().optional(),
     url: z.string().optional(),
   })
   .superRefine((value, context) => {
-    const hasTitle = Boolean(value.title?.trim());
     const file = value.file ?? null;
     const isExisting = Boolean(value.id);
 
@@ -56,9 +125,11 @@ const referenceDocumentSchema = z
       context.addIssue({
         code: "custom",
         message:
-          value.type === "HOMEWORK"
-            ? "Phải chọn file cho bài tập về nhà"
-            : "Phải chọn file cho tài liệu bổ sung",
+          value.type === "PRIMARY_FROM_SOURCE"
+            ? "Phải chọn file cho tài liệu nền tảng"
+            : value.type === "HOMEWORK"
+              ? "Phải chọn file cho bài tập về nhà"
+              : "Phải chọn file cho tài liệu bổ sung",
         path: ["file"],
       });
     }
@@ -92,69 +163,50 @@ export const lessonSchema = z.object({
   completionMinScore: z.coerce.number().min(0).max(10),
   trialEnabled: z.boolean(),
   status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"]),
-  sourceDocumentPageRange: z
-    .object({
-      sourceDocumentId: z.string().trim().optional(),
-      pageStart: z.string().trim().optional(),
-      pageEnd: z.string().trim().optional(),
-      isRangeEnabled: z.boolean().optional(),
-    })
-    .superRefine((value, context) => {
-      const hasStart = Boolean(value.pageStart?.trim());
-      const hasEnd = Boolean(value.pageEnd?.trim());
-
-      if (!value.isRangeEnabled) {
-        return;
-      }
-
-      if (!hasStart && !hasEnd) {
-        context.addIssue({
-          code: "custom",
-          message: "Phải nhập khoảng trang cho tài liệu nền tảng",
-          path: ["pageStart"],
-        });
-        return;
-      }
-
-      if (!value.sourceDocumentId?.trim()) {
-        context.addIssue({
-          code: "custom",
-          message: "Chọn tài liệu nền tảng",
-          path: ["sourceDocumentId"],
-        });
-      }
-
-      if (!hasStart) {
-        context.addIssue({
-          code: "custom",
-          message: "Nhập trang bắt đầu",
-          path: ["pageStart"],
-        });
-      }
-
-      if (!hasEnd) {
-        context.addIssue({
-          code: "custom",
-          message: "Nhập trang kết thúc",
-          path: ["pageEnd"],
-        });
-      }
-
-      if (hasStart && hasEnd) {
-        const startNum = parseInt(value.pageStart!, 10);
-        const endNum = parseInt(value.pageEnd!, 10);
-        if (!isNaN(startNum) && !isNaN(endNum) && endNum < startNum) {
-          context.addIssue({
-            code: "custom",
-            message: "Phải lớn hơn hoặc bằng Từ trang",
-            path: ["pageEnd"],
-          });
+  sourceDocumentExtractions: z
+    .array(sourceDocumentExtractionSchema)
+    .max(20, "Tối đa 20 khối trích xuất")
+    .superRefine((extractions, context) => {
+      extractions.forEach((current, currentIndex) => {
+        const currentStart = current.pageStart ?? "";
+        const currentEnd = current.pageEnd ?? "";
+        if (
+          !positiveIntegerTextPattern.test(currentStart) ||
+          !positiveIntegerTextPattern.test(currentEnd)
+        ) {
+          return;
         }
-      }
+
+        for (let previousIndex = 0; previousIndex < currentIndex; previousIndex += 1) {
+          const previous = extractions[previousIndex]!;
+          const previousStart = previous.pageStart ?? "";
+          const previousEnd = previous.pageEnd ?? "";
+          if (
+            previous.sourceDocumentId !== current.sourceDocumentId ||
+            !positiveIntegerTextPattern.test(previousStart) ||
+            !positiveIntegerTextPattern.test(previousEnd)
+          ) {
+            continue;
+          }
+
+          if (
+            Number(currentStart) <= Number(previousEnd) &&
+            Number(previousStart) <= Number(currentEnd)
+          ) {
+            context.addIssue({
+              code: "custom",
+              message: `Khoảng trang xung đột với khối trích xuất ${previousIndex + 1}`,
+              path: [currentIndex, "pageStart"],
+            });
+            break;
+          }
+        }
+      });
     }),
+  foundationDocumentOrder: z.array(z.string()).optional(),
   referenceDocuments: z
     .array(referenceDocumentSchema)
-    .max(10, "Tối đa 10 tài liệu tham khảo")
+    .max(10, "Tối đa 10 tài liệu upload")
     .superRefine((docs, ctx) => {
       const fileKeys = new Set<string>();
       const titleKeys = new Set<string>();
@@ -187,84 +239,104 @@ export const lessonSchema = z.object({
           }
         }
       });
-
-      const homeworkCount = docs.filter((d) => d.type === "HOMEWORK").length;
-      if (homeworkCount > 1) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Chỉ được upload 1 bài tập về nhà",
-          path: [0, "file"],
-        });
-      }
     }),
 });
 
 export function createLessonSchema(
   sourceDocuments: Array<{ file: { originalName: string; sizeBytes: number } }> = [],
+  sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]> = {},
 ) {
-  return lessonSchema.extend({
-    referenceDocuments: z
-      .array(referenceDocumentSchema)
-      .max(10, "Tối đa 10 tài liệu tham khảo")
-      .superRefine((docs, ctx) => {
-        const fileKeys = new Set<string>();
-        const titleKeys = new Set<string>();
-        docs.forEach((doc, index) => {
-          const name = doc.file ? doc.file.name : doc.originalName;
-          if (name) {
-            if (fileKeys.has(name)) {
-              ctx.addIssue({
-                code: "custom",
-                message: "Tài liệu này đã được chọn",
-                path: [index, "file"],
-              });
-            } else {
-              fileKeys.add(name);
-            }
-
-            if (doc.file) {
-              const isMatch = sourceDocuments.some((sd) => {
-                return (
-                  sd.file.originalName === doc.file!.name &&
-                  sd.file.sizeBytes === doc.file!.size
-                );
-              });
-              if (isMatch) {
+  return lessonSchema
+    .extend({
+      referenceDocuments: z
+        .array(referenceDocumentSchema)
+        .max(10, "Tối đa 10 tài liệu upload")
+        .superRefine((docs, ctx) => {
+          const fileKeys = new Set<string>();
+          const titleKeys = new Set<string>();
+          docs.forEach((doc, index) => {
+            const name = doc.file ? doc.file.name : doc.originalName;
+            if (name) {
+              if (fileKeys.has(name)) {
                 ctx.addIssue({
                   code: "custom",
-                  message: "Tài liệu này trùng với file nguồn của khóa học",
+                  message: "Tài liệu này đã được chọn",
                   path: [index, "file"],
                 });
-              }
-            }
-          }
-
-          if (doc.title) {
-            const titleKey = doc.title.trim().toLowerCase();
-            if (titleKey) {
-              if (titleKeys.has(titleKey)) {
-                ctx.addIssue({
-                  code: "custom",
-                  message: "Không được đặt tên tài liệu trùng nhau",
-                  path: [index, "title"],
-                });
               } else {
-                titleKeys.add(titleKey);
+                fileKeys.add(name);
+              }
+
+              if (doc.file) {
+                const isMatch = sourceDocuments.some((sd) => {
+                  return (
+                    sd.file.originalName === doc.file!.name &&
+                    sd.file.sizeBytes === doc.file!.size
+                  );
+                });
+                if (isMatch) {
+                  ctx.addIssue({
+                    code: "custom",
+                    message: "Tài liệu này trùng với file nguồn của khóa học",
+                    path: [index, "file"],
+                  });
+                }
               }
             }
+
+            if (doc.title) {
+              const titleKey = doc.title.trim().toLowerCase();
+              if (titleKey) {
+                if (titleKeys.has(titleKey)) {
+                  ctx.addIssue({
+                    code: "custom",
+                    message: "Không được đặt tên tài liệu trùng nhau",
+                    path: [index, "title"],
+                  });
+                } else {
+                  titleKeys.add(titleKey);
+                }
+              }
+            }
+          });
+        }),
+    })
+    .superRefine((values, context) => {
+      values.sourceDocumentExtractions.forEach((extraction, index) => {
+        const maximumPrintedPage = getMaximumPrintedPageNumber(
+          sourcePagesByDocumentId[extraction.sourceDocumentId] ?? [],
+        );
+        if (maximumPrintedPage === null) {
+          return;
+        }
+
+        const boundedFields = [
+          {
+            field: "pageStart" as const,
+            label: "Trang bắt đầu",
+            value: extraction.pageStart?.trim() ?? "",
+          },
+          {
+            field: "pageEnd" as const,
+            label: "Trang kết thúc",
+            value: extraction.pageEnd?.trim() ?? "",
+          },
+        ];
+
+        boundedFields.forEach(({ field, label, value }) => {
+          if (
+            positiveIntegerTextPattern.test(value) &&
+            Number(value) > maximumPrintedPage
+          ) {
+            context.addIssue({
+              code: "custom",
+              message: `${label} tối đa là ${maximumPrintedPage}`,
+              path: ["sourceDocumentExtractions", index, field],
+            });
           }
         });
-
-        const homeworkCount = docs.filter((d) => d.type === "HOMEWORK").length;
-        if (homeworkCount > 1) {
-          ctx.addIssue({
-            code: "custom",
-            message: "Chỉ được upload 1 bài tập về nhà",
-            path: [0, "file"],
-          });
-        }
-      }),
-  });
+      });
+    });
 }
 
 export const chapterSchema = z.object({
@@ -303,18 +375,22 @@ export type LessonFormValues = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
-  sourceDocumentPageRange: {
-    sourceDocumentId?: string;
+  sourceDocumentExtractions: Array<{
+    id?: string;
+    clientKey: string;
+    sourceDocumentId: string;
     pageStart?: string;
     pageEnd?: string;
-    isRangeEnabled?: boolean;
-  };
+    hasInteracted?: boolean;
+  }>;
+  foundationDocumentOrder: string[];
   referenceDocuments: Array<{
     id?: string;
+    clientKey?: string;
     originalName?: string;
     title?: string;
     file?: File | null;
-    type?: "SUPPLEMENT" | "HOMEWORK";
+    type?: "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
     status?: string;
     extractError?: string;
     progress?: number;
@@ -355,12 +431,16 @@ export const emptyLessonValues: LessonFormValues = {
   completionMinScore: 7,
   trialEnabled: false,
   status: "PUBLISHED",
-  sourceDocumentPageRange: {
-    sourceDocumentId: "",
-    pageStart: "",
-    pageEnd: "",
-    isRangeEnabled: true,
-  },
+  sourceDocumentExtractions: [
+    {
+      clientKey: "default-extraction",
+      sourceDocumentId: "",
+      pageStart: "",
+      pageEnd: "",
+      hasInteracted: false,
+    },
+  ],
+  foundationDocumentOrder: ["EXTRACTION:default-extraction"],
   referenceDocuments: [],
 };
 

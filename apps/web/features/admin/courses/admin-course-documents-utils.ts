@@ -132,21 +132,12 @@ export function groupLessonDocumentsByLessonId(documents: AdminLessonDocumentApi
 }
 
 export function getPrimaryLessonDocument(documents: AdminLessonDocumentApi[]) {
-  return (
-    documents.find(
-      (document) =>
-        document.kind === "PRIMARY_FROM_SOURCE" ||
-        document.kind === "PRIMARY_REPLACEMENT",
-    ) ?? null
-  );
+  return documents.find((document) => document.kind === "PRIMARY_FROM_SOURCE") ?? null;
 }
 
 export function getSupplementLessonDocuments(documents: AdminLessonDocumentApi[]) {
   return documents.filter(
-    (document) =>
-      document.kind === "SUPPLEMENT" ||
-      document.kind === "PRIMARY_REPLACEMENT" ||
-      document.kind === "HOMEWORK",
+    (document) => document.kind === "SUPPLEMENT" || document.kind === "HOMEWORK",
   );
 }
 
@@ -191,53 +182,65 @@ export function createInitialRangeDraft(
       pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
       isPrimary,
       primarySupplementId:
-        primary && primary.kind === "PRIMARY_REPLACEMENT" ? primary.id : null,
+        primary && primary.sourceDocumentId === null ? primary.id : null,
     };
 
     return draft;
   }, {});
 }
 
-export function getLessonSourceRangeFormValues(
+export function getLessonSourceExtractionFormValues(
   lessonId: string | null | undefined,
   documentsByLessonId: Record<string, AdminLessonDocumentApi[]>,
   fallbackSourceDocumentId: string | null | undefined,
-  sourcePages: AdminSourceDocumentPageApi[],
+  sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]>,
 ) {
   if (!lessonId) {
-    return {
-      sourceDocumentId: fallbackSourceDocumentId ?? "",
-      pageStart: "",
-      pageEnd: "",
-      isPrimary: true,
-      isRangeEnabled: true,
-    };
+    return [
+      {
+        clientKey: "default-extraction",
+        sourceDocumentId: fallbackSourceDocumentId ?? "",
+        pageStart: "",
+        pageEnd: "",
+        hasInteracted: false,
+      },
+    ];
   }
 
   const documents = documentsByLessonId[lessonId] ?? [];
-  const sourceMappedDoc = documents.find(
-    (d) =>
-      d.sourceDocumentId === fallbackSourceDocumentId &&
-      readRecord(d.metadataJson)?.source === "source_document_page_range",
-  );
-  const primary = getPrimaryLessonDocument(documents);
+  return documents
+    .filter(
+      (document) =>
+        document.kind === "PRIMARY_FROM_SOURCE" &&
+        Boolean(document.sourceDocumentId) &&
+        (Boolean(document.pageRange) ||
+          readRecord(document.metadataJson)?.source === "source_document_page_range"),
+    )
+    .sort(
+      (left, right) =>
+        left.sortOrder - right.sortOrder ||
+        new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+    )
+    .flatMap((document) => {
+      const range = document.pageRange ?? getLessonDocumentRange(document);
+      const sourceDocumentId = document.sourceDocumentId;
+      if (!range || !sourceDocumentId) {
+        return [];
+      }
+      const pages = sourcePagesByDocumentId[sourceDocumentId] ?? [];
 
-  const range = sourceMappedDoc ? getLessonDocumentRange(sourceMappedDoc) : null;
-
-  let isPrimary = true;
-  if (sourceMappedDoc) {
-    isPrimary = sourceMappedDoc.kind !== "SUPPLEMENT";
-  } else if (primary) {
-    isPrimary = false;
-  }
-
-  return {
-    sourceDocumentId: sourceMappedDoc?.sourceDocumentId ?? fallbackSourceDocumentId ?? "",
-    pageStart: range ? getPrintedPageFromPdfPage(range.pageStart, sourcePages) : "",
-    pageEnd: range ? getPrintedPageFromPdfPage(range.pageEnd, sourcePages) : "",
-    isPrimary,
-    isRangeEnabled: !!range,
-  };
+      return [
+        {
+          id: document.pageRangeId ?? document.pageRange?.id ?? undefined,
+          clientKey:
+            document.pageRangeId ?? document.pageRange?.id ?? `extraction-${document.id}`,
+          sourceDocumentId,
+          pageStart: getPrintedPageFromPdfPage(range.pageStart, pages),
+          pageEnd: getPrintedPageFromPdfPage(range.pageEnd, pages),
+          hasInteracted: false,
+        },
+      ];
+    });
 }
 
 export function validateLessonRangeDraft(
@@ -524,6 +527,15 @@ export function getPrintedPageView(page: AdminSourceDocumentPageApi): PrintedPag
   };
 }
 
+export function getMaximumPrintedPageNumber(pages: AdminSourceDocumentPageApi[]) {
+  const printedPageNumbers = pages.flatMap((page) => {
+    const printedPageNumber = getPrintedPageView(page).printedPageNumber;
+    return printedPageNumber === null ? [] : [printedPageNumber];
+  });
+
+  return printedPageNumbers.length > 0 ? Math.max(...printedPageNumbers) : null;
+}
+
 export function getPageVisualSummary(
   page: AdminSourceDocumentPageApi,
 ): PageVisualSummary {
@@ -571,11 +583,7 @@ export function formatDocumentKind(kind: AdminLessonDocumentKind) {
   if (kind === "HOMEWORK") {
     return "Bài tập về nhà";
   }
-  if (kind === "PRIMARY_REPLACEMENT") {
-    return "Tài liệu chính";
-  }
-
-  return "Từ tài liệu chính";
+  return "Tài liệu nền tảng";
 }
 
 export type OcrPageIssue = {

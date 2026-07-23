@@ -11,3 +11,5 @@
   - Cập nhật `UpdateLessonDto` thêm rule cho phép giá trị `null` đối với trường `sourceDocumentPageRange`.
   - Bổ sung logic vào `lessons.service.ts`: nếu `dto.sourceDocumentPageRange === null`, gọi service để xóa hoàn toàn sự liên kết trang nền tảng của bài học.
   - Bổ sung phương thức `removeSingleLessonPageRangeInTransaction` vào `source-documents.service.ts` để xóa cứng dữ liệu trong bảng `LessonDocumentPageRange` và cập nhật xóa mềm bằng `replacedAt` cho `LessonDocument`.
+
+- 2026-07-23: Mở rộng quản lý tài liệu khóa học và buổi học với nhiều tài liệu nguồn, nhiều khối trích xuất có thứ tự, nhiều file nền tảng/bổ sung/bài tập về nhà, chuẩn hóa ba document kind, trạng thái sẵn sàng và validation khoảng trang; đồng thời bổ sung kiểm tra trùng tên buổi học trong cùng chương ở cả API và modal quản trị.

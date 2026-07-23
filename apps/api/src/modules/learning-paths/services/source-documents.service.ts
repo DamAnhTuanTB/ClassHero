@@ -23,6 +23,7 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
 import { ConfirmPrintedPageDto } from "#api/modules/learning-paths/dto/confirm-printed-page.dto";
+import type { LessonSourceDocumentExtractionDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
 import {
   lessonDocumentPageRangeSelect,
   lessonDocumentSelect,
@@ -42,8 +43,10 @@ import type {
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
 import {
   assertNoDuplicateLessonRanges,
+  assertNoOverlappingSourceExtractions,
   assertPageRangeOrder,
   assertSourceDocumentReadyForPageRanges,
+  buildSourceDocumentReadinessSummary,
   buildPageRangeWarnings,
   handleDocumentPrismaError,
   normalizeOptionalTitle,
@@ -85,25 +88,6 @@ export class SourceDocumentsService {
             this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
           const descriptor = this.cacheService.createDescriptor(file.checksum, provider);
           isCacheRun = await this.cacheService.hasArtifact(descriptor);
-        }
-
-        const existingDocs = await tx.sourceDocument.findMany({
-          where: { learningPathId, deletedAt: null },
-          select: { id: true },
-        });
-
-        for (const doc of existingDocs) {
-          await tx.lessonDocument.updateMany({
-            where: { sourceDocumentId: doc.id, replacedAt: null },
-            data: { replacedAt: new Date() },
-          });
-          await tx.lessonDocumentPageRange.deleteMany({
-            where: { sourceDocumentId: doc.id },
-          });
-          await tx.sourceDocument.update({
-            where: { id: doc.id },
-            data: { deletedAt: new Date() },
-          });
         }
 
         const created = await tx.sourceDocument.create({
@@ -173,10 +157,41 @@ export class SourceDocumentsService {
         deletedAt: null,
       },
       select: sourceDocumentSelect,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
 
-    return documents.map(serializeSourceDocument);
+    const pages =
+      documents.length > 0
+        ? await this.prisma.sourceDocumentPage.findMany({
+            where: {
+              sourceDocumentId: {
+                in: documents.map((document) => document.id),
+              },
+            },
+            select: {
+              sourceDocumentId: true,
+              status: true,
+              metadataJson: true,
+            },
+          })
+        : [];
+    const pagesBySourceDocumentId = new Map<
+      string,
+      Array<(typeof pages)[number]>
+    >();
+    for (const page of pages) {
+      const sourcePages = pagesBySourceDocumentId.get(page.sourceDocumentId) ?? [];
+      sourcePages.push(page);
+      pagesBySourceDocumentId.set(page.sourceDocumentId, sourcePages);
+    }
+
+    return documents.map((document) => ({
+      ...serializeSourceDocument(document),
+      readiness: buildSourceDocumentReadinessSummary(
+        document,
+        pagesBySourceDocumentId.get(document.id) ?? [],
+      ),
+    }));
   }
 
   async requestProcessing(
@@ -442,35 +457,43 @@ export class SourceDocumentsService {
         const lessonDocuments: LessonDocumentRecord[] = [];
 
         for (const range of dto.ranges) {
-          await tx.lessonDocumentPageRange.deleteMany({
+          const previousRanges = await tx.lessonDocumentPageRange.findMany({
             where: {
               lessonId: range.lessonId,
-              sourceDocumentId: {
-                not: sourceDocument.id,
-              },
+              sourceDocumentId: sourceDocument.id,
             },
+            select: { id: true },
           });
-
-          const savedRange = await tx.lessonDocumentPageRange.upsert({
-            where: {
-              lessonId_sourceDocumentId: {
-                lessonId: range.lessonId,
-                sourceDocumentId: sourceDocument.id,
+          const previousRangeIds = previousRanges.map((item) => item.id);
+          if (previousRangeIds.length > 0) {
+            await tx.lessonDocument.updateMany({
+              where: {
+                pageRangeId: {
+                  in: previousRangeIds,
+                },
+                replacedAt: null,
               },
-            },
-            create: {
+              data: {
+                pageRangeId: null,
+                replacedAt: now,
+              },
+            });
+            await tx.lessonDocumentPageRange.deleteMany({
+              where: {
+                id: {
+                  in: previousRangeIds,
+                },
+              },
+            });
+          }
+
+          const savedRange = await tx.lessonDocumentPageRange.create({
+            data: {
               lessonId: range.lessonId,
               sourceDocumentId: sourceDocument.id,
               pageStart: range.pageStart,
               pageEnd: range.pageEnd,
               createdById: actorUserId,
-              metadataJson: toDocumentInputJson({
-                source: "admin_page_range_mapping",
-              }),
-            },
-            update: {
-              pageStart: range.pageStart,
-              pageEnd: range.pageEnd,
               metadataJson: toDocumentInputJson({
                 source: "admin_page_range_mapping",
               }),
@@ -486,8 +509,8 @@ export class SourceDocumentsService {
             sourceDocument,
             pageStart: range.pageStart,
             pageEnd: range.pageEnd,
-            isPrimary: range.isPrimary,
-            now,
+            pageRangeId: savedRange.id,
+            sortOrder: 0,
           });
 
           lessonDocuments.push(lessonDocument);
@@ -531,6 +554,251 @@ export class SourceDocumentsService {
     }
   }
 
+  async syncLessonSourceExtractionsInTransaction(
+    tx: Prisma.TransactionClient,
+    {
+      actorUserId,
+      context = {},
+      extractions,
+      lessonId,
+    }: {
+      actorUserId: string;
+      context?: RequestContext;
+      extractions: LessonSourceDocumentExtractionDto[];
+      lessonId: string;
+    },
+  ) {
+    const extractionIds = extractions
+      .map((extraction) => extraction.id)
+      .filter((id): id is string => Boolean(id));
+
+    if (new Set(extractionIds).size !== extractionIds.length) {
+      throwBadRequest(
+        "VALIDATION_ERROR",
+        "Danh sách trích xuất chứa mã bị lặp",
+      );
+    }
+
+    for (const extraction of extractions) {
+      assertPageRangeOrder(extraction.pageStart, extraction.pageEnd);
+    }
+    assertNoOverlappingSourceExtractions(extractions);
+
+    const lesson = await tx.lesson.findFirst({
+      where: {
+        id: lessonId,
+        deletedAt: null,
+        chapter: {
+          deletedAt: null,
+        },
+        learningPath: {
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true,
+        learningPathId: true,
+      },
+    });
+
+    if (!lesson) {
+      throwNotFound("NOT_FOUND", "Không tìm thấy buổi học");
+    }
+
+    const sourceDocumentIds = [
+      ...new Set(extractions.map((extraction) => extraction.sourceDocumentId)),
+    ];
+    const sourceDocuments = await tx.sourceDocument.findMany({
+      where: {
+        id: {
+          in: sourceDocumentIds,
+        },
+        learningPathId: lesson.learningPathId,
+        deletedAt: null,
+      },
+      select: sourceDocumentSelect,
+    });
+    const sourceDocumentById = new Map(
+      sourceDocuments.map((sourceDocument) => [sourceDocument.id, sourceDocument]),
+    );
+
+    if (sourceDocuments.length !== sourceDocumentIds.length) {
+      throwBadRequest(
+        "VALIDATION_ERROR",
+        "Tài liệu nguồn phải thuộc cùng khóa học với buổi học",
+      );
+    }
+
+    const pageLimitBySourceId = new Map<string, number>();
+    for (const sourceDocument of sourceDocuments) {
+      pageLimitBySourceId.set(
+        sourceDocument.id,
+        await assertSourceDocumentReadyForPageRanges(tx, sourceDocument),
+      );
+    }
+
+    for (const extraction of extractions) {
+      const pageLimit = pageLimitBySourceId.get(extraction.sourceDocumentId);
+      if (!pageLimit || extraction.pageEnd > pageLimit) {
+        throwBadRequest(
+          "VALIDATION_ERROR",
+          "Khoảng trang vượt quá số trang của tài liệu nguồn",
+          {
+            extractionId: extraction.id ?? null,
+            sourceDocumentId: extraction.sourceDocumentId,
+            pageStart: extraction.pageStart,
+            pageEnd: extraction.pageEnd,
+            pageCount: pageLimit ?? null,
+          },
+        );
+      }
+    }
+
+    const existingRanges = await tx.lessonDocumentPageRange.findMany({
+      where: {
+        lessonId,
+      },
+      select: lessonDocumentPageRangeSelect,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const existingRangeById = new Map(
+      existingRanges.map((range) => [range.id, range]),
+    );
+
+    for (const extractionId of extractionIds) {
+      if (!existingRangeById.has(extractionId)) {
+        throwBadRequest(
+          "VALIDATION_ERROR",
+          "Khối trích xuất không thuộc buổi học đang sửa",
+          { extractionId },
+        );
+      }
+    }
+
+    const now = new Date();
+    const requestedIds = new Set(extractionIds);
+    const removedRanges = existingRanges.filter(
+      (range) => !requestedIds.has(range.id),
+    );
+
+    for (const range of removedRanges) {
+      await tx.lessonDocument.updateMany({
+        where: {
+          pageRangeId: range.id,
+          replacedAt: null,
+        },
+        data: {
+          pageRangeId: null,
+          replacedAt: now,
+        },
+      });
+      await tx.lessonDocumentPageRange.delete({
+        where: { id: range.id },
+      });
+    }
+
+    const changedDocuments: LessonDocumentRecord[] = [];
+    const savedRangeIds: string[] = [];
+
+    for (const [index, extraction] of extractions.entries()) {
+      const sortOrder = extraction.sortOrder ?? index;
+      const existingRange = extraction.id
+        ? existingRangeById.get(extraction.id)
+        : undefined;
+      const sourceDocument = sourceDocumentById.get(extraction.sourceDocumentId)!;
+      const isUnchanged =
+        existingRange?.sourceDocumentId === extraction.sourceDocumentId &&
+        existingRange.pageStart === extraction.pageStart &&
+        existingRange.pageEnd === extraction.pageEnd;
+
+      if (existingRange && isUnchanged) {
+        await tx.lessonDocument.updateMany({
+          where: {
+            pageRangeId: existingRange.id,
+            replacedAt: null,
+          },
+          data: {
+            sortOrder,
+          },
+        });
+        savedRangeIds.push(existingRange.id);
+        continue;
+      }
+
+      if (existingRange) {
+        await tx.lessonDocument.updateMany({
+          where: {
+            pageRangeId: existingRange.id,
+            replacedAt: null,
+          },
+          data: {
+            pageRangeId: null,
+            replacedAt: now,
+          },
+        });
+      }
+
+      const savedRange = existingRange
+        ? await tx.lessonDocumentPageRange.update({
+            where: { id: existingRange.id },
+            data: {
+              sourceDocumentId: extraction.sourceDocumentId,
+              pageStart: extraction.pageStart,
+              pageEnd: extraction.pageEnd,
+              metadataJson: toDocumentInputJson({
+                source: "lesson_editor_extraction",
+                sortOrder,
+              }),
+            },
+            select: lessonDocumentPageRangeSelect,
+          })
+        : await tx.lessonDocumentPageRange.create({
+            data: {
+              lessonId,
+              sourceDocumentId: extraction.sourceDocumentId,
+              pageStart: extraction.pageStart,
+              pageEnd: extraction.pageEnd,
+              createdById: actorUserId,
+              metadataJson: toDocumentInputJson({
+                source: "lesson_editor_extraction",
+                sortOrder,
+              }),
+            },
+            select: lessonDocumentPageRangeSelect,
+          });
+
+      const lessonDocument = await this.upsertLessonDocumentFromSource(tx, {
+        actorUserId,
+        lessonId,
+        pageEnd: extraction.pageEnd,
+        pageRangeId: savedRange.id,
+        pageStart: extraction.pageStart,
+        sortOrder,
+        sourceDocument,
+      });
+      changedDocuments.push(lessonDocument);
+      savedRangeIds.push(savedRange.id);
+    }
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId,
+        action: "LESSON_SOURCE_EXTRACTIONS_SYNCED",
+        entityType: "Lesson",
+        entityId: lessonId,
+        after: toDocumentInputJson({
+          extractionIds: savedRangeIds,
+          removedExtractionIds: removedRanges.map((range) => range.id),
+          lessonDocumentIds: changedDocuments.map((document) => document.id),
+        }),
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      },
+    });
+
+    return changedDocuments;
+  }
+
   async assignSingleLessonPageRangeInTransaction(
     tx: Prisma.TransactionClient,
     {
@@ -540,7 +808,6 @@ export class SourceDocumentsService {
       pageEnd,
       pageStart,
       sourceDocumentId,
-      isPrimary,
     }: {
       actorUserId: string;
       context?: RequestContext;
@@ -551,96 +818,74 @@ export class SourceDocumentsService {
       isPrimary?: boolean;
     },
   ) {
-    assertPageRangeOrder(pageStart, pageEnd);
-
-    const sourceDocument = await this.findActiveSourceDocument(sourceDocumentId, tx);
-    const pageLimit = await assertSourceDocumentReadyForPageRanges(tx, sourceDocument);
-
-    if (pageEnd > pageLimit) {
-      throwBadRequest(
-        "VALIDATION_ERROR",
-        "Khoảng trang vượt quá số trang của tài liệu nguồn",
-        {
-          lessonId,
-          pageStart,
-          pageEnd,
-          pageCount: pageLimit,
+    const existingRanges = await tx.lessonDocumentPageRange.findMany({
+      where: { lessonId },
+      select: {
+        id: true,
+        pageEnd: true,
+        pageStart: true,
+        sourceDocumentId: true,
+        lessonDocument: {
+          select: {
+            sortOrder: true,
+          },
         },
-      );
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const extractions: LessonSourceDocumentExtractionDto[] =
+      existingRanges.length === 0
+        ? [
+            {
+              pageEnd,
+              pageStart,
+              sortOrder: 0,
+              sourceDocumentId,
+            },
+          ]
+        : existingRanges.map((range, index) =>
+            index === 0
+              ? {
+                  id: range.id,
+                  pageEnd,
+                  pageStart,
+                  sortOrder: range.lessonDocument?.sortOrder ?? index,
+                  sourceDocumentId,
+                }
+              : {
+                  id: range.id,
+                  pageEnd: range.pageEnd,
+                  pageStart: range.pageStart,
+                  sortOrder: range.lessonDocument?.sortOrder ?? index,
+                  sourceDocumentId: range.sourceDocumentId,
+                },
+          );
+    const documents = await this.syncLessonSourceExtractionsInTransaction(tx, {
+      actorUserId,
+      context,
+      extractions,
+      lessonId,
+    });
+
+    if (documents[0]) {
+      return documents[0];
     }
 
-    await this.assertLessonsBelongToLearningPath(
-      tx,
-      [lessonId],
-      sourceDocument.learningPathId,
-    );
-
-    await tx.lessonDocumentPageRange.deleteMany({
-      where: {
-        lessonId,
-        sourceDocumentId: {
-          not: sourceDocument.id,
-        },
-      },
-    });
-
-    const savedRange = await tx.lessonDocumentPageRange.upsert({
-      where: {
-        lessonId_sourceDocumentId: {
-          lessonId,
-          sourceDocumentId: sourceDocument.id,
-        },
-      },
-      create: {
-        lessonId,
-        sourceDocumentId: sourceDocument.id,
-        pageStart,
-        pageEnd,
-        createdById: actorUserId,
-        metadataJson: toDocumentInputJson({
-          source: "lesson_editor_page_range",
-        }),
-      },
-      update: {
-        pageStart,
-        pageEnd,
-        metadataJson: toDocumentInputJson({
-          source: "lesson_editor_page_range",
-        }),
-      },
-      select: lessonDocumentPageRangeSelect,
-    });
-
-    const lessonDocument = await this.upsertLessonDocumentFromSource(tx, {
-      actorUserId,
-      lessonId,
-      now: new Date(),
-      pageEnd,
-      pageStart,
-      sourceDocument,
-      isPrimary,
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorUserId,
-        action: "LESSON_PAGE_RANGE_UPDATED",
-        entityType: "Lesson",
-        entityId: lessonId,
-        after: toDocumentInputJson({
-          pageRange: serializeLessonDocumentPageRange(savedRange),
-          lessonDocumentId: lessonDocument.id,
-        }),
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      },
-    });
-
-    return lessonDocument;
+    const retainedRangeId = existingRanges[0]?.id;
+    return retainedRangeId
+      ? tx.lessonDocument.findFirst({
+          where: {
+            lessonId,
+            pageRangeId: retainedRangeId,
+            replacedAt: null,
+          },
+          select: lessonDocumentSelect,
+        })
+      : null;
   }
 
   async removeSingleLessonPageRangeInTransaction(
-    tx: any,
+    tx: Prisma.TransactionClient,
     lessonId: string,
     actorUserId: string,
   ) {
@@ -650,10 +895,11 @@ export class SourceDocumentsService {
     });
 
     const docToDelete = mappedDocs.find(
-      (d: any) =>
-        d.metadataJson &&
-        typeof d.metadataJson === "object" &&
-        (d.metadataJson as Record<string, unknown>).source === "source_document_page_range",
+      (document) =>
+        document.metadataJson &&
+        typeof document.metadataJson === "object" &&
+        (document.metadataJson as Record<string, unknown>).source ===
+          "source_document_page_range",
     );
 
     if (docToDelete) {
@@ -811,8 +1057,8 @@ export class SourceDocumentsService {
       sourceDocument,
       pageStart,
       pageEnd,
-      isPrimary,
-      now,
+      pageRangeId,
+      sortOrder,
     }: {
       actorUserId: string;
       lessonId: string;
@@ -821,90 +1067,35 @@ export class SourceDocumentsService {
       >;
       pageStart: number;
       pageEnd: number;
-      isPrimary?: boolean;
-      now: Date;
+      pageRangeId: string;
+      sortOrder: number;
     },
   ) {
-    const markAsPrimary = isPrimary ?? true;
-    const kind = markAsPrimary
-      ? LessonDocumentKind.PRIMARY_FROM_SOURCE
-      : LessonDocumentKind.SUPPLEMENT;
-
-    const existingDoc = await tx.lessonDocument.findFirst({
-      where: {
-        lessonId,
-        sourceDocumentId: sourceDocument.id,
-        replacedAt: null,
-      },
-      select: {
-        id: true,
-        kind: true,
-      },
-    });
-
-    if (markAsPrimary) {
-      await tx.lessonDocument.updateMany({
-        where: {
-          lessonId,
-          kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
-          ...(existingDoc ? { id: { not: existingDoc.id } } : {}),
-          replacedAt: null,
-        },
-        data: {
-          replacedAt: now,
-        },
-      });
-
-      await tx.lessonDocument.updateMany({
-        where: {
-          lessonId,
-          kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
-          ...(existingDoc ? { id: { not: existingDoc.id } } : {}),
-          replacedAt: null,
-        },
-        data: {
-          kind: LessonDocumentKind.SUPPLEMENT,
-        },
-      });
-    }
-
     const metadataJson = toDocumentInputJson({
       source: "source_document_page_range",
       pageStart,
       pageEnd,
+      pageRangeId,
+      sortOrder,
     });
     const title =
       sourceDocument.title ?? `Trang ${pageStart}-${pageEnd} từ tài liệu nguồn`;
 
-    const lessonDocument = existingDoc
-      ? await tx.lessonDocument.update({
-          where: { id: existingDoc.id },
-          data: {
-            fileId: sourceDocument.fileId,
-            kind,
-            title,
-            status: DocumentStatus.PROCESSING,
-            extractError: null,
-            contentHash: sourceDocument.contentHash,
-            chunkCount: 0,
-            processedAt: null,
-            metadataJson,
-          },
-          select: lessonDocumentSelect,
-        })
-      : await tx.lessonDocument.create({
-          data: {
-            lessonId,
-            fileId: sourceDocument.fileId,
-            sourceDocumentId: sourceDocument.id,
-            kind,
-            title,
-            status: DocumentStatus.PROCESSING,
-            contentHash: sourceDocument.contentHash,
-            metadataJson,
-          },
-          select: lessonDocumentSelect,
-        });
+    const lessonDocument = await tx.lessonDocument.create({
+      data: {
+        lessonId,
+        fileId: sourceDocument.fileId,
+        sourceDocumentId: sourceDocument.id,
+        pageRangeId,
+        kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
+        sortOrder,
+        title,
+        status: DocumentStatus.PROCESSING,
+        contentHash: sourceDocument.contentHash,
+        metadataJson,
+      },
+      select: lessonDocumentSelect,
+    });
 
     const job = await this.createDocumentJob(tx, {
       ownerUserId: actorUserId,
@@ -916,6 +1107,7 @@ export class SourceDocumentsService {
         lessonId,
         lessonDocumentId: lessonDocument.id,
         sourceDocumentId: sourceDocument.id,
+        pageRangeId,
         pageStart,
         pageEnd,
       },
@@ -1124,12 +1316,15 @@ export class SourceDocumentsService {
       throwNotFound("PAGE_NOT_FOUND", "Trang tài liệu không tồn tại");
     }
 
-    const metadata =
+    const metadata: Record<string, unknown> =
       typeof page.metadataJson === "object" && page.metadataJson !== null
-        ? (page.metadataJson as Record<string, any>)
+        ? (page.metadataJson as Record<string, unknown>)
         : {};
 
-    const printedPage = metadata.printedPage || {};
+    const printedPage =
+      typeof metadata.printedPage === "object" && metadata.printedPage !== null
+        ? (metadata.printedPage as Record<string, unknown>)
+        : {};
 
     const updatedPrintedPage = {
       ...printedPage,

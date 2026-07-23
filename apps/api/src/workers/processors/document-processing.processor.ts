@@ -192,9 +192,17 @@ export class DocumentProcessingProcessor {
           result = await this.handleSourcePageExtraction(runningJob);
           break;
         case "LESSON_CHUNKING_FROM_SOURCE":
+        case "LESSON_PRIMARY_FROM_SOURCE_PROCESSING":
+          result = await this.handleLessonChunking(runningJob);
+          break;
+        // Transitional compatibility for jobs queued before ADR-0009.
         case "LESSON_PRIMARY_REPLACEMENT_FROM_SOURCE":
           result = await this.handleLessonChunking(runningJob);
           break;
+        case "LESSON_PRIMARY_UPLOAD_PROCESSING":
+          result = await this.handleDirectLessonDocumentOcr(runningJob);
+          break;
+        // Transitional compatibility for jobs queued before ADR-0009.
         case "LESSON_PRIMARY_REPLACEMENT_UPLOAD":
         case "LESSON_SUPPLEMENT_PROCESSING":
           result = await this.handleDirectLessonDocumentOcr(runningJob);
@@ -379,7 +387,8 @@ export class DocumentProcessingProcessor {
     const lessonId = readString(inputMeta, "lessonId") ?? record.lessonId;
     const lessonDocumentId =
       readString(inputMeta, "lessonDocumentId") ?? record.resourceId;
-    const sourceDocId = readString(inputMeta, "sourceDocumentId");
+    const inputSourceDocumentId = readString(inputMeta, "sourceDocumentId");
+    const inputPageRangeId = readString(inputMeta, "pageRangeId");
 
     if (!lessonId) {
       throw new UnrecoverableError(
@@ -394,29 +403,13 @@ export class DocumentProcessingProcessor {
     }
 
     this.logger.log(
-      `[LESSON_CHUNKING] Starting for lesson=${lessonId}, document=${lessonDocumentId}, sourceDoc=${sourceDocId}`,
+      `[LESSON_CHUNKING] Starting for lesson=${lessonId}, document=${lessonDocumentId}, sourceDoc=${inputSourceDocumentId}`,
     );
-
-    if (!sourceDocId) {
-      throw new UnrecoverableError(
-        `Missing sourceDocumentId in inputMeta for ${action ?? "source lesson chunking"}`,
-      );
-    }
-
-    const pageRange = await this.prisma.lessonDocumentPageRange.findUniqueOrThrow({
-      where: {
-        lessonId_sourceDocumentId: {
-          lessonId,
-          sourceDocumentId: sourceDocId,
-        },
-      },
-    });
 
     const lessonDoc = await this.prisma.lessonDocument.findFirstOrThrow({
       where: {
         id: lessonDocumentId,
         lessonId,
-        sourceDocumentId: sourceDocId,
         replacedAt: null,
       },
       select: {
@@ -424,6 +417,7 @@ export class DocumentProcessingProcessor {
         lessonId: true,
         fileId: true,
         sourceDocumentId: true,
+        pageRangeId: true,
         kind: true,
         metadataJson: true,
         file: {
@@ -431,6 +425,22 @@ export class DocumentProcessingProcessor {
             objectKey: true,
           },
         },
+      },
+    });
+    const sourceDocId = inputSourceDocumentId ?? lessonDoc.sourceDocumentId;
+    const pageRangeId = inputPageRangeId ?? lessonDoc.pageRangeId;
+
+    if (!sourceDocId || !pageRangeId) {
+      throw new UnrecoverableError(
+        `Missing sourceDocumentId/pageRangeId for ${action ?? "source lesson chunking"}`,
+      );
+    }
+
+    const pageRange = await this.prisma.lessonDocumentPageRange.findFirstOrThrow({
+      where: {
+        id: pageRangeId,
+        lessonId,
+        sourceDocumentId: sourceDocId,
       },
     });
 
@@ -1127,7 +1137,7 @@ export class DocumentProcessingProcessor {
       for (const page of pages) {
         const replaceUrls = (text: string) => {
           return text.replace(
-            /https:\/\/cdn\.mathpix\.com\/cropped\/([a-zA-Z0-9\-]+)-(\d+)\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)/g,
+            /https:\/\/cdn\.mathpix\.com\/cropped\/([a-zA-Z0-9-]+)-(\d+)\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)/g,
             (match, pdfId, pageNumStr, height, width, y, x) => {
               const pageNum = parseInt(pageNumStr, 10);
               const paddedPage = String(pageNum).padStart(3, "0");

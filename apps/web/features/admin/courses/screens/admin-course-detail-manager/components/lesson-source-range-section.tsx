@@ -1,535 +1,247 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { FileText, Layers3, Maximize2, Minimize2, FilePlus2, Trash2 } from "lucide-react";
-import type { UseFormReturn } from "react-hook-form";
+import { BookOpenText, FilePlus2, ScanText } from "lucide-react";
+import type { UseFieldArrayReturn, UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
-import { OptionField } from "@/components/common/forms/option-field";
-import { TextField } from "@/components/common/forms/text-field";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
-import { getPrintedPageView } from "@/features/admin/courses/admin-course-documents-utils";
-import {
+import { LessonDocumentUploadRow } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-document-upload-row";
+import { LessonSourceExtractionBlock } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-source-extraction-block";
+import type {
   AdminSourceDocumentApi,
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
-import { getPdfPageFromPrintedPage } from "@/features/admin/courses/admin-course-documents-utils";
-import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
-import { PdfPagePreview } from "@/components/shared/pdf-page-preview";
 
 export function LessonSourceRangeSection({
   disabled,
   form,
   isSaving,
-  isRangeReady,
-  pageLimit,
-  pages,
-  rangeDisabledReason,
-  selectedSourceDocument,
   sourceDocuments,
-  onSelectSourceDocument,
+  sourcePagesByDocumentId,
+  extractionFieldArray,
+  documentFieldArray,
 }: {
   disabled: boolean;
   form: UseFormReturn<LessonFormValues>;
   isSaving: boolean;
-  isRangeReady: boolean;
-  pageLimit: number | null;
-  pages: AdminSourceDocumentPageApi[];
-  rangeDisabledReason: string;
-  selectedSourceDocument: AdminSourceDocumentApi | null;
   sourceDocuments: AdminSourceDocumentApi[];
-  onSelectSourceDocument: (sourceDocumentId: string | null) => void;
+  sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]>;
+  extractionFieldArray: UseFieldArrayReturn<
+    LessonFormValues,
+    "sourceDocumentExtractions",
+    "id"
+  >;
+  documentFieldArray: UseFieldArrayReturn<
+    LessonFormValues,
+    "referenceDocuments",
+    "id"
+  >;
 }) {
-  const isRangeVisible = form.watch("sourceDocumentPageRange.isRangeEnabled") ?? true;
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
-  const sourceDocumentId = form.watch("sourceDocumentPageRange.sourceDocumentId") ?? "";
-  const pageStart = form.watch("sourceDocumentPageRange.pageStart") ?? "";
-  const pageEnd = form.watch("sourceDocumentPageRange.pageEnd") ?? "";
-  const pageStartNumber = getPdfPageFromPrintedPage(pageStart, pages);
-  const pageEndNumber = getPdfPageFromPrintedPage(pageEnd, pages);
-  const previewPage =
-    pageStartNumber !== null
-      ? pages.find((page) => page.pageNumber === pageStartNumber)
-      : null;
-
-  const previewPages =
-    pageStartNumber !== null && pageEndNumber !== null && pageStartNumber <= pageEndNumber
-      ? pages.filter(
-          (page) =>
-            page.pageNumber >= pageStartNumber && page.pageNumber <= pageEndNumber,
-        )
-      : previewPage
-        ? [previewPage]
-        : [];
-  const fullText = previewPages
-    .map((page) => page.mathpixMarkdown ?? page.fullText ?? page.textPreview)
-    .filter(Boolean)
-    .join("\n\n");
-  const hasMultiplePages = previewPages.length > 1 || (fullText && fullText.length > 200);
-  const printedPage = previewPage ? getPrintedPageView(previewPage) : null;
-  const selectedTitle =
-    selectedSourceDocument?.title ??
-    selectedSourceDocument?.file.originalName ??
-    "Tài liệu chính";
-  const rangeWarning =
-    pageLimit && pageEndNumber !== null && pageEndNumber > pageLimit
-      ? `Tài liệu chỉ có ${pageLimit} trang.`
-      : null;
-
-  const lessonTitle = form.watch("title") ?? "";
-
-  const suggestedPages = useMemo(() => {
-    if (!lessonTitle.trim() || !pages || pages.length === 0) return [];
-
-    const normalizedTitle = lessonTitle.trim().toLowerCase();
-
-    // Extract core title (e.g. "Bài 1: Tỉ lệ thức" -> "tỉ lệ thức")
-    let searchStr = normalizedTitle
-      .replace(/^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/, "")
-      .trim();
-    if (!searchStr || searchStr.length < 3) {
-      // Fallback if there's no core title or it's too short, strip trailing punctuations
-      searchStr = normalizedTitle.replace(/[:\-\.]\s*$/, "");
+  const { append, fields, remove } = documentFieldArray;
+  const {
+    append: appendExtraction,
+    fields: extractionFields,
+    remove: removeExtraction,
+  } = extractionFieldArray;
+  const foundationDocumentOrder = form.watch("foundationDocumentOrder") ?? [];
+  const referenceDocuments = form.watch("referenceDocuments");
+  const extractions = form.watch("sourceDocumentExtractions");
+  const isDisabled = disabled || isSaving;
+  const primaryUploadFields = fields.flatMap((field, index) => {
+    const document = referenceDocuments[index];
+    if (document?.type !== "PRIMARY_FROM_SOURCE") {
+      return [];
     }
 
-    const normalizeText = (t: string) =>
-      t
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/đ/g, "d")
-        .replace(/[^a-z0-9]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    const clientKey = document.clientKey ?? document.id ?? field.id;
+    return [{ clientKey, field, index }];
+  });
+  const foundationDocumentCount =
+    extractionFields.length + primaryUploadFields.length;
 
-    const normSearchStr = normalizeText(searchStr);
-    if (!normSearchStr) return [];
+  function setFoundationOrder(order: string[]) {
+    form.setValue("foundationDocumentOrder", order, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  }
 
-    // Strip LaTeX/Mathpix markdown commands so that command names like "section",
-    // "begin", "textbf" etc. don't interfere with text search.
-    // e.g. \section{Bài}\n\section{37 HÌNH...} → "{Bài}\n{37 HÌNH...}"
-    // After normalizeText: "bai 37 hinh..." (contiguous, searchable)
-    const stripLatex = (t: string) => t.replace(/\\[a-zA-Z]+\*?/g, " ");
-
-    const getSearchText = (page: NonNullable<(typeof pages)[0]>) => {
-      const raw = page.fullText ?? page.textPreview ?? page.mathpixMarkdown ?? "";
-      return stripLatex(raw).toLowerCase();
-    };
-
-    const matchedPages: (NonNullable<(typeof pages)[0]> & { index: number })[] = [];
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      if (!page) continue;
-      const text = getSearchText(page);
-
-      const isTocPage =
-        /m[uụú]c\s*l[uụú][cg]/i.test(text) ||
-        (text.match(/\.{4,}/g) ?? []).length > 4 ||
-        (text.match(/(bài|chương|chủ đề|phần)\s+\d+/gi) ?? []).length > 6;
-
-      if (isTocPage) continue;
-
-      if (normalizeText(text).includes(normSearchStr)) {
-        matchedPages.push({ ...page, index: i });
-      }
-    }
-
-    if (matchedPages.length === 0) return [];
-
-    let nextLessonStr = "";
-    const prefixMatch = normalizedTitle.match(
-      /^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+(\d+)[:\-\.]?\s*/,
+  function addExtraction() {
+    const clientKey = crypto.randomUUID();
+    const index = extractionFields.length;
+    appendExtraction(
+      {
+        clientKey,
+        sourceDocumentId: sourceDocuments[0]?.id ?? "",
+        pageStart: "",
+        pageEnd: "",
+        hasInteracted: false,
+      },
+      { shouldFocus: false },
     );
-    if (prefixMatch && prefixMatch[1] && prefixMatch[2]) {
-      nextLessonStr = normalizeText(
-        `${prefixMatch[1]} ${parseInt(prefixMatch[2], 10) + 1}`,
-      );
-    }
-    const stopKeywords = [
-      nextLessonStr,
-      "luyen tap",
-      "luyen tap chung",
-      "bai tap cuoi chuong",
-      "on tap chuong",
-    ].filter(Boolean);
+    setFoundationOrder([
+      ...foundationDocumentOrder,
+      `EXTRACTION:${clientKey}`,
+    ]);
+    requestAnimationFrame(() => {
+      form.clearErrors(`sourceDocumentExtractions.${index}`);
+    });
+  }
 
-    const validMatchedPages: typeof matchedPages = [];
-    for (let i = 0; i < matchedPages.length; i++) {
-      const p = matchedPages[i]!;
-      if (i > 0) {
-        const text = normalizeText(getSearchText(p));
-        // Check strict stop keywords (next lesson, chapter review) anywhere in text
-        const strictStopHit = stopKeywords
-          .filter((k) => k !== "luyen tap")
-          .some((k) => text.includes(k));
-        // Check "luyen tap" as a standalone heading (first ~40 chars, NOT followed by a number)
-        // "Luyện tập 2" = part of lesson exercises → don't stop
-        // "Luyện tập" alone = separate section → stop
-        const isExerciseHeading = /luyen tap(?!\s*\d)/.test(text.substring(0, 40));
-        if (strictStopHit || isExerciseHeading) {
-          break; // Dừng việc gộp trang nếu gặp trang của bài học tiếp theo hoặc phần ôn tập
-        }
-      }
-      validMatchedPages.push(p);
-    }
-
-    if (validMatchedPages.length === 0) return [];
-
-    const resolveRange = (range: typeof validMatchedPages) => {
-      const firstMatch = range[0]!;
-      let lastMatch = range[range.length - 1]!;
-
-      // Quét tiến để đoán điểm kết thúc nếu chỉ tìm thấy trang bắt đầu (như khi gõ "Bài 20:")
-      if (nextLessonStr) {
-        const startIdx = firstMatch.index;
-        const endIdx = lastMatch.index;
-        const maxScan = Math.min(endIdx + 15, pages.length);
-        let foundStop = false;
-        let stopIdx = endIdx;
-
-        for (let j = endIdx + 1; j < maxScan; j++) {
-          const scanPage = pages[j];
-          if (!scanPage) continue;
-          const t = normalizeText(getSearchText(scanPage));
-          const strictHit = stopKeywords
-            .filter((k) => k !== "luyen tap")
-            .some((k) => t.includes(k));
-          const headingHit = /luyen tap(?!\s*\d)/.test(t.substring(0, 40));
-          if (strictHit || headingHit) {
-            foundStop = true;
-            stopIdx = j - 1;
-            break;
-          }
-        }
-        // Chỉ mở rộng range nếu tìm thấy chính xác điểm dừng
-        if (foundStop && stopIdx > endIdx) {
-          lastMatch = { ...pages[stopIdx]!, index: stopIdx };
-        }
-      }
-
-      const startPrinted = getPrintedPageView(firstMatch);
-      const endPrinted = getPrintedPageView(lastMatch);
-      const startStr =
-        startPrinted.printedPageLabel ??
-        startPrinted.printedPageNumber?.toString() ??
-        firstMatch.pageNumber.toString();
-      const endStr =
-        endPrinted.printedPageLabel ??
-        endPrinted.printedPageNumber?.toString() ??
-        lastMatch.pageNumber.toString();
-
-      return {
-        start: startStr,
-        end: endStr,
-        label:
-          startStr === endStr ? `Trang ${startStr}` : `Trang ${startStr} - ${endStr}`,
-      };
-    };
-
-    const ranges: { start: string; end: string; label: string }[] = [];
-    let currentRange: typeof validMatchedPages = [validMatchedPages[0]!];
-
-    for (let i = 1; i < validMatchedPages.length; i++) {
-      const prev = currentRange[currentRange.length - 1]!;
-      const curr = validMatchedPages[i]!;
-      if (curr.index === prev.index + 1) {
-        currentRange.push(curr);
-      } else {
-        ranges.push(resolveRange(currentRange));
-        currentRange = [curr];
-      }
-    }
-    ranges.push(resolveRange(currentRange));
-
-    // Trả về duy nhất 1 gợi ý (khoảng trang đầu tiên khớp và đã được gộp liên tiếp)
-    // vì người dùng muốn khi gõ tên bài học chính xác thì chỉ hiện 1 khoảng trang chính xác nhất
-    return [ranges[0]!];
-  }, [lessonTitle, pages]);
-
-  const isRangeInputDisabled = disabled || isSaving || !isRangeReady;
-  const isSourceSelectDisabled = disabled || isSaving;
+  function addFoundationDocument() {
+    const clientKey = crypto.randomUUID();
+    const newIndex = referenceDocuments.length;
+    append(
+      {
+        clientKey,
+        file: null,
+        title: "",
+        type: "PRIMARY_FROM_SOURCE",
+      },
+      { shouldFocus: false },
+    );
+    setFoundationOrder([...foundationDocumentOrder, `UPLOAD:${clientKey}`]);
+    requestAnimationFrame(() => {
+      form.clearErrors([
+        `referenceDocuments.${newIndex}.title`,
+        `referenceDocuments.${newIndex}.file`,
+      ]);
+    });
+  }
 
   return (
-    <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
+    <section
+      data-testid="lesson-foundation-documents-section"
+      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
-            <FileText className="h-4 w-4" aria-hidden="true" />
+            <BookOpenText className="h-4 w-4" aria-hidden="true" />
           </span>
-          <div className="min-w-0">
-            <FieldLabel id="admin-lesson-source-range" label="Tài liệu nền tảng" />
+          <div className="flex min-w-0 items-center gap-2">
+            <FieldLabel
+              id="admin-lesson-source-range"
+              label="Tài liệu nền tảng"
+              isOptional
+            />
+            <span
+              data-testid="foundation-document-count"
+              aria-label={`${foundationDocumentCount} tài liệu nền tảng`}
+              className="inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-[var(--theme-surface)] px-2 py-0.5 text-xs font-extrabold tabular-nums text-[var(--theme-text-muted)]"
+            >
+              {foundationDocumentCount}
+            </span>
           </div>
         </div>
-        <button
-          type="button"
-          disabled={isRangeVisible || disabled || isSaving}
-          onClick={() => form.setValue("sourceDocumentPageRange.isRangeEnabled", true, { shouldValidate: true })}
-          className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-          Thêm tài liệu
-        </button>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <button
+            type="button"
+            data-testid="add-foundation-extraction"
+            disabled={isDisabled}
+            onClick={addExtraction}
+            className="theme-button-neutral inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:text-sm"
+          >
+            <ScanText className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Thêm trích xuất
+          </button>
+          <button
+            type="button"
+            data-testid="add-foundation-document"
+            disabled={isDisabled}
+            onClick={addFoundationDocument}
+            className="theme-button-neutral inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:text-sm"
+          >
+            <FilePlus2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Thêm tài liệu
+          </button>
+        </div>
       </div>
 
-      {sourceDocuments.length === 0 ? (
-        <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
-          Chưa có tài liệu chính.
-        </div>
-      ) : isRangeVisible ? (
-        <div className="mt-3 grid gap-3">
-          {!isRangeReady ? (
-            <p className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-warning-text)]">
-              {rangeDisabledReason}
-            </p>
-          ) : null}
-          {suggestedPages.length > 0 ? (
-            <div className="flex items-center gap-1 text-xs text-[var(--theme-text-muted)]">
-              (Gợi ý:
-              {suggestedPages.map((range, idx) => (
-                <span key={idx}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      form.setValue("sourceDocumentPageRange.pageStart", range.start, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      });
-                      if (range.start !== range.end) {
-                        form.setValue("sourceDocumentPageRange.pageEnd", range.end, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                      }
-                    }}
-                    className="font-bold text-[var(--theme-primary)] hover:underline"
-                  >
-                    {range.label}
-                  </button>
-                  {idx < suggestedPages.length - 1 ? ", " : ""}
-                </span>
-              ))}
-              )
-            </div>
-          ) : null}
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-            <TextField
-              id="admin-lesson-page-start"
-              label="Từ trang"
-              inputMode="text"
-              disabled={isRangeInputDisabled}
-              icon={null}
-              error={form.formState.errors.sourceDocumentPageRange?.pageStart}
-              {...form.register("sourceDocumentPageRange.pageStart")}
-            />
-            <TextField
-              id="admin-lesson-page-end"
-              label="Đến trang"
-              inputMode="text"
-              disabled={isRangeInputDisabled}
-              icon={null}
-              error={form.formState.errors.sourceDocumentPageRange?.pageEnd}
-              {...form.register("sourceDocumentPageRange.pageEnd")}
-            />
-            <div className="mt-0 flex items-start sm:mt-7">
-              <button
-                type="button"
-                disabled={disabled || isSaving}
-                onClick={() => {
-                  form.setValue("sourceDocumentPageRange.isRangeEnabled", false, { shouldValidate: true });
-                  form.setValue("sourceDocumentPageRange.pageStart", "", {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                  form.setValue("sourceDocumentPageRange.pageEnd", "", {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
-                }}
-                className="theme-button-danger-subtle inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Trash2 className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+      {sourceDocuments.length === 0 && extractionFields.length > 0 ? (
+        <p className="mt-3 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-warning-text)]">
+          Chưa có tài liệu nguồn sẵn sàng. Hãy hoàn tất xử lý và xác nhận tất cả
+          số trang in ở trang chi tiết khóa học trước khi nhập khoảng trang.
+        </p>
+      ) : null}
 
-          <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3 transition-all">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-                Xem nhanh
-              </p>
-              <div className="flex items-center gap-2 sm:gap-3">
-                {previewPages.length > 0 && (
-                  <div className="hidden sm:flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewMode("ocr")}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
-                        previewMode === "ocr"
-                          ? "bg-[var(--theme-primary)] text-white"
-                          : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
-                      }`}
-                    >
-                      Nội dung OCR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewMode("pdf")}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
-                        previewMode === "pdf"
-                          ? "bg-[var(--theme-primary)] text-white"
-                          : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
-                      }`}
-                    >
-                      PDF gốc
-                    </button>
-                  </div>
-                )}
-                {hasMultiplePages && (
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
-                  >
-                    {isExpanded ? (
-                      <>
-                        <Minimize2 className="h-3.5 w-3.5" />
-                        Thu gọn
-                      </>
-                    ) : (
-                      <>
-                        <Maximize2 className="h-3.5 w-3.5" />
-                        Mở rộng
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
+      <div className="mt-3 flex flex-col gap-3">
+        {extractionFields.map((field, index) => {
+          const extraction = extractions[index];
+          const clientKey = extraction?.clientKey ?? field.clientKey ?? field.id;
+          const explicitOrder = foundationDocumentOrder.indexOf(
+            `EXTRACTION:${clientKey}`,
+          );
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <p className="text-sm font-extrabold text-[var(--theme-primary)]">
-                {selectedTitle}
-              </p>
-            </div>
-
-            {/* Mobile-only toggle row */}
-            {previewPages.length > 0 && (
-              <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
-                <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewMode("ocr")}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
-                      previewMode === "ocr"
-                        ? "bg-[var(--theme-primary)] text-white"
-                        : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
-                    }`}
-                  >
-                    Nội dung OCR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewMode("pdf")}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
-                      previewMode === "pdf"
-                        ? "bg-[var(--theme-primary)] text-white"
-                        : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
-                    }`}
-                  >
-                    PDF gốc
-                  </button>
-                </div>
-              </div>
-            )}
-            {/* Compact hint when collapsed */}
-            {!isExpanded && previewMode === "pdf" && (
-              <p className="mt-1 text-xs italic text-[var(--theme-text-muted)]">
-                Mở rộng để xem bản PDF chi tiết
-              </p>
-            )}
+          return (
             <div
-              className={`mt-2 w-full max-w-3xl text-sm font-semibold leading-5 text-[var(--theme-text)] transition-all ${
-                isExpanded
-                  ? "max-h-[500px] overflow-y-auto whitespace-normal rounded-md border border-[var(--theme-border)] bg-white p-3 shadow-sm"
-                  : "hidden"
-              }`}
+              key={field.id}
+              data-testid="foundation-extraction-item"
+              style={{
+                order:
+                  explicitOrder >= 0
+                    ? explicitOrder
+                    : foundationDocumentOrder.length + index,
+              }}
             >
-              {previewPages.length > 0 ? (
-                isExpanded ? (
-                  <div className="flex flex-col gap-4">
-                    {previewPages.map((page, index) => {
-                      const text =
-                        page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
-                      const printed = getPrintedPageView(page);
-                      return (
-                        <div
-                          key={page.id}
-                          className={
-                            index > 0
-                              ? "border-t border-[var(--theme-border-strong)] pt-4"
-                              : ""
-                          }
-                        >
-                          <div className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                            Trang PDF {page.pageNumber}{" "}
-                            {printed.printedPageLabel
-                              ? `(Trang in: ${printed.printedPageLabel})`
-                              : ""}
-                          </div>
-                          {previewMode === "ocr" ? (
-                            text ? (
-                              <MathpixMarkdownRenderer content={text} />
-                            ) : (
-                              <p className="italic text-[var(--theme-text-muted)]">
-                                Không có nội dung OCR
-                              </p>
-                            )
-                          ) : (
-                            <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
-                              {selectedSourceDocument?.file?.publicUrl ? (
-                                <div className="inline-block align-top">
-                                  <PdfPagePreview
-                                    pdfUrl={selectedSourceDocument.file.publicUrl}
-                                    pageNumber={page.pageNumber}
-                                    width={650}
-                                  />
-                                </div>
-                              ) : (
-                                <p className="p-4 italic text-[var(--theme-text-muted)]">
-                                  Không tìm thấy file PDF
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="hidden"></div>
-                )
-              ) : (
-                <p>
-                  {printedPage
-                    ? `Trang in ${printedPage.printedPageLabel ?? printedPage.printedPageNumber ?? "chưa rõ"}`
-                    : "Nhập trang bắt đầu để xem nhanh."}
-                </p>
-              )}
-              {!isExpanded && fullText && previewMode === "ocr" && (
-                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[var(--theme-surface)] to-transparent" />
-              )}
+              <LessonSourceExtractionBlock
+                disabled={isDisabled}
+                form={form}
+                index={index}
+                sourceDocuments={sourceDocuments}
+                sourcePagesByDocumentId={sourcePagesByDocumentId}
+                onRemove={() => {
+                  removeExtraction(index);
+                  setFoundationOrder(
+                    foundationDocumentOrder.filter(
+                      (item) => item !== `EXTRACTION:${clientKey}`,
+                    ),
+                  );
+                }}
+              />
             </div>
-            {rangeWarning ? (
-              <p className="mt-2 text-sm font-bold text-[var(--theme-danger)]">
-                {rangeWarning}
-              </p>
-            ) : null}
+          );
+        })}
+
+        {primaryUploadFields.map(({ clientKey, field, index }, fallbackIndex) => {
+          const explicitOrder = foundationDocumentOrder.indexOf(
+            `UPLOAD:${clientKey}`,
+          );
+          return (
+            <div
+              key={field.id}
+              data-testid="foundation-upload-item"
+              style={{
+                order:
+                  explicitOrder >= 0
+                    ? explicitOrder
+                    : foundationDocumentOrder.length + fallbackIndex,
+              }}
+            >
+              <LessonDocumentUploadRow
+                disabled={isDisabled}
+                field={field}
+                form={form}
+                index={index}
+                onRemove={() => {
+                  remove(index);
+                  setFoundationOrder(
+                    foundationDocumentOrder.filter(
+                      (item) => item !== `UPLOAD:${clientKey}`,
+                    ),
+                  );
+                }}
+                placeholder="Ví dụ: Tài liệu nền tảng mở rộng"
+              />
+            </div>
+          );
+        })}
+
+        {extractionFields.length === 0 && primaryUploadFields.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
+            Chưa thêm tài liệu nền tảng.
           </div>
-        </div>
-      ) : (
-        <div className="mt-3 rounded-lg border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-surface)] px-3 py-4 text-sm font-semibold text-[var(--theme-text-muted)]">
-          Chưa thêm tài liệu nền tảng.
-        </div>
-      )}
+        ) : null}
+      </div>
     </section>
   );
 }

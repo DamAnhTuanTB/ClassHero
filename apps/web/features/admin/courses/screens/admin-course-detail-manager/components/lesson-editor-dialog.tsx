@@ -14,8 +14,9 @@ import {
 } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 import {
-  getLessonSourceRangeFormValues,
+  getLessonSourceExtractionFormValues,
   getPdfPageFromPrintedPage,
+  getSourceDocumentRangeReadiness,
   readRecord,
 } from "@/features/admin/courses/admin-course-documents-utils";
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
@@ -45,10 +46,30 @@ export function LessonEditorDialog({
     documentsManager: ReturnType<typeof useAdminCourseDocumentsManager>,
   ) => void | Promise<void>;
 }) {
-  const documentsManager = useAdminCourseDocumentsManager(learningPath);
+  const documentsManager = useAdminCourseDocumentsManager(learningPath, {
+    loadAllSourcePages: isOpen,
+  });
   const formSchema = useMemo(
-    () => createLessonSchema(documentsManager.sourceDocuments),
-    [documentsManager.sourceDocuments],
+    () =>
+      createLessonSchema(
+        documentsManager.sourceDocuments,
+        documentsManager.sourcePagesByDocumentId,
+      ),
+    [documentsManager.sourceDocuments, documentsManager.sourcePagesByDocumentId],
+  );
+  const selectableSourceDocuments = useMemo(
+    () =>
+      documentsManager.sourceDocuments.filter((sourceDocument) => {
+        if (sourceDocument.readiness?.isEligibleForExtraction === false) {
+          return false;
+        }
+
+        return getSourceDocumentRangeReadiness(
+          sourceDocument,
+          documentsManager.sourcePagesByDocumentId[sourceDocument.id] ?? [],
+        ).isReady;
+      }),
+    [documentsManager.sourceDocuments, documentsManager.sourcePagesByDocumentId],
   );
 
   const form = useForm<LessonFormValues>({
@@ -65,19 +86,29 @@ export function LessonEditorDialog({
       return;
     }
 
-    const sourceDocumentPageRange = getLessonSourceRangeFormValues(
+    const selectableSourceDocumentIds = new Set(
+      selectableSourceDocuments.map((document) => document.id),
+    );
+    const sourceDocumentExtractions = getLessonSourceExtractionFormValues(
       mode === "edit" ? selectedLesson?.id : null,
       documentsManager.documentsByLessonId,
-      documentsManager.selectedSourceDocument?.id,
-      documentsManager.sourcePages,
+      selectableSourceDocuments[0]?.id,
+      documentsManager.sourcePagesByDocumentId,
+    ).map((extraction) =>
+      selectableSourceDocumentIds.has(extraction.sourceDocumentId)
+        ? extraction
+        : { ...extraction, sourceDocumentId: "" },
     );
     const editorKey = [
       mode,
       selectedLesson?.id ?? "new",
       defaultOrderIndex,
-      sourceDocumentPageRange.sourceDocumentId,
-      sourceDocumentPageRange.pageStart,
-      sourceDocumentPageRange.pageEnd,
+      ...sourceDocumentExtractions.flatMap((extraction) => [
+        ("id" in extraction ? extraction.id : undefined) ?? extraction.clientKey,
+        extraction.sourceDocumentId,
+        extraction.pageStart,
+        extraction.pageEnd,
+      ]),
     ].join(":");
 
     if (!isOpen) {
@@ -93,62 +124,79 @@ export function LessonEditorDialog({
       return;
     }
 
-    const existingSupplements =
+    const existingDocuments =
       mode === "edit" && selectedLesson
         ? documentsManager.documentsByLessonId[selectedLesson.id]?.filter((doc) => {
-            const isSupplementOrHomework =
-              doc.kind === "SUPPLEMENT" || doc.kind === "HOMEWORK";
-            const isSourceMapped =
-              readRecord(doc.metadataJson)?.source === "source_document_page_range";
-            return isSupplementOrHomework && !isSourceMapped;
+            const isRangeDocument =
+              doc.kind === "PRIMARY_FROM_SOURCE" &&
+              (Boolean(doc.pageRangeId) ||
+                readRecord(doc.metadataJson)?.source === "source_document_page_range");
+            return !isRangeDocument;
           }) || []
         : [];
+    const foundationDocuments =
+      mode === "edit" && selectedLesson
+        ? documentsManager.documentsByLessonId[selectedLesson.id]
+            ?.filter((doc) => doc.kind === "PRIMARY_FROM_SOURCE")
+            .sort(
+              (left, right) =>
+                left.sortOrder - right.sortOrder ||
+                new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+            ) || []
+        : [];
+    const foundationDocumentOrder =
+      mode === "edit"
+        ? foundationDocuments.map((doc) =>
+            doc.pageRangeId ? `EXTRACTION:${doc.pageRangeId}` : `UPLOAD:${doc.id}`,
+          )
+        : sourceDocumentExtractions.map(
+            (extraction) => `EXTRACTION:${extraction.clientKey}`,
+          );
 
     form.reset(
       mode === "edit" && selectedLesson
         ? {
-            ...toLessonFormValues(selectedLesson, existingSupplements),
-            sourceDocumentPageRange,
+            ...toLessonFormValues(selectedLesson, existingDocuments),
+            sourceDocumentExtractions,
+            foundationDocumentOrder,
           }
         : {
             ...emptyLessonValues,
             orderIndex: defaultOrderIndex,
-            sourceDocumentPageRange,
+            sourceDocumentExtractions,
+            foundationDocumentOrder,
           },
     );
     resetKeyRef.current = editorKey;
-
-    if (sourceDocumentPageRange.sourceDocumentId) {
-      documentsManager.actions.selectSourceDocument(
-        sourceDocumentPageRange.sourceDocumentId,
-      );
-    }
   }, [
     defaultOrderIndex,
-    documentsManager.actions,
     documentsManager.documentsByLessonId,
-    documentsManager.selectedSourceDocument?.id,
-    documentsManager.sourcePages,
+    documentsManager.sourceDocuments,
+    documentsManager.sourcePagesByDocumentId,
     form,
     form.formState.isDirty,
     isOpen,
     mode,
+    selectableSourceDocuments,
     selectedLesson,
   ]);
 
   useEffect(() => {
     if (!isOpen || mode !== "edit" || !selectedLesson) return;
 
-    const existingSupplements =
+    const existingDocuments =
       documentsManager.documentsByLessonId[selectedLesson.id]?.filter(
-        (doc) => doc.kind === "SUPPLEMENT" || doc.kind === "HOMEWORK",
+        (doc) =>
+          doc.kind !== "PRIMARY_FROM_SOURCE" ||
+          (!doc.pageRangeId &&
+            readRecord(doc.metadataJson)?.source !== "source_document_page_range"),
       ) || [];
 
     const formDocs = form.getValues("referenceDocuments") || [];
 
     formDocs.forEach((formDoc, index) => {
       if (formDoc.id) {
-        const latestDoc = existingSupplements.find((d) => d.id === formDoc.id);
+        const latestDoc = existingDocuments.find((d) => d.id === formDoc.id);
         if (latestDoc) {
           if (
             formDoc.status !== latestDoc.status ||
@@ -177,17 +225,50 @@ export function LessonEditorDialog({
 
   async function submit(values: LessonFormValues) {
     try {
-      if (values.sourceDocumentPageRange?.sourceDocumentId) {
-        const { pageStart, pageEnd } = values.sourceDocumentPageRange;
+      let hasInvalidExtraction = false;
+      values.sourceDocumentExtractions.forEach((extraction, index) => {
+        const pageStart = extraction.pageStart?.trim() ?? "";
+        const pageEnd = extraction.pageEnd?.trim() ?? "";
+        if (!extraction.sourceDocumentId) {
+          form.setError(`sourceDocumentExtractions.${index}.sourceDocumentId`, {
+            type: "manual",
+            message: "Chọn tài liệu nguồn",
+          });
+          hasInvalidExtraction = true;
+        }
+        if (!pageStart) {
+          form.setError(`sourceDocumentExtractions.${index}.pageStart`, {
+            type: "manual",
+            message: "Nhập trang bắt đầu",
+          });
+          hasInvalidExtraction = true;
+        }
+        if (!pageEnd) {
+          form.setError(`sourceDocumentExtractions.${index}.pageEnd`, {
+            type: "manual",
+            message: "Nhập trang kết thúc",
+          });
+          hasInvalidExtraction = true;
+        }
+      });
+      if (hasInvalidExtraction) {
+        return;
+      }
+
+      for (const [index, extraction] of values.sourceDocumentExtractions.entries()) {
+        const pageStart = extraction.pageStart ?? "";
+        const pageEnd = extraction.pageEnd ?? "";
+        const sourcePages =
+          documentsManager.sourcePagesByDocumentId[extraction.sourceDocumentId] ?? [];
         const pdfPageStart = pageStart
-          ? getPdfPageFromPrintedPage(pageStart, documentsManager.sourcePages)
+          ? getPdfPageFromPrintedPage(pageStart, sourcePages)
           : null;
         const pdfPageEnd = pageEnd
-          ? getPdfPageFromPrintedPage(pageEnd, documentsManager.sourcePages)
+          ? getPdfPageFromPrintedPage(pageEnd, sourcePages)
           : null;
 
         if (pageStart && !pdfPageStart) {
-          form.setError("sourceDocumentPageRange.pageStart", {
+          form.setError(`sourceDocumentExtractions.${index}.pageStart`, {
             type: "manual",
             message: "Trang bắt đầu không hợp lệ",
           });
@@ -195,7 +276,7 @@ export function LessonEditorDialog({
         }
 
         if (pageEnd && !pdfPageEnd) {
-          form.setError("sourceDocumentPageRange.pageEnd", {
+          form.setError(`sourceDocumentExtractions.${index}.pageEnd`, {
             type: "manual",
             message: "Trang kết thúc không hợp lệ",
           });
@@ -203,21 +284,27 @@ export function LessonEditorDialog({
         }
 
         if (pdfPageStart && pdfPageEnd && pdfPageStart > pdfPageEnd) {
-          form.setError("sourceDocumentPageRange.pageStart", {
+          form.setError(`sourceDocumentExtractions.${index}.pageStart`, {
             type: "manual",
             message: "Trang bắt đầu không được lớn hơn trang kết thúc",
           });
           return;
         }
 
-        values.sourceDocumentPageRange.pageStart = pdfPageStart
-          ? String(pdfPageStart)
-          : "";
-        values.sourceDocumentPageRange.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
+        extraction.pageStart = pdfPageStart ? String(pdfPageStart) : "";
+        extraction.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
       }
 
       await onSubmit(values, documentsManager);
     } catch (error) {
+      if (error instanceof Error && error.message === "DUPLICATED_LESSON_TITLE") {
+        form.setError("title", {
+          type: "manual",
+          message: "Buổi học đã trùng tên",
+        });
+        return;
+      }
+
       if (error instanceof Error && error.message === "DUPLICATED_LESSON_ORDER") {
         form.setError("orderIndex", {
           type: "manual",
@@ -242,14 +329,9 @@ export function LessonEditorDialog({
         form={form}
         isSaving={isSaving}
         disabled={disabled}
-        isRangeReady={documentsManager.rangeReadiness.isReady}
-        pageLimit={documentsManager.pageLimit}
-        pages={documentsManager.sourcePages}
-        rangeDisabledReason={documentsManager.rangeReadiness.reason}
-        selectedSourceDocument={documentsManager.selectedSourceDocument}
-        sourceDocuments={documentsManager.sourceDocuments}
+        sourceDocuments={selectableSourceDocuments}
+        sourcePagesByDocumentId={documentsManager.sourcePagesByDocumentId}
         onClose={onClose}
-        onSelectSourceDocument={documentsManager.actions.selectSourceDocument}
         onSubmit={submit}
       />
     </EditorDialogShell>

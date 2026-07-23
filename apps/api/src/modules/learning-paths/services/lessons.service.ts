@@ -11,6 +11,7 @@ import {
   normalizeOptionalText,
   normalizeText,
   throwChapterNotFound,
+  throwDuplicatedLessonTitle,
   throwLessonNotFound,
   toInputJson,
 } from "#api/modules/learning-paths/utils/lesson.helpers";
@@ -76,13 +77,16 @@ export class LessonsService {
           throwChapterNotFound();
         }
 
+        const normalizedTitle = normalizeText(dto.title);
+        await this.assertLessonTitleAvailable(tx, chapter.id, normalizedTitle);
+
         const status = dto.status ?? PublishStatus.DRAFT;
         const created = await tx.lesson.create({
           data: {
             learningPathId: chapter.learningPathId,
             chapterId: chapter.id,
             orderIndex: dto.orderIndex,
-            title: normalizeText(dto.title),
+            title: normalizedTitle,
             shortDescription: normalizeOptionalText(dto.shortDescription),
             scheduledAt: dto.scheduledAt ?? null,
             examOpenAt: dto.examOpenAt ?? null,
@@ -118,24 +122,26 @@ export class LessonsService {
           },
         });
 
-        const lessonDocument = dto.sourceDocumentPageRange
-          ? await this.sourceDocumentsService.assignSingleLessonPageRangeInTransaction(
-              tx,
-              {
-                actorUserId,
-                context,
-                lessonId: created.id,
-                pageEnd: dto.sourceDocumentPageRange.pageEnd,
-                pageStart: dto.sourceDocumentPageRange.pageStart,
-                sourceDocumentId: dto.sourceDocumentPageRange.sourceDocumentId,
-              },
-            )
-          : null;
+        const sourceDocumentExtractions =
+          dto.sourceDocumentExtractions ??
+          (dto.sourceDocumentPageRange ? [dto.sourceDocumentPageRange] : []);
+        const lessonDocuments =
+          sourceDocumentExtractions.length > 0
+            ? await this.sourceDocumentsService.syncLessonSourceExtractionsInTransaction(
+                tx,
+                {
+                  actorUserId,
+                  context,
+                  extractions: sourceDocumentExtractions,
+                  lessonId: created.id,
+                },
+              )
+            : [];
 
-        return { lesson: created, lessonDocument };
+        return { lesson: created, lessonDocuments };
       });
 
-      await this.enqueueOptionalLessonDocument(result.lessonDocument);
+      await this.enqueueLessonDocuments(result.lessonDocuments);
 
       return serializeLesson(result.lesson);
     } catch (error) {
@@ -175,6 +181,17 @@ export class LessonsService {
           throwLessonNotFound();
         }
 
+        const normalizedTitle =
+          dto.title !== undefined ? normalizeText(dto.title) : undefined;
+        if (normalizedTitle !== undefined) {
+          await this.assertLessonTitleAvailable(
+            tx,
+            before.chapterId,
+            normalizedTitle,
+            before.id,
+          );
+        }
+
         if (dto.orderIndex !== undefined && dto.orderIndex !== before.orderIndex) {
           await this.moveLessonOrder(tx, before, dto.orderIndex);
         }
@@ -183,7 +200,7 @@ export class LessonsService {
         const updated = await tx.lesson.update({
           where: { id: lessonId },
           data: {
-            ...(dto.title !== undefined ? { title: normalizeText(dto.title) } : {}),
+            ...(normalizedTitle !== undefined ? { title: normalizedTitle } : {}),
             ...(dto.shortDescription !== undefined
               ? { shortDescription: normalizeOptionalText(dto.shortDescription) }
               : {}),
@@ -219,31 +236,31 @@ export class LessonsService {
           },
         });
 
-        const lessonDocument = dto.sourceDocumentPageRange
-          ? await this.sourceDocumentsService.assignSingleLessonPageRangeInTransaction(
-              tx,
-              {
-                actorUserId,
-                context,
-                lessonId: updated.id,
-                pageEnd: dto.sourceDocumentPageRange.pageEnd,
-                pageStart: dto.sourceDocumentPageRange.pageStart,
-                sourceDocumentId: dto.sourceDocumentPageRange.sourceDocumentId,
-                isPrimary: dto.sourceDocumentPageRange.isPrimary,
-              },
-            )
-          : dto.sourceDocumentPageRange === null
-            ? await this.sourceDocumentsService.removeSingleLessonPageRangeInTransaction(
+        const sourceDocumentExtractions =
+          dto.sourceDocumentExtractions !== undefined
+            ? dto.sourceDocumentExtractions
+            : dto.sourceDocumentPageRange !== undefined
+              ? dto.sourceDocumentPageRange
+                ? [dto.sourceDocumentPageRange]
+                : []
+              : undefined;
+        const lessonDocuments =
+          sourceDocumentExtractions !== undefined
+            ? await this.sourceDocumentsService.syncLessonSourceExtractionsInTransaction(
                 tx,
-                updated.id,
-                actorUserId,
+                {
+                  actorUserId,
+                  context,
+                  extractions: sourceDocumentExtractions,
+                  lessonId: updated.id,
+                },
               )
-            : null;
+            : [];
 
-        return { lesson: updated, lessonDocument };
+        return { lesson: updated, lessonDocuments };
       });
 
-      await this.enqueueOptionalLessonDocument(result.lessonDocument);
+      await this.enqueueLessonDocuments(result.lessonDocuments);
 
       return serializeLesson(result.lesson);
     } catch (error) {
@@ -430,12 +447,45 @@ export class LessonsService {
     return lesson ? lesson.orderIndex - 1 : -1;
   }
 
-  private enqueueOptionalLessonDocument(document: LessonDocumentRecord | null) {
-    if (!document) {
+  private enqueueLessonDocuments(documents: LessonDocumentRecord[]) {
+    if (documents.length === 0) {
       return Promise.resolve();
     }
 
-    return this.sourceDocumentsService.enqueueLessonDocumentProcessingJobs([document]);
+    return this.sourceDocumentsService.enqueueLessonDocumentProcessingJobs(documents);
+  }
+
+  private async assertLessonTitleAvailable(
+    tx: Prisma.TransactionClient,
+    chapterId: string,
+    title: string,
+    excludedLessonId?: string,
+  ) {
+    await tx.$executeRaw`
+      SELECT pg_advisory_xact_lock(
+        hashtext('lesson-title'),
+        hashtext(${chapterId})
+      )
+    `;
+
+    const duplicatedLesson = await tx.lesson.findFirst({
+      where: {
+        chapterId,
+        deletedAt: null,
+        title: {
+          equals: title,
+          mode: "insensitive",
+        },
+        ...(excludedLessonId ? { id: { not: excludedLessonId } } : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicatedLesson) {
+      throwDuplicatedLessonTitle();
+    }
   }
 
   private async moveLessonOrder(

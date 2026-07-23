@@ -1,14 +1,19 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  createAdminLessonSupplementDocument,
+  createAdminLessonDocument,
   createAdminSourceDocument,
-  deleteAdminLessonSupplementDocument,
+  deleteAdminLessonDocument,
   deleteAdminSourceDocument,
-  updateAdminLessonSupplementDocument,
+  updateAdminLessonDocument,
   getAdminFileSignedUrl,
   listAdminLearningPathLessonDocuments,
   listAdminSourceDocumentPages,
@@ -31,19 +36,24 @@ import {
   type LessonRangeDraft,
 } from "@/features/admin/courses/admin-course-documents-utils";
 import type {
+  AdminLessonDocumentApi,
   AdminLessonDocumentKind,
   AdminPageRangeWarningApi,
+  AdminSourceDocumentApi,
+  AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { ApiRequestError } from "@/lib/api-client";
 import { computeAutofillRanges } from "@/features/admin/courses/utils/autofill-page-ranges";
 
-const EMPTY_ARRAY: any[] = [];
+const EMPTY_SOURCE_DOCUMENTS: AdminSourceDocumentApi[] = [];
+const EMPTY_SOURCE_PAGES: AdminSourceDocumentPageApi[] = [];
+const EMPTY_LESSON_DOCUMENTS: AdminLessonDocumentApi[] = [];
 
 type DialogState =
   | {
       type: "lesson-upload";
-      kind: Exclude<AdminLessonDocumentKind, "PRIMARY_FROM_SOURCE">;
+      kind: Exclude<AdminLessonDocumentKind, "HOMEWORK">;
       lessonId: string;
       returnTo?: "ranges";
     }
@@ -77,7 +87,10 @@ export const adminCourseDocumentQueryKeys = {
     ] as const,
 };
 
-export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
+export function useAdminCourseDocumentsManager(
+  path: AdminLearningPath | null,
+  options: { loadAllSourcePages?: boolean } = {},
+) {
   const queryClient = useQueryClient();
   const session = useAuthSessionStore((state) => state.session);
   const token = session?.accessToken ?? "";
@@ -88,7 +101,6 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
   const [selectedSourceDocumentId, setSelectedSourceDocumentId] = useState<string | null>(
     null,
   );
-  const hasAutoSelectedRef = useRef(false);
   const [rangeDraft, setRangeDraft] = useState<LessonRangeDraft>({});
   const [rangeSubmitAttempted, setRangeSubmitAttempted] = useState(false);
   const [latestRangeWarnings, setLatestRangeWarnings] = useState<
@@ -102,9 +114,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   });
-  const sourceDocuments =
-    sourceDocumentsQuery.data ??
-    (EMPTY_ARRAY as typeof sourceDocumentsQuery.data & any[]);
+  const sourceDocuments = sourceDocumentsQuery.data ?? EMPTY_SOURCE_DOCUMENTS;
   const selectedSourceDocument =
     sourceDocuments.find((document) => document.id === selectedSourceDocumentId) ?? null;
 
@@ -118,8 +128,40 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: selectedSourceDocument?.status === "PROCESSING" ? 5_000 : false,
     refetchIntervalInBackground: false,
   });
-  const sourcePages =
-    sourcePagesQuery.data ?? (EMPTY_ARRAY as typeof sourcePagesQuery.data & any[]);
+  const sourcePages = sourcePagesQuery.data ?? EMPTY_SOURCE_PAGES;
+  const allSourcePageQueries = useQueries({
+    queries: options.loadAllSourcePages
+      ? sourceDocuments.map((sourceDocument) => ({
+          queryKey: adminCourseDocumentQueryKeys.sourcePages(
+            userId,
+            sourceDocument.id,
+          ),
+          queryFn: () => listAdminSourceDocumentPages(sourceDocument.id, token),
+          enabled: Boolean(token),
+          staleTime: 30_000,
+        }))
+      : [],
+  });
+  const sourcePagesByDocumentId = useMemo(() => {
+    const entries = sourceDocuments.map((sourceDocument, index) => {
+      const pages =
+        allSourcePageQueries[index]?.data ??
+        (sourceDocument.id === selectedSourceDocument?.id
+          ? sourcePages
+          : EMPTY_SOURCE_PAGES);
+      return [sourceDocument.id, pages] as const;
+    });
+
+    return Object.fromEntries(entries) as Record<
+      string,
+      AdminSourceDocumentPageApi[]
+    >;
+  }, [
+    allSourcePageQueries,
+    selectedSourceDocument?.id,
+    sourceDocuments,
+    sourcePages,
+  ]);
 
   const lessonDocumentsQuery = useQuery({
     queryKey: adminCourseDocumentQueryKeys.lessonDocuments(userId, pathId),
@@ -128,9 +170,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   });
-  const lessonDocuments =
-    lessonDocumentsQuery.data ??
-    (EMPTY_ARRAY as typeof lessonDocumentsQuery.data & any[]);
+  const lessonDocuments = lessonDocumentsQuery.data ?? EMPTY_LESSON_DOCUMENTS;
   const documentsByLessonId = useMemo(
     () => groupLessonDocumentsByLessonId(lessonDocuments),
     [lessonDocuments],
@@ -156,9 +196,15 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     () => getSourceDocumentRangeReadiness(selectedSourceDocument, sourcePages),
     [selectedSourceDocument, sourcePages],
   );
-  const mappedLessonCount = lessonDocuments.filter((document) =>
-    ["PRIMARY_FROM_SOURCE", "PRIMARY_REPLACEMENT"].includes(document.kind),
-  ).length;
+  const mappedLessonCount = new Set(
+    lessonDocuments
+      .filter(
+        (document) =>
+          document.kind === "PRIMARY_FROM_SOURCE" &&
+          document.sourceDocumentId === selectedSourceDocument?.id,
+      )
+      .map((document) => document.lessonId),
+  ).size;
   const selectedUploadLesson =
     dialogState?.type === "lesson-upload"
       ? (lessons.find((item) => item.lesson.id === dialogState.lessonId) ?? null)
@@ -173,16 +219,10 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     }
 
     if (
-      selectedSourceDocumentId &&
+      !selectedSourceDocumentId ||
       !sourceDocuments.some((document) => document.id === selectedSourceDocumentId)
     ) {
-      setSelectedSourceDocumentId(null);
-      return;
-    }
-
-    if (!selectedSourceDocumentId && !hasAutoSelectedRef.current) {
       setSelectedSourceDocumentId(sourceDocuments[0]?.id ?? null);
-      hasAutoSelectedRef.current = true;
     }
   }, [selectedSourceDocumentId, sourceDocuments]);
 
@@ -251,20 +291,20 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       );
     },
     onSuccess: async (sourceDocument) => {
-      queryClient.setQueryData(
+      queryClient.setQueryData<AdminSourceDocumentApi[]>(
         adminCourseDocumentQueryKeys.sourceDocuments(userId, pathId),
-        (old: any) => {
+        (old) => {
           if (!old) return [sourceDocument];
-          return [sourceDocument, ...old];
+          return [...old, sourceDocument];
         },
       );
       setSelectedSourceDocumentId(sourceDocument.id);
       setDialogState(null);
-      toast.success("Đã nhận tài liệu chính");
+      toast.success("Đã thêm tài liệu nguồn");
       await invalidateDocumentQueries();
     },
     onError: (error) => {
-      toast.error("Chưa upload được tài liệu chính", {
+      toast.error("Chưa upload được tài liệu nguồn", {
         description: getErrorMessage(error),
       });
     },
@@ -291,19 +331,19 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
   const deleteSourceDocumentMutation = useMutation({
     mutationFn: () => deleteAdminSourceDocument(selectedSourceDocument?.id ?? "", token),
     onSuccess: async () => {
-      queryClient.setQueryData(
+      queryClient.setQueryData<AdminSourceDocumentApi[]>(
         adminCourseDocumentQueryKeys.sourceDocuments(userId, pathId),
-        (old: any) => {
+        (old) => {
           if (!old) return [];
-          return old.filter((doc: any) => doc.id !== selectedSourceDocumentId);
+          return old.filter((doc) => doc.id !== selectedSourceDocumentId);
         },
       );
       setSelectedSourceDocumentId(null);
       await invalidateDocumentQueries();
-      toast.info("Đã xóa tài liệu chính");
+      toast.info("Đã xóa tài liệu nguồn");
     },
     onError: (error) => {
-      toast.error("Chưa xóa được tài liệu chính", {
+      toast.error("Chưa xóa được tài liệu nguồn", {
         description: getErrorMessage(error),
       });
     },
@@ -321,13 +361,13 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         ([lessonId, draft]) => {
           const documents = documentsByLessonId[lessonId] ?? [];
           const currentPrimaryDoc = documents.find(
-            (d) => d.kind === "PRIMARY_REPLACEMENT",
+            (d) => d.kind === "PRIMARY_FROM_SOURCE" && d.sourceDocumentId === null,
           );
           const calls = [];
 
           if (currentPrimaryDoc && currentPrimaryDoc.id !== draft.primarySupplementId) {
             calls.push(
-              updateAdminLessonSupplementDocument(
+              updateAdminLessonDocument(
                 lessonId,
                 currentPrimaryDoc.id,
                 { kind: "SUPPLEMENT" },
@@ -341,10 +381,10 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
             draft.primarySupplementId !== currentPrimaryDoc?.id
           ) {
             calls.push(
-              updateAdminLessonSupplementDocument(
+              updateAdminLessonDocument(
                 lessonId,
                 draft.primarySupplementId,
-                { kind: "PRIMARY_REPLACEMENT" },
+                { kind: "PRIMARY_FROM_SOURCE" },
                 token,
               ),
             );
@@ -369,7 +409,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
                         token,
                       );
                     }
-                    return createAdminLessonSupplementDocument(
+                    return createAdminLessonDocument(
                       lessonId,
                       {
                         fileId: uploadedFile.id,
@@ -415,14 +455,14 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       title,
     }: {
       file: File;
-      kind: Exclude<AdminLessonDocumentKind, "PRIMARY_FROM_SOURCE">;
+      kind: Exclude<AdminLessonDocumentKind, "HOMEWORK">;
       lessonId: string;
       returnTo?: "ranges";
       title: string;
     }) => {
       const uploadedFile = await uploadAdminLessonDocumentFile(file, token);
 
-      if (kind === "PRIMARY_REPLACEMENT") {
+      if (kind === "PRIMARY_FROM_SOURCE") {
         return replaceAdminLessonPrimaryDocument(
           lessonId,
           {
@@ -433,7 +473,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
         );
       }
 
-      return createAdminLessonSupplementDocument(
+      return createAdminLessonDocument(
         lessonId,
         {
           fileId: uploadedFile.id,
@@ -447,7 +487,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       setDialogState(variables.returnTo === "ranges" ? { type: "ranges" } : null);
       await invalidateDocumentQueries();
       toast.success(
-        variables.kind === "PRIMARY_REPLACEMENT"
+        variables.kind === "PRIMARY_FROM_SOURCE"
           ? "Đã thay tài liệu chính"
           : "Đã thêm tài liệu bổ sung",
       );
@@ -461,7 +501,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
 
   const deleteSupplementMutation = useMutation({
     mutationFn: ({ documentId, lessonId }: { documentId: string; lessonId: string }) =>
-      deleteAdminLessonSupplementDocument(lessonId, documentId, token),
+      deleteAdminLessonDocument(lessonId, documentId, token),
     onSuccess: async () => {
       await invalidateDocumentQueries();
       toast.info("Đã xóa tài liệu bổ sung");
@@ -483,10 +523,10 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       lessonId: string;
       isPrimary: boolean;
     }) =>
-      updateAdminLessonSupplementDocument(
+      updateAdminLessonDocument(
         lessonId,
         documentId,
-        { kind: isPrimary ? "PRIMARY_REPLACEMENT" : "SUPPLEMENT" },
+        { kind: isPrimary ? "PRIMARY_FROM_SOURCE" : "SUPPLEMENT" },
         token,
       ),
     onSuccess: async () => {
@@ -572,7 +612,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     setRangeSubmitAttempted(true);
 
     if (!selectedSourceDocument) {
-      toast.warning("Hãy upload tài liệu chính trước");
+      toast.warning("Hãy upload tài liệu nguồn trước");
       return;
     }
 
@@ -620,6 +660,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
     sourceDocuments,
     sourceDocumentsError: sourceDocumentsQuery.error,
     sourcePages,
+    sourcePagesByDocumentId,
     sourceStats,
     actions: {
       autofillRanges,
@@ -634,7 +675,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       ) => updateSupplementMutation.mutateAsync({ documentId, lessonId, isPrimary }),
       openLessonPrimaryUpload: (lessonId: string, returnTo?: "ranges") =>
         setDialogState({
-          kind: "PRIMARY_REPLACEMENT",
+          kind: "PRIMARY_FROM_SOURCE",
           lessonId,
           returnTo,
           type: "lesson-upload",
@@ -681,7 +722,7 @@ export function useAdminCourseDocumentsManager(path: AdminLearningPath | null) {
       updateRangeDraft,
       uploadLessonDocument: (
         lessonId: string,
-        kind: Exclude<AdminLessonDocumentKind, "PRIMARY_FROM_SOURCE">,
+        kind: Exclude<AdminLessonDocumentKind, "HOMEWORK">,
         file: File,
         title: string,
       ) =>

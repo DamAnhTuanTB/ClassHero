@@ -9,7 +9,10 @@ import {
   throwNotFound,
 } from "#api/common/errors/api-exception";
 import type { LessonPageRangeDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
-import type { PageRangeWarning } from "#api/modules/learning-paths/types/document.types";
+import type {
+  PageRangeWarning,
+  SourceDocumentReadinessSummary,
+} from "#api/modules/learning-paths/types/document.types";
 
 type SourceDocumentPageReader = Pick<Prisma.TransactionClient, "sourceDocumentPage">;
 
@@ -18,6 +21,66 @@ type PageRangeSourceDocument = {
   pageCount: number | null;
   status: DocumentStatus;
 };
+
+export function buildSourceDocumentReadinessSummary(
+  sourceDocument: Pick<PageRangeSourceDocument, "pageCount" | "status">,
+  pages: Array<{ status: DocumentStatus; metadataJson: unknown }>,
+): SourceDocumentReadinessSummary {
+  const readyPageCount = pages.filter(
+    (page) => page.status === DocumentStatus.READY,
+  ).length;
+  const warningPageCount = pages.filter((page) =>
+    hasPrintedPageWarning(page.metadataJson),
+  ).length;
+  const totalPageRecords = pages.length;
+
+  if (sourceDocument.status === DocumentStatus.FAILED) {
+    return {
+      status: "FAILED",
+      isEligibleForExtraction: false,
+      warningPageCount,
+      readyPageCount,
+      totalPageRecords,
+    };
+  }
+
+  if (
+    sourceDocument.status === DocumentStatus.UPLOADED ||
+    sourceDocument.status === DocumentStatus.PROCESSING
+  ) {
+    return {
+      status: "PROCESSING",
+      isEligibleForExtraction: false,
+      warningPageCount,
+      readyPageCount,
+      totalPageRecords,
+    };
+  }
+
+  if (warningPageCount > 0) {
+    return {
+      status: "NEEDS_CONFIRMATION",
+      isEligibleForExtraction: false,
+      warningPageCount,
+      readyPageCount,
+      totalPageRecords,
+    };
+  }
+
+  const expectedPageCount = sourceDocument.pageCount ?? totalPageRecords;
+  const isReady =
+    expectedPageCount > 0 &&
+    totalPageRecords >= expectedPageCount &&
+    readyPageCount === totalPageRecords;
+
+  return {
+    status: isReady ? "READY" : "NOT_READY",
+    isEligibleForExtraction: isReady,
+    warningPageCount,
+    readyPageCount,
+    totalPageRecords,
+  };
+}
 
 export function normalizeOptionalTitle(value: string | null | undefined) {
   if (value === undefined) {
@@ -46,6 +109,58 @@ export function assertPageRangeOrder(pageStart: number, pageEnd: number) {
       "VALIDATION_ERROR",
       "Trang bắt đầu phải nhỏ hơn hoặc bằng trang kết thúc",
     );
+  }
+}
+
+export function assertNoOverlappingSourceExtractions(
+  extractions: Array<{
+    id?: string;
+    sourceDocumentId: string;
+    pageStart: number;
+    pageEnd: number;
+  }>,
+) {
+  const bySourceDocument = new Map<string, typeof extractions>();
+
+  for (const extraction of extractions) {
+    const sourceExtractions = bySourceDocument.get(extraction.sourceDocumentId) ?? [];
+    sourceExtractions.push(extraction);
+    bySourceDocument.set(extraction.sourceDocumentId, sourceExtractions);
+  }
+
+  for (const [sourceDocumentId, sourceExtractions] of bySourceDocument) {
+    const sorted = [...sourceExtractions].sort((left, right) => {
+      if (left.pageStart === right.pageStart) {
+        return left.pageEnd - right.pageEnd;
+      }
+
+      return left.pageStart - right.pageStart;
+    });
+
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1]!;
+      const current = sorted[index]!;
+
+      if (current.pageStart <= previous.pageEnd) {
+        throwBadRequest(
+          "LESSON_SOURCE_EXTRACTION_OVERLAP",
+          "Các khoảng trang trong cùng tài liệu nguồn không được giao nhau",
+          {
+            sourceDocumentId,
+            first: {
+              id: previous.id ?? null,
+              pageStart: previous.pageStart,
+              pageEnd: previous.pageEnd,
+            },
+            second: {
+              id: current.id ?? null,
+              pageStart: current.pageStart,
+              pageEnd: current.pageEnd,
+            },
+          },
+        );
+      }
+    }
   }
 }
 

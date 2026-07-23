@@ -99,7 +99,12 @@ export const lessonDocumentSelect = {
       pageCount: true,
     },
   },
+  pageRangeId: true,
+  pageRange: {
+    select: lessonDocumentPageRangeSelect,
+  },
   kind: true,
+  sortOrder: true,
   title: true,
   status: true,
   extractedText: true,

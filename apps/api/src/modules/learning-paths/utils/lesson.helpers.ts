@@ -80,6 +80,10 @@ export function throwLessonNotFound(): never {
   throwNotFound("NOT_FOUND", "Không tìm thấy buổi học");
 }
 
+export function throwDuplicatedLessonTitle(): never {
+  throwConflict("LESSON_TITLE_DUPLICATE", "Buổi học đã trùng tên");
+}
+
 export function getStatusAuditAction(defaultAction: string, status: PublishStatus) {
   if (status === PublishStatus.PUBLISHED) {
     return "LESSON_PUBLISHED";

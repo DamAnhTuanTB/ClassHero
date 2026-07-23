@@ -19,7 +19,6 @@ export function SourceDocumentUploadDialog({
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
-  const [titleTouched, setTitleTouched] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,7 +26,6 @@ export function SourceDocumentUploadDialog({
       setFile(null);
       setTitle("");
       setTitleError(null);
-      setTitleTouched(false);
       setFileError(null);
     }
   }, [isOpen]);
@@ -45,7 +43,6 @@ export function SourceDocumentUploadDialog({
 
     if (!title.trim()) {
       setTitleError("Vui lòng nhập tên tài liệu.");
-      setTitleTouched(true);
       hasError = true;
     }
 
@@ -59,7 +56,7 @@ export function SourceDocumentUploadDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel="Upload tài liệu chính"
+      ariaLabel="Thêm tài liệu nguồn"
       isOpen={isOpen}
       onClose={isSaving ? () => undefined : onClose}
     >
@@ -69,7 +66,7 @@ export function SourceDocumentUploadDialog({
         </span>
         <div className="min-w-0">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Upload tài liệu chính
+            Thêm tài liệu nguồn
           </h2>
         </div>
       </div>
@@ -108,11 +105,9 @@ export function SourceDocumentUploadDialog({
             onChange={(event) => {
               const val = event.target.value;
               setTitle(val);
-              setTitleTouched(true);
               setTitleError(val.trim() ? null : "Vui lòng nhập tên tài liệu.");
             }}
             onBlur={() => {
-              setTitleTouched(true);
               setTitleError(title.trim() ? null : "Vui lòng nhập tên tài liệu.");
             }}
             placeholder="Ví dụ: Toán 7 Tập 1"

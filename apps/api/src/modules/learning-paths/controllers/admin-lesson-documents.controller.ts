@@ -44,7 +44,9 @@ export class AdminLessonDocumentsController {
   }
 
   @Post("primary-document/replace")
-  @ApiOperation({ summary: "Replace the primary document for one lesson" })
+  @ApiOperation({
+    summary: "Create a foundation document or replace its source page range",
+  })
   replacePrimaryDocument(
     @Param("lessonId") lessonId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -60,14 +62,14 @@ export class AdminLessonDocumentsController {
   }
 
   @Post("documents")
-  @ApiOperation({ summary: "Create a supplemental document for one lesson" })
-  createSupplementalDocument(
+  @ApiOperation({ summary: "Create a document for one lesson" })
+  createLessonDocument(
     @Param("lessonId") lessonId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateLessonDocumentDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.lessonDocumentsService.createSupplementalDocument(
+    return this.lessonDocumentsService.createLessonDocument(
       lessonId,
       user.id,
       dto,
@@ -76,15 +78,15 @@ export class AdminLessonDocumentsController {
   }
 
   @Patch("documents/:documentId")
-  @ApiOperation({ summary: "Update a supplemental lesson document" })
-  updateSupplementalDocument(
+  @ApiOperation({ summary: "Update an uploaded lesson document" })
+  updateLessonDocument(
     @Param("lessonId") lessonId: string,
     @Param("documentId") documentId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateLessonDocumentDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.lessonDocumentsService.updateSupplementalDocument(
+    return this.lessonDocumentsService.updateLessonDocument(
       lessonId,
       documentId,
       user.id,
@@ -94,14 +96,14 @@ export class AdminLessonDocumentsController {
   }
 
   @Delete("documents/:documentId")
-  @ApiOperation({ summary: "Delete a supplemental lesson document" })
-  deleteSupplementalDocument(
+  @ApiOperation({ summary: "Delete an uploaded lesson document" })
+  deleteLessonDocument(
     @Param("lessonId") lessonId: string,
     @Param("documentId") documentId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.lessonDocumentsService.deleteSupplementalDocument(
+    return this.lessonDocumentsService.deleteLessonDocument(
       lessonId,
       documentId,
       user.id,

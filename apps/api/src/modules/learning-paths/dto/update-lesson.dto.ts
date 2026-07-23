@@ -2,6 +2,8 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { PublishStatus } from "@prisma/client";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -16,7 +18,10 @@ import {
   ValidateIf,
   ValidateNested,
 } from "class-validator";
-import { LessonSourceDocumentPageRangeDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
+import {
+  LessonSourceDocumentExtractionDto,
+  LessonSourceDocumentPageRangeDto,
+} from "#api/modules/learning-paths/dto/create-lesson.dto";
 
 export class UpdateLessonDto {
   @ApiPropertyOptional({ example: 1, minimum: 1 })
@@ -96,4 +101,16 @@ export class UpdateLessonDto {
   @ValidateNested()
   @Type(() => LessonSourceDocumentPageRangeDto)
   sourceDocumentPageRange?: LessonSourceDocumentPageRangeDto | null;
+
+  @ApiPropertyOptional({
+    type: [LessonSourceDocumentExtractionDto],
+    description:
+      "Complete ordered extraction collection. An empty array removes all extractions.",
+  })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => LessonSourceDocumentExtractionDto)
+  sourceDocumentExtractions?: LessonSourceDocumentExtractionDto[];
 }

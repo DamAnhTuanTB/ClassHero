@@ -89,6 +89,21 @@ export type SourceDocumentResponse = {
   deletedAt: Date | null;
 };
 
+export type SourceDocumentReadinessStatus =
+  | "READY"
+  | "NEEDS_CONFIRMATION"
+  | "PROCESSING"
+  | "FAILED"
+  | "NOT_READY";
+
+export type SourceDocumentReadinessSummary = {
+  status: SourceDocumentReadinessStatus;
+  isEligibleForExtraction: boolean;
+  warningPageCount: number;
+  readyPageCount: number;
+  totalPageRecords: number;
+};
+
 export type SourceDocumentPageResponse = {
   id: string;
   sourceDocumentId: string;
@@ -132,7 +147,10 @@ export type LessonDocumentResponse = {
     status: DocumentStatus;
     pageCount: number | null;
   } | null;
+  pageRangeId: string | null;
+  pageRange: LessonDocumentPageRangeResponse | null;
   kind: LessonDocumentKind;
+  sortOrder: number;
   title: string | null;
   status: DocumentStatus;
   extractError: string | null;

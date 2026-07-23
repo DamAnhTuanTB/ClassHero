@@ -8,7 +8,7 @@ content = content.replace(
   /const primaryDocument = getPrimaryLessonDocument\(documents\);\s+const supplements = getSupplementLessonDocuments\(documents\);\s+const newSupplements = draft.newSupplements \?\? \[\];/,
   `const primaryDocument = getPrimaryLessonDocument(documents);
   const allSupplements = getSupplementLessonDocuments(documents);
-  const supplements = allSupplements.filter(d => d.kind === "SUPPLEMENT" || d.kind === "PRIMARY_REPLACEMENT");
+  const supplements = allSupplements.filter(d => d.kind === "SUPPLEMENT");
   const homeworks = allSupplements.filter(d => d.kind === "HOMEWORK");
   
   const allNewSupplements = draft.newSupplements ?? [];

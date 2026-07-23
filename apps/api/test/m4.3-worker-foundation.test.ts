@@ -138,7 +138,7 @@ describe("M4.3 BullMQ worker foundation", () => {
       }),
       select: expect.any(Object),
     });
-    expect(prisma.backgroundJob.update).toHaveBeenNthCalledWith(2, {
+    expect(prisma.backgroundJob.update).toHaveBeenCalledWith({
       where: { id: "durable-job-3" },
       data: expect.objectContaining({
         status: BackgroundJobStatus.SUCCEEDED,

@@ -44,8 +44,20 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - Nguyên nhân: state form/mock giữ `blob:` URL tạo bằng `URL.createObjectURL`, nhưng component upload đã revoke URL khi unmount.
 - Cách tránh khi còn mock UI: dùng `FileReader.readAsDataURL` để lưu data URL ổn định trong state local, và thêm fallback placeholder khi ảnh hiện tại không load được. Khi đã nối API thật, phải upload lên Files API trước và lưu `thumbnailFileId`; không lưu URL tạm vào dữ liệu production-connected.
 - Lỗi: mở modal tạo chương học đã thấy lỗi required dù người dùng chưa nhập gì.
-- Nguyên nhân: gọi validate toàn form ngay sau `reset()` để tính `isValid`, rồi truyền thẳng `formState.errors` vào field. Validation state và error visibility bị trộn làm một.
-- Cách tránh trong modal form: bám pattern form chuẩn đã duyệt hoặc form tương tự đang chạy ổn; dùng `mode: "onChange"` và truyền thẳng `formState.errors.<field>` vào primitive field; không gọi `trigger()` ngay sau `reset()` khi mở modal. Không tự bọc bằng `dirtyFields/touchedFields` trong component, vì nhập rồi xóa về default có thể làm `dirty` quay về false và mất validate realtime.
+- Nguyên nhân: gọi validate toàn form ngay sau `reset()` để tính `isValid`, hoặc gọi `trigger()` ngay sau khi thêm một dòng field-array còn trống, rồi truyền thẳng `formState.errors` vào field. Validation state và error visibility bị trộn làm một nên form pristine đã hiện lỗi.
+- Cách tránh trong modal form: bám pattern form chuẩn đã duyệt hoặc form tương tự đang chạy ổn; dùng `mode: "onChange"` và truyền thẳng `formState.errors.<field>` vào primitive field; không gọi `trigger()` ngay sau `reset()` hoặc ngay sau `append()` một dòng động. Để validation bắt đầu khi người dùng sửa field hoặc submit form. Không tự bọc bằng `dirtyFields/touchedFields` trong component, vì nhập rồi xóa về default có thể làm `dirty` quay về false và mất validate realtime.
+- Lỗi: giá trị dẫn xuất trong form như gợi ý khoảng trang không đổi khi admin đang gõ tên bài học.
+- Nguyên nhân: component đọc tên bằng `getValues()` bên trong `useMemo`; `getValues()` chỉ lấy snapshot hiện tại và không đăng ký render lại khi field thay đổi.
+- Cách tránh: dùng `watch()`/`useWatch()` cho field ảnh hưởng trực tiếp tới UI, rồi đưa giá trị đã theo dõi vào dependency của `useMemo`. `getValues()` chỉ phù hợp khi cần đọc tức thời trong handler hoặc lúc submit mà không cần UI phản ứng realtime.
+- Lỗi: validation giới hạn khoảng trang chỉ báo lỗi cho `Đến trang in`, còn `Từ trang in` vẫn nhận giá trị vượt trang in lớn nhất.
+- Nguyên nhân: rule giới hạn được viết riêng cho `pageEnd` thay vì áp dụng đối xứng cho hai đầu khoảng.
+- Cách tránh: với cặp field cùng chịu một giới hạn, duyệt chung qua cấu hình field/label để dùng một rule duy nhất và phải có test biên riêng cho từng đầu khoảng.
+- Lỗi: hai buổi học trong cùng một chương có thể lưu trùng tên, hoặc backend trả `409` nhưng UI lại báo nhầm vào ô thứ tự.
+- Nguyên nhân: frontend chỉ bắt trùng thứ tự và gom mọi lỗi conflict vào cùng một mã; backend chưa áp dụng quy tắc tên duy nhất trong chapter.
+- Cách tránh: frontend có thể kiểm tra nhanh lesson của chapter đang mở để phản hồi ngay, nhưng backend vẫn phải chuẩn hóa tên, khóa transaction theo chapter và kiểm tra lại trước khi ghi. Hai chapter khác nhau được phép dùng cùng tên lesson. Mỗi rule conflict cần một `error.code` ổn định để modal đặt lỗi đúng field; không suy ra field chỉ từ HTTP status `409`.
+- Lỗi: Prisma báo không deserialize được cột kiểu PostgreSQL `void` khi lấy advisory lock trước bước kiểm tra trùng tên.
+- Nguyên nhân: `pg_advisory_xact_lock(...)` là hàm tạo side effect và trả `void`, nhưng `$queryRaw` yêu cầu Prisma đọc và chuyển đổi mọi cột trong result set.
+- Cách tránh: dùng `$executeRaw` cho câu SQL chỉ cần side effect mà không cần đọc dữ liệu trả về; giữ `$queryRaw` cho truy vấn có cột kết quả thuộc kiểu Prisma hỗ trợ. Test của service phải mock đúng raw API để bắt sai khác này.
 - Lỗi: trên điện thoại hiện hydration mismatch ở input dù HTML/app state không đổi.
 - Nguyên nhân: một số trình duyệt, autofill hoặc extension có thể chèn attribute riêng vào input trước khi React hydrate, ví dụ `__gcruniqueid`; React thấy DOM client khác HTML server nên báo overlay đỏ trong dev.
 - Cách tránh: với input primitive dùng chung, đặt `suppressHydrationWarning` trên chính element input để bỏ qua attribute ngoài ý muốn từ browser. Không dùng cách này để che mismatch do app tự tạo bằng `Date.now()`, `Math.random()` hoặc format ngày/tiền khác giữa server và client.

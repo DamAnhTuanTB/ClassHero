@@ -24,7 +24,6 @@ import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/u
 import { AdminCourseDocumentStat } from "@/features/admin/courses/screens/admin-course-detail-manager/components/admin-course-document-stat";
 import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
 import { LessonDocumentUploadDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-document-upload-dialog";
-import { LessonPageRangeDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-page-range-dialog";
 import { SourceDocumentPagesDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-pages-dialog";
 import { SourceDocumentUploadDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-upload-dialog";
 import { RetrySourceDocumentConfirmDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/retry-source-document-confirm-dialog";
@@ -34,12 +33,6 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
   const [isDeleteSourceConfirmOpen, setIsDeleteSourceConfirmOpen] = useState(false);
   const [isRetrySourceConfirmOpen, setIsRetrySourceConfirmOpen] = useState(false);
   const sourceDocument = manager.selectedSourceDocument;
-  const canMapRanges = Boolean(
-    sourceDocument &&
-    manager.pageLimit &&
-    manager.lessons.length &&
-    manager.rangeReadiness.isReady,
-  );
   const isSourceProcessing =
     sourceDocument?.status === "PROCESSING" ||
     sourceDocument?.processingJob?.status === "RUNNING" ||
@@ -68,7 +61,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h2 className="mt-1 text-xl font-extrabold text-[var(--theme-text-strong)]">
-            Tài liệu nền tảng
+            Tài liệu nguồn
           </h2>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -78,26 +71,69 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
             className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
-            {sourceDocument ? "Thay tài liệu" : "Upload tài liệu"}
+            Thêm tài liệu nguồn
           </button>
-          {/* <button
-            type="button"
-            disabled={!canMapRanges}
-            onClick={manager.actions.openRangesDialog}
-            title={
-              canMapRanges
-                ? undefined
-                : !manager.lessons.length
-                  ? "Cần tạo ít nhất 1 buổi học trước khi gán trang"
-                  : manager.rangeReadiness.reason
-            }
-            className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <FileText className="h-4 w-4" aria-hidden="true" />
-            Nhập khoảng trang
-          </button> */}
         </div>
       </div>
+
+      {manager.sourceDocuments.length > 0 ? (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-[var(--theme-text-muted)]">
+            Danh sách tài liệu nguồn
+          </p>
+          <div
+            role="listbox"
+            aria-label="Chọn tài liệu nguồn đang quản lý"
+            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+          >
+            {manager.sourceDocuments.map((document) => {
+              const isSelected = document.id === sourceDocument?.id;
+              return (
+                <button
+                  key={document.id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() =>
+                    manager.actions.selectSourceDocument(document.id)
+                  }
+                  className={
+                    isSelected
+                      ? "theme-button-primary-subtle flex min-h-14 min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-left transition"
+                      : "theme-button-neutral flex min-h-14 min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-left transition"
+                  }
+                >
+                  <FileText className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="min-w-0 flex-1 truncate text-sm font-extrabold">
+                        {document.title ?? document.file.originalName}
+                      </span>
+                      <DocumentStatusBadge
+                        hasPrintedPageWarning={
+                          document.status === "READY" &&
+                          document.readiness?.status !== "READY"
+                        }
+                        jobStatus={document.processingJob?.status}
+                        progress={document.processingJob?.progress}
+                        status={document.status}
+                        isCacheRun={readIsCacheRun(document.metadataJson)}
+                      />
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs font-semibold opacity-75">
+                      {document.pageCount
+                        ? `${document.pageCount} trang`
+                        : document.status === "PROCESSING"
+                          ? "Đang xử lý"
+                          : "Chưa có dữ liệu trang"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <AdminCourseDocumentStat
@@ -144,10 +180,11 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               aria-hidden="true"
             />
             <p className="text-base font-extrabold text-[var(--theme-text-strong)]">
-              Chưa có tài liệu chính
+              Chưa có tài liệu nguồn
             </p>
             <p className="mx-auto max-w-md text-sm font-semibold leading-6 text-[var(--theme-text-muted)]">
-              Upload sách hoặc giáo trình chính để gán trang cho từng buổi học.
+              Upload một hoặc nhiều sách, giáo trình để làm nguồn trích xuất cho
+              từng buổi học.
             </p>
             <button
               type="button"
@@ -155,7 +192,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               className="theme-button-primary mx-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition"
             >
               <Upload className="h-4 w-4" aria-hidden="true" />
-              Chọn file PDF
+              Thêm tài liệu nguồn
             </button>
           </div>
         ) : null}
@@ -173,7 +210,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                     jobStatus={sourceDocument.processingJob?.status}
                     progress={sourceDocument.processingJob?.progress}
                     status={sourceDocument.status}
-                    isCacheRun={(sourceDocument.metadataJson as any)?.isCacheRun}
+                    isCacheRun={readIsCacheRun(sourceDocument.metadataJson)}
                   />
                 </div>
                 <p className="mt-2 text-sm font-semibold flex items-center min-w-0">
@@ -307,42 +344,19 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         sourceDocument={sourceDocument}
         onClose={manager.actions.closeDialog}
       />
-      {/* <LessonPageRangeDialog
-        isOpen={manager.dialogState?.type === "ranges"}
-        documentsByLessonId={manager.documentsByLessonId}
-        isDeletingSupplement={manager.isDeletingSupplement}
-        isSaving={manager.isSavingRanges}
-        latestWarnings={manager.latestRangeWarnings}
-        lessons={manager.lessons}
-        localWarnings={manager.localRangeWarnings}
-        pageLimit={manager.pageLimit}
-        pages={manager.sourcePages}
-        rangeDraft={manager.rangeDraft}
-        rangeSubmitAttempted={manager.rangeSubmitAttempted}
-        rangeValidation={manager.rangeValidation}
-        sourceDocument={sourceDocument}
-        onAutofill={manager.actions.autofillRanges}
-        onClose={manager.actions.closeDialog}
-        onDeleteSupplement={manager.actions.deleteSupplementDocument}
-        onOpenSupplementUpload={(lessonId) =>
-          manager.actions.openLessonSupplementUpload(lessonId, "ranges")
-        }
-        onSave={manager.actions.saveRanges}
-        onUpdateRange={manager.actions.updateRangeDraft}
-      /> */}
       <DeleteConfirmDialog
         confirmLabel="Xóa tài liệu"
         description={
           manager.mappedLessonCount > 0
             ? `Tài liệu này đang được gán cho ${manager.mappedLessonCount} buổi học. Nếu tiếp tục xóa, các buổi học này sẽ mất gán tài liệu và trở về trạng thái trống.`
-            : `Hành động này sẽ xóa hoàn toàn tài liệu chính.`
+            : `Hành động này sẽ xóa tài liệu nguồn đã chọn.`
         }
         isConfirming={manager.isDeletingSourceDocument}
         isOpen={isDeleteSourceConfirmOpen}
         itemName={
           sourceDocument?.title ?? sourceDocument?.file.originalName ?? "tài liệu"
         }
-        title="Xóa tài liệu chính"
+        title="Xóa tài liệu nguồn"
         onCancel={() => setIsDeleteSourceConfirmOpen(false)}
         onConfirm={() => void handleDeleteSourceDocument()}
       />
@@ -473,5 +487,14 @@ function OcrStatusSummaryView({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function readIsCacheRun(value: unknown) {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).isCacheRun === true
   );
 }

@@ -2,9 +2,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  createAdminLessonSupplementDocument,
-  deleteAdminLessonSupplementDocument,
-  updateAdminLessonSupplementDocument,
+  createAdminLessonDocument,
+  deleteAdminLessonDocument,
+  updateAdminLessonDocument,
   uploadAdminLessonDocumentFile,
 } from "@/features/admin/courses/api/admin-course-documents-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -22,9 +22,9 @@ import {
   findLessonMatch,
   getAdminCourseDetailStats,
   getLessonReferenceDocumentUploads,
+  resolveFoundationDocumentSortOrder,
 } from "@/features/admin/courses/admin-courses-utils";
 import {
-  getLessonSourceRangeFormValues,
   readRecord,
 } from "@/features/admin/courses/admin-course-documents-utils";
 import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admin-course-document-types";
@@ -278,6 +278,17 @@ export function useAdminCourseDetailManager(
       return;
     }
 
+    const normalizedTitle = normalizeLessonTitleForComparison(values.title);
+    const duplicatedTitle = targetChapter.lessons.some(
+      (lesson) =>
+        lesson.id !== selectedLesson?.id &&
+        normalizeLessonTitleForComparison(lesson.title) === normalizedTitle,
+    );
+
+    if (duplicatedTitle) {
+      throw new Error("DUPLICATED_LESSON_TITLE");
+    }
+
     const duplicatedOrder = targetChapter.lessons.some(
       (lesson) =>
         lesson.orderIndex === values.orderIndex &&
@@ -309,25 +320,26 @@ export function useAdminCourseDetailManager(
         });
 
         try {
-          const originalSupplements =
+          const originalDocuments =
             documentsManager.documentsByLessonId[selectedLesson.id]?.filter((doc) => {
-              const isSupplementOrHomework =
-                doc.kind === "SUPPLEMENT" || doc.kind === "HOMEWORK";
-              const isSourceMapped =
-                readRecord(doc.metadataJson)?.source === "source_document_page_range";
-              return isSupplementOrHomework && !isSourceMapped;
+              const isRangeDocument =
+                doc.kind === "PRIMARY_FROM_SOURCE" &&
+                (Boolean(doc.sourceDocumentId) ||
+                  readRecord(doc.metadataJson)?.source ===
+                    "source_document_page_range");
+              return !isRangeDocument;
             }) || [];
 
           const remainingIds = values.referenceDocuments
             .map((doc) => doc.id)
             .filter(Boolean);
 
-          const deletedDocs = originalSupplements.filter(
+          const deletedDocs = originalDocuments.filter(
             (doc) => !remainingIds.includes(doc.id),
           );
 
           for (const doc of deletedDocs) {
-            await deleteAdminLessonSupplementDocument(
+            await deleteAdminLessonDocument(
               selectedLesson.id,
               doc.id,
               accessToken,
@@ -336,33 +348,44 @@ export function useAdminCourseDetailManager(
 
           const existingDocsToUpdate = values.referenceDocuments
             .filter((doc) => doc.id)
-            .map((doc) => {
-              const original = originalSupplements.find((o) => o.id === doc.id);
+            .map((doc, index) => {
+              const original = originalDocuments.find((o) => o.id === doc.id);
               if (!original) return null;
 
               const titleChanged = doc.title !== original.title;
               const targetKind = doc.type ?? "SUPPLEMENT";
               const typeChanged = targetKind !== original.kind;
+              const sortOrder =
+                targetKind === "PRIMARY_FROM_SOURCE"
+                  ? resolveFoundationDocumentSortOrder(values, doc, index)
+                  : original.sortOrder;
+              const sortOrderChanged = sortOrder !== original.sortOrder;
 
-              if (!titleChanged && !typeChanged) return null;
+              if (!titleChanged && !typeChanged && !sortOrderChanged) return null;
 
               return {
                 id: doc.id!,
                 title: titleChanged ? doc.title : undefined,
                 kind: typeChanged ? targetKind : undefined,
+                sortOrder: sortOrderChanged ? sortOrder : undefined,
               };
             })
             .filter(Boolean) as Array<{
             id: string;
             title?: string;
-            kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT" | "HOMEWORK";
+            kind?: "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
+            sortOrder?: number;
           }>;
 
           for (const docUpdate of existingDocsToUpdate) {
-            await updateAdminLessonSupplementDocument(
+            await updateAdminLessonDocument(
               selectedLesson.id,
               docUpdate.id,
-              { title: docUpdate.title, kind: docUpdate.kind },
+              {
+                title: docUpdate.title,
+                kind: docUpdate.kind,
+                sortOrder: docUpdate.sortOrder,
+              },
               accessToken,
             );
           }
@@ -393,6 +416,10 @@ export function useAdminCourseDetailManager(
       setSelectedLessonId(null);
       setIsLessonEditorOpen(false);
     } catch (error) {
+      if (isLessonTitleConflictError(error)) {
+        throw new Error("DUPLICATED_LESSON_TITLE", { cause: error });
+      }
+
       if (isConflictError(error)) {
         throw new Error("DUPLICATED_LESSON_ORDER", { cause: error });
       }
@@ -420,12 +447,13 @@ export function useAdminCourseDetailManager(
           document.file,
           accessToken,
         );
-        await createAdminLessonSupplementDocument(
+        await createAdminLessonDocument(
           lessonId,
           {
             fileId: uploadedFile.id,
-            kind: document.type === "HOMEWORK" ? "HOMEWORK" : "SUPPLEMENT",
+            kind: document.type ?? "SUPPLEMENT",
             processingMode: "PROCESSING",
+            sortOrder: document.sortOrder,
             title: document.title || uploadedFile.originalName,
           },
           accessToken,
@@ -632,6 +660,14 @@ export function useAdminCourseDetailManager(
 
 function isConflictError(error: unknown) {
   return error instanceof ApiRequestError && error.code === "CONFLICT";
+}
+
+function isLessonTitleConflictError(error: unknown) {
+  return error instanceof ApiRequestError && error.code === "LESSON_TITLE_DUPLICATE";
+}
+
+function normalizeLessonTitleForComparison(title: string) {
+  return title.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
 }
 
 function getErrorMessage(error: unknown) {

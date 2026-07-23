@@ -2,7 +2,7 @@
 
 ## Tính năng này giải quyết gì?
 
-MVP không upload từng file rời rạc cho từng chương. Admin tạo sẵn lesson metadata, upload một PDF/tài liệu nguồn dài ở cấp lộ trình, rồi gán khoảng trang cho từng lesson. Lesson vẫn có thể có tài liệu bổ sung riêng, nhưng mọi chunk/embedding về sau phải gắn với `lesson_id`.
+MVP không upload tài liệu ở cấp chương. Admin quản lý một hoặc nhiều PDF/tài liệu nguồn ở cấp lộ trình, rồi tạo một hoặc nhiều khối trích xuất cho từng lesson. Lesson vẫn có thể có file nền tảng trực tiếp, tài liệu bổ sung và bài tập về nhà, nhưng mọi chunk/embedding về sau phải gắn với `lesson_id`.
 
 ## Bức tranh tổng thể
 
@@ -38,8 +38,8 @@ flowchart TD
 8. API validate lesson cùng lộ trình, page range hợp lệ, cảnh báo overlap/gap, rồi tạo `lesson_document_page_ranges`.
 9. API tạo hoặc cập nhật `lesson_documents` loại `PRIMARY_FROM_SOURCE` và tạo job chunking theo `lesson_id`.
 10. Worker chunk từ source pages bằng `lessonId` trong `inputMeta`, không dùng nhầm `lessonDocument.id` làm lesson id.
-11. Nếu admin thay tài liệu chính bằng file riêng, API tạo `PRIMARY_REPLACEMENT`; worker chạy cùng pipeline OCR artifact rồi chunk vào đúng lesson.
-12. Nếu admin thêm tài liệu bổ sung, API tạo `SUPPLEMENT`; worker OCR/chunk như một lesson document độc lập nhưng chunks vẫn gắn cùng `lesson_id`.
+11. Nếu admin thêm tài liệu nền tảng bằng file riêng, API vẫn tạo `PRIMARY_FROM_SOURCE`; nguồn gốc trực tiếp được lưu trong metadata và `source_document_id = null`, không tạo kind mới. Một lesson có thể giữ nhiều page ranges cùng nhiều file nền tảng; worker chạy cùng pipeline OCR artifact rồi chunk tất cả vào đúng lesson.
+12. Nếu admin thêm tài liệu bổ sung hoặc bài tập về nhà, API tạo `SUPPLEMENT` hoặc `HOMEWORK`; worker OCR/chunk như một lesson document độc lập nhưng chunks vẫn gắn cùng `lesson_id`.
 
 ## Back-end/API
 
@@ -54,7 +54,7 @@ flowchart TD
 - `source_document_pages`: text/status/quality từng trang, do worker tạo.
 - `lesson_document_page_ranges`: mapping `lesson -> page_start/page_end`.
 - `lesson_documents`: tài liệu học thật gắn với lesson, có `kind`.
-- `replaced_at`: đánh dấu tài liệu chính cũ, giúp mỗi lesson chỉ có một tài liệu chính active mà không xóa lịch sử ngay.
+- `replaced_at`: giữ lịch sử thay đổi của document sinh từ page range; file nền tảng upload trực tiếp là additive và không thay thế nhau.
 
 ## Worker/AI/Integration
 
@@ -98,7 +98,9 @@ Worker `M4.4` hiện làm các việc chính:
 - `artifact-audit.json` không thay thế artifact gốc; nó là bảng kiểm chất lượng để các bước sau quyết định dùng crop, dùng whole-page fallback hay báo admin cần kiểm tra.
 - File PDF gốc vẫn được giữ để học sinh xem đúng tài liệu và để backend render/crop page image fallback khi visual refs của provider chưa đủ.
 - Retrieval/RAG sau này phải filter theo `lesson_id`, nên chunk cuối cùng luôn gắn với lesson.
-- Tài liệu chính và tài liệu bổ sung là hai luồng khác nhau; thay tài liệu chính không được xóa supplemental.
+- `kind` mô tả vai trò retrieval, còn `source_document_id`/metadata mô tả nguồn tạo. Vì vậy page range và file upload trực tiếp đều có thể là `PRIMARY_FROM_SOURCE`.
+- Form lesson giữ một thứ tự UI riêng cho page range và các file nền tảng. Thứ tự này chỉ phục vụ trải nghiệm thêm/xóa trong modal; payload API vẫn tách page range và danh sách upload theo đúng contract.
+- Tài liệu nền tảng và tài liệu bổ sung là hai luồng khác nhau; thêm hoặc xóa tài liệu nền tảng không được xóa supplemental/homework.
 - `background_jobs.id` là `jobId` cho UI poll và cũng được dùng làm BullMQ `jobId` để enqueue idempotent hơn.
 - DB giữ trạng thái durable để UI xem được kể cả khi worker/Redis restart; BullMQ chỉ là nơi xếp hàng và chạy job.
 

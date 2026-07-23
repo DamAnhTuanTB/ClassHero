@@ -25,11 +25,13 @@ type LessonMutationPayload = {
   orderIndex?: number;
   scheduledAt?: string | null;
   shortDescription?: string | null;
-  sourceDocumentPageRange?: {
+  sourceDocumentExtractions?: Array<{
+    id?: string;
     pageEnd: number;
     pageStart: number;
+    sortOrder?: number;
     sourceDocumentId: string;
-  };
+  }>;
   status?: string;
   title?: string;
   trialEnabled?: boolean;
@@ -37,7 +39,7 @@ type LessonMutationPayload = {
 };
 
 test.describe("M4.5 admin lesson documents", () => {
-  test("uploads source PDF, maps ranges, replaces primary, and manages supplements", async ({
+  test("uploads and switches between multiple source PDFs", async ({
     page,
   }, testInfo) => {
     await seedAdminSession(page);
@@ -46,10 +48,13 @@ test.describe("M4.5 admin lesson documents", () => {
     await page.goto(`/admin/courses/${learningPathId}`);
 
     const panel = page.getByTestId("admin-course-document-panel");
-    await expect(panel.getByText("Chưa có tài liệu chính")).toBeVisible();
+    await expect(panel.getByText("Chưa có tài liệu nguồn")).toBeVisible();
     await captureM45Screenshot(page, testInfo.project.name, "01-empty-source");
 
-    await panel.getByRole("button", { name: "Chọn file PDF" }).click();
+    await panel
+      .getByRole("button", { name: "Thêm tài liệu nguồn" })
+      .first()
+      .click();
     await page.getByLabel("File PDF").setInputFiles(buildPdfFixture("toan-7-tap-1.pdf"));
     await page.getByLabel("Tên tài liệu").fill("Toán 7 Tập 1");
     await page.getByRole("button", { name: "Xử lý OCR" }).click();
@@ -58,68 +63,67 @@ test.describe("M4.5 admin lesson documents", () => {
     await expect(panel.getByTestId("document-stat-total-pages")).toContainText("8");
     await captureM45Screenshot(page, testInfo.project.name, "02-source-ready");
 
+    await panel.getByRole("button", { name: "Thêm tài liệu nguồn" }).first().click();
+    await page.getByLabel("File PDF").setInputFiles(buildPdfFixture("toan-7-tap-2.pdf"));
+    await page.getByLabel("Tên tài liệu").fill("Toán 7 Tập 2");
+    await page.getByRole("button", { name: "Xử lý OCR" }).click();
+
+    const sourceList = panel.getByRole("listbox", {
+      name: "Chọn tài liệu nguồn đang quản lý",
+    });
+    await expect(sourceList.getByRole("option")).toHaveCount(2);
+    await expect(sourceList.getByRole("option").nth(0)).toContainText(
+      "Toán 7 Tập 1",
+    );
+    await expect(sourceList.getByRole("option").nth(1)).toContainText(
+      "Toán 7 Tập 2",
+    );
+    await expect(panel.getByRole("heading", { name: "Toán 7 Tập 2" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Thêm bài học" }).first().click();
+    const createDialog = page.getByRole("dialog", { name: "Thêm bài học" });
+    await expect(createDialog.getByLabel("Tài liệu trích xuất")).toContainText(
+      "Toán 7 Tập 1",
+    );
+    const foundationSection = createDialog.getByTestId(
+      "lesson-foundation-documents-section",
+    );
+    await foundationSection.getByTestId("add-foundation-extraction").click();
+    const extractions = foundationSection.getByTestId("foundation-extraction-item");
+    await expectVerticallyCentered(
+      extractions.nth(0).getByLabel("Đến trang"),
+      extractions
+        .nth(0)
+        .getByRole("button", { name: "Xóa khối trích xuất 1" }),
+    );
+    await extractions.nth(1).getByLabel("Tài liệu trích xuất").click();
+    await extractions.nth(1).getByRole("option", { name: "Toán 7 Tập 2" }).click();
+    await expect(
+      extractions.nth(1).getByText("Nhập trang bắt đầu"),
+    ).toHaveCount(0);
+    await expect(
+      extractions.nth(1).getByText("Nhập trang kết thúc"),
+    ).toHaveCount(0);
+    await extractions.nth(0).getByLabel("Từ trang").fill("1");
+    await extractions.nth(0).getByLabel("Đến trang").fill("5");
+    await extractions.nth(1).getByLabel("Từ trang").fill("1");
+    await extractions.nth(1).getByLabel("Đến trang").fill("5");
+    await expect(
+      foundationSection.getByText(/Khoảng trang xung đột/),
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    await sourceList.getByRole("option", { name: /Toán 7 Tập 1/ }).click();
+    await expect(panel.getByRole("heading", { name: "Toán 7 Tập 1" })).toBeVisible();
+
     await panel.getByRole("button", { name: "Xem trang" }).click();
     await expect(page.getByRole("heading", { name: "Xem trang" })).toBeVisible();
     await expect(page.getByText("Trang PDF 1")).toBeVisible();
     await page.keyboard.press("Escape");
-
-    await panel.getByRole("button", { name: "Nhập khoảng trang" }).first().click();
-    await page.getByRole("button", { name: "Gợi ý chia trang" }).click();
-    await captureM45Screenshot(page, testInfo.project.name, "03-range-entry");
-    await page.getByRole("button", { name: "Lưu khoảng trang" }).click();
-
-    await panel.getByRole("button", { name: "Nhập khoảng trang" }).first().click();
-    const rangeDialog = page.getByRole("dialog", { name: "Nhập khoảng trang" });
-    await expect(
-      rangeDialog
-        .getByTestId(`lesson-document-row-${lessonOneId}`)
-        .getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ"),
-    ).toHaveValue("1");
-    await expect(
-      rangeDialog
-        .getByTestId(`lesson-document-row-${lessonOneId}`)
-        .getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ"),
-    ).toHaveValue("4");
-
-    await expect(
-      rangeDialog
-        .getByTestId(`lesson-document-row-${lessonTwoId}`)
-        .getByLabel("Trang bắt đầu Bài học 2: Lũy thừa"),
-    ).toHaveValue("5");
-    await expect(
-      rangeDialog
-        .getByTestId(`lesson-document-row-${lessonTwoId}`)
-        .getByLabel("Trang kết thúc Bài học 2: Lũy thừa"),
-    ).toHaveValue("8");
-
-    const firstLessonRow = rangeDialog.getByTestId(`lesson-document-row-${lessonOneId}`);
-    await firstLessonRow.getByRole("button", { name: "Thay tài liệu chính" }).click();
-    await page
-      .getByLabel("File PDF")
-      .setInputFiles(buildPdfFixture("bai-1-thay-the.pdf"));
-    await page.getByLabel("Tên hiển thị").fill("PDF chính buổi 1");
-    await page.getByRole("button", { exact: true, name: "Thay tài liệu" }).click();
-    await expect(firstLessonRow).toContainText("PDF chính buổi 1");
-
-    await firstLessonRow.getByRole("button", { name: "Thêm tài liệu bổ sung" }).click();
-    await page
-      .getByLabel("File PDF")
-      .setInputFiles(buildPdfFixture("phieu-luyen-them.pdf"));
-    await page.getByLabel("Tên hiển thị").fill("Phiếu luyện thêm");
-    await page.getByRole("button", { exact: true, name: "Thêm tài liệu" }).click();
-    await expect(firstLessonRow).toContainText("Phiếu luyện thêm");
-    await expect(page.getByText("Đã thêm tài liệu bổ sung")).toBeHidden({
-      timeout: 8_000,
-    });
-    await expectNoHorizontalOverflow(page);
-    await captureM45Screenshot(page, testInfo.project.name, "04-final-mapped");
-
-    await firstLessonRow.getByLabel("Xóa Phiếu luyện thêm").click();
-    await expect(firstLessonRow.getByText("Phiếu luyện thêm")).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
 
-  test("validates page ranges and shows source delete conflict", async ({
+  test("validates overlapping extractions and shows source delete conflict", async ({
     page,
   }, testInfo) => {
     await seedAdminSession(page);
@@ -130,19 +134,29 @@ test.describe("M4.5 admin lesson documents", () => {
     const panel = page.getByTestId("admin-course-document-panel");
     await expect(panel.getByRole("heading", { name: "Toán 7 Tập 1" })).toBeVisible();
 
-    await panel.getByRole("button", { name: "Nhập khoảng trang" }).first().click();
-    await page.getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ").fill("5");
-    await page.getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ").fill("2");
-    await page.getByRole("button", { name: "Lưu khoảng trang" }).click();
+    const lessonOneArticle = page
+      .getByRole("heading", { name: "Bài học 1: Số hữu tỉ" })
+      .locator("xpath=ancestor::article[1]");
+    await lessonOneArticle.getByRole("button", { name: "Sửa" }).click();
+    const editDialog = page.getByRole("dialog", { name: "Sửa bài học" });
+    const foundationSection = editDialog.getByTestId(
+      "lesson-foundation-documents-section",
+    );
+    await foundationSection.getByTestId("add-foundation-extraction").click();
+    const extractions = foundationSection.getByTestId("foundation-extraction-item");
+    await extractions.nth(1).getByLabel("Từ trang").fill("4");
+    await extractions.nth(1).getByLabel("Đến trang").fill("6");
     await expect(
-      page.getByText("Trang bắt đầu không được lớn hơn trang kết thúc."),
+      extractions
+        .nth(1)
+        .getByText("Khoảng trang xung đột với khối trích xuất 1"),
     ).toBeVisible();
     await captureM45Screenshot(page, testInfo.project.name, "05-range-error");
     await page.keyboard.press("Escape");
 
     await panel.getByRole("button", { name: "Xóa" }).click();
     await page.getByRole("button", { name: "Xóa tài liệu" }).click();
-    await expect(page.getByText("Chưa xóa được tài liệu chính")).toBeVisible();
+    await expect(page.getByText("Chưa xóa được tài liệu nguồn")).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await captureM45Screenshot(page, testInfo.project.name, "06-delete-conflict");
   });
@@ -160,38 +174,39 @@ test.describe("M4.5 admin lesson documents", () => {
     await expect(createDialog.getByLabel("Tên bài học")).toBeVisible();
     await expect(createDialog.getByLabel("Từ trang")).toBeEnabled();
     const referenceSection = createDialog.getByTestId(
-      "lesson-reference-documents-section",
+      "lesson-supplement-documents-section",
     );
     await expectElementAboveDialogFooter(
       createDialog,
       referenceSection.getByRole("button", { name: "Thêm tài liệu" }),
     );
+    await createDialog.getByRole("button", { name: "Xóa khối trích xuất 1" }).click();
     await createDialog.getByLabel("Thứ tự").fill("3");
     await createDialog.getByLabel("Tên bài học").fill("Bài học 3: Ôn tập");
-    await createDialog.getByRole("button", { name: "Thêm tài liệu" }).click();
+    await referenceSection.getByRole("button", { name: "Thêm tài liệu" }).click();
     await expectElementAboveDialogFooter(
       createDialog,
       createDialog.getByTestId("lesson-reference-file-control-1"),
     );
-    await createDialog.getByLabel("Tên tài liệu 1").fill("Phiếu đọc thêm");
-    await createDialog
-      .getByLabel("File tài liệu 1")
+    await referenceSection.getByLabel("Tên tài liệu").fill("Phiếu đọc thêm");
+    await referenceSection
+      .getByLabel("File tài liệu")
       .setInputFiles(buildPdfFixture("phieu-doc-them.pdf"));
     await createDialog.getByRole("button", { name: "Lưu bài học" }).click();
     await expect(page.getByText("Đã thêm bài học")).toBeVisible();
-    expect(mock.lessonCreatePayloads.at(-1)?.sourceDocumentPageRange).toBeUndefined();
+    expect(mock.lessonCreatePayloads.at(-1)?.sourceDocumentExtractions).toEqual([]);
     expect(mock.lessonDocuments).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          chunkCount: 0,
+          chunkCount: 3,
           kind: "SUPPLEMENT",
           lessonId: "lesson-created-1",
           metadataJson: expect.objectContaining({
-            processingMode: "storage_only",
-            source: "supplemental_lesson_document_upload",
+            processingMode: "processing",
+            source: "uploaded_supplement_document",
           }),
-          processingJob: null,
-          processingJobId: null,
+          processingJob: expect.objectContaining({ status: "SUCCEEDED" }),
+          processingJobId: "reference-1-job",
           status: "READY",
           title: "Phiếu đọc thêm",
         }),
@@ -207,14 +222,90 @@ test.describe("M4.5 admin lesson documents", () => {
     await editDialog.getByLabel("Đến trang").fill("3");
     await editDialog.getByRole("button", { name: "Lưu bài học" }).click();
     await expect(page.getByText("Đã lưu bài học")).toBeVisible();
-    expect(mock.lessonUpdatePayloads.at(-1)?.sourceDocumentPageRange).toEqual({
-      pageEnd: 3,
-      pageStart: 2,
-      sourceDocumentId: "source-doc-1",
-    });
+    expect(mock.lessonUpdatePayloads.at(-1)?.sourceDocumentExtractions).toEqual([
+      expect.objectContaining({
+        pageEnd: 3,
+        pageStart: 2,
+        sourceDocumentId: "source-doc-1",
+      }),
+    ]);
   });
 
-  test("disables lesson page range inputs while the source document is not ready", async ({
+  test("keeps the default foundation range and appends items in action order on mobile", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 844, width: 390 });
+    await seedAdminSession(page);
+    await setupM45ApiMock(page, { withMappedSource: true });
+
+    await page.goto(`/admin/courses/${learningPathId}`);
+    await page.getByRole("button", { name: "Thêm bài học" }).first().click();
+
+    const dialog = page.getByRole("dialog", { name: "Thêm bài học" });
+    const foundationSection = dialog.getByTestId(
+      "lesson-foundation-documents-section",
+    );
+    const addExtractionButton = foundationSection.getByTestId(
+      "add-foundation-extraction",
+    );
+    const addDocumentButton = foundationSection.getByTestId(
+      "add-foundation-document",
+    );
+
+    await expect(foundationSection.getByTestId("foundation-extraction-item")).toHaveCount(1);
+    await expect(addExtractionButton).toBeEnabled();
+    await expect(addDocumentButton).toBeEnabled();
+
+    const addRangeBox = await addExtractionButton.boundingBox();
+    const addDocumentBox = await addDocumentButton.boundingBox();
+    expect(addRangeBox).not.toBeNull();
+    expect(addDocumentBox).not.toBeNull();
+    expect(Math.abs(addRangeBox!.y - addDocumentBox!.y)).toBeLessThan(2);
+
+    await addDocumentButton.click();
+    await expect(foundationSection.getByTestId("foundation-upload-item")).toBeVisible();
+    await expect(foundationSection.getByText("Nhập tên tài liệu")).toHaveCount(0);
+    await expect(
+      foundationSection.getByText("Phải chọn file cho tài liệu nền tảng"),
+    ).toHaveCount(0);
+
+    await addExtractionButton.click();
+    await expect(
+      foundationSection.getByText("Phải nhập khoảng trang cho tài liệu nền tảng"),
+    ).toHaveCount(0);
+    const firstExtractionBox = await foundationSection
+      .getByTestId("foundation-extraction-item")
+      .nth(0)
+      .boundingBox();
+    const uploadBox = await foundationSection
+      .getByTestId("foundation-upload-item")
+      .boundingBox();
+    const secondExtractionBox = await foundationSection
+      .getByTestId("foundation-extraction-item")
+      .nth(1)
+      .boundingBox();
+
+    expect(firstExtractionBox).not.toBeNull();
+    expect(uploadBox).not.toBeNull();
+    expect(secondExtractionBox).not.toBeNull();
+    expect(firstExtractionBox!.y).toBeLessThan(uploadBox!.y);
+    expect(uploadBox!.y).toBeLessThan(secondExtractionBox!.y);
+    await expect(addExtractionButton).toBeEnabled();
+
+    const extractionItems = foundationSection.getByTestId("foundation-extraction-item");
+    await extractionItems.nth(0).getByLabel("Từ trang").fill("1");
+    await extractionItems.nth(0).getByLabel("Đến trang").fill("5");
+    await extractionItems.nth(1).getByLabel("Từ trang").fill("5");
+    await extractionItems.nth(1).getByLabel("Đến trang").fill("8");
+    await expect(
+      extractionItems
+        .nth(1)
+        .getByText("Khoảng trang xung đột với khối trích xuất 1"),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("excludes source documents that are not ready from lesson extraction", async ({
     page,
   }) => {
     await seedAdminSession(page);
@@ -222,18 +313,109 @@ test.describe("M4.5 admin lesson documents", () => {
 
     await page.goto(`/admin/courses/${learningPathId}`);
 
-    const panel = page.getByTestId("admin-course-document-panel");
-    await expect(
-      panel.getByRole("button", { name: "Nhập khoảng trang" }).first(),
-    ).toBeDisabled();
-
     await page.getByRole("button", { name: "Thêm bài học" }).first().click();
     const dialog = page.getByRole("dialog", { name: "Thêm bài học" });
-    await expect(dialog.getByText("Tài liệu chưa đọc xong.")).toBeVisible();
+    await expect(dialog.getByText("Chưa có tài liệu nguồn sẵn sàng.")).toBeVisible();
+    await expect(dialog.getByLabel("Tài liệu trích xuất")).toBeDisabled();
     await expect(dialog.getByLabel("Từ trang")).toBeDisabled();
     await expect(dialog.getByLabel("Đến trang")).toBeDisabled();
     await expect(dialog.getByLabel("Tên bài học")).toBeEnabled();
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("shows pristine extraction errors after the user submits the lesson", async ({
+    page,
+  }) => {
+    await seedAdminSession(page);
+    await setupM45ApiMock(page, { withMappedSource: true });
+
+    await page.goto(`/admin/courses/${learningPathId}`);
+    await page.getByRole("button", { name: "Thêm bài học" }).first().click();
+
+    const dialog = page.getByRole("dialog", { name: "Thêm bài học" });
+    await expect(dialog.getByText("Nhập trang bắt đầu")).toHaveCount(0);
+    await expect(dialog.getByText("Nhập trang kết thúc")).toHaveCount(0);
+
+    await dialog.getByRole("button", { name: "Lưu bài học" }).click();
+
+    await expect(dialog.getByText("Nhập tên bài học")).toBeVisible();
+    await expect(dialog.getByText("Nhập trang bắt đầu")).toBeVisible();
+    await expect(dialog.getByText("Nhập trang kết thúc")).toBeVisible();
+  });
+
+  test("allows multiple homework files in the lesson editor", async ({ page }) => {
+    await seedAdminSession(page);
+    const mock = await setupM45ApiMock(page, { withMappedSource: true });
+
+    await page.goto(`/admin/courses/${learningPathId}`);
+    await page.getByRole("button", { name: "Thêm bài học" }).first().click();
+
+    const dialog = page.getByRole("dialog", { name: "Thêm bài học" });
+    await dialog.getByRole("button", { name: "Xóa khối trích xuất 1" }).click();
+    await dialog.getByLabel("Thứ tự").fill("3");
+    await dialog.getByLabel("Tên bài học").fill("Bài học 3: Bài tập tổng hợp");
+
+    const homeworkSection = dialog.getByTestId(
+      "lesson-homework-documents-section",
+    );
+    const addHomeworkButton = homeworkSection.getByRole("button", {
+      name: "Thêm tài liệu",
+    });
+    await addHomeworkButton.click();
+    await expect(addHomeworkButton).toBeEnabled();
+    await addHomeworkButton.click();
+
+    await expect(homeworkSection.getByLabel("Tên tài liệu")).toHaveCount(2);
+    await expect(homeworkSection.getByLabel("File tài liệu")).toHaveCount(2);
+    await homeworkSection
+      .getByLabel("Tên tài liệu")
+      .nth(0)
+      .fill("Bài tập đại số");
+    await homeworkSection
+      .getByLabel("Tên tài liệu")
+      .nth(1)
+      .fill("Bài tập hình học");
+    await homeworkSection
+      .getByLabel("File tài liệu")
+      .nth(0)
+      .setInputFiles(buildPdfFixture("bai-tap-dai-so.pdf"));
+    await homeworkSection
+      .getByLabel("File tài liệu")
+      .nth(1)
+      .setInputFiles(buildPdfFixture("bai-tap-hinh-hoc.pdf"));
+
+    await dialog.getByRole("button", { name: "Lưu bài học" }).click();
+    await expect(page.getByText("Đã thêm bài học")).toBeVisible();
+
+    expect(
+      mock.lessonDocuments.filter(
+        (document) => document.kind === "HOMEWORK",
+      ),
+    ).toEqual([
+      expect.objectContaining({ title: "Bài tập đại số" }),
+      expect.objectContaining({ title: "Bài tập hình học" }),
+    ]);
+  });
+
+  test("shows confirmation status and excludes sources with printed-page warnings", async ({
+    page,
+  }) => {
+    await seedAdminSession(page);
+    await setupM45ApiMock(page, { warningPageNumber: 2 });
+
+    await page.goto(`/admin/courses/${learningPathId}`);
+
+    const panel = page.getByTestId("admin-course-document-panel");
+    const sourceOption = panel.getByRole("option", { name: /Toán 7 Tập 1/ });
+    await expect(sourceOption).toContainText("Cần xác nhận");
+
+    await page.getByRole("button", { name: "Thêm bài học" }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Thêm bài học" });
+    await expect(dialog.getByText("Chưa có tài liệu nguồn sẵn sàng.")).toBeVisible();
+    await expect(dialog.getByLabel("Tài liệu trích xuất")).toBeDisabled();
+    await expect(
+      dialog.getByRole("option", { name: "Toán 7 Tập 1" }),
+    ).toHaveCount(0);
   });
 
   for (const themeMode of ["light", "dark"] as const) {
@@ -253,29 +435,20 @@ test.describe("M4.5 admin lesson documents", () => {
       const panel = page.getByTestId("admin-course-document-panel");
       await expect(panel.getByRole("heading", { name: "Toán 7 Tập 1" })).toBeVisible();
 
-      await panel.getByRole("button", { name: "Nhập khoảng trang" }).first().click();
-      const rangeDialog = page.getByRole("dialog", { name: "Nhập khoảng trang" });
-      await expect(rangeDialog).toBeVisible();
-      await expectDialogFitsViewport(page, rangeDialog);
-      await expect(
-        rangeDialog
-          .getByTestId(`lesson-document-row-${lessonOneId}`)
-          .getByLabel("Trang bắt đầu Bài học 1: Số hữu tỉ"),
-      ).toHaveValue("1");
-      await expect(
-        rangeDialog
-          .getByTestId(`lesson-document-row-${lessonOneId}`)
-          .getByLabel("Trang kết thúc Bài học 1: Số hữu tỉ"),
-      ).toHaveValue("4");
-      await expectNoHorizontalOverflow(page);
-      await rangeDialog.getByRole("button", { name: "Đóng" }).click();
-
-      await page.getByRole("button", { name: "Thêm bài học" }).first().click();
-      const createDialog = page.getByRole("dialog", { name: "Thêm bài học" });
+      const lessonOneArticle = page
+        .getByRole("heading", { name: "Bài học 1: Số hữu tỉ" })
+        .locator("xpath=ancestor::article[1]");
+      await lessonOneArticle.getByRole("button", { name: "Sửa" }).click();
+      const createDialog = page.getByRole("dialog", { name: "Sửa bài học" });
       await expect(createDialog).toBeVisible();
       await expectDialogFitsViewport(page, createDialog);
+      await expect(createDialog.getByLabel("Từ trang")).toHaveValue("1");
+      await expect(createDialog.getByLabel("Đến trang")).toHaveValue("4");
 
-      const referenceButton = createDialog.getByRole("button", {
+      const referenceSection = createDialog.getByTestId(
+        "lesson-supplement-documents-section",
+      );
+      const referenceButton = referenceSection.getByRole("button", {
         name: "Thêm tài liệu",
       });
       await expectElementAboveDialogFooter(createDialog, referenceButton);
@@ -344,6 +517,7 @@ async function setupM45ApiMock(
       ? [
           buildSourceDocument("source-file-1", "Toán 7 Tập 1", {
             status: options.sourceStatus ?? "READY",
+            warningPageCount: options.warningPageNumber ? 1 : 0,
           }),
         ]
       : [],
@@ -378,8 +552,10 @@ async function setupM45ApiMock(
       pathname === `/admin/learning-paths/${learningPathId}/source-documents`
     ) {
       const body = request.postDataJSON() as { fileId: string; title?: string };
-      const sourceDocument = buildSourceDocument(body.fileId, body.title);
-      state.sourceDocuments = [sourceDocument];
+      const sourceDocument = buildSourceDocument(body.fileId, body.title, {
+        id: `source-doc-${state.sourceDocuments.length + 1}`,
+      });
+      state.sourceDocuments = [...state.sourceDocuments, sourceDocument];
       state.sourcePages = buildSourcePages();
       return fulfillJson(route, 201, { data: sourceDocument });
     }
@@ -399,7 +575,10 @@ async function setupM45ApiMock(
       });
     }
 
-    if (method === "GET" && pathname === "/admin/source-documents/source-doc-1/pages") {
+    if (
+      method === "GET" &&
+      /^\/admin\/source-documents\/[^/]+\/pages$/.test(pathname)
+    ) {
       return fulfillJson(route, 200, { data: state.sourcePages });
     }
 
@@ -461,11 +640,11 @@ async function setupM45ApiMock(
       );
       state.learningPath = addLessonToLearningPath(state.learningPath, lesson);
 
-      if (body.sourceDocumentPageRange) {
-        state.lessonDocuments = upsertSourceLessonDocument(
+      if (body.sourceDocumentExtractions) {
+        state.lessonDocuments = syncSourceLessonDocuments(
           state.lessonDocuments,
           lesson.id,
-          body.sourceDocumentPageRange,
+          body.sourceDocumentExtractions,
         );
       }
 
@@ -478,11 +657,11 @@ async function setupM45ApiMock(
       state.lessonUpdatePayloads.push(body);
       state.learningPath = updateLessonInLearningPath(state.learningPath, lessonId, body);
 
-      if (body.sourceDocumentPageRange) {
-        state.lessonDocuments = upsertSourceLessonDocument(
+      if (body.sourceDocumentExtractions) {
+        state.lessonDocuments = syncSourceLessonDocuments(
           state.lessonDocuments,
           lessonId,
-          body.sourceDocumentPageRange,
+          body.sourceDocumentExtractions,
         );
       }
 
@@ -501,15 +680,10 @@ async function setupM45ApiMock(
     ) {
       const body = request.postDataJSON() as { fileId: string; title?: string };
       state.lessonDocuments = [
-        ...state.lessonDocuments.filter(
-          (document) =>
-            !isRecord(document) ||
-            document.lessonId !== lessonOneId ||
-            document.kind === "SUPPLEMENT",
-        ),
+        ...state.lessonDocuments,
         buildLessonDocument({
-          id: "primary-replacement-1",
-          kind: "PRIMARY_REPLACEMENT",
+          id: "primary-upload-1",
+          kind: "PRIMARY_FROM_SOURCE",
           lessonId: lessonOneId,
           sourceDocumentId: null,
           title: body.title ?? "PDF chính buổi 1",
@@ -525,18 +699,25 @@ async function setupM45ApiMock(
       const lessonId = pathname.split("/")[3] ?? lessonOneId;
       const body = request.postDataJSON() as {
         fileId: string;
+        kind?: "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
         processingMode?: string;
         title?: string;
       };
-      const isStorageOnly = false; // Luôn PROCESSING theo logic mới
+      const kind = body.kind ?? "SUPPLEMENT";
+      const source =
+        kind === "PRIMARY_FROM_SOURCE"
+          ? "uploaded_primary_document"
+          : kind === "HOMEWORK"
+            ? "uploaded_homework_document"
+            : "uploaded_supplement_document";
       const document = buildLessonDocument({
         fileId: body.fileId,
         id: `reference-${state.fileCounter}`,
-        kind: "SUPPLEMENT",
+        kind,
         lessonId,
         metadataJson: {
           processingMode: "processing",
-          source: "supplemental_lesson_document_upload",
+          source,
         },
         sourceDocumentId: null,
         storageOnly: false,
@@ -669,9 +850,19 @@ function buildLesson(id: string, orderIndex: number, title: string) {
 function buildSourceDocument(
   fileId = "source-file-1",
   title = "Toán 7 Tập 1",
-  options: { status?: string } = {},
+  options: { id?: string; status?: string; warningPageCount?: number } = {},
 ) {
   const status = options.status ?? "READY";
+  const id = options.id ?? "source-doc-1";
+  const warningPageCount = options.warningPageCount ?? 0;
+  const readinessStatus =
+    status === "FAILED"
+      ? "FAILED"
+      : status !== "READY"
+        ? "PROCESSING"
+        : warningPageCount > 0
+          ? "NEEDS_CONFIRMATION"
+          : "READY";
 
   return {
     contentHash: "hash-source",
@@ -679,7 +870,7 @@ function buildSourceDocument(
     deletedAt: null,
     file: buildDocumentFile(fileId, "toan-7-tap-1.pdf"),
     fileId,
-    id: "source-doc-1",
+    id,
     learningPathId,
     metadataJson: {
       qualitySummary: {
@@ -690,6 +881,13 @@ function buildSourceDocument(
     processedAt: status === "READY" ? nowIso() : null,
     processingJob: buildJob(status === "READY" ? "SUCCEEDED" : "RUNNING"),
     processingJobId: "job-source-1",
+    readiness: {
+      isEligibleForExtraction: readinessStatus === "READY",
+      readyPageCount: status === "READY" ? 8 : 0,
+      status: readinessStatus,
+      totalPageRecords: status === "READY" ? 8 : 0,
+      warningPageCount,
+    },
     status,
     title,
     updatedAt: nowIso(),
@@ -799,27 +997,33 @@ function updateLessonInLearningPath(
   };
 }
 
-function upsertSourceLessonDocument(
+function syncSourceLessonDocuments(
   documents: Array<ReturnType<typeof buildLessonDocument>>,
   lessonId: string,
-  range: NonNullable<LessonMutationPayload["sourceDocumentPageRange"]>,
+  ranges: NonNullable<LessonMutationPayload["sourceDocumentExtractions"]>,
 ) {
   return [
     ...documents.filter(
-      (document) => document.lessonId !== lessonId || document.kind === "SUPPLEMENT",
+      (document) =>
+        document.lessonId !== lessonId ||
+        document.sourceDocumentId === null ||
+        document.kind !== "PRIMARY_FROM_SOURCE",
     ),
-    buildLessonDocument({
-      id: `primary-from-editor-${lessonId}`,
-      kind: "PRIMARY_FROM_SOURCE",
-      lessonId,
-      metadataJson: {
-        pageEnd: range.pageEnd,
-        pageStart: range.pageStart,
-        source: "lesson_editor_page_range",
-      },
-      sourceDocumentId: range.sourceDocumentId,
-      title: "Toán 7 Tập 1",
-    }),
+    ...ranges.map((range, index) =>
+      buildLessonDocument({
+        id: `primary-from-editor-${lessonId}-${index + 1}`,
+        kind: "PRIMARY_FROM_SOURCE",
+        lessonId,
+        metadataJson: {
+          pageEnd: range.pageEnd,
+          pageStart: range.pageStart,
+          source: "source_document_page_range",
+        },
+        sortOrder: range.sortOrder ?? index,
+        sourceDocumentId: range.sourceDocumentId,
+        title: "Toán 7 Tập 1",
+      }),
+    ),
   ];
 }
 
@@ -829,7 +1033,11 @@ function buildMappedLessonDocuments() {
       id: "primary-from-source-1",
       kind: "PRIMARY_FROM_SOURCE",
       lessonId: lessonOneId,
-      metadataJson: { pageEnd: 4, pageStart: 1 },
+      metadataJson: {
+        pageEnd: 4,
+        pageStart: 1,
+        source: "source_document_page_range",
+      },
       sourceDocumentId: "source-doc-1",
       title: "Toán 7 Tập 1",
     }),
@@ -837,7 +1045,11 @@ function buildMappedLessonDocuments() {
       id: "primary-from-source-2",
       kind: "PRIMARY_FROM_SOURCE",
       lessonId: lessonTwoId,
-      metadataJson: { pageEnd: 8, pageStart: 5 },
+      metadataJson: {
+        pageEnd: 8,
+        pageStart: 5,
+        source: "source_document_page_range",
+      },
       sourceDocumentId: "source-doc-1",
       title: "Toán 7 Tập 1",
     }),
@@ -850,6 +1062,7 @@ function buildLessonDocument({
   kind,
   lessonId,
   metadataJson = {},
+  sortOrder = 0,
   sourceDocumentId,
   storageOnly = false,
   title,
@@ -859,11 +1072,20 @@ function buildLessonDocument({
   kind: string;
   lessonId: string;
   metadataJson?: Record<string, unknown>;
+  sortOrder?: number;
   sourceDocumentId: string | null;
   storageOnly?: boolean;
   title: string;
 }) {
   const resolvedFileId = fileId ?? `${id}-file`;
+  const isExtraction =
+    sourceDocumentId !== null &&
+    metadataJson.source === "source_document_page_range";
+  const pageRangeId = isExtraction ? `${id}-range` : null;
+  const pageStart =
+    typeof metadataJson.pageStart === "number" ? metadataJson.pageStart : 1;
+  const pageEnd =
+    typeof metadataJson.pageEnd === "number" ? metadataJson.pageEnd : pageStart;
 
   return {
     chunkCount: storageOnly ? 0 : kind === "SUPPLEMENT" ? 3 : 12,
@@ -879,6 +1101,20 @@ function buildLessonDocument({
     kind,
     lessonId,
     metadataJson,
+    pageRange: pageRangeId
+      ? {
+          createdAt: nowIso(),
+          createdById: "admin-user",
+          id: pageRangeId,
+          lessonId,
+          metadataJson: {},
+          pageEnd,
+          pageStart,
+          sourceDocumentId,
+          updatedAt: nowIso(),
+        }
+      : null,
+    pageRangeId,
     processedAt: nowIso(),
     processingJob: storageOnly ? null : buildJob("SUCCEEDED"),
     processingJobId: storageOnly ? null : `${id}-job`,
@@ -893,6 +1129,7 @@ function buildLessonDocument({
         }
       : null,
     sourceDocumentId,
+    sortOrder,
     status: "READY",
     title,
     updatedAt: nowIso(),
@@ -1018,6 +1255,23 @@ async function expectElementAboveDialogFooter(dialog: Locator, target: Locator) 
   expect((targetBox?.y ?? 0) + (targetBox?.height ?? 0)).toBeLessThanOrEqual(
     (footerBox?.y ?? 0) - 1,
   );
+}
+
+async function expectVerticallyCentered(
+  referenceControl: Locator,
+  actionButton: Locator,
+) {
+  const [referenceBox, actionBox] = await Promise.all([
+    referenceControl.boundingBox(),
+    actionButton.boundingBox(),
+  ]);
+
+  expect(referenceBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+
+  const referenceCenter = (referenceBox?.y ?? 0) + (referenceBox?.height ?? 0) / 2;
+  const actionCenter = (actionBox?.y ?? 0) + (actionBox?.height ?? 0) / 2;
+  expect(Math.abs(referenceCenter - actionCenter)).toBeLessThanOrEqual(1);
 }
 
 async function captureM45Screenshot(page: Page, projectName: string, stateName: string) {

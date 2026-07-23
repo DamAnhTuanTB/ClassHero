@@ -122,7 +122,6 @@ enum DocumentStatus {
 
 enum LessonDocumentKind {
   PRIMARY_FROM_SOURCE
-  PRIMARY_REPLACEMENT
   SUPPLEMENT
   HOMEWORK
 }
@@ -683,9 +682,9 @@ model LessonDocumentPageRange {
   metadataJson     Json?          @map("metadata_json")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
+  lessonDocument   LessonDocument?
 
-  @@unique([lessonId, sourceDocumentId])
-  @@index([lessonId])
+  @@index([lessonId, sourceDocumentId])
   @@index([sourceDocumentId])
   @@index([createdById])
   @@map("lesson_document_page_ranges")
@@ -699,7 +698,10 @@ model LessonDocument {
   file                File               @relation("LessonDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
   sourceDocumentId    String?            @map("source_document_id") @db.Uuid
   sourceDocument      SourceDocument?    @relation("LessonDocumentSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  pageRangeId          String?            @unique @map("page_range_id") @db.Uuid
+  pageRange            LessonDocumentPageRange? @relation(fields: [pageRangeId], references: [id], onDelete: SetNull)
   kind                LessonDocumentKind @default(SUPPLEMENT)
+  sortOrder           Int                @default(0) @map("sort_order")
   title               String?
   status              DocumentStatus     @default(UPLOADED)
   extractedText       String?            @map("extracted_text") @db.Text
@@ -720,10 +722,12 @@ model LessonDocument {
 
   @@index([lessonId])
   @@index([lessonId, kind])
+  @@index([lessonId, kind, sortOrder])
   @@index([status])
   @@index([contentHash])
   @@index([fileId])
   @@index([sourceDocumentId])
+  @@index([pageRangeId])
   @@index([processingJobId])
   @@index([replacedAt])
   @@map("lesson_documents")

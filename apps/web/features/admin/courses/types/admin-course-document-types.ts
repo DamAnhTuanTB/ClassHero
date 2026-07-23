@@ -4,7 +4,7 @@ export type AdminBackgroundJobStatus =
   "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
 export type AdminLessonDocumentKind =
-  "PRIMARY_FROM_SOURCE" | "PRIMARY_REPLACEMENT" | "SUPPLEMENT" | "HOMEWORK";
+  "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
 
 export type AdminDocumentFileApi = {
   id: string;
@@ -51,6 +51,18 @@ export type AdminSourceDocumentApi = {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  readiness?: {
+    status:
+      | "READY"
+      | "NEEDS_CONFIRMATION"
+      | "PROCESSING"
+      | "FAILED"
+      | "NOT_READY";
+    isEligibleForExtraction: boolean;
+    warningPageCount: number;
+    readyPageCount: number;
+    totalPageRecords: number;
+  };
 };
 
 export type AdminSourceDocumentPageApi = {
@@ -96,7 +108,10 @@ export type AdminLessonDocumentApi = {
     status: AdminDocumentStatus;
     pageCount: number | null;
   } | null;
+  pageRangeId: string | null;
+  pageRange: AdminLessonDocumentPageRangeApi | null;
   kind: AdminLessonDocumentKind;
+  sortOrder: number;
   title: string | null;
   status: AdminDocumentStatus;
   extractError: string | null;

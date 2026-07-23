@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   assertNoDuplicateLessonRanges,
+  assertNoOverlappingSourceExtractions,
   assertPageRangeOrder,
   buildPageRangeWarnings,
   normalizeOptionalTitle,
@@ -44,6 +45,38 @@ describe("M4.2 document range helpers", () => {
         { lessonId: duplicateLessonId, pageStart: 3, pageEnd: 4 },
       ]),
     ).toThrow(BadRequestException);
+  });
+
+  it("rejects inclusive overlap only when extraction blocks use the same source", () => {
+    expect(() =>
+      assertNoOverlappingSourceExtractions([
+        {
+          sourceDocumentId: "source-a",
+          pageStart: 1,
+          pageEnd: 5,
+        },
+        {
+          sourceDocumentId: "source-a",
+          pageStart: 5,
+          pageEnd: 8,
+        },
+      ]),
+    ).toThrow(BadRequestException);
+
+    expect(() =>
+      assertNoOverlappingSourceExtractions([
+        {
+          sourceDocumentId: "source-a",
+          pageStart: 1,
+          pageEnd: 5,
+        },
+        {
+          sourceDocumentId: "source-b",
+          pageStart: 5,
+          pageEnd: 8,
+        },
+      ]),
+    ).not.toThrow();
   });
 
   it("returns overlap and gap warnings without blocking save", () => {

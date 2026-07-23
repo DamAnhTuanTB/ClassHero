@@ -1,26 +1,30 @@
 "use client";
 
-import { FilePlus2, Trash2, Upload, Eye } from "lucide-react";
+import { Eye, FilePlus2, Files, Trash2, Upload } from "lucide-react";
 import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
-import { useFieldArray, type UseFormReturn } from "react-hook-form";
+import type { UseFieldArrayReturn, UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { TextField } from "@/components/common/forms/text-field";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
+import type { AdminDocumentStatus } from "@/features/admin/courses/types/admin-course-document-types";
 import { cn } from "@/lib/utils";
 
 export function LessonSupplementDocumentsSection({
   disabled,
   form,
   isSaving,
+  documentFieldArray,
 }: {
   disabled: boolean;
   form: UseFormReturn<LessonFormValues>;
   isSaving: boolean;
+  documentFieldArray: UseFieldArrayReturn<
+    LessonFormValues,
+    "referenceDocuments",
+    "id"
+  >;
 }) {
-  const { append, fields, remove } = useFieldArray({
-    control: form.control,
-    name: "referenceDocuments",
-  });
+  const { append, fields, remove } = documentFieldArray;
   const isDisabled = disabled || isSaving;
   const supplementCount = form
     .watch("referenceDocuments")
@@ -28,20 +32,27 @@ export function LessonSupplementDocumentsSection({
 
   return (
     <section
-      data-testid="lesson-reference-documents-section"
+      data-testid="lesson-supplement-documents-section"
       className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="theme-button-primary-subtle grid h-9 w-9 shrink-0 place-items-center rounded-lg">
-            <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+            <Files className="h-4 w-4" aria-hidden="true" />
           </span>
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <FieldLabel
               id="admin-lesson-reference-documents"
               label="Tài liệu bổ sung"
               isOptional
             />
+            <span
+              data-testid="supplement-document-count"
+              aria-label={`${supplementCount} tài liệu bổ sung`}
+              className="inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-[var(--theme-surface)] px-2 py-0.5 text-xs font-extrabold tabular-nums text-[var(--theme-text-muted)]"
+            >
+              {supplementCount}
+            </span>
           </div>
         </div>
         <button
@@ -49,7 +60,6 @@ export function LessonSupplementDocumentsSection({
           disabled={isDisabled}
           onClick={() => {
             append({ file: null, title: "", type: "SUPPLEMENT" });
-            setTimeout(() => form.trigger(`referenceDocuments`), 0);
           }}
           className="theme-button-neutral inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
@@ -78,7 +88,7 @@ export function LessonSupplementDocumentsSection({
               `referenceDocuments.${index}.originalName`,
             ) as string | undefined;
             const docStatus = form.watch(`referenceDocuments.${index}.status`) as
-              string | undefined;
+              AdminDocumentStatus | undefined;
             const docProgress = form.watch(`referenceDocuments.${index}.progress`) as
               number | undefined;
 
@@ -113,7 +123,7 @@ export function LessonSupplementDocumentsSection({
                       {docStatus && (
                         <div className="ml-auto flex shrink-0 items-center">
                           <DocumentStatusBadge
-                            status={docStatus as any}
+                            status={docStatus}
                             progress={docProgress}
                           />
                         </div>
@@ -162,7 +172,7 @@ export function LessonSupplementDocumentsSection({
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-2 lg:mt-[34px]">
+                <div className="flex min-h-[3.35rem] self-start items-center justify-end gap-2 lg:mt-7 lg:justify-start">
                   <button
                     type="button"
                     aria-label="Xem tài liệu"

@@ -17,29 +17,20 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { CreateLessonDocumentDto } from "#api/modules/learning-paths/dto/create-lesson-document.dto";
 import { ReplacePrimaryLessonDocumentDto } from "#api/modules/learning-paths/dto/replace-primary-lesson-document.dto";
-import {
-  lessonDocumentPageRangeSelect,
-  lessonDocumentSelect,
-  sourceDocumentSelect,
-} from "#api/modules/learning-paths/selectors/document.selects";
-import {
-  serializeLessonDocument,
-  serializeLessonDocumentPageRange,
-} from "#api/modules/learning-paths/serializers/document.serializers";
+import { lessonDocumentSelect } from "#api/modules/learning-paths/selectors/document.selects";
+import { serializeLessonDocument } from "#api/modules/learning-paths/serializers/document.serializers";
 import type { LessonDocumentRecord } from "#api/modules/learning-paths/types/document.types";
 import { UpdateLessonDocumentDto } from "#api/modules/learning-paths/dto/update-lesson-document.dto";
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
 import {
-  assertPageRangeOrder,
-  assertSourceDocumentReadyForPageRanges,
   handleDocumentPrismaError,
   normalizeOptionalTitle,
   throwDocumentFileNotFound,
   throwLessonDocumentNotFound,
-  throwSourceDocumentNotFound,
   toDocumentInputJson,
 } from "#api/modules/learning-paths/utils/document.helpers";
 import { throwLessonNotFound } from "#api/modules/learning-paths/utils/lesson.helpers";
+import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
 
 @Injectable()
 export class LessonDocumentsService {
@@ -47,6 +38,8 @@ export class LessonDocumentsService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(BackgroundJobQueueService)
     private readonly backgroundJobQueue: BackgroundJobQueueService,
+    @Inject(SourceDocumentsService)
+    private readonly sourceDocumentsService: SourceDocumentsService,
   ) {}
 
   async listForLesson(lessonId: string) {
@@ -58,7 +51,7 @@ export class LessonDocumentsService {
         replacedAt: null,
       },
       select: lessonDocumentSelect,
-      orderBy: [{ createdAt: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
     return documents.map(serializeLessonDocument);
@@ -94,7 +87,7 @@ export class LessonDocumentsService {
         },
       },
       select: lessonDocumentSelect,
-      orderBy: [{ lessonId: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
     return documents.map(serializeLessonDocument);
@@ -108,142 +101,53 @@ export class LessonDocumentsService {
   ) {
     try {
       const document = await this.prisma.$transaction(async (tx) => {
-        const lesson = await this.assertLessonExists(tx, lessonId);
-        const now = new Date();
+        await this.assertLessonExists(tx, lessonId);
 
         if (this.isSourceReplacement(dto)) {
-          assertPageRangeOrder(dto.pageStart, dto.pageEnd);
+          const created =
+            await this.sourceDocumentsService.assignSingleLessonPageRangeInTransaction(
+              tx,
+              {
+                actorUserId,
+                context,
+                lessonId,
+                pageEnd: dto.pageEnd,
+                pageStart: dto.pageStart,
+                sourceDocumentId: dto.sourceDocumentId,
+              },
+            );
 
-          const sourceDocument = await tx.sourceDocument.findFirst({
-            where: {
-              id: dto.sourceDocumentId,
-              learningPathId: lesson.learningPathId,
-              deletedAt: null,
-            },
-            select: sourceDocumentSelect,
-          });
-
-          if (!sourceDocument) {
-            throwSourceDocumentNotFound();
-          }
-
-          const pageLimit = await assertSourceDocumentReadyForPageRanges(
-            tx,
-            sourceDocument,
-          );
-          if (dto.pageEnd > pageLimit) {
+          if (!created) {
             throwBadRequest(
               "VALIDATION_ERROR",
-              "Khoảng trang vượt quá số trang của tài liệu nguồn",
-              {
-                pageStart: dto.pageStart,
-                pageEnd: dto.pageEnd,
-                pageCount: pageLimit,
-              },
+              "Không thể tạo tài liệu trích xuất",
             );
           }
 
-          await tx.lessonDocumentPageRange.deleteMany({
-            where: {
-              lessonId,
-              sourceDocumentId: {
-                not: sourceDocument.id,
-              },
-            },
-          });
-
-          const pageRange = await tx.lessonDocumentPageRange.upsert({
-            where: {
-              lessonId_sourceDocumentId: {
-                lessonId,
-                sourceDocumentId: sourceDocument.id,
-              },
-            },
-            create: {
-              lessonId,
-              sourceDocumentId: sourceDocument.id,
-              pageStart: dto.pageStart,
-              pageEnd: dto.pageEnd,
-              createdById: actorUserId,
-              metadataJson: toDocumentInputJson({
-                source: "primary_document_replacement",
-              }),
-            },
-            update: {
-              pageStart: dto.pageStart,
-              pageEnd: dto.pageEnd,
-              metadataJson: toDocumentInputJson({
-                source: "primary_document_replacement",
-              }),
-            },
-            select: lessonDocumentPageRangeSelect,
-          });
-
-          await this.replaceActivePrimaryDocuments(tx, lessonId, now);
-          const created = await tx.lessonDocument.create({
-            data: {
-              lessonId,
-              fileId: sourceDocument.fileId,
-              sourceDocumentId: sourceDocument.id,
-              kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
-              title:
-                normalizeOptionalTitle(dto.title) ??
-                sourceDocument.title ??
-                `Tài liệu chính trang ${dto.pageStart}-${dto.pageEnd}`,
-              status: DocumentStatus.PROCESSING,
-              contentHash: sourceDocument.contentHash,
-              metadataJson: toDocumentInputJson({
-                source: "source_document_primary_replacement",
-                pageStart: dto.pageStart,
-                pageEnd: dto.pageEnd,
-                pageRange: serializeLessonDocumentPageRange(pageRange),
-              }),
-            },
-            select: lessonDocumentSelect,
-          });
-
-          const withJob = await this.attachDocumentJob(tx, {
-            actorUserId,
-            lessonId,
-            document: created,
-            action: "LESSON_PRIMARY_REPLACEMENT_FROM_SOURCE",
-            inputMeta: {
-              sourceDocumentId: sourceDocument.id,
-              pageStart: dto.pageStart,
-              pageEnd: dto.pageEnd,
-            },
-          });
-
           await this.auditDocumentChange(tx, {
             actorUserId,
-            action: "LESSON_PRIMARY_DOCUMENT_REPLACED",
-            document: withJob,
+            action: "LESSON_SOURCE_EXTRACTION_REPLACED",
+            document: created,
             context,
           });
 
-          return withJob;
+          return created;
         }
 
         if (this.isFileReplacement(dto)) {
           const file = await this.getLessonDocumentFile(tx, dto.fileId);
 
-          await tx.lessonDocumentPageRange.deleteMany({
-            where: {
-              lessonId,
-            },
-          });
-          await this.replaceActivePrimaryDocuments(tx, lessonId, now);
-
           const created = await tx.lessonDocument.create({
             data: {
               lessonId,
               fileId: file.id,
-              kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
+              kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
               title: normalizeOptionalTitle(dto.title),
               status: DocumentStatus.PROCESSING,
               contentHash: file.checksum,
               metadataJson: toDocumentInputJson({
-                source: "uploaded_primary_replacement",
+                source: "uploaded_primary_document",
+                processingMode: "processing",
               }),
             },
             select: lessonDocumentSelect,
@@ -253,7 +157,7 @@ export class LessonDocumentsService {
             actorUserId,
             lessonId,
             document: created,
-            action: "LESSON_PRIMARY_REPLACEMENT_UPLOAD",
+            action: "LESSON_PRIMARY_UPLOAD_PROCESSING",
             inputMeta: {
               fileId: file.id,
             },
@@ -261,7 +165,7 @@ export class LessonDocumentsService {
 
           await this.auditDocumentChange(tx, {
             actorUserId,
-            action: "LESSON_PRIMARY_DOCUMENT_REPLACED",
+            action: "LESSON_PRIMARY_DOCUMENT_CREATED",
             document: withJob,
             context,
           });
@@ -271,7 +175,7 @@ export class LessonDocumentsService {
 
         throwBadRequest(
           "VALIDATION_ERROR",
-          "Cần gửi sourceDocumentId + pageStart/pageEnd hoặc fileId để thay thế tài liệu chính",
+          "Cần gửi sourceDocumentId + pageStart/pageEnd hoặc fileId cho tài liệu nền tảng",
         );
       });
 
@@ -283,24 +187,12 @@ export class LessonDocumentsService {
     }
   }
 
-  async createSupplementalDocument(
+  async createLessonDocument(
     lessonId: string,
     actorUserId: string,
     dto: CreateLessonDocumentDto,
     context: RequestContext = {},
   ) {
-    if (
-      dto.kind &&
-      dto.kind !== LessonDocumentKind.SUPPLEMENT &&
-      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT &&
-      dto.kind !== LessonDocumentKind.HOMEWORK
-    ) {
-      throwBadRequest(
-        "VALIDATION_ERROR",
-        "Endpoint này chỉ dùng để upload tài liệu bổ sung, tài liệu chính hoặc bài tập về nhà",
-      );
-    }
-
     try {
       const document = await this.prisma.$transaction(async (tx) => {
         await this.assertLessonExists(tx, lessonId);
@@ -308,36 +200,25 @@ export class LessonDocumentsService {
         const isStorageOnly = dto.processingMode === "STORAGE_ONLY";
 
         const kind = dto.kind || LessonDocumentKind.SUPPLEMENT;
-
-        if (kind === LessonDocumentKind.PRIMARY_REPLACEMENT) {
-          await tx.lessonDocument.updateMany({
-            where: {
-              lessonId,
-              kind: {
-                in: [
-                  LessonDocumentKind.PRIMARY_FROM_SOURCE,
-                  LessonDocumentKind.PRIMARY_REPLACEMENT,
-                ],
-              },
-              replacedAt: null,
-            },
-            data: {
-              replacedAt: new Date(),
-            },
-          });
-        }
+        const source =
+          kind === LessonDocumentKind.PRIMARY_FROM_SOURCE
+            ? "uploaded_primary_document"
+            : kind === LessonDocumentKind.HOMEWORK
+              ? "uploaded_homework_document"
+              : "uploaded_supplement_document";
 
         const created = await tx.lessonDocument.create({
           data: {
             lessonId,
             fileId: file.id,
             kind,
+            sortOrder: dto.sortOrder ?? 0,
             title: normalizeOptionalTitle(dto.title),
             status: isStorageOnly ? DocumentStatus.READY : DocumentStatus.PROCESSING,
             contentHash: file.checksum,
             processedAt: isStorageOnly ? new Date() : undefined,
             metadataJson: toDocumentInputJson({
-              source: "supplemental_lesson_document_upload",
+              source,
               processingMode: isStorageOnly ? "storage_only" : "processing",
             }),
           },
@@ -350,7 +231,10 @@ export class LessonDocumentsService {
               actorUserId,
               lessonId,
               document: created,
-              action: "LESSON_SUPPLEMENT_PROCESSING",
+              action:
+                kind === LessonDocumentKind.PRIMARY_FROM_SOURCE
+                  ? "LESSON_PRIMARY_UPLOAD_PROCESSING"
+                  : "LESSON_SUPPLEMENT_PROCESSING",
               inputMeta: {
                 fileId: file.id,
               },
@@ -358,7 +242,7 @@ export class LessonDocumentsService {
 
         await this.auditDocumentChange(tx, {
           actorUserId,
-          action: "LESSON_SUPPLEMENT_DOCUMENT_CREATED",
+          action: "LESSON_DOCUMENT_CREATED",
           document,
           context,
         });
@@ -374,7 +258,7 @@ export class LessonDocumentsService {
     }
   }
 
-  async updateSupplementalDocument(
+  async updateLessonDocument(
     lessonId: string,
     documentId: string,
     actorUserId: string,
@@ -387,8 +271,8 @@ export class LessonDocumentsService {
 
     if (
       dto.kind &&
+      dto.kind !== LessonDocumentKind.PRIMARY_FROM_SOURCE &&
       dto.kind !== LessonDocumentKind.SUPPLEMENT &&
-      dto.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT &&
       dto.kind !== LessonDocumentKind.HOMEWORK
     ) {
       throwBadRequest(
@@ -407,8 +291,8 @@ export class LessonDocumentsService {
             lessonId,
             kind: {
               in: [
+                LessonDocumentKind.PRIMARY_FROM_SOURCE,
                 LessonDocumentKind.SUPPLEMENT,
-                LessonDocumentKind.PRIMARY_REPLACEMENT,
                 LessonDocumentKind.HOMEWORK,
               ],
             },
@@ -420,39 +304,20 @@ export class LessonDocumentsService {
           throwLessonDocumentNotFound();
         }
 
-        const kind = dto.kind ?? existing.kind;
-
-        if (
-          kind === LessonDocumentKind.PRIMARY_REPLACEMENT &&
-          existing.kind !== LessonDocumentKind.PRIMARY_REPLACEMENT
-        ) {
-          await tx.lessonDocument.updateMany({
-            where: {
-              lessonId,
-              kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
-              replacedAt: null,
-            },
-            data: {
-              replacedAt: new Date(),
-            },
-          });
-
-          await tx.lessonDocument.updateMany({
-            where: {
-              lessonId,
-              kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
-              replacedAt: null,
-            },
-            data: {
-              kind: LessonDocumentKind.SUPPLEMENT,
-            },
-          });
+        if (existing.pageRangeId || existing.sourceDocumentId) {
+          throwConflict(
+            "CONFLICT",
+            "Tài liệu trích xuất phải được cập nhật qua collection khối trích xuất của buổi học",
+          );
         }
+
+        const kind = dto.kind ?? existing.kind;
 
         const updated = await tx.lessonDocument.update({
           where: { id: documentId },
           data: {
             ...(dto.kind !== undefined ? { kind } : {}),
+            ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
             ...(dto.title !== undefined
               ? { title: normalizeOptionalTitle(dto.title) }
               : {}),
@@ -463,7 +328,7 @@ export class LessonDocumentsService {
 
         await this.auditDocumentChange(tx, {
           actorUserId,
-          action: "LESSON_SUPPLEMENT_DOCUMENT_UPDATED",
+          action: "LESSON_DOCUMENT_UPDATED",
           document: updated,
           context,
         });
@@ -477,7 +342,7 @@ export class LessonDocumentsService {
     }
   }
 
-  async deleteSupplementalDocument(
+  async deleteLessonDocument(
     lessonId: string,
     documentId: string,
     actorUserId: string,
@@ -500,12 +365,12 @@ export class LessonDocumentsService {
         }
 
         if (
-          document.kind !== LessonDocumentKind.SUPPLEMENT &&
-          document.kind !== LessonDocumentKind.HOMEWORK
+          document.kind === LessonDocumentKind.PRIMARY_FROM_SOURCE &&
+          document.sourceDocumentId
         ) {
           throwConflict(
             "CONFLICT",
-            "Chỉ được xóa tài liệu bổ sung hoặc bài tập về nhà bằng endpoint này",
+            "Tài liệu nền tảng từ khoảng trang phải được xóa bằng flow khoảng trang",
           );
         }
 
@@ -518,7 +383,7 @@ export class LessonDocumentsService {
         await tx.auditLog.create({
           data: {
             actorUserId,
-            action: "LESSON_SUPPLEMENT_DOCUMENT_DELETED",
+            action: "LESSON_DOCUMENT_DELETED",
             entityType: "LessonDocument",
             entityId: document.id,
             before: toDocumentInputJson(serializeLessonDocument(document)),
@@ -589,28 +454,6 @@ export class LessonDocumentsService {
     }
 
     return file;
-  }
-
-  private replaceActivePrimaryDocuments(
-    tx: Prisma.TransactionClient,
-    lessonId: string,
-    replacedAt: Date,
-  ) {
-    return tx.lessonDocument.updateMany({
-      where: {
-        lessonId,
-        kind: {
-          in: [
-            LessonDocumentKind.PRIMARY_FROM_SOURCE,
-            LessonDocumentKind.PRIMARY_REPLACEMENT,
-          ],
-        },
-        replacedAt: null,
-      },
-      data: {
-        replacedAt,
-      },
-    });
   }
 
   private async attachDocumentJob(

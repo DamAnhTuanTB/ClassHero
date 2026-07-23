@@ -114,26 +114,23 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Evidence:
   - Files: `apps/web/features/admin/courses/screens/admin-courses-manager/index.tsx`, `apps/web/features/admin/courses/screens/admin-course-detail-manager/index.tsx`, `apps/web/components/admin/courses/editor-dialog-shell.tsx`, `apps/web/features/admin/courses/screens/admin-courses-manager/components/path-editor.tsx`, `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/chapter-editor.tsx`, `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/lesson-editor.tsx`, `apps/web/components/admin/courses/delete-confirm-dialog.tsx`, `apps/web/features/admin/courses/screens/admin-courses-manager/components/archived-paths-dialog.tsx`, `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/chapter-lesson-panel.tsx`, `apps/web/features/admin/courses/screens/admin-course-detail-manager/components/learning-path-summary-panel.tsx`, `apps/web/features/admin/courses/screens/admin-courses-manager/components/learning-path-row.tsx`.
 
-## Admin Lesson Document Upload - 2026-07-17
+## Admin Lesson Document Upload - updated 2026-07-23
 
 - Context: `M4.5` admin lesson document upload/status flow trong màn quản lý lộ trình/chương/buổi học.
 - Approved:
-  - Flow chính sau khi chốt ngày 2026-07-17: tạo buổi học bằng metadata thô trước, upload một PDF/tài liệu nguồn dài ở cấp lộ trình, rồi gán khoảng trang vào từng buổi học.
+  - Course có thể upload nhiều PDF/tài liệu nguồn; mọi tài liệu trong danh sách đều là nguồn trích xuất ngang hàng.
   - Hệ thống chạy/import paid OCR artifact tài liệu nguồn theo từng trang trước; chunk theo lesson chỉ chạy sau khi admin gán page range.
   - UI nên hiển thị provider, cost estimate, OCR artifact cache status, page/job status, quality summary và visual asset refs nếu backend trả.
-  - UI gán trang hiển thị danh sách buổi học, mỗi dòng có `fromPage`/`toPage`, trạng thái xử lý và preview/warning nếu có.
-  - Mỗi buổi học có hai action riêng: `Upload/Thay thế tài liệu gốc` và `Upload tài liệu bổ sung`.
-  - Khi chưa có tài liệu chính, action tài liệu gốc là upload tài liệu gốc cho buổi; khi đã có tài liệu chính thì là thay thế.
+  - Section nền tảng trong modal lesson có `Thêm trích xuất` và `Thêm tài liệu`; khối trích xuất gồm source select, `fromPage`/`toPage`, preview/warning và có thể xuất hiện nhiều lần.
+  - Khối mới mặc định chọn source đầu danh sách API. Nhiều khối được dùng cùng source nhưng range không được overlap inclusive; source khác được phép trùng số trang.
+  - Modal tạo mới có sẵn một khối trích xuất. Item trích xuất và file upload giữ thứ tự theo action thêm; vừa append item trống chưa hiện lỗi, chỉ validate sau tương tác hoặc submit.
   - Action `Upload tài liệu bổ sung` luôn tồn tại riêng cho mỗi buổi học để thêm phiếu bài tập, đáp án, ảnh công thức hoặc tài liệu tham khảo.
-  - Upload lẻ tài liệu cho từng buổi học là supplemental document flow; không thay thế source PDF dài làm tài liệu chính.
-  - Không đặt upload tài liệu trong modal tạo buổi học; tránh draft upload, file tạm, rollback và cleanup phức tạp trong MVP.
-  - Có action quản lý tài liệu tổng ở cấp detail lộ trình hoặc panel chương/buổi; khi mở ra hiển thị source document, page status và mapping theo lesson.
-  - Bulk upload nhiều file rồi gán mapping từng file vào buổi học không thuộc MVP hiện tại; chỉ cân nhắc sau khi source document page mapping ổn định.
+  - Upload file nền tảng, bổ sung và bài tập về nhà trong modal dùng cùng row pattern nhưng giữ kind/action riêng; tài liệu bổ sung và bài tập về nhà đều cho phép thêm nhiều dòng.
+  - Course detail có action quản lý nhiều tài liệu nguồn, danh sách chọn nguồn, page status và processing state của nguồn đang chọn.
 - Avoid:
-  - Không tạo draft upload session trong modal thêm buổi học nếu chưa có yêu cầu rõ.
-  - Không upload nhiều file vào staging rồi bắt admin map file với lesson trong MVP.
+  - Không upload source document mới trong modal lesson; source document được quản lý ở course detail.
   - Không chunk toàn bộ sách trước rồi đoán lesson; chunk phải theo page range đã được admin xác nhận.
-  - Không trộn action upload/thay thế tài liệu gốc với action upload bổ sung; hai hành động phải có label/state/handler riêng.
+  - Không trộn khối trích xuất, file nền tảng, tài liệu bổ sung và bài tập về nhà; mỗi nhóm phải có label/state/kind đúng.
   - Không để file đã upload nhưng chưa gắn lesson tồn tại âm thầm mà không có cleanup/status rõ.
   - Không để action upload nhìn bấm được nhưng thiếu pending/retry/error feedback.
 - Reuse for:

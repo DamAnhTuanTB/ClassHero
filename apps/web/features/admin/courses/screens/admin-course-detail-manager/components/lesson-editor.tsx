@@ -9,7 +9,8 @@ import {
   Trophy,
   Video,
 } from "lucide-react";
-import type { UseFormReturn } from "react-hook-form";
+import type { FormEvent } from "react";
+import { useFieldArray, type UseFormReturn } from "react-hook-form";
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -31,37 +32,54 @@ export function LessonEditor({
   form,
   isSaving,
   disabled,
-  isRangeReady,
-  pageLimit,
-  pages,
-  rangeDisabledReason,
-  selectedSourceDocument,
   sourceDocuments,
+  sourcePagesByDocumentId,
   onClose,
-  onSelectSourceDocument,
   onSubmit,
 }: {
   mode: EditorMode;
   form: UseFormReturn<LessonFormValues>;
   isSaving: boolean;
   disabled: boolean;
-  isRangeReady: boolean;
-  pageLimit: number | null;
-  pages: AdminSourceDocumentPageApi[];
-  rangeDisabledReason: string;
-  selectedSourceDocument: AdminSourceDocumentApi | null;
   sourceDocuments: AdminSourceDocumentApi[];
+  sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]>;
   onClose: () => void;
-  onSelectSourceDocument: (sourceDocumentId: string | null) => void;
   onSubmit: (values: LessonFormValues) => void | Promise<void>;
 }) {
+  const documentFieldArray = useFieldArray({
+    control: form.control,
+    name: "referenceDocuments",
+  });
+  const extractionFieldArray = useFieldArray({
+    control: form.control,
+    name: "sourceDocumentExtractions",
+  });
+
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    form
+      .getValues("sourceDocumentExtractions")
+      .forEach((_, index) => {
+        form.setValue(
+          `sourceDocumentExtractions.${index}.hasInteracted`,
+          true,
+          {
+            shouldDirty: false,
+            shouldTouch: false,
+            shouldValidate: false,
+          },
+        );
+      });
+
+    void form.handleSubmit(onSubmit)(event);
+  }
+
   return (
     <form
       className={cn(
         "flex w-full min-w-0 min-h-0 flex-1 flex-col overflow-hidden",
         disabled && "opacity-65",
       )}
-      onSubmit={form.handleSubmit(onSubmit)}
+      onSubmit={handleFormSubmit}
       noValidate
     >
       <div className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-3 px-4 py-3 pr-16 sm:px-5 sm:py-3 sm:pr-16">
@@ -99,24 +117,23 @@ export function LessonEditor({
           <LessonSourceRangeSection
             disabled={disabled}
             form={form}
-            isRangeReady={isRangeReady}
             isSaving={isSaving}
-            pageLimit={pageLimit}
-            pages={pages}
-            rangeDisabledReason={rangeDisabledReason}
-            selectedSourceDocument={selectedSourceDocument}
             sourceDocuments={sourceDocuments}
-            onSelectSourceDocument={onSelectSourceDocument}
+            sourcePagesByDocumentId={sourcePagesByDocumentId}
+            extractionFieldArray={extractionFieldArray}
+            documentFieldArray={documentFieldArray}
           />
           <LessonSupplementDocumentsSection
             disabled={disabled}
             form={form}
             isSaving={isSaving}
+            documentFieldArray={documentFieldArray}
           />
           <LessonHomeworkDocumentSection
             disabled={disabled}
             form={form}
             isSaving={isSaving}
+            documentFieldArray={documentFieldArray}
           />
           <div>
             <FieldLabel

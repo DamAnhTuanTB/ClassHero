@@ -194,6 +194,11 @@ describe("M4.2 document API integration", () => {
       cleanupIds.lessonDocumentIds.add(document.id);
       cleanupIds.jobIds.add(document.processingJobId);
     }
+    const lessonOnePageRangeDocument =
+      rangesResponse.body.data.lessonDocuments.find(
+        (document: { lessonId: string }) => document.lessonId === ids.lessonOne,
+      );
+    expect(lessonOnePageRangeDocument).toBeDefined();
 
     const supplementResponse = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
@@ -208,6 +213,55 @@ describe("M4.2 document API integration", () => {
     cleanupIds.lessonDocumentIds.add(supplementResponse.body.data.id);
     cleanupIds.jobIds.add(supplementResponse.body.data.processingJobId);
     expect(supplementResponse.body.data.kind).toBe(LessonDocumentKind.SUPPLEMENT);
+
+    const homeworkResponse = await request(httpServer)
+      .post(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        fileId: ids.supplementFile,
+        title: "Homework",
+        kind: LessonDocumentKind.HOMEWORK,
+      })
+      .expect(201);
+
+    cleanupIds.lessonDocumentIds.add(homeworkResponse.body.data.id);
+    cleanupIds.jobIds.add(homeworkResponse.body.data.processingJobId);
+    expect(homeworkResponse.body.data.kind).toBe(LessonDocumentKind.HOMEWORK);
+
+    const secondHomeworkResponse = await request(httpServer)
+      .post(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        fileId: ids.supplementFile,
+        title: "Homework 2",
+        kind: LessonDocumentKind.HOMEWORK,
+      })
+      .expect(201);
+
+    cleanupIds.lessonDocumentIds.add(secondHomeworkResponse.body.data.id);
+    cleanupIds.jobIds.add(secondHomeworkResponse.body.data.processingJobId);
+    expect(secondHomeworkResponse.body.data.kind).toBe(
+      LessonDocumentKind.HOMEWORK,
+    );
+
+    const uploadedPrimaryResponse = await request(httpServer)
+      .post(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        fileId: ids.supplementFile,
+        title: "Uploaded primary document",
+        kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
+      })
+      .expect(201);
+
+    cleanupIds.lessonDocumentIds.add(uploadedPrimaryResponse.body.data.id);
+    cleanupIds.jobIds.add(uploadedPrimaryResponse.body.data.processingJobId);
+    expect(uploadedPrimaryResponse.body.data).toEqual(
+      expect.objectContaining({
+        kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
+        sourceDocumentId: null,
+      }),
+    );
 
     backgroundJobQueueMock.enqueueMany.mockClear();
     const storageOnlySupplementResponse = await request(httpServer)
@@ -232,7 +286,7 @@ describe("M4.2 document API integration", () => {
     expect(storageOnlySupplementResponse.body.data.metadataJson).toEqual(
       expect.objectContaining({
         processingMode: "storage_only",
-        source: "supplemental_lesson_document_upload",
+        source: "uploaded_supplement_document",
       }),
     );
 
@@ -255,7 +309,20 @@ describe("M4.2 document API integration", () => {
 
     cleanupIds.lessonDocumentIds.add(replaceResponse.body.data.id);
     cleanupIds.jobIds.add(replaceResponse.body.data.processingJobId);
-    expect(replaceResponse.body.data.kind).toBe(LessonDocumentKind.PRIMARY_REPLACEMENT);
+    expect(replaceResponse.body.data.kind).toBe(LessonDocumentKind.PRIMARY_FROM_SOURCE);
+    const replacementJob = await prisma.backgroundJob.findUniqueOrThrow({
+      where: {
+        id: replaceResponse.body.data.processingJobId,
+      },
+      select: {
+        inputMeta: true,
+      },
+    });
+    expect(replacementJob.inputMeta).toEqual(
+      expect.objectContaining({
+        action: "LESSON_PRIMARY_UPLOAD_PROCESSING",
+      }),
+    );
 
     const lessonDocumentsResponse = await request(httpServer)
       .get(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
@@ -264,7 +331,7 @@ describe("M4.2 document API integration", () => {
 
     expect(lessonDocumentsResponse.body.data).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: LessonDocumentKind.PRIMARY_REPLACEMENT }),
+        expect.objectContaining({ kind: LessonDocumentKind.PRIMARY_FROM_SOURCE }),
         expect.objectContaining({ kind: LessonDocumentKind.SUPPLEMENT }),
       ]),
     );
@@ -273,7 +340,39 @@ describe("M4.2 document API integration", () => {
         (document: { kind: LessonDocumentKind }) =>
           document.kind === LessonDocumentKind.PRIMARY_FROM_SOURCE,
       ),
-    ).toHaveLength(0);
+    ).toHaveLength(3);
+    expect(
+      lessonDocumentsResponse.body.data.filter(
+        (document: { kind: LessonDocumentKind }) =>
+          document.kind === LessonDocumentKind.HOMEWORK,
+      ),
+    ).toHaveLength(2);
+
+    await request(httpServer)
+      .delete(
+        `/api/v1/admin/lessons/${ids.lessonOne}/documents/${lessonOnePageRangeDocument.id}`,
+      )
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(409);
+
+    await request(httpServer)
+      .delete(
+        `/api/v1/admin/lessons/${ids.lessonOne}/documents/${uploadedPrimaryResponse.body.data.id}`,
+      )
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    const documentsAfterDirectPrimaryDelete = await request(httpServer)
+      .get(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(
+      documentsAfterDirectPrimaryDelete.body.data.filter(
+        (document: { kind: LessonDocumentKind }) =>
+          document.kind === LessonDocumentKind.PRIMARY_FROM_SOURCE,
+      ),
+    ).toHaveLength(2);
 
     const learningPathDocumentsResponse = await request(httpServer)
       .get(`/api/v1/admin/learning-paths/${ids.learningPath}/lesson-documents`)
@@ -284,7 +383,7 @@ describe("M4.2 document API integration", () => {
       expect.arrayContaining([
         expect.objectContaining({
           lessonId: ids.lessonOne,
-          kind: LessonDocumentKind.PRIMARY_REPLACEMENT,
+          kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
         }),
         expect.objectContaining({
           lessonId: ids.lessonOne,
@@ -406,6 +505,138 @@ describe("M4.2 document API integration", () => {
     expect(updatedRange).toEqual({ pageEnd: 4, pageStart: 3 });
   });
 
+  it("supports multiple source documents and multiple non-overlapping extractions per lesson", async () => {
+    const beforeSources = await prisma.sourceDocument.count({
+      where: {
+        learningPathId: ids.learningPath,
+        deletedAt: null,
+      },
+    });
+    const firstCreatedSource = await request(httpServer)
+      .post(`/api/v1/admin/learning-paths/${ids.learningPath}/source-documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        fileId: ids.sourceFile,
+        title: "Additional source A",
+      })
+      .expect(201);
+    const secondCreatedSource = await request(httpServer)
+      .post(`/api/v1/admin/learning-paths/${ids.learningPath}/source-documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        fileId: ids.replacementFile,
+        title: "Additional source B",
+      })
+      .expect(201);
+
+    for (const response of [firstCreatedSource, secondCreatedSource]) {
+      cleanupIds.sourceDocumentIds.add(response.body.data.id);
+      cleanupIds.jobIds.add(response.body.data.processingJobId);
+    }
+
+    const listedSources = await request(httpServer)
+      .get(`/api/v1/admin/learning-paths/${ids.learningPath}/source-documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+    expect(listedSources.body.data).toHaveLength(beforeSources + 2);
+    const listedSourceIds = listedSources.body.data.map(
+      (item: { id: string }) => item.id,
+    );
+    expect(listedSourceIds).toEqual(
+      expect.arrayContaining([
+        firstCreatedSource.body.data.id,
+        secondCreatedSource.body.data.id,
+      ]),
+    );
+    expect(listedSourceIds.indexOf(firstCreatedSource.body.data.id)).toBeLessThan(
+      listedSourceIds.indexOf(secondCreatedSource.body.data.id),
+    );
+
+    const readySource = await createReadySourceDocument(prisma, {
+      pageCount: 12,
+      title: "Multiple extraction source",
+    });
+    const createResponse = await request(httpServer)
+      .post(`/api/v1/admin/chapters/${ids.chapter}/lessons`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        completionMinScore: 7,
+        orderIndex: 4,
+        sourceDocumentExtractions: [
+          {
+            pageEnd: 3,
+            pageStart: 1,
+            sortOrder: 0,
+            sourceDocumentId: readySource.id,
+          },
+          {
+            pageEnd: 7,
+            pageStart: 5,
+            sortOrder: 1,
+            sourceDocumentId: readySource.id,
+          },
+        ],
+        status: PublishStatus.DRAFT,
+        title: "Lesson with multiple extractions",
+        trialEnabled: false,
+      })
+      .expect(201);
+    const lessonId = createResponse.body.data.id;
+    cleanupIds.lessonIds.add(lessonId);
+
+    const ranges = await prisma.lessonDocumentPageRange.findMany({
+      where: { lessonId },
+      orderBy: { pageStart: "asc" },
+    });
+    expect(ranges.map((range) => [range.pageStart, range.pageEnd])).toEqual([
+      [1, 3],
+      [5, 7],
+    ]);
+
+    const documents = await prisma.lessonDocument.findMany({
+      where: {
+        lessonId,
+        replacedAt: null,
+      },
+      orderBy: { sortOrder: "asc" },
+    });
+    expect(documents).toHaveLength(2);
+    expect(documents.every((document) => Boolean(document.pageRangeId))).toBe(true);
+    for (const document of documents) {
+      cleanupIds.lessonDocumentIds.add(document.id);
+      if (document.processingJobId) {
+        cleanupIds.jobIds.add(document.processingJobId);
+      }
+    }
+
+    const overlapResponse = await request(httpServer)
+      .patch(`/api/v1/admin/lessons/${lessonId}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        sourceDocumentExtractions: [
+          {
+            id: ranges[0]!.id,
+            pageEnd: 5,
+            pageStart: 1,
+            sortOrder: 0,
+            sourceDocumentId: readySource.id,
+          },
+          {
+            id: ranges[1]!.id,
+            pageEnd: 8,
+            pageStart: 5,
+            sortOrder: 1,
+            sourceDocumentId: readySource.id,
+          },
+        ],
+      })
+      .expect(400);
+
+    expect(overlapResponse.body.error.code).toBe(
+      "LESSON_SOURCE_EXTRACTION_OVERLAP",
+    );
+  });
+
   it("rejects page range mapping until the source document is fully ready", async () => {
     const processingSourceDocument = await prisma.sourceDocument.create({
       data: {
@@ -435,6 +666,19 @@ describe("M4.2 document API integration", () => {
       pageCount: 2,
       title: "Review source",
       warningPageNumber: 2,
+    });
+
+    const listedSources = await request(httpServer)
+      .get(`/api/v1/admin/learning-paths/${ids.learningPath}/source-documents`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+    const reviewSource = listedSources.body.data.find(
+      (source: { id: string }) => source.id === reviewSourceDocument.id,
+    );
+    expect(reviewSource.readiness).toMatchObject({
+      isEligibleForExtraction: false,
+      status: "NEEDS_CONFIRMATION",
+      warningPageCount: 1,
     });
 
     await request(httpServer)

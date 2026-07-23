@@ -2,6 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { PublishStatus } from "@prisma/client";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -17,7 +19,21 @@ import {
   ValidateNested,
 } from "class-validator";
 
-export class LessonSourceDocumentPageRangeDto {
+export class LessonSourceDocumentExtractionDto {
+  @ApiPropertyOptional({
+    description: "Existing extraction id, used when updating a lesson",
+  })
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @ApiPropertyOptional({ example: 0, minimum: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
   @ApiProperty({ example: "00000000-0000-0000-0000-000000000000" })
   @IsUUID()
   sourceDocumentId!: string;
@@ -33,12 +49,10 @@ export class LessonSourceDocumentPageRangeDto {
   @IsInt()
   @Min(1)
   pageEnd!: number;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  isPrimary?: boolean;
 }
+
+/** @deprecated Use LessonSourceDocumentExtractionDto. */
+export class LessonSourceDocumentPageRangeDto extends LessonSourceDocumentExtractionDto {}
 
 export class CreateLessonDto {
   @ApiProperty({ example: 1, minimum: 1 })
@@ -97,7 +111,22 @@ export class CreateLessonDto {
   @IsEnum(PublishStatus)
   status?: PublishStatus;
 
-  @ApiPropertyOptional({ type: LessonSourceDocumentPageRangeDto })
+  @ApiPropertyOptional({
+    type: [LessonSourceDocumentExtractionDto],
+    description:
+      "Ordered source-document extractions. Ranges using the same source must not overlap.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => LessonSourceDocumentExtractionDto)
+  sourceDocumentExtractions?: LessonSourceDocumentExtractionDto[];
+
+  @ApiPropertyOptional({
+    type: LessonSourceDocumentPageRangeDto,
+    deprecated: true,
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => LessonSourceDocumentPageRangeDto)

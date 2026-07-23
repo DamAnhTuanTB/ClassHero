@@ -143,14 +143,14 @@ Acceptance Criteria:
 
 Actor: Admin.
 
-Flow chính MVP: upload một tài liệu nguồn dài cho lộ trình rồi gán trang vào từng buổi học. Hệ thống hỗ trợ cả hai thứ tự thao tác phổ biến:
+Flow chính MVP: upload một hoặc nhiều tài liệu nguồn ở cấp lộ trình rồi tạo các khối trích xuất cho từng buổi học. Hệ thống hỗ trợ cả hai thứ tự thao tác phổ biến:
 
 - Tạo chương/buổi học trước, sau đó upload sách và gán page range hàng loạt.
 - Upload sách trước, sau đó tạo chương/buổi học và gán page range ngay trong modal tạo/sửa buổi học.
 
 Các bước:
 
-1. Admin upload một PDF/tài liệu nguồn dài ở cấp lộ trình, hoặc dùng source document đã upload trước đó.
+1. Admin upload một hoặc nhiều PDF/tài liệu nguồn ở cấp lộ trình, hoặc dùng source documents đã upload trước đó. Mọi tài liệu trong danh sách đều là nguồn trích xuất ngang hàng.
 2. Admin tạo/sửa chương và buổi học.
 3. Backend validate file type và size.
 4. Backend tạo object key.
@@ -158,10 +158,10 @@ Các bước:
 6. Backend lưu metadata vào `files`.
 7. Backend tạo source document và enqueue job xử lý PDF nếu là PDF.
 8. Worker kiểm tra OCR artifact cache theo `content_hash`; nếu chưa có thì gọi paid OCR provider từ file gốc, rồi lưu page text/Markdown/LaTeX, layout/region refs, visual refs nếu có, snapshot/thumbnail và quality status.
-9. Nếu source document đã có và đã xử lý xong, modal tạo/sửa buổi học cho admin chọn source document, nhập khoảng trang tùy chọn, xem preview trang/text ngắn và lưu mapping ngay cùng thao tác lesson; nếu chỉ muốn tạo metadata buổi học trước thì bỏ trống khoảng trang.
-10. Khi tạo buổi học, admin có thể thêm nhiều tài liệu tham khảo tùy chọn theo từng dòng gồm tên tài liệu và file PDF. Các file này chỉ lưu kèm buổi học, không chạy OCR/chunking.
+9. Modal tạo/sửa buổi học cho admin tạo nhiều khối trích xuất. Mỗi khối gồm select `Tài liệu trích xuất`, `Từ trang`, `Đến trang` và preview. Select chỉ chứa source document đã đủ trang, mọi page `READY` và đã xác nhận hết cảnh báo số trang in; danh sách giữ thứ tự upload cũ đến mới và mặc định chọn item hợp lệ đầu tiên.
+10. Section `Tài liệu nền tảng` có hai action độc lập: `Thêm trích xuất` luôn nối thêm một khối trích xuất và `Thêm tài liệu` nối thêm một file PDF nền tảng trực tiếp. Modal tạo mới hiển thị sẵn một khối trích xuất; khối và file hiển thị theo đúng thứ tự admin bấm thêm. Admin cũng có thể thêm nhiều tài liệu bổ sung và tài liệu bài tập về nhà theo từng dòng gồm tên tài liệu và file PDF.
 11. Nếu các buổi học đã tồn tại, admin bấm `Nhập khoảng trang` ở course detail để mở modal gán trang hàng loạt và nhập/chỉnh nhiều lesson cùng lúc.
-12. Backend validate page range và tạo mapping `lesson -> page ranges`.
+12. Backend validate từng page range và toàn bộ collection: các range dùng cùng source document không được giao nhau theo biên inclusive; các source document khác nhau có thể dùng cùng số trang.
 13. Worker chunk nội dung theo từng lesson dựa trên page range.
 14. Worker tạo embedding.
 15. Worker lưu chunks/embedding vào database với `lesson_id` đúng.
@@ -177,11 +177,14 @@ Acceptance Criteria:
 - File chính không lưu trong disk app/VPS.
 - PDF processing chạy background theo paid OCR artifact/page-level trước, chunking theo lesson sau khi có page range.
 - Nếu xử lý lỗi, document status là `FAILED`.
-- Admin thấy trạng thái xử lý tài liệu nguồn, từng trang, từng lesson mapping và tài liệu bổ sung nếu có.
+- Admin thấy trạng thái `Sẵn sàng`/`Cần xác nhận` ngay trên từng tài liệu nguồn, đồng thời thấy trạng thái xử lý từng trang, từng lesson mapping và tài liệu bổ sung nếu có.
 - Course detail không nhét toàn bộ form nhập khoảng trang vào màn chính; màn chính chỉ hiển thị danh sách/status gọn, còn chỉnh nhanh toàn bộ lesson nằm trong modal `Nhập khoảng trang`.
-- Upload source PDF vẫn nằm ở cấp lộ trình/course detail. Modal lesson không upload source PDF mới; modal chỉ gán page range từ source document đã có và preview nội dung để tránh chọn nhầm trang.
+- Upload source PDF vẫn nằm ở cấp lộ trình/course detail. Modal lesson không upload source PDF mới; modal chỉ chọn nguồn đã có, tạo các khối trích xuất và preview nội dung để tránh chọn nhầm trang.
 - Các input khoảng trang trong modal lesson và modal `Nhập khoảng trang` phải disabled cho tới khi source document ở trạng thái sẵn sàng, đủ page records, tất cả page đã xử lý xong và không còn warning số trang in cần admin xác nhận.
-- Modal tạo buổi học có thể thêm nhiều tài liệu tham khảo storage-only; mỗi dòng cần tên hiển thị tùy chọn và một file PDF, các dòng trống không gửi lên API.
+- Modal tạo/sửa buổi học hỗ trợ nhiều khối trích xuất và nhiều file nền tảng upload cùng lúc. Xóa một khối không xóa các khối/file còn lại.
+- Nút `Thêm trích xuất` luôn khả dụng khi form không pending và mỗi lần bấm nối thêm một khối mới.
+- Khi vừa append khối/file trống, UI chưa hiện lỗi. Lỗi realtime bắt đầu sau khi người dùng tương tác; submit vẫn hiển thị đầy đủ lỗi bắt buộc.
+- Các range cùng `sourceDocumentId` không được giao nhau, kể cả chạm biên (`1-5` và `5-10`); range của các source khác nhau được phép trùng số trang.
 
 ---
 

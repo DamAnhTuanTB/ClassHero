@@ -53,8 +53,9 @@ export type LessonMatch = {
 
 export type LessonReferenceDocumentUpload = {
   file: File;
+  sortOrder: number;
   title?: string;
-  type?: "SUPPLEMENT" | "HOMEWORK";
+  type?: "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
 };
 
 export function toPathFormValues(path: AdminLearningPath): LearningPathFormValues {
@@ -110,17 +111,19 @@ export function toLessonFormValues(
     completionMinScore: lesson.completionMinScore,
     trialEnabled: lesson.trialEnabled,
     status: lesson.status,
-    sourceDocumentPageRange: {
-      sourceDocumentId: "",
-      pageStart: "",
-      pageEnd: "",
-    },
+    sourceDocumentExtractions: [],
+    foundationDocumentOrder: existingSupplements
+      ? existingSupplements
+          .filter((doc) => doc.kind === "PRIMARY_FROM_SOURCE")
+          .map((doc) => `UPLOAD:${doc.id}`)
+      : [],
     referenceDocuments:
       existingSupplements?.map((doc) => ({
         id: doc.id,
+        clientKey: doc.id,
         title: doc.title || "",
         originalName: doc.file?.originalName || "Tài liệu",
-        type: doc.kind === "HOMEWORK" ? "HOMEWORK" : "SUPPLEMENT",
+        type: doc.kind,
         status: doc.status,
         extractError: doc.extractError || undefined,
         progress: doc.processingJob?.progress || undefined,
@@ -146,7 +149,7 @@ export function toLessonPayload(values: LessonFormValues): Omit<AdminLesson, "id
 export function getLessonReferenceDocumentUploads(
   values: LessonFormValues,
 ): LessonReferenceDocumentUpload[] {
-  return values.referenceDocuments.flatMap((document) => {
+  return values.referenceDocuments.flatMap((document, index) => {
     const file = document.file ?? null;
 
     if (!file) {
@@ -156,11 +159,27 @@ export function getLessonReferenceDocumentUploads(
     return [
       {
         file,
+        sortOrder: resolveFoundationDocumentSortOrder(values, document, index),
         title: document.title?.trim() || file.name,
         type: document.type,
       },
     ];
   });
+}
+
+export function resolveFoundationDocumentSortOrder(
+  values: LessonFormValues,
+  document: LessonFormValues["referenceDocuments"][number],
+  fallbackIndex = 0,
+) {
+  const key = document.clientKey ?? document.id;
+  const explicitOrder = key
+    ? values.foundationDocumentOrder.indexOf(`UPLOAD:${key}`)
+    : -1;
+
+  return explicitOrder >= 0
+    ? explicitOrder
+    : values.foundationDocumentOrder.length + fallbackIndex;
 }
 
 export function toChapterFormValues(chapter: AdminChapter): ChapterFormValues {

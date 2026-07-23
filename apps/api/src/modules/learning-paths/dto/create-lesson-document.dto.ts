@@ -3,10 +3,12 @@ import { LessonDocumentKind } from "@prisma/client";
 import {
   IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Min,
   MinLength,
 } from "class-validator";
 
@@ -41,4 +43,10 @@ export class CreateLessonDocumentDto {
   @IsOptional()
   @IsIn(lessonDocumentProcessingModes)
   processingMode?: LessonDocumentProcessingMode;
+
+  @ApiPropertyOptional({ example: 0, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
 }

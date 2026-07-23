@@ -130,7 +130,7 @@ updated_at timestamp
 
 Index/constraint:
 
-- unique `(lesson_id, source_document_id)`.
+- index `(lesson_id, source_document_id)`.
 - index `lesson_id`.
 - index `source_document_id`.
 - index `created_by_id`.
@@ -139,7 +139,8 @@ Rules:
 
 - `page_start <= page_end`.
 - Lesson phải thuộc cùng learning path với source document.
-- Cho phép cảnh báo range trùng/bỏ sót ở API/UI; không tự động gán page nếu admin chưa xác nhận.
+- Một lesson có thể có nhiều range, kể cả nhiều range từ cùng source document.
+- Các range của cùng lesson và cùng source document không được giao nhau theo biên inclusive; rule này được validate ở API transaction. Range thuộc source document khác có thể trùng số trang.
 - Khi mapping đổi, worker phải tạo lại chunks cho lesson liên quan.
 
 ### 4.5. `lesson_documents`
@@ -151,7 +152,9 @@ id uuid pk
 lesson_id uuid fk lessons.id
 file_id uuid fk files.id
 source_document_id uuid? fk source_documents.id
-kind string default SUPPLEMENT -- PRIMARY_FROM_SOURCE | PRIMARY_REPLACEMENT | SUPPLEMENT
+page_range_id uuid? unique fk lesson_document_page_ranges.id
+kind string default SUPPLEMENT -- PRIMARY_FROM_SOURCE | SUPPLEMENT | HOMEWORK
+sort_order int default 0
 title string?
 status DocumentStatus default UPLOADED
 extracted_text text?
@@ -177,6 +180,8 @@ Index:
 - `content_hash`.
 - `file_id`.
 - `source_document_id`.
+- `page_range_id` unique.
+- `(lesson_id, kind, sort_order)`.
 - `processing_job_id`.
 - `replaced_at`.
 
@@ -186,12 +191,16 @@ Rules:
 - Nếu tài liệu thay đổi, worker phải tạo lại chunks/embedding và các explanation liên quan có thể bị stale.
 - Chapter không có `chapter_documents` riêng ở MVP; tài liệu/chunk/embedding chỉ gắn với lesson.
 - Với source document dài, `lesson_documents` có thể trỏ tới `source_document_id` và dùng `lesson_document_page_ranges` để biết page range nguồn.
-- `PRIMARY_FROM_SOURCE` là tài liệu chính của lesson được tạo từ source document + page range.
-- `PRIMARY_REPLACEMENT` là tài liệu chính thay thế của lesson, có thể đến từ page range mới hoặc file upload riêng.
+- `PRIMARY_FROM_SOURCE` là **Tài liệu nền tảng** của lesson. Tài liệu này có thể đến từ source document + page range hoặc từ file upload trực tiếp; một lesson có thể có nhiều bản ghi active cùng kind này.
 - `SUPPLEMENT` là tài liệu bổ sung upload trực tiếp cho lesson, ví dụ phiếu bài tập riêng, đáp án, ảnh công thức hoặc tài liệu tham khảo.
+- `HOMEWORK` là tài liệu bài tập về nhà upload trực tiếp cho lesson.
 - `SUPPLEMENT` có thể là tài liệu cần xử lý hoặc storage-only. Storage-only dùng cho tài liệu tham khảo thêm trong modal tạo lesson: lưu file/document, `status = READY`, `chunk_count = 0`, không có `processing_job_id`, và `metadata_json.processingMode = "storage_only"`.
-- Mỗi lesson chỉ có một tài liệu chính active tại một thời điểm; tài liệu chính cũ được đánh dấu bằng `replaced_at`, thay thế tài liệu chính không được xóa hoặc làm mất supplemental documents.
-- Một lesson có thể có một hoặc nhiều supplemental documents; tất cả chunks cuối cùng vẫn phải gắn `lesson_id`.
+- Mỗi lesson có thể có nhiều tài liệu nền tảng dạng source document + page range và nhiều tài liệu nền tảng dạng file upload trực tiếp.
+- `page_range_id` liên kết chính xác một lesson document với một khối trích xuất; không suy ra bằng cặp `(lesson_id, source_document_id)` vì cùng source có thể có nhiều range.
+- `source_document_id`/`page_range_id`/metadata phân biệt tài liệu nền tảng từ khối trích xuất với file nền tảng upload; không tạo thêm document kind.
+- `sort_order` giữ thứ tự tương đối giữa các tài liệu nền tảng trong modal.
+- `replaced_at` giữ lịch sử khi một khối trích xuất đổi nguồn/range hoặc bị xóa; thêm file/khối khác không đánh dấu các tài liệu nền tảng còn lại là replaced.
+- Một lesson có thể có một hoặc nhiều tài liệu `PRIMARY_FROM_SOURCE`/`SUPPLEMENT`/`HOMEWORK`; tất cả chunks cuối cùng vẫn phải gắn `lesson_id`.
 
 ### 4.6. `document_chunks`
 

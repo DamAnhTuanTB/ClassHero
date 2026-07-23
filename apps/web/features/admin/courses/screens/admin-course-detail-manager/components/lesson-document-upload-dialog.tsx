@@ -17,7 +17,7 @@ export function LessonDocumentUploadDialog({
 }: {
   isOpen: boolean;
   isSaving: boolean;
-  kind: Exclude<AdminLessonDocumentKind, "PRIMARY_FROM_SOURCE">;
+  kind: Exclude<AdminLessonDocumentKind, "HOMEWORK">;
   lesson: AdminLessonWithChapter | null;
   onClose: () => void;
   onSubmit: (file: File, title: string) => Promise<unknown>;
@@ -25,16 +25,14 @@ export function LessonDocumentUploadDialog({
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
-  const [titleTouched, setTitleTouched] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  const isPrimary = kind === "PRIMARY_REPLACEMENT";
+  const isPrimary = kind === "PRIMARY_FROM_SOURCE";
 
   useEffect(() => {
     if (isOpen) {
       setFile(null);
       setTitle("");
       setTitleError(null);
-      setTitleTouched(false);
       setFileError(null);
     }
   }, [isOpen, lesson?.lesson.id]);
@@ -56,7 +54,6 @@ export function LessonDocumentUploadDialog({
 
     if (!title.trim()) {
       setTitleError("Vui lòng nhập tên tài liệu.");
-      setTitleTouched(true);
       hasError = true;
     }
 
@@ -128,11 +125,9 @@ export function LessonDocumentUploadDialog({
             onChange={(event) => {
               const val = event.target.value;
               setTitle(val);
-              setTitleTouched(true);
               setTitleError(val.trim() ? null : "Vui lòng nhập tên tài liệu.");
             }}
             onBlur={() => {
-              setTitleTouched(true);
               setTitleError(title.trim() ? null : "Vui lòng nhập tên tài liệu.");
             }}
             placeholder={isPrimary ? "PDF chính của buổi học" : "Phiếu bài tập thêm"}

@@ -37,12 +37,11 @@ describe("M4.4 document processing worker", () => {
       }),
     );
 
-    expect(prisma.lessonDocumentPageRange.findUniqueOrThrow).toHaveBeenCalledWith({
+    expect(prisma.lessonDocumentPageRange.findFirstOrThrow).toHaveBeenCalledWith({
       where: {
-        lessonId_sourceDocumentId: {
-          lessonId: "lesson-1",
-          sourceDocumentId: "source-1",
-        },
+        id: "range-1",
+        lessonId: "lesson-1",
+        sourceDocumentId: "source-1",
       },
     });
 
@@ -844,10 +843,11 @@ function createSourceChunkingPrismaMock() {
     resourceType: "LESSON_DOCUMENT",
     resourceId: "lesson-document-1",
     inputMeta: {
-      action: "LESSON_CHUNKING_FROM_SOURCE",
+      action: "LESSON_PRIMARY_FROM_SOURCE_PROCESSING",
       lessonId: "lesson-1",
       lessonDocumentId: "lesson-document-1",
       sourceDocumentId: "source-1",
+      pageRangeId: "range-1",
     } satisfies Prisma.InputJsonObject,
     result: null,
     attempts: 0,
@@ -863,9 +863,11 @@ function createSourceChunkingPrismaMock() {
       })),
     },
     lessonDocumentPageRange: {
-      findUniqueOrThrow: vi.fn(async () => ({
+      findFirstOrThrow: vi.fn(async () => ({
+        id: "range-1",
         lessonId: "lesson-1",
         sourceDocumentId: "source-1",
+        pageRangeId: "range-1",
         pageStart: 2,
         pageEnd: 3,
       })),
@@ -909,7 +911,7 @@ function createSourceChunkingPrismaMock() {
       updateMany: vi.fn(async () => ({ count: 0 })),
     },
   } as unknown as PrismaService & {
-    lessonDocumentPageRange: { findUniqueOrThrow: ReturnType<typeof vi.fn> };
+    lessonDocumentPageRange: { findFirstOrThrow: ReturnType<typeof vi.fn> };
     lessonDocument: { update: ReturnType<typeof vi.fn> };
     documentChunk: { createMany: ReturnType<typeof vi.fn> };
   };

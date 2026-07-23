@@ -328,11 +328,20 @@ Body:
   "completionMinScore": 7,
   "trialEnabled": false,
   "status": "DRAFT",
-  "sourceDocumentPageRange": {
-    "sourceDocumentId": "uuid",
-    "pageStart": 20,
-    "pageEnd": 22
-  }
+  "sourceDocumentExtractions": [
+    {
+      "sourceDocumentId": "uuid-source-a",
+      "pageStart": 20,
+      "pageEnd": 22,
+      "sortOrder": 0
+    },
+    {
+      "sourceDocumentId": "uuid-source-a",
+      "pageStart": 30,
+      "pageEnd": 35,
+      "sortOrder": 2
+    }
+  ]
 }
 ```
 
@@ -341,15 +350,17 @@ Behavior:
 - `completionMinScore` mặc định là `7` nếu không gửi.
 - `trialEnabled` mặc định là `false`; học thử thuộc từng buổi học, không thuộc lộ trình.
 - `orderIndex` phải unique trong cùng chapter.
+- `title` được trim, thu gọn khoảng trắng và không được trùng (không phân biệt hoa/thường) với lesson đang hoạt động khác trong cùng chapter. Hai chapter khác nhau có thể dùng cùng tên lesson. Nếu trùng trong chapter, trả `409` với `error.code = "LESSON_TITLE_DUPLICATE"` và message `Buổi học đã trùng tên`.
 - `videoUrl` chỉ chấp nhận YouTube hoặc Google Drive.
-- `sourceDocumentPageRange` là optional extension của flow M4.x, chỉ gửi khi learning path đã có source document sẵn sàng và admin muốn gán trang ngay trong modal tạo buổi học. Nếu admin chỉ muốn tạo metadata buổi học trước, client bỏ trống/không gửi object này.
+- `sourceDocumentExtractions` là ordered collection optional của flow M4.x. Mỗi item trỏ tới một source document thuộc cùng learning path và một range. Gửi `[]` khi lesson không có khối trích xuất.
+- Nhiều item có thể dùng cùng `sourceDocumentId`, nhưng range không được giao nhau theo biên inclusive. Các source document khác nhau có thể dùng cùng số trang.
 
 Side effects:
 
 - Tạo `lessons`.
-- Nếu có `sourceDocumentPageRange`, validate source document thuộc cùng learning path với chapter/lesson, validate page range và tạo lesson document mapping trong cùng transaction nếu có thể.
-- Nếu có `sourceDocumentPageRange`, backend chỉ nhận khi source document `READY`, đủ page records, mọi page `READY` và không còn `printedPage.warning`; nếu chưa đạt, trả lỗi validation thay vì lưu mapping sớm.
-- Nếu có `sourceDocumentPageRange`, enqueue chunking cho đúng `lesson_id`.
+- Nếu có `sourceDocumentExtractions`, backend validate toàn bộ source documents/ranges và reconcile collection trong cùng transaction.
+- Mỗi source document chỉ được dùng khi `READY`, đủ page records, mọi page `READY` và không còn `printedPage.warning`; nếu chưa đạt, trả lỗi validation thay vì lưu mapping sớm.
+- Tạo một `lesson_document_page_ranges` và một `lesson_documents(kind = PRIMARY_FROM_SOURCE)` liên kết bằng `pageRangeId` cho từng khối; enqueue chunking cho các khối mới/đã đổi.
 - Tăng `learning_paths.total_lesson_count`.
 - Ghi `audit_logs`.
 
@@ -365,14 +376,16 @@ Behavior:
 
 Role: `ADMIN`.
 
-Body: partial của body create. `sourceDocumentPageRange` có thể gửi để gán/đổi khoảng trang của tài liệu nguồn cho lesson hiện tại; bỏ qua field này khi chỉ sửa metadata lesson.
+Body: partial của body create. `sourceDocumentExtractions` là collection đầy đủ sau chỉnh sửa: gửi `[]` để xóa tất cả khối, hoặc bỏ field khi chỉ sửa metadata lesson. Item hiện có gửi thêm `id` của page range để backend reconcile ổn định.
 
 Behavior:
 
 - Cho phép đổi `orderIndex`, metadata, thời điểm mở bài thi, video URL, completion score, `trialEnabled` và `status`.
 - `shortDescription`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
 - Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng chapter.
-- Nếu gửi `sourceDocumentPageRange`, backend dùng cùng rule với `POST /admin/lessons/:lessonId/primary-document/replace` dạng page range: validate source document cùng learning path, chỉ cho lưu khi source document/page đã sẵn sàng, cập nhật mapping/tài liệu chính của lesson và enqueue chunking khi range đổi.
+- Nếu đổi `title`, tên mới vẫn phải duy nhất trong cùng chapter theo cùng quy tắc của API tạo lesson; lesson hiện tại được loại khỏi phép kiểm tra.
+- Nếu gửi `sourceDocumentExtractions`, backend validate source document cùng learning path, readiness, thứ tự range và same-source overlap; sau đó tạo/cập nhật/xóa đúng từng mapping và enqueue chunking khi nguồn/range đổi.
+- Same-source overlap trả `400` với `error.code = "LESSON_SOURCE_EXTRACTION_OVERLAP"` và details của hai range xung đột.
 - Ghi `audit_logs`.
 
 ### `DELETE /admin/lessons/:lessonId`
@@ -519,7 +532,7 @@ Behavior:
 
 Role: `ADMIN`.
 
-Ghi chú: Flow chính MVP là upload một PDF/tài liệu nguồn dài ở cấp lộ trình rồi gán page range vào từng lesson. Chapter không có document/material upload riêng.
+Ghi chú: Course có thể upload nhiều PDF/tài liệu nguồn. Mọi source document active đều là nguồn trích xuất ngang hàng cho lesson; chapter không có document/material upload riêng.
 
 Body:
 
@@ -532,7 +545,7 @@ Body:
 
 Side effects:
 
-- Tạo source document.
+- Tạo thêm source document; không thay thế/xóa mềm source documents đã có.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING`.
 - `M4.2` tạo durable job record; `M4.3` nối BullMQ thật để worker nhận job; `M4.4` import hoặc tạo paid OCR artifact page-level nếu PDF.
 
@@ -553,7 +566,9 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả source documents của lộ trình, tổng số trang, trạng thái xử lý và lỗi nếu có.
+- Trả toàn bộ source documents active của lộ trình theo đúng thứ tự upload cũ đến mới (`createdAt asc`, `id asc`).
+- Mỗi item có `readiness` gồm `status`, `isEligibleForExtraction`, `warningPageCount`, `readyPageCount`, `totalPageRecords`. Chỉ item có `isEligibleForExtraction = true` mới được đưa vào source select của modal lesson; item còn `printedPage.warning` có `status = NEEDS_CONFIRMATION`.
+- UI dùng phần tử đầu danh sách làm mặc định cho source select của khối trích xuất mới, nhưng admin có thể chọn bất kỳ phần tử nào.
 
 ### `DELETE /admin/source-documents/:sourceDocumentId`
 
@@ -606,7 +621,7 @@ Behavior:
 
 Role: `ADMIN`.
 
-Ghi chú: Upload hoặc thay thế tài liệu gốc/chính của một lesson. Action này tách biệt với upload tài liệu bổ sung.
+Ghi chú: Endpoint tương thích cho client cũ với một page range hoặc một file. UI mới dùng `sourceDocumentExtractions` trên create/update lesson để quản lý nhiều khối và dùng `POST /admin/lessons/:lessonId/documents` để thêm file nền tảng.
 
 Body khi dùng page range từ source document:
 
@@ -618,7 +633,7 @@ Body khi dùng page range từ source document:
 }
 ```
 
-Body khi upload file riêng làm tài liệu chính thay thế:
+Body tương thích khi upload file nền tảng:
 
 ```json
 {
@@ -629,9 +644,11 @@ Body khi upload file riêng làm tài liệu chính thay thế:
 
 Behavior:
 
-- Chỉ có một tài liệu chính active cho mỗi lesson.
-- Tài liệu chính cũ bị đánh dấu stale/archived theo schema thực tế, không xóa file gốc ngay.
-- Tài liệu bổ sung `SUPPLEMENT` của lesson không bị ảnh hưởng.
+- Client mới không dùng endpoint này để reconcile nhiều khối; collection canonical nằm ở `sourceDocumentExtractions`.
+- Một lesson có thể có nhiều file nền tảng active; tất cả đều trả `kind = PRIMARY_FROM_SOURCE`.
+- Thay page range chỉ đánh dấu page-range document cũ là replaced, không ảnh hưởng các file nền tảng upload.
+- Nhánh `fileId` tạo thêm một file nền tảng và không thay thế các tài liệu nền tảng hiện có.
+- Tài liệu `SUPPLEMENT` và `HOMEWORK` của lesson không bị ảnh hưởng.
 - Nếu thay bằng page range từ source document, backend chỉ nhận khi source document/page đã sẵn sàng như rule của `PUT /admin/source-documents/:sourceDocumentId/lesson-page-ranges`.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING` để import/tạo OCR artifact nếu cần rồi chunk lại cho lesson; `M4.3` nối BullMQ thật.
 
@@ -639,7 +656,7 @@ Behavior:
 
 Role: `ADMIN`.
 
-Ghi chú: Upload tài liệu bổ sung trực tiếp cho một lesson. Tài liệu chính của lesson vẫn ưu tiên đến từ source PDF dài + page range.
+Ghi chú: Upload trực tiếp một tài liệu nền tảng, tài liệu bổ sung hoặc tài liệu bài tập về nhà cho lesson.
 
 Body:
 
@@ -652,6 +669,8 @@ Body:
 }
 ```
 
+`kind` nhận một trong ba giá trị canonical: `PRIMARY_FROM_SOURCE`, `SUPPLEMENT`, `HOMEWORK`.
+
 `processingMode` optional:
 
 - Không gửi hoặc gửi `PROCESSING`: tài liệu bổ sung được đưa vào pipeline xử lý/chunking như context bổ sung của lesson.
@@ -659,7 +678,8 @@ Body:
 
 Side effects:
 
-- Tạo `lesson_documents` trực tiếp cho lesson với `kind = SUPPLEMENT`.
+- Tạo `lesson_documents` trực tiếp cho lesson với kind được gửi lên. `PRIMARY_FROM_SOURCE` ở endpoint này luôn là file upload trực tiếp, không phải page-range mapping.
+- Tạo thêm `PRIMARY_FROM_SOURCE` không replace hoặc xóa các tài liệu nền tảng hiện có.
 - Tạo `background_jobs` queue `DOCUMENT_PROCESSING` khi `processingMode` là `PROCESSING`.
 - `M4.3` nối BullMQ thật để worker nhận job nếu PDF; `M4.4` dùng paid OCR-first cho tài liệu học chính/supplement khi OCR paid được bật.
 
@@ -670,7 +690,8 @@ Role: `ADMIN`.
 Behavior:
 
 - Trả cả tài liệu chính từ source document/page range và tài liệu bổ sung upload trực tiếp.
-- Response cần phân biệt `kind = PRIMARY_FROM_SOURCE | PRIMARY_REPLACEMENT | SUPPLEMENT` để UI nhóm tài liệu rõ ràng.
+- Response chỉ dùng ba kind canonical: `PRIMARY_FROM_SOURCE | SUPPLEMENT | HOMEWORK`.
+- Item từ khối trích xuất có `pageRangeId`, object `pageRange` và `sortOrder`; file upload trực tiếp có `pageRangeId = null`.
 
 ### `GET /admin/learning-paths/:learningPathId/lesson-documents`
 
@@ -681,6 +702,7 @@ Behavior:
 - Trả toàn bộ lesson documents active của các lesson trong một learning path.
 - Dùng cho màn M4.5 để hiển thị tài liệu chính, tài liệu bổ sung, trạng thái chunking và lỗi theo từng buổi học bằng một request tổng hợp, tránh gọi `GET /admin/lessons/:lessonId/documents` lặp lại cho từng lesson.
 - Response item dùng cùng shape với `GET /admin/lessons/:lessonId/documents`.
+- Danh sách được sắp xếp theo `sortOrder`, sau đó `createdAt`/`id` để UI khôi phục thứ tự ổn định.
 
 ### `DELETE /admin/lessons/:lessonId/documents/:documentId`
 
@@ -688,8 +710,8 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Chỉ xóa tài liệu bổ sung `SUPPLEMENT` của lesson.
-- Không cho xóa tài liệu chính bằng endpoint này.
+- Cho xóa file upload trực tiếp `PRIMARY_FROM_SOURCE`, `SUPPLEMENT` hoặc `HOMEWORK`.
+- Không cho xóa tài liệu `PRIMARY_FROM_SOURCE` có `source_document_id`; page range phải được xóa bằng flow mapping của lesson.
 - Không xóa file gốc khỏi object storage trong request này.
 
 ### `POST /admin/lessons/:lessonId/materials`

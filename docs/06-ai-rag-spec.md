@@ -225,20 +225,21 @@ Paid OCR artifact format/import:
 
 ### 3.2.1. Lesson page mapping
 
-Sau khi source document đã có page records, admin gán khoảng trang cho từng lesson:
+Sau khi các source documents đã có page records, admin tạo một hoặc nhiều khối trích xuất cho từng lesson:
 
 ```txt
-lesson_id -> source_document_id + page_start + page_end
+lesson_id -> [source_document_id + page_start + page_end]*
 ```
 
 Rules:
 
 - Page range phải nằm trong tổng số trang.
+- Các range trong cùng source document không được overlap inclusive; range từ source document khác được phép dùng cùng số trang.
 - Cho phép cảnh báo range trùng hoặc trang chưa gán, nhưng không tự đoán silently.
 - Nếu tài liệu có số trang in lệch với trang PDF, AI/chat/viewer phải dùng mapping `printedPage` trong page metadata để resolve câu hỏi theo cách học sinh gọi trang. Nếu mapping `missing` hoặc `ambiguous`, service phải fallback có caveat hoặc hỏi lại, không tự coi `pdfPageNumber` là `printedPageNumber`.
-- Khi admin sửa page range, chunks/embedding/explanation liên quan đến lesson đó phải được đánh dấu stale hoặc tạo lại.
+- Khi admin thêm/sửa/xóa một khối trích xuất, chunks/embedding/explanation liên quan đến document đó phải được đánh dấu stale hoặc tạo lại mà không làm mất các khối còn lại.
 - Retrieval/chat vẫn chỉ dùng `lesson_id`; source document chỉ là nguồn tạo chunk.
-- Lesson có thể có thêm supplemental documents upload trực tiếp. Các tài liệu này không cần page range, nhưng chunks cuối cùng vẫn phải gắn cùng `lesson_id`.
+- Lesson có thể có nhiều khối trích xuất, nhiều tài liệu nền tảng upload trực tiếp, supplemental documents và homework documents; mọi chunks cuối cùng vẫn phải gắn cùng `lesson_id`.
 
 ### 3.3. Chunking
 
@@ -246,8 +247,8 @@ Chunking nên giữ ngữ cảnh giáo dục:
 
 - Chunking chạy sau khi có page range mapping.
 - Với source document dài, worker lấy page text trong range của từng lesson rồi mới chunk.
-- Với supplemental documents, worker dùng cùng pipeline OCR artifact/chunk theo file bổ sung và gắn chunks vào lesson sở hữu tài liệu.
-- Retrieval theo lesson phải gom context từ cả tài liệu chính `PRIMARY_FROM_SOURCE` và tài liệu bổ sung `SUPPLEMENT`, nhưng vẫn không lấy chunk từ lesson khác.
+- Với các file upload trực tiếp (`PRIMARY_FROM_SOURCE`, `SUPPLEMENT`, `HOMEWORK`), worker dùng cùng pipeline OCR artifact/chunk theo từng file và gắn chunks vào lesson sở hữu tài liệu.
+- Retrieval theo lesson phải gom context từ tất cả tài liệu active thuộc lesson, gồm nhiều `PRIMARY_FROM_SOURCE`, `SUPPLEMENT` và `HOMEWORK`, nhưng vẫn không lấy chunk từ lesson khác.
 - Chunk theo heading/section nếu extract được.
 - Nếu không, chunk theo đoạn.
 - Có overlap vừa phải.

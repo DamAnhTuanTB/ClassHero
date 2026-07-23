@@ -116,12 +116,12 @@ export function computeAutofillRanges(
     if (startPages[i] === null) {
       let coreTitle = rawTitle
         .replace(
-          /^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:\-\.]?\s*/,
+          /^(bài|chủ đề|tiết|phần|unit|lesson|chuyên đề|buổi)\s+\d+[:.-]?\s*/,
           "",
         )
         .trim();
       if (!coreTitle || coreTitle.length < 3) {
-        coreTitle = rawTitle.replace(/[:\-\.]\s*$/, "");
+        coreTitle = rawTitle.replace(/[:.-]\s*$/, "");
       }
       const normCoreTitle = normalizeText(coreTitle);
       if (normCoreTitle) {

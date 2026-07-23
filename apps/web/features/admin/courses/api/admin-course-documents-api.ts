@@ -153,13 +153,14 @@ export function replaceAdminLessonPrimaryDocument(
   );
 }
 
-export function createAdminLessonSupplementDocument(
+export function createAdminLessonDocument(
   lessonId: string,
   payload: {
     fileId: string;
     title?: string;
-    kind: "SUPPLEMENT" | "PRIMARY_REPLACEMENT" | "HOMEWORK";
+    kind: "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
     processingMode?: "PROCESSING" | "STORAGE_ONLY";
+    sortOrder?: number;
   },
   token: string,
 ) {
@@ -170,12 +171,13 @@ export function createAdminLessonSupplementDocument(
   });
 }
 
-export function updateAdminLessonSupplementDocument(
+export function updateAdminLessonDocument(
   lessonId: string,
   documentId: string,
   payload: {
     title?: string;
-    kind?: "SUPPLEMENT" | "PRIMARY_REPLACEMENT" | "HOMEWORK";
+    kind?: "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
+    sortOrder?: number;
   },
   token: string,
 ) {
@@ -189,7 +191,7 @@ export function updateAdminLessonSupplementDocument(
   );
 }
 
-export function deleteAdminLessonSupplementDocument(
+export function deleteAdminLessonDocument(
   lessonId: string,
   documentId: string,
   token: string,

@@ -92,12 +92,13 @@ export type AdminLessonPayload = {
   scheduledAt?: string | null;
   shortDescription?: string | null;
   status?: AdminPublishStatus;
-  sourceDocumentPageRange?: {
+  sourceDocumentExtractions?: Array<{
+    id?: string;
     sourceDocumentId: string;
     pageStart: number;
     pageEnd: number;
-    isPrimary?: boolean;
-  } | null;
+    sortOrder?: number;
+  }>;
   title?: string;
   trialEnabled?: boolean;
   videoUrl?: string | null;

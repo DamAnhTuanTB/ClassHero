@@ -66,9 +66,7 @@ export function LessonPageRangeRow({
 }) {
   const primaryDocument = getPrimaryLessonDocument(documents);
   const allSupplements = getSupplementLessonDocuments(documents);
-  const supplements = allSupplements.filter(
-    (d) => d.kind === "SUPPLEMENT" || d.kind === "PRIMARY_REPLACEMENT",
-  );
+  const supplements = allSupplements.filter((d) => d.kind === "SUPPLEMENT");
   const homeworks = allSupplements.filter((d) => d.kind === "HOMEWORK");
 
   const allNewSupplements = draft.newSupplements ?? [];
@@ -554,7 +552,7 @@ export function LessonPageRangeRow({
                 { id: crypto.randomUUID(), file: null, title: "", type: "HOMEWORK" },
               ]);
             }}
-            disabled={isSaving || homeworks.length + newHomeworks.length >= 1}
+            disabled={isSaving}
             className="theme-button-neutral inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
