@@ -32,6 +32,7 @@ MVP tập trung vào việc giúp:
 - Có các role: Admin, Student, Parent.
 - Có lộ trình học theo môn và khối lớp.
 - Mỗi lộ trình có nhiều chương học; mỗi chương có nhiều buổi học.
+- Admin có thể tạo một bản lộ trình cá nhân riêng tư từ khóa học mà học sinh đã mua để chỉnh sửa độc lập cho đúng học sinh đó.
 - Có học thử ở buổi học cụ thể do admin bật.
 - Có thanh toán QR/đối soát tự động bằng payOS.
 - Lộ trình học có hạn 12 tháng sau khi thanh toán.
@@ -76,6 +77,7 @@ Không làm trong MVP:
 Admin có quyền:
 
 - Quản lý lộ trình học.
+- Tạo, chỉnh sửa, ngừng sử dụng bản lộ trình cá nhân của một enrollment.
 - Quản lý buổi học.
 - Upload tài liệu/PDF/ảnh.
 - Tạo hoặc chỉnh sửa tóm tắt bài học.
@@ -166,6 +168,20 @@ Quy tắc liên kết:
 - Lộ trình có thể có giá gốc, giá sau khuyến mãi và mã giảm giá.
 - Học thử được bật/tắt ở từng buổi học cụ thể, không cấu hình ở cấp lộ trình.
 - Sau khi thanh toán thành công, enrollment có hạn 12 tháng.
+
+#### 4.1.1. Bản lộ trình cá nhân
+
+- Bản lộ trình cá nhân chỉ được tạo cho một enrollment hợp lệ của học sinh đã mua khóa học gốc.
+- Khóa học gốc tiếp tục là sản phẩm dùng cho giá, payment, enrollment, doanh thu và báo cáo bán hàng.
+- Enrollment có thể dùng khóa gốc hoặc một bản lộ trình cá nhân làm nội dung được giao để học.
+- Mỗi enrollment chỉ có tối đa một bản lộ trình cá nhân đang được sử dụng tại một thời điểm.
+- Bản cá nhân là riêng tư: không xuất hiện ở public/student explore, không có giá riêng, không thể mua, không tạo payment hoặc enrollment mới.
+- Admin được thêm, sửa, xóa mềm và sắp xếp chương/buổi học trong bản cá nhân mà không làm thay đổi khóa gốc.
+- Bản cá nhân là snapshot độc lập; thay đổi về sau ở khóa gốc không tự đồng bộ sang bản cá nhân trong MVP.
+- Sau khi clone hoàn tất và được kích hoạt, bản cá nhân trở thành lộ trình học chính thức, lâu dài của enrollment; không có flow quay lại khóa gốc.
+- Mọi thay đổi và dữ liệu học tập phát sinh sau thời điểm kích hoạt đi theo bản cá nhân; sai sót được sửa trực tiếp trên bản cá nhân thay vì đổi lại nguồn học.
+- File/object storage và OCR artifact không bị sao chép vật lý nếu nội dung không đổi; các bản ghi nội dung có thể tái sử dụng file/artifact nguồn an toàn.
+- Việc nhân bản phải giữ lineage từ chương/buổi học mới về chương/buổi học gốc để bảo toàn và giải thích lịch sử tiến độ.
 
 ### 4.2. Chương học
 

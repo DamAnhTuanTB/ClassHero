@@ -11,6 +11,7 @@ export type TextFieldProps = {
   helperText?: string;
   wrapperClassName?: string;
   labelAction?: ReactNode;
+  trailingAction?: ReactNode;
   hideLabel?: boolean;
   isOptional?: boolean;
   optionalLabel?: string;

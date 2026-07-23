@@ -35,6 +35,7 @@ Behavior:
 
 - Trả thông tin lộ trình.
 - Trả chapters public metadata, mỗi chapter chứa lessons public metadata theo thứ tự.
+- Lesson public metadata trả `lessonType` để UI phân biệt buổi học cơ bản và buổi học live; không trả `liveUrl` qua endpoint public.
 - Mặc định chỉ trả lộ trình `PUBLISHED`.
 - Nếu authenticated student đã có active enrollment với lộ trình đó, detail vẫn trả lộ trình `DRAFT` hoặc `HIDDEN` chưa bị xóa mềm để học sinh thấy khóa học đã mua; UI phải coi `status != PUBLISHED` là trạng thái bảo trì và khóa toàn bộ lesson.
 - M3.3 bổ sung trạng thái enrollment/trial nếu authenticated; M3.5 bổ sung progress cơ bản từ `lesson_progress` cho authenticated student đã mua lộ trình.
@@ -90,6 +91,7 @@ Response detail có thêm `chapters`:
           "orderIndex": 1,
           "title": "Buổi 1: Số hữu tỉ",
           "shortDescription": "Ôn tập số hữu tỉ",
+          "lessonType": "LIVE",
           "examOpenAt": null,
           "trialEnabled": true,
           "status": "PUBLISHED"
@@ -415,7 +417,60 @@ Behavior:
 
 ---
 
-## 8. Lesson summary API
+## 8. Admin personalized learning path API
+
+### `GET /admin/learning-paths/:learningPathId/enrollments`
+
+Role: `ADMIN`.
+
+Query: `search`, `personalizationStatus`, pagination.
+
+Behavior:
+
+- Chỉ nhận `learningPathId` của khóa `CATALOG`.
+- Trả enrollment, thông tin student tối thiểu, lộ trình đang được giao và trạng thái clone job nếu có.
+
+### `POST /admin/enrollments/:enrollmentId/personal-learning-path`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{
+  "idempotencyKey": "client-generated-key"
+}
+```
+
+Behavior:
+
+- Chỉ cho enrollment hợp lệ của khóa `CATALOG`.
+- Nếu enrollment đã có bản cá nhân đang dùng, trả `409 PERSONAL_LEARNING_PATH_EXISTS`.
+- Queue clone job và trả `202 Accepted` theo job convention.
+- Clone gồm learning path/chapter/lesson và nội dung quản trị mutable; file/OCR artifact hợp lệ được tái sử dụng.
+- Chỉ set `enrollment.delivery_learning_path_id` ở bước cuối sau khi toàn bộ clone thành công.
+- Ghi audit log.
+
+### `GET /admin/enrollments/:enrollmentId/personal-learning-path`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả khóa gốc, bản cá nhân hiện tại, clone status và lineage summary.
+- Sau khi clone đã activation, API chỉ trả bản cá nhân hiện tại; không có endpoint revert/reset về khóa gốc.
+
+### Quy tắc dùng lại CRUD
+
+- CRUD learning path/chapter/lesson hiện có được tái sử dụng cho path `PERSONALIZED` ở admin.
+- Response admin phải trả `kind`, `sourceLearningPathId` và student owner summary khi là bản cá nhân.
+- Delete permanent bản cá nhân bị chặn khi còn student history hoặc chưa qua retention policy.
+- Bản cá nhân đang gắn với enrollment không được archive/delete ở cấp root; admin sửa trực tiếp chapter/lesson/content bên trong.
+- Public list/detail luôn filter `kind = CATALOG`; không dựa riêng vào `status`.
+
+---
+
+## 9. Lesson summary API
 
 ### `GET /admin/lessons/:lessonId/summary`
 
@@ -482,7 +537,7 @@ Behavior:
 
 ---
 
-## 9. File/material API
+## 10. File/material API
 
 ### `POST /files/upload`
 

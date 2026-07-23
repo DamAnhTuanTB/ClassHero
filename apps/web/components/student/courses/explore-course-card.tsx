@@ -2,7 +2,6 @@ import {
   ArrowRight,
   CalendarDays,
   Crown,
-  Globe2,
   LockKeyhole,
   PlayCircle,
   Star,
@@ -167,24 +166,14 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
       {!isEnrolled ? (
         <p className="mt-3 flex min-w-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-xs font-semibold leading-5 text-slate-700 dark:text-[var(--theme-text)] sm:gap-x-2 sm:text-base sm:leading-6">
           <span className="font-semibold text-slate-500 dark:text-[var(--theme-text-muted)]">
-            Hình thức:
+            Hình thức học:
           </span>{" "}
           <span className="inline-flex min-w-0 items-center gap-1">
             <Video
               className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300 sm:h-5 sm:w-5"
               aria-hidden="true"
             />
-            <span>Học online trực tiếp</span>
-          </span>
-          <span className="shrink-0 text-slate-400 dark:text-[var(--theme-text-muted)]">
-            +
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1">
-            <Globe2
-              className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300 sm:h-5 sm:w-5"
-              aria-hidden="true"
-            />
-            Website
+            <span>Học online tương tác</span>
           </span>
         </p>
       ) : null}

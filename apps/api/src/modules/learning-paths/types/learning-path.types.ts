@@ -23,6 +23,8 @@ export type LearningPathDetailRecord = Prisma.LearningPathGetPayload<{
 
 export type LearningPathResponse = {
   id: string;
+  kind: LearningPathRecord["kind"];
+  sourceLearningPathId: string | null;
   subject: LearningPathRecord["subject"];
   grade: number;
   title: string;

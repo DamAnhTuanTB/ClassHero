@@ -1,6 +1,7 @@
 import type {
   StudentCourseDetailChapterStatus,
   StudentCourseDetailContinueKind,
+  StudentCourseLessonType,
 } from "@/features/student/shared/student-courses-types";
 
 export type PublicLearningPathSubject = "MATH" | "PHYSICS" | "CHEMISTRY";
@@ -31,6 +32,7 @@ export type PublicLearningPathLessonApi = {
   orderIndex: number;
   title: string;
   shortDescription: string | null;
+  lessonType: StudentCourseLessonType;
   examOpenAt: string | null;
   status: PublicLearningPathPublishStatus;
   trialEnabled: boolean;

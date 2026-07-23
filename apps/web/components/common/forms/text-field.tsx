@@ -18,6 +18,7 @@ export function TextField({
   helperText,
   wrapperClassName,
   labelAction,
+  trailingAction,
   hideLabel = false,
   isOptional = false,
   optionalLabel,
@@ -135,7 +136,7 @@ export function TextField({
             "min-h-[3.35rem] w-full rounded-xl border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] py-0 text-base font-semibold text-[var(--theme-text-strong)] outline-none transition placeholder:text-[var(--theme-text-placeholder)] hover:border-[var(--theme-input-hover-border)] focus:bg-[var(--theme-input-bg)] disabled:cursor-not-allowed disabled:bg-[var(--theme-input-bg-disabled)] disabled:text-[var(--theme-input-text-disabled)] lg:text-sm",
             formFocusClass,
             resolvedIcon ? "pl-12" : "pl-4",
-            isPasswordField ? "pr-14" : "pr-4",
+            isPasswordField || trailingAction ? "pr-14" : "pr-4",
             passwordMaskClass,
           )}
         />
@@ -156,6 +157,10 @@ export function TextField({
               <Eye className="h-5 w-5" aria-hidden="true" />
             )}
           </button>
+        ) : trailingAction ? (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2">
+            {trailingAction}
+          </span>
         ) : null}
       </div>
       {error ? (

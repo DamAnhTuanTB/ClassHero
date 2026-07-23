@@ -184,6 +184,10 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 77     | `M14.5` | Logging, monitoring và error tracking                              |
 | 78     | `M14.6` | Docker Compose production, Nginx và health checks                  |
 | 79     | `M14.7` | Backup/restore và vận hành production notes                        |
+| 80     | `M3.6`  | Personal learning path clone foundation                            |
+| 81     | `M3.7`  | Admin personal learning path management UI                         |
+| 82     | `M7.8`  | Student personalized learning path access và progress              |
+| 83     | `M11.5` | Parent personalized learning path view                             |
 
 Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toán/học thủ công trước AI nâng cao. Khi làm AI/RAG vẫn phải giữ phụ thuộc `M4.x -> M5.x -> M9.x`.
 
@@ -208,6 +212,8 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 - `M3.3` phụ thuộc `M3.1`, `M3.2`, `M2.3`.
 - `M3.4` phụ thuộc API `M3.1`, `M3.2` và nền web.
 - `M3.5` phụ thuộc `M3.3`; payment CTA thật phụ thuộc `M8.4`.
+- `M3.6` phụ thuộc `M3.1`, `M3.2`, `M4.3` và enrollment thật từ `M8.3`.
+- `M3.7` phụ thuộc `M3.4`, `M3.6`.
 - Từ M3 trở đi, cấu trúc course detail là `learning path -> chapters -> lessons`; chapter chỉ chứa thông tin tổng quan, còn nội dung học chi tiết nằm ở lesson.
 
 ### File/document/worker
@@ -227,6 +233,7 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 - `M7.2` đến `M7.4` phụ thuộc content tương ứng trong `M6.x` và `M7.1`.
 - `M7.5` phụ thuộc attempts/progress từ `M7.2` đến `M7.4`.
 - `M7.7` phụ thuộc `M7.5`; notification/XP thật phụ thuộc `M10.x`/`M13.x`.
+- `M7.8` phụ thuộc `M3.6`, `M7.1`, `M7.5`; quiz/flashcard/test history đầy đủ phụ thuộc các task runner tương ứng.
 
 ### Payment
 
@@ -250,6 +257,7 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 
 - `M10.x` phụ thuộc notification models, auth và các flow tạo event.
 - `M11.x` phụ thuộc parent-child link, progress/payment/news tương ứng.
+- `M11.5` phụ thuộc `M7.8`, `M11.1`, `M11.2`.
 - `M12.x` phụ thuộc report/content/AI moderation/news models tương ứng.
 - `M13.x` phụ thuộc learning progress/attempts/profile/file upload tương ứng.
 - `M13.5` phụ thuộc các module dashboard muốn hiển thị; có thể dùng placeholder cho metric chưa có.

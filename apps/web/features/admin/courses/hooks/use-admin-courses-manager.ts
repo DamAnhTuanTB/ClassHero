@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  adminGrades,
+  adminStatuses,
+  adminSubjects,
   type AdminLearningPath,
   type AdminPublishStatus,
   type AdminSubject,
@@ -29,7 +32,16 @@ import {
   adminSidebarCollapsedStorageKey,
 } from "@/lib/sidebar-collapse-state";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
+import { useFilterSearchParams } from "@/lib/use-filter-search-params";
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
+
+const learningPathSortKeys: LearningPathSortKey[] = [
+  "title",
+  "subject",
+  "grade",
+  "price",
+  "status",
+];
 
 export function useAdminCoursesManager(
   initialLearningPaths?: AdminLearningPath[],
@@ -49,6 +61,7 @@ export function useAdminCoursesManager(
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
+  const { replaceFilterSearchParams, searchParams } = useFilterSearchParams();
   const [paths, setPaths] = useState<AdminLearningPath[]>(
     () => learningPathsQuery.data ?? [],
   );
@@ -64,12 +77,12 @@ export function useAdminCoursesManager(
     false,
     adminSidebarCollapsedDatasetKey,
   );
-  const [query, setQuery] = useState("");
-  const [subjectFilter, setSubjectFilter] = useState<AdminSubject | "ALL">("ALL");
-  const [statusFilter, setStatusFilter] = useState<AdminPublishStatus | "ALL">("ALL");
-  const [gradeFilter, setGradeFilter] = useState<number | "ALL">("ALL");
-  const [sortKey, setSortKey] = useState<LearningPathSortKey>("title");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const query = searchParams.get("q") ?? "";
+  const subjectFilter = parseAdminSubjectFilter(searchParams.get("subject"));
+  const statusFilter = parseAdminStatusFilter(searchParams.get("status"));
+  const gradeFilter = parseAdminGradeFilter(searchParams.get("grade"));
+  const sortKey = parseLearningPathSortKey(searchParams.get("sort"));
+  const sortDirection = parseSortDirection(searchParams.get("direction"));
 
   const editingPath = paths.find((path) => path.id === editingPathId) ?? null;
   const isSavingPath = mutations.createPath.isPending || mutations.updatePath.isPending;
@@ -192,12 +205,18 @@ export function useAdminCoursesManager(
 
   function toggleSort(nextSortKey: LearningPathSortKey) {
     if (sortKey === nextSortKey) {
-      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      const nextDirection = sortDirection === "asc" ? "desc" : "asc";
+      replaceFilterSearchParams({
+        direction: nextDirection === "asc" ? null : nextDirection,
+        sort: nextSortKey === "title" ? null : nextSortKey,
+      });
       return;
     }
 
-    setSortKey(nextSortKey);
-    setSortDirection("asc");
+    replaceFilterSearchParams({
+      direction: null,
+      sort: nextSortKey === "title" ? null : nextSortKey,
+    });
   }
 
   function requestDeletePaths(pathIds: string[]) {
@@ -379,10 +398,22 @@ export function useAdminCoursesManager(
       retryLoad,
       restorePaths,
       savePath,
-      setGradeFilter,
-      setQuery,
-      setStatusFilter,
-      setSubjectFilter,
+      setGradeFilter: (value: number | "ALL") => {
+        replaceFilterSearchParams({ grade: value === "ALL" ? null : value });
+      },
+      setQuery: (value: string) => {
+        replaceFilterSearchParams({ q: value });
+      },
+      setStatusFilter: (value: AdminPublishStatus | "ALL") => {
+        replaceFilterSearchParams({
+          status: value === "ALL" ? null : value.toLowerCase(),
+        });
+      },
+      setSubjectFilter: (value: AdminSubject | "ALL") => {
+        replaceFilterSearchParams({
+          subject: value === "ALL" ? null : value.toLowerCase(),
+        });
+      },
       startCreatePath,
       startEditPath,
       toggleDarkTheme: toggleTheme,
@@ -404,4 +435,38 @@ function getErrorMessage(error: unknown) {
   }
 
   return "Vui lòng thử lại sau ít phút.";
+}
+
+function parseAdminGradeFilter(value: string | null): number | "ALL" {
+  const parsedGrade = Number(value);
+
+  return Number.isInteger(parsedGrade) && adminGrades.includes(parsedGrade)
+    ? parsedGrade
+    : "ALL";
+}
+
+function parseAdminStatusFilter(value: string | null): AdminPublishStatus | "ALL" {
+  const normalizedValue = value?.toUpperCase() as AdminPublishStatus | undefined;
+
+  return normalizedValue && adminStatuses.some((status) => status === normalizedValue)
+    ? normalizedValue
+    : "ALL";
+}
+
+function parseAdminSubjectFilter(value: string | null): AdminSubject | "ALL" {
+  const normalizedValue = value?.toUpperCase() as AdminSubject | undefined;
+
+  return normalizedValue && adminSubjects.includes(normalizedValue)
+    ? normalizedValue
+    : "ALL";
+}
+
+function parseLearningPathSortKey(value: string | null): LearningPathSortKey {
+  return value && learningPathSortKeys.includes(value as LearningPathSortKey)
+    ? (value as LearningPathSortKey)
+    : "title";
+}
+
+function parseSortDirection(value: string | null): SortDirection {
+  return value === "desc" ? "desc" : "asc";
 }

@@ -20,6 +20,8 @@ export function serializeLearningPath(
 ): LearningPathResponse {
   return {
     id: record.id,
+    kind: record.kind,
+    sourceLearningPathId: record.sourceLearningPathId,
     subject: record.subject,
     grade: record.grade,
     title: record.title,
@@ -131,6 +133,7 @@ function serializePublicLesson(lesson: PublicLessonRecord) {
     orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription,
+    lessonType: lesson.lessonType,
     examOpenAt: lesson.examOpenAt,
     status: lesson.status,
     trialEnabled: lesson.trialEnabled,

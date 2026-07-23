@@ -647,3 +647,58 @@ Acceptance Criteria:
 - Nếu student làm lại sau khi đã hoàn thành, chỉ cập nhật XP nếu rule cho phép.
 
 TODO: Công thức XP và level cần chốt chi tiết. Trong MVP có thể triển khai công thức tạm trong `GamificationService` và cấu hình bằng constant để dễ đổi.
+
+---
+
+## 27. Admin tạo bản lộ trình cá nhân cho học sinh
+
+Actor: Admin.
+
+Precondition:
+
+- Học sinh có enrollment hợp lệ với khóa học gốc.
+- Enrollment chưa có tác vụ tạo bản cá nhân đang chạy.
+
+Các bước:
+
+1. Admin mở danh sách học sinh của khóa học gốc.
+2. Admin chọn học sinh và bấm `Tạo bản cá nhân`.
+3. UI hiển thị tên học sinh, khóa gốc và cảnh báo bản cá nhân không tự nhận các thay đổi tương lai từ khóa gốc.
+4. Backend tạo clone job idempotent và trả trạng thái xử lý.
+5. Worker nhân bản cấu trúc/nội dung mutable, giữ lineage về khóa/chương/buổi học gốc và tái sử dụng file/OCR artifact bất biến.
+6. Khi clone hoàn tất, backend mới gán bản cá nhân làm lộ trình được giao của enrollment.
+7. Admin được điều hướng tới màn chỉnh sửa bản cá nhân và có thể thêm, sửa, xóa mềm hoặc sắp xếp lại nội dung.
+
+Acceptance Criteria:
+
+- Bản cá nhân không xuất hiện trong public/student explore và không thể được mua.
+- Chỉnh sửa bản cá nhân không làm thay đổi khóa gốc hoặc lộ trình của học sinh khác.
+- Clone lỗi không được chuyển enrollment sang một bản chưa hoàn chỉnh.
+- Gửi lại cùng yêu cầu không tạo nhiều bản cá nhân đang hoạt động.
+- Không gọi lại paid OCR chỉ để nhân bản nội dung đã có artifact/cache hợp lệ.
+- Mọi thao tác tạo, kích hoạt và chỉnh sửa bản cá nhân có audit log.
+- Sau khi kích hoạt thành công, không có action quay lại khóa gốc; admin tiếp tục thêm, sửa, xóa trên bản cá nhân.
+
+---
+
+## 28. Học sinh học theo bản lộ trình cá nhân
+
+Actor: Student.
+
+Các bước:
+
+1. Student mở khóa học đã mua bằng route/CTA hiện có của khóa gốc.
+2. Backend xác định lộ trình hiệu lực của enrollment: bản cá nhân nếu enrollment đã được cá nhân hóa, ngược lại dùng khóa gốc.
+3. UI hiển thị badge nhỏ `Lộ trình cá nhân` và cây chương/buổi học hiệu lực.
+4. Student học, làm bài và lưu tiến độ trên các lesson thuộc lộ trình hiệu lực.
+5. Tiến độ từ lesson gốc đã học trước khi cá nhân hóa được giữ thông qua lineage; lesson mới bắt đầu ở trạng thái chưa học.
+6. Từ thời điểm kích hoạt, mọi progress, attempt, note, comment và favorite mới được ghi theo lesson/content của bản cá nhân.
+
+Acceptance Criteria:
+
+- Student khác không thể truy cập bản cá nhân qua ID hoặc URL.
+- Progress percent, lesson tiếp theo và số buổi học được tính theo lộ trình hiệu lực.
+- Không cộng XP lần hai cho một lesson gốc đã hoàn thành trước khi nhân bản.
+- Attempt/note/comment cũ vẫn truy xuất được theo policy lineage, không bị sao chép thành dữ liệu của học sinh khác.
+- Parent đã liên kết chỉ xem được bản cá nhân của đúng người con đang chọn.
+- Không có API/UI để student, parent hoặc admin chuyển enrollment đã cá nhân hóa quay lại khóa gốc.

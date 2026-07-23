@@ -10,6 +10,8 @@ const thumbnailFileSelect = {
 
 export const learningPathSelect = {
   id: true,
+  kind: true,
+  sourceLearningPathId: true,
   subject: true,
   grade: true,
   title: true,
@@ -58,6 +60,7 @@ const publicLessonMetadataSelect = {
   orderIndex: true,
   title: true,
   shortDescription: true,
+  lessonType: true,
   examOpenAt: true,
   trialEnabled: true,
   status: true,

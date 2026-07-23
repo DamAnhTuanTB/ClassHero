@@ -9,6 +9,8 @@ export const backgroundJobQueueNames = {
   [BackgroundJobQueue.ZALO_DELIVERY]: "zalo-delivery",
   [BackgroundJobQueue.DIAGRAM_RENDERING]: "diagram-rendering",
   [BackgroundJobQueue.PAYMENT_POSTPROCESS]: "payment-postprocess",
+  [BackgroundJobQueue.PERSONAL_LEARNING_PATH_CLONE]:
+    "personal-learning-path-clone",
 } satisfies Record<BackgroundJobQueue, string>;
 
 export type BackgroundJobBullmqData = {
@@ -23,6 +25,7 @@ export type BackgroundJobBullmqResult = {
   action: string | null;
   message: string;
   handledAt: string;
+  details?: unknown;
 };
 
 export function getBullmqQueueName(queue: BackgroundJobQueue): string {

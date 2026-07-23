@@ -55,3 +55,4 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0007-paid-ocr-first-document-ingestion.md` | Accepted | Chọn paid OCR-first bằng Mathpix cho tài liệu học chính, cache artifact theo content hash để tránh gọi lại |
 | `ADR-0008-future-features-from-ocr-artifacts.md` | Accepted | Chốt các feature tương lai được phép tận dụng OCR artifact nhưng không mở rộng scope MVP hiện tại          |
 | `ADR-0009-lesson-document-kind-taxonomy.md`  | Accepted | Chốt duy nhất ba lesson document kind và coi thay thế tài liệu nền tảng là action, không phải kind          |
+| `ADR-0010-personalized-learning-path-fork.md` | Accepted | Chốt bản lộ trình cá nhân là private fork của khóa đã mua, thuộc đúng một enrollment                       |

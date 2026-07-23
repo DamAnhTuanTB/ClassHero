@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { EnrollmentStatus, PaymentStatus, Prisma, PublishStatus } from "@prisma/client";
+import {
+  EnrollmentStatus,
+  LearningPathKind,
+  PaymentStatus,
+  Prisma,
+  PublishStatus,
+} from "@prisma/client";
 import { throwNotFound } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { MockPurchaseDto } from "#api/modules/payments/dto/mock-purchase.dto";
@@ -41,6 +47,7 @@ export class MockPaymentsService {
       const learningPath = await tx.learningPath.findFirst({
         where: {
           id: dto.learningPathId,
+          kind: LearningPathKind.CATALOG,
           deletedAt: null,
           status: PublishStatus.PUBLISHED,
         },

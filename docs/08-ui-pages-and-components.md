@@ -227,6 +227,8 @@ Hiển thị:
 - Hạn còn lại nếu đã mua.
 - Danh sách chương học và buổi học theo thứ tự.
 - Trạng thái từng buổi: chưa học, đang học, hoàn thành, bị khóa.
+- Nếu enrollment đang dùng bản cá nhân, hiển thị badge nhỏ `Lộ trình cá nhân`; URL/course card vẫn đại diện cho khóa gốc đã mua.
+- Không hiển thị công cụ quản trị, source clone ID hoặc private slug cho student.
 
 ### 4.4. Trang buổi học student
 
@@ -383,6 +385,8 @@ Payment flow:
 4. Hiển thị QR/checkout.
 5. Sau webhook paid, hiển thị enrollment đã mở khóa.
 
+Nếu người con đang chọn học theo bản cá nhân, parent course/progress view hiển thị cùng cây nội dung hiệu lực và badge `Lộ trình cá nhân`; parent không có quyền chỉnh sửa.
+
 ---
 
 ## 6. Admin pages
@@ -410,6 +414,16 @@ CRUD learning path:
 - Mô tả.
 - Trial enabled.
 - Status.
+
+Course detail có khu vực `Học sinh đã mua`:
+
+- Search/pagination enrollment của khóa.
+- Hiển thị trạng thái `Đang học khóa gốc`, `Đang tạo bản cá nhân` hoặc `Đang học bản cá nhân`.
+- Action `Tạo bản cá nhân` hoặc `Mở bản cá nhân`; không có action quay lại khóa gốc sau activation.
+- Tạo bản cá nhân dùng confirmation modal nêu rõ bản mới không tự nhận thay đổi tương lai từ khóa gốc.
+- Clone chạy nền có pending/progress/error/retry state; admin không được vào editor trước khi clone sẵn sàng.
+- Editor bản cá nhân reuse course detail/chapter/lesson editor hiện có và luôn có banner riêng tư kèm tên học sinh, khóa nguồn và action quay lại enrollment.
+- Bản cá nhân đang gắn enrollment không có action archive/delete root; admin sửa trực tiếp nội dung bên trong.
 
 ### 6.3. Chapter management
 

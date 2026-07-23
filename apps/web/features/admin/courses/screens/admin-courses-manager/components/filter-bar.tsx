@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import {
@@ -49,6 +49,18 @@ export function FilterBar({
           icon={<Search className="h-5 w-5" aria-hidden="true" />}
           placeholder="Tìm tên hoặc slug"
           onChange={(event) => onQueryChange(event.target.value)}
+          trailingAction={
+            query ? (
+              <button
+                type="button"
+                aria-label="Xóa từ khóa tìm kiếm"
+                onClick={() => onQueryChange("")}
+                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] dark:focus:ring-1 dark:focus:ring-sky-500/15"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            ) : null
+          }
         />
         <OptionField
           id="admin-course-filter-grade"

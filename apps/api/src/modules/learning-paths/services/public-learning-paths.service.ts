@@ -1,5 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { EnrollmentStatus, Prisma, PublishStatus, UserRole } from "@prisma/client";
+import {
+  EnrollmentStatus,
+  LearningPathKind,
+  Prisma,
+  PublishStatus,
+  UserRole,
+} from "@prisma/client";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { PublicLearningPathQueryDto } from "#api/modules/learning-paths/dto/public-learning-path-query.dto";
@@ -34,6 +40,7 @@ export class PublicLearningPathsService {
     const enrolledLearningPathIds =
       await this.findActiveEnrollmentLearningPathIds(viewer);
     const where: Prisma.LearningPathWhereInput = {
+      kind: LearningPathKind.CATALOG,
       deletedAt: null,
       ...(query.subject ? { subject: query.subject } : {}),
       ...(query.grade ? { grade: query.grade } : {}),
@@ -102,6 +109,7 @@ export class PublicLearningPathsService {
     const learningPath = await this.prisma.learningPath.findFirst({
       where: {
         ...getIdOrSlugWhere(idOrSlug),
+        kind: LearningPathKind.CATALOG,
         deletedAt: null,
         status: {
           not: PublishStatus.ARCHIVED,

@@ -20,6 +20,10 @@ M3 course/chapter/lesson + M6 quiz/flashcard/test
 
 M3 course/chapter/lesson + M8 payment/enrollment
   -> full paid enrollment access and payment CTA after M8.4
+  -> M3.6 private personalized clone
+    -> M3.7 admin management
+    -> M7.8 student effective curriculum/progress
+      -> M11.5 parent read view
   -> M11 parent payment/progress
 
 M10 notification + M12 news/report
@@ -59,6 +63,8 @@ M14 testing/hardening/deploy
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3` và `M9.1`.
 - `M13.5` admin dashboard có thể dùng placeholder cho metric chưa có API, nhưng phải ghi rõ.
+- `M3.6` cần enrollment thật từ `M8.3` và worker foundation `M4.3`; không được kích hoạt clone trước khi job hoàn tất.
+- `M3.7` cần `M3.6`; `M7.8` cần `M3.6`, `M7.1`, `M7.5`; `M11.5` cần `M7.8`, `M11.1`, `M11.2`.
 
 ## 4. Khi nào cập nhật file này
 

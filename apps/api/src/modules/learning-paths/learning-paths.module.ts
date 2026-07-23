@@ -12,6 +12,7 @@ import {
   AdminLessonDocumentsController,
 } from "#api/modules/learning-paths/controllers/admin-lesson-documents.controller";
 import { AdminLearningPathsController } from "#api/modules/learning-paths/controllers/admin-learning-paths.controller";
+import { AdminPersonalLearningPathsController } from "#api/modules/learning-paths/controllers/admin-personal-learning-paths.controller";
 import { AdminLessonsController } from "#api/modules/learning-paths/controllers/admin-lessons.controller";
 import { AdminSourceDocumentsController } from "#api/modules/learning-paths/controllers/admin-source-documents.controller";
 import { ChaptersService } from "#api/modules/learning-paths/services/chapters.service";
@@ -19,6 +20,7 @@ import { LessonDocumentsService } from "#api/modules/learning-paths/services/les
 import { LearningPathsService } from "#api/modules/learning-paths/services/learning-paths.service";
 import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
 import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
+import { PersonalLearningPathsService } from "#api/modules/learning-paths/services/personal-learning-paths.service";
 import { PublicLearningPathsController } from "#api/modules/learning-paths/controllers/public-learning-paths.controller";
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
 import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
@@ -30,6 +32,7 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
     AdminLearningPathLessonDocumentsController,
     AdminLessonDocumentsController,
     AdminLearningPathsController,
+    AdminPersonalLearningPathsController,
     AdminLessonsController,
     AdminSourceDocumentsController,
     PublicLearningPathsController,
@@ -40,6 +43,7 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
     LearningPathsService,
     LessonsService,
     PublicLearningPathsService,
+    PersonalLearningPathsService,
     SourceDocumentsService,
     JwtAuthGuard,
     OptionalJwtAuthGuard,

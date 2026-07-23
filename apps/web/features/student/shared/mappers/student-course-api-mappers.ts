@@ -150,6 +150,7 @@ function mapChapterToDetail({
       durationMinutes: 40,
       id: lesson.id,
       isTrial: isCoursePublished && !hasActiveEnrollment && lesson.trialEnabled,
+      lessonType: lesson.lessonType,
       status: getLessonStatus({
         completedLessonIds,
         continueLessonId,

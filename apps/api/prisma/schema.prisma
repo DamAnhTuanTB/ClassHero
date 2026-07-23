@@ -69,6 +69,11 @@ enum EnrollmentStatus {
   CANCELLED
 }
 
+enum LearningPathKind {
+  CATALOG
+  PERSONALIZED
+}
+
 enum PaymentProvider {
   PAYOS
 }
@@ -262,6 +267,7 @@ enum BackgroundJobQueue {
   ZALO_DELIVERY
   DIAGRAM_RENDERING
   PAYMENT_POSTPROCESS
+  PERSONAL_LEARNING_PATH_CLONE
 }
 
 enum BackgroundJobStatus {
@@ -451,6 +457,7 @@ model BackgroundJob {
   id              String              @id @default(uuid()) @db.Uuid
   queue           BackgroundJobQueue
   status          BackgroundJobStatus @default(QUEUED)
+  idempotencyKey  String?             @unique @map("idempotency_key")
   bullmqJobId     String?             @map("bullmq_job_id")
   ownerUserId     String?             @map("owner_user_id") @db.Uuid
   ownerUser       User?               @relation("BackgroundJobOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
@@ -480,35 +487,42 @@ model BackgroundJob {
 }
 
 model LearningPath {
-  id                String                @id @default(uuid()) @db.Uuid
-  subject           Subject
-  grade             Int
-  title             String
-  slug              String                @unique
-  originalPriceVnd  Int                   @map("original_price_vnd")
-  salePriceVnd      Int?                  @map("sale_price_vnd")
-  totalChapterCount Int                   @default(0) @map("total_chapter_count")
-  totalLessonCount  Int                   @default(0) @map("total_lesson_count")
-  thumbnailFileId   String?               @map("thumbnail_file_id") @db.Uuid
-  thumbnailFile     File?                 @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
-  descriptionJson   Json?                 @map("description_json")
-  status            PublishStatus         @default(DRAFT)
-  trialEnabled      Boolean               @default(false) @map("trial_enabled")
-  publishedAt       DateTime?             @map("published_at")
-  sortOrder         Int                   @default(0) @map("sort_order")
-  createdById       String?               @map("created_by_id") @db.Uuid
-  createdBy         User?                 @relation("LearningPathCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById       String?               @map("updated_by_id") @db.Uuid
-  updatedBy         User?                 @relation("LearningPathUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt         DateTime              @default(now()) @map("created_at")
-  updatedAt         DateTime              @updatedAt @map("updated_at")
-  deletedAt         DateTime?             @map("deleted_at")
-  chapters          LearningPathChapter[]
-  lessons           Lesson[]
-  sourceDocuments   SourceDocument[]
-  enrollments       Enrollment[]
-  payments          Payment[]
+  id                   String                @id @default(uuid()) @db.Uuid
+  kind                 LearningPathKind      @default(CATALOG)
+  sourceLearningPathId String?               @map("source_learning_path_id") @db.Uuid
+  sourceLearningPath   LearningPath?         @relation("PersonalLearningPathSource", fields: [sourceLearningPathId], references: [id], onDelete: Restrict)
+  personalizedCopies   LearningPath[]        @relation("PersonalLearningPathSource")
+  subject              Subject
+  grade                Int
+  title                String
+  slug                 String                @unique
+  originalPriceVnd     Int                   @map("original_price_vnd")
+  salePriceVnd         Int?                  @map("sale_price_vnd")
+  totalChapterCount    Int                   @default(0) @map("total_chapter_count")
+  totalLessonCount     Int                   @default(0) @map("total_lesson_count")
+  thumbnailFileId      String?               @map("thumbnail_file_id") @db.Uuid
+  thumbnailFile        File?                 @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
+  descriptionJson      Json?                 @map("description_json")
+  status               PublishStatus         @default(DRAFT)
+  trialEnabled         Boolean               @default(false) @map("trial_enabled")
+  publishedAt          DateTime?             @map("published_at")
+  sortOrder            Int                   @default(0) @map("sort_order")
+  createdById          String?               @map("created_by_id") @db.Uuid
+  createdBy            User?                 @relation("LearningPathCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById          String?               @map("updated_by_id") @db.Uuid
+  updatedBy            User?                 @relation("LearningPathUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  deletedAt            DateTime?             @map("deleted_at")
+  chapters             LearningPathChapter[]
+  lessons              Lesson[]
+  sourceDocuments      SourceDocument[]
+  enrollments          Enrollment[]          @relation("EnrollmentPurchasedLearningPath")
+  deliveredEnrollments Enrollment[]          @relation("EnrollmentDeliveryLearningPath")
+  payments             Payment[]
 
+  @@index([kind, status])
+  @@index([sourceLearningPathId])
   @@index([subject, grade])
   @@index([status])
   @@index([sortOrder])
@@ -519,24 +533,28 @@ model LearningPath {
 }
 
 model LearningPathChapter {
-  id             String        @id @default(uuid()) @db.Uuid
-  learningPathId String        @map("learning_path_id") @db.Uuid
-  learningPath   LearningPath  @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  orderIndex     Int           @map("order_index")
-  title          String
-  overview       String?
-  objectivesJson Json?         @map("objectives_json")
-  status         PublishStatus @default(DRAFT)
-  createdById    String?       @map("created_by_id") @db.Uuid
-  createdBy      User?         @relation("LearningPathChapterCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById    String?       @map("updated_by_id") @db.Uuid
-  updatedBy      User?         @relation("LearningPathChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  deletedAt      DateTime?     @map("deleted_at")
-  lessons        Lesson[]
+  id                 String                @id @default(uuid()) @db.Uuid
+  sourceChapterId    String?               @map("source_chapter_id") @db.Uuid
+  sourceChapter      LearningPathChapter?  @relation("PersonalLearningPathChapterSource", fields: [sourceChapterId], references: [id], onDelete: Restrict)
+  personalizedCopies LearningPathChapter[] @relation("PersonalLearningPathChapterSource")
+  learningPathId     String                @map("learning_path_id") @db.Uuid
+  learningPath       LearningPath          @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  orderIndex         Int                   @map("order_index")
+  title              String
+  overview           String?
+  objectivesJson     Json?                 @map("objectives_json")
+  status             PublishStatus         @default(DRAFT)
+  createdById        String?               @map("created_by_id") @db.Uuid
+  createdBy          User?                 @relation("LearningPathChapterCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById        String?               @map("updated_by_id") @db.Uuid
+  updatedBy          User?                 @relation("LearningPathChapterUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+  deletedAt          DateTime?             @map("deleted_at")
+  lessons            Lesson[]
 
   @@unique([learningPathId, orderIndex])
+  @@index([sourceChapterId])
   @@index([learningPathId, status])
   @@index([createdById])
   @@index([updatedById])
@@ -545,6 +563,9 @@ model LearningPathChapter {
 
 model Lesson {
   id                 String                    @id @default(uuid()) @db.Uuid
+  sourceLessonId     String?                   @map("source_lesson_id") @db.Uuid
+  sourceLesson       Lesson?                   @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
+  personalizedCopies Lesson[]                  @relation("PersonalLearningPathLessonSource")
   learningPathId     String                    @map("learning_path_id") @db.Uuid
   learningPath       LearningPath              @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
   chapterId          String                    @map("chapter_id") @db.Uuid
@@ -594,6 +615,7 @@ model Lesson {
   xpEvents           XpEvent[]
 
   @@unique([chapterId, orderIndex])
+  @@index([sourceLessonId])
   @@index([chapterId, status])
   @@index([learningPathId, status])
   @@index([scheduledAt])
@@ -677,18 +699,18 @@ model SourceDocumentPage {
 }
 
 model LessonDocumentPageRange {
-  id               String         @id @default(uuid()) @db.Uuid
-  lessonId         String         @map("lesson_id") @db.Uuid
-  lesson           Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  sourceDocumentId String         @map("source_document_id") @db.Uuid
-  sourceDocument   SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
-  pageStart        Int            @map("page_start")
-  pageEnd          Int            @map("page_end")
-  createdById      String?        @map("created_by_id") @db.Uuid
-  createdBy        User?          @relation("LessonDocumentPageRangeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  metadataJson     Json?          @map("metadata_json")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  id               String          @id @default(uuid()) @db.Uuid
+  lessonId         String          @map("lesson_id") @db.Uuid
+  lesson           Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  sourceDocumentId String          @map("source_document_id") @db.Uuid
+  sourceDocument   SourceDocument  @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  pageStart        Int             @map("page_start")
+  pageEnd          Int             @map("page_end")
+  createdById      String?         @map("created_by_id") @db.Uuid
+  createdBy        User?           @relation("LessonDocumentPageRangeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  metadataJson     Json?           @map("metadata_json")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
   lessonDocument   LessonDocument?
 
   @@index([lessonId, sourceDocumentId])
@@ -698,33 +720,33 @@ model LessonDocumentPageRange {
 }
 
 model LessonDocument {
-  id                  String             @id @default(uuid()) @db.Uuid
-  lessonId            String             @map("lesson_id") @db.Uuid
-  lesson              Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  fileId              String             @map("file_id") @db.Uuid
-  file                File               @relation("LessonDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
-  sourceDocumentId    String?            @map("source_document_id") @db.Uuid
-  sourceDocument      SourceDocument?    @relation("LessonDocumentSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
-  pageRangeId          String?            @unique @map("page_range_id") @db.Uuid
-  pageRange            LessonDocumentPageRange? @relation(fields: [pageRangeId], references: [id], onDelete: SetNull)
-  kind                LessonDocumentKind @default(SUPPLEMENT)
-  sortOrder           Int                @default(0) @map("sort_order")
+  id                  String                   @id @default(uuid()) @db.Uuid
+  lessonId            String                   @map("lesson_id") @db.Uuid
+  lesson              Lesson                   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileId              String                   @map("file_id") @db.Uuid
+  file                File                     @relation("LessonDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  sourceDocumentId    String?                  @map("source_document_id") @db.Uuid
+  sourceDocument      SourceDocument?          @relation("LessonDocumentSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  pageRangeId         String?                  @unique @map("page_range_id") @db.Uuid
+  pageRange           LessonDocumentPageRange? @relation(fields: [pageRangeId], references: [id], onDelete: SetNull)
+  kind                LessonDocumentKind       @default(SUPPLEMENT)
+  sortOrder           Int                      @default(0) @map("sort_order")
   title               String?
-  status              DocumentStatus     @default(UPLOADED)
-  extractedText       String?            @map("extracted_text") @db.Text
-  extractError        String?            @map("extract_error") @db.Text
-  contentHash         String?            @map("content_hash")
-  chunkCount          Int                @default(0) @map("chunk_count")
-  processingJobId     String?            @map("processing_job_id") @db.Uuid
-  processingJob       BackgroundJob?     @relation("LessonDocumentProcessingJob", fields: [processingJobId], references: [id], onDelete: SetNull)
-  processedAt         DateTime?          @map("processed_at")
-  embeddingProvider   AiProviderName?    @map("embedding_provider")
-  embeddingModel      String?            @map("embedding_model")
-  embeddingDimensions Int?               @map("embedding_dimensions")
-  metadataJson        Json?              @map("metadata_json")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
-  replacedAt          DateTime?          @map("replaced_at")
+  status              DocumentStatus           @default(UPLOADED)
+  extractedText       String?                  @map("extracted_text") @db.Text
+  extractError        String?                  @map("extract_error") @db.Text
+  contentHash         String?                  @map("content_hash")
+  chunkCount          Int                      @default(0) @map("chunk_count")
+  processingJobId     String?                  @map("processing_job_id") @db.Uuid
+  processingJob       BackgroundJob?           @relation("LessonDocumentProcessingJob", fields: [processingJobId], references: [id], onDelete: SetNull)
+  processedAt         DateTime?                @map("processed_at")
+  embeddingProvider   AiProviderName?          @map("embedding_provider")
+  embeddingModel      String?                  @map("embedding_model")
+  embeddingDimensions Int?                     @map("embedding_dimensions")
+  metadataJson        Json?                    @map("metadata_json")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  replacedAt          DateTime?                @map("replaced_at")
   chunks              DocumentChunk[]
 
   @@index([lessonId])
@@ -788,23 +810,26 @@ model LessonSummary {
 }
 
 model Enrollment {
-  id             String           @id @default(uuid()) @db.Uuid
-  studentUserId  String           @map("student_user_id") @db.Uuid
-  studentUser    User             @relation("EnrollmentStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
-  learningPathId String           @map("learning_path_id") @db.Uuid
-  learningPath   LearningPath     @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  paidByUserId   String?          @map("paid_by_user_id") @db.Uuid
-  paidByUser     User?            @relation("EnrollmentPaidBy", fields: [paidByUserId], references: [id], onDelete: SetNull)
-  paymentId      String?          @map("payment_id") @db.Uuid
-  payment        Payment?         @relation("EnrollmentPayment", fields: [paymentId], references: [id], onDelete: SetNull)
-  status         EnrollmentStatus @default(ACTIVE)
-  startsAt       DateTime         @map("starts_at")
-  expiresAt      DateTime         @map("expires_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id                     String           @id @default(uuid()) @db.Uuid
+  studentUserId          String           @map("student_user_id") @db.Uuid
+  studentUser            User             @relation("EnrollmentStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  learningPathId         String           @map("learning_path_id") @db.Uuid
+  learningPath           LearningPath     @relation("EnrollmentPurchasedLearningPath", fields: [learningPathId], references: [id], onDelete: Cascade)
+  deliveryLearningPathId String?          @unique @map("delivery_learning_path_id") @db.Uuid
+  deliveryLearningPath   LearningPath?    @relation("EnrollmentDeliveryLearningPath", fields: [deliveryLearningPathId], references: [id], onDelete: Restrict)
+  paidByUserId           String?          @map("paid_by_user_id") @db.Uuid
+  paidByUser             User?            @relation("EnrollmentPaidBy", fields: [paidByUserId], references: [id], onDelete: SetNull)
+  paymentId              String?          @map("payment_id") @db.Uuid
+  payment                Payment?         @relation("EnrollmentPayment", fields: [paymentId], references: [id], onDelete: SetNull)
+  status                 EnrollmentStatus @default(ACTIVE)
+  startsAt               DateTime         @map("starts_at")
+  expiresAt              DateTime         @map("expires_at")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
 
   @@index([studentUserId, learningPathId, status])
   @@index([learningPathId])
+  @@index([deliveryLearningPathId])
   @@index([paidByUserId])
   @@index([paymentId])
   @@map("enrollments")

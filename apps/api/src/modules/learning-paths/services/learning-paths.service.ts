@@ -1,5 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { FilePurpose, Prisma, PublishStatus } from "@prisma/client";
+import {
+  FilePurpose,
+  LearningPathKind,
+  Prisma,
+  PublishStatus,
+} from "@prisma/client";
 import {
   throwBadRequest,
   throwConflict,
@@ -42,6 +47,7 @@ export class LearningPathsService {
     const pageSize = query.pageSize;
     const shouldListArchived = query.status === PublishStatus.ARCHIVED;
     const where: Prisma.LearningPathWhereInput = {
+      kind: LearningPathKind.CATALOG,
       deletedAt: shouldListArchived ? { not: null } : null,
       ...(query.status
         ? { status: query.status }
@@ -179,6 +185,16 @@ export class LearningPathsService {
         if (!before) {
           throwNotFound();
         }
+        if (
+          before.kind === LearningPathKind.PERSONALIZED &&
+          dto.status !== undefined &&
+          dto.status !== PublishStatus.PUBLISHED
+        ) {
+          throwConflict(
+            "PERSONAL_LEARNING_PATH_STATUS_CHANGE_FORBIDDEN",
+            "Khóa học cá nhân đang là chương trình chính thức và phải luôn được phát hành",
+          );
+        }
 
         const originalPriceVnd = dto.originalPriceVnd ?? before.originalPriceVnd;
         const salePriceVnd =
@@ -269,6 +285,7 @@ export class LearningPathsService {
         if (!before) {
           throwNotFound();
         }
+        this.assertCanDeleteLearningPath(before.kind);
 
         const deleted = await tx.learningPath.update({
           where: { id },
@@ -377,6 +394,7 @@ export class LearningPathsService {
         if (!before) {
           throwNotFound();
         }
+        this.assertCanDeleteLearningPath(before.kind);
 
         await tx.auditLog.create({
           data: {
@@ -460,6 +478,15 @@ export class LearningPathsService {
     }
 
     return learningPath;
+  }
+
+  private assertCanDeleteLearningPath(kind: LearningPathKind) {
+    if (kind === LearningPathKind.PERSONALIZED) {
+      throwConflict(
+        "PERSONAL_LEARNING_PATH_DELETE_FORBIDDEN",
+        "Khóa học cá nhân là chương trình học vĩnh viễn của enrollment và không thể xóa",
+      );
+    }
   }
 
   private async serializeLearningPathWithFiles(

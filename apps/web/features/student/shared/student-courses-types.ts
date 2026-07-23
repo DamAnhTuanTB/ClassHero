@@ -13,6 +13,7 @@ export type StudentCourseLesson = {
 };
 
 export type StudentCourseDetailLessonStatus = "completed" | "current" | "locked" | "next";
+export type StudentCourseLessonType = "BASIC" | "LIVE";
 
 export type StudentCourseDetailContinueKind = "first" | "inProgress" | "last" | "next";
 export type StudentCourseDetailChapterStatus =
@@ -22,6 +23,7 @@ export type StudentCourseDetailLesson = {
   durationMinutes: number;
   id: string;
   isTrial?: boolean;
+  lessonType?: StudentCourseLessonType;
   status: StudentCourseDetailLessonStatus;
   title: string;
 };
