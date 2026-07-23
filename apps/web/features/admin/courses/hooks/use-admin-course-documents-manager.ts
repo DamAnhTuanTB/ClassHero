@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useMutation,
-  useQueries,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -132,10 +127,7 @@ export function useAdminCourseDocumentsManager(
   const allSourcePageQueries = useQueries({
     queries: options.loadAllSourcePages
       ? sourceDocuments.map((sourceDocument) => ({
-          queryKey: adminCourseDocumentQueryKeys.sourcePages(
-            userId,
-            sourceDocument.id,
-          ),
+          queryKey: adminCourseDocumentQueryKeys.sourcePages(userId, sourceDocument.id),
           queryFn: () => listAdminSourceDocumentPages(sourceDocument.id, token),
           enabled: Boolean(token),
           staleTime: 30_000,
@@ -152,16 +144,8 @@ export function useAdminCourseDocumentsManager(
       return [sourceDocument.id, pages] as const;
     });
 
-    return Object.fromEntries(entries) as Record<
-      string,
-      AdminSourceDocumentPageApi[]
-    >;
-  }, [
-    allSourcePageQueries,
-    selectedSourceDocument?.id,
-    sourceDocuments,
-    sourcePages,
-  ]);
+    return Object.fromEntries(entries) as Record<string, AdminSourceDocumentPageApi[]>;
+  }, [allSourcePageQueries, selectedSourceDocument?.id, sourceDocuments, sourcePages]);
 
   const lessonDocumentsQuery = useQuery({
     queryKey: adminCourseDocumentQueryKeys.lessonDocuments(userId, pathId),
@@ -201,7 +185,8 @@ export function useAdminCourseDocumentsManager(
       .filter(
         (document) =>
           document.kind === "PRIMARY_FROM_SOURCE" &&
-          document.sourceDocumentId === selectedSourceDocument?.id,
+          document.sourceDocumentId === selectedSourceDocument?.id &&
+          document.pageRange !== null,
       )
       .map((document) => document.lessonId),
   ).size;
@@ -560,7 +545,13 @@ export function useAdminCourseDocumentsManager(
       | string
       | boolean
       | null
-      | { id: string; file: File | null; title: string; isPrimary?: boolean; type?: "SUPPLEMENT" | "HOMEWORK" }[],
+      | {
+          id: string;
+          file: File | null;
+          title: string;
+          isPrimary?: boolean;
+          type?: "SUPPLEMENT" | "HOMEWORK";
+        }[],
   ) {
     setRangeDraft((current) => ({
       ...current,

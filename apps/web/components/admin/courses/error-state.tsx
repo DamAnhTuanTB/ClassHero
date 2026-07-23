@@ -8,7 +8,7 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
         Chưa tải được danh sách
       </h2>
       <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--theme-text)]">
-        Vui lòng thử lại để tiếp tục quản lý khóa học và bài học.
+        Vui lòng thử lại để tiếp tục quản lý khóa học và buổi học.
       </p>
       <button
         type="button"

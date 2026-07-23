@@ -73,6 +73,25 @@ export function SourceDocumentUploadDialog({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
         <div className="grid gap-4">
+          <TextField
+            id="source-document-title"
+            label="Tên tài liệu"
+            icon={null}
+            value={title}
+            disabled={isSaving}
+            maxLength={180}
+            onChange={(event) => {
+              const val = event.target.value;
+              setTitle(val);
+              setTitleError(val.trim() ? null : "Vui lòng nhập tên tài liệu.");
+            }}
+            onBlur={() => {
+              setTitleError(title.trim() ? null : "Vui lòng nhập tên tài liệu.");
+            }}
+            placeholder="Ví dụ: Toán 7 Tập 1"
+            error={titleError ? { message: titleError, type: "manual" } : undefined}
+          />
+
           <label className="block">
             <span className="text-sm font-extrabold text-[var(--theme-text-strong)]">
               File PDF
@@ -94,25 +113,6 @@ export function SourceDocumentUploadDialog({
               </p>
             ) : null}
           </label>
-
-          <TextField
-            id="source-document-title"
-            label="Tên tài liệu"
-            icon={null}
-            value={title}
-            disabled={isSaving}
-            maxLength={180}
-            onChange={(event) => {
-              const val = event.target.value;
-              setTitle(val);
-              setTitleError(val.trim() ? null : "Vui lòng nhập tên tài liệu.");
-            }}
-            onBlur={() => {
-              setTitleError(title.trim() ? null : "Vui lòng nhập tên tài liệu.");
-            }}
-            placeholder="Ví dụ: Toán 7 Tập 1"
-            error={titleError ? { message: titleError, type: "manual" } : undefined}
-          />
         </div>
       </div>
 

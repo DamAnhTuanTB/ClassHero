@@ -47,7 +47,7 @@ export function StudentCourseChapterCard({
   showProgress: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
-  const lessonCountLabel = `${chapter.lessons.length} bài học`;
+  const lessonCountLabel = `${chapter.lessons.length} buổi học`;
   const isUnpublishedChapter =
     chapter.status !== undefined && chapter.status !== "PUBLISHED";
 

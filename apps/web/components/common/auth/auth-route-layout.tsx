@@ -36,7 +36,7 @@ const theme = {
   recovery: {
     titleFirst: "Quay lại",
     titleSecond: "lớp học",
-    description: "Bài học đang chờ bạn.",
+    description: "Buổi học đang chờ bạn.",
     illustration: "secure" as IllustrationType,
     illustrationSrc: "/images/auth/reference/auth-hero-recovery-transparent.png",
   },

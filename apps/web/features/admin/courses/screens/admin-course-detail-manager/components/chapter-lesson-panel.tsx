@@ -140,7 +140,7 @@ export function ChapterLessonPanel({
             Cấu trúc khóa học
           </h2>
           <p className="mt-1 text-sm font-semibold text-[var(--theme-text-muted)]">
-            {path.chapters.length} chương, {path.totalLessonCount} bài học
+            {path.chapters.length} chương, {path.totalLessonCount} buổi học
           </p>
         </div>
         <button
@@ -164,7 +164,7 @@ export function ChapterLessonPanel({
               Chưa có chương học
             </p>
             <p className="mt-1 text-sm text-[var(--theme-text-muted)]">
-              Tạo chương học trước, sau đó thêm các bài học vào từng chương.
+              Tạo chương học trước, sau đó thêm các buổi học vào từng chương.
             </p>
             <button
               type="button"
@@ -237,7 +237,7 @@ export function ChapterLessonPanel({
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                       <span className="inline-flex items-center gap-1">
                         <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                        {chapter.lessons.length} bài học
+                        {chapter.lessons.length} buổi học
                       </span>
                       {chapter.objectives ? (
                         <span className="inline-flex min-w-0 items-center gap-1">
@@ -254,7 +254,7 @@ export function ChapterLessonPanel({
                       className="theme-button-success inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
-                      Thêm bài học
+                      Thêm buổi học
                     </button>
                     <button
                       type="button"
@@ -284,7 +284,7 @@ export function ChapterLessonPanel({
                         aria-hidden="true"
                       />
                       <p className="mt-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
-                        Chưa có bài học trong chương này
+                        Chưa có buổi học trong chương này
                       </p>
                       <button
                         type="button"
@@ -292,7 +292,7 @@ export function ChapterLessonPanel({
                         className="theme-button-success mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-extrabold transition"
                       >
                         <Plus className="h-4 w-4" aria-hidden="true" />
-                        Thêm bài học
+                        Thêm buổi học
                       </button>
                     </div>
                   ) : (
@@ -330,7 +330,7 @@ export function ChapterLessonPanel({
                                 onDragEnd={clearDragState}
                                 className="grid h-10 w-5 cursor-grab place-items-center rounded-md text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] active:cursor-grabbing"
                                 aria-label={`Kéo để đổi vị trí ${lesson.title}`}
-                                title="Kéo để đổi vị trí bài học"
+                                title="Kéo để đổi vị trí buổi học"
                               >
                                 <GripVertical className="h-5 w-5" aria-hidden="true" />
                               </button>
@@ -370,7 +370,7 @@ export function ChapterLessonPanel({
                                     : "italic text-[var(--theme-text-muted)]",
                                 )}
                               >
-                                {lessonDescription || "Chưa có mô tả bài học"}
+                                {lessonDescription || "Chưa có mô tả buổi học"}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
                                 <span className="inline-flex items-center gap-1">

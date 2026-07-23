@@ -1,15 +1,13 @@
 "use client";
 
-import { Maximize2, Minimize2, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
+import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
+import { SourceDocumentRangePreview } from "@/components/admin/courses/source-document-range-preview";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
-import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
-import { PdfPagePreview } from "@/components/shared/pdf-page-preview";
 import {
   getPdfPageFromPrintedPage,
-  getPrintedPageView,
   getSourceDocumentPageLimit,
   getSourceDocumentRangeReadiness,
 } from "@/features/admin/courses/admin-course-documents-utils";
@@ -35,8 +33,6 @@ export function LessonSourceExtractionBlock({
   sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]>;
   onRemove: () => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
   const sourceDocumentId =
     form.watch(`sourceDocumentExtractions.${index}.sourceDocumentId`) ?? "";
   const pageStart = form.watch(`sourceDocumentExtractions.${index}.pageStart`) ?? "";
@@ -119,7 +115,6 @@ export function LessonSourceExtractionBlock({
             shouldValidate: false,
           });
           form.clearErrors(`sourceDocumentExtractions.${index}`);
-          setIsExpanded(false);
         }}
         disabled={disabled || sourceDocuments.length === 0}
         icon={null}
@@ -190,109 +185,11 @@ export function LessonSourceExtractionBlock({
         </div>
       </div>
 
-      <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
-              Xem nhanh
-            </p>
-            <p className="mt-1 text-sm font-extrabold text-[var(--theme-primary)]">
-              {selectedSourceDocument?.title ??
-                selectedSourceDocument?.file.originalName ??
-                "Chưa chọn tài liệu nguồn"}
-            </p>
-          </div>
-          {previewPages.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode("ocr")}
-                  className={previewButtonClass(previewMode === "ocr", true)}
-                >
-                  Nội dung OCR
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode("pdf")}
-                  className={previewButtonClass(previewMode === "pdf", false)}
-                >
-                  PDF gốc
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsExpanded((current) => !current)}
-                className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)]"
-              >
-                {isExpanded ? (
-                  <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
-                ) : (
-                  <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-                )}
-                {isExpanded ? "Thu gọn" : "Mở rộng"}
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        {isExpanded && previewPages.length > 0 ? (
-          <div className="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3">
-            {previewPages.map((page, pageIndex) => {
-              const printed = getPrintedPageView(page);
-              const content = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
-              return (
-                <div
-                  key={page.id}
-                  className={
-                    pageIndex > 0 ? "mt-4 border-t border-[var(--theme-border)] pt-4" : ""
-                  }
-                >
-                  <p className="mb-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                    Trang PDF {page.pageNumber}
-                    {printed.printedPageLabel
-                      ? ` (Trang in: ${printed.printedPageLabel})`
-                      : ""}
-                  </p>
-                  {previewMode === "ocr" ? (
-                    content ? (
-                      <MathpixMarkdownRenderer content={content} />
-                    ) : (
-                      <p className="italic text-[var(--theme-text-muted)]">
-                        Không có nội dung OCR.
-                      </p>
-                    )
-                  ) : selectedSourceDocument?.file.publicUrl ? (
-                    <div className="overflow-x-auto rounded-md bg-[var(--theme-surface-soft)] text-center">
-                      <PdfPagePreview
-                        pdfUrl={selectedSourceDocument.file.publicUrl}
-                        pageNumber={page.pageNumber}
-                        width={650}
-                      />
-                    </div>
-                  ) : (
-                    <p className="italic text-[var(--theme-text-muted)]">
-                      Không tìm thấy file PDF.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm font-semibold text-[var(--theme-text-muted)]">
-            {previewPages.length > 0
-              ? "Mở rộng để xem nội dung chi tiết."
-              : "Nhập khoảng trang để xem nhanh."}
-          </p>
-        )}
-
-        {rangeWarning ? (
-          <p className="mt-2 text-sm font-bold text-[var(--theme-danger)]">
-            {rangeWarning}
-          </p>
-        ) : null}
-      </div>
+      <SourceDocumentRangePreview
+        pages={previewPages}
+        sourceDocument={selectedSourceDocument}
+        warning={rangeWarning}
+      />
     </div>
   );
 }
@@ -305,14 +202,4 @@ function markInteractedAndValidate(form: UseFormReturn<LessonFormValues>, index:
   requestAnimationFrame(() => {
     void form.trigger("sourceDocumentExtractions");
   });
-}
-
-function previewButtonClass(active: boolean, isFirst: boolean) {
-  return [
-    "px-2.5 py-1 text-xs font-bold transition-colors",
-    isFirst ? "rounded-l-md" : "rounded-r-md",
-    active
-      ? "bg-[var(--theme-primary)] text-white"
-      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]",
-  ].join(" ");
 }

@@ -159,7 +159,7 @@ export function useAdminCoursesManager(
         setPathEditorMode("edit");
         setIsPathEditorOpen(false);
         toast.success("Đã tạo khóa học", {
-          description: "Mở chi tiết khóa học để thêm chương học và bài học.",
+          description: "Mở chi tiết khóa học để thêm chương học và buổi học.",
         });
       } else if (editingPath) {
         await mutations.updatePath.mutateAsync({

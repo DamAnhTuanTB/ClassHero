@@ -136,7 +136,7 @@ export function LessonPageRangeRow({
         </div>
 
         <p className="mb-4 text-sm font-medium text-[var(--theme-text-muted)]">
-          Gợi ý: Nhập khoảng trang để hệ thống tự động trích xuất nội dung bài học từ Tài
+          Gợi ý: Nhập khoảng trang để hệ thống tự động trích xuất nội dung buổi học từ Tài
           liệu nguồn.
         </p>
 

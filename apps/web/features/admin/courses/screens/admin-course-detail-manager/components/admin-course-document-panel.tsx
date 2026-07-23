@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   CheckCircle,
+  Eye,
   ExternalLink,
   FileText,
   Loader2,
@@ -24,12 +25,14 @@ import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/u
 import { AdminCourseDocumentStat } from "@/features/admin/courses/screens/admin-course-detail-manager/components/admin-course-document-stat";
 import { DocumentStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/document-status-badge";
 import { LessonDocumentUploadDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-document-upload-dialog";
+import { SourceDocumentAssignmentsDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-assignments-dialog";
 import { SourceDocumentPagesDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-pages-dialog";
 import { SourceDocumentUploadDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-upload-dialog";
 import { RetrySourceDocumentConfirmDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/retry-source-document-confirm-dialog";
 
 export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) {
   const manager = useAdminCourseDocumentsManager(path);
+  const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
   const [isDeleteSourceConfirmOpen, setIsDeleteSourceConfirmOpen] = useState(false);
   const [isRetrySourceConfirmOpen, setIsRetrySourceConfirmOpen] = useState(false);
   const sourceDocument = manager.selectedSourceDocument;
@@ -94,9 +97,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  onClick={() =>
-                    manager.actions.selectSourceDocument(document.id)
-                  }
+                  onClick={() => manager.actions.selectSourceDocument(document.id)}
                   className={
                     isSelected
                       ? "theme-button-primary-subtle flex min-h-14 min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-left transition"
@@ -149,7 +150,18 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         <AdminCourseDocumentStat
           label="Đã gán"
           testId="document-stat-mapped-lessons"
-          value={`${manager.mappedLessonCount}/${manager.lessons.length}`}
+          value={
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              disabled={manager.mappedLessonCount === 0}
+              onClick={() => setIsAssignmentsOpen(true)}
+              className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-sm text-left text-[var(--theme-text-strong)] outline-none transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-100"
+            >
+              <Eye className="h-5 w-5 shrink-0" aria-hidden="true" />
+              {manager.mappedLessonCount} buổi học
+            </button>
+          }
         />
         <AdminCourseDocumentStat
           label="Độ rõ"
@@ -183,8 +195,8 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
               Chưa có tài liệu nguồn
             </p>
             <p className="mx-auto max-w-md text-sm font-semibold leading-6 text-[var(--theme-text-muted)]">
-              Upload một hoặc nhiều sách, giáo trình để làm nguồn trích xuất cho
-              từng buổi học.
+              Upload một hoặc nhiều sách, giáo trình để làm nguồn trích xuất cho từng buổi
+              học.
             </p>
             <button
               type="button"
@@ -314,6 +326,14 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         isSaving={manager.isUploadingSourceDocument}
         onClose={manager.actions.closeDialog}
         onSubmit={manager.actions.uploadSourceDocument}
+      />
+      <SourceDocumentAssignmentsDialog
+        documentsByLessonId={manager.documentsByLessonId}
+        isOpen={isAssignmentsOpen}
+        lessons={manager.lessons}
+        pages={manager.sourcePages}
+        sourceDocument={sourceDocument}
+        onClose={() => setIsAssignmentsOpen(false)}
       />
       <LessonDocumentUploadDialog
         isOpen={manager.dialogState?.type === "lesson-upload"}

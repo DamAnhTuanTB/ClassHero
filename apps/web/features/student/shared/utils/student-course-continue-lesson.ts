@@ -11,19 +11,19 @@ const continueLessonCopy: Record<
 > = {
   first: {
     actionLabel: "Vào học",
-    prefix: "Bài học đầu tiên",
+    prefix: "Buổi học đầu tiên",
   },
   inProgress: {
     actionLabel: "Học tiếp",
-    prefix: "Bài học đang học",
+    prefix: "Buổi học đang học",
   },
   last: {
     actionLabel: "Vào học",
-    prefix: "Bài học cuối cùng",
+    prefix: "Buổi học cuối cùng",
   },
   next: {
     actionLabel: "Vào học",
-    prefix: "Bài học tiếp theo",
+    prefix: "Buổi học tiếp theo",
   },
 };
 

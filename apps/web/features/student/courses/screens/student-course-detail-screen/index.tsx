@@ -68,7 +68,7 @@ export function StudentCourseDetailScreen({
           <EmptyCourseState
             isLoading
             title="Đang tải khóa học"
-            description="ClassHero đang lấy thông tin chương học và bài học mới nhất."
+            description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
           />
         </div>
       </main>
@@ -252,7 +252,7 @@ export function StudentCourseDetailScreen({
                     aria-hidden="true"
                   />
                   <span className="truncate text-sm font-bold">
-                    {course.lessonCount} bài học
+                    {course.lessonCount} buổi học
                   </span>
                 </div>
               </div>
@@ -305,7 +305,7 @@ export function StudentCourseDetailScreen({
                 Nội dung khóa học
               </h2>
               <p className="student-course-count-text hidden shrink-0 text-sm font-black sm:block">
-                {course.chapterCount} chương · {course.lessonCount} bài học
+                {course.chapterCount} chương · {course.lessonCount} buổi học
               </p>
             </div>
             <div className="grid gap-3">

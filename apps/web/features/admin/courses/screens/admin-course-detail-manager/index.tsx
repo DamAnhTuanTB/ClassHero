@@ -41,7 +41,7 @@ const PathEditorDialog = dynamic(() =>
 
 const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Khóa học", icon: Layers3, active: true },
-  { label: "Bài học", icon: BookOpen, active: false },
+  { label: "Buổi học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
 ];
 
@@ -151,7 +151,7 @@ export function AdminCourseDetailManager({
             {viewState === "loading" ? (
               <LoadingState
                 title="Đang tải chi tiết khóa học"
-                description="ClassHero đang lấy thông tin chương học và bài học mới nhất."
+                description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
               />
             ) : null}
             {viewState === "error" ? <ErrorState onRetry={actions.retryLoad} /> : null}
@@ -251,8 +251,8 @@ export function AdminCourseDetailManager({
       ) : null}
       {deletingLesson ? (
         <DeleteConfirmDialog
-          title="Xóa bài học"
-          confirmLabel="Xóa bài học"
+          title="Xóa buổi học"
+          confirmLabel="Xóa buổi học"
           isOpen={Boolean(deletingLesson)}
           isConfirming={isDeletingLesson}
           itemName={deletingLesson.title}

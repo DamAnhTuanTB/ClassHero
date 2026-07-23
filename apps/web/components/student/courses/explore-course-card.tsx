@@ -73,12 +73,12 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
   const isCurrentLessonInProgress = course.nextLesson?.kind === "inProgress";
   const nextLessonLabel =
     course.nextLesson?.kind === "first"
-      ? "Bài học đầu tiên"
+      ? "Buổi học đầu tiên"
       : course.nextLesson?.kind === "last"
-        ? "Bài học cuối cùng"
+        ? "Buổi học cuối cùng"
         : isCurrentLessonInProgress
-          ? "Bài học đang học"
-          : "Bài học tiếp theo";
+          ? "Buổi học đang học"
+          : "Buổi học tiếp theo";
   const nextLessonCtaLabel = isCurrentLessonInProgress ? "Học tiếp" : "Vào học";
   const coursePrice = getCoursePrice(course);
   const discountPercent =
@@ -352,7 +352,7 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
                     Học thử miễn phí
                   </p>
                   <p className="student-soft-bold-text truncate text-sm font-extrabold text-slate-600 dark:text-[var(--theme-text-strong)]">
-                    {course.trialLessonCount} bài học
+                    {course.trialLessonCount} buổi học
                   </p>
                 </div>
               </div>

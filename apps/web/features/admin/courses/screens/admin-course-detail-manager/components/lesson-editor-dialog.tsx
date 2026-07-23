@@ -318,7 +318,7 @@ export function LessonEditorDialog({
 
   return (
     <EditorDialogShell
-      ariaLabel={mode === "create" ? "Thêm bài học" : "Sửa bài học"}
+      ariaLabel={mode === "create" ? "Thêm buổi học" : "Sửa buổi học"}
       isOpen={isOpen}
       onClose={onClose}
       panelClassName="max-w-4xl"

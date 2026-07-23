@@ -136,7 +136,7 @@ export function getPurchasedCourseStats(courses: StudentCourse[]): StudentCourse
   return [
     { label: "đang học", value: String(purchasedCourses.length) },
     { label: "tiến độ", value: `${averageProgress}%` },
-    { label: "bài học hôm nay", value: String(nextLessonCount) },
+    { label: "buổi học hôm nay", value: String(nextLessonCount) },
   ];
 }
 

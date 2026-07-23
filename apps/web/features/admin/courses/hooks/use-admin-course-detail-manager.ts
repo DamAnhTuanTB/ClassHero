@@ -401,14 +401,14 @@ export function useAdminCourseDetailManager(
       // Ensure documents are re-fetched to reflect deleted/added supplements
       documentsManager.actions.reloadDocuments();
       if (referenceUploadError) {
-        toast.warning("Đã thêm bài học", {
+        toast.warning("Đã thêm buổi học", {
           description: getErrorMessage(referenceUploadError),
         });
       } else {
         toast.success(
-          lessonEditorMode === "create" ? "Đã thêm bài học" : "Đã lưu bài học",
+          lessonEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
           {
-            description: "Danh sách bài học trong chương đã được cập nhật.",
+            description: "Danh sách buổi học trong chương đã được cập nhật.",
           },
         );
       }
@@ -424,7 +424,7 @@ export function useAdminCourseDetailManager(
         throw new Error("DUPLICATED_LESSON_ORDER", { cause: error });
       }
 
-      toast.error("Chưa lưu được bài học", {
+      toast.error("Chưa lưu được buổi học", {
         description: getErrorMessage(error),
       });
     }
@@ -485,7 +485,7 @@ export function useAdminCourseDetailManager(
       await mutations.invalidateLearningPath(pathId);
       await learningPathQuery.refetch();
       toast.info("Đã xóa chương học", {
-        description: "Các bài học trong chương cũng được chuyển sang lưu trữ.",
+        description: "Các buổi học trong chương cũng được chuyển sang lưu trữ.",
       });
       setDeletingChapterId(null);
     } catch (error) {
@@ -516,10 +516,10 @@ export function useAdminCourseDetailManager(
       });
       await mutations.invalidateLearningPath(pathId);
       await learningPathQuery.refetch();
-      toast.info("Đã xóa bài học");
+      toast.info("Đã xóa buổi học");
       setDeletingLessonId(null);
     } catch (error) {
-      toast.error("Chưa xóa được bài học", {
+      toast.error("Chưa xóa được buổi học", {
         description: getErrorMessage(error),
       });
     }
@@ -582,7 +582,7 @@ export function useAdminCourseDetailManager(
       setSelectedChapterId(chapterId);
       setSelectedLessonId(sourceLessonId);
     } catch (error) {
-      toast.error("Chưa đổi được thứ tự bài học", {
+      toast.error("Chưa đổi được thứ tự buổi học", {
         description: getErrorMessage(error),
       });
     }

@@ -16,7 +16,7 @@ export function CourseMetaRow({ course }: { course: StudentCourse }) {
           className="student-progress-accent-text h-[18px] w-[18px] text-sky-600 dark:text-sky-300 lg:h-[22px] lg:w-[22px]"
           aria-hidden="true"
         />
-        {course.lessonCount} bài học
+        {course.lessonCount} buổi học
       </span>
     </div>
   );

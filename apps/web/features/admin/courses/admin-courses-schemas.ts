@@ -146,7 +146,7 @@ const referenceDocumentSchema = z
 export const lessonSchema = z.object({
   orderIndex: z.coerce.number().int().min(1, "Thứ tự bắt đầu từ 1").max(500),
   title: requiredTrimmedText({
-    requiredMessage: "Nhập tên bài học",
+    requiredMessage: "Nhập tên buổi học",
     maxLength: 180,
   }),
   shortDescription: z.string().trim().max(500).optional(),
