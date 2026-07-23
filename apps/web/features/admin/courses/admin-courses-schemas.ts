@@ -15,7 +15,7 @@ const sourceDocumentExtractionSchema = z
   .object({
     id: z.string().optional(),
     clientKey: z.string(),
-    sourceDocumentId: z.string().trim(),
+    sourceDocumentId: z.string({ error: "Chọn tài liệu nguồn" }).trim(),
     pageStart: z.string().trim().optional(),
     pageEnd: z.string().trim().optional(),
     hasInteracted: z.boolean().optional(),

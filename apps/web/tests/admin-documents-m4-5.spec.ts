@@ -161,6 +161,46 @@ test.describe("M4.5 admin lesson documents", () => {
     await captureM45Screenshot(page, testInfo.project.name, "06-delete-conflict");
   });
 
+  test("adds exactly one extraction when editing a lesson without documents", async ({
+    page,
+  }) => {
+    await seedAdminSession(page);
+    await setupM45ApiMock(page, { sourceStatus: "READY" });
+
+    await page.goto(`/admin/courses/${learningPathId}`);
+    await expect(
+      page
+        .getByTestId("admin-course-document-panel")
+        .getByRole("heading", { name: "Toán 7 Tập 1" }),
+    ).toBeVisible();
+
+    const lessonOneArticle = page
+      .getByRole("heading", { name: "Bài học 1: Số hữu tỉ" })
+      .locator("xpath=ancestor::article[1]");
+    await lessonOneArticle.getByRole("button", { name: "Sửa" }).click();
+
+    const editDialog = page.getByRole("dialog", { name: "Sửa bài học" });
+    const foundationSection = editDialog.getByTestId(
+      "lesson-foundation-documents-section",
+    );
+    const extractions = foundationSection.getByTestId("foundation-extraction-item");
+
+    await expect(extractions).toHaveCount(0);
+    await foundationSection.getByTestId("add-foundation-extraction").click();
+    await expect(extractions).toHaveCount(1);
+    await expect(foundationSection.getByTestId("foundation-document-count")).toHaveText(
+      "1",
+    );
+
+    await editDialog.getByLabel("Tên bài học").fill("Toán 7");
+    await extractions.getByRole("button", { name: "Trang 1 - 8" }).click();
+
+    await expect(extractions).toHaveCount(1);
+    await expect(extractions.getByLabel("Từ trang in")).toHaveValue("1");
+    await expect(extractions.getByLabel("Đến trang in")).toHaveValue("8");
+    await expect(editDialog.getByText(/Invalid input:/)).toHaveCount(0);
+  });
+
   test("creates lesson metadata first and saves a source range when provided", async ({
     page,
   }) => {

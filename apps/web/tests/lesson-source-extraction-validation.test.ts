@@ -85,6 +85,33 @@ test("chấp nhận Đến trang bằng trang in lớn nhất", () => {
   assert.equal(result.success, true);
 });
 
+test("hiển thị lỗi nghiệp vụ khi khối trích xuất thiếu tài liệu nguồn", () => {
+  const schema = createLessonSchema([], {});
+  const result = schema.safeParse({
+    ...emptyLessonValues,
+    title: "Bài 1",
+    sourceDocumentExtractions: [
+      {
+        clientKey: "extraction-1",
+        pageStart: "5",
+        pageEnd: "9",
+        hasInteracted: true,
+      },
+    ],
+  });
+
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.equal(
+      result.error.issues.find(
+        (issue) =>
+          issue.path.join(".") === "sourceDocumentExtractions.0.sourceDocumentId",
+      )?.message,
+      "Chọn tài liệu nguồn",
+    );
+  }
+});
+
 function createPage(
   pageNumber: number,
   printedPageNumber: number,

@@ -76,7 +76,11 @@ export function LessonEditorDialog({
     resolver: zodResolver(formSchema) as Resolver<LessonFormValues>,
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: emptyLessonValues,
+    defaultValues: {
+      ...emptyLessonValues,
+      sourceDocumentExtractions: [],
+      foundationDocumentOrder: [],
+    },
   });
   const resetKeyRef = useRef<string | null>(null);
 
@@ -110,11 +114,6 @@ export function LessonEditorDialog({
         extraction.pageEnd,
       ]),
     ].join(":");
-
-    if (!isOpen) {
-      resetKeyRef.current = null;
-      return;
-    }
 
     if (resetKeyRef.current === editorKey) {
       return;

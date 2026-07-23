@@ -13,3 +13,4 @@
   - Bổ sung phương thức `removeSingleLessonPageRangeInTransaction` vào `source-documents.service.ts` để xóa cứng dữ liệu trong bảng `LessonDocumentPageRange` và cập nhật xóa mềm bằng `replacedAt` cho `LessonDocument`.
 
 - 2026-07-23: Mở rộng quản lý tài liệu khóa học và buổi học với nhiều tài liệu nguồn, nhiều khối trích xuất có thứ tự, nhiều file nền tảng/bổ sung/bài tập về nhà, chuẩn hóa ba document kind, trạng thái sẵn sàng và validation khoảng trang; đồng thời bổ sung kiểm tra trùng tên buổi học trong cùng chương ở cả API và modal quản trị.
+- 2026-07-23: Sửa modal chỉnh sửa buổi học bị nhân đôi khối trích xuất sau một lần thêm, chuẩn hóa lỗi thiếu tài liệu nguồn thành thông báo nghiệp vụ và bổ sung regression test cho luồng thêm trích xuất rồi áp dụng gợi ý trên desktop, tablet và mobile.
