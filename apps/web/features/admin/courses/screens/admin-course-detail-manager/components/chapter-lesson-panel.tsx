@@ -15,6 +15,7 @@ import { useState, type DragEvent } from "react";
 import { StatusBadge } from "@/components/admin/courses/status-badge";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import { formatDateTime } from "@/features/admin/courses/admin-courses-utils";
+import { LessonTypeBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-type-badge";
 import { cn } from "@/lib/utils";
 
 export function ChapterLessonPanel({
@@ -340,6 +341,7 @@ export function ChapterLessonPanel({
                             </div>
                             <div className="flex flex-wrap items-center justify-end gap-2 md:hidden">
                               <StatusBadge status={lesson.status} />
+                              <LessonTypeBadge lessonType={lesson.lessonType} />
                               {lesson.trialEnabled ? (
                                 <span className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-2.5 text-xs font-extrabold text-[var(--theme-warning-text)]">
                                   <Crown className="h-3.5 w-3.5" aria-hidden="true" />
@@ -354,6 +356,9 @@ export function ChapterLessonPanel({
                                 </h4>
                                 <span className="hidden shrink-0 md:inline-flex">
                                   <StatusBadge status={lesson.status} />
+                                </span>
+                                <span className="hidden shrink-0 md:inline-flex">
+                                  <LessonTypeBadge lessonType={lesson.lessonType} />
                                 </span>
                                 {lesson.trialEnabled ? (
                                   <span className="hidden min-h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-2.5 text-xs font-extrabold text-[var(--theme-warning-text)] md:inline-flex">

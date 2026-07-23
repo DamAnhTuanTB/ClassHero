@@ -2,7 +2,9 @@
 
 import {
   Check,
+  BookOpen,
   FileText,
+  Link2,
   ListOrdered,
   Loader2,
   SlidersHorizontal,
@@ -15,7 +17,12 @@ import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
-import { adminStatuses, statusLabels } from "@/features/admin/courses/admin-courses-data";
+import {
+  adminLessonTypes,
+  adminStatuses,
+  lessonTypeLabels,
+  statusLabels,
+} from "@/features/admin/courses/admin-courses-data";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 import { LessonSupplementDocumentsSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-supplement-documents-section";
@@ -46,6 +53,7 @@ export function LessonEditor({
   onClose: () => void;
   onSubmit: (values: LessonFormValues) => void | Promise<void>;
 }) {
+  const lessonType = form.watch("lessonType");
   const documentFieldArray = useFieldArray({
     control: form.control,
     name: "referenceDocuments",
@@ -56,19 +64,13 @@ export function LessonEditor({
   });
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
-    form
-      .getValues("sourceDocumentExtractions")
-      .forEach((_, index) => {
-        form.setValue(
-          `sourceDocumentExtractions.${index}.hasInteracted`,
-          true,
-          {
-            shouldDirty: false,
-            shouldTouch: false,
-            shouldValidate: false,
-          },
-        );
+    form.getValues("sourceDocumentExtractions").forEach((_, index) => {
+      form.setValue(`sourceDocumentExtractions.${index}.hasInteracted`, true, {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: false,
       });
+    });
 
     void form.handleSubmit(onSubmit)(event);
   }
@@ -113,6 +115,46 @@ export function LessonEditor({
               disabled={disabled || isSaving}
               {...form.register("title")}
             />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <OptionField
+              id="admin-lesson-type"
+              label="Loại buổi học"
+              value={lessonType}
+              icon={<BookOpen className="h-5 w-5" aria-hidden="true" />}
+              options={adminLessonTypes.map((type) => ({
+                value: type,
+                label: lessonTypeLabels[type],
+              }))}
+              error={form.formState.errors.lessonType}
+              onChange={(value) => {
+                const nextLessonType = value as LessonFormValues["lessonType"];
+                form.setValue("lessonType", nextLessonType, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true,
+                });
+                if (nextLessonType === "BASIC") {
+                  form.setValue("liveUrl", "", {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                }
+              }}
+              disabled={disabled || isSaving}
+            />
+            {lessonType === "LIVE" ? (
+              <TextField
+                id="admin-lesson-live-url"
+                label="Link học live"
+                isOptional
+                placeholder="https://meet.google.com/..."
+                icon={<Link2 className="h-5 w-5" aria-hidden="true" />}
+                error={form.formState.errors.liveUrl}
+                disabled={disabled || isSaving}
+                {...form.register("liveUrl")}
+              />
+            ) : null}
           </div>
           <LessonSourceRangeSection
             disabled={disabled}

@@ -105,6 +105,8 @@ export function toLessonFormValues(
     orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription,
+    lessonType: lesson.lessonType,
+    liveUrl: lesson.liveUrl,
     scheduledAt: lesson.scheduledAt,
     examOpenAt: lesson.examOpenAt,
     videoUrl: lesson.videoUrl,
@@ -137,6 +139,8 @@ export function toLessonPayload(values: LessonFormValues): Omit<AdminLesson, "id
     orderIndex: Number(values.orderIndex),
     title: values.title.trim(),
     shortDescription: values.shortDescription?.trim() ?? "",
+    lessonType: values.lessonType,
+    liveUrl: values.lessonType === "LIVE" ? (values.liveUrl?.trim() ?? "") : "",
     scheduledAt: values.scheduledAt ?? "",
     examOpenAt: values.examOpenAt ?? "",
     videoUrl: values.videoUrl?.trim() ?? "",
@@ -390,6 +394,15 @@ export function isAllowedVideoUrl(value: string) {
         hostname === "youtube-nocookie.com" ||
         hostname === "drive.google.com")
     );
+  } catch {
+    return false;
+  }
+}
+
+export function isValidWebUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
   } catch {
     return false;
   }

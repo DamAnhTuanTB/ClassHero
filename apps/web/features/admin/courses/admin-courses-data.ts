@@ -1,6 +1,7 @@
 export type AdminSubject = "MATH" | "PHYSICS" | "CHEMISTRY";
 export type AdminPublishStatus = "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED";
 export type AdminEditableStatus = Exclude<AdminPublishStatus, "ARCHIVED">;
+export type AdminLessonType = "BASIC" | "LIVE";
 
 export type AdminLesson = {
   id: string;
@@ -8,6 +9,8 @@ export type AdminLesson = {
   orderIndex: number;
   title: string;
   shortDescription: string;
+  lessonType: AdminLessonType;
+  liveUrl: string;
   scheduledAt: string;
   examOpenAt: string;
   videoUrl: string;
@@ -60,6 +63,11 @@ export const statusLabels: Record<AdminPublishStatus, string> = {
   ARCHIVED: "Lưu trữ",
 };
 
+export const lessonTypeLabels: Record<AdminLessonType, string> = {
+  BASIC: "Học cơ bản",
+  LIVE: "Học live",
+};
+
 export const statusStyles: Record<AdminPublishStatus, string> = {
   DRAFT:
     "border-[var(--theme-border)] bg-[var(--theme-surface-soft)] text-[var(--theme-text)]",
@@ -73,6 +81,7 @@ export const statusStyles: Record<AdminPublishStatus, string> = {
 
 export const adminSubjects = Object.keys(subjectLabels) as AdminSubject[];
 export const adminStatuses: AdminEditableStatus[] = ["DRAFT", "PUBLISHED", "HIDDEN"];
+export const adminLessonTypes: AdminLessonType[] = ["BASIC", "LIVE"];
 export const adminGrades = Array.from({ length: 10 }, (_, index) => index + 3);
 
 export const adminLearningPaths: AdminLearningPath[] = [
@@ -109,6 +118,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
             orderIndex: 1,
             title: "Buổi học 1: Số hữu tỉ",
             shortDescription: "Ôn tập số hữu tỉ, thứ tự và phép tính cơ bản.",
+            lessonType: "BASIC",
+            liveUrl: "",
             scheduledAt: "2026-08-01T12:00",
             examOpenAt: "2026-08-01T13:00",
             videoUrl: "https://youtube.com/watch?v=toan7-01",
@@ -121,6 +132,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
             orderIndex: 2,
             title: "Buổi học 2: Lũy thừa",
             shortDescription: "Lũy thừa với số mũ tự nhiên và bài tập vận dụng.",
+            lessonType: "BASIC",
+            liveUrl: "",
             scheduledAt: "2026-08-05T12:00",
             examOpenAt: "2026-08-05T13:00",
             videoUrl: "https://drive.google.com/file/d/toan7-02/view",
@@ -175,6 +188,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
             orderIndex: 1,
             title: "Buổi học 1: Chuyển động cơ học",
             shortDescription: "Khái niệm chuyển động, vận tốc và bài tập đọc đồ thị.",
+            lessonType: "BASIC",
+            liveUrl: "",
             scheduledAt: "2026-08-03T12:00",
             examOpenAt: "2026-08-03T13:00",
             videoUrl: "https://youtube.com/watch?v=ly8-01",
@@ -219,6 +234,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
             orderIndex: 1,
             title: "Buổi học 1: Oxit",
             shortDescription: "Phân loại oxit, tính chất hóa học và bài tập nhận biết.",
+            lessonType: "BASIC",
+            liveUrl: "",
             scheduledAt: "2026-08-07T12:00",
             examOpenAt: "2026-08-07T13:00",
             videoUrl: "https://youtube.com/watch?v=hoa9-01",

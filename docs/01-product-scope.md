@@ -186,6 +186,8 @@ ASSUMPTION: Ở MVP, chương học chỉ dùng để chia cấu trúc và giả
 Mỗi buổi học gồm:
 
 - Tên buổi học.
+- Loại buổi học: học cơ bản hoặc học live; mặc định là học cơ bản.
+- Link học live tùy chọn khi loại buổi học là học live.
 - Tóm tắt ngắn nội dung sẽ học.
 - Phiếu tài liệu trước buổi học.
 - Ngày/giờ diễn ra hoặc ngày/giờ mở bài thi.

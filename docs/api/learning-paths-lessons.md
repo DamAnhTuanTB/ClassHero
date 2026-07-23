@@ -322,6 +322,8 @@ Body:
   "orderIndex": 1,
   "title": "Buổi 1: Số hữu tỉ",
   "shortDescription": "Ôn tập số hữu tỉ và phép tính cơ bản",
+  "lessonType": "LIVE",
+  "liveUrl": "https://meet.google.com/abc-defg-hij",
   "scheduledAt": "2026-08-01T12:00:00.000Z",
   "examOpenAt": "2026-08-01T13:00:00.000Z",
   "videoUrl": "https://youtube.com/...",
@@ -349,6 +351,8 @@ Behavior:
 
 - `completionMinScore` mặc định là `7` nếu không gửi.
 - `trialEnabled` mặc định là `false`; học thử thuộc từng buổi học, không thuộc lộ trình.
+- `lessonType` nhận `BASIC | LIVE`, mặc định `BASIC`.
+- `liveUrl` là optional. Nếu có ở lesson `LIVE`, giá trị phải là URL HTTP(S) hợp lệ. Với lesson `BASIC`, backend luôn lưu `liveUrl = null`.
 - `orderIndex` phải unique trong cùng chapter.
 - `title` được trim, thu gọn khoảng trắng và không được trùng (không phân biệt hoa/thường) với lesson đang hoạt động khác trong cùng chapter. Hai chapter khác nhau có thể dùng cùng tên lesson. Nếu trùng trong chapter, trả `409` với `error.code = "LESSON_TITLE_DUPLICATE"` và message `Buổi học đã trùng tên`.
 - `videoUrl` chỉ chấp nhận YouTube hoặc Google Drive.
@@ -370,7 +374,7 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả lesson chưa bị soft delete.
+- Trả lesson chưa bị soft delete, gồm `lessonType` và `liveUrl`.
 
 ### `PATCH /admin/lessons/:lessonId`
 
@@ -380,8 +384,9 @@ Body: partial của body create. `sourceDocumentExtractions` là collection đ�
 
 Behavior:
 
-- Cho phép đổi `orderIndex`, metadata, thời điểm mở bài thi, video URL, completion score, `trialEnabled` và `status`.
-- `shortDescription`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
+- Cho phép đổi `orderIndex`, metadata, `lessonType`, `liveUrl`, thời điểm mở bài thi, video URL, completion score, `trialEnabled` và `status`.
+- `shortDescription`, `liveUrl`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
+- Khi đổi `lessonType` về `BASIC`, backend clear `liveUrl` kể cả request không gửi lại field này.
 - Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng chapter.
 - Nếu đổi `title`, tên mới vẫn phải duy nhất trong cùng chapter theo cùng quy tắc của API tạo lesson; lesson hiện tại được loại khỏi phép kiểm tra.
 - Nếu gửi `sourceDocumentExtractions`, backend validate source document cùng learning path, readiness, thứ tự range và same-source overlap; sau đó tạo/cập nhật/xóa đúng từng mapping và enqueue chunking khi nguồn/range đổi.

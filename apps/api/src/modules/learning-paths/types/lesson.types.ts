@@ -1,4 +1,4 @@
-import { Prisma, PublishStatus } from "@prisma/client";
+import { LessonType, Prisma, PublishStatus } from "@prisma/client";
 import { lessonSelect } from "#api/modules/learning-paths/selectors/lesson.selects";
 
 export type LessonRecord = Prisma.LessonGetPayload<{
@@ -12,6 +12,8 @@ export type LessonResponse = {
   orderIndex: number;
   title: string;
   shortDescription: string | null;
+  lessonType: LessonType;
+  liveUrl: string | null;
   scheduledAt: Date | null;
   examOpenAt: Date | null;
   videoUrl: string | null;

@@ -123,7 +123,7 @@ Các bước:
 3. Nhập tên chương, thứ tự, mô tả/tổng quan ngắn, mục tiêu học tập hoặc nội dung trọng tâm nếu có, trạng thái.
 4. Backend tạo `learning_path_chapters`.
 5. Admin mở chương học và bấm thêm buổi học.
-6. Nhập title, order index, mô tả ngắn, ngày/giờ học hoặc ngày/giờ mở bài thi, video URL, tiêu chí hoàn thành.
+6. Nhập title, order index, loại buổi học, mô tả ngắn, ngày/giờ học hoặc ngày/giờ mở bài thi, video URL và tiêu chí hoàn thành. Loại mặc định là `BASIC`; khi chọn `LIVE`, form hiển thị thêm field link học live tùy chọn.
 7. Backend tạo `lessons` thuộc chương học.
 8. Backend cập nhật tổng số buổi nếu cần.
 9. Backend ghi audit log.
@@ -134,6 +134,8 @@ Acceptance Criteria:
 - `order_index` của buổi học không trùng trong cùng chương.
 - Chương học chỉ chứa thông tin tổng quan, không có video/tài liệu/PDF/quiz/flashcard/test riêng.
 - `completion_min_score` mặc định là 7.
+- `lesson_type` mặc định là `BASIC`; chỉ nhận `BASIC` hoặc `LIVE`.
+- `live_url` là optional, chỉ được giữ khi `lesson_type = LIVE`; khi chuyển về `BASIC`, backend clear field này.
 - Video URL chấp nhận YouTube hoặc Google Drive.
 - Chỉ admin được tạo/sửa/xóa.
 

@@ -65,6 +65,12 @@ export function toLessonApiPayload(
     ...(values.shortDescription !== undefined
       ? { shortDescription: values.shortDescription?.trim() || null }
       : {}),
+    ...(values.lessonType !== undefined ? { lessonType: values.lessonType } : {}),
+    ...(values.lessonType !== undefined || values.liveUrl !== undefined
+      ? {
+          liveUrl: values.lessonType === "BASIC" ? null : values.liveUrl?.trim() || null,
+        }
+      : {}),
     ...(values.scheduledAt !== undefined
       ? { scheduledAt: toIsoDateTime(values.scheduledAt) }
       : {}),
@@ -79,9 +85,7 @@ export function toLessonApiPayload(
       : {}),
     ...(values.trialEnabled !== undefined ? { trialEnabled: values.trialEnabled } : {}),
     ...(values.status !== undefined ? { status: values.status } : {}),
-    ...(sourceDocumentExtractions !== undefined
-      ? { sourceDocumentExtractions }
-      : {}),
+    ...(sourceDocumentExtractions !== undefined ? { sourceDocumentExtractions } : {}),
   };
 }
 

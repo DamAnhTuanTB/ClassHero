@@ -1,5 +1,6 @@
 import type {
   AdminChapter,
+  AdminLessonType,
   AdminPublishStatus,
   AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
@@ -45,6 +46,8 @@ export type AdminLessonApi = {
   orderIndex: number;
   title: string;
   shortDescription: string | null;
+  lessonType: AdminLessonType;
+  liveUrl: string | null;
   scheduledAt: string | null;
   examOpenAt: string | null;
   videoUrl: string | null;
@@ -88,6 +91,8 @@ export type AdminChapterPayload = {
 export type AdminLessonPayload = {
   completionMinScore?: number;
   examOpenAt?: string | null;
+  lessonType?: AdminLessonType;
+  liveUrl?: string | null;
   orderIndex?: number;
   scheduledAt?: string | null;
   shortDescription?: string | null;

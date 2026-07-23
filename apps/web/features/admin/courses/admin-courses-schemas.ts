@@ -1,11 +1,15 @@
 import { z } from "zod";
 import type {
   AdminEditableStatus,
+  AdminLessonType,
   AdminPublishStatus,
   AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
 import { getMaximumPrintedPageNumber } from "@/features/admin/courses/admin-course-documents-utils";
-import { isAllowedVideoUrl } from "@/features/admin/courses/admin-courses-utils";
+import {
+  isAllowedVideoUrl,
+  isValidWebUrl,
+} from "@/features/admin/courses/admin-courses-utils";
 import type { AdminSourceDocumentPageApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { requiredTrimmedText } from "@/lib/form-validation";
 
@@ -150,6 +154,15 @@ export const lessonSchema = z.object({
     maxLength: 180,
   }),
   shortDescription: z.string().trim().max(500).optional(),
+  lessonType: z.enum(["BASIC", "LIVE"]),
+  liveUrl: z
+    .string()
+    .trim()
+    .max(2048, "Link học live tối đa 2048 ký tự")
+    .optional()
+    .refine((value) => !value || isValidWebUrl(value), {
+      message: "Link học live không hợp lệ",
+    }),
   scheduledAt: z.string().optional(),
   examOpenAt: z.string().optional(),
   videoUrl: z
@@ -369,6 +382,8 @@ export type LessonFormValues = {
   orderIndex: number;
   title: string;
   shortDescription?: string;
+  lessonType: AdminLessonType;
+  liveUrl?: string;
   scheduledAt?: string;
   examOpenAt?: string;
   videoUrl?: string;
@@ -425,6 +440,8 @@ export const emptyLessonValues: LessonFormValues = {
   orderIndex: 1,
   title: "",
   shortDescription: "",
+  lessonType: "BASIC",
+  liveUrl: "",
   scheduledAt: "",
   examOpenAt: "",
   videoUrl: "",

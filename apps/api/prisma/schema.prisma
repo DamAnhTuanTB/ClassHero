@@ -126,6 +126,11 @@ enum LessonDocumentKind {
   HOMEWORK
 }
 
+enum LessonType {
+  BASIC
+  LIVE
+}
+
 enum LessonMaterialType {
   PDF
   IMAGE
@@ -547,6 +552,8 @@ model Lesson {
   orderIndex         Int                       @map("order_index")
   title              String
   shortDescription   String?                   @map("short_description")
+  lessonType         LessonType                @default(BASIC) @map("lesson_type")
+  liveUrl            String?                   @map("live_url")
   prepMaterialJson   Json?                     @map("prep_material_json")
   scheduledAt        DateTime?                 @map("scheduled_at")
   examOpenAt         DateTime?                 @map("exam_open_at")

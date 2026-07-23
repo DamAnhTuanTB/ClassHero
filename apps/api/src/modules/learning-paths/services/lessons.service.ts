@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { Prisma, PublishStatus } from "@prisma/client";
+import { LessonType, Prisma, PublishStatus } from "@prisma/client";
 import { throwBadRequest } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { CreateLessonDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
@@ -8,6 +8,7 @@ import {
   assertVideoUrlAllowed,
   getStatusAuditAction,
   handleKnownPrismaError,
+  normalizeLessonLiveUrl,
   normalizeOptionalText,
   normalizeText,
   throwChapterNotFound,
@@ -56,6 +57,8 @@ export class LessonsService {
     context: RequestContext = {},
   ) {
     assertVideoUrlAllowed(dto.videoUrl);
+    const lessonType = dto.lessonType ?? LessonType.BASIC;
+    const liveUrl = normalizeLessonLiveUrl(lessonType, dto.liveUrl);
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -88,6 +91,8 @@ export class LessonsService {
             orderIndex: dto.orderIndex,
             title: normalizedTitle,
             shortDescription: normalizeOptionalText(dto.shortDescription),
+            lessonType,
+            liveUrl,
             scheduledAt: dto.scheduledAt ?? null,
             examOpenAt: dto.examOpenAt ?? null,
             videoUrl: normalizeOptionalText(dto.videoUrl),
@@ -159,8 +164,6 @@ export class LessonsService {
       throwBadRequest("VALIDATION_ERROR", "Cần cung cấp ít nhất một trường để cập nhật");
     }
 
-    assertVideoUrlAllowed(dto.videoUrl);
-
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         const before = await tx.lesson.findFirst({
@@ -181,6 +184,12 @@ export class LessonsService {
           throwLessonNotFound();
         }
 
+        assertVideoUrlAllowed(dto.videoUrl);
+        const lessonType = dto.lessonType ?? before.lessonType;
+        const liveUrl = normalizeLessonLiveUrl(
+          lessonType,
+          dto.liveUrl === undefined ? before.liveUrl : dto.liveUrl,
+        );
         const normalizedTitle =
           dto.title !== undefined ? normalizeText(dto.title) : undefined;
         if (normalizedTitle !== undefined) {
@@ -203,6 +212,10 @@ export class LessonsService {
             ...(normalizedTitle !== undefined ? { title: normalizedTitle } : {}),
             ...(dto.shortDescription !== undefined
               ? { shortDescription: normalizeOptionalText(dto.shortDescription) }
+              : {}),
+            ...(dto.lessonType !== undefined ? { lessonType } : {}),
+            ...(dto.lessonType !== undefined || dto.liveUrl !== undefined
+              ? { liveUrl }
               : {}),
             ...(dto.scheduledAt !== undefined
               ? { scheduledAt: dto.scheduledAt ?? null }

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { PublishStatus } from "@prisma/client";
+import { LessonType, PublishStatus } from "@prisma/client";
 import {
   ArrayMaxSize,
   IsArray,
@@ -52,6 +52,21 @@ export class UpdateLessonDto {
   @IsString()
   @MaxLength(500)
   shortDescription?: string | null;
+
+  @ApiPropertyOptional({ enum: LessonType, example: LessonType.LIVE })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsEnum(LessonType)
+  lessonType?: LessonType;
+
+  @ApiPropertyOptional({
+    example: "https://meet.google.com/abc-defg-hij",
+    maxLength: 2048,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  liveUrl?: string | null;
 
   @ApiPropertyOptional({
     example: "2026-08-01T12:00:00.000Z",

@@ -53,6 +53,8 @@ export function mapLesson(lesson: AdminLessonApi): AdminLesson {
     orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription ?? "",
+    lessonType: lesson.lessonType,
+    liveUrl: lesson.liveUrl ?? "",
     scheduledAt: toDateTimeLocalValue(lesson.scheduledAt),
     examOpenAt: toDateTimeLocalValue(lesson.examOpenAt),
     videoUrl: lesson.videoUrl ?? "",

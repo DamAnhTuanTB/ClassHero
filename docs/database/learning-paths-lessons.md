@@ -81,6 +81,8 @@ chapter_id uuid fk learning_path_chapters.id
 order_index int
 title string
 short_description string?
+lesson_type LessonType default BASIC
+live_url string?
 prep_material_json jsonb?
 scheduled_at timestamp?
 exam_open_at timestamp?
@@ -102,6 +104,8 @@ Constraint:
 Rules:
 
 - Buổi học luôn thuộc một chương học.
+- `lesson_type` chỉ nhận `BASIC` hoặc `LIVE` và mặc định là `BASIC`.
+- `live_url` là optional cho buổi `LIVE`; buổi `BASIC` luôn lưu `live_url = null`.
 - `learning_path_id` trên `lessons` được giữ như denormalized compatibility/filter field trong giai đoạn nối M3.4; source of truth phân cấp vẫn là `chapter_id -> learning_path_chapters.learning_path_id`.
 - Quiz, flashcard, test, document, summary, progress và AI chat vẫn gắn với `lesson_id`.
 - Counter `learning_paths.total_chapter_count` và `learning_paths.total_lesson_count` phải được service cập nhật khi tạo/xóa mềm phần tử liên quan.

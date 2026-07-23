@@ -1,4 +1,4 @@
-import { Prisma, PublishStatus } from "@prisma/client";
+import { LessonType, Prisma, PublishStatus } from "@prisma/client";
 import {
   isPrismaRecordNotFoundError,
   isPrismaUniqueConstraintError,
@@ -58,6 +58,31 @@ export function normalizeOptionalText(value: string | null | undefined) {
 
   const normalized = normalizeText(value);
   return normalized.length > 0 ? normalized : null;
+}
+
+export function normalizeLessonLiveUrl(
+  lessonType: LessonType,
+  liveUrl: string | null | undefined,
+) {
+  if (lessonType === LessonType.BASIC) {
+    return null;
+  }
+
+  const normalized = liveUrl?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("Unsupported protocol");
+    }
+  } catch {
+    throwBadRequest("VALIDATION_ERROR", "Link học live không hợp lệ");
+  }
+
+  return normalized;
 }
 
 export function toInputJson(value: unknown): Prisma.InputJsonValue | undefined {
