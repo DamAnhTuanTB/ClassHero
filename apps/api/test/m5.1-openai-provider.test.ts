@@ -1,0 +1,151 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { AiProviderName } from "@prisma/client";
+
+import type { AiEmbeddingInput } from "#api/modules/ai/types/ai-embedding.types";
+import type { AiProvider } from "#api/modules/ai/types/ai-provider.interface";
+import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
+
+// Mock OpenAI SDK
+const mockEmbeddingsCreate = vi.fn();
+vi.mock("openai", () => {
+  return {
+    default: class MockOpenAI {
+      embeddings = { create: mockEmbeddingsCreate };
+      constructor() {}
+    },
+  };
+});
+
+describe("OpenAiProvider", () => {
+  let provider: AiProvider;
+  const testConfig: AiOpenAiConfig = {
+    apiKey: "test-api-key",
+    structuredModel: "gpt-4.1-mini",
+    chatModel: "gpt-4.1-mini",
+    embeddingModel: "text-embedding-3-small",
+    embeddingDimensions: 1536,
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { OpenAiProvider } = await import(
+      "#api/modules/ai/providers/openai.provider"
+    );
+    provider = new OpenAiProvider(testConfig);
+  });
+
+  describe("name", () => {
+    it("should be OPENAI", () => {
+      expect(provider.name).toBe(AiProviderName.OPENAI);
+    });
+  });
+
+  describe("createEmbedding", () => {
+    const mockInput: AiEmbeddingInput = {
+      texts: ["Hello world", "Test embedding"],
+    };
+
+    const mockResponse = {
+      data: [
+        { embedding: new Array(1536).fill(0.1), index: 0 },
+        { embedding: new Array(1536).fill(0.2), index: 1 },
+      ],
+      model: "text-embedding-3-small",
+      usage: {
+        prompt_tokens: 5,
+        total_tokens: 5,
+      },
+    };
+
+    it("should create embeddings successfully", async () => {
+      mockEmbeddingsCreate.mockResolvedValueOnce(mockResponse);
+
+      const result = await provider.createEmbedding(mockInput);
+
+      expect(mockEmbeddingsCreate).toHaveBeenCalledWith({
+        model: "text-embedding-3-small",
+        input: ["Hello world", "Test embedding"],
+        dimensions: 1536,
+      });
+
+      expect(result.vectors).toHaveLength(2);
+      expect(result.model).toBe("text-embedding-3-small");
+      expect(result.dimensions).toBe(1536);
+      expect(result.usage).toEqual({
+        promptTokens: 5,
+        totalTokens: 5,
+      });
+    });
+
+    it("should use custom model when provided", async () => {
+      mockEmbeddingsCreate.mockResolvedValueOnce(mockResponse);
+
+      const customInput: AiEmbeddingInput = {
+        texts: ["test"],
+        model: "text-embedding-3-large",
+        dimensions: 3072,
+      };
+
+      await provider.createEmbedding(customInput);
+
+      expect(mockEmbeddingsCreate).toHaveBeenCalledWith({
+        model: "text-embedding-3-large",
+        input: ["test"],
+        dimensions: 3072,
+      });
+    });
+
+    it("should throw on API error", async () => {
+      mockEmbeddingsCreate.mockRejectedValueOnce(
+        new Error("Rate limit exceeded"),
+      );
+
+      await expect(provider.createEmbedding(mockInput)).rejects.toThrow(
+        "Rate limit exceeded",
+      );
+    });
+
+    it("should handle single text input", async () => {
+      const singleResponse = {
+        data: [{ embedding: new Array(1536).fill(0.5), index: 0 }],
+        model: "text-embedding-3-small",
+        usage: { prompt_tokens: 2, total_tokens: 2 },
+      };
+
+      mockEmbeddingsCreate.mockResolvedValueOnce(singleResponse);
+
+      const result = await provider.createEmbedding({ texts: ["single"] });
+
+      expect(result.vectors).toHaveLength(1);
+      expect(result.vectors[0]).toHaveLength(1536);
+    });
+  });
+
+  describe("generateText", () => {
+    it("should throw not implemented error", async () => {
+      await expect(
+        provider.generateText({
+          systemPrompt: "test",
+          userPrompt: "test",
+        }),
+      ).rejects.toThrow("not yet implemented");
+    });
+  });
+
+  describe("generateStructured", () => {
+    it("should throw not implemented error", async () => {
+      await expect(
+        provider.generateStructured(
+          {
+            systemPrompt: "test",
+            userPrompt: "test",
+            outputName: "test",
+            promptVersion: "v1",
+            schemaVersion: "v1",
+          },
+          {},
+        ),
+      ).rejects.toThrow("not yet implemented");
+    });
+  });
+});

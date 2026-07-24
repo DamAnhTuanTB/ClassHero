@@ -23,3 +23,16 @@
 - `apps/web/features/admin/courses/admin-courses-data.ts`
 - `apps/web/features/admin/courses/mappers/admin-course-api-mappers.ts`
 - `apps/web/features/admin/courses/types/admin-course-api-types.ts`
+
+### Tính năng mới / Cải thiện
+- [M5.4] Triển khai Hybrid Search kết hợp Vector Search và Keyword Search nhằm tăng độ chính xác khi truy xuất các công thức toán học, ký hiệu đặc thù (`\frac`, `cm²`, `∑`), cấu hình hạn mức token (budget cap) trả về.
+- Tích hợp bộ tiền xử lý `extractKeywords()` sử dụng regex chuyên sâu phân tích câu hỏi người dùng thành mảng từ khóa để chạy tìm kiếm `ILIKE` song song bằng Postgres.
+- Tinh chỉnh Integration Tests cho hybrid search: xử lý nghiêm ngặt Prisma constraints (`FilePurpose`, `bucket`, `objectKey` unique) và dùng API mock để vượt quá giới hạn Rate limit của OpenAI.
+
+### File thay đổi
+- `apps/api/src/modules/ai/services/retrieval.service.ts`
+- `apps/api/src/modules/ai/types/retrieval.types.ts`
+- `apps/api/src/modules/ai/utils/keyword-extractor.ts` (Mới)
+- `apps/api/test/m5.3-retrieval.test.ts`
+- `apps/api/test/m5.4-hybrid-search-live.int.test.ts` (Mới)
+- `apps/api/test/m5.4-keyword-extractor.test.ts` (Mới)

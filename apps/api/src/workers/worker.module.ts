@@ -2,9 +2,13 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { PrismaModule } from "#api/common/prisma/prisma.module";
 import { FilesModule } from "#api/modules/files/files.module";
+import { AiModule } from "#api/modules/ai/ai.module";
 import { validateEnv } from "#api/config/env.validation";
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
+import { EmbeddingProcessor } from "#api/workers/processors/embedding.processor";
 import { DocumentProcessingWorkerService } from "#api/workers/services/document-processing-worker.service";
+import { EmbeddingWorkerService } from "#api/workers/services/embedding-worker.service";
+import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import { MathpixOcrService } from "#api/workers/services/mathpix-ocr.service";
 import { PdfMetadataService } from "#api/workers/services/pdf-metadata.service";
 import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
@@ -21,11 +25,15 @@ import { PersonalLearningPathClonerService } from "#api/workers/services/persona
       validate: validateEnv,
     }),
     PrismaModule,
+    AiModule,
     FilesModule,
   ],
   providers: [
     DocumentProcessingProcessor,
     DocumentProcessingWorkerService,
+    EmbeddingProcessor,
+    EmbeddingWorkerService,
+    EmbeddingJobEnqueuer,
     MathpixOcrService,
     PdfMetadataService,
     OcrArtifactCacheService,
@@ -36,3 +44,4 @@ import { PersonalLearningPathClonerService } from "#api/workers/services/persona
   ],
 })
 export class WorkerModule {}
+

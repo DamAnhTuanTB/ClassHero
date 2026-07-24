@@ -4,6 +4,7 @@ import { AppController } from "#api/app.controller";
 import { AppService } from "#api/app.service";
 import { PrismaModule } from "#api/common/prisma/prisma.module";
 import { validateEnv } from "#api/config/env.validation";
+import { AiModule } from "#api/modules/ai/ai.module";
 import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
@@ -18,6 +19,7 @@ import { PaymentsModule } from "#api/modules/payments/payments.module";
       validate: validateEnv,
     }),
     PrismaModule,
+    AiModule,
     AuthModule,
     FilesModule,
     JobsModule,
@@ -28,3 +30,4 @@ import { PaymentsModule } from "#api/modules/payments/payments.module";
   providers: [AppService],
 })
 export class AppModule {}
+

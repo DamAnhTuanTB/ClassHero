@@ -16,6 +16,7 @@ import type {
   BackgroundJobBullmqResult,
 } from "#api/jobs/background-job-queues";
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
+import type { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import { parseMathpixImageFilename } from "#api/workers/services/image-extraction.service";
 import type { OcrArtifactBundle } from "#api/workers/services/mathpix-ocr.service";
 import { buildOcrArtifactAudit } from "#api/workers/utils/ocr-artifact-audit";
@@ -1095,6 +1096,9 @@ function createProcessorWithBundle(prisma: PrismaService, bundle: OcrArtifactBun
       extractImagesFromZip: vi.fn(async () => []),
       groupByPage: vi.fn(() => new Map()),
     } as never,
+    {
+      enqueueEmbeddingJob: vi.fn(async () => ({ jobId: "embedding-job-1" })),
+    } as unknown as EmbeddingJobEnqueuer,
   );
 
   return {

@@ -45,6 +45,23 @@ const envSchema = z
     MATHPIX_APP_KEY: z.string().min(1).optional(),
     MATHPIX_LANGUAGE_HINTS: z.string().default("vi,en"),
     OCR_MAX_CONCURRENT_DOCUMENTS: z.coerce.number().int().positive().default(2),
+
+    // OpenAI
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    OPENAI_STRUCTURED_MODEL: z.string().min(1).default("gpt-4.1-mini"),
+    OPENAI_CHAT_MODEL: z.string().min(1).default("gpt-4.1-mini"),
+    OPENAI_EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-small"),
+    OPENAI_EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
+
+    // Gemini
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    GEMINI_STRUCTURED_MODEL: z.string().min(1).default("gemini-2.0-flash"),
+    GEMINI_CHAT_MODEL: z.string().min(1).default("gemini-2.0-flash"),
+
+    // AI budget/rate limit
+    AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
+    AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
+    AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {

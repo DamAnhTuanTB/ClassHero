@@ -14,6 +14,7 @@ import {
 import { parseRedisConnection } from "#api/jobs/redis-connection";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
+import type { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import type { OcrArtifactBundle } from "#api/workers/services/mathpix-ocr.service";
 
 describe("M4.3 BullMQ worker foundation", () => {
@@ -353,6 +354,9 @@ function createProcessor(prisma: PrismaService) {
       extractImagesFromZip: vi.fn(async () => []),
       groupByPage: vi.fn(() => new Map()),
     } as never,
+    {
+      enqueueEmbeddingJob: vi.fn(async () => ({ jobId: "embedding-job-1" })),
+    } as unknown as EmbeddingJobEnqueuer,
   );
 }
 

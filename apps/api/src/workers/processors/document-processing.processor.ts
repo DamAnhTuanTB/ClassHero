@@ -23,6 +23,7 @@ import {
 import { PdfMetadataService } from "#api/workers/services/pdf-metadata.service";
 import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
 import { ImageExtractionService } from "#api/workers/services/image-extraction.service";
+import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import type {
   OcrArtifactCacheDescriptor,
   OcrArtifactCacheManifest,
@@ -134,6 +135,8 @@ export class DocumentProcessingProcessor {
     private readonly artifactCache: OcrArtifactCacheService,
     @Inject(ImageExtractionService)
     private readonly imageExtraction: ImageExtractionService,
+    @Inject(EmbeddingJobEnqueuer)
+    private readonly embeddingEnqueuer: EmbeddingJobEnqueuer,
   ) {}
 
   async process(
@@ -624,6 +627,14 @@ export class DocumentProcessingProcessor {
       `[LESSON_CHUNKING] Completed: ${chunks.length} chunks created for lesson=${lessonId}`,
     );
 
+    // Auto-enqueue EMBEDDING job (docs/06-ai-rag-spec.md §10.1)
+    if (chunks.length > 0) {
+      await this.embeddingEnqueuer.enqueueEmbeddingJob({
+        lessonId,
+        lessonDocumentId,
+      });
+    }
+
     return {
       status: "SUCCEEDED",
       queue: record.queue,
@@ -803,6 +814,14 @@ export class DocumentProcessingProcessor {
     this.logger.log(
       `[DIRECT_LESSON_OCR] Completed: ${chunks.length} chunks created for lesson=${lessonId}`,
     );
+
+    // Auto-enqueue EMBEDDING job (docs/06-ai-rag-spec.md §10.1)
+    if (chunks.length > 0) {
+      await this.embeddingEnqueuer.enqueueEmbeddingJob({
+        lessonId,
+        lessonDocumentId: lessonDoc.id,
+      });
+    }
 
     return {
       status: "SUCCEEDED",
