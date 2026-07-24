@@ -84,7 +84,7 @@ export function EditorDialogShell({
               <button
                 type="button"
                 onClick={onClose}
-                className="theme-button-primary-subtle grid h-10 w-10 place-items-center rounded-lg transition"
+                className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg transition"
                 aria-label="Đóng"
               >
                 <X className="h-4 w-4" aria-hidden="true" />

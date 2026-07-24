@@ -65,6 +65,7 @@ export type ActiveEnrollmentRecord = {
   status: EnrollmentStatus;
   startsAt: Date;
   expiresAt: Date;
+  deliveryLearningPathId?: string | null;
 };
 
 export type StudentLessonProgressRecord = {

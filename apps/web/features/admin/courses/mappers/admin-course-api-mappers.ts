@@ -14,6 +14,8 @@ export function mapLearningPath(path: AdminLearningPathApi): AdminLearningPath {
 
   return {
     id: path.id,
+    kind: path.kind ?? "CATALOG",
+    sourceLearningPathId: path.sourceLearningPathId ?? null,
     title: path.title,
     slug: path.slug,
     thumbnailFileId: path.thumbnailFileId,

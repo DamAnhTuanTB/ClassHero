@@ -5,8 +5,12 @@ import type {
   AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
 
+export type AdminLearningPathKind = "CATALOG" | "PERSONALIZED";
+
 export type AdminLearningPathApi = {
   id: string;
+  kind: AdminLearningPathKind;
+  sourceLearningPathId: string | null;
   title: string;
   slug: string;
   thumbnailFileId: string | null;
@@ -27,6 +31,45 @@ export type AdminLearningPathApi = {
   sortOrder: number;
   updatedAt: string;
   chapters?: AdminChapterApi[];
+};
+
+export type PersonalizationStatus = "BASE" | "CLONING" | "FAILED" | "PERSONALIZED";
+
+export type PersonalLearningPathCloneJobApi = {
+  jobId: string;
+  status: string;
+  error: string | null;
+  attempts: number;
+  maxAttempts: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type PersonalLearningPathEnrollmentApi = {
+  enrollmentId: string;
+  enrollmentStatus: string;
+  startsAt: string | null;
+  expiresAt: string | null;
+  student: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  };
+  baseLearningPath: { id: string; title: string; slug: string };
+  personalLearningPath: { id: string; title: string; slug: string } | null;
+  personalizationStatus: PersonalizationStatus;
+  cloneJob: PersonalLearningPathCloneJobApi | null;
+};
+
+export type PersonalLearningPathDetailApi = PersonalLearningPathEnrollmentApi;
+
+
+export type PersonalLearningPathEnrollmentsListApi = {
+  items: PersonalLearningPathEnrollmentApi[];
+  total: number;
+  page: number;
+  pageSize: number;
 };
 
 export type AdminChapterApi = {

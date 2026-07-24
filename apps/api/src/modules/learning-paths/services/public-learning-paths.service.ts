@@ -124,17 +124,42 @@ export class PublicLearningPathsService {
 
     await this.attachStudentLearningState(viewer, [learningPath]);
 
-    const hasActiveEnrollment = viewer.activeEnrollmentByLearningPathId.has(
+    const activeEnrollment = viewer.activeEnrollmentByLearningPathId.get(
       learningPath.id,
     );
+    const hasActiveEnrollment = Boolean(activeEnrollment);
     if (learningPath.status !== PublishStatus.PUBLISHED && !hasActiveEnrollment) {
       throwNotFound();
     }
 
+    let finalLearningPath = learningPath;
+
+    if (activeEnrollment?.deliveryLearningPathId) {
+      const deliveryPath = await this.prisma.learningPath.findUnique({
+        where: { id: activeEnrollment.deliveryLearningPathId },
+        select: publicLearningPathDetailSelect,
+      });
+
+      if (deliveryPath) {
+        finalLearningPath = {
+          ...learningPath,
+          chapters: deliveryPath.chapters,
+          lessons: deliveryPath.lessons,
+          totalChapterCount: deliveryPath.totalChapterCount,
+          totalLessonCount: deliveryPath.totalLessonCount,
+        } as any;
+
+        await this.attachLessonProgress(
+          viewer,
+          deliveryPath.lessons.map((lesson) => lesson.id),
+        );
+      }
+    }
+
     return serializePublicLearningPath(
-      learningPath,
+      finalLearningPath,
       viewer,
-      await this.filesService.resolveAccessUrl(learningPath.thumbnailFile),
+      await this.filesService.resolveAccessUrl(finalLearningPath.thumbnailFile),
     );
   }
 
@@ -314,6 +339,7 @@ export class PublicLearningPathsService {
         status: true,
         startsAt: true,
         expiresAt: true,
+        deliveryLearningPathId: true,
       },
     });
 
@@ -323,6 +349,7 @@ export class PublicLearningPathsService {
         status: enrollment.status,
         startsAt: enrollment.startsAt,
         expiresAt: enrollment.expiresAt,
+        deliveryLearningPathId: enrollment.deliveryLearningPathId,
       });
     }
   }

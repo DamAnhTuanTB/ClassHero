@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, BookOpen, FileText, Layers3, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Layers3, Pencil, Trash2, Users } from "lucide-react";
 import {
   AdminCoursesSidebar,
   type AdminCoursesSidebarItem,
@@ -10,6 +12,8 @@ import {
 import { ChapterLessonPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/chapter-lesson-panel";
 import { LearningPathSummaryPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/learning-path-summary-panel";
 import { AdminCourseDocumentPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/admin-course-document-panel";
+import { EnrollmentListModal } from "@/features/admin/courses/screens/admin-course-detail-manager/components/enrollment-list-modal";
+import { PersonalPathBanner } from "@/features/admin/courses/screens/admin-course-detail-manager/components/personal-path-banner";
 import { ErrorState } from "@/components/admin/courses/error-state";
 import { LoadingState } from "@/components/admin/courses/loading-state";
 import { StatCard } from "@/components/admin/courses/stat-card";
@@ -47,13 +51,16 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
 
 export function AdminCourseDetailManager({
   pathId,
+  enrollmentId = null,
   initialLearningPath,
   initialThemeMode = "light",
 }: {
   pathId: string;
+  enrollmentId?: string | null;
   initialLearningPath?: AdminLearningPath | null;
   initialThemeMode?: AppThemeMode;
 }) {
+  const [isEnrollmentListOpen, setIsEnrollmentListOpen] = useState(false);
   const {
     actions,
     chapterEditorMode,
@@ -114,7 +121,7 @@ export function AdminCourseDetailManager({
                 Danh sách khóa học
               </Link>
               <p className="mt-4 text-sm font-bold text-[var(--theme-primary)]">
-                Chi tiết khóa học
+                {path?.kind === "PERSONALIZED" ? "Chi tiết khóa học cá nhân hóa" : "Chi tiết khóa học"}
               </p>
               <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
                 {path?.title ?? "Không tìm thấy khóa học"}
@@ -125,6 +132,18 @@ export function AdminCourseDetailManager({
               </p>
             </div>
             <div className="flex gap-2">
+              {/* Quản lý danh sách học sinh */}
+              {path?.kind !== "PERSONALIZED" && (
+                <button
+                  type="button"
+                  onClick={() => setIsEnrollmentListOpen(true)}
+                  disabled={viewState !== "ready" || !path}
+                  className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Users className="h-4 w-4" aria-hidden="true" />
+                  Học sinh đã mua
+                </button>
+              )}
               <button
                 type="button"
                 onClick={actions.startEditPath}
@@ -132,18 +151,21 @@ export function AdminCourseDetailManager({
                 className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Pencil className="h-4 w-4" aria-hidden="true" />
-                Edit
+                Sửa thông tin
               </button>
-              <button
-                type="button"
-                onClick={actions.requestDeletePath}
-                disabled={viewState !== "ready" || !path || isDeletingPath}
-                aria-label={path ? `Xóa khóa học ${path.title}` : "Xóa khóa học"}
-                className="theme-button-danger-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-                Xóa
-              </button>
+              {/* Ẩn nút Xóa cho bản cá nhân — không được archive/delete root khi đang gắn enrollment */}
+              {path?.kind !== "PERSONALIZED" && (
+                <button
+                  type="button"
+                  onClick={actions.requestDeletePath}
+                  disabled={viewState !== "ready" || !path || isDeletingPath}
+                  aria-label={path ? `Xóa khóa học ${path.title}` : "Xóa khóa học"}
+                  className="theme-button-danger-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Xóa
+                </button>
+              )}
             </div>
           </header>
 
@@ -157,14 +179,25 @@ export function AdminCourseDetailManager({
             {viewState === "error" ? <ErrorState onRetry={actions.retryLoad} /> : null}
             {viewState === "ready" && path ? (
               <div className="grid gap-5">
-                <section className="max-w-sm">
-                  <StatCard
-                    isDarkTheme={isDarkTheme}
-                    label="Học sinh đang học"
-                    value={courseStats.enrolledStudents}
-                    tone="sky"
+                {/* Banner bản cá nhân — chỉ hiển thị khi kind = PERSONALIZED */}
+                {path.kind === "PERSONALIZED" && (
+                  <PersonalPathBanner
+                    enrollmentId={enrollmentId}
+                    basePathId={path.sourceLearningPathId}
                   />
-                </section>
+                )}
+
+                {/* Stat chỉ hiển thị cho khóa catalog */}
+                {path.kind !== "PERSONALIZED" && (
+                  <section className="max-w-sm">
+                    <StatCard
+                      isDarkTheme={isDarkTheme}
+                      label="Học sinh đang học"
+                      value={courseStats.enrolledStudents}
+                      tone="sky"
+                    />
+                  </section>
+                )}
 
                 <LearningPathSummaryPanel path={path} isDarkTheme={isDarkTheme} />
 
@@ -260,6 +293,14 @@ export function AdminCourseDetailManager({
           onConfirm={actions.confirmDeleteLesson}
         />
       ) : null}
+
+      {isEnrollmentListOpen && path && (
+        <EnrollmentListModal
+          isOpen={isEnrollmentListOpen}
+          onClose={() => setIsEnrollmentListOpen(false)}
+          learningPathId={pathId}
+        />
+      )}
     </main>
   );
 }

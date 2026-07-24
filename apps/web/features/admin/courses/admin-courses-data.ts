@@ -31,6 +31,8 @@ export type AdminChapter = {
 
 export type AdminLearningPath = {
   id: string;
+  kind: "CATALOG" | "PERSONALIZED";
+  sourceLearningPathId: string | null;
   title: string;
   slug: string;
   thumbnailFileId?: string | null;
@@ -87,6 +89,8 @@ export const adminGrades = Array.from({ length: 10 }, (_, index) => index + 3);
 export const adminLearningPaths: AdminLearningPath[] = [
   {
     id: "path-math-7",
+    kind: "CATALOG",
+    sourceLearningPathId: null,
     title: "Toán 7 nền tảng",
     slug: "toan-7-nen-tang",
     thumbnailFileName: "",
@@ -157,6 +161,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
   },
   {
     id: "path-physics-8",
+    kind: "CATALOG",
+    sourceLearningPathId: null,
     title: "Vật lý 8 tăng tốc",
     slug: "vat-ly-8-tang-toc",
     thumbnailFileName: "",
@@ -203,6 +209,8 @@ export const adminLearningPaths: AdminLearningPath[] = [
   },
   {
     id: "path-chemistry-9",
+    kind: "CATALOG",
+    sourceLearningPathId: null,
     title: "Hóa 9 ôn thi",
     slug: "hoa-9-on-thi",
     thumbnailFileName: "",
