@@ -1,6 +1,9 @@
 ## 2026-07-25
 
 ### Tính năng mới / Cải thiện
+- Cải thiện thao tác cảm ứng trên Mobile: Chạm vào video khi đang ẩn thanh công cụ sẽ chỉ hiển thị thanh công cụ (thay vì Tạm dừng video), giống với trải nghiệm người dùng trên app YouTube.
+- Bổ sung chức năng Bật/Tắt Phụ đề (CC - Closed Captions) trên thanh điều khiển.
+- Cấu hình ép buộc ẩn Phụ đề (CC) mặc định cho mọi video (ghi đè cài đặt tài khoản cá nhân của người xem) nhằm giữ giao diện học tập gọn gàng ban đầu.
 - Fix lỗi crash ứng dụng (`TypeError: seekTo is not a function`) khi người dùng ấn nút "Bắt đầu học" quá nhanh trước khi Youtube Iframe khởi tạo xong.
 - Nâng cấp UI ở chế độ Toàn màn hình: Tự động tính toán Safe Area tỷ lệ 16:9 bao bọc video để giữ Logo, Watermark và thanh điều khiển luôn bám sát vào viền video (thay vì bám vào viền màn hình và bị chèn lên khoảng đen letterbox).
 - Fix icon phóng to/thu nhỏ chưa đổi trạng thái đúng ở chế độ Toàn màn hình.

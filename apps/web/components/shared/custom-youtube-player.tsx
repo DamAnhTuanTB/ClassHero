@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Pause, Maximize, Minimize, Volume2, VolumeX, Gauge, RotateCcw, RotateCw, GraduationCap, Check } from "lucide-react";
+import { Play, Pause, Maximize, Minimize, Volume2, VolumeX, Gauge, RotateCcw, RotateCw, GraduationCap, Check, Subtitles } from "lucide-react";
 
 export interface CustomVideoSettings {
   isDisabled: boolean;
@@ -75,6 +75,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(false);
   const [windowSize, setWindowSize] = useState({ w: 0, h: 0 });
   const [isPortrait, setIsPortrait] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -214,9 +215,20 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
         fs: 0,
         playsinline: 1,
         iv_load_policy: 3,
+        cc_load_policy: 0,
       },
       events: {
         onReady: (event: any) => {
+          // Ép ẩn phụ đề mặc định
+          try {
+            if (typeof event.target.unloadModule === 'function') {
+              event.target.unloadModule("captions");
+            }
+            if (typeof event.target.setOption === 'function') {
+              event.target.setOption("captions", "track", {});
+            }
+          } catch (e) {}
+
           const rawDuration = event.target.getDuration();
           if (rawDuration > 0) {
             const validDuration = Math.max(0, rawDuration - currentSettings.startTimeInSeconds - currentSettings.endTimeCutInSeconds);
@@ -278,6 +290,15 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
       playerRef.current.pauseVideo();
     } else {
       playerRef.current.playVideo();
+    }
+  };
+
+  const handleOverlayClick = () => {
+    if (!showOverlay) {
+      setShowOverlay(true);
+      hideOverlayDelayed();
+    } else {
+      handlePlayPause();
     }
   };
 
@@ -409,6 +430,23 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
     }
   };
 
+  const handleToggleCaptions = () => {
+    const p = playerRef.current as any;
+    if (!p) return;
+    
+    if (showCaptions) {
+      if (typeof p.unloadModule === 'function') p.unloadModule("captions");
+      if (typeof p.setOption === 'function') p.setOption("captions", "track", {});
+      setShowCaptions(false);
+    } else {
+      if (typeof p.loadModule === 'function') p.loadModule("captions");
+      // Mặc định gọi ngôn ngữ tiếng Việt (vi) hoặc tiếng Anh (en) tuỳ cấu hình video, 
+      // truyền {} rỗng ở setOption thường YT tự động chọn ngôn ngữ tốt nhất.
+      if (typeof p.setOption === 'function') p.setOption("captions", "track", { languageCode: "vi" });
+      setShowCaptions(true);
+    }
+  };
+
   if (!videoId) {
     return (
       <div className="w-full aspect-video flex items-center justify-center bg-black text-white rounded-lg">
@@ -529,7 +567,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
       {/* Invisible overlay to block interacting directly with the iframe and handle clicks for play/pause */}
       <div 
         className="absolute inset-0 z-10 cursor-pointer" 
-        onClick={handlePlayPause}
+        onClick={handleOverlayClick}
       ></div>
 
       {/* Dải băng đen che Tiêu đề của Youtube khi Pause */}
@@ -545,7 +583,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
       )}
 
       {/* Control bar */}
-      <div className={`absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/80 to-transparent z-50 transition-opacity duration-300 ${(!isPlaying || isStarting) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+      <div className={`absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/80 to-transparent z-50 transition-opacity duration-300 ${(!isPlaying || isStarting || showOverlay) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         
         {/* Progress Bar */}
         <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 w-full">
@@ -563,7 +601,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
               }}
             />
             {/* Background Track */}
-            <div className={`absolute left-0 right-0 bg-white/20 rounded-full overflow-hidden pointer-events-none transition-all ${(!isPlaying) ? "h-2" : "h-1.5 group-hover/slider:h-2"}`}>
+            <div className={`absolute left-0 right-0 bg-white/20 rounded-full overflow-hidden pointer-events-none transition-all ${(!isPlaying || showOverlay) ? "h-2" : "h-1.5 group-hover/slider:h-2"}`}>
               {/* Progress */}
               <div 
                 className="absolute left-0 top-0 bottom-0 bg-[var(--theme-primary)]"
@@ -572,7 +610,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
             </div>
             {/* Thumb */}
             <div 
-              className={`absolute h-3 w-3 sm:h-4 sm:w-4 bg-[var(--theme-primary)] rounded-full -ml-1.5 sm:-ml-2 pointer-events-none transition-all shadow-[0_0_8px_rgba(var(--theme-primary-rgb),0.6)] ${(!isPlaying) ? "opacity-100 scale-110" : "opacity-0 group-hover/slider:opacity-100 group-hover/slider:scale-110"}`}
+              className={`absolute h-3 w-3 sm:h-4 sm:w-4 bg-[var(--theme-primary)] rounded-full -ml-1.5 sm:-ml-2 pointer-events-none transition-all shadow-[0_0_8px_rgba(var(--theme-primary-rgb),0.6)] ${(!isPlaying || showOverlay) ? "opacity-100 scale-110" : "opacity-0 group-hover/slider:opacity-100 group-hover/slider:scale-110"}`}
               style={{ left: `${progressPercentage}%` }}
             />
           </div>
@@ -650,6 +688,17 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* Captions / Subtitles */}
+            <button 
+              onClick={handleToggleCaptions} 
+              className={`text-white p-1 sm:p-1.5 transition-colors group/btn relative ${showCaptions ? 'text-[var(--theme-primary)] opacity-100' : 'opacity-70 hover:opacity-100 hover:text-[var(--theme-primary)]'}`}
+            >
+              <Subtitles className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-800 text-white text-[11px] font-medium rounded whitespace-nowrap opacity-0 group-hover/btn:opacity-100 pointer-events-none z-50">
+                {showCaptions ? "Tắt Phụ đề" : "Bật Phụ đề"}
+              </span>
+            </button>
+
             {/* Speed Control */}
             <div 
               className="relative flex items-center gap-1 sm:gap-1.5 text-white hover:text-[var(--theme-primary)] transition-colors cursor-pointer p-1 sm:p-1.5"
