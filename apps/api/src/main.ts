@@ -47,7 +47,7 @@ async function bootstrap() {
     logger.log(`Swagger docs available at /api/docs`);
   }
 
-  await app.listen(port);
+  await app.listen(port, "0.0.0.0");
   logger.log(`${appName} API listening on port ${port}`);
 }
 

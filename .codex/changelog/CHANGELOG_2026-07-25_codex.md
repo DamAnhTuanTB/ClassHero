@@ -60,3 +60,8 @@
 - `apps/web/features/admin/quiz/` (Mới)
 - `apps/web/test-zod.mjs` (Mới)
 - `apps/web/test-zod.ts` (Mới)
+
+### Fixes
+- Đổi màu nền thanh Header (`student-courses-header.tsx`) thành màu đặc hoàn toàn (không dùng `backdrop-blur` và `color-mix` trong suốt) để UI video (các dropdown) không bị hiện mờ đè lên Header khi cuộn trang.
+- Sửa lỗi video không xoay ngang trong Fullscreen trên điện thoại (đặc biệt là Android) bằng cách ép bỏ qua Native Fullscreen khi đang ở chế độ dọc (`isPortrait`), từ đó giúp CSS `rotate-90` (chế độ giả lập Fullscreen) luôn được kích hoạt.
+

@@ -416,10 +416,13 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
     const doc = document as any;
 
     const canNativeFs = !!(doc.fullscreenEnabled || doc.webkitFullscreenEnabled || doc.mozFullScreenEnabled || doc.msFullscreenEnabled);
+    
+    // Bỏ qua native fullscreen trên thiết bị di động (portrait) để ép dùng CSS rotate-90 xoay ngang video
+    const shouldUseNative = canNativeFs && !isPortrait;
 
     if (!isFullscreen) {
       setIsFullscreen(true);
-      if (canNativeFs) {
+      if (shouldUseNative) {
         const reqFs = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
         if (reqFs) {
           try {
