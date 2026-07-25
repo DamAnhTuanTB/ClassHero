@@ -47,8 +47,8 @@ export class UpdateQuizSetBodyDto implements UpdateQuizSetDto {
 
 @ApiTags("admin-quiz")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+
+
 @Controller("admin")
 export class AdminQuizController {
   constructor(

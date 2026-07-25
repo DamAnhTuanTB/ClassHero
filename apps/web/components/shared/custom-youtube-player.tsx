@@ -73,7 +73,10 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const [isStarting, setIsStarting] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [windowSize, setWindowSize] = useState({ w: 0, h: 0 });
+  const [isPortrait, setIsPortrait] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const durationRef = useRef<number>(0);
   const isFirstPlayStartedRef = useRef<boolean>(false);
@@ -87,14 +90,47 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const doc = document as any;
+      const isNative = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+      setIsNativeFullscreen((prev) => {
+        if (prev && !isNative) setIsFullscreen(false);
+        else if (!prev && isNative) setIsFullscreen(true);
+        return isNative;
+      });
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
     };
   }, []);
+
+  useEffect(() => {
+    const updateSize = () => {
+      setWindowSize({ w: window.innerWidth, h: window.innerHeight });
+      setIsPortrait(window.innerHeight > window.innerWidth && window.innerWidth < 768);
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  useEffect(() => {
+    if (isFullscreen && !isNativeFullscreen) {
+      document.body.classList.add("overflow-hidden");
+      document.documentElement.classList.add("overflow-hidden");
+    } else {
+      document.body.classList.remove("overflow-hidden");
+      document.documentElement.classList.remove("overflow-hidden");
+    }
+    
+    return () => {
+      document.body.classList.remove("overflow-hidden");
+      document.documentElement.classList.remove("overflow-hidden");
+    };
+  }, [isFullscreen, isNativeFullscreen]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -337,10 +373,32 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
 
   const handleFullscreen = () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen();
+    const elem = containerRef.current as any;
+    const doc = document as any;
+
+    const canNativeFs = !!(doc.fullscreenEnabled || doc.webkitFullscreenEnabled || doc.mozFullScreenEnabled || doc.msFullscreenEnabled);
+
+    if (!isFullscreen) {
+      setIsFullscreen(true);
+      if (canNativeFs) {
+        const reqFs = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
+        if (reqFs) {
+          try {
+            reqFs.call(elem);
+          } catch (err) {}
+        }
+      }
     } else {
-      document.exitFullscreen();
+      setIsFullscreen(false);
+      if (canNativeFs) {
+        const exitFs = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+        const isNativeFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+        if (exitFs && isNativeFs) {
+          try {
+            exitFs.call(doc);
+          } catch (err) {}
+        }
+      }
     }
   };
 
@@ -370,8 +428,14 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
     );
   }
 
+  const isPseudoPortrait = isFullscreen && !isNativeFullscreen && isPortrait;
+
   return (
-    <div ref={containerRef} className="w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)] bg-black relative group flex flex-col justify-center">
+    <div 
+      ref={containerRef} 
+      className={`bg-black group flex flex-col justify-center ${isFullscreen ? (isPseudoPortrait ? "fixed z-[99999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90" : "fixed inset-0 z-[99999] w-full h-full") : "relative w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)]"}`}
+      style={isPseudoPortrait ? { width: `${windowSize.h}px`, height: `${windowSize.w}px` } : undefined}
+    >
       {/* Watermark Logo ClassHero */}
       {currentSettings.hasWatermark && (
         <div 

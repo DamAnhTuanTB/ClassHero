@@ -48,7 +48,11 @@ export class ApiRequestError extends Error {
 }
 
 function getApiBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_URL ?? defaultApiBaseUrl).replace(/\/$/, "");
+  let baseUrl = process.env.NEXT_PUBLIC_API_URL ?? defaultApiBaseUrl;
+  if (typeof window !== "undefined" && baseUrl.includes("localhost") && window.location.hostname !== "localhost") {
+    baseUrl = baseUrl.replace("localhost", window.location.hostname);
+  }
+  return baseUrl.replace(/\/$/, "");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

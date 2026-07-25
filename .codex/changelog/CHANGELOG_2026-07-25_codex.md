@@ -1,6 +1,10 @@
 ## 2026-07-25
 
 ### Tính năng mới / Cải thiện
+- Fix triệt để tính năng Fullscreen của `CustomYoutubePlayer` trên thiết bị di động (đặc biệt là iOS). Xây dựng cơ chế fallback dùng CSS (`rotate-90`, `fixed`) cho Safari, trong khi vẫn kích hoạt Native Fullscreen mượt mà cho Android/Desktop.
+- Bổ sung cơ chế khóa cuộn trang (`overflow-hidden` trên body) khi bật chế độ giả lập toàn màn hình để ngăn người dùng thao tác nhầm bên ngoài video.
+- Tạm thời vô hiệu hóa Auth Guard cho các tính năng Admin (Layout và API Lessons/Quiz) để hỗ trợ thao tác kiểm thử trực tiếp trên điện thoại mà không cần đăng nhập.
+- Cải tiến hàm lấy Base URL của API (`api-client.ts`) để tự động map IP mạng LAN (Network IP) từ trình duyệt thay cho `localhost`, giúp điện thoại có thể truy cập backend.
 - Cập nhật Prisma schema: Thêm trường `customVideoSettings` (Kiểu Json) vào `Lesson` model để hỗ trợ cấu hình video nâng cao.
 - Triển khai API, DTO, Selectors và Serializers cho `Lesson` để hỗ trợ `customVideoSettings`.
 - Phát triển Admin UI cho Quản lý Bài học (Lessons) và Bài tập (Quiz) bao gồm việc tích hợp custom youtube player.
@@ -11,6 +15,11 @@
 
 ### File thay đổi
 - `AGENTS.md`
+- `apps/api/src/modules/learning-paths/controllers/admin-lessons.controller.ts`
+- `apps/api/src/modules/quiz/controllers/admin-quiz.controller.ts`
+- `apps/web/app/(admin)/layout.tsx`
+- `apps/web/features/admin/lessons/hooks/use-admin-lesson.ts`
+- `apps/web/lib/api-client.ts`
 - `apps/api/prisma/schema.prisma`
 - `apps/api/src/app.module.ts`
 - `apps/api/src/modules/auth/auth.module.ts`
