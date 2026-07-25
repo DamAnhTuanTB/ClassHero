@@ -1,6 +1,9 @@
 ## 2026-07-25
 
 ### Tính năng mới / Cải thiện
+- Fix lỗi crash ứng dụng (`TypeError: seekTo is not a function`) khi người dùng ấn nút "Bắt đầu học" quá nhanh trước khi Youtube Iframe khởi tạo xong.
+- Nâng cấp UI ở chế độ Toàn màn hình: Tự động tính toán Safe Area tỷ lệ 16:9 bao bọc video để giữ Logo, Watermark và thanh điều khiển luôn bám sát vào viền video (thay vì bám vào viền màn hình và bị chèn lên khoảng đen letterbox).
+- Fix icon phóng to/thu nhỏ chưa đổi trạng thái đúng ở chế độ Toàn màn hình.
 - Fix triệt để tính năng Fullscreen của `CustomYoutubePlayer` trên thiết bị di động (đặc biệt là iOS). Xây dựng cơ chế fallback dùng CSS (`rotate-90`, `fixed`) cho Safari, trong khi vẫn kích hoạt Native Fullscreen mượt mà cho Android/Desktop.
 - Bổ sung cơ chế khóa cuộn trang (`overflow-hidden` trên body) khi bật chế độ giả lập toàn màn hình để ngăn người dùng thao tác nhầm bên ngoài video.
 - Tạm thời vô hiệu hóa Auth Guard cho các tính năng Admin (Layout và API Lessons/Quiz) để hỗ trợ thao tác kiểm thử trực tiếp trên điện thoại mà không cần đăng nhập.

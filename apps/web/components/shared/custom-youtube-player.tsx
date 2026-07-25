@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Pause, Maximize, Volume2, VolumeX, Gauge, RotateCcw, RotateCw, GraduationCap, Check } from "lucide-react";
+import { Play, Pause, Maximize, Minimize, Volume2, VolumeX, Gauge, RotateCcw, RotateCw, GraduationCap, Check } from "lucide-react";
 
 export interface CustomVideoSettings {
   isDisabled: boolean;
@@ -284,12 +284,19 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const handleStart = () => {
     if (isStarting) return;
     setIsStarting(true);
-    setShowOverlay(true);
-    hideOverlayDelayed();
-    if (playerRef.current) {
-      playerRef.current.seekTo(currentSettings.startTimeInSeconds, true);
-      playerRef.current.playVideo();
-    }
+    
+    const tryStart = () => {
+      if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+        setShowOverlay(true);
+        hideOverlayDelayed();
+        playerRef.current.seekTo(currentSettings.startTimeInSeconds, true);
+        playerRef.current.playVideo();
+      } else {
+        setTimeout(tryStart, 100);
+      }
+    };
+    
+    tryStart();
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,13 +437,38 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
 
   const isPseudoPortrait = isFullscreen && !isNativeFullscreen && isPortrait;
 
+  let innerWidth: string | undefined = undefined;
+  let innerHeight: string | undefined = undefined;
+
+  if (isFullscreen) {
+    const parentW = isPseudoPortrait ? windowSize.h : windowSize.w;
+    const parentH = isPseudoPortrait ? windowSize.w : windowSize.h;
+    
+    if (parentW && parentH) {
+      if (parentW / parentH > 16 / 9) {
+        innerHeight = `${parentH}px`;
+        innerWidth = `${parentH * 16 / 9}px`;
+      } else {
+        innerWidth = `${parentW}px`;
+        innerHeight = `${parentW * 9 / 16}px`;
+      }
+    }
+  } else {
+    innerWidth = '100%';
+    innerHeight = '100%';
+  }
+
   return (
     <div 
       ref={containerRef} 
-      className={`bg-black group flex flex-col justify-center ${isFullscreen ? (isPseudoPortrait ? "fixed z-[99999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90" : "fixed inset-0 z-[99999] w-full h-full") : "relative w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)]"}`}
+      className={`bg-black group flex flex-col items-center justify-center overflow-hidden ${isFullscreen ? (isPseudoPortrait ? "fixed z-[99999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90" : "fixed inset-0 z-[99999] w-full h-full") : "relative w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)]"}`}
       style={isPseudoPortrait ? { width: `${windowSize.h}px`, height: `${windowSize.w}px` } : undefined}
     >
-      {/* Watermark Logo ClassHero */}
+      <div 
+        className="relative flex-none w-full h-full overflow-hidden"
+        style={{ width: innerWidth, height: innerHeight }}
+      >
+        {/* Watermark Logo ClassHero */}
       {currentSettings.hasWatermark && (
         <div 
           className={`absolute z-40 flex items-center pointer-events-none bg-black/80 rounded-lg backdrop-blur-sm border border-white/10 shadow-lg transition-all duration-300 ${
@@ -653,13 +685,14 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
               onClick={handleFullscreen} 
               className="text-white hover:text-[var(--theme-primary)] p-1 sm:p-1.5 transition-colors group/btn relative"
             >
-              <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />
+              {isFullscreen ? <Minimize className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />}
               <span className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-800 text-white text-[11px] font-medium rounded whitespace-nowrap opacity-0 group-hover/btn:opacity-100 pointer-events-none z-50">
-                Toàn màn hình
+                {isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
               </span>
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
