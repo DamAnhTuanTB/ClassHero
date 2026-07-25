@@ -513,7 +513,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   return (
     <div 
       ref={containerRef} 
-      className={`bg-black group flex flex-col items-center justify-center overflow-hidden ${isFullscreen ? (isPseudoPortrait ? "fixed z-[99999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90" : "fixed inset-0 z-[99999] w-full h-full") : "relative w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)]"}`}
+      className={`bg-black group flex flex-col items-center justify-center overflow-hidden ${isFullscreen ? (isPseudoPortrait ? "fixed z-[99999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90" : "fixed inset-0 z-[99999] w-full h-full") : "relative z-0 w-full aspect-video sm:rounded-lg border-y sm:border border-[var(--theme-border)]"}`}
       style={isPseudoPortrait ? { width: `${windowSize.h}px`, height: `${windowSize.w}px` } : undefined}
     >
       <div 
@@ -524,11 +524,11 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
       {currentSettings.hasWatermark && (
         <div 
           className={`absolute z-40 flex items-center pointer-events-none bg-black/80 rounded-lg backdrop-blur-sm border border-white/10 shadow-lg transition-all duration-300 ${
-            isFullscreen ? "top-4 right-4 sm:top-8 sm:right-8 gap-2 sm:gap-3 px-3 py-2 sm:px-5 sm:py-3 scale-100 sm:scale-125 origin-top-right" : "top-2 right-2 sm:top-4 sm:right-4 gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 scale-75 sm:scale-100 origin-top-right"
+            isFullscreen ? "top-4 right-4 lg:top-8 lg:right-8 gap-2 lg:gap-3 px-3 py-2 lg:px-5 lg:py-3 scale-100 lg:scale-110 origin-top-right" : "top-2 right-2 lg:top-4 lg:right-4 gap-1 lg:gap-1.5 px-2 py-1 lg:px-3 lg:py-1.5 scale-75 lg:scale-100 origin-top-right"
           }`}
         >
-          <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--theme-primary)]" />
-          <span className="text-white font-bold tracking-widest text-[11px] sm:text-sm drop-shadow-md">ClassHero</span>
+          <GraduationCap className="h-4 w-4 lg:h-5 lg:w-5 text-[var(--theme-primary)]" />
+          <span className="text-white font-bold tracking-widest text-[11px] lg:text-sm drop-shadow-md">ClassHero</span>
         </div>
       )}
 

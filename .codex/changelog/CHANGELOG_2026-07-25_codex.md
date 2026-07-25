@@ -64,4 +64,6 @@
 ### Fixes
 - Đổi màu nền thanh Header (`student-courses-header.tsx`) thành màu đặc hoàn toàn (không dùng `backdrop-blur` và `color-mix` trong suốt) để UI video (các dropdown) không bị hiện mờ đè lên Header khi cuộn trang.
 - Sửa lỗi video không xoay ngang trong Fullscreen trên điện thoại (đặc biệt là Android) bằng cách ép bỏ qua Native Fullscreen khi đang ở chế độ dọc (`isPortrait`), từ đó giúp CSS `rotate-90` (chế độ giả lập Fullscreen) luôn được kích hoạt.
+- Thêm `relative z-0` vào container của video để nhốt các Tooltip (`z-50`) bên trong video không cho đè lên thanh Header (`z-40`) hay Sidebar.
+- Đổi các class `sm:` thành `lg:` đối với Logo Watermark trong video ở chế độ toàn màn hình để ngăn logo bị phóng to quá mức (scale-125) khi xem trên thiết bị di động nằm ngang.
 
