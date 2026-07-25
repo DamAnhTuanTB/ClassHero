@@ -12,6 +12,7 @@ export const lessonSelect = {
   scheduledAt: true,
   examOpenAt: true,
   videoUrl: true,
+  customVideoSettings: true,
   completionMinScore: true,
   trialEnabled: true,
   status: true,

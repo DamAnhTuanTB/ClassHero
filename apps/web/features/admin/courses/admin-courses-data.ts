@@ -5,7 +5,10 @@ export type AdminLessonType = "BASIC" | "LIVE";
 
 export type AdminLesson = {
   id: string;
+  learningPathId?: string;
   chapterId?: string;
+  courseTitle?: string;
+  chapterTitle?: string;
   orderIndex: number;
   title: string;
   shortDescription: string;
@@ -17,6 +20,7 @@ export type AdminLesson = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
+  customVideoSettings?: any;
 };
 
 export type AdminChapter = {

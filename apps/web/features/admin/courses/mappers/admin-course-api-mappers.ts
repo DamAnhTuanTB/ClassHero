@@ -51,7 +51,10 @@ export function mapChapter(chapter: AdminChapterApi): AdminChapter {
 export function mapLesson(lesson: AdminLessonApi): AdminLesson {
   return {
     id: lesson.id,
+    learningPathId: lesson.learningPathId,
     chapterId: lesson.chapterId,
+    courseTitle: lesson.courseTitle ?? "",
+    chapterTitle: lesson.chapterTitle ?? "",
     orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription ?? "",
@@ -63,6 +66,7 @@ export function mapLesson(lesson: AdminLessonApi): AdminLesson {
     completionMinScore: lesson.completionMinScore,
     trialEnabled: lesson.trialEnabled ?? false,
     status: lesson.status,
+    customVideoSettings: lesson.customVideoSettings,
   };
 }
 

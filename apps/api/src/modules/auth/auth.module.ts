@@ -11,6 +11,6 @@ import { ProfileController } from "#api/modules/auth/controllers/profile.control
   imports: [JwtModule.register({})],
   controllers: [AuthController, ProfileController],
   providers: [AuthService, AuthTokenService, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

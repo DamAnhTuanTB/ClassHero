@@ -85,7 +85,10 @@ export type AdminChapterApi = {
 
 export type AdminLessonApi = {
   id: string;
+  learningPathId: string;
   chapterId: string;
+  courseTitle?: string | null;
+  chapterTitle?: string | null;
   orderIndex: number;
   title: string;
   shortDescription: string | null;
@@ -97,6 +100,7 @@ export type AdminLessonApi = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
+  customVideoSettings?: any;
 };
 
 export type UploadedFileApi = {

@@ -46,8 +46,36 @@ export class LessonsService {
   }
 
   async getForAdmin(lessonId: string) {
-    const lesson = await this.findActiveById(lessonId);
-    return serializeLesson(lesson);
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+        deletedAt: null,
+      },
+      select: {
+        ...lessonSelect,
+        chapter: {
+          select: {
+            title: true,
+            learningPath: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!lesson) {
+      throwLessonNotFound();
+    }
+
+    return {
+      ...serializeLesson(lesson),
+      courseTitle: lesson.chapter?.learningPath?.title ?? null,
+      chapterTitle: lesson.chapter?.title ?? null,
+      learningPathId: lesson.learningPathId,
+    };
   }
 
   async create(
@@ -230,6 +258,9 @@ export class LessonsService {
               ? { completionMinScore: dto.completionMinScore }
               : {}),
             ...(dto.trialEnabled !== undefined ? { trialEnabled: dto.trialEnabled } : {}),
+            ...(dto.customVideoSettings !== undefined
+              ? { customVideoSettings: dto.customVideoSettings ? (dto.customVideoSettings as any) : null }
+              : {}),
             ...(dto.status !== undefined ? { status } : {}),
             updatedById: actorUserId,
           },

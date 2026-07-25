@@ -10,6 +10,7 @@ import { FilesModule } from "#api/modules/files/files.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
 import { PaymentsModule } from "#api/modules/payments/payments.module";
+import { QuizModule } from "#api/modules/quiz/quiz.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PaymentsModule } from "#api/modules/payments/payments.module";
     JobsModule,
     LearningPathsModule,
     PaymentsModule,
+    QuizModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -56,6 +56,7 @@ Nếu cần định tuyến nhanh bộ tài liệu, đọc `docs/00-docs-map.md`
 - Nếu phát hiện mâu thuẫn lớn giữa docs, báo owner hoặc ghi rõ quyết định tạm thời; không âm thầm tự quyết.
 - Không cập nhật changelog trong task thường. Changelog chỉ được ghi khi owner yêu cầu commit và commit thật sự được thực hiện.
 - Khi hệ thống/IDE tự động duyệt (auto-approve) plan/artifact, Codex vẫn phải chờ owner xác nhận rõ ràng bằng lời (ví dụ "ok", "bắt đầu đi", "code đi") trước khi thực thi. Không được coi auto-approve là lệnh của owner.
+- Luôn phải chạy lệnh kiểm tra lỗi (ví dụ `pnpm tsc --noEmit`) hoặc kiểm tra lại output của terminal sau mỗi lần chỉnh sửa code để đảm bảo không có lỗi cú pháp hoặc lỗi TypeScript trước khi báo cáo kết quả cho owner.
 
 ### 2.1. Khi Owner Không Hài Lòng
 

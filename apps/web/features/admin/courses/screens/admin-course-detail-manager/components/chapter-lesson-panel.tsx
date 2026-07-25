@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   BookOpen,
   Clock3,
   Crown,
@@ -11,6 +12,7 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
+import Link from "next/link";
 import { useState, type DragEvent } from "react";
 import { StatusBadge } from "@/components/admin/courses/status-badge";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -351,9 +353,11 @@ export function ChapterLessonPanel({
                             </div>
                             <div className="col-span-2 min-w-0 md:col-span-1">
                               <div className="grid gap-2 md:flex md:flex-wrap md:items-center">
-                                <h4 className="w-full text-sm font-extrabold leading-6 text-[var(--theme-text-strong)] md:w-auto md:min-w-0">
-                                  {lesson.title}
-                                </h4>
+                                <Link href={`/admin/lessons/${lesson.id}`} className="w-full md:w-auto md:min-w-0 hover:underline hover:text-[var(--theme-primary)] transition-colors">
+                                  <h4 className="text-sm font-extrabold leading-6 text-[var(--theme-text-strong)]">
+                                    {lesson.title}
+                                  </h4>
+                                </Link>
                                 <span className="hidden shrink-0 md:inline-flex">
                                   <StatusBadge status={lesson.status} />
                                 </span>
@@ -389,6 +393,13 @@ export function ChapterLessonPanel({
                               </div>
                             </div>
                             <div className="col-span-2 flex items-center justify-end gap-2 md:col-span-1">
+                              <Link
+                                href={`/admin/lessons/${lesson.id}`}
+                                className="theme-button-primary inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition"
+                              >
+                                <Target className="h-4 w-4" aria-hidden="true" />
+                                Quản lý
+                              </Link>
                               <button
                                 type="button"
                                 onClick={() => onEditLesson(lesson.id)}

@@ -2,6 +2,7 @@ import { Prisma, PublishStatus } from "@prisma/client";
 import {
   isPrismaRecordNotFoundError,
   isPrismaUniqueConstraintError,
+  isPrismaForeignKeyConstraintError,
 } from "#api/common/errors/prisma-error.mapper";
 import {
   throwBadRequest,
@@ -91,6 +92,10 @@ export function handleKnownPrismaError(error: unknown): never {
 
   if (isPrismaRecordNotFoundError(error)) {
     throwNotFound();
+  }
+
+  if (isPrismaForeignKeyConstraintError(error)) {
+    throwConflict("CONFLICT", "Không thể xóa dữ liệu vì có dữ liệu khác phụ thuộc (ví dụ: giao dịch mua bán, lộ trình cá nhân hóa, v.v.).");
   }
 
   throw error;

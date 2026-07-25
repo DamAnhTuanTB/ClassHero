@@ -35,9 +35,32 @@ export async function updateAdminLesson(
   return mapLesson(lesson);
 }
 
+export async function updateAdminLessonVideoSettings(
+  lessonId: string,
+  customVideoSettings: any,
+  token: string,
+) {
+  const lesson = await apiRequest<AdminLessonApi>(`/admin/lessons/${lessonId}`, {
+    method: "PATCH",
+    body: { customVideoSettings },
+    token,
+  });
+
+  return mapLesson(lesson);
+}
+
 export async function archiveAdminLesson(lessonId: string, token: string) {
   return apiRequest<{ success: boolean }>(`/admin/lessons/${lessonId}`, {
     method: "DELETE",
     token,
   });
+}
+
+export async function getAdminLesson(lessonId: string, token: string) {
+  const lesson = await apiRequest<AdminLessonApi>(`/admin/lessons/${lessonId}`, {
+    method: "GET",
+    token,
+  });
+
+  return mapLesson(lesson);
 }

@@ -23,6 +23,63 @@ import {
   LessonSourceDocumentPageRangeDto,
 } from "#api/modules/learning-paths/dto/create-lesson.dto";
 
+export class CustomVideoSettingsDto {
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsBoolean()
+  isDisabled?: boolean;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  startTimeInSeconds?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  endTimeCutInSeconds?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  introOverlayDurationInSeconds?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  pauseOverlayDurationInSeconds?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  seekStepInSeconds?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  letterboxTopPercentage?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  letterboxRightPercentage?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  letterboxBottomPercentage?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsNumber()
+  letterboxLeftPercentage?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsBoolean()
+  hasWatermark?: boolean;
+}
+
 export class UpdateLessonDto {
   @ApiPropertyOptional({ example: 1, minimum: 1 })
   @ValidateIf((_, value: unknown) => value !== undefined)
@@ -92,6 +149,12 @@ export class UpdateLessonDto {
   @IsString()
   @MaxLength(2048)
   videoUrl?: string | null;
+
+  @ApiPropertyOptional({ type: CustomVideoSettingsDto, nullable: true })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @ValidateNested()
+  @Type(() => CustomVideoSettingsDto)
+  customVideoSettings?: CustomVideoSettingsDto | null;
 
   @ApiPropertyOptional({ example: 7, minimum: 0, maximum: 10 })
   @ValidateIf((_, value: unknown) => value !== undefined)

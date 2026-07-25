@@ -18,7 +18,7 @@ export function StudentLearningGreetingPanel({ studentName }: { studentName: str
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="student-soft-bold-text truncate text-lg font-extrabold leading-tight text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-xl">
+          <p className="student-soft-bold-text text-lg font-extrabold leading-tight text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-xl">
             Chào {studentName}
           </p>
           <p className="mt-1 text-sm font-semibold leading-5 text-slate-500 dark:text-[var(--theme-text-muted)] sm:text-base">

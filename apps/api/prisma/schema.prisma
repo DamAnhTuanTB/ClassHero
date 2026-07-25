@@ -579,6 +579,7 @@ model Lesson {
   scheduledAt        DateTime?                 @map("scheduled_at")
   examOpenAt         DateTime?                 @map("exam_open_at")
   videoUrl           String?                   @map("video_url")
+  customVideoSettings Json?                    @map("custom_video_settings")
   completionMinScore Decimal                   @default(7) @map("completion_min_score") @db.Decimal(5, 2)
   trialEnabled       Boolean                   @default(false) @map("trial_enabled")
   status             PublishStatus             @default(DRAFT)
