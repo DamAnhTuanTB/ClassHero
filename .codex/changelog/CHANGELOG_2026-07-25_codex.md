@@ -1,6 +1,8 @@
 ## 2026-07-25
 
 ### Tính năng mới / Cải thiện
+- Cải thiện UX trên thiết bị di động: Ẩn hoàn toàn nút Tắt/Bật âm lượng vì trình duyệt di động (iOS/Android) chặn JavaScript can thiệp vào âm lượng phần cứng của thiết bị.
+- Bổ sung các Safety Checks (kiểm tra `typeof ... === 'function'`) trước khi gọi các hàm API nội bộ của YouTube Iframe (`mute`, `unMute`, `setVolume`, `unloadModule`...) để ngăn chặn triệt để lỗi crash `TypeError` khi mạng lag hoặc khi Iframe chưa kịp render các module điều khiển.
 - Cải thiện thao tác cảm ứng trên Mobile: Chạm vào video khi đang ẩn thanh công cụ sẽ chỉ hiển thị thanh công cụ (thay vì Tạm dừng video), giống với trải nghiệm người dùng trên app YouTube.
 - Bổ sung chức năng Bật/Tắt Phụ đề (CC - Closed Captions) trên thanh điều khiển.
 - Cấu hình ép buộc ẩn Phụ đề (CC) mặc định cho mọi video (ghi đè cài đặt tài khoản cá nhân của người xem) nhằm giữ giao diện học tập gọn gàng ban đầu.

@@ -215,7 +215,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
         fs: 0,
         playsinline: 1,
         iv_load_policy: 3,
-        cc_load_policy: 0,
+        cc_load_policy: 3, // 3 is an undocumented trick to suppress captions
       },
       events: {
         onReady: (event: any) => {
@@ -245,6 +245,17 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
             if (!isFirstPlayStartedRef.current) {
               isFirstPlayStartedRef.current = true;
               setIsFirstPlayStarted(true);
+              
+              // Ép ẩn phụ đề lần nữa khi video thực sự bắt đầu phát (vì lúc onReady có thể YT chưa load xong module phụ đề)
+              try {
+                if (typeof event.target.unloadModule === 'function') {
+                  event.target.unloadModule("captions");
+                  event.target.unloadModule("cc");
+                }
+                if (typeof event.target.setOption === 'function') {
+                  event.target.setOption("captions", "track", {});
+                }
+              } catch (e) {}
             }
             setIsStarting(false);
             setIsReady(true); // Fallback: nếu onReady không gọi được mà video vẫn play
@@ -337,14 +348,14 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const handleToggleMute = () => {
     if (!playerRef.current) return;
     if (isMuted) {
-      playerRef.current.unMute();
+      if (typeof playerRef.current.unMute === 'function') playerRef.current.unMute();
       setIsMuted(false);
       if (volume === 0) {
-        playerRef.current.setVolume(100);
+        if (typeof playerRef.current.setVolume === 'function') playerRef.current.setVolume(100);
         setVolume(100);
       }
     } else {
-      playerRef.current.mute();
+      if (typeof playerRef.current.mute === 'function') playerRef.current.mute();
       setIsMuted(true);
     }
   };
@@ -352,13 +363,13 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseInt(e.target.value);
     if (!playerRef.current) return;
-    playerRef.current.setVolume(newVolume);
+    if (typeof playerRef.current.setVolume === 'function') playerRef.current.setVolume(newVolume);
     setVolume(newVolume);
     if (newVolume > 0 && isMuted) {
-      playerRef.current.unMute();
+      if (typeof playerRef.current.unMute === 'function') playerRef.current.unMute();
       setIsMuted(false);
     } else if (newVolume === 0 && !isMuted) {
-      playerRef.current.mute();
+      if (typeof playerRef.current.mute === 'function') playerRef.current.mute();
       setIsMuted(true);
     }
   };
@@ -653,7 +664,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
             </button>
             
             {/* Volume Control */}
-            <div className="flex items-center group/volume gap-1">
+            <div className="hidden sm:flex items-center group/volume gap-1">
               <button 
                 onClick={handleToggleMute}
                 className="text-white hover:text-[var(--theme-primary)] p-1.5 transition-colors group/btn relative"
