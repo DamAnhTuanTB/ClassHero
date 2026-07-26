@@ -1,3 +1,4 @@
 - 2026-07-26: Khôi phục guard xác thực và phân quyền ADMIN cho trang/API quản trị bài học, loại bỏ token giả khỏi query lesson và ghi lại nguyên tắc giữ session nhất quán xuyên suốt UI với backend.
 - 2026-07-26: Bổ sung cấu hình và validation chapter video từ UI đến API, hỗ trợ lấy mốc từ YouTube, đồng thời hoàn thiện player tùy chỉnh với timeline/chapter responsive, trạng thái bắt đầu rõ ràng và các bản sửa tương tác trên desktop lẫn mobile.
 - 2026-07-26: Bổ sung luồng admin lấy transcript công khai từ YouTube, ánh xạ đúng khoảng video sau cắt, duyệt/chỉnh sửa/lưu transcript đồng bộ với player và thêm test/API/docs liên quan.
+- 2026-07-26: Thêm milestone M15 cho học video thông minh sau luồng học sinh cốt lõi, đồng bộ scope/flow/API/DB/UI/AI/performance/dependency và sửa các tham chiếu tài liệu lỗi thời qua review docs.

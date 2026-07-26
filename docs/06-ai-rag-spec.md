@@ -930,12 +930,42 @@ Không gọi AI blocking trong request-new.
 - Ưu tiên cache lời giải.
 - Ưu tiên dùng bộ dự phòng trước khi gọi AI tạo mới.
 - Không gửi toàn bộ tài liệu hoặc toàn bộ lịch sử chat vào AI.
+- Với smart video `M15`, không gửi toàn bộ transcript mỗi lần; chỉ dùng chapter, cửa sổ cue lân cận và retrieved chunks cần thiết.
 
 ASSUMPTION:
 
 - Student chat rate limit ban đầu: 20 messages/lesson/day.
 - Student request-new quiz/flashcard/test: giới hạn theo lesson/day.
 - Giá trị cụ thể cần chốt sau khi test usage thực tế.
+
+---
+
+## 12.1. Smart video AI context
+
+Các action `Hỏi đoạn này`, `Em chưa hiểu`, chapter summary, flashcard từ video và semantic search thuộc `M15`.
+
+Context tối thiểu:
+
+```txt
+lesson_id
+playback_seconds theo timeline sau cắt
+source_seconds nếu cần debug/mapping
+chapter id/title/range nếu có
+transcript cue hiện tại + một cửa sổ cue lân cận có giới hạn
+retrieved document chunks của đúng lesson
+prompt/schema/transcript/chapter version
+```
+
+Rules:
+
+- Backend tự resolve context từ `lessonId + playbackSeconds`; không tin chapter/transcript text tùy ý từ client.
+- Transcript chỉ là nguồn bổ sung. Nếu không có transcript, fallback sang chapter + lesson retrieval và trả caveat rõ.
+- Không gửi toàn bộ transcript hoặc toàn bộ PDF vào model.
+- Chapter summary/flashcard phải giữ source timestamp và stale khi transcript, chapter hoặc cấu hình cắt thay đổi.
+- Semantic search index phải filter `lesson_id`, giữ timestamp/chapter metadata và dùng hybrid search cho công thức/thuật ngữ.
+- Cache contextual explanation theo lesson, time window, normalized question và các version liên quan.
+- Recommendation/difficulty không được giao hoàn toàn cho model từ raw event stream. Backend tạo feature tổng hợp, áp rule giải thích được; AI chỉ hỗ trợ diễn đạt hoặc xếp hạng trong phạm vi an toàn.
+- Mọi action student phải áp rate limit/budget guard và không làm blocking player.
 
 ---
 

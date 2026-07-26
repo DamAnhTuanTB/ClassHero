@@ -163,7 +163,7 @@ docs/06-ai-rag-spec.md                    AI/RAG
 docs/07-integration-and-env.md            Env và tích hợp
 docs/08-ui-pages-and-components.md        Màn hình/component
 docs/09-implementation-plan.md            Index milestone/subtask
-docs/implementation/                      Chi tiết milestone M0..M14
+docs/implementation/                      Chi tiết milestone M0..M15
 docs/11-ui-design-system.md               UI design system
 docs/12-performance-and-observability.md  Hiệu năng/đo đạc
 docs/13-seo-and-content-discovery.md      SEO/public discovery

@@ -1,6 +1,6 @@
 # Milestone Overview - Diễn giải dễ hiểu
 
-File này giúp owner nhìn nhanh từng milestone lớn `M0` đến `M14` theo ngôn ngữ sản phẩm. Nếu cần phạm vi chi tiết, `Mode`, `Done khi` và các subtask nhỏ, mở file `docs/implementation/Mx.md` tương ứng.
+File này giúp owner nhìn nhanh từng milestone lớn `M0` đến `M15` theo ngôn ngữ sản phẩm. Nếu cần phạm vi chi tiết, `Mode`, `Done khi` và các subtask nhỏ, mở file `docs/implementation/Mx.md` tương ứng.
 
 ---
 
@@ -242,3 +242,23 @@ Khi xong milestone này:
 - Có notes backup/restore/vận hành.
 
 Milestone này không thêm nhiều tính năng mới; nó làm sản phẩm đủ tin cậy để vận hành thật.
+
+---
+
+## M15 - Học video thông minh
+
+Mục tiêu: biến video từ nội dung chỉ để xem thành một luồng học có thể tiếp tục, ghi chú, kiểm tra mức hiểu, tìm kiếm và đề xuất ôn tập theo đúng timestamp/chapter.
+
+Ưu tiên:
+
+- Bắt đầu phần nền tảng ngay sau khi luồng học sinh `lesson -> quiz/test -> completion` ở `M7.1-M7.5` đã hoàn tất.
+- Các phần dùng AI/RAG vẫn phải chờ nền `M5.x` và `M9.x` tương ứng; không gọi AI trước khi retrieval, validation và cache sẵn sàng.
+
+Khi xong milestone này:
+
+- Hệ thống lưu khoảng video thực sự đã xem và cho tiếp tục đúng vị trí.
+- Học sinh ghi chú, hỏi AI, bấm `Em chưa hiểu`, làm checkpoint và tìm trong video theo timestamp/chapter.
+- Hệ thống có chapter mastery, flashcard/tóm tắt từ video và đề xuất đoạn nên ôn lại.
+- Admin xem analytics tổng hợp về các đoạn/chapter khó mà không biến tính năng thành công cụ giám sát thô.
+
+Milestone này tái sử dụng transcript/chapter của `M3.8`, luồng học sinh của `M7` và AI/RAG của `M9`; không thay thế điều kiện hoàn thành lesson hiện tại.

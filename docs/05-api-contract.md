@@ -73,6 +73,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | `M12.x` | `report-news`, `conventions-errors-security` |
 | `M13.x` | `leaderboard`, `auth-profile`, `conventions-errors-security` |
 | `M14.x` | File API liên quan đến flow được test/harden/deploy |
+| `M15.x` | `student-learning`, `ai-chat`, `quiz-flashcard-tests`, `conventions-errors-security`; admin analytics có thể tách file khi implement |
 
 ---
 

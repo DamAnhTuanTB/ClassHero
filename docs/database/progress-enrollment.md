@@ -89,4 +89,35 @@ ASSUMPTION: Không cần bảng trial riêng ở MVP. Quyền học thử đư�
 
 Nếu cần tracking trial view, thêm bảng `trial_access_logs` sau.
 
+### 6.4. M15 smart video progress extension
+
+Scope mở rộng M15 cần lưu tiến độ xem tách khỏi `lesson_progress`.
+
+ASSUMPTION tên model trước khi chốt Prisma:
+
+```txt
+video_playback_sessions
+video_watched_intervals
+video_chapter_mastery
+video_learning_signal_aggregates
+```
+
+Yêu cầu dữ liệu:
+
+- Session gắn `student_user_id`, `lesson_id`, optional enrollment/effective lesson lineage, thời điểm bắt đầu/kết thúc và last position.
+- Watched interval lưu `start_seconds`, `end_seconds` theo timeline sau cắt, có idempotency key/session key và được service merge để tính số giây duy nhất đã xem.
+- Không lưu một row theo từng frame/timeupdate.
+- Chapter mastery lưu chapter identity/version, trạng thái và reason/feature snapshot đủ để giải thích; không dùng mastery thay `lesson_progress.status`.
+- Difficulty/analytics lưu aggregate cần thiết theo lesson/chapter/time bucket; raw event có retention giới hạn và không phải nguồn báo cáo trực tiếp.
+- Nếu cấu hình cắt video đổi, service phải version timeline hoặc remap có kiểm soát; không âm thầm diễn giải interval cũ theo timeline mới.
+
+Index/constraint dự kiến:
+
+- index session `(student_user_id, lesson_id, updated_at)`.
+- unique/idempotent key cho heartbeat batch.
+- GiST/range hoặc chiến lược merge phù hợp cho interval khi chốt schema.
+- index aggregate `(lesson_id, chapter_key, bucket_start_seconds)`.
+
+TODO `M15.1`: chốt model/field/migration cụ thể sau khi benchmark write volume và chiến lược merge interval.
+
 ---

@@ -9,6 +9,12 @@ Update note 2026-07-07:
 - Khi chọn task tiếp theo, ưu tiên đọc `docs/09-implementation-plan.md` và file milestone tương ứng thay vì dùng danh sách task cũ trong file này.
 - Danh sách task trong mục 3 là snapshot lịch sử, có thể thiếu task UI mới như `M2.4`, `M3.5`, `M4.5`, `M7.7`, `M8.5`, `M9.8`, `M13.5`; không dùng mục đó làm roadmap hiện hành.
 
+Update note 2026-07-26:
+
+- Owner đã duyệt scope mở rộng `M15 Smart video learning`; chi tiết nằm ở `docs/implementation/M15.md`.
+- Ưu tiên phần nền `M15.1-M15.3` sau khi hoàn tất core student `M7.1-M7.5`; các phần AI `M15.4-M15.8` chỉ chạy khi dependency `M3.8`, `M5.x`, `M9.x` tương ứng đã sẵn sàng.
+- Mục 3 bên dưới tiếp tục là snapshot lịch sử. Thứ tự hiện hành chỉ lấy từ `docs/09-implementation-plan.md`.
+
 ## 1. Phạm vi bước này
 
 Subtask hiện tại: `M0.P` - đọc tài liệu và tạo execution plan.

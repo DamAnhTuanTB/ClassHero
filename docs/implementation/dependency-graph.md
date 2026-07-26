@@ -15,8 +15,15 @@ M0 repo/tooling
 
 M3 course/chapter/lesson + M6 quiz/flashcard/test
   -> M7 student learning flow
+    -> M15.1-M15.3 smart video foundation
     -> M10 notification triggers
     -> M13 XP/profile/leaderboard
+
+M3.8 transcript/chapter + M7 student learning + M5 retrieval + M9 AI
+  -> M15 smart video learning
+    -> watch progress/resume/timestamp notes/checkpoints
+    -> contextual AI/semantic search/adaptive review
+    -> aggregate admin video analytics
 
 M3 course/chapter/lesson + M8 payment/enrollment
   -> full paid enrollment access and payment CTA after M8.4
@@ -52,6 +59,7 @@ M14 testing/hardening/deploy
 | `M12` | Report/news models, auth, content modules | Report moderation, news/events |
 | `M13` | Progress/attempt/profile/file models | XP, leaderboard, profile, admin dashboard |
 | `M14` | Implemented sensitive flows | Tests, hardening, deploy, operations |
+| `M15` | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x` | Smart video progress, contextual learning, adaptive review và analytics |
 
 ## 3. Phụ thuộc cần nhớ khi chọn task
 
@@ -65,6 +73,11 @@ M14 testing/hardening/deploy
 - `M13.5` admin dashboard có thể dùng placeholder cho metric chưa có API, nhưng phải ghi rõ.
 - `M3.6` cần enrollment thật từ `M8.3` và worker foundation `M4.3`; không được kích hoạt clone trước khi job hoàn tất.
 - `M3.7` cần `M3.6`; `M7.8` cần `M3.6`, `M7.1`, `M7.5`; `M11.5` cần `M7.8`, `M11.1`, `M11.2`.
+- `M3.8` cần lesson API/UI từ `M3.2`, `M3.4`; kết nối caption YouTube là best-effort và không phải dependency của video playback.
+- `M15.1-M15.3` được ưu tiên sau khi student lesson/quiz/test/completion ở `M7.1-M7.5` sẵn sàng; `M15.2` cần thêm notes `M7.6`.
+- `M15.4-M15.6` không được chạy trước nền transcript `M3.8`, retrieval `M5.x` và AI `M9.x` tương ứng.
+- `M15.7` chỉ suy luận difficulty từ nhiều tín hiệu học tập; `M15.8` chỉ hiển thị analytics tổng hợp có ngưỡng riêng tư.
+- M15 không thay đổi rule completed của `M7.5`; watched percent/chapter mastery chỉ là tín hiệu hỗ trợ.
 
 ## 4. Khi nào cập nhật file này
 

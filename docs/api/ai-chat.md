@@ -111,3 +111,12 @@ Behavior:
 ASSUMPTION: Chat AI có thể xử lý sync trong request ở MVP nếu latency chấp nhận được. Nếu provider latency cao, chuyển sang async job sau.
 
 ---
+
+## 13.1. Smart video contextual AI (`M15`, planned)
+
+- `ASK_THIS_MOMENT` và `I_DONT_UNDERSTAND` tái sử dụng `AiProvider`, retrieval, cache/job và rate limit hiện có.
+- Client chỉ gửi `lessonId`, `playbackSeconds`, action và optional question; backend tự resolve chapter/transcript context.
+- Retrieval tiếp tục filter theo lesson; transcript window không thay thế document RAG.
+- Cache key phải gồm timeline/transcript/chapter version để cấu hình cắt hoặc nội dung đã sửa không trả explanation cũ.
+- Chapter summary/flashcard video là background job, có source timestamp và review status.
+- Không gửi raw watch-event stream vào model để “đánh giá” học sinh. Recommendation service dùng feature aggregate/rule giải thích được; model chỉ hỗ trợ nội dung học tập.

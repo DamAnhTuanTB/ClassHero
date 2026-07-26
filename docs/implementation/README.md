@@ -4,7 +4,7 @@ Thư mục này chứa chi tiết phạm vi, `Không làm` và `Done khi` cho t�
 
 Các file phụ trợ trong thư mục này:
 
-- `milestone-overview.md`: diễn giải dễ hiểu từng milestone lớn `M0` đến `M14` cho owner.
+- `milestone-overview.md`: diễn giải dễ hiểu từng milestone lớn `M0` đến `M15` cho owner.
 - `dependency-graph.md`: xem nhanh phụ thuộc giữa milestone/subtask.
 - `feature-coverage-matrix.md`: rà feature đã đủ DB/API/UI/worker/test chưa.
 
@@ -48,3 +48,4 @@ Mapping nhanh:
 | `M12.x` | `docs/implementation/M12.md` |
 | `M13.x` | `docs/implementation/M13.md` |
 | `M14.x` | `docs/implementation/M14.md` |
+| `M15.x` | `docs/implementation/M15.md` |

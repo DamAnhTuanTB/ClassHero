@@ -8,12 +8,12 @@ Chi tiết `Mode`, phạm vi, `Không làm` và `Done khi` từng subtask nằm 
 docs/implementation/M0.md
 docs/implementation/M1.md
 ...
-docs/implementation/M14.md
+docs/implementation/M15.md
 ```
 
 Nếu cần xem cách map nhanh, mở `docs/implementation/README.md`.
 
-Nếu muốn đọc diễn giải dễ hiểu theo milestone lớn `M0` đến `M14`, mở `docs/implementation/milestone-overview.md`.
+Nếu muốn đọc diễn giải dễ hiểu theo milestone lớn `M0` đến `M15`, mở `docs/implementation/milestone-overview.md`.
 
 Nếu cần xem phụ thuộc hoặc coverage theo feature nhanh hơn, mở thêm:
 
@@ -138,58 +138,72 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 31     | `M7.3`  | Flashcard progress, favorite và review                             |
 | 32     | `M7.4`  | Test start, submit và review                                       |
 | 33     | `M7.5`  | Best attempt, lesson completion và top 5                           |
-| 34     | `M7.6`  | Personal notes và private comments dưới video                      |
-| 35     | `M7.7`  | Student dashboard UI                                               |
-| 36     | `M8.1`  | Discount code admin và validation                                  |
-| 37     | `M8.2`  | Create payment order bằng payOS                                    |
-| 38     | `M8.3`  | payOS webhook verify, idempotency và enrollment 12 tháng           |
-| 39     | `M8.4`  | Payment UI/status và thông báo sau thanh toán                      |
-| 40     | `M8.5`  | Admin discount code UI                                             |
-| 41     | `M5.1`  | AiProvider abstraction cho embedding                               |
-| 42     | `M5.2`  | Embedding worker và lưu pgvector                                   |
-| 43     | `M5.3`  | RetrievalService vector search theo lesson                         |
-| 44     | `M5.4`  | Hybrid search cho công thức/ký hiệu                                |
-| 45     | `M9.1`  | AiModule structured output foundation                              |
-| 46     | `M9.2`  | Admin generate lesson summary                                      |
-| 47     | `M9.3`  | Admin generate quiz/flashcard/test                                 |
-| 48     | `M9.4`  | Student request-new reserve-first flow                             |
-| 49     | `M9.5`  | AI explanation cache inline                                        |
-| 50     | `M9.6`  | Chat AI trong lesson bằng RAG                                      |
-| 51     | `M9.7`  | Conversation summary và diagram placeholder                        |
-| 52     | `M9.8`  | Admin AI generation panel UI                                       |
-| 53     | `M10.1` | Notification in-app API                                            |
-| 54     | `M10.2` | NotificationBell UI và notification page                           |
-| 55     | `M10.3` | Socket.IO realtime notification                                    |
-| 56     | `M10.4` | Admin manual notification                                          |
-| 57     | `M10.5` | Automatic notification triggers                                    |
-| 58     | `M10.6` | Email/Zalo delivery workers                                        |
-| 59     | `M11.1` | Parent-child link và selected child                                |
-| 60     | `M11.2` | Parent dashboard và progress view                                  |
-| 61     | `M11.3` | Parent course list và payment for child                            |
-| 62     | `M11.4` | Parent notifications và news view                                  |
-| 63     | `M12.1` | Student report item                                                |
-| 64     | `M12.2` | Admin report moderation                                            |
-| 65     | `M12.3` | AI unreviewed content moderation                                   |
-| 66     | `M12.4` | News/events/livestream CRUD admin                                  |
-| 67     | `M12.5` | Student/parent news/events view                                    |
-| 68     | `M13.1` | XP events và level calculation                                     |
-| 69     | `M13.2` | Global student leaderboard                                         |
-| 70     | `M13.3` | Student profile editable fields                                    |
-| 71     | `M13.4` | Avatar upload integration                                          |
-| 72     | `M13.5` | Admin dashboard overview UI                                        |
-| 73     | `M14.1` | Unit tests cho service quan trọng                                  |
-| 74     | `M14.2` | API tests cho flow nhạy cảm                                        |
-| 75     | `M14.3` | Playwright E2E cho flow chính                                      |
-| 76     | `M14.4` | Security hardening và rate limit                                   |
-| 77     | `M14.5` | Logging, monitoring và error tracking                              |
-| 78     | `M14.6` | Docker Compose production, Nginx và health checks                  |
-| 79     | `M14.7` | Backup/restore và vận hành production notes                        |
-| 80     | `M3.6`  | Personal learning path clone foundation                            |
-| 81     | `M3.7`  | Admin personal learning path management UI                         |
-| 82     | `M7.8`  | Student personalized learning path access và progress              |
-| 83     | `M11.5` | Parent personalized learning path view                             |
+| 34     | `M3.8`  | Admin lesson video transcript                                      |
+| 35     | `M15.1` | Video watch progress, watched intervals và smart resume            |
+| 36     | `M7.6`  | Personal notes và private comments dưới video                      |
+| 37     | `M15.2` | Synced transcript, timestamp notes và chapter learning context     |
+| 38     | `M15.3` | In-video checkpoints và chapter mastery                            |
+| 39     | `M7.7`  | Student dashboard UI                                               |
+| 40     | `M8.1`  | Discount code admin và validation                                  |
+| 41     | `M8.2`  | Create payment order bằng payOS                                    |
+| 42     | `M8.3`  | payOS webhook verify, idempotency và enrollment 12 tháng           |
+| 43     | `M8.4`  | Payment UI/status và thông báo sau thanh toán                      |
+| 44     | `M8.5`  | Admin discount code UI                                             |
+| 45     | `M5.1`  | AiProvider abstraction cho embedding                               |
+| 46     | `M5.2`  | Embedding worker và lưu pgvector                                   |
+| 47     | `M5.3`  | RetrievalService vector search theo lesson                         |
+| 48     | `M5.4`  | Hybrid search cho công thức/ký hiệu                                |
+| 49     | `M9.1`  | AiModule structured output foundation                              |
+| 50     | `M9.2`  | Admin generate lesson summary                                      |
+| 51     | `M9.3`  | Admin generate quiz/flashcard/test                                 |
+| 52     | `M9.4`  | Student request-new reserve-first flow                             |
+| 53     | `M9.5`  | AI explanation cache inline                                        |
+| 54     | `M9.6`  | Chat AI trong lesson bằng RAG                                      |
+| 55     | `M9.7`  | Conversation summary và diagram placeholder                        |
+| 56     | `M9.8`  | Admin AI generation panel UI                                       |
+| 57     | `M15.4` | Contextual AI `Hỏi đoạn này` và `Em chưa hiểu`                     |
+| 58     | `M15.5` | AI chapter summary và flashcard từ video                           |
+| 59     | `M15.6` | Semantic search inside video                                       |
+| 60     | `M15.7` | Adaptive review recommendations và difficulty signals              |
+| 61     | `M15.8` | Admin video learning analytics                                     |
+| 62     | `M10.1` | Notification in-app API                                            |
+| 63     | `M10.2` | NotificationBell UI và notification page                           |
+| 64     | `M10.3` | Socket.IO realtime notification                                    |
+| 65     | `M10.4` | Admin manual notification                                          |
+| 66     | `M10.5` | Automatic notification triggers                                    |
+| 67     | `M10.6` | Email/Zalo delivery workers                                        |
+| 68     | `M11.1` | Parent-child link và selected child                                |
+| 69     | `M11.2` | Parent dashboard và progress view                                  |
+| 70     | `M11.3` | Parent course list và payment for child                            |
+| 71     | `M11.4` | Parent notifications và news view                                  |
+| 72     | `M12.1` | Student report item                                                |
+| 73     | `M12.2` | Admin report moderation                                            |
+| 74     | `M12.3` | AI unreviewed content moderation                                   |
+| 75     | `M12.4` | News/events/livestream CRUD admin                                  |
+| 76     | `M12.5` | Student/parent news/events view                                    |
+| 77     | `M13.1` | XP events và level calculation                                     |
+| 78     | `M13.2` | Global student leaderboard                                         |
+| 79     | `M13.3` | Student profile editable fields                                    |
+| 80     | `M13.4` | Avatar upload integration                                          |
+| 81     | `M13.5` | Admin dashboard overview UI                                        |
+| 82     | `M14.1` | Unit tests cho service quan trọng                                  |
+| 83     | `M14.2` | API tests cho flow nhạy cảm                                        |
+| 84     | `M14.3` | Playwright E2E cho flow chính                                      |
+| 85     | `M14.4` | Security hardening và rate limit                                   |
+| 86     | `M14.5` | Logging, monitoring và error tracking                              |
+| 87     | `M14.6` | Docker Compose production, Nginx và health checks                  |
+| 88     | `M14.7` | Backup/restore và vận hành production notes                        |
+| 89     | `M3.6`  | Personal learning path clone foundation                            |
+| 90     | `M3.7`  | Admin personal learning path management UI                         |
+| 91     | `M7.8`  | Student personalized learning path access và progress              |
+| 92     | `M11.5` | Parent personalized learning path view                             |
 
-Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toán/học thủ công trước AI nâng cao. Khi làm AI/RAG vẫn phải giữ phụ thuộc `M4.x -> M5.x -> M9.x`.
+Ghi chú:
+
+- `M15.1-M15.3` được ưu tiên ngay sau cụm học sinh cốt lõi `M7.1-M7.5`; `M15.2` đi sau nền ghi chú `M7.6`.
+- `M15.4-M15.8` vẫn thuộc cùng milestone nhưng được đặt sau `M5.x/M9.x` vì cần retrieval, AI validation/cache hoặc dữ liệu tích lũy từ phần nền tảng.
+- `M3.8` là prerequisite của các subtask M15 dùng transcript/chapter và được đặt ngay trước phần nền M15.
+- `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toán/học thủ công trước AI nâng cao. Khi làm AI/RAG vẫn phải giữ phụ thuộc `M4.x -> M5.x -> M9.x`.
 
 ---
 
@@ -214,6 +228,7 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 - `M3.5` phụ thuộc `M3.3`; payment CTA thật phụ thuộc `M8.4`.
 - `M3.6` phụ thuộc `M3.1`, `M3.2`, `M4.3` và enrollment thật từ `M8.3`.
 - `M3.7` phụ thuộc `M3.4`, `M3.6`.
+- `M3.8` phụ thuộc `M3.2`, `M3.4`; transcript là optional và không chặn phát video.
 - Từ M3 trở đi, cấu trúc course detail là `learning path -> chapters -> lessons`; chapter chỉ chứa thông tin tổng quan, còn nội dung học chi tiết nằm ở lesson.
 
 ### File/document/worker
@@ -252,6 +267,18 @@ Ghi chú: `M8.x` được đặt trước `M5.x`/`M9.x` để MVP có thanh toá
 - `M9.1` phụ thuộc `M5.1`, background job/AI log models.
 - `M9.2` đến `M9.6` phụ thuộc `M5.x`, `M9.1` và content/student flow liên quan.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`; job status UI phụ thuộc `M4.3`.
+
+### Smart video learning
+
+- M15 là scope mở rộng đã được owner duyệt, ưu tiên sau khi `M7.1`, `M7.2`, `M7.4`, `M7.5` hoàn tất; `M7.3` nên hoàn tất cùng cụm nền để tái sử dụng flashcard.
+- `M15.1` phụ thuộc `M3.8`, `M6.5`, `M7.1`, `M7.5`.
+- `M15.2` phụ thuộc `M3.8`, `M7.6`, `M15.1`.
+- `M15.3` phụ thuộc `M3.8`, `M7.2`, `M7.4`, `M7.5`, `M15.1`.
+- `M15.4` phụ thuộc `M3.8`, `M5.3`, `M9.1`, `M9.6`, `M15.1`.
+- `M15.5` phụ thuộc `M3.8`, `M6.3`, `M9.1`, `M9.2`, `M9.3`, `M15.2`.
+- `M15.6` phụ thuộc `M3.8`, `M5.2`, `M5.3`, `M5.4`.
+- `M15.7` phụ thuộc `M7.2-M7.4`, `M15.1`, `M15.3`, `M15.4`.
+- `M15.8` phụ thuộc `M15.1`, `M15.3`, `M15.7`.
 
 ### Notification/parent/report/gamification/testing
 

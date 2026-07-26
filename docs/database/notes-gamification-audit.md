@@ -18,6 +18,23 @@ updated_at timestamp
 deleted_at timestamp?
 ```
 
+M15 planned optional extension, chưa có migration ở thời điểm lập milestone:
+
+```txt
+playback_seconds numeric?
+source_seconds numeric?
+video_timeline_version string?
+chapter_key string?
+chapter_title_snapshot string?
+```
+
+M15 rules khi implement:
+
+- Các field video đều optional để note thường của `M7.6` tiếp tục hoạt động.
+- `playback_seconds` là timestamp học sinh nhìn thấy sau cắt; `source_seconds` dùng cho mapping/debug, không hiển thị trực tiếp.
+- `chapter_title_snapshot` không phải nguồn chapter hiện tại; UI resolve chapter mới theo timestamp/version và chỉ dùng snapshot làm fallback.
+- Timestamp note không cấp quyền xem lesson; API vẫn enforce ownership/access.
+
 ### 15.2. `lesson_video_comments`
 
 Comment/ý kiến riêng dưới video, chỉ student đó thấy.

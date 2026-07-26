@@ -73,6 +73,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | `M12.x` | `notification-report-news`, `ai-rag-chat` nếu moderation AI |
 | `M13.x` | `notes-gamification-audit`, `files-documents` nếu avatar |
 | `M14.x` | File liên quan đến flow được test/harden/deploy |
+| `M15.x` | `progress-enrollment`, `notes-gamification-audit`, `quiz-flashcard-tests`, `ai-rag-chat`, `indexes-and-checklist` |
 
 ---
 

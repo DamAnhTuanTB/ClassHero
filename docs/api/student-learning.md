@@ -107,3 +107,133 @@ Body:
 Role: `STUDENT`.
 
 ---
+
+## 15. Smart video learning API (`M15`, planned)
+
+Các endpoint dưới đây là contract định hướng; request/response cuối cùng được chốt trong từng subtask trước khi code.
+
+### `GET /student/lessons/:lessonId/video-progress`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả `lastPositionSeconds`, unique watched seconds/percent, timeline version và optional chapter mastery/recommendations.
+- Mọi timestamp phía student dùng timeline sau cắt.
+- Không dùng watched percent để tự đánh dấu completed.
+
+### `POST /student/lessons/:lessonId/video-sessions`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Tạo/resume playback session idempotent cho student + lesson.
+
+### `POST /student/lessons/:lessonId/video-sessions/:sessionId/heartbeat`
+
+Role: `STUDENT`.
+
+Body định hướng:
+
+```json
+{
+  "idempotencyKey": "uuid",
+  "timelineVersion": "string",
+  "positionSeconds": 42,
+  "watchedIntervals": [
+    { "startSeconds": 30, "endSeconds": 42 }
+  ],
+  "reason": "HEARTBEAT"
+}
+```
+
+Behavior:
+
+- Validate ownership, timeline version, duration và interval hợp lệ.
+- Merge interval ở server; request lặp không cộng trùng.
+- `reason` có thể là `HEARTBEAT`, `PAUSE`, `SEEK`, `CHAPTER_CHANGE`, `ENDED`, `PAGE_HIDE`.
+
+### Timestamp note
+
+`POST/PATCH` note của mục 14 bổ sung optional:
+
+```json
+{
+  "contentJson": {},
+  "playbackSeconds": 42,
+  "timelineVersion": "string"
+}
+```
+
+Backend tự resolve `sourceSeconds` và chapter hiện tại; không tin chapter title client gửi.
+
+### `GET /student/lessons/:lessonId/video-learning`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả transcript/chapter được phép hiển thị, checkpoint, mastery và recommendation cần cho UI.
+- Không trả raw signal/event log.
+
+### `POST /student/lessons/:lessonId/video-checkpoints/:checkpointId/attempts`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Reuse content/answer validation từ quiz/test khi phù hợp.
+- Lưu attempt idempotent và trả feedback + resume position.
+
+### `GET /student/lessons/:lessonId/video-search`
+
+Role: `STUDENT`.
+
+Query:
+
+```txt
+q=<text>
+```
+
+Behavior:
+
+- Hybrid/semantic search chỉ trong lesson đang có quyền.
+- Trả chapter, snippet, `playbackSeconds` và score đã normalize.
+
+### `POST /student/lessons/:lessonId/video-context-actions`
+
+Role: `STUDENT`.
+
+Body định hướng:
+
+```json
+{
+  "action": "ASK_THIS_MOMENT",
+  "playbackSeconds": 42,
+  "question": "Vì sao bước này đổi dấu?"
+}
+```
+
+Behavior:
+
+- `action` gồm `ASK_THIS_MOMENT` hoặc `I_DONT_UNDERSTAND`.
+- Backend resolve chapter/transcript/RAG context từ lesson + timestamp.
+- Response theo cache/job contract AI, có rate limit/budget guard.
+
+### Admin analytics
+
+`M15.8` cần endpoint admin aggregate theo lesson/chapter/time bucket. Contract cụ thể chỉ chốt khi có schema/retention/privacy threshold; không trả raw surveillance log từng student.
+
+Error codes dự kiến:
+
+```txt
+VIDEO_TIMELINE_VERSION_MISMATCH
+VIDEO_SESSION_NOT_FOUND
+VIDEO_INTERVAL_INVALID
+VIDEO_TRANSCRIPT_UNAVAILABLE
+VIDEO_CHECKPOINT_NOT_FOUND
+VIDEO_CONTEXT_UNAVAILABLE
+```
+
+---

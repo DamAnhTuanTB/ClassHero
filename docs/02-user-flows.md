@@ -141,6 +141,37 @@ Acceptance Criteria:
 
 ---
 
+## 5.1. Admin lấy và duyệt bản chép lời video
+
+Actor: Admin.
+
+Các bước:
+
+1. Admin mở màn chi tiết một buổi học có video YouTube.
+2. Admin mở panel `Bản chép lời video` cạnh khu vực cấu hình video và bấm `Lấy transcript từ YouTube`.
+3. Backend thử lấy toàn bộ caption công khai theo trình tự thời gian; ưu tiên tiếng Việt, nếu không có thì dùng ngôn ngữ công khai phù hợp đầu tiên.
+4. Backend đọc cấu hình player hiện tại, chỉ giữ các đoạn có timestamp nguồn nằm từ `startTimeInSeconds` đến `videoDuration - endTimeCutInSeconds`, rồi trừ `startTimeInSeconds` để ánh xạ về trục phát bắt đầu từ `0:00`. Nếu custom player bị tắt, giữ toàn bộ video và offset bằng `0`.
+5. Backend giữ nguyên từng cue caption mà YouTube trả về: `time = offset` và `endTime = offset + duration`, sau đó ánh xạ cả hai về trục phát sau cắt. Không chia lại text theo khoảng thời gian tự đặt.
+6. UI chỉ đưa kết quả vào form nháp, chèn header chapter kèm mốc thời gian trước đúng cụm transcript và chưa tự động ghi đè dữ liệu lesson.
+7. Khi video phát hoặc được tua, UI chọn cue có khoảng timestamp gốc `[time, endTime)` đang chứa thời gian hiện tại, làm nổi bật đoạn đó và tự cuộn bên trong danh sách để giữ đoạn active trong vùng nhìn.
+8. Admin tìm kiếm, duyệt, sửa mốc thời gian hoặc nội dung từng đoạn; có thể bấm action phát của một đoạn để player cộng lại phần cắt đầu, tua tới đúng timestamp nguồn và phát video.
+9. Admin bấm lưu; frontend cộng lại `startTimeInSeconds` để PATCH transcript theo timestamp nguồn ổn định.
+
+Acceptance Criteria:
+
+- Chỉ hỗ trợ best-effort cho video YouTube có caption công khai; không chạy speech-to-text thay thế trong task này.
+- Không có caption hoặc YouTube từ chối truy cập phải trả lỗi thân thiện và không ảnh hưởng phát video hay transcript đã lưu.
+- Transcript được sắp xếp theo mốc thời gian tăng dần; mỗi đoạn có thời gian không âm và nội dung không rỗng.
+- Transcript chỉ chứa caption thuộc khoảng video học viên thực sự được xem; timestamp trên form thuộc trục phát sau cắt, trong đó đoạn đầu bắt đầu tại `0:00`, còn dữ liệu lưu giữ timestamp nguồn để ánh xạ lại nếu cấu hình cắt thay đổi.
+- Transcript lấy mới giữ nguyên ranh giới cue do YouTube cung cấp; độ dài mỗi đoạn có thể khác nhau. Timestamp được giữ tối đa 3 chữ số thập phân để action phát không làm tròn sai điểm bắt đầu.
+- Header chapter hiển thị tên và timestamp trên cùng trục phát sau cắt với transcript.
+- Action phát của từng đoạn chỉ khả dụng khi timestamp hợp lệ; khi bấm, player ánh xạ mốc sau cắt về timestamp nguồn, được đưa vào vùng nhìn và phát từ mốc tương ứng.
+- Player chỉ thông báo thời gian qua listener nhẹ; panel chỉ đổi state khi chuyển sang đoạn transcript khác. Đoạn active có trạng thái `Đang phát`; auto-scroll chỉ tác động container transcript và tạm dừng khi admin đang tìm kiếm.
+- Nếu cue YouTube chồng thời gian, UI ưu tiên cue có timestamp bắt đầu mới nhất đã tới thay vì giữ cue cũ đến hết `duration`; mỗi thời điểm chỉ có một đoạn transcript active.
+- Chỉ admin được lấy và lưu transcript.
+
+---
+
 ## 6. Admin upload tài liệu/PDF cho buổi học
 
 Actor: Admin.
@@ -309,6 +340,37 @@ Acceptance Criteria:
 - Trước ngày mở bài thi, student chưa được làm bài kiểm tra.
 - Student chỉ thấy comment riêng của chính mình.
 - Ghi chú riêng chỉ thuộc student đó.
+
+---
+
+## 11.1. Học sinh học video thông minh
+
+Actor: Student.
+
+Tiền điều kiện:
+
+- Student có quyền truy cập lesson.
+- Video lesson phát được; transcript/chapter là optional.
+- Luồng lesson/quiz/test/completion ở `M7.1-M7.5` đã sẵn sàng.
+
+Các bước:
+
+1. Student mở lesson; backend trả vị trí gần nhất, watched percent và optional chapter mastery.
+2. Nếu có lịch sử, UI cho chọn `Tiếp tục từ ...` hoặc `Xem lại từ đầu`.
+3. Khi video chạy, client mở playback session, gửi heartbeat nhẹ theo chu kỳ và flush khoảng đã xem khi pause, seek, đổi chapter, kết thúc hoặc rời trang.
+4. Student có thể tạo note theo timestamp, bấm note để quay lại mốc, làm checkpoint hoặc chọn `Hỏi đoạn này`/`Em chưa hiểu`.
+5. Context AI gồm timestamp hiện tại, chapter, một cửa sổ transcript lân cận và retrieval của đúng lesson; thiếu transcript thì fallback rõ ràng.
+6. Hệ thống cập nhật watched intervals/mastery và đề xuất chapter/đoạn nên ôn lại bằng nhiều tín hiệu.
+7. Student có thể tìm theo ý nghĩa trong transcript, bấm kết quả để phát từ đúng timestamp, hoặc bỏ qua recommendation.
+
+Acceptance Criteria:
+
+- Tua thẳng tới cuối không làm watched percent thành 100%.
+- Resume, note, checkpoint, search result và AI source đều dùng timeline sau cắt mà học sinh nhìn thấy.
+- Video vẫn dùng được khi không có transcript.
+- Chapter mastery không tự đánh dấu completed; completed vẫn theo `M7.5`.
+- Auto tracking không gửi request theo từng frame và không làm player/input bị giật.
+- Difficulty không được suy luận từ một event đơn lẻ; admin analytics chỉ hiển thị dữ liệu tổng hợp có ngưỡng riêng tư.
 
 ---
 

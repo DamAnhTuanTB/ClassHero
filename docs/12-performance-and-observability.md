@@ -152,6 +152,18 @@ Rules:
 
 ---
 
+## 6.1. Smart video tracking performance (`M15`)
+
+- Không gửi API theo từng `timeupdate`/frame của player.
+- Heartbeat mặc định theo batch khoảng 10-15 giây; flush thêm khi pause, seek, đổi chapter, ended hoặc `pagehide`.
+- Client chỉ cập nhật React state khi active transcript/checkpoint/chapter thực sự thay đổi; current time liên tục ưu tiên ref/store tách biệt để không re-render form/transcript lớn.
+- Heartbeat phải có idempotency key, payload giới hạn và retry có backoff; server merge watched intervals thay vì cộng dồn mù.
+- Analytics/difficulty dùng aggregate theo time bucket. Không query hoặc trả raw event stream trên lesson page.
+- Semantic search/AI context lazy-load khi học sinh mở panel; không đưa embedding/search/AI bundle vào đường tải player ban đầu nếu chưa dùng.
+- Đo riêng player start latency, heartbeat error rate, interval merge duration, smart-resume latency và contextual AI latency.
+
+---
+
 ## 7. AI/RAG performance
 
 AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:

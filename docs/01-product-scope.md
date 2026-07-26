@@ -43,6 +43,7 @@ MVP tập trung vào việc giúp:
 - Có nhiều bộ quiz/flashcard/bài thi trong một buổi học.
 - Có kho bộ dự phòng do AI tạo.
 - Có AI tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải chi tiết và chat theo buổi học.
+- Có học video thông minh theo `M15`: lưu khoảng đã xem/tiếp tục học, ghi chú theo timestamp, checkpoint, hỏi AI theo đoạn, tìm trong video, chapter mastery và đề xuất ôn tập. Đây là scope mở rộng được ưu tiên sau khi luồng lesson/quiz/test phía học sinh hoàn tất.
 - Có report lỗi ở cấp item lẻ.
 - Có quản lý nội dung AI chưa duyệt.
 - Có comment/ý kiến riêng dưới video cho từng học sinh.
@@ -108,6 +109,9 @@ Học sinh có quyền:
 - Học thử buổi học cụ thể nếu admin bật cho buổi đó.
 - Vào buổi học đã mở quyền truy cập.
 - Xem video bài giảng.
+- Tiếp tục video từ vị trí gần nhất và xem tiến độ dựa trên phần thực sự đã xem.
+- Ghi chú, tìm kiếm, làm checkpoint hoặc hỏi AI theo timestamp/chapter của video khi lesson hỗ trợ.
+- Xem chapter cần ôn lại và lý do đề xuất; có quyền bỏ qua đề xuất.
 - Xem phiếu tài liệu trước buổi học.
 - Xem tóm tắt bài học.
 - Làm quiz.
@@ -208,6 +212,7 @@ Mỗi buổi học gồm:
 - Phiếu tài liệu trước buổi học.
 - Ngày/giờ diễn ra hoặc ngày/giờ mở bài thi.
 - Link video bài giảng YouTube hoặc Google Drive.
+- Bản chép lời video tùy chọn theo từng mốc thời gian. Với video YouTube, admin có thể thử lấy caption công khai; hệ thống chỉ giữ phần nằm trong khoảng phát thực tế, ánh xạ timestamp về trục phát bắt đầu từ `0:00` sau khi cắt đầu/đuôi, gom các caption ngắn thành cụm dễ đọc, không gom qua ranh giới chapter, hiển thị tên/thời gian chapter, làm nổi bật và tự cuộn theo đoạn đang phát, đồng thời cho phát video từ từng mốc transcript trước khi admin duyệt/chỉnh sửa và lưu.
 - PDF tài liệu sách giáo khoa/tài liệu bài học.
 - Tóm tắt bài học.
 - Quiz.
@@ -232,6 +237,19 @@ Nhưng chưa được làm bài kiểm tra.
 - Học sinh đạt điểm bài kiểm tra từ 7/10 trở lên.
 
 ASSUMPTION: Nếu một buổi học có nhiều bộ đề/bài kiểm tra, kết quả dùng để xét hoàn thành là kết quả tốt nhất của học sinh trong buổi học.
+
+### 4.4.1. Học video thông minh
+
+Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi `M7.1-M7.5`.
+
+- Hệ thống lưu playback session, vị trí gần nhất và các khoảng video thực sự đã xem theo timeline sau khi cắt đầu/đuôi.
+- Tua tới cuối không được tính như đã xem toàn bộ.
+- Học sinh có thể tạo ghi chú theo timestamp, bấm để quay lại đoạn video, làm checkpoint trong video và xem chapter mastery.
+- `Hỏi đoạn này`/`Em chưa hiểu` dùng chapter, transcript lân cận và RAG của đúng lesson; không lấy context lesson khác.
+- Tóm tắt chapter, flashcard từ video, semantic search và đề xuất ôn tập phải giữ liên kết timestamp nguồn.
+- Difficulty/recommendation phải kết hợp nhiều tín hiệu như watched interval, replay, checkpoint, quiz/test, flashcard và action chủ động; không kết luận từ một lần pause/seek.
+- Admin chỉ xem analytics video tổng hợp có ngưỡng riêng tư, không dùng event thô để giám sát học sinh.
+- Watched percent và chapter mastery là tín hiệu hỗ trợ, không thay thế điều kiện hoàn thành lesson 7/10 ở MVP.
 
 ### 4.5. Quiz
 
