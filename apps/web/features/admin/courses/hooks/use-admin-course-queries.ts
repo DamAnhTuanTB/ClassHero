@@ -61,7 +61,7 @@ export function useAdminLearningPathQuery(
   return useQuery({
     queryKey: adminCourseQueryKeys.learningPath(session?.user.id, pathId),
     queryFn: () => getAdminLearningPath(pathId, session?.accessToken ?? ""),
-    enabled: isAuthHydrated && Boolean(session?.accessToken),
+    enabled: isAuthHydrated && Boolean(session?.accessToken) && Boolean(pathId),
     initialData,
   });
 }

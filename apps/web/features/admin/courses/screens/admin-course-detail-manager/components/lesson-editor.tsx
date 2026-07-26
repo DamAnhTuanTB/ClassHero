@@ -12,7 +12,7 @@ import {
   Video,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useFieldArray, type UseFormReturn } from "react-hook-form";
+import type { UseFormReturn } from "react-hook-form";
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -25,9 +25,7 @@ import {
 } from "@/features/admin/courses/admin-courses-data";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
-import { LessonSupplementDocumentsSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-supplement-documents-section";
-import { LessonHomeworkDocumentSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-homework-document-section";
-import { LessonSourceRangeSection } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-source-range-section";
+import { LessonDocumentsFields } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-documents-fields";
 import type {
   AdminSourceDocumentApi,
   AdminSourceDocumentPageApi,
@@ -54,14 +52,6 @@ export function LessonEditor({
   onSubmit: (values: LessonFormValues) => void | Promise<void>;
 }) {
   const lessonType = form.watch("lessonType");
-  const documentFieldArray = useFieldArray({
-    control: form.control,
-    name: "referenceDocuments",
-  });
-  const extractionFieldArray = useFieldArray({
-    control: form.control,
-    name: "sourceDocumentExtractions",
-  });
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
     form.getValues("sourceDocumentExtractions").forEach((_, index) => {
@@ -156,26 +146,12 @@ export function LessonEditor({
               />
             ) : null}
           </div>
-          <LessonSourceRangeSection
+          <LessonDocumentsFields
             disabled={disabled}
             form={form}
             isSaving={isSaving}
             sourceDocuments={sourceDocuments}
             sourcePagesByDocumentId={sourcePagesByDocumentId}
-            extractionFieldArray={extractionFieldArray}
-            documentFieldArray={documentFieldArray}
-          />
-          <LessonSupplementDocumentsSection
-            disabled={disabled}
-            form={form}
-            isSaving={isSaving}
-            documentFieldArray={documentFieldArray}
-          />
-          <LessonHomeworkDocumentSection
-            disabled={disabled}
-            form={form}
-            isSaving={isSaving}
-            documentFieldArray={documentFieldArray}
           />
           <div>
             <FieldLabel

@@ -15,12 +15,12 @@ import {
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 import {
   getLessonSourceExtractionFormValues,
-  getPdfPageFromPrintedPage,
   getSourceDocumentRangeReadiness,
   readRecord,
 } from "@/features/admin/courses/admin-course-documents-utils";
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
+import { prepareLessonFormValuesForSubmit } from "@/features/admin/courses/utils/prepare-lesson-form-values";
 
 export function LessonEditorDialog({
   defaultOrderIndex,
@@ -44,7 +44,7 @@ export function LessonEditorDialog({
   onSubmit: (
     values: LessonFormValues,
     documentsManager: ReturnType<typeof useAdminCourseDocumentsManager>,
-  ) => void | Promise<void>;
+  ) => unknown | Promise<unknown>;
 }) {
   const documentsManager = useAdminCourseDocumentsManager(learningPath, {
     loadAllSourcePages: isOpen,
@@ -224,77 +224,16 @@ export function LessonEditorDialog({
 
   async function submit(values: LessonFormValues) {
     try {
-      let hasInvalidExtraction = false;
-      values.sourceDocumentExtractions.forEach((extraction, index) => {
-        const pageStart = extraction.pageStart?.trim() ?? "";
-        const pageEnd = extraction.pageEnd?.trim() ?? "";
-        if (!extraction.sourceDocumentId) {
-          form.setError(`sourceDocumentExtractions.${index}.sourceDocumentId`, {
-            type: "manual",
-            message: "Chọn tài liệu nguồn",
-          });
-          hasInvalidExtraction = true;
-        }
-        if (!pageStart) {
-          form.setError(`sourceDocumentExtractions.${index}.pageStart`, {
-            type: "manual",
-            message: "Nhập trang bắt đầu",
-          });
-          hasInvalidExtraction = true;
-        }
-        if (!pageEnd) {
-          form.setError(`sourceDocumentExtractions.${index}.pageEnd`, {
-            type: "manual",
-            message: "Nhập trang kết thúc",
-          });
-          hasInvalidExtraction = true;
-        }
-      });
-      if (hasInvalidExtraction) {
+      const preparedValues = prepareLessonFormValuesForSubmit(
+        form,
+        values,
+        documentsManager.sourcePagesByDocumentId,
+      );
+      if (!preparedValues) {
         return;
       }
 
-      for (const [index, extraction] of values.sourceDocumentExtractions.entries()) {
-        const pageStart = extraction.pageStart ?? "";
-        const pageEnd = extraction.pageEnd ?? "";
-        const sourcePages =
-          documentsManager.sourcePagesByDocumentId[extraction.sourceDocumentId] ?? [];
-        const pdfPageStart = pageStart
-          ? getPdfPageFromPrintedPage(pageStart, sourcePages)
-          : null;
-        const pdfPageEnd = pageEnd
-          ? getPdfPageFromPrintedPage(pageEnd, sourcePages)
-          : null;
-
-        if (pageStart && !pdfPageStart) {
-          form.setError(`sourceDocumentExtractions.${index}.pageStart`, {
-            type: "manual",
-            message: "Trang bắt đầu không hợp lệ",
-          });
-          return;
-        }
-
-        if (pageEnd && !pdfPageEnd) {
-          form.setError(`sourceDocumentExtractions.${index}.pageEnd`, {
-            type: "manual",
-            message: "Trang kết thúc không hợp lệ",
-          });
-          return;
-        }
-
-        if (pdfPageStart && pdfPageEnd && pdfPageStart > pdfPageEnd) {
-          form.setError(`sourceDocumentExtractions.${index}.pageStart`, {
-            type: "manual",
-            message: "Trang bắt đầu không được lớn hơn trang kết thúc",
-          });
-          return;
-        }
-
-        extraction.pageStart = pdfPageStart ? String(pdfPageStart) : "";
-        extraction.pageEnd = pdfPageEnd ? String(pdfPageEnd) : "";
-      }
-
-      await onSubmit(values, documentsManager);
+      await onSubmit(preparedValues, documentsManager);
     } catch (error) {
       if (error instanceof Error && error.message === "DUPLICATED_LESSON_TITLE") {
         form.setError("title", {

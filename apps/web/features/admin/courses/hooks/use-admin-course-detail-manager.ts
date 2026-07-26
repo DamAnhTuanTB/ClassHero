@@ -24,9 +24,7 @@ import {
   getLessonReferenceDocumentUploads,
   resolveFoundationDocumentSortOrder,
 } from "@/features/admin/courses/admin-courses-utils";
-import {
-  readRecord,
-} from "@/features/admin/courses/admin-course-documents-utils";
+import { readRecord } from "@/features/admin/courses/admin-course-documents-utils";
 import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
@@ -266,22 +264,33 @@ export function useAdminCourseDetailManager(
       documentsByLessonId: Record<string, AdminLessonDocumentApi[]>;
       actions: { reloadDocuments: () => void };
     },
-  ) {
-    if (!path || !selectedChapterId) {
-      return;
+    options: {
+      chapterId?: string;
+      closeEditor?: boolean;
+      lessonId?: string;
+    } = {},
+  ): Promise<boolean> {
+    const explicitLessonMatch = options.lessonId
+      ? findLessonMatch(path, options.lessonId)
+      : null;
+    const targetChapterId =
+      options.chapterId ?? explicitLessonMatch?.chapter.id ?? selectedChapterId;
+    const targetLesson = explicitLessonMatch?.lesson ?? selectedLesson;
+    const targetEditorMode = options.lessonId ? "edit" : lessonEditorMode;
+
+    if (!path || !targetChapterId) {
+      return false;
     }
 
-    const targetChapter = path.chapters.find(
-      (chapter) => chapter.id === selectedChapterId,
-    );
+    const targetChapter = path.chapters.find((chapter) => chapter.id === targetChapterId);
     if (!targetChapter) {
-      return;
+      return false;
     }
 
     const normalizedTitle = normalizeLessonTitleForComparison(values.title);
     const duplicatedTitle = targetChapter.lessons.some(
       (lesson) =>
-        lesson.id !== selectedLesson?.id &&
+        lesson.id !== targetLesson?.id &&
         normalizeLessonTitleForComparison(lesson.title) === normalizedTitle,
     );
 
@@ -292,7 +301,7 @@ export function useAdminCourseDetailManager(
     const duplicatedOrder = targetChapter.lessons.some(
       (lesson) =>
         lesson.orderIndex === values.orderIndex &&
-        (lessonEditorMode === "create" || lesson.id !== selectedLesson?.id),
+        (targetEditorMode === "create" || lesson.id !== targetLesson?.id),
     );
 
     if (duplicatedOrder) {
@@ -302,9 +311,9 @@ export function useAdminCourseDetailManager(
     try {
       let referenceUploadError: unknown = null;
 
-      if (lessonEditorMode === "create") {
+      if (targetEditorMode === "create") {
         const createdLesson = await mutations.createLesson.mutateAsync({
-          chapterId: selectedChapterId,
+          chapterId: targetChapterId,
           values,
         });
 
@@ -313,20 +322,19 @@ export function useAdminCourseDetailManager(
         } catch (error) {
           referenceUploadError = error;
         }
-      } else if (selectedLesson) {
+      } else if (targetLesson) {
         await mutations.updateLesson.mutateAsync({
-          lessonId: selectedLesson.id,
+          lessonId: targetLesson.id,
           values,
         });
 
         try {
           const originalDocuments =
-            documentsManager.documentsByLessonId[selectedLesson.id]?.filter((doc) => {
+            documentsManager.documentsByLessonId[targetLesson.id]?.filter((doc) => {
               const isRangeDocument =
                 doc.kind === "PRIMARY_FROM_SOURCE" &&
                 (Boolean(doc.sourceDocumentId) ||
-                  readRecord(doc.metadataJson)?.source ===
-                    "source_document_page_range");
+                  readRecord(doc.metadataJson)?.source === "source_document_page_range");
               return !isRangeDocument;
             }) || [];
 
@@ -339,11 +347,7 @@ export function useAdminCourseDetailManager(
           );
 
           for (const doc of deletedDocs) {
-            await deleteAdminLessonDocument(
-              selectedLesson.id,
-              doc.id,
-              accessToken,
-            );
+            await deleteAdminLessonDocument(targetLesson.id, doc.id, accessToken);
           }
 
           const existingDocsToUpdate = values.referenceDocuments
@@ -379,7 +383,7 @@ export function useAdminCourseDetailManager(
 
           for (const docUpdate of existingDocsToUpdate) {
             await updateAdminLessonDocument(
-              selectedLesson.id,
+              targetLesson.id,
               docUpdate.id,
               {
                 title: docUpdate.title,
@@ -390,7 +394,7 @@ export function useAdminCourseDetailManager(
             );
           }
 
-          await uploadLessonReferenceDocuments(selectedLesson.id, values);
+          await uploadLessonReferenceDocuments(targetLesson.id, values);
         } catch (error) {
           referenceUploadError = error;
         }
@@ -401,20 +405,26 @@ export function useAdminCourseDetailManager(
       // Ensure documents are re-fetched to reflect deleted/added supplements
       documentsManager.actions.reloadDocuments();
       if (referenceUploadError) {
-        toast.warning("Đã thêm buổi học", {
-          description: getErrorMessage(referenceUploadError),
-        });
+        toast.warning(
+          targetEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
+          {
+            description: getErrorMessage(referenceUploadError),
+          },
+        );
       } else {
         toast.success(
-          lessonEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
+          targetEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
           {
             description: "Danh sách buổi học trong chương đã được cập nhật.",
           },
         );
       }
-      setLessonEditorMode("create");
-      setSelectedLessonId(null);
-      setIsLessonEditorOpen(false);
+      if (options.closeEditor !== false) {
+        setLessonEditorMode("create");
+        setSelectedLessonId(null);
+        setIsLessonEditorOpen(false);
+      }
+      return true;
     } catch (error) {
       if (isLessonTitleConflictError(error)) {
         throw new Error("DUPLICATED_LESSON_TITLE", { cause: error });
@@ -427,6 +437,7 @@ export function useAdminCourseDetailManager(
       toast.error("Chưa lưu được buổi học", {
         description: getErrorMessage(error),
       });
+      return false;
     }
   }
 

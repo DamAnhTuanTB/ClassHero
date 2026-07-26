@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLesson } from "../../hooks/use-admin-lesson";
@@ -14,6 +15,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Layers3,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -36,6 +38,17 @@ import {
   adminSidebarCollapsedStorageKey,
 } from "@/lib/sidebar-collapse-state";
 
+const LessonDetailEditorDialog = dynamic(() =>
+  import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
+    (module) => module.LessonDetailEditorDialog,
+  ),
+);
+const LessonDocumentsTab = dynamic(() =>
+  import("@/features/admin/lessons/components/lesson-documents-tab").then(
+    (module) => module.LessonDocumentsTab,
+  ),
+);
+
 interface AdminLessonDetailManagerProps {
   lessonId: string;
 }
@@ -50,8 +63,9 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
 
 export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerProps) {
   const router = useRouter();
-  const { data: lesson, isLoading, error } = useAdminLesson(lessonId);
+  const { data: lesson, isLoading, error, refetch } = useAdminLesson(lessonId);
   const [activeTab, setActiveTab] = useState<TabKey>("quiz");
+  const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
   const [previewSettings, setPreviewSettings] = useState<CustomVideoSettings | null>(
     null,
   );
@@ -95,6 +109,10 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
     }
     return didStart;
   }, []);
+
+  const handleLessonSaved = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
@@ -218,8 +236,8 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <h1 className="text-2xl font-bold tracking-tight text-[var(--theme-text-strong)]">
                     {lesson.title}
                   </h1>
@@ -232,6 +250,15 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                     )}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLessonEditorOpen(true)}
+                  disabled={!lesson.learningPathId}
+                  className="theme-button-primary-subtle inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                  Chỉnh sửa buổi học
+                </button>
               </div>
             </div>
             <div className="w-full flex flex-col gap-8">
@@ -473,11 +500,15 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
               </div>
 
               <div className="bg-[var(--theme-bg-subtle)] border border-[var(--theme-border)] rounded-xl min-h-[400px]">
-                {activeTab === "documents" && (
-                  <div className="p-6 text-[var(--theme-text-muted)] text-sm font-medium">
-                    Tính năng tài liệu đang được phát triển.
-                  </div>
-                )}
+                {activeTab === "documents" &&
+                !isLessonEditorOpen &&
+                lesson.learningPathId ? (
+                  <LessonDocumentsTab
+                    lessonId={lessonId}
+                    learningPathId={lesson.learningPathId}
+                    onSaved={handleLessonSaved}
+                  />
+                ) : null}
 
                 {activeTab === "quiz" && (
                   <div className="p-6 h-full">
@@ -501,6 +532,16 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
           </div>
         </section>
       </div>
+
+      {isLessonEditorOpen && lesson.learningPathId ? (
+        <LessonDetailEditorDialog
+          isOpen={isLessonEditorOpen}
+          lessonId={lessonId}
+          learningPathId={lesson.learningPathId}
+          onClose={() => setIsLessonEditorOpen(false)}
+          onSaved={handleLessonSaved}
+        />
+      ) : null}
     </main>
   );
 }
