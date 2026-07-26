@@ -25,6 +25,7 @@ import { statusLabels, statusStyles } from "@/features/admin/courses/admin-cours
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
 import { CustomYoutubePlayer } from "@/components/shared/custom-youtube-player";
 import { LessonVideoSettingsForm } from "../../components/lesson-video-settings-form";
+import { LessonVideoChaptersForm } from "../../components/lesson-video-chapters-form";
 import { useThemeStore } from "@/lib/theme-store";
 import {
   adminSidebarCollapsedDatasetKey,
@@ -47,6 +48,7 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
   const router = useRouter();
   const { data: lesson, isLoading, error } = useAdminLesson(lessonId);
   const [activeTab, setActiveTab] = useState<TabKey>("quiz");
+  const [previewSettings, setPreviewSettings] = useState<any>(null);
 
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
@@ -171,7 +173,7 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                         <div className="w-full">
                           <div className="w-full aspect-video sm:rounded-lg sm:border border-[var(--theme-border)] bg-black flex items-center justify-center relative group">
                             {lesson.videoUrl.includes("youtube.com") || lesson.videoUrl.includes("youtu.be") ? (
-                              <CustomYoutubePlayer videoUrl={lesson.videoUrl} settings={lesson.customVideoSettings as any} title={lesson.title} />
+                              <CustomYoutubePlayer videoUrl={lesson.videoUrl} settings={(previewSettings || lesson.customVideoSettings) as any} title={lesson.title} />
                             ) : (
                               <a href={lesson.videoUrl} target="_blank" rel="noreferrer" className="text-white hover:text-white/80 hover:underline flex flex-col items-center gap-3">
                                 <div className="p-4 rounded-full bg-white/10 transition-colors group-hover:bg-white/20">
@@ -188,6 +190,12 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                               <LessonVideoSettingsForm 
                                 lessonId={lessonId} 
                                 initialSettings={lesson.customVideoSettings as any} 
+                              />
+                              <LessonVideoChaptersForm
+                                lessonId={lessonId}
+                                videoUrl={lesson.videoUrl}
+                                initialSettings={lesson.customVideoSettings as any}
+                                onPreviewSettingsChange={setPreviewSettings}
                               />
                             </div>
                           )}

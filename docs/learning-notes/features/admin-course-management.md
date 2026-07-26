@@ -79,6 +79,12 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - Lỗi: bấm `Sửa` buổi học rồi đóng modal ngay làm card buổi học vẫn có nền xanh như đang focus.
 - Nguyên nhân: hook dùng `selectedLessonId` vừa để chọn lesson đưa vào modal edit, vừa để tô selected state trên card. Khi đóng modal không lưu, state này không được dọn nên card vẫn nhận class nền primary.
 - Cách tránh: state dùng tạm cho editor phải được dọn khi cancel/close modal. Chỉ giữ selected/highlight sau các thao tác có chủ ý như tạo mới, lưu thành công hoặc reorder nếu UI thật sự cần báo item vừa tác động.
+- Lỗi: form hiển thị chapters hợp lệ nhưng PATCH lesson trả `400 VALIDATION_ERROR` với message chung "Dữ liệu không hợp lệ".
+- Nguyên nhân: frontend đã thêm `customVideoSettings.chapters` vào payload nhưng DTO nested của backend chưa khai báo field này; global `ValidationPipe` dùng `forbidNonWhitelisted` nên từ chối field lạ trước khi service chạy.
+- Cách tránh: khi thêm field persisted vào JSON/form, phải cập nhật đồng thời type/schema frontend, DTO nested backend, API contract và test validation bằng payload thật. Không nới global whitelist để chữa triệu chứng; khai báo đúng field được phép và validation tối thiểu theo nghiệp vụ.
+- Lỗi: bấm bắt đầu video rồi màn hình loading giữ rất lâu dù nút đã nhận click.
+- Nguyên nhân: UI cho phép gọi YouTube `playVideo()` khi object player đã có method nhưng provider chưa phát `onReady`; đồng thời gọi `seekTo()` ngay trước lần phát đầu tạo thêm một vòng buffer dù `playerVars.start` đã định vị sẵn.
+- Cách tránh: phân biệt trạng thái provider `ready`, ý định người dùng `start requested` và xác nhận `playing`. Chỉ nhận cú bấm sau `onReady`, không dùng việc method tồn tại làm bằng chứng player đã sẵn sàng và tránh seek dư trước lần phát đầu. Trong khoảng `start requested -> playing`, giữ một loading state liên tục trên màn bắt đầu; chỉ hiện controls khi provider xác nhận `PLAYING` để UI không mô tả sai trạng thái thực tế.
 
 ## File quan trọng
 

@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { LessonType, PublishStatus } from "@prisma/client";
 import {
@@ -22,6 +22,19 @@ import {
   LessonSourceDocumentExtractionDto,
   LessonSourceDocumentPageRangeDto,
 } from "#api/modules/learning-paths/dto/create-lesson.dto";
+
+export class VideoChapterDto {
+  @ApiProperty({ example: 69, minimum: 0 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  time!: number;
+
+  @ApiProperty({ example: "1. Đơn thức và đơn thức thu gọn" })
+  @IsString()
+  @MinLength(1)
+  title!: string;
+}
 
 export class CustomVideoSettingsDto {
   @ApiPropertyOptional()
@@ -78,6 +91,13 @@ export class CustomVideoSettingsDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsBoolean()
   hasWatermark?: boolean;
+
+  @ApiPropertyOptional({ type: [VideoChapterDto] })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VideoChapterDto)
+  chapters?: VideoChapterDto[];
 }
 
 export class UpdateLessonDto {

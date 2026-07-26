@@ -384,9 +384,24 @@ Role: `ADMIN`.
 
 Body: partial của body create. `sourceDocumentExtractions` là collection đầy đủ sau chỉnh sửa: gửi `[]` để xóa tất cả khối, hoặc bỏ field khi chỉ sửa metadata lesson. Item hiện có gửi thêm `id` của page range để backend reconcile ổn định.
 
+`customVideoSettings.chapters` là danh sách mốc thời gian optional của video:
+
+```json
+{
+  "customVideoSettings": {
+    "chapters": [
+      { "time": 0, "title": "Giới thiệu" },
+      { "time": 69, "title": "1. Đơn thức và đơn thức thu gọn" }
+    ]
+  }
+}
+```
+
+Mỗi mốc cần `time` là số giây nguyên không âm và `title` không rỗng. Có thể bỏ field `chapters` khi chỉ sửa cài đặt player khác.
+
 Behavior:
 
-- Cho phép đổi `orderIndex`, metadata, `lessonType`, `liveUrl`, thời điểm mở bài thi, video URL, completion score, `trialEnabled` và `status`.
+- Cho phép đổi `orderIndex`, metadata, `lessonType`, `liveUrl`, thời điểm mở bài thi, video URL, custom video settings/chapters, completion score, `trialEnabled` và `status`.
 - `shortDescription`, `liveUrl`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
 - Khi đổi `lessonType` về `BASIC`, backend clear `liveUrl` kể cả request không gửi lại field này.
 - Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng chapter.

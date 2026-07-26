@@ -15,6 +15,7 @@ export interface CustomVideoSettings {
   letterboxBottomPercentage: number;
   letterboxLeftPercentage: number;
   hasWatermark: boolean;
+  chapters?: { time: number; title: string }[];
   
   // Backward compatibility
   hasLetterbox?: boolean;
@@ -35,6 +36,11 @@ export const DEFAULT_CUSTOM_VIDEO_SETTINGS: CustomVideoSettings = {
   hasWatermark: true,
 };
 
+export interface VideoChapter {
+  time: number; // Thời gian tính bằng giây
+  title: string;
+}
+
 interface CustomYoutubePlayerProps {
   videoUrl: string;
   settings?: CustomVideoSettings | null;
@@ -50,6 +56,7 @@ declare global {
 
 export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutubePlayerProps) {
   const rawSettings = { ...DEFAULT_CUSTOM_VIDEO_SETTINGS, ...settings };
+  const chapters = settings?.chapters || [];
   
   // Xử lý giá trị mặc định của viền đen
   const bottomPercent = settings?.letterboxBottomPercentage ?? rawSettings.letterboxBottomPercentage;
@@ -61,6 +68,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
   const playerNodeRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -78,9 +86,14 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   const [showCaptions, setShowCaptions] = useState(false);
   const [windowSize, setWindowSize] = useState({ w: 0, h: 0 });
   const [isPortrait, setIsPortrait] = useState(false);
+  const [hoverPercent, setHoverPercent] = useState<number | null>(null);
+
   const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const durationRef = useRef<number>(0);
   const isFirstPlayStartedRef = useRef<boolean>(false);
+  const isMobileTimelineDraggingRef = useRef(false);
+
+  const isPhoneViewport = windowSize.w > 0 && windowSize.w < 640;
 
   const hideOverlayDelayed = () => {
     if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
@@ -268,6 +281,10 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
             playerRef.current.pauseVideo();
           }
         },
+        onError: () => {
+          setIsStarting(false);
+          setIsPlaying(false);
+        },
       },
     });
   };
@@ -295,6 +312,50 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
     };
   }, [isPlaying]);
 
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (!progressBarRef.current || !playerRef.current || duration === 0) return;
+
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const rawPosition = (e.clientX - rect.left) / rect.width;
+    const pos = Math.max(0, Math.min(1, rawPosition));
+    const newTime = pos * duration;
+    playerRef.current.seekTo(currentSettings.startTimeInSeconds + newTime, true);
+    setCurrentTime(newTime);
+  };
+
+  const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isPhoneViewport || !progressBarRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    setHoverPercent(Math.max(0, Math.min(1, pos)) * 100);
+  };
+
+  const handleProgressTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
+    isMobileTimelineDraggingRef.current = false;
+
+    if (!isPhoneViewport) {
+      setHoverPercent(Number(e.currentTarget.value));
+    }
+  };
+
+  const handleProgressTouchMove = (e: React.TouchEvent<HTMLInputElement>) => {
+    if (!isPhoneViewport || !progressBarRef.current) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const pos = (touch.clientX - rect.left) / rect.width;
+    isMobileTimelineDraggingRef.current = true;
+    setHoverPercent(Math.max(0, Math.min(1, pos)) * 100);
+  };
+
+  const handleProgressTouchEnd = () => {
+    isMobileTimelineDraggingRef.current = false;
+    setHoverPercent(null);
+  };
+
   const handlePlayPause = () => {
     if (!playerRef.current) return;
     if (isPlaying) {
@@ -305,6 +366,13 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   };
 
   const handleOverlayClick = () => {
+    const hasPreciseHoverPointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    if (hasPreciseHoverPointer) {
+      handlePlayPause();
+      return;
+    }
+
     if (!showOverlay) {
       setShowOverlay(true);
       hideOverlayDelayed();
@@ -314,35 +382,12 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   };
 
   const handleStart = () => {
-    if (isStarting) return;
-    setIsStarting(true);
-    
-    const tryStart = () => {
-      if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
-        setShowOverlay(true);
-        hideOverlayDelayed();
-        playerRef.current.seekTo(currentSettings.startTimeInSeconds, true);
-        playerRef.current.playVideo();
-      } else {
-        setTimeout(tryStart, 100);
-      }
-    };
-    
-    tryStart();
-  };
+    if (isStarting || !isReady || !playerRef.current) return;
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const displayValue = parseFloat(e.target.value);
-    if (!playerRef.current) return;
-    
-    if (isPlaying) {
-      setShowOverlay(true);
-      hideOverlayDelayed();
-    }
-    
-    const actualTime = displayValue + currentSettings.startTimeInSeconds;
-    playerRef.current.seekTo(actualTime, true);
-    setCurrentTime(displayValue);
+    setIsStarting(true);
+    setShowOverlay(true);
+    hideOverlayDelayed();
+    playerRef.current.playVideo();
   };
 
   const handleToggleMute = () => {
@@ -404,9 +449,9 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
   };
 
   const formatTime = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return "0:00";
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
+    const safeSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    const m = Math.floor(safeSeconds / 60);
+    const s = Math.floor(safeSeconds % 60);
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
@@ -469,10 +514,11 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
     );
   }
 
-  const progressPercentage = duration ? (currentTime / duration) * 100 : 0;
+  const progressPercentage = duration
+    ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
+    : 0;
   
   const shouldShowIntro = currentTime < currentSettings.introOverlayDurationInSeconds;
-
   if (currentSettings.isDisabled) {
     const embedUrl = `https://www.youtube.com/embed/${videoId}`;
     return (
@@ -552,21 +598,31 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
       
       {/* Màn hình chờ đen tuyền che toàn bộ ảnh nền mặc định của Youtube */}
       {!isFirstPlayStarted && (
-        <div 
-          className="absolute inset-0 z-30 bg-black flex flex-col items-center justify-center cursor-pointer group/start sm:rounded-lg overflow-hidden"
+        <button
+          type="button"
+          disabled={!isReady || isStarting}
+          className={`absolute inset-0 z-30 bg-black flex flex-col items-center justify-center group/start sm:rounded-lg overflow-hidden ${
+            isReady && !isStarting ? "cursor-pointer" : "cursor-wait"
+          }`}
           onClick={handleStart}
         >
-          {isStarting ? (
-            <div className="w-10 h-10 sm:w-14 sm:h-14 border-4 border-white/20 border-t-[var(--theme-primary)] rounded-full animate-spin mb-2 sm:mb-4"></div>
+          {!isReady || isStarting ? (
+            <div
+              className={`w-10 h-10 sm:w-14 sm:h-14 border-4 border-white/20 border-t-[var(--theme-primary)] rounded-full animate-spin ${
+                isStarting ? "" : "mb-2 sm:mb-4"
+              }`}
+            ></div>
           ) : (
             <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-[var(--theme-primary)] flex items-center justify-center mb-2 sm:mb-4 group-hover/start:scale-110 transition-transform shadow-lg shadow-[var(--theme-primary)]/30">
               <Play className="h-6 w-6 sm:h-10 sm:w-10 text-white fill-current ml-0.5 sm:ml-1" />
             </div>
           )}
-          <span className="text-white/80 font-medium text-sm sm:text-lg">
-            {isStarting ? "Đang kết nối đến Giáo viên..." : "Nhấn để bắt đầu học"}
-          </span>
-        </div>
+          {!isStarting && (
+            <span className="text-white/80 font-medium text-sm sm:text-lg">
+              {isReady ? "Nhấn để bắt đầu học" : "Đang kết nối tới Giáo viên..."}
+            </span>
+          )}
+        </button>
       )}
 
       {/* Màn hình Intro che video trong 10 giây đầu tiên của trục thời gian ảo */}
@@ -585,46 +641,110 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
       ></div>
 
       {/* Dải băng đen che Tiêu đề của Youtube khi Pause */}
-      {showOverlay && (
+      {isFirstPlayStarted && showOverlay && (
         <div className="absolute top-0 left-0 w-full h-[50px] sm:h-[60px] bg-black z-10 flex items-center px-2 sm:px-4 pointer-events-none transition-opacity duration-300">
           <span className="text-white/70 font-semibold text-xs sm:text-sm line-clamp-1">{title || "Video bài giảng"}</span>
         </div>
       )}
 
       {/* Dải băng đen che các icon Share/Watch Later/More Videos của Youtube ở dưới cùng khi Pause */}
-      {showOverlay && (
+      {isFirstPlayStarted && showOverlay && (
         <div className="absolute bottom-0 left-0 w-full h-[45px] sm:h-[60px] bg-black z-10 pointer-events-none transition-opacity duration-300"></div>
       )}
 
       {/* Control bar */}
-      <div className={`absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/80 to-transparent z-50 transition-opacity duration-300 ${(!isPlaying || isStarting || showOverlay) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+      {isFirstPlayStarted && (
+        <div className={`absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black/80 to-transparent z-50 transition-opacity duration-300 ${(!isPlaying || isStarting || showOverlay) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         
         {/* Progress Bar */}
         <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 w-full">
           <span className="text-white text-[11px] sm:text-[13px] font-bold w-9 sm:w-11 text-right">{formatTime(currentTime)}</span>
-          <div className="relative flex-1 flex items-center group/slider h-4 cursor-pointer">
+          <div
+            className="flex-1 relative h-4 sm:h-5 group/slider cursor-pointer flex items-center"
+            ref={progressBarRef}
+            onClick={handleProgressClick}
+            onMouseMove={handleProgressHover}
+            onMouseLeave={() => setHoverPercent(null)}
+          >
+            {/* Input range for mobile touch support (invisible) */}
             <input
               type="range"
               min={0}
-              max={duration || 100}
-              value={currentTime}
-              onChange={handleSeek}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30 m-0 p-0"
+              max={100}
+              value={progressPercentage}
+              onTouchStart={handleProgressTouchStart}
+              onTouchMove={handleProgressTouchMove}
+              onTouchEnd={handleProgressTouchEnd}
+              onTouchCancel={handleProgressTouchEnd}
+              onMouseDown={(e) => {
+                if (!isPhoneViewport) {
+                  setHoverPercent(Number(e.currentTarget.value));
+                }
+              }}
+              onMouseUp={() => setHoverPercent(null)}
+              onChange={(e) => {
+                const pos = Number(e.target.value) / 100;
+                const newTime = pos * duration;
+                if (playerRef.current) playerRef.current.seekTo(currentSettings.startTimeInSeconds + newTime, true);
+                setCurrentTime(newTime);
+                if (!isPhoneViewport || isMobileTimelineDraggingRef.current) {
+                  setHoverPercent(pos * 100);
+                } else {
+                  setHoverPercent(null);
+                }
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
               style={{
                 touchAction: 'none'
               }}
             />
             {/* Background Track */}
-            <div className={`absolute left-0 right-0 bg-white/20 rounded-full overflow-hidden pointer-events-none transition-all ${(!isPlaying || showOverlay) ? "h-2" : "h-1.5 group-hover/slider:h-2"}`}>
+            <div className={`absolute left-0 right-0 bg-white/30 rounded-full overflow-hidden pointer-events-none transition-all ${(!isPlaying || showOverlay) ? "h-1.5 sm:h-2" : "h-1.5 group-hover/slider:h-2 sm:group-hover/slider:h-2.5"}`}>
               {/* Progress */}
               <div 
                 className="absolute left-0 top-0 bottom-0 bg-[var(--theme-primary)]"
                 style={{ width: `${progressPercentage}%` }}
               />
+
+              {/* Chapters markers */}
+              {chapters && chapters.length > 0 && chapters.map((chapter, i) => {
+                const leftPercent = duration > 0 ? (chapter.time / duration) * 100 : 0;
+                // Bỏ qua chapter ở giây 0 để không hiện vạch sát mép
+                if (chapter.time === 0) return null;
+                return (
+                  <div
+                    key={i}
+                    className="absolute top-0 bottom-0 w-[2px] bg-black/60 z-10"
+                    style={{ left: `${leftPercent}%` }}
+                  />
+                );
+              })}
             </div>
+
+            {/* Hover Tooltip */}
+            {hoverPercent !== null && (
+              <div
+                className="absolute bottom-full mb-3 pointer-events-none z-50 flex flex-col items-center w-0"
+                style={{ left: `${hoverPercent}%` }}
+              >
+                <div
+                  className="bg-gray-900/90 text-white text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded whitespace-nowrap shadow-lg backdrop-blur-sm border border-white/10"
+                  style={{ transform: `translateX(calc(50% - ${hoverPercent}% + ${hoverPercent / 10 - 5}px))` }}
+                >
+                  {formatTime((hoverPercent / 100) * duration)}
+                  {(() => {
+                    const hoverTime = (hoverPercent / 100) * duration;
+                    const activeChapter = chapters.slice().reverse().find(c => c.time <= hoverTime);
+                    return activeChapter ? <span className="ml-1.5 font-bold text-blue-300">• {activeChapter.title}</span> : "";
+                  })()}
+                </div>
+                <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-gray-900/90"></div>
+              </div>
+            )}
+
             {/* Thumb */}
             <div 
-              className={`absolute h-3 w-3 sm:h-4 sm:w-4 bg-[var(--theme-primary)] rounded-full -ml-1.5 sm:-ml-2 pointer-events-none transition-all shadow-[0_0_8px_rgba(var(--theme-primary-rgb),0.6)] ${(!isPlaying || showOverlay) ? "opacity-100 scale-110" : "opacity-0 group-hover/slider:opacity-100 group-hover/slider:scale-110"}`}
+              className={`absolute h-3.5 w-3.5 sm:h-4 sm:w-4 bg-[var(--theme-primary)] rounded-full -ml-[7px] sm:-ml-2 pointer-events-none transition-all shadow-[0_0_8px_rgba(var(--theme-primary-rgb),0.6)] ${(!isPlaying || showOverlay) ? "opacity-100 scale-110" : "opacity-0 group-hover/slider:opacity-100 group-hover/slider:scale-110"}`}
               style={{ left: `${progressPercentage}%` }}
             />
           </div>
@@ -633,7 +753,7 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
 
         {/* Controls */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
             <button 
               onClick={handlePlayPause} 
               className="text-white hover:text-[var(--theme-primary)] p-1 sm:p-1.5 transition-colors group/btn relative"
@@ -699,9 +819,22 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
                 />
               </div>
             </div>
+
+            {/* Current Chapter Name */}
+            {chapters && chapters.length > 0 && (
+              <span className="ml-1 flex min-w-0 flex-1 items-center border-l border-white/20 pl-2 sm:pl-3 md:flex-none">
+                <span className="block min-w-0 truncate text-[11px] font-medium text-white/90 sm:text-sm md:max-w-[200px] lg:max-w-[300px]">
+                  {(() => {
+                    const sortedChapters = [...chapters].sort((a, b) => b.time - a.time);
+                    const current = sortedChapters.find(c => currentTime >= c.time) || sortedChapters[sortedChapters.length - 1];
+                    return current?.title;
+                  })()}
+                </span>
+              </span>
+            )}
           </div>
           
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {/* Captions / Subtitles */}
             <button 
               onClick={handleToggleCaptions} 
@@ -755,7 +888,8 @@ export function CustomYoutubePlayer({ videoUrl, settings, title }: CustomYoutube
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      )}
       </div>
     </div>
   );
