@@ -1,3 +1,4 @@
+- 2026-07-26: Sửa xác thực và phân quyền ADMIN cho toàn bộ Quiz CRUD, đồng thời chuẩn hóa DTO, import nội bộ, lỗi API và dữ liệu JSON Prisma để thao tác thêm bộ câu hỏi hoạt động ổn định.
 - 2026-07-26: Bổ sung action chỉnh sửa buổi học và tab Tài liệu ở màn chi tiết, tái sử dụng modal, form validation và luồng lưu ba nhóm tài liệu hiện có để dữ liệu luôn đồng bộ với course detail.
 - 2026-07-26: Khôi phục guard xác thực và phân quyền ADMIN cho trang/API quản trị bài học, loại bỏ token giả khỏi query lesson và ghi lại nguyên tắc giữ session nhất quán xuyên suốt UI với backend.
 - 2026-07-26: Bổ sung cấu hình và validation chapter video từ UI đến API, hỗ trợ lấy mốc từ YouTube, đồng thời hoàn thiện player tùy chỉnh với timeline/chapter responsive, trạng thái bắt đầu rõ ràng và các bản sửa tương tác trên desktop lẫn mobile.

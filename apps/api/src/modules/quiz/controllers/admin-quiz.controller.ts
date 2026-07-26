@@ -21,14 +21,18 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
-import { QuizService, CreateQuizSetDto, UpdateQuizSetDto } from "../services/quiz.service";
-import { QuizQuestionContentDto } from "../dto/quiz-question-content.dto";
+import { QuizQuestionContentDto } from "#api/modules/quiz/dto/quiz-question-content.dto";
+import {
+  QuizService,
+  type CreateQuizSetDto,
+  type UpdateQuizSetDto,
+} from "#api/modules/quiz/services/quiz.service";
 import { IsString, IsOptional, IsEnum } from "class-validator";
 
 // We create wrapper DTOs for the sets for ClassValidator
 export class CreateQuizSetBodyDto implements CreateQuizSetDto {
   @IsString()
-  title: string;
+  title!: string;
 
   @IsOptional()
   @IsEnum(Difficulty)
@@ -47,8 +51,8 @@ export class UpdateQuizSetBodyDto implements UpdateQuizSetDto {
 
 @ApiTags("admin-quiz")
 @ApiBearerAuth()
-
-
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
 @Controller("admin")
 export class AdminQuizController {
   constructor(
@@ -70,7 +74,12 @@ export class AdminQuizController {
     @Body() dto: CreateQuizSetBodyDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.createQuizSet(lessonId, user.id, dto, getRequestContext(request));
+    return this.quizService.createQuizSet(
+      lessonId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Patch("quiz-sets/:setId")
@@ -81,7 +90,12 @@ export class AdminQuizController {
     @Body() dto: UpdateQuizSetBodyDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.updateQuizSet(setId, user.id, dto, getRequestContext(request));
+    return this.quizService.updateQuizSet(
+      setId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Delete("quiz-sets/:setId")
@@ -108,7 +122,12 @@ export class AdminQuizController {
     @Body() dto: QuizQuestionContentDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.createQuestion(setId, user.id, dto, getRequestContext(request));
+    return this.quizService.createQuestion(
+      setId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Patch("quiz-questions/:questionId")
@@ -119,7 +138,12 @@ export class AdminQuizController {
     @Body() dto: Partial<QuizQuestionContentDto>,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.updateQuestion(questionId, user.id, dto, getRequestContext(request));
+    return this.quizService.updateQuestion(
+      questionId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Delete("quiz-questions/:questionId")
@@ -129,6 +153,10 @@ export class AdminQuizController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.deleteQuestion(questionId, user.id, getRequestContext(request));
+    return this.quizService.deleteQuestion(
+      questionId,
+      user.id,
+      getRequestContext(request),
+    );
   }
 }

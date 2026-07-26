@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaService } from "#api/common/prisma/prisma.service";
-import { Difficulty, ContentSource, ReviewStatus, QuestionType } from "@prisma/client";
-import { RequestContext } from "#api/common/api/request-context";
-import { QuizQuestionContentDto } from "../dto/quiz-question-content.dto";
+import { notFoundException } from "#api/common/errors/api-exception";
+import type { getRequestContext } from "#api/common/api/request-context";
+import { ContentSource, Difficulty, Prisma, ReviewStatus } from "@prisma/client";
+import { QuizQuestionContentDto } from "#api/modules/quiz/dto/quiz-question-content.dto";
+
+type RequestContext = ReturnType<typeof getRequestContext>;
 
 export interface CreateQuizSetDto {
   title: string;
@@ -37,12 +40,12 @@ export class QuizService {
     lessonId: string,
     userId: string,
     dto: CreateQuizSetDto,
-    context: RequestContext,
+    _context: RequestContext,
   ) {
     // Verify lesson exists
     const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
     if (!lesson) {
-      throw new NotFoundException("Lesson not found");
+      throw notFoundException("NOT_FOUND", "Không tìm thấy buổi học");
     }
 
     return this.prisma.quizSet.create({
@@ -61,10 +64,14 @@ export class QuizService {
     setId: string,
     userId: string,
     dto: UpdateQuizSetDto,
-    context: RequestContext,
+    _context: RequestContext,
   ) {
-    const set = await this.prisma.quizSet.findUnique({ where: { id: setId, deletedAt: null } });
-    if (!set) throw new NotFoundException("Quiz Set not found");
+    const set = await this.prisma.quizSet.findUnique({
+      where: { id: setId, deletedAt: null },
+    });
+    if (!set) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
+    }
 
     return this.prisma.quizSet.update({
       where: { id: setId },
@@ -75,9 +82,13 @@ export class QuizService {
     });
   }
 
-  async deleteQuizSet(setId: string, userId: string, context: RequestContext) {
-    const set = await this.prisma.quizSet.findUnique({ where: { id: setId, deletedAt: null } });
-    if (!set) throw new NotFoundException("Quiz Set not found");
+  async deleteQuizSet(setId: string, userId: string, _context: RequestContext) {
+    const set = await this.prisma.quizSet.findUnique({
+      where: { id: setId, deletedAt: null },
+    });
+    if (!set) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
+    }
 
     return this.prisma.quizSet.update({
       where: { id: setId },
@@ -98,12 +109,16 @@ export class QuizService {
 
   async createQuestion(
     setId: string,
-    userId: string,
+    _userId: string,
     dto: QuizQuestionContentDto,
-    context: RequestContext,
+    _context: RequestContext,
   ) {
-    const set = await this.prisma.quizSet.findUnique({ where: { id: setId, deletedAt: null } });
-    if (!set) throw new NotFoundException("Quiz Set not found");
+    const set = await this.prisma.quizSet.findUnique({
+      where: { id: setId, deletedAt: null },
+    });
+    if (!set) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
+    }
 
     const question = await this.prisma.quizQuestion.create({
       data: {
@@ -111,11 +126,11 @@ export class QuizService {
         lessonId: set.lessonId,
         questionType: dto.questionType,
         difficulty: dto.difficulty,
-        questionJson: dto.questionJson || {},
-        optionsJson: (dto.optionsJson as any) || null,
-        correctAnswerJson: (dto.correctAnswerJson as any) || null,
-        hintJson: dto.hintJson || null,
-        gradingConfigJson: (dto.gradingConfigJson as any) || null,
+        questionJson: toInputJson(dto.questionJson),
+        optionsJson: toNullableInputJson(dto.optionsJson),
+        correctAnswerJson: toInputJson(dto.correctAnswerJson),
+        hintJson: toNullableInputJson(dto.hintJson),
+        gradingConfigJson: toNullableInputJson(dto.gradingConfigJson),
         reviewStatus: ReviewStatus.APPROVED,
       },
     });
@@ -131,21 +146,33 @@ export class QuizService {
 
   async updateQuestion(
     questionId: string,
-    userId: string,
+    _userId: string,
     dto: Partial<QuizQuestionContentDto>,
-    context: RequestContext,
+    _context: RequestContext,
   ) {
-    const question = await this.prisma.quizQuestion.findUnique({ where: { id: questionId } });
-    if (!question) throw new NotFoundException("Question not found");
+    const question = await this.prisma.quizQuestion.findUnique({
+      where: { id: questionId },
+    });
+    if (!question) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
+    }
 
-    const updateData: any = {};
+    const updateData: Prisma.QuizQuestionUpdateInput = {};
     if (dto.questionType) updateData.questionType = dto.questionType;
     if (dto.difficulty) updateData.difficulty = dto.difficulty;
-    if (dto.questionJson) updateData.questionJson = dto.questionJson;
-    if (dto.optionsJson !== undefined) updateData.optionsJson = dto.optionsJson;
-    if (dto.correctAnswerJson !== undefined) updateData.correctAnswerJson = dto.correctAnswerJson;
-    if (dto.hintJson !== undefined) updateData.hintJson = dto.hintJson;
-    if (dto.gradingConfigJson !== undefined) updateData.gradingConfigJson = dto.gradingConfigJson;
+    if (dto.questionJson) updateData.questionJson = toInputJson(dto.questionJson);
+    if (dto.optionsJson !== undefined) {
+      updateData.optionsJson = toNullableInputJson(dto.optionsJson);
+    }
+    if (dto.correctAnswerJson !== undefined) {
+      updateData.correctAnswerJson = toInputJson(dto.correctAnswerJson);
+    }
+    if (dto.hintJson !== undefined) {
+      updateData.hintJson = toNullableInputJson(dto.hintJson);
+    }
+    if (dto.gradingConfigJson !== undefined) {
+      updateData.gradingConfigJson = toNullableInputJson(dto.gradingConfigJson);
+    }
 
     return this.prisma.quizQuestion.update({
       where: { id: questionId },
@@ -153,9 +180,13 @@ export class QuizService {
     });
   }
 
-  async deleteQuestion(questionId: string, userId: string, context: RequestContext) {
-    const question = await this.prisma.quizQuestion.findUnique({ where: { id: questionId } });
-    if (!question) throw new NotFoundException("Question not found");
+  async deleteQuestion(questionId: string, _userId: string, _context: RequestContext) {
+    const question = await this.prisma.quizQuestion.findUnique({
+      where: { id: questionId },
+    });
+    if (!question) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
+    }
 
     await this.prisma.quizQuestion.delete({
       where: { id: questionId },
@@ -169,4 +200,14 @@ export class QuizService {
 
     return { success: true };
   }
+}
+
+function toInputJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function toNullableInputJson(
+  value: unknown | undefined,
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return value === undefined ? Prisma.DbNull : toInputJson(value);
 }
