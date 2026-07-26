@@ -257,7 +257,21 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 - Quiz có thể do admin tạo hoặc AI tạo.
 - Mỗi câu quiz có câu hỏi, lựa chọn/câu trả lời, đáp án đúng, gợi ý, lời giải chi tiết.
 - Loại câu hỏi: trắc nghiệm, đúng/sai, tự nhập đáp án.
-- Câu hỏi/câu trả lời có thể là text hoặc text kèm hình ảnh.
+- Câu hỏi, phương án, gợi ý và lời giải dùng rich content: văn bản có thể bôi
+  chọn để in đậm/in nghiêng/gạch chân/đổi màu, tạo bullet hoặc danh sách đánh
+  số, căn trái/giữa/phải/đều, chèn ảnh và chèn công thức Toán/Lý/Hóa bằng
+  LaTeX/KaTeX + mhchem; phím `Tab` thụt đoạn sang phải và `Shift + Tab` lùi
+  đoạn về trái, còn trong danh sách thì tăng/giảm cấp danh sách con.
+- Nút chèn bảng mở modal cấu hình số hàng, số cột và hàng tiêu đề trước khi
+  chèn. Sau khi chèn, admin kéo trực tiếp đường biên dọc để đổi độ rộng cột,
+  kéo đường biên ngang để đổi chiều cao hàng, thêm/xóa hàng hoặc cột, gộp/tách
+  các ô đã chọn và bật/tắt hàng/cột tiêu đề; không cần nhập chiều cao thủ công.
+- Ảnh đã chèn có thể căn trái/giữa/phải, kéo đổi kích thước theo tỷ lệ vùng
+  editor, cắt xén trực tiếp bằng khung kéo phủ trên ảnh với lưới một phần ba,
+  đặt lại vùng cắt và xóa nhanh ngay trên preview ảnh; thao tác cắt không phá
+  hủy ảnh gốc và alignment/kích thước/vùng cắt được lưu cùng Tiptap JSON.
+- Đáp án chấm tự động của câu `TEXT_INPUT` vẫn là chuỗi canonical để so khớp,
+  nhưng được phép chứa LaTeX/mhchem và có công cụ xem trước công thức.
 - Học sinh làm xong quiz thì thấy số câu đúng/sai.
 - Học sinh có thể làm lại tất cả, làm lại câu sai hoặc làm bộ quiz khác.
 

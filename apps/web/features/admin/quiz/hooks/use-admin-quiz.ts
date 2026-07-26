@@ -3,12 +3,14 @@ import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import {
   getAdminQuizSets,
   createAdminQuizSet,
-  updateAdminQuizSet,
   deleteAdminQuizSet,
   getAdminQuizQuestions,
   createAdminQuizQuestion,
   deleteAdminQuizQuestion,
-} from "../api/admin-quiz-api";
+  updateAdminQuizQuestion,
+  type AdminQuizQuestionPayload,
+  type QuizDifficulty,
+} from "@/features/admin/quiz/api/admin-quiz-api";
 
 export function useAdminQuizSets(lessonId: string) {
   const session = useAuthSessionStore((state) => state.session);
@@ -28,7 +30,7 @@ export function useAdminQuizSetMutations(lessonId: string) {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { title: string; difficulty?: QuizDifficulty }) => {
       if (!session?.accessToken) throw new Error("No token");
       return createAdminQuizSet(lessonId, data, session.accessToken);
     },
@@ -71,13 +73,29 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: AdminQuizQuestionPayload) => {
       if (!session?.accessToken) throw new Error("No token");
       return createAdminQuizQuestion(setId, data, session.accessToken);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-quiz-questions", setId] });
       queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({
+      questionId,
+      data,
+    }: {
+      questionId: string;
+      data: AdminQuizQuestionPayload;
+    }) => {
+      if (!session?.accessToken) throw new Error("No token");
+      return updateAdminQuizQuestion(questionId, data, session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-quiz-questions", setId] });
     },
   });
 
@@ -94,6 +112,7 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
 
   return {
     createQuestion: createMutation,
+    updateQuestion: updateMutation,
     deleteQuestion: deleteMutation,
   };
 }

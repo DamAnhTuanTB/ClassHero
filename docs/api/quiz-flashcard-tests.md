@@ -87,15 +87,77 @@ Body:
 ```json
 {
   "questionType": "MULTIPLE_CHOICE",
-  "questionJson": {},
-  "optionsJson": {},
-  "correctAnswerJson": {},
-  "hintJson": {},
-  "gradingConfigJson": {},
-  "difficulty": "EASY",
-  "sortOrder": 1
+  "questionJson": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "2 + 2 bằng bao nhiêu?" }]
+      }
+    ]
+  },
+  "optionsJson": [
+    {
+      "id": "option-a",
+      "richText": {
+        "type": "doc",
+        "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "3" }] }]
+      }
+    },
+    {
+      "id": "option-b",
+      "richText": {
+        "type": "doc",
+        "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "4" }] }]
+      }
+    }
+  ],
+  "correctAnswerJson": ["option-b"],
+  "hintJson": null,
+  "explanationJson": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Cộng hai đơn vị với hai đơn vị được bốn đơn vị." }
+        ]
+      }
+    ]
+  },
+  "difficulty": "EASY"
 }
 ```
+
+- `optionsJson` là mảng động, tối thiểu 2 phần tử và không có giới hạn cố định 4 phương án.
+- Mỗi option có `id` duy nhất; mọi ID trong `correctAnswerJson` phải tồn tại trong `optionsJson`.
+- Với `TRUE_FALSE`, `correctAnswerJson` là boolean.
+- Với `TEXT_INPUT`, `correctAnswerJson` là mảng câu trả lời được chấp nhận và `gradingConfigJson` chứa `caseSensitive`/`exactMatch`.
+- `hintJson` và `explanationJson` nhận Tiptap JSON hoặc `null`. Lời giải chi tiết thủ công được lưu trong `ai_explanations` với `source=ADMIN` và trả về qua relation `explanation`.
+- `questionJson`, `optionsJson[*].richText`, `hintJson` và
+  `explanationJson` cùng nhận cây Tiptap rich content. Contract cho phép
+  `heading`, `paragraph`, `bulletList`, `orderedList`, `listItem`; marks
+  `bold`, `italic`, `underline`, `strike`, `textStyle.color`; thuộc tính
+  `textAlign`, `indent` (số nguyên từ `1` đến `8`) trên paragraph/heading;
+  node `inlineMath`/`blockMath` với `attrs.latex`; node `image` với
+  `attrs.fileId`, `src`, `alt`, `title`, `alignment` (`left|center|right`),
+  `baseWidthPercent`, `widthPercent`, `sourceWidth`, `sourceHeight`, `cropTop`,
+  `cropRight`, `cropBottom`, `cropLeft`; và node
+  `table`, `tableRow`, `tableHeader`, `tableCell` theo table schema của Tiptap.
+  Cell giữ `colspan`, `rowspan`, `colwidth` và `cellHeight` để bảo toàn resize
+  cột, chiều cao hàng và trạng thái merge/split khi đọc lại.
+- Ảnh câu hỏi phải upload trước qua `POST /files/upload` với
+  `purpose=QUESTION_IMAGE`; payload rich content không nhận ảnh base64.
+- Crop ảnh là non-destructive và dùng phần trăm bốn cạnh trong khoảng hợp lệ;
+  `baseWidthPercent` là độ rộng khung ảnh ở scale gốc, còn `widthPercent` là mức
+  resize hiển thị cho người dùng và nằm trong `20–100`. Ảnh mới bắt đầu tại
+  `widthPercent=100`; node cũ thiếu `baseWidthPercent` mặc định dùng `100` để
+  không đổi cách hiển thị. Xóa node ảnh khỏi rich content không đồng nghĩa xóa
+  file storage ở endpoint câu hỏi.
+- Với `TEXT_INPUT`, mỗi phần tử `correctAnswerJson` vẫn là string canonical
+  dùng để chấm; string có thể chứa LaTeX hoặc mhchem như
+  `\frac{1}{2}`/`\ce{H2O}`.
+- Server tự gán `sortOrder` tiếp theo trong quiz set.
 
 #### `PATCH /admin/quiz-questions/:questionId`
 
@@ -103,7 +165,8 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Cập nhật câu hỏi.
+- Cập nhật câu hỏi với cùng contract nội dung như create; cho phép đổi loại câu hỏi và xóa gợi ý/lời giải bằng `null`.
+- Khi gửi `explanationJson`, service tạo mới hoặc cập nhật `ai_explanations` nguồn `ADMIN`; nội dung rỗng/`null` gỡ lời giải khỏi câu hỏi.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation liên quan stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - Ghi audit log.
 
@@ -135,9 +198,7 @@ Body:
 
 ```json
 {
-  "answers": [
-    { "questionId": "uuid", "answerJson": {} }
-  ]
+  "answers": [{ "questionId": "uuid", "answerJson": {} }]
 }
 ```
 
@@ -423,9 +484,7 @@ Body:
 
 ```json
 {
-  "answers": [
-    { "questionId": "uuid", "answerJson": {} }
-  ]
+  "answers": [{ "questionId": "uuid", "answerJson": {} }]
 }
 ```
 

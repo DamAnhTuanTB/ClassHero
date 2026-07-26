@@ -162,6 +162,21 @@ Spacing/radius mặc định:
 - Field số trong admin như thứ tự, tiền VNĐ, phần trăm hoặc số lượng không dùng native number spinner/default browser UI; dùng input text styled cùng form chuẩn, `inputMode` phù hợp, chỉ nhận ký tự hợp lệ, normalize/format dữ liệu trước khi lưu và hiển thị đơn vị rõ khi cần.
 - Không đặt toggle học thử ở form lộ trình; học thử là cấu hình của buổi học cụ thể.
 - Action icon trong admin phải dùng màu theo ý nghĩa để dễ quét: sửa dùng xanh, xóa dùng đỏ, đóng/hủy dùng màu trung tính hoặc xanh nhẹ. Hành động xóa phải mở modal xác nhận rõ tên item trước khi thực thi.
+- Toolbar ngữ cảnh có nhiều lệnh ngắn như chỉnh bảng phải dùng icon, chia nhóm
+  theo chức năng và có tooltip tùy biến xuất hiện ngay khi hover/focus cùng
+  `aria-label`; không chỉ dựa vào `title` native bị trễ và không trải một hàng
+  nút chữ dài làm người dùng khó quét.
+- Với kích thước bảng, ưu tiên thao tác trực tiếp: kéo biên dọc để đổi độ rộng
+  cột và kéo biên ngang để đổi chiều cao hàng. Không bắt người dùng nhập pixel
+  thủ công khi kích thước có thể điều chỉnh trực quan.
+- Action tạo một cấu trúc có nhiều tham số như bảng phải mở modal cấu hình gọn
+  trước khi chèn, không làm toolbar/editor nở thêm một form inline gây dịch
+  layout. Node cấu trúc hợp lệ như bảng hoặc ảnh phải làm placeholder biến mất
+  và được validation nhận là nội dung, kể cả chưa có text thuần.
+- Cắt ảnh trong editor phải là thao tác trực tiếp trên preview: phủ vùng tối bên
+  ngoài, khung cắt có lưới một phần ba và handle ở cạnh/góc để kéo; cho phép kéo
+  cả khung, Hủy, Đặt lại và Áp dụng ngay trên ảnh. Không dùng bốn slider cạnh
+  ảnh làm tương tác crop chính.
 
 ## 7. Component rules
 
@@ -316,15 +331,15 @@ Local dev/browser guardrails:
 
 Performance budget/checklist:
 
-| Hạng mục         | Mục tiêu                                                        |
-| ---------------- | --------------------------------------------------------------- |
-| Core Web Vitals  | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile                |
-| Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn     |
+| Hạng mục         | Mục tiêu                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| Core Web Vitals  | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile                                        |
+| Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn                             |
 | Mobile load      | Mọi đường load trên điện thoại phải nhẹ nhất có thể: cold load, transition, data, asset |
-| Interaction      | Button/action đổi state ngay sau thao tác                       |
-| List dài         | Có pagination/infinite/virtualization                           |
-| Animation        | Nhẹ, ngắn, không block thao tác                                 |
-| Bundle           | Không thêm thư viện nặng nếu shadcn/Tailwind/native API đủ dùng |
+| Interaction      | Button/action đổi state ngay sau thao tác                                               |
+| List dài         | Có pagination/infinite/virtualization                                                   |
+| Animation        | Nhẹ, ngắn, không block thao tác                                                         |
+| Bundle           | Không thêm thư viện nặng nếu shadcn/Tailwind/native API đủ dùng                         |
 
 Khi làm UI phức tạp, Codex nên ghi rõ trong final response đã kiểm tra hoặc bỏ qua phần nào:
 

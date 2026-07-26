@@ -1,10 +1,50 @@
 import { apiRequest } from "@/lib/api-client";
 
+export type QuizDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
+export type QuizQuestionType = "MULTIPLE_CHOICE" | "TRUE_FALSE" | "TEXT_INPUT";
+
+export interface TiptapJsonMark {
+  type: string;
+  attrs?: Record<string, unknown>;
+}
+
+export interface TiptapJsonNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapJsonNode[];
+  marks?: TiptapJsonMark[];
+  text?: string;
+}
+
+export interface TiptapTextDocument extends TiptapJsonNode {
+  type: "doc";
+}
+
+export interface AdminQuizOption {
+  id: string;
+  richText: TiptapTextDocument;
+}
+
+export interface AdminQuizQuestionPayload {
+  questionType: QuizQuestionType;
+  difficulty: Exclude<QuizDifficulty, "MIXED">;
+  questionJson: TiptapTextDocument;
+  optionsJson?: AdminQuizOption[];
+  correctAnswerJson: string[] | boolean;
+  hintJson?: TiptapTextDocument | null;
+  gradingConfigJson?: {
+    caseSensitive: boolean;
+    exactMatch: boolean;
+    keywords?: string[];
+  };
+  explanationJson?: TiptapTextDocument | null;
+}
+
 export interface AdminQuizSet {
   id: string;
   lessonId: string;
   title: string;
-  difficulty: string;
+  difficulty: QuizDifficulty;
   source: string;
   reviewStatus: string;
   questionCount: number;
@@ -18,13 +58,21 @@ export interface AdminQuizSet {
 export interface AdminQuizQuestion {
   id: string;
   quizSetId: string;
-  questionType: string;
-  difficulty: string;
-  questionJson: any;
-  optionsJson: any;
-  correctAnswerJson: any;
-  hintJson: any;
-  gradingConfigJson: any;
+  questionType: QuizQuestionType;
+  difficulty: Exclude<QuizDifficulty, "MIXED">;
+  questionJson: TiptapTextDocument;
+  optionsJson: AdminQuizOption[] | null;
+  correctAnswerJson: string[] | boolean;
+  hintJson: TiptapTextDocument | null;
+  gradingConfigJson: {
+    caseSensitive?: boolean;
+    exactMatch?: boolean;
+    keywords?: string[];
+  } | null;
+  explanation: {
+    id: string;
+    contentJson: TiptapTextDocument;
+  } | null;
   reviewStatus: string;
 }
 
@@ -35,7 +83,11 @@ export async function getAdminQuizSets(lessonId: string, token: string) {
   });
 }
 
-export async function createAdminQuizSet(lessonId: string, data: any, token: string) {
+export async function createAdminQuizSet(
+  lessonId: string,
+  data: { title: string; difficulty?: QuizDifficulty },
+  token: string,
+) {
   return apiRequest<AdminQuizSet>(`/admin/lessons/${lessonId}/quiz-sets`, {
     method: "POST",
     body: data,
@@ -43,7 +95,11 @@ export async function createAdminQuizSet(lessonId: string, data: any, token: str
   });
 }
 
-export async function updateAdminQuizSet(setId: string, data: any, token: string) {
+export async function updateAdminQuizSet(
+  setId: string,
+  data: { title?: string; difficulty?: QuizDifficulty },
+  token: string,
+) {
   return apiRequest<AdminQuizSet>(`/admin/quiz-sets/${setId}`, {
     method: "PATCH",
     body: data,
@@ -65,9 +121,25 @@ export async function getAdminQuizQuestions(setId: string, token: string) {
   });
 }
 
-export async function createAdminQuizQuestion(setId: string, data: any, token: string) {
+export async function createAdminQuizQuestion(
+  setId: string,
+  data: AdminQuizQuestionPayload,
+  token: string,
+) {
   return apiRequest<AdminQuizQuestion>(`/admin/quiz-sets/${setId}/questions`, {
     method: "POST",
+    body: data,
+    token,
+  });
+}
+
+export async function updateAdminQuizQuestion(
+  questionId: string,
+  data: AdminQuizQuestionPayload,
+  token: string,
+) {
+  return apiRequest<AdminQuizQuestion>(`/admin/quiz-questions/${questionId}`, {
+    method: "PATCH",
     body: data,
     token,
   });
@@ -78,4 +150,33 @@ export async function deleteAdminQuizQuestion(questionId: string, token: string)
     method: "DELETE",
     token,
   });
+}
+
+export async function uploadAdminQuizImage(file: File, token: string) {
+  const formData = new FormData();
+  formData.set("purpose", "QUESTION_IMAGE");
+  formData.set("file", file);
+
+  const uploadedFile = await apiRequest<{
+    id: string;
+    originalName: string;
+    publicUrl: string | null;
+  }>("/files/upload", {
+    method: "POST",
+    body: formData,
+    token,
+  });
+  const imageUrl = uploadedFile.publicUrl
+    ? uploadedFile.publicUrl
+    : (
+        await apiRequest<{ url: string }>(`/files/${uploadedFile.id}/signed-url`, {
+          token,
+        })
+      ).url;
+
+  return {
+    fileId: uploadedFile.id,
+    fileName: uploadedFile.originalName,
+    imageUrl,
+  };
 }

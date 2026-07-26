@@ -221,6 +221,52 @@ Acceptance Criteria:
 
 ---
 
+## 6.1. Admin tạo và chỉnh sửa câu Quiz giàu nội dung
+
+Actor: Admin.
+
+Các bước:
+
+1. Admin mở tab Quiz trong chi tiết buổi học và chọn một bộ câu hỏi.
+2. Admin thêm hoặc sửa câu hỏi, chọn loại/mức độ và nhập nội dung.
+3. Ở câu hỏi, từng phương án, gợi ý và lời giải, admin có thể bôi chọn văn bản
+   rồi định dạng; tạo danh sách; căn lề; dùng `Tab`/`Shift + Tab` để tăng/giảm
+   cấp thụt đoạn hoặc cấp danh sách; chèn bảng, ảnh và công thức Toán/Lý/Hóa.
+4. Ảnh được upload với `QUESTION_IMAGE`; editor chèn reference vào Tiptap JSON.
+5. Admin có thể chọn ảnh rồi căn trái/giữa/phải hoặc kéo đổi kích thước; khi
+   chọn cắt ảnh, editor phủ lưới một phần ba trực tiếp lên ảnh để admin kéo cả
+   vùng cắt hoặc từng cạnh/góc, sau đó áp dụng, đặt lại hoặc hủy. Nút chèn bảng
+   mở modal cấu hình trước khi tạo;
+   sau khi chèn, admin kéo đường biên dọc để đổi độ rộng cột, kéo đường biên
+   ngang để đổi chiều cao hàng, thêm/xóa hàng cột, chọn nhiều ô để gộp và tách
+   ô đã gộp bằng toolbar icon có tooltip xuất hiện ngay khi hover/focus.
+6. Với câu tự nhập đáp án, admin nhập một hoặc nhiều chuỗi được chấp nhận; có
+   thể chèn và xem trước LaTeX/mhchem nhưng dữ liệu vẫn là chuỗi để chấm điểm.
+7. Backend validate nội dung, đáp án đúng và lưu toàn bộ Tiptap JSON.
+
+Acceptance Criteria:
+
+- Đóng rồi mở lại form không mất format, màu, list, căn lề, bảng, kích
+  thước/vùng cắt ảnh hoặc công thức.
+- Công thức hỗ trợ inline và block; mhchem render được phương trình Hóa học.
+- Ảnh chỉ nhận JPEG/PNG/WebP theo giới hạn upload và không lưu base64.
+- Crop ảnh là non-destructive: chỉ lưu tỷ lệ cắt bốn cạnh, không ghi đè file
+  gốc. Nút xóa nhanh chỉ xóa node ảnh khỏi nội dung, không tự xóa file dùng
+  chung khỏi storage.
+- Bảng cho phép 1–20 hàng/cột khi tạo; công cụ chỉnh bảng chỉ hiện khi con trỏ
+  nằm trong bảng. Bảng mới dù chưa có chữ vẫn là nội dung cấu trúc hợp lệ;
+  placeholder phải ẩn và form không được báo thiếu nội dung. Merge áp dụng cho
+  vùng ô liền nhau đang được chọn.
+- Vùng văn bản được bôi chọn là vùng duy nhất nhận định dạng.
+- `Tab`/`Shift + Tab` trong editor không chuyển focus: đoạn thường tăng/giảm
+  `attrs.indent`, còn list item tăng/giảm cấp lồng nhau; đóng rồi mở lại vẫn giữ
+  đúng độ thụt.
+- Multiple choice có ít nhất 2 phương án; phương án chỉ có công thức hoặc ảnh
+  có mô tả vẫn là nội dung hợp lệ.
+- Editor/modal được lazy-load khi admin mở, không làm chậm tải lesson detail.
+
+---
+
 ## 7. Admin dùng AI tạo tóm tắt/quiz/flashcard/bài kiểm tra
 
 Actor: Admin.

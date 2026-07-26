@@ -21,7 +21,10 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
-import { QuizQuestionContentDto } from "#api/modules/quiz/dto/quiz-question-content.dto";
+import {
+  QuizQuestionContentDto,
+  UpdateQuizQuestionContentDto,
+} from "#api/modules/quiz/dto/quiz-question-content.dto";
 import {
   QuizService,
   type CreateQuizSetDto,
@@ -135,7 +138,7 @@ export class AdminQuizController {
   updateQuestion(
     @Param("questionId") questionId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: Partial<QuizQuestionContentDto>,
+    @Body() dto: UpdateQuizQuestionContentDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.quizService.updateQuestion(

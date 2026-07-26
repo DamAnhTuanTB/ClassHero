@@ -475,6 +475,8 @@ Màn chi tiết buổi học admin:
 - Course detail có nút `Nhập khoảng trang` mở modal gán trang hàng loạt cho nhiều lesson; không nhét toàn bộ form nhập range dài vào màn chính.
 - Modal tạo/sửa lesson và lesson detail là nơi gán/điều chỉnh page range tùy chọn của một lesson cụ thể để tránh thao tác vòng khi admin upload sách trước rồi mới tạo buổi học; phần nhập trang disabled tới khi source document xử lý xong và không còn page warning.
 - Là nơi admin thêm thủ công, sửa, xóa mềm, ẩn/hiện, duyệt lại quiz/flashcard/test; nội dung do AI sinh sau M9.3 cũng được quản trị tại đây.
+- Tab `Quiz` hiển thị mỗi quiz set như một tab ngang có count; chọn tab sẽ render toàn bộ câu hỏi của set ngay bên dưới. Trong set có action `Thêm câu hỏi`, sửa và xóa từng câu.
+- Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi tiết. Multiple choice dùng danh sách phương án động: admin có thể tạo 2, 3, 4, 5 hoặc nhiều phương án hơn, thêm/xóa từng phương án và chọn đáp án đúng; không hard-code bốn ô A/B/C/D.
 
 ### 6.5. AI generation panel
 
@@ -504,10 +506,32 @@ Dùng chung editor cho:
 
 Editor cần hỗ trợ:
 
-- Text.
-- Image insert.
-- Math/chem formula.
-- Basic formatting.
+- Bôi chọn một phần văn bản rồi áp dụng định dạng đúng trên vùng chọn.
+- Paragraph/heading, in đậm, in nghiêng, gạch chân, gạch ngang và màu chữ.
+- Bullet list và numbered list.
+- Căn trái, căn giữa, căn phải và căn đều.
+- `Tab` thụt đoạn hiện tại sang phải, `Shift + Tab` lùi về trái; trong bullet
+  hoặc numbered list, hai phím này tăng/giảm cấp list item.
+- Icon chèn bảng mở modal cấu hình 1–20 hàng/cột và tùy chọn hàng tiêu đề; không
+  render form cấu hình chen vào bên dưới editor. Khi focus trong bảng hiện
+  context toolbar icon-only, chia nhóm thao tác cột, hàng, gộp/tách, tiêu đề và
+  xóa bảng; mỗi icon có `aria-label` và tooltip xuất hiện tức thì. Độ rộng cột
+  thay đổi bằng cách kéo đường biên dọc, chiều cao hàng thay đổi bằng cách kéo
+  đường biên ngang; không dùng input pixel thủ công.
+- Table node là nội dung cấu trúc hợp lệ kể cả khi các ô chưa có chữ: editor
+  phải ẩn placeholder và validation không được báo field rỗng sau khi chèn.
+- Chèn ảnh qua object storage; không nhúng base64 vào rich content. Ảnh có
+  action nổi để cắt xén hoặc xóa nhanh, handle kéo ở góc để đổi độ rộng
+  `20–100%` và label phần trăm kích thước. Crop dùng khung lưới một phần ba phủ
+  trực tiếp trên ảnh; admin kéo vùng cắt, cạnh hoặc góc và có Hủy/Đặt lại/Áp
+  dụng ngay trên preview, không dùng form slider bốn cạnh.
+- Công thức Toán/Lý bằng LaTeX/KaTeX và công thức/phương trình Hóa bằng
+  mhchem; hỗ trợ cả công thức trong dòng và một dòng riêng, có xem trước.
+- Form Quiz dùng editor này cho câu hỏi, từng phương án, gợi ý và lời giải.
+  Đáp án `TEXT_INPUT` dùng field chuỗi có công cụ LaTeX/mhchem vì dữ liệu này
+  còn phải phục vụ chấm tự động.
+- Editor nặng trong modal phải lazy-load theo tương tác, không kéo Tiptap,
+  KaTeX và image tools vào bundle ban đầu của lesson detail.
 
 ### 6.7. Report moderation
 

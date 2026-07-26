@@ -61,7 +61,17 @@ Index:
 
 Rules:
 
-- Với `TEXT_INPUT`, `grading_config_json` có thể chứa `acceptedAnswers`, `caseSensitive`, `trimWhitespace`, `numericTolerance`, `unitRequired`, `acceptedUnits`.
+- `options_json` của `MULTIPLE_CHOICE` là mảng phương án động, tối thiểu 2 phần tử và không giới hạn cố định ở 4; mỗi phần tử có `id` duy nhất và Tiptap `richText`.
+- Rich content trong `question_json`, `options_json[*].richText`, `hint_json`
+  và `ai_explanations.content_json` được phép chứa format marks, list,
+  `textAlign`, `inlineMath`/`blockMath.attrs.latex` và
+  `image.attrs.{fileId,src,alt,title}`. Không lưu ảnh base64 trong JSON; file
+  thật nằm ở object storage với `files.purpose=QUESTION_IMAGE`.
+- `correct_answer_json` của `MULTIPLE_CHOICE` chỉ chứa ID còn tồn tại trong `options_json`; của `TRUE_FALSE` là boolean; của `TEXT_INPUT` là mảng chuỗi được chấp nhận.
+- Chuỗi đáp án `TEXT_INPUT` có thể chứa LaTeX/mhchem canonical nhưng không lưu
+  marks/ảnh vì server cần chuẩn hóa và so khớp đáp án học sinh.
+- Với `TEXT_INPUT`, các đáp án chấp nhận nằm trong `correct_answer_json`; `grading_config_json` chứa cấu hình so khớp như `caseSensitive`, `exactMatch` và có thể mở rộng thêm `trimWhitespace`, `numericTolerance`, `unitRequired`, `acceptedUnits`.
+- Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`: `target_type=QUIZ_QUESTION`, `target_id=quiz_questions.id`, `source=ADMIN`, `review_status=APPROVED`; `quiz_questions.explanation_id` trỏ tới bản ghi này.
 - Khi admin sửa nội dung/correct answer/hint, service phải mark explanation stale hoặc xóa `explanation_id` theo AI/RAG spec.
 
 ### 7.3. `quiz_attempts`
