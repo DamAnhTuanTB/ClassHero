@@ -1,16 +1,22 @@
 "use client";
 
-import { Check, Loader2, ListOrdered, Plus, Trash2, Wand2, GripVertical } from "lucide-react";
+import { Check, Loader2, ListOrdered, Plus, Trash2, Wand2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useForm as useHookForm, useFieldArray, useWatch as useHookFormWatch } from "react-hook-form";
+import {
+  useForm as useHookForm,
+  useFieldArray,
+  useWatch as useHookFormWatch,
+} from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { TextField } from "@/components/common/forms/text-field";
-import { CustomVideoSettings, DEFAULT_CUSTOM_VIDEO_SETTINGS } from "@/components/shared/custom-youtube-player";
+import {
+  DEFAULT_CUSTOM_VIDEO_SETTINGS,
+  type CustomVideoSettings,
+} from "@/components/shared/custom-youtube-player";
 import { updateAdminLessonVideoSettings } from "@/features/admin/courses/api/admin-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface LessonVideoChaptersFormProps {
@@ -21,7 +27,13 @@ interface LessonVideoChaptersFormProps {
 }
 
 const chapterSchema = z.object({
-  timeString: z.string().regex(/^(?:(?:\d+):)?([0-5]?\d):([0-5]?\d)$/, "Sai định dạng (VD: 01:30 hoặc 1:05:30)").min(1, "Vui lòng nhập"),
+  timeString: z
+    .string()
+    .regex(
+      /^(?:(?:\d+):)?([0-5]?\d):([0-5]?\d)$/,
+      "Sai định dạng (VD: 01:30 hoặc 1:05:30)",
+    )
+    .min(1, "Vui lòng nhập"),
   title: z.string().min(1, "Tiêu đề không được để trống"),
 });
 
@@ -29,9 +41,38 @@ const chaptersFormSchema = z.object({
   chapters: z.array(chapterSchema).min(1, "Cần ít nhất một mốc thời gian hợp lệ"),
 });
 
+const youtubeChaptersResponseSchema = z.object({
+  chapters: z
+    .array(
+      z.object({
+        time: z.number().nonnegative(),
+        title: z.string(),
+      }),
+    )
+    .optional(),
+});
+
 type ChaptersFormValues = z.infer<typeof chaptersFormSchema>;
 
-export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, onPreviewSettingsChange }: LessonVideoChaptersFormProps) {
+const CHAPTER_PREVIEW_DEBOUNCE_MS = 180;
+
+function parseChapterTimestamp(timeString: string) {
+  const parts = timeString.split(":").map(Number);
+  if (parts.length === 3) {
+    return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+  }
+  if (parts.length === 2) {
+    return (parts[0] || 0) * 60 + (parts[1] || 0);
+  }
+  return parts[0] || 0;
+}
+
+export function LessonVideoChaptersForm({
+  lessonId,
+  videoUrl,
+  initialSettings,
+  onPreviewSettingsChange,
+}: LessonVideoChaptersFormProps) {
   const queryClient = useQueryClient();
   const session = useAuthSessionStore((state) => state.session);
   const [isOpen, setIsOpen] = useState(false);
@@ -42,18 +83,18 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = Math.floor(totalSeconds % 60);
     if (h > 0) {
-      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
     }
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   const form = useHookForm<ChaptersFormValues>({
     resolver: zodResolver(chaptersFormSchema),
     mode: "onChange",
     defaultValues: {
-      chapters: (initialSettings?.chapters || []).map(c => ({
+      chapters: (initialSettings?.chapters || []).map((c) => ({
         title: c.title,
-        timeString: formatSeconds(c.time)
+        timeString: formatSeconds(c.time),
       })),
     },
   });
@@ -65,39 +106,40 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
     formState: { isSubmitting, errors, isValid },
     setValue,
   } = form;
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "chapters",
   });
-  
+
   const watchedChapters = useHookFormWatch({
     control,
-    name: "chapters"
+    name: "chapters",
   });
 
   // Gửi callback để preview thay đổi realtime
   useEffect(() => {
-    if (onPreviewSettingsChange && watchedChapters) {
-      const parsedChapters = (watchedChapters as any[]).map(c => {
-        if (!c || !c.timeString) return { title: c?.title || "", time: 0 };
-        const parts = c.timeString.split(":").map(Number);
-        let timeInSeconds = 0;
-        if (parts.length === 3) {
-          timeInSeconds = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-        } else if (parts.length === 2) {
-          timeInSeconds = (parts[0] || 0) * 60 + (parts[1] || 0);
-        } else {
-          timeInSeconds = parts[0] || 0;
-        }
-        return { title: c.title || "", time: timeInSeconds };
-      }).filter(c => c.title !== "");
+    if (!onPreviewSettingsChange || !watchedChapters) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const parsedChapters = watchedChapters
+        .map((c) => {
+          return {
+            title: c.title,
+            time: parseChapterTimestamp(c.timeString),
+          };
+        })
+        .filter((c) => c.title !== "");
 
       onPreviewSettingsChange({
         ...DEFAULT_CUSTOM_VIDEO_SETTINGS,
         ...(initialSettings || {}),
         chapters: parsedChapters,
       });
-    }
+    }, CHAPTER_PREVIEW_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
   }, [watchedChapters, initialSettings, onPreviewSettingsChange]);
 
   const updateMutation = useMutation({
@@ -105,8 +147,9 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
       if (!session?.accessToken) throw new Error("Chưa đăng nhập");
       return updateAdminLessonVideoSettings(lessonId, newSettings, session.accessToken);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-lesson", lessonId] });
+    onSuccess: (updatedLesson) => {
+      queryClient.setQueriesData({ queryKey: ["admin-lesson", lessonId] }, updatedLesson);
+      void queryClient.invalidateQueries({ queryKey: ["admin-lesson", lessonId] });
       toast.success("Lưu mốc thời gian thành công");
       setIsOpen(false);
     },
@@ -115,21 +158,11 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
     },
   });
 
-  const onSubmit = async (values: ChaptersFormValues) => {
-    const parsedChapters = values.chapters.map(c => {
-      const parts = c.timeString.split(":").map(Number);
-      let timeInSeconds = 0;
-      if (parts.length === 3) {
-        const [hours = 0, minutes = 0, seconds = 0] = parts;
-        timeInSeconds = hours * 3600 + minutes * 60 + seconds;
-      } else if (parts.length === 2) {
-        const [minutes = 0, seconds = 0] = parts;
-        timeInSeconds = minutes * 60 + seconds;
-      } else {
-        timeInSeconds = parts[0] || 0;
-      }
-      return { title: c.title, time: timeInSeconds };
-    });
+  const onSubmit = (values: ChaptersFormValues) => {
+    const parsedChapters = values.chapters.map((c) => ({
+      title: c.title,
+      time: parseChapterTimestamp(c.timeString),
+    }));
 
     const fullSettings: CustomVideoSettings = {
       ...DEFAULT_CUSTOM_VIDEO_SETTINGS,
@@ -142,7 +175,7 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
   const extractYoutubeId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
-    return (match && match[2] && match[2].length === 11) ? match[2] : null;
+    return match && match[2] && match[2].length === 11 ? match[2] : null;
   };
 
   const handleScrapeChapters = async () => {
@@ -160,19 +193,23 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
     try {
       const res = await fetch(`/api/youtube/chapters?videoId=${videoId}`);
       if (!res.ok) throw new Error("Không thể lấy dữ liệu");
-      const data = await res.json();
-      
-      if (data?.chapters && data.chapters.length > 0) {
-        const mappedChapters = data.chapters.map((c: any) => ({
+      const result = youtubeChaptersResponseSchema.safeParse(await res.json());
+      if (!result.success) {
+        throw new Error("Dữ liệu chapter từ YouTube không hợp lệ");
+      }
+      const chapters = result.data.chapters ?? [];
+
+      if (chapters.length > 0) {
+        const mappedChapters = chapters.map((c) => ({
           title: c.title,
-          timeString: formatSeconds(c.time)
+          timeString: formatSeconds(c.time),
         }));
         setValue("chapters", mappedChapters, { shouldValidate: true, shouldDirty: true });
-        toast.success(`Đã tự động lấy ${data.chapters.length} mốc thời gian`);
+        toast.success(`Đã tự động lấy ${chapters.length} mốc thời gian`);
       } else {
         toast.warning("Video này không có mốc thời gian (chapters) nào");
       }
-    } catch (e) {
+    } catch {
       toast.error("Có lỗi xảy ra khi lấy dữ liệu tự động");
     } finally {
       setIsScraping(false);
@@ -191,10 +228,12 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
               <ListOrdered className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <h3 className="font-bold text-[var(--theme-text-strong)]">Mốc thời gian Video</h3>
+              <h3 className="font-bold text-[var(--theme-text-strong)]">
+                Mốc thời gian Video
+              </h3>
               <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-                {fields.length > 0 
-                  ? `Đã cấu hình ${fields.length} mốc thời gian` 
+                {fields.length > 0
+                  ? `Đã cấu hình ${fields.length} mốc thời gian`
                   : "Chưa cấu hình mốc thời gian nào"}
               </p>
             </div>
@@ -214,7 +253,7 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
           <ListOrdered className="w-4 h-4 text-[var(--theme-primary)]" />
           Quản lý Mốc Thời Gian
         </div>
-        <button 
+        <button
           onClick={() => setIsOpen(false)}
           className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
         >
@@ -232,7 +271,11 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
           disabled={isScraping}
           className="flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 text-xs font-semibold transition-colors disabled:opacity-50"
         >
-          {isScraping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+          {isScraping ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Wand2 className="w-3.5 h-3.5" />
+          )}
           Tự động lấy từ YouTube
         </button>
       </div>
@@ -241,12 +284,17 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
         {fields.length === 0 ? (
           <div className="text-center py-8 bg-[var(--theme-surface-sunken)] rounded-lg border border-dashed border-[var(--theme-border)]">
             <ListOrdered className="w-8 h-8 text-[var(--theme-text-muted)]/50 mx-auto mb-2" />
-            <p className="text-sm text-[var(--theme-text-muted)]">Chưa có mốc thời gian nào</p>
+            <p className="text-sm text-[var(--theme-text-muted)]">
+              Chưa có mốc thời gian nào
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
             {fields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-3 p-3 bg-[var(--theme-surface-sunken)] rounded-lg border border-[var(--theme-border)] group relative">
+              <div
+                key={field.id}
+                className="flex items-start gap-3 p-3 bg-[var(--theme-surface-sunken)] rounded-lg border border-[var(--theme-border)] group relative"
+              >
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="col-span-1">
                     <TextField
@@ -259,7 +307,7 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
                       {...register(`chapters.${index}.timeString`)}
                     />
                   </div>
-                  
+
                   <div className="col-span-1 sm:col-span-3">
                     <TextField
                       id={`chapters.${index}.title`}
@@ -297,10 +345,12 @@ export function LessonVideoChaptersForm({ lessonId, videoUrl, initialSettings, o
         <div className="flex items-center justify-end pt-4 mt-6 border-t border-[var(--theme-border)]">
           <button
             type="submit"
-            disabled={fields.length === 0 || !isValid || isSubmitting || updateMutation.isPending}
+            disabled={
+              fields.length === 0 || !isValid || isSubmitting || updateMutation.isPending
+            }
             className="flex items-center gap-2 rounded-lg bg-[var(--theme-primary)] px-6 py-2 text-sm font-semibold text-white shadow-sm enabled:hover:bg-[var(--theme-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)] focus:ring-offset-2 focus:ring-offset-[var(--theme-surface)] disabled:cursor-not-allowed disabled:opacity-50 transition-all"
           >
-            {(isSubmitting || updateMutation.isPending) ? (
+            {isSubmitting || updateMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Đang lưu...

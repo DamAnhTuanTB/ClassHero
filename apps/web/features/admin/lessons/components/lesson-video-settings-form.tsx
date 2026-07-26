@@ -1,17 +1,19 @@
 "use client";
 
-import { Check, Loader2, Play, Settings } from "lucide-react";
+import { Check, Loader2, Settings } from "lucide-react";
 import { useState } from "react";
 import { useForm as useHookForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { TextField } from "@/components/common/forms/text-field";
-import { CustomVideoSettings, DEFAULT_CUSTOM_VIDEO_SETTINGS } from "@/components/shared/custom-youtube-player";
+import {
+  CustomVideoSettings,
+  DEFAULT_CUSTOM_VIDEO_SETTINGS,
+} from "@/components/shared/custom-youtube-player";
 import { updateAdminLessonVideoSettings } from "@/features/admin/courses/api/admin-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface LessonVideoSettingsFormProps {
@@ -21,19 +23,41 @@ interface LessonVideoSettingsFormProps {
 
 const customVideoSettingsSchema = z.object({
   isDisabled: z.boolean(),
-  startTimeInSeconds: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0, "Thời gian phải ≥ 0"),
-  endTimeCutInSeconds: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0, "Thời gian phải ≥ 0"),
-  introOverlayDurationInSeconds: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0, "Thời gian phải ≥ 0"),
-  pauseOverlayDurationInSeconds: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0, "Thời gian phải ≥ 0"),
-  seekStepInSeconds: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(1, "Bước nhảy phải ≥ 1"),
+  startTimeInSeconds: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0, "Thời gian phải ≥ 0"),
+  endTimeCutInSeconds: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0, "Thời gian phải ≥ 0"),
+  introOverlayDurationInSeconds: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0, "Thời gian phải ≥ 0"),
+  pauseOverlayDurationInSeconds: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0, "Thời gian phải ≥ 0"),
+  seekStepInSeconds: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(1, "Bước nhảy phải ≥ 1"),
   letterboxTopPercentage: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0).max(50),
-  letterboxBottomPercentage: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0).max(50),
-  letterboxLeftPercentage: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0).max(50),
-  letterboxRightPercentage: z.number({ message: "Vui lòng nhập số hợp lệ" }).min(0).max(50),
+  letterboxBottomPercentage: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0)
+    .max(50),
+  letterboxLeftPercentage: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0)
+    .max(50),
+  letterboxRightPercentage: z
+    .number({ message: "Vui lòng nhập số hợp lệ" })
+    .min(0)
+    .max(50),
   hasWatermark: z.boolean(),
 });
 
-export function LessonVideoSettingsForm({ lessonId, initialSettings }: LessonVideoSettingsFormProps) {
+export function LessonVideoSettingsForm({
+  lessonId,
+  initialSettings,
+}: LessonVideoSettingsFormProps) {
   const queryClient = useQueryClient();
   const session = useAuthSessionStore((state) => state.session);
   const [isOpen, setIsOpen] = useState(false);
@@ -53,9 +77,14 @@ export function LessonVideoSettingsForm({ lessonId, initialSettings }: LessonVid
     },
   });
 
-  const { register, watch, handleSubmit, formState: { isSubmitting, errors } } = form;
+  const {
+    register,
+    watch,
+    handleSubmit,
+    formState: { errors },
+  } = form;
   const isDisabled = watch("isDisabled");
-  
+
   const topLetterbox = watch("letterboxTopPercentage") ?? 0;
   const bottomLetterbox = watch("letterboxBottomPercentage") ?? 0;
   const leftLetterbox = watch("letterboxLeftPercentage") ?? 0;
@@ -77,7 +106,11 @@ export function LessonVideoSettingsForm({ lessonId, initialSettings }: LessonVid
   });
 
   const onSubmit = (data: CustomVideoSettings) => {
-    updateMutation.mutate(data);
+    updateMutation.mutate({
+      ...DEFAULT_CUSTOM_VIDEO_SETTINGS,
+      ...(initialSettings ?? {}),
+      ...data,
+    });
   };
 
   if (!isOpen) {
@@ -99,7 +132,7 @@ export function LessonVideoSettingsForm({ lessonId, initialSettings }: LessonVid
           <Settings className="w-4 h-4 text-[var(--theme-primary)]" />
           Cài đặt Custom Video Player
         </div>
-        <button 
+        <button
           onClick={() => setIsOpen(false)}
           className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
         >
@@ -115,8 +148,13 @@ export function LessonVideoSettingsForm({ lessonId, initialSettings }: LessonVid
             {...register("isDisabled")}
           />
           <div className="flex-1">
-            <p className="font-bold text-[var(--theme-text-strong)] text-sm">Sử dụng YouTube Player mặc định</p>
-            <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">Tắt hoàn toàn giao diện tùy chỉnh và sử dụng khung phát video gốc của YouTube (có logo, quảng cáo...).</p>
+            <p className="font-bold text-[var(--theme-text-strong)] text-sm">
+              Sử dụng YouTube Player mặc định
+            </p>
+            <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
+              Tắt hoàn toàn giao diện tùy chỉnh và sử dụng khung phát video gốc của
+              YouTube (có logo, quảng cáo...).
+            </p>
           </div>
         </label>
 
@@ -172,7 +210,9 @@ export function LessonVideoSettingsForm({ lessonId, initialSettings }: LessonVid
                   className="w-4 h-4 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] bg-[var(--theme-surface)]"
                   {...register("hasWatermark")}
                 />
-                <span className="font-semibold text-[var(--theme-text-strong)] text-sm">Hiện Logo ClassHero góc trên bên phải</span>
+                <span className="font-semibold text-[var(--theme-text-strong)] text-sm">
+                  Hiện Logo ClassHero góc trên bên phải
+                </span>
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">

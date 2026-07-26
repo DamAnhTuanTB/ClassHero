@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 
@@ -53,6 +54,14 @@ export function internalServerErrorException(
   return new InternalServerErrorException(createApiErrorBody(code, message, details));
 }
 
+export function serviceUnavailableException(
+  code: string,
+  message: string,
+  details?: unknown,
+) {
+  return new ServiceUnavailableException(createApiErrorBody(code, message, details));
+}
+
 export function throwBadRequest(code: string, message: string, details?: unknown): never {
   throw badRequestException(code, message, details);
 }
@@ -83,4 +92,12 @@ export function throwInternalServerError(
   details?: unknown,
 ): never {
   throw internalServerErrorException(code, message, details);
+}
+
+export function throwServiceUnavailable(
+  code: string,
+  message: string,
+  details?: unknown,
+): never {
+  throw serviceUnavailableException(code, message, details);
 }

@@ -118,6 +118,7 @@ Rules:
 - `lesson_type` chỉ nhận `BASIC` hoặc `LIVE` và mặc định là `BASIC`.
 - `live_url` là optional cho buổi `LIVE`; buổi `BASIC` luôn lưu `live_url = null`.
 - `learning_path_id` trên `lessons` được giữ như denormalized compatibility/filter field trong giai đoạn nối M3.4; source of truth phân cấp vẫn là `chapter_id -> learning_path_chapters.learning_path_id`.
+- `custom_video_settings` (field JSON hiện có trong Prisma) có thể lưu transcript đã được admin duyệt ở `transcript: Array<{ time: number; endTime?: number; text: string }>` và ngôn ngữ ở `transcriptLanguage`; transcript là optional nên M3.8 không cần migration riêng. `time`/`endTime` lưu theo timestamp video nguồn với tối đa 3 chữ số thập phân để có thể ánh xạ lại khi cấu hình cắt thay đổi. API bản nháp và form admin hiển thị `playbackTime = sourceTime - startTimeInSeconds`; khi lưu/phát, frontend đổi ngược về source time. `endTime` optional để dữ liệu transcript cũ vẫn tương thích.
 - Quiz, flashcard, test, document, summary, progress và AI chat vẫn gắn với `lesson_id`.
 - Counter `learning_paths.total_chapter_count` và `learning_paths.total_lesson_count` phải được service cập nhật khi tạo/xóa mềm phần tử liên quan.
 - Chapter/lesson được clone cho bản cá nhân giữ `source_chapter_id`/`source_lesson_id` để ánh xạ lịch sử học trước khi cá nhân hóa.

@@ -414,6 +414,16 @@ Không dùng Socket.IO để làm chat realtime giữa người dùng trong MVP.
 
 ---
 
+## 10.1. YouTube public transcript
+
+- M3.8 lấy transcript best-effort ở server từ caption công khai của video YouTube bên thứ ba.
+- Tích hợp này không dùng YouTube Data API `captions.download`, vì endpoint chính thức yêu cầu OAuth và quyền chỉnh sửa video.
+- Không cần API key/env mới. Không chạy speech-to-text fallback trong MVP.
+- Request phải có timeout, giới hạn retry và lỗi thân thiện; thất bại không được ảnh hưởng video playback hoặc transcript đã lưu.
+- Do đây là endpoint không được YouTube cam kết ổn định cho video bên thứ ba, code phải cô lập sau service riêng để có thể thay provider sau này.
+
+---
+
 ## 11. Nginx/domain/SSL
 
 Production:

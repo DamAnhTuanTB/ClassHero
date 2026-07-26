@@ -36,6 +36,27 @@ export class VideoChapterDto {
   title!: string;
 }
 
+export class VideoTranscriptSegmentDto {
+  @ApiProperty({ example: 15.13, minimum: 0 })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  time!: number;
+
+  @ApiPropertyOptional({ example: 22.4, minimum: 0 })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  endTime?: number;
+
+  @ApiProperty({ example: "Hai đơn thức đồng dạng có cùng phần biến." })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  text!: string;
+}
+
 export class CustomVideoSettingsDto {
   @ApiPropertyOptional()
   @ValidateIf((_, value: unknown) => value !== undefined)
@@ -98,6 +119,20 @@ export class CustomVideoSettingsDto {
   @ValidateNested({ each: true })
   @Type(() => VideoChapterDto)
   chapters?: VideoChapterDto[];
+
+  @ApiPropertyOptional({ example: "vi", maxLength: 35 })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsString()
+  @MaxLength(35)
+  transcriptLanguage?: string;
+
+  @ApiPropertyOptional({ type: [VideoTranscriptSegmentDto] })
+  @ValidateIf((_, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(10_000)
+  @ValidateNested({ each: true })
+  @Type(() => VideoTranscriptSegmentDto)
+  transcript?: VideoTranscriptSegmentDto[];
 }
 
 export class UpdateLessonDto {

@@ -8,6 +8,7 @@ import type {
   AdminLearningPathPayload,
   AdminLessonPayload,
 } from "@/features/admin/courses/types/admin-course-api-types";
+import type { CustomVideoSettings } from "@/components/shared/custom-youtube-player";
 
 export function toLearningPathApiPayload(
   values: LearningPathFormValues,
@@ -86,6 +87,44 @@ export function toLessonApiPayload(
     ...(values.trialEnabled !== undefined ? { trialEnabled: values.trialEnabled } : {}),
     ...(values.status !== undefined ? { status: values.status } : {}),
     ...(sourceDocumentExtractions !== undefined ? { sourceDocumentExtractions } : {}),
+  };
+}
+
+export function toCustomVideoSettingsApiPayload(
+  settings: CustomVideoSettings,
+): CustomVideoSettings {
+  return {
+    isDisabled: settings.isDisabled,
+    startTimeInSeconds: settings.startTimeInSeconds,
+    endTimeCutInSeconds: settings.endTimeCutInSeconds,
+    introOverlayDurationInSeconds: settings.introOverlayDurationInSeconds,
+    pauseOverlayDurationInSeconds: settings.pauseOverlayDurationInSeconds,
+    seekStepInSeconds: settings.seekStepInSeconds,
+    letterboxTopPercentage: settings.letterboxTopPercentage,
+    letterboxRightPercentage: settings.letterboxRightPercentage,
+    letterboxBottomPercentage: settings.letterboxBottomPercentage,
+    letterboxLeftPercentage: settings.letterboxLeftPercentage,
+    hasWatermark: settings.hasWatermark,
+    ...(settings.chapters !== undefined
+      ? {
+          chapters: settings.chapters.map((chapter) => ({
+            time: chapter.time,
+            title: chapter.title,
+          })),
+        }
+      : {}),
+    ...(settings.transcriptLanguage !== undefined
+      ? { transcriptLanguage: settings.transcriptLanguage }
+      : {}),
+    ...(settings.transcript !== undefined
+      ? {
+          transcript: settings.transcript.map((segment) => ({
+            ...(segment.endTime !== undefined ? { endTime: segment.endTime } : {}),
+            time: segment.time,
+            text: segment.text,
+          })),
+        }
+      : {}),
   };
 }
 

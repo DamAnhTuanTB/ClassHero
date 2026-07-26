@@ -82,9 +82,24 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - Lỗi: form hiển thị chapters hợp lệ nhưng PATCH lesson trả `400 VALIDATION_ERROR` với message chung "Dữ liệu không hợp lệ".
 - Nguyên nhân: frontend đã thêm `customVideoSettings.chapters` vào payload nhưng DTO nested của backend chưa khai báo field này; global `ValidationPipe` dùng `forbidNonWhitelisted` nên từ chối field lạ trước khi service chạy.
 - Cách tránh: khi thêm field persisted vào JSON/form, phải cập nhật đồng thời type/schema frontend, DTO nested backend, API contract và test validation bằng payload thật. Không nới global whitelist để chữa triệu chứng; khai báo đúng field được phép và validation tối thiểu theo nghiệp vụ.
+- Lỗi round-trip JSON: dữ liệu cũ trong database có thể còn field đã bỏ như `transcriptTimeline`; nếu frontend trải nguyên `customVideoSettings` đọc từ API vào payload PATCH, global whitelist vẫn từ chối dù các field transcript đang hiển thị đều hợp lệ.
+- Cách tránh: API client phải tạo payload bằng allowlist serializer, chỉ lấy từng field thuộc contract hiện tại và clone rõ các item nested. Không dùng spread toàn bộ JSON persisted cho request ghi; cách này đồng thời loại field legacy/obsolete mà không cần nới validation backend.
 - Lỗi: bấm bắt đầu video rồi màn hình loading giữ rất lâu dù nút đã nhận click.
 - Nguyên nhân: UI cho phép gọi YouTube `playVideo()` khi object player đã có method nhưng provider chưa phát `onReady`; đồng thời gọi `seekTo()` ngay trước lần phát đầu tạo thêm một vòng buffer dù `playerVars.start` đã định vị sẵn.
 - Cách tránh: phân biệt trạng thái provider `ready`, ý định người dùng `start requested` và xác nhận `playing`. Chỉ nhận cú bấm sau `onReady`, không dùng việc method tồn tại làm bằng chứng player đã sẵn sàng và tránh seek dư trước lần phát đầu. Trong khoảng `start requested -> playing`, giữ một loading state liên tục trên màn bắt đầu; chỉ hiện controls khi provider xác nhận `PLAYING` để UI không mô tả sai trạng thái thực tế.
+- Lỗi: transcript hiển thị `0:05` ở đầu bài dù custom player đã cắt 5 giây đầu và đang đứng tại `0:00`.
+- Nguyên nhân: caption được lọc đúng bằng timestamp video YouTube gốc nhưng chưa đổi sang trục phát của custom player; action phát lại nhận cùng timestamp nguồn nên UI và player dùng hai hệ quy chiếu khác nhau.
+- Cách tránh: phân biệt rõ `source time` và `playback time`. Dùng source time làm dữ liệu lưu ổn định; API bản nháp và form hiển thị `playbackTime = sourceTime - startCut`, còn khi lưu/phát thì đổi ngược `sourceTime = startCut + playbackTime`. Cách này vẫn đúng nếu admin đổi cấu hình cắt đầu về sau và không cần migration transcript cũ.
+- Lỗi: transcript theo cue YouTube có thể chồng thời gian, làm quy tắc chọn ô active khó dự đoán và UI chuyển ô không đúng kỳ vọng của owner.
+- Quyết định cuối cùng: để action phát khớp tốt nhất với lời thoại hiện có, transcript lấy mới phải giữ nguyên từng cue `offset`/`duration` mà YouTube trả về; không ép thành bucket 5 giây và không tự phân phối từ.
+- Lỗi triển khai cần tránh: làm tròn `offset` thập phân thành giây nguyên trên form rồi dùng giá trị đã làm tròn để seek sẽ làm mất độ chính xác dù backend đã giữ đúng cue.
+- Cách tránh: giữ số thực tối đa 3 chữ số thập phân xuyên suốt provider → API draft → form → JSON lưu → `seekTo`; chỉ format phần hiển thị mà không làm mất giá trị thời gian. Khi đổi giữa `source time` và `playback time`, phép trừ/cộng JavaScript có thể tạo đuôi IEEE-754 như `5.1370000000000005`, vì vậy phải chuẩn hóa lại tối đa 3 chữ số thập phân ngay trước khi tạo payload PATCH; không dùng giá trị đã format trên UI để thay thế timestamp chính xác.
+- Lỗi UI cần tránh: đặt chapter header chứa action ở chế độ `sticky` ngay trong container transcript cuộn có thể làm header phủ lên label/input của row đầu khi người dùng cuộn.
+- Cách tránh: giữ header/action trong luồng layout bình thường nếu chưa có thiết kế sticky hoàn chỉnh với vùng chiếm chỗ, nền opaque và offset cuộn tương ứng; không thêm `sticky` chỉ để giữ một nút luôn nhìn thấy.
+- Lỗi focus transcript chậm một cue: caption YouTube có thể có các khoảng `offset + duration` chồng nhau; nếu tìm từ đầu danh sách và trả cue đầu tiên còn hiệu lực, cue cũ sẽ giữ focus dù cue mới đã bắt đầu.
+- Cách tránh: trong các cue đang chứa thời gian player, chọn cue có `time` lớn nhất. Không cộng offset giả vào player và không sửa nội dung/timestamp chỉ để che lỗi thứ tự ưu tiên active.
+- Lỗi nhập chapter/transcript bị khựng: `useWatch()` ở cấp panel theo dõi toàn bộ mảng transcript và Zod resolver kiểm tra lại hàng trăm đoạn sau mỗi ký tự; preview chapter còn làm component player nặng render liên tục.
+- Cách tránh: chỉ subscribe form state ở đúng hàng/field đang nhập, dùng validation Zod cấp field khi `onChange` và parse toàn schema một lần trước khi lưu. Tách hàng dài thành component `memo` để đổi active/error của một hàng không render lại mọi hàng; với preview nặng nhưng không gọi API, debounce ngắn để ưu tiên phản hồi bàn phím. `useWatch()` vẫn đúng cho giá trị dẫn xuất cần realtime, nhưng phải watch phạm vi nhỏ thay vì cả field array lớn.
 
 ## File quan trọng
 
@@ -108,6 +123,8 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - `apps/web/features/admin/courses/screens/admin-courses-manager/components/path-editor.tsx`
 - `apps/web/features/admin/courses/admin-courses-schemas.ts`
 - `apps/web/components/common/forms/text-field.tsx`
+- `apps/web/features/admin/lessons/components/lesson-video-transcript-row.tsx`
+- `apps/web/features/admin/lessons/schemas/lesson-video-transcript-schema.ts`
 
 ## Task liên quan
 

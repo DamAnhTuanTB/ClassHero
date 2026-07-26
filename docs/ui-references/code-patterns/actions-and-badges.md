@@ -71,3 +71,14 @@ Trong implementation:
 - Không xóa trực tiếp từ row/list mà thiếu confirm dialog.
 - Không dùng màu primary/xanh cho action destructive.
 - Không để confirm dialog thiếu `Hủy` hoặc thiếu nút `X`.
+- Không dùng `window.confirm`, `window.alert` hoặc hộp thoại native của trình duyệt cho action quản trị. Mọi xác nhận phải dùng dialog theo theme dự án, copy tiếng Việt và màu/icon đúng semantic của hành động.
+
+## 4. Non-destructive Confirm Dialog
+
+Dùng cho action thay thế dữ liệu nháp, tải lại hoặc làm mới nhưng chưa thay đổi dữ liệu đã lưu ngay lập tức.
+
+- Dùng cùng shell ba vùng header/body/footer như confirm destructive.
+- Header có icon cảnh báo hoặc làm mới; action chính dùng màu primary thay vì màu đỏ.
+- Body nói rõ dữ liệu nào bị thay trong UI và thời điểm nào dữ liệu thật mới được lưu.
+- Footer luôn có `Hủy` và action tiếng Việt mô tả đúng việc sẽ làm, ví dụ `Lấy lại transcript`.
+- Không dùng label chung chung kiểu `OK`, `Cancel` hoặc dialog có title `localhost says`.

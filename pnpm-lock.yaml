@@ -89,6 +89,9 @@ importers:
       yauzl:
         specifier: ^3.4.0
         version: 3.4.0
+      youtube-transcript-plus:
+        specifier: ^2.0.0
+        version: 2.0.0
       zod:
         specifier: 4.2.1
         version: 4.2.1
@@ -4750,6 +4753,10 @@ packages:
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
+
+  youtube-transcript-plus@2.0.0:
+    resolution: {integrity: sha512-n4nnGVV3ZABnvk/sSF+W51c/+P6I23kLwwhOiYeKLeHOGfpjwCUthhoKgQk9dldJEgHCkbyJpuD3vkbBxWqDHA==}
+    engines: {node: '>=20.0.0'}
 
   zeptomatch@2.1.0:
     resolution: {integrity: sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA==}
@@ -9642,6 +9649,8 @@ snapshots:
       pend: 1.2.0
 
   yocto-queue@0.1.0: {}
+
+  youtube-transcript-plus@2.0.0: {}
 
   zeptomatch@2.1.0:
     dependencies:

@@ -191,6 +191,7 @@ export class LessonsService {
     if (Object.keys(dto).length === 0) {
       throwBadRequest("VALIDATION_ERROR", "Cần cung cấp ít nhất một trường để cập nhật");
     }
+    this.assertTranscriptIsChronological(dto.customVideoSettings?.transcript);
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -259,7 +260,11 @@ export class LessonsService {
               : {}),
             ...(dto.trialEnabled !== undefined ? { trialEnabled: dto.trialEnabled } : {}),
             ...(dto.customVideoSettings !== undefined
-              ? { customVideoSettings: dto.customVideoSettings ? (dto.customVideoSettings as any) : null }
+              ? {
+                  customVideoSettings: dto.customVideoSettings
+                    ? (dto.customVideoSettings as unknown as Prisma.InputJsonValue)
+                    : Prisma.DbNull,
+                }
               : {}),
             ...(dto.status !== undefined ? { status } : {}),
             updatedById: actorUserId,
@@ -309,6 +314,41 @@ export class LessonsService {
       return serializeLesson(result.lesson);
     } catch (error) {
       handleKnownPrismaError(error);
+    }
+  }
+
+  private assertTranscriptIsChronological(
+    transcript: NonNullable<UpdateLessonDto["customVideoSettings"]>["transcript"],
+  ) {
+    if (!transcript) {
+      return;
+    }
+
+    for (let index = 0; index < transcript.length; index += 1) {
+      const segment = transcript[index];
+      if (!segment || segment.text.trim().length === 0) {
+        throwBadRequest(
+          "VIDEO_TRANSCRIPT_INVALID",
+          "Nội dung transcript không được để trống",
+          { index },
+        );
+      }
+
+      if (segment.endTime !== undefined && segment.endTime < segment.time) {
+        throwBadRequest(
+          "VIDEO_TRANSCRIPT_INVALID",
+          "Thời gian kết thúc transcript phải lớn hơn hoặc bằng thời gian bắt đầu",
+          { index },
+        );
+      }
+
+      if (index > 0 && segment.time < transcript[index - 1]!.time) {
+        throwBadRequest(
+          "VIDEO_TRANSCRIPT_INVALID",
+          "Các đoạn transcript phải được sắp xếp theo thời gian tăng dần",
+          { index },
+        );
+      }
     }
   }
 

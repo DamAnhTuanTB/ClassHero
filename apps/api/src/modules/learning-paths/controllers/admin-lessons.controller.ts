@@ -24,6 +24,7 @@ import { RolesGuard } from "#api/common/auth/roles.guard";
 import { CreateLessonDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
 import { UpdateLessonDto } from "#api/modules/learning-paths/dto/update-lesson.dto";
 import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
+import { YoutubeTranscriptService } from "#api/modules/learning-paths/services/youtube-transcript.service";
 
 @ApiTags("admin-lessons")
 @ApiBearerAuth()
@@ -34,6 +35,8 @@ export class AdminLessonsController {
   constructor(
     @Inject(LessonsService)
     private readonly lessonsService: LessonsService,
+    @Inject(YoutubeTranscriptService)
+    private readonly youtubeTranscriptService: YoutubeTranscriptService,
   ) {}
 
   @Get("admin/chapters/:chapterId/lessons")
@@ -62,6 +65,12 @@ export class AdminLessonsController {
   @ApiOperation({ summary: "Get one lesson for admin management" })
   getById(@Param("lessonId") lessonId: string) {
     return this.lessonsService.getForAdmin(lessonId);
+  }
+
+  @Post("admin/lessons/:lessonId/video-transcript/fetch")
+  @ApiOperation({ summary: "Fetch a public YouTube transcript draft for admin review" })
+  fetchVideoTranscript(@Param("lessonId") lessonId: string) {
+    return this.youtubeTranscriptService.fetchForLesson(lessonId);
   }
 
   @Patch("admin/lessons/:lessonId")
