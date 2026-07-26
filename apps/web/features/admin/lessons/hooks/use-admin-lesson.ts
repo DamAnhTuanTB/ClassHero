@@ -3,14 +3,13 @@ import { getAdminLesson } from "@/features/admin/courses/api/admin-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
 export function useAdminLesson(lessonId: string) {
+  const isHydrated = useAuthSessionStore((state) => state.isHydrated);
   const session = useAuthSessionStore((state) => state.session);
+  const accessToken = session?.accessToken ?? "";
 
   return useQuery({
-    queryKey: ["admin-lesson", lessonId],
-    queryFn: async () => {
-      // if (!session?.accessToken) throw new Error("No token");
-      return getAdminLesson(lessonId, session?.accessToken || "fake-token");
-    },
-    enabled: !!lessonId,
+    queryKey: ["admin-lesson", lessonId, session?.user.id ?? "guest"],
+    queryFn: () => getAdminLesson(lessonId, accessToken),
+    enabled: isHydrated && Boolean(accessToken) && Boolean(lessonId),
   });
 }

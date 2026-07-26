@@ -122,6 +122,7 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - Nếu route có `RolesGuard` trả `500` với lỗi `getAllAndOverride` trên `undefined`, kiểm tra guard có inject `Reflector` bằng `@Inject(Reflector)` chưa. Trong dev runtime thiếu metadata, constructor DI không explicit có thể nhận `undefined`.
 - Nếu màn protected hiện error state như "Chưa tải được danh sách" sau khi để máy lâu, kiểm tra access token đã hết hạn chưa. Đúng flow là Query/Mutation nhận 401, provider clear session, route guard đưa về `/login`; không để từng feature tự kiểm `statusCode === 401` rải rác.
 - Nếu đã đăng nhập mà browser Back hoặc gõ tay `/login`/`/register/...` vẫn thấy form auth, thiếu guard ở `(auth)/layout.tsx`. Đúng flow là auth layout kiểm session, gọi `/me`, rồi redirect user hợp lệ về màn theo role.
+- Nếu trang admin vẫn đọc được dữ liệu nhưng mutation báo "Chưa đăng nhập", kiểm tra đồng thời ba lớp: route-group admin phải còn `AuthenticatedRouteGuard`, query không được fallback sang token giả, và controller admin phải có `JwtAuthGuard + RolesGuard + @Roles(UserRole.ADMIN)`. Không để GET mở công khai che giấu session rỗng rồi chỉ lỗi khi POST/PATCH cần `@CurrentUser`.
 
 ## File quan trọng
 

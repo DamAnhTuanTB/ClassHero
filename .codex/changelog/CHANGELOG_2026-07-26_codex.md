@@ -1,0 +1,1 @@
+- 2026-07-26: Khôi phục guard xác thực và phân quyền ADMIN cho trang/API quản trị bài học, loại bỏ token giả khỏi query lesson và ghi lại nguyên tắc giữ session nhất quán xuyên suốt UI với backend.

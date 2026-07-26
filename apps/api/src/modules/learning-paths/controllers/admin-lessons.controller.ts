@@ -27,8 +27,8 @@ import { LessonsService } from "#api/modules/learning-paths/services/lessons.ser
 
 @ApiTags("admin-lessons")
 @ApiBearerAuth()
-
-
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
 @Controller()
 export class AdminLessonsController {
   constructor(
