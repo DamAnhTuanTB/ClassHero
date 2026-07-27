@@ -70,6 +70,10 @@
   color-scheme: light;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 html.dark {
   --background: #020617;
   --foreground: #f8fafc;

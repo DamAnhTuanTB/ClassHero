@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Layers, Loader2, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import type {
@@ -16,6 +16,7 @@ import {
 } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
 import { FlashcardSetPanel } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-panel";
 import { FlashcardSetTabs } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-tabs";
+import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
 
 const FlashcardSetEditorDialog = dynamic(() =>
@@ -45,6 +46,22 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
     AdminFlashcard | null | undefined
   >(undefined);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const {
+    minHeight: flashcardSetPanelMinHeight,
+    panelRef: flashcardSetPanelRef,
+    preserveCurrentHeight: preserveFlashcardSetPanelHeight,
+  } = useStableTabPanelHeight();
+  const handleSelectSet = useCallback(
+    (setId: string) => {
+      if (setId === selectedSetId) {
+        return;
+      }
+
+      preserveFlashcardSetPanelHeight();
+      setSelectedSetId(setId);
+    },
+    [preserveFlashcardSetPanelHeight, selectedSetId],
+  );
 
   useEffect(() => {
     if (!sets?.length) {
@@ -52,9 +69,9 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
       return;
     }
     if (!sets.some((set) => set.id === selectedSetId)) {
-      setSelectedSetId(sets[0]?.id ?? "");
+      handleSelectSet(sets[0]?.id ?? "");
     }
-  }, [selectedSetId, sets]);
+  }, [handleSelectSet, selectedSetId, sets]);
 
   const activeSet = useMemo(
     () => sets?.find((set) => set.id === selectedSetId) ?? null,
@@ -135,10 +152,12 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
           <FlashcardSetTabs
             activeSetId={selectedSetId}
             sets={sets}
-            onSelect={setSelectedSetId}
+            onSelect={handleSelectSet}
           />
           {activeSet ? (
             <FlashcardSetPanel
+              minHeight={flashcardSetPanelMinHeight}
+              panelRef={flashcardSetPanelRef}
               set={activeSet}
               onAddCard={() => setCardEditorTarget(null)}
               onDeleteCard={(card) =>
@@ -169,7 +188,7 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
           lessonId={lessonId}
           set={setEditorTarget}
           onClose={() => setSetEditorTarget(undefined)}
-          onSaved={(savedSet) => setSelectedSetId(savedSet.id)}
+          onSaved={(savedSet) => handleSelectSet(savedSet.id)}
         />
       ) : null}
 

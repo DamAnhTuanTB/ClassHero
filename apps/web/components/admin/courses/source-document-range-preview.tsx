@@ -24,26 +24,28 @@ export function SourceDocumentRangePreview({
 
   return (
     <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-extrabold uppercase text-[var(--theme-text-muted)]">
             Xem nhanh
           </p>
-          <p className="mt-1 text-sm font-extrabold text-[var(--theme-primary)]">
+          <p className="mt-1 truncate text-sm font-extrabold text-[var(--theme-primary)]">
             {sourceDocument?.title ??
               sourceDocument?.file.originalName ??
               "Chưa chọn tài liệu nguồn"}
           </p>
         </div>
         {pages.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex">
+            <div className="flex min-w-0 rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
               <button
                 type="button"
+                aria-label="Nội dung OCR"
                 onClick={() => setPreviewMode("ocr")}
                 className={previewButtonClass(previewMode === "ocr", true)}
               >
-                Nội dung OCR
+                <span className="hidden min-[360px]:inline">Nội dung </span>
+                OCR
               </button>
               <button
                 type="button"
@@ -56,7 +58,7 @@ export function SourceDocumentRangePreview({
             <button
               type="button"
               onClick={() => setIsExpanded((current) => !current)}
-              className="inline-flex min-h-9 items-center gap-1 rounded-md px-2 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-surface-hover)]"
+              className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-bold text-[var(--theme-primary)] transition hover:bg-[var(--theme-surface-hover)] sm:min-h-9"
             >
               {isExpanded ? (
                 <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -129,7 +131,7 @@ export function SourceDocumentRangePreview({
 
 function previewButtonClass(active: boolean, isFirst: boolean) {
   return [
-    "px-2.5 py-1 text-xs font-bold transition-colors",
+    "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap px-2 py-1 text-xs font-bold transition-colors sm:min-h-9 sm:px-2.5",
     isFirst ? "rounded-l-md" : "rounded-r-md",
     active
       ? "bg-[var(--theme-primary)] text-white"

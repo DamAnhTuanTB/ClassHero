@@ -240,7 +240,7 @@ export function LessonDocumentsTab({
 
   return (
     <form className="flex min-w-0 flex-col" onSubmit={handleSubmit} noValidate>
-      <div className="space-y-3 p-4 sm:p-5">
+      <div className="space-y-3 sm:p-5">
         <LessonDocumentsFields
           disabled={false}
           form={form}

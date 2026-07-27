@@ -262,6 +262,7 @@ Rules:
 - Tablet/iPad: layout trung gian hợp lý; có thể 2 cột nếu giúp đọc/học tốt hơn.
 - Desktop: tận dụng sidebar, split view, table, secondary panel khi có lợi.
 - Không để tab/table/form gây overflow ngang vô kiểm soát.
+- Thanh tab cuộn ngang trên mobile phải tự đưa tab active vào trọn vùng nhìn thấy sau click/keyboard, ưu tiên đặt gần giữa viewport tab khi còn khoảng cuộn và áp dụng đối xứng khi chọn item bên trái hoặc bên phải; không để chỉ còn icon, cắt mất nhãn hoặc giữ tab active lệch sát mép dù người dùng vừa chọn lại item trước đó. Nếu không dùng Tabs primitive của shadcn/Radix, custom tab phải giữ semantic `tablist`/`tab`, roving `tabIndex`, phím mũi tên/Home/End và hành vi reveal active item.
 - Lesson/quiz/test mobile ưu tiên nội dung chính; điều hướng phụ dùng drawer/tabs/sticky footer.
 
 Breakpoint/pattern mặc định:
@@ -308,6 +309,8 @@ Frontend rules:
 - Mọi output render lần đầu phải hydration-safe: không dùng formatter/sort phụ thuộc khác biệt server-client, `Date.now()`, `Math.random()` hoặc browser-only branch trong JSX đầu tiên; nếu browser/autofill chèn attribute ngoài ý muốn vào input, xử lý tại primitive thay vì để dev overlay làm người dùng tưởng app lỗi.
 - Ảnh phải tối ưu kích thước, dùng responsive image, lazy load ảnh ngoài viewport và tránh ảnh quá lớn cho mobile.
 - Không dùng animation trên thuộc tính gây layout/reflow nặng; ưu tiên transform/opacity.
+- Với tab dữ liệu có panel lớn hoặc chiều cao khác nhau, không dùng shared-layout measurement/`layoutId`, animation `height` hoặc exit-before-enter làm việc đổi tab phải chờ đo lại toàn bộ DOM. Indicator nên chạy bằng `transform` trên một layout tab ổn định; panel dữ liệu đổi trực tiếp và dùng skeleton có kích thước phù hợp nếu phải tải lazy. Nếu panel mới hoặc query của nested tab có thể tạm co thấp hơn panel cũ, giữ `min-height` ít nhất bằng chiều cao panel đang hiển thị ngay trong cùng lần đổi state để document không co giãn qua nhiều frame; rule này áp dụng cả tab cấp trang lẫn tab set con như bộ Quiz/Flashcard.
+- Root page phải giữ scrollbar gutter ổn định khi các tab/route có thể làm scrollbar dọc xuất hiện hoặc biến mất, tránh toàn bộ shell dịch ngang giữa hai trạng thái.
 - Tôn trọng `prefers-reduced-motion` khi thêm animation đáng kể.
 
 Mobile UX rules:

@@ -72,7 +72,22 @@ export function LessonSourceExtractionBlock({
   const isRangeInputDisabled = disabled || !readiness.isReady;
 
   return (
-    <div className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3">
+    <div className="grid gap-3 sm:rounded-lg sm:border sm:border-[var(--theme-border)] sm:bg-[var(--theme-surface)] sm:p-3">
+      <div className="flex items-center justify-between gap-3 sm:hidden">
+        <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+          Khoảng trích xuất {index + 1}
+        </p>
+        <button
+          type="button"
+          aria-label={`Xóa khối trích xuất ${index + 1}`}
+          disabled={disabled}
+          onClick={onRemove}
+          className="theme-button-danger-subtle inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Trash2 className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+
       <OptionField
         id={`admin-lesson-extraction-source-${index}`}
         label="Tài liệu trích xuất"
@@ -151,8 +166,8 @@ export function LessonSourceExtractionBlock({
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-        <div className="min-w-0 max-sm:col-span-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:gap-3">
+        <div className="min-w-0">
           <TextField
             id={`admin-lesson-page-start-${index}`}
             label="Từ trang in"
@@ -172,7 +187,7 @@ export function LessonSourceExtractionBlock({
           error={errors?.pageEnd}
           {...endField}
         />
-        <div className="mt-7 flex min-h-[3.35rem] self-start items-center justify-end sm:justify-start">
+        <div className="mt-7 hidden min-h-[3.35rem] self-start items-center justify-start sm:flex">
           <button
             type="button"
             aria-label={`Xóa khối trích xuất ${index + 1}`}

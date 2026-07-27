@@ -1,16 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLesson } from "../../hooks/use-admin-lesson";
 import {
   Loader2,
   BookOpen,
   FileText,
-  HelpCircle,
   Layers,
-  ClipboardList,
   ChevronRight,
   ArrowLeft,
   Layers3,
@@ -36,16 +34,32 @@ import {
   adminSidebarCollapsedDatasetKey,
   adminSidebarCollapsedStorageKey,
 } from "@/lib/sidebar-collapse-state";
+import {
+  LessonContentTabs,
+  type LessonContentTabKey,
+} from "@/features/admin/lessons/screens/admin-lesson-detail/components/lesson-content-tabs";
 
 const LessonDetailEditorDialog = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
     (module) => module.LessonDetailEditorDialog,
   ),
 );
-const LessonDocumentsTab = dynamic(() =>
-  import("@/features/admin/lessons/components/lesson-documents-tab").then(
-    (module) => module.LessonDocumentsTab,
-  ),
+const LessonDocumentsTab = dynamic(
+  () =>
+    import("@/features/admin/lessons/components/lesson-documents-tab").then(
+      (module) => module.LessonDocumentsTab,
+    ),
+  {
+    loading: () => (
+      <div className="flex min-h-72 items-center justify-center gap-3 p-6 text-sm font-bold text-[var(--theme-text-muted)]">
+        <Loader2
+          className="h-5 w-5 animate-spin text-[var(--theme-primary)]"
+          aria-hidden="true"
+        />
+        Đang tải tài liệu buổi học
+      </div>
+    ),
+  },
 );
 const AdminQuizTab = dynamic(() =>
   import("@/features/admin/quiz/components/admin-quiz-tab").then(
@@ -62,8 +76,6 @@ interface AdminLessonDetailManagerProps {
   lessonId: string;
 }
 
-type TabKey = "documents" | "quiz" | "flashcard" | "test";
-
 const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Khóa học", icon: Layers3, active: true },
   { label: "Buổi học", icon: BookOpen, active: false },
@@ -73,17 +85,44 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
 export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerProps) {
   const router = useRouter();
   const { data: lesson, isLoading, error, refetch } = useAdminLesson(lessonId);
-  const [activeTab, setActiveTab] = useState<TabKey>("quiz");
+  const [activeTab, setActiveTab] = useState<LessonContentTabKey>("quiz");
+  const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
+  const [tabPanelMinHeight, setTabPanelMinHeight] = useState(400);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
   const [previewSettings, setPreviewSettings] = useState<CustomVideoSettings | null>(
     null,
   );
   const videoPlayerRef = useRef<CustomYoutubePlayerHandle>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
+  const tabPanelRef = useRef<HTMLDivElement>(null);
   const latestPlaybackTimeRef = useRef(0);
   const hasPlaybackTimeRef = useRef(false);
   const transcriptPlaybackListenerRef = useRef<((timeInSeconds: number) => void) | null>(
     null,
+  );
+
+  useEffect(() => {
+    const resetTabPanelMinHeight = () => setTabPanelMinHeight(400);
+    window.addEventListener("resize", resetTabPanelMinHeight);
+
+    return () => window.removeEventListener("resize", resetTabPanelMinHeight);
+  }, []);
+
+  const handleTabChange = useCallback(
+    (nextTab: LessonContentTabKey) => {
+      if (nextTab === activeTab) {
+        return;
+      }
+
+      const currentPanelHeight = tabPanelRef.current?.getBoundingClientRect().height;
+      if (currentPanelHeight) {
+        setTabPanelMinHeight((currentMinHeight) =>
+          Math.max(currentMinHeight, Math.ceil(currentPanelHeight)),
+        );
+      }
+      setActiveTab(nextTab);
+    },
+    [activeTab],
   );
 
   const handlePlaybackTimeChange = useCallback((timeInSeconds: number) => {
@@ -457,58 +496,19 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-2 overflow-x-auto no-scrollbar mt-4">
-                <button
-                  onClick={() => setActiveTab("documents")}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-bold transition-colors border-b-2",
-                    activeTab === "documents"
-                      ? "border-[var(--theme-primary)] text-[var(--theme-primary)]"
-                      : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)] hover:bg-[var(--theme-bg-hover)]",
-                  )}
-                >
-                  <FileText className="h-4 w-4" />
-                  Tài liệu
-                </button>
-                <button
-                  onClick={() => setActiveTab("quiz")}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-bold transition-colors border-b-2",
-                    activeTab === "quiz"
-                      ? "border-[var(--theme-primary)] text-[var(--theme-primary)]"
-                      : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)] hover:bg-[var(--theme-bg-hover)]",
-                  )}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                  Quiz
-                </button>
-                <button
-                  onClick={() => setActiveTab("flashcard")}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-bold transition-colors border-b-2",
-                    activeTab === "flashcard"
-                      ? "border-[var(--theme-primary)] text-[var(--theme-primary)]"
-                      : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)] hover:bg-[var(--theme-bg-hover)]",
-                  )}
-                >
-                  <Layers className="h-4 w-4" />
-                  Flashcard
-                </button>
-                <button
-                  onClick={() => setActiveTab("test")}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-bold transition-colors border-b-2",
-                    activeTab === "test"
-                      ? "border-[var(--theme-primary)] text-[var(--theme-primary)]"
-                      : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)] hover:bg-[var(--theme-bg-hover)]",
-                  )}
-                >
-                  <ClipboardList className="h-4 w-4" />
-                  Test
-                </button>
-              </div>
+              <LessonContentTabs
+                activeTab={activeTab}
+                panelId={lessonContentPanelId}
+                onChange={handleTabChange}
+              />
 
-              <div className="bg-[var(--theme-bg-subtle)] border border-[var(--theme-border)] rounded-xl min-h-[400px]">
+              <div
+                ref={tabPanelRef}
+                id={lessonContentPanelId}
+                role="tabpanel"
+                className="min-h-[400px] overflow-hidden bg-transparent sm:rounded-xl sm:border sm:border-[var(--theme-border)] sm:bg-[var(--theme-bg-subtle)]"
+                style={{ minHeight: tabPanelMinHeight }}
+              >
                 {activeTab === "documents" &&
                 !isLessonEditorOpen &&
                 lesson.learningPathId ? (
@@ -520,19 +520,19 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                 ) : null}
 
                 {activeTab === "quiz" && (
-                  <div className="p-6 h-full">
+                  <div className="h-full sm:p-6">
                     <AdminQuizTab lessonId={lessonId} />
                   </div>
                 )}
 
                 {activeTab === "flashcard" && (
-                  <div className="h-full p-4 sm:p-6">
+                  <div className="h-full sm:p-6">
                     <AdminFlashcardsTab lessonId={lessonId} />
                   </div>
                 )}
 
                 {activeTab === "test" && (
-                  <div className="p-6 text-[var(--theme-text-muted)] text-sm font-medium">
+                  <div className="p-4 text-sm font-medium text-[var(--theme-text-muted)] sm:p-6">
                     Quản lý Bài kiểm tra sẽ được tích hợp ở M6.4.
                   </div>
                 )}

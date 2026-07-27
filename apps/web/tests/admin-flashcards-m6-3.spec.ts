@@ -8,7 +8,7 @@ test("admin creates a flashcard set and card from lesson detail", async ({ page 
   await setupFlashcardApiMock(page);
 
   await page.goto(`/admin/lessons/${lessonId}`);
-  await page.getByRole("button", { name: "Flashcard" }).click();
+  await page.getByRole("tab", { name: "Flashcard" }).click();
 
   await expect(page.getByRole("heading", { name: "Quản lý Flashcard" })).toBeVisible();
   await expect(page.getByRole("tab", { name: /Công thức nền tảng/ })).toBeVisible();
@@ -52,7 +52,7 @@ test("admin edits the selected quiz set from its panel", async ({ page }) => {
   await setupFlashcardApiMock(page);
 
   await page.goto(`/admin/lessons/${lessonId}`);
-  await page.getByRole("button", { name: "Quiz" }).click();
+  await page.getByRole("tab", { name: "Quiz" }).click();
 
   await expect(page.getByRole("tab", { name: /Bộ câu hỏi 1/ })).toBeVisible();
   await page.getByRole("button", { name: "Sửa Bộ câu hỏi 1" }).click();

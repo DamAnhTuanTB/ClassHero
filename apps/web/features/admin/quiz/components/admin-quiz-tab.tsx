@@ -10,7 +10,14 @@ import {
   Trash2,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type Ref,
+} from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import type {
@@ -24,6 +31,8 @@ import {
   useAdminQuizSets,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
+import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
+import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { cn } from "@/lib/utils";
 
 const AdminQuizQuestionEditorDialog = dynamic(
@@ -61,6 +70,22 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
   const [setEditorTarget, setSetEditorTarget] = useState<AdminQuizSet | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const { deleteQuestion } = useAdminQuizQuestionMutations(selectedSetId, lessonId);
+  const {
+    minHeight: quizSetPanelMinHeight,
+    panelRef: quizSetPanelRef,
+    preserveCurrentHeight: preserveQuizSetPanelHeight,
+  } = useStableTabPanelHeight();
+  const handleSelectQuizSet = useCallback(
+    (setId: string) => {
+      if (setId === selectedSetId) {
+        return;
+      }
+
+      preserveQuizSetPanelHeight();
+      setSelectedSetId(setId);
+    },
+    [preserveQuizSetPanelHeight, selectedSetId],
+  );
 
   useEffect(() => {
     if (!quizSets?.length) {
@@ -79,6 +104,43 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
     () => quizSets?.find((set) => set.id === selectedSetId) ?? null,
     [quizSets, selectedSetId],
   );
+  const {
+    focusItem: focusQuizSetTab,
+    scrollerRef: quizSetTabsRef,
+    setItemRef: setQuizSetTabRef,
+  } = useRevealActiveHorizontalItem(activeSet?.id);
+
+  function handleQuizSetTabsKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) {
+    if (!quizSets?.length) {
+      return;
+    }
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % quizSets.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + quizSets.length) % quizSets.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = quizSets.length - 1;
+    }
+
+    if (nextIndex === null) {
+      return;
+    }
+    const nextSet = quizSets[nextIndex];
+    if (!nextSet) {
+      return;
+    }
+
+    event.preventDefault();
+    handleSelectQuizSet(nextSet.id);
+    focusQuizSetTab(nextSet.id);
+  }
 
   const handleSaveSet = async ({
     difficulty,
@@ -97,7 +159,7 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
             title,
             difficulty,
           });
-      setSelectedSetId(savedSet.id);
+      handleSelectQuizSet(savedSet.id);
       setIsSetEditorOpen(false);
       setSetEditorTarget(null);
       toast.success(setEditorTarget ? "Đã cập nhật bộ câu hỏi" : "Đã tạo bộ câu hỏi");
@@ -152,20 +214,24 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
       ) : (
         <>
           <div
+            ref={quizSetTabsRef}
             role="tablist"
             aria-label="Các bộ câu hỏi"
-            className="flex gap-2 overflow-x-auto border-b border-[var(--theme-border)] pb-0"
+            className="flex gap-2 overflow-x-auto overflow-y-hidden border-b border-[var(--theme-border)] pb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {quizSets.map((set) => {
+            {quizSets.map((set, setIndex) => {
               const isActive = set.id === activeSet?.id;
               return (
                 <button
                   key={set.id}
+                  ref={(element) => setQuizSetTabRef(set.id, element)}
                   type="button"
                   role="tab"
                   aria-selected={isActive}
                   aria-controls={`quiz-set-panel-${set.id}`}
-                  onClick={() => setSelectedSetId(set.id)}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => handleSelectQuizSet(set.id)}
+                  onKeyDown={(event) => handleQuizSetTabsKeyDown(event, setIndex)}
                   className={cn(
                     "relative inline-flex min-h-12 shrink-0 items-center gap-2 rounded-t-xl border border-b-0 px-4 text-sm font-extrabold transition",
                     isActive
@@ -195,6 +261,8 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
           {activeSet ? (
             <QuizSetPanel
               activeSet={activeSet}
+              minHeight={quizSetPanelMinHeight}
+              panelRef={quizSetPanelRef}
               onAddQuestion={() => {
                 setEditorQuestion(null);
                 setIsEditorOpen(true);
@@ -286,6 +354,8 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
 
 function QuizSetPanel({
   activeSet,
+  minHeight,
+  panelRef,
   onAddQuestion,
   onDeleteQuestion,
   onDeleteSet,
@@ -293,6 +363,8 @@ function QuizSetPanel({
   onEditQuestion,
 }: {
   activeSet: AdminQuizSet;
+  minHeight: number;
+  panelRef: Ref<HTMLElement>;
   onAddQuestion: () => void;
   onDeleteQuestion: (question: AdminQuizQuestion) => void;
   onDeleteSet: () => void;
@@ -302,9 +374,11 @@ function QuizSetPanel({
   const { data: questions, isLoading, isError } = useAdminQuizQuestions(activeSet.id);
   return (
     <section
+      ref={panelRef}
       id={`quiz-set-panel-${activeSet.id}`}
       role="tabpanel"
       className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm"
+      style={{ minHeight: minHeight || undefined }}
     >
       <div className="flex flex-col gap-4 border-b border-[var(--theme-border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
@@ -320,11 +394,11 @@ function QuizSetPanel({
             {questions?.length ?? activeSet._count.questions} câu hỏi
           </p>
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.5rem] gap-2 sm:flex">
+        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
           <button
             type="button"
             onClick={onAddQuestion}
-            className="theme-button-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold sm:flex-none"
+            className="theme-button-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold sm:flex-none sm:px-4"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Thêm câu hỏi
@@ -332,7 +406,7 @@ function QuizSetPanel({
           <button
             type="button"
             onClick={onEditSet}
-            className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
+            className="theme-button-primary-subtle grid h-10 w-10 place-items-center rounded-lg"
             aria-label={`Sửa ${activeSet.title}`}
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />

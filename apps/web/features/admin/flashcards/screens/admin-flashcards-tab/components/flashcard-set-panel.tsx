@@ -1,6 +1,7 @@
 "use client";
 
 import { Layers, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import type { Ref } from "react";
 import type {
   AdminFlashcard,
   AdminFlashcardSet,
@@ -16,6 +17,8 @@ const difficultyLabels = {
 } as const;
 
 export function FlashcardSetPanel({
+  minHeight,
+  panelRef,
   set,
   onAddCard,
   onDeleteCard,
@@ -23,6 +26,8 @@ export function FlashcardSetPanel({
   onEditCard,
   onEditSet,
 }: {
+  minHeight: number;
+  panelRef: Ref<HTMLElement>;
   set: AdminFlashcardSet;
   onAddCard: () => void;
   onDeleteCard: (card: AdminFlashcard) => void;
@@ -34,9 +39,11 @@ export function FlashcardSetPanel({
 
   return (
     <section
+      ref={panelRef}
       id={`flashcard-set-panel-${set.id}`}
       role="tabpanel"
       className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm"
+      style={{ minHeight: minHeight || undefined }}
     >
       <div className="flex flex-col gap-4 border-b border-[var(--theme-border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
@@ -52,11 +59,11 @@ export function FlashcardSetPanel({
             {cards?.length ?? set.cardCount} flashcard
           </p>
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.5rem] gap-2 sm:flex">
+        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
           <button
             type="button"
             onClick={onAddCard}
-            className="theme-button-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold sm:flex-none"
+            className="theme-button-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold sm:flex-none sm:px-4"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Thêm flashcard
@@ -64,7 +71,7 @@ export function FlashcardSetPanel({
           <button
             type="button"
             onClick={onEditSet}
-            className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
+            className="theme-button-primary-subtle grid h-10 w-10 place-items-center rounded-lg"
             aria-label={`Sửa ${set.title}`}
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
