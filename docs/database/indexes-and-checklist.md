@@ -18,13 +18,16 @@ ON test_attempts(student_user_id, lesson_id)
 WHERE is_best_for_lesson = true;
 ```
 
-Vector index ví dụ, cần điều chỉnh theo Supabase/model thực tế:
+Vector index đang dùng cho `document_chunks.embedding`:
 
 ```sql
--- Example only. Chỉ tạo sau khi xác định operator class phù hợp.
--- CREATE INDEX document_chunks_embedding_hnsw
--- ON document_chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding_hnsw
+ON document_chunks
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
 ```
+
+Migration bù `20260727001000_restore_embedding_hnsw_index` reissue câu lệnh idempotent này cho các môi trường đã ghi nhận migration cũ nhưng thiếu physical index.
 
 ---
 
@@ -38,11 +41,11 @@ Vector index ví dụ, cần điều chỉnh theo Supabase/model thực tế:
 [ ] `learning_path_chapters` có unique `(learning_path_id, order_index)`.
 [ ] `lessons` có unique `(chapter_id, order_index)`.
 [ ] `lesson_documents` có `title`, `content_hash`, `processing_job_id`, provider/model/dimension.
-[ ] `document_chunks` có provider/model/dimension và filter rule.
+[x] `document_chunks` có provider/model/dimension và filter rule.
 [ ] `quiz_questions`, `flashcards`, `test_questions` có `review_status` để admin ẩn item report.
 [ ] `quiz_questions`, `test_questions` có `grading_config_json`.
 [ ] `ai_explanations` có hash/stale fields.
 [ ] `payments` có `idempotency_key`.
 [ ] `xp_events` có idempotency.
-[ ] Raw SQL partial unique indexes được tạo trong migration.
+[x] Raw SQL partial unique/vector indexes được tạo trong migration.
 ```

@@ -1,1 +1,2 @@
 - 2026-07-27: Hoàn thiện M6.2 với CRUD câu hỏi quiz phía API, rich editor quản trị cho nội dung, đáp án, gợi ý và lời giải, cùng bảng, công thức, ảnh, màu tùy chỉnh, validation, test và tài liệu hợp đồng liên quan.
+- 2026-07-27: Hoàn tất M5.1-M5.4 với OpenAI embedding được kiểm soát vector space, durable worker có retry và lifecycle đầy đủ, pgvector retrieval cô lập theo lesson, hybrid search giữ token budget, tái sử dụng vector khi clone lộ trình cá nhân và migration HNSW bù cho các môi trường thiếu index.

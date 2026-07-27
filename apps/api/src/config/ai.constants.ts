@@ -1,0 +1,1 @@
+export const EMBEDDING_VECTOR_DIMENSIONS = 1536;

@@ -163,9 +163,7 @@ export class PersonalLearningPathClonerService {
     });
 
     if (!source) {
-      throw new Error(
-        `Catalog learning path ${enrollment.learningPathId} was not found`,
-      );
+      throw new Error(`Catalog learning path ${enrollment.learningPathId} was not found`);
     }
 
     const sourceLessonIds = source.chapters.flatMap((chapter) =>
@@ -258,6 +256,8 @@ export class PersonalLearningPathClonerService {
     const pageRangeIdMap = createIdMap(pageRanges);
     const lessonDocuments = lessons.flatMap((lesson) => lesson.documents);
     const lessonDocumentIdMap = createIdMap(lessonDocuments);
+    const documentChunks = lessonDocuments.flatMap((document) => document.chunks);
+    const documentChunkIdMap = createIdMap(documentChunks);
     const quizSets = lessons.flatMap((lesson) => lesson.quizSets);
     const quizSetIdMap = createIdMap(quizSets);
     const quizQuestions = quizSets.flatMap((set) => set.questions);
@@ -429,10 +429,7 @@ export class PersonalLearningPathClonerService {
       pageRanges.map((range) => ({
         id: getMappedId(pageRangeIdMap, range.id),
         lessonId: getMappedId(lessonIdMap, range.lessonId),
-        sourceDocumentId: getMappedId(
-          sourceDocumentIdMap,
-          range.sourceDocumentId,
-        ),
+        sourceDocumentId: getMappedId(sourceDocumentIdMap, range.sourceDocumentId),
         pageStart: range.pageStart,
         pageEnd: range.pageEnd,
         createdById: actorUserId,
@@ -462,9 +459,9 @@ export class PersonalLearningPathClonerService {
         chunkCount: document.chunks.length,
         processingJobId: null,
         processedAt: document.processedAt,
-        embeddingProvider: null,
-        embeddingModel: null,
-        embeddingDimensions: null,
+        embeddingProvider: document.embeddingProvider,
+        embeddingModel: document.embeddingModel,
+        embeddingDimensions: document.embeddingDimensions,
         metadataJson: nullableJson(document.metadataJson),
       })),
     );
@@ -473,20 +470,26 @@ export class PersonalLearningPathClonerService {
       tx.documentChunk,
       lessonDocuments.flatMap((document) =>
         document.chunks.map((chunk) => ({
-          id: randomUUID(),
+          id: getMappedId(documentChunkIdMap, chunk.id),
           documentId: getMappedId(lessonDocumentIdMap, document.id),
           lessonId: getMappedId(lessonIdMap, document.lessonId),
           chunkIndex: chunk.chunkIndex,
           content: chunk.content,
           contentHash: chunk.contentHash,
           tokenCount: chunk.tokenCount,
-          embeddingProvider: null,
-          embeddingModel: null,
-          embeddingDimensions: null,
+          embeddingProvider: chunk.embeddingProvider,
+          embeddingModel: chunk.embeddingModel,
+          embeddingDimensions: chunk.embeddingDimensions,
           metadataJson: nullableJson(chunk.metadataJson),
         })),
       ),
     );
+
+    await copyChunkEmbeddings({
+      tx,
+      chunks: documentChunks,
+      chunkIdMap: documentChunkIdMap,
+    });
 
     await createManyIfNeeded(
       tx.lessonSummary,
@@ -548,9 +551,8 @@ export class PersonalLearningPathClonerService {
           difficulty: question.difficulty,
           reviewStatus: question.reviewStatus,
           explanationId:
-            explanationIdByTargetId.get(
-              getMappedId(quizQuestionIdMap, question.id),
-            ) ?? null,
+            explanationIdByTargetId.get(getMappedId(quizQuestionIdMap, question.id)) ??
+            null,
           sortOrder: question.sortOrder,
         })),
       ),
@@ -579,18 +581,13 @@ export class PersonalLearningPathClonerService {
       tx.flashcard,
       flashcards.map((flashcard) => ({
         id: getMappedId(flashcardIdMap, flashcard.id),
-        flashcardSetId: getMappedId(
-          flashcardSetIdMap,
-          flashcard.flashcardSetId,
-        ),
+        flashcardSetId: getMappedId(flashcardSetIdMap, flashcard.flashcardSetId),
         lessonId: getMappedId(lessonIdMap, flashcard.lessonId),
         frontJson: requiredJson(flashcard.frontJson),
         backJson: requiredJson(flashcard.backJson),
         hintJson: nullableJson(flashcard.hintJson),
         explanationId:
-          explanationIdByTargetId.get(
-            getMappedId(flashcardIdMap, flashcard.id),
-          ) ?? null,
+          explanationIdByTargetId.get(getMappedId(flashcardIdMap, flashcard.id)) ?? null,
         difficulty: flashcard.difficulty,
         reviewStatus: flashcard.reviewStatus,
         sortOrder: flashcard.sortOrder,
@@ -636,9 +633,8 @@ export class PersonalLearningPathClonerService {
           difficulty: question.difficulty,
           reviewStatus: question.reviewStatus,
           explanationId:
-            explanationIdByTargetId.get(
-              getMappedId(testQuestionIdMap, question.id),
-            ) ?? null,
+            explanationIdByTargetId.get(getMappedId(testQuestionIdMap, question.id)) ??
+            null,
           sortOrder: question.sortOrder,
         })),
       ),
@@ -717,17 +713,11 @@ export class PersonalLearningPathClonerService {
         0,
       ),
       quizSets: quizSets.length,
-      quizQuestions: quizSets.reduce(
-        (total, set) => total + set.questions.length,
-        0,
-      ),
+      quizQuestions: quizSets.reduce((total, set) => total + set.questions.length, 0),
       flashcardSets: flashcardSets.length,
       flashcards: flashcards.length,
       testSets: testSets.length,
-      testQuestions: testSets.reduce(
-        (total, set) => total + set.questions.length,
-        0,
-      ),
+      testQuestions: testSets.reduce((total, set) => total + set.questions.length, 0),
       aiExplanations: explanationClones.length,
       lessonProgress: migratedLessonProgress.length,
       flashcardProgress: migratedFlashcardProgress.length,
@@ -838,6 +828,42 @@ async function createManyIfNeeded<
   if (data.length > 0) {
     await delegate.createMany({ data } as never);
   }
+}
+
+async function copyChunkEmbeddings({
+  tx,
+  chunks,
+  chunkIdMap,
+}: {
+  tx: Prisma.TransactionClient;
+  chunks: Array<{ id: string }>;
+  chunkIdMap: Map<string, string>;
+}) {
+  if (chunks.length === 0) {
+    return;
+  }
+
+  const mappings = chunks.map(
+    (chunk) =>
+      Prisma.sql`(${chunk.id}::uuid, ${getMappedId(chunkIdMap, chunk.id)}::uuid)`,
+  );
+
+  await tx.$executeRaw(
+    Prisma.sql`
+      UPDATE document_chunks AS target
+      SET embedding = source.embedding,
+          embedding_provider = source.embedding_provider,
+          embedding_model = source.embedding_model,
+          embedding_dimensions = source.embedding_dimensions
+      FROM (
+        VALUES ${Prisma.join(mappings)}
+      ) AS mapping(source_id, target_id)
+      JOIN document_chunks AS source
+        ON source.id = mapping.source_id
+      WHERE target.id = mapping.target_id
+        AND source.embedding IS NOT NULL
+    `,
+  );
 }
 
 function emptyCloneCounts(): CloneCounts {

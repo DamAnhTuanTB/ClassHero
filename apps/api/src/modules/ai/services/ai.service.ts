@@ -13,14 +13,25 @@ import { AiProviderName } from "@prisma/client";
 
 import type { EnvConfig } from "#api/config/env.validation";
 
-import type { AiEmbeddingInput, AiEmbeddingOutput } from "../types/ai-embedding.types";
+import type {
+  AiEmbeddingInput,
+  AiEmbeddingOutput,
+} from "#api/modules/ai/types/ai-embedding.types";
 import {
   AI_PROVIDER_REGISTRY,
   type AiProvider,
   type AiProviderRegistry,
-} from "../types/ai-provider.interface";
-import type { AiStructuredInput, AiTextInput, AiTextOutput } from "../types/ai-text.types";
-import { getEmbeddingConfig } from "../utils/ai-config.helper";
+} from "#api/modules/ai/types/ai-provider.interface";
+import type {
+  AiStructuredInput,
+  AiTextInput,
+  AiTextOutput,
+} from "#api/modules/ai/types/ai-text.types";
+import { getEmbeddingConfig } from "#api/modules/ai/utils/ai-config.helper";
+import {
+  assertEmbeddingInput,
+  assertEmbeddingOutput,
+} from "#api/modules/ai/utils/embedding-validation";
 
 @Injectable()
 export class AiService {
@@ -68,8 +79,39 @@ export class AiService {
    * Model và dimensions lấy từ config nếu không được override trong input.
    */
   async createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput> {
+    assertEmbeddingInput(input);
+
+    const embeddingConfig = this.getEmbeddingConfig();
+    if (
+      input.model !== undefined &&
+      input.model !== embeddingConfig.model
+    ) {
+      throw new Error(
+        `Embedding model override "${input.model}" does not match configured vector space "${embeddingConfig.model}".`,
+      );
+    }
+    if (
+      input.dimensions !== undefined &&
+      input.dimensions !== embeddingConfig.dimensions
+    ) {
+      throw new Error(
+        `Embedding dimensions override ${input.dimensions} does not match configured vector space ${embeddingConfig.dimensions}.`,
+      );
+    }
+
     const provider = this.getEmbeddingProvider();
-    return provider.createEmbedding(input);
+    const output = await provider.createEmbedding({
+      ...input,
+      model: embeddingConfig.model,
+      dimensions: embeddingConfig.dimensions,
+    });
+    assertEmbeddingOutput({
+      output,
+      expectedCount: input.texts.length,
+      expectedSpace: embeddingConfig,
+    });
+
+    return output;
   }
 
   /**

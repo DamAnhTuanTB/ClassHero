@@ -11,10 +11,21 @@ import { Logger } from "@nestjs/common";
 import { AiProviderName } from "@prisma/client";
 import OpenAI from "openai";
 
-import type { AiEmbeddingInput, AiEmbeddingOutput } from "../types/ai-embedding.types";
-import type { AiProvider } from "../types/ai-provider.interface";
-import type { AiStructuredInput, AiTextInput, AiTextOutput } from "../types/ai-text.types";
-import type { AiOpenAiConfig } from "../utils/ai-config.helper";
+import type {
+  AiEmbeddingInput,
+  AiEmbeddingOutput,
+} from "#api/modules/ai/types/ai-embedding.types";
+import type { AiProvider } from "#api/modules/ai/types/ai-provider.interface";
+import type {
+  AiStructuredInput,
+  AiTextInput,
+  AiTextOutput,
+} from "#api/modules/ai/types/ai-text.types";
+import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
+import {
+  assertEmbeddingInput,
+  assertEmbeddingOutput,
+} from "#api/modules/ai/utils/embedding-validation";
 
 export class OpenAiProvider implements AiProvider {
   readonly name = AiProviderName.OPENAI;
@@ -28,6 +39,8 @@ export class OpenAiProvider implements AiProvider {
   }
 
   async createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput> {
+    assertEmbeddingInput(input);
+
     const model = input.model ?? this.config.embeddingModel;
     const dimensions = input.dimensions ?? this.config.embeddingDimensions;
 
@@ -40,16 +53,20 @@ export class OpenAiProvider implements AiProvider {
         dimensions,
       });
 
-      const latencyMs = Date.now() - startTime;
-
-      this.logger.debug(
-        `Embedding created: ${input.texts.length} texts, model=${response.model}, ` +
-          `dimensions=${dimensions}, tokens=${response.usage?.prompt_tokens ?? "n/a"}, ` +
-          `latency=${latencyMs}ms`,
+      const sortedData = [...response.data].sort(
+        (left, right) => left.index - right.index,
       );
+      const hasInvalidIndexes = sortedData.some(
+        (item, index) => item.index !== index,
+      );
+      if (hasInvalidIndexes) {
+        throw new Error(
+          "OpenAI embedding response indexes do not match the input order.",
+        );
+      }
 
-      return {
-        vectors: response.data.map((d) => d.embedding),
+      const output: AiEmbeddingOutput = {
+        vectors: sortedData.map((item) => item.embedding),
         model: response.model,
         dimensions,
         usage: {
@@ -57,6 +74,20 @@ export class OpenAiProvider implements AiProvider {
           totalTokens: response.usage?.total_tokens,
         },
       };
+      assertEmbeddingOutput({
+        output,
+        expectedCount: input.texts.length,
+        expectedSpace: { model, dimensions },
+      });
+
+      const latencyMs = Date.now() - startTime;
+      this.logger.debug(
+        `Embedding created: ${input.texts.length} texts, model=${response.model}, ` +
+          `dimensions=${dimensions}, tokens=${response.usage?.prompt_tokens ?? "n/a"}, ` +
+          `latency=${latencyMs}ms`,
+      );
+
+      return output;
     } catch (error) {
       const latencyMs = Date.now() - startTime;
       this.logger.error(

@@ -4,7 +4,13 @@ import { Test, type TestingModule } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
 import {
   AiExplanationTargetType,
+  AiProviderName,
+  DocumentStatus,
   EnrollmentStatus,
+  FileProvider,
+  FilePurpose,
+  FileStatus,
+  FileVisibility,
   LearningPathKind,
   LessonProgressStatus,
   PrismaClient,
@@ -32,6 +38,9 @@ const ids = {
   quizSet: randomUUID(),
   quizQuestion: randomUUID(),
   explanation: randomUUID(),
+  file: randomUUID(),
+  lessonDocument: randomUUID(),
+  documentChunk: randomUUID(),
 };
 
 describe("M3.6 personal learning-path clone integration", () => {
@@ -69,6 +78,8 @@ describe("M3.6 personal learning-path clone integration", () => {
         quizQuestions: 1,
         aiExplanations: 1,
         lessonProgress: 1,
+        lessonDocuments: 1,
+        documentChunks: 1,
       },
     });
 
@@ -92,6 +103,11 @@ describe("M3.6 personal learning-path clone integration", () => {
                     },
                     progressEntries: {
                       where: { studentUserId: ids.student },
+                    },
+                    documents: {
+                      include: {
+                        chunks: true,
+                      },
                     },
                   },
                 },
@@ -117,6 +133,29 @@ describe("M3.6 personal learning-path clone integration", () => {
       status: LessonProgressStatus.COMPLETED,
       xpAwarded: true,
     });
+    const personalDocument = personalLesson?.documents[0];
+    const personalChunk = personalDocument?.chunks[0];
+    expect(personalDocument).toMatchObject({
+      status: DocumentStatus.READY,
+      embeddingProvider: AiProviderName.OPENAI,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 1536,
+    });
+    expect(personalChunk).toMatchObject({
+      embeddingProvider: AiProviderName.OPENAI,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 1536,
+    });
+    const clonedVectors = await prisma.$queryRaw<
+      Array<{ id: string; embedding: string }>
+    >`
+      SELECT id, embedding::text AS embedding
+      FROM document_chunks
+      WHERE id IN (${ids.documentChunk}::uuid, ${personalChunk!.id}::uuid)
+      ORDER BY id
+    `;
+    expect(clonedVectors).toHaveLength(2);
+    expect(new Set(clonedVectors.map((row) => row.embedding)).size).toBe(1);
     const personalQuestion = personalLesson?.quizSets[0]?.questions[0];
     expect(personalQuestion?.explanation).toMatchObject({
       targetId: personalQuestion?.id,
@@ -231,6 +270,54 @@ async function createFixture(prisma: PrismaClient) {
       xpAwarded: true,
     },
   });
+  await prisma.file.create({
+    data: {
+      id: ids.file,
+      provider: FileProvider.MINIO_LOCAL,
+      purpose: FilePurpose.LESSON_DOCUMENT,
+      bucket: "test",
+      objectKey: `m3-6/${testRunId}.pdf`,
+      originalName: "m3-6.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1n,
+      visibility: FileVisibility.PRIVATE,
+      status: FileStatus.READY,
+      uploadedById: ids.admin,
+    },
+  });
+  await prisma.lessonDocument.create({
+    data: {
+      id: ids.lessonDocument,
+      lessonId: ids.lesson,
+      fileId: ids.file,
+      status: DocumentStatus.READY,
+      chunkCount: 1,
+      embeddingProvider: AiProviderName.OPENAI,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 1536,
+    },
+  });
+  await prisma.documentChunk.create({
+    data: {
+      id: ids.documentChunk,
+      documentId: ids.lessonDocument,
+      lessonId: ids.lesson,
+      chunkIndex: 0,
+      content: "Số hữu tỉ có thể viết dưới dạng phân số.",
+      tokenCount: 12,
+      embeddingProvider: AiProviderName.OPENAI,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 1536,
+    },
+  });
+  const vectorString = `[${Array.from({ length: 1536 }, (_, index) =>
+    index === 0 ? 1 : 0,
+  ).join(",")}]`;
+  await prisma.$executeRaw`
+    UPDATE document_chunks
+    SET embedding = ${vectorString}::vector
+    WHERE id = ${ids.documentChunk}::uuid
+  `;
   await prisma.quizSet.create({
     data: {
       id: ids.quizSet,
@@ -289,6 +376,7 @@ async function cleanupFixture(prisma: PrismaClient) {
     where: { sourceLearningPathId: ids.basePath },
   });
   await prisma.learningPath.deleteMany({ where: { id: ids.basePath } });
+  await prisma.file.deleteMany({ where: { id: ids.file } });
   await prisma.user.deleteMany({
     where: {
       id: { in: [ids.admin, ids.student] },

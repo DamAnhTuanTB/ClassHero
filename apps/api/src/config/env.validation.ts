@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { EMBEDDING_VECTOR_DIMENSIONS } from "#api/config/ai.constants";
+
 const envSchema = z
   .object({
     NODE_ENV: z
@@ -105,6 +107,16 @@ const envSchema = z
           message: "MATHPIX_APP_KEY is required when OCR_PAID_ENABLED is true.",
         });
       }
+    }
+
+    if (env.OPENAI_EMBEDDING_DIMENSIONS !== EMBEDDING_VECTOR_DIMENSIONS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["OPENAI_EMBEDDING_DIMENSIONS"],
+        message:
+          `OPENAI_EMBEDDING_DIMENSIONS must be ${EMBEDDING_VECTOR_DIMENSIONS} ` +
+          "to match document_chunks.embedding vector(1536). Create a database migration before changing dimensions.",
+      });
     }
   });
 

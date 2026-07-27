@@ -84,10 +84,35 @@ describe("AiService", () => {
       const input = { texts: ["test text"] };
       const result = await service.createEmbedding(input);
 
-      expect(mockProvider.createEmbedding).toHaveBeenCalledWith(input);
+      expect(mockProvider.createEmbedding).toHaveBeenCalledWith({
+        texts: ["test text"],
+        model: "text-embedding-3-small",
+        dimensions: 1536,
+      });
       expect(result.vectors).toHaveLength(1);
       expect(result.model).toBe("text-embedding-3-small");
       expect(result.dimensions).toBe(1536);
+    });
+
+    it("should reject a model override from another vector space", async () => {
+      await expect(
+        service.createEmbedding({
+          texts: ["test text"],
+          model: "text-embedding-3-large",
+        }),
+      ).rejects.toThrow("does not match configured vector space");
+      expect(mockProvider.createEmbedding).not.toHaveBeenCalled();
+    });
+
+    it("should reject provider output with an invalid vector count", async () => {
+      vi.mocked(mockProvider.createEmbedding).mockResolvedValueOnce({
+        ...mockEmbeddingOutput,
+        vectors: [],
+      });
+
+      await expect(
+        service.createEmbedding({ texts: ["test text"] }),
+      ).rejects.toThrow("returned 0 vectors for 1 inputs");
     });
   });
 

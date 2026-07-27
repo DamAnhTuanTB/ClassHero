@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
+  AiProviderName,
   BackgroundJobQueue,
   BackgroundJobStatus,
   Prisma,
@@ -12,6 +13,8 @@ import type {
 } from "#api/jobs/background-job-queues";
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
+import { AiService } from "#api/modules/ai/services/ai.service";
+import { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import { PersonalLearningPathClonerService } from "#api/workers/services/personal-learning-path-cloner.service";
 
 const workerJobSelect = {
@@ -39,6 +42,9 @@ export class PersonalLearningPathCloneProcessor {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(PersonalLearningPathClonerService)
     private readonly cloner: PersonalLearningPathClonerService,
+    @Inject(AiService) private readonly aiService: AiService,
+    @Inject(EmbeddingJobEnqueuer)
+    private readonly embeddingEnqueuer: EmbeddingJobEnqueuer,
   ) {}
 
   async process(
@@ -55,9 +61,7 @@ export class PersonalLearningPathCloneProcessor {
       );
     }
 
-    if (
-      durableJob.queue !== BackgroundJobQueue.PERSONAL_LEARNING_PATH_CLONE
-    ) {
+    if (durableJob.queue !== BackgroundJobQueue.PERSONAL_LEARNING_PATH_CLONE) {
       throw new UnrecoverableError(
         `Job ${durableJob.id} belongs to ${durableJob.queue}, not PERSONAL_LEARNING_PATH_CLONE`,
       );
@@ -73,11 +77,7 @@ export class PersonalLearningPathCloneProcessor {
 
     const enrollmentId = durableJob.resourceId;
     const actorUserId = durableJob.ownerUserId;
-    if (
-      durableJob.resourceType !== "ENROLLMENT" ||
-      !enrollmentId ||
-      !actorUserId
-    ) {
+    if (durableJob.resourceType !== "ENROLLMENT" || !enrollmentId || !actorUserId) {
       throw new UnrecoverableError(
         `Job ${durableJob.id} is missing enrollment or actor metadata`,
       );
@@ -104,6 +104,10 @@ export class PersonalLearningPathCloneProcessor {
         actorUserId,
         backgroundJobId: runningJob.id,
       });
+      const embeddingJobsQueued = await this.enqueueMissingEmbeddings({
+        personalLearningPathId: clone.personalLearningPathId,
+        actorUserId,
+      });
       const result: BackgroundJobBullmqResult = {
         status: clone.alreadyActivated ? "SKIPPED" : "SUCCEEDED",
         queue: runningJob.queue,
@@ -114,7 +118,10 @@ export class PersonalLearningPathCloneProcessor {
           ? "Enrollment already uses a personal learning path."
           : "Personal learning path cloned and activated.",
         handledAt: new Date().toISOString(),
-        details: clone,
+        details: {
+          ...clone,
+          embeddingJobsQueued,
+        },
       };
 
       await this.prisma.backgroundJob.update({
@@ -135,9 +142,7 @@ export class PersonalLearningPathCloneProcessor {
       await this.prisma.backgroundJob.update({
         where: { id: runningJob.id },
         data: {
-          status: hasRetryLeft
-            ? BackgroundJobStatus.QUEUED
-            : BackgroundJobStatus.FAILED,
+          status: hasRetryLeft ? BackgroundJobStatus.QUEUED : BackgroundJobStatus.FAILED,
           attempts: attempt,
           errorMessage: message,
           finishedAt: hasRetryLeft ? null : new Date(),
@@ -172,5 +177,46 @@ export class PersonalLearningPathCloneProcessor {
         : undefined;
 
     return Math.max(bullmqAttempts ?? record.maxAttempts, 1);
+  }
+
+  private async enqueueMissingEmbeddings({
+    personalLearningPathId,
+    actorUserId,
+  }: {
+    personalLearningPathId: string;
+    actorUserId: string;
+  }) {
+    const embeddingConfig = this.aiService.getEmbeddingConfig();
+    const pendingDocuments = await this.prisma.$queryRaw<
+      Array<{ lessonDocumentId: string; lessonId: string }>
+    >`
+      SELECT DISTINCT
+        ld.id AS "lessonDocumentId",
+        ld.lesson_id AS "lessonId"
+      FROM lesson_documents AS ld
+      JOIN lessons AS lesson
+        ON lesson.id = ld.lesson_id
+      JOIN document_chunks AS chunk
+        ON chunk.document_id = ld.id
+      WHERE lesson.learning_path_id = ${personalLearningPathId}::uuid
+        AND ld.replaced_at IS NULL
+        AND (
+          chunk.embedding IS NULL
+          OR chunk.embedding_provider IS DISTINCT FROM ${AiProviderName.OPENAI}::"AiProviderName"
+          OR chunk.embedding_model IS DISTINCT FROM ${embeddingConfig.model}
+          OR chunk.embedding_dimensions IS DISTINCT FROM ${embeddingConfig.dimensions}
+        )
+      ORDER BY ld.id
+    `;
+
+    for (const document of pendingDocuments) {
+      await this.embeddingEnqueuer.enqueueEmbeddingJob({
+        lessonId: document.lessonId,
+        lessonDocumentId: document.lessonDocumentId,
+        ownerUserId: actorUserId,
+      });
+    }
+
+    return pendingDocuments.length;
   }
 }

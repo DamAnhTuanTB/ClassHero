@@ -12,8 +12,15 @@
 
 import { AiProviderName } from "@prisma/client";
 
-import type { AiEmbeddingInput, AiEmbeddingOutput } from "./ai-embedding.types";
-import type { AiStructuredInput, AiTextInput, AiTextOutput } from "./ai-text.types";
+import type {
+  AiEmbeddingInput,
+  AiEmbeddingOutput,
+} from "#api/modules/ai/types/ai-embedding.types";
+import type {
+  AiStructuredInput,
+  AiTextInput,
+  AiTextOutput,
+} from "#api/modules/ai/types/ai-text.types";
 
 export const AI_PROVIDER_REGISTRY = Symbol("AI_PROVIDER_REGISTRY");
 

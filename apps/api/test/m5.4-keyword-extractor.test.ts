@@ -57,4 +57,13 @@ describe("keyword-extractor", () => {
     expect(result).not.toContain("1");
     expect(result).not.toContain("2");
   });
+
+  it("deduplicates keywords case-insensitively and caps SQL conditions", () => {
+    const result = extractKeywords(
+      "Alpha alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron",
+    );
+
+    expect(result.filter((item) => item.toLowerCase() === "alpha")).toHaveLength(1);
+    expect(result.length).toBeLessThanOrEqual(12);
+  });
 });

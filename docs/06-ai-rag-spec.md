@@ -54,7 +54,7 @@ Không tự ý đổi provider mặc định nếu chưa được yêu cầu.
 Đề xuất interface:
 
 ```ts
-export type AiProviderName = 'OPENAI' | 'GEMINI';
+export type AiProviderName = "OPENAI" | "GEMINI";
 
 export interface AiProvider {
   name: AiProviderName;
@@ -310,7 +310,7 @@ interface RetrievalInput {
   topK?: number;
   minScore?: number;
   includeKeywordSearch?: boolean;
-  embeddingProvider: 'OPENAI';
+  embeddingProvider: "OPENAI";
   embeddingModel: string;
   embeddingDimensions: number;
 }
@@ -322,6 +322,7 @@ interface RetrievalInput {
 2. Create query embedding bằng provider chính.
 3. Vector search trong `document_chunks` với điều kiện:
    - `lesson_id = lessonId`,
+   - document cha đang active (`replaced_at IS NULL`) và `status = READY`,
    - `embedding_provider = configuredProvider`,
    - `embedding_model = configuredModel`,
    - `embedding_dimensions = configuredDimensions`.
@@ -329,18 +330,26 @@ interface RetrievalInput {
 5. Merge kết quả.
 6. Deduplicate chunk theo `chunk_id`.
 7. Sort theo score/rank.
-8. Trả topK theo token budget.
+8. Trả topK theo token budget; không đưa vào cả chunk đầu tiên nếu riêng chunk đó đã vượt budget.
 
 Pseudo SQL vector search:
 
 ```sql
-SELECT id, content, metadata_json, 1 - (embedding <=> $query_embedding) AS score
-FROM document_chunks
-WHERE lesson_id = $lesson_id
-  AND embedding_provider = $embedding_provider
-  AND embedding_model = $embedding_model
-  AND embedding_dimensions = $embedding_dimensions
-ORDER BY embedding <=> $query_embedding
+SELECT chunk.id,
+       chunk.content,
+       chunk.metadata_json,
+       1 - (chunk.embedding <=> $query_embedding) AS score
+FROM document_chunks AS chunk
+JOIN lesson_documents AS document ON document.id = chunk.document_id
+WHERE chunk.lesson_id = $lesson_id
+  AND document.lesson_id = $lesson_id
+  AND document.replaced_at IS NULL
+  AND document.status = 'READY'
+  AND chunk.embedding_provider = $embedding_provider
+  AND chunk.embedding_model = $embedding_model
+  AND chunk.embedding_dimensions = $embedding_dimensions
+  AND 1 - (chunk.embedding <=> $query_embedding) >= $min_score
+ORDER BY chunk.embedding <=> $query_embedding
 LIMIT $top_k;
 ```
 
@@ -456,9 +465,7 @@ Output schema:
         "text": "string",
         "latex": ["string"]
       },
-      "options": [
-        { "id": "A", "text": "string" }
-      ],
+      "options": [{ "id": "A", "text": "string" }],
       "correctAnswer": { "optionId": "A" },
       "hint": "string",
       "explanation": "string",
@@ -1011,10 +1018,10 @@ Cần mock:
 Test cases chính:
 
 ```txt
-[ ] Chunk chỉ lưu đúng lesson_id.
-[ ] Retrieval không trả chunk lesson khác.
-[ ] Retrieval filter provider/model/dimension.
-[ ] Hybrid keyword search chỉ chạy trong cùng lesson_id.
+[x] Chunk chỉ lưu đúng lesson_id.
+[x] Retrieval không trả chunk lesson khác.
+[x] Retrieval filter provider/model/dimension.
+[x] Hybrid keyword search chỉ chạy trong cùng lesson_id.
 [ ] Output invalid bị reject.
 [ ] Cached explanation không gọi AI lần 2.
 [ ] Stale explanation tạo job mới.
@@ -1031,17 +1038,17 @@ Test cases chính:
 ## 15. Checklist implement cho Codex
 
 ```txt
-[ ] Tạo AiProvider abstraction.
+[x] Tạo AiProvider abstraction.
 [ ] Tạo OpenAI provider cho embedding và structured output.
 [ ] Tạo Gemini provider backup interface, có thể chưa bật mặc định.
 [ ] Tạo DocumentProcessingWorker.
-[ ] Tạo EmbeddingWorker.
+[x] Tạo EmbeddingWorker.
 [ ] Tạo AiGenerationWorker cho summary/quiz/flashcard/test/explanation.
-[ ] Tạo RetrievalService filter lesson_id + provider/model/dimension.
-[ ] Tạo HybridSearchService hoặc function keyword fallback đơn giản.
+[x] Tạo RetrievalService filter lesson_id + provider/model/dimension.
+[x] Tạo HybridSearchService hoặc function keyword fallback đơn giản.
 [ ] Tạo ExplanationService với hash + stale logic.
 [ ] Tạo AiChatService với context restriction.
 [ ] Tạo BackgroundJobService để API poll status.
-[ ] Log token usage, model, provider, status, error.
+[x] Log token usage, model, provider, status, error.
 [ ] Validate mọi structured output bằng Zod/JSON Schema trước khi lưu.
 ```

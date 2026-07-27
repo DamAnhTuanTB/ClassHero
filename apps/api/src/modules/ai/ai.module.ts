@@ -16,11 +16,14 @@ import { AiProviderName } from "@prisma/client";
 
 import type { EnvConfig } from "#api/config/env.validation";
 
-import { OpenAiProvider } from "./providers/openai.provider";
-import { AiService } from "./services/ai.service";
-import { RetrievalService } from "./services/retrieval.service";
-import { AI_PROVIDER_REGISTRY, type AiProviderRegistry } from "./types/ai-provider.interface";
-import { getOpenAiConfig } from "./utils/ai-config.helper";
+import { OpenAiProvider } from "#api/modules/ai/providers/openai.provider";
+import { AiService } from "#api/modules/ai/services/ai.service";
+import { RetrievalService } from "#api/modules/ai/services/retrieval.service";
+import {
+  AI_PROVIDER_REGISTRY,
+  type AiProviderRegistry,
+} from "#api/modules/ai/types/ai-provider.interface";
+import { getOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
 
 const logger = new Logger("AiModule");
 

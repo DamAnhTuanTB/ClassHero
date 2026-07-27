@@ -19,6 +19,7 @@ import {
   AiProviderName,
   BackgroundJobQueue,
   BackgroundJobStatus,
+  DocumentStatus,
   Prisma,
 } from "@prisma/client";
 import { Job, UnrecoverableError } from "bullmq";
@@ -30,6 +31,7 @@ import type {
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import { AiService } from "#api/modules/ai/services/ai.service";
+import { assertEmbeddingOutput } from "#api/modules/ai/utils/embedding-validation";
 import { stripLatexForEmbedding } from "#api/workers/utils/strip-latex";
 
 const EMBEDDING_BATCH_SIZE = 50;
@@ -55,6 +57,20 @@ interface ChunkToEmbed {
   id: string;
   content: string;
   chunkIndex: number;
+}
+
+interface EmbeddingRunSummary {
+  embeddedCount: number;
+  totalPromptTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  model: string;
+  dimensions: number;
+}
+
+interface EmbeddingExecution {
+  result: BackgroundJobBullmqResult;
+  summary: EmbeddingRunSummary;
 }
 
 @Injectable()
@@ -97,7 +113,7 @@ export class EmbeddingProcessor {
     }
 
     const attempt = job.attemptsMade + 1;
-    const maxAttempts = Math.max(backgroundJob.maxAttempts, job.opts.attempts ?? 3);
+    const maxAttempts = this.resolveMaxAttempts(job, backgroundJob);
 
     await this.prisma.backgroundJob.update({
       where: { id: backgroundJob.id },
@@ -107,34 +123,61 @@ export class EmbeddingProcessor {
         attempts: attempt,
         errorMessage: null,
         startedAt: new Date(),
+        finishedAt: null,
       },
     });
 
+    let aiGenerationId: string | null = null;
     try {
-      const result = await this.handleEmbedding(backgroundJob);
+      const aiGeneration = await this.startAiGeneration(backgroundJob, attempt);
+      aiGenerationId = aiGeneration.id;
+      const execution = await this.handleEmbedding(backgroundJob);
+      const finishedAt = new Date();
 
-      await this.prisma.backgroundJob.update({
-        where: { id: backgroundJob.id },
-        data: {
-          status: BackgroundJobStatus.SUCCEEDED,
-          result: toJobJson(result),
-          errorMessage: null,
-          finishedAt: new Date(),
-        },
-      });
+      await Promise.all([
+        this.prisma.backgroundJob.update({
+          where: { id: backgroundJob.id },
+          data: {
+            status: BackgroundJobStatus.SUCCEEDED,
+            result: toJobJson(execution.result),
+            errorMessage: null,
+            finishedAt,
+          },
+        }),
+        this.prisma.aiGeneration.update({
+          where: { id: aiGeneration.id },
+          data: {
+            status: AiGenerationStatus.SUCCEEDED,
+            provider: AiProviderName.OPENAI,
+            model: execution.summary.model,
+            promptTokens: execution.summary.totalPromptTokens,
+            totalTokens: execution.summary.totalTokens,
+            latencyMs: execution.summary.latencyMs,
+            retryCount: Math.max(attempt - 1, 0),
+            outputJson: toJobJson(execution.result),
+            errorMessage: null,
+            finishedAt,
+          },
+        }),
+      ]);
 
-      return result;
+      return execution.result;
     } catch (error) {
-      await this.markAttemptFailed(backgroundJob, error, attempt, maxAttempts);
+      await this.markAttemptFailed({
+        record: backgroundJob,
+        aiGenerationId,
+        error,
+        attempt,
+        maxAttempts,
+      });
       throw error;
     }
   }
 
   private async handleEmbedding(
     record: EmbeddingJobRecord,
-  ): Promise<BackgroundJobBullmqResult> {
-    const inputMeta = record.inputMeta as Record<string, unknown> | null;
-    const lessonDocumentId = inputMeta?.lessonDocumentId as string | undefined;
+  ): Promise<EmbeddingExecution> {
+    const lessonDocumentId = this.readLessonDocumentId(record);
     const lessonId = record.lessonId;
 
     if (!lessonDocumentId) {
@@ -149,6 +192,33 @@ export class EmbeddingProcessor {
       );
     }
 
+    if (
+      record.resourceType !== "lesson_document" ||
+      record.resourceId !== lessonDocumentId
+    ) {
+      throw new UnrecoverableError(
+        `EMBEDDING job ${record.id} has inconsistent lesson document metadata`,
+      );
+    }
+
+    const lessonDocument = await this.prisma.lessonDocument.findFirst({
+      where: {
+        id: lessonDocumentId,
+        lessonId,
+        replacedAt: null,
+      },
+      select: {
+        id: true,
+        chunkCount: true,
+      },
+    });
+
+    if (!lessonDocument) {
+      throw new UnrecoverableError(
+        `Active lesson document ${lessonDocumentId} was not found in lesson ${lessonId}`,
+      );
+    }
+
     // Check AI provider availability
     if (!this.aiService.isProviderAvailable(AiProviderName.OPENAI)) {
       throw new UnrecoverableError(
@@ -156,22 +226,63 @@ export class EmbeddingProcessor {
       );
     }
 
-    // Load chunks chưa có embedding
-    const chunks = await this.loadChunksWithoutEmbedding(lessonDocumentId);
+    const embeddingConfig = this.aiService.getEmbeddingConfig();
+    const startedAt = new Date();
+
+    await this.prisma.lessonDocument.update({
+      where: { id: lessonDocumentId },
+      data: {
+        status: DocumentStatus.PROCESSING,
+        extractError: null,
+      },
+    });
+
+    // Load chunks chưa có embedding hoặc thuộc vector space cũ.
+    const chunks = await this.loadChunksNeedingEmbedding({
+      lessonDocumentId,
+      lessonId,
+      model: embeddingConfig.model,
+      dimensions: embeddingConfig.dimensions,
+    });
 
     if (chunks.length === 0) {
       this.logger.log(
         `[EMBEDDING] No chunks without embedding for document=${lessonDocumentId}`,
       );
 
+      await this.prisma.lessonDocument.update({
+        where: { id: lessonDocumentId },
+        data: {
+          status: DocumentStatus.READY,
+          extractError: null,
+          embeddingProvider:
+            lessonDocument.chunkCount > 0 ? AiProviderName.OPENAI : null,
+          embeddingModel:
+            lessonDocument.chunkCount > 0 ? embeddingConfig.model : null,
+          embeddingDimensions:
+            lessonDocument.chunkCount > 0 ? embeddingConfig.dimensions : null,
+        },
+      });
+
+      const latencyMs = Date.now() - startedAt.getTime();
       return {
-        status: "SKIPPED",
-        queue: record.queue,
-        resourceType: record.resourceType,
-        resourceId: record.resourceId,
-        action: "EMBEDDING",
-        message: "All chunks already have embeddings",
-        handledAt: new Date().toISOString(),
+        result: {
+          status: "SKIPPED",
+          queue: record.queue,
+          resourceType: record.resourceType,
+          resourceId: record.resourceId,
+          action: "EMBEDDING",
+          message: "All chunks already have embeddings",
+          handledAt: new Date().toISOString(),
+        },
+        summary: {
+          embeddedCount: 0,
+          totalPromptTokens: 0,
+          totalTokens: 0,
+          latencyMs,
+          model: embeddingConfig.model,
+          dimensions: embeddingConfig.dimensions,
+        },
       };
     }
 
@@ -179,8 +290,6 @@ export class EmbeddingProcessor {
       `[EMBEDDING] Starting: ${chunks.length} chunks for document=${lessonDocumentId}, lesson=${lessonId}`,
     );
 
-    const startedAt = new Date();
-    const embeddingConfig = this.aiService.getEmbeddingConfig();
     let totalPromptTokens = 0;
     let totalTokens = 0;
     let embeddedCount = 0;
@@ -188,19 +297,24 @@ export class EmbeddingProcessor {
     // Batch embedding
     const batches = this.splitIntoBatches(chunks, EMBEDDING_BATCH_SIZE);
 
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
+    for (const [batchIndex, batch] of batches.entries()) {
       this.logger.debug(
-        `[EMBEDDING] Batch ${i + 1}/${batches.length}: ${batch.length} chunks`,
+        `[EMBEDDING] Batch ${batchIndex + 1}/${batches.length}: ${batch.length} chunks`,
       );
 
       // Strip LaTeX markup before embedding for better search quality
-      const textsForEmbedding = batch.map((c) =>
-        stripLatexForEmbedding(c.content),
-      );
+      const textsForEmbedding = batch.map((chunk) => {
+        const normalizedContent = stripLatexForEmbedding(chunk.content).trim();
+        return normalizedContent || chunk.content;
+      });
 
       const result = await this.aiService.createEmbedding({
         texts: textsForEmbedding,
+      });
+      assertEmbeddingOutput({
+        output: result,
+        expectedCount: batch.length,
+        expectedSpace: embeddingConfig,
       });
 
       // Save vectors via raw SQL
@@ -222,26 +336,11 @@ export class EmbeddingProcessor {
     await this.prisma.lessonDocument.update({
       where: { id: lessonDocumentId },
       data: {
+        status: DocumentStatus.READY,
+        extractError: null,
         embeddingProvider: AiProviderName.OPENAI,
         embeddingModel: embeddingConfig.model,
         embeddingDimensions: embeddingConfig.dimensions,
-      },
-    });
-
-    // Log ai_generations record
-    await this.prisma.aiGeneration.create({
-      data: {
-        type: AiGenerationType.EMBEDDING,
-        status: AiGenerationStatus.SUCCEEDED,
-        provider: AiProviderName.OPENAI,
-        model: embeddingConfig.model,
-        lessonId,
-        backgroundJobId: record.id,
-        promptTokens: totalPromptTokens,
-        totalTokens,
-        latencyMs,
-        startedAt,
-        finishedAt,
       },
     });
 
@@ -250,34 +349,101 @@ export class EmbeddingProcessor {
         `tokens=${totalTokens}, latency=${latencyMs}ms`,
     );
 
+    const summary: EmbeddingRunSummary = {
+      embeddedCount,
+      totalPromptTokens,
+      totalTokens,
+      latencyMs,
+      model: embeddingConfig.model,
+      dimensions: embeddingConfig.dimensions,
+    };
+
     return {
-      status: "SUCCEEDED",
-      queue: record.queue,
-      resourceType: record.resourceType,
-      resourceId: record.resourceId,
-      action: "EMBEDDING",
-      message: `Embedded ${embeddedCount} chunks (${totalTokens} tokens, ${latencyMs}ms)`,
-      handledAt: new Date().toISOString(),
-      details: {
-        embeddedCount,
-        totalPromptTokens,
-        totalTokens,
-        latencyMs,
-        model: embeddingConfig.model,
-        dimensions: embeddingConfig.dimensions,
+      result: {
+        status: "SUCCEEDED",
+        queue: record.queue,
+        resourceType: record.resourceType,
+        resourceId: record.resourceId,
+        action: "EMBEDDING",
+        message: `Embedded ${embeddedCount} chunks (${totalTokens} tokens, ${latencyMs}ms)`,
+        handledAt: new Date().toISOString(),
+        details: summary,
       },
+      summary,
     };
   }
 
-  private async loadChunksWithoutEmbedding(
-    lessonDocumentId: string,
-  ): Promise<ChunkToEmbed[]> {
-    // Use raw SQL to check embedding IS NULL since Prisma can't filter Unsupported types
+  private async startAiGeneration(
+    record: EmbeddingJobRecord,
+    attempt: number,
+  ): Promise<{ id: string }> {
+    const embeddingConfig = this.aiService.getEmbeddingConfig();
+    const existing = await this.prisma.aiGeneration.findFirst({
+      where: {
+        backgroundJobId: record.id,
+        type: AiGenerationType.EMBEDDING,
+      },
+      select: {
+        id: true,
+        startedAt: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+    const startedAt = existing?.startedAt ?? new Date();
+    const data = {
+      status: AiGenerationStatus.RUNNING,
+      provider: AiProviderName.OPENAI,
+      model: embeddingConfig.model,
+      retryCount: Math.max(attempt - 1, 0),
+      errorMessage: null,
+      startedAt,
+      finishedAt: null,
+    } satisfies Prisma.AiGenerationUpdateInput;
+
+    if (existing) {
+      return this.prisma.aiGeneration.update({
+        where: { id: existing.id },
+        data,
+        select: { id: true },
+      });
+    }
+
+    return this.prisma.aiGeneration.create({
+      data: {
+        type: AiGenerationType.EMBEDDING,
+        backgroundJobId: record.id,
+        lessonId: record.lessonId,
+        targetType: "LESSON_DOCUMENT",
+        targetId: record.resourceId,
+        inputMetaJson: {
+          lessonDocumentId: this.readLessonDocumentId(record) ?? null,
+          dimensions: embeddingConfig.dimensions,
+        },
+        ...data,
+      },
+      select: { id: true },
+    });
+  }
+
+  private async loadChunksNeedingEmbedding(params: {
+    lessonDocumentId: string;
+    lessonId: string;
+    model: string;
+    dimensions: number;
+  }): Promise<ChunkToEmbed[]> {
     const chunks = await this.prisma.$queryRaw<ChunkToEmbed[]>`
       SELECT id, content, chunk_index AS "chunkIndex"
       FROM document_chunks
-      WHERE document_id = ${lessonDocumentId}::uuid
-        AND embedding IS NULL
+      WHERE document_id = ${params.lessonDocumentId}::uuid
+        AND lesson_id = ${params.lessonId}::uuid
+        AND (
+          embedding IS NULL
+          OR embedding_provider IS DISTINCT FROM ${AiProviderName.OPENAI}::"AiProviderName"
+          OR embedding_model IS DISTINCT FROM ${params.model}
+          OR embedding_dimensions IS DISTINCT FROM ${params.dimensions}
+        )
       ORDER BY chunk_index ASC
     `;
 
@@ -293,14 +459,26 @@ export class EmbeddingProcessor {
       dimensions: number;
     },
   ): Promise<void> {
-    // Update each chunk with its embedding vector via raw SQL
-    // Prisma Unsupported("vector(1536)") cannot be written via Prisma client
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const vector = vectors[i];
-      const vectorString = `[${vector.join(",")}]`;
+    if (vectors.length !== chunks.length) {
+      throw new Error(
+        `Cannot persist ${vectors.length} embedding vectors for ${chunks.length} chunks.`,
+      );
+    }
 
-      await this.prisma.$executeRaw`
+    // Prisma Unsupported("vector(1536)") cannot be written via Prisma client.
+    for (const [index, chunk] of chunks.entries()) {
+      const vector = vectors[index];
+      if (!vector) {
+        throw new Error(`Embedding vector at index ${index} is missing.`);
+      }
+      if (vector.length !== meta.dimensions) {
+        throw new Error(
+          `Embedding vector at index ${index} has ${vector.length} dimensions, expected ${meta.dimensions}.`,
+        );
+      }
+
+      const vectorString = `[${vector.join(",")}]`;
+      const updatedRows = await this.prisma.$executeRaw`
         UPDATE document_chunks
         SET embedding = ${vectorString}::vector,
             embedding_provider = ${meta.provider}::"AiProviderName",
@@ -308,17 +486,50 @@ export class EmbeddingProcessor {
             embedding_dimensions = ${meta.dimensions}
         WHERE id = ${chunk.id}::uuid
       `;
+
+      if (updatedRows !== 1) {
+        throw new Error(
+          `Embedding chunk ${chunk.id} was not updated exactly once.`,
+        );
+      }
     }
   }
 
   private splitIntoBatches<T>(items: T[], batchSize: number): T[][] {
     const batches: T[][] = [];
 
-    for (let i = 0; i < items.length; i += batchSize) {
-      batches.push(items.slice(i, i + batchSize));
+    for (let index = 0; index < items.length; index += batchSize) {
+      batches.push(items.slice(index, index + batchSize));
     }
 
     return batches;
+  }
+
+  private readLessonDocumentId(record: EmbeddingJobRecord): string | undefined {
+    if (
+      !record.inputMeta ||
+      typeof record.inputMeta !== "object" ||
+      Array.isArray(record.inputMeta)
+    ) {
+      return undefined;
+    }
+
+    const lessonDocumentId = record.inputMeta.lessonDocumentId;
+    return typeof lessonDocumentId === "string"
+      ? lessonDocumentId
+      : undefined;
+  }
+
+  private resolveMaxAttempts(
+    job: Job<BackgroundJobBullmqData, BackgroundJobBullmqResult>,
+    record: EmbeddingJobRecord,
+  ): number {
+    const bullmqAttempts =
+      typeof job.opts.attempts === "number" && job.opts.attempts > 0
+        ? job.opts.attempts
+        : record.maxAttempts;
+
+    return Math.max(record.maxAttempts, bullmqAttempts, 1);
   }
 
   private buildSkippedResult(
@@ -335,25 +546,68 @@ export class EmbeddingProcessor {
     };
   }
 
-  private async markAttemptFailed(
-    record: EmbeddingJobRecord,
-    error: unknown,
-    attempt: number,
-    maxAttempts: number,
-  ): Promise<void> {
+  private async markAttemptFailed(params: {
+    record: EmbeddingJobRecord;
+    aiGenerationId: string | null;
+    error: unknown;
+    attempt: number;
+    maxAttempts: number;
+  }): Promise<void> {
+    const { record, aiGenerationId, error, attempt, maxAttempts } = params;
     const message = getJobErrorMessage(error);
-    const isFinalAttempt = attempt >= maxAttempts;
+    const isFinalAttempt =
+      error instanceof UnrecoverableError || attempt >= maxAttempts;
+    const finishedAt = isFinalAttempt ? new Date() : null;
 
-    await this.prisma.backgroundJob.update({
-      where: { id: record.id },
-      data: {
-        status: isFinalAttempt
-          ? BackgroundJobStatus.FAILED
-          : BackgroundJobStatus.QUEUED,
-        errorMessage: message,
-        finishedAt: isFinalAttempt ? new Date() : null,
-      },
-    });
+    const updates: Array<Promise<unknown>> = [
+      this.prisma.backgroundJob.update({
+        where: { id: record.id },
+        data: {
+          status: isFinalAttempt
+            ? BackgroundJobStatus.FAILED
+            : BackgroundJobStatus.QUEUED,
+          errorMessage: message,
+          finishedAt,
+        },
+      }),
+    ];
+
+    if (aiGenerationId) {
+      updates.push(
+        this.prisma.aiGeneration.update({
+          where: { id: aiGenerationId },
+          data: {
+            status: isFinalAttempt
+              ? AiGenerationStatus.FAILED
+              : AiGenerationStatus.QUEUED,
+            errorMessage: message,
+            retryCount: Math.max(attempt - 1, 0),
+            finishedAt,
+          },
+        }),
+      );
+    }
+
+    const lessonDocumentId = this.readLessonDocumentId(record);
+    if (lessonDocumentId && record.lessonId) {
+      updates.push(
+        this.prisma.lessonDocument.updateMany({
+          where: {
+            id: lessonDocumentId,
+            lessonId: record.lessonId,
+            replacedAt: null,
+          },
+          data: {
+            status: isFinalAttempt
+              ? DocumentStatus.FAILED
+              : DocumentStatus.PROCESSING,
+            extractError: message,
+          },
+        }),
+      );
+    }
+
+    await Promise.all(updates);
 
     if (isFinalAttempt) {
       this.logger.error(

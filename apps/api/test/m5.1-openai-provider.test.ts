@@ -78,7 +78,11 @@ describe("OpenAiProvider", () => {
     });
 
     it("should use custom model when provided", async () => {
-      mockEmbeddingsCreate.mockResolvedValueOnce(mockResponse);
+      mockEmbeddingsCreate.mockResolvedValueOnce({
+        ...mockResponse,
+        data: [{ embedding: new Array(3072).fill(0.1), index: 0 }],
+        model: "text-embedding-3-large",
+      });
 
       const customInput: AiEmbeddingInput = {
         texts: ["test"],
@@ -93,6 +97,50 @@ describe("OpenAiProvider", () => {
         input: ["test"],
         dimensions: 3072,
       });
+    });
+
+    it("should reject empty embedding input", async () => {
+      await expect(provider.createEmbedding({ texts: [] })).rejects.toThrow(
+        "must contain at least one text",
+      );
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+    });
+
+    it("should reject an incomplete provider response", async () => {
+      mockEmbeddingsCreate.mockResolvedValueOnce({
+        ...mockResponse,
+        data: [mockResponse.data[0]],
+      });
+
+      await expect(provider.createEmbedding(mockInput)).rejects.toThrow(
+        "returned 1 vectors for 2 inputs",
+      );
+    });
+
+    it("should reject a vector with the wrong dimensions", async () => {
+      mockEmbeddingsCreate.mockResolvedValueOnce({
+        ...mockResponse,
+        data: [
+          { embedding: new Array(100).fill(0.1), index: 0 },
+          mockResponse.data[1],
+        ],
+      });
+
+      await expect(provider.createEmbedding(mockInput)).rejects.toThrow(
+        "has 100 dimensions, expected 1536",
+      );
+    });
+
+    it("should restore provider output to input index order", async () => {
+      mockEmbeddingsCreate.mockResolvedValueOnce({
+        ...mockResponse,
+        data: [mockResponse.data[1], mockResponse.data[0]],
+      });
+
+      const result = await provider.createEmbedding(mockInput);
+
+      expect(result.vectors[0]?.[0]).toBe(0.1);
+      expect(result.vectors[1]?.[0]).toBe(0.2);
     });
 
     it("should throw on API error", async () => {

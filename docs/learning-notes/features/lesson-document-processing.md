@@ -23,7 +23,7 @@ flowchart TD
   I --> J[Tạo job chunk đúng lesson_id]
   K[Admin upload primary file riêng hoặc supplemental] --> L[Worker OCR cùng pipeline]
   L --> J
-  J --> M[Lưu document_chunks; M5 mới tạo embedding]
+  J --> M[Lưu document_chunks; M5 tạo embedding]
 ```
 
 ## Luồng code end-to-end
@@ -71,7 +71,7 @@ Worker `M4.4` hiện làm các việc chính:
 - Tạo audit artifact để biết page count, trang rỗng, printed-page missing/ambiguous/duplicate, bbox/object key/text visual lỗi, chất lượng crop và smoke-test resolver. Khi resolver không có crop usable, chat AI/viewer fallback về render trang PDF gốc.
 - Normalize artifact thành page text/Markdown/confidence/layout refs/quality flags để DB và RAG dùng được mà không phụ thuộc raw provider shape.
 - Copy ảnh/crop provider trả trong `.mmd.zip` về object storage nội bộ dưới `document-images/...`.
-- Tạo `document_chunks` không embedding; `M5.x` mới tạo embedding bằng pgvector.
+- Tạo `document_chunks` không embedding; worker `M5.x` tiếp tục tạo embedding và lưu pgvector.
 - Nếu job fail hết retry, cập nhật document/page sang `FAILED` và ghi lỗi rõ cho UI.
 
 ## File quan trọng
@@ -111,3 +111,4 @@ Worker `M4.4` hiện làm các việc chính:
 - `M4.3`: BullMQ worker foundation.
 - `M4.4`: Paid OCR artifact và chunking.
 - `M4.5`: Lesson document upload UI/status.
+- `M5.1-M5.4`: [Embedding và retrieval theo lesson](embedding-retrieval.md).

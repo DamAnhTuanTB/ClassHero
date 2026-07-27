@@ -232,6 +232,7 @@ Rules:
 
 - Lưu `lesson_id` trực tiếp để retrieval luôn filter theo lesson.
 - Retrieval phải filter theo `lesson_id`, `embedding_provider`, `embedding_model`, `embedding_dimensions`.
+- Retrieval chỉ dùng chunk thuộc `lesson_documents` active (`replaced_at IS NULL`) và `status = READY`.
 - Không fallback sang vector space khác nếu provider/model/dimension không khớp.
 
 ---

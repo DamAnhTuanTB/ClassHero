@@ -15,17 +15,16 @@
 
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-
 import { PrismaService } from "#api/common/prisma/prisma.service";
-
-import { extractKeywords } from "../utils/keyword-extractor";
-import { AiService } from "./ai.service";
 import {
   RETRIEVAL_DEFAULTS,
   type RetrievalInput,
   type RetrievalOutput,
   type RetrievedChunk,
-} from "../types/retrieval.types";
+} from "#api/modules/ai/types/retrieval.types";
+import { assertEmbeddingOutput } from "#api/modules/ai/utils/embedding-validation";
+import { extractKeywords } from "#api/modules/ai/utils/keyword-extractor";
+import { AiService } from "#api/modules/ai/services/ai.service";
 
 interface RawChunkRow {
   id: string;
@@ -55,71 +54,100 @@ export class RetrievalService {
    */
   async retrieveContext(input: RetrievalInput): Promise<RetrievalOutput> {
     const startTime = Date.now();
-
+    const query = input.query.trim();
+    if (!query) {
+      throw new Error("Retrieval query must not be empty.");
+    }
     const topK = Math.min(
-      input.topK ?? RETRIEVAL_DEFAULTS.topK,
+      Math.max(1, Math.trunc(input.topK ?? RETRIEVAL_DEFAULTS.topK)),
       RETRIEVAL_DEFAULTS.maxTopK,
     );
-    const minScore = input.minScore ?? RETRIEVAL_DEFAULTS.minScore;
+    const minScore = Math.min(
+      1,
+      Math.max(0, input.minScore ?? RETRIEVAL_DEFAULTS.minScore),
+    );
     const includeKeywordSearch =
       input.includeKeywordSearch ?? RETRIEVAL_DEFAULTS.includeKeywordSearch;
-    const maxTokens =
-      input.maxContextTokens ?? RETRIEVAL_DEFAULTS.maxContextTokens;
+    const maxTokens = Math.max(
+      1,
+      Math.trunc(input.maxContextTokens ?? RETRIEVAL_DEFAULTS.maxContextTokens),
+    );
 
     // 1. Get embedding config (provider, model, dimensions)
     const embConfig = this.aiService.getEmbeddingConfig();
 
     // 2. Embed the query
     const embResult = await this.aiService.createEmbedding({
-      texts: [input.query],
+      texts: [query],
+    });
+    assertEmbeddingOutput({
+      output: embResult,
+      expectedCount: 1,
+      expectedSpace: embConfig,
     });
     const queryVector = embResult.vectors[0];
+    if (!queryVector) {
+      throw new Error("Embedding provider did not return a query vector.");
+    }
     const vectorString = `[${queryVector.join(",")}]`;
 
     // 3. Vector search with pgvector cosine distance
     const vectorRows = await this.prisma.$queryRaw<RawChunkRow[]>`
       SELECT
-        id,
-        document_id,
-        lesson_id,
-        content,
-        chunk_index,
-        token_count,
-        metadata_json,
-        1 - (embedding <=> ${vectorString}::vector) AS score
-      FROM document_chunks
-      WHERE lesson_id = ${input.lessonId}::uuid
-        AND embedding IS NOT NULL
-        AND embedding_provider = ${embConfig.provider}::"AiProviderName"
-        AND embedding_model = ${embConfig.model}
-        AND embedding_dimensions = ${embConfig.dimensions}
-      ORDER BY embedding <=> ${vectorString}::vector
+        chunk.id,
+        chunk.document_id,
+        chunk.lesson_id,
+        chunk.content,
+        chunk.chunk_index,
+        chunk.token_count,
+        chunk.metadata_json,
+        1 - (chunk.embedding <=> ${vectorString}::vector) AS score
+      FROM document_chunks AS chunk
+      JOIN lesson_documents AS document
+        ON document.id = chunk.document_id
+      WHERE chunk.lesson_id = ${input.lessonId}::uuid
+        AND document.lesson_id = ${input.lessonId}::uuid
+        AND document.replaced_at IS NULL
+        AND document.status = 'READY'::"DocumentStatus"
+        AND chunk.embedding IS NOT NULL
+        AND chunk.embedding_provider = ${embConfig.provider}::"AiProviderName"
+        AND chunk.embedding_model = ${embConfig.model}
+        AND chunk.embedding_dimensions = ${embConfig.dimensions}
+        AND 1 - (chunk.embedding <=> ${vectorString}::vector) >= ${minScore}
+      ORDER BY chunk.embedding <=> ${vectorString}::vector, chunk.id
       LIMIT ${topK}
     `;
 
     // 4. Keyword search fallback
     let keywordRows: RawChunkRow[] = [];
     if (includeKeywordSearch) {
-      const keywords = extractKeywords(input.query);
+      const keywords = extractKeywords(query);
       if (keywords.length > 0) {
         const keywordConditions = keywords.map(
-          (kw) => Prisma.sql`content ILIKE ${"%" + kw + "%"}`
+          (keyword) =>
+            Prisma.sql`chunk.content ILIKE ${`%${escapeLikePattern(keyword)}%`} ESCAPE '\'`,
         );
         const orClause = Prisma.sql`(${Prisma.join(keywordConditions, " OR ")})`;
 
         keywordRows = await this.prisma.$queryRaw<RawChunkRow[]>`
           SELECT
-            id,
-            document_id,
-            lesson_id,
-            content,
-            chunk_index,
-            token_count,
-            metadata_json,
+            chunk.id,
+            chunk.document_id,
+            chunk.lesson_id,
+            chunk.content,
+            chunk.chunk_index,
+            chunk.token_count,
+            chunk.metadata_json,
             0.5 AS score
-          FROM document_chunks
-          WHERE lesson_id = ${input.lessonId}::uuid
+          FROM document_chunks AS chunk
+          JOIN lesson_documents AS document
+            ON document.id = chunk.document_id
+          WHERE chunk.lesson_id = ${input.lessonId}::uuid
+            AND document.lesson_id = ${input.lessonId}::uuid
+            AND document.replaced_at IS NULL
+            AND document.status = 'READY'::"DocumentStatus"
             AND ${orClause}
+          ORDER BY chunk.document_id, chunk.chunk_index, chunk.id
           LIMIT ${topK}
         `;
       }
@@ -131,17 +159,7 @@ export class RetrievalService {
     // Process vector results
     for (const row of vectorRows) {
       if (row.score >= minScore) {
-        chunkMap.set(row.id, {
-          chunkId: row.id,
-          documentId: row.document_id,
-          lessonId: row.lesson_id,
-          content: row.content,
-          score: row.score,
-          chunkIndex: row.chunk_index,
-          tokenCount: row.token_count ?? 0,
-          metadataJson: row.metadata_json,
-          matchSource: "vector",
-        });
+        chunkMap.set(row.id, toRetrievedChunk(row, "vector"));
       }
     }
 
@@ -155,25 +173,21 @@ export class RetrievalService {
         existing.matchSource = "both";
         keywordMatchCount++;
       } else {
-        chunkMap.set(row.id, {
-          chunkId: row.id,
-          documentId: row.document_id,
-          lessonId: row.lesson_id,
-          content: row.content,
-          score: row.score,
-          chunkIndex: row.chunk_index,
-          tokenCount: row.token_count ?? 0,
-          metadataJson: row.metadata_json,
-          matchSource: "keyword",
-        });
+        chunkMap.set(row.id, toRetrievedChunk(row, "keyword"));
         keywordMatchCount++;
       }
     }
 
     // Sort by score descending
-    const sortedChunks = Array.from(chunkMap.values()).sort(
-      (a, b) => b.score - a.score,
-    );
+    const sortedChunks = Array.from(chunkMap.values()).sort((a, b) => {
+      const scoreDifference = b.score - a.score;
+      if (scoreDifference !== 0) {
+        return scoreDifference;
+      }
+
+      const documentDifference = a.documentId.localeCompare(b.documentId);
+      return documentDifference !== 0 ? documentDifference : a.chunkIndex - b.chunkIndex;
+    });
 
     // 6. Token budget cap and topK limit
     const finalChunks: RetrievedChunk[] = [];
@@ -183,7 +197,7 @@ export class RetrievalService {
       if (finalChunks.length >= topK) break;
 
       const newTotal = currentTokens + chunk.tokenCount;
-      if (finalChunks.length > 0 && newTotal > maxTokens) {
+      if (newTotal > maxTokens) {
         continue;
       }
 
@@ -194,17 +208,42 @@ export class RetrievalService {
     const searchLatencyMs = Date.now() - startTime;
 
     this.logger.debug(
-      `[RETRIEVAL] lesson=${input.lessonId} query="${input.query.slice(0, 50)}..." ` +
+      `[RETRIEVAL] lesson=${input.lessonId} query="${query.slice(0, 50)}..." ` +
         `vector=${vectorRows.length} keyword=${keywordRows.length} ` +
         `merged=${finalChunks.length} tokens=${currentTokens} latency=${searchLatencyMs}ms`,
     );
 
     return {
       chunks: finalChunks,
-      query: input.query,
+      query,
       totalTokens: currentTokens,
       searchLatencyMs,
       keywordMatchCount,
     };
   }
+}
+
+function toRetrievedChunk(
+  row: RawChunkRow,
+  matchSource: RetrievedChunk["matchSource"],
+): RetrievedChunk {
+  return {
+    chunkId: row.id,
+    documentId: row.document_id,
+    lessonId: row.lesson_id,
+    content: row.content,
+    score: row.score,
+    chunkIndex: row.chunk_index,
+    tokenCount: row.token_count ?? estimateTokenCount(row.content),
+    metadataJson: row.metadata_json,
+    matchSource,
+  };
+}
+
+function estimateTokenCount(content: string) {
+  return Math.max(1, Math.ceil(content.length / 4));
+}
+
+function escapeLikePattern(keyword: string) {
+  return keyword.replace(/[\\%_]/g, "\\$&");
 }

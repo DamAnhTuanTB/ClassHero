@@ -81,7 +81,7 @@ describe("M4.4 document processing worker", () => {
     expect(prisma.lessonDocument.update).toHaveBeenLastCalledWith({
       where: { id: "lesson-document-1" },
       data: expect.objectContaining({
-        status: DocumentStatus.READY,
+        status: DocumentStatus.PROCESSING,
         chunkCount: expect.any(Number),
         contentHash: expect.any(String),
         embeddingProvider: null,
@@ -128,7 +128,7 @@ describe("M4.4 document processing worker", () => {
     expect(prisma.lessonDocument.update).toHaveBeenLastCalledWith({
       where: { id: "supplement-document-1" },
       data: expect.objectContaining({
-        status: DocumentStatus.READY,
+        status: DocumentStatus.PROCESSING,
         extractedText: expect.stringContaining("Nội dung trang 1"),
         contentHash: "content-hash",
         metadataJson: expect.objectContaining({

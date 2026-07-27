@@ -9,6 +9,7 @@
 
 /** Minimum keyword length to avoid noise */
 const MIN_KEYWORD_LENGTH = 2;
+const MAX_KEYWORDS = 12;
 
 /**
  * Vietnamese stopwords — loại khỏi keyword search.
@@ -166,5 +167,21 @@ export function extractKeywords(query: string): string[] {
     }
   }
 
-  return keywords;
+  const deduplicated = new Map<string, string>();
+  for (const keyword of keywords) {
+    const trimmed = keyword.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const normalized = trimmed.toLocaleLowerCase("vi");
+    if (!deduplicated.has(normalized)) {
+      deduplicated.set(normalized, trimmed);
+    }
+    if (deduplicated.size >= MAX_KEYWORDS) {
+      break;
+    }
+  }
+
+  return Array.from(deduplicated.values());
 }

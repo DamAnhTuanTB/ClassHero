@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
 import { AiProviderName } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { PrismaService } from "#api/common/prisma/prisma.service";
+import type { AiService } from "#api/modules/ai/services/ai.service";
 import { RetrievalService } from "#api/modules/ai/services/retrieval.service";
-import { AiService } from "#api/modules/ai/services/ai.service";
-import { PrismaService } from "#api/common/prisma/prisma.service";
 
 // Helpers
 function makeChunkRow(overrides: Record<string, unknown> = {}) {
@@ -25,37 +24,30 @@ const mockQueryVector = new Array(1536).fill(0.1);
 
 describe("RetrievalService", () => {
   let service: RetrievalService;
-  let mockPrisma: any;
-  let mockAiService: any;
+  let queryRaw: ReturnType<typeof vi.fn>;
+  let createEmbedding: ReturnType<typeof vi.fn>;
 
-  beforeEach(async () => {
-    mockPrisma = {
-      $queryRaw: vi.fn().mockResolvedValue([]),
-    };
-
-    mockAiService = {
-      createEmbedding: vi.fn().mockResolvedValue({
-        vectors: [mockQueryVector],
-        model: "text-embedding-3-small",
-        dimensions: 1536,
-        usage: { promptTokens: 10, totalTokens: 10 },
-      }),
+  beforeEach(() => {
+    queryRaw = vi.fn().mockResolvedValue([]);
+    createEmbedding = vi.fn().mockResolvedValue({
+      vectors: [mockQueryVector],
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      usage: { promptTokens: 10, totalTokens: 10 },
+    });
+    const mockPrisma = {
+      $queryRaw: queryRaw,
+    } as unknown as PrismaService;
+    const mockAiService = {
+      createEmbedding,
       getEmbeddingConfig: vi.fn().mockReturnValue({
         provider: AiProviderName.OPENAI,
         model: "text-embedding-3-small",
         dimensions: 1536,
       }),
-    };
+    } as unknown as AiService;
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RetrievalService,
-        { provide: PrismaService, useValue: mockPrisma },
-        { provide: AiService, useValue: mockAiService },
-      ],
-    }).compile();
-
-    service = module.get<RetrievalService>(RetrievalService);
+    service = new RetrievalService(mockPrisma, mockAiService);
   });
 
   it("should embed query and return matching chunks", async () => {
@@ -63,7 +55,7 @@ describe("RetrievalService", () => {
       makeChunkRow({ id: "c1", score: 0.92, chunk_index: 0 }),
       makeChunkRow({ id: "c2", score: 0.78, chunk_index: 1 }),
     ];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(chunks);
+    queryRaw.mockResolvedValueOnce(chunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -71,7 +63,7 @@ describe("RetrievalService", () => {
     });
 
     // Verify embedding was called with the query
-    expect(mockAiService.createEmbedding).toHaveBeenCalledWith({
+    expect(createEmbedding).toHaveBeenCalledWith({
       texts: ["Số hữu tỉ là gì?"],
     });
 
@@ -89,9 +81,9 @@ describe("RetrievalService", () => {
     const chunks = [
       makeChunkRow({ id: "c1", score: 0.85 }),
       makeChunkRow({ id: "c2", score: 0.15 }), // below threshold
-      makeChunkRow({ id: "c3", score: 0.10 }), // below threshold
+      makeChunkRow({ id: "c3", score: 0.1 }), // below threshold
     ];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(chunks);
+    queryRaw.mockResolvedValueOnce(chunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -105,10 +97,10 @@ describe("RetrievalService", () => {
 
   it("should use default minScore 0.25", async () => {
     const chunks = [
-      makeChunkRow({ id: "c1", score: 0.30 }),
-      makeChunkRow({ id: "c2", score: 0.20 }), // below default 0.25
+      makeChunkRow({ id: "c1", score: 0.3 }),
+      makeChunkRow({ id: "c2", score: 0.2 }), // below default 0.25
     ];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(chunks);
+    queryRaw.mockResolvedValueOnce(chunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -116,11 +108,11 @@ describe("RetrievalService", () => {
     });
 
     expect(result.chunks).toHaveLength(1);
-    expect(result.chunks[0].score).toBe(0.30);
+    expect(result.chunks[0].score).toBe(0.3);
   });
 
   it("should return empty array if no chunks found", async () => {
-    mockPrisma.$queryRaw.mockResolvedValueOnce([]);
+    queryRaw.mockResolvedValueOnce([]);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-no-chunks",
@@ -132,7 +124,7 @@ describe("RetrievalService", () => {
   });
 
   it("should cap topK at maxTopK (20)", async () => {
-    mockPrisma.$queryRaw.mockResolvedValueOnce([]);
+    queryRaw.mockResolvedValueOnce([]);
 
     await service.retrieveContext({
       lessonId: "lesson-1",
@@ -142,11 +134,11 @@ describe("RetrievalService", () => {
     });
 
     // Verify SQL was called — the LIMIT in the query should be 20 (maxTopK)
-    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it("should use default topK=6 when not specified", async () => {
-    mockPrisma.$queryRaw.mockResolvedValueOnce([]);
+    queryRaw.mockResolvedValueOnce([]);
 
     await service.retrieveContext({
       lessonId: "lesson-1",
@@ -154,7 +146,7 @@ describe("RetrievalService", () => {
       includeKeywordSearch: false,
     });
 
-    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it("should compute totalTokens correctly", async () => {
@@ -163,7 +155,7 @@ describe("RetrievalService", () => {
       makeChunkRow({ id: "c2", score: 0.8, token_count: 200 }),
       makeChunkRow({ id: "c3", score: 0.7, token_count: 300 }),
     ];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(chunks);
+    queryRaw.mockResolvedValueOnce(chunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -178,23 +170,21 @@ describe("RetrievalService", () => {
       makeChunkRow({ id: "c1", score: 0.9, token_count: null }),
       makeChunkRow({ id: "c2", score: 0.8, token_count: 200 }),
     ];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(chunks);
+    queryRaw.mockResolvedValueOnce(chunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
       query: "test",
     });
 
-    expect(result.totalTokens).toBe(200); // 0 + 200
-    expect(result.chunks[0].tokenCount).toBe(0);
+    expect(result.totalTokens).toBe(212);
+    expect(result.chunks[0].tokenCount).toBe(12);
   });
 
   it("should preserve original content (LaTeX) in results", async () => {
     const latexContent = "\\frac{a}{b} \\neq 0 \\in \\mathbb{Z}";
-    const chunks = [
-      makeChunkRow({ id: "c1", score: 0.9, content: latexContent }),
-    ];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(chunks);
+    const chunks = [makeChunkRow({ id: "c1", score: 0.9, content: latexContent })];
+    queryRaw.mockResolvedValueOnce(chunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -217,9 +207,7 @@ describe("RetrievalService", () => {
       makeChunkRow({ id: "c3", score: 0.5 }), // keyword only
     ];
 
-    mockPrisma.$queryRaw
-      .mockResolvedValueOnce(vectorChunks)
-      .mockResolvedValueOnce(keywordChunks);
+    queryRaw.mockResolvedValueOnce(vectorChunks).mockResolvedValueOnce(keywordChunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -227,7 +215,7 @@ describe("RetrievalService", () => {
     });
 
     expect(result.chunks).toHaveLength(3);
-    
+
     // c2 should be boosted from 0.8 -> 0.95 and sorted to top
     expect(result.chunks[0].chunkId).toBe("c2");
     expect(result.chunks[0].score).toBeCloseTo(0.95);
@@ -251,9 +239,7 @@ describe("RetrievalService", () => {
       makeChunkRow({ id: "c3", score: 0.7, token_count: 800 }), // this one exceeds 3000 total (1500+1000+800=3300)
     ];
 
-    mockPrisma.$queryRaw
-      .mockResolvedValueOnce(vectorChunks)
-      .mockResolvedValueOnce([]); // no keywords
+    queryRaw.mockResolvedValueOnce(vectorChunks).mockResolvedValueOnce([]); // no keywords
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -267,7 +253,7 @@ describe("RetrievalService", () => {
 
   it("should bypass keyword search if includeKeywordSearch is false", async () => {
     const vectorChunks = [makeChunkRow({ id: "c1", score: 0.9 })];
-    mockPrisma.$queryRaw.mockResolvedValueOnce(vectorChunks);
+    queryRaw.mockResolvedValueOnce(vectorChunks);
 
     const result = await service.retrieveContext({
       lessonId: "lesson-1",
@@ -275,8 +261,75 @@ describe("RetrievalService", () => {
       includeKeywordSearch: false,
     });
 
-    expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1); // only vector search called
+    expect(queryRaw).toHaveBeenCalledTimes(1); // only vector search called
     expect(result.chunks).toHaveLength(1);
     expect(result.keywordMatchCount).toBe(0);
+  });
+
+  it("never includes an oversized first chunk", async () => {
+    queryRaw.mockResolvedValueOnce([
+      makeChunkRow({ id: "too-large", score: 0.9, token_count: 301 }),
+      makeChunkRow({ id: "fits", score: 0.8, token_count: 200 }),
+    ]);
+
+    const result = await service.retrieveContext({
+      lessonId: "lesson-1",
+      query: "ngân sách",
+      includeKeywordSearch: false,
+      maxContextTokens: 300,
+    });
+
+    expect(result.chunks.map((chunk) => chunk.chunkId)).toEqual(["fits"]);
+    expect(result.totalTokens).toBe(200);
+  });
+
+  it("rejects an empty query before calling the provider", async () => {
+    await expect(
+      service.retrieveContext({
+        lessonId: "lesson-1",
+        query: "   ",
+      }),
+    ).rejects.toThrow("must not be empty");
+
+    expect(createEmbedding).not.toHaveBeenCalled();
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("rejects a query vector in the wrong embedding space", async () => {
+    createEmbedding.mockResolvedValueOnce({
+      vectors: [new Array(3072).fill(0.1)],
+      model: "text-embedding-3-large",
+      dimensions: 3072,
+      usage: { promptTokens: 1, totalTokens: 1 },
+    });
+
+    await expect(
+      service.retrieveContext({
+        lessonId: "lesson-1",
+        query: "phân số",
+      }),
+    ).rejects.toThrow('model "text-embedding-3-large"');
+
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("uses active READY lesson-document guards in vector and keyword SQL", async () => {
+    queryRaw.mockResolvedValue([]);
+
+    await service.retrieveContext({
+      lessonId: "lesson-1",
+      query: "diện tích hình vuông",
+    });
+
+    const sqlText = queryRaw.mock.calls
+      .map(([strings]) => Array.from(strings as TemplateStringsArray).join("?"))
+      .join("\n");
+    expect(sqlText).toContain("JOIN lesson_documents");
+    expect(sqlText).toContain("document.lesson_id");
+    expect(sqlText).toContain("document.replaced_at IS NULL");
+    expect(sqlText).toContain("document.status = 'READY'");
+    expect(sqlText).toContain("chunk.embedding_provider");
+    expect(sqlText).toContain("chunk.embedding_model");
+    expect(sqlText).toContain("chunk.embedding_dimensions");
   });
 });

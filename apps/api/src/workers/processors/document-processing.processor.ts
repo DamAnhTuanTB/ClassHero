@@ -583,7 +583,10 @@ export class DocumentProcessingProcessor {
     await this.prisma.lessonDocument.update({
       where: { id: lessonDoc.id },
       data: {
-        status: DocumentStatus.READY,
+        status:
+          chunks.length > 0
+            ? DocumentStatus.PROCESSING
+            : DocumentStatus.READY,
         extractedText: fullText || null,
         extractError: null,
         chunkCount: chunks.length,
@@ -769,7 +772,10 @@ export class DocumentProcessingProcessor {
     await this.prisma.lessonDocument.update({
       where: { id: lessonDoc.id },
       data: {
-        status: DocumentStatus.READY,
+        status:
+          chunks.length > 0
+            ? DocumentStatus.PROCESSING
+            : DocumentStatus.READY,
         extractedText: fullText || null,
         extractError: null,
         chunkCount: chunks.length,

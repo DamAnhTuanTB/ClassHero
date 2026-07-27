@@ -16,17 +16,17 @@ import type {
 } from "#api/jobs/background-job-queues";
 import { getBullmqQueueName } from "#api/jobs/background-job-queues";
 import type { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
+import type { AiService } from "#api/modules/ai/services/ai.service";
 import { PersonalLearningPathsService } from "#api/modules/learning-paths/services/personal-learning-paths.service";
 import { PersonalLearningPathCloneProcessor } from "#api/workers/processors/personal-learning-path-clone.processor";
+import type { EmbeddingJobEnqueuer } from "#api/workers/services/embedding-job-enqueuer.service";
 import type { PersonalLearningPathClonerService } from "#api/workers/services/personal-learning-path-cloner.service";
 
 describe("M3.6 personal learning-path clone foundation", () => {
   it("maps the personal clone queue to a dedicated BullMQ queue", () => {
-    expect(
-      getBullmqQueueName(
-        BackgroundJobQueue.PERSONAL_LEARNING_PATH_CLONE,
-      ),
-    ).toBe("personal-learning-path-clone");
+    expect(getBullmqQueueName(BackgroundJobQueue.PERSONAL_LEARNING_PATH_CLONE)).toBe(
+      "personal-learning-path-clone",
+    );
   });
 
   it("returns the existing job for an identical idempotency key", async () => {
@@ -81,8 +81,7 @@ describe("M3.6 personal learning-path clone foundation", () => {
         findFirst: vi.fn(async () => null),
       },
       $transaction: vi.fn(
-        async (callback: (transaction: typeof tx) => Promise<unknown>) =>
-          callback(tx),
+        async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx),
       ),
     } as unknown as PrismaService;
     const queue = {
@@ -133,13 +132,17 @@ describe("M3.6 personal learning-path clone foundation", () => {
     const prisma = {
       backgroundJob: {
         findUnique: vi.fn(async () => durableJob),
-        update: vi.fn(
-          async ({ data }: { data: Record<string, unknown> }) => ({
-            ...durableJob,
-            ...data,
-          }),
-        ),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          ...durableJob,
+          ...data,
+        })),
       },
+      $queryRaw: vi.fn(async () => [
+        {
+          lessonDocumentId: "lesson-document-1",
+          lessonId: "lesson-1",
+        },
+      ]),
     } as unknown as PrismaService;
     const cloner = {
       cloneForEnrollment: vi.fn(async () => ({
@@ -150,7 +153,16 @@ describe("M3.6 personal learning-path clone foundation", () => {
         counts: { chapters: 1, lessons: 2 },
       })),
     } as unknown as PersonalLearningPathClonerService;
-    const processor = new PersonalLearningPathCloneProcessor(prisma, cloner);
+    const aiService = createAiServiceMock();
+    const embeddingEnqueuer = {
+      enqueueEmbeddingJob: vi.fn(async () => ({ jobId: "embedding-job-1" })),
+    } as unknown as EmbeddingJobEnqueuer;
+    const processor = new PersonalLearningPathCloneProcessor(
+      prisma,
+      cloner,
+      aiService,
+      embeddingEnqueuer,
+    );
 
     const result = await processor.process(createBullmqJob());
 
@@ -163,7 +175,13 @@ describe("M3.6 personal learning-path clone foundation", () => {
       status: "SUCCEEDED",
       details: {
         personalLearningPathId: "personal-path-1",
+        embeddingJobsQueued: 1,
       },
+    });
+    expect(embeddingEnqueuer.enqueueEmbeddingJob).toHaveBeenCalledWith({
+      lessonId: "lesson-1",
+      lessonDocumentId: "lesson-document-1",
+      ownerUserId: "admin-1",
     });
     expect(prisma.backgroundJob.update).toHaveBeenLastCalledWith({
       where: { id: durableJob.id },
@@ -186,12 +204,10 @@ describe("M3.6 personal learning-path clone foundation", () => {
     const prisma = {
       backgroundJob: {
         findUnique: vi.fn(async () => durableJob),
-        update: vi.fn(
-          async ({ data }: { data: Record<string, unknown> }) => ({
-            ...durableJob,
-            ...data,
-          }),
-        ),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+          ...durableJob,
+          ...data,
+        })),
       },
       enrollment: {
         update: vi.fn(),
@@ -208,7 +224,14 @@ describe("M3.6 personal learning-path clone foundation", () => {
         throw new Error("Clone failed");
       }),
     } as unknown as PersonalLearningPathClonerService;
-    const processor = new PersonalLearningPathCloneProcessor(prisma, cloner);
+    const processor = new PersonalLearningPathCloneProcessor(
+      prisma,
+      cloner,
+      createAiServiceMock(),
+      {
+        enqueueEmbeddingJob: vi.fn(),
+      } as unknown as EmbeddingJobEnqueuer,
+    );
 
     await expect(processor.process(createBullmqJob({ attempts: 1 }))).rejects.toThrow(
       "Clone failed",
@@ -225,6 +248,16 @@ describe("M3.6 personal learning-path clone foundation", () => {
     expect(prisma.enrollment.updateMany).not.toHaveBeenCalled();
   });
 });
+
+function createAiServiceMock() {
+  return {
+    getEmbeddingConfig: vi.fn(() => ({
+      provider: "OPENAI",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    })),
+  } as unknown as AiService;
+}
 
 function createEnrollmentRecord() {
   return {
