@@ -20,6 +20,8 @@ flowchart LR
   C --> D[Quiz hoặc Test API kiểm tra lại]
   D --> E[Lưu câu hỏi và lời giải]
   E --> F[Mở lại đúng định dạng]
+  E --> G[Student content API lọc dữ liệu]
+  G --> H[Học sinh chỉ nhận nội dung an toàn]
 ```
 
 ## Luồng code end-to-end
@@ -67,6 +69,17 @@ UI nhập phút để thân thiện rồi chuyển sang giây tại API boundary
 
 Validator của loại nhiều mệnh đề kiểm tra tối thiểu 2 mệnh đề, ID không trùng,
 nội dung không rỗng và `correctAnswerJson` ánh xạ đúng một lần cho mọi ID.
+
+Student lesson API dùng một access resolver chung trước khi đọc summary,
+quiz/flashcard/test. Resolver phân biệt enrollment và trial, đồng thời chặn truy
+cập trực tiếp bản `PERSONALIZED` của học sinh khác. Query student dùng selector
+riêng: quiz chỉ lấy nội dung câu, phương án và gợi ý; không select đáp án đúng,
+grading config hoặc lời giải. Aggregate lesson/test chỉ trả metadata và số lượng,
+không tải nội dung đề thi trước lúc bắt đầu attempt.
+
+Khả năng bắt đầu test được tính từ thời gian server. Enrollment chỉ được mở khi
+đã tới `examOpenAt`; trial có thể đọc lesson nhưng luôn bị khóa test. Đây là
+policy backend, không phụ thuộc đồng hồ hoặc nút disabled ở trình duyệt.
 
 Mảng object trong DTO NestJS phải khai báo rõ lớp phần tử bằng
 `@Type(() => ItemDto)` và `@ValidateNested({ each: true })`. Nếu chỉ ghi type
@@ -151,6 +164,11 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   container cắt. Flow Quiz/Test phải bỏ tooltip nội bộ này và dùng tooltip chung
   render bằng portal vào `document.body`; tooltip xuất hiện ngay, tự giữ trong
   viewport và không tham gia kích thước layout của editor.
+- Không dùng cùng selector admin cho student rồi xóa field sau khi query. Selector
+  student phải không lấy answer key/grading/storage key ngay từ database để giảm
+  nguy cơ serializer hoặc log vô tình làm lộ dữ liệu.
+- Trial là quyền đọc giới hạn, không tương đương enrollment. Mọi action nhạy cảm
+  như bắt đầu test phải kiểm tra `access.mode` ở backend dù lesson bật trial.
 
 ## File quan trọng
 
@@ -164,6 +182,8 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 - `apps/web/features/admin/tests/`
 - `apps/api/src/modules/quiz/`
 - `apps/api/src/modules/tests/`
+- `apps/api/src/modules/student-learning/`
+- `apps/api/src/modules/learning-paths/services/student-lesson-access.service.ts`
 
 ## Kiến thức cần nhớ
 
@@ -175,3 +195,4 @@ Editor dựa trên document model có thể tái tạo DOM bất cứ lúc nào.
 - `M6.2`
 - `M6.3`
 - `M6.4`
+- `M6.5`

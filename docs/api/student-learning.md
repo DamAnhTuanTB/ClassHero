@@ -28,12 +28,58 @@ Behavior:
 
 - Kiểm tra enrollment còn hạn hoặc trial hợp lệ.
 - Trả metadata chapter cha để UI hiển thị breadcrumb/tổng quan.
-- Trả video, tài liệu, tóm tắt, quiz/flashcard/test metadata, notes/comments/favorites của student.
-- Trước `exam_open_at`, bài kiểm tra có `canStartTest = false`.
+- Trả video, material, document `READY`, tóm tắt đã duyệt và metadata của
+  quiz/flashcard/test set đã duyệt, không phải reserve.
+- File chỉ trả metadata an toàn và `accessUrl` public/signed có hạn; không trả
+  `objectKey`, storage bucket hoặc thông tin nội bộ của provider.
+- Aggregate chỉ trả số câu/thẻ của set. Nội dung câu quiz đọc qua endpoint riêng;
+  aggregate và test status không trả đáp án đúng, grading config, lời giải hoặc
+  nội dung câu test.
+- `testAvailability.canStartTest` được tính bằng thời gian server. Trước
+  `exam_open_at` giá trị là `false`; trial luôn là `false`.
+- Notes/comments/favorites và progress/attempt không thuộc response `M6.5`; các
+  phần này được bổ sung ở `M7.x`.
 - Nếu lesson thuộc path `PERSONALIZED`, chỉ student sở hữu enrollment đang được giao path đó mới được truy cập.
 - Access resolver phải kiểm tra lesson nằm trong lộ trình hiệu lực, không chỉ kiểm tra student đã mua khóa nguồn.
 - Lịch sử từ lesson gốc được resolve qua `sourceLessonId` theo contract progress; không sao chép record của student khác.
 - Sau activation, mọi write mới của progress/attempt/note/comment/favorite phải dùng lesson/content thuộc bản cá nhân; API không hỗ trợ chuyển enrollment trở lại khóa gốc.
+
+Response chính:
+
+```json
+{
+  "data": {
+    "id": "lesson-uuid",
+    "access": { "mode": "ENROLLMENT" },
+    "chapter": {},
+    "learningPath": {},
+    "materials": [],
+    "documents": [],
+    "summary": null,
+    "quizSets": [],
+    "flashcardSets": [],
+    "testSets": [],
+    "testAvailability": {
+      "canStartTest": false,
+      "examOpenAt": "2026-08-01T13:00:00.000Z"
+    }
+  }
+}
+```
+
+### Các endpoint đọc content `M6.5`
+
+```txt
+GET /student/lessons/:lessonId/summary
+GET /student/lessons/:lessonId/quiz-sets
+GET /student/lessons/:lessonId/flashcard-sets
+GET /student/lessons/:lessonId/test-sets/status
+```
+
+Tất cả endpoint trên dùng cùng access policy enrollment/trial của lesson. Summary
+chỉ trả bản `APPROVED`; quiz chỉ trả câu `APPROVED` và payload an toàn; flashcard
+theo contract tại `docs/api/quiz-flashcard-tests.md`; test status chỉ trả
+metadata/khả năng bắt đầu.
 
 ### Error codes bổ sung
 

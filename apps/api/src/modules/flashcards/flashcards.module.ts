@@ -4,9 +4,10 @@ import { AuthModule } from "#api/modules/auth/auth.module";
 import { AdminFlashcardsController } from "#api/modules/flashcards/controllers/admin-flashcards.controller";
 import { StudentFlashcardsController } from "#api/modules/flashcards/controllers/student-flashcards.controller";
 import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
+import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, LearningPathsModule],
   controllers: [AdminFlashcardsController, StudentFlashcardsController],
   providers: [FlashcardsService],
   exports: [FlashcardsService],

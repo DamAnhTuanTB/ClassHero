@@ -17,7 +17,7 @@ export type LessonResponse = {
   scheduledAt: Date | null;
   examOpenAt: Date | null;
   videoUrl: string | null;
-  customVideoSettings?: any;
+  customVideoSettings?: Prisma.JsonValue | null;
   completionMinScore: number;
   trialEnabled: boolean;
   status: PublishStatus;
@@ -30,4 +30,13 @@ export type LessonResponse = {
 export type RequestContext = {
   ipAddress?: string;
   userAgent?: string;
+};
+
+export type StudentLessonAccessMode = "ENROLLMENT" | "TRIAL";
+
+export type StudentLessonAccessContext = {
+  evaluatedAt: Date;
+  lessonId: string;
+  learningPathId: string;
+  mode: StudentLessonAccessMode;
 };

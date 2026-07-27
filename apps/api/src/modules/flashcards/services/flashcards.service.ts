@@ -1,18 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import {
   AiExplanationTargetType,
   ContentSource,
   Difficulty,
-  EnrollmentStatus,
   Prisma,
-  PublishStatus,
   ReviewStatus,
 } from "@prisma/client";
-import {
-  badRequestException,
-  forbiddenException,
-  notFoundException,
-} from "#api/common/errors/api-exception";
+import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { hasTiptapContent } from "#api/common/validation/rich-text-content";
 import {
@@ -37,10 +31,15 @@ import {
   toFlashcardInputJson,
   toFlashcardRecord,
 } from "#api/modules/flashcards/utils/flashcard-json";
+import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
 
 @Injectable()
 export class FlashcardsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(StudentLessonAccessService)
+    private readonly studentLessonAccessService: StudentLessonAccessService,
+  ) {}
 
   async listAdminSetsByLesson(lessonId: string) {
     const records = await this.prisma.flashcardSet.findMany({
@@ -394,7 +393,7 @@ export class FlashcardsService {
   }
 
   async listStudentSetsByLesson(lessonId: string, studentUserId: string) {
-    await this.assertStudentLessonAccess(lessonId, studentUserId);
+    await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
     const records = await this.prisma.flashcardSet.findMany({
       where: {
         lessonId,
@@ -406,47 +405,6 @@ export class FlashcardsService {
       select: studentFlashcardSetSelect,
     });
     return records.map(serializeStudentFlashcardSet);
-  }
-
-  private async assertStudentLessonAccess(lessonId: string, studentUserId: string) {
-    const lesson = await this.prisma.lesson.findFirst({
-      where: {
-        id: lessonId,
-        deletedAt: null,
-        status: PublishStatus.PUBLISHED,
-      },
-      select: {
-        learningPathId: true,
-        trialEnabled: true,
-      },
-    });
-    if (!lesson) {
-      throw notFoundException("NOT_FOUND", "Không tìm thấy buổi học");
-    }
-    if (lesson.trialEnabled) {
-      return;
-    }
-
-    const now = new Date();
-    const enrollment = await this.prisma.enrollment.findFirst({
-      where: {
-        studentUserId,
-        status: EnrollmentStatus.ACTIVE,
-        startsAt: { lte: now },
-        expiresAt: { gt: now },
-        OR: [
-          { learningPathId: lesson.learningPathId },
-          { deliveryLearningPathId: lesson.learningPathId },
-        ],
-      },
-      select: { id: true },
-    });
-    if (!enrollment) {
-      throw forbiddenException(
-        "ENROLLMENT_REQUIRED",
-        "Bạn cần quyền học buổi này để xem flashcard",
-      );
-    }
   }
 
   private async findActiveSet(setId: string) {

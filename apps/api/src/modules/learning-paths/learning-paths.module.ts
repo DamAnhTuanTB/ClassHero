@@ -23,6 +23,7 @@ import { PublicLearningPathsService } from "#api/modules/learning-paths/services
 import { PersonalLearningPathsService } from "#api/modules/learning-paths/services/personal-learning-paths.service";
 import { PublicLearningPathsController } from "#api/modules/learning-paths/controllers/public-learning-paths.controller";
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
+import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
 import { YoutubeTranscriptService } from "#api/modules/learning-paths/services/youtube-transcript.service";
 import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cache.service";
 
@@ -46,12 +47,13 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
     PublicLearningPathsService,
     PersonalLearningPathsService,
     SourceDocumentsService,
+    StudentLessonAccessService,
     YoutubeTranscriptService,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     RolesGuard,
     OcrArtifactCacheService,
   ],
-  exports: [LearningPathsService],
+  exports: [LearningPathsService, StudentLessonAccessService],
 })
 export class LearningPathsModule {}

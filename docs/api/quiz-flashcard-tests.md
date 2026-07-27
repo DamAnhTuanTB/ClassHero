@@ -261,7 +261,15 @@ Behavior: soft delete.
 
 Role: `STUDENT`.
 
-Behavior: trả bộ quiz được phép dùng.
+Behavior:
+
+- Yêu cầu lesson đã publish và student có enrollment active còn hạn cho khóa
+  gốc/bản cá nhân hiệu lực, hoặc lesson bật trial.
+- Chỉ trả set/question chưa xóa, trạng thái `APPROVED` và set không phải reserve.
+- Question chỉ gồm `questionJson`, `optionsJson`, `hintJson`, loại, độ khó và thứ
+  tự; không trả `correctAnswerJson`, `gradingConfigJson`, `explanation` hoặc dữ
+  liệu chấm điểm nội bộ.
+- Attempt/progress và chấm bài thuộc `M7.2`.
 
 #### `POST /student/quiz-sets/:quizSetId/attempts`
 
@@ -605,13 +613,28 @@ Response gồm:
   "data": {
     "canStart": true,
     "examOpenAt": "2026-08-01T13:00:00.000Z",
-    "bestAttempt": {
-      "score": 8,
-      "durationSeconds": 600
-    }
+    "bestAttempt": null,
+    "sets": [
+      {
+        "id": "test-set-uuid",
+        "title": "Kiểm tra cuối bài",
+        "durationSeconds": 900,
+        "totalScore": 10,
+        "questionCount": 10
+      }
+    ]
   }
 }
 ```
+
+Behavior:
+
+- Dùng cùng enrollment/trial access policy của lesson.
+- Chỉ trả metadata set `APPROVED`, chưa xóa, không phải reserve và số câu đã
+  duyệt; không trả nội dung câu hỏi hoặc đáp án.
+- `canStart` được tính bằng thời gian server so với `examOpenAt`; trial luôn bị
+  khóa dù được đọc nội dung lesson.
+- `bestAttempt` là `null` trong `M6.5`; dữ liệu attempt thật được nối ở `M7.5`.
 
 #### `POST /student/lessons/:lessonId/test-attempts/start`
 
