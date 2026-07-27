@@ -65,6 +65,7 @@ import type { TiptapTextDocument } from "@/types/rich-text";
 import { uploadAdminQuizImage } from "@/features/admin/quiz/api/admin-quiz-api";
 import { QuizRichImageNodeView } from "@/features/admin/quiz/components/quiz-rich-image-node-view";
 import { QuizTextColorPicker } from "@/features/admin/quiz/components/quiz-text-color-picker";
+import { VisualMathInput } from "@/features/admin/quiz/components/visual-math-input";
 import {
   areTiptapDocumentsEquivalent,
   hasTiptapDocumentContent,
@@ -186,17 +187,6 @@ const QuizImage = Image.extend({
     return ReactNodeViewRenderer(QuizRichImageNodeView);
   },
 });
-
-const formulaTemplates = [
-  { label: "Phân số", latex: "\\frac{a}{b}" },
-  { label: "Căn", latex: "\\sqrt{x}" },
-  { label: "Lũy thừa", latex: "x^{n}" },
-  { label: "Tích phân", latex: "\\int_{a}^{b} f(x)\\,dx" },
-  { label: "Tổng", latex: "\\sum_{i=1}^{n} a_i" },
-  { label: "Vector", latex: "\\vec{F}=m\\vec{a}" },
-  { label: "Đơn vị", latex: "v=10\\,\\mathrm{m/s}" },
-  { label: "Hóa học", latex: "\\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}" },
-];
 
 export function QuizRichContentEditor({
   ariaLabel,
@@ -490,8 +480,10 @@ export function ScientificAnswerField({
   placeholder: string;
   value: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [isFormulaToolsOpen, setIsFormulaToolsOpen] = useState(false);
+  const [usesVisualFormula, setUsesVisualFormula] = useState(() =>
+    looksLikeFormula(value),
+  );
   const previewHtml = useMemo(
     () =>
       value.trim()
@@ -503,43 +495,60 @@ export function ScientificAnswerField({
     [value],
   );
 
-  const insertAtCursor = (latex: string) => {
-    const input = inputRef.current;
-    const selectionStart = input?.selectionStart ?? value.length;
-    const selectionEnd = input?.selectionEnd ?? selectionStart;
-    const nextValue = value.slice(0, selectionStart) + latex + value.slice(selectionEnd);
-    onChange(nextValue);
-    requestAnimationFrame(() => {
-      input?.focus();
-      const nextCursor = selectionStart + latex.length;
-      input?.setSelectionRange(nextCursor, nextCursor);
-    });
-  };
+  useEffect(() => {
+    if (!value.trim()) {
+      setUsesVisualFormula(false);
+    }
+  }, [value]);
 
   return (
     <div>
       <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
-        <input
-          ref={inputRef}
-          id={id}
-          value={value}
-          onBlur={onBlur}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          aria-invalid={error ? "true" : "false"}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className={cn(
-            "min-h-10 w-full rounded-xl border bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition placeholder:text-[var(--theme-text-placeholder)]",
-            error
-              ? "border-[var(--theme-error-border)]"
-              : "border-[var(--theme-input-border)] hover:border-[var(--theme-input-hover-border)] focus:border-[var(--theme-primary)]",
-          )}
-        />
+        {usesVisualFormula && value.trim() ? (
+          <button
+            id={id}
+            type="button"
+            aria-label="Sửa đáp án bằng trình nhập công thức trực quan"
+            aria-invalid={error ? "true" : "false"}
+            aria-describedby={error ? `${id}-error` : undefined}
+            onClick={() => setIsFormulaToolsOpen(true)}
+            className={cn(
+              "min-h-10 w-full overflow-x-auto rounded-xl border bg-[var(--theme-input-bg)] px-4 py-2 text-left text-[var(--theme-text-strong)] outline-none transition",
+              error
+                ? "border-[var(--theme-error-border)]"
+                : "border-[var(--theme-input-border)] hover:border-[var(--theme-primary)] focus-visible:border-[var(--theme-primary)]",
+            )}
+          >
+            <span
+              className="block min-w-max text-center"
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+          </button>
+        ) : (
+          <input
+            id={id}
+            value={value}
+            onBlur={onBlur}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={placeholder}
+            aria-invalid={error ? "true" : "false"}
+            aria-describedby={error ? `${id}-error` : undefined}
+            className={cn(
+              "min-h-10 w-full rounded-xl border bg-[var(--theme-input-bg)] px-4 text-sm font-semibold text-[var(--theme-text-strong)] outline-none transition placeholder:text-[var(--theme-text-placeholder)]",
+              error
+                ? "border-[var(--theme-error-border)]"
+                : "border-[var(--theme-input-border)] hover:border-[var(--theme-input-hover-border)] focus:border-[var(--theme-primary)]",
+            )}
+          />
+        )}
         <button
           type="button"
           aria-label="Mở công cụ nhập công thức"
           aria-expanded={isFormulaToolsOpen}
-          onClick={() => setIsFormulaToolsOpen((isOpen) => !isOpen)}
+          onClick={() => {
+            setUsesVisualFormula(true);
+            setIsFormulaToolsOpen((isOpen) => !isOpen);
+          }}
           className={cn(
             "grid h-10 w-10 place-items-center rounded-lg border text-sm font-extrabold transition",
             isFormulaToolsOpen
@@ -552,40 +561,20 @@ export function ScientificAnswerField({
       </div>
       {isFormulaToolsOpen ? (
         <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
-          <div className="space-y-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-            <p className="text-xs font-semibold text-[var(--theme-text-muted)]">
-              Chèn LaTeX hoặc phương trình Hóa học vào đáp án dùng để chấm.
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {formulaTemplates.map((template) => (
-                <button
-                  key={template.label}
-                  type="button"
-                  onClick={() => insertAtCursor(template.latex)}
-                  className="theme-button-primary-subtle min-h-8 rounded-lg px-2.5 text-xs font-bold"
-                >
-                  {template.label}
-                </button>
-              ))}
-            </div>
-            <div className="min-h-12 overflow-x-auto rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-2 text-center text-[var(--theme-text-strong)]">
-              {previewHtml ? (
-                <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
-              ) : (
-                <span className="text-xs text-[var(--theme-text-muted)]">
-                  Xem trước đáp án công thức
-                </span>
-              )}
-            </div>
-          </div>
+          <VisualMathInput
+            ariaLabel="Nhập đáp án công thức"
+            value={value}
+            onBlur={onBlur}
+            onChange={onChange}
+          />
           <button
             type="button"
-            aria-label="Xóa phần nhập ký tự toán đặc biệt"
-            title="Xóa phần nhập ký tự toán đặc biệt"
+            aria-label="Đóng trình nhập công thức"
+            title="Đóng trình nhập công thức"
             onClick={() => setIsFormulaToolsOpen(false)}
-            className="theme-button-danger-subtle grid h-10 w-10 place-items-center self-center rounded-lg"
+            className="theme-button-neutral grid h-10 w-10 place-items-center self-center rounded-lg"
           >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       ) : null}
@@ -1616,18 +1605,6 @@ function FormulaComposer({
   onChange: (draft: FormulaDraft) => void;
   onClose: () => void;
 }) {
-  const previewHtml = useMemo(
-    () =>
-      draft.latex.trim()
-        ? katex.renderToString(draft.latex, {
-            displayMode: draft.kind === "block",
-            throwOnError: false,
-            strict: false,
-          })
-        : "",
-    [draft.kind, draft.latex],
-  );
-
   const saveFormula = () => {
     const latex = draft.latex.trim();
     if (!editor || !latex) {
@@ -1656,7 +1633,7 @@ function FormulaComposer({
             {draft.position === undefined ? "Chèn công thức" : "Sửa công thức"}
           </p>
           <p className="text-xs font-medium text-[var(--theme-text-muted)]">
-            Dùng LaTeX cho Toán/Lý; dùng <code>\ce{"{...}"}</code> cho Hóa học.
+            Chọn ký hiệu hoặc cấu trúc, sau đó nhập trực tiếp vào từng vị trí.
           </p>
         </div>
         <button
@@ -1686,32 +1663,11 @@ function FormulaComposer({
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
-        {formulaTemplates.map((template) => (
-          <button
-            key={template.label}
-            type="button"
-            onClick={() => onChange({ ...draft, latex: template.latex })}
-            className="theme-button-primary-subtle min-h-8 rounded-lg px-2.5 text-xs font-bold"
-          >
-            {template.label}
-          </button>
-        ))}
-      </div>
-      <textarea
-        value={draft.latex}
-        onChange={(event) => onChange({ ...draft, latex: event.target.value })}
-        className="min-h-20 w-full resize-y rounded-lg border border-[var(--theme-input-border)] bg-[var(--theme-input-bg)] px-3 py-2 font-mono text-sm text-[var(--theme-text-strong)] outline-none focus:border-[var(--theme-primary)]"
-        placeholder="\frac{a}{b} hoặc \ce{2H2 + O2 -> 2H2O}"
-        aria-label="Mã LaTeX công thức"
-      />
-      <div className="min-h-16 overflow-x-auto rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3 text-center text-[var(--theme-text-strong)]">
-        {previewHtml ? (
-          <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
-        ) : (
-          <span className="text-sm text-[var(--theme-text-muted)]">
-            Xem trước công thức
-          </span>
-        )}
+        <VisualMathInput
+          ariaLabel="Nhập công thức trực quan"
+          value={draft.latex}
+          onChange={(latex) => onChange({ ...draft, latex })}
+        />
       </div>
       <div className="flex justify-end">
         <button
@@ -1726,4 +1682,8 @@ function FormulaComposer({
       </div>
     </div>
   );
+}
+
+function looksLikeFormula(value: string) {
+  return /\\[a-zA-Z]+|[_^{}]|[=<>±×÷∑∫√]/u.test(value);
 }

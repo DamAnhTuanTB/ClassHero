@@ -114,11 +114,44 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 - Chỉ cập nhật tài liệu hoặc label không làm select xuất hiện thêm option. Một
   loại câu hỏi mới phải đi xuyên suốt Prisma enum -> client generate -> DTO/Zod
   validation -> API types -> form schema/default/payload -> card render -> test.
+- Trong Tiptap JSON, text node không định dạng thường không có field `marks`.
+  Read-only renderer phải dùng `(marks ?? []).reduce(..., text)` để luôn giữ
+  `text` làm giá trị ban đầu; dùng `marks?.reduce(...)` sẽ trả về `undefined` và
+  làm mất toàn bộ chữ thường, trong khi ảnh hoặc công thức vẫn có thể hiển thị.
+- Một số getter của MathLive như `mathfield.macros` cần custom element đã được
+  mount. Macro hoặc option khởi tạo phải truyền vào
+  `new MathfieldElement(options)`; không đọc rồi spread getter phụ thuộc DOM
+  trước khi append element, nếu không browser sẽ ném lỗi `Mathfield not mounted`.
+- Khi gắn custom element vào React bằng DOM API, vùng mount imperative phải là
+  một node rỗng riêng. Không gọi `replaceChildren()` trên container còn chứa
+  loading/error node do React render, vì React vẫn giữ ownership của node đó và
+  sẽ lỗi `removeChild` khi reconciliation hoặc unmount.
+- Placeholder của MathLive nằm bên trong custom macro có thể hiển thị nhưng
+  không nhận bàn phím như placeholder của cấu trúc native. Cấu trúc cần sửa trực
+  tiếp như Vector hoặc công thức Hóa học phải dùng lệnh native có placeholder,
+  ví dụ `#@_{#?}#?`, để người dùng gõ rồi dùng `Tab` chuyển giữa từng phần.
+  Riêng mẫu Vector dùng `\vec{#?}` để hiện ô placeholder native có màu ngay dưới
+  mũi tên; `F` chỉ là nội dung preview trên nút mẫu. Không chèn `F` thật rồi
+  chọn atom bằng offset vì selection trong accent có thể bị vẽ sai, và thao tác
+  chuột/bàn phím ảo dễ làm mất trạng thái thay thế. Khi người dùng chạm lại đúng
+  glyph placeholder đang được chọn, giữ nguyên selection để MathLive không đẩy
+  caret ra ngoài Vector trước khi nhận phím nhập.
+- Preview KaTeX trong palette chỉ có nhiệm vụ hiển thị nên phải dùng
+  `pointer-events: none`; nút semantic bên ngoài mới sở hữu thao tác click/tap.
+  Kích thước nút phải theo intrinsic width của công thức và wrap theo hàng,
+  không ép mọi công thức dài/ngắn vào các cột bằng nhau rồi để glyph tràn sang
+  hit target bên cạnh.
+- MathLive dùng `letterShapeStyle = "upright"` để chữ nhập trực tiếp luôn đứng.
+  KaTeX preview/editor/viewer cần override cả `.mathnormal` và `.mathit` về
+  `KaTeX_Main` với `font-style: normal`; nếu chỉ sửa vùng nhập thì công thức sau
+  khi chèn vào Tiptap vẫn quay lại chữ nghiêng.
 
 ## File quan trọng
 
 - `apps/web/features/admin/quiz/components/quiz-rich-content-editor.tsx`
 - `apps/web/features/admin/quiz/components/quiz-rich-content-editor.css`
+- `apps/web/features/admin/quiz/components/quiz-rich-content-viewer.tsx`
+- `apps/web/features/admin/quiz/components/visual-math-input.tsx`
 - `apps/web/features/admin/quiz/components/quiz-text-color-picker.tsx`
 - `apps/web/features/admin/tests/`
 - `apps/api/src/modules/quiz/`

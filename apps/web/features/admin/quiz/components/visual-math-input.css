@@ -1,0 +1,246 @@
+.visual-math-input {
+  --visual-math-accent: var(--theme-primary);
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 0.75rem;
+  background: var(--theme-input-bg);
+}
+
+.visual-math-input__category-bar {
+  display: flex;
+  min-height: 3rem;
+  align-items: stretch;
+  gap: 0.125rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--theme-border);
+  background: var(--theme-surface-soft);
+  padding: 0.25rem;
+  scrollbar-width: none;
+}
+
+.visual-math-input__category-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.visual-math-input__category-button {
+  display: inline-flex;
+  min-width: 4.4rem;
+  min-height: 2.5rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  color: var(--theme-text-muted);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.visual-math-input__category-button:hover:not(:disabled) {
+  border-color: var(--theme-border);
+  background: var(--theme-bg);
+  color: var(--theme-text-strong);
+}
+
+.visual-math-input__category-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--visual-math-accent) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.visual-math-input__category-button--active {
+  border-color: color-mix(in srgb, var(--visual-math-accent) 42%, var(--theme-border));
+  background: var(--theme-primary-subtle);
+  color: var(--visual-math-accent);
+}
+
+.visual-math-input__category-button:disabled,
+.visual-math-input__template-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.visual-math-input__caret {
+  font-size: 0.65rem;
+}
+
+.visual-math-input__palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.375rem;
+  border-bottom: 1px solid var(--theme-border);
+  background: var(--theme-bg);
+  padding: 0.5rem;
+}
+
+.visual-math-input__template-button {
+  display: inline-grid;
+  min-width: 3.5rem;
+  max-width: 100%;
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--theme-border);
+  border-radius: 0.55rem;
+  background: var(--theme-input-bg);
+  color: var(--theme-text-strong);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.visual-math-input__template-button:hover:not(:disabled) {
+  border-color: var(--visual-math-accent);
+  background: var(--theme-primary-subtle);
+  transform: translateY(-1px);
+}
+
+.visual-math-input__template-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.visual-math-input__template-button:focus-visible {
+  border-color: var(--visual-math-accent);
+  outline: 2px solid color-mix(in srgb, var(--visual-math-accent) 28%, transparent);
+  outline-offset: 1px;
+}
+
+.visual-math-input__math-preview {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.visual-math-input__math-preview .katex {
+  font-size: 1.05em;
+}
+
+.visual-math-input__math-preview .katex :is(.mathnormal, .mathit) {
+  font-family: KaTeX_Main, serif;
+  font-style: normal;
+}
+
+.visual-math-input__field-shell {
+  padding: 0.75rem;
+}
+
+.visual-math-input__field-host {
+  min-height: 4.75rem;
+}
+
+.visual-math-input__field-host math-field {
+  display: block;
+  width: 100%;
+  min-height: 4.75rem;
+  overflow-x: auto;
+  border: 1px solid var(--theme-input-border);
+  border-radius: 0.65rem;
+  background: var(--theme-input-bg);
+  color: var(--theme-text-strong);
+  padding: 0.75rem 3rem 0.75rem 0.875rem;
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
+  line-height: 1.45;
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+  --caret-color: var(--visual-math-accent);
+  --contains-highlight-background-color: color-mix(
+    in srgb,
+    var(--visual-math-accent) 12%,
+    transparent
+  );
+  --placeholder-color: var(--visual-math-accent);
+  --placeholder-opacity: 1;
+  --selection-background-color: color-mix(
+    in srgb,
+    var(--visual-math-accent) 28%,
+    transparent
+  );
+  --selection-color: var(--visual-math-accent);
+  --smart-fence-color: var(--visual-math-accent);
+}
+
+.visual-math-input__field-host math-field:focus-within {
+  border-color: var(--visual-math-accent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--visual-math-accent) 18%, transparent);
+}
+
+.visual-math-input__field-host math-field::part(menu-toggle) {
+  display: none;
+}
+
+.visual-math-input__field-host math-field::part(virtual-keyboard-toggle) {
+  color: var(--theme-text-muted);
+}
+
+.visual-math-input__loading {
+  display: flex;
+  min-height: 4.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px dashed var(--theme-border);
+  border-radius: 0.65rem;
+  background: var(--theme-surface-soft);
+  color: var(--theme-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.visual-math-input__hint {
+  margin-top: 0.5rem;
+  color: var(--theme-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .visual-math-input__category-button {
+    min-width: 3.75rem;
+  }
+
+  .visual-math-input__template-button {
+    min-width: 3.25rem;
+    padding-inline: 0.55rem;
+  }
+
+  .visual-math-input__field-shell {
+    padding: 0.625rem;
+  }
+
+  .visual-math-input__field-host math-field {
+    min-height: 3.75rem;
+    padding: 0.625rem 2.5rem 0.625rem 0.75rem;
+    font-size: 1.125rem;
+  }
+
+  .visual-math-input__field-host,
+  .visual-math-input__loading {
+    min-height: 3.75rem;
+  }
+
+  .visual-math-input__hint {
+    font-size: 0.6875rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visual-math-input__category-button,
+  .visual-math-input__template-button,
+  .visual-math-input__field-host math-field {
+    transition: none;
+  }
+}

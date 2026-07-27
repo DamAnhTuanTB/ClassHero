@@ -94,6 +94,9 @@ Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới 
 - Không dùng negative letter-spacing.
 - Không scale font bằng viewport width.
 - Công thức Toán/Lý/Hóa phải có khoảng thở, không chen sát text.
+- Trong trình soạn và phần hiển thị công thức Quiz/Flashcard/Test, mọi ký tự
+  chữ cái phải dùng kiểu chữ đứng, gồm ký tự chính, chỉ số trên, chỉ số dưới,
+  Vector và công thức Hóa học; không dùng kiểu nghiêng mặc định của math font.
 
 Scale mặc định:
 

@@ -32,6 +32,7 @@ import {
   useAdminQuizSetMutations,
   useAdminQuizSets,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
+import { QuizRichContentViewer } from "@/features/admin/quiz/components/quiz-rich-content-viewer";
 import type {
   AdminTestQuestion,
   AdminTestSet,
@@ -617,9 +618,12 @@ function QuestionCard({
               {difficultyLabel(question.difficulty)}
             </span>
           </div>
-          <h5 className="mt-2 whitespace-pre-wrap text-base font-extrabold leading-6 text-[var(--theme-text-strong)]">
-            {getTiptapDocumentText(question.questionJson) || "Câu hỏi chưa có nội dung"}
-          </h5>
+          <QuizRichContentViewer
+            ariaLabel={`Nội dung câu ${index + 1}`}
+            className="mt-2 text-base font-extrabold leading-6 text-[var(--theme-text-strong)]"
+            content={question.questionJson}
+            fallback="Câu hỏi chưa có nội dung"
+          />
         </div>
         <div className="flex shrink-0 gap-2">
           <button
@@ -658,7 +662,11 @@ function QuestionCard({
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-current text-xs font-extrabold">
                   {answerOptionLabel(optionIndex)}
                 </span>
-                {getTiptapDocumentText(option.richText)}
+                <QuizRichContentViewer
+                  ariaLabel={`Nội dung đáp án ${answerOptionLabel(optionIndex)}`}
+                  className="min-w-0 flex-1"
+                  content={option.richText}
+                />
               </div>
             );
           })}
@@ -683,9 +691,11 @@ function QuestionCard({
                   <span className="shrink-0 font-extrabold text-[var(--theme-text-muted)]">
                     {statementIndex + 1}.
                   </span>
-                  <span className="break-words">
-                    {getTiptapDocumentText(statement.richText)}
-                  </span>
+                  <QuizRichContentViewer
+                    ariaLabel={`Nội dung mệnh đề ${statementIndex + 1}`}
+                    className="min-w-0 flex-1 break-words"
+                    content={statement.richText}
+                  />
                 </div>
                 <span
                   className={cn(

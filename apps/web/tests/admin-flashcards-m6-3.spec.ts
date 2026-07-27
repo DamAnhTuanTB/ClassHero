@@ -2,6 +2,13 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 const apiBaseUrl = "http://localhost:4000/api/v1";
 const lessonId = "lesson-flashcards-m6-3";
+const mathTemplateCounts = [
+  { category: "Chữ cái Hy Lạp", count: 14 },
+  { category: "Phép toán", count: 14 },
+  { category: "Quan hệ", count: 14 },
+  { category: "Cấu trúc", count: 15 },
+  { category: "Mũi tên", count: 10 },
+] as const;
 
 test("admin creates a flashcard set and card from lesson detail", async ({ page }) => {
   await seedAdminSession(page);
@@ -64,6 +71,341 @@ test("admin edits the selected quiz set from its panel", async ({ page }) => {
 
   await expect(page.getByRole("tab", { name: /Bộ câu hỏi ôn tập/ })).toBeVisible();
   await expectNoFrameworkOverlay(page);
+});
+
+test("admin composes a fraction without a framework runtime error", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  const formulaTrigger = dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first();
+  await formulaTrigger.click();
+
+  const mathfield = dialog.locator("math-field");
+  await expect(mathfield).toBeVisible({ timeout: 15_000 });
+  await dialog.getByRole("button", { name: "Chèn phân số" }).click();
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
+    )
+    .toContain("\\frac");
+
+  await page.keyboard.type("1");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("2");
+  const latex = await mathfield.evaluate(
+    (element) => (element as HTMLElement & { value: string }).value,
+  );
+  expect(latex).toContain("1");
+  expect(latex).toContain("2");
+
+  await dialog.getByRole("button", { name: "Đóng trình nhập công thức" }).click();
+  await expect(mathfield).toHaveCount(0);
+
+  await formulaTrigger.click();
+  await expect(dialog.locator("math-field")).toBeVisible();
+  await dialog.getByRole("button", { name: "Đóng trình nhập công thức" }).click();
+  await dialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(dialog).toBeHidden();
+
+  await expectNoFrameworkOverlay(page);
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("admin can type into vector and chemistry structures", async ({ page }) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+
+  const mathfield = dialog.locator("math-field");
+  await expect(mathfield).toBeVisible({ timeout: 15_000 });
+
+  await dialog.getByRole("button", { name: "Chèn vector" }).click();
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""),
+    )
+    .toContain("▢");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.tagName))
+    .toBe("MATH-FIELD");
+  const clickVectorPlaceholder = async () => {
+    const placeholderCandidates = await mathfield.evaluate((element) =>
+      Array.from(element.shadowRoot?.querySelectorAll(".ML__selected") ?? [])
+        .map((candidate) => {
+          const box = candidate.getBoundingClientRect();
+          return {
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height,
+          };
+        }),
+    );
+    const placeholderBox = placeholderCandidates.at(-1) ?? null;
+    expect(placeholderBox).not.toBeNull();
+    if (placeholderBox) {
+      await page.mouse.click(
+        placeholderBox.x + placeholderBox.width / 2,
+        placeholderBox.y + placeholderBox.height / 2,
+      );
+    }
+  };
+  await clickVectorPlaceholder();
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""),
+    )
+    .toContain("▢");
+  await page.keyboard.type("AB");
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
+    )
+    .toContain("\\vec{AB}");
+
+  await mathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+
+  await dialog.getByRole("button", { name: "Chèn vector" }).click();
+  await clickVectorPlaceholder();
+  await page.keyboard.insertText("C");
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
+    )
+    .toContain("\\vec{C}");
+
+  await mathfield.evaluate((element) => {
+    const field = element as HTMLElement & { value: string };
+    field.value = "";
+    field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  });
+
+  await dialog.getByRole("button", { name: "Chèn hóa học" }).click();
+  await page.keyboard.type("H");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("2");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("O");
+  await expect
+    .poll(() =>
+      mathfield.evaluate((element) => (element as HTMLElement & { value: string }).value),
+    )
+    .toMatch(/H_\{?2\}?O/);
+  const italicMathfieldGlyphs = await mathfield.evaluate((element) => {
+    const shadowRoot = element.shadowRoot;
+    if (!shadowRoot) {
+      return -1;
+    }
+
+    return Array.from(shadowRoot.querySelectorAll(".ML__mathit")).filter(
+      (glyph) =>
+        glyph.textContent?.trim() &&
+        ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
+    ).length;
+  });
+  expect(italicMathfieldGlyphs).toBe(0);
+
+  await dialog.getByRole("button", { name: "Chèn công thức", exact: true }).click();
+  const insertedFormula = dialog
+    .locator('.tiptap-mathematics-render[data-type="inline-math"]')
+    .first();
+  await expect(insertedFormula).toBeVisible();
+  const italicFormulaGlyphs = await insertedFormula
+    .locator(".mathnormal, .mathit")
+    .evaluateAll((glyphs) =>
+      glyphs.filter((glyph) =>
+        ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
+      ).length,
+    );
+  expect(italicFormulaGlyphs).toBe(0);
+
+  await expectNoFrameworkOverlay(page);
+});
+
+test("math structure previews stay inside their buttons", async ({ page }) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+
+  const templateButtons = dialog.locator(".visual-math-input__template-button");
+  await expect(templateButtons).toHaveCount(15);
+
+  const overflowedTemplates = await templateButtons.evaluateAll((buttons) =>
+    buttons.flatMap((button) => {
+      const preview = button.querySelector(".visual-math-input__math-preview");
+      if (!preview) {
+        return [];
+      }
+
+      const buttonRect = button.getBoundingClientRect();
+      const previewRect = preview.getBoundingClientRect();
+      const fits =
+        previewRect.left >= buttonRect.left - 1 &&
+        previewRect.right <= buttonRect.right + 1 &&
+        previewRect.top >= buttonRect.top - 1 &&
+        previewRect.bottom <= buttonRect.bottom + 1;
+
+      return fits ? [] : [button.getAttribute("aria-label") ?? "unknown"];
+    }),
+  );
+
+  expect(overflowedTemplates).toEqual([]);
+  const hiddenPaletteContent = await dialog
+    .locator(".visual-math-input__palette")
+    .evaluate((palette) => palette.scrollHeight - palette.clientHeight);
+  expect(hiddenPaletteContent).toBeLessThanOrEqual(1);
+  const viewportOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(viewportOverflow).toBeLessThanOrEqual(1);
+  const mathfieldHeight = await dialog
+    .locator("math-field")
+    .evaluate((field) => field.getBoundingClientRect().height);
+  expect(mathfieldHeight).toBeLessThanOrEqual(96);
+
+  const categoryBar = dialog.locator(".visual-math-input__category-bar");
+  const arrowsCategory = dialog.getByRole("button", {
+    name: "Mũi tên",
+    exact: true,
+  });
+  const categoryBarBeforeSelection = await categoryBar.evaluate((bar) => ({
+    hasHorizontalOverflow: bar.scrollWidth > bar.clientWidth,
+    scrollLeft: bar.scrollLeft,
+    top: bar.getBoundingClientRect().top,
+  }));
+  await arrowsCategory.evaluate((button) => (button as HTMLButtonElement).click());
+  await expect(arrowsCategory).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(() =>
+      categoryBar.evaluate((bar) => {
+        const activeButton = bar.querySelector('[aria-pressed="true"]');
+        if (!activeButton) {
+          return false;
+        }
+
+        const barRect = bar.getBoundingClientRect();
+        const buttonRect = activeButton.getBoundingClientRect();
+        return (
+          buttonRect.left >= barRect.left - 1 &&
+          buttonRect.right <= barRect.right + 1
+        );
+      }),
+    )
+    .toBe(true);
+  const categoryBarAfterSelection = await categoryBar.evaluate((bar) => ({
+    scrollLeft: bar.scrollLeft,
+    top: bar.getBoundingClientRect().top,
+  }));
+  expect(
+    Math.abs(categoryBarAfterSelection.top - categoryBarBeforeSelection.top),
+  ).toBeLessThanOrEqual(1);
+  if (categoryBarBeforeSelection.hasHorizontalOverflow) {
+    expect(categoryBarAfterSelection.scrollLeft).toBeGreaterThan(
+      categoryBarBeforeSelection.scrollLeft,
+    );
+  }
+  await expectNoFrameworkOverlay(page);
+});
+
+test("every math palette template inserts visual content", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+
+  const mathfield = dialog.locator("math-field");
+  await expect(mathfield).toBeVisible({ timeout: 15_000 });
+
+  for (const { category, count } of mathTemplateCounts) {
+    await dialog.getByRole("button", { name: category, exact: true }).click();
+    const palette = dialog.getByRole("group", { name: category });
+    const templateButtons = palette.locator(".visual-math-input__template-button");
+    await expect(templateButtons).toHaveCount(count);
+    const italicPreviewGlyphs = await palette
+      .locator(".mathnormal, .mathit")
+      .evaluateAll((glyphs) =>
+        glyphs.filter((glyph) =>
+          ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
+        ).length,
+      );
+    expect(italicPreviewGlyphs).toBe(0);
+
+    for (let index = 0; index < count; index += 1) {
+      await mathfield.evaluate((element) => {
+        const field = element as HTMLElement & {
+          blur: () => void;
+          setValue: (value: string) => void;
+        };
+        field.setValue("");
+        field.blur();
+        field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      });
+
+      const templateButton = templateButtons.nth(index);
+      const templateName = await templateButton.getAttribute("aria-label");
+      await templateButton.click();
+      await expect
+        .poll(() =>
+          mathfield.evaluate(
+            (element) => (element as HTMLElement & { value: string }).value.trim(),
+          ),
+        )
+        .not.toBe("");
+      expect(templateName).toMatch(/^Chèn /);
+    }
+  }
+
+  await dialog.getByRole("button", { name: "Đóng trình nhập công thức" }).click();
+  await dialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(dialog).toBeHidden();
+  await expectNoFrameworkOverlay(page);
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });
 
 async function seedAdminSession(page: Page) {
