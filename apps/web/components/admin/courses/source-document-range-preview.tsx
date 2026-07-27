@@ -37,15 +37,15 @@ export function SourceDocumentRangePreview({
         </div>
         {pages.length > 0 ? (
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex">
-            <div className="flex min-w-0 rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
+            <div className="flex min-w-0 overflow-hidden rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)]">
               <button
                 type="button"
                 aria-label="Nội dung OCR"
                 onClick={() => setPreviewMode("ocr")}
                 className={previewButtonClass(previewMode === "ocr", true)}
               >
-                <span className="hidden min-[360px]:inline">Nội dung </span>
-                OCR
+                <span className="hidden min-[360px]:inline">Nội dung OCR</span>
+                <span className="min-[360px]:hidden">OCR</span>
               </button>
               <button
                 type="button"
@@ -131,7 +131,8 @@ export function SourceDocumentRangePreview({
 
 function previewButtonClass(active: boolean, isFirst: boolean) {
   return [
-    "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap px-2 py-1 text-xs font-bold transition-colors sm:min-h-9 sm:px-2.5",
+    "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center whitespace-nowrap px-3.5 py-1.5 text-center text-xs font-bold transition-colors sm:min-h-9 sm:min-w-[6.5rem] sm:px-4 lg:px-5",
+    isFirst ? "sm:min-w-[7.75rem]" : "",
     isFirst ? "rounded-l-md" : "rounded-r-md",
     active
       ? "bg-[var(--theme-primary)] text-white"

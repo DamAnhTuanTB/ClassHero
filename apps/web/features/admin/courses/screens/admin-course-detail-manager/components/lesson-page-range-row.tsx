@@ -181,11 +181,11 @@ export function LessonPageRangeRow({
             </p>
             <div className="flex items-center gap-2 sm:gap-3">
               {previewPages.length > 0 && (
-                <div className="hidden sm:flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]">
+                <div className="hidden overflow-hidden rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] sm:flex">
                   <button
                     type="button"
                     onClick={() => setPreviewMode("ocr")}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
+                    className={`min-h-9 min-w-[7.75rem] whitespace-nowrap px-4 py-1.5 text-center text-xs font-bold transition-colors lg:px-5 ${
                       previewMode === "ocr"
                         ? "bg-[var(--theme-primary)] text-white"
                         : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
@@ -196,7 +196,7 @@ export function LessonPageRangeRow({
                   <button
                     type="button"
                     onClick={() => setPreviewMode("pdf")}
-                    className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
+                    className={`min-h-9 min-w-[6.5rem] whitespace-nowrap px-4 py-1.5 text-center text-xs font-bold transition-colors lg:px-5 ${
                       previewMode === "pdf"
                         ? "bg-[var(--theme-primary)] text-white"
                         : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]"
@@ -230,11 +230,11 @@ export function LessonPageRangeRow({
           {/* Mobile-only toggle row */}
           {previewPages.length > 0 && (
             <div className="mt-1.5 flex items-center justify-center gap-2 sm:hidden">
-              <div className="flex rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]">
+              <div className="flex overflow-hidden rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]">
                 <button
                   type="button"
                   onClick={() => setPreviewMode("ocr")}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-l-md transition-colors ${
+                  className={`min-h-9 whitespace-nowrap px-3.5 py-1.5 text-xs font-bold transition-colors ${
                     previewMode === "ocr"
                       ? "bg-[var(--theme-primary)] text-white"
                       : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-hover)]"
@@ -245,7 +245,7 @@ export function LessonPageRangeRow({
                 <button
                   type="button"
                   onClick={() => setPreviewMode("pdf")}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-r-md transition-colors ${
+                  className={`min-h-9 whitespace-nowrap px-3.5 py-1.5 text-xs font-bold transition-colors ${
                     previewMode === "pdf"
                       ? "bg-[var(--theme-primary)] text-white"
                       : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-hover)]"
