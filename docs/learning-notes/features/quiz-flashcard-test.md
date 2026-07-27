@@ -47,6 +47,12 @@ UI editor cập nhật giá trị React Hook Form, API client gửi payload câu
 
 API quiz nhận rich content theo schema của `M6.1`, không tin dữ liệu từ UI và validate lại trước khi service lưu.
 
+Mảng object trong DTO NestJS phải khai báo rõ lớp phần tử bằng
+`@Type(() => ItemDto)` và `@ValidateNested({ each: true })`. Nếu chỉ ghi type
+TypeScript như `QuizOption[]`, `ValidationPipe` bật implicit conversion có thể dựa
+vào metadata `Array` chung chung và biến từng object thành array trước khi schema
+nghiệp vụ nhận dữ liệu.
+
 ## Database
 
 Câu hỏi, phương án, gợi ý và lời giải giữ cấu trúc JSON để bảo toàn rich content; quiz set và question item vẫn là các entity riêng.
@@ -70,6 +76,13 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   biểu thị mức resize cho người dùng. Nếu ảnh mới hiển thị gọn ở 60% nhưng chưa
   được kéo, nhãn vẫn phải là 100%; cần một thuộc tính base riêng và fallback 100%
   cho node cũ để không làm thay đổi nội dung đã lưu.
+- Nếu payload trên Network có đúng nhiều phương án nhưng API vẫn báo từng phương
+  án không phải object, kiểm tra dữ liệu ngay sau `ValidationPipe`. TypeScript type
+  chỉ tồn tại lúc compile; runtime cần item DTO và metadata chuyển đổi rõ ràng.
+- Modal edit dùng resolver bất đồng bộ phải khởi tạo React Hook Form bằng dữ liệu
+  entity ngay từ lần mount đầu. Nếu luôn mount với giá trị tạo mới rỗng rồi mới
+  `reset()` trong effect, lượt validation cũ có thể hoàn tất muộn và gắn lỗi rỗng
+  lên form dù rich editor đã hiển thị dữ liệu hợp lệ.
 
 ## File quan trọng
 

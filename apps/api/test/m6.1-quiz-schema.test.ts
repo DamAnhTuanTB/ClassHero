@@ -4,10 +4,59 @@ import {
   correctAnswerSchema,
 } from "../src/modules/quiz/types/quiz.types";
 import { tiptapContentSchema } from "../src/common/validation/zod-schemas/tiptap.schema";
+import { QuizQuestionContentDto } from "../src/modules/quiz/dto/quiz-question-content.dto";
+import { plainToInstance } from "class-transformer";
 import { describe, it, expect } from "vitest";
 
 describe("M6.1 Quiz Schema Validation", () => {
   describe("multipleChoiceOptionsSchema", () => {
+    it("should preserve option objects during DTO implicit conversion", () => {
+      const dto = plainToInstance(
+        QuizQuestionContentDto,
+        {
+          questionType: "MULTIPLE_CHOICE",
+          difficulty: "MEDIUM",
+          questionJson: {
+            type: "doc",
+            content: [{ type: "paragraph" }],
+          },
+          optionsJson: [
+            {
+              id: "option-a",
+              richText: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    attrs: { indent: null, textAlign: null },
+                    content: [{ type: "text", text: "Màu vàng" }],
+                  },
+                ],
+              },
+            },
+            {
+              id: "option-b",
+              richText: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    attrs: { indent: null, textAlign: null },
+                    content: [{ type: "text", text: "Màu đỏ" }],
+                  },
+                ],
+              },
+            },
+          ],
+          correctAnswerJson: ["option-a"],
+        },
+        { enableImplicitConversion: true },
+      );
+
+      expect(dto.optionsJson?.some(Array.isArray)).toBe(false);
+      expect(multipleChoiceOptionsSchema.safeParse(dto.optionsJson).success).toBe(true);
+    });
+
     it("should validate valid options array", () => {
       const options = [
         { id: "A", richText: { type: "doc", content: [] } },

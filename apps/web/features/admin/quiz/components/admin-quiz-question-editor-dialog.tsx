@@ -13,8 +13,8 @@ import { OptionField } from "@/components/common/forms/option-field";
 import type {
   AdminQuizQuestion,
   AdminQuizQuestionPayload,
-  TiptapTextDocument,
 } from "@/features/admin/quiz/api/admin-quiz-api";
+import type { TiptapTextDocument } from "@/types/rich-text";
 import {
   QuizRichContentEditor,
   ScientificAnswerField,
@@ -24,7 +24,7 @@ import {
   createEmptyTiptapDocument,
   getTiptapDocumentText,
   hasTiptapDocumentContent,
-} from "@/features/admin/quiz/utils/quiz-rich-content";
+} from "@/lib/tiptap-rich-content";
 import { cn } from "@/lib/utils";
 
 const tiptapDocumentSchema = z.custom<TiptapTextDocument>(
@@ -142,7 +142,7 @@ export function AdminQuizQuestionEditorDialog({
     resolver: zodResolver(questionFormSchema) as Resolver<QuestionFormValues>,
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: createEmptyDefaults(),
+    defaultValues: question ? toFormValues(question) : createEmptyDefaults(),
   });
   const options = useFieldArray({ control: form.control, name: "options" });
   const acceptedAnswers = useFieldArray({
@@ -552,6 +552,14 @@ function createEmptyDefaults(): QuestionFormValues {
     difficulty: "MEDIUM",
     questionContent: createEmptyTiptapDocument(),
     options: [
+      {
+        optionId: createOptionId(),
+        content: createEmptyTiptapDocument(),
+      },
+      {
+        optionId: createOptionId(),
+        content: createEmptyTiptapDocument(),
+      },
       {
         optionId: createOptionId(),
         content: createEmptyTiptapDocument(),

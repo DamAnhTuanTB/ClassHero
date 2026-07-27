@@ -151,7 +151,12 @@ deleted_at timestamp?
 
 Rules:
 
-- Khi admin sửa `front_json`, `back_json` hoặc `hint_json`, service phải mark explanation stale hoặc xóa `explanation_id`.
+- `hint_json` là cột legacy nullable; contract M6.3 mới không đọc/ghi trường này.
+- Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`:
+  `target_type=FLASHCARD`, `target_id=flashcards.id`, `source=ADMIN`,
+  `review_status=APPROVED`; `flashcards.explanation_id` trỏ tới bản ghi này.
+- Khi admin sửa `front_json` hoặc `back_json` mà không gửi lời giải mới,
+  service phải mark explanation hiện tại là stale.
 
 ### 8.3. `flashcard_progress`
 

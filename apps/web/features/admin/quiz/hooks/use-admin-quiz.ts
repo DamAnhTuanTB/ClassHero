@@ -8,6 +8,7 @@ import {
   createAdminQuizQuestion,
   deleteAdminQuizQuestion,
   updateAdminQuizQuestion,
+  updateAdminQuizSet,
   type AdminQuizQuestionPayload,
   type QuizDifficulty,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -49,9 +50,26 @@ export function useAdminQuizSetMutations(lessonId: string) {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({
+      data,
+      setId,
+    }: {
+      data: { title: string; difficulty?: QuizDifficulty };
+      setId: string;
+    }) => {
+      if (!session?.accessToken) throw new Error("No token");
+      return updateAdminQuizSet(setId, data, session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+    },
+  });
+
   return {
     createSet: createMutation,
     deleteSet: deleteMutation,
+    updateSet: updateMutation,
   };
 }
 

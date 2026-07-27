@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  Check,
   CircleHelp,
   FileQuestion,
+  Gauge,
   Loader2,
   Pencil,
   Plus,
@@ -23,13 +23,21 @@ import {
   useAdminQuizSetMutations,
   useAdminQuizSets,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
-import { getTiptapDocumentText } from "@/features/admin/quiz/utils/quiz-rich-content";
+import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
 import { cn } from "@/lib/utils";
 
 const AdminQuizQuestionEditorDialog = dynamic(
   () =>
     import("@/features/admin/quiz/components/admin-quiz-question-editor-dialog").then(
       (module) => module.AdminQuizQuestionEditorDialog,
+    ),
+  { ssr: false },
+);
+
+const AdminQuizSetEditorDialog = dynamic(
+  () =>
+    import("@/features/admin/quiz/components/admin-quiz-set-editor-dialog").then(
+      (module) => module.AdminQuizSetEditorDialog,
     ),
   { ssr: false },
 );
@@ -45,10 +53,12 @@ type DeleteTarget =
 
 export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
   const { data: quizSets, isLoading, isError } = useAdminQuizSets(lessonId);
-  const { createSet, deleteSet } = useAdminQuizSetMutations(lessonId);
+  const { createSet, deleteSet, updateSet } = useAdminQuizSetMutations(lessonId);
   const [selectedSetId, setSelectedSetId] = useState("");
   const [editorQuestion, setEditorQuestion] = useState<AdminQuizQuestion | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isSetEditorOpen, setIsSetEditorOpen] = useState(false);
+  const [setEditorTarget, setSetEditorTarget] = useState<AdminQuizSet | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const { deleteQuestion } = useAdminQuizQuestionMutations(selectedSetId, lessonId);
 
@@ -70,16 +80,29 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
     [quizSets, selectedSetId],
   );
 
-  const handleCreateSet = async () => {
+  const handleSaveSet = async ({
+    difficulty,
+    title,
+  }: {
+    difficulty: AdminQuizSet["difficulty"];
+    title: string;
+  }) => {
     try {
-      const createdSet = await createSet.mutateAsync({
-        title: `Bộ câu hỏi ${(quizSets?.length ?? 0) + 1}`,
-        difficulty: "MIXED",
-      });
-      setSelectedSetId(createdSet.id);
-      toast.success("Đã tạo bộ câu hỏi");
+      const savedSet = setEditorTarget
+        ? await updateSet.mutateAsync({
+            setId: setEditorTarget.id,
+            data: { title, difficulty },
+          })
+        : await createSet.mutateAsync({
+            title,
+            difficulty,
+          });
+      setSelectedSetId(savedSet.id);
+      setIsSetEditorOpen(false);
+      setSetEditorTarget(null);
+      toast.success(setEditorTarget ? "Đã cập nhật bộ câu hỏi" : "Đã tạo bộ câu hỏi");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Chưa tạo được bộ câu hỏi");
+      toast.error(error instanceof Error ? error.message : "Chưa lưu được bộ câu hỏi");
     }
   };
 
@@ -108,21 +131,24 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
         </div>
         <button
           type="button"
-          onClick={handleCreateSet}
-          disabled={createSet.isPending}
-          className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition disabled:opacity-60"
+          onClick={() => {
+            setSetEditorTarget(null);
+            setIsSetEditorOpen(true);
+          }}
+          className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition"
         >
-          {createSet.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Plus className="h-4 w-4" aria-hidden="true" />
-          )}
+          <Plus className="h-4 w-4" aria-hidden="true" />
           Thêm bộ câu hỏi
         </button>
       </div>
 
       {!quizSets?.length ? (
-        <QuizEmptyState onCreate={handleCreateSet} isCreating={createSet.isPending} />
+        <QuizEmptyState
+          onCreate={() => {
+            setSetEditorTarget(null);
+            setIsSetEditorOpen(true);
+          }}
+        />
       ) : (
         <>
           <div
@@ -187,6 +213,10 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
                   label: activeSet.title,
                 })
               }
+              onEditSet={() => {
+                setSetEditorTarget(activeSet);
+                setIsSetEditorOpen(true);
+              }}
               onEditQuestion={(question) => {
                 setEditorQuestion(question);
                 setIsEditorOpen(true);
@@ -208,6 +238,20 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
           ) : null}
         </>
       )}
+
+      {isSetEditorOpen ? (
+        <AdminQuizSetEditorDialog
+          defaultTitle={getNextQuizSetTitle(quizSets)}
+          isOpen
+          isSaving={createSet.isPending || updateSet.isPending}
+          set={setEditorTarget}
+          onClose={() => {
+            setIsSetEditorOpen(false);
+            setSetEditorTarget(null);
+          }}
+          onSubmit={handleSaveSet}
+        />
+      ) : null}
 
       <DeleteConfirmDialog
         isOpen={deleteTarget !== null}
@@ -245,12 +289,14 @@ function QuizSetPanel({
   onAddQuestion,
   onDeleteQuestion,
   onDeleteSet,
+  onEditSet,
   onEditQuestion,
 }: {
   activeSet: AdminQuizSet;
   onAddQuestion: () => void;
   onDeleteQuestion: (question: AdminQuizQuestion) => void;
   onDeleteSet: () => void;
+  onEditSet: () => void;
   onEditQuestion: (question: AdminQuizQuestion) => void;
 }) {
   const { data: questions, isLoading, isError } = useAdminQuizQuestions(activeSet.id);
@@ -274,7 +320,7 @@ function QuizSetPanel({
             {questions?.length ?? activeSet._count.questions} câu hỏi
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.5rem] gap-2 sm:flex">
           <button
             type="button"
             onClick={onAddQuestion}
@@ -282,6 +328,14 @@ function QuizSetPanel({
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Thêm câu hỏi
+          </button>
+          <button
+            type="button"
+            onClick={onEditSet}
+            className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
+            aria-label={`Sửa ${activeSet.title}`}
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -366,7 +420,17 @@ function QuestionCard({
             <span className="rounded-full bg-[var(--theme-surface-soft)] px-2 py-0.5 text-xs font-bold text-[var(--theme-text-muted)]">
               {questionTypeLabel(question.questionType)}
             </span>
-            <span className="rounded-full bg-[var(--theme-surface-soft)] px-2 py-0.5 text-xs font-bold text-[var(--theme-text-muted)]">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-extrabold",
+                question.difficulty === "MEDIUM"
+                  ? "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]"
+                  : "border-transparent bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
+              )}
+            >
+              {question.difficulty === "MEDIUM" ? (
+                <Gauge className="size-3.5" aria-hidden="true" />
+              ) : null}
               {difficultyLabel(question.difficulty)}
             </span>
           </div>
@@ -409,11 +473,7 @@ function QuestionCard({
                 )}
               >
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-current text-xs font-extrabold">
-                  {isCorrect ? (
-                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  ) : (
-                    answerOptionLabel(optionIndex)
-                  )}
+                  {answerOptionLabel(optionIndex)}
                 </span>
                 {getTiptapDocumentText(option.richText)}
               </div>
@@ -473,13 +533,7 @@ function QuizLoadingState() {
   );
 }
 
-function QuizEmptyState({
-  isCreating,
-  onCreate,
-}: {
-  isCreating: boolean;
-  onCreate: () => void;
-}) {
+function QuizEmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-12 text-center">
       <FileQuestion
@@ -492,14 +546,24 @@ function QuizEmptyState({
       <button
         type="button"
         onClick={onCreate}
-        disabled={isCreating}
-        className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
+        className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
         Tạo bộ câu hỏi đầu tiên
       </button>
     </div>
   );
+}
+
+function getNextQuizSetTitle(quizSets: AdminQuizSet[] | undefined) {
+  const latestNumber =
+    quizSets?.reduce((highestNumber, quizSet) => {
+      const match = /^Bộ câu hỏi\s+(\d+)$/iu.exec(quizSet.title.trim());
+      const currentNumber = match?.[1] ? Number.parseInt(match[1], 10) : 0;
+      return Math.max(highestNumber, currentNumber);
+    }, 0) ?? 0;
+
+  return `Bộ câu hỏi ${latestNumber + 1}`;
 }
 
 function difficultyLabel(

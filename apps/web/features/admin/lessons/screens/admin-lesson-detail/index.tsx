@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLesson } from "../../hooks/use-admin-lesson";
-import { AdminQuizTab } from "@/features/admin/quiz/components/admin-quiz-tab";
 import {
   Loader2,
   BookOpen,
@@ -46,6 +45,16 @@ const LessonDetailEditorDialog = dynamic(() =>
 const LessonDocumentsTab = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-documents-tab").then(
     (module) => module.LessonDocumentsTab,
+  ),
+);
+const AdminQuizTab = dynamic(() =>
+  import("@/features/admin/quiz/components/admin-quiz-tab").then(
+    (module) => module.AdminQuizTab,
+  ),
+);
+const AdminFlashcardsTab = dynamic(() =>
+  import("@/features/admin/flashcards/screens/admin-flashcards-tab").then(
+    (module) => module.AdminFlashcardsTab,
   ),
 );
 
@@ -517,8 +526,8 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                 )}
 
                 {activeTab === "flashcard" && (
-                  <div className="p-6 text-[var(--theme-text-muted)] text-sm font-medium">
-                    Quản lý Flashcard sẽ được tích hợp ở M6.3.
+                  <div className="h-full p-4 sm:p-6">
+                    <AdminFlashcardsTab lessonId={lessonId} />
                   </div>
                 )}
 

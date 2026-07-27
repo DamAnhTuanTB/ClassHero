@@ -667,7 +667,7 @@ Khi student/admin yêu cầu explanation:
 1. Load target hiện tại.
 2. Tính `target_content_hash` từ nội dung target:
    - quiz/test question: `question_json`, `options_json`, `correct_answer_json`, `hint_json`, `grading_config_json`.
-   - flashcard: `front_json`, `back_json`, `hint_json`.
+   - flashcard: `front_json`, `back_json`.
 3. Tính `source_context_hash` từ tài liệu/context nguồn được dùng, tối thiểu dựa trên `lesson_documents.content_hash` và chunk ids.
 4. Nếu explanation tồn tại và hash khớp, dùng cache.
 5. Nếu không khớp, coi cache là stale và enqueue `AI_GENERATE_EXPLANATION`.

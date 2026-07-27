@@ -251,6 +251,11 @@ Response nếu phải tạo AI job: `202 Accepted`.
 
 Role: `ADMIN`.
 
+Behavior:
+
+- Trả các bộ chưa bị xóa mềm theo `sortOrder`.
+- `cardCount` phản ánh số flashcard chưa bị xóa mềm.
+
 #### `POST /admin/lessons/:lessonId/flashcard-sets`
 
 Role: `ADMIN`.
@@ -265,12 +270,18 @@ Body:
     {
       "frontJson": {},
       "backJson": {},
-      "hintJson": {},
+      "explanationJson": {},
       "difficulty": "MEDIUM"
     }
   ]
 }
 ```
+
+Behavior:
+
+- Chỉ tạo cho lesson tồn tại.
+- Bộ thủ công dùng `source=ADMIN`, `reviewStatus=APPROVED`.
+- Server tự gán `sortOrder` tiếp theo và ghi audit log.
 
 #### `POST /admin/lessons/:lessonId/flashcard-sets/generate-ai`
 
@@ -291,13 +302,19 @@ Response: `202 Accepted` với `jobId`.
 
 Role: `ADMIN`.
 
+Behavior: cập nhật title/difficulty và ghi audit log.
+
 #### `DELETE /admin/flashcard-sets/:setId`
 
 Role: `ADMIN`.
 
+Behavior: soft delete và ghi audit log.
+
 #### `POST /admin/flashcard-sets/:setId/review`
 
 Role: `ADMIN`.
+
+Behavior: cập nhật `reviewStatus` và ghi audit log.
 
 ### 11.2. Admin flashcard item-level CRUD
 
@@ -311,11 +328,25 @@ Body:
 {
   "frontJson": {},
   "backJson": {},
-  "hintJson": {},
+  "explanationJson": {},
   "difficulty": "MEDIUM",
   "sortOrder": 1
 }
 ```
+
+Rules:
+
+- `frontJson` và `backJson` là Tiptap JSON có nội dung; công thức, ảnh có
+  `alt`/`src` và bảng được tính là nội dung cấu trúc hợp lệ.
+- `explanationJson` optional và có thể gửi `null`; form quản trị không còn ô
+  gợi ý.
+- Lời giải chi tiết thủ công được lưu trong `ai_explanations` với
+  `targetType=FLASHCARD`, `source=ADMIN`, `reviewStatus=APPROVED` và trả về qua
+  relation `explanation`.
+- Difficulty của từng card chỉ nhận `EASY`, `MEDIUM`, `HARD`; server tự gán
+  `sortOrder` tiếp theo nếu client không gửi.
+- Tạo card tăng `flashcard_sets.card_count` trong cùng transaction và ghi audit
+  log.
 
 #### `PATCH /admin/flashcards/:flashcardId`
 
@@ -324,7 +355,10 @@ Role: `ADMIN`.
 Behavior:
 
 - Cập nhật flashcard.
-- Nếu nội dung thay đổi, mark explanation stale.
+- Nếu front/back thay đổi mà request không gửi `explanationJson`, mark lời giải
+  hiện tại stale. Gửi `explanationJson` sẽ tạo/cập nhật lời giải; gửi `null`
+  hoặc document rỗng sẽ gỡ lời giải.
+- Ghi audit log.
 
 #### `DELETE /admin/flashcards/:flashcardId`
 
@@ -332,11 +366,22 @@ Role: `ADMIN`.
 
 Behavior: soft delete.
 
+- Giảm `flashcard_sets.card_count` trong cùng transaction.
+- Ghi audit log.
+
 ### 11.3. Student flashcard
 
 #### `GET /student/lessons/:lessonId/flashcard-sets`
 
 Role: `STUDENT`.
+
+Behavior:
+
+- Yêu cầu lesson đã publish và student có enrollment active còn hạn cho khóa
+  gốc/bản cá nhân hiệu lực, hoặc lesson bật trial.
+- Chỉ trả set/card chưa xóa, set/card `APPROVED` và set không phải reserve.
+- Response chứa front/back/difficulty và lời giải đã `APPROVED` để student đọc
+  nội dung; progress thuộc `M7.3`.
 
 #### `POST /student/flashcards/:flashcardId/progress`
 

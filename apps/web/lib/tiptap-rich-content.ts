@@ -1,7 +1,4 @@
-import type {
-  TiptapJsonNode,
-  TiptapTextDocument,
-} from "@/features/admin/quiz/api/admin-quiz-api";
+import type { TiptapJsonNode, TiptapTextDocument } from "@/types/rich-text";
 
 export function createEmptyTiptapDocument(): TiptapTextDocument {
   return {

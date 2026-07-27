@@ -1,24 +1,8 @@
 import { apiRequest } from "@/lib/api-client";
+import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type QuizDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
 export type QuizQuestionType = "MULTIPLE_CHOICE" | "TRUE_FALSE" | "TEXT_INPUT";
-
-export interface TiptapJsonMark {
-  type: string;
-  attrs?: Record<string, unknown>;
-}
-
-export interface TiptapJsonNode {
-  type: string;
-  attrs?: Record<string, unknown>;
-  content?: TiptapJsonNode[];
-  marks?: TiptapJsonMark[];
-  text?: string;
-}
-
-export interface TiptapTextDocument extends TiptapJsonNode {
-  type: "doc";
-}
 
 export interface AdminQuizOption {
   id: string;

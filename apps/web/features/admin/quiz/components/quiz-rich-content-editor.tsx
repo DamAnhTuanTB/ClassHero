@@ -61,14 +61,14 @@ import {
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
-import type { TiptapTextDocument } from "@/features/admin/quiz/api/admin-quiz-api";
+import type { TiptapTextDocument } from "@/types/rich-text";
 import { uploadAdminQuizImage } from "@/features/admin/quiz/api/admin-quiz-api";
 import { QuizRichImageNodeView } from "@/features/admin/quiz/components/quiz-rich-image-node-view";
 import { QuizTextColorPicker } from "@/features/admin/quiz/components/quiz-text-color-picker";
 import {
   areTiptapDocumentsEquivalent,
   hasTiptapDocumentContent,
-} from "@/features/admin/quiz/utils/quiz-rich-content";
+} from "@/lib/tiptap-rich-content";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { cn } from "@/lib/utils";
 import "@/features/admin/quiz/components/quiz-rich-content-editor.css";

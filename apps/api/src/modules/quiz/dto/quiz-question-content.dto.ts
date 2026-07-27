@@ -1,12 +1,32 @@
-import { IsDefined, IsEnum, IsOptional } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDefined,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { QuestionType, Difficulty } from "@prisma/client";
 import { IsTiptapJson } from "#api/common/validation/decorators/is-tiptap-json.decorator";
 import type {
   QuizCorrectAnswer,
-  QuizOption,
   TextInputGradingConfig,
 } from "#api/modules/quiz/types/quiz.types";
+
+export class QuizOptionDto {
+  @ApiProperty({ example: "option-a" })
+  @IsString()
+  @MinLength(1)
+  id!: string;
+
+  @ApiProperty({ description: "Nội dung phương án dạng Tiptap JSON" })
+  @IsTiptapJson()
+  richText!: Record<string, unknown>;
+}
 
 export class QuizQuestionContentDto {
   @ApiProperty({ enum: QuestionType, example: QuestionType.MULTIPLE_CHOICE })
@@ -23,7 +43,11 @@ export class QuizQuestionContentDto {
 
   @ApiPropertyOptional({ description: "Danh sách đáp án cho câu hỏi trắc nghiệm" })
   @IsOptional()
-  optionsJson?: QuizOption[];
+  @IsArray()
+  @ArrayMinSize(2)
+  @ValidateNested({ each: true })
+  @Type(() => QuizOptionDto)
+  optionsJson?: QuizOptionDto[];
 
   @ApiProperty({ description: "Đáp án đúng" })
   @IsDefined()

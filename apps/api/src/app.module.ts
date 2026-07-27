@@ -7,6 +7,7 @@ import { validateEnv } from "#api/config/env.validation";
 import { AiModule } from "#api/modules/ai/ai.module";
 import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
+import { FlashcardsModule } from "#api/modules/flashcards/flashcards.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
 import { PaymentsModule } from "#api/modules/payments/payments.module";
@@ -23,6 +24,7 @@ import { QuizModule } from "#api/modules/quiz/quiz.module";
     AiModule,
     AuthModule,
     FilesModule,
+    FlashcardsModule,
     JobsModule,
     LearningPathsModule,
     PaymentsModule,
@@ -32,4 +34,3 @@ import { QuizModule } from "#api/modules/quiz/quiz.module";
   providers: [AppService],
 })
 export class AppModule {}
-
