@@ -41,7 +41,10 @@ export class QuizQuestionContentDto {
   @IsTiptapJson()
   questionJson!: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: "Danh sách đáp án cho câu hỏi trắc nghiệm" })
+  @ApiPropertyOptional({
+    description:
+      "Danh sách phương án trắc nghiệm hoặc danh sách mệnh đề của câu đúng/sai nhiều mệnh đề",
+  })
   @IsOptional()
   @IsArray()
   @ArrayMinSize(2)

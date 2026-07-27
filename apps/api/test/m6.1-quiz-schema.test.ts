@@ -1,4 +1,6 @@
 import {
+  multiStatementCorrectAnswerSchema,
+  multiStatementOptionsSchema,
   multipleChoiceOptionsSchema,
   textInputGradingSchema,
   correctAnswerSchema,
@@ -90,6 +92,41 @@ describe("M6.1 Quiz Schema Validation", () => {
         expect(result.data.caseSensitive).toBe(false);
         expect(result.data.exactMatch).toBe(true);
       }
+    });
+  });
+
+  describe("multi-statement true/false schemas", () => {
+    const statements = [
+      {
+        id: "statement-a",
+        richText: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "A" }] }],
+        },
+      },
+      {
+        id: "statement-b",
+        richText: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "B" }] }],
+        },
+      },
+    ];
+
+    it("should validate at least two rich-content statements", () => {
+      expect(multiStatementOptionsSchema.safeParse(statements).success).toBe(true);
+      expect(multiStatementOptionsSchema.safeParse(statements.slice(0, 1)).success).toBe(
+        false,
+      );
+    });
+
+    it("should validate one boolean answer mapping per statement", () => {
+      const answers = [
+        { statementId: "statement-a", value: true },
+        { statementId: "statement-b", value: false },
+      ];
+      expect(multiStatementCorrectAnswerSchema.safeParse(answers).success).toBe(true);
+      expect(correctAnswerSchema.safeParse(answers).success).toBe(true);
     });
   });
 

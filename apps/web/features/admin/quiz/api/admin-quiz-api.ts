@@ -2,11 +2,17 @@ import { apiRequest } from "@/lib/api-client";
 import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type QuizDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
-export type QuizQuestionType = "MULTIPLE_CHOICE" | "TRUE_FALSE" | "TEXT_INPUT";
+export type QuizQuestionType =
+  "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";
 
 export interface AdminQuizOption {
   id: string;
   richText: TiptapTextDocument;
+}
+
+export interface AdminMultiStatementAnswer {
+  statementId: string;
+  value: boolean;
 }
 
 export interface AdminQuizQuestionPayload {
@@ -14,7 +20,7 @@ export interface AdminQuizQuestionPayload {
   difficulty: Exclude<QuizDifficulty, "MIXED">;
   questionJson: TiptapTextDocument;
   optionsJson?: AdminQuizOption[];
-  correctAnswerJson: string[] | boolean;
+  correctAnswerJson: string[] | boolean | AdminMultiStatementAnswer[];
   hintJson?: TiptapTextDocument | null;
   gradingConfigJson?: {
     caseSensitive: boolean;
@@ -46,7 +52,7 @@ export interface AdminQuizQuestion {
   difficulty: Exclude<QuizDifficulty, "MIXED">;
   questionJson: TiptapTextDocument;
   optionsJson: AdminQuizOption[] | null;
-  correctAnswerJson: string[] | boolean;
+  correctAnswerJson: string[] | boolean | AdminMultiStatementAnswer[];
   hintJson: TiptapTextDocument | null;
   gradingConfigJson: {
     caseSensitive?: boolean;

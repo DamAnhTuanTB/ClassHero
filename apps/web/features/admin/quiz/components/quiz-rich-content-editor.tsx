@@ -551,31 +551,42 @@ export function ScientificAnswerField({
         </button>
       </div>
       {isFormulaToolsOpen ? (
-        <div className="mt-2 space-y-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-          <p className="text-xs font-semibold text-[var(--theme-text-muted)]">
-            Chèn LaTeX hoặc phương trình Hóa học vào đáp án dùng để chấm.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {formulaTemplates.map((template) => (
-              <button
-                key={template.label}
-                type="button"
-                onClick={() => insertAtCursor(template.latex)}
-                className="theme-button-primary-subtle min-h-8 rounded-lg px-2.5 text-xs font-bold"
-              >
-                {template.label}
-              </button>
-            ))}
+        <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
+          <div className="space-y-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+            <p className="text-xs font-semibold text-[var(--theme-text-muted)]">
+              Chèn LaTeX hoặc phương trình Hóa học vào đáp án dùng để chấm.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {formulaTemplates.map((template) => (
+                <button
+                  key={template.label}
+                  type="button"
+                  onClick={() => insertAtCursor(template.latex)}
+                  className="theme-button-primary-subtle min-h-8 rounded-lg px-2.5 text-xs font-bold"
+                >
+                  {template.label}
+                </button>
+              ))}
+            </div>
+            <div className="min-h-12 overflow-x-auto rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-2 text-center text-[var(--theme-text-strong)]">
+              {previewHtml ? (
+                <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
+              ) : (
+                <span className="text-xs text-[var(--theme-text-muted)]">
+                  Xem trước đáp án công thức
+                </span>
+              )}
+            </div>
           </div>
-          <div className="min-h-12 overflow-x-auto rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-2 text-center text-[var(--theme-text-strong)]">
-            {previewHtml ? (
-              <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
-            ) : (
-              <span className="text-xs text-[var(--theme-text-muted)]">
-                Xem trước đáp án công thức
-              </span>
-            )}
-          </div>
+          <button
+            type="button"
+            aria-label="Xóa phần nhập ký tự toán đặc biệt"
+            title="Xóa phần nhập ký tự toán đặc biệt"
+            onClick={() => setIsFormulaToolsOpen(false)}
+            className="theme-button-danger-subtle grid h-10 w-10 place-items-center self-center rounded-lg"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
       ) : null}
       {error ? (

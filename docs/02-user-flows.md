@@ -242,7 +242,10 @@ Các bước:
    ô đã gộp bằng toolbar icon có tooltip xuất hiện ngay khi hover/focus.
 6. Với câu tự nhập đáp án, admin nhập một hoặc nhiều chuỗi được chấp nhận; có
    thể chèn và xem trước LaTeX/mhchem nhưng dữ liệu vẫn là chuỗi để chấm điểm.
-7. Backend validate nội dung, đáp án đúng và lưu toàn bộ Tiptap JSON.
+7. Với câu `Đúng/Sai`, admin chọn một đáp án boolean Đúng hoặc Sai cho toàn
+   câu. Với câu `Đúng/Sai nhiều mệnh đề`, admin nhập đề dẫn chung, thêm các
+   mệnh đề và chọn Đúng/Sai độc lập cho từng mệnh đề.
+8. Backend validate nội dung, đáp án đúng và lưu toàn bộ Tiptap JSON.
 
 Acceptance Criteria:
 
@@ -263,7 +266,32 @@ Acceptance Criteria:
   đúng độ thụt.
 - Multiple choice có ít nhất 2 phương án; phương án chỉ có công thức hoặc ảnh
   có mô tả vẫn là nội dung hợp lệ.
+- `Đúng/Sai` chỉ lưu một boolean chung; `Đúng/Sai nhiều mệnh đề` là loại câu
+  hỏi khác và lưu ánh xạ theo từng mệnh đề.
 - Editor/modal được lazy-load khi admin mở, không làm chậm tải lesson detail.
+
+---
+
+## 6.2. Admin tạo và chỉnh sửa câu Đúng/Sai nhiều mệnh đề
+
+Actor: Admin.
+
+Các bước:
+
+1. Admin mở tab Quiz hoặc Test, chọn một bộ và thêm/sửa câu hỏi loại
+   `Đúng/Sai nhiều mệnh đề`.
+2. Admin nhập đề dẫn chung rồi thêm tối thiểu 2 mệnh đề.
+3. Mỗi mệnh đề có rich content riêng và một lựa chọn Đúng hoặc Sai độc lập.
+4. Backend validate ID mệnh đề duy nhất, nội dung và ánh xạ Đúng/Sai đầy đủ rồi
+   lưu vào question tương ứng.
+
+Acceptance Criteria:
+
+- Không giới hạn cố định bốn mệnh đề.
+- Mỗi mệnh đề có đúng một giá trị Đúng/Sai.
+- Đóng rồi mở lại form không mất nội dung, thứ tự hoặc ánh xạ của từng mệnh đề.
+- `Đúng/Sai` và `Đúng/Sai nhiều mệnh đề` luôn là hai lựa chọn riêng; tạo loại
+  mới không thay đổi câu `Đúng/Sai` đã tồn tại.
 
 ---
 
@@ -429,6 +457,7 @@ Các bước:
 1. Student chọn một bộ quiz trong buổi học.
 2. Backend tạo quiz attempt.
 3. Student trả lời từng câu.
+   Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
 4. Student nộp bài.
 5. Backend chấm câu.
 6. Backend lưu attempt và answers.
@@ -478,6 +507,7 @@ Các bước:
 2. Backend chọn một `test_set` phù hợp.
 3. Backend tạo `test_attempt`.
 4. Student làm bài trong thời gian quy định.
+   Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
 5. Student nộp bài.
 6. Backend chấm bài.
 7. Backend tính điểm thang 10.

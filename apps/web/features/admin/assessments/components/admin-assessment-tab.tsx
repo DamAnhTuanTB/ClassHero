@@ -2,6 +2,7 @@
 
 import {
   CircleHelp,
+  Clock3,
   FileQuestion,
   Gauge,
   Loader2,
@@ -21,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import type {
+  AdminMultiStatementAnswer,
   AdminQuizQuestion,
   AdminQuizSet,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -30,15 +32,25 @@ import {
   useAdminQuizSetMutations,
   useAdminQuizSets,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
+import type {
+  AdminTestQuestion,
+  AdminTestSet,
+} from "@/features/admin/tests/api/admin-tests-api";
+import {
+  useAdminTestQuestionMutations,
+  useAdminTestQuestions,
+  useAdminTestSetMutations,
+  useAdminTestSets,
+} from "@/features/admin/tests/hooks/use-admin-tests";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { cn } from "@/lib/utils";
 
-const AdminQuizQuestionEditorDialog = dynamic(
+const AdminAssessmentQuestionEditorDialog = dynamic(
   () =>
-    import("@/features/admin/quiz/components/admin-quiz-question-editor-dialog").then(
-      (module) => module.AdminQuizQuestionEditorDialog,
+    import("@/features/admin/assessments/components/admin-assessment-question-editor-dialog").then(
+      (module) => module.AdminAssessmentQuestionEditorDialog,
     ),
   { ssr: false },
 );
@@ -51,7 +63,16 @@ const AdminQuizSetEditorDialog = dynamic(
   { ssr: false },
 );
 
-interface AdminQuizTabProps {
+const AdminTestSetEditorDialog = dynamic(
+  () =>
+    import("@/features/admin/tests/screens/admin-tests-tab/components/admin-test-set-editor-dialog").then(
+      (module) => module.AdminTestSetEditorDialog,
+    ),
+  { ssr: false },
+);
+
+interface AdminAssessmentTabProps {
+  assessmentKind?: "quiz" | "test";
   lessonId: string;
 }
 
@@ -60,16 +81,31 @@ type DeleteTarget =
   | { type: "question"; id: string; label: string }
   | null;
 
-export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
-  const { data: quizSets, isLoading, isError } = useAdminQuizSets(lessonId);
-  const { createSet, deleteSet, updateSet } = useAdminQuizSetMutations(lessonId);
+export function AdminAssessmentTab({
+  assessmentKind = "quiz",
+  lessonId,
+}: AdminAssessmentTabProps) {
+  const isTest = assessmentKind === "test";
+  const quizSetsQuery = useAdminQuizSets(lessonId, !isTest);
+  const testSetsQuery = useAdminTestSets(lessonId, isTest);
+  const quizSetMutations = useAdminQuizSetMutations(lessonId);
+  const testSetMutations = useAdminTestSetMutations(lessonId);
+  const quizSets = isTest ? testSetsQuery.data : quizSetsQuery.data;
+  const isLoading = isTest ? testSetsQuery.isLoading : quizSetsQuery.isLoading;
+  const isError = isTest ? testSetsQuery.isError : quizSetsQuery.isError;
+  const copy = getAssessmentCopy(assessmentKind);
   const [selectedSetId, setSelectedSetId] = useState("");
-  const [editorQuestion, setEditorQuestion] = useState<AdminQuizQuestion | null>(null);
+  const [editorQuestion, setEditorQuestion] = useState<
+    AdminQuizQuestion | AdminTestQuestion | null
+  >(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSetEditorOpen, setIsSetEditorOpen] = useState(false);
-  const [setEditorTarget, setSetEditorTarget] = useState<AdminQuizSet | null>(null);
+  const [setEditorTarget, setSetEditorTarget] = useState<
+    AdminQuizSet | AdminTestSet | null
+  >(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
-  const { deleteQuestion } = useAdminQuizQuestionMutations(selectedSetId, lessonId);
+  const quizQuestionMutations = useAdminQuizQuestionMutations(selectedSetId, lessonId);
+  const testQuestionMutations = useAdminTestQuestionMutations(selectedSetId, lessonId);
   const {
     minHeight: quizSetPanelMinHeight,
     panelRef: quizSetPanelRef,
@@ -144,27 +180,48 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
 
   const handleSaveSet = async ({
     difficulty,
+    durationMinutes,
     title,
   }: {
     difficulty: AdminQuizSet["difficulty"];
+    durationMinutes?: string;
     title: string;
   }) => {
     try {
-      const savedSet = setEditorTarget
-        ? await updateSet.mutateAsync({
-            setId: setEditorTarget.id,
-            data: { title, difficulty },
-          })
-        : await createSet.mutateAsync({
-            title,
-            difficulty,
-          });
+      const savedSet = isTest
+        ? setEditorTarget
+          ? await testSetMutations.updateSet.mutateAsync({
+              setId: setEditorTarget.id,
+              data: {
+                title,
+                difficulty,
+                durationSeconds: Number(durationMinutes) * 60,
+              },
+            })
+          : await testSetMutations.createSet.mutateAsync({
+              title,
+              difficulty,
+              durationSeconds: Number(durationMinutes) * 60,
+            })
+        : setEditorTarget
+          ? await quizSetMutations.updateSet.mutateAsync({
+              setId: setEditorTarget.id,
+              data: { title, difficulty },
+            })
+          : await quizSetMutations.createSet.mutateAsync({
+              title,
+              difficulty,
+            });
       handleSelectQuizSet(savedSet.id);
       setIsSetEditorOpen(false);
       setSetEditorTarget(null);
-      toast.success(setEditorTarget ? "Đã cập nhật bộ câu hỏi" : "Đã tạo bộ câu hỏi");
+      toast.success(
+        setEditorTarget ? `Đã cập nhật ${copy.setName}` : `Đã tạo ${copy.setName}`,
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Chưa lưu được bộ câu hỏi");
+      toast.error(
+        error instanceof Error ? error.message : `Chưa lưu được ${copy.setName}`,
+      );
     }
   };
 
@@ -175,7 +232,7 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
   if (isError) {
     return (
       <div className="rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-5 text-sm font-semibold text-[var(--theme-error-text)]">
-        Không tải được danh sách bộ câu hỏi. Hãy thử tải lại trang.
+        Không tải được danh sách {copy.setNamePlural}. Hãy thử tải lại trang.
       </div>
     );
   }
@@ -185,10 +242,10 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Quản lý Quiz
+            {copy.heading}
           </h3>
           <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            Mỗi tab là một bộ câu hỏi của buổi học.
+            {copy.description}
           </p>
         </div>
         <button
@@ -200,12 +257,13 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
           className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
-          Thêm bộ câu hỏi
+          {copy.addSetLabel}
         </button>
       </div>
 
       {!quizSets?.length ? (
         <QuizEmptyState
+          assessmentKind={assessmentKind}
           onCreate={() => {
             setSetEditorTarget(null);
             setIsSetEditorOpen(true);
@@ -216,7 +274,7 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
           <div
             ref={quizSetTabsRef}
             role="tablist"
-            aria-label="Các bộ câu hỏi"
+            aria-label={`Các ${copy.setNamePlural}`}
             className="flex gap-2 overflow-x-auto overflow-y-hidden border-b border-[var(--theme-border)] pb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {quizSets.map((set, setIndex) => {
@@ -228,7 +286,7 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  aria-controls={`quiz-set-panel-${set.id}`}
+                  aria-controls={`${assessmentKind}-set-panel-${set.id}`}
                   tabIndex={isActive ? 0 : -1}
                   onClick={() => handleSelectQuizSet(set.id)}
                   onKeyDown={(event) => handleQuizSetTabsKeyDown(event, setIndex)}
@@ -260,6 +318,7 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
 
           {activeSet ? (
             <QuizSetPanel
+              assessmentKind={assessmentKind}
               activeSet={activeSet}
               minHeight={quizSetPanelMinHeight}
               panelRef={quizSetPanelRef}
@@ -293,7 +352,8 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
           ) : null}
 
           {activeSet && isEditorOpen ? (
-            <AdminQuizQuestionEditorDialog
+            <AdminAssessmentQuestionEditorDialog
+              assessmentKind={assessmentKind}
               isOpen
               lessonId={lessonId}
               question={editorQuestion}
@@ -307,12 +367,30 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
         </>
       )}
 
-      {isSetEditorOpen ? (
-        <AdminQuizSetEditorDialog
-          defaultTitle={getNextQuizSetTitle(quizSets)}
+      {isSetEditorOpen && isTest ? (
+        <AdminTestSetEditorDialog
+          defaultTitle={getNextSetTitle(quizSets, assessmentKind)}
           isOpen
-          isSaving={createSet.isPending || updateSet.isPending}
-          set={setEditorTarget}
+          isSaving={
+            testSetMutations.createSet.isPending || testSetMutations.updateSet.isPending
+          }
+          set={setEditorTarget as AdminTestSet | null}
+          onClose={() => {
+            setIsSetEditorOpen(false);
+            setSetEditorTarget(null);
+          }}
+          onSubmit={handleSaveSet}
+        />
+      ) : null}
+
+      {isSetEditorOpen && !isTest ? (
+        <AdminQuizSetEditorDialog
+          defaultTitle={getNextSetTitle(quizSets, assessmentKind)}
+          isOpen
+          isSaving={
+            quizSetMutations.createSet.isPending || quizSetMutations.updateSet.isPending
+          }
+          set={setEditorTarget as AdminQuizSet | null}
           onClose={() => {
             setIsSetEditorOpen(false);
             setSetEditorTarget(null);
@@ -323,23 +401,37 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
 
       <DeleteConfirmDialog
         isOpen={deleteTarget !== null}
-        isConfirming={deleteSet.isPending || deleteQuestion.isPending}
+        isConfirming={
+          isTest
+            ? testSetMutations.deleteSet.isPending ||
+              testQuestionMutations.deleteQuestion.isPending
+            : quizSetMutations.deleteSet.isPending ||
+              quizQuestionMutations.deleteQuestion.isPending
+        }
         itemName={deleteTarget?.label ?? ""}
-        title={deleteTarget?.type === "set" ? "Xóa bộ câu hỏi" : "Xóa câu hỏi"}
+        title={deleteTarget?.type === "set" ? copy.deleteSetTitle : "Xóa câu hỏi"}
         description={
           deleteTarget?.type === "set"
             ? `Toàn bộ câu hỏi trong “${deleteTarget.label}” sẽ bị xóa. Hành động này không thể hoàn tác.`
-            : "Câu hỏi và lời giải chi tiết đi kèm sẽ bị xóa khỏi bộ câu hỏi."
+            : `Câu hỏi và lời giải chi tiết đi kèm sẽ bị xóa khỏi ${copy.setName}.`
         }
         onCancel={() => setDeleteTarget(null)}
         onConfirm={async () => {
           if (!deleteTarget) return;
           try {
             if (deleteTarget.type === "set") {
-              await deleteSet.mutateAsync(deleteTarget.id);
-              toast.success("Đã xóa bộ câu hỏi");
+              if (isTest) {
+                await testSetMutations.deleteSet.mutateAsync(deleteTarget.id);
+              } else {
+                await quizSetMutations.deleteSet.mutateAsync(deleteTarget.id);
+              }
+              toast.success(`Đã xóa ${copy.setName}`);
             } else {
-              await deleteQuestion.mutateAsync(deleteTarget.id);
+              if (isTest) {
+                await testQuestionMutations.deleteQuestion.mutateAsync(deleteTarget.id);
+              } else {
+                await quizQuestionMutations.deleteQuestion.mutateAsync(deleteTarget.id);
+              }
               toast.success("Đã xóa câu hỏi");
             }
             setDeleteTarget(null);
@@ -353,6 +445,7 @@ export function AdminQuizTab({ lessonId }: AdminQuizTabProps) {
 }
 
 function QuizSetPanel({
+  assessmentKind,
   activeSet,
   minHeight,
   panelRef,
@@ -362,20 +455,26 @@ function QuizSetPanel({
   onEditSet,
   onEditQuestion,
 }: {
-  activeSet: AdminQuizSet;
+  assessmentKind: "quiz" | "test";
+  activeSet: AdminQuizSet | AdminTestSet;
   minHeight: number;
   panelRef: Ref<HTMLElement>;
   onAddQuestion: () => void;
-  onDeleteQuestion: (question: AdminQuizQuestion) => void;
+  onDeleteQuestion: (question: AdminQuizQuestion | AdminTestQuestion) => void;
   onDeleteSet: () => void;
   onEditSet: () => void;
-  onEditQuestion: (question: AdminQuizQuestion) => void;
+  onEditQuestion: (question: AdminQuizQuestion | AdminTestQuestion) => void;
 }) {
-  const { data: questions, isLoading, isError } = useAdminQuizQuestions(activeSet.id);
+  const isTest = assessmentKind === "test";
+  const quizQuestionsQuery = useAdminQuizQuestions(activeSet.id, !isTest);
+  const testQuestionsQuery = useAdminTestQuestions(activeSet.id, isTest);
+  const questions = isTest ? testQuestionsQuery.data : quizQuestionsQuery.data;
+  const isLoading = isTest ? testQuestionsQuery.isLoading : quizQuestionsQuery.isLoading;
+  const isError = isTest ? testQuestionsQuery.isError : quizQuestionsQuery.isError;
   return (
     <section
       ref={panelRef}
-      id={`quiz-set-panel-${activeSet.id}`}
+      id={`${assessmentKind}-set-panel-${activeSet.id}`}
       role="tabpanel"
       className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm"
       style={{ minHeight: minHeight || undefined }}
@@ -389,6 +488,12 @@ function QuizSetPanel({
             <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
               {difficultyLabel(activeSet.difficulty)}
             </span>
+            {isTest ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
+                <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                {formatDuration((activeSet as AdminTestSet).durationSeconds)}
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
             {questions?.length ?? activeSet._count.questions} câu hỏi
@@ -473,13 +578,17 @@ function QuestionCard({
   onEdit,
 }: {
   index: number;
-  question: AdminQuizQuestion;
+  question: AdminQuizQuestion | AdminTestQuestion;
   onDelete: () => void;
   onEdit: () => void;
 }) {
-  const correctAnswers = Array.isArray(question.correctAnswerJson)
-    ? question.correctAnswerJson
-    : [];
+  const correctAnswers = getStringAnswers(question.correctAnswerJson);
+  const statementAnswerById = new Map(
+    getMultiStatementAnswers(question.correctAnswerJson).map((answer) => [
+      answer.statementId,
+      answer.value,
+    ]),
+  );
   const hint = getTiptapDocumentText(question.hintJson);
   const explanation = getTiptapDocumentText(question.explanation?.contentJson);
 
@@ -555,17 +664,55 @@ function QuestionCard({
           })}
         </div>
       ) : question.questionType === "TRUE_FALSE" ? (
-        <div className="inline-flex rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] px-3 py-2 text-sm font-extrabold text-[var(--theme-success-text)]">
-          Đáp án đúng: {question.correctAnswerJson ? "Đúng" : "Sai"}
+        <div className="inline-flex gap-1 rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] px-3 py-2 text-sm text-[var(--theme-success-text)]">
+          <span className="font-normal">Đáp án đúng:</span>
+          <span className="font-extrabold">
+            {question.correctAnswerJson ? "Đúng" : "Sai"}
+          </span>
         </div>
+      ) : question.questionType === "MULTI_STATEMENT_TRUE_FALSE" ? (
+        <ul className="space-y-2">
+          {question.optionsJson?.map((statement, statementIndex) => {
+            const answer = statementAnswerById.get(statement.id) ?? false;
+            return (
+              <li
+                key={statement.id}
+                className="flex items-start justify-between gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 py-2"
+              >
+                <div className="flex min-w-0 items-start gap-2 text-sm font-semibold text-[var(--theme-text)]">
+                  <span className="shrink-0 font-extrabold text-[var(--theme-text-muted)]">
+                    {statementIndex + 1}.
+                  </span>
+                  <span className="break-words">
+                    {getTiptapDocumentText(statement.richText)}
+                  </span>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full border px-2.5 py-1 text-xs font-extrabold",
+                    answer
+                      ? "border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] text-[var(--theme-success-text)]"
+                      : "border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] text-[var(--theme-error-text)]",
+                  )}
+                >
+                  {answer ? "Đúng" : "Sai"}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
-        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-          <p className="text-xs font-bold text-[var(--theme-text-muted)]">
+        <div className="rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] p-3">
+          <p className="text-sm font-normal text-[var(--theme-success-text)]">
             Đáp án được chấp nhận
           </p>
-          <p className="mt-1 text-sm font-semibold text-[var(--theme-text-strong)]">
-            {correctAnswers.join(" · ")}
-          </p>
+          <ul className="mt-1 space-y-1 text-sm font-extrabold text-[var(--theme-success-text)]">
+            {correctAnswers.map((answer, answerIndex) => (
+              <li key={`${answerIndex}-${answer}`} className="break-words">
+                {answer}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -607,7 +754,14 @@ function QuizLoadingState() {
   );
 }
 
-function QuizEmptyState({ onCreate }: { onCreate: () => void }) {
+function QuizEmptyState({
+  assessmentKind,
+  onCreate,
+}: {
+  assessmentKind: "quiz" | "test";
+  onCreate: () => void;
+}) {
+  const copy = getAssessmentCopy(assessmentKind);
   return (
     <div className="flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-12 text-center">
       <FileQuestion
@@ -615,7 +769,7 @@ function QuizEmptyState({ onCreate }: { onCreate: () => void }) {
         aria-hidden="true"
       />
       <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
-        Chưa có bộ câu hỏi nào
+        Chưa có {copy.setName} nào
       </p>
       <button
         type="button"
@@ -623,25 +777,33 @@ function QuizEmptyState({ onCreate }: { onCreate: () => void }) {
         className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
-        Tạo bộ câu hỏi đầu tiên
+        {copy.createFirstSetLabel}
       </button>
     </div>
   );
 }
 
-function getNextQuizSetTitle(quizSets: AdminQuizSet[] | undefined) {
+function getNextSetTitle(
+  quizSets: Array<AdminQuizSet | AdminTestSet> | undefined,
+  assessmentKind: "quiz" | "test",
+) {
+  const prefix = assessmentKind === "test" ? "Bộ đề" : "Bộ câu hỏi";
   const latestNumber =
     quizSets?.reduce((highestNumber, quizSet) => {
-      const match = /^Bộ câu hỏi\s+(\d+)$/iu.exec(quizSet.title.trim());
+      const match = new RegExp(`^${prefix}\\s+(\\d+)$`, "iu").exec(quizSet.title.trim());
       const currentNumber = match?.[1] ? Number.parseInt(match[1], 10) : 0;
       return Math.max(highestNumber, currentNumber);
     }, 0) ?? 0;
 
-  return `Bộ câu hỏi ${latestNumber + 1}`;
+  return `${prefix} ${latestNumber + 1}`;
 }
 
 function difficultyLabel(
-  difficulty: AdminQuizSet["difficulty"] | AdminQuizQuestion["difficulty"],
+  difficulty:
+    | AdminQuizSet["difficulty"]
+    | AdminTestSet["difficulty"]
+    | AdminQuizQuestion["difficulty"]
+    | AdminTestQuestion["difficulty"],
 ) {
   return {
     EASY: "Dễ",
@@ -651,12 +813,68 @@ function difficultyLabel(
   }[difficulty];
 }
 
-function questionTypeLabel(type: AdminQuizQuestion["questionType"]) {
+function questionTypeLabel(
+  type: AdminQuizQuestion["questionType"] | AdminTestQuestion["questionType"],
+) {
   return {
     MULTIPLE_CHOICE: "Trắc nghiệm",
     TRUE_FALSE: "Đúng / Sai",
+    MULTI_STATEMENT_TRUE_FALSE: "Đúng / Sai nhiều mệnh đề",
     TEXT_INPUT: "Nhập đáp án",
   }[type];
+}
+
+function getStringAnswers(
+  correctAnswer: AdminQuizQuestion["correctAnswerJson"],
+): string[] {
+  return Array.isArray(correctAnswer) &&
+    correctAnswer.every((answer): answer is string => typeof answer === "string")
+    ? correctAnswer
+    : [];
+}
+
+function getMultiStatementAnswers(
+  correctAnswer: AdminQuizQuestion["correctAnswerJson"],
+): AdminMultiStatementAnswer[] {
+  return Array.isArray(correctAnswer) &&
+    correctAnswer.every(
+      (answer): answer is AdminMultiStatementAnswer =>
+        typeof answer === "object" &&
+        answer !== null &&
+        "statementId" in answer &&
+        typeof answer.statementId === "string" &&
+        "value" in answer &&
+        typeof answer.value === "boolean",
+    )
+    ? correctAnswer
+    : [];
+}
+
+function getAssessmentCopy(assessmentKind: "quiz" | "test") {
+  return assessmentKind === "test"
+    ? {
+        addSetLabel: "Thêm bộ đề",
+        createFirstSetLabel: "Tạo bộ đề đầu tiên",
+        deleteSetTitle: "Xóa bộ đề",
+        description: "Mỗi tab là một bộ đề kiểm tra của buổi học.",
+        heading: "Quản lý Bài kiểm tra",
+        setName: "bộ đề",
+        setNamePlural: "bộ đề",
+      }
+    : {
+        addSetLabel: "Thêm bộ câu hỏi",
+        createFirstSetLabel: "Tạo bộ câu hỏi đầu tiên",
+        deleteSetTitle: "Xóa bộ câu hỏi",
+        description: "Mỗi tab là một bộ câu hỏi của buổi học.",
+        heading: "Quản lý Quiz",
+        setName: "bộ câu hỏi",
+        setNamePlural: "bộ câu hỏi",
+      };
+}
+
+function formatDuration(durationSeconds: number) {
+  const minutes = Math.max(1, Math.round(durationSeconds / 60));
+  return `${minutes} phút`;
 }
 
 function answerOptionLabel(index: number) {

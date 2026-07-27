@@ -13,7 +13,7 @@ import {
   type QuizDifficulty,
 } from "@/features/admin/quiz/api/admin-quiz-api";
 
-export function useAdminQuizSets(lessonId: string) {
+export function useAdminQuizSets(lessonId: string, enabled = true) {
   const session = useAuthSessionStore((state) => state.session);
 
   return useQuery({
@@ -22,7 +22,7 @@ export function useAdminQuizSets(lessonId: string) {
       if (!session?.accessToken) throw new Error("No token");
       return getAdminQuizSets(lessonId, session.accessToken);
     },
-    enabled: !!session?.accessToken && !!lessonId,
+    enabled: enabled && !!session?.accessToken && !!lessonId,
   });
 }
 
@@ -73,7 +73,7 @@ export function useAdminQuizSetMutations(lessonId: string) {
   };
 }
 
-export function useAdminQuizQuestions(setId: string) {
+export function useAdminQuizQuestions(setId: string, enabled = true) {
   const session = useAuthSessionStore((state) => state.session);
 
   return useQuery({
@@ -82,7 +82,7 @@ export function useAdminQuizQuestions(setId: string) {
       if (!session?.accessToken) throw new Error("No token");
       return getAdminQuizQuestions(setId, session.accessToken);
     },
-    enabled: !!session?.accessToken && !!setId,
+    enabled: enabled && !!session?.accessToken && !!setId,
   });
 }
 

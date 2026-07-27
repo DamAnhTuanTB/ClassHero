@@ -12,6 +12,7 @@ import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
 import { PaymentsModule } from "#api/modules/payments/payments.module";
 import { QuizModule } from "#api/modules/quiz/quiz.module";
+import { TestsModule } from "#api/modules/tests/tests.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { QuizModule } from "#api/modules/quiz/quiz.module";
     LearningPathsModule,
     PaymentsModule,
     QuizModule,
+    TestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

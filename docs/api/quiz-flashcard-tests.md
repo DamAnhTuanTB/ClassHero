@@ -46,7 +46,12 @@ Body:
 {
   "questionCount": 10,
   "difficulty": "MEDIUM",
-  "questionTypes": ["MULTIPLE_CHOICE", "TRUE_FALSE"]
+  "questionTypes": [
+    "MULTIPLE_CHOICE",
+    "TRUE_FALSE",
+    "MULTI_STATEMENT_TRUE_FALSE",
+    "TEXT_INPUT"
+  ]
 }
 ```
 
@@ -131,7 +136,81 @@ Body:
 
 - `optionsJson` là mảng động, tối thiểu 2 phần tử và không có giới hạn cố định 4 phương án.
 - Mỗi option có `id` duy nhất; mọi ID trong `correctAnswerJson` phải tồn tại trong `optionsJson`.
-- Với `TRUE_FALSE`, `correctAnswerJson` là boolean.
+- Với `TRUE_FALSE`, `optionsJson` là `null` hoặc không gửi và
+  `correctAnswerJson` là một boolean chung:
+
+```json
+{
+  "questionType": "TRUE_FALSE",
+  "questionJson": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Số 2 là số nguyên tố." }]
+      }
+    ]
+  },
+  "optionsJson": null,
+  "correctAnswerJson": true,
+  "difficulty": "EASY"
+}
+```
+
+- Với `MULTI_STATEMENT_TRUE_FALSE`, `questionJson` là đề dẫn chung;
+  `optionsJson` là danh sách tối thiểu 2 mệnh đề và `correctAnswerJson` ánh xạ
+  Đúng/Sai cho từng mệnh đề:
+
+```json
+{
+  "questionType": "MULTI_STATEMENT_TRUE_FALSE",
+  "questionJson": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Xác định tính đúng sai của các mệnh đề sau." }]
+      }
+    ]
+  },
+  "optionsJson": [
+    {
+      "id": "statement-a",
+      "richText": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [{ "type": "text", "text": "Mệnh đề thứ nhất" }]
+          }
+        ]
+      }
+    },
+    {
+      "id": "statement-b",
+      "richText": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [{ "type": "text", "text": "Mệnh đề thứ hai" }]
+          }
+        ]
+      }
+    }
+  ],
+  "correctAnswerJson": [
+    { "statementId": "statement-a", "value": true },
+    { "statementId": "statement-b", "value": false }
+  ],
+  "difficulty": "MEDIUM"
+}
+```
+
+- ID mệnh đề phải duy nhất. `correctAnswerJson` phải chứa đúng một entry cho mọi
+  ID trong `optionsJson`, không thiếu, không thừa và không trùng.
+- `TRUE_FALSE` và `MULTI_STATEMENT_TRUE_FALSE` là hai contract riêng; API không
+  tự chuyển boolean thành danh sách mệnh đề hoặc ngược lại.
 - Với `TEXT_INPUT`, `correctAnswerJson` là mảng câu trả lời được chấp nhận và `gradingConfigJson` chứa `caseSensitive`/`exactMatch`.
 - `hintJson` và `explanationJson` nhận Tiptap JSON hoặc `null`. Lời giải chi tiết thủ công được lưu trong `ai_explanations` với `source=ADMIN` và trả về qua relation `explanation`.
 - `questionJson`, `optionsJson[*].richText`, `hintJson` và
@@ -419,10 +498,17 @@ Body:
 {
   "title": "Bài kiểm tra ngắn",
   "durationSeconds": 900,
-  "difficultyRatioJson": { "easy": 0.4, "medium": 0.4, "hard": 0.2 },
-  "questions": []
+  "difficulty": "MIXED",
+  "difficultyRatioJson": { "easy": 0.4, "medium": 0.4, "hard": 0.2 }
 }
 ```
+
+Rules:
+
+- `durationSeconds` bắt buộc, từ `60` đến `14400` giây.
+- UI quản trị nhập thời gian theo phút rồi đổi sang giây trước khi gọi API.
+- `difficultyRatioJson` là metadata tùy chọn; UI CRUD thủ công M6.4 giữ cùng
+  field mức độ như Quiz và không bắt admin nhập tỷ lệ riêng.
 
 #### `POST /admin/lessons/:lessonId/test-sets/generate-ai`
 
@@ -444,15 +530,28 @@ Response: `202 Accepted` với `jobId`.
 
 Role: `ADMIN`.
 
+Body: một phần hoặc toàn bộ `title`, `durationSeconds`, `difficulty`,
+`difficultyRatioJson`.
+
 #### `DELETE /admin/test-sets/:testSetId`
 
 Role: `ADMIN`.
+
+Behavior: soft delete.
 
 #### `POST /admin/test-sets/:testSetId/review`
 
 Role: `ADMIN`.
 
 ### 12.2. Admin test question item-level CRUD
+
+#### `GET /admin/test-sets/:testSetId/questions`
+
+Role: `ADMIN`.
+
+Response mỗi câu gồm `points` đã lưu và `effectivePoints`. Khi `points=null`,
+service chia phần điểm còn lại cho các câu chưa đặt điểm riêng, làm tròn hai chữ
+số thập phân và giữ tổng điểm hiệu lực bằng `test_sets.total_score` (mặc định 10).
 
 #### `POST /admin/test-sets/:testSetId/questions`
 
@@ -473,6 +572,10 @@ Body:
   "sortOrder": 1
 }
 ```
+
+Contract nội dung câu hỏi giống mục `10.2 Admin quiz question item-level CRUD`
+và hỗ trợ đủ bốn loại `MULTIPLE_CHOICE`, `TRUE_FALSE`,
+`MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`; Test bổ sung `points`.
 
 #### `PATCH /admin/test-questions/:questionId`
 
@@ -536,6 +639,10 @@ Body:
 Behavior:
 
 - Chấm điểm thang 10.
+- Với `MULTI_STATEMENT_TRUE_FALSE`, `answerJson` là mảng
+  `{ statementId, value }`. Nếu câu có `N` mệnh đề và `effectivePoints = P`,
+  mỗi mệnh đề đúng nhận `P / N`, mệnh đề sai nhận 0; tổng điểm câu không dùng
+  all-or-nothing.
 - Lưu attempt answers.
 - Cập nhật best attempt trong transaction.
 - Nếu score >= lesson completion score, cập nhật lesson progress completed.
@@ -549,7 +656,9 @@ Role: `STUDENT`.
 Behavior:
 
 - Chỉ sau khi submit.
-- Trả câu hỏi, answer của học sinh, correct answer, trạng thái đúng/sai.
+- Trả câu hỏi, answer của học sinh, correct answer, trạng thái đúng/sai. Với
+  `MULTI_STATEMENT_TRUE_FALSE`, response có kết quả và điểm nhận được theo từng
+  `statementId`; `isCorrect` của cả câu chỉ true khi mọi mệnh đề đều đúng.
 
 #### `POST /student/lessons/:lessonId/test-sets/request-new`
 

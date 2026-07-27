@@ -476,7 +476,21 @@ Màn chi tiết buổi học admin:
 - Modal tạo/sửa lesson và lesson detail là nơi gán/điều chỉnh page range tùy chọn của một lesson cụ thể để tránh thao tác vòng khi admin upload sách trước rồi mới tạo buổi học; phần nhập trang disabled tới khi source document xử lý xong và không còn page warning.
 - Là nơi admin thêm thủ công, sửa, xóa mềm, ẩn/hiện, duyệt lại quiz/flashcard/test; nội dung do AI sinh sau M9.3 cũng được quản trị tại đây.
 - Tab `Quiz` hiển thị mỗi quiz set như một tab ngang có count; chọn tab sẽ render toàn bộ câu hỏi của set ngay bên dưới. Trong set có action `Thêm câu hỏi`, sửa và xóa từng câu.
-- Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi tiết. Multiple choice dùng danh sách phương án động: admin có thể tạo 2, 3, 4, 5 hoặc nhiều phương án hơn, thêm/xóa từng phương án và chọn đáp án đúng; không hard-code bốn ô A/B/C/D.
+- Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`,
+  `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi
+  tiết. Multiple choice dùng danh sách phương án động:
+  admin có thể tạo 2, 3, 4, 5 hoặc nhiều phương án hơn, thêm/xóa từng phương án
+  và chọn đáp án đúng; không hard-code bốn ô A/B/C/D. `TRUE_FALSE` giữ một cặp
+  lựa chọn Đúng/Sai chung cho toàn câu. `MULTI_STATEMENT_TRUE_FALSE` dùng đề
+  dẫn chung và danh sách mệnh đề động tối thiểu 2 dòng; mỗi dòng có rich
+  editor, control Đúng/Sai riêng và action thêm/xóa.
+- Tab `Test` tái sử dụng cùng layout, rich editor, form câu hỏi và interaction của
+  tab `Quiz`. Modal bộ đề có thêm field `Thời gian làm bài (phút)`; panel bộ đề
+  hiển thị thời lượng đã lưu cạnh mức độ. Select `Loại câu hỏi` có đúng bốn lựa
+  chọn: `Trắc nghiệm`, `Đúng/Sai`, `Đúng/Sai nhiều mệnh đề`, `Nhập đáp án`.
+  Hai lựa chọn Đúng/Sai là hai loại độc lập: loại cũ render một cặp Đúng/Sai
+  cho toàn câu, loại mới render danh sách mệnh đề động. Card xem lại loại mới
+  hiển thị từng mệnh đề kèm badge Đúng hoặc Sai.
 
 ### 6.5. AI generation panel
 

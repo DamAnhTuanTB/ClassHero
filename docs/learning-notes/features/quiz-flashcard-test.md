@@ -6,7 +6,10 @@ Admin tạo nội dung luyện tập theo từng buổi học. Nội dung câu h
 
 ## Bức tranh tổng thể
 
-Rich editor là điểm nhập nội dung ở front-end. Form gửi JSON đã validate qua API quiz; backend kiểm tra cấu trúc, lưu dữ liệu và trả lại cùng JSON để lần mở sau khôi phục đúng nội dung.
+Rich editor là điểm nhập nội dung ở front-end. Quiz và Test dùng chung flow soạn
+câu hỏi; Test chỉ bổ sung thời gian làm bài ở cấp bộ đề. Form gửi JSON đã validate
+qua API tương ứng; backend kiểm tra cấu trúc, lưu dữ liệu và trả lại cùng JSON để
+lần mở sau khôi phục đúng nội dung.
 
 ## Sơ đồ luồng dễ hiểu
 
@@ -14,14 +17,24 @@ Rich editor là điểm nhập nội dung ở front-end. Form gửi JSON đã va
 flowchart LR
   A[Admin soạn câu hỏi] --> B[Rich editor tạo Tiptap JSON]
   B --> C[Form kiểm tra nội dung]
-  C --> D[Quiz API kiểm tra lại]
+  C --> D[Quiz hoặc Test API kiểm tra lại]
   D --> E[Lưu câu hỏi và lời giải]
   E --> F[Mở lại đúng định dạng]
 ```
 
 ## Luồng code end-to-end
 
-UI editor cập nhật giá trị React Hook Form, API client gửi payload câu hỏi, controller/service quiz validate và lưu cấu trúc JSON. Khi đọc lại, dữ liệu đi ngược về editor để Tiptap render các node và mark tương ứng.
+UI editor cập nhật giá trị React Hook Form, API client gửi payload câu hỏi,
+controller/service Quiz hoặc Test validate và lưu cấu trúc JSON. Khi đọc lại, dữ
+liệu đi ngược về editor để Tiptap render các node và mark tương ứng. Manager Test
+tái sử dụng manager Quiz với adapter API riêng, nên hai tab giữ cùng interaction
+mà không nhân đôi toàn bộ editor.
+
+`TRUE_FALSE` và `MULTI_STATEMENT_TRUE_FALSE` là hai loại dữ liệu độc lập. Loại
+cũ lưu một boolean; loại mới lưu danh sách rich-content statement và một mảng
+ánh xạ `{ statementId, value }`. Quiz và Test đều dùng cùng contract bốn loại,
+vì vậy select, TypeScript union, Prisma enum và backend validation phải thay đổi
+đồng bộ.
 
 ## Front-end
 
@@ -42,10 +55,18 @@ UI editor cập nhật giá trị React Hook Form, API client gửi payload câu
   lệ ảnh gốc. `baseWidthPercent=60` giữ ảnh mới gọn trong editor, còn
   `widthPercent=100` biểu thị ảnh chưa bị người dùng resize. Kích thước khung cơ
   sở, mức resize và aspect ratio là ba khái niệm riêng.
+- Câu Đúng/Sai nhiều mệnh đề dùng một field-array riêng. Mỗi row sở hữu nội
+  dung rich text, ID ổn định và lựa chọn Đúng/Sai; không tái sử dụng state
+  boolean của loại Đúng/Sai cũ.
 
 ## Back-end/API
 
-API quiz nhận rich content theo schema của `M6.1`, không tin dữ liệu từ UI và validate lại trước khi service lưu.
+API Quiz và Test nhận rich content theo schema của `M6.1`, không tin dữ liệu từ
+UI và validate lại trước khi service lưu. Test set bắt buộc có `durationSeconds`;
+UI nhập phút để thân thiện rồi chuyển sang giây tại API boundary.
+
+Validator của loại nhiều mệnh đề kiểm tra tối thiểu 2 mệnh đề, ID không trùng,
+nội dung không rỗng và `correctAnswerJson` ánh xạ đúng một lần cho mọi ID.
 
 Mảng object trong DTO NestJS phải khai báo rõ lớp phần tử bằng
 `@Type(() => ItemDto)` và `@ValidateNested({ each: true })`. Nếu chỉ ghi type
@@ -55,7 +76,14 @@ nghiệp vụ nhận dữ liệu.
 
 ## Database
 
-Câu hỏi, phương án, gợi ý và lời giải giữ cấu trúc JSON để bảo toàn rich content; quiz set và question item vẫn là các entity riêng.
+Câu hỏi, phương án, gợi ý và lời giải giữ cấu trúc JSON để bảo toàn rich content;
+set và question item vẫn là các entity riêng. Test có tổng điểm mặc định 10. Khi
+`test_questions.points` để trống, service tính `effectivePoints` chia đều và phân
+bổ phần dư làm tròn theo thứ tự câu để tổng vẫn đúng 10.
+
+Khi chấm câu nhiều mệnh đề, điểm hiệu lực của câu được chia đều cho số mệnh đề.
+Mệnh đề đúng nhận phần điểm của mình, mệnh đề sai nhận 0; trạng thái đúng toàn
+câu chỉ dùng để đánh dấu đã đúng hết, không biến cách tính thành all-or-nothing.
 
 ## Worker/AI/Integration
 
@@ -83,13 +111,18 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   entity ngay từ lần mount đầu. Nếu luôn mount với giá trị tạo mới rỗng rồi mới
   `reset()` trong effect, lượt validation cũ có thể hoàn tất muộn và gắn lỗi rỗng
   lên form dù rich editor đã hiển thị dữ liệu hợp lệ.
+- Chỉ cập nhật tài liệu hoặc label không làm select xuất hiện thêm option. Một
+  loại câu hỏi mới phải đi xuyên suốt Prisma enum -> client generate -> DTO/Zod
+  validation -> API types -> form schema/default/payload -> card render -> test.
 
 ## File quan trọng
 
 - `apps/web/features/admin/quiz/components/quiz-rich-content-editor.tsx`
 - `apps/web/features/admin/quiz/components/quiz-rich-content-editor.css`
 - `apps/web/features/admin/quiz/components/quiz-text-color-picker.tsx`
+- `apps/web/features/admin/tests/`
 - `apps/api/src/modules/quiz/`
+- `apps/api/src/modules/tests/`
 
 ## Kiến thức cần nhớ
 
@@ -99,3 +132,5 @@ Editor dựa trên document model có thể tái tạo DOM bất cứ lúc nào.
 
 - `M6.1`
 - `M6.2`
+- `M6.3`
+- `M6.4`

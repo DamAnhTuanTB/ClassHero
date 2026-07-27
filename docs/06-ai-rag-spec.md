@@ -448,7 +448,12 @@ Input:
   "lessonId": "uuid",
   "questionCount": 10,
   "difficulty": "MEDIUM",
-  "questionTypes": ["MULTIPLE_CHOICE", "TRUE_FALSE"]
+  "questionTypes": [
+    "MULTIPLE_CHOICE",
+    "TRUE_FALSE",
+    "MULTI_STATEMENT_TRUE_FALSE",
+    "TEXT_INPUT"
+  ]
 }
 ```
 
@@ -475,12 +480,52 @@ Output schema:
 }
 ```
 
+Với `questionType = TRUE_FALSE`, output dùng một boolean chung:
+
+```json
+{
+  "questionType": "TRUE_FALSE",
+  "difficulty": "EASY",
+  "question": {
+    "text": "Số 2 là số nguyên tố.",
+    "latex": []
+  },
+  "correctAnswer": true,
+  "hint": "string",
+  "explanation": "string",
+  "gradingConfig": null
+}
+```
+
+Với `questionType = MULTI_STATEMENT_TRUE_FALSE`, output dùng nhiều mệnh đề:
+
+```json
+{
+  "questionType": "MULTI_STATEMENT_TRUE_FALSE",
+  "difficulty": "MEDIUM",
+  "question": {
+    "text": "Xác định tính đúng sai của các mệnh đề sau.",
+    "latex": []
+  },
+  "statements": [
+    { "id": "statement-a", "text": "Mệnh đề thứ nhất", "value": true },
+    { "id": "statement-b", "text": "Mệnh đề thứ hai", "value": false }
+  ],
+  "hint": "string",
+  "explanation": "string",
+  "gradingConfig": null
+}
+```
+
 Validation:
 
 - Số câu đúng request.
 - Mỗi câu có correct answer.
 - Multiple choice phải có ít nhất 2 options.
-- True/false chỉ có true/false.
+- `TRUE_FALSE` có đúng một `correctAnswer` boolean.
+- `MULTI_STATEMENT_TRUE_FALSE` có tối thiểu 2 mệnh đề ID duy nhất; mỗi mệnh đề
+  có nội dung và một `value` boolean. Mapper lưu nội dung vào `options_json` và
+  đáp án theo `statementId` vào `correct_answer_json` đúng contract M6.
 - Text input có đáp án dạng text hoặc accepted answers.
 - Câu hỏi phải là câu hỏi mới bám kiến thức lesson, không copy nguyên văn bài tập/ví dụ từ context.
 
@@ -551,6 +596,8 @@ Rules:
 
 - Tổng điểm bài thi là 10.
 - Nếu không set `points`, backend chia điểm đều.
+- Test generation dùng cùng union bốn loại câu hỏi của Quiz generation:
+  `MULTIPLE_CHOICE`, `TRUE_FALSE`, `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`.
 - Bài thi do AI tạo từ học sinh request-new có `review_status = NEEDS_REVIEW` nhưng vẫn được dùng.
 - Câu hỏi trong bài thi phải là câu hỏi mới bám kiến thức lesson, không copy nguyên văn bài tập/ví dụ từ context.
 

@@ -250,3 +250,23 @@ onOpenChange={(nextOpen) => {
 - Không chỉ gọi `setIsOpen(false)` trong `onPointerDownCapture` rồi để `onOpenChange` tự xử lý. Trên mobile, chuỗi pointer/click/open event có thể làm dropdown đóng rồi mở lại rất nhanh.
 - Không thêm `touchstart`/`touchend` handler riêng để vá cảm giác; ưu tiên một trigger `button` semantic với `onClick` toggle thật và `onBlur` đóng khi focus rời khỏi wrapper.
 - Không bỏ keyboard cơ bản: `Escape` đóng, `Enter`/`Space`/`ArrowDown` mở, item dùng `role="option"` và `aria-selected`.
+
+## 6. Helper Panel Action Ownership
+
+Dùng khi một field mở panel công cụ phụ như nhập công thức, chọn ký hiệu, xem trước hoặc cấu hình nâng cao.
+
+### Pattern chuẩn
+
+- State mở/đóng panel và action đóng/xóa panel phải nằm trong cùng component sở hữu panel.
+- Icon đứng cạnh hoặc căn theo panel phải điều khiển chính panel đó; action đóng panel chỉ đổi UI state, không được xóa giá trị field hoặc phần tử của field array.
+- Nút đóng/xóa panel chỉ hiện khi panel đang mở, dùng `type="button"` và `aria-label` mô tả đúng hành vi như `Ẩn công cụ nhập công thức`.
+- Giá trị người dùng đã nhập/chèn phải được giữ nguyên khi ẩn panel, trừ khi UI nói rõ đây là action xóa dữ liệu.
+- Nếu field array có hàng đầu tiên bắt buộc làm hàng neo, action xóa đáp án phải nằm ở cấp row và dùng `disabled={index === 0}`; các hàng từ thứ hai trở đi vẫn phải xóa được.
+- Khi cùng UI có cả xóa row và xóa/ẩn helper panel, đặt hai action ở hai vị trí tương ứng với đối tượng bị tác động và dùng `aria-label`/`title` khác nhau.
+
+### Không làm
+
+- Không nối icon đứng cạnh panel công cụ với `fieldArray.remove()` chỉ vì icon dùng hình thùng rác.
+- Không đặt action ở component cha rồi điều khiển nhầm entity/field khi state panel nằm trong component con.
+- Không dùng cùng một icon/action mơ hồ cho cả “ẩn panel” và “xóa đáp án”; nếu cần cả hai, phải tách vị trí và `aria-label` theo đúng đối tượng bị tác động.
+- Không dùng `fields.length <= 1` để khóa xóa nếu rule nghiệp vụ là “không bao giờ xóa hàng đầu tiên”; điều kiện theo độ dài có thể cho phép xóa nhầm hàng neo khi danh sách có nhiều phần tử.

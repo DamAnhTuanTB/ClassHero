@@ -256,7 +256,11 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 - Một buổi học có thể có nhiều bộ quiz.
 - Quiz có thể do admin tạo hoặc AI tạo.
 - Mỗi câu quiz có câu hỏi, lựa chọn/câu trả lời, đáp án đúng, gợi ý, lời giải chi tiết.
-- Loại câu hỏi: trắc nghiệm, đúng/sai, tự nhập đáp án.
+- Loại câu hỏi gồm bốn lựa chọn: trắc nghiệm, đúng/sai, đúng/sai nhiều mệnh đề
+  và tự nhập đáp án.
+- `Đúng/Sai` giữ dạng một câu hỏi với một đáp án boolean chung.
+- `Đúng/Sai nhiều mệnh đề` có một đề dẫn chung và danh sách tối thiểu 2 mệnh
+  đề; từng mệnh đề được gán `Đúng` hoặc `Sai` độc lập.
 - Câu hỏi, phương án, gợi ý và lời giải dùng rich content: văn bản có thể bôi
   chọn để in đậm/in nghiêng/gạch chân/đổi màu, tạo bullet hoặc danh sách đánh
   số, căn trái/giữa/phải/đều, chèn ảnh và chèn công thức Toán/Lý/Hóa bằng
@@ -285,6 +289,11 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 ### 4.7. Bài kiểm tra
 
 - Bài kiểm tra chỉ mở vào ngày/giờ admin thiết lập.
+- Form câu hỏi bài kiểm tra có bốn lựa chọn: `Trắc nghiệm`, `Đúng/Sai`,
+  `Đúng/Sai nhiều mệnh đề` và `Nhập đáp án`.
+- `Đúng/Sai` cũ tiếp tục dùng một đáp án boolean chung. `Đúng/Sai nhiều mệnh
+  đề` là loại độc lập, không thay thế hoặc làm thay đổi dữ liệu câu Đúng/Sai
+  cũ.
 - Học sinh được làm lại nhiều lần.
 - Mỗi lần làm là một bộ đề khác nhau nếu còn bộ phù hợp.
 - Hệ thống lưu toàn bộ lịch sử làm bài.

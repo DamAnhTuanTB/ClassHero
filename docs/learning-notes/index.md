@@ -10,7 +10,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Basic Auth API](features/auth-basic.md)                              | Auth, RBAC, profile base, refresh/reset password, auth UI nối API thật                               | `M2.2`-`M2.4`  | Đã cập nhật |
 | [Lesson document processing](features/lesson-document-processing.md)  | Source document, page range mapping, paid OCR artifacts, lesson documents, BullMQ worker và chunking | `M4.2`-`M4.4`  | Đã cập nhật |
 | [Embedding và retrieval theo lesson](features/embedding-retrieval.md) | OpenAI embedding, durable worker, pgvector isolation, hybrid search và token budget                  | `M5.1`-`M5.4`  | Đã cập nhật |
-| [Quiz, flashcard và test](features/quiz-flashcard-test.md)            | Rich content, Tiptap editor, bảng/màu và luồng CRUD nội dung luyện tập                               | `M6.1`, `M6.2` | Đã cập nhật |
+| [Quiz, flashcard và test](features/quiz-flashcard-test.md)            | Rich content, Tiptap editor, bảng/màu, Quiz/Flashcard/Test CRUD và điểm mặc định                     | `M6.1`-`M6.4`  | Đã cập nhật |
 | [Student course browsing](features/student-course-browsing.md)        | Student danh sách/khám phá/chi tiết lộ trình nối public API thật                                     | `M3.5`         | Đã cập nhật |
 
 ## Foundation Notes

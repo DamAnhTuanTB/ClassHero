@@ -16,6 +16,8 @@ import {
 } from "#api/modules/quiz/dto/quiz-question-content.dto";
 import {
   correctAnswerSchema,
+  multiStatementCorrectAnswerSchema,
+  multiStatementOptionsSchema,
   multipleChoiceOptionsSchema,
   textInputGradingSchema,
 } from "#api/modules/quiz/types/quiz.types";
@@ -253,7 +255,10 @@ export class QuizService {
     if (dto.gradingConfigJson !== undefined) {
       updateData.gradingConfigJson = toNullableInputJson(dto.gradingConfigJson);
     }
-    if (mergedContent.questionType !== QuestionType.MULTIPLE_CHOICE) {
+    if (
+      mergedContent.questionType !== QuestionType.MULTIPLE_CHOICE &&
+      mergedContent.questionType !== QuestionType.MULTI_STATEMENT_TRUE_FALSE
+    ) {
       updateData.optionsJson = Prisma.DbNull;
     }
     if (mergedContent.questionType !== QuestionType.TEXT_INPUT) {
@@ -370,7 +375,9 @@ function validateQuestionContent(dto: QuizQuestionContentDto) {
     }
     if (
       !Array.isArray(correctAnswer.data) ||
-      correctAnswer.data.some((answerId) => !optionIds.includes(answerId))
+      correctAnswer.data.some(
+        (answerId) => typeof answerId !== "string" || !optionIds.includes(answerId),
+      )
     ) {
       throw badRequestException(
         "QUIZ_QUESTION_CORRECT_OPTION_NOT_FOUND",
@@ -389,10 +396,61 @@ function validateQuestionContent(dto: QuizQuestionContentDto) {
     );
   }
 
+  if (dto.questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE) {
+    const statements = multiStatementOptionsSchema.safeParse(dto.optionsJson);
+    if (!statements.success) {
+      throw badRequestException(
+        "QUIZ_QUESTION_INVALID_STATEMENTS",
+        "Câu hỏi đúng/sai nhiều mệnh đề cần ít nhất 2 mệnh đề hợp lệ",
+        statements.error.flatten(),
+      );
+    }
+
+    const statementIds = statements.data.map((statement) => statement.id);
+    if (new Set(statementIds).size !== statementIds.length) {
+      throw badRequestException(
+        "QUIZ_QUESTION_DUPLICATE_STATEMENT_IDS",
+        "Mã mệnh đề không được trùng nhau",
+      );
+    }
+    if (
+      statements.data.some(
+        (statement) => getTiptapText(statement.richText).trim().length === 0,
+      )
+    ) {
+      throw badRequestException(
+        "QUIZ_QUESTION_EMPTY_STATEMENT",
+        "Nội dung mệnh đề không được để trống",
+      );
+    }
+
+    const answers = multiStatementCorrectAnswerSchema.safeParse(dto.correctAnswerJson);
+    if (!answers.success) {
+      throw badRequestException(
+        "QUIZ_QUESTION_INVALID_STATEMENT_ANSWERS",
+        "Mỗi mệnh đề phải có một đáp án Đúng hoặc Sai",
+        answers.error.flatten(),
+      );
+    }
+    const answerIds = answers.data.map((answer) => answer.statementId);
+    if (
+      new Set(answerIds).size !== answerIds.length ||
+      answerIds.length !== statementIds.length ||
+      answerIds.some((statementId) => !statementIds.includes(statementId))
+    ) {
+      throw badRequestException(
+        "QUIZ_QUESTION_STATEMENT_ANSWER_MISMATCH",
+        "Đáp án phải ánh xạ đúng một lần cho mọi mệnh đề",
+      );
+    }
+  }
+
   if (dto.questionType === QuestionType.TEXT_INPUT) {
     if (
       !Array.isArray(correctAnswer.data) ||
-      correctAnswer.data.some((answer) => answer.trim().length === 0)
+      correctAnswer.data.some(
+        (answer) => typeof answer !== "string" || answer.trim().length === 0,
+      )
     ) {
       throw badRequestException(
         "QUIZ_QUESTION_INVALID_TEXT_ANSWERS",

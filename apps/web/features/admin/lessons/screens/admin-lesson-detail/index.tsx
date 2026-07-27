@@ -62,13 +62,18 @@ const LessonDocumentsTab = dynamic(
   },
 );
 const AdminQuizTab = dynamic(() =>
-  import("@/features/admin/quiz/components/admin-quiz-tab").then(
-    (module) => module.AdminQuizTab,
+  import("@/features/admin/assessments/components/admin-assessment-tab").then(
+    (module) => module.AdminAssessmentTab,
   ),
 );
 const AdminFlashcardsTab = dynamic(() =>
   import("@/features/admin/flashcards/screens/admin-flashcards-tab").then(
     (module) => module.AdminFlashcardsTab,
+  ),
+);
+const AdminTestsTab = dynamic(() =>
+  import("@/features/admin/tests/screens/admin-tests-tab").then(
+    (module) => module.AdminTestsTab,
   ),
 );
 
@@ -532,8 +537,8 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
                 )}
 
                 {activeTab === "test" && (
-                  <div className="p-4 text-sm font-medium text-[var(--theme-text-muted)] sm:p-6">
-                    Quản lý Bài kiểm tra sẽ được tích hợp ở M6.4.
+                  <div className="h-full sm:p-6">
+                    <AdminTestsTab lessonId={lessonId} />
                   </div>
                 )}
               </div>

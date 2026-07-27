@@ -11,6 +11,7 @@ import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
 import type {
+  AdminMultiStatementAnswer,
   AdminQuizQuestion,
   AdminQuizQuestionPayload,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -20,6 +21,8 @@ import {
   ScientificAnswerField,
 } from "@/features/admin/quiz/components/quiz-rich-content-editor";
 import { useAdminQuizQuestionMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
+import type { AdminTestQuestion } from "@/features/admin/tests/api/admin-tests-api";
+import { useAdminTestQuestionMutations } from "@/features/admin/tests/hooks/use-admin-tests";
 import {
   createEmptyTiptapDocument,
   getTiptapDocumentText,
@@ -50,14 +53,31 @@ const acceptedAnswerSchema = z.object({
   text: z.string(),
 });
 
+const statementSchema = z.object({
+  statementId: z.string().min(1),
+  content: tiptapDocumentSchema,
+  answer: z.enum(["true", "false"]),
+});
+
+const TRUE_FALSE_OPTIONS = [
+  { value: "true", label: "Đúng" },
+  { value: "false", label: "Sai" },
+] as const;
+
 const questionFormSchema = z
   .object({
-    questionType: z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "TEXT_INPUT"]),
+    questionType: z.enum([
+      "MULTIPLE_CHOICE",
+      "TRUE_FALSE",
+      "MULTI_STATEMENT_TRUE_FALSE",
+      "TEXT_INPUT",
+    ]),
     difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
     questionContent: requiredQuestionContentSchema,
     options: z.array(optionSchema),
     correctOptionId: z.string(),
     trueFalseAnswer: z.enum(["true", "false"]),
+    statements: z.array(statementSchema),
     acceptedAnswers: z.array(acceptedAnswerSchema),
     caseSensitive: z.boolean(),
     exactMatch: z.boolean(),
@@ -107,6 +127,35 @@ const questionFormSchema = z
       }
     }
 
+    if (value.questionType === "MULTI_STATEMENT_TRUE_FALSE") {
+      if (value.statements.length < 2) {
+        context.addIssue({
+          code: "custom",
+          path: ["statements"],
+          message: "Cần ít nhất 2 mệnh đề",
+        });
+      }
+
+      const statementIds = value.statements.map((statement) => statement.statementId);
+      if (new Set(statementIds).size !== statementIds.length) {
+        context.addIssue({
+          code: "custom",
+          path: ["statements"],
+          message: "Mã mệnh đề không được trùng nhau",
+        });
+      }
+
+      value.statements.forEach((statement, index) => {
+        if (!hasTiptapDocumentContent(statement.content)) {
+          context.addIssue({
+            code: "custom",
+            path: ["statements", index, "content"],
+            message: "Hãy nhập nội dung mệnh đề",
+          });
+        }
+      });
+    }
+
     if (
       value.questionType === "TEXT_INPUT" &&
       !value.acceptedAnswers.some((answer) => answer.text.trim())
@@ -121,16 +170,18 @@ const questionFormSchema = z
 
 type QuestionFormValues = z.infer<typeof questionFormSchema>;
 
-export function AdminQuizQuestionEditorDialog({
+export function AdminAssessmentQuestionEditorDialog({
+  assessmentKind = "quiz",
   isOpen,
   lessonId,
   question,
   setId,
   onClose,
 }: {
+  assessmentKind?: "quiz" | "test";
   isOpen: boolean;
   lessonId: string;
-  question: AdminQuizQuestion | null;
+  question: AdminQuizQuestion | AdminTestQuestion | null;
   setId: string;
   onClose: () => void;
 }) {
@@ -138,6 +189,8 @@ export function AdminQuizQuestionEditorDialog({
     setId,
     lessonId,
   );
+  const { createQuestion: createTestQuestion, updateQuestion: updateTestQuestion } =
+    useAdminTestQuestionMutations(setId, lessonId);
   const form = useForm<QuestionFormValues>({
     resolver: zodResolver(questionFormSchema) as Resolver<QuestionFormValues>,
     mode: "onChange",
@@ -145,13 +198,21 @@ export function AdminQuizQuestionEditorDialog({
     defaultValues: question ? toFormValues(question) : createEmptyDefaults(),
   });
   const options = useFieldArray({ control: form.control, name: "options" });
+  const statements = useFieldArray({
+    control: form.control,
+    name: "statements",
+  });
   const acceptedAnswers = useFieldArray({
     control: form.control,
     name: "acceptedAnswers",
   });
   const questionType = form.watch("questionType");
   const correctOptionId = form.watch("correctOptionId");
-  const isSaving = createQuestion.isPending || updateQuestion.isPending;
+  const statementValues = form.watch("statements");
+  const isSaving =
+    assessmentKind === "test"
+      ? createTestQuestion.isPending || updateTestQuestion.isPending
+      : createQuestion.isPending || updateQuestion.isPending;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -162,10 +223,24 @@ export function AdminQuizQuestionEditorDialog({
     const payload = toPayload(values);
     try {
       if (question) {
-        await updateQuestion.mutateAsync({ questionId: question.id, data: payload });
+        if (assessmentKind === "test") {
+          await updateTestQuestion.mutateAsync({
+            questionId: question.id,
+            data: payload,
+          });
+        } else {
+          await updateQuestion.mutateAsync({
+            questionId: question.id,
+            data: payload,
+          });
+        }
         toast.success("Đã cập nhật câu hỏi");
       } else {
-        await createQuestion.mutateAsync(payload);
+        if (assessmentKind === "test") {
+          await createTestQuestion.mutateAsync(payload);
+        } else {
+          await createQuestion.mutateAsync(payload);
+        }
         toast.success("Đã thêm câu hỏi");
       }
       onClose();
@@ -200,13 +275,21 @@ export function AdminQuizQuestionEditorDialog({
               options={[
                 { value: "MULTIPLE_CHOICE", label: "Trắc nghiệm" },
                 { value: "TRUE_FALSE", label: "Đúng / Sai" },
+                {
+                  value: "MULTI_STATEMENT_TRUE_FALSE",
+                  label: "Đúng / Sai nhiều mệnh đề",
+                },
                 { value: "TEXT_INPUT", label: "Nhập câu trả lời" },
               ]}
               onChange={(value) =>
                 form.setValue(
                   "questionType",
                   value as QuestionFormValues["questionType"],
-                  { shouldValidate: true },
+                  {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                  },
                 )
               }
               icon={null}
@@ -222,6 +305,8 @@ export function AdminQuizQuestionEditorDialog({
               ]}
               onChange={(value) =>
                 form.setValue("difficulty", value as QuestionFormValues["difficulty"], {
+                  shouldDirty: true,
+                  shouldTouch: true,
                   shouldValidate: true,
                 })
               }
@@ -368,10 +453,7 @@ export function AdminQuizQuestionEditorDialog({
             <section className="space-y-3">
               <FieldLabel id="quiz-true-answer" label="Đáp án đúng" />
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: "true", label: "Đúng" },
-                  { value: "false", label: "Sai" },
-                ].map((option) => {
+                {TRUE_FALSE_OPTIONS.map((option) => {
                   const selected = form.watch("trueFalseAnswer") === option.value;
                   return (
                     <button
@@ -381,7 +463,11 @@ export function AdminQuizQuestionEditorDialog({
                         form.setValue(
                           "trueFalseAnswer",
                           option.value as "true" | "false",
-                          { shouldValidate: true },
+                          {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          },
                         )
                       }
                       className={cn(
@@ -396,6 +482,123 @@ export function AdminQuizQuestionEditorDialog({
                   );
                 })}
               </div>
+            </section>
+          ) : null}
+
+          {questionType === "MULTI_STATEMENT_TRUE_FALSE" ? (
+            <section className="space-y-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                    Các mệnh đề Đúng / Sai
+                  </h3>
+                  <p className="mt-1 text-xs font-medium text-[var(--theme-text-muted)]">
+                    Mỗi mệnh đề có một đáp án riêng và có trọng số bằng nhau.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    statements.append({
+                      statementId: createStatementId(),
+                      content: createEmptyTiptapDocument(),
+                      answer: "true",
+                    })
+                  }
+                  className="theme-button-primary-subtle inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-extrabold"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Thêm mệnh đề
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {statements.fields.map((field, index) => {
+                  const selectedAnswer = statementValues[index]?.answer;
+                  return (
+                    <div
+                      key={field.id}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
+                    >
+                      <input
+                        type="hidden"
+                        {...form.register(`statements.${index}.statementId`)}
+                      />
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                          Mệnh đề {index + 1}
+                        </p>
+                        <button
+                          type="button"
+                          aria-label={`Xóa mệnh đề ${index + 1}`}
+                          title={
+                            statements.fields.length <= 2
+                              ? "Cần giữ tối thiểu 2 mệnh đề"
+                              : `Xóa mệnh đề ${index + 1}`
+                          }
+                          disabled={statements.fields.length <= 2}
+                          onClick={() => statements.remove(index)}
+                          className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                      <Controller
+                        control={form.control}
+                        name={`statements.${index}.content`}
+                        render={({ field: statementField, fieldState }) => (
+                          <QuizRichContentEditor
+                            ariaLabel={`Nội dung mệnh đề ${index + 1}`}
+                            compact
+                            value={statementField.value}
+                            onChange={statementField.onChange}
+                            onBlur={statementField.onBlur}
+                            placeholder={`Nhập mệnh đề ${index + 1}...`}
+                            error={fieldState.error?.message}
+                          />
+                        )}
+                      />
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {TRUE_FALSE_OPTIONS.map((answerOption) => {
+                          const selected = selectedAnswer === answerOption.value;
+                          return (
+                            <button
+                              key={answerOption.value}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() =>
+                                form.setValue(
+                                  `statements.${index}.answer`,
+                                  answerOption.value as "true" | "false",
+                                  {
+                                    shouldDirty: true,
+                                    shouldTouch: true,
+                                    shouldValidate: true,
+                                  },
+                                )
+                              }
+                              className={cn(
+                                "min-h-10 rounded-lg border px-3 text-sm font-extrabold transition",
+                                selected
+                                  ? "border-[var(--theme-primary)] bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)]"
+                                  : "border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text)]",
+                              )}
+                            >
+                              {answerOption.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <FormError
+                message={
+                  form.formState.errors.statements?.root?.message ??
+                  form.formState.errors.statements?.message
+                }
+              />
             </section>
           ) : null}
 
@@ -422,7 +625,7 @@ export function AdminQuizQuestionEditorDialog({
               {acceptedAnswers.fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2"
+                  className="grid grid-cols-[minmax(0,1fr)_2.5rem] items-start gap-2"
                 >
                   <Controller
                     control={form.control}
@@ -441,9 +644,14 @@ export function AdminQuizQuestionEditorDialog({
                   <button
                     type="button"
                     aria-label={`Xóa đáp án ${index + 1}`}
-                    disabled={acceptedAnswers.fields.length <= 1}
+                    title={
+                      index === 0
+                        ? "Không thể xóa đáp án đầu tiên"
+                        : `Xóa đáp án ${index + 1}`
+                    }
+                    disabled={index === 0}
                     onClick={() => acceptedAnswers.remove(index)}
-                    className="theme-button-danger-subtle grid h-10 w-10 place-items-center self-center rounded-lg disabled:opacity-40"
+                    className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -571,6 +779,7 @@ function createEmptyDefaults(): QuestionFormValues {
     ],
     correctOptionId: "",
     trueFalseAnswer: "true",
+    statements: [createEmptyStatement(), createEmptyStatement()],
     acceptedAnswers: [{ text: "" }],
     caseSensitive: false,
     exactMatch: true,
@@ -579,21 +788,37 @@ function createEmptyDefaults(): QuestionFormValues {
   };
 }
 
-function toFormValues(question: AdminQuizQuestion): QuestionFormValues {
-  const correctAnswers = Array.isArray(question.correctAnswerJson)
-    ? question.correctAnswerJson
-    : [];
+function toFormValues(
+  question: AdminQuizQuestion | AdminTestQuestion,
+): QuestionFormValues {
+  const correctAnswers = getStringAnswers(question.correctAnswerJson);
+  const statementAnswers = getMultiStatementAnswers(question.correctAnswerJson);
+  const statementAnswerById = new Map(
+    statementAnswers.map((answer) => [answer.statementId, answer.value]),
+  );
+  const emptyDefaults = createEmptyDefaults();
   return {
     questionType: question.questionType,
     difficulty: question.difficulty,
     questionContent: question.questionJson,
     options:
-      question.optionsJson?.map((option) => ({
-        optionId: option.id,
-        content: option.richText,
-      })) ?? createEmptyDefaults().options,
+      question.questionType === "MULTIPLE_CHOICE" && question.optionsJson
+        ? question.optionsJson.map((option) => ({
+            optionId: option.id,
+            content: option.richText,
+          }))
+        : emptyDefaults.options,
     correctOptionId: correctAnswers[0] ?? "",
     trueFalseAnswer: question.correctAnswerJson === false ? "false" : "true",
+    statements:
+      question.questionType === "MULTI_STATEMENT_TRUE_FALSE" &&
+      question.optionsJson?.length
+        ? question.optionsJson.map((statement) => ({
+            statementId: statement.id,
+            content: statement.richText,
+            answer: statementAnswerById.get(statement.id) === false ? "false" : "true",
+          }))
+        : emptyDefaults.statements,
     acceptedAnswers:
       question.questionType === "TEXT_INPUT" && correctAnswers.length
         ? correctAnswers.map((answer) => ({ text: answer }))
@@ -635,6 +860,20 @@ function toPayload(values: QuestionFormValues): AdminQuizQuestionPayload {
     };
   }
 
+  if (values.questionType === "MULTI_STATEMENT_TRUE_FALSE") {
+    return {
+      ...base,
+      optionsJson: values.statements.map((statement) => ({
+        id: statement.statementId,
+        richText: statement.content,
+      })),
+      correctAnswerJson: values.statements.map((statement) => ({
+        statementId: statement.statementId,
+        value: statement.answer === "true",
+      })),
+    };
+  }
+
   return {
     ...base,
     correctAnswerJson: values.acceptedAnswers
@@ -656,6 +895,47 @@ function createOptionId() {
     return `option_${crypto.randomUUID()}`;
   }
   return `option_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function createEmptyStatement() {
+  return {
+    statementId: createStatementId(),
+    content: createEmptyTiptapDocument(),
+    answer: "true" as const,
+  };
+}
+
+function createStatementId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `statement_${crypto.randomUUID()}`;
+  }
+  return `statement_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function getStringAnswers(
+  correctAnswer: AdminQuizQuestion["correctAnswerJson"],
+): string[] {
+  return Array.isArray(correctAnswer) &&
+    correctAnswer.every((answer): answer is string => typeof answer === "string")
+    ? correctAnswer
+    : [];
+}
+
+function getMultiStatementAnswers(
+  correctAnswer: AdminQuizQuestion["correctAnswerJson"],
+): AdminMultiStatementAnswer[] {
+  return Array.isArray(correctAnswer) &&
+    correctAnswer.every(
+      (answer): answer is AdminMultiStatementAnswer =>
+        typeof answer === "object" &&
+        answer !== null &&
+        "statementId" in answer &&
+        typeof answer.statementId === "string" &&
+        "value" in answer &&
+        typeof answer.value === "boolean",
+    )
+    ? correctAnswer
+    : [];
 }
 
 function optionLabel(index: number) {

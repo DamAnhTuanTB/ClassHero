@@ -232,6 +232,66 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     expect(set?.questionCount).toBe(2);
   });
 
+  it("should create and preserve a multi-statement true/false question", async () => {
+    const question = await quizService.createQuestion(
+      testQuizSetId,
+      testUserId,
+      {
+        questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+        difficulty: Difficulty.MEDIUM,
+        questionJson: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Xác định tính đúng sai." }],
+            },
+          ],
+        },
+        optionsJson: [
+          {
+            id: "statement-a",
+            richText: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Số 2 là số nguyên tố." }],
+                },
+              ],
+            },
+          },
+          {
+            id: "statement-b",
+            richText: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Số 4 là số nguyên tố." }],
+                },
+              ],
+            },
+          },
+        ],
+        correctAnswerJson: [
+          { statementId: "statement-a", value: true },
+          { statementId: "statement-b", value: false },
+        ],
+      },
+      mockContext,
+    );
+
+    expect(question.questionType).toBe(QuestionType.MULTI_STATEMENT_TRUE_FALSE);
+    expect(question.optionsJson).toHaveLength(2);
+    expect(question.correctAnswerJson).toEqual([
+      { statementId: "statement-a", value: true },
+      { statementId: "statement-b", value: false },
+    ]);
+
+    await quizService.deleteQuestion(question.id, testUserId, mockContext);
+  });
+
   it("should list quiz sets and questions", async () => {
     const sets = await quizService.listQuizSetsByLesson(testLessonId);
     expect(sets.length).toBe(1);
