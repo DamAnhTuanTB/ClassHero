@@ -10,6 +10,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import { cn } from "@/lib/utils";
 
 type CropEdges = {
@@ -268,49 +269,52 @@ export function QuizRichImageNodeView({
         {editor.isEditable && !isCropping ? (
           <>
             <div className="quiz-rich-image-actions">
+              <ImmediateTooltip content="Cắt xén ảnh">
+                <button
+                  type="button"
+                  aria-label="Cắt xén ảnh"
+                  onClick={() => {
+                    setCropDraft(persistedCrop);
+                    setIsCropping((current) => !current);
+                  }}
+                >
+                  <Crop />
+                </button>
+              </ImmediateTooltip>
+              <ImmediateTooltip content="Xóa ảnh">
+                <button
+                  type="button"
+                  aria-label="Xóa ảnh"
+                  onClick={deleteNode}
+                >
+                  <X />
+                </button>
+              </ImmediateTooltip>
+            </div>
+            <ImmediateTooltip content="Kéo để đổi kích thước ảnh">
               <button
                 type="button"
-                aria-label="Cắt xén ảnh"
-                title="Cắt xén ảnh"
-                onClick={() => {
-                  setCropDraft(persistedCrop);
-                  setIsCropping((current) => !current);
+                aria-label="Kéo để đổi kích thước ảnh"
+                className="quiz-rich-image-resize-handle"
+                onPointerDown={beginResize}
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+                    return;
+                  }
+                  event.preventDefault();
+                  const nextWidth = readBoundedNumber(
+                    previewWidth + (event.key === "ArrowRight" ? 5 : -5),
+                    minImageWidthPercent,
+                    maxImageWidthPercent,
+                    previewWidth,
+                  );
+                  setPreviewWidth(nextWidth);
+                  updateAttributes({ widthPercent: nextWidth });
                 }}
               >
-                <Crop />
+                <Maximize2 />
               </button>
-              <button
-                type="button"
-                aria-label="Xóa ảnh"
-                title="Xóa ảnh"
-                onClick={deleteNode}
-              >
-                <X />
-              </button>
-            </div>
-            <button
-              type="button"
-              aria-label="Kéo để đổi kích thước ảnh"
-              title="Kéo để đổi kích thước ảnh"
-              className="quiz-rich-image-resize-handle"
-              onPointerDown={beginResize}
-              onKeyDown={(event) => {
-                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
-                  return;
-                }
-                event.preventDefault();
-                const nextWidth = readBoundedNumber(
-                  previewWidth + (event.key === "ArrowRight" ? 5 : -5),
-                  minImageWidthPercent,
-                  maxImageWidthPercent,
-                  previewWidth,
-                );
-                setPreviewWidth(nextWidth);
-                updateAttributes({ widthPercent: nextWidth });
-              }}
-            >
-              <Maximize2 />
-            </button>
+            </ImmediateTooltip>
             <span className="quiz-rich-image-size-label">
               {Math.round(previewWidth)}%
             </span>
@@ -354,69 +358,82 @@ export function QuizRichImageNodeView({
               <span className="quiz-rich-image-crop-grid-line quiz-rich-image-crop-grid-line--horizontal-start" />
               <span className="quiz-rich-image-crop-grid-line quiz-rich-image-crop-grid-line--horizontal-end" />
               {cropHandles.map((handle) => (
-                <button
+                <ImmediateTooltip
                   key={handle}
-                  type="button"
-                  data-crop-handle={handle}
-                  className="quiz-rich-image-crop-handle"
-                  aria-label={cropHandleLabels[handle]}
-                  title={cropHandleLabels[handle]}
-                  onPointerDown={(event) => beginCropInteraction(event, handle)}
-                  onKeyDown={(event) => {
-                    const step = event.shiftKey ? 5 : 1;
-                    const deltaX =
-                      event.key === "ArrowLeft"
-                        ? -step
-                        : event.key === "ArrowRight"
-                          ? step
-                          : 0;
-                    const deltaY =
-                      event.key === "ArrowUp"
-                        ? -step
-                        : event.key === "ArrowDown"
-                          ? step
-                          : 0;
-                    if (deltaX === 0 && deltaY === 0) {
-                      return;
+                  content={cropHandleLabels[handle]}
+                >
+                  <button
+                    type="button"
+                    data-crop-handle={handle}
+                    className="quiz-rich-image-crop-handle"
+                    aria-label={cropHandleLabels[handle]}
+                    onPointerDown={(event) =>
+                      beginCropInteraction(event, handle)
                     }
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setCropDraft((current) =>
-                      calculateCropFromPointer(current, handle, deltaX, deltaY),
-                    );
-                  }}
-                />
+                    onKeyDown={(event) => {
+                      const step = event.shiftKey ? 5 : 1;
+                      const deltaX =
+                        event.key === "ArrowLeft"
+                          ? -step
+                          : event.key === "ArrowRight"
+                            ? step
+                            : 0;
+                      const deltaY =
+                        event.key === "ArrowUp"
+                          ? -step
+                          : event.key === "ArrowDown"
+                            ? step
+                            : 0;
+                      if (deltaX === 0 && deltaY === 0) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setCropDraft((current) =>
+                        calculateCropFromPointer(
+                          current,
+                          handle,
+                          deltaX,
+                          deltaY,
+                        ),
+                      );
+                    }}
+                  />
+                </ImmediateTooltip>
               ))}
             </div>
             <div
               className="quiz-rich-image-crop-actions"
               onPointerDown={(event) => event.stopPropagation()}
             >
-              <button
-                type="button"
-                aria-label="Hủy cắt ảnh"
-                title="Hủy"
-                onClick={cancelCrop}
-              >
-                <X />
-              </button>
-              <button
-                type="button"
-                aria-label="Đặt lại vùng cắt ảnh"
-                title="Đặt lại"
-                onClick={resetCrop}
-              >
-                <RotateCcw />
-              </button>
-              <button
-                type="button"
-                aria-label="Áp dụng vùng cắt ảnh"
-                title="Áp dụng"
-                className="quiz-rich-image-crop-action--primary"
-                onClick={saveCrop}
-              >
-                <Check />
-              </button>
+              <ImmediateTooltip content="Hủy">
+                <button
+                  type="button"
+                  aria-label="Hủy cắt ảnh"
+                  onClick={cancelCrop}
+                >
+                  <X />
+                </button>
+              </ImmediateTooltip>
+              <ImmediateTooltip content="Đặt lại">
+                <button
+                  type="button"
+                  aria-label="Đặt lại vùng cắt ảnh"
+                  onClick={resetCrop}
+                >
+                  <RotateCcw />
+                </button>
+              </ImmediateTooltip>
+              <ImmediateTooltip content="Áp dụng">
+                <button
+                  type="button"
+                  aria-label="Áp dụng vùng cắt ảnh"
+                  className="quiz-rich-image-crop-action--primary"
+                  onClick={saveCrop}
+                >
+                  <Check />
+                </button>
+              </ImmediateTooltip>
             </div>
           </div>
         ) : null}

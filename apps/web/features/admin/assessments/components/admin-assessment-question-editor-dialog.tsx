@@ -10,6 +10,7 @@ import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shel
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import type {
   AdminMultiStatementAnswer,
   AdminQuizQuestion,
@@ -528,20 +529,23 @@ export function AdminAssessmentQuestionEditorDialog({
                         <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
                           Mệnh đề {index + 1}
                         </p>
-                        <button
-                          type="button"
-                          aria-label={`Xóa mệnh đề ${index + 1}`}
-                          title={
+                        <ImmediateTooltip
+                          content={
                             statements.fields.length <= 2
                               ? "Cần giữ tối thiểu 2 mệnh đề"
                               : `Xóa mệnh đề ${index + 1}`
                           }
-                          disabled={statements.fields.length <= 2}
-                          onClick={() => statements.remove(index)}
-                          className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </button>
+                          <button
+                            type="button"
+                            aria-label={`Xóa mệnh đề ${index + 1}`}
+                            disabled={statements.fields.length <= 2}
+                            onClick={() => statements.remove(index)}
+                            className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </ImmediateTooltip>
                       </div>
                       <Controller
                         control={form.control}
@@ -641,20 +645,23 @@ export function AdminAssessmentQuestionEditorDialog({
                       />
                     )}
                   />
-                  <button
-                    type="button"
-                    aria-label={`Xóa đáp án ${index + 1}`}
-                    title={
+                  <ImmediateTooltip
+                    content={
                       index === 0
                         ? "Không thể xóa đáp án đầu tiên"
                         : `Xóa đáp án ${index + 1}`
                     }
-                    disabled={index === 0}
-                    onClick={() => acceptedAnswers.remove(index)}
-                    className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      aria-label={`Xóa đáp án ${index + 1}`}
+                      disabled={index === 0}
+                      onClick={() => acceptedAnswers.remove(index)}
+                      className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </ImmediateTooltip>
                 </div>
               ))}
               <FormError message={form.formState.errors.acceptedAnswers?.root?.message} />

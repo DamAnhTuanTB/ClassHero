@@ -199,6 +199,11 @@ Spacing/radius mặc định:
 - Mọi ô input nhập liệu phải tắt gợi ý trình duyệt/autofill bằng cấu hình input chung; không dùng `autoComplete` semantic như `username`, `name`, `tel`, `street-address` hoặc `new-password` trong UI trừ khi owner yêu cầu rõ.
 - Dialog, Drawer, Sheet, Tabs, Card, Table, Badge, Alert ưu tiên shadcn/ui.
 - Icon button phải có `aria-label` hoặc tooltip nếu không hiển nhiên.
+- Tooltip phải là tooltip tùy biến xuất hiện ngay ở frame hover/focus đầu tiên,
+  không dùng `title` native bị trễ. Tooltip phải render ngoài container có
+  `overflow`/scroll (ưu tiên portal vào `document.body`), tự giữ trong viewport
+  và không được làm thay đổi `scrollWidth`, tạo scrollbar hoặc bị modal/editor
+  cắt mất.
 - Logo và text logo `ClassHero` là brand component dùng chung, không được tự dựng biến thể mới theo từng màn. Mọi header, app bar, auth brand, sidebar hoặc mobile bar khi cần hiển thị thương hiệu phải dùng cùng cấu trúc/logo/text/token đã có ở header chuẩn gần nhất, hiện là icon `GraduationCap` trên nền gradient `theme-brand` và chữ `Class`/`Hero` tách màu theo `--theme-brand-primary`/`--theme-brand-secondary`. Không dùng logo chữ tắt như `CH`, không đổi font, màu, khoảng cách hoặc icon brand nếu chưa có yêu cầu đổi brand toàn hệ thống.
 - Loading, empty, error, disabled state phải được thiết kế cùng component/màn hình.
 - Search, filter và sort ở màn danh sách cấp trang của Student, Parent và Admin phải đồng bộ vào URL query params để giữ nguyên sau refresh/F5, hỗ trợ điều hướng Back/Forward và không phụ thuộc state tạm trong component. Giá trị query phải được validate theo option hợp lệ; giá trị rỗng/mặc định nên được bỏ khỏi URL. State thuần trình bày như dropdown đang mở, modal đang mở hoặc item đang hover không lưu vào URL.

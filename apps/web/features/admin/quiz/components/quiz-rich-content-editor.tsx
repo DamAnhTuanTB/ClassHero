@@ -61,6 +61,7 @@ import {
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import type { TiptapTextDocument } from "@/types/rich-text";
 import { uploadAdminQuizImage } from "@/features/admin/quiz/api/admin-quiz-api";
 import { QuizRichImageNodeView } from "@/features/admin/quiz/components/quiz-rich-image-node-view";
@@ -541,23 +542,25 @@ export function ScientificAnswerField({
             )}
           />
         )}
-        <button
-          type="button"
-          aria-label="Mở công cụ nhập công thức"
-          aria-expanded={isFormulaToolsOpen}
-          onClick={() => {
-            setUsesVisualFormula(true);
-            setIsFormulaToolsOpen((isOpen) => !isOpen);
-          }}
-          className={cn(
-            "grid h-10 w-10 place-items-center rounded-lg border text-sm font-extrabold transition",
-            isFormulaToolsOpen
-              ? "border-[var(--theme-primary)] bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)]"
-              : "border-[var(--theme-border)] text-[var(--theme-text-muted)]",
-          )}
-        >
-          <Sigma className="h-4 w-4" />
-        </button>
+        <ImmediateTooltip content="Mở công cụ nhập công thức">
+          <button
+            type="button"
+            aria-label="Mở công cụ nhập công thức"
+            aria-expanded={isFormulaToolsOpen}
+            onClick={() => {
+              setUsesVisualFormula(true);
+              setIsFormulaToolsOpen((isOpen) => !isOpen);
+            }}
+            className={cn(
+              "grid h-10 w-10 place-items-center rounded-lg border text-sm font-extrabold transition",
+              isFormulaToolsOpen
+                ? "border-[var(--theme-primary)] bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)]"
+                : "border-[var(--theme-border)] text-[var(--theme-text-muted)]",
+            )}
+          >
+            <Sigma className="h-4 w-4" />
+          </button>
+        </ImmediateTooltip>
       </div>
       {isFormulaToolsOpen ? (
         <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2">
@@ -567,15 +570,16 @@ export function ScientificAnswerField({
             onBlur={onBlur}
             onChange={onChange}
           />
-          <button
-            type="button"
-            aria-label="Đóng trình nhập công thức"
-            title="Đóng trình nhập công thức"
-            onClick={() => setIsFormulaToolsOpen(false)}
-            className="theme-button-neutral grid h-10 w-10 place-items-center self-center rounded-lg"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <ImmediateTooltip content="Đóng trình nhập công thức">
+            <button
+              type="button"
+              aria-label="Đóng trình nhập công thức"
+              onClick={() => setIsFormulaToolsOpen(false)}
+              className="theme-button-neutral grid h-10 w-10 place-items-center self-center rounded-lg"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </ImmediateTooltip>
         </div>
       ) : null}
       {error ? (
@@ -772,7 +776,7 @@ function ToolbarButton({
   onMouseDown?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <span className="relative inline-flex shrink-0">
+    <ImmediateTooltip content={label}>
       <button
         type="button"
         aria-label={label}
@@ -789,7 +793,7 @@ function ToolbarButton({
       >
         {children}
       </button>
-    </span>
+    </ImmediateTooltip>
   );
 }
 
@@ -1019,7 +1023,7 @@ function TableContextIconButton({
   tone?: "danger" | "neutral" | "primary";
 }) {
   return (
-    <span className="relative inline-flex shrink-0">
+    <ImmediateTooltip content={label}>
       <button
         type="button"
         aria-label={label}
@@ -1038,7 +1042,7 @@ function TableContextIconButton({
         {children}
         <span className="sr-only">{label}</span>
       </button>
-    </span>
+    </ImmediateTooltip>
   );
 }
 

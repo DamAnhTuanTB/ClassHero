@@ -338,6 +338,103 @@ test("math structure previews stay inside their buttons", async ({ page }) => {
   await expectNoFrameworkOverlay(page);
 });
 
+test("math tooltips appear immediately without creating horizontal overflow", async ({
+  page,
+}, testInfo) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await dialog.getByLabel("Chèn công thức Toán, Lý, Hóa").first().click();
+
+  const mathfield = dialog.locator("math-field");
+  await expect(mathfield).toBeVisible({ timeout: 15_000 });
+  const keyboardToggle = mathfield.locator(
+    '[part="virtual-keyboard-toggle"]',
+  );
+  await expect(keyboardToggle).toBeVisible();
+
+  const overflowBeforeHover = await mathfield.evaluate((field) => ({
+    clientWidth: field.clientWidth,
+    scrollWidth: field.scrollWidth,
+  }));
+  const supportsHover = await page.evaluate(() =>
+    window.matchMedia("(hover: hover)").matches,
+  );
+  if (supportsHover) {
+    await keyboardToggle.hover();
+  } else {
+    await keyboardToggle.evaluate((toggle) => {
+      toggle.dispatchEvent(new PointerEvent("pointerenter"));
+    });
+  }
+
+  const keyboardTooltip = page
+    .locator("[data-immediate-tooltip]")
+    .filter({ hasText: "Mở hoặc đóng bàn phím ảo" });
+  await expect(keyboardTooltip).toBeVisible({ timeout: 300 });
+  await expect(keyboardToggle).not.toHaveAttribute("data-tooltip", /.+/);
+  await expect(keyboardToggle).not.toHaveAttribute("data-l10n-tooltip", /.+/);
+
+  const overflowAfterHover = await mathfield.evaluate((field) => ({
+    clientWidth: field.clientWidth,
+    scrollWidth: field.scrollWidth,
+  }));
+  expect(overflowAfterHover).toEqual(overflowBeforeHover);
+
+  const tooltipBounds = await keyboardTooltip.boundingBox();
+  expect(tooltipBounds).not.toBeNull();
+  if (tooltipBounds) {
+    expect(tooltipBounds.x).toBeGreaterThanOrEqual(0);
+    expect(tooltipBounds.y).toBeGreaterThanOrEqual(0);
+    expect(tooltipBounds.x + tooltipBounds.width).toBeLessThanOrEqual(
+      await page.evaluate(() => window.innerWidth),
+    );
+  }
+  if (!supportsHover) {
+    await keyboardToggle.evaluate((toggle) => {
+      toggle.dispatchEvent(new PointerEvent("pointerleave"));
+    });
+  }
+
+  const fractionButton = dialog.getByRole("button", {
+    name: "Chèn phân số",
+  });
+  await expect(fractionButton).not.toHaveAttribute("title", /.+/);
+  if (supportsHover) {
+    await fractionButton.hover();
+  } else {
+    await fractionButton.focus();
+  }
+  await expect(
+    page
+      .locator("[data-immediate-tooltip]")
+      .filter({ hasText: "Phân số" }),
+  ).toBeVisible({ timeout: 300 });
+
+  const boldButton = dialog.getByRole("button", { name: "In đậm" }).first();
+  if (supportsHover) {
+    await boldButton.hover();
+  } else {
+    await boldButton.focus();
+  }
+  await expect(
+    page.locator("[data-immediate-tooltip]").filter({ hasText: "In đậm" }),
+  ).toBeVisible({ timeout: 300 });
+
+  await expectNoFrameworkOverlay(page);
+  testInfo.annotations.push({
+    description: supportsHover
+      ? "Verified with a real hover-capable pointer."
+      : "Verified with the equivalent pointer/focus events on a touch viewport.",
+    type: "tooltip-input-mode",
+  });
+});
+
 test("every math palette template inserts visual content", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];

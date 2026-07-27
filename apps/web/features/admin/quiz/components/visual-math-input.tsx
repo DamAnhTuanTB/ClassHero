@@ -4,6 +4,8 @@ import katex from "katex";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { MathfieldElement } from "mathlive";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
+import { ImmediateTooltipPortal } from "@/components/common/ui/immediate-tooltip-portal";
 import { cn } from "@/lib/utils";
 import "mathlive/fonts.css";
 import "@/features/admin/quiz/components/visual-math-input.css";
@@ -199,6 +201,8 @@ export function VisualMathInput({
   const latestOnBlurRef = useRef(onBlur);
   const latestOnChangeRef = useRef(onChange);
   const latestValueRef = useRef(value);
+  const [keyboardTooltipAnchor, setKeyboardTooltipAnchor] =
+    useState<HTMLElement | null>(null);
   const [activeCategoryId, setActiveCategoryId] =
     useState<FormulaCategory["id"]>("structures");
   const [isReady, setIsReady] = useState(false);
@@ -247,6 +251,32 @@ export function VisualMathInput({
       mathfield.addEventListener("blur", handleBlur);
       hostRef.current.replaceChildren(mathfield);
       const mathfieldShadowRoot = mathfield.shadowRoot;
+      const virtualKeyboardToggle =
+        mathfieldShadowRoot?.querySelector<HTMLElement>(
+          '[part="virtual-keyboard-toggle"]',
+        ) ?? null;
+      const showKeyboardTooltip = () => {
+        setKeyboardTooltipAnchor(virtualKeyboardToggle);
+      };
+      const hideKeyboardTooltip = () => {
+        setKeyboardTooltipAnchor(null);
+      };
+      virtualKeyboardToggle?.removeAttribute("data-tooltip");
+      virtualKeyboardToggle?.removeAttribute("data-l10n-tooltip");
+      virtualKeyboardToggle?.setAttribute(
+        "aria-label",
+        "Mở hoặc đóng bàn phím ảo",
+      );
+      virtualKeyboardToggle?.addEventListener(
+        "pointerenter",
+        showKeyboardTooltip,
+      );
+      virtualKeyboardToggle?.addEventListener(
+        "pointerleave",
+        hideKeyboardTooltip,
+      );
+      virtualKeyboardToggle?.addEventListener("focusin", showKeyboardTooltip);
+      virtualKeyboardToggle?.addEventListener("focusout", hideKeyboardTooltip);
       const keepVectorPlaceholderSelected = (event: Event) => {
         const clickedSelectedGlyph = event
           .composedPath()
@@ -282,6 +312,23 @@ export function VisualMathInput({
             keepVectorPlaceholderSelected,
             { capture: true },
           );
+          virtualKeyboardToggle?.removeEventListener(
+            "pointerenter",
+            showKeyboardTooltip,
+          );
+          virtualKeyboardToggle?.removeEventListener(
+            "pointerleave",
+            hideKeyboardTooltip,
+          );
+          virtualKeyboardToggle?.removeEventListener(
+            "focusin",
+            showKeyboardTooltip,
+          );
+          virtualKeyboardToggle?.removeEventListener(
+            "focusout",
+            hideKeyboardTooltip,
+          );
+          hideKeyboardTooltip();
         },
         { once: true },
       );
@@ -289,6 +336,7 @@ export function VisualMathInput({
 
     return () => {
       isDisposed = true;
+      setKeyboardTooltipAnchor(null);
       mountedMathfield?.remove();
       if (mathfieldRef.current === mountedMathfield) {
         mathfieldRef.current = null;
@@ -322,45 +370,46 @@ export function VisualMathInput({
         aria-label="Nhóm ký hiệu và cấu trúc công thức"
       >
         {formulaCategories.map((category) => (
-          <button
-            key={category.id}
-            type="button"
-            aria-label={category.label}
-            aria-pressed={activeCategoryId === category.id}
-            disabled={disabled}
-            onClick={(event) => {
-              setActiveCategoryId(category.id);
-              const categoryBar = categoryBarRef.current;
-              if (!categoryBar) {
-                return;
-              }
+          <ImmediateTooltip key={category.id} content={category.label}>
+            <button
+              type="button"
+              aria-label={category.label}
+              aria-pressed={activeCategoryId === category.id}
+              disabled={disabled}
+              onClick={(event) => {
+                setActiveCategoryId(category.id);
+                const categoryBar = categoryBarRef.current;
+                if (!categoryBar) {
+                  return;
+                }
 
-              const categoryButton = event.currentTarget;
-              const centeredScrollLeft =
-                categoryButton.offsetLeft -
-                (categoryBar.clientWidth - categoryButton.offsetWidth) / 2;
-              categoryBar.scrollTo({
-                behavior: "smooth",
-                left: centeredScrollLeft,
-              });
-            }}
-            className={cn(
-              "visual-math-input__category-button",
-              activeCategoryId === category.id &&
-                "visual-math-input__category-button--active",
-            )}
-          >
-            <span
-              className="visual-math-input__math-preview"
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{
-                __html: renderMathPreviewHtml(category.preview),
+                const categoryButton = event.currentTarget;
+                const centeredScrollLeft =
+                  categoryButton.offsetLeft -
+                  (categoryBar.clientWidth - categoryButton.offsetWidth) / 2;
+                categoryBar.scrollTo({
+                  behavior: "smooth",
+                  left: centeredScrollLeft,
+                });
               }}
-            />
-            <span aria-hidden="true" className="visual-math-input__caret">
-              ▾
-            </span>
-          </button>
+              className={cn(
+                "visual-math-input__category-button",
+                activeCategoryId === category.id &&
+                  "visual-math-input__category-button--active",
+              )}
+            >
+              <span
+                className="visual-math-input__math-preview"
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{
+                  __html: renderMathPreviewHtml(category.preview),
+                }}
+              />
+              <span aria-hidden="true" className="visual-math-input__caret">
+                ▾
+              </span>
+            </button>
+          </ImmediateTooltip>
         ))}
       </div>
 
@@ -370,39 +419,39 @@ export function VisualMathInput({
         aria-label={activeCategory.label}
       >
         {activeCategory.templates.map((template) => (
-          <button
-            key={template.label}
-            type="button"
-            disabled={disabled || !isReady}
-            title={template.label}
-            aria-label={`Chèn ${template.label.toLocaleLowerCase("vi")}`}
-            onClick={() => {
-              const mathfield = mathfieldRef.current;
-              if (!mathfield) {
-                return;
-              }
-              mathfield.insert(template.latex, {
-                focus: true,
-                insertionMode: "replaceSelection",
-                selectionMode: "placeholder",
-              });
-              requestAnimationFrame(() => {
-                if (mathfieldRef.current === mathfield) {
-                  mathfield.focus();
+          <ImmediateTooltip key={template.label} content={template.label}>
+            <button
+              type="button"
+              disabled={disabled || !isReady}
+              aria-label={`Chèn ${template.label.toLocaleLowerCase("vi")}`}
+              onClick={() => {
+                const mathfield = mathfieldRef.current;
+                if (!mathfield) {
+                  return;
                 }
-              });
-              latestOnChangeRef.current(mathfield.value);
-            }}
-            className="visual-math-input__template-button"
-          >
-            <span
-              className="visual-math-input__math-preview"
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{
-                __html: renderMathPreviewHtml(template.preview),
+                mathfield.insert(template.latex, {
+                  focus: true,
+                  insertionMode: "replaceSelection",
+                  selectionMode: "placeholder",
+                });
+                requestAnimationFrame(() => {
+                  if (mathfieldRef.current === mathfield) {
+                    mathfield.focus();
+                  }
+                });
+                latestOnChangeRef.current(mathfield.value);
               }}
-            />
-          </button>
+              className="visual-math-input__template-button"
+            >
+              <span
+                className="visual-math-input__math-preview"
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{
+                  __html: renderMathPreviewHtml(template.preview),
+                }}
+              />
+            </button>
+          </ImmediateTooltip>
         ))}
       </div>
 
@@ -420,6 +469,10 @@ export function VisualMathInput({
           Chọn mẫu rồi nhập vào từng ô. Dùng Tab để chuyển vị trí.
         </p>
       </div>
+      <ImmediateTooltipPortal
+        anchor={keyboardTooltipAnchor}
+        content="Mở hoặc đóng bàn phím ảo"
+      />
     </div>
   );
 }

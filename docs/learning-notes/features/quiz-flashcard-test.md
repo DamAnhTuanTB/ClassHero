@@ -145,6 +145,12 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   KaTeX preview/editor/viewer cần override cả `.mathnormal` và `.mathit` về
   `KaTeX_Main` với `font-style: normal`; nếu chỉ sửa vùng nhập thì công thức sau
   khi chèn vào Tiptap vẫn quay lại chữ nghiêng.
+- Tooltip mặc định của nút bàn phím MathLive nằm trong shadow DOM của
+  `math-field`. Nếu để tooltip đó trong vùng nhập có `overflow-x: auto`, pseudo
+  element khi hover có thể tăng `scrollWidth`, tạo thanh cuộn và vẫn bị
+  container cắt. Flow Quiz/Test phải bỏ tooltip nội bộ này và dùng tooltip chung
+  render bằng portal vào `document.body`; tooltip xuất hiện ngay, tự giữ trong
+  viewport và không tham gia kích thước layout của editor.
 
 ## File quan trọng
 
@@ -152,6 +158,8 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 - `apps/web/features/admin/quiz/components/quiz-rich-content-editor.css`
 - `apps/web/features/admin/quiz/components/quiz-rich-content-viewer.tsx`
 - `apps/web/features/admin/quiz/components/visual-math-input.tsx`
+- `apps/web/components/common/ui/immediate-tooltip.tsx`
+- `apps/web/components/common/ui/immediate-tooltip-portal.tsx`
 - `apps/web/features/admin/quiz/components/quiz-text-color-picker.tsx`
 - `apps/web/features/admin/tests/`
 - `apps/api/src/modules/quiz/`
