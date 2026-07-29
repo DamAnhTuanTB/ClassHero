@@ -9,34 +9,84 @@ import {
   updateAdminFlashcard,
   updateAdminFlashcardSet,
   type AdminFlashcardPayload,
+  type AdminFlashcardSet,
   type AdminFlashcardSetPayload,
 } from "@/features/admin/flashcards/api/admin-flashcards-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
-const flashcardSetsKey = (lessonId: string) =>
-  ["admin-flashcard-sets", lessonId] as const;
-const flashcardsKey = (setId: string) => ["admin-flashcards", setId] as const;
+const adminFlashcardQueryKeys = {
+  all: ["admin", "flashcards"] as const,
+  sets: (lessonId: string) => [...adminFlashcardQueryKeys.all, "sets", lessonId] as const,
+  setsForUser: (lessonId: string, userId?: string) =>
+    [...adminFlashcardQueryKeys.sets(lessonId), userId ?? "guest"] as const,
+  cards: (setId: string) => [...adminFlashcardQueryKeys.all, "cards", setId] as const,
+  cardsForUser: (setId: string, userId?: string) =>
+    [...adminFlashcardQueryKeys.cards(setId), userId ?? "guest"] as const,
+};
+
+export function getAdminFlashcardSetsQueryOptions({
+  accessToken,
+  lessonId,
+  userId,
+}: {
+  accessToken: string;
+  lessonId: string;
+  userId?: string;
+}) {
+  return {
+    queryKey: adminFlashcardQueryKeys.setsForUser(lessonId, userId),
+    queryFn: () => getAdminFlashcardSets(lessonId, accessToken),
+    staleTime: 30_000,
+  };
+}
+
+export function getAdminFlashcardsQueryOptions({
+  accessToken,
+  setId,
+  userId,
+}: {
+  accessToken: string;
+  setId: string;
+  userId?: string;
+}) {
+  return {
+    queryKey: adminFlashcardQueryKeys.cardsForUser(setId, userId),
+    queryFn: () => getAdminFlashcards(setId, accessToken),
+    staleTime: 30_000,
+  };
+}
 
 export function useAdminFlashcardSets(lessonId: string) {
-  const token = useAuthSessionStore((state) => state.session?.accessToken);
+  const session = useAuthSessionStore((state) => state.session);
   return useQuery({
-    queryKey: flashcardSetsKey(lessonId),
-    queryFn: () => getAdminFlashcardSets(lessonId, requireToken(token)),
-    enabled: Boolean(token && lessonId),
-    staleTime: 30_000,
+    ...getAdminFlashcardSetsQueryOptions({
+      accessToken: session?.accessToken ?? "",
+      lessonId,
+      userId: session?.user.id,
+    }),
+    enabled: Boolean(session?.accessToken && lessonId),
   });
 }
 
 export function useAdminFlashcardSetMutations(lessonId: string) {
-  const token = useAuthSessionStore((state) => state.session?.accessToken);
+  const session = useAuthSessionStore((state) => state.session);
+  const token = session?.accessToken;
   const queryClient = useQueryClient();
   const invalidateSets = () =>
-    queryClient.invalidateQueries({ queryKey: flashcardSetsKey(lessonId) });
+    queryClient.invalidateQueries({
+      queryKey: adminFlashcardQueryKeys.sets(lessonId),
+    });
 
   const createSet = useMutation({
     mutationFn: (payload: AdminFlashcardSetPayload) =>
       createAdminFlashcardSet(lessonId, payload, requireToken(token)),
-    onSuccess: invalidateSets,
+    onSuccess: (createdSet) => {
+      queryClient.setQueryData<AdminFlashcardSet[]>(
+        adminFlashcardQueryKeys.setsForUser(lessonId, session?.user.id),
+        (currentSets) => [...(currentSets ?? []), createdSet],
+      );
+      void invalidateSets();
+    },
   });
   const updateSet = useMutation({
     mutationFn: ({
@@ -57,12 +107,14 @@ export function useAdminFlashcardSetMutations(lessonId: string) {
 }
 
 export function useAdminFlashcards(setId: string) {
-  const token = useAuthSessionStore((state) => state.session?.accessToken);
+  const session = useAuthSessionStore((state) => state.session);
   return useQuery({
-    queryKey: flashcardsKey(setId),
-    queryFn: () => getAdminFlashcards(setId, requireToken(token)),
-    enabled: Boolean(token && setId),
-    staleTime: 30_000,
+    ...getAdminFlashcardsQueryOptions({
+      accessToken: session?.accessToken ?? "",
+      setId,
+      userId: session?.user.id,
+    }),
+    enabled: Boolean(session?.accessToken && setId),
   });
 }
 
@@ -71,8 +123,12 @@ export function useAdminFlashcardMutations(setId: string, lessonId: string) {
   const queryClient = useQueryClient();
   const invalidateCards = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: flashcardsKey(setId) }),
-      queryClient.invalidateQueries({ queryKey: flashcardSetsKey(lessonId) }),
+      queryClient.invalidateQueries({
+        queryKey: adminFlashcardQueryKeys.cards(setId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: adminFlashcardQueryKeys.sets(lessonId),
+      }),
     ]);
 
   const createCard = useMutation({

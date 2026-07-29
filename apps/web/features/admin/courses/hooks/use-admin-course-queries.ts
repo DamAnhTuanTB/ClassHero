@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   archiveAdminLearningPath,
   createAdminLearningPath,
@@ -39,6 +40,22 @@ export const adminCourseQueryKeys = {
     [...adminCourseQueryKeys.learningPaths(userId), pathId] as const,
 };
 
+function getAdminLearningPathQueryOptions({
+  accessToken,
+  pathId,
+  userId,
+}: {
+  accessToken: string;
+  pathId: string;
+  userId?: string;
+}) {
+  return {
+    queryKey: adminCourseQueryKeys.learningPath(userId, pathId),
+    queryFn: () => getAdminLearningPath(pathId, accessToken),
+    staleTime: 60_000,
+  };
+}
+
 export function useAdminLearningPathsQuery(initialData?: AdminLearningPath[]) {
   const session = useAuthSessionStore((state) => state.session);
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
@@ -59,11 +76,37 @@ export function useAdminLearningPathQuery(
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
 
   return useQuery({
-    queryKey: adminCourseQueryKeys.learningPath(session?.user.id, pathId),
-    queryFn: () => getAdminLearningPath(pathId, session?.accessToken ?? ""),
+    ...getAdminLearningPathQueryOptions({
+      accessToken: session?.accessToken ?? "",
+      pathId,
+      userId: session?.user.id,
+    }),
     enabled: isAuthHydrated && Boolean(session?.accessToken) && Boolean(pathId),
     initialData,
   });
+}
+
+export function useAdminLearningPathPrefetch() {
+  const queryClient = useQueryClient();
+  const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
+  const session = useAuthSessionStore((state) => state.session);
+
+  return useCallback(
+    (pathId: string) => {
+      if (!isAuthHydrated || !session?.accessToken || !pathId) {
+        return Promise.resolve();
+      }
+
+      return queryClient.prefetchQuery(
+        getAdminLearningPathQueryOptions({
+          accessToken: session.accessToken,
+          pathId,
+          userId: session.user.id,
+        }),
+      );
+    },
+    [isAuthHydrated, queryClient, session?.accessToken, session?.user.id],
+  );
 }
 
 export function useAdminCourseMutations() {

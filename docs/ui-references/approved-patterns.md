@@ -218,3 +218,43 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Evidence:
   - Screenshot: `docs/ui-references/designs/student-course-detail/student-course-detail-mobile-v1.png`
   - Files: `apps/web/app/(student)/student/courses/[slug]/page.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/index.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-mobile-brand-bar.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-detail-progress-card.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-chapter-card.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-lesson-row.tsx`, `apps/web/features/student/shared/student-courses-data.ts`, `apps/web/app/(student)/student-theme.css`.
+
+## Student Lesson Video Connection State - 2026-07-28
+
+- Context: trạng thái chờ kết nối ban đầu trong video của màn chi tiết buổi học học sinh.
+- Approved:
+  - Giữ bố cục hoạt hình `sách -> ngôi sao -> mũ tốt nghiệp`, hai khối màu cyan/violet và nhãn ngắn `Đang kết nối tới Giáo viên...`.
+  - Cảm giác đang kết nối đến từ dải sáng co giãn từ tâm ra hai phía, hai khối nghiêng rất nhẹ tại chỗ và ngôi sao phát sáng theo nhịp.
+  - Hình học của toàn bộ cụm phải ổn định khi đổi từ state kết nối sang state sẵn sàng; không để phần tử rơi từ trên xuống hoặc trượt vị trí do React tái sử dụng DOM.
+  - Animation phải nhẹ, lặp đều và có fallback `prefers-reduced-motion`.
+- Avoid:
+  - Không dùng nhiều chấm sáng chạy liên tục từ trái sang phải.
+  - Không thay cụm đã duyệt bằng spinner mặc định, không thêm nền card xám và không làm icon dịch chuyển theo trục dọc.
+- Reuse for:
+  - Trạng thái kết nối/chờ ngắn trong media học tập hoặc các surface học sinh cần thể hiện hai đầu đang bắt tay.
+- Evidence:
+  - Files: `apps/web/components/shared/custom-youtube-player.tsx`, `apps/web/app/globals.css`.
+
+## Student Lesson Practice Fullscreen Flow - 2026-07-29
+
+- Context: owner xác nhận luồng làm Quiz phía học sinh là luồng chuẩn và yêu cầu
+  Flashcard áp dụng đồng nhất từ UI đến logic.
+- Approved:
+  - Tab lesson giữ panel vào bài; bấm `Bắt đầu`/`Tiếp tục`/`Xem lại` mới mở
+    surface luyện tập toàn màn hình.
+  - Runner dùng header ClassHero, back + confirm khi thoát dở, progress rõ, khóa
+    scroll nền, pending/disabled thật và responsive mobile-first.
+  - Result là surface toàn màn hình cùng hierarchy với Quiz; Flashcard chỉ có
+    `Ôn lại tất cả` và `Ôn lại thẻ chưa thuộc`.
+  - Quiz và Flashcard dùng cùng transition/shell behavior nhưng giữ tone/copy
+    semantic riêng.
+- Avoid:
+  - Không học Flashcard trực tiếp trong card dài bên dưới tab lesson sau khi bấm
+    bắt đầu.
+  - Không tạo header, back behavior hoặc result layout riêng lệch khỏi Quiz.
+  - Không filter động deck đang học theo mutation `isKnown`, tránh nhảy/bỏ thẻ.
+- Reuse for:
+  - Test runner và các activity/checkpoint học sinh toàn màn hình nếu contract
+    tương lai cần cùng entry/runner/result flow.
+- Evidence:
+  - Files: `apps/web/features/student/lessons/screens/student-lesson-screen/components/quiz-learning-panel.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/flashcard-learning-panel.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/flashcard-result-screen.tsx`.

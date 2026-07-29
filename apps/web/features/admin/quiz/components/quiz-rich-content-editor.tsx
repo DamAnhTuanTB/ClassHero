@@ -2,6 +2,7 @@
 
 import { Image } from "@tiptap/extension-image";
 import { Mathematics } from "@tiptap/extension-mathematics";
+import { Placeholder } from "@tiptap/extension-placeholder";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
@@ -66,14 +67,12 @@ import type { TiptapTextDocument } from "@/types/rich-text";
 import { uploadAdminQuizImage } from "@/features/admin/quiz/api/admin-quiz-api";
 import { QuizRichImageNodeView } from "@/features/admin/quiz/components/quiz-rich-image-node-view";
 import { QuizTextColorPicker } from "@/features/admin/quiz/components/quiz-text-color-picker";
-import { VisualMathInput } from "@/features/admin/quiz/components/visual-math-input";
-import {
-  areTiptapDocumentsEquivalent,
-  hasTiptapDocumentContent,
-} from "@/lib/tiptap-rich-content";
+import { VisualMathInput } from "@/components/common/math/visual-math-input";
+import { areTiptapDocumentsEquivalent } from "@/lib/tiptap-rich-content";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { cn } from "@/lib/utils";
 import "@/features/admin/quiz/components/quiz-rich-content-editor.css";
+import "@/components/common/content/math-content-typography.css";
 
 type FormulaKind = "inline" | "block";
 type ImageAlignment = "center" | "left" | "right";
@@ -211,18 +210,18 @@ export function QuizRichContentEditor({
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const latestValueRef = useRef(value);
-  const lastEmittedValueRef = useRef(JSON.stringify(value));
   const [formulaDraft, setFormulaDraft] = useState<FormulaDraft | null>(null);
   const [tableDraft, setTableDraft] = useState<TableDraft | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [, setEditorRevision] = useState(0);
 
-  latestValueRef.current = value;
-
   const extensions = useMemo(
     () => [
       StarterKit.configure({
         heading: { levels: [2, 3] },
+      }),
+      Placeholder.configure({
+        placeholder,
       }),
       TextStyle,
       Color,
@@ -275,7 +274,7 @@ export function QuizRichContentEditor({
         },
       }),
     ],
-    [],
+    [placeholder],
   );
 
   const editor = useEditor({
@@ -298,7 +297,6 @@ export function QuizRichContentEditor({
     onTransaction: () => setEditorRevision((revision) => revision + 1),
     onUpdate: ({ editor: currentEditor }) => {
       const nextValue = currentEditor.getJSON() as TiptapTextDocument;
-      const serializedNextValue = JSON.stringify(nextValue);
 
       // Tiptap extensions may dispatch a normalizing transaction while the editor
       // is mounting. Do not report that unchanged document as a user edit because
@@ -308,7 +306,6 @@ export function QuizRichContentEditor({
       }
 
       latestValueRef.current = nextValue;
-      lastEmittedValueRef.current = serializedNextValue;
       onChange(nextValue);
       setEditorRevision((revision) => revision + 1);
     },
@@ -320,14 +317,15 @@ export function QuizRichContentEditor({
 
   useEffect(() => {
     if (!editor) {
+      latestValueRef.current = value;
       return;
     }
 
-    const serializedValue = JSON.stringify(value);
-    if (
-      serializedValue === lastEmittedValueRef.current ||
-      serializedValue === JSON.stringify(editor.getJSON())
-    ) {
+    // Keep the previous controlled value in the ref until this effect runs. During
+    // an async form reset, a late Tiptap transaction from the previous document
+    // must still compare against that previous value instead of overwriting RHF.
+    latestValueRef.current = value;
+    if (areTiptapDocumentsEquivalent(value, editor.getJSON() as TiptapTextDocument)) {
       return;
     }
 
@@ -381,10 +379,6 @@ export function QuizRichContentEditor({
     }
   };
 
-  const isEmpty = editor
-    ? !hasTiptapDocumentContent(editor.getJSON() as TiptapTextDocument)
-    : true;
-
   return (
     <div>
       <div
@@ -426,14 +420,7 @@ export function QuizRichContentEditor({
         {editor?.isActive("table") ? (
           <TableContextToolbar disabled={disabled} editor={editor} />
         ) : null}
-        <div className="relative">
-          {isEmpty ? (
-            <span className="pointer-events-none absolute left-4 top-3 z-[1] text-sm font-medium text-[var(--theme-text-placeholder)]">
-              {placeholder}
-            </span>
-          ) : null}
-          <EditorContent editor={editor} />
-        </div>
+        <EditorContent editor={editor} />
         {formulaDraft ? (
           <FormulaComposer
             draft={formulaDraft}
@@ -521,7 +508,7 @@ export function ScientificAnswerField({
             )}
           >
             <span
-              className="block min-w-max text-center"
+              className="math-content-typography block min-w-max text-center"
               dangerouslySetInnerHTML={{ __html: previewHtml }}
             />
           </button>

@@ -9,9 +9,15 @@
   outline: none;
 }
 
-.quiz-rich-content-editor .katex :is(.mathnormal, .mathit) {
-  font-family: KaTeX_Main, serif;
-  font-style: normal;
+.quiz-rich-content-editor
+  .quiz-rich-content-prosemirror
+  p.is-editor-empty:first-child::before {
+  height: 0;
+  float: left;
+  margin-inline-start: 0.25rem;
+  color: var(--theme-text-placeholder);
+  content: attr(data-placeholder);
+  pointer-events: none;
 }
 
 .quiz-rich-content-editor .quiz-rich-content-prosemirror .ProseMirror-gapcursor::after {

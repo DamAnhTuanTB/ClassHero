@@ -8,12 +8,49 @@ Dùng cho màn có data/action.
 
 ### Pattern chuẩn
 
-- Loading: skeleton hoặc state component rõ, không để vùng trống.
+- Loading detail, danh sách, card hoặc tab panel: dùng skeleton mô phỏng gần đúng bố cục thật, không để vùng trống và không dùng mặc định spinner kèm câu mô tả.
+- Thiết kế skeleton theo layout thật của từng màn; không áp một component skeleton tổng quát cho list, detail, form và tab có cấu trúc khác nhau. Chỉ dùng chung primitive nhỏ khi không làm mất đặc trưng bố cục của màn đích.
 - Empty: nói người dùng có thể làm gì tiếp theo.
 - Error: có action retry khi có thể.
 - Disabled/pending: action đang chạy phải disabled và có feedback.
+- Full-page loading/error phải căn giữa cả chiều ngang lẫn chiều dọc bằng vùng bao có chiều cao viewport. State trong shell có header/sidebar căn giữa phần nội dung còn lại; state trong tab/card chỉ căn giữa vùng được cấp.
+- Với initial loading ngắn, trì hoãn hiển thị khoảng `250-300ms`; nếu loading đã xuất hiện thì giữ tối thiểu khoảng `300ms` để tránh nháy.
+- Fetch/prefetch dữ liệu của các tab ngay khi đủ dependency và chạy song song khi có thể; khi đổi tab, ưu tiên cache và không thay dữ liệu đang có bằng skeleton chỉ vì background refetch.
 
 ### Không làm
 
 - Không để button nhìn bấm được nhưng thiếu handler hoặc pending state.
 - Không hiển thị text kỹ thuật như `mock`, task code, stack trace hoặc TODO trong UI.
+- Không thay một detail/list/tab panel bằng icon xoay kèm dòng “Đang tải…”. Spinner chỉ dùng cho pending cục bộ không có layout nội dung để skeleton hóa, ví dụ bên trong nút bấm.
+
+## 2. Animated Connection State
+
+Dùng cho trạng thái chờ ngắn khi hai đầu của một media hoặc dịch vụ đang kết nối.
+
+### Pattern chuẩn
+
+- Giữ khung hình học ổn định giữa state kết nối và state kế tiếp; dùng `key` riêng cho root của mỗi conditional state để React không tái sử dụng các node có transition khác vị trí.
+- Cho chuyển động diễn ra bên trong khung: dải sáng co giãn từ tâm, glow theo nhịp hoặc nghiêng rất nhẹ tại chỗ.
+- Chuyển động trang trí không được thay đổi vị trí theo trục dọc và phải có `prefers-reduced-motion`.
+- Copy chỉ dùng một dòng trạng thái ngắn.
+- Với transition che toàn màn hình trước navigation, provider phải nằm ở route
+  shell/layout để còn tồn tại khi route nguồn unmount. Ngay khi click, chạy
+  song song animation đóng, `router.prefetch` và TanStack Query
+  `fetchQuery`/`prefetchQuery`; giữ overlay nếu dữ liệu cốt lõi chưa xong và chỉ
+  mở overlay sau khi pathname đích đã commit.
+
+### Không làm
+
+- Không dùng nhiều chấm sáng chạy liên tục qua lại nếu chúng trở thành điểm nhìn chính.
+- Không dùng spinner mặc định khi surface học sinh đã có ngôn ngữ minh họa riêng.
+- Không animate từ vị trí của loading state sang vị trí của ready state.
+- Không đợi animation đóng hoàn tất rồi mới bắt đầu gọi API hoặc prefetch route,
+  vì hai độ trễ sẽ bị cộng dồn.
+- Nếu có vật thể chạy theo quỹ đạo, tâm vật thể phải bám đúng nét quỹ đạo đang
+  hiển thị ở mọi breakpoint; không đặt một animation ngang độc lập bên dưới
+  hoặc bên trên đường mà người dùng nhìn thấy.
+
+### Evidence
+
+- `apps/web/components/shared/custom-youtube-player.tsx`
+- `apps/web/app/globals.css`

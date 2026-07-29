@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Bell, GraduationCap, Moon, Sun } from "lucide-react";
+import { Bell, Moon, Sun } from "lucide-react";
 import Link from "next/link";
+import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { MessengerIcon } from "@/components/student/courses/messenger-icon";
+import { useAutoHidingStudentHeader } from "@/components/student/layout/use-auto-hiding-student-header";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 
-const HEADER_REVEAL_SCROLL_DISTANCE = 100;
 const HEADER_ICON_STROKE_WIDTH = 1.75;
 
 export function StudentCoursesHeader({
@@ -16,11 +16,7 @@ export function StudentCoursesHeader({
   title: string;
   initialThemeMode?: AppThemeMode;
 }) {
-  const headerRef = useRef<HTMLElement | null>(null);
-  const isVisibleRef = useRef(true);
-  const lastScrollYRef = useRef(0);
-  const revealScrollDistanceRef = useRef(0);
-  const scrollFrameRef = useRef<number | null>(null);
+  const headerRef = useAutoHidingStudentHeader();
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -28,108 +24,6 @@ export function StudentCoursesHeader({
   const themeToggleLabel = isDarkTheme
     ? "Chuyển sang giao diện sáng"
     : "Chuyển sang giao diện tối";
-
-  useEffect(() => {
-    const getScrollTop = () =>
-      window.scrollY ||
-      document.documentElement.scrollTop ||
-      document.body.scrollTop ||
-      0;
-
-    const resetRevealDistance = () => {
-      revealScrollDistanceRef.current = 0;
-    };
-
-    const setHeaderVisible = (visible: boolean) => {
-      if (window.matchMedia("(min-width: 1024px)").matches) {
-        isVisibleRef.current = true;
-        headerRef.current?.classList.add("translate-y-0");
-        headerRef.current?.classList.remove("-translate-y-full");
-        return;
-      }
-
-      if (isVisibleRef.current === visible) {
-        return;
-      }
-
-      isVisibleRef.current = visible;
-      headerRef.current?.classList.toggle("translate-y-0", visible);
-      headerRef.current?.classList.toggle("-translate-y-full", !visible);
-    };
-
-    const setVisibilityFromDelta = (delta: number) => {
-      if (getScrollTop() <= 8) {
-        resetRevealDistance();
-        setHeaderVisible(true);
-        return;
-      }
-
-      if (delta > 0) {
-        resetRevealDistance();
-        setHeaderVisible(false);
-        return;
-      }
-
-      if (delta < 0) {
-        revealScrollDistanceRef.current += Math.abs(delta);
-
-        if (revealScrollDistanceRef.current >= HEADER_REVEAL_SCROLL_DISTANCE) {
-          resetRevealDistance();
-          setHeaderVisible(true);
-        }
-      }
-    };
-
-    lastScrollYRef.current = getScrollTop();
-
-    const syncHeaderWithScroll = () => {
-      if (window.matchMedia("(min-width: 1024px)").matches) {
-        setHeaderVisible(true);
-        lastScrollYRef.current = getScrollTop();
-        return;
-      }
-
-      const currentScrollY = getScrollTop();
-      const delta = currentScrollY - lastScrollYRef.current;
-
-      if (currentScrollY <= 8) {
-        resetRevealDistance();
-        setHeaderVisible(true);
-        lastScrollYRef.current = currentScrollY;
-        return;
-      }
-
-      if (Math.abs(delta) < 1) {
-        return;
-      }
-
-      setVisibilityFromDelta(delta);
-      lastScrollYRef.current = currentScrollY;
-    };
-
-    const handleScroll = () => {
-      if (scrollFrameRef.current !== null) {
-        return;
-      }
-
-      scrollFrameRef.current = window.requestAnimationFrame(() => {
-        scrollFrameRef.current = null;
-        syncHeaderWithScroll();
-      });
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    document.addEventListener("scroll", handleScroll, { passive: true, capture: true });
-
-    return () => {
-      if (scrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollFrameRef.current);
-      }
-
-      window.removeEventListener("scroll", handleScroll);
-      document.removeEventListener("scroll", handleScroll, { capture: true });
-    };
-  }, []);
 
   return (
     <>
@@ -140,23 +34,9 @@ export function StudentCoursesHeader({
       >
         <Link
           href="/student/explore"
-          className="inline-flex min-w-0 items-center gap-2.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+          className="inline-flex min-w-0 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,var(--theme-brand-secondary),var(--theme-brand-primary))] text-[var(--theme-brand-foreground)] shadow-sm">
-            <GraduationCap
-              className="h-5 w-5"
-              strokeWidth={HEADER_ICON_STROKE_WIDTH}
-              aria-hidden="true"
-            />
-          </span>
-          <span className="inline-flex min-w-0 items-baseline truncate leading-none tracking-normal">
-            <span className="font-[var(--font-display)] text-[1.45rem] font-extrabold text-[var(--theme-brand-primary)]">
-              Class
-            </span>
-            <span className="font-[var(--font-display)] text-[1.45rem] font-extrabold text-[var(--theme-brand-secondary)]">
-              Hero
-            </span>
-          </span>
+          <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
         </Link>
 
         <h1 className="hidden min-w-0 flex-1 truncate text-center text-base font-extrabold text-[var(--theme-text-strong)] md:block lg:hidden">

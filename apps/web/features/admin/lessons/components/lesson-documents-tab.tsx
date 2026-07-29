@@ -14,11 +14,13 @@ import {
   getSourceDocumentRangeReadiness,
   readRecord,
 } from "@/features/admin/courses/admin-course-documents-utils";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { LessonDocumentsFields } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-documents-fields";
 import { prepareLessonFormValuesForSubmit } from "@/features/admin/courses/utils/prepare-lesson-form-values";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function LessonDocumentsTab({
   learningPathId,
@@ -42,6 +44,8 @@ export function LessonDocumentsTab({
   const documentsManager = useAdminCourseDocumentsManager(path, {
     loadAllSourcePages: viewState === "ready",
   });
+  const isInitialPending = viewState === "loading" || documentsManager.isLoading;
+  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
   const selectableSourceDocuments = useMemo(
     () =>
       documentsManager.sourceDocuments.filter((sourceDocument) => {
@@ -203,15 +207,11 @@ export function LessonDocumentsTab({
     void form.handleSubmit(submit)(event);
   }
 
-  if (viewState === "loading" || documentsManager.isLoading) {
-    return (
-      <div className="flex min-h-72 items-center justify-center gap-3 p-6 text-sm font-bold text-[var(--theme-text-muted)]">
-        <Loader2
-          className="h-5 w-5 animate-spin text-[var(--theme-primary)]"
-          aria-hidden="true"
-        />
-        Đang tải tài liệu buổi học
-      </div>
+  if (isInitialPending || shouldShowInitialLoading) {
+    return shouldShowInitialLoading ? (
+      <LessonDocumentsSkeleton />
+    ) : (
+      <div aria-busy="true" className="min-h-72" />
     );
   }
 
@@ -265,5 +265,44 @@ export function LessonDocumentsTab({
         </button>
       </div>
     </form>
+  );
+}
+
+function LessonDocumentsSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải tài liệu buổi học"
+      className="min-h-72 animate-pulse space-y-5 p-5"
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <SkeletonBlock className="h-4 w-32 rounded-full" />
+          <SkeletonBlock className="h-11 rounded-lg" />
+        </div>
+        <div className="space-y-2">
+          <SkeletonBlock className="h-4 w-24 rounded-full" />
+          <SkeletonBlock className="h-11 rounded-lg" />
+        </div>
+      </div>
+      <div className="rounded-xl border border-[var(--theme-border)] p-4">
+        <SkeletonBlock className="h-5 w-44 rounded-full" />
+        {Array.from({ length: 3 }, (_, index) => (
+          <div
+            key={index}
+            className="mt-4 grid gap-3 rounded-lg border border-[var(--theme-border)] p-4 sm:grid-cols-[minmax(0,1fr)_7rem]"
+          >
+            <div className="space-y-2">
+              <SkeletonBlock className="h-4 w-3/5 rounded-full" />
+              <SkeletonBlock className="h-3.5 w-2/5 rounded-full opacity-70" />
+            </div>
+            <SkeletonBlock className="h-9 rounded-lg" />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <SkeletonBlock className="h-11 w-36 rounded-lg" />
+      </div>
+    </div>
   );
 }

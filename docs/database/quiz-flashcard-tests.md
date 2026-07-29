@@ -91,6 +91,7 @@ id uuid pk
 student_user_id uuid fk users.id
 lesson_id uuid fk lessons.id
 quiz_set_id uuid fk quiz_sets.id
+source_attempt_id uuid? fk quiz_attempts.id
 status AttemptStatus default IN_PROGRESS
 started_at timestamp
 submitted_at timestamp?
@@ -118,6 +119,21 @@ Constraint:
 
 Rules:
 
+- Khi start, mỗi câu được phép trong attempt có một answer placeholder nội bộ.
+  Placeholder này chốt tập question ID ở server và chưa được tính là câu đã trả
+  lời. Khi submit, payload phải chứa đúng một answer cho mọi placeholder; server
+  chấm lại và thay toàn bộ placeholder trong cùng transaction với việc submit.
+- Attempt `ALL` có `source_attempt_id=null` là kết quả gốc. Mọi attempt có
+  `source_attempt_id` là lượt phụ và trỏ tới attempt cha trực tiếp, nên chuỗi
+  retry giữ được đúng bộ câu của từng lượt.
+- Khi submit attempt phụ, row attempt đó vẫn giữ
+  `correct_count`/`wrong_count`/`total_count` của chính lượt làm. Server đồng
+  thời lần về attempt gốc và chỉ thay các answer đang sai bằng answer đúng mới,
+  rồi tính lại thống kê toàn bài trên attempt gốc. Câu đã đúng không bị hạ
+  thành sai bởi một retry cũ hoặc request đồng thời.
+- Attempt `ALL` mới không có liên kết nguồn trở thành kết quả gốc hiện hành mới
+  và không cộng dồn với kết quả trước đó. Attempt `ALL` có liên kết nguồn chỉ
+  làm lại toàn bộ tập câu của lượt cha và vẫn thuộc chuỗi retry hiện tại.
 - Với `MULTI_STATEMENT_TRUE_FALSE`, `answer_json` lưu mảng
   `{ statementId: string, value: boolean }`.
 - Mỗi mệnh đề có trọng số bằng nhau trong phạm vi điểm của câu. Cấp Quiz coi
@@ -194,6 +210,13 @@ updated_at timestamp
 Constraint:
 
 - unique `(student_user_id, flashcard_id)`.
+
+Rules:
+
+- Mỗi lần student đánh dấu đã thuộc/chưa thuộc đều upsert record, tăng
+  `review_count` và cập nhật `last_reviewed_at`.
+- Flashcard prerequisite hoàn thành khi mọi card được duyệt của ít nhất một set
+  không dự phòng đã có `review_count > 0`; không yêu cầu mọi `is_known=true`.
 
 ---
 
@@ -294,7 +317,8 @@ WHERE is_best_for_lesson = true;
 
 Rules:
 
-- Cập nhật best attempt phải chạy trong transaction.
+- Submit chỉ lưu/chấm attempt. Cập nhật best chỉ xảy ra khi student chủ động
+  `use-result` với attempt đạt ngưỡng và phải chạy trong transaction.
 - Best result ưu tiên điểm cao hơn; nếu bằng điểm, thời gian làm nhanh hơn.
 - `lesson_progress.best_test_attempt_id` là nguồn chính; `is_best_for_lesson` là denormalized để query nhanh.
 
@@ -316,6 +340,8 @@ Constraint:
 
 Rules:
 
+- Khi start, answer placeholder chốt tập câu của đề. Timer auto-submit có thể
+  thay placeholder bằng marker unanswered hợp lệ để lưu câu 0 điểm.
 - Với `MULTI_STATEMENT_TRUE_FALSE`, `answer_json` lưu mảng
   `{ statementId: string, value: boolean }`.
 - Nếu câu có `N` mệnh đề và điểm hiệu lực là `P`, mỗi mệnh đề đúng nhận `P / N`,

@@ -116,10 +116,10 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Public landing, public course list/detail | `M3.5`                 | `M3.3`                            | `M1.3`                    | -                                             | Tạm hoãn sang pass sau; pass hiện tại của `M3.5` ưu tiên student browsing trước. CTA mua/học thử nối thật ở `M8.4`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Login/register/forgot/reset password      | `M2.4`                 | `M2.2`, `M2.3`                    | `M1.2`                    | -                                             | Gồm session UI, form validation và forgot/reset flow.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Student course list/detail                | `M3.5`                 | `M3.3`                            | `M1.3`                    | -                                             | Chỉ browse/detail và trạng thái học thử/enrollment nếu API `M3.3` trả; CTA/payment thật nối ở `M8.4`, không kéo `M8.2`/`M8.3` vào `M3.5`.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Student lesson page skeleton              | `M7.1`                 | `M7.1`, `M6.5`                    | `M1.3`, `M1.4`            | `M4.4`, `M5.x` khi có tài liệu/AI             | Chỉ skeleton lesson; quiz/flashcard/test/AI tách task riêng.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Quiz runner                               | `M7.2`                 | `M7.2`                            | `M1.4`                    | `M9.5` nếu có giải thích AI                   | CRUD câu hỏi admin ở `M6.2`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Flashcard deck                            | `M7.3`                 | `M7.3`                            | `M1.4`                    | `M9.5` nếu có giải thích AI                   | CRUD flashcard admin ở `M6.3`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Test runner/review                        | `M7.4`                 | `M7.4`                            | `M1.4`                    | -                                             | CRUD đề kiểm tra admin ở `M6.4`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Student lesson page                       | `M7.1-M7.5`            | `M7.1-M7.5`, `M6.5`               | `M1.3`, `M1.4`            | `M4.4`, `M5.x` khi có tài liệu/AI             | Core learning Done; tab Bài học mở summary, có previous/next và panel Quiz/Flashcard/Test dùng API thật.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Quiz runner                               | `M7.2`                 | `M7.2`                            | `M1.4`                    | `M9.5` nếu có giải thích AI                   | Done; hint/check local tức thì không gọi API từng câu, batch submit, explanation chủ động, review/retry tất cả hoặc câu sai.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Flashcard deck                            | `M7.3`                 | `M7.3`                            | `M1.4`                    | `M9.5` nếu có giải thích AI                   | Done; panel vào bài dùng CTA Bắt đầu/Tiếp tục/Xem lại, runner và kết quả toàn màn hình đồng nhất Quiz, progress/favorite, review tất cả/chưa thuộc/yêu thích.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Test runner/review                        | `M7.4-M7.5`            | `M7.4-M7.5`                       | `M1.4`                    | -                                             | Done; prerequisite gate, timer, review, use-result, completion và Top 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Student dashboard                         | `M7.7`                 | `M7.5`, `M10.1`, `M13.1`          | `M1.3`, `M1.4`, `M1.5`    | `M10.5`, `M13.1`                              | Notification/XP thật phụ thuộc `M10.x`, `M13.x`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Student notes/private comments            | `M7.6`                 | `M7.6`                            | `M1.4`                    | -                                             | Comment là private dưới video, không phải chat realtime.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Student smart video learning              | `M15.1-M15.7`          | `M15.1-M15.7`                     | `M15.1-M15.3`, `M15.7`    | `M3.8`, `M5.x`, `M9.x`                        | Ưu tiên sau core lesson/quiz/test. Gồm resume, watched progress, timestamp note, checkpoint/mastery, contextual AI, semantic search và adaptive review; không đổi completion rule `M7.5`.                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -231,6 +231,10 @@ Hiển thị:
 - Trạng thái từng buổi: chưa học, đang học, hoàn thành, bị khóa.
 - Nếu enrollment đang dùng bản cá nhân, hiển thị badge nhỏ `Lộ trình cá nhân`; URL/course card vẫn đại diện cho khóa gốc đã mua.
 - Không hiển thị công cụ quản trị, source clone ID hoặc private slug cho student.
+- Mọi CTA/link trực tiếp tới một buổi học (`Vào học`, `Học thử`, `Học tiếp`,
+  tên lesson có quyền truy cập) dùng transition toàn màn hình random trước khi
+  mở lesson. Transition hiển thị `Học thông minh - Vững tương lai`, tránh lặp
+  biến thể gần nhất và chạy song song với route/API prefetch.
 
 ### 4.4. Trang buổi học student
 
@@ -243,13 +247,10 @@ Main content:
   - Smart video toolbar: tiếp tục học, watched progress, ghi chú timestamp
   - Transcript/chapter panel: search, active cue, checkpoint, chapter mastery
   - Contextual actions: Hỏi đoạn này, Em chưa hiểu, xem lại đề xuất
-  - Phiếu tài liệu trước buổi học
-  - Tóm tắt bài học
+  - Tab Bài học mở thẳng tóm tắt kiến thức trọng tâm
   - Quiz section
   - Flashcard section
   - Test section
-  - Notes section
-  - Private video comments
   - AI chat panel
 Sidebar:
   - Lesson navigation
@@ -259,7 +260,21 @@ Sidebar:
 
 Rules:
 
+- Video bài giảng là nội dung chính luôn nằm trước thanh tab
+  Bài học/Quiz/Flashcard/Kiểm tra; tab `Bài học` chỉ quyết định phần nội dung
+  summary bên dưới, không được làm mất video.
+- Nút bài trước/bài tiếp theo cũng dùng cùng transition toàn màn hình và
+  prefetch lesson đích ngay khi click. Chỉ điều hướng sau khi transition che
+  kín và dữ liệu lesson cốt lõi đã sẵn trong cache; transition mở ra sau khi
+  route đích commit.
+- Copy của transition phải bám đúng ngữ cảnh: transition điều hướng vào lesson
+  dùng `Học thông minh - Vững tương lai`, còn transition mở runner nội bộ giữ
+  `Đang chuẩn bị Quiz...` hoặc `Đang chuẩn bị Flashcard...`; không thay đồng
+  loạt ba loại copy này.
 - Trước `exam_open_at`, test section hiển thị countdown hoặc thông báo chưa mở.
+- Sau giờ mở, Test vẫn khóa đến khi một Quiz đã submit và toàn bộ thẻ trong ít
+  nhất một bộ Flashcard đã review. Khi đủ điều kiện, giữ lời nhắc cùng action
+  quay lại ôn Quiz và Flashcard.
 - Nếu không có quyền truy cập, hiển thị paywall/trial message.
 - Chat AI chỉ có input text.
 - Smart video controls chỉ hiện sau khi video/lesson foundation sẵn sàng; thiếu transcript thì ẩn tính năng phụ thuộc transcript nhưng không chặn player.
@@ -273,10 +288,60 @@ Component:
 - Question card.
 - Multiple choice/true false/text input renderer.
 - Formula renderer.
+- Text input có biểu tượng mở trình nhập toán trực quan dùng chung UI MathLive
+  với màn admin. Preset học sinh gồm số `0-9`, dấu trừ để nhập số âm, dấu thập
+  phân, phân số, căn và số mũ; vẫn giữ ô text thường cho đáp án không phải công
+  thức. Khi mở bàn phím toán, vùng MathLive nằm ngay tại vị trí ô đáp án và bảng
+  phím mở bên dưới; không được nhân đôi thêm một ô nhập công thức.
 - Submit button.
+- Nút `Gợi ý` chủ động; không tự mở hint.
+- Mỗi chấm trong dải trạng thái là một nút điều hướng trực tiếp tới câu tương
+  ứng. Giữ nguyên mã màu đúng/sai/chưa kiểm tra, biểu diễn riêng câu hiện tại và
+  có nhãn truy cập mô tả số câu cùng trạng thái.
+- `Kiểm tra đáp án` chỉ bật khi answer đầy đủ; feedback màu và action mở lời
+  giải chỉ xuất hiện sau khi kiểm tra. Thao tác này chấm local từ grading data
+  đã tải cùng attempt và không có pending network.
+- Nhãn `Đã làm` đếm các câu có answer đầy đủ theo đúng loại câu, kể cả khi chưa
+  bấm `Kiểm tra đáp án`.
+- Ở câu cuối, `Hoàn thành` vẫn cho bấm. Nếu còn câu chưa có answer đầy đủ, runner không
+  submit và hiển thị cảnh báo inline liệt kê đúng số thứ tự các câu cần hoàn
+  thành; danh sách cập nhật trực tiếp theo answer hiện có. Nếu mọi answer đã
+  đầy đủ, frontend gửi toàn bộ answer trong một request submit để backend chấm
+  lại và lưu chính thức. Bấm `Câu trước` phải đóng cảnh báo, không tự hiện lại
+  khi quay về câu cuối.
+- Nút quay lại trong runner của attempt chưa submit mở modal xác nhận
+  `Bạn chưa hoàn thành xong bài Quiz. Vẫn thoát chứ?`; `Ở lại` giữ nguyên
+  runner và `Vẫn thoát` mới quay về panel Quiz. Khi vào Quiz lại, frontend phải
+  resume attempt `IN_PROGRESS` thay vì tạo lượt mới.
+- Browser Back trong runner cũng mở modal xác nhận. Hủy thoát phải khôi phục
+  history entry của runner; xác nhận thoát phải dừng ở trang chi tiết buổi học
+  hiện tại, không quay về trang chi tiết khóa học.
+- Refresh/F5 hoặc thoát runner rồi vào lại chỉ khôi phục câu đã bấm
+  `Kiểm tra đáp án`; mọi text, công thức, lựa chọn trắc nghiệm hoặc trạng thái
+  Đúng/Sai chưa kiểm tra phải trở về rỗng. Vị trí câu hiện tại vẫn được giữ để
+  runner mở lại đúng câu. F5 chỉ tự mở lại runner nếu student đang đứng trong
+  runner; sau khi đã xác nhận thoát về panel Quiz, F5 phải giữ nguyên panel và
+  CTA trên panel mới resume attempt đang dở. Feedback chưa submit chỉ khôi phục
+  trên cùng trình duyệt vì được lưu local theo `attemptId`.
+- CTA panel Quiz lấy trạng thái attempt từ server và ghép tiến độ local: lượt
+  hiện tại chưa có câu nào được
+  kiểm tra dùng `Bắt đầu`; đã kiểm tra ít nhất một câu dùng
+  `Tiếp tục vào làm`; đã submit và không còn lượt đang làm dùng `Xem lại`.
+- Trạng thái đã hoàn thành hiển thị thêm action `Làm bộ Quiz mới` để tạo lượt
+  đầy đủ mới của bộ quiz hiện tại. `Xem lại` mở màn kết quả của lượt submit gần
+  nhất; student chọn xem lại tất cả hoặc các câu sai từ màn kết quả.
+- F5 khi đang ở result giữ nguyên màn result bằng history marker của attempt
+  gốc; dữ liệu summary vẫn được đối chiếu với server và không chạy lại confetti.
+  Khi student chủ động quay về panel Quiz, marker result phải được xóa để F5 giữ
+  panel.
 - Result summary.
-- Buttons: làm lại tất cả, làm lại câu sai, làm bộ khác.
-- Inline explanation block.
+- Result không liệt kê câu sai; có xem lại/làm lại tất cả hoặc câu sai.
+- `Làm lại câu sai` giữ số câu gốc trong runner. Sau khi hoàn thành, result
+  summary luôn hiển thị thống kê cộng dồn của toàn bộ bài Quiz gốc; không có
+  summary riêng cho lượt con.
+- Mọi action xem lại/làm lại trên result dùng kết quả gốc đã cộng dồn.
+  `Làm lại tất cả` mở một lượt đầy đủ mới và reset kết quả.
+- Inline explanation block chỉ mở khi student bấm xem lời giải.
 - Report button từng câu.
 - Favorite button từng câu.
 
@@ -287,8 +352,16 @@ Component:
 - Card front/back.
 - Flip animation.
 - Buttons: đã thuộc, chưa thuộc.
+- Dải chấm trạng thái là control điều hướng trực tiếp tới từng thẻ; thẻ hiện tại
+  kéo dài, đã thuộc màu xanh, chưa thuộc màu đỏ và chưa đánh dấu màu xám.
+- Nút `Hoàn thành` vẫn cho bấm ở thẻ cuối; nếu còn thẻ chưa đánh dấu, giữ nguyên
+  runner và hiển thị alert inline liệt kê số thứ tự các thẻ cần xử lý.
 - Summary: đã thuộc/chưa thuộc.
-- Buttons: ôn lại tất cả, ôn lại câu chưa thuộc, học bộ khác.
+- Summary không liệt kê thẻ cần ôn; chỉ có ôn lại tất cả và ôn lại thẻ chưa
+  thuộc.
+- `Ôn lại tất cả` mở lượt mới từ thẻ đầu, reset tiến độ hiển thị, bộ đếm và nhãn
+  lựa chọn của phiên; không hiển thị lại nhãn từ progress lịch sử trước khi thẻ
+  được đánh dấu trong lượt mới.
 - Inline explanation.
 - Report/favorite từng card.
 
@@ -307,8 +380,11 @@ Component:
 Rules:
 
 - Không hiển thị đáp án đúng trước submit.
-- Không cho start trước giờ mở.
-- Nếu hết giờ, TODO: chốt auto-submit hay cảnh báo. ASSUMPTION: MVP auto-submit khi hết giờ nếu answer state còn ở client.
+- Không cho start trước giờ mở hoặc trước khi hoàn thành Quiz + Flashcard.
+- Hết giờ tự submit; câu chưa trả lời nhận 0 điểm.
+- Review summary không liệt kê sẵn câu hỏi; action xem lại mới mở từng câu.
+- Kết quả chưa đạt hiển thị cảnh báo làm lại và không cho dùng kết quả.
+- `Dùng điểm bài này` mới cập nhật completion và mở Completion + Top 5.
 
 ### 4.8. AI chat panel
 
@@ -323,6 +399,8 @@ Component:
 Không có upload file/ảnh.
 
 ### 4.9. Notes và private comments
+
+Chưa triển khai trong pass M7 core theo yêu cầu owner; giữ scope cho `M7.6`.
 
 - Notes: rich text + ảnh.
 - Private video comments: comment riêng của student trong lesson video.

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { AppToaster } from "@/app/toaster";
 import { AuthenticatedRouteGuard } from "@/components/common/auth/authenticated-route-guard";
 import { getServerThemeMode } from "@/lib/server-theme";
 import "@/app/(admin)/admin-theme.css";
@@ -16,7 +15,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <AuthenticatedRouteGuard allowedRoles={["ADMIN"]}>
         {children}
       </AuthenticatedRouteGuard>
-      <AppToaster />
     </div>
   );
 }

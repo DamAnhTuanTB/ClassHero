@@ -15,6 +15,7 @@ import type {
   SortDirection,
   ViewState,
 } from "@/features/admin/courses/admin-courses-types";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 type AdminCoursesContentProps = {
   allFilteredPathsSelected: boolean;
@@ -32,6 +33,7 @@ type AdminCoursesContentProps = {
   onClearSelected: () => void;
   onCreatePath: () => void;
   onEditPath: (pathId: string) => void;
+  onPrefetchPath: (pathId: string) => void;
   onGradeChange: (value: number | "ALL") => void;
   onQueryChange: (value: string) => void;
   onRequestDeleteSelected: () => void;
@@ -59,6 +61,7 @@ export function AdminCoursesContent({
   onClearSelected,
   onCreatePath,
   onEditPath,
+  onPrefetchPath,
   onGradeChange,
   onQueryChange,
   onRequestDeleteSelected,
@@ -69,16 +72,24 @@ export function AdminCoursesContent({
   onToggleSelectAll,
   onToggleSort,
 }: AdminCoursesContentProps) {
+  const isInitialPending = viewState === "loading";
+  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
+
   return (
     <section className="mt-5">
-      {viewState === "loading" ? (
-        <LoadingState
-          title="Đang tải danh sách khóa học"
-          description="ClassHero đang lấy dữ liệu khóa học mới nhất."
-        />
+      {isInitialPending || shouldShowInitialLoading ? (
+        shouldShowInitialLoading ? (
+          <LoadingState
+            title="Đang tải danh sách khóa học"
+            description="ClassHero đang lấy dữ liệu khóa học mới nhất."
+            variant="list"
+          />
+        ) : (
+          <div aria-busy="true" className="min-h-80 lg:min-h-[calc(100svh-16rem)]" />
+        )
       ) : null}
       {viewState === "error" ? <ErrorState onRetry={onRetryLoad} /> : null}
-      {viewState === "ready" ? (
+      {viewState === "ready" && !shouldShowInitialLoading ? (
         <div className="min-w-0">
           <FilterBar
             isDarkTheme={isDarkTheme}
@@ -105,6 +116,7 @@ export function AdminCoursesContent({
               onArchivePath={onArchivePath}
               onClearSelected={onClearSelected}
               onEditPath={onEditPath}
+              onPrefetchPath={onPrefetchPath}
               onRequestDeleteSelected={onRequestDeleteSelected}
               onSelectPath={onSelectPath}
               onToggleSelectAll={onToggleSelectAll}

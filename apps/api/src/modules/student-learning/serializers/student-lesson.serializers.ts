@@ -7,6 +7,7 @@ import type {
   StudentQuizSetRecord,
   StudentTestSetRecord,
 } from "#api/modules/student-learning/types/student-lesson.types";
+import type { StudentTestPrerequisiteStatus } from "#api/modules/student-learning/types/student-learning-prerequisite.types";
 
 export function serializeStudentLessonContent(
   record: StudentLessonContentRecord,
@@ -101,13 +102,22 @@ export function serializeStudentQuizSet(record: StudentQuizSetRecord) {
 
 export function serializeStudentTestStatus(
   records: StudentTestSetRecord[],
-  examOpenAt: Date | null,
-  access: StudentLessonAccessContext,
+  prerequisites: StudentTestPrerequisiteStatus,
+  bestAttempt: {
+    id: string;
+    score: { toString(): string } | null;
+    durationSeconds: number | null;
+  } | null,
 ) {
   return {
-    canStart: canStudentStartTest(examOpenAt, access),
-    examOpenAt,
-    bestAttempt: null,
+    ...prerequisites,
+    bestAttempt: bestAttempt
+      ? {
+          id: bestAttempt.id,
+          score: bestAttempt.score ? Number(bestAttempt.score) : null,
+          durationSeconds: bestAttempt.durationSeconds,
+        }
+      : null,
     sets: records.map((record) => serializeStudentTestSet(record)),
   };
 }

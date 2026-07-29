@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   outputDir: "../../.codex/playwright-results",
+  timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -39,8 +40,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command:
-      "pnpm exec next build && pnpm exec next start --hostname localhost --port 3000",
+    command: "pnpm build && pnpm exec next start --hostname localhost --port 3000",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

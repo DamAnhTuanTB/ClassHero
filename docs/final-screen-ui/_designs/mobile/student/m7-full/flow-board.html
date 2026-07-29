@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>M7 Student Learning Flow</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, system-ui, sans-serif; background:#eef7ff; color:#12243e; }
+      * { box-sizing:border-box; }
+      body { margin:0; padding:32px; }
+      header, section { max-width:1600px; margin:0 auto; }
+      header { padding:28px; border:1px solid #cce7fb; border-radius:24px; background:white; }
+      h1 { margin:0; font-size:32px; } h2 { margin:0 0 18px; font-size:24px; }
+      p { line-height:1.6; color:#56708d; }
+      nav { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      nav a { padding:9px 12px; border-radius:10px; background:#e8f5ff; color:#0876d8; font-weight:800; text-decoration:none; }
+      section { margin-top:28px; padding:24px; border:1px solid #cce7fb; border-radius:24px; background:#f8fcff; }
+      .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,360px)); justify-content:start; gap:22px; }
+      .node { overflow:hidden; border:1px solid #d8e7f4; border-radius:20px; background:white; box-shadow:0 20px 45px -38px #167bd0; }
+      .node-copy { padding:16px 17px 18px; }
+      .number { display:inline-grid; min-width:30px; height:30px; place-items:center; padding:0 7px; border-radius:9px; background:#1688f8; color:white; font-weight:900; }
+      .state { margin-left:7px; color:#0876d8; font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+      h3 { margin:10px 0 4px; font-size:17px; }
+      .guide { margin:0; font-size:13px; }
+      .node a { display:block; padding:14px; background:#eaf6ff; }
+      .node img { display:block; width:100%; height:auto; border-radius:14px; border:1px solid #dbe9f4; }
+      .branch { border-style:dashed; background:#fffaf0; }
+      @media (max-width:600px) { body{padding:14px} header,section{padding:17px}.grid{grid-template-columns:1fr} }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>M7 · Student Learning Flow</h1>
+      <p>Mobile 390 × 844 · Lesson, Quiz, Flashcard, Test, Completion. Notes, Dashboard và màn Personalized riêng không thuộc lượt triển khai này.</p>
+      <nav>
+        <a href="#access">Lesson access</a><a href="#quiz">Quiz</a><a href="#flashcard">Flashcard</a>
+        <a href="#test">Test</a><a href="#states">System states</a>
+      </nav>
+    </header>
+
+    <section id="access"><h2>1. Lesson access</h2><div class="grid">
+      <article class="node"><div class="node-copy"><span class="number">01</span><span class="state">Main</span><h3>Lesson enrolled</h3><p class="guide">Có enrollment → mở tab Bài học → xem video và tóm tắt trọng tâm, không hiện danh sách tài liệu.</p></div><a href="01-lesson-enrolled/screen.png"><img src="01-lesson-enrolled/screen.png" alt="Lesson enrolled" /></a></article>
+      <article class="node"><div class="node-copy"><span class="number">02</span><span class="state">Trial</span><h3>Lesson trial</h3><p class="guide">Lesson cho học thử → đọc nội dung an toàn → Test vẫn bị khóa.</p></div><a href="02-lesson-trial/screen.png"><img src="02-lesson-trial/screen.png" alt="Lesson trial" /></a></article>
+      <article class="node branch"><div class="node-copy"><span class="number">03</span><span class="state">Blocked</span><h3>Lesson paywall</h3><p class="guide">Không enrollment/trial → từ chối nội dung → quay lại khóa học hoặc mua quyền học.</p></div><a href="03-lesson-paywall/screen.png"><img src="03-lesson-paywall/screen.png" alt="Lesson paywall" /></a></article>
+    </div></section>
+
+    <section id="quiz"><h2>2. Quiz</h2><div class="grid">
+      <article class="node"><div class="node-copy"><span class="number">04</span><span class="state">Input</span><h3>Quiz runner</h3><p class="guide">Chọn đáp án → tùy chọn mở Gợi ý → bấm Kiểm tra đáp án → nhận màu đúng/sai và nút lời giải.</p></div><a href="04-quiz-runner/screen.png"><img src="04-quiz-runner/screen.png" alt="Quiz runner" /></a></article>
+      <article class="node"><div class="node-copy"><span class="number">05</span><span class="state">Result</span><h3>Quiz result</h3><p class="guide">Submit → xem thống kê gọn → xem lại hoặc làm lại tất cả/câu sai, không hiện danh sách sai.</p></div><a href="05-quiz-result/screen.png"><img src="05-quiz-result/screen.png" alt="Quiz result" /></a></article>
+    </div></section>
+
+    <section id="flashcard"><h2>3. Flashcard</h2><div class="grid">
+      <article class="node"><div class="node-copy"><span class="number">06</span><span class="state">Input</span><h3>Flashcard study</h3><p class="guide">Lật thẻ → đánh dấu đã/chưa thuộc → progress lưu theo student/card.</p></div><a href="06-flashcard-study/screen.png"><img src="06-flashcard-study/screen.png" alt="Flashcard study" /></a></article>
+      <article class="node"><div class="node-copy"><span class="number">07</span><span class="state">Result</span><h3>Flashcard summary</h3><p class="guide">Kết thúc lượt ôn → xem số liệu → chỉ còn Ôn lại tất cả hoặc thẻ chưa thuộc.</p></div><a href="07-flashcard-summary/screen.png"><img src="07-flashcard-summary/screen.png" alt="Flashcard summary" /></a></article>
+    </div></section>
+
+    <section id="test"><h2>4. Test và hoàn thành lesson</h2><div class="grid">
+      <article class="node branch"><div class="node-copy"><span class="number">08</span><span class="state">Gate</span><h3>Test locked</h3><p class="guide">Đã đến giờ nhưng thiếu Quiz/Flashcard → tiếp tục khóa → redirect về đúng phần để ôn.</p></div><a href="08-test-locked/screen.png"><img src="08-test-locked/screen.png" alt="Test locked" /></a></article>
+      <article class="node"><div class="node-copy"><span class="number">09</span><span class="state">Input</span><h3>Test runner</h3><p class="guide">Đủ điều kiện → bắt đầu bộ đề → trả lời trong thời gian giới hạn → submit server-side.</p></div><a href="09-test-runner/screen.png"><img src="09-test-runner/screen.png" alt="Test runner" /></a></article>
+      <article class="node"><div class="node-copy"><span class="number">10</span><span class="state">Passed</span><h3>Test review đạt</h3><p class="guide">Điểm đạt → xem lại/làm đề mới → chọn Dùng điểm bài này để cập nhật best/completion.</p></div><a href="10-test-review/screen.png"><img src="10-test-review/screen.png" alt="Test review passed" /></a></article>
+      <article class="node branch"><div class="node-copy"><span class="number">10B</span><span class="state">Failed</span><h3>Test review chưa đạt</h3><p class="guide">Điểm dưới ngưỡng → cảnh báo bắt buộc làm lại → Dùng điểm bài này bị khóa.</p></div><a href="10b-test-review-failed/screen.png"><img src="10b-test-review-failed/screen.png" alt="Test review failed" /></a></article>
+      <article class="node"><div class="node-copy"><span class="number">11</span><span class="state">Success</span><h3>Completion và Top 5</h3><p class="guide">Dùng kết quả đạt → transaction cập nhật best/progress → hiển thị hoàn thành và Top 5.</p></div><a href="11-completion-leaderboard/screen.png"><img src="11-completion-leaderboard/screen.png" alt="Completion and top five" /></a></article>
+    </div></section>
+
+    <section id="states"><h2>5. System states</h2><div class="grid">
+      <article class="node"><div class="node-copy"><span class="number">12</span><span class="state">Loading</span><h3>Lesson loading</h3><p class="guide">Đọc session và tải aggregate/progress → skeleton ổn định → thay bằng lesson thật.</p></div><a href="12-lesson-loading/screen.png"><img src="12-lesson-loading/screen.png" alt="Lesson loading" /></a></article>
+      <article class="node branch"><div class="node-copy"><span class="number">13</span><span class="state">Error</span><h3>Content error</h3><p class="guide">API/network lỗi → giữ progress an toàn → cho thử lại hoặc quay về lộ trình.</p></div><a href="13-content-error/screen.png"><img src="13-content-error/screen.png" alt="Content error" /></a></article>
+    </div></section>
+  </body>
+</html>

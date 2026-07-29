@@ -3,6 +3,7 @@ import {
   AiExplanationTargetType,
   ContentSource,
   Difficulty,
+  FavoriteTargetType,
   Prisma,
   ReviewStatus,
 } from "@prisma/client";
@@ -32,6 +33,7 @@ import {
   toFlashcardRecord,
 } from "#api/modules/flashcards/utils/flashcard-json";
 import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
+import type { ToggleStudentFavoriteDto } from "#api/modules/flashcards/dto/student-flashcard-progress.dto";
 
 @Injectable()
 export class FlashcardsService {
@@ -404,7 +406,202 @@ export class FlashcardsService {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: studentFlashcardSetSelect,
     });
-    return records.map(serializeStudentFlashcardSet);
+    const cardIds = records.flatMap((record) =>
+      record.flashcards.map((flashcard) => flashcard.id),
+    );
+    const [progressEntries, favoriteEntries] = await Promise.all([
+      cardIds.length === 0
+        ? []
+        : this.prisma.flashcardProgress.findMany({
+            where: {
+              studentUserId,
+              flashcardId: { in: cardIds },
+            },
+            select: {
+              flashcardId: true,
+              isKnown: true,
+              lastReviewedAt: true,
+              reviewCount: true,
+            },
+          }),
+      cardIds.length === 0
+        ? []
+        : this.prisma.favorite.findMany({
+            where: {
+              studentUserId,
+              lessonId,
+              targetType: FavoriteTargetType.FLASHCARD,
+              targetId: { in: cardIds },
+            },
+            select: { targetId: true },
+          }),
+    ]);
+    const progressByCardId = new Map(
+      progressEntries.map(({ flashcardId, ...progress }) => [flashcardId, progress]),
+    );
+    const favoriteCardIds = new Set(favoriteEntries.map((favorite) => favorite.targetId));
+
+    return records.map((record) =>
+      serializeStudentFlashcardSet(record, progressByCardId, favoriteCardIds),
+    );
+  }
+
+  async updateStudentProgress(
+    flashcardId: string,
+    studentUserId: string,
+    isKnown: boolean,
+  ) {
+    const flashcard = await this.prisma.flashcard.findFirst({
+      where: {
+        id: flashcardId,
+        deletedAt: null,
+        reviewStatus: ReviewStatus.APPROVED,
+        flashcardSet: {
+          deletedAt: null,
+          isReserve: false,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+      },
+      select: {
+        id: true,
+        lessonId: true,
+        flashcardSetId: true,
+      },
+    });
+    if (!flashcard) {
+      throw notFoundException("FLASHCARD_NOT_FOUND", "Không tìm thấy flashcard");
+    }
+    await this.studentLessonAccessService.assertCanRead(
+      flashcard.lessonId,
+      studentUserId,
+    );
+    const reviewedAt = new Date();
+    const progress = await this.prisma.flashcardProgress.upsert({
+      where: {
+        studentUserId_flashcardId: {
+          studentUserId,
+          flashcardId,
+        },
+      },
+      create: {
+        studentUserId,
+        lessonId: flashcard.lessonId,
+        flashcardId,
+        isKnown,
+        lastReviewedAt: reviewedAt,
+        reviewCount: 1,
+      },
+      update: {
+        isKnown,
+        lastReviewedAt: reviewedAt,
+        reviewCount: { increment: 1 },
+      },
+      select: {
+        flashcardId: true,
+        isKnown: true,
+        lastReviewedAt: true,
+        reviewCount: true,
+      },
+    });
+
+    return {
+      ...progress,
+      setProgress: await this.getStudentSetProgressSummary(
+        flashcard.flashcardSetId,
+        studentUserId,
+      ),
+    };
+  }
+
+  async toggleStudentFavorite(studentUserId: string, input: ToggleStudentFavoriteDto) {
+    await this.studentLessonAccessService.assertCanRead(input.lessonId, studentUserId);
+    const targetExists =
+      input.targetType === FavoriteTargetType.FLASHCARD
+        ? await this.prisma.flashcard.findFirst({
+            where: {
+              id: input.targetId,
+              lessonId: input.lessonId,
+              deletedAt: null,
+              reviewStatus: ReviewStatus.APPROVED,
+            },
+            select: { id: true },
+          })
+        : await this.prisma.quizQuestion.findFirst({
+            where: {
+              id: input.targetId,
+              lessonId: input.lessonId,
+              deletedAt: null,
+              reviewStatus: ReviewStatus.APPROVED,
+            },
+            select: { id: true },
+          });
+    if (!targetExists) {
+      throw notFoundException(
+        "FAVORITE_TARGET_NOT_FOUND",
+        "Không tìm thấy nội dung cần lưu",
+      );
+    }
+
+    const key = {
+      studentUserId_targetType_targetId: {
+        studentUserId,
+        targetType: input.targetType,
+        targetId: input.targetId,
+      },
+    };
+    const existing = await this.prisma.favorite.findUnique({
+      where: key,
+      select: { id: true },
+    });
+    if (existing) {
+      await this.prisma.favorite.delete({ where: { id: existing.id } });
+      return { isFavorite: false };
+    }
+    await this.prisma.favorite.create({
+      data: {
+        studentUserId,
+        lessonId: input.lessonId,
+        targetType: input.targetType,
+        targetId: input.targetId,
+      },
+    });
+    return { isFavorite: true };
+  }
+
+  private async getStudentSetProgressSummary(
+    flashcardSetId: string,
+    studentUserId: string,
+  ) {
+    const [cards, progress] = await Promise.all([
+      this.prisma.flashcard.findMany({
+        where: {
+          flashcardSetId,
+          deletedAt: null,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+        select: { id: true },
+      }),
+      this.prisma.flashcardProgress.findMany({
+        where: {
+          studentUserId,
+          flashcard: {
+            flashcardSetId,
+            deletedAt: null,
+            reviewStatus: ReviewStatus.APPROVED,
+          },
+        },
+        select: { isKnown: true },
+      }),
+    ]);
+    const knownCount = progress.filter((entry) => entry.isKnown).length;
+    return {
+      totalCount: cards.length,
+      reviewedCount: progress.length,
+      knownCount,
+      unknownCount: progress.length - knownCount,
+      unreviewedCount: cards.length - progress.length,
+      isCompleted: cards.length === 0 || progress.length === cards.length,
+    };
   }
 
   private async findActiveSet(setId: string) {

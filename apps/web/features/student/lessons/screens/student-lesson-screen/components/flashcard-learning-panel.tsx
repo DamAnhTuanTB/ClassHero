@@ -1,0 +1,544 @@
+"use client";
+
+import { useReducedMotion } from "framer-motion";
+import { Brain, Eye, Loader2, Play, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import {
+  toggleFlashcardFavorite,
+  updateFlashcardProgress,
+} from "@/features/student/lessons/api/student-lessons-api";
+import { FlashcardResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-result-screen";
+import { FlashcardRunnerScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen";
+import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
+import type {
+  FlashcardProgressSummary,
+  StudentFlashcard,
+  StudentFlashcardSet,
+  StudentLesson,
+} from "@/features/student/lessons/types/student-lesson-types";
+import {
+  clearFlashcardRunnerHistoryMarker,
+  clearFlashcardResultHistoryMarker,
+  clearStoredFlashcardSession,
+  getFlashcardRunnerHistorySetId,
+  getFlashcardResultHistorySetId,
+  readStoredFlashcardSession,
+  setFlashcardResultHistoryMarker,
+  writeStoredFlashcardSession,
+} from "@/features/student/lessons/utils/flashcard-runner-history";
+import { getNextLearningSet } from "@/features/student/lessons/utils/learning-set-selection";
+import {
+  pickQuizTransitionVariant,
+  quizTransitionTimings,
+  type QuizTransitionPhase,
+  type QuizTransitionVariant,
+} from "@/features/student/lessons/utils/quiz-transition-variant";
+
+type SessionMode = "ALL" | "FAVORITE" | "UNKNOWN" | "UNREVIEWED";
+type FlashcardScreen = "PANEL" | "RUNNER" | "RESULT";
+
+export function FlashcardLearningPanel({
+  lesson,
+  onProgressChanged,
+  sets,
+  token,
+}: {
+  lesson: StudentLesson;
+  onProgressChanged: () => Promise<void>;
+  sets: StudentFlashcardSet[];
+  token: string;
+}) {
+  const [activeSetId, setActiveSetId] = useState(
+    () =>
+      getFlashcardRunnerHistorySetId() ??
+      getFlashcardResultHistorySetId() ??
+      sets[0]?.id ??
+      "",
+  );
+  const set = sets.find((candidate) => candidate.id === activeSetId) ?? sets[0];
+  const [initialSession] = useState(() =>
+    set
+      ? readStoredFlashcardSession(set.id, new Set(set.flashcards.map((card) => card.id)))
+      : null,
+  );
+  const [screen, setScreen] = useState<FlashcardScreen>(() =>
+    set?.progress.isCompleted && getFlashcardResultHistorySetId() === set.id
+      ? "RESULT"
+      : set && initialSession && getFlashcardRunnerHistorySetId() === set.id
+        ? "RUNNER"
+        : "PANEL",
+  );
+  const [runnerBackDestination, setRunnerBackDestination] = useState<
+    Exclude<FlashcardScreen, "RUNNER">
+  >(initialSession?.backDestination ?? "PANEL");
+  const [sessionCardIds, setSessionCardIds] = useState<string[]>(
+    initialSession?.cardIds ?? [],
+  );
+  const [sessionReviewedIds, setSessionReviewedIds] = useState<Set<string>>(
+    () => new Set(initialSession?.reviewedCardIds),
+  );
+  const sessionReviewedIdsRef = useRef(sessionReviewedIds);
+  const [sessionResumesSavedProgress, setSessionResumesSavedProgress] = useState(
+    initialSession?.resumesSavedProgress ?? false,
+  );
+  const [currentIndex, setCurrentIndex] = useState(initialSession?.currentIndex ?? 0);
+  const [isBackVisible, setIsBackVisible] = useState(
+    initialSession?.isBackVisible ?? false,
+  );
+  const [knownOverrides, setKnownOverrides] = useState<Record<string, boolean>>({});
+  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [shouldCelebrateResult, setShouldCelebrateResult] = useState(false);
+  const [curtainPhase, setCurtainPhase] = useState<QuizTransitionPhase>("idle");
+  const [transitionVariant, setTransitionVariant] =
+    useState<QuizTransitionVariant>("book");
+  const didValidateInitialRunnerMarkerRef = useRef(false);
+  const lastTransitionVariantRef = useRef<QuizTransitionVariant | null>(null);
+  const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (didValidateInitialRunnerMarkerRef.current || !set) return;
+    didValidateInitialRunnerMarkerRef.current = true;
+    if (!initialSession && getFlashcardRunnerHistorySetId() === set.id) {
+      clearFlashcardRunnerHistoryMarker();
+    }
+  }, [initialSession, set]);
+
+  useEffect(() => {
+    sessionReviewedIdsRef.current = sessionReviewedIds;
+  }, [sessionReviewedIds]);
+
+  useEffect(() => {
+    if (!set || sessionCardIds.length === 0 || screen === "RESULT") return;
+
+    writeStoredFlashcardSession(set.id, {
+      backDestination: runnerBackDestination,
+      cardIds: sessionCardIds,
+      currentIndex,
+      isBackVisible,
+      resumesSavedProgress: sessionResumesSavedProgress,
+      reviewedCardIds: Array.from(sessionReviewedIds),
+    });
+  }, [
+    currentIndex,
+    isBackVisible,
+    runnerBackDestination,
+    screen,
+    sessionCardIds,
+    sessionResumesSavedProgress,
+    sessionReviewedIds,
+    set,
+  ]);
+
+  const cardById = useMemo(
+    () => new Map(set?.flashcards.map((card) => [card.id, card]) ?? []),
+    [set],
+  );
+  const sessionCards = useMemo(
+    () =>
+      sessionCardIds.flatMap((cardId) => {
+        const card = cardById.get(cardId);
+        return card ? [card] : [];
+      }),
+    [cardById, sessionCardIds],
+  );
+
+  if (!set) {
+    return <EmptyPanel copy="Bài học này chưa có bộ Flashcard được duyệt." />;
+  }
+  const activeSet = set;
+
+  const progress = buildProgress(activeSet, knownOverrides);
+  const favoriteCardCount = activeSet.flashcards.filter(
+    (card) => favoriteOverrides[card.id] ?? card.isFavorite,
+  ).length;
+  const currentCard = sessionCards[currentIndex];
+  const sessionReviewStatuses = sessionCards.map((card) =>
+    sessionReviewedIds.has(card.id)
+      ? (knownOverrides[card.id] ?? card.progress?.isKnown ?? null)
+      : null,
+  );
+  const sessionKnownCount = sessionReviewStatuses.filter(
+    (status) => status === true,
+  ).length;
+  const hasPendingSession =
+    sessionCards.length > 0 && sessionReviewedIds.size < sessionCards.length;
+  const hasResumableSession =
+    hasPendingSession && (sessionReviewedIds.size > 0 || sessionResumesSavedProgress);
+  const entryActionLabel = hasPendingSession
+    ? hasResumableSession
+      ? "Tiếp tục vào học"
+      : "Bắt đầu"
+    : progress.isCompleted
+      ? "Xem lại"
+      : progress.reviewedCount > 0
+        ? "Tiếp tục vào học"
+        : "Bắt đầu";
+  const EntryActionIcon = progress.isCompleted && !hasPendingSession ? Eye : Play;
+
+  function renderWithCurtain(content: ReactNode) {
+    return (
+      <>
+        {content}
+        <QuizCurtainTransition
+          ariaLabel="Đang chuẩn bị Flashcard"
+          phase={curtainPhase}
+          statusText="Đang chuẩn bị Flashcard..."
+          variant={transitionVariant}
+        />
+      </>
+    );
+  }
+
+  async function transitionTo(action: () => void) {
+    if (pendingAction) return;
+    setPendingAction("start");
+    const nextVariant = pickQuizTransitionVariant(lastTransitionVariantRef.current);
+    lastTransitionVariantRef.current = nextVariant;
+    setTransitionVariant(nextVariant);
+    setCurtainPhase("closing");
+
+    await waitForCurtain(
+      shouldReduceMotion
+        ? quizTransitionTimings.reducedCloseMs
+        : quizTransitionTimings.closeMs,
+    );
+    setCurtainPhase("closed");
+    action();
+    await waitForCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
+    setCurtainPhase("opening");
+    await waitForCurtain(
+      shouldReduceMotion
+        ? quizTransitionTimings.reducedOpenMs
+        : quizTransitionTimings.openMs,
+    );
+    setCurtainPhase("idle");
+    setPendingAction(null);
+  }
+
+  function getCardsForMode(
+    nextMode: SessionMode,
+    targetSet: StudentFlashcardSet = activeSet,
+  ) {
+    if (nextMode === "ALL") return targetSet.flashcards;
+    if (nextMode === "FAVORITE") {
+      return targetSet.flashcards.filter(
+        (card) => favoriteOverrides[card.id] ?? card.isFavorite,
+      );
+    }
+    if (nextMode === "UNKNOWN") {
+      return targetSet.flashcards.filter(
+        (card) => (knownOverrides[card.id] ?? card.progress?.isKnown) !== true,
+      );
+    }
+    return targetSet.flashcards.filter(
+      (card) => !Object.hasOwn(knownOverrides, card.id) && card.progress === null,
+    );
+  }
+
+  function startSession(
+    nextMode: SessionMode,
+    backDestination: Exclude<FlashcardScreen, "RUNNER"> = "PANEL",
+    targetSet: StudentFlashcardSet = activeSet,
+  ) {
+    setShouldCelebrateResult(false);
+    setRunnerBackDestination(backDestination);
+    setActiveSetId(targetSet.id);
+    const nextCards = getCardsForMode(nextMode, targetSet);
+    if (nextCards.length === 0) {
+      clearStoredFlashcardSession(targetSet.id);
+      setFlashcardResultHistoryMarker(targetSet.id);
+      setScreen("RESULT");
+      return;
+    }
+    const nextCardIds = nextCards.map((card) => card.id);
+    const targetProgress = buildProgress(targetSet, knownOverrides);
+    const nextResumesSavedProgress =
+      nextMode === "UNREVIEWED" && targetProgress.reviewedCount > 0;
+    const nextReviewedIds =
+      nextMode === "FAVORITE"
+        ? nextCards.flatMap((card) =>
+            Object.hasOwn(knownOverrides, card.id) || card.progress !== null
+              ? [card.id]
+              : [],
+          )
+        : [];
+    writeStoredFlashcardSession(targetSet.id, {
+      backDestination,
+      cardIds: nextCardIds,
+      currentIndex: 0,
+      isBackVisible: false,
+      resumesSavedProgress: nextResumesSavedProgress,
+      reviewedCardIds: nextReviewedIds,
+    });
+    setSessionCardIds(nextCardIds);
+    setSessionResumesSavedProgress(nextResumesSavedProgress);
+    const nextReviewedIdSet = new Set(nextReviewedIds);
+    sessionReviewedIdsRef.current = nextReviewedIdSet;
+    setSessionReviewedIds(nextReviewedIdSet);
+    setCurrentIndex(0);
+    setIsBackVisible(false);
+    setScreen("RUNNER");
+  }
+
+  function persistSessionPatch({
+    nextCurrentIndex = currentIndex,
+    nextIsBackVisible = isBackVisible,
+    nextReviewedIds = sessionReviewedIdsRef.current,
+  }: {
+    nextCurrentIndex?: number;
+    nextIsBackVisible?: boolean;
+    nextReviewedIds?: ReadonlySet<string>;
+  }) {
+    if (sessionCardIds.length === 0) return;
+    writeStoredFlashcardSession(activeSet.id, {
+      backDestination: runnerBackDestination,
+      cardIds: sessionCardIds,
+      currentIndex: nextCurrentIndex,
+      isBackVisible: nextIsBackVisible,
+      resumesSavedProgress: sessionResumesSavedProgress,
+      reviewedCardIds: Array.from(nextReviewedIds),
+    });
+  }
+
+  function updateCurrentCard(nextIndex: number, nextIsBackVisible = false) {
+    const boundedIndex = Math.min(
+      Math.max(0, nextIndex),
+      Math.max(0, sessionCards.length - 1),
+    );
+    persistSessionPatch({
+      nextCurrentIndex: boundedIndex,
+      nextIsBackVisible,
+    });
+    setCurrentIndex(boundedIndex);
+    setIsBackVisible(nextIsBackVisible);
+  }
+
+  async function handleEntryAction() {
+    if (hasPendingSession) {
+      await transitionTo(() => {
+        if (!hasResumableSession) {
+          setCurrentIndex(0);
+          setIsBackVisible(false);
+        }
+        setScreen("RUNNER");
+      });
+      return;
+    }
+    if (progress.isCompleted) {
+      setFlashcardResultHistoryMarker(activeSet.id);
+      setShouldCelebrateResult(false);
+      setScreen("RESULT");
+      return;
+    }
+    await transitionTo(() =>
+      startSession(progress.reviewedCount > 0 ? "UNREVIEWED" : "ALL"),
+    );
+  }
+
+  async function handleMark(isKnown: boolean) {
+    if (!currentCard || pendingAction) return false;
+    const progressAction = `progress-${isKnown ? "known" : "unknown"}-${currentCard.id}`;
+    setPendingAction(progressAction);
+    try {
+      await updateFlashcardProgress(currentCard.id, isKnown, token);
+      setKnownOverrides((current) => ({ ...current, [currentCard.id]: isKnown }));
+      const nextReviewedIds = new Set(sessionReviewedIdsRef.current);
+      nextReviewedIds.add(currentCard.id);
+      sessionReviewedIdsRef.current = nextReviewedIds;
+      persistSessionPatch({
+        nextIsBackVisible: false,
+        nextReviewedIds,
+      });
+      setSessionReviewedIds(nextReviewedIds);
+      setIsBackVisible(false);
+      void onProgressChanged().catch((error: unknown) => {
+        toast.error("Đã lưu thẻ nhưng chưa làm mới được tiến độ", {
+          description: getErrorMessage(error),
+        });
+      });
+      return true;
+    } catch (error) {
+      toast.error("Chưa lưu được tiến độ thẻ", {
+        description: getErrorMessage(error),
+      });
+      return false;
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleFavorite(card: StudentFlashcard) {
+    if (pendingAction) return;
+    const favoriteAction = `favorite-${card.id}`;
+    setPendingAction(favoriteAction);
+    try {
+      const result = await toggleFlashcardFavorite(lesson.id, card.id, token);
+      setFavoriteOverrides((current) => ({
+        ...current,
+        [card.id]: result.isFavorite,
+      }));
+    } catch (error) {
+      toast.error("Chưa lưu được thẻ yêu thích", {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  if (screen === "RESULT") {
+    return renderWithCurtain(
+      <FlashcardResultScreen
+        favoriteCount={favoriteCardCount}
+        progress={progress}
+        pendingAction={pendingAction}
+        shouldCelebrate={shouldCelebrateResult}
+        onBack={() => {
+          clearFlashcardResultHistoryMarker();
+          setShouldCelebrateResult(false);
+          setScreen("PANEL");
+        }}
+        onReviewFavorites={() => void transitionTo(() => startSession("FAVORITE"))}
+        onRestartAll={() => void transitionTo(() => startSession("ALL"))}
+        onRestartUnknown={() =>
+          void transitionTo(() => startSession("UNKNOWN", "RESULT"))
+        }
+      />,
+    );
+  }
+
+  if (screen === "RUNNER" && currentCard) {
+    const isFavorite = favoriteOverrides[currentCard.id] ?? currentCard.isFavorite;
+    return renderWithCurtain(
+      <FlashcardRunnerScreen
+        card={currentCard}
+        currentIndex={currentIndex}
+        isBackVisible={isBackVisible}
+        isFavorite={isFavorite}
+        lessonTitle={lesson.title}
+        onBack={() => {
+          clearFlashcardRunnerHistoryMarker();
+          if (runnerBackDestination === "RESULT") {
+            setFlashcardResultHistoryMarker(activeSet.id);
+          }
+          setShouldCelebrateResult(false);
+          setScreen(runnerBackDestination);
+        }}
+        onComplete={() => {
+          clearStoredFlashcardSession(activeSet.id);
+          setFlashcardResultHistoryMarker(activeSet.id);
+          setShouldCelebrateResult(true);
+          setScreen("RESULT");
+        }}
+        onFavorite={() => handleFavorite(currentCard)}
+        onFlip={() => {
+          const nextIsBackVisible = !isBackVisible;
+          persistSessionPatch({ nextIsBackVisible });
+          setIsBackVisible(nextIsBackVisible);
+        }}
+        onMark={handleMark}
+        onCardSelect={(index) => updateCurrentCard(index)}
+        onNext={() => updateCurrentCard(currentIndex + 1)}
+        onPrevious={() => updateCurrentCard(currentIndex - 1)}
+        knownCount={sessionKnownCount}
+        pendingAction={pendingAction}
+        reviewStatuses={sessionReviewStatuses}
+        setId={activeSet.id}
+        totalCount={sessionCards.length}
+      />,
+    );
+  }
+
+  return renderWithCurtain(
+    <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+          <Brain className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <h2 className="min-w-0 text-base font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-lg">
+          Flashcard
+        </h2>
+        <span className="ml-auto shrink-0 rounded-xl bg-violet-100 px-3 py-2 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+          {activeSet.flashcards.length} thẻ
+        </span>
+      </div>
+      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+        Cùng ghi nhớ các kiến thức đã học nhé.
+      </p>
+      <button
+        type="button"
+        onClick={() => void handleEntryAction()}
+        disabled={Boolean(pendingAction)}
+        className="student-flashcard-cta-3d mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-violet-500 px-5 text-lg font-black text-white hover:bg-violet-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
+      >
+        {pendingAction === "start" ? (
+          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+        ) : (
+          <EntryActionIcon className="h-6 w-6" aria-hidden="true" />
+        )}
+        {entryActionLabel}
+      </button>
+      {progress.isCompleted && !hasPendingSession ? (
+        <button
+          type="button"
+          onClick={() =>
+            void transitionTo(() =>
+              startSession("ALL", "PANEL", getNextLearningSet(sets, activeSet.id)),
+            )
+          }
+          disabled={Boolean(pendingAction)}
+          className="mt-3 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-5 text-lg font-black text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:cursor-wait disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:hover:bg-violet-500/10"
+        >
+          <RotateCcw className="h-6 w-6" aria-hidden="true" />
+          Học bộ Flashcard mới
+        </button>
+      ) : null}
+    </section>,
+  );
+}
+
+function buildProgress(
+  set: StudentFlashcardSet,
+  knownOverrides: Record<string, boolean>,
+): FlashcardProgressSummary {
+  const summary = set.flashcards.reduce(
+    (current, card) => {
+      const wasReviewed =
+        Object.hasOwn(knownOverrides, card.id) || card.progress !== null;
+      const isKnown = knownOverrides[card.id] ?? card.progress?.isKnown;
+      if (wasReviewed) current.reviewedCount += 1;
+      if (isKnown === true) current.knownCount += 1;
+      if (wasReviewed && isKnown === false) current.unknownCount += 1;
+      return current;
+    },
+    { knownCount: 0, reviewedCount: 0, unknownCount: 0 },
+  );
+
+  return {
+    ...summary,
+    totalCount: set.flashcards.length,
+    unreviewedCount: Math.max(0, set.flashcards.length - summary.reviewedCount),
+    isCompleted:
+      set.flashcards.length > 0 && summary.reviewedCount === set.flashcards.length,
+  };
+}
+
+function EmptyPanel({ copy }: { copy: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm font-bold text-slate-500 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-muted)]">
+      {copy}
+    </div>
+  );
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Vui lòng thử lại.";
+}
+
+function waitForCurtain(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}

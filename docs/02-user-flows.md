@@ -380,9 +380,14 @@ Các bước:
 
 1. Student vào chi tiết lộ trình chưa mua.
 2. Nếu có buổi học được bật học thử, UI hiển thị buổi học đó.
-3. Student mở buổi đầu.
-4. Backend kiểm tra quyền trial.
-5. Student được xem nội dung học thử được phép.
+3. Student bấm CTA học thử hoặc một link hợp lệ dẫn thẳng tới buổi học.
+4. UI chọn ngẫu nhiên một biến thể transition, tránh lặp lại biến thể vừa dùng,
+   đồng thời prefetch route và gọi API lesson ngay khi transition bắt đầu.
+5. Khi transition đã che kín và dữ liệu lesson cốt lõi đã vào cache, UI điều
+   hướng sang trang buổi học; nếu API chậm hơn animation thì tiếp tục giữ màn
+   transition thay vì mở trang lesson rỗng rồi mới tải.
+6. Backend kiểm tra quyền trial.
+7. Student được xem nội dung học thử được phép.
 
 Acceptance Criteria:
 
@@ -403,17 +408,25 @@ Tiền điều kiện:
 
 Các bước:
 
-1. Student mở buổi học.
-2. Backend kiểm tra quyền truy cập.
-3. UI hiển thị video, phiếu tài liệu, tóm tắt, quiz, flashcard, bài kiểm tra, ghi chú, comment riêng, chat AI, nút bài trước/bài tiếp theo.
-4. Student học nội dung.
-5. Student có thể tạo ghi chú/comment riêng.
+1. Student bấm một CTA/link trực tiếp tới buổi học từ danh sách khóa đã mua,
+   chi tiết khóa học hoặc nút bài trước/bài tiếp theo.
+2. UI chạy transition random với dòng `Học thông minh - Vững tương lai`, đồng
+   thời prefetch route và dữ liệu lesson vào TanStack Query cache.
+3. Sau khi transition che kín và API lesson cốt lõi hoàn tất, UI điều hướng;
+   transition chỉ mở ra khi route lesson đã commit.
+4. Backend kiểm tra quyền truy cập.
+5. UI hiển thị video, phiếu tài liệu, tóm tắt, quiz, flashcard, bài kiểm tra, ghi chú, comment riêng, chat AI, nút bài trước/bài tiếp theo.
+6. Student học nội dung.
+7. Student có thể tạo ghi chú/comment riêng.
 
 Acceptance Criteria:
 
 - Trước ngày mở bài thi, student chưa được làm bài kiểm tra.
 - Student chỉ thấy comment riêng của chính mình.
 - Ghi chú riêng chỉ thuộc student đó.
+- Mọi CTA/link trong student app dẫn trực tiếp tới trang chi tiết buổi học đều
+  dùng cùng transition; API lesson phải bắt đầu song song với animation, không
+  chờ animation kết thúc mới gọi.
 
 ---
 
@@ -455,19 +468,43 @@ Actor: Student.
 Các bước:
 
 1. Student chọn một bộ quiz trong buổi học.
-2. Backend tạo quiz attempt.
-3. Student trả lời từng câu.
+2. UI đọc trạng thái attempt của bộ quiz và ghép số câu đã kiểm tra đang lưu
+   local trên cùng trình duyệt:
+   - Chưa có câu nào được kiểm tra trong lượt hiện tại: hiển thị `Bắt đầu`.
+   - Lượt hiện tại đã có ít nhất một câu được kiểm tra: hiển thị
+     `Tiếp tục vào làm`.
+   - Không còn lượt đang làm và đã có lượt hoàn thành: hiển thị `Xem lại` cùng
+     action `Làm bộ Quiz mới`.
+3. `Bắt đầu`/`Tiếp tục vào làm` khôi phục lượt `IN_PROGRESS` nếu có; nếu chưa
+   có thì backend tạo quiz attempt mới. `Xem lại` mở kết quả gốc đã cộng dồn của
+   toàn bộ bài Quiz; `Làm bộ Quiz mới` tạo một lượt đầy đủ mới của bộ quiz hiện
+   tại.
+4. Khi mở/resume attempt, API trả sẵn dữ liệu chấm và lời giải cho frontend theo
+   quyết định ưu tiên tốc độ. Student trả lời từng câu; nút `Kiểm tra đáp án`
+   chấm local tức thì, không gọi API theo từng câu và chỉ lúc đó mới hiện
+   feedback/lời giải trên UI.
    Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
-4. Student nộp bài.
-5. Backend chấm câu.
-6. Backend lưu attempt và answers.
-7. UI hiển thị số câu đúng/sai.
-8. UI cho chọn làm lại tất cả, làm lại câu sai hoặc làm bộ quiz khác.
+5. Student nộp bài; frontend gửi toàn bộ answer trong một request.
+6. Backend validate đúng tập câu của attempt và chấm lại authoritative.
+7. Backend lưu attempt và answers; nếu đây là lượt làm lại câu sai, backend giữ
+   lịch sử lượt con và cộng các câu sửa đúng vào kết quả gốc.
+8. UI luôn hiển thị số câu đúng/sai cộng dồn của kết quả gốc, không hiển thị
+   summary riêng của lượt con.
+9. UI cho chọn làm lại tất cả câu của bài gốc, làm lại các câu còn sai trong
+   kết quả gốc hoặc quay về panel Quiz.
 
 Acceptance Criteria:
 
 - Attempt lưu đầy đủ lịch sử.
+- Nhãn CTA ở panel Quiz được suy ra từ attempt server kết hợp tiến độ local theo
+  `attemptId`; sau refresh/F5 trên cùng trình duyệt vẫn đúng, không chỉ dựa vào
+  React state đang giữ trong bộ nhớ.
 - Câu đúng/sai tính nhất quán.
+- Sau mọi lần submit, màn kết quả và các action xem lại/làm lại phải dùng attempt
+  gốc đã cộng dồn.
+- F5 khi đang ở màn kết quả phải khôi phục đúng màn kết quả từ attempt gốc gần
+  nhất và không phát lại hiệu ứng ăn mừng; nếu student đã quay về panel Quiz thì
+  F5 vẫn giữ panel.
 - Student không sửa được attempt đã submit.
 
 ---
@@ -478,17 +515,47 @@ Actor: Student.
 
 Các bước:
 
-1. Student chọn một bộ flashcard.
-2. UI hiển thị từng flashcard.
-3. Student đánh dấu đã thuộc/chưa thuộc.
-4. Backend lưu progress theo từng flashcard.
-5. UI tổng kết đã thuộc/chưa thuộc.
-6. UI cho chọn ôn lại tất cả, ôn lại câu chưa thuộc hoặc học bộ khác.
+1. Student mở tab Flashcard trong lesson.
+2. Panel đọc progress của bộ Flashcard được duyệt đầu tiên và hiển thị CTA:
+   - `Bắt đầu` nếu chưa review thẻ nào; một lượt chỉ mới mở nhưng chưa đánh dấu
+     thẻ nào vẫn giữ nhãn này, và khi bấm lại phải mở từ thẻ đầu.
+   - `Tiếp tục vào học` nếu lượt đang học đã có ít nhất một trạng thái được lưu
+     hoặc bộ còn thẻ chưa review sau progress trước đó; khi bấm phải giữ đúng
+     vị trí của lượt đang dở.
+   - `Xem lại` nếu đã review toàn bộ thẻ.
+3. Student bấm CTA; UI dùng transition cùng chuẩn Quiz rồi mở runner Flashcard
+   toàn màn hình với header ClassHero, tiến độ và action quay lại.
+4. Student lật từng thẻ, có thể yêu thích, rồi đánh dấu `Đã thuộc` hoặc
+   `Chưa thuộc`; backend lưu progress theo từng flashcard. Dải chấm trạng thái
+   cho phép mở trực tiếp từng thẻ và phân biệt đã thuộc/chưa thuộc/chưa đánh dấu.
+5. Nếu student thoát giữa lượt, UI hỏi xác nhận và quay lại panel; progress đã
+   lưu ở server vẫn được dùng để tiếp tục các thẻ chưa review.
+6. Khi student bấm `Hoàn thành`, nếu còn thẻ chưa đánh dấu thì UI giữ runner và
+   cảnh báo đúng số thẻ còn thiếu; chỉ khi mọi thẻ đã có trạng thái mới mở màn
+   kết quả toàn màn hình, tổng kết đã thuộc/chưa thuộc/đã ôn.
+7. Màn kết quả cho `Ôn lại tất cả`, `Ôn lại thẻ chưa thuộc` hoặc
+   `Xem lại thẻ yêu thích`; action quay lại trở về panel Flashcard. `Ôn lại tất
+cả` tạo lượt mới từ thẻ đầu tiên, reset bộ đếm và nhãn lựa chọn trong lượt
+   nhưng không xóa progress lịch sử. `Xem lại thẻ yêu thích` chốt danh sách các
+   thẻ đang được yêu thích trong bộ, hiển thị lại nhãn `Đã thuộc`/`Chưa thuộc` từ
+   progress đã lưu và bị khóa khi danh sách này rỗng; trạng thái khóa vẫn giữ tone
+   đỏ/hồng semantic của action yêu thích thay vì chuyển sang xám.
 
 Acceptance Criteria:
 
 - Progress gắn với student và flashcard.
 - Student khác không thấy progress của nhau.
+- Runner/kết quả che toàn bộ shell lesson, khóa scroll nền, hỗ trợ light/dark và
+  giữ touch target phù hợp mobile.
+- Danh sách thẻ của một lượt được chốt khi bắt đầu để việc đổi trạng thái một
+  thẻ không làm lọc lại danh sách và bỏ qua thẻ kế tiếp.
+- Lượt `Ôn lại tất cả` bắt đầu với toàn bộ thẻ chưa có nhãn lựa chọn trong phiên;
+  khi student đánh dấu lại, nhãn và bộ đếm phản ánh riêng lựa chọn mới của lượt.
+- Không thể hoàn thành lượt khi còn thẻ chưa được đánh dấu `Đã thuộc` hoặc
+  `Chưa thuộc`; cảnh báo phải cập nhật theo trạng thái hiện tại của dải chấm.
+- Lượt xem lại yêu thích chỉ chứa các thẻ được yêu thích tại thời điểm bắt đầu
+  lượt, khôi phục trạng thái known/unknown đã lưu và không tự đổi danh sách khi
+  trạng thái yêu thích thay đổi giữa lượt.
 
 ---
 

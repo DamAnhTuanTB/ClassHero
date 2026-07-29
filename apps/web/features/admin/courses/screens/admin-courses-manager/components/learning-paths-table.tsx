@@ -20,6 +20,7 @@ type LearningPathsTableProps = {
   onArchivePath: (pathId: string) => void;
   onClearSelected: () => void;
   onEditPath: (pathId: string) => void;
+  onPrefetchPath: (pathId: string) => void;
   onRequestDeleteSelected: () => void;
   onSelectPath: (pathId: string) => void;
   onToggleSelectAll: () => void;
@@ -36,6 +37,7 @@ export function LearningPathsTable({
   onArchivePath,
   onClearSelected,
   onEditPath,
+  onPrefetchPath,
   onRequestDeleteSelected,
   onSelectPath,
   onToggleSelectAll,
@@ -116,6 +118,7 @@ export function LearningPathsTable({
               isDarkTheme={isDarkTheme}
               isSelected={selectedPathIds.includes(path.id)}
               onEdit={() => onEditPath(path.id)}
+              onPrefetch={() => onPrefetchPath(path.id)}
               onArchive={() => onArchivePath(path.id)}
               onSelect={() => onSelectPath(path.id)}
             />

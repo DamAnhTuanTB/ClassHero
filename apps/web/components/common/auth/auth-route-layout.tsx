@@ -1,10 +1,11 @@
 "use client";
 
-import { ChevronLeft, GraduationCap } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AuthDevHydrationBoundary } from "@/components/common/auth/auth-dev-hydration-boundary";
+import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 
 type AuthVariant = "login" | "student" | "parent" | "recovery";
 type IllustrationType = "login" | "student" | "parent" | "secure";
@@ -90,19 +91,9 @@ export function AuthRouteLayout({ children }: { children: ReactNode }) {
       >
         <div className="relative h-[25rem] px-6 pb-28 pt-6 sm:h-[26.125rem] sm:px-8 sm:pb-28 sm:pt-8 lg:h-auto lg:min-h-full lg:px-10 lg:pb-12 lg:pt-10 xl:px-14">
           <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="inline-flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--theme-brand-secondary),var(--theme-brand-primary))] text-[var(--theme-brand-foreground)] shadow-[var(--theme-shadow-sm)]">
-                <GraduationCap className="h-6 w-6" aria-hidden="true" />
-              </span>
+            <Link href="/" className="inline-flex items-center">
               <span>
-                <span className="inline-flex items-baseline leading-none tracking-normal">
-                  <span className="font-[var(--font-display)] text-[1.45rem] font-extrabold text-[var(--theme-brand-primary)]">
-                    Class
-                  </span>
-                  <span className="font-[var(--font-display)] text-[1.45rem] font-extrabold text-[var(--theme-brand-secondary)]">
-                    Hero
-                  </span>
-                </span>
+                <ClassHeroLogo className="h-8 max-w-[10rem]" priority />
                 <span className="block text-xs font-extrabold text-[var(--theme-brand-secondary)]">
                   {authBrandSlogan}
                 </span>

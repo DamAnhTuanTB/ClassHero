@@ -31,6 +31,7 @@ import {
 import { getStudentCourseContinueLessonCopy } from "@/features/student/shared/utils/student-course-continue-lesson";
 import { cn } from "@/lib/utils";
 import type { AppThemeMode } from "@/lib/theme-store";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function StudentCourseDetailScreen({
   initialThemeMode,
@@ -43,6 +44,8 @@ export function StudentCourseDetailScreen({
   const mockPurchaseMutation = useStudentMockPurchaseMutation(slug);
   const course = courseDetailQuery.data?.course;
   const detail = courseDetailQuery.data?.detail;
+  const isInitialPending = !isAuthHydrated || courseDetailQuery.isLoading;
+  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
   const defaultExpandedChapterId = useMemo(
     () =>
       detail?.chapters.find((chapter) => chapter.progressPercent > 0)?.id ??
@@ -57,20 +60,23 @@ export function StudentCourseDetailScreen({
     setExpandedChapterIds(defaultExpandedChapterId ? [defaultExpandedChapterId] : []);
   }, [defaultExpandedChapterId]);
 
-  if (!isAuthHydrated || courseDetailQuery.isLoading) {
+  if (isInitialPending || shouldShowInitialLoading) {
     return (
       <main
-        className="min-h-screen px-4 py-4 sm:px-6 lg:px-8"
+        className="grid min-h-screen place-items-center px-4 py-4 sm:px-6 lg:px-8"
         data-theme={initialThemeMode}
         style={{ background: "var(--student-screen-bg)" }}
       >
-        <div className="mx-auto max-w-3xl">
-          <EmptyCourseState
-            isLoading
-            title="Đang tải khóa học"
-            description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
-          />
-        </div>
+        {shouldShowInitialLoading ? (
+          <div className="mx-auto w-full max-w-3xl">
+            <EmptyCourseState
+              isLoading
+              loadingVariant="detail"
+              title="Đang tải khóa học"
+              description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
+            />
+          </div>
+        ) : null}
       </main>
     );
   }
@@ -78,11 +84,11 @@ export function StudentCourseDetailScreen({
   if (!course || !detail || courseDetailQuery.isError) {
     return (
       <main
-        className="min-h-screen px-4 py-4 sm:px-6 lg:px-8"
+        className="grid min-h-screen place-items-center px-4 py-4 sm:px-6 lg:px-8"
         style={{ background: "var(--student-screen-bg)" }}
         data-theme={initialThemeMode}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto w-full max-w-3xl">
           <EmptyCourseState
             title="Chưa tìm thấy khóa học này"
             description="Bạn quay lại danh sách học tập để chọn khóa học đang học nhé."

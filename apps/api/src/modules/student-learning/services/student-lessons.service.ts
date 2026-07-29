@@ -4,6 +4,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FilesService } from "#api/modules/files/services/files.service";
 import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
 import { throwLessonNotFound } from "#api/modules/learning-paths/utils/lesson.helpers";
+import { StudentLearningPrerequisitesService } from "#api/modules/student-learning/services/student-learning-prerequisites.service";
 import {
   studentLessonContentSelect,
   studentLessonSummarySelect,
@@ -25,6 +26,8 @@ export class StudentLessonsService {
     @Inject(FilesService) private readonly filesService: FilesService,
     @Inject(StudentLessonAccessService)
     private readonly studentLessonAccessService: StudentLessonAccessService,
+    @Inject(StudentLearningPrerequisitesService)
+    private readonly prerequisitesService: StudentLearningPrerequisitesService,
   ) {}
 
   async getLessonContent(lessonId: string, studentUserId: string) {
@@ -41,8 +44,14 @@ export class StudentLessonsService {
       throwLessonNotFound();
     }
 
-    const fileAccessUrls = await this.resolveFileAccessUrls(record);
-    return serializeStudentLessonContent(record, access, fileAccessUrls);
+    const [fileAccessUrls, navigation] = await Promise.all([
+      this.resolveFileAccessUrls(record),
+      this.getLessonNavigation(record.learningPathId, lessonId),
+    ]);
+    return {
+      ...serializeStudentLessonContent(record, access, fileAccessUrls),
+      navigation,
+    };
   }
 
   async getLessonSummary(lessonId: string, studentUserId: string) {
@@ -76,15 +85,8 @@ export class StudentLessonsService {
   }
 
   async getTestSetsStatus(lessonId: string, studentUserId: string) {
-    const access = await this.studentLessonAccessService.assertCanRead(
-      lessonId,
-      studentUserId,
-    );
-    const [lesson, records] = await Promise.all([
-      this.prisma.lesson.findUnique({
-        where: { id: lessonId },
-        select: { examOpenAt: true },
-      }),
+    const [prerequisites, records, progress] = await Promise.all([
+      this.prerequisitesService.getTestPrerequisites(lessonId, studentUserId),
       this.prisma.testSet.findMany({
         where: {
           lessonId,
@@ -95,13 +97,65 @@ export class StudentLessonsService {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         select: studentTestSetSelect,
       }),
+      this.prisma.lessonProgress.findUnique({
+        where: {
+          studentUserId_lessonId: {
+            studentUserId,
+            lessonId,
+          },
+        },
+        select: {
+          bestTestAttempt: {
+            select: {
+              id: true,
+              score: true,
+              durationSeconds: true,
+            },
+          },
+        },
+      }),
     ]);
 
-    if (!lesson) {
-      throwLessonNotFound();
-    }
+    return serializeStudentTestStatus(
+      records,
+      prerequisites,
+      progress?.bestTestAttempt ?? null,
+    );
+  }
 
-    return serializeStudentTestStatus(records, lesson.examOpenAt, access);
+  private async getLessonNavigation(learningPathId: string, lessonId: string) {
+    const lessons = await this.prisma.lesson.findMany({
+      where: {
+        learningPathId,
+        deletedAt: null,
+        status: "PUBLISHED",
+        chapter: {
+          deletedAt: null,
+          status: "PUBLISHED",
+        },
+      },
+      orderBy: [{ chapter: { orderIndex: "asc" } }, { orderIndex: "asc" }],
+      select: {
+        id: true,
+        title: true,
+        orderIndex: true,
+        chapter: {
+          select: {
+            id: true,
+            title: true,
+            orderIndex: true,
+          },
+        },
+      },
+    });
+    const currentIndex = lessons.findIndex((lesson) => lesson.id === lessonId);
+    return {
+      previous: currentIndex > 0 ? lessons[currentIndex - 1] : null,
+      next:
+        currentIndex >= 0 && currentIndex < lessons.length - 1
+          ? lessons[currentIndex + 1]
+          : null,
+    };
   }
 
   private async resolveFileAccessUrls(record: StudentLessonContentRecord) {

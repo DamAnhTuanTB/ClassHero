@@ -4,7 +4,15 @@ import { useState } from "react";
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, BookOpen, FileText, Layers3, Pencil, Trash2, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  FileText,
+  Layers3,
+  Pencil,
+  Trash2,
+  Users,
+} from "lucide-react";
 import {
   AdminCoursesSidebar,
   type AdminCoursesSidebarItem,
@@ -21,6 +29,7 @@ import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-d
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import type { AppThemeMode } from "@/lib/theme-store";
 import { cn } from "@/lib/utils";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 const ChapterEditorDialog = dynamic(() =>
   import("@/features/admin/courses/screens/admin-course-detail-manager/components/chapter-editor-dialog").then(
@@ -89,6 +98,8 @@ export function AdminCourseDetailManager({
     uploadCover,
     viewState,
   } = useAdminCourseDetailManager(pathId, initialLearningPath, initialThemeMode);
+  const isInitialPending = viewState === "loading";
+  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
 
   return (
     <main data-admin-theme="true" className="theme-page">
@@ -121,7 +132,9 @@ export function AdminCourseDetailManager({
                 Danh sách khóa học
               </Link>
               <p className="mt-4 text-sm font-bold text-[var(--theme-primary)]">
-                {path?.kind === "PERSONALIZED" ? "Chi tiết khóa học cá nhân hóa" : "Chi tiết khóa học"}
+                {path?.kind === "PERSONALIZED"
+                  ? "Chi tiết khóa học cá nhân hóa"
+                  : "Chi tiết khóa học"}
               </p>
               <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
                 {path?.title ?? "Không tìm thấy khóa học"}
@@ -131,7 +144,7 @@ export function AdminCourseDetailManager({
                 trong từng buổi.
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {/* Quản lý danh sách học sinh */}
               {path?.kind !== "PERSONALIZED" && (
                 <button
@@ -170,14 +183,21 @@ export function AdminCourseDetailManager({
           </header>
 
           <section className="mt-5">
-            {viewState === "loading" ? (
-              <LoadingState
-                title="Đang tải chi tiết khóa học"
-                description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
-              />
+            {isInitialPending || shouldShowInitialLoading ? (
+              shouldShowInitialLoading ? (
+                <LoadingState
+                  title="Đang tải chi tiết khóa học"
+                  description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
+                />
+              ) : (
+                <div
+                  aria-busy="true"
+                  className="min-h-80 lg:min-h-[calc(100svh-16rem)]"
+                />
+              )
             ) : null}
             {viewState === "error" ? <ErrorState onRetry={actions.retryLoad} /> : null}
-            {viewState === "ready" && path ? (
+            {viewState === "ready" && !shouldShowInitialLoading && path ? (
               <div className="grid gap-5">
                 {/* Banner bản cá nhân — chỉ hiển thị khi kind = PERSONALIZED */}
                 {path.kind === "PERSONALIZED" && (

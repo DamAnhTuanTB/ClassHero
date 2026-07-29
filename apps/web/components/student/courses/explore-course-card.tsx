@@ -58,7 +58,13 @@ function getCourseAccentStripClass(course: StudentCourse) {
   );
 }
 
-export function ExploreCourseCard({ course }: { course: StudentCourse }) {
+export function ExploreCourseCard({
+  course,
+  onPrefetch,
+}: {
+  course: StudentCourse;
+  onPrefetch?: (slug: string) => void;
+}) {
   const isEnrolled = course.access === "completed" || course.access === "enrolled";
   const isUnderMaintenance = course.isUnderMaintenance === true;
   const isStudying = course.access === "enrolled" && !isUnderMaintenance;
@@ -104,6 +110,9 @@ export function ExploreCourseCard({ course }: { course: StudentCourse }) {
     <Link
       id={course.slug}
       href={`/student/courses/${course.slug}`}
+      onFocus={() => onPrefetch?.(course.slug)}
+      onPointerEnter={() => onPrefetch?.(course.slug)}
+      onTouchStart={() => onPrefetch?.(course.slug)}
       aria-label={`Xem chi tiết ${course.title}`}
       className="group relative block min-w-0 cursor-pointer overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-5 shadow-none transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-6 sm:pl-7"
     >

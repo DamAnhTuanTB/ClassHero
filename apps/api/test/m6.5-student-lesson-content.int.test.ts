@@ -386,7 +386,7 @@ describe("M6.5 student lesson content integration", () => {
     expect(serialized).not.toContain("Câu hỏi đang ẩn");
   });
 
-  it("uses server time to open tests for an enrolled student", async () => {
+  it("keeps tests locked after open time until quiz and flashcard are completed", async () => {
     const blocked = await studentLessonsService.getTestSetsStatus(
       lessonId,
       enrolledStudentId,
@@ -405,7 +405,10 @@ describe("M6.5 student lesson content integration", () => {
       lessonId,
       enrolledStudentId,
     );
-    expect(open.canStart).toBe(true);
+    expect(open.canStart).toBe(false);
+    expect(open.lockReason).toBe("PREREQUISITES_INCOMPLETE");
+    expect(open.quiz.isCompleted).toBe(false);
+    expect(open.flashcard.isCompleted).toBe(false);
   });
 
   it("allows trial reads but never opens the test for trial access", async () => {

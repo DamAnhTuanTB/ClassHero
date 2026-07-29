@@ -5,7 +5,6 @@ import {
   Clock3,
   FileQuestion,
   Gauge,
-  Loader2,
   Pencil,
   Plus,
   Trash2,
@@ -21,6 +20,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import type {
   AdminMultiStatementAnswer,
   AdminQuizQuestion,
@@ -46,6 +46,7 @@ import {
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 import { cn } from "@/lib/utils";
 
 const AdminAssessmentQuestionEditorDialog = dynamic(
@@ -93,6 +94,7 @@ export function AdminAssessmentTab({
   const testSetMutations = useAdminTestSetMutations(lessonId);
   const quizSets = isTest ? testSetsQuery.data : quizSetsQuery.data;
   const isLoading = isTest ? testSetsQuery.isLoading : quizSetsQuery.isLoading;
+  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
   const isError = isTest ? testSetsQuery.isError : quizSetsQuery.isError;
   const copy = getAssessmentCopy(assessmentKind);
   const [selectedSetId, setSelectedSetId] = useState("");
@@ -226,14 +228,18 @@ export function AdminAssessmentTab({
     }
   };
 
-  if (isLoading) {
-    return <QuizLoadingState />;
+  if (isLoading || shouldShowInitialLoading) {
+    return shouldShowInitialLoading ? (
+      <QuizLoadingState />
+    ) : (
+      <div aria-busy="true" className="min-h-72" />
+    );
   }
 
   if (isError) {
     return (
-      <div className="rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-5 text-sm font-semibold text-[var(--theme-error-text)]">
-        Không tải được danh sách {copy.setNamePlural}. Hãy thử tải lại trang.
+      <div className="flex min-h-32 items-center justify-center rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-5 text-center text-sm font-semibold text-[var(--theme-error-text)]">
+        <p>Không tải được danh sách {copy.setNamePlural}. Hãy thử tải lại trang.</p>
       </div>
     );
   }
@@ -471,6 +477,7 @@ function QuizSetPanel({
   const testQuestionsQuery = useAdminTestQuestions(activeSet.id, isTest);
   const questions = isTest ? testQuestionsQuery.data : quizQuestionsQuery.data;
   const isLoading = isTest ? testQuestionsQuery.isLoading : quizQuestionsQuery.isLoading;
+  const shouldShowQuestionsLoading = useStableLoadingVisibility(isLoading);
   const isError = isTest ? testQuestionsQuery.isError : quizQuestionsQuery.isError;
   return (
     <section
@@ -497,7 +504,8 @@ function QuizSetPanel({
             ) : null}
           </div>
           <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            {questions?.length ?? activeSet._count.questions} câu hỏi
+            {questions?.length ?? activeSet._count?.questions ?? activeSet.questionCount}{" "}
+            câu hỏi
           </p>
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
@@ -528,10 +536,14 @@ function QuizSetPanel({
         </div>
       </div>
 
-      {isLoading ? (
-        <QuizLoadingState />
+      {isLoading || shouldShowQuestionsLoading ? (
+        shouldShowQuestionsLoading ? (
+          <QuizLoadingState />
+        ) : (
+          <div aria-busy="true" className="min-h-48" />
+        )
       ) : isError ? (
-        <div className="p-6 text-center text-sm font-semibold text-[var(--theme-error-text)]">
+        <div className="flex min-h-32 items-center justify-center p-6 text-center text-sm font-semibold text-[var(--theme-error-text)]">
           Không tải được câu hỏi của bộ này.
         </div>
       ) : !questions?.length ? (
@@ -755,11 +767,38 @@ function QuestionCard({
 
 function QuizLoadingState() {
   return (
-    <div className="flex min-h-32 items-center justify-center p-8">
-      <Loader2
-        className="h-6 w-6 animate-spin text-[var(--theme-primary)]"
-        aria-label="Đang tải"
-      />
+    <div
+      aria-busy="true"
+      aria-label="Đang tải bộ câu hỏi"
+      className="min-h-64 animate-pulse space-y-5"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+          <SkeletonBlock className="h-6 w-44 rounded-full" />
+          <SkeletonBlock className="h-4 w-72 max-w-full rounded-full opacity-70" />
+        </div>
+        <SkeletonBlock className="h-11 w-40 rounded-lg" />
+      </div>
+      <div className="flex gap-2 overflow-hidden">
+        <SkeletonBlock className="h-10 w-32 shrink-0 rounded-lg" />
+        <SkeletonBlock className="h-10 w-32 shrink-0 rounded-lg" />
+        <SkeletonBlock className="h-10 w-32 shrink-0 rounded-lg" />
+      </div>
+      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5">
+        <div className="flex items-center justify-between gap-4">
+          <SkeletonBlock className="h-6 w-2/5 rounded-full" />
+          <SkeletonBlock className="h-10 w-32 rounded-lg" />
+        </div>
+        {Array.from({ length: 4 }, (_, index) => (
+          <div
+            key={index}
+            className="mt-4 rounded-lg border border-[var(--theme-border)] p-4"
+          >
+            <SkeletonBlock className="h-4 w-3/4 rounded-full" />
+            <SkeletonBlock className="mt-3 h-3.5 w-1/2 rounded-full opacity-70" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Loader2, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import { LessonEditorDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-editor-dialog";
@@ -124,16 +125,41 @@ export function LessonDetailEditorDialog({
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3 text-sm font-bold text-[var(--theme-text-muted)]">
-              <Loader2
-                className="h-5 w-5 animate-spin text-[var(--theme-primary)]"
-                aria-hidden="true"
-              />
-              Đang tải thông tin buổi học
-            </div>
+            <LessonEditorSkeleton />
           )}
         </div>
       </div>
     </EditorDialogShell>
+  );
+}
+
+function LessonEditorSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải biểu mẫu sửa buổi học"
+      className="w-full animate-pulse space-y-5"
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        {Array.from({ length: 2 }, (_, index) => (
+          <div key={index} className="space-y-2">
+            <SkeletonBlock className="h-4 w-28 rounded-full" />
+            <SkeletonBlock className="h-11 rounded-lg" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        <SkeletonBlock className="h-4 w-36 rounded-full" />
+        <SkeletonBlock className="h-28 rounded-lg" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <SkeletonBlock key={index} className="h-11 rounded-lg" />
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <SkeletonBlock className="h-11 w-32 rounded-lg" />
+      </div>
+    </div>
   );
 }

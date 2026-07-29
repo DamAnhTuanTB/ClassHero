@@ -1,0 +1,556 @@
+import { randomUUID } from "node:crypto";
+import { Test, type TestingModule } from "@nestjs/testing";
+import {
+  AttemptStatus,
+  EnrollmentStatus,
+  PublishStatus,
+  QuestionType,
+  ReviewStatus,
+  Subject,
+  UserRole,
+} from "@prisma/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { AppModule } from "#api/app.module";
+import { PrismaService } from "#api/common/prisma/prisma.service";
+import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
+import { QuizAttemptScopeDto } from "#api/modules/quiz/dto/student-quiz-attempt.dto";
+import { StudentQuizAttemptsService } from "#api/modules/quiz/services/student-quiz-attempts.service";
+import { StudentLessonsService } from "#api/modules/student-learning/services/student-lessons.service";
+import { StudentTestAttemptsService } from "#api/modules/tests/services/student-test-attempts.service";
+
+describe("M7 student learning flow integration", () => {
+  let moduleRef: TestingModule;
+  let prisma: PrismaService;
+  let flashcardsService: FlashcardsService;
+  let quizAttemptsService: StudentQuizAttemptsService;
+  let lessonsService: StudentLessonsService;
+  let testAttemptsService: StudentTestAttemptsService;
+  let studentUserId = "";
+  let adminUserId = "";
+  let learningPathId = "";
+  let lessonId = "";
+  let quizSetId = "";
+  let flashcardId = "";
+  const suffix = randomUUID().slice(0, 8);
+
+  beforeAll(async () => {
+    moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    prisma = moduleRef.get(PrismaService);
+    flashcardsService = moduleRef.get(FlashcardsService);
+    quizAttemptsService = moduleRef.get(StudentQuizAttemptsService);
+    lessonsService = moduleRef.get(StudentLessonsService);
+    testAttemptsService = moduleRef.get(StudentTestAttemptsService);
+
+    const [admin, student] = await Promise.all([
+      prisma.user.create({
+        data: {
+          role: UserRole.ADMIN,
+          username: `m7-admin-${suffix}`,
+          passwordHash: "not-used",
+        },
+      }),
+      prisma.user.create({
+        data: {
+          role: UserRole.STUDENT,
+          username: `m7-student-${suffix}`,
+          fullName: "Học sinh M7",
+          passwordHash: "not-used",
+        },
+      }),
+    ]);
+    adminUserId = admin.id;
+    studentUserId = student.id;
+
+    const path = await prisma.learningPath.create({
+      data: {
+        title: `M7 Path ${suffix}`,
+        slug: `m7-path-${suffix}`,
+        subject: Subject.MATH,
+        grade: 7,
+        originalPriceVnd: 100_000,
+        status: PublishStatus.PUBLISHED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    learningPathId = path.id;
+    const chapter = await prisma.learningPathChapter.create({
+      data: {
+        learningPathId,
+        orderIndex: 1,
+        title: "Chương M7",
+        status: PublishStatus.PUBLISHED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    const lesson = await prisma.lesson.create({
+      data: {
+        learningPathId,
+        chapterId: chapter.id,
+        orderIndex: 1,
+        title: "Buổi học M7",
+        examOpenAt: new Date(Date.now() - 60_000),
+        completionMinScore: 7,
+        status: PublishStatus.PUBLISHED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    lessonId = lesson.id;
+    await prisma.enrollment.create({
+      data: {
+        studentUserId,
+        learningPathId,
+        status: EnrollmentStatus.ACTIVE,
+        startsAt: new Date(Date.now() - 60_000),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+
+    const quizSet = await prisma.quizSet.create({
+      data: {
+        lessonId,
+        title: "Quiz M7",
+        reviewStatus: ReviewStatus.APPROVED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    quizSetId = quizSet.id;
+    await prisma.quizQuestion.create({
+      data: {
+        quizSetId,
+        lessonId,
+        questionType: QuestionType.MULTIPLE_CHOICE,
+        questionJson: documentWithText("2 + 2 bằng bao nhiêu?"),
+        optionsJson: [
+          { id: "A", richText: documentWithText("3") },
+          { id: "B", richText: documentWithText("4") },
+        ],
+        correctAnswerJson: ["B"],
+        hintJson: documentWithText("Hãy cộng hai số."),
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+    });
+
+    const flashcardSet = await prisma.flashcardSet.create({
+      data: {
+        lessonId,
+        title: "Flashcard M7",
+        reviewStatus: ReviewStatus.APPROVED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    const flashcard = await prisma.flashcard.create({
+      data: {
+        flashcardSetId: flashcardSet.id,
+        lessonId,
+        frontJson: documentWithText("2 + 2"),
+        backJson: documentWithText("4"),
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+    });
+    flashcardId = flashcard.id;
+
+    const testSet = await prisma.testSet.create({
+      data: {
+        lessonId,
+        title: "Test M7",
+        durationSeconds: 600,
+        reviewStatus: ReviewStatus.APPROVED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    await prisma.testQuestion.create({
+      data: {
+        testSetId: testSet.id,
+        lessonId,
+        questionType: QuestionType.MULTIPLE_CHOICE,
+        questionJson: documentWithText("3 + 3 bằng bao nhiêu?"),
+        optionsJson: [
+          { id: "A", richText: documentWithText("5") },
+          { id: "B", richText: documentWithText("6") },
+        ],
+        correctAnswerJson: ["B"],
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    if (prisma) {
+      await prisma.enrollment.deleteMany({ where: { learningPathId } });
+      await prisma.quizAttempt.deleteMany({ where: { lessonId } });
+      await prisma.testAttempt.deleteMany({ where: { lessonId } });
+      await prisma.flashcardProgress.deleteMany({ where: { lessonId } });
+      await prisma.lessonProgress.deleteMany({ where: { lessonId } });
+      await prisma.learningPath.deleteMany({ where: { id: learningPathId } });
+      await prisma.user.deleteMany({
+        where: { id: { in: [adminUserId, studentUserId] } },
+      });
+      await moduleRef.close();
+    }
+  });
+
+  it("requires quiz and flashcard, grades attempts, and promotes only a passing result", async () => {
+    const initiallyLocked = await lessonsService.getTestSetsStatus(
+      lessonId,
+      studentUserId,
+    );
+    expect(initiallyLocked.canStart).toBe(false);
+    expect(initiallyLocked.lockReason).toBe("PREREQUISITES_INCOMPLETE");
+    await expect(
+      quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
+    ).resolves.toMatchObject({
+      state: "NOT_STARTED",
+      checkedCount: 0,
+      currentAttemptId: null,
+      latestSubmittedAttempt: null,
+    });
+
+    const staleQuizAttempt = await quizAttemptsService.startAttempt(
+      quizSetId,
+      studentUserId,
+      {
+        scope: QuizAttemptScopeDto.ALL,
+      },
+    );
+    const quizAttempt = await quizAttemptsService.startAttempt(quizSetId, studentUserId, {
+      scope: QuizAttemptScopeDto.ALL,
+    });
+    await expect(
+      prisma.quizAttempt.findUniqueOrThrow({
+        where: { id: staleQuizAttempt.id },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: AttemptStatus.CANCELLED });
+    expect(quizAttempt.questions[0]?.correctAnswerJson).toEqual(["B"]);
+    expect(quizAttempt.questions[0]?.gradingConfigJson).toBeNull();
+    expect(quizAttempt.questions[0]?.hintJson).toEqual(
+      documentWithText("Hãy cộng hai số."),
+    );
+    const pendingQuizAttempt = await quizAttemptsService.getCurrentAttempt(
+      quizSetId,
+      studentUserId,
+    );
+    expect(pendingQuizAttempt?.id).toBe(quizAttempt.id);
+    expect(pendingQuizAttempt?.checkedAnswers).toHaveLength(0);
+    await expect(
+      quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
+    ).resolves.toMatchObject({
+      state: "IN_PROGRESS",
+      checkedCount: 0,
+      currentAttemptId: quizAttempt.id,
+    });
+    const quizFeedback = await quizAttemptsService.checkAnswer(
+      quizAttempt.id,
+      quizAttempt.questions[0]!.id,
+      studentUserId,
+      ["B"],
+    );
+    expect(quizFeedback.isCorrect).toBe(true);
+    const resumedQuizAttempt = await quizAttemptsService.getCurrentAttempt(
+      quizSetId,
+      studentUserId,
+    );
+    expect(resumedQuizAttempt?.checkedAnswers[0]?.answerJson).toEqual(["B"]);
+    expect(resumedQuizAttempt?.checkedAnswers[0]?.feedback.isCorrect).toBe(true);
+    await expect(
+      quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
+    ).resolves.toMatchObject({
+      state: "IN_PROGRESS",
+      checkedCount: 1,
+      currentAttemptId: quizAttempt.id,
+    });
+    const quizResult = await quizAttemptsService.submitAttempt(
+      quizAttempt.id,
+      studentUserId,
+      [{ questionId: quizAttempt.questions[0]!.id, answerJson: ["B"] }],
+    );
+    expect(quizResult.correctCount).toBe(1);
+    await prisma.quizAttempt.update({
+      where: { id: staleQuizAttempt.id },
+      data: {
+        status: AttemptStatus.IN_PROGRESS,
+        startedAt: new Date(quizAttempt.startedAt.getTime() - 60_000),
+      },
+    });
+    await expect(
+      quizAttemptsService.getCurrentAttempt(quizSetId, studentUserId),
+    ).resolves.toBeNull();
+    await expect(
+      quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
+    ).resolves.toMatchObject({
+      state: "COMPLETED",
+      checkedCount: 1,
+      currentAttemptId: null,
+      latestSubmittedAttempt: {
+        id: quizAttempt.id,
+        correctCount: 1,
+        wrongCount: 0,
+        totalCount: 1,
+        accuracyPercent: 100,
+      },
+    });
+
+    await Promise.all(
+      [2, 3, 4].map((questionNumber) =>
+        prisma.quizQuestion.create({
+          data: {
+            quizSetId,
+            lessonId,
+            questionType: QuestionType.MULTIPLE_CHOICE,
+            questionJson: documentWithText(`Câu ${questionNumber}: chọn đáp án đúng`),
+            optionsJson: [
+              { id: "A", richText: documentWithText("Sai") },
+              { id: "B", richText: documentWithText("Đúng") },
+            ],
+            correctAnswerJson: ["B"],
+            reviewStatus: ReviewStatus.APPROVED,
+            sortOrder: questionNumber - 1,
+          },
+        }),
+      ),
+    );
+
+    const cumulativeSource = await quizAttemptsService.startAttempt(
+      quizSetId,
+      studentUserId,
+      { scope: QuizAttemptScopeDto.ALL },
+    );
+    expect(cumulativeSource.questions.map((question) => question.questionNumber)).toEqual(
+      [1, 2, 3, 4],
+    );
+    const cumulativeSourceResult = await quizAttemptsService.submitAttempt(
+      cumulativeSource.id,
+      studentUserId,
+      cumulativeSource.questions.map((question) => ({
+        questionId: question.id,
+        answerJson:
+          question.questionNumber === 1 || question.questionNumber === 3 ? ["B"] : ["A"],
+      })),
+    );
+    expect(cumulativeSourceResult).toMatchObject({
+      id: cumulativeSource.id,
+      correctCount: 2,
+      wrongCount: 2,
+      totalCount: 4,
+    });
+
+    const firstIncorrectRetry = await quizAttemptsService.startAttempt(
+      quizSetId,
+      studentUserId,
+      {
+        scope: QuizAttemptScopeDto.INCORRECT,
+        sourceAttemptId: cumulativeSource.id,
+      },
+    );
+    expect(firstIncorrectRetry).toMatchObject({
+      scope: QuizAttemptScopeDto.INCORRECT,
+      sourceAttemptId: cumulativeSource.id,
+      originalTotalCount: 4,
+      totalCount: 2,
+    });
+    expect(
+      firstIncorrectRetry.questions.map((question) => question.questionNumber),
+    ).toEqual([2, 4]);
+    const firstChildResult = await quizAttemptsService.submitAttempt(
+      firstIncorrectRetry.id,
+      studentUserId,
+      firstIncorrectRetry.questions.map((question) => ({
+        questionId: question.id,
+        answerJson: question.questionNumber === 2 ? ["B"] : ["A"],
+      })),
+    );
+    expect(firstChildResult).toMatchObject({
+      id: firstIncorrectRetry.id,
+      sourceAttemptId: cumulativeSource.id,
+      correctCount: 1,
+      wrongCount: 1,
+      totalCount: 2,
+      aggregateResult: {
+        id: cumulativeSource.id,
+        correctCount: 3,
+        wrongCount: 1,
+        totalCount: 4,
+      },
+    });
+    const firstChildReview = await quizAttemptsService.reviewAttempt(
+      firstChildResult.id,
+      studentUserId,
+      QuizAttemptScopeDto.ALL,
+    );
+    expect(firstChildReview).toMatchObject({
+      id: firstChildResult.id,
+      sourceAttemptId: cumulativeSource.id,
+      totalCount: 2,
+      originalTotalCount: 4,
+    });
+    expect(firstChildReview.questions.map((question) => question.questionNumber)).toEqual(
+      [2, 4],
+    );
+
+    const firstChildAllRetry = await quizAttemptsService.startAttempt(
+      quizSetId,
+      studentUserId,
+      {
+        scope: QuizAttemptScopeDto.ALL,
+        sourceAttemptId: firstChildResult.id,
+      },
+    );
+    expect(firstChildAllRetry).toMatchObject({
+      sourceAttemptId: firstChildResult.id,
+      originalTotalCount: 4,
+      totalCount: 2,
+    });
+    expect(
+      firstChildAllRetry.questions.map((question) => question.questionNumber),
+    ).toEqual([2, 4]);
+
+    const secondIncorrectRetry = await quizAttemptsService.startAttempt(
+      quizSetId,
+      studentUserId,
+      {
+        scope: QuizAttemptScopeDto.INCORRECT,
+        sourceAttemptId: firstChildResult.id,
+      },
+    );
+    expect(secondIncorrectRetry).toMatchObject({
+      sourceAttemptId: firstChildResult.id,
+      originalTotalCount: 4,
+      totalCount: 1,
+    });
+    expect(
+      secondIncorrectRetry.questions.map((question) => question.questionNumber),
+    ).toEqual([4]);
+    const completedSecondChildResult = await quizAttemptsService.submitAttempt(
+      secondIncorrectRetry.id,
+      studentUserId,
+      [{ questionId: secondIncorrectRetry.questions[0]!.id, answerJson: ["B"] }],
+    );
+    expect(completedSecondChildResult).toMatchObject({
+      id: secondIncorrectRetry.id,
+      sourceAttemptId: firstChildResult.id,
+      correctCount: 1,
+      wrongCount: 0,
+      totalCount: 1,
+      aggregateResult: {
+        id: cumulativeSource.id,
+        correctCount: 4,
+        wrongCount: 0,
+        totalCount: 4,
+      },
+    });
+    const cumulativeReview = await quizAttemptsService.reviewAttempt(
+      cumulativeSource.id,
+      studentUserId,
+      QuizAttemptScopeDto.ALL,
+    );
+    expect(cumulativeReview.questions).toHaveLength(4);
+    expect(cumulativeReview.questions.every((question) => question.isCorrect)).toBe(true);
+    await expect(
+      quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
+    ).resolves.toMatchObject({
+      state: "COMPLETED",
+      latestSubmittedAttempt: {
+        id: cumulativeSource.id,
+        correctCount: 4,
+        wrongCount: 0,
+        totalCount: 4,
+      },
+    });
+
+    const fullResetAttempt = await quizAttemptsService.startAttempt(
+      quizSetId,
+      studentUserId,
+      { scope: QuizAttemptScopeDto.ALL },
+    );
+    const fullResetResult = await quizAttemptsService.submitAttempt(
+      fullResetAttempt.id,
+      studentUserId,
+      fullResetAttempt.questions.map((question) => ({
+        questionId: question.id,
+        answerJson: ["A"],
+      })),
+    );
+    expect(fullResetResult).toMatchObject({
+      id: fullResetAttempt.id,
+      correctCount: 0,
+      wrongCount: 4,
+      totalCount: 4,
+    });
+    await expect(
+      quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
+    ).resolves.toMatchObject({
+      state: "COMPLETED",
+      latestSubmittedAttempt: {
+        id: fullResetAttempt.id,
+        correctCount: 0,
+        wrongCount: 4,
+        totalCount: 4,
+      },
+    });
+
+    await flashcardsService.updateStudentProgress(flashcardId, studentUserId, false);
+    const ready = await lessonsService.getTestSetsStatus(lessonId, studentUserId);
+    expect(ready.canStart).toBe(true);
+    expect(ready.flashcard.isCompleted).toBe(true);
+
+    const failedAttempt = await testAttemptsService.startAttempt(lessonId, studentUserId);
+    expect(JSON.stringify(failedAttempt)).not.toContain("correctAnswerJson");
+    const failedResult = await testAttemptsService.submitAttempt(
+      failedAttempt.id,
+      studentUserId,
+      [{ questionId: failedAttempt.questions[0]!.id, answerJson: ["A"] }],
+    );
+    expect(failedResult.passed).toBe(false);
+    await expect(
+      testAttemptsService.useResult(failedAttempt.id, studentUserId),
+    ).rejects.toThrow();
+
+    const passingAttempt = await testAttemptsService.startAttempt(
+      lessonId,
+      studentUserId,
+    );
+    const passingResult = await testAttemptsService.submitAttempt(
+      passingAttempt.id,
+      studentUserId,
+      [{ questionId: passingAttempt.questions[0]!.id, answerJson: ["B"] }],
+    );
+    expect(passingResult.score).toBe(10);
+    expect(passingResult.passed).toBe(true);
+
+    const completion = await testAttemptsService.useResult(
+      passingAttempt.id,
+      studentUserId,
+    );
+    expect(completion.status).toBe("COMPLETED");
+    expect(completion.bestAttempt?.id).toBe(passingAttempt.id);
+    expect(completion.leaderboard[0]).toMatchObject({
+      rank: 1,
+      isCurrentStudent: true,
+      score: 10,
+    });
+
+    const idempotent = await testAttemptsService.useResult(
+      passingAttempt.id,
+      studentUserId,
+    );
+    expect(idempotent.promotedToBest).toBe(false);
+  });
+});
+
+function documentWithText(text: string) {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      },
+    ],
+  };
+}

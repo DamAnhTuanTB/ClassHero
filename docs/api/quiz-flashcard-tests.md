@@ -12,6 +12,11 @@ Chi tiết tách từ `docs/05-api-contract.md`. File index chính vẫn là `do
 
 Role: `ADMIN`.
 
+Behavior:
+
+- Trả các bộ chưa bị xóa mềm theo `sortOrder`, rồi `createdAt` tăng dần để giữ
+  ổn định thứ tự tạo của dữ liệu cũ.
+
 #### `POST /admin/lessons/:lessonId/quiz-sets`
 
 Role: `ADMIN`.
@@ -35,6 +40,10 @@ Body:
   ]
 }
 ```
+
+Behavior:
+
+- Server tự gán `sortOrder` tiếp theo trong lesson.
 
 #### `POST /admin/lessons/:lessonId/quiz-sets/generate-ai`
 
@@ -169,7 +178,9 @@ Body:
     "content": [
       {
         "type": "paragraph",
-        "content": [{ "type": "text", "text": "Xác định tính đúng sai của các mệnh đề sau." }]
+        "content": [
+          { "type": "text", "text": "Xác định tính đúng sai của các mệnh đề sau." }
+        ]
       }
     ]
   },
@@ -275,7 +286,93 @@ Behavior:
 
 Role: `STUDENT`.
 
-Side effect: tạo attempt.
+Body:
+
+```json
+{
+  "scope": "ALL",
+  "sourceAttemptId": null
+}
+```
+
+Behavior:
+
+- `scope=ALL` không có `sourceAttemptId` tạo lượt làm đủ câu và trở thành kết
+  quả gốc mới. `scope=ALL` có `sourceAttemptId` tạo lượt phụ gồm toàn bộ câu
+  của kết quả nguồn.
+- `scope=INCORRECT` bắt buộc `sourceAttemptId` thuộc chính student, là attempt
+  đã submit và chỉ lấy những câu sai của chính attempt nguồn.
+- `sourceAttemptId` luôn là attempt cha trực tiếp. Backend lần theo chuỗi
+  cha-con để tìm attempt gốc dùng cho kết quả cộng dồn của toàn bộ bài.
+- Tạo sẵn answer placeholder cho đúng tập câu của attempt để server không tin
+  danh sách question ID do client gửi về sau.
+- Response trả nội dung runner, hint, `correctAnswerJson`, `gradingConfigJson`
+  và `explanationJson` đã duyệt để frontend chấm tức thì mà không gọi API từng
+  câu. Đây là đánh đổi đã chốt để ưu tiên tốc độ; dữ liệu chấm có thể được xem
+  bằng DevTools.
+- Mỗi question có `questionNumber` theo vị trí trong bộ Quiz gốc; response có
+  `originalTotalCount` để runner retry hiển thị đúng dạng `Câu hỏi 4/9` thay vì
+  đánh số lại thành `1/4`.
+
+#### `GET /student/quiz-sets/:quizSetId/attempts/current`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả lượt `IN_PROGRESS` mới nhất của chính student trong bộ Quiz, hoặc `null`
+  nếu không có lượt đang làm.
+- Response trả lại danh sách câu theo đúng attempt đã tạo, gồm dữ liệu chấm và
+  lời giải giống response start. `checkedAnswers` chỉ giữ dữ liệu server từ flow
+  cũ; flow hiện hành khôi phục các câu đã kiểm tra từ local storage trên cùng
+  trình duyệt và backend chỉ lưu answer chính thức khi submit.
+- Frontend dùng endpoint này để khôi phục runner sau refresh/F5 hoặc khi
+  student đã thoát runner rồi vào Quiz lại, không tạo attempt mới khi vẫn còn
+  lượt `IN_PROGRESS`.
+- Response có `scope`, `sourceAttemptId`, `originalTotalCount` và
+  `questionNumber` để khôi phục đúng ngữ cảnh của runner retry câu sai.
+
+#### `GET /student/quiz-sets/:quizSetId/attempts/status`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả trạng thái entry của bộ Quiz theo chính student:
+  `NOT_STARTED`, `IN_PROGRESS` hoặc `COMPLETED`.
+- Chỉ lượt `IN_PROGRESS` được tạo sau lần submit gần nhất mới được ưu tiên và
+  response trả `currentAttemptId` cùng `checkedCount` đã lưu ở server. Flow hiện
+  hành chưa ghi từng câu lên server nên frontend ghép thêm số câu đã kiểm tra
+  trong local storage theo cùng `attemptId`; tổng bằng `0` dùng CTA `Bắt đầu`,
+  lớn hơn `0` dùng CTA `Tiếp tục vào làm`. Lượt đang dở cũ hơn lần submit gần
+  nhất phải bị bỏ qua để sau F5 không che mất kết quả đã hoàn thành.
+- Attempt có `sourceAttemptId` là lượt phụ nên không che trạng thái
+  `COMPLETED`/kết quả tích lũy của attempt gốc trên panel Quiz. Nếu F5 ngay
+  trong runner lượt phụ, frontend vẫn khôi phục lượt phụ bằng history marker
+  và endpoint `current`.
+- Nếu không có lượt đang làm nhưng đã submit, response trả
+  `latestSubmittedAttempt` gồm `id`, `correctCount`, `wrongCount`,
+  `totalCount`, `accuracyPercent` để panel mở lại kết quả gần nhất.
+- Endpoint chỉ trả metadata nhẹ, không trả nội dung câu hỏi hoặc đáp án.
+- Khi tạo hoặc submit một lượt mới, backend chuyển các lượt `IN_PROGRESS` dư
+  của cùng student/bộ Quiz sang `CANCELLED` để giữ một nguồn trạng thái hiện
+  hành.
+
+#### `POST /student/quiz-attempts/:attemptId/questions/:questionId/check`
+
+Role: `STUDENT`.
+
+Body:
+
+```json
+{ "answerJson": {} }
+```
+
+Behavior:
+
+- Endpoint tương thích cho client cũ; UI hiện hành không gọi endpoint này.
+- Client hiện hành chấm local từ dữ liệu đã trả khi start/resume và chỉ ghi
+  answer lên server ở endpoint submit.
 
 #### `POST /student/quiz-attempts/:attemptId/submit`
 
@@ -285,15 +382,49 @@ Body:
 
 ```json
 {
-  "answers": [{ "questionId": "uuid", "answerJson": {} }]
+  "answers": [
+    {
+      "questionId": "uuid",
+      "answerJson": {}
+    }
+  ]
 }
 ```
 
 Behavior:
 
-- Chấm bài.
-- Lưu answers.
-- Trả correct/wrong count.
+- Nhận toàn bộ answer trong một request. Backend không tin danh sách question ID
+  từ client: phải khớp chính xác các placeholder đã tạo cho attempt, không trùng
+  và không thiếu câu.
+- Backend validate answer theo loại câu, chấm lại authoritative, lưu answers và
+  submit attempt trong một transaction.
+- Ở runner, frontend dùng answer đầy đủ làm căn cứ cho `Đã làm`/cảnh báo thiếu
+  câu; student không bắt buộc bấm nút kiểm tra ở từng câu.
+- Trả summary của chính attempt vừa submit gồm `id`, `sourceAttemptId`,
+  `correctCount`, `wrongCount`, `totalCount`, `accuracyPercent` để backend giữ
+  được lịch sử chi tiết của từng lượt làm.
+- Response đồng thời có `aggregateResult`, là summary của attempt gốc sau khi
+  đã cộng các câu sửa đúng từ lượt phụ. Frontend luôn dùng `aggregateResult`
+  cho màn kết quả, trạng thái panel và mọi action xem lại/làm lại; không hiển
+  thị summary riêng của lượt con.
+- Với attempt phụ, server lưu kết quả riêng của lượt đó vào lịch sử và chỉ nâng
+  các answer đang sai của attempt gốc thành đúng; câu đã đúng không bị hạ thành
+  sai. Với attempt gốc `ALL`, `aggregateResult` chính là kết quả attempt vừa
+  submit và không cộng dồn dữ liệu từ kết quả gốc cũ.
+
+#### `GET /student/quiz-attempts/:attemptId/review?scope=ALL|INCORRECT`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Chỉ owner của attempt đã submit được xem lại.
+- `ALL` trả toàn bộ câu; `INCORRECT` chỉ trả câu sai.
+- Response có answer của student, đáp án đúng, kết quả từng mệnh đề và lời giải
+  đã duyệt.
+- Review dùng thống kê và tập câu của chính attempt được yêu cầu; đồng thời trả
+  `questionNumber` và `originalTotalCount` theo bộ Quiz gốc để lượt con không bị
+  đánh số lại từ 1.
 
 #### `POST /student/lessons/:lessonId/quiz-sets/request-new`
 
@@ -340,7 +471,7 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả các bộ chưa bị xóa mềm theo `sortOrder`.
+- Trả các bộ chưa bị xóa mềm theo `sortOrder`, rồi `createdAt` tăng dần.
 - `cardCount` phản ánh số flashcard chưa bị xóa mềm.
 
 #### `POST /admin/lessons/:lessonId/flashcard-sets`
@@ -467,10 +598,10 @@ Behavior:
 - Yêu cầu lesson đã publish và student có enrollment active còn hạn cho khóa
   gốc/bản cá nhân hiệu lực, hoặc lesson bật trial.
 - Chỉ trả set/card chưa xóa, set/card `APPROVED` và set không phải reserve.
-- Response chứa front/back/difficulty và lời giải đã `APPROVED` để student đọc
-  nội dung; progress thuộc `M7.3`.
+- Response chứa front/back/difficulty, lời giải đã `APPROVED`,
+  `progress`/`isFavorite` theo student và summary đã review/known/unknown.
 
-#### `POST /student/flashcards/:flashcardId/progress`
+#### `PATCH /student/flashcards/:flashcardId/progress`
 
 Role: `STUDENT`.
 
@@ -479,6 +610,22 @@ Body:
 ```json
 { "isKnown": true }
 ```
+
+Behavior:
+
+- Upsert progress theo student/card, tăng `reviewCount` và cập nhật
+  `lastReviewedAt`.
+- Completion prerequisite cần mỗi card của ít nhất một bộ được duyệt đã review
+  một lần; `isKnown` dùng để tách nhóm đã thuộc/chưa thuộc.
+
+#### `POST /student/favorites/toggle`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Toggle favorite cho Quiz question hoặc Flashcard sau khi kiểm tra ownership,
+  lesson access và target thuộc đúng lesson.
 
 #### `POST /student/lessons/:lessonId/flashcard-sets/request-new`
 
@@ -495,6 +642,11 @@ Response giống quiz request-new: `200 EXISTING` hoặc `202 QUEUED`.
 #### `GET /admin/lessons/:lessonId/test-sets`
 
 Role: `ADMIN`.
+
+Behavior:
+
+- Trả các bộ đề chưa bị xóa mềm theo `sortOrder`, rồi `createdAt` tăng dần để
+  giữ ổn định thứ tự tạo của dữ liệu cũ.
 
 #### `POST /admin/lessons/:lessonId/test-sets`
 
@@ -515,6 +667,7 @@ Rules:
 
 - `durationSeconds` bắt buộc, từ `60` đến `14400` giây.
 - UI quản trị nhập thời gian theo phút rồi đổi sang giây trước khi gọi API.
+- Server tự gán `sortOrder` tiếp theo trong lesson.
 - `difficultyRatioJson` là metadata tùy chọn; UI CRUD thủ công M6.4 giữ cùng
   field mức độ như Quiz và không bắt admin nhập tỷ lệ riêng.
 
@@ -613,6 +766,10 @@ Response gồm:
   "data": {
     "canStart": true,
     "examOpenAt": "2026-08-01T13:00:00.000Z",
+    "evaluatedAt": "2026-08-01T13:01:00.000Z",
+    "lockReason": null,
+    "quiz": { "isRequired": true, "isCompleted": true },
+    "flashcard": { "isRequired": true, "isCompleted": true },
     "bestAttempt": null,
     "sets": [
       {
@@ -632,9 +789,13 @@ Behavior:
 - Dùng cùng enrollment/trial access policy của lesson.
 - Chỉ trả metadata set `APPROVED`, chưa xóa, không phải reserve và số câu đã
   duyệt; không trả nội dung câu hỏi hoặc đáp án.
-- `canStart` được tính bằng thời gian server so với `examOpenAt`; trial luôn bị
-  khóa dù được đọc nội dung lesson.
-- `bestAttempt` là `null` trong `M6.5`; dữ liệu attempt thật được nối ở `M7.5`.
+- `canStart=true` chỉ khi có enrollment, đã tới giờ mở và prerequisite Quiz +
+  Flashcard đều hoàn thành. Trial luôn bị khóa dù được đọc nội dung lesson.
+- `lockReason` là `TRIAL_NOT_ALLOWED`, `BEFORE_OPEN_TIME`,
+  `PREREQUISITES_INCOMPLETE` hoặc `null`.
+- Không có content Quiz/Flashcard được duyệt thì prerequisite tương ứng không
+  bắt buộc.
+- `bestAttempt` là kết quả student đã chủ động dùng cho lesson.
 
 #### `POST /student/lessons/:lessonId/test-attempts/start`
 
@@ -643,6 +804,7 @@ Role: `STUDENT`.
 Behavior:
 
 - Kiểm tra đã đến `exam_open_at`.
+- Kiểm tra enrollment và prerequisite Quiz + Flashcard.
 - Chọn bộ đề phù hợp.
 - Tạo attempt.
 - Trả câu hỏi không kèm đáp án đúng.
@@ -667,12 +829,10 @@ Behavior:
   mỗi mệnh đề đúng nhận `P / N`, mệnh đề sai nhận 0; tổng điểm câu không dùng
   all-or-nothing.
 - Lưu attempt answers.
-- Cập nhật best attempt trong transaction.
-- Nếu score >= lesson completion score, cập nhật lesson progress completed.
-- Tạo XP event idempotent nếu đủ điều kiện.
-- Gửi notification cho student/parent nếu cần.
+- Chỉ chấm/lưu attempt và trả `passed`; chưa cập nhật best/completion.
+- Client có thể gửi marker unanswered khi timer tự nộp; câu đó nhận 0 điểm.
 
-#### `GET /student/test-attempts/:attemptId/review`
+#### `GET /student/test-attempts/:attemptId/review?scope=ALL|INCORRECT`
 
 Role: `STUDENT`.
 
@@ -682,6 +842,28 @@ Behavior:
 - Trả câu hỏi, answer của học sinh, correct answer, trạng thái đúng/sai. Với
   `MULTI_STATEMENT_TRUE_FALSE`, response có kết quả và điểm nhận được theo từng
   `statementId`; `isCorrect` của cả câu chỉ true khi mọi mệnh đề đều đúng.
+
+#### `POST /student/test-attempts/:attemptId/use-result`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Chỉ nhận attempt đã submit của chính student và đạt
+  `lesson.completion_min_score`.
+- Trong transaction, so sánh score cao hơn rồi duration thấp hơn; cập nhật
+  `is_best_for_lesson`, `lesson_progress` và completion idempotently.
+- Response trả Completion, best attempt và Top 5. Attempt không đạt bị từ chối
+  với `TEST_SCORE_BELOW_COMPLETION_THRESHOLD`.
+
+#### `GET /student/lessons/:lessonId/leaderboard/top-tests`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả tối đa 5 best result đã được student lựa chọn, sort score giảm dần,
+  duration tăng dần rồi thời điểm submit.
 
 #### `POST /student/lessons/:lessonId/test-sets/request-new`
 

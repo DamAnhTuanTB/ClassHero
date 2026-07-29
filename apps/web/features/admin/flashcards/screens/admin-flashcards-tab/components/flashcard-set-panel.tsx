@@ -1,13 +1,15 @@
 "use client";
 
-import { Layers, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Layers, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Ref } from "react";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import type {
   AdminFlashcard,
   AdminFlashcardSet,
 } from "@/features/admin/flashcards/api/admin-flashcards-api";
 import { useAdminFlashcards } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
 import { FlashcardCardRow } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-card-row";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 const difficultyLabels = {
   EASY: "Dễ",
@@ -36,6 +38,7 @@ export function FlashcardSetPanel({
   onEditSet: () => void;
 }) {
   const { data: cards, isError, isLoading, refetch } = useAdminFlashcards(set.id);
+  const shouldShowCardsLoading = useStableLoadingVisibility(isLoading);
 
   return (
     <section
@@ -87,25 +90,44 @@ export function FlashcardSetPanel({
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex min-h-32 items-center justify-center p-8">
-          <Loader2
-            className="h-6 w-6 animate-spin text-[var(--theme-primary)]"
-            aria-label="Đang tải"
-          />
-        </div>
-      ) : isError ? (
-        <div className="p-6 text-center">
-          <p className="text-sm font-semibold text-[var(--theme-error-text)]">
-            Không tải được flashcard của bộ này.
-          </p>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="theme-button-neutral mt-3 min-h-10 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
+      {isLoading || shouldShowCardsLoading ? (
+        shouldShowCardsLoading ? (
+          <div
+            aria-busy="true"
+            aria-label={`Đang tải flashcard của ${set.title}`}
+            className="min-h-48 animate-pulse"
           >
-            Thử lại
-          </button>
+            {Array.from({ length: 3 }, (_, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-[2rem_minmax(0,1fr)_5rem] items-center gap-3 border-b border-[var(--theme-border)] p-4 last:border-b-0"
+              >
+                <SkeletonBlock className="h-7 w-7 rounded-lg" />
+                <div className="space-y-2">
+                  <SkeletonBlock className="h-4 w-2/5 rounded-full" />
+                  <SkeletonBlock className="h-3.5 w-3/5 rounded-full opacity-70" />
+                </div>
+                <SkeletonBlock className="h-9 rounded-lg" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div aria-busy="true" className="min-h-48" />
+        )
+      ) : isError ? (
+        <div className="flex min-h-32 items-center justify-center p-6 text-center">
+          <div>
+            <p className="text-sm font-semibold text-[var(--theme-error-text)]">
+              Không tải được flashcard của bộ này.
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="theme-button-neutral mt-3 min-h-10 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
+            >
+              Thử lại
+            </button>
+          </div>
         </div>
       ) : !cards?.length ? (
         <div className="m-5 flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] px-4 py-10 text-center">

@@ -12,17 +12,18 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import { CloneStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/clone-status-badge";
 import { useEnrollmentListPanel } from "@/features/admin/courses/hooks/use-enrollment-list-panel";
 import type { PersonalizationStatus } from "@/features/admin/courses/types/admin-course-api-types";
-import { cn } from "@/lib/utils";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 const CreatePersonalPathConfirmDialog = dynamic(() =>
-  import(
-    "@/features/admin/courses/screens/admin-course-detail-manager/components/create-personal-path-confirm-dialog"
-  ).then((m) => m.CreatePersonalPathConfirmDialog),
+  import("@/features/admin/courses/screens/admin-course-detail-manager/components/create-personal-path-confirm-dialog").then(
+    (m) => m.CreatePersonalPathConfirmDialog,
+  ),
 );
 
 const STATUS_FILTER_OPTIONS: { value: PersonalizationStatus | "ALL"; label: string }[] = [
@@ -43,7 +44,6 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
     statusFilter,
     confirmingEnrollment,
     isLoading,
-    isFetching,
     isError,
     isSubmitting,
     handleSearchChange,
@@ -55,6 +55,7 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
     handlePageChange,
     refetch,
   } = useEnrollmentListPanel(learningPathId);
+  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
 
   return (
     <section
@@ -65,21 +66,20 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
       <div className="flex flex-col gap-3 border-b border-[var(--theme-border)] py-4 pl-5 pr-14 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:py-0 sm:pr-20">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
-            <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+            <Users
+              className="h-5 w-5 text-purple-600 dark:text-purple-400"
+              aria-hidden="true"
+            />
           </div>
           <div>
             <h2 className="text-base font-bold text-[var(--theme-text-strong)]">
               Học sinh đã mua
             </h2>
             {!isLoading && (
-              <p className="text-sm text-[var(--theme-text-muted)]">
-                {total} học sinh
-              </p>
+              <p className="text-sm text-[var(--theme-text-muted)]">{total} học sinh</p>
             )}
           </div>
         </div>
-
-
       </div>
 
       {/* Filters */}
@@ -91,7 +91,12 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
             label="Tìm học sinh"
             hideLabel
             value={search}
-            icon={<Search className="h-5 w-5 text-[var(--theme-text-muted)]" aria-hidden="true" />}
+            icon={
+              <Search
+                className="h-5 w-5 text-[var(--theme-text-muted)]"
+                aria-hidden="true"
+              />
+            }
             placeholder="Tìm học sinh (tên, email, SĐT)..."
             onChange={(e) => handleSearchChange(e.target.value)}
             trailingAction={
@@ -117,7 +122,9 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
             hideLabel
             value={statusFilter}
             icon={null}
-            onChange={(value) => handleStatusFilterChange(value as PersonalizationStatus | "ALL")}
+            onChange={(value) =>
+              handleStatusFilterChange(value as PersonalizationStatus | "ALL")
+            }
             options={STATUS_FILTER_OPTIONS}
           />
         </div>
@@ -125,28 +132,34 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
 
       {/* Content */}
       <div className="p-5">
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-3 py-12 text-[var(--theme-text-muted)]">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            <span className="text-sm">Đang tải danh sách học sinh...</span>
-          </div>
+        {isLoading || shouldShowInitialLoading ? (
+          shouldShowInitialLoading ? (
+            <EnrollmentTableSkeleton />
+          ) : (
+            <div aria-busy="true" className="min-h-48" />
+          )
         ) : isError ? (
-          <div className="py-12 text-center">
-            <p className="text-sm text-[var(--theme-danger-text)]">
-              Không thể tải danh sách. Vui lòng thử lại.
-            </p>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="theme-button-neutral mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold"
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              Thử lại
-            </button>
+          <div className="flex min-h-48 items-center justify-center text-center">
+            <div>
+              <p className="text-sm text-[var(--theme-danger-text)]">
+                Không thể tải danh sách. Vui lòng thử lại.
+              </p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="theme-button-neutral mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold"
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Thử lại
+              </button>
+            </div>
           </div>
         ) : enrollments.length === 0 ? (
           <div className="py-12 text-center">
-            <Users className="mx-auto h-10 w-10 text-[var(--theme-text-muted)] opacity-40" aria-hidden="true" />
+            <Users
+              className="mx-auto h-10 w-10 text-[var(--theme-text-muted)] opacity-40"
+              aria-hidden="true"
+            />
             <p className="mt-3 text-sm text-[var(--theme-text-muted)]">
               {search || statusFilter !== "ALL"
                 ? "Không có kết quả phù hợp với bộ lọc."
@@ -212,7 +225,10 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
                       )}
                       {enrollment.personalizationStatus === "CLONING" && (
                         <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-[var(--theme-text-muted)] opacity-60">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                          <Loader2
+                            className="h-3.5 w-3.5 animate-spin"
+                            aria-hidden="true"
+                          />
                           Đang xử lý...
                         </span>
                       )}
@@ -296,5 +312,37 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
         />
       ) : null}
     </section>
+  );
+}
+
+function EnrollmentTableSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải danh sách học sinh"
+      className="min-h-48 animate-pulse overflow-x-auto"
+    >
+      <div className="min-w-[600px]">
+        <div className="grid grid-cols-[minmax(0,1.5fr)_1fr_1fr_6rem] gap-4 border-b border-[var(--theme-border)] pb-3">
+          {Array.from({ length: 4 }, (_, index) => (
+            <SkeletonBlock key={index} className="h-3.5 rounded-full" />
+          ))}
+        </div>
+        {Array.from({ length: 5 }, (_, index) => (
+          <div
+            key={index}
+            className="grid grid-cols-[minmax(0,1.5fr)_1fr_1fr_6rem] items-center gap-4 border-b border-[var(--theme-border)] py-3 last:border-b-0"
+          >
+            <div className="space-y-2">
+              <SkeletonBlock className="h-4 w-1/2 rounded-full" />
+              <SkeletonBlock className="h-3 w-2/3 rounded-full opacity-70" />
+            </div>
+            <SkeletonBlock className="h-7 w-24 rounded-full" />
+            <SkeletonBlock className="h-4 w-24 rounded-full" />
+            <SkeletonBlock className="h-9 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

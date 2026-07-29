@@ -12,6 +12,7 @@ import type {
 import { hasTiptapDocumentContent } from "@/lib/tiptap-rich-content";
 import { cn } from "@/lib/utils";
 import "@/features/admin/quiz/components/quiz-rich-content-editor.css";
+import "@/components/common/content/math-content-typography.css";
 
 interface QuizRichContentViewerProps {
   ariaLabel?: string;
@@ -125,7 +126,8 @@ function renderTextMarks(text: string, marks: TiptapJsonMark[] | undefined) {
       case "code":
         return <code>{content}</code>;
       case "textStyle": {
-        const color = typeof mark.attrs?.color === "string" ? mark.attrs.color : undefined;
+        const color =
+          typeof mark.attrs?.color === "string" ? mark.attrs.color : undefined;
         return color ? <span style={{ color }}>{content}</span> : content;
       }
       default:
@@ -228,13 +230,7 @@ function RichContentImage({ node }: { node: TiptapJsonNode }) {
   );
 }
 
-function RichContentTableCell({
-  node,
-  tag,
-}: {
-  node: TiptapJsonNode;
-  tag: "td" | "th";
-}) {
+function RichContentTableCell({ node, tag }: { node: TiptapJsonNode; tag: "td" | "th" }) {
   const cellHeight = readOptionalBoundedNumber(node.attrs?.cellHeight, 32, 320);
   const cellProps = {
     colSpan: readNumber(node.attrs?.colspan, 1),
@@ -276,16 +272,10 @@ function readTableColumnWidths(table: TiptapJsonNode) {
     let columnIndex = 0;
     row.content?.forEach((cell) => {
       const columnSpan = Math.max(1, Math.round(readNumber(cell.attrs?.colspan, 1)));
-      const cellWidths = Array.isArray(cell.attrs?.colwidth)
-        ? cell.attrs.colwidth
-        : [];
+      const cellWidths = Array.isArray(cell.attrs?.colwidth) ? cell.attrs.colwidth : [];
 
       for (let spanIndex = 0; spanIndex < columnSpan; spanIndex += 1) {
-        const width = readOptionalBoundedNumber(
-          cellWidths[spanIndex],
-          24,
-          2_000,
-        );
+        const width = readOptionalBoundedNumber(cellWidths[spanIndex], 24, 2_000);
         if (width && !widths[columnIndex + spanIndex]) {
           widths[columnIndex + spanIndex] = width;
         } else if (widths[columnIndex + spanIndex] === undefined) {
@@ -360,11 +350,7 @@ function readBoundedNumber(
   return Math.min(Math.max(readNumber(value, fallback), minimum), maximum);
 }
 
-function readOptionalBoundedNumber(
-  value: unknown,
-  minimum: number,
-  maximum: number,
-) {
+function readOptionalBoundedNumber(value: unknown, minimum: number, maximum: number) {
   if (value === null || value === undefined || value === "") {
     return undefined;
   }

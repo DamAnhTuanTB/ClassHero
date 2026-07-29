@@ -170,6 +170,7 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 70. `M14.5` - Logging, monitoring và error tracking.
 71. `M14.6` - Docker Compose production, Nginx và health checks.
 72. `M14.7` - Backup/restore và vận hành production notes.
+73. `M14.8` - Frontend loading, prefetch và transition hardening. `Done 2026-07-29`.
 
 Ghi chú: `docs/09-implementation-plan.md` đặt nhóm `M8.x` trước `M5.x`/`M9.x` trong danh sách ưu tiên khi thiếu thời gian. Điều này hợp lý cho MVP có payment/enrollment trước AI nâng cao. Tuy nhiên, mọi subtask AI/RAG dựa trên tài liệu vẫn cần các phần `M4.x` và `M5.x` tương ứng trước khi hoàn thiện.
 
@@ -260,6 +261,8 @@ Phụ thuộc parent/report/news/gamification/testing:
 - `M14.1` đến `M14.5` phụ thuộc các service/flow tương ứng đã được implement.
 - `M14.6` phụ thuộc `M0.2` và app/container đã tồn tại.
 - `M14.7` phụ thuộc quyết định deploy/env từ `M14.6`.
+- `M14.8` phụ thuộc các screen/query tương ứng đã được implement; phần E2E mở
+  rộng dùng nền `M14.3` và triển khai theo batch Admin/Student có checkpoint.
 
 ## 5. Kiểm tra mâu thuẫn tài liệu
 

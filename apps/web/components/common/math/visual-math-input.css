@@ -53,7 +53,7 @@
 
 .visual-math-input__category-button--active {
   border-color: color-mix(in srgb, var(--visual-math-accent) 42%, var(--theme-border));
-  background: var(--theme-primary-subtle);
+  background: var(--theme-primary-soft);
   color: var(--visual-math-accent);
 }
 
@@ -97,7 +97,7 @@
 
 .visual-math-input__template-button:hover:not(:disabled) {
   border-color: var(--visual-math-accent);
-  background: var(--theme-primary-subtle);
+  background: var(--theme-primary-soft);
   transform: translateY(-1px);
 }
 
@@ -139,6 +139,7 @@
 }
 
 .visual-math-input__field-host math-field {
+  box-sizing: border-box;
   display: block;
   width: 100%;
   min-height: 4.75rem;
@@ -173,16 +174,141 @@
 
 .visual-math-input__field-host math-field:focus-within {
   border-color: var(--visual-math-accent);
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--visual-math-accent) 18%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--visual-math-accent) 18%, transparent);
+}
+
+.visual-math-input__field-host math-field[data-empty] {
+  --text-highlight-background-color: transparent;
 }
 
 .visual-math-input__field-host math-field::part(menu-toggle) {
   display: none;
 }
 
+.visual-math-input__field-host math-field::part(container) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 100%;
+  align-items: center;
+}
+
+.visual-math-input__field-host math-field::part(content) {
+  align-self: center;
+  overflow: visible;
+}
+
 .visual-math-input__field-host math-field::part(virtual-keyboard-toggle) {
+  align-self: center;
   color: var(--theme-text-muted);
+  fill: currentColor;
+}
+
+.visual-math-input__field-host
+  math-field[data-virtual-keyboard-open]::part(virtual-keyboard-toggle) {
+  border-color: color-mix(in srgb, var(--visual-math-accent) 42%, var(--theme-border));
+  background: var(--theme-primary-soft);
+  color: var(--visual-math-accent);
+}
+
+.visual-math-input__field-host
+  math-field[data-virtual-keyboard-open]::part(virtual-keyboard-toggle):hover {
+  background: var(--theme-primary-soft);
+  color: var(--visual-math-accent);
+}
+
+.visual-math-input--student-answer
+  .visual-math-input__field-host
+  math-field::part(virtual-keyboard-toggle) {
+  display: none;
+}
+
+.visual-math-input--student-answer {
+  --student-math-placeholder-color: var(--color-slate-400);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.dark .visual-math-input--student-answer {
+  --student-math-placeholder-color: var(--color-slate-500);
+}
+
+.visual-math-input--student-answer .visual-math-input__field-shell {
+  padding: 0;
+}
+
+.visual-math-input--student-answer .visual-math-input__field-host,
+.visual-math-input--student-answer .visual-math-input__loading {
+  height: 4rem;
+  min-height: 4rem;
+}
+
+.visual-math-input--student-answer .visual-math-input__field-host {
+  position: relative;
+}
+
+.visual-math-input--student-answer .visual-math-input__field-host math-field {
+  box-sizing: border-box;
+  display: flex;
+  height: 4rem;
+  min-height: 4rem;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 0 3.75rem 0 0.875rem;
+  font-size: 1.125rem;
+  --contains-highlight-color: var(--theme-text-strong);
+}
+
+.visual-math-input--student-answer
+  .visual-math-input__field-host
+  math-field::part(container) {
+  height: 100%;
+  min-height: 0;
+  align-items: center;
+  padding: 0;
+}
+
+.visual-math-input--student-answer
+  .visual-math-input__field-host
+  math-field::part(content) {
+  align-self: center;
+  overflow: visible;
+}
+
+.visual-math-input--student-answer .visual-math-input__loading {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border: 1px solid var(--visual-math-accent);
+  border-radius: 1rem;
+  background: var(--theme-input-bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--visual-math-accent) 18%, transparent);
+}
+
+.visual-math-input--student-answer .visual-math-input__template-button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.visual-math-input--student-answer .visual-math-input__controls {
+  margin-top: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 0.9rem;
+  background: var(--theme-input-bg);
+}
+
+.visual-math-input--student-answer .visual-math-input__palette {
+  border-bottom: 0;
+}
+
+.visual-math-input--correct .visual-math-input__field-host math-field {
+  border-color: rgb(52 211 153);
+}
+
+.visual-math-input--incorrect .visual-math-input__field-host math-field {
+  border-color: rgb(251 113 133);
 }
 
 .visual-math-input__loading {

@@ -10,18 +10,61 @@ import {
   updateAdminQuizQuestion,
   updateAdminQuizSet,
   type AdminQuizQuestionPayload,
+  type AdminQuizSet,
   type QuizDifficulty,
 } from "@/features/admin/quiz/api/admin-quiz-api";
+
+const adminQuizQueryKeys = {
+  all: ["admin", "quiz"] as const,
+  sets: (lessonId: string) => [...adminQuizQueryKeys.all, "sets", lessonId] as const,
+  setsForUser: (lessonId: string, userId?: string) =>
+    [...adminQuizQueryKeys.sets(lessonId), userId ?? "guest"] as const,
+  questions: (setId: string) => [...adminQuizQueryKeys.all, "questions", setId] as const,
+  questionsForUser: (setId: string, userId?: string) =>
+    [...adminQuizQueryKeys.questions(setId), userId ?? "guest"] as const,
+};
+
+export function getAdminQuizSetsQueryOptions({
+  accessToken,
+  lessonId,
+  userId,
+}: {
+  accessToken: string;
+  lessonId: string;
+  userId?: string;
+}) {
+  return {
+    queryKey: adminQuizQueryKeys.setsForUser(lessonId, userId),
+    queryFn: () => getAdminQuizSets(lessonId, accessToken),
+    staleTime: 30_000,
+  };
+}
+
+export function getAdminQuizQuestionsQueryOptions({
+  accessToken,
+  setId,
+  userId,
+}: {
+  accessToken: string;
+  setId: string;
+  userId?: string;
+}) {
+  return {
+    queryKey: adminQuizQueryKeys.questionsForUser(setId, userId),
+    queryFn: () => getAdminQuizQuestions(setId, accessToken),
+    staleTime: 30_000,
+  };
+}
 
 export function useAdminQuizSets(lessonId: string, enabled = true) {
   const session = useAuthSessionStore((state) => state.session);
 
   return useQuery({
-    queryKey: ["admin-quiz-sets", lessonId],
-    queryFn: async () => {
-      if (!session?.accessToken) throw new Error("No token");
-      return getAdminQuizSets(lessonId, session.accessToken);
-    },
+    ...getAdminQuizSetsQueryOptions({
+      accessToken: session?.accessToken ?? "",
+      lessonId,
+      userId: session?.user.id,
+    }),
     enabled: enabled && !!session?.accessToken && !!lessonId,
   });
 }
@@ -35,8 +78,18 @@ export function useAdminQuizSetMutations(lessonId: string) {
       if (!session?.accessToken) throw new Error("No token");
       return createAdminQuizSet(lessonId, data, session.accessToken);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+    onSuccess: (createdSet) => {
+      const cachedSet: AdminQuizSet = {
+        ...createdSet,
+        _count: createdSet._count ?? { questions: createdSet.questionCount },
+      };
+      queryClient.setQueryData<AdminQuizSet[]>(
+        adminQuizQueryKeys.setsForUser(lessonId, session?.user.id),
+        (currentSets) => [...(currentSets ?? []), cachedSet],
+      );
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
     },
   });
 
@@ -46,7 +99,9 @@ export function useAdminQuizSetMutations(lessonId: string) {
       return deleteAdminQuizSet(setId, session.accessToken);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
     },
   });
 
@@ -62,7 +117,9 @@ export function useAdminQuizSetMutations(lessonId: string) {
       return updateAdminQuizSet(setId, data, session.accessToken);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
     },
   });
 
@@ -77,11 +134,11 @@ export function useAdminQuizQuestions(setId: string, enabled = true) {
   const session = useAuthSessionStore((state) => state.session);
 
   return useQuery({
-    queryKey: ["admin-quiz-questions", setId],
-    queryFn: async () => {
-      if (!session?.accessToken) throw new Error("No token");
-      return getAdminQuizQuestions(setId, session.accessToken);
-    },
+    ...getAdminQuizQuestionsQueryOptions({
+      accessToken: session?.accessToken ?? "",
+      setId,
+      userId: session?.user.id,
+    }),
     enabled: enabled && !!session?.accessToken && !!setId,
   });
 }
@@ -96,8 +153,12 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
       return createAdminQuizQuestion(setId, data, session.accessToken);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-questions", setId] });
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.questions(setId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
     },
   });
 
@@ -113,7 +174,9 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
       return updateAdminQuizQuestion(questionId, data, session.accessToken);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-questions", setId] });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.questions(setId),
+      });
     },
   });
 
@@ -123,8 +186,12 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
       return deleteAdminQuizQuestion(questionId, session.accessToken);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-questions", setId] });
-      queryClient.invalidateQueries({ queryKey: ["admin-quiz-sets", lessonId] });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.questions(setId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
     },
   });
 

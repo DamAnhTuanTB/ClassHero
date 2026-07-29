@@ -139,6 +139,7 @@ describe("M6.3 flashcard CRUD integration", () => {
       "Công thức trọng tâm",
       "Bộ đang biên tập",
     ]);
+    expect(sets.map((set) => set.sortOrder)).toEqual([0, 1]);
   });
 
   it("creates, reads and updates a flashcard item", async () => {

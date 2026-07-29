@@ -186,6 +186,7 @@ Spacing/radius mặc định:
 - Button dùng shadcn/ui `Button`.
 - Text trong button không được xuống dòng trong mọi viewport. Button phải có `white-space: nowrap`/`whitespace-nowrap`; khi nhãn dài hoặc màn hẹp, ưu tiên chỉnh layout, độ rộng, padding, font size hoặc copy ngắn hơn thay vì cho chữ wrap.
 - Mọi nút bấm và đường link có thể click được phải hiển thị `cursor: pointer`. Trạng thái không click được như disabled/loading phải dùng cursor đúng trạng thái (`not-allowed`, `wait`, `default` hoặc tương đương), không để người dùng hiểu nhầm là có thể bấm.
+- Các nút cùng một flow hoặc action group phải dùng chung ngôn ngữ tương tác theo từng vai trò: cùng độ sâu shadow, cùng khoảng dịch chuyển khi pressed và cùng nhịp transition. Nút enabled phải có đổi màu hover rõ nhưng nhẹ; nút disabled không được đổi màu như thể vẫn tương tác được. Khi student theme chủ động bỏ shadow trên mobile, action cần giữ hiệu ứng 3D phải dùng utility ngoại lệ đã có thay vì tự tạo độ sâu/màu shadow khác ở từng màn.
 - Form dùng React Hook Form + Zod; nếu đã setup shadcn Form thì dùng shadcn Form.
 - Trước khi tạo form, phải kiểm tra form chuẩn đã duyệt và reusable primitives: `apps/web/components/common/forms`, các form tương tự trong feature đang làm, và `docs/ui-references/approved-patterns.md`. Reuse/nâng cấp component sẵn có thay vì tạo input/select/textarea/button cùng chức năng với style khác.
 - Checklist bắt buộc cho mọi form mới hoặc form được sửa: schema Zod đủ required/min/max/format; React Hook Form validate khi nhập/chọn; lỗi inline có copy rõ và đúng rule đang fail; submit invalid phải bị chặn bằng validation handler thay vì khóa nút modal; action button trong modal vẫn bấm được để hiện lỗi, chỉ disabled khi pending/saving hoặc thiếu prerequisite cứng; pending state có feedback; reset/default values đúng khi mở lại modal/drawer; không có control nhìn bấm được nhưng thiếu handler/state thật.
@@ -323,6 +324,14 @@ Frontend rules:
 
 Mobile UX rules:
 
+- Mobile header tự ẩn theo hướng cuộn phải lưu/khôi phục trạng thái theo từng
+  browser history entry cùng `scrollY`, không cache chỉ theo pathname và không
+  phụ thuộc browser/Next tự restore. Khi Back/Forward về một entry còn giữ vị
+  trí cuộn sâu, student shell phải khôi phục đúng `scrollY` và header phải nhận
+  trạng thái cũ trước frame đầu. Khi bấm link/CTA để mở một history entry mới,
+  màn đích bắt đầu ở `scrollY = 0`, header hiện và không kế thừa trạng thái của
+  entry cũ. Sau F5/reload, entry hiện tại được reset về `scrollY = 0` như lần đầu
+  vào màn và header luôn khởi tạo ở trạng thái hiện.
 - Touch target tối thiểu khoảng `44px` cho CTA, option quiz, tab, icon button quan trọng.
 - Trạng thái bấm/tap phải rõ: pressed/active/loading/disabled.
 - Form mobile phải ít ma sát: input label rõ, lỗi hiện gần field, keyboard type phù hợp, submit không bị che bởi keyboard/sticky footer.
@@ -332,6 +341,19 @@ Mobile UX rules:
 - Select/dropdown không được ép mở bằng `touchstart`/`pointerdown` khi người dùng chỉ lướt qua; chỉ mở sau click/tap có chủ đích. Với form mobile đơn giản như auth, ưu tiên inline controlled button/listbox nếu portal dropdown tạo lỗi double-open trên touch viewport. Click/tap lại trigger khi đang mở phải đóng hẳn, và icon mũi tên phải phản ánh đúng trạng thái mở/đóng.
 - Nút submit trong form mock/client-only nên có `preventDefault` rõ hoặc dùng intent handler riêng để tránh submit HTML mặc định làm reload trang khi client JS chưa hydrate.
 - Với quiz/flashcard/test, thao tác chính phải nằm trong tầm ngón tay; tránh bắt user cuộn quá nhiều chỉ để submit/chuyển câu.
+- Quiz là flow tham chiếu cho các hoạt động luyện tập trong lesson. Flashcard
+  phải giữ panel vào bài trong tab lesson, nhưng sau `Bắt đầu`/`Tiếp tục`/`Xem
+lại` phải chuyển sang runner hoặc result toàn màn hình có cùng header
+  ClassHero, back/exit-confirm, scroll lock, progress hierarchy và responsive
+  behavior; chỉ đổi tone/copy/action theo nghiệp vụ Flashcard.
+- Flow học dài như Quiz/Test đang làm phải chịu được refresh/F5: attempt và các
+  kết quả đã chấm khôi phục từ server; vị trí câu/đáp án nháp có thể lưu browser
+  storage theo đúng attempt. Không được chỉ giữ flow bằng React state rồi đưa
+  người học về màn bắt đầu sau reload.
+- Khi resume một flow fullscreen sau F5, trạng thái pending phải chiếm cùng
+  fullscreen boundary và giữ gần đúng bố cục đích ngay từ HTML đầu tiên. Không
+  render loading dạng card trong shell rồi mới phủ runner lên sau khi API trả về,
+  vì sẽ làm màn trước nháy lên dù dữ liệu resume vẫn đúng.
 - Khi API chậm, ưu tiên skeleton, inline progress hoặc retry thân thiện thay vì màn hình trắng.
 
 Local dev/browser guardrails:
@@ -365,10 +387,15 @@ Khi làm UI phức tạp, Codex nên ghi rõ trong final response đã kiểm tr
 
 Mỗi màn hình hoặc block có data fetching phải có:
 
-- Loading state: skeleton hoặc spinner phù hợp layout.
+- Loading của dữ liệu detail, danh sách, card và tab panel phải ưu tiên skeleton mô phỏng gần đúng bố cục thật; không dùng mặc định spinner kèm câu mô tả cho các surface này.
+- Skeleton phải được thiết kế theo cấu trúc thật của từng màn: list mô phỏng row/card list, detail mô phỏng hero/stat/section, form mô phỏng field/action và tab mô phỏng đúng panel đích. Không dùng một skeleton tổng quát giống hệt cho nhiều loại màn chỉ để thay spinner; chỉ tái sử dụng primitive nhỏ như block màu khi hình học thực sự giống nhau.
+- Spinner chỉ dành cho thao tác ngắn không có bố cục nội dung để mô phỏng, ví dụ pending ngay bên trong nút bấm hoặc bước kết nối đặc thù. Không thay toàn bộ detail/list/tab panel bằng một icon xoay và dòng “Đang tải…”.
 - Empty state: nói rõ chưa có dữ liệu và CTA tiếp theo nếu có.
 - Error state: message dễ hiểu và retry nếu hợp lý.
 - Disabled state: action chưa dùng được phải có lý do hoặc tooltip/helper text.
+- Full-page loading/error phải căn giữa theo cả chiều ngang và chiều dọc của viewport. Nếu màn nằm trong shell có header/sidebar thì căn giữa phần content còn lại; loading/error của tab hoặc card chỉ căn giữa vùng của chính tab/card.
+- Initial loading dưới khoảng `250-300ms` không nên xuất hiện ngay vì tạo nháy khi hydrate/F5. Nếu loading đã hiện, giữ tối thiểu khoảng `300ms` để trạng thái ổn định trước khi chuyển sang nội dung.
+- Dữ liệu của các tab cùng một màn phải được fetch/prefetch sớm nhất có thể ngay khi đủ dependency và chạy song song khi độc lập; không đợi người dùng mở tab mới bắt đầu request. Chuyển tab phải ưu tiên dữ liệu cache và không đưa panel đã có dữ liệu quay lại skeleton khi background refetch.
 
 Không để trắng màn hình hoặc chỉ hiện lỗi raw.
 

@@ -44,7 +44,15 @@ Codex phải ưu tiên:
 - Lazy load phần nặng hoặc ít dùng như editor, chart, AI panel, admin tool.
 - Không kéo form/modal/drawer/editor/chart/admin tool chưa dùng vào client bundle ban đầu; dynamic import/lazy-load khi người dùng mở hoặc chuẩn bị mở.
 - Dùng server render, initial data hoặc placeholder data an toàn để giảm thời gian skeleton ở lần mở đầu, kể cả khi đang dùng mock data.
+- Không render full-page loading ngay cho request ngắn vì sẽ tạo hiệu ứng nháy khi hydrate/F5. Nếu chưa có initial data, trì hoãn loading khoảng `250-300ms`; khi loading đã xuất hiện, giữ tối thiểu khoảng `300ms` để trạng thái không chớp một khung hình rồi biến mất.
 - Prefetch/cache route và data hợp lý để chuyển trang nhanh nhưng không refetch thừa; tránh màn trắng trong route transition.
+- Nếu CTA dùng branded/full-screen transition trước khi đổi route, phải bắt đầu
+  `router.prefetch` và data prefetch/fetch vào cache ngay trong cùng click với
+  animation. Không được chờ transition chạy xong mới gọi API. Có thể chờ đồng
+  thời thời gian hiển thị tối thiểu ngắn để copy thương hiệu đủ đọc và dữ liệu
+  cốt lõi; nếu API chậm hơn thì giữ overlay. Thời gian tối thiểu phải chạy song
+  song với request, không nối tiếp sau request; khi route đích commit thì mở
+  overlay ngay, không thêm một khoảng hold thứ hai làm chậm flow.
 - Giảm asset/font/image trên mobile: chỉ tải kích thước cần, lazy-load media ngoài viewport và không kéo font/weight không dùng.
 - API/data cho UI phải trả đúng metadata cần hiển thị, có pagination/list limit, tránh trả rich text/blob/include lớn nếu màn chưa dùng.
 - Tránh hydration mismatch trên mobile: formatter ngày/tiền/sort phải deterministic giữa server và client; browser-only logic chỉ chạy sau hydrate; attribute do browser/autofill chèn vào input phải được xử lý ở primitive phù hợp.
@@ -104,6 +112,12 @@ Các flow cần chú ý độ trễ:
 - Lesson content.
 - Quiz/test submit.
 - Payment create/status/webhook.
+
+Riêng Quiz `M7.2`, response start/resume được phép trả dữ liệu chấm cho client
+theo quyết định sản phẩm ưu tiên tốc độ. `Kiểm tra đáp án` phải chấm local và
+không tạo request từng câu; `Hoàn thành` gửi toàn bộ answer trong một request để
+backend chấm/lưu authoritative.
+
 - Notification list/bell.
 - AI chat/generate/job status.
 

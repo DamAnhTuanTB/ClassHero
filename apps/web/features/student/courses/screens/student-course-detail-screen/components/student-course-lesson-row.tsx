@@ -1,5 +1,5 @@
 import { Check, Crown, LockKeyhole, Play, Radio, RadioTower } from "lucide-react";
-import Link from "next/link";
+import { StudentLessonTransitionLink } from "@/components/student/learning-transition/student-lesson-transition-link";
 import type { StudentCourseDetailLesson } from "@/features/student/shared/student-courses-types";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +48,14 @@ export function StudentCourseLessonRow({
         : isLocked
           ? LockKeyhole
           : Radio;
+  const lessonTitleClassName = cn(
+    "min-w-0 break-words text-base font-bold leading-6 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100",
+    isLocked
+      ? "text-slate-500 dark:text-[var(--theme-text-muted)]"
+      : isCurrent
+        ? "text-blue-600 dark:text-sky-300"
+        : "text-slate-700 hover:text-blue-600 dark:text-[var(--theme-text)] dark:hover:text-sky-300",
+  );
 
   return (
     <li className="relative z-10 grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-start gap-3 px-3 py-3">
@@ -77,20 +85,18 @@ export function StudentCourseLessonRow({
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
         <div className="flex min-w-0 flex-col items-start gap-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <Link
-              href={isLocked ? "#" : `/student/lessons/${lesson.id}`}
-              aria-disabled={isLocked}
-              className={cn(
-                "min-w-0 break-words text-base font-bold leading-6 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100",
-                isLocked
-                  ? "pointer-events-none text-slate-500 dark:text-[var(--theme-text-muted)]"
-                  : isCurrent
-                    ? "text-blue-600 dark:text-sky-300"
-                    : "text-slate-700 hover:text-blue-600 dark:text-[var(--theme-text)] dark:hover:text-sky-300",
-              )}
-            >
-              {lesson.title}
-            </Link>
+            {isLocked ? (
+              <span aria-disabled="true" className={lessonTitleClassName}>
+                {lesson.title}
+              </span>
+            ) : (
+              <StudentLessonTransitionLink
+                lessonId={lesson.id}
+                className={lessonTitleClassName}
+              >
+                {lesson.title}
+              </StudentLessonTransitionLink>
+            )}
             {lesson.lessonType === "LIVE" ? (
               <span
                 className="inline-flex min-h-5 shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-1.5 text-[10px] font-extrabold leading-none text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-300"
@@ -109,12 +115,12 @@ export function StudentCourseLessonRow({
           ) : null}
         </div>
         {shouldShowLessonCta ? (
-          <Link
-            href={`/student/lessons/${lesson.id}`}
+          <StudentLessonTransitionLink
+            lessonId={lesson.id}
             className="inline-flex min-h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-sky-500 px-2.5 text-[11px] font-black text-white shadow-sm transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
           >
             {lessonCtaLabel}
-          </Link>
+          </StudentLessonTransitionLink>
         ) : null}
       </div>
     </li>

@@ -38,28 +38,29 @@ M10 notification + M12 news/report
 
 M14 testing/hardening/deploy
   -> depends on implemented flows
+  -> M14.8 frontend loading/prefetch hardening audits only existing screens
 ```
 
 ## 2. Phụ thuộc theo milestone
 
-| Milestone | Phụ thuộc chính | Mở khóa |
-| --- | --- | --- |
-| `M0` | Docs/project decision | Repo, tooling, Docker local |
-| `M1` | `M0` | Schema/model nền cho toàn hệ thống |
-| `M2` | `M1.2`, `M2.1` | Auth, RBAC, profile, protected APIs |
-| `M3` | `M1.3`, `M2.3` | Course/chapter/lesson APIs và UI public/student/admin |
-| `M4` | `M1.2`, `M1.3`, `M2.3`, `M3.2` | Upload, lesson document API, worker, PDF processing |
-| `M5` | `M4.4`, API/env nền | Embedding, pgvector retrieval, hybrid search |
-| `M6` | `M1.4`, `M2.3`, `M3.2` | Quiz/flashcard/test CRUD và read-only lesson content |
-| `M7` | `M3.2`, `M6.5`, `M2.3` | Student lesson flow, attempts, progress, dashboard |
-| `M8` | `M1.5`, `M2.3`, `M3.1` | Discount, payment order, webhook, enrollment |
-| `M9` | `M5.x`, `M9.1`, content modules | AI generate, explanation cache, lesson chat |
-| `M10` | Notification models, auth, event sources | In-app/realtime/email/Zalo notification |
-| `M11` | Parent-child link, progress/payment/news APIs | Parent portal |
-| `M12` | Report/news models, auth, content modules | Report moderation, news/events |
-| `M13` | Progress/attempt/profile/file models | XP, leaderboard, profile, admin dashboard |
-| `M14` | Implemented sensitive flows | Tests, hardening, deploy, operations |
-| `M15` | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x` | Smart video progress, contextual learning, adaptive review và analytics |
+| Milestone | Phụ thuộc chính                                                     | Mở khóa                                                                 |
+| --------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `M0`      | Docs/project decision                                               | Repo, tooling, Docker local                                             |
+| `M1`      | `M0`                                                                | Schema/model nền cho toàn hệ thống                                      |
+| `M2`      | `M1.2`, `M2.1`                                                      | Auth, RBAC, profile, protected APIs                                     |
+| `M3`      | `M1.3`, `M2.3`                                                      | Course/chapter/lesson APIs và UI public/student/admin                   |
+| `M4`      | `M1.2`, `M1.3`, `M2.3`, `M3.2`                                      | Upload, lesson document API, worker, PDF processing                     |
+| `M5`      | `M4.4`, API/env nền                                                 | Embedding, pgvector retrieval, hybrid search                            |
+| `M6`      | `M1.4`, `M2.3`, `M3.2`                                              | Quiz/flashcard/test CRUD và read-only lesson content                    |
+| `M7`      | `M3.2`, `M6.5`, `M2.3`                                              | Student lesson flow, attempts, progress, dashboard                      |
+| `M8`      | `M1.5`, `M2.3`, `M3.1`                                              | Discount, payment order, webhook, enrollment                            |
+| `M9`      | `M5.x`, `M9.1`, content modules                                     | AI generate, explanation cache, lesson chat                             |
+| `M10`     | Notification models, auth, event sources                            | In-app/realtime/email/Zalo notification                                 |
+| `M11`     | Parent-child link, progress/payment/news APIs                       | Parent portal                                                           |
+| `M12`     | Report/news models, auth, content modules                           | Report moderation, news/events                                          |
+| `M13`     | Progress/attempt/profile/file models                                | XP, leaderboard, profile, admin dashboard                               |
+| `M14`     | Implemented sensitive flows                                         | Tests, hardening, deploy, operations                                    |
+| `M15`     | `M3.8`, core `M7.1-M7.5`; AI tasks additionally need `M5.x`, `M9.x` | Smart video progress, contextual learning, adaptive review và analytics |
 
 ## 3. Phụ thuộc cần nhớ khi chọn task
 
@@ -78,6 +79,8 @@ M14 testing/hardening/deploy
 - `M15.4-M15.6` không được chạy trước nền transcript `M3.8`, retrieval `M5.x` và AI `M9.x` tương ứng.
 - `M15.7` chỉ suy luận difficulty từ nhiều tín hiệu học tập; `M15.8` chỉ hiển thị analytics tổng hợp có ngưỡng riêng tư.
 - M15 không thay đổi rule completed của `M7.5`; watched percent/chapter mastery chỉ là tín hiệu hỗ trợ.
+- `M14.8` phụ thuộc các screen/query đã được implement ở từng feature; phần
+  regression Playwright dùng nền `M14.3`, không chặn feature chưa có UI.
 
 ## 4. Khi nào cập nhật file này
 

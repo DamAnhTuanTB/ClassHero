@@ -10,6 +10,71 @@ const mathTemplateCounts = [
   { category: "Mũi tên", count: 10 },
 ] as const;
 
+test("admin lesson preloads flashcard data before tab intent without a transient loader", async ({
+  page,
+}) => {
+  let flashcardSetRequests = 0;
+  let flashcardCardRequests = 0;
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname.replace("/api/v1", "");
+    if (pathname === `/admin/lessons/${lessonId}/flashcard-sets`) {
+      flashcardSetRequests += 1;
+    }
+    if (pathname === "/admin/flashcard-sets/set-foundation/cards") {
+      flashcardCardRequests += 1;
+    }
+  });
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await expect(page.getByRole("heading", { name: "Quản lý Quiz" })).toBeVisible();
+  await expect.poll(() => flashcardSetRequests).toBe(1);
+  await expect.poll(() => flashcardCardRequests).toBe(1);
+
+  await page.evaluate(() => {
+    const probe = { observedLoading: false };
+    const observer = new MutationObserver(() => {
+      if (
+        document.querySelector(
+          '[aria-label="Đang tải danh sách bộ flashcard"], [aria-label^="Đang tải flashcard của"]',
+        )
+      ) {
+        probe.observedLoading = true;
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    (
+      window as typeof window & {
+        __adminFlashcardLoadingProbe?: {
+          observer: MutationObserver;
+          probe: { observedLoading: boolean };
+        };
+      }
+    ).__adminFlashcardLoadingProbe = { observer, probe };
+  });
+
+  await page.getByRole("tab", { name: "Flashcard" }).click();
+  await expect(page.getByRole("heading", { name: "Quản lý Flashcard" })).toBeVisible();
+  await expect(page.getByText("Định lý Pythagore")).toBeVisible();
+
+  const observedLoading = await page.evaluate(() => {
+    const loadingProbe = (
+      window as typeof window & {
+        __adminFlashcardLoadingProbe?: {
+          observer: MutationObserver;
+          probe: { observedLoading: boolean };
+        };
+      }
+    ).__adminFlashcardLoadingProbe;
+    loadingProbe?.observer.disconnect();
+    return loadingProbe?.probe.observedLoading ?? false;
+  });
+  expect(observedLoading).toBe(false);
+  expect(flashcardSetRequests).toBe(1);
+  expect(flashcardCardRequests).toBe(1);
+});
+
 test("admin creates a flashcard set and card from lesson detail", async ({ page }) => {
   await seedAdminSession(page);
   await setupFlashcardApiMock(page);
@@ -26,7 +91,13 @@ test("admin creates a flashcard set and card from lesson detail", async ({ page 
   await expect(setDialog.getByLabel("Tên bộ flashcard")).toHaveValue("Bộ flashcard 1");
   await setDialog.getByLabel("Tên bộ flashcard").fill("Khái niệm trọng tâm");
   await setDialog.getByRole("button", { name: "Lưu", exact: true }).click();
-  await expect(page.getByRole("tab", { name: /Khái niệm trọng tâm/ })).toBeVisible();
+  const flashcardTabs = page
+    .getByRole("tablist", { name: "Các bộ flashcard" })
+    .getByRole("tab");
+  await expect(flashcardTabs).toHaveCount(2);
+  await expect(flashcardTabs.nth(0)).toContainText("Công thức nền tảng");
+  await expect(flashcardTabs.nth(1)).toContainText("Khái niệm trọng tâm");
+  await expect(flashcardTabs.nth(1)).toHaveAttribute("aria-selected", "true");
 
   await page.getByRole("button", { name: "Thêm flashcard" }).first().click();
   const cardDialog = page.getByRole("dialog", { name: "Thêm flashcard" });
@@ -70,6 +141,102 @@ test("admin edits the selected quiz set from its panel", async ({ page }) => {
   await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
 
   await expect(page.getByRole("tab", { name: /Bộ câu hỏi ôn tập/ })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("admin keeps quiz sets in creation order and selects the new set", async ({
+  page,
+}) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Thêm bộ câu hỏi" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Thêm bộ câu hỏi" });
+  await expect(dialog.getByLabel("Tên bộ câu hỏi")).toHaveValue("Bộ câu hỏi 2");
+  await dialog.getByRole("button", { name: "Thêm bộ câu hỏi" }).click();
+
+  const quizTabs = page.getByRole("tablist", { name: "Các bộ câu hỏi" }).getByRole("tab");
+  await expect(quizTabs).toHaveCount(2);
+  await expect(quizTabs.nth(0)).toContainText("Bộ câu hỏi 1");
+  await expect(quizTabs.nth(1)).toContainText("Bộ câu hỏi 2");
+  await expect(quizTabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expectNoFrameworkOverlay(page);
+});
+
+test("admin math content uses the same typography across symbol groups", async ({
+  page,
+}) => {
+  await seedAdminSession(page);
+  await setupFlashcardApiMock(page, { withMathQuestion: true });
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Quiz" }).click();
+
+  const questionContent = page.getByLabel("Nội dung câu 1");
+  const questionParagraph = questionContent.locator("p");
+  const mathExpressions = questionContent.locator(".katex");
+  const mathTextGlyphs = questionContent.locator(".katex :is(.mathnormal, .mathit)");
+  const fractionGlyph = questionContent.locator(".mfrac .mord.mtight").first();
+
+  await expect(questionParagraph).toBeVisible();
+  await expect(mathExpressions).toHaveCount(9);
+  await expect(mathTextGlyphs.first()).toBeVisible();
+  await expect(fractionGlyph).toBeVisible();
+
+  const textTypography = await questionParagraph.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      color: style.color,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+    };
+  });
+  const mathTypography = await mathExpressions.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element);
+      return {
+        color: style.color,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+      };
+    }),
+  );
+  const fractionTypography = await fractionGlyph.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      color: style.color,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+    };
+  });
+  const mathTextTypography = await mathTextGlyphs.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element);
+      return {
+        color: style.color,
+        fontFamily: style.fontFamily,
+        fontStyle: style.fontStyle,
+        fontWeight: style.fontWeight,
+      };
+    }),
+  );
+
+  expect(mathTypography).toEqual(Array.from({ length: 9 }, () => textTypography));
+  expect(fractionTypography).toEqual(textTypography);
+  for (const typography of mathTextTypography) {
+    expect(typography).toEqual({
+      color: textTypography.color,
+      fontFamily: textTypography.fontFamily,
+      fontStyle: "normal",
+      fontWeight: textTypography.fontWeight,
+    });
+  }
   await expectNoFrameworkOverlay(page);
 });
 
@@ -142,17 +309,15 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
 
   await dialog.getByRole("button", { name: "Chèn vector" }).click();
   await expect
-    .poll(() =>
-      mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""),
-    )
+    .poll(() => mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""))
     .toContain("▢");
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.tagName))
     .toBe("MATH-FIELD");
   const clickVectorPlaceholder = async () => {
     const placeholderCandidates = await mathfield.evaluate((element) =>
-      Array.from(element.shadowRoot?.querySelectorAll(".ML__selected") ?? [])
-        .map((candidate) => {
+      Array.from(element.shadowRoot?.querySelectorAll(".ML__selected") ?? []).map(
+        (candidate) => {
           const box = candidate.getBoundingClientRect();
           return {
             x: box.x,
@@ -160,7 +325,8 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
             width: box.width,
             height: box.height,
           };
-        }),
+        },
+      ),
     );
     const placeholderBox = placeholderCandidates.at(-1) ?? null;
     expect(placeholderBox).not.toBeNull();
@@ -173,9 +339,7 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
   };
   await clickVectorPlaceholder();
   await expect
-    .poll(() =>
-      mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""),
-    )
+    .poll(() => mathfield.evaluate((element) => element.shadowRoot?.textContent ?? ""))
     .toContain("▢");
   await page.keyboard.type("AB");
   await expect
@@ -237,10 +401,11 @@ test("admin can type into vector and chemistry structures", async ({ page }) => 
   await expect(insertedFormula).toBeVisible();
   const italicFormulaGlyphs = await insertedFormula
     .locator(".mathnormal, .mathit")
-    .evaluateAll((glyphs) =>
-      glyphs.filter((glyph) =>
-        ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
-      ).length,
+    .evaluateAll(
+      (glyphs) =>
+        glyphs.filter((glyph) =>
+          ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
+        ).length,
     );
   expect(italicFormulaGlyphs).toBe(0);
 
@@ -317,8 +482,7 @@ test("math structure previews stay inside their buttons", async ({ page }) => {
         const barRect = bar.getBoundingClientRect();
         const buttonRect = activeButton.getBoundingClientRect();
         return (
-          buttonRect.left >= barRect.left - 1 &&
-          buttonRect.right <= barRect.right + 1
+          buttonRect.left >= barRect.left - 1 && buttonRect.right <= barRect.right + 1
         );
       }),
     )
@@ -353,17 +517,15 @@ test("math tooltips appear immediately without creating horizontal overflow", as
 
   const mathfield = dialog.locator("math-field");
   await expect(mathfield).toBeVisible({ timeout: 15_000 });
-  const keyboardToggle = mathfield.locator(
-    '[part="virtual-keyboard-toggle"]',
-  );
+  const keyboardToggle = mathfield.locator('[part="virtual-keyboard-toggle"]');
   await expect(keyboardToggle).toBeVisible();
 
   const overflowBeforeHover = await mathfield.evaluate((field) => ({
     clientWidth: field.clientWidth,
     scrollWidth: field.scrollWidth,
   }));
-  const supportsHover = await page.evaluate(() =>
-    window.matchMedia("(hover: hover)").matches,
+  const supportsHover = await page.evaluate(
+    () => window.matchMedia("(hover: hover)").matches,
   );
   if (supportsHover) {
     await keyboardToggle.hover();
@@ -411,9 +573,7 @@ test("math tooltips appear immediately without creating horizontal overflow", as
     await fractionButton.focus();
   }
   await expect(
-    page
-      .locator("[data-immediate-tooltip]")
-      .filter({ hasText: "Phân số" }),
+    page.locator("[data-immediate-tooltip]").filter({ hasText: "Phân số" }),
   ).toBeVisible({ timeout: 300 });
 
   const boldButton = dialog.getByRole("button", { name: "In đậm" }).first();
@@ -465,10 +625,11 @@ test("every math palette template inserts visual content", async ({ page }) => {
     await expect(templateButtons).toHaveCount(count);
     const italicPreviewGlyphs = await palette
       .locator(".mathnormal, .mathit")
-      .evaluateAll((glyphs) =>
-        glyphs.filter((glyph) =>
-          ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
-        ).length,
+      .evaluateAll(
+        (glyphs) =>
+          glyphs.filter((glyph) =>
+            ["italic", "oblique"].includes(getComputedStyle(glyph).fontStyle),
+          ).length,
       );
     expect(italicPreviewGlyphs).toBe(0);
 
@@ -488,8 +649,8 @@ test("every math palette template inserts visual content", async ({ page }) => {
       await templateButton.click();
       await expect
         .poll(() =>
-          mathfield.evaluate(
-            (element) => (element as HTMLElement & { value: string }).value.trim(),
+          mathfield.evaluate((element) =>
+            (element as HTMLElement & { value: string }).value.trim(),
           ),
         )
         .not.toBe("");
@@ -531,7 +692,30 @@ async function seedAdminSession(page: Page) {
   );
 }
 
-async function setupFlashcardApiMock(page: Page) {
+async function setupFlashcardApiMock(
+  page: Page,
+  options: { withMathQuestion?: boolean } = {},
+) {
+  const quizQuestions = options.withMathQuestion
+    ? [
+        {
+          id: "quiz-question-math",
+          quizSetId: "quiz-set-1",
+          questionType: "MULTIPLE_CHOICE",
+          difficulty: "EASY",
+          questionJson: tiptapMathDocument(),
+          optionsJson: [
+            { id: "option-a", richText: tiptapDocument("Đáp án A") },
+            { id: "option-b", richText: tiptapDocument("Đáp án B") },
+          ],
+          correctAnswerJson: ["option-a"],
+          hintJson: null,
+          gradingConfigJson: null,
+          explanation: null,
+          reviewStatus: "APPROVED",
+        },
+      ]
+    : [];
   const quizSets = [
     {
       id: "quiz-set-1",
@@ -540,8 +724,9 @@ async function setupFlashcardApiMock(page: Page) {
       difficulty: "MIXED",
       source: "ADMIN",
       reviewStatus: "APPROVED",
-      questionCount: 0,
-      _count: { questions: 0 },
+      questionCount: quizQuestions.length,
+      sortOrder: 0,
+      _count: { questions: quizQuestions.length },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -619,8 +804,34 @@ async function setupFlashcardApiMock(page: Page) {
       return fulfillJson(route, 200, { data: quizSets });
     }
 
-    if (method === "GET" && pathname === "/admin/quiz-sets/quiz-set-1/questions") {
-      return fulfillJson(route, 200, { data: [] });
+    if (method === "POST" && pathname === `/admin/lessons/${lessonId}/quiz-sets`) {
+      const body = request.postDataJSON() as {
+        difficulty: string;
+        title: string;
+      };
+      const set = {
+        id: `quiz-set-${quizSets.length + 1}`,
+        lessonId,
+        title: body.title,
+        difficulty: body.difficulty,
+        source: "ADMIN",
+        reviewStatus: "APPROVED",
+        questionCount: 0,
+        sortOrder: quizSets.length,
+        _count: { questions: 0 },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      quizSets.push(set);
+      const { _count: _omittedCount, ...createdSetResponse } = set;
+      return fulfillJson(route, 201, { data: createdSetResponse });
+    }
+
+    const quizQuestionsMatch = pathname.match(/^\/admin\/quiz-sets\/([^/]+)\/questions$/);
+    if (method === "GET" && quizQuestionsMatch) {
+      return fulfillJson(route, 200, {
+        data: quizQuestionsMatch[1] === "quiz-set-1" ? quizQuestions : [],
+      });
     }
 
     if (method === "PATCH" && pathname === "/admin/quiz-sets/quiz-set-1") {
@@ -644,6 +855,10 @@ async function setupFlashcardApiMock(page: Page) {
 
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}/flashcard-sets`) {
       return fulfillJson(route, 200, { data: sets });
+    }
+
+    if (method === "GET" && pathname === `/admin/lessons/${lessonId}/test-sets`) {
+      return fulfillJson(route, 200, { data: [] });
     }
 
     if (method === "POST" && pathname === `/admin/lessons/${lessonId}/flashcard-sets`) {
@@ -724,6 +939,37 @@ function tiptapDocument(text: string) {
       {
         type: "paragraph",
         content: [{ type: "text", text }],
+      },
+    ],
+  };
+}
+
+function tiptapMathDocument() {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Mẫu toán: " },
+          { type: "inlineMath", attrs: { latex: "\\frac{2}{3}" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\sqrt{4}" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "2^3" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\lim_{x\\to0}" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\sum_{i=1}^{n}i" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\int_0^1x\\,dx" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\left(x+1\\right)" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\alpha\\leq\\beta" } },
+          { type: "text", text: " " },
+          { type: "inlineMath", attrs: { latex: "\\mathbb{R}" } },
+        ],
       },
     ],
   };

@@ -1,0 +1,1297 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>M7 Student Learning Design</title>
+    <style>
+      :root {
+        --ink: #17243c;
+        --muted: #66758c;
+        --line: #dbe8f3;
+        --sky: #1688f8;
+        --sky-2: #066fe5;
+        --sky-soft: #eaf6ff;
+        --green: #16a46b;
+        --green-soft: #e9fbf3;
+        --amber: #f59e0b;
+        --amber-soft: #fff7df;
+        --red: #ef4a5c;
+        --red-soft: #fff0f2;
+        --violet: #7658ef;
+        --violet-soft: #f1efff;
+        --surface: #ffffff;
+        --bg: #e5f5ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 390px;
+        min-height: 844px;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-rounded, "SF Pro Rounded", "Segoe UI", Arial, sans-serif;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      .phone {
+        position: relative;
+        width: 390px;
+        height: 844px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 90% 4%, rgba(42, 169, 255, 0.14), transparent 23%),
+          linear-gradient(180deg, #f4fbff 0, #e5f5ff 38%, #f7fbff 100%);
+      }
+
+      .appbar {
+        position: absolute;
+        z-index: 20;
+        inset: 0 0 auto;
+        height: 66px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.97);
+        border-bottom: 1px solid #dcebf5;
+      }
+
+      .back,
+      .icon-button {
+        width: 42px;
+        height: 42px;
+        border: 0;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        background: #f2f8fd;
+        color: #29415f;
+        font-weight: 900;
+        font-size: 23px;
+      }
+
+      .back {
+        margin-left: -5px;
+        background: transparent;
+        font-size: 29px;
+      }
+
+      .brand {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+      }
+
+      .brand img {
+        width: 146px;
+        height: 42px;
+        object-fit: contain;
+        object-position: left center;
+      }
+
+      .app-actions {
+        display: flex;
+        gap: 5px;
+      }
+
+      .app-actions .icon-button {
+        width: 38px;
+        height: 38px;
+        background: transparent;
+        font-size: 20px;
+      }
+
+      .main {
+        position: absolute;
+        inset: 66px 0 68px;
+        overflow: hidden;
+        padding: 13px 14px 20px;
+      }
+
+      .bottom-nav {
+        position: absolute;
+        z-index: 30;
+        inset: auto 0 0;
+        height: 68px;
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        background: rgba(255, 255, 255, 0.98);
+        border-top: 1px solid #d9e7f2;
+        box-shadow: 0 -9px 24px rgba(31, 77, 116, 0.08);
+      }
+
+      .nav-item {
+        position: relative;
+        display: grid;
+        place-content: center;
+        gap: 2px;
+        color: #718096;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 800;
+      }
+
+      .nav-item .nav-icon {
+        font-size: 21px;
+        line-height: 1;
+        filter: grayscale(1);
+      }
+
+      .nav-item.active {
+        color: var(--sky-2);
+      }
+
+      .nav-item.active::before {
+        content: "";
+        position: absolute;
+        inset: 0 7px auto;
+        height: 3px;
+        border-radius: 0 0 4px 4px;
+        background: var(--sky);
+      }
+
+      .nav-item.active .nav-icon {
+        filter: none;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 22px;
+        line-height: 1.22;
+        font-weight: 900;
+      }
+
+      h2 {
+        font-size: 17px;
+        line-height: 1.3;
+        font-weight: 900;
+      }
+
+      h3 {
+        font-size: 15px;
+        line-height: 1.3;
+        font-weight: 850;
+      }
+
+      .eyebrow {
+        color: #61758e;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .sub {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 600;
+      }
+
+      .card {
+        border: 1px solid rgba(200, 221, 236, 0.94);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.96);
+      }
+
+      .pad {
+        padding: 14px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 11px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .between {
+        justify-content: space-between;
+      }
+
+      .grow {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 24px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--sky-soft);
+        color: #0871d5;
+        font-size: 10px;
+        line-height: 1;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .badge.green {
+        background: var(--green-soft);
+        color: #098155;
+      }
+
+      .badge.amber {
+        background: var(--amber-soft);
+        color: #b96c00;
+      }
+
+      .badge.red {
+        background: var(--red-soft);
+        color: #c62e40;
+      }
+
+      .badge.violet {
+        background: var(--violet-soft);
+        color: #6245d8;
+      }
+
+      .button {
+        min-height: 44px;
+        border: 0;
+        border-radius: 13px;
+        padding: 0 15px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        color: white;
+        background: linear-gradient(180deg, #2499ff, #0877e9);
+        box-shadow: 0 7px 14px rgba(18, 126, 230, 0.2);
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .button.secondary {
+        color: #126fca;
+        background: white;
+        border: 1px solid #b8dcfa;
+        box-shadow: none;
+      }
+
+      .button.green {
+        background: linear-gradient(180deg, #28ba7c, #12925f);
+        box-shadow: 0 7px 14px rgba(16, 153, 96, 0.18);
+      }
+
+      .button.red {
+        background: linear-gradient(180deg, #ff6472, #e94254);
+        box-shadow: 0 7px 14px rgba(229, 62, 81, 0.18);
+      }
+
+      .button.disabled {
+        background: #cbd7e3;
+        color: #738297;
+        box-shadow: none;
+      }
+
+      .button.full {
+        width: 100%;
+      }
+
+      .breadcrumb {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        min-width: 0;
+        color: #56708a;
+        font-size: 10px;
+        font-weight: 800;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .breadcrumb span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .lesson-heading {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+
+      .video {
+        position: relative;
+        height: 183px;
+        overflow: hidden;
+        border-radius: 18px;
+        background:
+          radial-gradient(circle at 78% 26%, rgba(255, 255, 255, 0.23), transparent 22%),
+          linear-gradient(145deg, #0b62d8, #159eea 58%, #63d1ff);
+        color: white;
+      }
+
+      .video::before {
+        content: "a/b   ×   √x    ∑    x²";
+        position: absolute;
+        top: 23px;
+        left: 20px;
+        font-family: Georgia, serif;
+        font-size: 23px;
+        letter-spacing: 4px;
+        opacity: 0.85;
+      }
+
+      .video::after {
+        content: "TỈ LỆ THỨC";
+        position: absolute;
+        right: 20px;
+        bottom: 22px;
+        font-size: 19px;
+        font-weight: 950;
+        letter-spacing: 1px;
+      }
+
+      .play {
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--sky-2);
+        font-size: 25px;
+        padding-left: 4px;
+        box-shadow: 0 14px 30px rgba(9, 66, 142, 0.24);
+      }
+
+      .video-time {
+        position: absolute;
+        left: 12px;
+        bottom: 10px;
+        padding: 4px 8px;
+        border-radius: 7px;
+        background: rgba(7, 39, 77, 0.66);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .progress {
+        height: 8px;
+        border-radius: 99px;
+        background: #e3ebf2;
+        overflow: hidden;
+      }
+
+      .progress > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #0d7ce9, #35b8ff);
+      }
+
+      .lesson-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+
+      .lesson-tab {
+        min-width: 0;
+        padding: 9px 4px;
+        border: 1px solid #d7e6f1;
+        border-radius: 11px;
+        background: white;
+        color: #607187;
+        text-align: center;
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .lesson-tab.active {
+        border-color: #8dc9fa;
+        background: var(--sky-soft);
+        color: #0772d5;
+      }
+
+      .mini-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 52px;
+        padding: 10px 11px;
+        border-radius: 13px;
+        background: #f7fbfe;
+        border: 1px solid #e2edf5;
+      }
+
+      .mini-icon,
+      .avatar {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        border-radius: 11px;
+        display: grid;
+        place-items: center;
+        background: #e7f4ff;
+        font-size: 18px;
+      }
+
+      .avatar {
+        border-radius: 50%;
+        color: white;
+        background: linear-gradient(135deg, #3d9bf3, #6d64e8);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .paywall {
+        margin-top: 46px;
+        padding: 24px 18px;
+        text-align: center;
+      }
+
+      .paywall-icon {
+        width: 78px;
+        height: 78px;
+        margin: 0 auto 14px;
+        border-radius: 24px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(145deg, #e8f5ff, #fff);
+        border: 1px solid #cae6fa;
+        font-size: 36px;
+      }
+
+      .question-head {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .step-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        color: #0871d5;
+        background: var(--sky-soft);
+        font-size: 13px;
+        font-weight: 950;
+      }
+
+      .answer-list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .answer {
+        min-height: 51px;
+        display: grid;
+        grid-template-columns: 30px 1fr;
+        gap: 10px;
+        align-items: center;
+        padding: 9px 11px;
+        border-radius: 13px;
+        border: 1px solid #dbe7f0;
+        background: white;
+        color: #32445b;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 750;
+      }
+
+      .answer .letter {
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        background: #f0f5f9;
+        color: #5e7087;
+        font-size: 11px;
+        font-weight: 950;
+      }
+
+      .answer.selected {
+        border-color: #68b9f8;
+        background: #eef8ff;
+        color: #086cc9;
+      }
+
+      .answer.selected .letter {
+        color: white;
+        background: var(--sky);
+      }
+
+      .answer.correct {
+        border-color: #6ed6aa;
+        background: var(--green-soft);
+        color: #087a52;
+      }
+
+      .answer.correct .letter {
+        color: white;
+        background: var(--green);
+      }
+
+      .answer.wrong {
+        border-color: #ff9da8;
+        background: var(--red-soft);
+        color: #b82a3d;
+      }
+
+      .answer.wrong .letter {
+        color: white;
+        background: var(--red);
+      }
+
+      .question-dots {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+      }
+
+      .question-dots span {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #c8d6e2;
+      }
+
+      .question-dots span.done {
+        background: var(--green);
+      }
+
+      .question-dots span.active {
+        width: 22px;
+        border-radius: 99px;
+        background: var(--sky);
+      }
+
+      .score-ring {
+        width: 94px;
+        height: 94px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: conic-gradient(var(--green) 0 80%, #e5edf3 80%);
+        margin: 0 auto;
+      }
+
+      .score-ring > div {
+        width: 73px;
+        height: 73px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: white;
+        text-align: center;
+      }
+
+      .score-ring strong {
+        display: block;
+        color: var(--green);
+        font-size: 25px;
+        line-height: 1;
+      }
+
+      .score-ring small {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .result-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .stat {
+        padding: 10px 5px;
+        border-radius: 12px;
+        text-align: center;
+        background: #f4f9fd;
+      }
+
+      .stat strong {
+        display: block;
+        color: #23374f;
+        font-size: 17px;
+        font-weight: 950;
+      }
+
+      .stat small {
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 800;
+      }
+
+      .flashcard {
+        position: relative;
+        min-height: 292px;
+        padding: 22px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: white;
+        border: 0;
+        background:
+          radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.2), transparent 24%),
+          linear-gradient(145deg, #635be8, #198de9 60%, #28b7ea);
+        box-shadow: 0 18px 35px rgba(58, 99, 191, 0.2);
+      }
+
+      .flashcard .counter {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        padding: 5px 8px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.18);
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .flashcard .favorite {
+        position: absolute;
+        top: 11px;
+        right: 13px;
+        font-size: 25px;
+      }
+
+      .flashcard .term {
+        font-family: Georgia, serif;
+        font-size: 31px;
+        line-height: 1.3;
+        font-weight: 800;
+      }
+
+      .flashcard .hint {
+        margin-top: 18px;
+        color: rgba(255, 255, 255, 0.84);
+        font-size: 11px;
+        font-weight: 750;
+      }
+
+      .flash-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .timer {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 11px;
+        background: var(--red-soft);
+        color: #c52f41;
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .test-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 7px;
+      }
+
+      .test-grid span {
+        height: 33px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        background: #eef3f7;
+        color: #5f7085;
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .test-grid span.done {
+        background: var(--green-soft);
+        color: #088054;
+      }
+
+      .test-grid span.active {
+        background: var(--sky);
+        color: white;
+      }
+
+      .leader-row {
+        display: grid;
+        grid-template-columns: 27px 34px 1fr auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 48px;
+      }
+
+      .rank {
+        color: #697b91;
+        font-size: 13px;
+        font-weight: 950;
+        text-align: center;
+      }
+
+      .leader-row.top .rank {
+        color: #f1a20b;
+        font-size: 18px;
+      }
+
+      .note {
+        display: grid;
+        gap: 7px;
+        padding: 12px;
+        border-radius: 13px;
+        background: #f7fbfe;
+        border: 1px solid #e0ebf3;
+      }
+
+      .time-pill {
+        display: inline-flex;
+        width: fit-content;
+        padding: 4px 7px;
+        border-radius: 8px;
+        background: var(--sky-soft);
+        color: #0872d6;
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .comment-box,
+      .text-box {
+        width: 100%;
+        min-height: 48px;
+        border: 1px solid #d4e4ef;
+        border-radius: 13px;
+        padding: 12px;
+        background: white;
+        color: #8090a2;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .dashboard-hero {
+        position: relative;
+        overflow: hidden;
+        padding: 16px;
+        color: white;
+        border: 0;
+        background:
+          radial-gradient(circle at 88% 24%, rgba(255, 255, 255, 0.24), transparent 24%),
+          linear-gradient(135deg, #1378e8, #24a6f2);
+      }
+
+      .dashboard-hero::after {
+        content: "✦  π  x²";
+        position: absolute;
+        right: 14px;
+        bottom: 10px;
+        opacity: 0.3;
+        font-family: Georgia, serif;
+        font-size: 23px;
+      }
+
+      .course-progress {
+        display: grid;
+        grid-template-columns: 78px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .course-art {
+        height: 78px;
+        border-radius: 15px;
+        display: grid;
+        place-items: center;
+        color: white;
+        background: linear-gradient(145deg, #0b6ee6, #24b4ef);
+        font-size: 29px;
+        font-weight: 950;
+      }
+
+      .personal-banner {
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 38px 1fr;
+        gap: 10px;
+        align-items: center;
+        color: #5a45c7;
+        background: linear-gradient(135deg, #f4f1ff, #eef7ff);
+        border-color: #d9d0ff;
+      }
+
+      .personal-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        color: white;
+        background: linear-gradient(145deg, #7e65ee, #4f82ef);
+        font-size: 20px;
+      }
+
+      .skeleton {
+        position: relative;
+        overflow: hidden;
+        border-radius: 11px;
+        background: #dfeaf2;
+      }
+
+      .skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+      }
+
+      .sk-title {
+        width: 72%;
+        height: 21px;
+      }
+
+      .sk-line {
+        height: 12px;
+      }
+
+      .sk-video {
+        height: 183px;
+        border-radius: 18px;
+      }
+
+      .error-state {
+        margin-top: 62px;
+        padding: 23px 18px;
+        text-align: center;
+      }
+
+      .error-state .error-icon {
+        width: 72px;
+        height: 72px;
+        margin: 0 auto 14px;
+        border-radius: 23px;
+        display: grid;
+        place-items: center;
+        color: #b9293a;
+        background: var(--red-soft);
+        font-size: 34px;
+      }
+
+      .divider {
+        height: 1px;
+        background: #e4edf4;
+      }
+
+      .center {
+        text-align: center;
+      }
+
+      .mt4 {
+        margin-top: 4px;
+      }
+
+      .mt8 {
+        margin-top: 8px;
+      }
+
+      .mt10 {
+        margin-top: 10px;
+      }
+
+      .mt12 {
+        margin-top: 12px;
+      }
+
+      .mt14 {
+        margin-top: 14px;
+      }
+
+      .action-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 9px;
+      }
+
+      .action-row.three {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+
+      .compact .button {
+        min-height: 40px;
+        padding: 0 9px;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      const caseId = new URLSearchParams(location.search).get("case") || "01-lesson-enrolled";
+      const logoPath = "logo.png";
+
+      const bottomNav = (active = "study") => {
+        const items = [
+          ["home", "⌂", "Trang chủ"],
+          ["explore", "⌖", "Khám phá"],
+          ["study", "🎓", "Học tập"],
+          ["events", "▣", "Sự kiện"],
+          ["profile", "♙", "Trang cá nhân"],
+          ["more", "☰", "Menu"],
+        ];
+        return `<nav class="bottom-nav">${items
+          .map(
+            ([id, icon, label]) =>
+              `<div class="nav-item ${active === id ? "active" : ""}"><span class="nav-icon">${icon}</span><span>${label}</span></div>`,
+          )
+          .join("")}</nav>`;
+      };
+
+      const shell = ({
+        content,
+        active = "study",
+        back = true,
+        actions = true,
+        dashboard = false,
+      }) => `
+        <div class="phone">
+          <header class="appbar">
+            ${back ? '<button class="back">‹</button>' : ""}
+            <div class="brand"><img src="${logoPath}" alt="ClassHero" /></div>
+            ${
+              actions
+                ? '<div class="app-actions"><button class="icon-button">♢</button><button class="icon-button">◉</button></div>'
+                : ""
+            }
+          </header>
+          <main class="main">${content}</main>
+          ${bottomNav(dashboard ? "home" : active)}
+        </div>`;
+
+      const lessonHeading = (badge = "", title = "Bài 5. Tỉ lệ thức") => `
+        <div class="lesson-heading">
+          <div class="breadcrumb"><span>Toán 7</span><b>›</b><span>Chương 1. Số hữu tỉ</span><b>›</b></div>
+          <div class="row between">
+            <h1 class="grow">${title}</h1>
+            ${badge}
+          </div>
+        </div>`;
+
+      const lessonVideo = (time = "12:24 / 38:00") => `
+        <div class="video">
+          <span class="play">▶</span>
+          <span class="video-time">${time}</span>
+        </div>`;
+
+      const lessonOverview = ({ trial = false } = {}) =>
+        shell({
+          content: `
+            ${lessonHeading(
+              trial ? '<span class="badge amber">★ Học thử</span>' : '<span class="badge green">● Đang học</span>',
+            )}
+            <div class="stack">
+              ${lessonVideo(trial ? "00:00 / 38:00" : "12:24 / 38:00")}
+              ${
+                trial
+                  ? `<div class="card pad">
+                      <div class="row between"><div><p class="eyebrow">Quyền học thử</p><h3 class="mt4">Bạn đang xem buổi học miễn phí</h3></div><span class="badge amber">Buổi 1/1</span></div>
+                    </div>`
+                  : `<div class="card pad">
+                      <div class="row between"><span class="eyebrow">Tiến độ buổi học</span><strong style="color:#1688f8;font-size:14px">42%</strong></div>
+                      <div class="progress mt8"><span style="width:42%"></span></div>
+                      <div class="row between mt10"><span class="sub">Đã xem 12 phút</span><span class="badge">Tiếp tục</span></div>
+                    </div>`
+              }
+              <div class="lesson-tabs">
+                <div class="lesson-tab active">Bài học</div>
+                <div class="lesson-tab">Quiz</div>
+                <div class="lesson-tab">Flashcard</div>
+                <div class="lesson-tab">Kiểm tra</div>
+              </div>
+              <section class="card pad stack">
+                <div class="row between"><h2>Tóm tắt kiến thức trọng tâm</h2><span class="badge">Bài học</span></div>
+                <div class="mini-item"><span class="mini-icon">✦</span><div class="grow"><h3>Định nghĩa tỉ lệ thức</h3><p class="sub">Đẳng thức của hai tỉ số a/b = c/d.</p></div></div>
+                <div class="mini-item"><span class="mini-icon">↔</span><div class="grow"><h3>Tính chất hai tích chéo</h3><p class="sub">Nếu a/b = c/d thì a · d = b · c.</p></div></div>
+              </section>
+              ${
+                trial
+                  ? `<button class="button full">Bắt đầu Quiz học thử</button>`
+                  : `<div class="action-row"><button class="button secondary">‹ Bài trước</button><button class="button">Bài tiếp theo ›</button></div>`
+              }
+            </div>`,
+        });
+
+      const paywall = () =>
+        shell({
+          content: `
+            ${lessonHeading('<span class="badge red">🔒 Đã khóa</span>', "Bài 2. Đại lượng tỉ lệ thuận")}
+            <section class="card paywall">
+              <div class="paywall-icon">🔐</div>
+              <h1>Buổi học dành cho học viên</h1>
+              <p class="sub mt10">Mua khóa học để mở video, tài liệu, Quiz và Flashcard của buổi này.</p>
+              <button class="button full mt14">Xem khóa học</button>
+              <button class="button secondary full mt10">Quay lại lộ trình</button>
+            </section>
+            <section class="card pad mt12">
+              <div class="row between"><div><p class="eyebrow">Bạn vẫn có thể học thử</p><h3 class="mt4">Bài 1. Tập hợp số hữu tỉ</h3></div><span class="badge amber">Học thử</span></div>
+            </section>`,
+        });
+
+      const quizRunner = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="row between">
+              <div><p class="eyebrow">Quiz · Tỉ lệ thức</p><h1>Câu hỏi 3/8</h1></div>
+              <span class="badge">Đã làm 2</span>
+            </div>
+            <div class="progress mt10"><span style="width:37.5%"></span></div>
+            <section class="card pad mt12">
+              <div class="question-head"><span class="step-circle">03</span><h2>Chọn đáp án đúng</h2><span class="badge violet">Dễ</span></div>
+              <p style="font: 800 19px/1.55 Georgia,serif;color:#1e3350">Nếu <i>x/6 = 3/9</i> thì giá trị của <i>x</i> là:</p>
+              <div class="answer-list mt14">
+                <div class="answer"><span class="letter">A</span><span>1</span></div>
+                <div class="answer selected"><span class="letter">B</span><span>2</span></div>
+                <div class="answer"><span class="letter">C</span><span>3</span></div>
+                <div class="answer"><span class="letter">D</span><span>6</span></div>
+              </div>
+              <button class="button secondary mt12">💡 Gợi ý</button>
+            </section>
+            <div class="question-dots mt14"><span class="done"></span><span class="done"></span><span class="active"></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="action-row mt14"><button class="button secondary">‹ Câu trước</button><button class="button">Kiểm tra đáp án</button></div>`,
+        });
+
+      const quizResult = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="center"><span class="badge green">✓ Đã hoàn thành</span><h1 class="mt8">Kết quả Quiz</h1><p class="sub mt4">Bộ 1 · Tỉ lệ thức cơ bản</p></div>
+            <section class="card pad mt12 stack">
+              <div class="score-ring"><div><span><strong>8/10</strong><small>Điểm Quiz</small></span></div></div>
+              <div class="result-stats">
+                <div class="stat"><strong style="color:#169865">6</strong><small>Câu đúng</small></div>
+                <div class="stat"><strong style="color:#e14859">2</strong><small>Câu sai</small></div>
+                <div class="stat"><strong>8</strong><small>Tổng câu</small></div>
+              </div>
+            </section>
+            <div class="action-row compact mt12"><button class="button secondary">Xem lại tất cả</button><button class="button secondary">Xem lại câu sai</button></div>
+            <div class="action-row compact mt10"><button class="button secondary">Làm lại tất cả</button><button class="button">Làm lại câu sai</button></div>`,
+        });
+
+      const flashcardStudy = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="row between">
+              <div><p class="eyebrow">Flashcard · Tỉ lệ thức</p><h1>Ôn tập nhanh</h1></div>
+              <span class="badge violet">3/12</span>
+            </div>
+            <div class="progress mt10"><span style="width:25%"></span></div>
+            <section class="card flashcard mt14">
+              <span class="counter">Mặt trước</span><span class="favorite">☆</span>
+              <div><div class="term">Tỉ lệ thức là gì?</div><p class="hint">Chạm để lật thẻ</p></div>
+            </section>
+            <div class="row between mt12"><span class="sub">Vuốt hoặc dùng nút bên dưới</span><span class="badge">↻ Lật thẻ</span></div>
+            <div class="flash-actions mt12">
+              <button class="button red">✕ Chưa thuộc</button>
+              <button class="button green">✓ Đã thuộc</button>
+            </div>
+            <button class="button secondary full mt10">☆ Thêm vào yêu thích</button>`,
+        });
+
+      const flashcardSummary = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="center"><span class="badge violet">✦ Hoàn thành lượt ôn</span><h1 class="mt8">Bạn nhớ khá tốt!</h1><p class="sub mt4">Bộ Tỉ lệ thức · 12 thẻ</p></div>
+            <section class="card pad mt14 stack">
+              <div class="row between"><h2>Kết quả lượt này</h2><strong style="font-size:24px;color:#1688f8">75%</strong></div>
+              <div class="progress"><span style="width:75%;background:linear-gradient(90deg,#655be9,#20a6ef)"></span></div>
+              <div class="result-stats">
+                <div class="stat"><strong style="color:#169865">9</strong><small>Đã thuộc</small></div>
+                <div class="stat"><strong style="color:#e14859">3</strong><small>Chưa thuộc</small></div>
+                <div class="stat"><strong style="color:#7054de">4</strong><small>Yêu thích</small></div>
+              </div>
+            </section>
+            <button class="button full mt12">Ôn lại tất cả</button>
+            <button class="button secondary full mt10">Ôn lại thẻ chưa thuộc</button>`,
+        });
+
+      const testLocked = () =>
+        shell({
+          content: `
+            ${lessonHeading("", "Bài kiểm tra cuối buổi")}
+            <section class="card paywall" style="margin-top:20px">
+              <div class="paywall-icon" style="background:var(--amber-soft);border-color:#ffe09a">🔒</div>
+              <span class="badge amber">Chưa đủ điều kiện</span>
+              <h1 class="mt10">Bài kiểm tra đang khóa</h1>
+              <p class="sub mt10">Hoàn thành xong quiz và Flashcard để mở khóa bài kiểm tra.</p>
+              <div class="divider mt14"></div>
+              <div class="mini-item mt12"><span class="mini-icon">✦</span><div class="grow"><h3>Quiz</h3><p class="sub">Chưa hoàn thành</p></div><span class="badge amber">Chưa xong</span></div>
+              <div class="mini-item mt10"><span class="mini-icon">◇</span><div class="grow"><h3>Flashcard</h3><p class="sub">Chưa ôn đủ thẻ</p></div><span class="badge amber">Chưa xong</span></div>
+            </section>
+            <div class="action-row compact mt12"><button class="button secondary">Ôn lại Quiz</button><button class="button secondary">Ôn lại Flashcard</button></div>`,
+        });
+
+      const testRunner = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="row between">
+              <div><p class="eyebrow">Bài kiểm tra · 15 câu</p><h1>Câu 8</h1></div>
+              <span class="timer">⏱ 12:48</span>
+            </div>
+            <section class="card pad mt12">
+              <div class="question-head"><span class="step-circle">08</span><h2>Đúng/Sai từng mệnh đề</h2><span class="badge violet">1 điểm</span></div>
+              <p class="sub">Với tỉ lệ thức <b>a/b = c/d</b>, chọn Đúng hoặc Sai:</p>
+              <div class="stack mt12">
+                <div class="mini-item"><div class="grow"><h3>a · d = b · c</h3></div><span class="badge green">Đúng</span><span class="badge">Sai</span></div>
+                <div class="mini-item"><div class="grow"><h3>a · b = c · d</h3></div><span class="badge">Đúng</span><span class="badge red">Sai</span></div>
+                <div class="mini-item"><div class="grow"><h3>a/c = b/d</h3></div><span class="badge green">Đúng</span><span class="badge">Sai</span></div>
+              </div>
+            </section>
+            <section class="card pad mt12">
+              <div class="row between"><h2>Danh sách câu</h2><span class="sub">7/15 đã làm</span></div>
+              <div class="test-grid mt10"><span class="done">1</span><span class="done">2</span><span class="done">3</span><span class="done">4</span><span class="done">5</span><span class="done">6</span><span class="done">7</span><span class="active">8</span><span>9</span><span>10</span></div>
+            </section>
+            <div class="action-row mt12"><button class="button secondary">‹ Câu trước</button><button class="button">Câu tiếp ›</button></div>
+            <button class="button green full mt10">Nộp bài kiểm tra</button>`,
+        });
+
+      const testReview = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="center"><span class="badge green">🏆 Đã vượt qua</span><h1 class="mt8">8.5 điểm</h1><p class="sub mt4">14 phút 32 giây · Mốc đạt 7.0</p></div>
+            <section class="card pad mt12 stack">
+              <div class="row between"><h2>Tổng kết bài kiểm tra</h2><span class="badge green">Đạt</span></div>
+              <div class="result-stats">
+                <div class="stat"><strong style="color:#169865">12</strong><small>Đúng</small></div>
+                <div class="stat"><strong style="color:#e14859">3</strong><small>Chưa đúng</small></div>
+                <div class="stat"><strong>15</strong><small>Tổng câu</small></div>
+              </div>
+            </section>
+            <div class="action-row compact mt12"><button class="button secondary">Xem lại tất cả</button><button class="button secondary">Xem lại câu sai</button></div>
+            <button class="button secondary full mt10">Làm lại bài kiểm tra mới</button>
+            <button class="button green full mt10">Dùng điểm bài này</button>`,
+        });
+
+      const testReviewFailed = () =>
+        shell({
+          actions: false,
+          content: `
+            <div class="center"><span class="badge amber">⚠ Chưa đạt</span><h1 class="mt8">6.5 điểm</h1><p class="sub mt4">12 phút 18 giây · Mốc đạt 7.0</p></div>
+            <section class="card pad mt12">
+              <div class="result-stats">
+                <div class="stat"><strong style="color:#169865">10</strong><small>Đúng</small></div>
+                <div class="stat"><strong style="color:#e14859">5</strong><small>Chưa đúng</small></div>
+                <div class="stat"><strong>15</strong><small>Tổng câu</small></div>
+              </div>
+            </section>
+            <section class="card pad mt12"><div class="row"><span class="mini-icon">!</span><div><h3>Bạn cần phải làm lại bài kiểm tra mới.</h3><p class="sub mt4">Kết quả này chưa đủ điều kiện hoàn thành buổi học.</p></div></div></section>
+            <div class="action-row compact mt12"><button class="button secondary">Xem lại tất cả</button><button class="button secondary">Xem lại câu sai</button></div>
+            <button class="button full mt10">Làm lại bài kiểm tra mới</button>
+            <button class="button disabled full mt10">Dùng điểm bài này</button>`,
+        });
+
+      const completionLeaderboard = () =>
+        shell({
+          content: `
+            <div class="center"><span style="font-size:54px">🎉</span><h1>Hoàn thành buổi học!</h1><p class="sub mt4">Bạn đã đạt mục tiêu với 8.5 điểm.</p></div>
+            <section class="card pad mt12 stack">
+              <div class="row between"><div><p class="eyebrow">Tiến độ khóa học</p><h2 class="mt4">5/48 buổi hoàn thành</h2></div><strong style="font-size:25px;color:#1688f8">12%</strong></div>
+              <div class="progress"><span style="width:12%"></span></div>
+              <button class="button full">Tiếp tục bài tiếp theo ›</button>
+            </section>
+            <section class="card pad mt12">
+              <div class="row between"><h2>🏆 Top 5 buổi học</h2><span class="badge">Xếp hạng 3</span></div>
+              <div class="mt10">
+                <div class="leader-row top"><span class="rank">1</span><span class="avatar">MA</span><div><h3>Minh Anh</h3><p class="sub">09:42</p></div><strong>9.5đ</strong></div>
+                <div class="divider"></div>
+                <div class="leader-row"><span class="rank">2</span><span class="avatar" style="background:linear-gradient(135deg,#f39452,#ef5e78)">HN</span><div><h3>Hoàng Nam</h3><p class="sub">11:08</p></div><strong>9.0đ</strong></div>
+                <div class="divider"></div>
+                <div class="leader-row" style="background:#edf8ff;border-radius:12px;padding:0 6px"><span class="rank">3</span><span class="avatar">BT</span><div><h3>Bảo Trâm · Bạn</h3><p class="sub">14:32</p></div><strong style="color:#0876d8">8.5đ</strong></div>
+                <div class="divider"></div>
+                <div class="leader-row"><span class="rank">4</span><span class="avatar" style="background:linear-gradient(135deg,#44b989,#1c8da6)">KL</span><div><h3>Khánh Linh</h3><p class="sub">13:25</p></div><strong>8.0đ</strong></div>
+              </div>
+            </section>`,
+        });
+
+      const loading = () =>
+        shell({
+          content: `
+            <div class="stack">
+              <div class="skeleton sk-line" style="width:55%"></div>
+              <div class="skeleton sk-title"></div>
+              <div class="skeleton sk-video"></div>
+              <div class="card pad stack">
+                <div class="skeleton sk-line" style="width:42%"></div>
+                <div class="skeleton sk-line" style="width:100%;height:8px"></div>
+                <div class="skeleton sk-line" style="width:72%"></div>
+              </div>
+              <div class="lesson-tabs"><div class="skeleton" style="height:42px"></div><div class="skeleton" style="height:42px"></div><div class="skeleton" style="height:42px"></div><div class="skeleton" style="height:42px"></div></div>
+              <div class="card pad stack"><div class="skeleton sk-title" style="width:48%"></div><div class="skeleton" style="height:58px"></div><div class="skeleton" style="height:58px"></div></div>
+            </div>`,
+        });
+
+      const errorState = () =>
+        shell({
+          content: `
+            <section class="card error-state">
+              <div class="error-icon">!</div>
+              <h1>Chưa tải được buổi học</h1>
+              <p class="sub mt10">Kết nối đang gián đoạn. Tiến độ của bạn vẫn được giữ an toàn.</p>
+              <button class="button full mt14">Thử lại</button>
+              <button class="button secondary full mt10">Quay lại lộ trình</button>
+            </section>
+            <section class="card pad mt12"><div class="row"><span class="mini-icon">☁</span><div><h3>Bạn có thể thử lại sau</h3><p class="sub">Không cần làm lại phần đã hoàn thành.</p></div></div></section>`,
+        });
+
+      const screens = {
+        "01-lesson-enrolled": () => lessonOverview(),
+        "02-lesson-trial": () => lessonOverview({ trial: true }),
+        "03-lesson-paywall": paywall,
+        "04-quiz-runner": quizRunner,
+        "05-quiz-result": quizResult,
+        "06-flashcard-study": flashcardStudy,
+        "07-flashcard-summary": flashcardSummary,
+        "08-test-locked": testLocked,
+        "09-test-runner": testRunner,
+        "10-test-review": testReview,
+        "10b-test-review-failed": testReviewFailed,
+        "11-completion-leaderboard": completionLeaderboard,
+        "12-lesson-loading": loading,
+        "13-content-error": errorState,
+      };
+
+      document.getElementById("app").innerHTML = (screens[caseId] || screens["01-lesson-enrolled"])();
+    </script>
+  </body>
+</html>

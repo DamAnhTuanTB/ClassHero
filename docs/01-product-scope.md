@@ -276,15 +276,45 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
   hủy ảnh gốc và alignment/kích thước/vùng cắt được lưu cùng Tiptap JSON.
 - Đáp án chấm tự động của câu `TEXT_INPUT` vẫn là chuỗi canonical để so khớp,
   nhưng được phép chứa LaTeX/mhchem và có công cụ xem trước công thức.
-- Học sinh làm xong quiz thì thấy số câu đúng/sai.
+- Panel Quiz hiển thị `Bắt đầu` khi lượt hiện tại chưa kiểm tra câu nào,
+  `Tiếp tục vào làm` khi đã kiểm tra ít nhất một câu, và `Xem lại` khi đã hoàn
+  thành mà không còn lượt đang làm.
+- Trong runner, `Đã làm` và điều kiện bấm `Hoàn thành` dựa trên số câu đã có đáp
+  án đầy đủ, không dựa trên số lần bấm `Kiểm tra đáp án`. Khi mọi câu đã đủ đáp
+  án, action `Hoàn thành` tự chấm các câu chưa kiểm tra trước khi submit.
+- Khi đã hoàn thành, panel có thêm `Làm bộ Quiz mới` để tạo một lượt đầy đủ mới
+  của bộ quiz hiện tại; luồng yêu cầu bộ nội dung khác/AI vẫn thuộc kho dự phòng.
+- Học sinh làm xong quiz hoặc lượt làm lại thì luôn thấy số câu đúng/sai cộng
+  dồn của bài Quiz gốc, không hiển thị một màn tổng kết riêng cho bộ câu con.
 - Học sinh có thể làm lại tất cả, làm lại câu sai hoặc làm bộ quiz khác.
 
 ### 4.6. Flashcard
 
 - Một buổi học có thể có nhiều bộ flashcard.
 - Flashcard có thể do admin tạo hoặc AI tạo.
+- Panel Flashcard trong lesson dùng cùng mô hình vào bài như Quiz: `Bắt đầu`
+  khi chưa học thẻ nào, `Tiếp tục vào học` khi bộ còn thẻ chưa review và
+  `Xem lại` khi đã hoàn thành.
+- Sau khi bấm CTA, UI chuyển sang runner toàn màn hình riêng thay vì tiếp tục
+  học ngay bên trong panel/tab lesson. Runner có header ClassHero, tiến độ,
+  xác nhận khi thoát giữa lượt và trạng thái pending/disabled rõ ràng.
 - Học sinh học xong thì thấy đã thuộc bao nhiêu, chưa thuộc bao nhiêu.
-- Học sinh có thể ôn lại tất cả, ôn lại câu chưa thuộc hoặc học bộ khác.
+- Runner có dải chấm điều hướng theo từng thẻ: chấm hiện tại kéo dài, thẻ đã
+  thuộc dùng xanh, chưa thuộc dùng đỏ và chưa đánh dấu dùng xám.
+- Khi học sinh đánh dấu `Đã thuộc` hoặc `Chưa thuộc`, runner hiển thị nhãn xác
+  nhận có hoạt ảnh ngay trên thẻ hiện tại rồi mới tự chuyển sang thẻ kế tiếp;
+  thao tác được khóa cho tới khi progress lưu thành công và hoạt ảnh kết thúc.
+- Nếu bấm `Hoàn thành` khi còn thẻ chưa được đánh dấu, runner không mở kết quả
+  và hiển thị cảnh báo inline liệt kê đúng số thứ tự các thẻ còn thiếu.
+- Màn kết quả Flashcard là màn toàn màn hình, có `Ôn lại tất cả`,
+  `Ôn lại thẻ chưa thuộc` và `Xem lại thẻ yêu thích`; không liệt kê từng thẻ cần
+  ôn hoặc thêm action chọn bộ. Action yêu thích bị khóa khi bộ không có thẻ yêu
+  thích.
+- `Ôn lại tất cả` mở một lượt mới gồm toàn bộ thẻ, đưa vị trí, bộ đếm và nhãn
+  `Đã thuộc`/`Chưa thuộc` của lượt về trạng thái ban đầu. Lịch sử progress đã lưu
+  không bị xóa; lựa chọn trong lượt mới cập nhật lại progress của từng thẻ.
+- `Xem lại thẻ yêu thích` chốt một lượt chỉ gồm các thẻ đang được yêu thích
+  trong bộ Flashcard hiện tại.
 
 ### 4.7. Bài kiểm tra
 
@@ -292,7 +322,7 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 - Form câu hỏi bài kiểm tra có bốn lựa chọn: `Trắc nghiệm`, `Đúng/Sai`,
   `Đúng/Sai nhiều mệnh đề` và `Nhập đáp án`.
 - `Đúng/Sai` cũ tiếp tục dùng một đáp án boolean chung. `Đúng/Sai nhiều mệnh
-  đề` là loại độc lập, không thay thế hoặc làm thay đổi dữ liệu câu Đúng/Sai
+đề` là loại độc lập, không thay thế hoặc làm thay đổi dữ liệu câu Đúng/Sai
   cũ.
 - Học sinh được làm lại nhiều lần.
 - Mỗi lần làm là một bộ đề khác nhau nếu còn bộ phù hợp.

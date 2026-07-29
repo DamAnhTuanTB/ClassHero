@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  GraduationCap,
   Loader2,
   LogOut,
   Moon,
@@ -14,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { logout } from "@/features/auth/api/auth-api";
 import {
   clearAuthSession,
@@ -80,19 +80,14 @@ export function AdminCoursesSidebarContent({
           isCollapsed && "lg:justify-center lg:gap-0",
         )}
       >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--theme-brand-secondary),var(--theme-brand-primary))] text-[var(--theme-brand-foreground)] shadow-[var(--theme-shadow-sm)]">
-          <GraduationCap className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
-          <p className="truncate leading-none tracking-normal">
-            <span className="font-[var(--font-display)] text-lg font-extrabold text-[var(--theme-brand-primary)]">
-              Class
-            </span>
-            <span className="font-[var(--font-display)] text-lg font-extrabold text-[var(--theme-brand-secondary)]">
-              Hero
-            </span>
-          </p>
-          <p className="truncate text-xs font-semibold text-[var(--theme-text-muted)]">
+        <div className={cn("min-w-0", isCollapsed && "lg:w-11 lg:overflow-hidden")}>
+          <ClassHeroLogo className="h-8 max-w-none" priority />
+          <p
+            className={cn(
+              "truncate text-xs font-semibold text-[var(--theme-text-muted)]",
+              isCollapsed && "lg:hidden",
+            )}
+          >
             {subtitle}
           </p>
         </div>

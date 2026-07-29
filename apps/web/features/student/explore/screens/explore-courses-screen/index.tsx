@@ -1,6 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { CourseSearchFilterPanel } from "@/features/student/explore/screens/explore-courses-screen/components/course-search-filter-panel";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
 import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
@@ -10,7 +11,9 @@ import {
   getExploreCourseGroups,
   hasMixedExploreCourseAccess,
 } from "@/features/student/shared/utils/student-courses-utils";
+import { useStudentCourseDetailPrefetch } from "@/features/student/shared/hooks/use-student-courses-query";
 import type { AppThemeMode } from "@/lib/theme-store";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function ExploreCoursesScreen({
   initialThemeMode = "light",
@@ -31,6 +34,7 @@ export function ExploreCoursesScreen({
     subject,
     total,
   } = useStudentCoursesFilter();
+  const prefetchCourseDetail = useStudentCourseDetailPrefetch();
   const { otherCourses, purchasedCourses } = getExploreCourseGroups(filteredCourses);
   const apiHasMixedCourseAccess = hasMixedExploreCourseAccess(
     coursesQuery.data?.courses ?? [],
@@ -38,6 +42,32 @@ export function ExploreCoursesScreen({
   const visibleHasMixedCourseAccess = hasMixedExploreCourseAccess(filteredCourses);
   const shouldShowCourseRibbons = apiHasMixedCourseAccess && visibleHasMixedCourseAccess;
   const screenBackground = "var(--student-screen-bg)";
+  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
+
+  if (isLoading || shouldShowInitialLoading) {
+    return (
+      <main
+        aria-busy="true"
+        className="min-h-screen w-full min-w-0 overflow-x-hidden"
+        style={{ background: screenBackground }}
+      >
+        <div
+          className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden lg:max-w-6xl"
+          style={{ background: screenBackground }}
+        >
+          <StudentCoursesHeader
+            title="Danh sách khóa học"
+            initialThemeMode={initialThemeMode}
+          />
+          {shouldShowInitialLoading ? (
+            <ExploreCoursesSkeleton />
+          ) : (
+            <div className="min-h-[calc(100svh-6rem)]" />
+          )}
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main
@@ -74,27 +104,22 @@ export function ExploreCoursesScreen({
           </div>
         </div>
 
-        {isLoading ? (
+        {isError ? (
           <div className="px-4 sm:px-6 lg:px-6">
             <EmptyCourseState
-              isLoading
-              title="Đang tải danh sách khóa học"
-              description="ClassHero đang lấy các khóa học đã xuất bản phù hợp với bạn."
-            />
-          </div>
-        ) : isError ? (
-          <div className="grid gap-3 px-4 sm:px-6 lg:px-6">
-            <EmptyCourseState
+              action={
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+                >
+                  Tải lại
+                </button>
+              }
+              isPageState
               title="Chưa tải được danh sách khóa học"
               description="Bạn thử tải lại danh sách hoặc quay lại sau ít phút nhé."
             />
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-            >
-              Tải lại
-            </button>
           </div>
         ) : filteredCourses.length > 0 ? (
           <section
@@ -114,7 +139,11 @@ export function ExploreCoursesScreen({
                     </div>
                     <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
                       {purchasedCourses.map((course) => (
-                        <ExploreCourseCard key={course.id} course={course} />
+                        <ExploreCourseCard
+                          key={course.id}
+                          course={course}
+                          onPrefetch={prefetchCourseDetail}
+                        />
                       ))}
                     </div>
                   </div>
@@ -131,7 +160,11 @@ export function ExploreCoursesScreen({
                     </div>
                     <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
                       {otherCourses.map((course) => (
-                        <ExploreCourseCard key={course.id} course={course} />
+                        <ExploreCourseCard
+                          key={course.id}
+                          course={course}
+                          onPrefetch={prefetchCourseDetail}
+                        />
                       ))}
                     </div>
                   </div>
@@ -140,7 +173,11 @@ export function ExploreCoursesScreen({
             ) : (
               <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
                 {filteredCourses.map((course) => (
-                  <ExploreCourseCard key={course.id} course={course} />
+                  <ExploreCourseCard
+                    key={course.id}
+                    course={course}
+                    onPrefetch={prefetchCourseDetail}
+                  />
                 ))}
               </div>
             )}
@@ -159,5 +196,23 @@ export function ExploreCoursesScreen({
         )}
       </div>
     </main>
+  );
+}
+
+function ExploreCoursesSkeleton() {
+  return (
+    <div className="grid gap-4 px-4 sm:px-6 lg:px-6">
+      <div className="grid animate-pulse gap-3 rounded-2xl bg-white p-4 dark:bg-[var(--theme-surface)] sm:grid-cols-[minmax(0,1fr)_9rem_9rem]">
+        <SkeletonBlock className="h-11 rounded-xl" />
+        <SkeletonBlock className="h-11 rounded-xl" />
+        <SkeletonBlock className="h-11 rounded-xl" />
+      </div>
+      <SkeletonBlock className="h-5 w-40 rounded-full" />
+      <EmptyCourseState
+        isLoading
+        title="Đang tải danh sách khóa học"
+        description="ClassHero đang lấy các khóa học đã xuất bản phù hợp với bạn."
+      />
+    </div>
   );
 }

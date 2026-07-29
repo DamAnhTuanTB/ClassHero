@@ -117,7 +117,9 @@ describe("M6.4 test CRUD integration", () => {
 
     expect(primary.durationSeconds).toBe(900);
     expect(primary.totalScore.toNumber()).toBe(10);
-    expect(await service.listSetsByLesson(lessonId)).toHaveLength(2);
+    const sets = await service.listSetsByLesson(lessonId);
+    expect(sets.map((set) => set.id)).toEqual([primary.id, secondary.id]);
+    expect(sets.map((set) => set.sortOrder)).toEqual([0, 1]);
 
     const updated = await service.updateSet(
       primarySetId,

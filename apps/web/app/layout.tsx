@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Baloo_2, Be_Vietnam_Pro } from "next/font/google";
 import { Providers } from "@/app/providers";
+import { AppToaster } from "@/app/toaster";
 import { getServerThemeMode } from "@/lib/server-theme";
 import {
   adminSidebarCollapsedDatasetKey,
@@ -116,7 +117,10 @@ export default async function RootLayout({
           id="classhero-theme-body-sync"
           dangerouslySetInnerHTML={{ __html: themeBodySyncScript }}
         />
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <AppToaster />
+        </Providers>
       </body>
     </html>
   );

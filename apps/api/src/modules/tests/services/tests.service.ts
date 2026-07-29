@@ -36,7 +36,7 @@ export class TestsService {
   async listSetsByLesson(lessonId: string) {
     return this.prisma.testSet.findMany({
       where: { lessonId, deletedAt: null },
-      orderBy: { sortOrder: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         _count: {
           select: {
@@ -63,18 +63,27 @@ export class TestsService {
       throw notFoundException("NOT_FOUND", "Không tìm thấy buổi học");
     }
 
-    return this.prisma.testSet.create({
-      data: {
-        lessonId,
-        title: dto.title.trim(),
-        durationSeconds: dto.durationSeconds,
-        difficulty: dto.difficulty ?? Difficulty.MIXED,
-        difficultyRatioJson: toNullableInputJson(dto.difficultyRatioJson),
-        totalScore: new Prisma.Decimal(10),
-        source: ContentSource.ADMIN,
-        createdById: userId,
-        updatedById: userId,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const lastSet = await transaction.testSet.findFirst({
+        where: { lessonId, deletedAt: null },
+        orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+        select: { sortOrder: true },
+      });
+
+      return transaction.testSet.create({
+        data: {
+          lessonId,
+          title: dto.title.trim(),
+          durationSeconds: dto.durationSeconds,
+          difficulty: dto.difficulty ?? Difficulty.MIXED,
+          difficultyRatioJson: toNullableInputJson(dto.difficultyRatioJson),
+          totalScore: new Prisma.Decimal(10),
+          source: ContentSource.ADMIN,
+          sortOrder: (lastSet?.sortOrder ?? -1) + 1,
+          createdById: userId,
+          updatedById: userId,
+        },
+      });
     });
   }
 

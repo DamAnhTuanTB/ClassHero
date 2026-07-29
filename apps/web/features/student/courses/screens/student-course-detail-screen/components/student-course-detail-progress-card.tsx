@@ -1,6 +1,6 @@
 import { Goal, Play, Star } from "lucide-react";
-import Link from "next/link";
 import type { CSSProperties } from "react";
+import { StudentLessonTransitionLink } from "@/components/student/learning-transition/student-lesson-transition-link";
 import type {
   StudentCourse,
   StudentCourseDetail,
@@ -61,13 +61,13 @@ export function StudentCourseDetailProgressCard({
       </div>
 
       <div className="mt-5">
-        <Link
-          href={`/student/lessons/${detail.continueLessonId}`}
+        <StudentLessonTransitionLink
+          lessonId={detail.continueLessonId}
           className="student-learn-cta-3d inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-lg font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
         >
           <Play className="h-7 w-7 shrink-0 fill-current" aria-hidden="true" />
           {lessonCopy.actionLabel}
-        </Link>
+        </StudentLessonTransitionLink>
       </div>
     </section>
   );

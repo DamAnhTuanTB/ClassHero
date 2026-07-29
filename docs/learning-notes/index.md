@@ -10,7 +10,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Basic Auth API](features/auth-basic.md)                              | Auth, RBAC, profile base, refresh/reset password, auth UI nối API thật                               | `M2.2`-`M2.4`  | Đã cập nhật |
 | [Lesson document processing](features/lesson-document-processing.md)  | Source document, page range mapping, paid OCR artifacts, lesson documents, BullMQ worker và chunking | `M4.2`-`M4.4`  | Đã cập nhật |
 | [Embedding và retrieval theo lesson](features/embedding-retrieval.md) | OpenAI embedding, durable worker, pgvector isolation, hybrid search và token budget                  | `M5.1`-`M5.4`  | Đã cập nhật |
-| [Quiz, flashcard và test](features/quiz-flashcard-test.md)            | Rich content, CRUD và student-safe lesson/quiz/flashcard/test read                                   | `M6.1`-`M6.5`  | Đã cập nhật |
+| [Quiz, flashcard và test](features/quiz-flashcard-test.md)            | Rich content, CRUD, student runner, prerequisite, review, best/completion và Top 5                    | `M6.1`-`M7.5`  | Đã cập nhật |
 | [Student course browsing](features/student-course-browsing.md)        | Student danh sách/khám phá/chi tiết lộ trình nối public API thật                                     | `M3.5`         | Đã cập nhật |
 
 ## Foundation Notes
@@ -20,6 +20,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [API foundation](foundation/api-foundation.md)                                           | NestJS env validation, global validation, error envelope, Swagger, logger     | `M2.1`            | Đã cập nhật |
 | [Codex notification and Telegram control](foundation/codex-notification-and-telegram.md) | macOS notification, Telegram notification/control, LaunchAgent, transcript    | Codex tooling     | Đã cập nhật |
 | [Frontend bundle isolation](foundation/frontend-bundle-isolation.md)                     | Tách bundle/CSS/provider theo route group khi admin và client chung Next app  | Performance audit | Đã cập nhật |
+| [Fullscreen media layout](foundation/fullscreen-media-layout.md)                         | Full-bleed mobile và fullscreen fallback không bị transform/overflow cắt      | `M7.1`, `M15.1`   | Đã cập nhật |
 | [Playwright UI checks](foundation/playwright-ui-checks.md)                               | Browser E2E, responsive screenshot và UI review local                         | `M2.4`, `M14.3`   | Đã cập nhật |
 | [Prisma database foundation](foundation/prisma-database.md)                              | Prisma, migration, pgvector, PrismaService, seed dev và foundation models     | `M1.1`-`M1.6`     | Đã cập nhật |
 | [UI state persistence](foundation/ui-state-persistence.md)                               | Lưu trạng thái UI local như sidebar collapse qua refresh bằng browser storage | `M3.4`, `M3.5`    | Đã cập nhật |

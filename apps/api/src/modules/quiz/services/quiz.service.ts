@@ -45,7 +45,7 @@ export class QuizService {
   async listQuizSetsByLesson(lessonId: string) {
     return this.prisma.quizSet.findMany({
       where: { lessonId, deletedAt: null },
-      orderBy: { sortOrder: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         _count: {
           select: {
@@ -70,15 +70,24 @@ export class QuizService {
       throw notFoundException("NOT_FOUND", "Không tìm thấy buổi học");
     }
 
-    return this.prisma.quizSet.create({
-      data: {
-        lessonId,
-        title: dto.title,
-        difficulty: dto.difficulty || Difficulty.MIXED,
-        source: ContentSource.ADMIN,
-        createdById: userId,
-        updatedById: userId,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const lastSet = await transaction.quizSet.findFirst({
+        where: { lessonId, deletedAt: null },
+        orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+        select: { sortOrder: true },
+      });
+
+      return transaction.quizSet.create({
+        data: {
+          lessonId,
+          title: dto.title,
+          difficulty: dto.difficulty || Difficulty.MIXED,
+          source: ContentSource.ADMIN,
+          sortOrder: (lastSet?.sortOrder ?? -1) + 1,
+          createdById: userId,
+          updatedById: userId,
+        },
+      });
     });
   }
 

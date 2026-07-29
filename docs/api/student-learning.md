@@ -28,6 +28,8 @@ Behavior:
 
 - Kiểm tra enrollment còn hạn hoặc trial hợp lệ.
 - Trả metadata chapter cha để UI hiển thị breadcrumb/tổng quan.
+- Trả `navigation.previous`/`navigation.next` theo thứ tự chapter + lesson của
+  lộ trình hiệu lực.
 - Trả video, material, document `READY`, tóm tắt đã duyệt và metadata của
   quiz/flashcard/test set đã duyệt, không phải reserve.
 - File chỉ trả metadata an toàn và `accessUrl` public/signed có hạn; không trả
@@ -35,8 +37,10 @@ Behavior:
 - Aggregate chỉ trả số câu/thẻ của set. Nội dung câu quiz đọc qua endpoint riêng;
   aggregate và test status không trả đáp án đúng, grading config, lời giải hoặc
   nội dung câu test.
-- `testAvailability.canStartTest` được tính bằng thời gian server. Trước
-  `exam_open_at` giá trị là `false`; trial luôn là `false`.
+- Aggregate vẫn giữ metadata material/document phục vụ các surface sau; UI tab
+  `Bài học` của M7 core chỉ hiển thị summary kiến thức trọng tâm.
+- `testAvailability` trong aggregate là metadata đọc nhanh. Gate đầy đủ theo
+  thời gian + Quiz + Flashcard phải lấy từ endpoint test status.
 - Notes/comments/favorites và progress/attempt không thuộc response `M6.5`; các
   phần này được bổ sung ở `M7.x`.
 - Nếu lesson thuộc path `PERSONALIZED`, chỉ student sở hữu enrollment đang được giao path đó mới được truy cập.
@@ -62,7 +66,8 @@ Response chính:
     "testAvailability": {
       "canStartTest": false,
       "examOpenAt": "2026-08-01T13:00:00.000Z"
-    }
+    },
+    "navigation": { "previous": null, "next": {} }
   }
 }
 ```
@@ -96,7 +101,9 @@ Role: `STUDENT`.
 
 Behavior:
 
-- Trả top 5 theo best score, tie-break duration.
+- Trả tối đa 5 attempt đã được chọn làm best của từng student, theo score giảm
+  dần, duration tăng dần và submit sớm hơn khi vẫn bằng nhau.
+- Chỉ student có quyền đọc lesson mới gọi được endpoint.
 
 ---
 

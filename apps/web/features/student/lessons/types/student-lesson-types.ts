@@ -1,0 +1,251 @@
+import type { TiptapTextDocument } from "@/types/rich-text";
+
+export type StudentLessonTab = "lesson" | "quiz" | "flashcard" | "test";
+export type AssessmentQuestionType =
+  "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";
+export type StudentAnswer =
+  | string
+  | boolean
+  | string[]
+  | Array<{ statementId: string; value: boolean }>
+  | { __unanswered: true };
+
+export type AssessmentOption = {
+  id: string;
+  richText: TiptapTextDocument;
+};
+
+export type StudentAssessmentQuestion = {
+  id: string;
+  questionType: AssessmentQuestionType;
+  questionJson: TiptapTextDocument;
+  optionsJson: AssessmentOption[] | null;
+  hintJson?: TiptapTextDocument | null;
+  correctAnswerJson?: StudentAnswer;
+  gradingConfigJson?: {
+    caseSensitive?: boolean;
+    exactMatch?: boolean;
+  } | null;
+  explanationJson?: TiptapTextDocument | null;
+  difficulty: "EASY" | "MEDIUM" | "HARD";
+  sortOrder: number;
+  questionNumber?: number;
+  hasExplanation?: boolean;
+};
+
+export type StudentLesson = {
+  id: string;
+  title: string;
+  shortDescription: string | null;
+  videoUrl: string | null;
+  customVideoSettings: unknown | null;
+  completionMinScore: number;
+  access: { mode: "ENROLLMENT" | "TRIAL" };
+  chapter: {
+    id: string;
+    title: string;
+    orderIndex: number;
+  };
+  learningPath: {
+    id: string;
+    slug: string;
+    title: string;
+  };
+  summary: {
+    id: string;
+    contentJson: TiptapTextDocument;
+    updatedAt: string;
+  } | null;
+  quizSets: Array<{
+    id: string;
+    title: string;
+    questionCount: number;
+  }>;
+  flashcardSets: Array<{
+    id: string;
+    title: string;
+    cardCount: number;
+  }>;
+  testSets: Array<{
+    id: string;
+    title: string;
+    questionCount: number;
+    durationSeconds: number;
+  }>;
+  navigation: {
+    previous: LessonNavigationItem | null;
+    next: LessonNavigationItem | null;
+  };
+};
+
+export type LessonNavigationItem = {
+  id: string;
+  title: string;
+  orderIndex: number;
+  chapter: {
+    id: string;
+    title: string;
+    orderIndex: number;
+  };
+};
+
+export type QuizAttempt = {
+  id: string;
+  totalCount: number;
+  originalTotalCount?: number;
+  scope?: "ALL" | "INCORRECT";
+  sourceAttemptId?: string | null;
+  quizSet: { id: string; title: string };
+  questions: StudentAssessmentQuestion[];
+};
+
+export type StatementResult = {
+  statementId: string;
+  selectedValue: boolean;
+  correctValue: boolean;
+  isCorrect: boolean;
+  pointsAwarded: number;
+};
+
+export type CheckedAnswer = {
+  isCorrect: boolean;
+  correctAnswerJson: StudentAnswer;
+  statementResults: StatementResult[] | null;
+  explanationJson: TiptapTextDocument | null;
+};
+
+export type ResumableQuizAttempt = QuizAttempt & {
+  checkedAnswers: Array<{
+    questionId: string;
+    answerJson: StudentAnswer;
+    feedback: CheckedAnswer;
+  }>;
+};
+
+export type AttemptSummary = {
+  id: string;
+  sourceAttemptId?: string | null;
+  correctCount: number;
+  wrongCount: number;
+  totalCount: number;
+  accuracyPercent?: number;
+};
+
+export type QuizSubmitResult = AttemptSummary & {
+  aggregateResult: AttemptSummary;
+};
+
+export type QuizAttemptStatus = {
+  state: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  currentAttemptId: string | null;
+  checkedCount: number;
+  latestSubmittedAttempt: AttemptSummary | null;
+};
+
+export type AssessmentReview = AttemptSummary & {
+  originalTotalCount?: number;
+  scope: "ALL" | "INCORRECT";
+  questions: Array<
+    StudentAssessmentQuestion &
+      CheckedAnswer & {
+        answerJson: StudentAnswer;
+        pointsAwarded?: number;
+      }
+  >;
+};
+
+export type StudentFlashcardSet = {
+  id: string;
+  lessonId: string;
+  title: string;
+  cardCount: number;
+  flashcards: StudentFlashcard[];
+  progress: FlashcardProgressSummary;
+};
+
+export type StudentFlashcard = {
+  id: string;
+  frontJson: TiptapTextDocument;
+  backJson: TiptapTextDocument;
+  explanation: { contentJson: TiptapTextDocument } | null;
+  isFavorite: boolean;
+  progress: {
+    isKnown: boolean;
+    lastReviewedAt: string;
+    reviewCount: number;
+  } | null;
+};
+
+export type FlashcardProgressSummary = {
+  totalCount: number;
+  reviewedCount: number;
+  knownCount: number;
+  unknownCount: number;
+  unreviewedCount: number;
+  isCompleted: boolean;
+};
+
+export type StudentTestStatus = {
+  canStart: boolean;
+  examOpenAt: string | null;
+  evaluatedAt: string;
+  lockReason:
+    "TRIAL_NOT_ALLOWED" | "BEFORE_OPEN_TIME" | "PREREQUISITES_INCOMPLETE" | null;
+  quiz: { isRequired: boolean; isCompleted: boolean };
+  flashcard: { isRequired: boolean; isCompleted: boolean };
+  bestAttempt: {
+    id: string;
+    score: number;
+    durationSeconds: number;
+  } | null;
+  sets: Array<{
+    id: string;
+    title: string;
+    durationSeconds: number;
+    totalScore: number;
+    questionCount: number;
+  }>;
+};
+
+export type StudentTestAttempt = {
+  id: string;
+  startedAt: string;
+  totalCount: number;
+  testSet: {
+    id: string;
+    title: string;
+    durationSeconds: number;
+    totalScore: number;
+  };
+  questions: StudentAssessmentQuestion[];
+};
+
+export type StudentTestResult = AttemptSummary & {
+  durationSeconds: number;
+  score: number;
+  completionMinScore: number;
+  passed: boolean;
+};
+
+export type LeaderboardEntry = {
+  rank: number;
+  attemptId: string;
+  studentName: string;
+  score: number;
+  durationSeconds: number;
+  isCurrentStudent: boolean;
+};
+
+export type CompletionResult = {
+  lessonId: string;
+  usedAttemptId: string;
+  promotedToBest: boolean;
+  status: "COMPLETED";
+  completedAt: string;
+  bestAttempt: {
+    id: string;
+    score: number;
+    durationSeconds: number;
+  } | null;
+  leaderboard: LeaderboardEntry[];
+};

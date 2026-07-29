@@ -24,6 +24,16 @@ test("admin creates a timed test set and a question from lesson detail", async (
   await expect(page.getByRole("tab", { name: /Bộ đề 1/ })).toBeVisible();
   await expect(page.getByText("20 phút", { exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "Thêm bộ đề" }).click();
+  await expect(setDialog.getByLabel("Tên bộ đề")).toHaveValue("Bộ đề 2");
+  await setDialog.getByRole("button", { name: "Thêm bộ đề" }).click();
+
+  const testTabs = page.getByRole("tablist", { name: "Các bộ đề" }).getByRole("tab");
+  await expect(testTabs).toHaveCount(2);
+  await expect(testTabs.nth(0)).toContainText("Bộ đề 1");
+  await expect(testTabs.nth(1)).toContainText("Bộ đề 2");
+  await expect(testTabs.nth(1)).toHaveAttribute("aria-selected", "true");
+
   await page.getByRole("button", { name: "Thêm câu hỏi" }).first().click();
   const questionDialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
   await questionDialog.getByLabel("Loại câu hỏi").click();
@@ -47,6 +57,132 @@ test("admin creates a timed test set and a question from lesson detail", async (
   await expect(page.getByText("Đúng / Sai nhiều mệnh đề", { exact: true })).toBeVisible();
   await expect(page.getByText("Số 2 là số chẵn.", { exact: true })).toBeVisible();
   await expect(page.getByText("Số 3 là số chẵn.", { exact: true })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("admin formula input keeps its focused placeholder clear and keyboard toggle aligned", async ({
+  page,
+}, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      browserErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => {
+    browserErrors.push(error.message);
+  });
+
+  await seedAdminSession(page);
+  await setupTestsApiMock(page);
+
+  await page.goto(`/admin/lessons/${lessonId}`);
+  await page.getByRole("tab", { name: "Test" }).click();
+  await page.getByRole("button", { name: "Thêm bộ đề" }).click();
+  await page
+    .getByRole("dialog", { name: "Thêm bộ đề" })
+    .getByRole("button", { name: "Thêm bộ đề" })
+    .click();
+  await page.getByRole("button", { name: "Thêm câu hỏi" }).first().click();
+
+  const questionDialog = page.getByRole("dialog", { name: "Thêm câu hỏi" });
+  await questionDialog
+    .getByRole("button", { name: "Chèn công thức Toán, Lý, Hóa" })
+    .nth(1)
+    .click();
+
+  const mathfield = questionDialog.locator(
+    'math-field[aria-label="Nhập công thức trực quan"]',
+  );
+  await expect(mathfield).toBeVisible({ timeout: 20_000 });
+  await mathfield.focus();
+
+  const layout = await mathfield.evaluate((element) => {
+    const shadowRoot = element.shadowRoot;
+    const fieldRect = element.getBoundingClientRect();
+    const keyboardToggle = shadowRoot?.querySelector<HTMLElement>(
+      '[part~="virtual-keyboard-toggle"]',
+    );
+    const placeholder = shadowRoot?.querySelector<HTMLElement>(
+      ".ML__content-placeholder .ML__text",
+    );
+    const container = shadowRoot?.querySelector<HTMLElement>('[part~="container"]');
+    const containerRect = container?.getBoundingClientRect();
+    const toggleRect = keyboardToggle?.getBoundingClientRect();
+
+    return {
+      containerWidth: containerRect?.width ?? 0,
+      fieldWidth: fieldRect.width,
+      placeholderBackground: placeholder
+        ? getComputedStyle(placeholder).backgroundColor
+        : "",
+      rightGap: toggleRect
+        ? fieldRect.right - toggleRect.right
+        : Number.POSITIVE_INFINITY,
+      verticalCenterDelta: toggleRect
+        ? Math.abs(
+            fieldRect.top +
+              fieldRect.height / 2 -
+              (toggleRect.top + toggleRect.height / 2),
+          )
+        : Number.POSITIVE_INFINITY,
+    };
+  });
+
+  expect(layout.placeholderBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(layout.containerWidth).toBeGreaterThan(layout.fieldWidth - 40);
+  expect(layout.rightGap).toBeGreaterThan(0);
+  expect(layout.rightGap).toBeLessThan(32);
+  expect(layout.verticalCenterDelta).toBeLessThanOrEqual(1);
+
+  const keyboardToggle = mathfield.locator('[part~="virtual-keyboard-toggle"]');
+  await keyboardToggle.click();
+  await expect(mathfield).toHaveAttribute("data-virtual-keyboard-open", "");
+  await expect(keyboardToggle).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(() =>
+      keyboardToggle.evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .not.toBe("rgba(0, 0, 0, 0)");
+  await mathfield.focus();
+  await expect(mathfield).toHaveAttribute("data-virtual-keyboard-open", "");
+  await keyboardToggle.evaluate((element) => {
+    element.dispatchEvent(new PointerEvent("pointerleave"));
+  });
+  await mathfield.screenshot({
+    path: testInfo.outputPath("formula-input-focused-keyboard-open.png"),
+  });
+
+  await page.evaluate(() => {
+    window.localStorage.setItem("classhero-theme", "dark");
+    document.documentElement.classList.add("dark");
+    document.body.classList.add("dark");
+  });
+  const darkThemeColors = await mathfield.evaluate((element) => {
+    const shadowRoot = element.shadowRoot;
+    const placeholder = shadowRoot?.querySelector<HTMLElement>(
+      ".ML__content-placeholder .ML__text",
+    );
+    const keyboardToggle = shadowRoot?.querySelector<HTMLElement>(
+      '[part~="virtual-keyboard-toggle"]',
+    );
+
+    return {
+      keyboardBackground: keyboardToggle
+        ? getComputedStyle(keyboardToggle).backgroundColor
+        : "",
+      placeholderBackground: placeholder
+        ? getComputedStyle(placeholder).backgroundColor
+        : "",
+    };
+  });
+  expect(darkThemeColors.placeholderBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(darkThemeColors.keyboardBackground).not.toBe("rgba(0, 0, 0, 0)");
+  await mathfield.screenshot({
+    path: testInfo.outputPath("formula-input-focused-keyboard-open-dark.png"),
+  });
+
+  expect(browserErrors).toEqual([]);
   await expectNoFrameworkOverlay(page);
 });
 
@@ -113,6 +249,14 @@ async function setupTestsApiMock(page: Page) {
       return fulfillJson(route, 200, { data: sets });
     }
 
+    if (method === "GET" && pathname === `/admin/lessons/${lessonId}/quiz-sets`) {
+      return fulfillJson(route, 200, { data: [] });
+    }
+
+    if (method === "GET" && pathname === `/admin/lessons/${lessonId}/flashcard-sets`) {
+      return fulfillJson(route, 200, { data: [] });
+    }
+
     if (method === "POST" && pathname === `/admin/lessons/${lessonId}/test-sets`) {
       const body = request.postDataJSON() as {
         difficulty: string;
@@ -128,13 +272,15 @@ async function setupTestsApiMock(page: Page) {
         reviewStatus: "APPROVED",
         questionCount: 0,
         totalScore: "10",
+        sortOrder: sets.length,
         _count: { questions: 0 },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       sets.push(set);
       questionsBySet.set(String(set.id), []);
-      return fulfillJson(route, 201, { data: set });
+      const { _count: _omittedCount, ...createdSetResponse } = set;
+      return fulfillJson(route, 201, { data: createdSetResponse });
     }
 
     const questionsMatch = pathname.match(/^\/admin\/test-sets\/([^/]+)\/questions$/);

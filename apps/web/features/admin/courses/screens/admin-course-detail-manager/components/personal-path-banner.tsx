@@ -5,6 +5,7 @@ import { ArrowLeft, BookOpen, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getPersonalLearningPath } from "@/features/admin/courses/api/admin-personal-learning-paths-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 function useEnrollmentInfo(enrollmentId: string | null) {
   const session = useAuthSessionStore((state) => state.session);
@@ -12,7 +13,12 @@ function useEnrollmentInfo(enrollmentId: string | null) {
   const token = session?.accessToken ?? "";
 
   return useQuery({
-    queryKey: ["personal-path-enrollment-detail", enrollmentId],
+    queryKey: [
+      "admin",
+      "personal-path-enrollment-detail",
+      enrollmentId,
+      session?.user.id ?? "guest",
+    ],
     queryFn: () => getPersonalLearningPath(enrollmentId!, token),
     enabled: isAuthHydrated && Boolean(token) && Boolean(enrollmentId),
     staleTime: 60_000,
@@ -29,6 +35,7 @@ export function PersonalPathBanner({
   basePathId: string | null;
 }) {
   const { data, isLoading } = useEnrollmentInfo(enrollmentId);
+  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
 
   const studentName = data?.student?.name ?? "Học sinh";
   const basePathTitle = data?.baseLearningPath?.title ?? "Khóa gốc";
@@ -42,16 +49,23 @@ export function PersonalPathBanner({
     >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900">
-          <User className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <User
+            className="h-5 w-5 text-purple-600 dark:text-purple-400"
+            aria-hidden="true"
+          />
         </div>
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-wider text-purple-500 dark:text-purple-400">
             Bản lộ trình cá nhân
           </p>
           <p className="mt-0.5 font-bold text-purple-800 dark:text-purple-200">
-            {isLoading ? (
+            {isLoading || shouldShowInitialLoading ? (
               <span
-                className="inline-block h-4 w-32 animate-pulse rounded bg-purple-200 dark:bg-purple-800"
+                className={`inline-block h-4 w-32 rounded ${
+                  shouldShowInitialLoading
+                    ? "animate-pulse bg-purple-200 dark:bg-purple-800"
+                    : "invisible"
+                }`}
                 aria-label="Đang tải tên học sinh"
               />
             ) : (
@@ -62,8 +76,14 @@ export function PersonalPathBanner({
             <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span className="truncate">
               Khóa nguồn:{" "}
-              {isLoading ? (
-                <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-purple-200 dark:bg-purple-800" />
+              {isLoading || shouldShowInitialLoading ? (
+                <span
+                  className={`inline-block h-3.5 w-24 rounded ${
+                    shouldShowInitialLoading
+                      ? "animate-pulse bg-purple-200 dark:bg-purple-800"
+                      : "invisible"
+                  }`}
+                />
               ) : (
                 <span className="font-semibold">{basePathTitle}</span>
               )}

@@ -1,9 +1,9 @@
 import { BookOpen, ChevronRight, Clock3, Star } from "lucide-react";
-import Link from "next/link";
 import type { CSSProperties } from "react";
 import { CourseIllustration } from "@/components/student/courses/course-illustration";
 import { CourseStatusBadge } from "@/components/student/courses/course-status-badge";
 import { CourseSubjectBadge } from "@/components/student/courses/course-subject-badge";
+import { StudentLessonTransitionLink } from "@/components/student/learning-transition/student-lesson-transition-link";
 import type { StudentCourse } from "@/features/student/shared/student-courses-types";
 import { getGradeTextClass } from "@/features/student/shared/utils/student-courses-utils";
 import { cn } from "@/lib/utils";
@@ -61,13 +61,13 @@ function ProminentPurchasedCourseCard({ course }: { course: StudentCourse }) {
           ) : null}
 
           {course.nextLesson ? (
-            <Link
-              href={`/student/lessons/${course.nextLesson.id}`}
+            <StudentLessonTransitionLink
+              lessonId={course.nextLesson.id}
               className="mt-5 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:min-h-12 sm:px-4"
             >
               Vào học ngay
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+            </StudentLessonTransitionLink>
           ) : null}
         </div>
       </div>
@@ -98,13 +98,13 @@ function CompactPurchasedCourseCard({ course }: { course: StudentCourse }) {
             </div>
           ) : null}
           {course.nextLesson ? (
-            <Link
-              href={`/student/lessons/${course.nextLesson.id}`}
+            <StudentLessonTransitionLink
+              lessonId={course.nextLesson.id}
               className="mt-3 inline-flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-white px-3 text-xs font-extrabold text-blue-600 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4 sm:text-sm"
             >
               Tiếp tục
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+            </StudentLessonTransitionLink>
           ) : null}
         </div>
       </div>

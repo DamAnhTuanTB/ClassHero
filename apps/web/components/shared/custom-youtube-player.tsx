@@ -18,10 +18,11 @@ import {
   Gauge,
   RotateCcw,
   RotateCw,
-  GraduationCap,
   Check,
   Subtitles,
+  GraduationCap,
 } from "lucide-react";
+import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 
 export interface CustomVideoSettings {
   isDisabled: boolean;
@@ -73,6 +74,7 @@ interface CustomYoutubePlayerProps {
   videoUrl: string;
   settings?: CustomVideoSettings | null;
   title?: string;
+  startButtonVariant?: "default" | "student";
   onPlaybackTimeChange?: (timeInSeconds: number) => void;
 }
 
@@ -90,7 +92,10 @@ declare global {
 export const CustomYoutubePlayer = forwardRef<
   CustomYoutubePlayerHandle,
   CustomYoutubePlayerProps
->(function CustomYoutubePlayer({ videoUrl, settings, title, onPlaybackTimeChange }, ref) {
+>(function CustomYoutubePlayer(
+  { videoUrl, settings, title, startButtonVariant = "default", onPlaybackTimeChange },
+  ref,
+) {
   const rawSettings = { ...DEFAULT_CUSTOM_VIDEO_SETTINGS, ...settings };
   const chapters = settings?.chapters || [];
 
@@ -101,6 +106,8 @@ export const CustomYoutubePlayer = forwardRef<
     ...rawSettings,
     letterboxBottomPercentage: bottomPercent,
   };
+  const shouldShowWatermark =
+    startButtonVariant === "student" || currentSettings.hasWatermark;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
@@ -126,6 +133,8 @@ export const CustomYoutubePlayer = forwardRef<
   const [hoverPercent, setHoverPercent] = useState<number | null>(null);
 
   const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const firstStartUiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const startRequestedAtRef = useRef(0);
   const durationRef = useRef<number>(0);
   const isFirstPlayStartedRef = useRef<boolean>(false);
   const isMobileTimelineDraggingRef = useRef(false);
@@ -255,6 +264,10 @@ export const CustomYoutubePlayer = forwardRef<
     return () => {
       isMounted = false;
       if (checkTimeout) clearTimeout(checkTimeout);
+      if (firstStartUiTimeoutRef.current) {
+        clearTimeout(firstStartUiTimeoutRef.current);
+        firstStartUiTimeoutRef.current = null;
+      }
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
@@ -312,7 +325,27 @@ export const CustomYoutubePlayer = forwardRef<
             setIsPlaying(true);
             if (!isFirstPlayStartedRef.current) {
               isFirstPlayStartedRef.current = true;
-              setIsFirstPlayStarted(true);
+
+              const revealFirstPlay = () => {
+                firstStartUiTimeoutRef.current = null;
+                setIsFirstPlayStarted(true);
+                setIsStarting(false);
+              };
+              const minimumLoadingTime = startButtonVariant === "student" ? 1200 : 0;
+              const loadingElapsed = Date.now() - startRequestedAtRef.current;
+              const remainingLoadingTime = Math.max(
+                0,
+                minimumLoadingTime - loadingElapsed,
+              );
+
+              if (remainingLoadingTime > 0) {
+                firstStartUiTimeoutRef.current = setTimeout(
+                  revealFirstPlay,
+                  remainingLoadingTime,
+                );
+              } else {
+                revealFirstPlay();
+              }
 
               // Ép ẩn phụ đề lần nữa khi video thực sự bắt đầu phát (vì lúc onReady có thể YT chưa load xong module phụ đề)
               try {
@@ -324,8 +357,9 @@ export const CustomYoutubePlayer = forwardRef<
                   event.target.setOption("captions", "track", {});
                 }
               } catch (e) {}
+            } else if (!firstStartUiTimeoutRef.current) {
+              setIsStarting(false);
             }
-            setIsStarting(false);
             setIsReady(true); // Fallback: nếu onReady không gọi được mà video vẫn play
           } else {
             setIsPlaying(false);
@@ -451,6 +485,7 @@ export const CustomYoutubePlayer = forwardRef<
   const handleStart = () => {
     if (isStarting || !isReady || !playerRef.current) return;
 
+    startRequestedAtRef.current = Date.now();
     setIsStarting(true);
     setShowOverlay(true);
     hideOverlayDelayed();
@@ -701,18 +736,20 @@ export const CustomYoutubePlayer = forwardRef<
         style={{ width: innerWidth, height: innerHeight }}
       >
         {/* Watermark Logo ClassHero */}
-        {currentSettings.hasWatermark && (
+        {shouldShowWatermark && (
           <div
-            className={`absolute z-40 flex items-center pointer-events-none bg-black/80 rounded-lg backdrop-blur-sm border border-white/10 shadow-lg transition-all duration-300 ${
+            className={`absolute z-40 flex items-center rounded-lg bg-white/10 shadow-[0_4px_14px_rgba(0,0,0,0.18)] ring-1 ring-white/15 backdrop-blur-sm pointer-events-none transition-all duration-300 ${
               isFullscreen
-                ? "top-4 right-4 lg:top-8 lg:right-8 gap-2 lg:gap-3 px-3 py-2 lg:px-5 lg:py-3 scale-100 lg:scale-110 origin-top-right"
-                : "top-2 right-2 lg:top-4 lg:right-4 gap-1 lg:gap-1.5 px-2 py-1 lg:px-3 lg:py-1.5 scale-75 lg:scale-100 origin-top-right"
+                ? "top-4 right-4 lg:top-8 lg:right-8 px-3 py-2 lg:px-4 lg:py-2.5 scale-100 lg:scale-110 origin-top-right"
+                : "top-2 right-2 lg:top-4 lg:right-4 px-2 py-1 lg:px-3 lg:py-1.5 scale-75 lg:scale-100 origin-top-right"
             }`}
           >
-            <GraduationCap className="h-4 w-4 lg:h-5 lg:w-5 text-[var(--theme-primary)]" />
-            <span className="text-white font-bold tracking-widest text-[11px] lg:text-sm drop-shadow-md">
-              ClassHero
-            </span>
+            <ClassHeroLogo
+              alt=""
+              className="h-7 max-w-[6.25rem] lg:h-8 lg:max-w-[7.5rem]"
+              priority
+              sizes="8rem"
+            />
           </div>
         )}
 
@@ -756,28 +793,79 @@ export const CustomYoutubePlayer = forwardRef<
             }`}
             onClick={handleStart}
           >
-            {!isReady || isStarting ? (
-              <div
-                className={`w-10 h-10 sm:w-14 sm:h-14 border-4 border-white/20 border-t-[var(--theme-primary)] rounded-full animate-spin ${
-                  isStarting ? "" : "mb-2 sm:mb-4"
-                }`}
-              ></div>
-            ) : (
-              <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-[var(--theme-primary)] flex items-center justify-center mb-2 sm:mb-4 group-hover/start:scale-110 transition-transform shadow-lg shadow-[var(--theme-primary)]/30">
-                <Play className="h-6 w-6 sm:h-10 sm:w-10 text-white fill-current ml-0.5 sm:ml-1" />
-              </div>
-            )}
-            {!isStarting && (
-              <span className="text-white/80 font-medium text-sm sm:text-lg">
-                {isReady ? "Nhấn để bắt đầu học" : "Đang kết nối tới Giáo viên..."}
-              </span>
-            )}
+            <div className="flex h-32 flex-col items-center justify-center transition-none sm:h-44 lg:h-48">
+              {isStarting && startButtonVariant === "student" ? (
+                <div
+                  key="student-starting"
+                  role="status"
+                  aria-live="polite"
+                  className="w-[min(76vw,17rem)] px-2 py-2 text-left sm:w-80 sm:px-3 sm:py-3 lg:w-[26rem] lg:px-4"
+                >
+                  <div className="text-center">
+                    <span className="text-sm font-black text-white sm:text-base lg:text-lg">
+                      Sẵn sàng vào học nhé!
+                    </span>
+                  </div>
+
+                  <span className="relative mt-3 block h-2.5 rounded-full bg-white/10 ring-1 ring-white/15 sm:mt-4 sm:h-3 lg:mt-5">
+                    <span className="student-video-loading-fill absolute inset-y-0 left-0 w-full rounded-full bg-gradient-to-r from-cyan-300 via-sky-400 to-violet-500 shadow-[0_0_14px_rgba(56,189,248,0.65)]" />
+                    <span
+                      aria-hidden="true"
+                      className="student-video-loading-mascot absolute left-0 top-1/2 z-10 grid h-10 w-10 place-items-center text-[35px] leading-none drop-shadow-[0_3px_4px_rgba(14,165,233,0.7)] sm:text-[36px] lg:h-11 lg:w-11 lg:text-[40px]"
+                    >
+                      <span className="student-video-loading-rocket">🚀</span>
+                    </span>
+                  </span>
+                </div>
+              ) : !isReady || isStarting ? (
+                <div
+                  key="connecting"
+                  aria-hidden="true"
+                  className={`relative h-16 w-44 sm:h-20 sm:w-60 ${
+                    isStarting ? "" : "mb-3 sm:mb-5"
+                  }`}
+                >
+                  <span className="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full shadow-[0_6px_20px_rgba(139,92,246,0.22)] sm:h-20 sm:w-20">
+                    <span className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,rgba(196,181,253,0.12),rgb(196,181,253),rgb(56,189,248),rgba(196,181,253,0.12))] motion-safe:animate-[spin_1.5s_linear_infinite]" />
+                    <span className="absolute inset-[3px] rounded-full bg-[#211638]" />
+                    <GraduationCap
+                      className="relative z-10 h-9 w-9 text-violet-200 sm:h-11 sm:w-11"
+                      strokeWidth={1.9}
+                    />
+                  </span>
+                </div>
+              ) : startButtonVariant === "student" ? (
+                <div
+                  key="student-ready"
+                  className="relative mb-3 h-20 w-20 sm:mb-5 sm:h-28 sm:w-28"
+                >
+                  <span className="absolute -inset-5 rounded-full bg-sky-500/20 blur-2xl transition duration-300 group-hover/start:bg-violet-500/25" />
+                  <span className="absolute -inset-2 rounded-full border-2 border-dashed border-cyan-300/70 transition-transform duration-700 group-hover/start:rotate-45 motion-safe:animate-[spin_12s_linear_infinite]" />
+                  <span className="absolute inset-0 rotate-6 rounded-[42%_58%_55%_45%/48%_42%_58%_52%] bg-gradient-to-br from-cyan-300 via-sky-500 to-violet-600 shadow-[0_8px_0_#075985] transition duration-300 group-hover/start:rotate-12 group-hover/start:scale-105 group-active/start:translate-y-1 group-active/start:shadow-[0_4px_0_#075985]" />
+                  <span className="absolute inset-2 grid place-items-center rounded-full border-4 border-white/70 bg-white shadow-inner shadow-sky-200 sm:inset-3">
+                    <Play className="ml-1 h-8 w-8 fill-sky-500 text-sky-500 sm:h-11 sm:w-11" />
+                  </span>
+                </div>
+              ) : (
+                <div
+                  key="default-ready"
+                  className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-[var(--theme-primary)] flex items-center justify-center mb-2 sm:mb-4 group-hover/start:scale-110 transition-transform shadow-lg shadow-[var(--theme-primary)]/30"
+                >
+                  <Play className="h-6 w-6 sm:h-10 sm:w-10 text-white fill-current ml-0.5 sm:ml-1" />
+                </div>
+              )}
+              {!isStarting && (
+                <span className="text-white/80 font-medium text-sm sm:text-lg">
+                  {isReady ? "Nhấn để bắt đầu học" : "Đang kết nối tới Giáo viên"}
+                </span>
+              )}
+            </div>
           </button>
         )}
 
         {/* Màn hình Intro che video trong 10 giây đầu tiên của trục thời gian ảo */}
         <div
-          className={`absolute inset-0 z-20 bg-black flex flex-col items-center justify-center pointer-events-none sm:rounded-lg overflow-hidden ${
+          className={`absolute inset-0 z-20 bg-black flex flex-col items-center justify-center px-6 sm:px-10 pointer-events-none sm:rounded-lg overflow-hidden ${
             shouldShowIntro ? "opacity-100" : "opacity-0 transition-opacity duration-1000"
           }`}
         >

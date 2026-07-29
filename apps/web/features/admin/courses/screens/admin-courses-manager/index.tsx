@@ -11,6 +11,7 @@ import {
 import { AdminCoursesStatsRow } from "@/features/admin/courses/screens/admin-courses-manager/components/admin-courses-stats-row";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import { useAdminCoursesManager } from "@/features/admin/courses/hooks/use-admin-courses-manager";
+import { useAdminLearningPathPrefetch } from "@/features/admin/courses/hooks/use-admin-course-queries";
 import type { AppThemeMode } from "@/lib/theme-store";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,7 @@ export function AdminCoursesManager({
     viewState,
     uploadCover,
   } = useAdminCoursesManager(initialLearningPaths, initialThemeMode);
+  const prefetchLearningPath = useAdminLearningPathPrefetch();
   const deleteTargetLabel =
     deletingPaths.length === 1
       ? (deletingPaths[0]?.title ?? "khóa học này")
@@ -121,6 +123,9 @@ export function AdminCoursesManager({
             onClearSelected={actions.clearSelectedPaths}
             onCreatePath={actions.startCreatePath}
             onEditPath={actions.startEditPath}
+            onPrefetchPath={(pathId) => {
+              void prefetchLearningPath(pathId);
+            }}
             onGradeChange={actions.setGradeFilter}
             onQueryChange={actions.setQuery}
             onRequestDeleteSelected={actions.requestDeleteSelectedPaths}

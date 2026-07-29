@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useCallback, useDeferredValue } from "react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -16,9 +21,13 @@ import type {
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
 export const enrollmentListQueryKeys = {
-  all: ["course-enrollments"] as const,
-  list: (learningPathId: string, query: PersonalLearningPathEnrollmentsQuery) =>
-    [...enrollmentListQueryKeys.all, learningPathId, query] as const,
+  all: ["admin", "course-enrollments"] as const,
+  list: (
+    learningPathId: string,
+    userId: string | undefined,
+    query: PersonalLearningPathEnrollmentsQuery,
+  ) =>
+    [...enrollmentListQueryKeys.all, learningPathId, userId ?? "guest", query] as const,
 };
 
 const PAGE_SIZE = 10;
@@ -55,7 +64,7 @@ export function useEnrollmentListPanel(learningPathId: string) {
   };
 
   const enrollmentsQuery = useQuery({
-    queryKey: enrollmentListQueryKeys.list(learningPathId, queryParams),
+    queryKey: enrollmentListQueryKeys.list(learningPathId, session?.user.id, queryParams),
     queryFn: () => listCourseEnrollments(learningPathId, queryParams, token),
     enabled: isAuthHydrated && Boolean(token),
     placeholderData: keepPreviousData,
@@ -82,8 +91,7 @@ export function useEnrollmentListPanel(learningPathId: string) {
       });
     },
     onError: (error: unknown) => {
-      const msg =
-        error instanceof Error ? error.message : "Không thể tạo bản cá nhân.";
+      const msg = error instanceof Error ? error.message : "Không thể tạo bản cá nhân.";
       if (msg.includes("PERSONAL_LEARNING_PATH_EXISTS")) {
         toast.error("Enrollment này đã có bản cá nhân.");
       } else {
@@ -97,13 +105,10 @@ export function useEnrollmentListPanel(learningPathId: string) {
     setPage(1);
   }, []);
 
-  const handleStatusFilterChange = useCallback(
-    (value: PersonalizationStatus | "ALL") => {
-      setStatusFilter(value);
-      setPage(1);
-    },
-    [],
-  );
+  const handleStatusFilterChange = useCallback((value: PersonalizationStatus | "ALL") => {
+    setStatusFilter(value);
+    setPage(1);
+  }, []);
 
   const handleRequestCreate = useCallback(
     (enrollment: PersonalLearningPathEnrollmentApi) => {

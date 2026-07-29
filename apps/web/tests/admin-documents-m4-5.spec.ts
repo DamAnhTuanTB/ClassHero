@@ -22,6 +22,8 @@ type MockState = {
 type LessonMutationPayload = {
   completionMinScore?: number;
   examOpenAt?: string | null;
+  lessonType?: "BASIC" | "LIVE";
+  liveUrl?: string | null;
   orderIndex?: number;
   scheduledAt?: string | null;
   shortDescription?: string | null;
@@ -83,10 +85,17 @@ test.describe("M4.5 admin lesson documents", () => {
     );
     await foundationSection.getByTestId("add-foundation-extraction").click();
     const extractions = foundationSection.getByTestId("foundation-extraction-item");
-    await expectVerticallyCentered(
-      extractions.nth(0).getByLabel("Đến trang"),
-      extractions.nth(0).getByRole("button", { name: "Xóa khối trích xuất 1" }),
-    );
+    const firstExtractionDeleteButton = extractions
+      .nth(0)
+      .getByRole("button", { name: "Xóa khối trích xuất 1" });
+    if ((page.viewportSize()?.width ?? 0) >= 640) {
+      await expectVerticallyCentered(
+        extractions.nth(0).getByLabel("Đến trang"),
+        firstExtractionDeleteButton,
+      );
+    } else {
+      await expect(firstExtractionDeleteButton).toBeVisible();
+    }
     await extractions.nth(1).getByLabel("Tài liệu trích xuất").click();
     await extractions.nth(1).getByRole("option", { name: "Toán 7 Tập 2" }).click();
     await expect(extractions.nth(1).getByText("Nhập trang bắt đầu")).toHaveCount(0);
@@ -860,6 +869,8 @@ function buildLesson(id: string, orderIndex: number, title: string) {
     completionMinScore: 7,
     examOpenAt: null as string | null,
     id,
+    lessonType: "BASIC" as "BASIC" | "LIVE",
+    liveUrl: null as string | null,
     orderIndex,
     scheduledAt: null as string | null,
     shortDescription: null as string | null,
@@ -956,6 +967,8 @@ function buildLessonFromPayload(id: string, body: LessonMutationPayload) {
     completionMinScore: body.completionMinScore ?? 7,
     examOpenAt: body.examOpenAt ?? null,
     id,
+    lessonType: body.lessonType ?? ("BASIC" as const),
+    liveUrl: body.liveUrl ?? null,
     orderIndex: body.orderIndex ?? 1,
     scheduledAt: body.scheduledAt ?? null,
     shortDescription: body.shortDescription ?? null,
@@ -1002,6 +1015,8 @@ function updateLessonInLearningPath(
               completionMinScore: body.completionMinScore ?? lesson.completionMinScore,
               examOpenAt:
                 body.examOpenAt === undefined ? lesson.examOpenAt : body.examOpenAt,
+              lessonType: body.lessonType ?? lesson.lessonType,
+              liveUrl: body.liveUrl === undefined ? lesson.liveUrl : body.liveUrl,
               orderIndex: body.orderIndex ?? lesson.orderIndex,
               scheduledAt:
                 body.scheduledAt === undefined ? lesson.scheduledAt : body.scheduledAt,
@@ -1215,10 +1230,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
-  const hasHorizontalOverflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-  );
-  expect(hasHorizontalOverflow).toBe(false);
+  const overflowingElements = await page.evaluate(() => {
+    const viewportWidth = document.documentElement.clientWidth;
+
+    return Array.from(document.querySelectorAll<HTMLElement>("body *"))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          className: element.className,
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          tagName: element.tagName,
+          testId: element.dataset.testid,
+        };
+      })
+      .filter(({ left, right }) => left < -1 || right > viewportWidth + 1)
+      .slice(0, 10);
+  });
+
+  expect(overflowingElements).toEqual([]);
 }
 
 async function expectDialogFitsViewport(page: Page, dialog: Locator) {

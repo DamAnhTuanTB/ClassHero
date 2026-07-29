@@ -84,9 +84,22 @@ Changelog is not written during UI iteration. It is written only during `/commit
 - When creating or touching any form, first pick the closest approved/reference form pattern from `apps/web/components/common/forms`, a similar feature form, or `docs/ui-references/approved-patterns.md`; reuse or upgrade that pattern instead of making a new visual/control variant. If no matching pattern exists, state the assumption in the plan/final.
 - Run a mandatory form-quality audit before final response: follow the closest approved/reference form pattern first (`mode: "onChange"`, `reValidateMode: "onChange"`, pass `form.formState.errors.<field>` directly to field primitives, and do not call `trigger()` right after `reset()` on modal open), every required/limited field must show a visible error state and message while the user edits, validation copy must match the failing rule (`Nhập ...` only for empty required fields, separate copy for min length/format/range/duplicate), required text fields should use the shared validation helper such as `requiredTrimmedText`, modal/drawer action buttons must stay clickable for invalid/pristine forms so submit can reveal inline validation errors and only disable for pending/saving or a hard missing prerequisite, modal/drawer forms must reset/default correctly, and numeric fields must not use native browser number controls when the app already has styled text/numeric inputs.
 - Include or preserve loading, empty, error, disabled, hover/focus states when the touched UI needs them.
+- When the owner requests a scoped visual change such as color only, preserve every
+  unrequested visual property and effect, including shadow depth, glow, transform,
+  border, radius, spacing, hover, active and focus behavior. Do not replace the
+  existing class or variant with another shared class unless its computed visual
+  behavior is equivalent. When recoloring a 3D button, keep the original shadow
+  offsets, blur, spread and press translation, and recolor every state together.
+- When a shared component receives a feature-specific accent, apply that accent to
+  every accent-bearing element in the component (such as its icon, close control,
+  primary action, border and related alert surface), including hover and dark
+  states. Do not leave part of a Flashcard/Quiz flow on the default theme color.
 - UI changes must feel production-ready, not static mockups: visual hierarchy, copy, states, controls, and expected actions should match what a real user would use.
 - Button text must never wrap to a second line. Keep all button labels one-line with `white-space: nowrap`/`whitespace-nowrap`; if the label does not fit, adjust layout, width, padding, font size, or copy instead of allowing wrapping.
 - Với editor công thức Toán/Lý/Hóa, LaTeX chỉ là định dạng dữ liệu lưu phía sau, không được dùng textarea/input mã LaTeX thô làm UX nhập chính. UI phải ưu tiên math field WYSIWYG có toolbar ký hiệu/cấu trúc trực quan; khi chọn phân số, căn, lũy thừa, tích phân hoặc cấu trúc tương tự, người dùng phải nhập trực tiếp vào từng vùng hiển thị thật và điều hướng được giữa các vùng bằng click/chạm, `Tab` hoặc phím mũi tên. Raw LaTeX chỉ được mở như chế độ nâng cao nếu owner yêu cầu rõ.
+- Decorative math expressions must not render a standalone Unicode `√` because
+  many fonts omit the visible vinculum. Use the shared radical expression pattern
+  with a real overbar and an explicit radicand such as `x` or `49`.
 - All modal/drawer UI must be vertically and horizontally centered in the viewport at every breakpoint, including mobile. Do not top-align modals on mobile; constrain long modals with max-height and scroll only the middle body region. Use a compact three-zone structure: fixed visible title-only header at the top, scrollable content in the middle, and fixed visible action/footer area at the bottom. Do not add descriptive subtitles under modal titles, do not let the entire modal scroll, and only the middle content region may scroll. Every modal/drawer must provide a footer `Hủy` action and an `X` close button in the header/shell. Keep modal footer padding compact; on mobile, keep the old rule of one action full width and two actions on one row by default; on laptop/desktop, modal footer buttons should size to their content (`max-content`/`w-auto`) instead of stretching full width.
 - Do not create or leave fake-static interaction. Any visible button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control, or clickable-looking icon must use semantic elements, real state/handlers, and pressed/pending/disabled/loading feedback as appropriate. If API is not connected, implement local/mock state that behaves like the production interaction.
 - Avoid large redesign unless requested.
@@ -100,6 +113,10 @@ Changelog is not written during UI iteration. It is written only during `/commit
 - A distinct display font can be used for auth visual-panel headings to add youthful character, while form/body typography should remain highly readable.
 - Auth visual panels must not use oversized all-black headlines or opaque blocks that hide the learning background. Prefer moderate gradient/accent display text, translucent panels, compact learning icons, and subtle motion with `prefers-reduced-motion` support.
 - Keep interaction lightweight; avoid animation/layout changes that make mobile feel laggy.
+- On branded loading or transition screens, decorative icons must remain secondary
+  to the brand logo and status. Omit decorative icon badges by default when they do
+  not communicate necessary state. Never use large saturated icon tiles, opaque
+  badges, heavy shadows, or high-contrast moving icons that compete with the logo.
 - For public/indexable pages, do not break heading hierarchy, crawlable text, alt text, or metadata-friendly structure while changing visuals.
 - Only create or save screenshots when screenshot mode is enabled by the command, for example `/change-ui screenshot màn đăng ký`. If the command does not contain `screenshot`, do not run screenshot capture or leave new screenshot artifacts.
 

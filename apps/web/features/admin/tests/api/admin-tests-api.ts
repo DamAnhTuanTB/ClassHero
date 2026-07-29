@@ -15,7 +15,7 @@ export interface AdminTestSet extends Omit<AdminQuizSet, "questionCount" | "_cou
   } | null;
   questionCount: number;
   totalScore: string | number;
-  _count: {
+  _count?: {
     questions: number;
   };
 }

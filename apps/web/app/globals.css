@@ -580,6 +580,14 @@ button {
   pointer-events: none !important;
 }
 
+@media (max-width: 639px) {
+  [data-sonner-toaster].app-toaster {
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+  }
+}
+
 [data-sonner-toast].app-toast {
   --app-toast-progress-color: var(--theme-neutral-accent);
   --app-toast-duration: 4200ms;
@@ -771,6 +779,222 @@ button {
     [data-admin-theme="true"]
     .admin-course-shell-grid {
     grid-template-columns: 5.5rem minmax(0, 1fr);
+  }
+}
+
+@keyframes student-video-loading-fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes student-video-loading-mascot {
+  0% {
+    left: 0;
+    transform: translateX(-50%) translateY(-50%) rotate(0deg);
+  }
+
+  12.5% {
+    left: 12.5%;
+    transform: translateX(-50%) translateY(calc(-50% - 5px));
+  }
+
+  25% {
+    left: 25%;
+    transform: translateX(-50%) translateY(-50%) rotate(0deg);
+  }
+
+  37.5% {
+    left: 37.5%;
+    transform: translateX(-50%) translateY(calc(-50% + 5px));
+  }
+
+  50% {
+    left: 50%;
+    transform: translateX(-50%) translateY(-50%) rotate(0deg);
+  }
+
+  62.5% {
+    left: 62.5%;
+    transform: translateX(-50%) translateY(calc(-50% - 5px));
+  }
+
+  75% {
+    left: 75%;
+    transform: translateX(-50%) translateY(-50%) rotate(0deg);
+  }
+
+  87.5% {
+    left: 87.5%;
+    transform: translateX(-50%) translateY(calc(-50% + 5px));
+  }
+
+  100% {
+    left: 100%;
+    transform: translateX(-50%) translateY(-50%) rotate(0deg);
+  }
+}
+
+@keyframes student-video-loading-rocket {
+  0% {
+    transform: rotate(24deg) scale(1);
+  }
+
+  12.5% {
+    transform: rotate(34deg) scale(1.04);
+  }
+
+  25% {
+    transform: rotate(44deg) scale(1);
+  }
+
+  37.5% {
+    transform: rotate(34deg) scale(1.03);
+  }
+
+  50% {
+    transform: rotate(24deg) scale(1);
+  }
+
+  62.5% {
+    transform: rotate(34deg) scale(1.04);
+  }
+
+  75% {
+    transform: rotate(44deg) scale(1);
+  }
+
+  87.5% {
+    transform: rotate(34deg) scale(1.03);
+  }
+
+  100% {
+    transform: rotate(24deg) scale(1);
+  }
+}
+
+@keyframes student-video-loading-mascot-reduced {
+  from {
+    left: 0;
+    transform: translateX(-50%) translateY(-50%);
+  }
+
+  to {
+    left: 100%;
+    transform: translateX(-50%) translateY(-50%);
+  }
+}
+
+@keyframes student-video-loading-rocket-glow {
+  0%,
+  100% {
+    filter: brightness(0.9);
+    opacity: 0.82;
+  }
+
+  50% {
+    filter: brightness(1.25);
+    opacity: 1;
+  }
+}
+
+@keyframes student-video-loading-smoke {
+  0% {
+    opacity: 0.9;
+    transform: translate(-1px, -50%) scale(0.35);
+  }
+
+  55% {
+    opacity: 0.55;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-14px, -50%) scale(1.25);
+  }
+}
+
+@keyframes student-video-loading-smoke-soft {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: translate(-6px, -50%) scale(0.7);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: translate(-8px, -50%) scale(1);
+  }
+}
+
+.student-video-loading-fill {
+  transform-origin: left center;
+  animation: student-video-loading-fill 1.2s linear both;
+}
+
+.student-video-loading-mascot {
+  isolation: isolate;
+  animation: student-video-loading-mascot 1.2s linear both;
+}
+
+.student-video-loading-rocket {
+  position: relative;
+  display: block;
+  transform: rotate(34deg);
+  transform-origin: center;
+  animation: student-video-loading-rocket 1.2s linear both;
+}
+
+.student-video-loading-mascot::before,
+.student-video-loading-mascot::after {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 90%) 0%,
+    rgb(186 230 253 / 72%) 50%,
+    rgb(125 211 252 / 0%) 100%
+  );
+  content: "";
+  filter: blur(0.4px);
+  animation: student-video-loading-smoke 360ms ease-out infinite;
+}
+
+.student-video-loading-mascot::after {
+  width: 6px;
+  height: 6px;
+  animation-delay: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-video-loading-fill {
+    animation: student-video-loading-fill 1.2s linear both;
+  }
+
+  .student-video-loading-mascot {
+    animation: student-video-loading-mascot-reduced 1.2s linear both;
+  }
+
+  .student-video-loading-rocket {
+    animation: student-video-loading-rocket-glow 420ms ease-in-out infinite;
+  }
+
+  .student-video-loading-mascot::before,
+  .student-video-loading-mascot::after {
+    animation: student-video-loading-smoke-soft 700ms ease-in-out infinite;
+  }
+
+  .student-video-loading-mascot::after {
+    animation-delay: 350ms;
   }
 }
 

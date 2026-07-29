@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLesson } from "../../hooks/use-admin-lesson";
 import {
-  Loader2,
   BookOpen,
   FileText,
   Layers,
@@ -14,6 +13,7 @@ import {
   Layers3,
   Pencil,
 } from "lucide-react";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { cn } from "@/lib/utils";
 import {
   AdminCoursesSidebar,
@@ -38,43 +38,35 @@ import {
   LessonContentTabs,
   type LessonContentTabKey,
 } from "@/features/admin/lessons/screens/admin-lesson-detail/components/lesson-content-tabs";
+import { useAdminLessonContentPrefetch } from "@/features/admin/lessons/hooks/use-admin-lesson-content-prefetch";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 const LessonDetailEditorDialog = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
     (module) => module.LessonDetailEditorDialog,
   ),
 );
+const loadLessonDocumentsTab = () =>
+  import("@/features/admin/lessons/components/lesson-documents-tab");
 const LessonDocumentsTab = dynamic(
-  () =>
-    import("@/features/admin/lessons/components/lesson-documents-tab").then(
-      (module) => module.LessonDocumentsTab,
-    ),
+  () => loadLessonDocumentsTab().then((module) => module.LessonDocumentsTab),
   {
-    loading: () => (
-      <div className="flex min-h-72 items-center justify-center gap-3 p-6 text-sm font-bold text-[var(--theme-text-muted)]">
-        <Loader2
-          className="h-5 w-5 animate-spin text-[var(--theme-primary)]"
-          aria-hidden="true"
-        />
-        Đang tải tài liệu buổi học
-      </div>
-    ),
+    loading: () => <AdminLessonDocumentsTabSkeleton />,
   },
 );
+const loadAdminAssessmentTab = () =>
+  import("@/features/admin/assessments/components/admin-assessment-tab");
+const loadAdminFlashcardsTab = () =>
+  import("@/features/admin/flashcards/screens/admin-flashcards-tab");
+const loadAdminTestsTab = () => import("@/features/admin/tests/screens/admin-tests-tab");
 const AdminQuizTab = dynamic(() =>
-  import("@/features/admin/assessments/components/admin-assessment-tab").then(
-    (module) => module.AdminAssessmentTab,
-  ),
+  loadAdminAssessmentTab().then((module) => module.AdminAssessmentTab),
 );
 const AdminFlashcardsTab = dynamic(() =>
-  import("@/features/admin/flashcards/screens/admin-flashcards-tab").then(
-    (module) => module.AdminFlashcardsTab,
-  ),
+  loadAdminFlashcardsTab().then((module) => module.AdminFlashcardsTab),
 );
 const AdminTestsTab = dynamic(() =>
-  import("@/features/admin/tests/screens/admin-tests-tab").then(
-    (module) => module.AdminTestsTab,
-  ),
+  loadAdminTestsTab().then((module) => module.AdminTestsTab),
 );
 
 interface AdminLessonDetailManagerProps {
@@ -90,6 +82,8 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
 export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerProps) {
   const router = useRouter();
   const { data: lesson, isLoading, error, refetch } = useAdminLesson(lessonId);
+  useAdminLessonContentPrefetch(lessonId, Boolean(lesson));
+  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
   const [activeTab, setActiveTab] = useState<LessonContentTabKey>("quiz");
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
   const [tabPanelMinHeight, setTabPanelMinHeight] = useState(400);
@@ -112,6 +106,29 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
 
     return () => window.removeEventListener("resize", resetTabPanelMinHeight);
   }, []);
+
+  useEffect(() => {
+    if (!lesson) {
+      return;
+    }
+
+    const preloadContentTabs = () => {
+      void loadLessonDocumentsTab();
+      void loadAdminAssessmentTab();
+      void loadAdminFlashcardsTab();
+      void loadAdminTestsTab();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleCallbackId = window.requestIdleCallback(preloadContentTabs, {
+        timeout: 1_000,
+      });
+      return () => window.cancelIdleCallback(idleCallbackId);
+    }
+
+    const timeoutId = globalThis.setTimeout(preloadContentTabs, 250);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [lesson]);
 
   const handleTabChange = useCallback(
     (nextTab: LessonContentTabKey) => {
@@ -178,7 +195,7 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
     adminSidebarCollapsedDatasetKey,
   );
 
-  if (isLoading) {
+  if (isLoading || shouldShowInitialLoading) {
     return (
       <main data-admin-theme="true" className="theme-page">
         <div
@@ -198,8 +215,8 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
             onToggleCollapsed={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             onToggleDarkTheme={toggleTheme}
           />
-          <div className="flex items-center justify-center min-h-screen">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--theme-text-muted)]" />
+          <div className="min-h-[calc(100svh-4rem)] p-5 sm:p-8">
+            {shouldShowInitialLoading ? <AdminLessonDetailSkeleton /> : null}
           </div>
         </div>
       </main>
@@ -226,7 +243,7 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
             onToggleCollapsed={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             onToggleDarkTheme={toggleTheme}
           />
-          <div className="p-6">
+          <div className="flex min-h-screen items-center justify-center p-6">
             <div className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-bg)] p-4 text-[var(--theme-danger-text)]">
               <p className="text-sm font-bold">
                 {error?.message || "Không tìm thấy buổi học"}
@@ -557,5 +574,62 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
         />
       ) : null}
     </main>
+  );
+}
+
+function AdminLessonDetailSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải chi tiết buổi học"
+      className="min-h-[calc(100svh-4rem)] animate-pulse space-y-6"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="space-y-3">
+          <SkeletonBlock className="h-4 w-40 rounded-full" />
+          <SkeletonBlock className="h-8 w-72 max-w-full rounded-full" />
+        </div>
+        <SkeletonBlock className="h-11 w-32 rounded-lg" />
+      </div>
+      <SkeletonBlock className="aspect-video rounded-xl bg-slate-800 ring-slate-700" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <SkeletonBlock key={index} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 4 }, (_, index) => (
+          <SkeletonBlock key={index} className="h-11 w-32 shrink-0 rounded-lg" />
+        ))}
+      </div>
+      <SkeletonBlock className="h-80 rounded-xl" />
+    </div>
+  );
+}
+
+function AdminLessonDocumentsTabSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải tab tài liệu buổi học"
+      className="min-h-72 animate-pulse space-y-4 p-5"
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SkeletonBlock className="h-11 rounded-lg" />
+        <SkeletonBlock className="h-11 rounded-lg" />
+      </div>
+      {Array.from({ length: 4 }, (_, index) => (
+        <div
+          key={index}
+          className="grid gap-3 rounded-lg border border-[var(--theme-border)] p-4 sm:grid-cols-[minmax(0,1fr)_6rem]"
+        >
+          <div className="space-y-2">
+            <SkeletonBlock className="h-4 w-1/2 rounded-full" />
+            <SkeletonBlock className="h-3.5 w-1/3 rounded-full opacity-70" />
+          </div>
+          <SkeletonBlock className="h-9 rounded-lg" />
+        </div>
+      ))}
+    </div>
   );
 }

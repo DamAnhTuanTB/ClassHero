@@ -38,7 +38,8 @@ export interface AdminQuizSet {
   source: string;
   reviewStatus: string;
   questionCount: number;
-  _count: {
+  sortOrder: number;
+  _count?: {
     questions: number;
   };
   createdAt: string;

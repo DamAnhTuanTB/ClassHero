@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   getStudentLearningPathDetail,
   listStudentLearningPaths,
@@ -8,18 +9,38 @@ import {
 } from "@/features/student/shared/api/student-learning-paths-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
-const studentLearningPathsQueryKey = (userId?: string) => [
+export const studentLearningPathsQueryKey = (userId?: string) => [
   "student",
   "learning-paths",
   userId ?? "guest",
 ];
 
-const studentLearningPathDetailQueryKey = (slug: string, userId?: string) => [
+export const studentLearningPathDetailQueryKey = (slug: string, userId?: string) => [
   "student",
   "learning-path",
   slug,
   userId ?? "guest",
 ];
+
+function getStudentLearningPathsQueryOptions(accessToken?: string, userId?: string) {
+  return {
+    queryKey: studentLearningPathsQueryKey(userId),
+    queryFn: () => listStudentLearningPaths(accessToken),
+    staleTime: 60_000,
+  };
+}
+
+function getStudentLearningPathDetailQueryOptions(
+  slug: string,
+  accessToken?: string,
+  userId?: string,
+) {
+  return {
+    queryKey: studentLearningPathDetailQueryKey(slug, userId),
+    queryFn: () => getStudentLearningPathDetail(slug, accessToken),
+    staleTime: 60_000,
+  };
+}
 
 export function useStudentCoursesQuery() {
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
@@ -29,8 +50,7 @@ export function useStudentCoursesQuery() {
     isAuthHydrated,
     session,
     query: useQuery({
-      queryKey: studentLearningPathsQueryKey(session?.user.id),
-      queryFn: () => listStudentLearningPaths(session?.accessToken),
+      ...getStudentLearningPathsQueryOptions(session?.accessToken, session?.user.id),
       enabled: isAuthHydrated,
     }),
   };
@@ -44,11 +64,37 @@ export function useStudentCourseDetailQuery(slug: string) {
     isAuthHydrated,
     session,
     query: useQuery({
-      queryKey: studentLearningPathDetailQueryKey(slug, session?.user.id),
-      queryFn: () => getStudentLearningPathDetail(slug, session?.accessToken),
+      ...getStudentLearningPathDetailQueryOptions(
+        slug,
+        session?.accessToken,
+        session?.user.id,
+      ),
       enabled: isAuthHydrated && slug.length > 0,
     }),
   };
+}
+
+export function useStudentCourseDetailPrefetch() {
+  const queryClient = useQueryClient();
+  const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
+  const session = useAuthSessionStore((state) => state.session);
+
+  return useCallback(
+    (slug: string) => {
+      if (!isAuthHydrated || !slug) {
+        return Promise.resolve();
+      }
+
+      return queryClient.prefetchQuery(
+        getStudentLearningPathDetailQueryOptions(
+          slug,
+          session?.accessToken,
+          session?.user.id,
+        ),
+      );
+    },
+    [isAuthHydrated, queryClient, session?.accessToken, session?.user.id],
+  );
 }
 
 export function useStudentMockPurchaseMutation(slug: string) {

@@ -924,26 +924,30 @@ model QuizQuestion {
 }
 
 model QuizAttempt {
-  id            String              @id @default(uuid()) @db.Uuid
-  studentUserId String              @map("student_user_id") @db.Uuid
-  studentUser   User                @relation("QuizAttemptStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
-  lessonId      String              @map("lesson_id") @db.Uuid
-  lesson        Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  quizSetId     String              @map("quiz_set_id") @db.Uuid
-  quizSet       QuizSet             @relation(fields: [quizSetId], references: [id], onDelete: Restrict)
-  status        AttemptStatus       @default(IN_PROGRESS)
-  startedAt     DateTime            @default(now()) @map("started_at")
-  submittedAt   DateTime?           @map("submitted_at")
-  correctCount  Int                 @default(0) @map("correct_count")
-  wrongCount    Int                 @default(0) @map("wrong_count")
-  totalCount    Int                 @default(0) @map("total_count")
-  createdAt     DateTime            @default(now()) @map("created_at")
-  updatedAt     DateTime            @updatedAt @map("updated_at")
-  answers       QuizAttemptAnswer[]
+  id              String              @id @default(uuid()) @db.Uuid
+  studentUserId   String              @map("student_user_id") @db.Uuid
+  studentUser     User                @relation("QuizAttemptStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lessonId        String              @map("lesson_id") @db.Uuid
+  lesson          Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  quizSetId       String              @map("quiz_set_id") @db.Uuid
+  quizSet         QuizSet             @relation(fields: [quizSetId], references: [id], onDelete: Restrict)
+  sourceAttemptId String?             @map("source_attempt_id") @db.Uuid
+  sourceAttempt   QuizAttempt?        @relation("QuizAttemptRetries", fields: [sourceAttemptId], references: [id], onDelete: SetNull)
+  retryAttempts   QuizAttempt[]       @relation("QuizAttemptRetries")
+  status          AttemptStatus       @default(IN_PROGRESS)
+  startedAt       DateTime            @default(now()) @map("started_at")
+  submittedAt     DateTime?           @map("submitted_at")
+  correctCount    Int                 @default(0) @map("correct_count")
+  wrongCount      Int                 @default(0) @map("wrong_count")
+  totalCount      Int                 @default(0) @map("total_count")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  answers         QuizAttemptAnswer[]
 
   @@index([studentUserId, lessonId])
   @@index([lessonId])
   @@index([quizSetId])
+  @@index([sourceAttemptId])
   @@index([status])
   @@map("quiz_attempts")
 }

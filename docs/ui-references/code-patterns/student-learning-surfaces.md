@@ -139,3 +139,64 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
 - Không chỉ thêm một case mock đẹp rồi bỏ các state dễ vỡ như locked/trial/last lesson.
 - Không để label progress và CTA timeline lệch nhau cho cùng một continue lesson.
 - Không để business wording hoặc option list riêng của một course trở thành pattern chung; pattern chung chỉ ghi state/visibility/interaction.
+
+## 9. Lesson Practice Entry And Fullscreen Runner
+
+### Pattern chuẩn
+
+- Tab lesson chỉ giữ panel vào hoạt động với metadata ngắn và CTA theo state.
+  Quiz/Flashcard dùng `Bắt đầu`, `Tiếp tục...`, `Xem lại` khi nghiệp vụ có trạng
+  thái tương ứng; không nhúng toàn bộ runner dài ngay trong panel.
+- Sau CTA, runner/result dùng `fixed inset-0` ở layer cao, khóa scroll document,
+  header ClassHero + back action, content `max-w-2xl` và màu semantic riêng cho
+  từng hoạt động.
+- Back khi lượt chưa hoàn thành phải mở confirm dialog; browser Back và back
+  button trong header có cùng outcome. Đóng dialog giữ nguyên vị trí/nội dung
+  đang học.
+- Progress hierarchy giữ cùng cấu trúc: tên lesson, vị trí hiện tại/tổng, số đã
+  làm hoặc đã ôn và progress bar. Action chính có pending/disabled tức thì,
+  touch target tối thiểu 44px và không wrap label.
+- Runner/result phải có light/dark cùng lúc. Transition, scroll lock, brand,
+  dialog và button feedback đang dùng ổn ở Quiz phải được reuse thay vì tạo một
+  shell khác cho Flashcard.
+- Runner dài trên cùng route phải tách ba lớp state: dữ liệu nghiệp vụ đã lưu ở
+  server, state phiên trình bày trong browser storage và history marker xác định
+  surface đang mở. Marker một mình không đủ để khôi phục runner sau F5 nếu deck,
+  vị trí item, trạng thái đã xử lý trong lượt hoặc mặt nội dung vẫn chỉ nằm trong
+  React `useState`.
+- Với surface được lazy-mount sau khi Next.js hydrate/query xong, không dựa duy
+  nhất vào custom field của `window.history.state`: router có thể chuẩn hóa
+  history trước khi component đó mount. Mirror marker runner/result vào
+  `sessionStorage`, validate theo entity ID khi đọc và xóa marker đúng lúc
+  student xác nhận rời surface.
+- Effect dọn marker stale chỉ được chạy một lần khi hydrate phiên ban đầu. Không
+  phụ thuộc trực tiếp vào object query có thể đổi identity sau invalidate/refetch,
+  nếu không một progress mutation hợp lệ sẽ vô tình xóa marker runner đang mở.
+- F5 khi runner đang mở phải dựng lại đúng phiên; sau khi student xác nhận thoát,
+  F5 giữ panel/result và chỉ CTA tiếp tục mới mở runner cũ. Kết quả được khôi
+  phục không chạy lại animation ăn mừng.
+- Khi CTA dùng hoạt ảnh che toàn màn hình để vào runner/result, request chuẩn bị
+  dữ liệu có thể chạy song song với pha che nhưng không được commit state làm
+  đổi surface đang render. Chỉ commit destination khi overlay đã che kín và
+  bắt đầu pha mở, để runner/result được hé lộ theo hoạt ảnh thay vì xuất hiện
+  phía sau khi màn vẫn đang khép.
+- Với deck được lọc như `chưa thuộc`, chốt danh sách ID khi bắt đầu lượt. Không
+  filter trực tiếp mảng đang render theo state vừa mutation vì có thể làm index
+  nhảy và bỏ qua item.
+
+### Không làm
+
+- Không để CTA `Bắt đầu` chỉ mở card dài ngay bên dưới tab khiến video/tab và
+  điều hướng lesson vẫn cạnh tranh không gian với hoạt động chính.
+- Không cập nhật state runner/result ngay khi vừa bấm CTA nếu transition che
+  toàn màn hình chưa khép kín.
+- Không đề xuất lại các ngôn ngữ transition đã bị owner loại khỏi random:
+  `math-tiles`, `geometric-shatter`, `chalk-dust`, `book-pop-up`,
+  `bookmark-scroll` và `secret-bookshelf`. Khi thiết kế biến thể mới, ưu tiên
+  một chuyển động chính liền mạch như rèm/trang giấy/vở, cổng hình học hoặc một
+  vật thể trung tâm rõ ràng; tránh bố cục nhiều ô, nhiều mảnh rời, bụi hạt và
+  cảnh chứa nhiều đạo cụ cạnh tranh điểm nhìn.
+- Không tạo header/logo/back behavior khác nhau giữa Quiz và Flashcard.
+- Không đổi danh sách item giữa một lượt chỉ vì progress mutation vừa thành công.
+- Không đưa action chọn bộ hoặc danh sách thẻ sai vào result nếu contract chỉ
+  cho ôn lại tất cả/chưa thuộc.

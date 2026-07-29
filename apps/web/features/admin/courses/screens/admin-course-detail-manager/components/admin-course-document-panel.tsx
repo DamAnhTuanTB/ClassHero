@@ -12,6 +12,7 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { useMemo, useState } from "react";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -171,19 +172,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
       </div>
 
       <div className="mt-4 overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)]">
-        {manager.isLoading && !sourceDocument ? (
-          <div className="flex min-h-48 items-center justify-center p-6 text-center">
-            <div>
-              <Loader2
-                className="mx-auto h-8 w-8 animate-spin text-[var(--theme-primary)]"
-                aria-hidden="true"
-              />
-              <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
-                Đang tải tài liệu
-              </p>
-            </div>
-          </div>
-        ) : null}
+        {manager.isLoading && !sourceDocument ? <SourceDocumentSkeleton /> : null}
 
         {!manager.isLoading && !sourceDocument ? (
           <div className="grid gap-3 p-6 text-center">
@@ -388,6 +377,30 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         onConfirm={(forceNewOcr) => void handleRetrySourceDocument(forceNewOcr)}
       />
     </section>
+  );
+}
+
+function SourceDocumentSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải tài liệu nguồn"
+      className="min-h-48 animate-pulse p-5"
+    >
+      <div className="grid gap-4 sm:grid-cols-[7rem_minmax(0,1fr)_8rem] sm:items-center">
+        <SkeletonBlock className="aspect-[3/4] rounded-lg" />
+        <div className="space-y-3">
+          <SkeletonBlock className="h-5 w-2/3 rounded-full" />
+          <SkeletonBlock className="h-4 w-1/2 rounded-full opacity-70" />
+          <SkeletonBlock className="h-4 w-3/4 rounded-full opacity-70" />
+          <div className="flex gap-2">
+            <SkeletonBlock className="h-8 w-24 rounded-lg" />
+            <SkeletonBlock className="h-8 w-24 rounded-lg" />
+          </div>
+        </div>
+        <SkeletonBlock className="h-10 rounded-lg" />
+      </div>
+    </div>
   );
 }
 

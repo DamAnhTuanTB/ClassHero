@@ -56,21 +56,56 @@ test.describe("M2.4 auth UI", () => {
   }
 
   test("login form shows validation and success state", async ({ page }) => {
+    const accessToken = [
+      Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url"),
+      Buffer.from(
+        JSON.stringify({
+          exp: Math.floor(Date.now() / 1000) + 3_600,
+          role: "STUDENT",
+          sub: "student-user",
+        }),
+      ).toString("base64url"),
+      "signature",
+    ].join(".");
+
+    await page.route("http://localhost:4000/api/v1/auth/login", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await route.fulfill({
+        body: JSON.stringify({
+          data: {
+            accessToken,
+            refreshToken: "refresh-token",
+            user: {
+              email: null,
+              id: "student-user",
+              phone: null,
+              role: "STUDENT",
+              username: "student1",
+            },
+          },
+        }),
+        contentType: "application/json",
+        status: 200,
+      });
+    });
+
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-    await expect(
-      page.getByText("Nhập email, số điện thoại hoặc tên đăng nhập."),
-    ).toBeVisible();
+    await expect(page.getByText("Nhập tên đăng nhập/SĐT")).toBeVisible();
     await expect(page.getByText("Nhập mật khẩu.")).toBeVisible();
 
-    await page.getByLabel("Tài khoản").fill("student1");
-    await page.getByLabel("Mật khẩu").fill("Password123!");
+    await page
+      .getByRole("textbox", { name: "Tên đăng nhập/Số điện thoại" })
+      .fill("student1");
+    await page
+      .getByRole("textbox", { name: "Mật khẩu", exact: true })
+      .fill("Password123!");
     await page.getByRole("button", { name: "Đăng nhập" }).click();
 
     await expect(page.getByRole("button", { name: "Đang xử lý..." })).toBeVisible();
-    await expect(page.getByText("Đăng nhập thành công")).toBeVisible();
+    await expect(page.getByText("Đăng nhập học sinh thành công")).toBeVisible();
   });
 });

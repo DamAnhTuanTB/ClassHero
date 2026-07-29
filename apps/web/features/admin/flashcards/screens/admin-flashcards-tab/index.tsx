@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Layers, Loader2, Plus } from "lucide-react";
+import { Layers, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import type {
   AdminFlashcard,
   AdminFlashcardSet,
@@ -17,6 +18,7 @@ import {
 import { FlashcardSetPanel } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-panel";
 import { FlashcardSetTabs } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-tabs";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
+import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
 
 const FlashcardSetEditorDialog = dynamic(() =>
@@ -37,6 +39,7 @@ type DeleteTarget =
 
 export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
   const { data: sets, isError, isLoading, refetch } = useAdminFlashcardSets(lessonId);
+  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
   const { deleteSet } = useAdminFlashcardSetMutations(lessonId);
   const [selectedSetId, setSelectedSetId] = useState("");
   const [setEditorTarget, setSetEditorTarget] = useState<
@@ -79,28 +82,29 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
   );
   const { deleteCard } = useAdminFlashcardMutations(selectedSetId, lessonId);
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-semibold text-[var(--theme-text-muted)]">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-        Đang tải các bộ flashcard...
-      </div>
+  if (isLoading || shouldShowInitialLoading) {
+    return shouldShowInitialLoading ? (
+      <FlashcardSetsSkeleton />
+    ) : (
+      <div aria-busy="true" className="min-h-72" />
     );
   }
 
   if (isError) {
     return (
-      <div className="rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-6 text-center">
-        <p className="text-sm font-semibold text-[var(--theme-error-text)]">
-          Không tải được danh sách bộ flashcard.
-        </p>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="theme-button-neutral mt-3 min-h-10 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
-        >
-          Thử lại
-        </button>
+      <div className="flex min-h-48 items-center justify-center rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-6 text-center">
+        <div>
+          <p className="text-sm font-semibold text-[var(--theme-error-text)]">
+            Không tải được danh sách bộ flashcard.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="theme-button-neutral mt-3 min-h-10 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
+          >
+            Thử lại
+          </button>
+        </div>
       </div>
     );
   }
@@ -229,6 +233,59 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
           }
         }}
       />
+    </div>
+  );
+}
+
+function FlashcardSetsSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang tải các bộ flashcard"
+      className="min-h-64 animate-pulse space-y-5"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+          <SkeletonBlock className="h-6 w-48 rounded-full" />
+          <SkeletonBlock className="h-4 w-72 max-w-full rounded-full opacity-70" />
+        </div>
+        <SkeletonBlock className="h-11 w-44 rounded-lg" />
+      </div>
+      <div className="flex gap-2 overflow-hidden">
+        <SkeletonBlock className="h-10 w-36 shrink-0 rounded-lg" />
+        <SkeletonBlock className="h-10 w-36 shrink-0 rounded-lg" />
+        <SkeletonBlock className="h-10 w-36 shrink-0 rounded-lg" />
+      </div>
+      <div className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)]">
+        <div className="flex items-center justify-between gap-4 border-b border-[var(--theme-border)] p-5">
+          <div className="space-y-2">
+            <SkeletonBlock className="h-5 w-40 rounded-full" />
+            <SkeletonBlock className="h-3.5 w-24 rounded-full opacity-70" />
+          </div>
+          <SkeletonBlock className="h-10 w-36 rounded-lg" />
+        </div>
+        <FlashcardRowsSkeleton />
+      </div>
+    </div>
+  );
+}
+
+function FlashcardRowsSkeleton() {
+  return (
+    <div>
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-[2rem_minmax(0,1fr)_5rem] items-center gap-3 border-b border-[var(--theme-border)] p-4 last:border-b-0"
+        >
+          <SkeletonBlock className="h-7 w-7 rounded-lg" />
+          <div className="space-y-2">
+            <SkeletonBlock className="h-4 w-2/5 rounded-full" />
+            <SkeletonBlock className="h-3.5 w-3/5 rounded-full opacity-70" />
+          </div>
+          <SkeletonBlock className="h-9 rounded-lg" />
+        </div>
+      ))}
     </div>
   );
 }

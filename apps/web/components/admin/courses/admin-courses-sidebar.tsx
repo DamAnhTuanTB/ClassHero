@@ -1,8 +1,9 @@
 "use client";
 
-import { GraduationCap, PanelLeftOpen, X, type LucideIcon } from "lucide-react";
+import { PanelLeftOpen, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 import { AdminCoursesSidebarContent } from "@/components/admin/courses/admin-courses-sidebar-content";
+import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { cn } from "@/lib/utils";
 
 export type AdminCoursesSidebarItem = {
@@ -122,19 +123,9 @@ export function AdminCoursesSidebar({
         >
           <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
         </button>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--theme-brand-secondary),var(--theme-brand-primary))] text-[var(--theme-brand-foreground)] shadow-[var(--theme-shadow-sm)]">
-            <GraduationCap className="h-6 w-6" aria-hidden="true" />
-          </div>
+        <div className="flex min-w-0 items-center">
           <div className="min-w-0">
-            <p className="truncate leading-none tracking-normal">
-              <span className="font-[var(--font-display)] text-lg font-extrabold text-[var(--theme-brand-primary)]">
-                Class
-              </span>
-              <span className="font-[var(--font-display)] text-lg font-extrabold text-[var(--theme-brand-secondary)]">
-                Hero
-              </span>
-            </p>
+            <ClassHeroLogo className="h-8 max-w-[9.25rem]" priority />
             <p className="truncate text-xs font-semibold text-[var(--theme-text-muted)]">
               {subtitle}
             </p>

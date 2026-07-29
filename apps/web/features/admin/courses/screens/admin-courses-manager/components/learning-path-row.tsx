@@ -16,6 +16,7 @@ export function LearningPathRow({
   path,
   onArchive,
   onEdit,
+  onPrefetch,
   onSelect,
 }: {
   isDarkTheme: boolean;
@@ -23,6 +24,7 @@ export function LearningPathRow({
   path: AdminLearningPath;
   onArchive: () => void;
   onEdit: () => void;
+  onPrefetch: () => void;
   onSelect: () => void;
 }) {
   const currentPrice = path.salePriceVnd ?? path.originalPriceVnd;
@@ -54,6 +56,8 @@ export function LearningPathRow({
       </label>
       <Link
         href={`/admin/courses/${path.id}`}
+        onFocus={onPrefetch}
+        onPointerEnter={onPrefetch}
         className="order-3 col-span-3 min-w-0 rounded-lg lg:order-2 lg:col-span-1"
       >
         <div className="flex items-center gap-2">

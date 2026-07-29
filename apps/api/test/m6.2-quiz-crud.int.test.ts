@@ -292,10 +292,16 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     await quizService.deleteQuestion(question.id, testUserId, mockContext);
   });
 
-  it("should list quiz sets and questions", async () => {
+  it("should list quiz sets in creation order and list questions", async () => {
+    const secondSet = await quizService.createQuizSet(
+      testLessonId,
+      testUserId,
+      { title: "Bộ câu hỏi 2" },
+      mockContext,
+    );
     const sets = await quizService.listQuizSetsByLesson(testLessonId);
-    expect(sets.length).toBe(1);
-    expect(sets[0].id).toBe(testQuizSetId);
+    expect(sets.map((set) => set.id)).toEqual([testQuizSetId, secondSet.id]);
+    expect(sets.map((set) => set.sortOrder)).toEqual([0, 1]);
     expect(sets[0]._count.questions).toBe(2);
 
     const questions = await quizService.listQuestionsBySet(testQuizSetId);
