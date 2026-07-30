@@ -126,13 +126,11 @@ export function FlashcardResultScreen({
           <button
             type="button"
             aria-busy={pendingAction === "restart-unknown"}
-            disabled={
-              progress.unknownCount === 0 || pendingAction === "restart-unknown"
-            }
+            disabled={progress.unknownCount === 0 || pendingAction === "restart-unknown"}
             onClick={onRestartUnknown}
-            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-violet-400 bg-white px-1.5 text-[13px] font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] sm:px-3 sm:text-base"
+            className="student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-violet-400 bg-white px-1.5 text-[13px] font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] sm:px-3 sm:text-base"
           >
-            <RotateCcw className="h-5 w-5" aria-hidden="true" />
+            <RotateCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
             Ôn lại thẻ chưa thuộc
           </button>
           <button
@@ -140,9 +138,9 @@ export function FlashcardResultScreen({
             aria-busy={pendingAction === "restart-all"}
             disabled={pendingAction === "restart-all"}
             onClick={onRestartAll}
-            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-[15px] font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:cursor-wait disabled:border-slate-300 disabled:bg-slate-300 disabled:opacity-60 disabled:shadow-none dark:disabled:border-slate-700 dark:disabled:bg-slate-700 sm:text-base"
+            className="student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-[13px] font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:cursor-wait disabled:border-slate-300 disabled:bg-slate-300 disabled:opacity-60 disabled:shadow-none dark:disabled:border-slate-700 dark:disabled:bg-slate-700 sm:text-base"
           >
-            <RefreshCcw className="h-5 w-5" aria-hidden="true" />
+            <RefreshCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
             Ôn lại tất cả
           </button>
           <button
@@ -150,10 +148,10 @@ export function FlashcardResultScreen({
             aria-busy={pendingAction === "review-favorites"}
             disabled={favoriteCount === 0 || pendingAction === "review-favorites"}
             onClick={onReviewFavorites}
-            className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-rose-400/60 bg-rose-500/90 px-3 text-[15px] font-black text-white shadow-[0_5px_0_rgb(225_29_72),0_12px_22px_-10px_rgb(159_18_57_/_65%)] transition enabled:hover:bg-rose-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(225_29_72),0_6px_12px_-10px_rgb(159_18_57_/_50%)] disabled:cursor-not-allowed disabled:border-rose-200 disabled:bg-rose-100 disabled:text-rose-400 disabled:shadow-[0_4px_0_rgb(254_205_211)] dark:disabled:border-rose-400/30 dark:disabled:bg-rose-500/10 dark:disabled:text-rose-300 dark:disabled:shadow-[0_4px_0_rgb(136_19_55_/_55%)] sm:text-base"
+            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-rose-400/60 bg-rose-500/90 px-3 text-[13px] font-black text-white shadow-[0_5px_0_rgb(225_29_72),0_12px_22px_-10px_rgb(159_18_57_/_65%)] transition enabled:hover:bg-rose-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(225_29_72),0_6px_12px_-10px_rgb(159_18_57_/_50%)] disabled:cursor-not-allowed disabled:border-rose-200 disabled:bg-rose-100 disabled:text-rose-400 disabled:shadow-[0_4px_0_rgb(254_205_211)] dark:disabled:border-rose-400/30 dark:disabled:bg-rose-500/10 dark:disabled:text-rose-300 dark:disabled:shadow-[0_4px_0_rgb(136_19_55_/_55%)] sm:text-base"
           >
             <Heart
-              className={cn("h-5 w-5", favoriteCount > 0 && "fill-current")}
+              className={cn("h-5 w-5 shrink-0", favoriteCount > 0 && "fill-current")}
               aria-hidden="true"
             />
             Xem lại thẻ yêu thích
@@ -163,9 +161,9 @@ export function FlashcardResultScreen({
             aria-busy={pendingAction === "start-new-set"}
             disabled={pendingAction === "start-new-set"}
             onClick={onStartNewSet}
-            className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-violet-300 bg-white px-4 text-base font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition enabled:hover:bg-violet-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-wait disabled:opacity-60 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] dark:enabled:hover:bg-violet-500/10"
+            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-4 text-[13px] font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition enabled:hover:bg-violet-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-wait disabled:opacity-60 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] dark:enabled:hover:bg-violet-500/10 sm:text-base"
           >
-            <Sparkles className="h-5 w-5" aria-hidden="true" />
+            <Sparkles className="h-5 w-5 shrink-0" aria-hidden="true" />
             Học bộ Flashcard mới
           </button>
         </div>

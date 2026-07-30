@@ -209,7 +209,7 @@ export function TestResultScreen({
                 disabled={action.disabled || action.pending}
                 onClick={action.onClick}
                 className={cn(
-                  "student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-[13px] font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-45 dark:focus-visible:ring-emerald-500/30 sm:px-3 sm:text-base",
+                  "student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-[13px] font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-45 dark:focus-visible:ring-emerald-500/30 sm:px-3 sm:text-base",
                   action.primary
                     ? "bg-emerald-500 text-white shadow-[0_4px_0_rgb(4_120_87)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] enabled:hover:bg-emerald-400"
                     : "student-mobile-border border border-emerald-500 bg-white text-emerald-700 shadow-[0_4px_0_rgb(167_243_208)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(167_243_208)] enabled:hover:bg-emerald-50 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_4px_0_rgb(6_78_59)] dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:enabled:hover:bg-emerald-500/10",
@@ -217,9 +217,9 @@ export function TestResultScreen({
                 )}
               >
                 {action.pending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                 )}
                 {action.label}
               </button>

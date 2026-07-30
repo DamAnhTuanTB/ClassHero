@@ -168,16 +168,16 @@ export function QuizResultScreen({
                 disabled={action.disabled || action.pending}
                 onClick={action.onClick}
                 className={cn(
-                  "student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-[15px] font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-45 dark:focus-visible:ring-sky-500/30 sm:px-3 sm:text-base",
+                  "student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-[13px] font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-45 dark:focus-visible:ring-sky-500/30 sm:px-3 sm:text-base",
                   action.primary
                     ? "bg-sky-600 text-white shadow-[0_4px_0_rgb(3_105_161)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] enabled:hover:bg-sky-500"
                     : "student-mobile-border border border-sky-500 bg-white text-sky-700 shadow-[0_4px_0_rgb(186_230_253)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(186_230_253)] enabled:hover:bg-sky-50 dark:border-sky-400 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:active:shadow-[0_1px_0_rgb(7_89_133)] dark:enabled:hover:bg-sky-500/10",
                 )}
               >
                 {action.pending && action.showsLocalPending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                 )}
                 {action.label}
               </button>
@@ -188,9 +188,9 @@ export function QuizResultScreen({
             aria-busy={pendingAction === "start-new-set"}
             disabled={pendingAction === "start-new-set"}
             onClick={onStartNewSet}
-            className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-sky-500 bg-sky-500 px-4 text-base font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition enabled:hover:border-sky-600 enabled:hover:bg-sky-600 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-wait disabled:opacity-60 dark:border-sky-600 dark:bg-sky-600 dark:text-white dark:shadow-[0_4px_0_rgb(7_89_133)] dark:enabled:hover:border-sky-700 dark:enabled:hover:bg-sky-700 dark:focus-visible:ring-sky-500/30"
+            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-sky-500 bg-sky-500 px-4 text-[13px] font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition enabled:hover:border-sky-600 enabled:hover:bg-sky-600 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-wait disabled:opacity-60 dark:border-sky-600 dark:bg-sky-600 dark:text-white dark:shadow-[0_4px_0_rgb(7_89_133)] dark:enabled:hover:border-sky-700 dark:enabled:hover:bg-sky-700 dark:focus-visible:ring-sky-500/30 sm:text-base"
           >
-            <Sparkles className="h-5 w-5" aria-hidden="true" />
+            <Sparkles className="h-5 w-5 shrink-0" aria-hidden="true" />
             Làm bộ Quiz mới
           </button>
         </div>
