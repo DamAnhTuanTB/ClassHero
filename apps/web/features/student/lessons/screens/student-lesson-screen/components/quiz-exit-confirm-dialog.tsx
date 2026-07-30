@@ -7,12 +7,14 @@ import { ArrowLeft, LogOut, TriangleAlert, X } from "lucide-react";
 export function QuizExitConfirmDialog({
   accent = "quiz",
   activityLabel = "bài Quiz",
+  description,
   isOpen,
   onCancel,
   onConfirm,
 }: {
-  accent?: "flashcard" | "quiz";
+  accent?: "flashcard" | "quiz" | "test";
   activityLabel?: string;
+  description?: string;
   isOpen: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -21,15 +23,21 @@ export function QuizExitConfirmDialog({
   const alertIconColorClassName =
     accent === "flashcard"
       ? "border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-300/40 dark:bg-violet-400/20 dark:text-violet-200"
-      : "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-300/40 dark:bg-sky-400/20 dark:text-sky-200";
+      : accent === "test"
+        ? "border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400/20 dark:text-emerald-200"
+        : "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-300/40 dark:bg-sky-400/20 dark:text-sky-200";
   const closeButtonColorClassName =
     accent === "flashcard"
       ? "border border-violet-300 bg-violet-100 text-violet-700 hover:bg-violet-200 dark:border-violet-300/40 dark:bg-violet-400/20 dark:text-violet-200 dark:hover:bg-violet-400/30"
-      : "theme-button-primary-subtle";
+      : accent === "test"
+        ? "border border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:border-emerald-300/40 dark:bg-emerald-400/20 dark:text-emerald-200 dark:hover:bg-emerald-400/30"
+        : "theme-button-primary-subtle";
   const confirmButtonColorClassName =
     accent === "flashcard"
       ? "bg-violet-500 text-white shadow-[var(--theme-shadow-sm)] hover:bg-violet-400 dark:bg-violet-500 dark:hover:bg-violet-400"
-      : "theme-button-primary";
+      : accent === "test"
+        ? "bg-emerald-500 text-white shadow-[var(--theme-shadow-sm)] hover:bg-emerald-400 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+        : "theme-button-primary";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -107,7 +115,8 @@ export function QuizExitConfirmDialog({
                 id="quiz-exit-dialog-description"
                 className="text-sm font-semibold leading-6 text-[var(--theme-text)]"
               >
-                Bạn chưa hoàn thành xong {activityLabel}. Vẫn thoát chứ?
+                {description ??
+                  `Bạn chưa hoàn thành xong ${activityLabel}. Vẫn thoát chứ?`}
               </p>
             </div>
 

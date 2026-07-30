@@ -43,8 +43,11 @@ export function FlashcardRunnerScreen({
   onPrevious,
   pendingAction,
   knownCount,
+  reviewMode = false,
+  reviewTitle,
   reviewStatuses,
   setId,
+  stackedOverDialog = false,
   totalCount,
 }: {
   card: StudentFlashcard;
@@ -62,8 +65,11 @@ export function FlashcardRunnerScreen({
   onPrevious: () => void;
   pendingAction: string | null;
   knownCount: number;
+  reviewMode?: boolean;
+  reviewTitle?: string;
   reviewStatuses: Array<boolean | null>;
   setId: string;
+  stackedOverDialog?: boolean;
   totalCount: number;
 }) {
   useDocumentScrollLock();
@@ -94,6 +100,10 @@ export function FlashcardRunnerScreen({
 
     function handlePopState() {
       isRunnerHistoryEntryActiveRef.current = false;
+      if (reviewMode) {
+        onBackRef.current();
+        return;
+      }
       if (isConfirmedHistoryExitRef.current) {
         isConfirmedHistoryExitRef.current = false;
         onBackRef.current();
@@ -104,7 +114,7 @@ export function FlashcardRunnerScreen({
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [setId]);
+  }, [reviewMode, setId]);
 
   function handleConfirmExit() {
     setIsExitDialogOpen(false);
@@ -130,6 +140,10 @@ export function FlashcardRunnerScreen({
 
   function handleOpenExitDialog() {
     dismissIncompleteAlert();
+    if (reviewMode) {
+      finishReview();
+      return;
+    }
     setIsExitDialogOpen(true);
   }
 
@@ -161,16 +175,20 @@ export function FlashcardRunnerScreen({
     if (!isMountedRef.current) return;
     setMarkFeedback(null);
 
-    if (currentIndex >= totalCount - 1) {
-      const remainingIncompleteCardNumbers = incompleteCardNumbers.filter(
-        (cardNumber) => cardNumber !== currentIndex + 1,
-      );
-      if (remainingIncompleteCardNumbers.length > 0) {
-        return;
-      }
+    if (reviewMode) {
+      if (currentIndex < totalCount - 1) onNext();
+      return;
+    }
+
+    const remainingIncompleteCardNumbers = incompleteCardNumbers.filter(
+      (cardNumber) => cardNumber !== currentIndex + 1,
+    );
+    if (remainingIncompleteCardNumbers.length === 0) {
       finishSession();
       return;
     }
+
+    if (currentIndex >= totalCount - 1) return;
 
     onNext();
   }
@@ -187,6 +205,11 @@ export function FlashcardRunnerScreen({
 
   function finishSession() {
     onComplete();
+    window.setTimeout(popFlashcardRunnerHistoryEntryPreservingResult, 0);
+  }
+
+  function finishReview() {
+    onBack();
     window.setTimeout(popFlashcardRunnerHistoryEntryPreservingResult, 0);
   }
 
@@ -210,8 +233,10 @@ export function FlashcardRunnerScreen({
   const knownProgressAction = `progress-known-${card.id}`;
   const favoriteAction = `favorite-${card.id}`;
   const isLastCard = currentIndex >= totalCount - 1;
+  const isFirstCard = currentIndex === 0;
   const reviewStatus = reviewStatuses[currentIndex] ?? null;
   const visibleReviewStatus = markFeedback ?? reviewStatus;
+  const unknownCount = reviewStatuses.filter((status) => status === false).length;
   const incompleteCardNumbers = reviewStatuses.flatMap((status, index) =>
     status === null ? [index + 1] : [],
   );
@@ -220,7 +245,13 @@ export function FlashcardRunnerScreen({
   const isInteractionLocked = Boolean(pendingAction) || markFeedback !== null;
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-y-auto bg-[linear-gradient(180deg,#ede9fe_0%,#faf5ff_100%)] text-slate-950 dark:bg-none dark:bg-[var(--theme-bg)] dark:text-[var(--theme-text-strong)]">
+    <div
+      className={cn(
+        "fixed inset-0 overflow-y-auto bg-[linear-gradient(180deg,#ede9fe_0%,#faf5ff_100%)] text-slate-950 dark:bg-none dark:bg-[var(--theme-bg)] dark:text-[var(--theme-text-strong)]",
+        stackedOverDialog ? "z-[115]" : "z-[80]",
+      )}
+      data-testid="flashcard-runner-screen"
+    >
       <header className="sticky top-0 z-20 border-b border-violet-100 bg-white/95 py-2 pl-1 pr-2 backdrop-blur dark:border-[var(--theme-border)] dark:bg-[color-mix(in_srgb,var(--theme-surface)_95%,transparent)] sm:pl-2 sm:pr-4">
         <div className="mx-auto flex min-h-14 max-w-2xl items-center gap-1.5">
           <button
@@ -237,21 +268,29 @@ export function FlashcardRunnerScreen({
 
       <main className="mx-auto w-full max-w-2xl px-4 py-5 pb-10 [perspective:1200px] sm:px-6 sm:py-7">
         <section aria-labelledby="flashcard-runner-title">
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-base font-black leading-tight text-violet-600 dark:text-violet-300 lg:text-lg">
-                {lessonTitle}
-              </p>
-              <h1
-                id="flashcard-runner-title"
-                className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
-              >
-                Thẻ {currentIndex + 1}/{totalCount}
-              </h1>
+          <p className="text-base font-black leading-tight text-violet-600 dark:text-violet-300 lg:text-lg">
+            {reviewMode && reviewTitle ? reviewTitle : lessonTitle}
+          </p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <h1
+              id="flashcard-runner-title"
+              className="shrink-0 whitespace-nowrap text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
+            >
+              Thẻ {currentIndex + 1}/{totalCount}
+            </h1>
+            <div
+              className="ml-auto flex shrink-0 items-center gap-2"
+              aria-label={`Thống kê Flashcard: ${unknownCount} chưa thuộc, ${knownCount} đã thuộc`}
+            >
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-rose-300 bg-white px-3 py-2 text-xs font-black text-rose-700 shadow-[0_3px_0_rgb(254_205_211)] dark:border-rose-400/40 dark:bg-[var(--theme-surface)] dark:text-rose-300 dark:shadow-[0_3px_0_rgb(136_19_55)]">
+                <X className="h-4 w-4" aria-hidden="true" />
+                {unknownCount}
+              </span>
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-emerald-400/60 bg-emerald-500 px-3 py-2 text-xs font-black text-white shadow-[0_3px_0_rgb(4_120_87)]">
+                <Check className="h-4 w-4" aria-hidden="true" />
+                {knownCount}
+              </span>
             </div>
-            <span className="shrink-0 rounded-2xl border border-violet-300 bg-violet-200 px-3 py-2 text-xs font-black text-violet-800 shadow-[0_3px_0_rgb(196_181_253)] dark:border-violet-300/30 dark:bg-violet-500/20 dark:text-violet-200 dark:shadow-[0_3px_0_rgb(76_29_149)]">
-              Đã thuộc {knownCount}
-            </span>
           </div>
 
           <div
@@ -439,9 +478,9 @@ export function FlashcardRunnerScreen({
         {isIncompleteAlertVisible ? (
           <div
             role="alert"
-            className="mt-4 flex items-start gap-2 rounded-2xl border border-violet-300 bg-violet-100 px-3 py-2.5 text-sm font-bold leading-5 text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/20 dark:text-violet-100"
+            className="mt-4 flex items-center gap-2 rounded-2xl border border-violet-400 bg-violet-200/80 px-3 py-4 text-sm font-bold leading-5 text-violet-800 shadow-[0_8px_20px_-16px_rgb(124_58_237_/_65%)] dark:border-violet-400/50 dark:bg-violet-500/25 dark:text-violet-100"
           >
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
             <p>
               Cần đánh dấu {incompleteCardNumbers.length === 1 ? "thẻ" : "các thẻ"}{" "}
               {incompleteCardNumbers.join(", ")} là Đã thuộc hoặc Chưa thuộc để tiếp tục!
@@ -475,19 +514,29 @@ export function FlashcardRunnerScreen({
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={currentIndex === 0 || isInteractionLocked}
-            onClick={handlePrevious}
-            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border border-violet-200 bg-white px-3 text-base font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition hover:bg-violet-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-violet-400/30 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] dark:active:shadow-[0_1px_0_rgb(76_29_149)]"
+            disabled={(!reviewMode && isFirstCard) || isInteractionLocked}
+            onClick={reviewMode && isFirstCard ? finishReview : handlePrevious}
+            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-200 bg-white px-2 text-sm font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition hover:bg-violet-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-violet-400/30 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] dark:active:shadow-[0_1px_0_rgb(76_29_149)] sm:gap-2.5 sm:px-3 sm:text-base"
           >
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-            Thẻ trước
+            {reviewMode && isFirstCard ? "Trở về" : "Thẻ trước"}
           </button>
-          {isLastCard ? (
+          {reviewMode && isLastCard ? (
+            <button
+              type="button"
+              disabled={isInteractionLocked}
+              onClick={finishReview}
+              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-sm font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:cursor-wait disabled:opacity-60 sm:gap-2.5 sm:px-3 sm:text-base"
+            >
+              <Flag className="h-5 w-5" aria-hidden="true" />
+              Kết thúc xem lại
+            </button>
+          ) : isLastCard ? (
             <button
               type="button"
               disabled={isInteractionLocked}
               onClick={handleComplete}
-              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border border-emerald-400/60 bg-emerald-500 px-3 text-base font-black text-white shadow-[0_5px_0_rgb(4_120_87),0_12px_22px_-10px_rgb(16_185_129_/_70%)] transition enabled:hover:bg-emerald-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(4_120_87),0_6px_12px_-10px_rgb(16_185_129_/_55%)] disabled:cursor-wait disabled:opacity-60"
+              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border border-sky-400/60 bg-sky-500 px-3 text-base font-black text-white shadow-[0_5px_0_rgb(3_105_161),0_12px_22px_-10px_rgb(14_165_233_/_70%)] transition enabled:hover:bg-sky-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(3_105_161),0_6px_12px_-10px_rgb(14_165_233_/_55%)] disabled:cursor-wait disabled:opacity-60"
             >
               <Flag className="h-5 w-5" aria-hidden="true" />
               Hoàn thành

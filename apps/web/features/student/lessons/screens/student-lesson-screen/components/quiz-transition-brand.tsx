@@ -1,26 +1,56 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { Nunito } from "next/font/google";
+import { useEffect, useState } from "react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import {
   quizTransitionTimings,
   type ActiveQuizTransitionPhase,
 } from "@/features/student/lessons/utils/quiz-transition-variant";
 
+const studentMessageFont = Nunito({
+  subsets: ["latin", "vietnamese"],
+  weight: ["800"],
+  display: "swap",
+});
 const statusFillDurationSeconds = (quizTransitionTimings.closeMs / 1_000) * 0.55;
+const countdownStepMs = 734;
 
 export function QuizTransitionBrand({
   animateStatusFill,
+  countdownFrom,
   phase,
   shouldReduceMotion,
   statusText,
 }: {
   animateStatusFill: boolean;
+  countdownFrom?: number;
   phase: ActiveQuizTransitionPhase;
   shouldReduceMotion: boolean;
   statusText: string;
 }) {
   const isOpening = phase === "opening";
+  const [countdownValue, setCountdownValue] = useState(() =>
+    Math.max(1, countdownFrom ?? 1),
+  );
+
+  useEffect(() => {
+    if (!countdownFrom) return;
+
+    setCountdownValue(Math.max(1, countdownFrom));
+    const interval = window.setInterval(() => {
+      setCountdownValue((value) => {
+        if (value <= 2) {
+          window.clearInterval(interval);
+          return 1;
+        }
+        return value - 1;
+      });
+    }, countdownStepMs);
+
+    return () => window.clearInterval(interval);
+  }, [countdownFrom]);
 
   return (
     <div className="absolute left-1/2 top-1/2 z-20 w-[min(20rem,90vw)] -translate-x-1/2 -translate-y-1/2 sm:w-[min(22rem,80vw)]">
@@ -143,7 +173,9 @@ export function QuizTransitionBrand({
           </motion.svg>
         </div>
         {animateStatusFill ? (
-          <p className="relative mt-0 whitespace-nowrap [font-family:var(--font-display)] text-[1.2rem] font-bold not-italic sm:text-[1.45rem]">
+          <p
+            className={`${studentMessageFont.className} relative mt-0 whitespace-nowrap text-[1.2rem] font-extrabold not-italic sm:text-[1.45rem]`}
+          >
             <span className="text-sky-200">{statusText}</span>
             <motion.span
               aria-hidden="true"
@@ -169,10 +201,43 @@ export function QuizTransitionBrand({
             </motion.span>
           </p>
         ) : (
-          <p className="mt-0 whitespace-nowrap text-center [font-family:var(--font-display)] text-[1.25rem] font-bold not-italic text-sky-600 sm:text-[1.75rem]">
+          <p
+            className={`${studentMessageFont.className} mt-0 whitespace-nowrap text-center text-[1.25rem] font-extrabold not-italic text-sky-600 sm:text-[1.75rem]`}
+          >
             {statusText}
           </p>
         )}
+        {countdownFrom ? (
+          <div
+            data-testid="learning-transition-countdown"
+            className="mt-5 grid h-20 w-20 place-items-center rounded-full border-4 border-emerald-200 bg-white/90 shadow-[0_12px_28px_-16px_rgb(5_150_105_/_80%)] dark:border-emerald-400/30 dark:bg-slate-900/90"
+            aria-hidden="true"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={countdownValue}
+                initial={
+                  shouldReduceMotion
+                    ? { opacity: 1 }
+                    : { opacity: 0, rotate: -12, scale: 0.35, y: 8 }
+                }
+                animate={{ opacity: 1, rotate: 0, scale: 1, y: 0 }}
+                exit={
+                  shouldReduceMotion
+                    ? { opacity: 0 }
+                    : { opacity: 0, rotate: 10, scale: 1.55, y: -8 }
+                }
+                transition={{
+                  duration: shouldReduceMotion ? 0 : 0.2,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className="bg-gradient-to-br from-emerald-500 to-teal-600 bg-clip-text [font-family:var(--font-display)] text-5xl font-black leading-none text-transparent drop-shadow-sm"
+              >
+                {countdownValue}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+        ) : null}
       </motion.div>
     </div>
   );

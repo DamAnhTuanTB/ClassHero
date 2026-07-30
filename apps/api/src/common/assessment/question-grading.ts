@@ -103,6 +103,79 @@ export function assertCompleteStudentAnswer(input: {
   }
 }
 
+export function validateStudentAnswerDraft(input: {
+  answerJson: unknown;
+  optionsJson: Prisma.JsonValue | null;
+  questionType: QuestionType;
+}) {
+  const { answerJson, optionsJson, questionType } = input;
+
+  if (
+    (isRecord(answerJson) && answerJson[unansweredMarker] === true) ||
+    (isRecord(answerJson) && answerJson[pendingAnswerMarker] === true)
+  ) {
+    return { isAnswered: false };
+  }
+
+  if (questionType === QuestionType.MULTIPLE_CHOICE) {
+    if (
+      !Array.isArray(answerJson) ||
+      answerJson.some((value) => typeof value !== "string")
+    ) {
+      throw invalidAnswer("Phương án trả lời chưa hợp lệ");
+    }
+    const optionIds = readOptionIds(optionsJson);
+    if (
+      new Set(answerJson).size !== answerJson.length ||
+      answerJson.some((value) => !optionIds.includes(value))
+    ) {
+      throw invalidAnswer("Phương án trả lời chưa hợp lệ");
+    }
+    return { isAnswered: answerJson.length > 0 };
+  }
+
+  if (questionType === QuestionType.TRUE_FALSE) {
+    if (typeof answerJson !== "boolean") {
+      throw invalidAnswer("Đáp án Đúng/Sai chưa hợp lệ");
+    }
+    return { isAnswered: true };
+  }
+
+  if (questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE) {
+    const optionIds = readOptionIds(optionsJson);
+    if (
+      !Array.isArray(answerJson) ||
+      answerJson.some(
+        (value) =>
+          !isRecord(value) ||
+          typeof value.statementId !== "string" ||
+          typeof value.value !== "boolean",
+      )
+    ) {
+      throw invalidAnswer("Đáp án mệnh đề chưa hợp lệ");
+    }
+    const answerIds = answerJson.map(
+      (value) => (value as { statementId: string }).statementId,
+    );
+    if (
+      new Set(answerIds).size !== answerIds.length ||
+      answerIds.some((statementId) => !optionIds.includes(statementId))
+    ) {
+      throw invalidAnswer("Đáp án mệnh đề chưa hợp lệ");
+    }
+    return { isAnswered: answerIds.length === optionIds.length };
+  }
+
+  if (typeof answerJson !== "string") {
+    throw invalidAnswer("Đáp án nhập chưa hợp lệ");
+  }
+  const normalizedAnswer = answerJson.trim();
+  return {
+    isAnswered:
+      normalizedAnswer.length > 0 && !normalizedAnswer.includes("\\placeholder"),
+  };
+}
+
 export function gradeQuestionAnswer(input: {
   answerJson: Prisma.JsonValue;
   correctAnswerJson: Prisma.JsonValue;

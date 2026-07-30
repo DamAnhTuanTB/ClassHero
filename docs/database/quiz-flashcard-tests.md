@@ -98,6 +98,7 @@ submitted_at timestamp?
 correct_count int default 0
 wrong_count int default 0
 total_count int default 0
+current_question_index int default 0
 created_at timestamp
 updated_at timestamp
 ```
@@ -109,6 +110,8 @@ id uuid pk
 attempt_id uuid fk quiz_attempts.id
 question_id uuid fk quiz_questions.id
 answer_json jsonb
+is_answered boolean default false
+is_checked boolean default false
 is_correct boolean
 created_at timestamp
 ```
@@ -121,8 +124,13 @@ Rules:
 
 - Khi start, mỗi câu được phép trong attempt có một answer placeholder nội bộ.
   Placeholder này chốt tập question ID ở server và chưa được tính là câu đã trả
-  lời. Khi submit, payload phải chứa đúng một answer cho mọi placeholder; server
-  chấm lại và thay toàn bộ placeholder trong cùng transaction với việc submit.
+  lời. Trong lúc làm, autosave cập nhật `answer_json`; `is_answered` chỉ bật khi
+  đáp án đã đầy đủ theo loại câu, còn `is_checked` chỉ bật sau khi student bấm
+  kiểm tra. Khi submit, payload phải chứa đúng một answer cho mọi placeholder;
+  server chấm lại và cập nhật toàn bộ answer trong cùng transaction.
+- `quiz_attempts.current_question_index` là vị trí resume dùng chung giữa các
+  thiết bị. Client vẫn có thể mirror local để phản hồi nhanh nhưng server là
+  nguồn chính.
 - Attempt `ALL` có `source_attempt_id=null` là kết quả gốc. Mọi attempt có
   `source_attempt_id` là lượt phụ và trỏ tới attempt cha trực tiếp, nên chuỗi
   retry giữ được đúng bộ câu của từng lượt.
@@ -134,6 +142,14 @@ Rules:
 - Attempt `ALL` mới không có liên kết nguồn trở thành kết quả gốc hiện hành mới
   và không cộng dồn với kết quả trước đó. Attempt `ALL` có liên kết nguồn chỉ
   làm lại toàn bộ tập câu của lượt cha và vẫn thuộc chuỗi retry hiện tại.
+- Lịch sử bộ Quiz của student chỉ liệt kê attempt gốc
+  (`source_attempt_id=null`). Mỗi attempt gốc là một mục lịch sử độc lập được
+  đánh số theo thứ tự bắt đầu `Bộ 1`, `Bộ 2`, ...; vì vậy khi hết bộ dự phòng và
+  UI tái sử dụng cùng một `quiz_set_id`, attempt mới vẫn phải tạo thêm một mục
+  lịch sử. Attempt retry không tạo thêm tên bộ trong danh sách này.
+- Tại một thời điểm chỉ mục `IN_PROGRESS` hiện hành mới được hiển thị là đang
+  làm. Các attempt đang dở cũ hơn lần submit gần nhất hoặc đã chuyển
+  `CANCELLED` không xuất hiện trong lịch sử student.
 - Với `MULTI_STATEMENT_TRUE_FALSE`, `answer_json` lưu mảng
   `{ statementId: string, value: boolean }`.
 - Mỗi mệnh đề có trọng số bằng nhau trong phạm vi điểm của câu. Cấp Quiz coi
@@ -217,6 +233,57 @@ Rules:
   `review_count` và cập nhật `last_reviewed_at`.
 - Flashcard prerequisite hoàn thành khi mọi card được duyệt của ít nhất một set
   không dự phòng đã có `review_count > 0`; không yêu cầu mọi `is_known=true`.
+
+### 8.4. `flashcard_study_sessions`
+
+```txt
+id uuid pk
+student_user_id uuid fk users.id
+lesson_id uuid fk lessons.id
+flashcard_set_id uuid fk flashcard_sets.id
+status AttemptStatus default IN_PROGRESS
+started_at timestamp
+completed_at timestamp?
+reviewed_count int default 0
+known_count int default 0
+unknown_count int default 0
+total_count int default 0
+created_at timestamp
+updated_at timestamp
+```
+
+### 8.5. `flashcard_study_session_items`
+
+```txt
+id uuid pk
+session_id uuid fk flashcard_study_sessions.id
+flashcard_id uuid fk flashcards.id
+sort_order int default 0
+is_known boolean?
+reviewed_at timestamp?
+created_at timestamp
+updated_at timestamp
+```
+
+Constraint:
+
+- unique `(session_id, flashcard_id)`.
+
+Rules:
+
+- `flashcard_progress` tiếp tục là trạng thái học mới nhất theo student/card và
+  phục vụ prerequisite. `flashcard_study_sessions` cùng các item là snapshot
+  theo từng lượt để resume và hiển thị lịch sử; không thay thế progress toàn cục.
+- Mỗi lần bắt đầu một lượt học toàn bộ tạo một session mới, kể cả khi tái sử
+  dụng lại cùng `flashcard_set_id`. Session được đánh số theo thứ tự bắt đầu
+  `Bộ 1`, `Bộ 2`, ... trong lịch sử của lesson.
+- Khi mọi item có `is_known`, session chuyển `SUBMITTED`, lưu
+  `completed_at` và thống kê known/unknown. Session `IN_PROGRESS` hiện hành là
+  mục duy nhất mang trạng thái đang làm; khi bắt đầu session mới, các session
+  đang dở trước đó của student trong lesson chuyển `CANCELLED` và không hiển thị.
+- `resumeExistingProgress=true` chỉ dùng để tạo session tương thích từ progress
+  legacy chưa có session. Những item đã có progress được nạp vào snapshot mới;
+  các lượt mới/làm lại thông thường bắt đầu với item chưa đánh dấu.
 
 ---
 

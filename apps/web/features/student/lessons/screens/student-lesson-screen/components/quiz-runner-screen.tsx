@@ -25,6 +25,7 @@ import {
   popQuizRunnerHistoryEntryPreservingResult,
   pushQuizRunnerHistoryEntry,
 } from "@/features/student/lessons/utils/quiz-runner-history";
+import { getAssessmentQuestionInstruction } from "@/features/student/lessons/utils/assessment-question-utils";
 import { isStudentAnswerComplete } from "@/features/student/lessons/utils/student-answer-utils";
 import { cn } from "@/lib/utils";
 
@@ -334,7 +335,7 @@ export function QuizRunnerScreen({
                 {String(questionNumber).padStart(2, "0")}
               </span>
               <h2 className="truncate text-base font-black text-sky-700 dark:text-sky-300 sm:text-lg">
-                {getQuestionInstruction(question.questionType)}
+                {getAssessmentQuestionInstruction(question.questionType)}
               </h2>
             </div>
           </div>
@@ -445,9 +446,9 @@ export function QuizRunnerScreen({
         {isIncompleteAlertVisible ? (
           <div
             role="alert"
-            className="mt-4 flex items-start gap-2 rounded-2xl border border-sky-300 bg-sky-100 px-3 py-2.5 text-sm font-bold leading-5 text-sky-800 dark:border-sky-400/40 dark:bg-sky-500/20 dark:text-sky-100"
+            className="mt-4 flex items-center gap-2 rounded-2xl border border-sky-400 bg-sky-200/80 px-3 py-4 text-sm font-bold leading-5 text-sky-800 shadow-[0_8px_20px_-16px_rgb(2_132_199_/_65%)] dark:border-sky-400/50 dark:bg-sky-500/25 dark:text-sky-100"
           >
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
             <p>
               Cần hoàn thành{" "}
               {incompleteQuestionNumbers.length === 1 ? "câu hỏi" : "các câu hỏi"}{" "}
@@ -503,15 +504,4 @@ export function QuizRunnerScreen({
       />
     </div>
   );
-}
-
-function getQuestionInstruction(
-  questionType: QuizAttempt["questions"][number]["questionType"],
-) {
-  if (questionType === "MULTIPLE_CHOICE") return "Chọn đáp án đúng";
-  if (questionType === "TRUE_FALSE") return "Chọn Đúng hoặc Sai";
-  if (questionType === "MULTI_STATEMENT_TRUE_FALSE") {
-    return "Đánh giá từng nhận định";
-  }
-  return "Nhập câu trả lời";
 }

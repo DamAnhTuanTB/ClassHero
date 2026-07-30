@@ -393,6 +393,7 @@ describe("M6.5 student lesson content integration", () => {
     );
     expect(blocked.canStart).toBe(false);
     expect(blocked.bestAttempt).toBeNull();
+    expect(blocked.latestSubmittedAttempt).toBeNull();
     expect(blocked.sets).toHaveLength(1);
 
     await prisma.lesson.update({

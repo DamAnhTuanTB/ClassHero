@@ -70,7 +70,7 @@ export class StudentLearningPrerequisitesService {
     }
 
     const quizCompleted =
-      quizSets.length === 0 ||
+      quizSets.length > 0 &&
       Boolean(
         await this.prisma.quizAttempt.findFirst({
           where: {
@@ -83,7 +83,7 @@ export class StudentLearningPrerequisitesService {
         }),
       );
     const flashcardCompleted =
-      flashcardSets.length === 0 ||
+      flashcardSets.length > 0 &&
       (
         await Promise.all(
           flashcardSets.map(async (set) => {
@@ -115,11 +115,11 @@ export class StudentLearningPrerequisitesService {
               ? "PREREQUISITES_INCOMPLETE"
               : null,
       quiz: {
-        isRequired: quizSets.length > 0,
+        isRequired: true,
         isCompleted: quizCompleted,
       },
       flashcard: {
-        isRequired: flashcardSets.length > 0,
+        isRequired: true,
         isCompleted: flashcardCompleted,
       },
     };

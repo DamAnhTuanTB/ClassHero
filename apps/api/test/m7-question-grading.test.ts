@@ -5,6 +5,7 @@ import {
   createPendingAnswerJson,
   gradeQuestionAnswer,
   isPendingAnswerJson,
+  validateStudentAnswerDraft,
 } from "#api/common/assessment/question-grading";
 
 describe("M7 assessment grading", () => {
@@ -90,6 +91,38 @@ describe("M7 assessment grading", () => {
   it("recognizes internal pending answer placeholders", () => {
     expect(isPendingAnswerJson(createPendingAnswerJson())).toBe(true);
     expect(isPendingAnswerJson(["A"])).toBe(false);
+  });
+
+  it("accepts partial drafts without counting incomplete questions as answered", () => {
+    const optionsJson = [
+      { id: "a", richText: documentWithText("A") },
+      { id: "b", richText: documentWithText("B") },
+    ];
+
+    expect(
+      validateStudentAnswerDraft({
+        questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+        answerJson: [{ statementId: "a", value: true }],
+        optionsJson,
+      }),
+    ).toEqual({ isAnswered: false });
+    expect(
+      validateStudentAnswerDraft({
+        questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+        answerJson: [
+          { statementId: "a", value: true },
+          { statementId: "b", value: false },
+        ],
+        optionsJson,
+      }),
+    ).toEqual({ isAnswered: true });
+    expect(
+      validateStudentAnswerDraft({
+        questionType: QuestionType.TEXT_INPUT,
+        answerJson: "-2.5",
+        optionsJson: null,
+      }),
+    ).toEqual({ isAnswered: true });
   });
 });
 

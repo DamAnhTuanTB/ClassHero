@@ -186,6 +186,11 @@ Spacing/radius mặc định:
 - Button dùng shadcn/ui `Button`.
 - Text trong button không được xuống dòng trong mọi viewport. Button phải có `white-space: nowrap`/`whitespace-nowrap`; khi nhãn dài hoặc màn hẹp, ưu tiên chỉnh layout, độ rộng, padding, font size hoặc copy ngắn hơn thay vì cho chữ wrap.
 - Mọi nút bấm và đường link có thể click được phải hiển thị `cursor: pointer`. Trạng thái không click được như disabled/loading phải dùng cursor đúng trạng thái (`not-allowed`, `wait`, `default` hoặc tương đương), không để người dùng hiểu nhầm là có thể bấm.
+- Nếu action ngay lập tức mở một loading/transition surface lớn hoặc toàn màn
+  hình, surface đó là feedback loading duy nhất. Button nguồn phải giữ nguyên
+  icon và label, không thêm spinner, progress hoặc đổi copy sang `Đang...`;
+  vẫn được khóa handler/disabled để chống bấm lặp. Chỉ dùng pending trực quan
+  trong button khi không có loading surface lớn thay thế.
 - Các nút cùng một flow hoặc action group phải dùng chung ngôn ngữ tương tác theo từng vai trò: cùng độ sâu shadow, cùng khoảng dịch chuyển khi pressed và cùng nhịp transition. Nút enabled phải có đổi màu hover rõ nhưng nhẹ; nút disabled không được đổi màu như thể vẫn tương tác được. Khi student theme chủ động bỏ shadow trên mobile, action cần giữ hiệu ứng 3D phải dùng utility ngoại lệ đã có thay vì tự tạo độ sâu/màu shadow khác ở từng màn.
 - Form dùng React Hook Form + Zod; nếu đã setup shadcn Form thì dùng shadcn Form.
 - Trước khi tạo form, phải kiểm tra form chuẩn đã duyệt và reusable primitives: `apps/web/components/common/forms`, các form tương tự trong feature đang làm, và `docs/ui-references/approved-patterns.md`. Reuse/nâng cấp component sẵn có thay vì tạo input/select/textarea/button cùng chức năng với style khác.
@@ -346,10 +351,15 @@ Mobile UX rules:
 lại` phải chuyển sang runner hoặc result toàn màn hình có cùng header
   ClassHero, back/exit-confirm, scroll lock, progress hierarchy và responsive
   behavior; chỉ đổi tone/copy/action theo nghiệp vụ Flashcard.
-- Flow học dài như Quiz/Test đang làm phải chịu được refresh/F5: attempt và các
-  kết quả đã chấm khôi phục từ server; vị trí câu/đáp án nháp có thể lưu browser
-  storage theo đúng attempt. Không được chỉ giữ flow bằng React state rồi đưa
-  người học về màn bắt đầu sau reload.
+- Flow học dài như Quiz/Test đang làm phải chịu được refresh/F5. Riêng Quiz,
+  attempt, mọi đáp án nháp, trạng thái đã kiểm tra và vị trí câu phải autosave
+  theo attempt ở server để resume được cả khi đổi thiết bị; browser storage chỉ
+  được dùng làm cache tăng tốc, không phải nguồn duy nhất. Không được chỉ giữ
+  flow bằng React state rồi đưa người học về màn bắt đầu sau reload.
+- Autosave nền không được đưa runner đang hiển thị quay lại loading/skeleton hoặc
+  chạy lại luồng resume sau mỗi response. Effect resume phải phụ thuộc vào danh
+  tính attempt/surface cần khôi phục, không phụ thuộc vào các counter tiến độ
+  thay đổi liên tục như số câu đã làm hoặc đã kiểm tra.
 - Khi resume một flow fullscreen sau F5, trạng thái pending phải chiếm cùng
   fullscreen boundary và giữ gần đúng bố cục đích ngay từ HTML đầu tiên. Không
   render loading dạng card trong shell rồi mới phủ runner lên sau khi API trả về,

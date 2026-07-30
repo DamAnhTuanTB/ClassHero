@@ -235,6 +235,10 @@ Nhưng chưa được làm bài kiểm tra.
 Ở MVP, tiêu chí hoàn thành buổi học là:
 
 - Học sinh đạt điểm bài kiểm tra từ 7/10 trở lên.
+- Hai nút `Bài học trước` và `Bài học kế tiếp` luôn xuất hiện ở cuối trang
+  lesson. Ở bài đầu tiên, nút trái đổi thành `Trở về` và dẫn về chi tiết khóa
+  học; từ bài thứ hai, nút này là `Bài học trước`. Nút kế tiếp chỉ bật khi có
+  bài đứng sau và bài thi hiện tại đạt ngưỡng hoàn thành của lesson.
 
 ASSUMPTION: Nếu một buổi học có nhiều bộ đề/bài kiểm tra, kết quả dùng để xét hoàn thành là kết quả tốt nhất của học sinh trong buổi học.
 
@@ -276,9 +280,15 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
   hủy ảnh gốc và alignment/kích thước/vùng cắt được lưu cùng Tiptap JSON.
 - Đáp án chấm tự động của câu `TEXT_INPUT` vẫn là chuỗi canonical để so khớp,
   nhưng được phép chứa LaTeX/mhchem và có công cụ xem trước công thức.
-- Panel Quiz hiển thị `Bắt đầu` khi lượt hiện tại chưa kiểm tra câu nào,
-  `Tiếp tục vào làm` khi đã kiểm tra ít nhất một câu, và `Xem lại` khi đã hoàn
-  thành mà không còn lượt đang làm.
+- Panel Quiz hiển thị `Bắt đầu` khi student chưa từng mở runner của lượt hiện
+  tại, `Tiếp tục làm` ngay khi lượt đã từng được mở dù chưa kiểm tra câu nào,
+  và `Xem lại` khi đã hoàn thành mà không còn lượt đang làm. `Bắt đầu` luôn mở
+  câu đầu tiên; `Tiếp tục làm` mở đúng câu gần nhất đã lưu ở server sau Back,
+  F5, đóng/mở lại web hoặc đăng nhập trên thiết bị khác.
+- Mọi đáp án Quiz đã chọn/đã nhập, kể cả chưa bấm `Kiểm tra đáp án`, phải được
+  autosave theo attempt. Lượt `IN_PROGRESS` khôi phục đúng đáp án, trạng thái
+  đã kiểm tra và vị trí câu trên mọi thiết bị; lịch sử hiển thị tiến độ
+  `X/Y câu đã làm` của lượt hiện tại.
 - Trong runner, `Đã làm` và điều kiện bấm `Hoàn thành` dựa trên số câu đã có đáp
   án đầy đủ, không dựa trên số lần bấm `Kiểm tra đáp án`. Khi mọi câu đã đủ đáp
   án, action `Hoàn thành` tự chấm các câu chưa kiểm tra trước khi submit.
@@ -293,8 +303,10 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 - Một buổi học có thể có nhiều bộ flashcard.
 - Flashcard có thể do admin tạo hoặc AI tạo.
 - Panel Flashcard trong lesson dùng cùng mô hình vào bài như Quiz: `Bắt đầu`
-  khi chưa học thẻ nào, `Tiếp tục vào học` khi bộ còn thẻ chưa review và
-  `Xem lại` khi đã hoàn thành.
+  khi student chưa từng mở runner của lượt hiện tại, `Tiếp tục học` ngay khi
+  lượt đã từng được mở dù chưa đánh dấu thẻ nào và `Xem lại` khi đã hoàn thành.
+  `Bắt đầu` luôn mở thẻ đầu tiên; `Tiếp tục học` mở đúng thẻ gần nhất đã lưu
+  trên cùng trình duyệt sau Back, F5 hoặc đóng/mở lại web.
 - Sau khi bấm CTA, UI chuyển sang runner toàn màn hình riêng thay vì tiếp tục
   học ngay bên trong panel/tab lesson. Runner có header ClassHero, tiến độ,
   xác nhận khi thoát giữa lượt và trạng thái pending/disabled rõ ràng.
@@ -319,6 +331,9 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 ### 4.7. Bài kiểm tra
 
 - Bài kiểm tra chỉ mở vào ngày/giờ admin thiết lập.
+- Bài kiểm tra chỉ mở sau khi học sinh đã hoàn thành cả Quiz và Flashcard của
+  lesson. Lesson thiếu bộ Quiz/Flashcard có nội dung được duyệt vẫn phải khóa
+  bài thi; không được coi nội dung còn thiếu là tiến độ đã hoàn thành.
 - Form câu hỏi bài kiểm tra có bốn lựa chọn: `Trắc nghiệm`, `Đúng/Sai`,
   `Đúng/Sai nhiều mệnh đề` và `Nhập đáp án`.
 - `Đúng/Sai` cũ tiếp tục dùng một đáp án boolean chung. `Đúng/Sai nhiều mệnh
@@ -326,6 +341,11 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
   cũ.
 - Học sinh được làm lại nhiều lần.
 - Mỗi lần làm là một bộ đề khác nhau nếu còn bộ phù hợp.
+- Trong lúc đang làm, nút Back của trình duyệt và nút quay lại trong header phải
+  cảnh báo rằng lượt hiện tại sẽ bị hủy và học sinh phải làm bài thi mới.
+- F5/reload/đóng trang phải dùng cảnh báo rời trang của trình duyệt. Nếu học sinh
+  vẫn tiếp tục rời hoặc reload, runner hiện tại bị hủy và không được khôi phục
+  như Quiz/Flashcard.
 - Hệ thống lưu toàn bộ lịch sử làm bài.
 - Kết quả dùng để hiển thị/gửi phụ huynh/tính thành tích/xếp hạng là kết quả tốt nhất.
 

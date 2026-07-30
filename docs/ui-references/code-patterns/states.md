@@ -13,6 +13,15 @@ Dùng cho màn có data/action.
 - Empty: nói người dùng có thể làm gì tiếp theo.
 - Error: có action retry khi có thể.
 - Disabled/pending: action đang chạy phải disabled và có feedback.
+- Khi một surface có nhiều action độc lập, pending state phải định danh theo từng
+  action (`start`, `review`, `restart`, `open-result`, ...) và chỉ disabled action
+  đang chạy. Không dùng `disabled={Boolean(pendingAction)}` cho cả nhóm nút; điều
+  kiện khóa nghiệp vụ cố định như thiếu prerequisite hoặc không có dữ liệu vẫn
+  được giữ riêng trên đúng action liên quan.
+- Action mở loading/transition surface lớn hoặc toàn màn hình: surface lớn sở
+  hữu feedback loading; button nguồn giữ nguyên icon/label, không render
+  spinner, progress hoặc copy `Đang...`, nhưng vẫn khóa bấm lặp bằng state nội
+  bộ/disabled.
 - Full-page loading/error phải căn giữa cả chiều ngang lẫn chiều dọc bằng vùng bao có chiều cao viewport. State trong shell có header/sidebar căn giữa phần nội dung còn lại; state trong tab/card chỉ căn giữa vùng được cấp.
 - Với initial loading ngắn, trì hoãn hiển thị khoảng `250-300ms`; nếu loading đã xuất hiện thì giữ tối thiểu khoảng `300ms` để tránh nháy.
 - Fetch/prefetch dữ liệu của các tab ngay khi đủ dependency và chạy song song khi có thể; khi đổi tab, ưu tiên cache và không thay dữ liệu đang có bằng skeleton chỉ vì background refetch.
@@ -20,6 +29,8 @@ Dùng cho màn có data/action.
 ### Không làm
 
 - Không để button nhìn bấm được nhưng thiếu handler hoặc pending state.
+- Không hiển thị loading đồng thời trong button và trên loading/transition
+  surface lớn được chính button đó mở.
 - Không hiển thị text kỹ thuật như `mock`, task code, stack trace hoặc TODO trong UI.
 - Không thay một detail/list/tab panel bằng icon xoay kèm dòng “Đang tải…”. Spinner chỉ dùng cho pending cục bộ không có layout nội dung để skeleton hóa, ví dụ bên trong nút bấm.
 

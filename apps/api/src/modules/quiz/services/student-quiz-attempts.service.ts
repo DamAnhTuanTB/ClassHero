@@ -5,6 +5,7 @@ import {
   createPendingAnswerJson,
   gradeQuestionAnswer,
   isPendingAnswerJson,
+  validateStudentAnswerDraft,
 } from "#api/common/assessment/question-grading";
 import {
   badRequestException,
@@ -15,6 +16,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
 import {
   QuizAttemptScopeDto,
+  type SaveStudentQuizProgressDto,
   type StartStudentQuizAttemptDto,
   type StudentQuizAnswerDto,
 } from "#api/modules/quiz/dto/student-quiz-attempt.dto";
@@ -45,6 +47,116 @@ export class StudentQuizAttemptsService {
     @Inject(StudentLessonAccessService)
     private readonly studentLessonAccessService: StudentLessonAccessService,
   ) {}
+
+  async getLessonHistory(lessonId: string, studentUserId: string) {
+    await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
+
+    const where = {
+      lessonId,
+      studentUserId,
+      sourceAttemptId: null,
+      status: {
+        in: [AttemptStatus.IN_PROGRESS, AttemptStatus.SUBMITTED, AttemptStatus.GRADED],
+      },
+      quizSet: {
+        deletedAt: null,
+        isReserve: false,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+    } satisfies Prisma.QuizAttemptWhereInput;
+    const [attempts, completedTotal] = await Promise.all([
+      this.prisma.quizAttempt.findMany({
+        where,
+        orderBy: [{ startedAt: "desc" }, { createdAt: "desc" }],
+        take: 100,
+        select: {
+          id: true,
+          quizSetId: true,
+          status: true,
+          startedAt: true,
+          submittedAt: true,
+          correctCount: true,
+          wrongCount: true,
+          totalCount: true,
+          _count: {
+            select: {
+              answers: {
+                where: {
+                  isAnswered: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.quizAttempt.count({
+        where: {
+          ...where,
+          status: { in: [AttemptStatus.SUBMITTED, AttemptStatus.GRADED] },
+        },
+      }),
+    ]);
+    const latestSubmittedAtBySetId = new Map<string, Date>();
+    attempts.forEach((attempt) => {
+      if (!attempt.submittedAt) return;
+      const current = latestSubmittedAtBySetId.get(attempt.quizSetId);
+      if (!current || attempt.submittedAt > current) {
+        latestSubmittedAtBySetId.set(attempt.quizSetId, attempt.submittedAt);
+      }
+    });
+    const currentAttempt = attempts
+      .filter((attempt) => {
+        if (attempt.status !== AttemptStatus.IN_PROGRESS) return false;
+        const latestSubmittedAt = latestSubmittedAtBySetId.get(attempt.quizSetId);
+        return !latestSubmittedAt || attempt.startedAt > latestSubmittedAt;
+      })
+      .sort((left, right) => right.startedAt.getTime() - left.startedAt.getTime())[0];
+    const historyAttempts = attempts
+      .filter(
+        (attempt) =>
+          attempt.status !== AttemptStatus.IN_PROGRESS ||
+          attempt.id === currentAttempt?.id,
+      )
+      .sort((left, right) => {
+        if (left.status === AttemptStatus.IN_PROGRESS) return -1;
+        if (right.status === AttemptStatus.IN_PROGRESS) return 1;
+        return right.startedAt.getTime() - left.startedAt.getTime();
+      })
+      .slice(0, 50);
+    const total = completedTotal + (currentAttempt ? 1 : 0);
+
+    const sequenceByAttemptId = new Map(
+      [...historyAttempts]
+        .sort((left, right) => left.startedAt.getTime() - right.startedAt.getTime())
+        .map((attempt, index) => [
+          attempt.id,
+          total - historyAttempts.length + index + 1,
+        ]),
+    );
+
+    return {
+      total,
+      items: historyAttempts.map((attempt) => ({
+        id: attempt.id,
+        setId: attempt.quizSetId,
+        displayName: `Bộ ${sequenceByAttemptId.get(attempt.id) ?? 1}`,
+        state:
+          attempt.status === AttemptStatus.IN_PROGRESS
+            ? ("IN_PROGRESS" as const)
+            : ("COMPLETED" as const),
+        startedAt: attempt.startedAt,
+        completedAt: attempt.submittedAt,
+        answeredCount: attempt._count.answers,
+        correctCount: attempt.correctCount,
+        wrongCount: attempt.wrongCount,
+        totalCount: attempt.totalCount,
+        accuracyPercent:
+          attempt.totalCount === 0
+            ? 0
+            : Math.round((attempt.correctCount / attempt.totalCount) * 100),
+      })),
+    };
+  }
 
   async getAttemptStatus(quizSetId: string, studentUserId: string) {
     const quizSet = await this.prisma.quizSet.findFirst({
@@ -78,7 +190,8 @@ export class StudentQuizAttemptsService {
           startedAt: true,
           answers: {
             select: {
-              answerJson: true,
+              isAnswered: true,
+              isChecked: true,
             },
           },
         },
@@ -127,9 +240,9 @@ export class StudentQuizAttemptsService {
       return {
         state: "IN_PROGRESS" as const,
         currentAttemptId: currentAttempt.id,
-        checkedCount: currentAttempt.answers.filter(
-          (answer) => !isPendingAnswerJson(answer.answerJson),
-        ).length,
+        answeredCount: currentAttempt.answers.filter((answer) => answer.isAnswered)
+          .length,
+        checkedCount: currentAttempt.answers.filter((answer) => answer.isChecked).length,
         latestSubmittedAttempt: latestSummary,
       };
     }
@@ -138,12 +251,14 @@ export class StudentQuizAttemptsService {
       ? {
           state: "COMPLETED" as const,
           currentAttemptId: null,
+          answeredCount: latestSummary.totalCount,
           checkedCount: latestSummary.totalCount,
           latestSubmittedAttempt: latestSummary,
         }
       : {
           state: "NOT_STARTED" as const,
           currentAttemptId: null,
+          answeredCount: 0,
           checkedCount: 0,
           latestSubmittedAttempt: null,
         };
@@ -192,10 +307,12 @@ export class StudentQuizAttemptsService {
           status: true,
           sourceAttemptId: true,
           totalCount: true,
+          currentQuestionIndex: true,
           answers: {
             orderBy: { question: { sortOrder: "asc" } },
             select: {
               answerJson: true,
+              isChecked: true,
               question: {
                 select: studentQuizQuestionSelect,
               },
@@ -236,6 +353,10 @@ export class StudentQuizAttemptsService {
       sourceAttemptId: attempt.sourceAttemptId,
       totalCount: attempt.totalCount,
       originalTotalCount: rootAttempt?.totalCount ?? quizSet.questions.length,
+      currentQuestionIndex: Math.min(
+        Math.max(0, attempt.currentQuestionIndex),
+        Math.max(0, attempt.totalCount - 1),
+      ),
       quizSet: {
         id: quizSet.id,
         title: quizSet.title,
@@ -246,8 +367,14 @@ export class StudentQuizAttemptsService {
           questionNumberById.get(answer.question.id),
         ),
       ),
-      checkedAnswers: attempt.answers
+      savedAnswers: attempt.answers
         .filter((answer) => !isPendingAnswerJson(answer.answerJson))
+        .map((answer) => ({
+          questionId: answer.question.id,
+          answerJson: answer.answerJson,
+        })),
+      checkedAnswers: attempt.answers
+        .filter((answer) => answer.isChecked && !isPendingAnswerJson(answer.answerJson))
         .map((answer) => ({
           questionId: answer.question.id,
           answerJson: answer.answerJson,
@@ -348,11 +475,18 @@ export class StudentQuizAttemptsService {
 
     const attempt = await this.prisma.$transaction(async (transaction) => {
       await transaction.quizAttempt.updateMany({
-        where: {
-          studentUserId,
-          quizSetId: quizSet.id,
-          status: AttemptStatus.IN_PROGRESS,
-        },
+        where: sourceAttemptId
+          ? {
+              studentUserId,
+              quizSetId: quizSet.id,
+              status: AttemptStatus.IN_PROGRESS,
+            }
+          : {
+              studentUserId,
+              lessonId: quizSet.lessonId,
+              sourceAttemptId: null,
+              status: AttemptStatus.IN_PROGRESS,
+            },
         data: {
           status: AttemptStatus.CANCELLED,
         },
@@ -378,6 +512,7 @@ export class StudentQuizAttemptsService {
           startedAt: true,
           status: true,
           totalCount: true,
+          currentQuestionIndex: true,
         },
       });
     });
@@ -401,6 +536,140 @@ export class StudentQuizAttemptsService {
     };
   }
 
+  async saveProgress(
+    attemptId: string,
+    studentUserId: string,
+    input: SaveStudentQuizProgressDto,
+  ) {
+    const attempt = await this.prisma.quizAttempt.findFirst({
+      where: {
+        id: attemptId,
+        studentUserId,
+      },
+      select: {
+        id: true,
+        lessonId: true,
+        status: true,
+        totalCount: true,
+        answers: {
+          select: {
+            id: true,
+            questionId: true,
+            isAnswered: true,
+            isChecked: true,
+            question: {
+              select: {
+                questionType: true,
+                optionsJson: true,
+                correctAnswerJson: true,
+                gradingConfigJson: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!attempt) {
+      throw notFoundException("QUIZ_ATTEMPT_NOT_FOUND", "Không tìm thấy lượt Quiz");
+    }
+    await this.studentLessonAccessService.assertCanRead(attempt.lessonId, studentUserId);
+    if (attempt.status !== AttemptStatus.IN_PROGRESS) {
+      throw conflictException(
+        "QUIZ_ATTEMPT_NOT_IN_PROGRESS",
+        "Lượt Quiz này đã kết thúc",
+      );
+    }
+    if (
+      input.currentQuestionIndex < 0 ||
+      input.currentQuestionIndex >= attempt.totalCount
+    ) {
+      throw badRequestException(
+        "QUIZ_CURRENT_QUESTION_INVALID",
+        "Vị trí câu Quiz chưa hợp lệ",
+      );
+    }
+
+    const draftAnswer = input.answer
+      ? attempt.answers.find((answer) => answer.questionId === input.answer?.questionId)
+      : undefined;
+    if (input.answer && !draftAnswer) {
+      throw badRequestException(
+        "QUIZ_QUESTION_NOT_IN_ATTEMPT",
+        "Câu hỏi không thuộc lượt Quiz này",
+      );
+    }
+
+    const normalizedAnswerJson =
+      input.answer && draftAnswer ? toJsonValue(input.answer.answerJson) : null;
+    const draftState =
+      normalizedAnswerJson !== null && draftAnswer
+        ? validateStudentAnswerDraft({
+            answerJson: normalizedAnswerJson,
+            optionsJson: draftAnswer.question.optionsJson,
+            questionType: draftAnswer.question.questionType,
+          })
+        : null;
+    const checkedGrade =
+      input.answer?.isChecked && normalizedAnswerJson !== null && draftAnswer
+        ? gradeQuestionAnswer({
+            answerJson: normalizedAnswerJson,
+            correctAnswerJson: draftAnswer.question.correctAnswerJson,
+            gradingConfigJson: draftAnswer.question.gradingConfigJson,
+            optionsJson: draftAnswer.question.optionsJson,
+            questionType: draftAnswer.question.questionType,
+          })
+        : null;
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.quizAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          currentQuestionIndex: input.currentQuestionIndex,
+        },
+      });
+
+      if (
+        draftAnswer &&
+        normalizedAnswerJson !== null &&
+        draftState &&
+        !draftAnswer.isChecked
+      ) {
+        await transaction.quizAttemptAnswer.updateMany({
+          where: {
+            id: draftAnswer.id,
+            isChecked: false,
+          },
+          data: {
+            answerJson: toInputJson(normalizedAnswerJson),
+            isAnswered: checkedGrade ? true : draftState.isAnswered,
+            isChecked: Boolean(checkedGrade),
+            isCorrect: checkedGrade?.isCorrect ?? false,
+          },
+        });
+      }
+    });
+
+    const answeredCount = attempt.answers.filter((answer) =>
+      answer.id === draftAnswer?.id && !answer.isChecked && draftState
+        ? checkedGrade
+          ? true
+          : draftState.isAnswered
+        : answer.isAnswered,
+    ).length;
+    const checkedCount = attempt.answers.filter((answer) =>
+      answer.id === draftAnswer?.id && !answer.isChecked && checkedGrade
+        ? true
+        : answer.isChecked,
+    ).length;
+
+    return {
+      attemptId: attempt.id,
+      currentQuestionIndex: input.currentQuestionIndex,
+      answeredCount,
+      checkedCount,
+    };
+  }
+
   async checkAnswer(
     attemptId: string,
     questionId: string,
@@ -421,6 +690,7 @@ export class StudentQuizAttemptsService {
           select: {
             id: true,
             answerJson: true,
+            isChecked: true,
             question: {
               select: studentQuizQuestionSelect,
             },
@@ -453,7 +723,7 @@ export class StudentQuizAttemptsService {
       questionType: answer.question.questionType,
     });
 
-    if (!isPendingAnswerJson(answer.answerJson)) {
+    if (answer.isChecked) {
       if (!jsonValuesEqual(answer.answerJson, answerJson)) {
         throw conflictException(
           "QUIZ_ANSWER_ALREADY_CHECKED",
@@ -474,6 +744,8 @@ export class StudentQuizAttemptsService {
       where: { id: answer.id },
       data: {
         answerJson: toInputJson(answerJson),
+        isAnswered: true,
+        isChecked: true,
         isCorrect: grade.isCorrect,
       },
     });
@@ -565,6 +837,8 @@ export class StudentQuizAttemptsService {
             where: { id: answer.id },
             data: {
               answerJson: toInputJson(answer.answerJson),
+              isAnswered: true,
+              isChecked: true,
               isCorrect: answer.grade.isCorrect,
             },
           });
@@ -617,6 +891,8 @@ export class StudentQuizAttemptsService {
             },
             data: {
               answerJson: toInputJson(answer.answerJson),
+              isAnswered: true,
+              isChecked: true,
               isCorrect: answer.grade.isCorrect,
             },
           });

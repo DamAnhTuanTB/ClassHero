@@ -152,7 +152,8 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
   từng hoạt động.
 - Back khi lượt chưa hoàn thành phải mở confirm dialog; browser Back và back
   button trong header có cùng outcome. Đóng dialog giữ nguyên vị trí/nội dung
-  đang học.
+  đang học. Với Bài thi có giới hạn thời gian, copy phải nói rõ xác nhận Back sẽ
+  hủy lượt hiện tại và học sinh phải bắt đầu bài thi mới.
 - Progress hierarchy giữ cùng cấu trúc: tên lesson, vị trí hiện tại/tổng, số đã
   làm hoặc đã ôn và progress bar. Action chính có pending/disabled tức thì,
   touch target tối thiểu 44px và không wrap label.
@@ -172,9 +173,16 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
 - Effect dọn marker stale chỉ được chạy một lần khi hydrate phiên ban đầu. Không
   phụ thuộc trực tiếp vào object query có thể đổi identity sau invalidate/refetch,
   nếu không một progress mutation hợp lệ sẽ vô tình xóa marker runner đang mở.
-- F5 khi runner đang mở phải dựng lại đúng phiên; sau khi student xác nhận thoát,
-  F5 giữ panel/result và chỉ CTA tiếp tục mới mở runner cũ. Kết quả được khôi
-  phục không chạy lại animation ăn mừng.
+- F5 khi runner Quiz/Flashcard đang mở phải dựng lại đúng phiên; sau khi student
+  xác nhận thoát, F5 giữ panel/result và chỉ CTA tiếp tục mới mở runner cũ. Kết
+  quả được khôi phục không chạy lại animation ăn mừng. Riêng runner Bài thi có
+  giới hạn thời gian phải đăng ký `beforeunload`; nếu student xác nhận reload/
+  rời trang thì hủy runner hiện tại và yêu cầu bắt đầu bài thi mới.
+- Khi một lesson có nhiều Quiz/Flashcard set, phải lưu riêng identity của active
+  set theo `user + lesson` trong storage bền và kiểm tra ID đó còn thuộc danh
+  sách set hiện tại trước khi dùng. Không lấy history marker làm active-set
+  storage: marker phải bị xóa khi Back khỏi fullscreen, còn active set phải sống
+  qua Back, refetch, F5 và đóng/mở lại web để panel không nhảy về bộ đầu tiên.
 - Khi CTA dùng hoạt ảnh che toàn màn hình để vào runner/result, request chuẩn bị
   dữ liệu có thể chạy song song với pha che nhưng không được commit state làm
   đổi surface đang render. Chỉ commit destination khi overlay đã che kín và
@@ -183,6 +191,24 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
 - Với deck được lọc như `chưa thuộc`, chốt danh sách ID khi bắt đầu lượt. Không
   filter trực tiếp mảng đang render theo state vừa mutation vì có thể làm index
   nhảy và bỏ qua item.
+- Khi một action trong modal lịch sử mở child surface toàn màn hình và Back cần
+  quay lại modal ngay, ưu tiên giữ modal mounted bên dưới child surface và đặt
+  child surface ở layer cao hơn nhưng thấp hơn transition. Back chỉ unmount
+  child surface để lộ lại cùng modal instance, nhờ đó giữ nguyên scroll/state và
+  không chạy lại animation mở modal. Không đặt `inert` trên toàn bộ overlay của
+  bottom-sheet vì WebKit/mobile compositor có thể loại cả layer khỏi trạng thái
+  hiển thị. Trong lúc bị che, giữ overlay nguyên vẹn, khóa pointer ở wrapper,
+  đặt `aria-hidden` cho dialog, blur focus còn sót lại và chặn Escape bằng state
+  của child surface. Chỉ snapshot/restore `scrollTop` khi kiến trúc bắt buộc phải
+  unmount modal. Action chỉ đọc dữ liệu lịch sử không được đổi identity state
+  của panel nguồn (ví dụ active set ID): query phụ có thể chuyển sang loading,
+  thay panel bằng skeleton và remount modal dù child surface vẫn mở bình thường.
+- Child review mở từ một item lịch sử phải nhận và hiển thị `displayName` của
+  chính item đó; không thay bằng copy phạm vi chung hoặc tên lesson làm người
+  dùng mất ngữ cảnh đang xem bộ nào.
+- Điều hướng tuần tự trong review dùng action thoát có nghĩa ở hai biên: item
+  đầu có `Trở về`, item cuối có `Kết thúc xem lại`; chỉ item giữa mới dùng
+  `... trước`/`... tiếp`. Hai action biên cùng trả về surface nguồn.
 
 ### Không làm
 
@@ -197,6 +223,9 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
   vật thể trung tâm rõ ràng; tránh bố cục nhiều ô, nhiều mảnh rời, bụi hạt và
   cảnh chứa nhiều đạo cụ cạnh tranh điểm nhìn.
 - Không tạo header/logo/back behavior khác nhau giữa Quiz và Flashcard.
+- Không tự thêm caret trang trí cho popover khi vị trí neo đã đủ rõ. Nếu luồng
+  khác thật sự cần caret, không dùng hình vuông `rotate-45` làm caret vì sẽ lộ
+  thành hình kim cương; phải render tam giác thật và giữ đúng màu light/dark.
 - Không đổi danh sách item giữa một lượt chỉ vì progress mutation vừa thành công.
 - Không đưa action chọn bộ hoặc danh sách thẻ sai vào result nếu contract chỉ
   cho ôn lại tất cả/chưa thuộc.

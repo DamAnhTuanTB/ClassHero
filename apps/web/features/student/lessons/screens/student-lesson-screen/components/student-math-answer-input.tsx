@@ -8,11 +8,13 @@ import { cn } from "@/lib/utils";
 type AnswerState = "correct" | "incorrect" | "idle";
 
 export function StudentMathAnswerInput({
+  accent = "quiz",
   answerState = "idle",
   disabled,
   onChange,
   value,
 }: {
+  accent?: "quiz" | "test";
   answerState?: AnswerState;
   disabled: boolean;
   onChange: (value: string) => void;
@@ -27,13 +29,16 @@ export function StudentMathAnswerInput({
       ? "border-emerald-400 focus:border-emerald-400 focus:ring-emerald-100 dark:focus:ring-emerald-500/20"
       : answerState === "incorrect"
         ? "border-rose-400 focus:border-rose-400 focus:ring-rose-100 dark:focus:ring-rose-500/20"
-        : "border-slate-200 focus:border-sky-400 focus:ring-sky-100 dark:border-[var(--theme-border)] dark:focus:border-sky-400 dark:focus:ring-sky-500/20";
+        : accent === "test"
+          ? "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100 dark:border-[var(--theme-border)] dark:focus:border-emerald-400 dark:focus:ring-emerald-500/20"
+          : "border-slate-200 focus:border-sky-400 focus:ring-sky-100 dark:border-[var(--theme-border)] dark:focus:border-sky-400 dark:focus:ring-sky-500/20";
 
   return (
     <div>
       <div className="relative">
         {isFormulaMode ? (
           <VisualMathInput
+            accent={accent === "test" ? "emerald" : "primary"}
             ariaLabel="Nhập đáp án"
             value={value}
             disabled={disabled}
@@ -84,10 +89,17 @@ export function StudentMathAnswerInput({
             }
           }}
           className={cn(
-            "absolute right-2 top-8 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl border p-0 leading-none transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-default disabled:opacity-50 dark:focus-visible:ring-sky-500/20 [&>svg]:block [&>svg]:shrink-0",
+            "absolute right-2 top-8 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl border p-0 leading-none transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-default disabled:opacity-50 [&>svg]:block [&>svg]:shrink-0",
+            accent === "test"
+              ? "focus-visible:ring-emerald-200 dark:focus-visible:ring-emerald-500/20"
+              : "focus-visible:ring-sky-200 dark:focus-visible:ring-sky-500/20",
             keyboardIsVisible
-              ? "border-sky-500 bg-sky-500 text-white"
-              : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/25",
+              ? accent === "test"
+                ? "border-emerald-500 bg-emerald-500 text-white"
+                : "border-sky-500 bg-sky-500 text-white"
+              : accent === "test"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
+                : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/25",
           )}
         >
           <Keyboard className="h-5 w-5" strokeWidth={2.25} aria-hidden="true" />

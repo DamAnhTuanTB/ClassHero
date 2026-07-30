@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
   AiExplanationTargetType,
+  AttemptStatus,
   ContentSource,
   Difficulty,
   FavoriteTargetType,
@@ -446,10 +447,209 @@ export class FlashcardsService {
     );
   }
 
+  async getStudentStudyHistory(lessonId: string, studentUserId: string) {
+    await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
+    const where = {
+      lessonId,
+      studentUserId,
+      status: { in: [AttemptStatus.IN_PROGRESS, AttemptStatus.SUBMITTED] },
+      flashcardSet: {
+        deletedAt: null,
+        isReserve: false,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+    } satisfies Prisma.FlashcardStudySessionWhereInput;
+    const [total, sessions] = await Promise.all([
+      this.prisma.flashcardStudySession.count({ where }),
+      this.prisma.flashcardStudySession.findMany({
+        where,
+        orderBy: [{ status: "asc" }, { startedAt: "desc" }, { createdAt: "desc" }],
+        take: 50,
+        select: {
+          id: true,
+          flashcardSetId: true,
+          status: true,
+          startedAt: true,
+          completedAt: true,
+          reviewedCount: true,
+          knownCount: true,
+          unknownCount: true,
+          totalCount: true,
+        },
+      }),
+    ]);
+    const sequenceBySessionId = new Map(
+      [...sessions]
+        .sort((left, right) => left.startedAt.getTime() - right.startedAt.getTime())
+        .map((session, index) => [session.id, total - sessions.length + index + 1]),
+    );
+
+    return {
+      total,
+      items: sessions.map((session) => ({
+        id: session.id,
+        setId: session.flashcardSetId,
+        displayName: `Bộ ${sequenceBySessionId.get(session.id) ?? 1}`,
+        state:
+          session.status === AttemptStatus.IN_PROGRESS
+            ? ("IN_PROGRESS" as const)
+            : ("COMPLETED" as const),
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
+        reviewedCount: session.reviewedCount,
+        knownCount: session.knownCount,
+        unknownCount: session.unknownCount,
+        totalCount: session.totalCount,
+      })),
+    };
+  }
+
+  async getStudentStudySession(sessionId: string, studentUserId: string) {
+    const session = await this.prisma.flashcardStudySession.findFirst({
+      where: {
+        id: sessionId,
+        studentUserId,
+        status: { in: [AttemptStatus.IN_PROGRESS, AttemptStatus.SUBMITTED] },
+        flashcardSet: {
+          deletedAt: null,
+          isReserve: false,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+      },
+      select: {
+        id: true,
+        lessonId: true,
+        flashcardSetId: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+        reviewedCount: true,
+        knownCount: true,
+        unknownCount: true,
+        totalCount: true,
+        items: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            flashcardId: true,
+            isKnown: true,
+            reviewedAt: true,
+          },
+        },
+      },
+    });
+    if (!session) {
+      throw notFoundException(
+        "FLASHCARD_SESSION_NOT_FOUND",
+        "Không tìm thấy lượt học Flashcard",
+      );
+    }
+    await this.studentLessonAccessService.assertCanRead(session.lessonId, studentUserId);
+
+    return {
+      ...session,
+      state:
+        session.status === AttemptStatus.IN_PROGRESS
+          ? ("IN_PROGRESS" as const)
+          : ("COMPLETED" as const),
+    };
+  }
+
+  async startStudentStudySession(
+    flashcardSetId: string,
+    studentUserId: string,
+    resumeExistingProgress = false,
+  ) {
+    const set = await this.prisma.flashcardSet.findFirst({
+      where: {
+        id: flashcardSetId,
+        deletedAt: null,
+        isReserve: false,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+      select: {
+        id: true,
+        lessonId: true,
+        flashcards: {
+          where: {
+            deletedAt: null,
+            reviewStatus: ReviewStatus.APPROVED,
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: { id: true, sortOrder: true },
+        },
+      },
+    });
+    if (!set) {
+      throw notFoundException("FLASHCARD_SET_NOT_FOUND", "Không tìm thấy bộ Flashcard");
+    }
+    if (set.flashcards.length === 0) {
+      throw badRequestException(
+        "FLASHCARD_SET_EMPTY",
+        "Bộ Flashcard chưa có thẻ được duyệt",
+      );
+    }
+    await this.studentLessonAccessService.assertCanRead(set.lessonId, studentUserId);
+
+    const savedProgress = resumeExistingProgress
+      ? await this.prisma.flashcardProgress.findMany({
+          where: {
+            studentUserId,
+            flashcardId: { in: set.flashcards.map((flashcard) => flashcard.id) },
+          },
+          select: {
+            flashcardId: true,
+            isKnown: true,
+            lastReviewedAt: true,
+          },
+        })
+      : [];
+    const savedProgressByCardId = new Map(
+      savedProgress.map((progress) => [progress.flashcardId, progress]),
+    );
+    const knownCount = savedProgress.filter((progress) => progress.isKnown).length;
+
+    const session = await this.prisma.$transaction(async (transaction) => {
+      await transaction.flashcardStudySession.updateMany({
+        where: {
+          lessonId: set.lessonId,
+          studentUserId,
+          status: AttemptStatus.IN_PROGRESS,
+        },
+        data: { status: AttemptStatus.CANCELLED },
+      });
+      return transaction.flashcardStudySession.create({
+        data: {
+          studentUserId,
+          lessonId: set.lessonId,
+          flashcardSetId: set.id,
+          reviewedCount: savedProgress.length,
+          knownCount,
+          unknownCount: savedProgress.length - knownCount,
+          totalCount: set.flashcards.length,
+          items: {
+            create: set.flashcards.map((flashcard, index) => {
+              const progress = savedProgressByCardId.get(flashcard.id);
+              return {
+                flashcardId: flashcard.id,
+                sortOrder: flashcard.sortOrder || index,
+                isKnown: progress?.isKnown,
+                reviewedAt: progress?.lastReviewedAt,
+              };
+            }),
+          },
+        },
+        select: { id: true },
+      });
+    });
+
+    return this.getStudentStudySession(session.id, studentUserId);
+  }
+
   async updateStudentProgress(
     flashcardId: string,
     studentUserId: string,
     isKnown: boolean,
+    sessionId?: string,
   ) {
     const flashcard = await this.prisma.flashcard.findFirst({
       where: {
@@ -475,37 +675,112 @@ export class FlashcardsService {
       flashcard.lessonId,
       studentUserId,
     );
-    const reviewedAt = new Date();
-    const progress = await this.prisma.flashcardProgress.upsert({
-      where: {
-        studentUserId_flashcardId: {
-          studentUserId,
+    if (sessionId) {
+      const sessionItem = await this.prisma.flashcardStudySessionItem.findFirst({
+        where: {
+          sessionId,
           flashcardId,
+          session: {
+            studentUserId,
+            flashcardSetId: flashcard.flashcardSetId,
+            status: AttemptStatus.IN_PROGRESS,
+          },
         },
+        select: { id: true },
+      });
+      if (!sessionItem) {
+        throw notFoundException(
+          "FLASHCARD_SESSION_ITEM_NOT_FOUND",
+          "Thẻ không thuộc lượt học Flashcard đang làm",
+        );
+      }
+    }
+
+    const reviewedAt = new Date();
+    const { progress, studySession } = await this.prisma.$transaction(
+      async (transaction) => {
+        const nextProgress = await transaction.flashcardProgress.upsert({
+          where: {
+            studentUserId_flashcardId: {
+              studentUserId,
+              flashcardId,
+            },
+          },
+          create: {
+            studentUserId,
+            lessonId: flashcard.lessonId,
+            flashcardId,
+            isKnown,
+            lastReviewedAt: reviewedAt,
+            reviewCount: 1,
+          },
+          update: {
+            isKnown,
+            lastReviewedAt: reviewedAt,
+            reviewCount: { increment: 1 },
+          },
+          select: {
+            flashcardId: true,
+            isKnown: true,
+            lastReviewedAt: true,
+            reviewCount: true,
+          },
+        });
+        if (!sessionId) {
+          return { progress: nextProgress, studySession: null };
+        }
+
+        await transaction.flashcardStudySessionItem.update({
+          where: {
+            sessionId_flashcardId: {
+              sessionId,
+              flashcardId,
+            },
+          },
+          data: { isKnown, reviewedAt },
+        });
+        const sessionItems = await transaction.flashcardStudySessionItem.findMany({
+          where: { sessionId },
+          select: { isKnown: true },
+        });
+        const reviewedCount = sessionItems.filter((item) => item.isKnown !== null).length;
+        const knownCount = sessionItems.filter((item) => item.isKnown === true).length;
+        const isCompleted = reviewedCount === sessionItems.length;
+        const nextSession = await transaction.flashcardStudySession.update({
+          where: { id: sessionId },
+          data: {
+            reviewedCount,
+            knownCount,
+            unknownCount: reviewedCount - knownCount,
+            status: isCompleted ? AttemptStatus.SUBMITTED : AttemptStatus.IN_PROGRESS,
+            completedAt: isCompleted ? reviewedAt : null,
+          },
+          select: {
+            id: true,
+            status: true,
+            reviewedCount: true,
+            knownCount: true,
+            unknownCount: true,
+            totalCount: true,
+            completedAt: true,
+          },
+        });
+        return {
+          progress: nextProgress,
+          studySession: {
+            ...nextSession,
+            state:
+              nextSession.status === AttemptStatus.IN_PROGRESS
+                ? ("IN_PROGRESS" as const)
+                : ("COMPLETED" as const),
+          },
+        };
       },
-      create: {
-        studentUserId,
-        lessonId: flashcard.lessonId,
-        flashcardId,
-        isKnown,
-        lastReviewedAt: reviewedAt,
-        reviewCount: 1,
-      },
-      update: {
-        isKnown,
-        lastReviewedAt: reviewedAt,
-        reviewCount: { increment: 1 },
-      },
-      select: {
-        flashcardId: true,
-        isKnown: true,
-        lastReviewedAt: true,
-        reviewCount: true,
-      },
-    });
+    );
 
     return {
       ...progress,
+      studySession,
       setProgress: await this.getStudentSetProgressSummary(
         flashcard.flashcardSetId,
         studentUserId,

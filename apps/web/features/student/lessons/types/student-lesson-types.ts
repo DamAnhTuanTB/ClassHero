@@ -92,6 +92,7 @@ export type LessonNavigationItem = {
 export type QuizAttempt = {
   id: string;
   totalCount: number;
+  currentQuestionIndex?: number;
   originalTotalCount?: number;
   scope?: "ALL" | "INCORRECT";
   sourceAttemptId?: string | null;
@@ -115,6 +116,11 @@ export type CheckedAnswer = {
 };
 
 export type ResumableQuizAttempt = QuizAttempt & {
+  currentQuestionIndex: number;
+  savedAnswers: Array<{
+    questionId: string;
+    answerJson: StudentAnswer;
+  }>;
   checkedAnswers: Array<{
     questionId: string;
     answerJson: StudentAnswer;
@@ -138,8 +144,31 @@ export type QuizSubmitResult = AttemptSummary & {
 export type QuizAttemptStatus = {
   state: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
   currentAttemptId: string | null;
+  answeredCount: number;
   checkedCount: number;
   latestSubmittedAttempt: AttemptSummary | null;
+};
+
+export type QuizHistoryItem = AttemptSummary & {
+  id: string;
+  setId: string;
+  displayName: string;
+  state: "IN_PROGRESS" | "COMPLETED";
+  startedAt: string;
+  completedAt: string | null;
+  answeredCount: number;
+};
+
+export type QuizHistory = {
+  total: number;
+  items: QuizHistoryItem[];
+};
+
+export type QuizProgressSnapshot = {
+  attemptId: string;
+  currentQuestionIndex: number;
+  answeredCount: number;
+  checkedCount: number;
 };
 
 export type AssessmentReview = AttemptSummary & {
@@ -185,6 +214,40 @@ export type FlashcardProgressSummary = {
   isCompleted: boolean;
 };
 
+export type FlashcardStudySessionSummary = {
+  id: string;
+  setId?: string;
+  flashcardSetId?: string;
+  displayName?: string;
+  state: "IN_PROGRESS" | "COMPLETED";
+  startedAt?: string;
+  completedAt: string | null;
+  reviewedCount: number;
+  knownCount: number;
+  unknownCount: number;
+  totalCount: number;
+};
+
+export type FlashcardStudySession = FlashcardStudySessionSummary & {
+  flashcardSetId: string;
+  items: Array<{
+    flashcardId: string;
+    isKnown: boolean | null;
+    reviewedAt: string | null;
+  }>;
+};
+
+export type FlashcardHistoryItem = FlashcardStudySessionSummary & {
+  setId: string;
+  displayName: string;
+  startedAt: string;
+};
+
+export type FlashcardHistory = {
+  total: number;
+  items: FlashcardHistoryItem[];
+};
+
 export type StudentTestStatus = {
   canStart: boolean;
   examOpenAt: string | null;
@@ -198,6 +261,12 @@ export type StudentTestStatus = {
     score: number;
     durationSeconds: number;
   } | null;
+  latestSubmittedAttempt: {
+    id: string;
+    score: number | null;
+    durationSeconds: number | null;
+    submittedAt: string | null;
+  } | null;
   sets: Array<{
     id: string;
     title: string;
@@ -205,6 +274,26 @@ export type StudentTestStatus = {
     totalScore: number;
     questionCount: number;
   }>;
+};
+
+export type StudentTestHistoryItem = {
+  id: string;
+  attemptId: string | null;
+  setId: string;
+  displayName: string;
+  state: "NOT_STARTED" | "COMPLETED";
+  startedAt: string | null;
+  completedAt: string | null;
+  durationSeconds: number | null;
+  score: number | null;
+  correctCount: number;
+  totalCount: number;
+};
+
+export type StudentTestHistory = {
+  total: number;
+  currentItemId: string | null;
+  items: StudentTestHistoryItem[];
 };
 
 export type StudentTestAttempt = {

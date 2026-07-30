@@ -3,15 +3,21 @@ import type {
   AssessmentReview,
   CompletionResult,
   FlashcardProgressSummary,
+  FlashcardHistory,
+  FlashcardStudySession,
+  FlashcardStudySessionSummary,
   LeaderboardEntry,
   QuizAttempt,
   QuizAttemptStatus,
+  QuizHistory,
+  QuizProgressSnapshot,
   QuizSubmitResult,
   ResumableQuizAttempt,
   StudentAnswer,
   StudentFlashcardSet,
   StudentLesson,
   StudentTestAttempt,
+  StudentTestHistory,
   StudentTestResult,
   StudentTestStatus,
 } from "@/features/student/lessons/types/student-lesson-types";
@@ -47,6 +53,37 @@ export function getQuizAttemptStatus(quizSetId: string, token: string) {
   );
 }
 
+export function getQuizHistory(lessonId: string, token: string) {
+  return apiRequest<QuizHistory>(
+    `/student/lessons/${encodeURIComponent(lessonId)}/quiz-history`,
+    { token },
+  );
+}
+
+export function saveQuizProgress(
+  attemptId: string,
+  input: {
+    currentQuestionIndex: number;
+    answer?: {
+      questionId: string;
+      answerJson: StudentAnswer;
+      isChecked?: boolean;
+    };
+  },
+  token: string,
+  options?: { keepalive?: boolean },
+) {
+  return apiRequest<QuizProgressSnapshot>(
+    `/student/quiz-attempts/${encodeURIComponent(attemptId)}/progress`,
+    {
+      method: "PATCH",
+      body: input,
+      token,
+      keepalive: options?.keepalive,
+    },
+  );
+}
+
 export function submitQuizAttempt(
   attemptId: string,
   answers: Array<{ questionId: string; answerJson: StudentAnswer }>,
@@ -76,18 +113,49 @@ export function getStudentFlashcards(lessonId: string, token?: string) {
   );
 }
 
+export function getFlashcardHistory(lessonId: string, token: string) {
+  return apiRequest<FlashcardHistory>(
+    `/student/lessons/${encodeURIComponent(lessonId)}/flashcard-history`,
+    { token },
+  );
+}
+
+export function getFlashcardStudySession(sessionId: string, token: string) {
+  return apiRequest<FlashcardStudySession>(
+    `/student/flashcard-sessions/${encodeURIComponent(sessionId)}`,
+    { token },
+  );
+}
+
+export function startFlashcardStudySession(
+  setId: string,
+  token: string,
+  resumeExistingProgress = false,
+) {
+  return apiRequest<FlashcardStudySession>(
+    `/student/flashcard-sets/${encodeURIComponent(setId)}/sessions`,
+    {
+      method: "POST",
+      body: { resumeExistingProgress },
+      token,
+    },
+  );
+}
+
 export function updateFlashcardProgress(
   flashcardId: string,
   isKnown: boolean,
   token: string,
+  sessionId?: string,
 ) {
   return apiRequest<{
     flashcardId: string;
     isKnown: boolean;
     setProgress: FlashcardProgressSummary;
+    studySession: FlashcardStudySessionSummary | null;
   }>(`/student/flashcards/${encodeURIComponent(flashcardId)}/progress`, {
     method: "PATCH",
-    body: { isKnown },
+    body: { isKnown, sessionId },
     token,
   });
 }
@@ -111,6 +179,13 @@ export function toggleFlashcardFavorite(
 export function getStudentTestStatus(lessonId: string, token?: string) {
   return apiRequest<StudentTestStatus>(
     `/student/lessons/${encodeURIComponent(lessonId)}/test-sets/status`,
+    { token },
+  );
+}
+
+export function getTestHistory(lessonId: string, token: string) {
+  return apiRequest<StudentTestHistory>(
+    `/student/lessons/${encodeURIComponent(lessonId)}/test-history`,
     { token },
   );
 }

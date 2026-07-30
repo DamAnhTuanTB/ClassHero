@@ -1,18 +1,28 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
-import { Brain, Eye, Loader2, Play, RotateCcw } from "lucide-react";
+import { Brain, Eye, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  getFlashcardHistory,
+  getFlashcardStudySession,
+  startFlashcardStudySession,
   toggleFlashcardFavorite,
   updateFlashcardProgress,
 } from "@/features/student/lessons/api/student-lessons-api";
+import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { FlashcardResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-result-screen";
 import { FlashcardRunnerScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen";
+import {
+  LearningHistoryControl,
+  type LearningHistoryDisplayItem,
+} from "@/features/student/lessons/screens/student-lesson-screen/components/learning-history-control";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
 import type {
   FlashcardProgressSummary,
+  FlashcardStudySession,
   StudentFlashcard,
   StudentFlashcardSet,
   StudentLesson,
@@ -23,8 +33,10 @@ import {
   clearStoredFlashcardSession,
   getFlashcardRunnerHistorySetId,
   getFlashcardResultHistorySetId,
+  readStoredFlashcardActiveSetId,
   readStoredFlashcardSession,
   setFlashcardResultHistoryMarker,
+  writeStoredFlashcardActiveSetId,
   writeStoredFlashcardSession,
 } from "@/features/student/lessons/utils/flashcard-runner-history";
 import { getNextLearningSet } from "@/features/student/lessons/utils/learning-set-selection";
@@ -35,33 +47,47 @@ import {
   type QuizTransitionVariant,
 } from "@/features/student/lessons/utils/quiz-transition-variant";
 
-type SessionMode = "ALL" | "FAVORITE" | "UNKNOWN" | "UNREVIEWED";
+type SessionMode = "ALL" | "FAVORITE" | "REVIEW_ALL" | "UNKNOWN" | "UNREVIEWED";
 type FlashcardScreen = "PANEL" | "RUNNER" | "RESULT";
 
 export function FlashcardLearningPanel({
+  autoStart,
   lesson,
+  onAutoStartHandled,
   onProgressChanged,
   sets,
   token,
 }: {
+  autoStart: boolean;
   lesson: StudentLesson;
+  onAutoStartHandled: (target: "flashcard" | "quiz") => void;
   onProgressChanged: () => Promise<void>;
   sets: StudentFlashcardSet[];
   token: string;
 }) {
-  const [activeSetId, setActiveSetId] = useState(
-    () =>
+  const userId = useAuthSessionStore((state) => state.session?.user.id);
+  const [activeSetId, setActiveSetId] = useState(() => {
+    const candidateId =
       getFlashcardRunnerHistorySetId() ??
       getFlashcardResultHistorySetId() ??
-      sets[0]?.id ??
-      "",
-  );
+      readStoredFlashcardActiveSetId(lesson.id, userId);
+
+    return (
+      sets.find((candidate) => candidate.id === candidateId)?.id ?? sets[0]?.id ?? ""
+    );
+  });
   const set = sets.find((candidate) => candidate.id === activeSetId) ?? sets[0];
   const [initialSession] = useState(() =>
     set
       ? readStoredFlashcardSession(set.id, new Set(set.flashcards.map((card) => card.id)))
       : null,
   );
+  const historyQuery = useQuery({
+    queryKey: ["student", "lesson", lesson.id, "flashcard-history"],
+    queryFn: () => getFlashcardHistory(lesson.id, token),
+    enabled: false,
+    staleTime: 15_000,
+  });
   const [screen, setScreen] = useState<FlashcardScreen>(() =>
     set?.progress.isCompleted && getFlashcardResultHistorySetId() === set.id
       ? "RESULT"
@@ -69,6 +95,7 @@ export function FlashcardLearningPanel({
         ? "RUNNER"
         : "PANEL",
   );
+  const [historyReviewTitle, setHistoryReviewTitle] = useState<string | null>(null);
   const [runnerBackDestination, setRunnerBackDestination] = useState<
     Exclude<FlashcardScreen, "RUNNER">
   >(initialSession?.backDestination ?? "PANEL");
@@ -82,6 +109,9 @@ export function FlashcardLearningPanel({
   const [sessionResumesSavedProgress, setSessionResumesSavedProgress] = useState(
     initialSession?.resumesSavedProgress ?? false,
   );
+  const [studySessionId, setStudySessionId] = useState<string | null>(
+    initialSession?.sessionId ?? null,
+  );
   const [currentIndex, setCurrentIndex] = useState(initialSession?.currentIndex ?? 0);
   const [isBackVisible, setIsBackVisible] = useState(
     initialSession?.isBackVisible ?? false,
@@ -94,8 +124,16 @@ export function FlashcardLearningPanel({
   const [transitionVariant, setTransitionVariant] =
     useState<QuizTransitionVariant>("book");
   const didValidateInitialRunnerMarkerRef = useRef(false);
+  const autoStartTriggeredRef = useRef(false);
+  const autoStartWasPendingRef = useRef(false);
+  const entryActionButtonRef = useRef<HTMLButtonElement>(null);
   const lastTransitionVariantRef = useRef<QuizTransitionVariant | null>(null);
   const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!set) return;
+    writeStoredFlashcardActiveSetId(lesson.id, set.id, userId);
+  }, [lesson.id, set, userId]);
 
   useEffect(() => {
     if (didValidateInitialRunnerMarkerRef.current || !set) return;
@@ -119,6 +157,7 @@ export function FlashcardLearningPanel({
       isBackVisible,
       resumesSavedProgress: sessionResumesSavedProgress,
       reviewedCardIds: Array.from(sessionReviewedIds),
+      sessionId: studySessionId ?? undefined,
     });
   }, [
     currentIndex,
@@ -129,6 +168,7 @@ export function FlashcardLearningPanel({
     sessionResumesSavedProgress,
     sessionReviewedIds,
     set,
+    studySessionId,
   ]);
 
   const cardById = useMemo(
@@ -144,10 +184,24 @@ export function FlashcardLearningPanel({
     [cardById, sessionCardIds],
   );
 
-  if (!set) {
-    return <EmptyPanel copy="Bài học này chưa có bộ Flashcard được duyệt." />;
-  }
-  const activeSet = set;
+  const activeSet =
+    set ??
+    ({
+      id: "",
+      lessonId: lesson.id,
+      title: "Flashcard",
+      cardCount: 0,
+      flashcards: [],
+      progress: {
+        totalCount: 0,
+        reviewedCount: 0,
+        knownCount: 0,
+        unknownCount: 0,
+        unreviewedCount: 0,
+        isCompleted: false,
+      },
+    } satisfies StudentFlashcardSet);
+  const hasFlashcards = activeSet.flashcards.length > 0;
 
   const progress = buildProgress(activeSet, knownOverrides);
   const favoriteCardCount = activeSet.flashcards.filter(
@@ -164,18 +218,68 @@ export function FlashcardLearningPanel({
   ).length;
   const hasPendingSession =
     sessionCards.length > 0 && sessionReviewedIds.size < sessionCards.length;
-  const hasResumableSession =
-    hasPendingSession && (sessionReviewedIds.size > 0 || sessionResumesSavedProgress);
   const entryActionLabel = hasPendingSession
-    ? hasResumableSession
-      ? "Tiếp tục vào học"
-      : "Bắt đầu"
+    ? "Tiếp tục học"
     : progress.isCompleted
       ? "Xem lại"
       : progress.reviewedCount > 0
-        ? "Tiếp tục vào học"
+        ? "Tiếp tục học"
         : "Bắt đầu";
   const EntryActionIcon = progress.isCompleted && !hasPendingSession ? Eye : Play;
+
+  useEffect(() => {
+    if (!autoStart) {
+      autoStartTriggeredRef.current = false;
+      autoStartWasPendingRef.current = false;
+      return;
+    }
+    if (!hasFlashcards) {
+      void onAutoStartHandled("flashcard");
+      return;
+    }
+    if (
+      autoStartTriggeredRef.current ||
+      screen !== "PANEL" ||
+      pendingAction
+    ) {
+      return;
+    }
+
+    const entryActionButton = entryActionButtonRef.current;
+    if (!entryActionButton || entryActionButton.disabled) return;
+
+    autoStartTriggeredRef.current = true;
+    entryActionButton.click();
+  }, [
+    autoStart,
+    hasFlashcards,
+    onAutoStartHandled,
+    pendingAction,
+    screen,
+  ]);
+
+  useEffect(() => {
+    if (!autoStart || !autoStartTriggeredRef.current) return;
+    if (pendingAction) autoStartWasPendingRef.current = true;
+
+    const didFinishStarting =
+      screen === "RUNNER" ||
+      screen === "RESULT" ||
+      (autoStartWasPendingRef.current &&
+        pendingAction === null &&
+        curtainPhase === "idle");
+    if (!didFinishStarting) return;
+
+    autoStartTriggeredRef.current = false;
+    autoStartWasPendingRef.current = false;
+    void onAutoStartHandled("flashcard");
+  }, [
+    autoStart,
+    curtainPhase,
+    onAutoStartHandled,
+    pendingAction,
+    screen,
+  ]);
 
   function renderWithCurtain(content: ReactNode) {
     return (
@@ -191,9 +295,9 @@ export function FlashcardLearningPanel({
     );
   }
 
-  async function transitionTo(action: () => void) {
+  async function transitionTo(action: () => void | Promise<void>, actionKey = "start") {
     if (pendingAction) return;
-    setPendingAction("start");
+    setPendingAction(actionKey);
     const nextVariant = pickQuizTransitionVariant(lastTransitionVariantRef.current);
     lastTransitionVariantRef.current = nextVariant;
     setTransitionVariant(nextVariant);
@@ -205,23 +309,30 @@ export function FlashcardLearningPanel({
         : quizTransitionTimings.closeMs,
     );
     setCurtainPhase("closed");
-    action();
-    await waitForCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
-    setCurtainPhase("opening");
-    await waitForCurtain(
-      shouldReduceMotion
-        ? quizTransitionTimings.reducedOpenMs
-        : quizTransitionTimings.openMs,
-    );
-    setCurtainPhase("idle");
-    setPendingAction(null);
+    try {
+      await action();
+      await waitForCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
+    } catch (error) {
+      toast.error("Chưa mở được bộ Flashcard", {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setCurtainPhase("opening");
+      await waitForCurtain(
+        shouldReduceMotion
+          ? quizTransitionTimings.reducedOpenMs
+          : quizTransitionTimings.openMs,
+      );
+      setCurtainPhase("idle");
+      setPendingAction(null);
+    }
   }
 
   function getCardsForMode(
     nextMode: SessionMode,
     targetSet: StudentFlashcardSet = activeSet,
   ) {
-    if (nextMode === "ALL") return targetSet.flashcards;
+    if (nextMode === "ALL" || nextMode === "REVIEW_ALL") return targetSet.flashcards;
     if (nextMode === "FAVORITE") {
       return targetSet.flashcards.filter(
         (card) => favoriteOverrides[card.id] ?? card.isFavorite,
@@ -241,12 +352,23 @@ export function FlashcardLearningPanel({
     nextMode: SessionMode,
     backDestination: Exclude<FlashcardScreen, "RUNNER"> = "PANEL",
     targetSet: StudentFlashcardSet = activeSet,
+    trackedSession: FlashcardStudySession | null = null,
+    nextHistoryReviewTitle: string | null = null,
   ) {
     setShouldCelebrateResult(false);
+    setHistoryReviewTitle(nextHistoryReviewTitle);
     setRunnerBackDestination(backDestination);
+    writeStoredFlashcardActiveSetId(lesson.id, targetSet.id, userId);
     setActiveSetId(targetSet.id);
-    const nextCards = getCardsForMode(nextMode, targetSet);
+    setStudySessionId(trackedSession?.id ?? null);
+    const trackedCardIds = new Set(
+      trackedSession?.items.map((item) => item.flashcardId) ?? [],
+    );
+    const nextCards = trackedSession
+      ? targetSet.flashcards.filter((card) => trackedCardIds.has(card.id))
+      : getCardsForMode(nextMode, targetSet);
     if (nextCards.length === 0) {
+      setHistoryReviewTitle(null);
       clearStoredFlashcardSession(targetSet.id);
       setFlashcardResultHistoryMarker(targetSet.id);
       setScreen("RESULT");
@@ -254,10 +376,14 @@ export function FlashcardLearningPanel({
     }
     const nextCardIds = nextCards.map((card) => card.id);
     const targetProgress = buildProgress(targetSet, knownOverrides);
-    const nextResumesSavedProgress =
-      nextMode === "UNREVIEWED" && targetProgress.reviewedCount > 0;
-    const nextReviewedIds =
-      nextMode === "FAVORITE"
+    const nextResumesSavedProgress = trackedSession
+      ? trackedSession.reviewedCount > 0
+      : nextMode === "UNREVIEWED" && targetProgress.reviewedCount > 0;
+    const nextReviewedIds = trackedSession
+      ? trackedSession.items.flatMap((item) =>
+          item.isKnown === null ? [] : [item.flashcardId],
+        )
+      : nextMode === "FAVORITE" || nextMode === "REVIEW_ALL"
         ? nextCards.flatMap((card) =>
             Object.hasOwn(knownOverrides, card.id) || card.progress !== null
               ? [card.id]
@@ -271,15 +397,43 @@ export function FlashcardLearningPanel({
       isBackVisible: false,
       resumesSavedProgress: nextResumesSavedProgress,
       reviewedCardIds: nextReviewedIds,
+      sessionId: trackedSession?.id,
     });
     setSessionCardIds(nextCardIds);
     setSessionResumesSavedProgress(nextResumesSavedProgress);
     const nextReviewedIdSet = new Set(nextReviewedIds);
     sessionReviewedIdsRef.current = nextReviewedIdSet;
     setSessionReviewedIds(nextReviewedIdSet);
-    setCurrentIndex(0);
+    const firstUnreviewedIndex = nextCards.findIndex(
+      (card) => !nextReviewedIds.includes(card.id),
+    );
+    setCurrentIndex(firstUnreviewedIndex >= 0 ? firstUnreviewedIndex : 0);
     setIsBackVisible(false);
+    if (trackedSession) {
+      setKnownOverrides((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          trackedSession.items.flatMap((item) =>
+            item.isKnown === null ? [] : [[item.flashcardId, item.isKnown]],
+          ),
+        ),
+      }));
+    }
     setScreen("RUNNER");
+  }
+
+  async function startTrackedSession(
+    targetSet: StudentFlashcardSet,
+    resumeExistingProgress = false,
+    backDestination: Exclude<FlashcardScreen, "RUNNER"> = "PANEL",
+  ) {
+    const trackedSession = await startFlashcardStudySession(
+      targetSet.id,
+      token,
+      resumeExistingProgress,
+    );
+    startSession("ALL", backDestination, targetSet, trackedSession);
+    if (historyQuery.data) void historyQuery.refetch();
   }
 
   function persistSessionPatch({
@@ -299,6 +453,7 @@ export function FlashcardLearningPanel({
       isBackVisible: nextIsBackVisible,
       resumesSavedProgress: sessionResumesSavedProgress,
       reviewedCardIds: Array.from(nextReviewedIds),
+      sessionId: studySessionId ?? undefined,
     });
   }
 
@@ -316,12 +471,9 @@ export function FlashcardLearningPanel({
   }
 
   async function handleEntryAction() {
+    if (!hasFlashcards) return;
     if (hasPendingSession) {
       await transitionTo(() => {
-        if (!hasResumableSession) {
-          setCurrentIndex(0);
-          setIsBackVisible(false);
-        }
         setScreen("RUNNER");
       });
       return;
@@ -332,9 +484,7 @@ export function FlashcardLearningPanel({
       setScreen("RESULT");
       return;
     }
-    await transitionTo(() =>
-      startSession(progress.reviewedCount > 0 ? "UNREVIEWED" : "ALL"),
-    );
+    await transitionTo(() => startTrackedSession(activeSet, progress.reviewedCount > 0));
   }
 
   async function handleMark(isKnown: boolean) {
@@ -342,7 +492,12 @@ export function FlashcardLearningPanel({
     const progressAction = `progress-${isKnown ? "known" : "unknown"}-${currentCard.id}`;
     setPendingAction(progressAction);
     try {
-      await updateFlashcardProgress(currentCard.id, isKnown, token);
+      await updateFlashcardProgress(
+        currentCard.id,
+        isKnown,
+        token,
+        studySessionId ?? undefined,
+      );
       setKnownOverrides((current) => ({ ...current, [currentCard.id]: isKnown }));
       const nextReviewedIds = new Set(sessionReviewedIdsRef.current);
       nextReviewedIds.add(currentCard.id);
@@ -358,6 +513,7 @@ export function FlashcardLearningPanel({
           description: getErrorMessage(error),
         });
       });
+      if (historyQuery.data) void historyQuery.refetch();
       return true;
     } catch (error) {
       toast.error("Chưa lưu được tiến độ thẻ", {
@@ -388,6 +544,74 @@ export function FlashcardLearningPanel({
     }
   }
 
+  const serverHistoryItems = historyQuery.data?.items ?? [];
+  const historySetIds = new Set(serverHistoryItems.map((item) => item.setId));
+  const legacyHistoryItems = sets
+    .filter(
+      (candidate) =>
+        !historySetIds.has(candidate.id) &&
+        candidate.progress.reviewedCount > 0 &&
+        (candidate.progress.isCompleted || candidate.id === activeSet.id),
+    )
+    .map((candidate, index) => ({
+      id: `legacy:${candidate.id}`,
+      setId: candidate.id,
+      displayName: `Bộ ${serverHistoryItems.length + index + 1}`,
+      state: candidate.progress.isCompleted
+        ? ("COMPLETED" as const)
+        : ("IN_PROGRESS" as const),
+      startedAt:
+        candidate.flashcards
+          .flatMap((card) => (card.progress ? [card.progress.lastReviewedAt] : []))
+          .sort()[0] ?? new Date(0).toISOString(),
+      completedAt: candidate.progress.isCompleted
+        ? (candidate.flashcards
+            .flatMap((card) => (card.progress ? [card.progress.lastReviewedAt] : []))
+            .sort()
+            .at(-1) ?? null)
+        : null,
+      reviewedCount: candidate.progress.reviewedCount,
+      knownCount: candidate.progress.knownCount,
+      unknownCount: candidate.progress.unknownCount,
+      totalCount: candidate.progress.totalCount,
+    }));
+  const flashcardHistoryItems = [...serverHistoryItems, ...legacyHistoryItems];
+
+  function findHistorySet(item: LearningHistoryDisplayItem) {
+    return sets.find((candidate) => candidate.id === item.setId);
+  }
+
+  function handleHistoryContinue(item: LearningHistoryDisplayItem) {
+    const targetSet = findHistorySet(item);
+    if (!targetSet) return;
+    void transitionTo(async () => {
+      if (item.id.startsWith("legacy:")) {
+        await startTrackedSession(targetSet, true);
+        return;
+      }
+      const trackedSession = await getFlashcardStudySession(item.id, token);
+      startSession("ALL", "PANEL", targetSet, trackedSession);
+    }, `history-continue:${item.id}`);
+  }
+
+  function handleHistoryReview(item: LearningHistoryDisplayItem) {
+    const targetSet = findHistorySet(item);
+    if (!targetSet) return;
+    void transitionTo(
+      () => startSession("REVIEW_ALL", "PANEL", targetSet, null, item.displayName),
+      `history-review:${item.id}`,
+    );
+  }
+
+  function handleHistoryRestart(item: LearningHistoryDisplayItem) {
+    const targetSet = findHistorySet(item);
+    if (!targetSet) return;
+    void transitionTo(
+      () => startTrackedSession(targetSet),
+      `history-restart:${item.id}`,
+    );
+  }
+
   if (screen === "RESULT") {
     return renderWithCurtain(
       <FlashcardResultScreen
@@ -400,16 +624,33 @@ export function FlashcardLearningPanel({
           setShouldCelebrateResult(false);
           setScreen("PANEL");
         }}
-        onReviewFavorites={() => void transitionTo(() => startSession("FAVORITE"))}
-        onRestartAll={() => void transitionTo(() => startSession("ALL"))}
+        onReviewFavorites={() =>
+          void transitionTo(
+            () => startSession("FAVORITE"),
+            "review-favorites",
+          )
+        }
+        onRestartAll={() =>
+          void transitionTo(() => startTrackedSession(activeSet), "restart-all")
+        }
         onRestartUnknown={() =>
-          void transitionTo(() => startSession("UNKNOWN", "RESULT"))
+          void transitionTo(
+            () => startSession("UNKNOWN", "RESULT"),
+            "restart-unknown",
+          )
+        }
+        onStartNewSet={() =>
+          void transitionTo(
+            () =>
+              startTrackedSession(getNextLearningSet(sets, activeSet.id), false, "PANEL"),
+            "start-new-set",
+          )
         }
       />,
     );
   }
 
-  if (screen === "RUNNER" && currentCard) {
+  if (screen === "RUNNER" && currentCard && historyReviewTitle === null) {
     const isFavorite = favoriteOverrides[currentCard.id] ?? currentCard.isFavorite;
     return renderWithCurtain(
       <FlashcardRunnerScreen
@@ -452,50 +693,128 @@ export function FlashcardLearningPanel({
   }
 
   return renderWithCurtain(
-    <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
-      <div className="flex items-center gap-2 sm:gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-          <Brain className="h-6 w-6" aria-hidden="true" />
-        </span>
-        <h2 className="min-w-0 text-base font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-lg">
-          Flashcard
-        </h2>
-        <span className="ml-auto shrink-0 rounded-xl bg-violet-100 px-3 py-2 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-          {activeSet.flashcards.length} thẻ
-        </span>
-      </div>
-      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
-        Cùng ghi nhớ các kiến thức đã học nhé.
-      </p>
-      <button
-        type="button"
-        onClick={() => void handleEntryAction()}
-        disabled={Boolean(pendingAction)}
-        className="student-flashcard-cta-3d mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-violet-500 px-5 text-lg font-black text-white hover:bg-violet-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
-      >
-        {pendingAction === "start" ? (
-          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-        ) : (
-          <EntryActionIcon className="h-6 w-6" aria-hidden="true" />
-        )}
-        {entryActionLabel}
-      </button>
-      {progress.isCompleted && !hasPendingSession ? (
-        <button
-          type="button"
-          onClick={() =>
-            void transitionTo(() =>
-              startSession("ALL", "PANEL", getNextLearningSet(sets, activeSet.id)),
-            )
+    <>
+      <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+            <Brain className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <h2 className="min-w-0 text-lg font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-xl">
+            Flashcard
+          </h2>
+          <LearningHistoryControl
+            accent="flashcard"
+            countLabel={`${activeSet.flashcards.length} thẻ`}
+            currentSetId={activeSet.id}
+            errorMessage={
+              historyQuery.error
+                ? "Chưa tải được lịch sử Flashcard. Vui lòng thử lại."
+                : null
+            }
+            isCoveredByChildSurface={screen === "RUNNER" && historyReviewTitle !== null}
+            isLoading={historyQuery.isLoading && !historyQuery.data}
+            items={flashcardHistoryItems.map((item) => ({
+              id: item.id,
+              setId: item.setId,
+              displayName: item.displayName,
+              state: item.state,
+              startedAt: item.startedAt,
+              completedAt: item.completedAt,
+              summary:
+                item.state === "IN_PROGRESS"
+                  ? `${item.reviewedCount}/${item.totalCount} thẻ đã học`
+                  : `${item.knownCount}/${item.totalCount} thẻ đã thuộc`,
+            }))}
+            onContinue={handleHistoryContinue}
+            onOpenHistory={() => {
+              if (!historyQuery.data) {
+                return historyQuery.refetch().then(() => undefined);
+              }
+            }}
+            onRestart={handleHistoryRestart}
+            onReview={handleHistoryReview}
+            pendingActionKey={
+              pendingAction?.startsWith("history-")
+                ? pendingAction.slice("history-".length)
+                : null
+            }
+          />
+        </div>
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+          Cùng ghi nhớ các kiến thức đã học nhé.
+        </p>
+        <div
+          className={
+            progress.isCompleted && !hasPendingSession
+              ? "mt-4 grid gap-3 lg:grid-cols-2"
+              : "mt-4 grid gap-3"
           }
-          disabled={Boolean(pendingAction)}
-          className="mt-3 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-5 text-lg font-black text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:cursor-wait disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:hover:bg-violet-500/10"
         >
-          <RotateCcw className="h-6 w-6" aria-hidden="true" />
-          Học bộ Flashcard mới
-        </button>
+          <button
+            ref={entryActionButtonRef}
+            type="button"
+            onClick={() => void handleEntryAction()}
+            aria-busy={pendingAction === "start"}
+            disabled={!hasFlashcards || pendingAction === "start"}
+            className="student-flashcard-cta-3d inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-violet-500 px-3 text-base font-black text-white hover:bg-violet-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:text-lg"
+          >
+            <EntryActionIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+            {entryActionLabel}
+          </button>
+          {progress.isCompleted && !hasPendingSession ? (
+            <button
+              type="button"
+              onClick={() =>
+                void transitionTo(
+                  () => startTrackedSession(getNextLearningSet(sets, activeSet.id)),
+                  "start-new-set",
+                )
+              }
+              aria-busy={pendingAction === "start-new-set"}
+              disabled={pendingAction === "start-new-set"}
+              className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-3 text-base font-black text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:cursor-wait disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:hover:bg-violet-500/10 sm:px-5 sm:text-lg"
+            >
+              <RotateCcw className="h-6 w-6 shrink-0" aria-hidden="true" />
+              Học bộ Flashcard mới
+            </button>
+          ) : null}
+        </div>
+      </section>
+      {screen === "RUNNER" && currentCard && historyReviewTitle !== null ? (
+        <FlashcardRunnerScreen
+          card={currentCard}
+          currentIndex={currentIndex}
+          isBackVisible={isBackVisible}
+          isFavorite={favoriteOverrides[currentCard.id] ?? currentCard.isFavorite}
+          lessonTitle={lesson.title}
+          onBack={() => {
+            clearFlashcardRunnerHistoryMarker();
+            clearStoredFlashcardSession(activeSet.id);
+            setHistoryReviewTitle(null);
+            setScreen("PANEL");
+          }}
+          onComplete={() => undefined}
+          onFavorite={() => handleFavorite(currentCard)}
+          onFlip={() => {
+            const nextIsBackVisible = !isBackVisible;
+            persistSessionPatch({ nextIsBackVisible });
+            setIsBackVisible(nextIsBackVisible);
+          }}
+          onMark={handleMark}
+          onCardSelect={(index) => updateCurrentCard(index)}
+          onNext={() => updateCurrentCard(currentIndex + 1)}
+          onPrevious={() => updateCurrentCard(currentIndex - 1)}
+          knownCount={sessionKnownCount}
+          pendingAction={pendingAction}
+          reviewMode
+          reviewStatuses={sessionReviewStatuses}
+          reviewTitle={historyReviewTitle}
+          setId={activeSet.id}
+          stackedOverDialog
+          totalCount={sessionCards.length}
+        />
       ) : null}
-    </section>,
+    </>,
   );
 }
 
@@ -523,14 +842,6 @@ function buildProgress(
     isCompleted:
       set.flashcards.length > 0 && summary.reviewedCount === set.flashcards.length,
   };
-}
-
-function EmptyPanel({ copy }: { copy: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm font-bold text-slate-500 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-muted)]">
-      {copy}
-    </div>
-  );
 }
 
 function getErrorMessage(error: unknown) {

@@ -267,6 +267,13 @@ Rules:
   prefetch lesson đích ngay khi click. Chỉ điều hướng sau khi transition che
   kín và dữ liệu lesson cốt lõi đã sẵn trong cache; transition mở ra sau khi
   route đích commit.
+- Luôn render đủ hai ô điều hướng lesson, kể cả ở đầu/cuối lộ trình hoặc khi
+  bài thi chưa đạt. Ở bài đầu tiên, ô trái là link `Trở về` dẫn về chi tiết
+  khóa học; từ bài thứ hai, ô này là `Bài học trước` và dùng
+  `navigation.previous`. Nút không dùng được phải là button disabled có màu
+  muted, không biến mất khỏi layout. Nút kế tiếp chỉ bật khi API trả
+  `navigation.next` và điểm của `latestSubmittedAttempt` hiện tại đạt
+  `completionMinScore`.
 - Copy của transition phải bám đúng ngữ cảnh: transition điều hướng vào lesson
   dùng `Học thông minh - Vững tương lai`, còn transition mở runner nội bộ giữ
   `Đang chuẩn bị Quiz...` hoặc `Đang chuẩn bị Flashcard...`; không thay đồng
@@ -275,6 +282,15 @@ Rules:
 - Sau giờ mở, Test vẫn khóa đến khi một Quiz đã submit và toàn bộ thẻ trong ít
   nhất một bộ Flashcard đã review. Khi đủ điều kiện, giữ lời nhắc cùng action
   quay lại ôn Quiz và Flashcard.
+- Action Quiz/Flashcard trong Test section chỉ chạy transition vào runner khi
+  tab đích có nội dung. Nếu chưa có set hoặc count bằng `0`, action vẫn đổi tab
+  nhưng không tự bắt đầu attempt/session.
+- Test section chưa có bộ đề vẫn dùng layout panel bình thường, hiển thị
+  `0 câu`, ẩn thời lượng và disable action tạo lượt thi.
+- Khi Test status đã có `latestSubmittedAttempt`, entry panel thay CTA
+  `Bắt đầu bài thi` bằng cặp action `Xem lại bài thi` và
+  `Làm bài thi mới`; action xem lại mở review toàn bộ attempt đã nộp gần nhất
+  (kể cả chưa đạt), action làm mới tiếp tục dùng transition/start flow hiện có.
 - Nếu không có quyền truy cập, hiển thị paywall/trial message.
 - Chat AI chỉ có input text.
 - Smart video controls chỉ hiện sau khi video/lesson foundation sẵn sàng; thiếu transcript thì ẩn tính năng phụ thuộc transcript nhưng không chặn player.
@@ -316,20 +332,34 @@ Component:
 - Browser Back trong runner cũng mở modal xác nhận. Hủy thoát phải khôi phục
   history entry của runner; xác nhận thoát phải dừng ở trang chi tiết buổi học
   hiện tại, không quay về trang chi tiết khóa học.
-- Refresh/F5 hoặc thoát runner rồi vào lại chỉ khôi phục câu đã bấm
-  `Kiểm tra đáp án`; mọi text, công thức, lựa chọn trắc nghiệm hoặc trạng thái
-  Đúng/Sai chưa kiểm tra phải trở về rỗng. Vị trí câu hiện tại vẫn được giữ để
-  runner mở lại đúng câu. F5 chỉ tự mở lại runner nếu student đang đứng trong
-  runner; sau khi đã xác nhận thoát về panel Quiz, F5 phải giữ nguyên panel và
-  CTA trên panel mới resume attempt đang dở. Feedback chưa submit chỉ khôi phục
-  trên cùng trình duyệt vì được lưu local theo `attemptId`.
-- CTA panel Quiz lấy trạng thái attempt từ server và ghép tiến độ local: lượt
-  hiện tại chưa có câu nào được
-  kiểm tra dùng `Bắt đầu`; đã kiểm tra ít nhất một câu dùng
-  `Tiếp tục vào làm`; đã submit và không còn lượt đang làm dùng `Xem lại`.
+- Refresh/F5 hoặc thoát runner rồi vào lại phải khôi phục mọi text, công thức,
+  lựa chọn trắc nghiệm và trạng thái Đúng/Sai đã nhập/chọn, kể cả chưa bấm
+  `Kiểm tra đáp án`, cùng feedback của câu đã kiểm tra và vị trí câu hiện tại.
+  Dữ liệu được autosave theo `attemptId` ở server để tiếp tục được trên thiết bị
+  khác. F5 chỉ tự mở lại runner nếu student đang đứng trong runner; sau khi đã
+  xác nhận thoát về panel Quiz, F5 phải giữ nguyên panel và CTA trên panel mới
+  resume attempt đang dở.
+- CTA panel Quiz lấy trạng thái attempt từ server: chưa có lượt dùng `Bắt đầu`
+  và luôn mở câu đầu tiên; mọi lượt `IN_PROGRESS` dùng `Tiếp tục làm` dù chưa
+  kiểm tra câu nào và mở đúng câu gần nhất đã lưu local. Lượt đã submit và
+  không còn lượt đang làm dùng `Xem lại`.
+- Bộ Quiz có `0 câu` vẫn hiển thị count `0 câu`; CTA tạo attempt phải disabled.
 - Trạng thái đã hoàn thành hiển thị thêm action `Làm bộ Quiz mới` để tạo lượt
   đầy đủ mới của bộ quiz hiện tại. `Xem lại` mở màn kết quả của lượt submit gần
   nhất; student chọn xem lại tất cả hoặc các câu sai từ màn kết quả.
+- Cạnh pill số câu có icon bánh răng. Menu có item `Các bộ Quiz đã làm`, mở
+  dialog trên desktop và bottom sheet trên mobile. Lịch sử dùng tên mặc định
+  `Bộ 1`, `Bộ 2`, ...; chỉ lượt hiện tại có badge `Đang làm` và summary
+  `X/Y câu đã làm`. Lượt hoàn thành có `Xem lại toàn bộ`/`Làm lại bộ này`, lượt
+  hiện tại có `Tiếp tục làm`.
+- Khi student bấm `Xem lại toàn bộ` từ một vị trí đã cuộn trong dialog lịch sử,
+  dialog phải được giữ nguyên dưới màn review thay vì unmount. Khi Back, cùng
+  modal instance hiện lại tức thì ở đúng vị trí cuộn cũ, không chạy animation
+  mở modal lần nữa và không đưa danh sách về đầu.
+- Review mở từ lịch sử dùng tên bộ vừa chọn thay cho copy
+  `Xem lại tất cả câu trả lời`. Câu đầu dùng `Trở về` thay `Câu trước`, câu cuối
+  dùng `Kết thúc xem lại` thay `Câu tiếp`; hai action biên quay lại modal lịch
+  sử cũ. Review mở từ result vẫn giữ copy phạm vi xem lại chung.
 - F5 khi đang ở result giữ nguyên màn result bằng history marker của attempt
   gốc; dữ liệu summary vẫn được đối chiếu với server và không chạy lại confetti.
   Khi student chủ động quay về panel Quiz, marker result phải được xóa để F5 giữ
@@ -341,6 +371,8 @@ Component:
   summary riêng cho lượt con.
 - Mọi action xem lại/làm lại trên result dùng kết quả gốc đã cộng dồn.
   `Làm lại tất cả` mở một lượt đầy đủ mới và reset kết quả.
+- Result có thêm `Làm bộ Quiz mới`; action này chọn bộ khả dụng kế tiếp, quay
+  vòng về bộ cũ khi cần và mở runner ngay.
 - Inline explanation block chỉ mở khi student bấm xem lời giải.
 - Report button từng câu.
 - Favorite button từng câu.
@@ -354,16 +386,35 @@ Component:
 - Buttons: đã thuộc, chưa thuộc.
 - Dải chấm trạng thái là control điều hướng trực tiếp tới từng thẻ; thẻ hiện tại
   kéo dài, đã thuộc màu xanh, chưa thuộc màu đỏ và chưa đánh dấu màu xám.
+- CTA dùng `Bắt đầu` khi chưa từng mở session và luôn mở thẻ đầu tiên. Session
+  đã từng mở dùng `Tiếp tục học` dù chưa đánh dấu thẻ nào; vị trí thẻ gần nhất
+  phải giữ qua Back, F5 và đóng/mở lại web trên cùng trình duyệt.
+- Bộ Flashcard có `0 thẻ` vẫn hiển thị count `0 thẻ`; CTA `Bắt đầu` phải
+  disabled.
+- Chưa có bộ Flashcard cũng dùng cùng panel này với `0 thẻ`, không render một
+  empty-state có bố cục khác.
 - Nút `Hoàn thành` vẫn cho bấm ở thẻ cuối; nếu còn thẻ chưa đánh dấu, giữ nguyên
   runner và hiển thị alert inline liệt kê số thứ tự các thẻ cần xử lý.
 - Summary: đã thuộc/chưa thuộc.
 - Summary không liệt kê thẻ cần ôn; chỉ có ôn lại tất cả và ôn lại thẻ chưa
   thuộc.
+- Cạnh pill số thẻ có icon bánh răng. Menu có item
+  `Các bộ Flashcard đã học`, dùng dialog trên desktop và bottom sheet trên
+  mobile. Mỗi session có tên `Bộ N`; chỉ session hiện tại có badge `Đang làm`.
+  Session hoàn thành có `Xem lại toàn bộ`/`Học lại bộ này`, session hiện tại có
+  `Tiếp tục học`.
 - `Ôn lại tất cả` mở lượt mới từ thẻ đầu, reset tiến độ hiển thị, bộ đếm và nhãn
   lựa chọn của phiên; không hiển thị lại nhãn từ progress lịch sử trước khi thẻ
   được đánh dấu trong lượt mới.
+- `Xem lại toàn bộ` từ modal lịch sử giữ chính modal đó mounted dưới runner,
+  dùng tên bộ vừa chọn làm dòng ngữ cảnh và không chạy luồng hoàn thành session.
+  Thẻ đầu dùng `Trở về`, thẻ cuối dùng `Kết thúc xem lại`, thẻ giữa giữ
+  `Thẻ trước`/`Thẻ sau`; action biên hiện lại modal cũ đúng scroll, không chạy
+  animation mở modal lần nữa.
 - Inline explanation.
 - Report/favorite từng card.
+- Result có thêm `Học bộ Flashcard mới`; action này mở thẳng session đầy đủ mới
+  của bộ khả dụng kế tiếp, kể cả khi phải quay vòng tái sử dụng set cũ.
 
 ### 4.7. Test runner
 
@@ -381,10 +432,23 @@ Rules:
 
 - Không hiển thị đáp án đúng trước submit.
 - Không cho start trước giờ mở hoặc trước khi hoàn thành Quiz + Flashcard.
+- Nếu lesson chưa có Quiz/Flashcard hợp lệ hoặc student chưa hoàn thành, panel
+  hiển thị trạng thái `Chưa mở`, CTA `Làm Quiz`/`Học Flashcard` và disable nút
+  `Bắt đầu bài thi`; không hiển thị `Ôn lại` hoặc `Sẵn sàng`.
 - Hết giờ tự submit; câu chưa trả lời nhận 0 điểm.
 - Review summary không liệt kê sẵn câu hỏi; action xem lại mới mở từng câu.
 - Kết quả chưa đạt hiển thị cảnh báo làm lại và không cho dùng kết quả.
 - `Dùng điểm bài này` mới cập nhật completion và mở Completion + Top 5.
+- Icon bánh răng nằm ngoài cùng sát mép phải của header, sau pill số câu và
+  duration, mở menu `Lịch sử Bài thi`. Dialog/bottom sheet dùng cùng shell lịch
+  sử Quiz/Flashcard và tải dữ liệu khi mở.
+- Lịch sử luôn đánh dấu đúng một mục `Bài thi hiện tại`. Nếu mục này chưa làm,
+  hiển thị `Chưa làm` và nút `Bắt đầu bài thi`; nếu đã hoàn thành, chỉ hiển thị
+  `Xem lại bài thi`, không hiển thị nút làm lại trong lịch sử.
+- Review mở từ lịch sử phải giữ modal lịch sử mounted bên dưới; Back quay lại
+  đúng modal và vị trí cuộn cũ.
+- Với lịch sử Quiz/Flashcard, khi mọi mục đều đã hoàn thành, gắn `Bộ hiện tại`
+  vào đúng mục mới nhất của set đang được chọn.
 
 ### 4.8. AI chat panel
 

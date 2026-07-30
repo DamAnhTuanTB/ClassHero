@@ -2,7 +2,6 @@
 
 import {
   ArrowLeft,
-  ArrowRight,
   BookOpen,
   Brain,
   ChevronRight,
@@ -11,12 +10,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { StudentLessonTransitionLink } from "@/components/student/learning-transition/student-lesson-transition-link";
+import { useCallback, useEffect, useState } from "react";
 import { StudentDetailMobileBrandBar } from "@/components/student/layout/student-detail-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
+import { usePracticeTabTransition } from "@/features/student/lessons/hooks/use-practice-tab-transition";
+import { LessonNavigationControl } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-navigation-control";
 import { LessonSummaryPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-summary-panel";
 import { LessonVideoPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-video-panel";
+import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
 import { QuizLearningPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-learning-panel";
 import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 import { useStudentLessonQueries } from "@/features/student/lessons/hooks/use-student-lesson-queries";
@@ -88,7 +89,7 @@ const tabItems: Array<{
   },
   {
     id: "test",
-    label: "Kiểm tra",
+    label: "Bài thi",
     icon: ClipboardCheck,
     nodeClassName:
       "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
@@ -132,7 +133,7 @@ export function StudentLessonScreen({
     void loadTestLearningPanel();
   }, [lessonQuery.data]);
 
-  function selectTab(tab: StudentLessonTab) {
+  const selectTab = useCallback((tab: StudentLessonTab) => {
     setActiveTab(tab);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("tab", tab);
@@ -141,7 +142,8 @@ export function StudentLessonScreen({
       "",
       `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
     );
-  }
+  }, []);
+  const practiceTabTransition = usePracticeTabTransition(selectTab);
 
   if (isInitialPending || shouldShowInitialLoading) {
     if (!shouldShowInitialLoading) {
@@ -174,6 +176,13 @@ export function StudentLessonScreen({
     );
   }
 
+  const currentTestScore =
+    testStatusQuery.data?.latestSubmittedAttempt?.score ??
+    testStatusQuery.data?.bestAttempt?.score;
+  const hasPassedCurrentLessonTest =
+    typeof currentTestScore === "number" &&
+    currentTestScore >= lesson.completionMinScore;
+
   return (
     <main
       className="min-h-screen px-2 py-4 sm:px-6 lg:px-8"
@@ -189,7 +198,7 @@ export function StudentLessonScreen({
         <section className="mt-1 px-1 pb-2 pt-2 sm:mt-4 sm:px-2 sm:py-5">
           <nav
             aria-label="Vị trí bài học"
-            className="flex min-w-0 items-center gap-1 text-xs font-black sm:text-sm"
+            className="flex min-w-0 items-center gap-1.5 text-sm font-black sm:gap-2 sm:text-base lg:text-lg"
           >
             <Link
               href={`/student/courses/${lesson.learningPath.slug}`}
@@ -198,14 +207,14 @@ export function StudentLessonScreen({
               {lesson.learningPath.title}
             </Link>
             <ChevronRight
-              className="h-4 w-4 shrink-0 text-sky-400 dark:text-sky-600"
+              className="h-5 w-5 shrink-0 text-sky-400 dark:text-sky-600"
               aria-hidden="true"
             />
             <span className="min-w-0 truncate text-[#058760] dark:text-emerald-300">
               {lesson.chapter.title}
             </span>
             <ChevronRight
-              className="h-4 w-4 shrink-0 text-emerald-400 dark:text-emerald-600"
+              className="h-5 w-5 shrink-0 text-emerald-400 dark:text-emerald-600"
               aria-hidden="true"
             />
           </nav>
@@ -302,7 +311,11 @@ export function StudentLessonScreen({
             <LessonSummaryPanel lesson={lesson} />
           ) : activeTab === "quiz" ? (
             <QuizLearningPanel
+              autoStart={practiceTabTransition.autoStartTarget === "quiz"}
               lesson={lesson}
+              onAutoStartHandled={
+                practiceTabTransition.completePracticeTabOpen
+              }
               token={token}
               onProgressChanged={refreshLearningProgress}
             />
@@ -315,10 +328,18 @@ export function StudentLessonScreen({
               )
             ) : (
               <TestLearningPanel
+                hasFlashcardContent={
+                  flashcardsQuery.data
+                    ? flashcardsQuery.data.some((set) => set.flashcards.length > 0)
+                    : lesson.flashcardSets.some((set) => set.cardCount > 0)
+                }
+                hasQuizContent={lesson.quizSets.some(
+                  (set) => set.questionCount > 0,
+                )}
                 lesson={lesson}
                 status={testStatusQuery.data}
                 token={token}
-                onSelectTab={selectTab}
+                onStartPrerequisite={practiceTabTransition.openPracticeTab}
                 onProgressChanged={refreshLearningProgress}
               />
             )
@@ -333,7 +354,11 @@ export function StudentLessonScreen({
           {!flashcardsQuery.isLoading && !shouldShowFlashcardsLoading ? (
             <div hidden={activeTab !== "flashcard"}>
               <FlashcardLearningPanel
+                autoStart={practiceTabTransition.autoStartTarget === "flashcard"}
                 lesson={lesson}
+                onAutoStartHandled={
+                  practiceTabTransition.completePracticeTabOpen
+                }
                 sets={flashcardsQuery.data ?? []}
                 token={token}
                 onProgressChanged={refreshLearningProgress}
@@ -343,34 +368,39 @@ export function StudentLessonScreen({
         </div>
 
         <nav aria-label="Điều hướng bài học" className="mt-6 grid gap-3 sm:grid-cols-2">
-          {lesson.navigation.previous ? (
-            <StudentLessonTransitionLink
-              lessonId={lesson.navigation.previous.id}
-              className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-left text-base font-black text-slate-700 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text)]"
-            >
-              <ArrowLeft className="h-6 w-6 shrink-0" />
-              <span className="min-w-0">
-                <span className="block text-xs text-slate-400">Bài trước</span>
-                <span className="block truncate">{lesson.navigation.previous.title}</span>
-              </span>
-            </StudentLessonTransitionLink>
-          ) : (
-            <div />
-          )}
-          {lesson.navigation.next ? (
-            <StudentLessonTransitionLink
-              lessonId={lesson.navigation.next.id}
-              className="flex min-h-14 items-center justify-end gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 text-right text-base font-black text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300"
-            >
-              <span className="min-w-0">
-                <span className="block text-xs text-sky-500">Bài tiếp theo</span>
-                <span className="block truncate">{lesson.navigation.next.title}</span>
-              </span>
-              <ArrowRight className="h-6 w-6 shrink-0" />
-            </StudentLessonTransitionLink>
-          ) : null}
+          <LessonNavigationControl
+            backHref={`/student/courses/${lesson.learningPath.slug}`}
+            direction="previous"
+            disabledReason="Không có bài học trước trong lộ trình."
+            isEnabled={Boolean(lesson.navigation.previous)}
+            lesson={lesson.navigation.previous}
+          />
+          <LessonNavigationControl
+            direction="next"
+            disabledReason={
+              lesson.navigation.next
+                ? "Cần hoàn thành bài thi của bài học hiện tại."
+                : "Không có bài học kế tiếp trong lộ trình."
+            }
+            isEnabled={Boolean(lesson.navigation.next) && hasPassedCurrentLessonTest}
+            lesson={lesson.navigation.next}
+          />
         </nav>
       </div>
+      <QuizCurtainTransition
+        ariaLabel={
+          practiceTabTransition.target === "flashcard"
+            ? "Đang chuẩn bị Flashcard"
+            : "Đang chuẩn bị Quiz"
+        }
+        phase={practiceTabTransition.phase}
+        statusText={
+          practiceTabTransition.target === "flashcard"
+            ? "Đang chuẩn bị Flashcard..."
+            : "Đang chuẩn bị Quiz..."
+        }
+        variant={practiceTabTransition.variant}
+      />
     </main>
   );
 }

@@ -1,5 +1,6 @@
 .visual-math-input {
   --visual-math-accent: var(--theme-primary);
+  --visual-math-accent-soft: var(--theme-primary-soft);
   width: 100%;
   overflow: hidden;
   border: 1px solid var(--theme-border);
@@ -53,7 +54,7 @@
 
 .visual-math-input__category-button--active {
   border-color: color-mix(in srgb, var(--visual-math-accent) 42%, var(--theme-border));
-  background: var(--theme-primary-soft);
+  background: var(--visual-math-accent-soft);
   color: var(--visual-math-accent);
 }
 
@@ -97,7 +98,7 @@
 
 .visual-math-input__template-button:hover:not(:disabled) {
   border-color: var(--visual-math-accent);
-  background: var(--theme-primary-soft);
+  background: var(--visual-math-accent-soft);
   transform: translateY(-1px);
 }
 
@@ -206,13 +207,13 @@
 .visual-math-input__field-host
   math-field[data-virtual-keyboard-open]::part(virtual-keyboard-toggle) {
   border-color: color-mix(in srgb, var(--visual-math-accent) 42%, var(--theme-border));
-  background: var(--theme-primary-soft);
+  background: var(--visual-math-accent-soft);
   color: var(--visual-math-accent);
 }
 
 .visual-math-input__field-host
   math-field[data-virtual-keyboard-open]::part(virtual-keyboard-toggle):hover {
-  background: var(--theme-primary-soft);
+  background: var(--visual-math-accent-soft);
   color: var(--visual-math-accent);
 }
 
@@ -227,6 +228,16 @@
   overflow: visible;
   border: 0;
   background: transparent;
+}
+
+.visual-math-input--emerald {
+  --visual-math-accent: rgb(5 150 105);
+  --visual-math-accent-soft: rgb(209 250 229);
+}
+
+.dark .visual-math-input--emerald {
+  --visual-math-accent: rgb(110 231 183);
+  --visual-math-accent-soft: rgb(16 185 129 / 15%);
 }
 
 .dark .visual-math-input--student-answer {

@@ -288,6 +288,7 @@ const studentPlaceholderCaretStyles = `
 `;
 
 export function VisualMathInput({
+  accent = "primary",
   ariaLabel,
   disabled = false,
   onBlur,
@@ -300,6 +301,7 @@ export function VisualMathInput({
   status = "idle",
   value,
 }: {
+  accent?: "emerald" | "primary";
   ariaLabel: string;
   disabled?: boolean;
   onBlur?: () => void;
@@ -676,6 +678,7 @@ export function VisualMathInput({
       className={cn(
         "visual-math-input",
         preset === "student-answer" && "visual-math-input--student-answer",
+        accent === "emerald" && "visual-math-input--emerald",
         status === "correct" && "visual-math-input--correct",
         status === "incorrect" && "visual-math-input--incorrect",
       )}

@@ -13,16 +13,16 @@ export function FlashcardProgressMetrics({
   );
   const metrics = [
     {
-      key: "known",
-      label: "Đã thuộc",
-      tone: "success",
-      value: progress.knownCount,
-    },
-    {
       key: "unknown",
       label: "Chưa thuộc",
       tone: "danger",
       value: progress.unknownCount,
+    },
+    {
+      key: "known",
+      label: "Đã thuộc",
+      tone: "success",
+      value: progress.knownCount,
     },
     {
       key: "score",

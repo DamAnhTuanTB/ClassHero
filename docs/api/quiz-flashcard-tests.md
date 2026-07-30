@@ -282,6 +282,22 @@ Behavior:
   liệu chấm điểm nội bộ.
 - Attempt/progress và chấm bài thuộc `M7.2`.
 
+#### `GET /student/lessons/:lessonId/quiz-history`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả tối đa 50 attempt gốc hiện hành/đã hoàn thành của chính student trong
+  lesson; không đưa retry attempt vào danh sách.
+- Mỗi lượt có `id`, `setId`, `displayName` dạng `Bộ N`, `state`,
+  `startedAt`, `completedAt` và summary điểm. Cùng một `setId` vẫn có thể xuất
+  hiện nhiều lần khi bộ được tái sử dụng.
+- `state=IN_PROGRESS` là lượt hiện hành để UI hiển thị nhãn `Đang làm`, action
+  `Tiếp tục làm` và `answeredCount/totalCount câu đã làm`. `state=COMPLETED` có
+  action xem lại toàn bộ hoặc làm lại bộ đó.
+- Lượt đang dở cũ hơn lần submit gần nhất và lượt `CANCELLED` không xuất hiện.
+
 #### `POST /student/quiz-sets/:quizSetId/attempts`
 
 Role: `STUDENT`.
@@ -307,9 +323,9 @@ Behavior:
 - Tạo sẵn answer placeholder cho đúng tập câu của attempt để server không tin
   danh sách question ID do client gửi về sau.
 - Response trả nội dung runner, hint, `correctAnswerJson`, `gradingConfigJson`
-  và `explanationJson` đã duyệt để frontend chấm tức thì mà không gọi API từng
-  câu. Đây là đánh đổi đã chốt để ưu tiên tốc độ; dữ liệu chấm có thể được xem
-  bằng DevTools.
+  và `explanationJson` đã duyệt để frontend chấm tức thì mà không chờ endpoint
+  chấm riêng; request autosave progress chỉ lưu answer/cờ checked. Đây là đánh
+  đổi đã chốt để ưu tiên tốc độ; dữ liệu chấm có thể được xem bằng DevTools.
 - Mỗi question có `questionNumber` theo vị trí trong bộ Quiz gốc; response có
   `originalTotalCount` để runner retry hiển thị đúng dạng `Câu hỏi 4/9` thay vì
   đánh số lại thành `1/4`.
@@ -323,12 +339,15 @@ Behavior:
 - Trả lượt `IN_PROGRESS` mới nhất của chính student trong bộ Quiz, hoặc `null`
   nếu không có lượt đang làm.
 - Response trả lại danh sách câu theo đúng attempt đã tạo, gồm dữ liệu chấm và
-  lời giải giống response start. `checkedAnswers` chỉ giữ dữ liệu server từ flow
-  cũ; flow hiện hành khôi phục các câu đã kiểm tra từ local storage trên cùng
-  trình duyệt và backend chỉ lưu answer chính thức khi submit.
+  lời giải giống response start, `savedAnswers` gồm mọi đáp án đã autosave,
+  `checkedAnswers` gồm các câu đã bấm kiểm tra và `currentQuestionIndex` là vị
+  trí gần nhất.
 - Frontend dùng endpoint này để khôi phục runner sau refresh/F5 hoặc khi
   student đã thoát runner rồi vào Quiz lại, không tạo attempt mới khi vẫn còn
   lượt `IN_PROGRESS`.
+- `Bắt đầu` của attempt mới luôn dùng index `0`; mọi lần vào lại attempt
+  `IN_PROGRESS` dùng CTA `Tiếp tục làm` và đúng index đã lưu ở server, kể cả
+  chưa có câu nào được kiểm tra hoặc student đổi thiết bị.
 - Response có `scope`, `sourceAttemptId`, `originalTotalCount` và
   `questionNumber` để khôi phục đúng ngữ cảnh của runner retry câu sai.
 
@@ -341,11 +360,12 @@ Behavior:
 - Trả trạng thái entry của bộ Quiz theo chính student:
   `NOT_STARTED`, `IN_PROGRESS` hoặc `COMPLETED`.
 - Chỉ lượt `IN_PROGRESS` được tạo sau lần submit gần nhất mới được ưu tiên và
-  response trả `currentAttemptId` cùng `checkedCount` đã lưu ở server. Flow hiện
-  hành chưa ghi từng câu lên server nên frontend ghép thêm số câu đã kiểm tra
-  trong local storage theo cùng `attemptId`; tổng bằng `0` dùng CTA `Bắt đầu`,
-  lớn hơn `0` dùng CTA `Tiếp tục vào làm`. Lượt đang dở cũ hơn lần submit gần
-  nhất phải bị bỏ qua để sau F5 không che mất kết quả đã hoàn thành.
+  response trả `currentAttemptId`, `answeredCount` và `checkedCount` đã lưu ở
+  server. CTA chỉ
+  dựa vào trạng thái lượt: `NOT_STARTED` dùng `Bắt đầu`, mọi `IN_PROGRESS` dùng
+  `Tiếp tục làm` dù `checkedCount=0`. `checkedCount` vẫn phục vụ metadata tiến
+  độ, không quyết định nhãn CTA. Lượt đang dở cũ hơn lần submit gần nhất phải
+  bị bỏ qua để sau F5 không che mất kết quả đã hoàn thành.
 - Attempt có `sourceAttemptId` là lượt phụ nên không che trạng thái
   `COMPLETED`/kết quả tích lũy của attempt gốc trên panel Quiz. Nếu F5 ngay
   trong runner lượt phụ, frontend vẫn khôi phục lượt phụ bằng history marker
@@ -354,9 +374,37 @@ Behavior:
   `latestSubmittedAttempt` gồm `id`, `correctCount`, `wrongCount`,
   `totalCount`, `accuracyPercent` để panel mở lại kết quả gần nhất.
 - Endpoint chỉ trả metadata nhẹ, không trả nội dung câu hỏi hoặc đáp án.
-- Khi tạo hoặc submit một lượt mới, backend chuyển các lượt `IN_PROGRESS` dư
-  của cùng student/bộ Quiz sang `CANCELLED` để giữ một nguồn trạng thái hiện
-  hành.
+- Khi tạo attempt gốc mới, backend chuyển attempt gốc `IN_PROGRESS` khác của
+  student trong cùng lesson sang `CANCELLED`; khi submit, backend tiếp tục dọn
+  các lượt đang dở dư của cùng student/bộ Quiz. Lịch sử vì vậy chỉ có một bộ
+  hiện hành mang nhãn `Đang làm`.
+
+#### `PATCH /student/quiz-attempts/:attemptId/progress`
+
+Role: `STUDENT`.
+
+Body:
+
+```json
+{
+  "currentQuestionIndex": 1,
+  "answer": {
+    "questionId": "uuid",
+    "answerJson": ["option-a"]
+  }
+}
+```
+
+Behavior:
+
+- Autosave vị trí câu và tùy chọn một đáp án nháp của attempt `IN_PROGRESS`
+  thuộc chính student. Answer có thể chưa đầy đủ với câu nhiều mệnh đề/text.
+- Server validate question thuộc attempt, shape đáp án và biên index; endpoint
+  không hiển thị đáp án đúng hoặc feedback.
+- Response trả `attemptId`, `currentQuestionIndex`, `answeredCount` và
+  `checkedCount`. Request chỉ đổi vị trí được phép bỏ `answer`.
+- Lựa chọn button gửi ngay; text/formula input debounce ngắn. Client flush bản
+  nháp đang chờ khi đổi câu hoặc thoát runner.
 
 #### `POST /student/quiz-attempts/:attemptId/questions/:questionId/check`
 
@@ -601,6 +649,53 @@ Behavior:
 - Response chứa front/back/difficulty, lời giải đã `APPROVED`,
   `progress`/`isFavorite` theo student và summary đã review/known/unknown.
 
+#### `GET /student/lessons/:lessonId/flashcard-history`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Trả tối đa 50 session học toàn bộ hiện hành/đã hoàn thành của student trong
+  lesson. Mỗi session có `id`, `setId`, `displayName` dạng `Bộ N`, `state`,
+  thời gian và thống kê reviewed/known/unknown.
+- Cùng một `setId` được phép có nhiều session và mỗi session vẫn là một mục
+  lịch sử riêng khi UI phải tái sử dụng bộ cũ.
+- `state=IN_PROGRESS` dùng nhãn `Đang làm` cùng action `Tiếp tục học`;
+  `state=COMPLETED` có action xem lại toàn bộ hoặc học lại bộ đó.
+
+#### `GET /student/flashcard-sessions/:sessionId`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Chỉ owner có quyền đọc session thuộc lesson còn truy cập được.
+- Trả snapshot session cùng danh sách item theo thứ tự đã chốt, gồm
+  `flashcardId`, `isKnown` và `reviewedAt`, để tiếp tục đúng lượt đang học.
+- Frontend lưu vị trí thẻ gần nhất theo `sessionId` trong local storage trên
+  cùng trình duyệt. Session đã từng mở luôn dùng CTA `Tiếp tục học`, kể cả mọi
+  item vẫn chưa đánh dấu; đóng/mở lại web không reset vị trí về thẻ đầu.
+
+#### `POST /student/flashcard-sets/:setId/sessions`
+
+Role: `STUDENT`.
+
+Body:
+
+```json
+{
+  "resumeExistingProgress": false
+}
+```
+
+Behavior:
+
+- Tạo session học toàn bộ mới và snapshot các thẻ approved hiện tại.
+- Mặc định mọi item chưa được đánh dấu. `resumeExistingProgress=true` chỉ dùng
+  cho tương thích progress legacy chưa có session.
+- Chuyển các session `IN_PROGRESS` cũ của student trong lesson sang
+  `CANCELLED`; session mới trở thành mục duy nhất có nhãn `Đang học`.
+
 #### `PATCH /student/flashcards/:flashcardId/progress`
 
 Role: `STUDENT`.
@@ -608,13 +703,18 @@ Role: `STUDENT`.
 Body:
 
 ```json
-{ "isKnown": true }
+{
+  "isKnown": true,
+  "sessionId": "uuid-optional"
+}
 ```
 
 Behavior:
 
 - Upsert progress theo student/card, tăng `reviewCount` và cập nhật
   `lastReviewedAt`.
+- Nếu có `sessionId`, đồng thời cập nhật item và thống kê session trong cùng
+  transaction. Khi mọi item đã được đánh dấu, session chuyển sang hoàn thành.
 - Completion prerequisite cần mỗi card của ít nhất một bộ được duyệt đã review
   một lần; `isKnown` dùng để tách nhóm đã thuộc/chưa thuộc.
 
@@ -793,9 +893,34 @@ Behavior:
   Flashcard đều hoàn thành. Trial luôn bị khóa dù được đọc nội dung lesson.
 - `lockReason` là `TRIAL_NOT_ALLOWED`, `BEFORE_OPEN_TIME`,
   `PREREQUISITES_INCOMPLETE` hoặc `null`.
-- Không có content Quiz/Flashcard được duyệt thì prerequisite tương ứng không
-  bắt buộc.
+- Không có content Quiz/Flashcard được duyệt thì prerequisite tương ứng chưa
+  hoàn thành, `canStart=false` và `lockReason=PREREQUISITES_INCOMPLETE`.
+  Endpoint không được coi content còn thiếu là tiến độ hoàn thành của student.
 - `bestAttempt` là kết quả student đã chủ động dùng cho lesson.
+- `latestSubmittedAttempt` là lượt Bài thi đã nộp gần nhất của student trong
+  lesson, không phụ thuộc đạt hay chưa; UI dùng ID này để mở lại review sau khi
+  quay về hoặc reload trang, đồng thời dùng `score` của lượt này để bật nút
+  `Bài học kế tiếp` khi đạt `completionMinScore`.
+
+#### `GET /student/lessons/:lessonId/test-history`
+
+Role: `STUDENT`.
+
+Behavior:
+
+- Dùng cùng lesson access policy và chỉ trả dữ liệu của student hiện tại.
+- Trả tối đa 50 lượt Bài thi đã nộp/đã chấm thuộc test set `APPROVED`, chưa
+  xóa, không phải reserve; mỗi mục có attempt/set ID, `displayName` duy nhất
+  dạng `Bộ đề N` theo thứ tự attempt trong lesson, trạng thái, thời gian, số câu
+  đúng/tổng câu, điểm và duration. Nhiều lượt dùng chung một test set vẫn phải
+  có số `N` khác nhau; mục `NOT_STARTED` nhận số kế tiếp.
+- `currentItemId` luôn trỏ tới mục đầu danh sách để UI gắn đúng một nhãn
+  `Bài thi hiện tại`: ưu tiên mục `NOT_STARTED` mới nếu response có mục này,
+  nếu không thì trỏ tới lượt đã nộp gần nhất. Nếu test set được chọn cho lượt
+  tiếp theo chưa có lượt hoàn thành, response thêm một mục `NOT_STARTED` tổng
+  hợp từ metadata set để UI hiển thị `Bắt đầu bài thi`.
+- Mục `COMPLETED` chỉ cho xem lại attempt tương ứng; API không cung cấp action
+  làm lại từ lịch sử. Danh sách được tải lười khi student mở menu cài đặt.
 
 #### `POST /student/lessons/:lessonId/test-attempts/start`
 

@@ -108,6 +108,12 @@ export function serializeStudentTestStatus(
     score: { toString(): string } | null;
     durationSeconds: number | null;
   } | null,
+  latestSubmittedAttempt: {
+    id: string;
+    score: { toString(): string } | null;
+    durationSeconds: number | null;
+    submittedAt: Date | null;
+  } | null,
 ) {
   return {
     ...prerequisites,
@@ -116,6 +122,16 @@ export function serializeStudentTestStatus(
           id: bestAttempt.id,
           score: bestAttempt.score ? Number(bestAttempt.score) : null,
           durationSeconds: bestAttempt.durationSeconds,
+        }
+      : null,
+    latestSubmittedAttempt: latestSubmittedAttempt
+      ? {
+          id: latestSubmittedAttempt.id,
+          score: latestSubmittedAttempt.score
+            ? Number(latestSubmittedAttempt.score)
+            : null,
+          durationSeconds: latestSubmittedAttempt.durationSeconds,
+          submittedAt: latestSubmittedAttempt.submittedAt?.toISOString() ?? null,
         }
       : null,
     sets: records.map((record) => serializeStudentTestSet(record)),

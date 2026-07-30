@@ -57,6 +57,127 @@ export class StudentTestAttemptsService {
     private readonly prerequisitesService: StudentLearningPrerequisitesService,
   ) {}
 
+  async getLessonHistory(lessonId: string, studentUserId: string) {
+    await this.studentLessonAccessService.assertCanRead(lessonId, studentUserId);
+
+    const approvedSetWhere = {
+      lessonId,
+      deletedAt: null,
+      isReserve: false,
+      reviewStatus: ReviewStatus.APPROVED,
+      questions: {
+        some: {
+          deletedAt: null,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+      },
+    } satisfies Prisma.TestSetWhereInput;
+    const completedAttemptWhere = {
+      lessonId,
+      studentUserId,
+      status: {
+        in: [AttemptStatus.SUBMITTED, AttemptStatus.GRADED],
+      },
+      testSet: approvedSetWhere,
+    } satisfies Prisma.TestAttemptWhereInput;
+    const [sets, previousAttempts, completedAttempts, completedTotal] = await Promise.all(
+      [
+        this.prisma.testSet.findMany({
+          where: approvedSetWhere,
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            title: true,
+            durationSeconds: true,
+            _count: {
+              select: {
+                questions: {
+                  where: {
+                    deletedAt: null,
+                    reviewStatus: ReviewStatus.APPROVED,
+                  },
+                },
+              },
+            },
+          },
+        }),
+        this.prisma.testAttempt.findMany({
+          where: { lessonId, studentUserId },
+          orderBy: { startedAt: "desc" },
+          select: { testSetId: true },
+        }),
+        this.prisma.testAttempt.findMany({
+          where: completedAttemptWhere,
+          orderBy: [{ submittedAt: "desc" }, { createdAt: "desc" }],
+          take: 50,
+          select: {
+            id: true,
+            testSetId: true,
+            startedAt: true,
+            submittedAt: true,
+            durationSeconds: true,
+            score: true,
+            correctCount: true,
+            totalCount: true,
+          },
+        }),
+        this.prisma.testAttempt.count({
+          where: completedAttemptWhere,
+        }),
+      ],
+    );
+    const currentSet = selectNextTestSet(sets, previousAttempts);
+    const currentCompletedAttempt = currentSet
+      ? completedAttempts.find((attempt) => attempt.testSetId === currentSet.id)
+      : undefined;
+    const pendingItemId =
+      currentSet && !currentCompletedAttempt ? `not-started:${currentSet.id}` : null;
+    const currentItemId = pendingItemId ?? completedAttempts[0]?.id ?? null;
+    const sequenceByAttemptId = new Map(
+      [...completedAttempts]
+        .sort((left, right) => left.startedAt.getTime() - right.startedAt.getTime())
+        .map((attempt, index) => [
+          attempt.id,
+          completedTotal - completedAttempts.length + index + 1,
+        ]),
+    );
+    const completedItems = completedAttempts.map((attempt) => ({
+      id: attempt.id,
+      attemptId: attempt.id,
+      setId: attempt.testSetId,
+      displayName: `Bộ đề ${sequenceByAttemptId.get(attempt.id) ?? 1}`,
+      state: "COMPLETED" as const,
+      startedAt: attempt.startedAt,
+      completedAt: attempt.submittedAt,
+      durationSeconds: attempt.durationSeconds,
+      score: attempt.score === null ? null : Number(attempt.score),
+      correctCount: attempt.correctCount,
+      totalCount: attempt.totalCount,
+    }));
+    const pendingItem =
+      currentSet && pendingItemId
+        ? {
+            id: pendingItemId,
+            attemptId: null,
+            setId: currentSet.id,
+            displayName: `Bộ đề ${completedTotal + 1}`,
+            state: "NOT_STARTED" as const,
+            startedAt: null,
+            completedAt: null,
+            durationSeconds: currentSet.durationSeconds,
+            score: null,
+            correctCount: 0,
+            totalCount: currentSet._count.questions,
+          }
+        : null;
+
+    return {
+      total: completedTotal + (pendingItem ? 1 : 0),
+      currentItemId,
+      items: pendingItem ? [pendingItem, ...completedItems] : completedItems,
+    };
+  }
+
   async startAttempt(lessonId: string, studentUserId: string) {
     const prerequisites = await this.prerequisitesService.getTestPrerequisites(
       lessonId,
@@ -121,10 +242,7 @@ export class StudentTestAttemptsService {
       orderBy: { startedAt: "desc" },
       select: { testSetId: true },
     });
-    const attemptedIds = new Set(previousAttempts.map((attempt) => attempt.testSetId));
-    const set =
-      sets.find((candidate) => !attemptedIds.has(candidate.id)) ??
-      sets[previousAttempts.length % sets.length];
+    const set = selectNextTestSet(sets, previousAttempts);
     if (!set) {
       throw notFoundException("TEST_SET_NOT_FOUND", "Buổi học chưa có bộ đề được duyệt");
     }
@@ -613,6 +731,18 @@ export class StudentTestAttemptsService {
       })),
     };
   }
+}
+
+function selectNextTestSet<T extends { id: string }>(
+  sets: T[],
+  previousAttempts: Array<{ testSetId: string }>,
+) {
+  if (sets.length === 0) return undefined;
+  const attemptedIds = new Set(previousAttempts.map((attempt) => attempt.testSetId));
+  return (
+    sets.find((candidate) => !attemptedIds.has(candidate.id)) ??
+    sets[previousAttempts.length % sets.length]
+  );
 }
 
 function serializeTestRunnerQuestion(question: StudentTestQuestionRecord) {

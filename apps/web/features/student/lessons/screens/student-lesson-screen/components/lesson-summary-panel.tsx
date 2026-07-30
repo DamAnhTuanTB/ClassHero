@@ -10,7 +10,7 @@ export function LessonSummaryPanel({ lesson }: { lesson: StudentLesson }) {
           <BookOpen className="h-6 w-6" aria-hidden="true" />
         </span>
         <div>
-          <h2 className="text-base font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-lg">
+          <h2 className="text-lg font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-xl">
             Kiến thức trọng tâm
           </h2>
         </div>

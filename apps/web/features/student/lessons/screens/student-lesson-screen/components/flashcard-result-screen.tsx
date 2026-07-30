@@ -1,6 +1,13 @@
 "use client";
 
-import { CheckCircle2, ChevronLeft, Heart, RefreshCcw, RotateCcw } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  Heart,
+  RefreshCcw,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentResultConfetti } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-result-confetti";
@@ -15,6 +22,7 @@ export function FlashcardResultScreen({
   onReviewFavorites,
   onRestartAll,
   onRestartUnknown,
+  onStartNewSet,
   pendingAction,
   progress,
   shouldCelebrate,
@@ -24,6 +32,7 @@ export function FlashcardResultScreen({
   onReviewFavorites: () => void;
   onRestartAll: () => void;
   onRestartUnknown: () => void;
+  onStartNewSet: () => void;
   pendingAction: string | null;
   progress: FlashcardProgressSummary;
   shouldCelebrate: boolean;
@@ -116,7 +125,10 @@ export function FlashcardResultScreen({
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={progress.unknownCount === 0 || Boolean(pendingAction)}
+            aria-busy={pendingAction === "restart-unknown"}
+            disabled={
+              progress.unknownCount === 0 || pendingAction === "restart-unknown"
+            }
             onClick={onRestartUnknown}
             className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-violet-400 bg-white px-1.5 text-[13px] font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] sm:px-3 sm:text-base"
           >
@@ -125,7 +137,8 @@ export function FlashcardResultScreen({
           </button>
           <button
             type="button"
-            disabled={Boolean(pendingAction)}
+            aria-busy={pendingAction === "restart-all"}
+            disabled={pendingAction === "restart-all"}
             onClick={onRestartAll}
             className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-[15px] font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:cursor-wait disabled:border-slate-300 disabled:bg-slate-300 disabled:opacity-60 disabled:shadow-none dark:disabled:border-slate-700 dark:disabled:bg-slate-700 sm:text-base"
           >
@@ -134,7 +147,8 @@ export function FlashcardResultScreen({
           </button>
           <button
             type="button"
-            disabled={favoriteCount === 0 || Boolean(pendingAction)}
+            aria-busy={pendingAction === "review-favorites"}
+            disabled={favoriteCount === 0 || pendingAction === "review-favorites"}
             onClick={onReviewFavorites}
             className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-rose-400/60 bg-rose-500/90 px-3 text-[15px] font-black text-white shadow-[0_5px_0_rgb(225_29_72),0_12px_22px_-10px_rgb(159_18_57_/_65%)] transition enabled:hover:bg-rose-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(225_29_72),0_6px_12px_-10px_rgb(159_18_57_/_50%)] disabled:cursor-not-allowed disabled:border-rose-200 disabled:bg-rose-100 disabled:text-rose-400 disabled:shadow-[0_4px_0_rgb(254_205_211)] dark:disabled:border-rose-400/30 dark:disabled:bg-rose-500/10 dark:disabled:text-rose-300 dark:disabled:shadow-[0_4px_0_rgb(136_19_55_/_55%)] sm:text-base"
           >
@@ -143,6 +157,16 @@ export function FlashcardResultScreen({
               aria-hidden="true"
             />
             Xem lại thẻ yêu thích
+          </button>
+          <button
+            type="button"
+            aria-busy={pendingAction === "start-new-set"}
+            disabled={pendingAction === "start-new-set"}
+            onClick={onStartNewSet}
+            className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-violet-300 bg-white px-4 text-base font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition enabled:hover:bg-violet-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-wait disabled:opacity-60 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] dark:enabled:hover:bg-violet-500/10"
+          >
+            <Sparkles className="h-5 w-5" aria-hidden="true" />
+            Học bộ Flashcard mới
           </button>
         </div>
       </main>

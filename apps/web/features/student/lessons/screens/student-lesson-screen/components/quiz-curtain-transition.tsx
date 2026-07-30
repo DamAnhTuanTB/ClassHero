@@ -38,12 +38,14 @@ const transitionEffects: Record<
 export function QuizCurtainTransition({
   animateStatusFill = true,
   ariaLabel = "Đang chuẩn bị Quiz",
+  countdownFrom,
   phase,
   statusText = "Đang chuẩn bị Quiz...",
   variant,
 }: {
   animateStatusFill?: boolean;
   ariaLabel?: string;
+  countdownFrom?: number;
   phase: QuizTransitionPhase;
   statusText?: string;
   variant: QuizTransitionVariant;
@@ -54,6 +56,7 @@ export function QuizCurtainTransition({
     <ActiveQuizTransition
       animateStatusFill={animateStatusFill}
       ariaLabel={ariaLabel}
+      countdownFrom={countdownFrom}
       phase={phase}
       statusText={statusText}
       variant={variant}
@@ -64,12 +67,14 @@ export function QuizCurtainTransition({
 function ActiveQuizTransition({
   animateStatusFill,
   ariaLabel,
+  countdownFrom,
   phase,
   statusText,
   variant,
 }: {
   animateStatusFill: boolean;
   ariaLabel: string;
+  countdownFrom?: number;
   phase: ActiveQuizTransitionPhase;
   statusText: string;
   variant: QuizTransitionVariant;
@@ -110,6 +115,7 @@ function ActiveQuizTransition({
       )}
       <QuizTransitionBrand
         animateStatusFill={animateStatusFill}
+        countdownFrom={countdownFrom}
         phase={phase}
         shouldReduceMotion={shouldReduceMotion}
         statusText={statusText}

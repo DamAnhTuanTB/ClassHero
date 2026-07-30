@@ -28,8 +28,10 @@ describe("M7 student learning flow integration", () => {
   let studentUserId = "";
   let adminUserId = "";
   let learningPathId = "";
+  let chapterId = "";
   let lessonId = "";
   let quizSetId = "";
+  let flashcardSetId = "";
   let flashcardId = "";
   const suffix = randomUUID().slice(0, 8);
 
@@ -84,6 +86,7 @@ describe("M7 student learning flow integration", () => {
         updatedById: admin.id,
       },
     });
+    chapterId = chapter.id;
     const lesson = await prisma.lesson.create({
       data: {
         learningPathId,
@@ -143,6 +146,7 @@ describe("M7 student learning flow integration", () => {
         updatedById: admin.id,
       },
     });
+    flashcardSetId = flashcardSet.id;
     const flashcard = await prisma.flashcard.create({
       data: {
         flashcardSetId: flashcardSet.id,
@@ -178,6 +182,67 @@ describe("M7 student learning flow integration", () => {
         reviewStatus: ReviewStatus.APPROVED,
       },
     });
+    const alternateTestSet = await prisma.testSet.create({
+      data: {
+        lessonId,
+        title: "Test M7 alternate",
+        durationSeconds: 600,
+        reviewStatus: ReviewStatus.APPROVED,
+        createdById: admin.id,
+        updatedById: admin.id,
+      },
+    });
+    await prisma.testQuestion.create({
+      data: {
+        testSetId: alternateTestSet.id,
+        lessonId,
+        questionType: QuestionType.MULTIPLE_CHOICE,
+        questionJson: documentWithText("4 + 4 bằng bao nhiêu?"),
+        optionsJson: [
+          { id: "A", richText: documentWithText("7") },
+          { id: "B", richText: documentWithText("8") },
+        ],
+        correctAnswerJson: ["B"],
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+    });
+  });
+
+  it("keeps the test locked when Quiz or Flashcard content is unavailable", async () => {
+    const lessonWithoutPrerequisiteContent = await prisma.lesson.create({
+      data: {
+        learningPathId,
+        chapterId,
+        orderIndex: 2,
+        title: "Bài 2 chưa có nội dung luyện tập",
+        examOpenAt: new Date(Date.now() - 60_000),
+        completionMinScore: 7,
+        status: PublishStatus.PUBLISHED,
+        createdById: adminUserId,
+        updatedById: adminUserId,
+      },
+    });
+    await prisma.quizSet.create({
+      data: {
+        lessonId: lessonWithoutPrerequisiteContent.id,
+        title: "Quiz chưa có câu hỏi",
+        reviewStatus: ReviewStatus.APPROVED,
+        createdById: adminUserId,
+        updatedById: adminUserId,
+      },
+    });
+
+    const status = await lessonsService.getTestSetsStatus(
+      lessonWithoutPrerequisiteContent.id,
+      studentUserId,
+    );
+
+    expect(status).toMatchObject({
+      canStart: false,
+      lockReason: "PREREQUISITES_INCOMPLETE",
+      quiz: { isRequired: true, isCompleted: false },
+      flashcard: { isRequired: true, isCompleted: false },
+    });
   });
 
   afterAll(async () => {
@@ -186,6 +251,7 @@ describe("M7 student learning flow integration", () => {
       await prisma.quizAttempt.deleteMany({ where: { lessonId } });
       await prisma.testAttempt.deleteMany({ where: { lessonId } });
       await prisma.flashcardProgress.deleteMany({ where: { lessonId } });
+      await prisma.flashcardStudySession.deleteMany({ where: { lessonId } });
       await prisma.lessonProgress.deleteMany({ where: { lessonId } });
       await prisma.learningPath.deleteMany({ where: { id: learningPathId } });
       await prisma.user.deleteMany({
@@ -206,6 +272,7 @@ describe("M7 student learning flow integration", () => {
       quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
     ).resolves.toMatchObject({
       state: "NOT_STARTED",
+      answeredCount: 0,
       checkedCount: 0,
       currentAttemptId: null,
       latestSubmittedAttempt: null,
@@ -237,11 +304,51 @@ describe("M7 student learning flow integration", () => {
       studentUserId,
     );
     expect(pendingQuizAttempt?.id).toBe(quizAttempt.id);
+    expect(pendingQuizAttempt?.savedAnswers).toHaveLength(0);
     expect(pendingQuizAttempt?.checkedAnswers).toHaveLength(0);
+    const savedQuizProgress = await quizAttemptsService.saveProgress(
+      quizAttempt.id,
+      studentUserId,
+      {
+        currentQuestionIndex: 0,
+        answer: {
+          questionId: quizAttempt.questions[0]!.id,
+          answerJson: ["A"],
+        },
+      },
+    );
+    expect(savedQuizProgress).toMatchObject({
+      attemptId: quizAttempt.id,
+      currentQuestionIndex: 0,
+      answeredCount: 1,
+      checkedCount: 0,
+    });
+    const draftQuizAttempt = await quizAttemptsService.getCurrentAttempt(
+      quizSetId,
+      studentUserId,
+    );
+    expect(draftQuizAttempt?.savedAnswers).toEqual([
+      {
+        questionId: quizAttempt.questions[0]!.id,
+        answerJson: ["A"],
+      },
+    ]);
+    expect(draftQuizAttempt?.checkedAnswers).toHaveLength(0);
+    const activeQuizHistory = await quizAttemptsService.getLessonHistory(
+      lessonId,
+      studentUserId,
+    );
+    expect(activeQuizHistory.items[0]).toMatchObject({
+      id: quizAttempt.id,
+      state: "IN_PROGRESS",
+      answeredCount: 1,
+      totalCount: 1,
+    });
     await expect(
       quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
     ).resolves.toMatchObject({
       state: "IN_PROGRESS",
+      answeredCount: 1,
       checkedCount: 0,
       currentAttemptId: quizAttempt.id,
     });
@@ -262,6 +369,7 @@ describe("M7 student learning flow integration", () => {
       quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
     ).resolves.toMatchObject({
       state: "IN_PROGRESS",
+      answeredCount: 1,
       checkedCount: 1,
       currentAttemptId: quizAttempt.id,
     });
@@ -285,6 +393,7 @@ describe("M7 student learning flow integration", () => {
       quizAttemptsService.getAttemptStatus(quizSetId, studentUserId),
     ).resolves.toMatchObject({
       state: "COMPLETED",
+      answeredCount: 1,
       checkedCount: 1,
       currentAttemptId: null,
       latestSubmittedAttempt: {
@@ -493,11 +602,90 @@ describe("M7 student learning flow integration", () => {
         totalCount: 4,
       },
     });
+    const quizHistory = await quizAttemptsService.getLessonHistory(
+      lessonId,
+      studentUserId,
+    );
+    expect(quizHistory.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: quizAttempt.id,
+          setId: quizSetId,
+          state: "COMPLETED",
+        }),
+        expect.objectContaining({
+          id: cumulativeSource.id,
+          setId: quizSetId,
+          state: "COMPLETED",
+        }),
+        expect.objectContaining({
+          id: fullResetAttempt.id,
+          setId: quizSetId,
+          state: "COMPLETED",
+        }),
+      ]),
+    );
+    expect(quizHistory.items.map((item) => item.displayName)).toEqual([
+      "Bộ 3",
+      "Bộ 2",
+      "Bộ 1",
+    ]);
 
-    await flashcardsService.updateStudentProgress(flashcardId, studentUserId, false);
+    const firstFlashcardSession = await flashcardsService.startStudentStudySession(
+      flashcardSetId,
+      studentUserId,
+    );
+    await flashcardsService.updateStudentProgress(
+      flashcardId,
+      studentUserId,
+      false,
+      firstFlashcardSession.id,
+    );
+    const secondFlashcardSession = await flashcardsService.startStudentStudySession(
+      flashcardSetId,
+      studentUserId,
+    );
+    await flashcardsService.updateStudentProgress(
+      flashcardId,
+      studentUserId,
+      true,
+      secondFlashcardSession.id,
+    );
+    const flashcardHistory = await flashcardsService.getStudentStudyHistory(
+      lessonId,
+      studentUserId,
+    );
+    expect(flashcardHistory.items).toMatchObject([
+      {
+        id: secondFlashcardSession.id,
+        setId: flashcardSetId,
+        displayName: "Bộ 2",
+        state: "COMPLETED",
+        knownCount: 1,
+      },
+      {
+        id: firstFlashcardSession.id,
+        setId: flashcardSetId,
+        displayName: "Bộ 1",
+        state: "COMPLETED",
+        unknownCount: 1,
+      },
+    ]);
     const ready = await lessonsService.getTestSetsStatus(lessonId, studentUserId);
     expect(ready.canStart).toBe(true);
     expect(ready.flashcard.isCompleted).toBe(true);
+    const initialTestHistory = await testAttemptsService.getLessonHistory(
+      lessonId,
+      studentUserId,
+    );
+    expect(initialTestHistory.currentItemId).toBe(
+      `not-started:${initialTestHistory.items[0]?.setId}`,
+    );
+    expect(initialTestHistory.items[0]).toMatchObject({
+      attemptId: null,
+      displayName: "Bộ đề 1",
+      state: "NOT_STARTED",
+    });
 
     const failedAttempt = await testAttemptsService.startAttempt(lessonId, studentUserId);
     expect(JSON.stringify(failedAttempt)).not.toContain("correctAnswerJson");
@@ -507,6 +695,33 @@ describe("M7 student learning flow integration", () => {
       [{ questionId: failedAttempt.questions[0]!.id, answerJson: ["A"] }],
     );
     expect(failedResult.passed).toBe(false);
+    const statusAfterFailedAttempt = await lessonsService.getTestSetsStatus(
+      lessonId,
+      studentUserId,
+    );
+    expect(statusAfterFailedAttempt.latestSubmittedAttempt).toMatchObject({
+      id: failedAttempt.id,
+      score: 0,
+    });
+    const historyAfterFailedAttempt = await testAttemptsService.getLessonHistory(
+      lessonId,
+      studentUserId,
+    );
+    expect(historyAfterFailedAttempt.currentItemId).toBe(
+      `not-started:${historyAfterFailedAttempt.items[0]?.setId}`,
+    );
+    expect(historyAfterFailedAttempt.items[0]).toMatchObject({
+      attemptId: null,
+      displayName: "Bộ đề 2",
+      state: "NOT_STARTED",
+    });
+    expect(historyAfterFailedAttempt.items[1]).toMatchObject({
+      id: failedAttempt.id,
+      attemptId: failedAttempt.id,
+      displayName: "Bộ đề 1",
+      score: 0,
+      state: "COMPLETED",
+    });
     await expect(
       testAttemptsService.useResult(failedAttempt.id, studentUserId),
     ).rejects.toThrow();
@@ -522,6 +737,32 @@ describe("M7 student learning flow integration", () => {
     );
     expect(passingResult.score).toBe(10);
     expect(passingResult.passed).toBe(true);
+    const statusAfterPassingAttempt = await lessonsService.getTestSetsStatus(
+      lessonId,
+      studentUserId,
+    );
+    expect(statusAfterPassingAttempt.latestSubmittedAttempt).toMatchObject({
+      id: passingAttempt.id,
+      score: 10,
+    });
+    const historyAfterPassingAttempt = await testAttemptsService.getLessonHistory(
+      lessonId,
+      studentUserId,
+    );
+    expect(historyAfterPassingAttempt.currentItemId).toBe(passingAttempt.id);
+    expect(historyAfterPassingAttempt.currentItemId).toBe(
+      historyAfterPassingAttempt.items[0]?.id,
+    );
+    expect(historyAfterPassingAttempt.items[0]).toMatchObject({
+      id: passingAttempt.id,
+      displayName: "Bộ đề 2",
+      score: 10,
+      state: "COMPLETED",
+    });
+    expect(historyAfterPassingAttempt.items.map((item) => item.displayName)).toEqual([
+      "Bộ đề 2",
+      "Bộ đề 1",
+    ]);
 
     const completion = await testAttemptsService.useResult(
       passingAttempt.id,

@@ -5,6 +5,7 @@ export type ApiRequestOptions = {
   body?: BodyInit | unknown;
   token?: string;
   headers?: HeadersInit;
+  keepalive?: boolean;
 };
 
 export type ApiSuccessEnvelope<
@@ -49,7 +50,11 @@ export class ApiRequestError extends Error {
 
 function getApiBaseUrl() {
   let baseUrl = process.env.NEXT_PUBLIC_API_URL ?? defaultApiBaseUrl;
-  if (typeof window !== "undefined" && baseUrl.includes("localhost") && window.location.hostname !== "localhost") {
+  if (
+    typeof window !== "undefined" &&
+    baseUrl.includes("localhost") &&
+    window.location.hostname !== "localhost"
+  ) {
     baseUrl = baseUrl.replace("localhost", window.location.hostname);
   }
   return baseUrl.replace(/\/$/, "");
@@ -134,6 +139,7 @@ export async function apiRequestEnvelope<
     method: options.method ?? "GET",
     headers,
     body: requestBody,
+    keepalive: options.keepalive,
   });
   const payload = await readJsonResponse(response);
 

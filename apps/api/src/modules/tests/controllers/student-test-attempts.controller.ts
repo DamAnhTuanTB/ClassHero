@@ -30,6 +30,12 @@ export class StudentTestAttemptsController {
     private readonly studentTestAttemptsService: StudentTestAttemptsService,
   ) {}
 
+  @Get("lessons/:lessonId/test-history")
+  @ApiOperation({ summary: "List the student's lesson test history" })
+  history(@Param("lessonId") lessonId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.studentTestAttemptsService.getLessonHistory(lessonId, user.id);
+  }
+
   @Post("lessons/:lessonId/test-attempts/start")
   @ApiOperation({ summary: "Start a test after time and learning prerequisites" })
   start(@Param("lessonId") lessonId: string, @CurrentUser() user: AuthenticatedUser) {

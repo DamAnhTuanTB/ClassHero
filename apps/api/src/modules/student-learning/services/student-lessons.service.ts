@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { ReviewStatus } from "@prisma/client";
+import { AttemptStatus, ReviewStatus } from "@prisma/client";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FilesService } from "#api/modules/files/services/files.service";
 import { StudentLessonAccessService } from "#api/modules/learning-paths/services/student-lesson-access.service";
@@ -85,7 +85,7 @@ export class StudentLessonsService {
   }
 
   async getTestSetsStatus(lessonId: string, studentUserId: string) {
-    const [prerequisites, records, progress] = await Promise.all([
+    const [prerequisites, records, progress, latestSubmittedAttempt] = await Promise.all([
       this.prerequisitesService.getTestPrerequisites(lessonId, studentUserId),
       this.prisma.testSet.findMany({
         where: {
@@ -114,12 +114,29 @@ export class StudentLessonsService {
           },
         },
       }),
+      this.prisma.testAttempt.findFirst({
+        where: {
+          lessonId,
+          studentUserId,
+          status: {
+            in: [AttemptStatus.SUBMITTED, AttemptStatus.GRADED],
+          },
+        },
+        orderBy: [{ submittedAt: "desc" }, { createdAt: "desc" }],
+        select: {
+          id: true,
+          score: true,
+          durationSeconds: true,
+          submittedAt: true,
+        },
+      }),
     ]);
 
     return serializeStudentTestStatus(
       records,
       prerequisites,
       progress?.bestTestAttempt ?? null,
+      latestSubmittedAttempt,
     );
   }
 

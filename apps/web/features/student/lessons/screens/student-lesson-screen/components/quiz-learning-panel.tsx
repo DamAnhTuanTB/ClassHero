@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
-import { Eye, HelpCircle, Loader2, Play, RefreshCcw, RotateCcw } from "lucide-react";
+import { Eye, HelpCircle, Play, RefreshCcw, RotateCcw } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import {
   getCurrentQuizAttempt,
+  getQuizHistory,
   getQuizAttemptStatus,
   reviewQuizAttempt,
   startQuizAttempt,
@@ -21,7 +22,12 @@ import {
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { studentQuizAttemptStatusQueryKey } from "@/features/student/lessons/hooks/use-student-lesson-queries";
+import { useQuizProgressAutosave } from "@/features/student/lessons/hooks/use-quiz-progress-autosave";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
+import {
+  LearningHistoryControl,
+  type LearningHistoryDisplayItem,
+} from "@/features/student/lessons/screens/student-lesson-screen/components/learning-history-control";
 import { QuizResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-result-screen";
 import { QuizReviewScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-review-screen";
 import {
@@ -35,6 +41,8 @@ import type {
   CheckedAnswer,
   QuizAttempt,
   QuizAttemptStatus,
+  QuizHistory,
+  QuizProgressSnapshot,
   ResumableQuizAttempt,
   StudentAnswer,
   StudentLesson,
@@ -46,7 +54,9 @@ import {
   getQuizResultHistorySetId,
   getQuizRunnerHistoryAttemptId,
   getQuizRunnerHistorySetId,
+  readStoredQuizActiveSetId,
   setQuizResultHistoryMarker,
+  writeStoredQuizActiveSetId,
 } from "@/features/student/lessons/utils/quiz-runner-history";
 import { getQuizEntryActionLabel } from "@/features/student/lessons/utils/quiz-entry-state";
 import { getNextLearningSet } from "@/features/student/lessons/utils/learning-set-selection";
@@ -63,6 +73,7 @@ import {
 
 type PreparedQuizAttempt = {
   answers: Record<string, StudentAnswer>;
+  answeredCount: number;
   attempt: QuizAttempt;
   checkedCount: number;
   currentIndex: number;
@@ -72,27 +83,43 @@ type PreparedQuizAttempt = {
 type StudentQuizSet = StudentLesson["quizSets"][number];
 
 export function QuizLearningPanel({
+  autoStart,
   lesson,
+  onAutoStartHandled,
   onProgressChanged,
   token,
 }: {
+  autoStart: boolean;
   lesson: StudentLesson;
+  onAutoStartHandled: (target: "flashcard" | "quiz") => void;
   onProgressChanged: () => Promise<void>;
   token: string;
 }) {
   const queryClient = useQueryClient();
   const userId = useAuthSessionStore((state) => state.session?.user.id);
-  const [activeQuizSetId, setActiveQuizSetId] = useState(
-    () =>
+  const [activeQuizSetId, setActiveQuizSetId] = useState(() => {
+    const candidateId =
       getQuizRunnerHistorySetId() ??
       getQuizResultHistorySetId() ??
+      readStoredQuizActiveSetId(lesson.id, userId);
+
+    return (
+      lesson.quizSets.find((candidate) => candidate.id === candidateId)?.id ??
       lesson.quizSets[0]?.id ??
-      "",
-  );
+      ""
+    );
+  });
   const quizSet =
     lesson.quizSets.find((candidate) => candidate.id === activeQuizSetId) ??
     lesson.quizSets[0];
-  const quizSetId = quizSet?.id ?? "";
+  const activeQuizSet =
+    quizSet ??
+    ({
+      id: "",
+      title: "Quiz",
+      questionCount: 0,
+    } satisfies StudentQuizSet);
+  const quizSetId = activeQuizSet.id;
   const attemptStatusQuery = useQuery({
     queryKey: studentQuizAttemptStatusQueryKey(quizSetId, userId),
     queryFn: () => getQuizAttemptStatus(quizSetId, token),
@@ -100,6 +127,12 @@ export function QuizLearningPanel({
     staleTime: 30_000,
   });
   const attemptStatus = attemptStatusQuery.data ?? null;
+  const historyQuery = useQuery({
+    queryKey: ["student", "lesson", lesson.id, "quiz-history", userId ?? "guest"],
+    queryFn: () => getQuizHistory(lesson.id, token),
+    enabled: false,
+    staleTime: 15_000,
+  });
   const isAttemptStatusPending = attemptStatusQuery.isLoading;
   const attemptStatusError = attemptStatusQuery.error;
   const shouldShowAttemptStatusLoading =
@@ -115,6 +148,8 @@ export function QuizLearningPanel({
   const [result, setResult] = useState<AttemptSummary | null>(null);
   const [shouldCelebrateResult, setShouldCelebrateResult] = useState(false);
   const [review, setReview] = useState<AssessmentReview | null>(null);
+  const [reviewOrigin, setReviewOrigin] = useState<"HISTORY" | "RESULT">("RESULT");
+  const [historyReviewTitle, setHistoryReviewTitle] = useState<string | null>(null);
   const [reviewDisplayScope, setReviewDisplayScope] = useState<"ALL" | "INCORRECT">(
     "ALL",
   );
@@ -131,7 +166,69 @@ export function QuizLearningPanel({
   const [transitionVariant, setTransitionVariant] =
     useState<QuizTransitionVariant>("book");
   const lastTransitionVariantRef = useRef<QuizTransitionVariant | null>(null);
+  const autoStartTriggeredRef = useRef(false);
+  const autoStartWasPendingRef = useRef(false);
+  const entryActionButtonRef = useRef<HTMLButtonElement>(null);
+  const autosaveErrorShownRef = useRef(false);
   const shouldReduceMotion = useReducedMotion();
+  const activeAttemptId = attempt?.id ?? null;
+
+  useEffect(() => {
+    if (!quizSetId) return;
+    writeStoredQuizActiveSetId(lesson.id, quizSetId, userId);
+  }, [lesson.id, quizSetId, userId]);
+
+  useEffect(() => {
+    if (!autoStart) {
+      autoStartTriggeredRef.current = false;
+      autoStartWasPendingRef.current = false;
+      return;
+    }
+    if (activeQuizSet.questionCount === 0) {
+      void onAutoStartHandled("quiz");
+      return;
+    }
+    if (
+      autoStartTriggeredRef.current ||
+      attempt ||
+      isAttemptStatusPending ||
+      isResumePending ||
+      resumeError
+    ) {
+      return;
+    }
+
+    const entryActionButton = entryActionButtonRef.current;
+    if (!entryActionButton || entryActionButton.disabled) return;
+
+    autoStartTriggeredRef.current = true;
+    entryActionButton.click();
+  }, [
+    activeQuizSet.questionCount,
+    attempt,
+    autoStart,
+    isAttemptStatusPending,
+    isResumePending,
+    onAutoStartHandled,
+    resumeError,
+  ]);
+
+  useEffect(() => {
+    if (!autoStart || !autoStartTriggeredRef.current) return;
+    if (pendingAction) autoStartWasPendingRef.current = true;
+
+    const didFinishStarting =
+      attempt !== null ||
+      (autoStartWasPendingRef.current &&
+        pendingAction === null &&
+        curtainPhase === "idle");
+    if (!didFinishStarting) return;
+
+    autoStartTriggeredRef.current = false;
+    autoStartWasPendingRef.current = false;
+    void onAutoStartHandled("quiz");
+  }, [attempt, autoStart, curtainPhase, onAutoStartHandled, pendingAction]);
+
   const setAttemptStatusForQuizSet = useCallback(
     (targetQuizSetId: string, nextStatus: SetStateAction<QuizAttemptStatus | null>) => {
       queryClient.setQueryData<QuizAttemptStatus | null>(
@@ -144,6 +241,50 @@ export function QuizLearningPanel({
     },
     [queryClient, userId],
   );
+  const handleProgressSaved = useCallback(
+    (snapshot: QuizProgressSnapshot) => {
+      autosaveErrorShownRef.current = false;
+      setAttemptStatusForQuizSet(quizSetId, (current) =>
+        current?.currentAttemptId === snapshot.attemptId
+          ? {
+              ...current,
+              answeredCount: snapshot.answeredCount,
+              checkedCount: snapshot.checkedCount,
+            }
+          : current,
+      );
+      queryClient.setQueryData<QuizHistory>(
+        ["student", "lesson", lesson.id, "quiz-history", userId ?? "guest"],
+        (current) =>
+          current
+            ? {
+                ...current,
+                items: current.items.map((item) =>
+                  item.id === snapshot.attemptId
+                    ? {
+                        ...item,
+                        answeredCount: snapshot.answeredCount,
+                      }
+                    : item,
+                ),
+              }
+            : current,
+      );
+    },
+    [lesson.id, queryClient, quizSetId, setAttemptStatusForQuizSet, userId],
+  );
+  const handleProgressSaveError = useCallback((error: unknown) => {
+    if (autosaveErrorShownRef.current) return;
+    autosaveErrorShownRef.current = true;
+    toast.error("Chưa đồng bộ được tiến độ Quiz", {
+      description: getErrorMessage(error),
+    });
+  }, []);
+  const quizProgressAutosave = useQuizProgressAutosave({
+    onError: handleProgressSaveError,
+    onSaved: handleProgressSaved,
+    token,
+  });
 
   useEffect(() => {
     if (!quizSetId || !token) {
@@ -154,6 +295,12 @@ export function QuizLearningPanel({
     const runnerAttemptId = getQuizRunnerHistoryAttemptId();
     const resultAttemptId = getQuizResultHistoryAttemptId();
     if (!runnerAttemptId && !resultAttemptId) {
+      setIsFullscreenResumePending(false);
+      setIsResumePending(false);
+      setResumeError(null);
+      return;
+    }
+    if (runnerAttemptId === activeAttemptId && !resultAttemptId) {
       setIsFullscreenResumePending(false);
       setIsResumePending(false);
       setResumeError(null);
@@ -232,6 +379,7 @@ export function QuizLearningPanel({
       isCancelled = true;
     };
   }, [
+    activeAttemptId,
     attemptStatus,
     isAttemptStatusPending,
     quizSetId,
@@ -256,11 +404,6 @@ export function QuizLearningPanel({
     });
   }, [answers, attempt, currentIndex, feedbackByQuestionId, quizSetId]);
 
-  if (!quizSet) {
-    return <EmptyPanel copy="Bài học này chưa có bộ Quiz được duyệt." />;
-  }
-  const activeQuizSet = quizSet;
-
   function renderWithCurtain(content: ReactNode) {
     return (
       <>
@@ -274,11 +417,13 @@ export function QuizLearningPanel({
     scope: "ALL" | "INCORRECT",
     sourceAttemptId?: string,
     targetQuizSet: StudentQuizSet = activeQuizSet,
+    forceNewAttempt = false,
+    actionKey = `start-${scope}`,
   ) {
-    if (!token || pendingAction) return;
+    if (!token || pendingAction || targetQuizSet.questionCount === 0) return;
     clearQuizResultHistoryMarker();
     setShouldCelebrateResult(false);
-    setPendingAction(`start-${scope}`);
+    setPendingAction(actionKey);
     // const nextTransitionVariant: QuizTransitionVariant = "paper-tear";
     const nextTransitionVariant = pickQuizTransitionVariant(
       lastTransitionVariantRef.current,
@@ -292,7 +437,12 @@ export function QuizLearningPanel({
         ? quizTransitionTimings.reducedCloseMs
         : quizTransitionTimings.closeMs,
     );
-    const prepareAttempt = prepareQuizAttempt(targetQuizSet, scope, sourceAttemptId);
+    const prepareAttempt = prepareQuizAttempt(
+      targetQuizSet,
+      scope,
+      sourceAttemptId,
+      forceNewAttempt,
+    );
     const [, prepareResult] = await Promise.allSettled([closeDelay, prepareAttempt]);
     setCurtainPhase("closed");
 
@@ -303,6 +453,7 @@ export function QuizLearningPanel({
 
       await waitForCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
       applyPreparedQuizAttempt(prepareResult.value, targetQuizSet.id);
+      if (historyQuery.data) void historyQuery.refetch();
     } catch (error) {
       toast.error("Chưa bắt đầu được Quiz", { description: getErrorMessage(error) });
     } finally {
@@ -321,17 +472,23 @@ export function QuizLearningPanel({
     targetQuizSet: StudentQuizSet,
     scope: "ALL" | "INCORRECT",
     sourceAttemptId?: string,
+    forceNewAttempt = false,
   ): Promise<PreparedQuizAttempt> {
-    if (scope === "ALL" && !sourceAttemptId) {
+    if (scope === "ALL" && !sourceAttemptId && !forceNewAttempt) {
       const currentAttempt = await getCurrentQuizAttempt(targetQuizSet.id, token);
       if (currentAttempt && !currentAttempt.sourceAttemptId) {
         const resumedState = createResumedQuizState(currentAttempt, targetQuizSet.id);
+        const answeredCount = countCompletedQuizAnswers(
+          currentAttempt,
+          resumedState.answers,
+        );
         const checkedCount = Object.keys(resumedState.feedbackByQuestionId).length;
         return {
           answers: resumedState.answers,
+          answeredCount,
           attempt: currentAttempt,
           checkedCount,
-          currentIndex: checkedCount === 0 ? 0 : resumedState.currentIndex,
+          currentIndex: resumedState.currentIndex,
           feedbackByQuestionId: resumedState.feedbackByQuestionId,
         };
       }
@@ -344,6 +501,7 @@ export function QuizLearningPanel({
 
     return {
       answers: {},
+      answeredCount: 0,
       attempt: nextAttempt,
       checkedCount: 0,
       currentIndex: 0,
@@ -358,9 +516,11 @@ export function QuizLearningPanel({
     setAttemptStatusForQuizSet(targetQuizSetId, (current) => ({
       state: "IN_PROGRESS",
       currentAttemptId: preparedAttempt.attempt.id,
+      answeredCount: preparedAttempt.answeredCount,
       checkedCount: preparedAttempt.checkedCount,
       latestSubmittedAttempt: current?.latestSubmittedAttempt ?? null,
     }));
+    writeStoredQuizActiveSetId(lesson.id, targetQuizSetId, userId);
     setActiveQuizSetId(targetQuizSetId);
     setAttempt(preparedAttempt.attempt);
     setAnswers(preparedAttempt.answers);
@@ -390,6 +550,15 @@ export function QuizLearningPanel({
         ...current,
         [question.id]: feedback,
       }));
+      void quizProgressAutosave.saveAnswer({
+        attemptId: attempt.id,
+        currentQuestionIndex: currentIndex,
+        answer: {
+          questionId: question.id,
+          answerJson: answer,
+          isChecked: true,
+        },
+      });
       setIsExplanationOpen(false);
     } catch (error) {
       toast.error("Chưa kiểm tra được đáp án", {
@@ -398,10 +567,29 @@ export function QuizLearningPanel({
     }
   }
 
+  function handleAnswerChange(nextAnswer: StudentAnswer) {
+    const question = attempt?.questions[currentIndex];
+    if (!attempt || !question) return;
+
+    setAnswers((current) => ({ ...current, [question.id]: nextAnswer }));
+    void quizProgressAutosave.saveAnswer(
+      {
+        attemptId: attempt.id,
+        currentQuestionIndex: currentIndex,
+        answer: {
+          questionId: question.id,
+          answerJson: nextAnswer,
+        },
+      },
+      question.questionType === "TEXT_INPUT" ? 350 : 0,
+    );
+  }
+
   async function handleSubmit() {
     if (!attempt || pendingAction) return false;
     setPendingAction("submit");
     try {
+      await quizProgressAutosave.flush();
       const submittedAnswers = attempt.questions.flatMap((question) => {
         const answer = answers[question.id];
         if (answer === undefined || !isStudentAnswerComplete(question, answer)) {
@@ -423,10 +611,12 @@ export function QuizLearningPanel({
       setAttemptStatusForQuizSet(activeQuizSet.id, {
         state: "COMPLETED",
         currentAttemptId: null,
+        answeredCount: aggregateResult.totalCount,
         checkedCount: aggregateResult.totalCount,
         latestSubmittedAttempt: aggregateResult,
       });
       await onProgressChanged();
+      if (historyQuery.data) void historyQuery.refetch();
       return true;
     } catch (error) {
       toast.error("Chưa hoàn thành được Quiz", {
@@ -441,14 +631,39 @@ export function QuizLearningPanel({
   async function handleReview(
     scope: "ALL" | "INCORRECT",
     sourceResult: AttemptSummary | null = result,
+    origin: "HISTORY" | "RESULT" = "RESULT",
+    nextHistoryReviewTitle: string | null = null,
+    actionKey = `review-${scope}`,
   ) {
     if (!sourceResult || pendingAction) return;
     setShouldCelebrateResult(false);
-    setPendingAction(`review-${scope}`);
+    setPendingAction(actionKey);
+    const nextTransitionVariant = pickQuizTransitionVariant(
+      lastTransitionVariantRef.current,
+    );
+    lastTransitionVariantRef.current = nextTransitionVariant;
+    setTransitionVariant(nextTransitionVariant);
+    setCurtainPhase("closing");
+
+    const closeDelay = waitForCurtain(
+      shouldReduceMotion
+        ? quizTransitionTimings.reducedCloseMs
+        : quizTransitionTimings.closeMs,
+    );
+    const prepareReview = reviewQuizAttempt(sourceResult.id, "ALL", token);
+    const [, reviewResult] = await Promise.allSettled([closeDelay, prepareReview]);
+    setCurtainPhase("closed");
+
     try {
-      const nextReview = await reviewQuizAttempt(sourceResult.id, "ALL", token);
-      setResult(sourceResult);
-      setReview(nextReview);
+      if (reviewResult.status === "rejected") {
+        throw reviewResult.reason;
+      }
+
+      await waitForCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
+      setResult(origin === "RESULT" ? sourceResult : null);
+      setReviewOrigin(origin);
+      setHistoryReviewTitle(origin === "HISTORY" ? nextHistoryReviewTitle : null);
+      setReview(reviewResult.value);
       setReviewDisplayScope(scope);
       setReviewIndex(0);
     } catch (error) {
@@ -456,17 +671,62 @@ export function QuizLearningPanel({
         description: getErrorMessage(error),
       });
     } finally {
+      setCurtainPhase("opening");
+      await waitForCurtain(
+        shouldReduceMotion
+          ? quizTransitionTimings.reducedOpenMs
+          : quizTransitionTimings.openMs,
+      );
+      setCurtainPhase("idle");
       setPendingAction(null);
     }
   }
 
-  if (review) {
+  function findHistoryItem(item: LearningHistoryDisplayItem) {
+    return historyQuery.data?.items.find((candidate) => candidate.id === item.id);
+  }
+
+  function findQuizSet(setId: string) {
+    return lesson.quizSets.find((candidate) => candidate.id === setId);
+  }
+
+  function handleHistoryContinue(item: LearningHistoryDisplayItem) {
+    const source = findHistoryItem(item);
+    const targetSet = source ? findQuizSet(source.setId) : undefined;
+    if (!targetSet) return;
+    void handleStart("ALL", undefined, targetSet, false, `history-continue:${item.id}`);
+  }
+
+  function handleHistoryReview(item: LearningHistoryDisplayItem) {
+    const source = findHistoryItem(item);
+    const targetSet = source ? findQuizSet(source.setId) : undefined;
+    if (!source || !targetSet) return;
+    void handleReview(
+      "ALL",
+      source,
+      "HISTORY",
+      item.displayName,
+      `history-review:${item.id}`,
+    );
+  }
+
+  function handleHistoryRestart(item: LearningHistoryDisplayItem) {
+    const source = findHistoryItem(item);
+    const targetSet = source ? findQuizSet(source.setId) : undefined;
+    if (!targetSet) return;
+    void handleStart("ALL", undefined, targetSet, true, `history-restart:${item.id}`);
+  }
+
+  if (review && reviewOrigin === "RESULT") {
     return renderWithCurtain(
       <QuizReviewScreen
+        backLabel="Quay lại kết quả Quiz"
         review={review}
         displayScope={reviewDisplayScope}
         currentIndex={reviewIndex}
-        onBack={() => setReview(null)}
+        onBack={() => {
+          setReview(null);
+        }}
         onCurrentIndexChange={setReviewIndex}
       />,
     );
@@ -487,6 +747,15 @@ export function QuizLearningPanel({
         onReviewIncorrect={() => void handleReview("INCORRECT")}
         onRestartAll={() => void handleStart("ALL")}
         onRestartIncorrect={() => void handleStart("INCORRECT", result.id)}
+        onStartNewSet={() =>
+          void handleStart(
+            "ALL",
+            undefined,
+            getNextLearningSet(lesson.quizSets, activeQuizSet.id),
+            true,
+            "start-new-set",
+          )
+        }
       />,
     );
   }
@@ -529,68 +798,134 @@ export function QuizLearningPanel({
     const completedAttempt =
       attemptStatus?.state === "COMPLETED" ? attemptStatus.latestSubmittedAttempt : null;
     const isCompleted = completedAttempt !== null;
+    const hasQuestions = activeQuizSet.questionCount > 0;
+    const nextQuizSet =
+      lesson.quizSets.length > 0
+        ? getNextLearningSet(lesson.quizSets, activeQuizSet.id)
+        : activeQuizSet;
     const entryActionLabel = getQuizEntryActionLabel(attemptStatus);
     const EntryActionIcon = isCompleted ? Eye : Play;
 
     return renderWithCurtain(
-      <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-            <HelpCircle className="h-6 w-6" aria-hidden="true" />
-          </span>
-          <h2 className="min-w-0 text-base font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-lg">
-            Quiz
-          </h2>
-          <span className="ml-auto shrink-0 rounded-xl bg-sky-100 px-3 py-2 text-xs font-black text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-            {activeQuizSet.questionCount} câu
-          </span>
-        </div>
-        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
-          Cùng luyện tập kiến thức vừa học xong nhé.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            if (completedAttempt) {
-              setQuizResultHistoryMarker(completedAttempt.id, activeQuizSet.id);
-              setShouldCelebrateResult(false);
-              setResult(completedAttempt);
-              return;
-            }
-            void handleStart("ALL");
-          }}
-          disabled={Boolean(pendingAction)}
-          className="student-quiz-cta-3d mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl px-5 text-lg font-black text-white focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
-        >
-          {!isCompleted && pendingAction ? (
-            <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-          ) : (
-            <EntryActionIcon className="h-6 w-6" aria-hidden="true" />
-          )}
-          {entryActionLabel}
-        </button>
-        {isCompleted ? (
-          <button
-            type="button"
-            onClick={() =>
-              void handleStart(
-                "ALL",
-                undefined,
-                getNextLearningSet(lesson.quizSets, activeQuizSet.id),
-              )
-            }
-            disabled={Boolean(pendingAction)}
-            className="mt-3 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-sky-300 bg-white px-5 text-lg font-black text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-wait disabled:opacity-70 dark:border-sky-400/50 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:hover:bg-sky-500/10"
+      <>
+        <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+              <HelpCircle className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <h2 className="min-w-0 text-lg font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-xl">
+              Quiz
+            </h2>
+            <LearningHistoryControl
+              accent="quiz"
+              countLabel={`${activeQuizSet.questionCount} câu`}
+              currentSetId={activeQuizSet.id}
+              errorMessage={
+                historyQuery.error
+                  ? "Chưa tải được lịch sử Quiz. Vui lòng thử lại."
+                  : null
+              }
+              isCoveredByChildSurface={Boolean(review && reviewOrigin === "HISTORY")}
+              isLoading={historyQuery.isLoading && !historyQuery.data}
+              items={(historyQuery.data?.items ?? []).map((item) => ({
+                id: item.id,
+                setId: item.setId,
+                displayName: item.displayName,
+                state: item.state,
+                startedAt: item.startedAt,
+                completedAt: item.completedAt,
+                summary:
+                  item.state === "IN_PROGRESS"
+                    ? `${item.answeredCount}/${item.totalCount} câu đã làm`
+                    : `${item.correctCount}/${item.totalCount} câu đúng`,
+                score:
+                  item.state === "COMPLETED"
+                    ? `${formatQuizScore(item.accuracyPercent ?? 0)} điểm`
+                    : undefined,
+              }))}
+              onContinue={handleHistoryContinue}
+              onOpenHistory={() => {
+                if (!historyQuery.data) {
+                  return historyQuery.refetch().then(() => undefined);
+                }
+              }}
+              onRestart={handleHistoryRestart}
+              onReview={handleHistoryReview}
+              pendingActionKey={
+                pendingAction?.startsWith("history-")
+                  ? pendingAction.slice("history-".length)
+                  : null
+              }
+            />
+          </div>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+            Cùng luyện tập kiến thức vừa học xong nhé.
+          </p>
+          <div
+            className={isCompleted ? "mt-4 grid gap-3 lg:grid-cols-2" : "mt-4 grid gap-3"}
           >
-            {pendingAction === "start-ALL" ? (
-              <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-            ) : (
-              <RotateCcw className="h-6 w-6" aria-hidden="true" />
-            )}
-            Làm bộ Quiz mới
-          </button>
+            <button
+              ref={entryActionButtonRef}
+              type="button"
+              onClick={() => {
+                if (completedAttempt) {
+                  setQuizResultHistoryMarker(completedAttempt.id, activeQuizSet.id);
+                  setShouldCelebrateResult(false);
+                  setResult(completedAttempt);
+                  return;
+                }
+                void handleStart("ALL");
+              }}
+              aria-busy={!completedAttempt && pendingAction === "start-ALL"}
+              disabled={
+                !completedAttempt && (!hasQuestions || pendingAction === "start-ALL")
+              }
+              className="student-quiz-cta-3d inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl px-3 text-base font-black text-white focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:text-lg"
+            >
+              <EntryActionIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+              {entryActionLabel}
+            </button>
+            {isCompleted ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void handleStart(
+                    "ALL",
+                    undefined,
+                    nextQuizSet,
+                    true,
+                    "start-new-set",
+                  )
+                }
+                aria-busy={pendingAction === "start-new-set"}
+                disabled={
+                  nextQuizSet.questionCount === 0 ||
+                  pendingAction === "start-new-set"
+                }
+                className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-sky-300 bg-white px-3 text-base font-black text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-400/50 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:hover:bg-sky-500/10 sm:px-5 sm:text-lg"
+              >
+                <RotateCcw className="h-6 w-6 shrink-0" aria-hidden="true" />
+                Làm bộ Quiz mới
+              </button>
+            ) : null}
+          </div>
+        </section>
+        {review && reviewOrigin === "HISTORY" ? (
+          <QuizReviewScreen
+            backLabel="Quay lại lịch sử Quiz"
+            currentIndex={reviewIndex}
+            displayScope={reviewDisplayScope}
+            onBack={() => {
+              setReview(null);
+              setHistoryReviewTitle(null);
+            }}
+            onCurrentIndexChange={setReviewIndex}
+            review={review}
+            reviewTitle={historyReviewTitle ?? undefined}
+            stackedOverDialog
+          />
         ) : null}
-      </section>,
+      </>,
     );
   }
 
@@ -616,10 +951,9 @@ export function QuizLearningPanel({
       pendingAction={pendingAction}
       isHintOpen={isHintOpen}
       isExplanationOpen={isExplanationOpen}
-      onAnswerChange={(nextAnswer) =>
-        setAnswers((current) => ({ ...current, [question.id]: nextAnswer }))
-      }
+      onAnswerChange={handleAnswerChange}
       onBack={() => {
+        void quizProgressAutosave.flush();
         clearQuizRunnerHistoryMarker();
         const sourceResult = attemptStatus?.latestSubmittedAttempt ?? null;
         if (attempt.sourceAttemptId && sourceResult) {
@@ -628,6 +962,7 @@ export function QuizLearningPanel({
           setAttemptStatusForQuizSet(activeQuizSet.id, {
             state: "COMPLETED",
             currentAttemptId: null,
+            answeredCount: sourceResult.totalCount,
             checkedCount: sourceResult.totalCount,
             latestSubmittedAttempt: sourceResult,
           });
@@ -636,6 +971,7 @@ export function QuizLearningPanel({
           setAttemptStatusForQuizSet(activeQuizSet.id, (current) => ({
             state: "IN_PROGRESS",
             currentAttemptId: attempt.id,
+            answeredCount: countCompletedQuizAnswers(attempt, answers),
             checkedCount: Object.keys(feedbackByQuestionId).length,
             latestSubmittedAttempt: current?.latestSubmittedAttempt ?? null,
           }));
@@ -650,21 +986,28 @@ export function QuizLearningPanel({
       onToggleHint={() => setIsHintOpen((open) => !open)}
       onToggleExplanation={() => setIsExplanationOpen((open) => !open)}
       onPrevious={() => {
-        setCurrentIndex((index) => Math.max(0, index - 1));
+        const nextIndex = Math.max(0, currentIndex - 1);
+        void quizProgressAutosave.savePosition(attempt.id, nextIndex);
+        setCurrentIndex(nextIndex);
         setIsHintOpen(false);
         setIsExplanationOpen(false);
       }}
       onQuestionSelect={(index) => {
-        setCurrentIndex(
-          Math.min(Math.max(0, index), Math.max(0, attempt.questions.length - 1)),
+        const nextIndex = Math.min(
+          Math.max(0, index),
+          Math.max(0, attempt.questions.length - 1),
         );
+        void quizProgressAutosave.savePosition(attempt.id, nextIndex);
+        setCurrentIndex(nextIndex);
         setIsHintOpen(false);
         setIsExplanationOpen(false);
       }}
       onCheck={handleCheck}
       onSubmit={handleSubmit}
       onNext={() => {
-        setCurrentIndex((index) => Math.min(attempt.questions.length - 1, index + 1));
+        const nextIndex = Math.min(attempt.questions.length - 1, currentIndex + 1);
+        void quizProgressAutosave.savePosition(attempt.id, nextIndex);
+        setCurrentIndex(nextIndex);
         setIsHintOpen(false);
         setIsExplanationOpen(false);
       }}
@@ -740,9 +1083,9 @@ type StoredQuizPosition = {
 function createResumedQuizState(currentAttempt: ResumableQuizAttempt, quizSetId: string) {
   const storedProgress = readStoredQuizPosition(quizSetId);
   const answers: Record<string, StudentAnswer> = Object.fromEntries(
-    currentAttempt.checkedAnswers.map((checkedAnswer) => [
-      checkedAnswer.questionId,
-      checkedAnswer.answerJson,
+    currentAttempt.savedAnswers.map((savedAnswer) => [
+      savedAnswer.questionId,
+      savedAnswer.answerJson,
     ]),
   );
   const feedbackByQuestionId: Record<string, CheckedAnswer> = Object.fromEntries(
@@ -777,8 +1120,9 @@ function createResumedQuizState(currentAttempt: ResumableQuizAttempt, quizSetId:
   const firstUncheckedIndex = currentAttempt.questions.findIndex(
     (question) => feedbackByQuestionId[question.id] === undefined,
   );
-  const preferredIndex =
-    storedProgress?.attemptId === currentAttempt.id
+  const preferredIndex = Number.isInteger(currentAttempt.currentQuestionIndex)
+    ? currentAttempt.currentQuestionIndex
+    : storedProgress?.attemptId === currentAttempt.id
       ? storedProgress.currentIndex
       : firstUncheckedIndex >= 0
         ? firstUncheckedIndex
@@ -792,6 +1136,15 @@ function createResumedQuizState(currentAttempt: ResumableQuizAttempt, quizSetId:
       Math.max(0, currentAttempt.questions.length - 1),
     ),
   };
+}
+
+function countCompletedQuizAnswers(
+  attempt: Pick<QuizAttempt, "questions">,
+  answers: Record<string, StudentAnswer>,
+) {
+  return attempt.questions.filter((question) =>
+    isStudentAnswerComplete(question, answers[question.id]),
+  ).length;
 }
 
 function readStoredQuizPosition(quizSetId: string): StoredQuizPosition | null {
@@ -848,6 +1201,12 @@ function isStoredQuizPosition(value: unknown): value is StoredQuizPosition {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Vui lòng thử lại.";
+}
+
+function formatQuizScore(accuracyPercent: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 1,
+  }).format(Number((accuracyPercent / 10).toFixed(1)));
 }
 
 function waitForCurtain(durationMs: number) {

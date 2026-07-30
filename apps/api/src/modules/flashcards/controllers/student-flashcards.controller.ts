@@ -7,6 +7,7 @@ import { RolesGuard } from "#api/common/auth/roles.guard";
 import type { AuthenticatedUser } from "#api/common/auth/authenticated-request";
 import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import {
+  StartStudentFlashcardSessionDto,
   ToggleStudentFavoriteDto,
   UpdateStudentFlashcardProgressDto,
 } from "#api/modules/flashcards/dto/student-flashcard-progress.dto";
@@ -26,6 +27,38 @@ export class StudentFlashcardsController {
     return this.flashcardsService.listStudentSetsByLesson(lessonId, user.id);
   }
 
+  @Get("lessons/:lessonId/flashcard-history")
+  @ApiOperation({ summary: "List Flashcard study sessions for the current student" })
+  studyHistory(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.flashcardsService.getStudentStudyHistory(lessonId, user.id);
+  }
+
+  @Get("flashcard-sessions/:sessionId")
+  @ApiOperation({ summary: "Get one resumable Flashcard study session" })
+  studySession(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.flashcardsService.getStudentStudySession(sessionId, user.id);
+  }
+
+  @Post("flashcard-sets/:setId/sessions")
+  @ApiOperation({ summary: "Start a new full Flashcard study session" })
+  startStudySession(
+    @Param("setId") setId: string,
+    @Body() body: StartStudentFlashcardSessionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.flashcardsService.startStudentStudySession(
+      setId,
+      user.id,
+      body.resumeExistingProgress ?? false,
+    );
+  }
+
   @Patch("flashcards/:flashcardId/progress")
   @ApiOperation({ summary: "Mark a flashcard as known or not known" })
   updateProgress(
@@ -37,6 +70,7 @@ export class StudentFlashcardsController {
       flashcardId,
       user.id,
       body.isKnown,
+      body.sessionId,
     );
   }
 

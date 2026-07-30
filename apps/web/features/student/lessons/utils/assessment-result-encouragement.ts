@@ -37,3 +37,24 @@ export function getAssessmentResultEncouragement(scoreOnTen: number) {
     message: "Không sao đâu! Xem lại rồi thử lại nhé!",
   };
 }
+
+export function getTestResultComment(scoreOnTen: number) {
+  if (scoreOnTen >= 9) {
+    return {
+      className: "text-amber-600 dark:text-amber-300",
+      message: "Xuất sắc",
+    };
+  }
+
+  if (scoreOnTen >= 7) {
+    return {
+      className: "text-emerald-600 dark:text-emerald-300",
+      message: "Rất tốt",
+    };
+  }
+
+  return {
+    className: "text-rose-600 dark:text-rose-300",
+    message: "Chưa Đạt",
+  };
+}

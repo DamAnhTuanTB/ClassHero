@@ -424,6 +424,11 @@ Acceptance Criteria:
 - Trước ngày mở bài thi, student chưa được làm bài kiểm tra.
 - Student chỉ thấy comment riêng của chính mình.
 - Ghi chú riêng chỉ thuộc student đó.
+- Hai ô điều hướng lesson luôn xuất hiện. Ở bài đầu tiên, ô trái là link
+  `Trở về` dẫn về chi tiết khóa học; từ bài thứ hai, ô này là `Bài học trước`.
+  Nút kế tiếp disabled khi không có bài đứng sau hoặc điểm của bài thi hiện tại chưa đạt
+  `completionMinScore`; sau khi student nộp một bài thi đạt ngưỡng, nút được
+  bật ngay mà không cần tải lại trang.
 - Mọi CTA/link trong student app dẫn trực tiếp tới trang chi tiết buổi học đều
   dùng cùng transition; API lesson phải bắt đầu song song với animation, không
   chờ animation kết thúc mới gọi.
@@ -468,21 +473,23 @@ Actor: Student.
 Các bước:
 
 1. Student chọn một bộ quiz trong buổi học.
-2. UI đọc trạng thái attempt của bộ quiz và ghép số câu đã kiểm tra đang lưu
-   local trên cùng trình duyệt:
-   - Chưa có câu nào được kiểm tra trong lượt hiện tại: hiển thị `Bắt đầu`.
-   - Lượt hiện tại đã có ít nhất một câu được kiểm tra: hiển thị
-     `Tiếp tục vào làm`.
+2. UI đọc trạng thái attempt, đáp án nháp và vị trí câu đã lưu ở server:
+   - Chưa từng mở runner của lượt hiện tại: hiển thị `Bắt đầu`.
+   - Đã từng mở runner của lượt hiện tại, kể cả chưa kiểm tra câu nào: hiển thị
+     `Tiếp tục làm`.
    - Không còn lượt đang làm và đã có lượt hoàn thành: hiển thị `Xem lại` cùng
      action `Làm bộ Quiz mới`.
-3. `Bắt đầu`/`Tiếp tục vào làm` khôi phục lượt `IN_PROGRESS` nếu có; nếu chưa
-   có thì backend tạo quiz attempt mới. `Xem lại` mở kết quả gốc đã cộng dồn của
-   toàn bộ bài Quiz; `Làm bộ Quiz mới` tạo một lượt đầy đủ mới của bộ quiz hiện
-   tại.
-4. Khi mở/resume attempt, API trả sẵn dữ liệu chấm và lời giải cho frontend theo
-   quyết định ưu tiên tốc độ. Student trả lời từng câu; nút `Kiểm tra đáp án`
-   chấm local tức thì, không gọi API theo từng câu và chỉ lúc đó mới hiện
-   feedback/lời giải trên UI.
+3. `Bắt đầu` tạo lượt mới và luôn mở câu đầu tiên. `Tiếp tục làm` khôi phục
+   lượt `IN_PROGRESS`, toàn bộ đáp án đã chọn/đã nhập và đúng câu gần nhất
+   student đứng trước khi Back, F5, đóng web hoặc đổi thiết bị. `Xem lại` mở
+   kết quả gốc đã cộng dồn của toàn bộ bài Quiz; `Làm bộ Quiz mới` tạo một lượt
+   đầy đủ mới của bộ quiz hiện tại.
+4. Khi mở/resume attempt, API trả sẵn dữ liệu chấm, lời giải, đáp án đã lưu,
+   trạng thái đã kiểm tra và `currentQuestionIndex`. Student trả lời từng câu;
+   frontend autosave lựa chọn ngay và debounce input text ngắn. Nút
+   `Kiểm tra đáp án` vẫn chấm local tức thì để không tăng độ trễ cảm nhận, đồng
+   thời đồng bộ trạng thái đã kiểm tra về server; chỉ lúc đó UI mới hiện
+   feedback/lời giải.
    Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
 5. Student nộp bài; frontend gửi toàn bộ answer trong một request.
 6. Backend validate đúng tập câu của attempt và chấm lại authoritative.
@@ -492,13 +499,21 @@ Các bước:
    summary riêng của lượt con.
 9. UI cho chọn làm lại tất cả câu của bài gốc, làm lại các câu còn sai trong
    kết quả gốc hoặc quay về panel Quiz.
+10. Trong màn xem lại, câu đầu đổi action trái từ `Câu trước` thành `Trở về`;
+    câu cuối đổi action phải từ `Câu tiếp` thành `Kết thúc xem lại`. Hai action
+    biên quay lại đúng màn nguồn. Nếu mở từ modal lịch sử, dòng ngữ cảnh dùng
+    tên bộ vừa chọn thay cho copy xem lại chung.
 
 Acceptance Criteria:
 
 - Attempt lưu đầy đủ lịch sử.
-- Nhãn CTA ở panel Quiz được suy ra từ attempt server kết hợp tiến độ local theo
-  `attemptId`; sau refresh/F5 trên cùng trình duyệt vẫn đúng, không chỉ dựa vào
-  React state đang giữ trong bộ nhớ.
+- Nhãn CTA ở panel Quiz được suy ra từ trạng thái attempt server; mọi attempt
+  `IN_PROGRESS` dùng `Tiếp tục làm` dù chưa kiểm tra câu nào. Đáp án nháp,
+  trạng thái đã kiểm tra và vị trí câu gần nhất được lưu theo `attemptId` ở
+  server; sau Back, refresh/F5, đóng/mở lại web hoặc đổi thiết bị vẫn đúng,
+  không chỉ dựa vào React state/browser storage.
+- Mục Quiz `Đang làm` trong lịch sử hiển thị `X/Y câu đã làm`, trong đó `X` là
+  số câu đã có đáp án đầy đủ đã autosave.
 - Câu đúng/sai tính nhất quán.
 - Sau mọi lần submit, màn kết quả và các action xem lại/làm lại phải dùng attempt
   gốc đã cộng dồn.
@@ -506,6 +521,8 @@ Acceptance Criteria:
   nhất và không phát lại hiệu ứng ăn mừng; nếu student đã quay về panel Quiz thì
   F5 vẫn giữ panel.
 - Student không sửa được attempt đã submit.
+- Điều hướng xem lại không có nút biên bị disabled: câu đầu luôn có `Trở về`,
+  câu cuối luôn có `Kết thúc xem lại`; câu giữa vẫn dùng `Câu trước`/`Câu tiếp`.
 
 ---
 
@@ -516,13 +533,18 @@ Actor: Student.
 Các bước:
 
 1. Student mở tab Flashcard trong lesson.
-2. Panel đọc progress của bộ Flashcard được duyệt đầu tiên và hiển thị CTA:
-   - `Bắt đầu` nếu chưa review thẻ nào; một lượt chỉ mới mở nhưng chưa đánh dấu
-     thẻ nào vẫn giữ nhãn này, và khi bấm lại phải mở từ thẻ đầu.
-   - `Tiếp tục vào học` nếu lượt đang học đã có ít nhất một trạng thái được lưu
-     hoặc bộ còn thẻ chưa review sau progress trước đó; khi bấm phải giữ đúng
-     vị trí của lượt đang dở.
+2. Panel đọc session/progress của bộ Flashcard được duyệt đầu tiên và hiển thị
+   CTA:
+   - `Bắt đầu` nếu chưa từng mở runner của lượt hiện tại; khi bấm luôn mở thẻ
+     đầu tiên.
+   - `Tiếp tục học` nếu lượt hiện tại đã từng mở, kể cả chưa đánh dấu thẻ nào;
+     khi bấm phải giữ đúng thẻ gần nhất trước khi Back, F5 hoặc đóng web trên
+     cùng trình duyệt.
    - `Xem lại` nếu đã review toàn bộ thẻ.
+   - Nếu bộ hiện tại có `0 thẻ`, vẫn hiển thị `Bắt đầu` nhưng CTA phải disabled
+     và không được tạo study session.
+   - Nếu chưa có bộ Flashcard, panel vẫn hiển thị như trạng thái bình thường với
+     `0 thẻ` và CTA `Bắt đầu` disabled, không đổi sang empty-state riêng.
 3. Student bấm CTA; UI dùng transition cùng chuẩn Quiz rồi mở runner Flashcard
    toàn màn hình với header ClassHero, tiến độ và action quay lại.
 4. Student lật từng thẻ, có thể yêu thích, rồi đánh dấu `Đã thuộc` hoặc
@@ -540,6 +562,10 @@ cả` tạo lượt mới từ thẻ đầu tiên, reset bộ đếm và nhãn l
    thẻ đang được yêu thích trong bộ, hiển thị lại nhãn `Đã thuộc`/`Chưa thuộc` từ
    progress đã lưu và bị khóa khi danh sách này rỗng; trạng thái khóa vẫn giữ tone
    đỏ/hồng semantic của action yêu thích thay vì chuyển sang xám.
+8. Khi mở `Xem lại toàn bộ` từ modal lịch sử Flashcard, runner review hiển thị
+   tên bộ vừa chọn. Thẻ đầu dùng `Trở về`, thẻ cuối dùng
+   `Kết thúc xem lại`, thẻ giữa giữ `Thẻ trước`/`Thẻ sau`. Hai action biên quay
+   lại chính modal lịch sử vẫn được giữ mounted ở đúng vị trí cuộn.
 
 Acceptance Criteria:
 
@@ -556,6 +582,8 @@ Acceptance Criteria:
 - Lượt xem lại yêu thích chỉ chứa các thẻ được yêu thích tại thời điểm bắt đầu
   lượt, khôi phục trạng thái known/unknown đã lưu và không tự đổi danh sách khi
   trạng thái yêu thích thay đổi giữa lượt.
+- Review toàn bộ từ lịch sử không chạy luồng hoàn thành session và không dựng
+  lại modal khi thoát; modal cũ hiện lại tức thì với cùng scroll/state.
 
 ---
 
@@ -575,6 +603,10 @@ Các bước:
 3. Backend tạo `test_attempt`.
 4. Student làm bài trong thời gian quy định.
    Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
+   Nếu Student bấm Back, UI mở modal cảnh báo lượt hiện tại sẽ bị hủy và phải
+   làm bài thi mới; chọn ở lại phải giữ nguyên câu và đáp án đang làm.
+   Nếu Student F5/reload/đóng trang, browser mở cảnh báo rời trang; nếu vẫn tiếp
+   tục thì runner hiện tại bị hủy, không resume lượt cũ.
 5. Student nộp bài.
 6. Backend chấm bài.
 7. Backend tính điểm thang 10.
@@ -588,6 +620,29 @@ Acceptance Criteria:
 
 - Không được làm bài trước giờ mở.
 - Làm lại nhiều lần được.
+- Browser Back và back button trong header có cùng modal/outcome; F5/reload dùng
+  cảnh báo hệ thống của browser.
+- Lượt Bài thi đang làm không khôi phục sau Back đã xác nhận hoặc reload; Student
+  phải bắt đầu một lượt mới.
+- Khi quay lại tab Bài thi và status đã có `latestSubmittedAttempt`, CTA chính đổi từ
+  `Bắt đầu bài thi` thành `Làm bài thi mới`, đồng thời hiển thị
+  `Xem lại bài thi`. Action xem lại tải attempt đã hoàn thành gần nhất/tốt nhất
+  từ `latestSubmittedAttempt.id`; action làm mới tạo một attempt mới như bình
+  thường. Quy tắc này áp dụng cho mọi attempt đã nộp, kể cả chưa đạt.
+- Nếu bộ đề hiện tại có `0 câu`, panel hiển thị `0 câu`, ẩn thời lượng và khóa
+  mọi action `Bắt đầu bài thi`/`Làm bài thi mới`, kể cả action trong lịch sử.
+- Nếu chưa có bộ đề nào, panel Bài thi vẫn hiển thị đầy đủ với `0 câu`, không
+  có thời lượng và CTA bắt đầu disabled.
+- Action `Làm Quiz`/`Học Flashcard` trong panel Bài thi vẫn chuyển tới tab tương
+  ứng khi chưa có set hoặc số item bằng `0`; trường hợp này không chạy
+  transition và không gọi API tạo attempt/session.
+- Student có thể mở `Lịch sử Bài thi` từ icon cài đặt. Hệ thống đánh dấu
+  `Bài thi hiện tại` tại mục đầu danh sách: ưu tiên bộ chưa làm mới nếu có,
+  nếu không thì là lượt vừa nộp gần nhất. Mục chưa làm cho phép student bắt đầu
+  ngay tại lịch sử, còn lượt đã hoàn thành chỉ có action xem lại và không có
+  action làm lại.
+- Khi mọi mục trong lịch sử Quiz/Flashcard đều đã hoàn thành, UI gắn
+  `Bộ hiện tại` vào đúng set đang được chọn để phân biệt.
 - Kết quả tốt nhất ưu tiên điểm cao, sau đó thời gian nhanh.
 - Lesson completed khi best score >= 7.
 - Parent xem được kết quả tốt nhất.

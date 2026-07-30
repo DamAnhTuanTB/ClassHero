@@ -38,6 +38,12 @@ export default defineConfig({
         ...devices["Pixel 7"],
       },
     },
+    {
+      name: "webkit-mobile",
+      use: {
+        ...devices["iPhone 14"],
+      },
+    },
   ],
   webServer: {
     command: "pnpm build && pnpm exec next start --hostname localhost --port 3000",

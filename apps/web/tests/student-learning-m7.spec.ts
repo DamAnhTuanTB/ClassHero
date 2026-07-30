@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 const apiBaseUrl = "http://localhost:4000/api/v1";
 const lessonId = "lesson-m7";
@@ -19,7 +19,9 @@ test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Tes
   await expect(page.locator("html")).toHaveClass(/dark/);
   await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
   expect(
-    await page.getByRole("main").evaluate((element) => getComputedStyle(element).background),
+    await page
+      .getByRole("main")
+      .evaluate((element) => getComputedStyle(element).background),
   ).not.toContain("rgb(255, 255, 255)");
   await page.screenshot({
     path: testInfo.outputPath("student-lesson-dark.png"),
@@ -81,14 +83,14 @@ test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Tes
   });
 
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
-  await page.getByRole("button", { name: "Bắt đầu bài kiểm tra" }).click();
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
   await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("student-test-runner-dark.png"),
   });
   await page.getByRole("button", { name: /A.*5/ }).click();
-  await page.getByRole("button", { name: "Nộp bài kiểm tra" }).click();
-  await expect(page.getByText("Bạn cần phải làm lại bài kiểm tra mới.")).toBeVisible();
+  await page.getByRole("button", { name: "Nộp bài thi" }).click();
+  await expect(page.getByText("Bạn cần phải làm lại bài thi mới.")).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("student-test-result-dark.png"),
   });
@@ -155,6 +157,679 @@ test("quiz status preloads before tab click and tab changes do not mount transie
   expect(statusRequestCount).toBe(1);
 });
 
+test("lesson navigation stays visible and unlocks the next lesson after a passing test", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    includeNextLesson: true,
+    testReady: true,
+    testPasses: true,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  const backToCourseLink = page.getByRole("link", {
+    name: "Trở về",
+    exact: true,
+  });
+  const nextLessonButton = page.getByRole("button", {
+    name: "Bài học kế tiếp Buổi 2: Giá trị tuyệt đối",
+  });
+  await expect(backToCourseLink).toBeVisible();
+  await expect(backToCourseLink).toHaveAttribute("href", "/student/courses/toan-7");
+  await expect(nextLessonButton).toBeVisible();
+  await expect(nextLessonButton).toBeDisabled();
+
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
+  await page.getByRole("button", { name: /B.*6/ }).click();
+  await page.getByRole("button", { name: "Nộp bài thi" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dùng điểm bài này" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Quay lại màn Bài thi" }).click();
+
+  await expect(nextLessonButton).toHaveCount(0);
+  await expect(
+    page.getByRole("link", {
+      name: "Bài học kế tiếp Buổi 2: Giá trị tuyệt đối",
+    }),
+  ).toBeVisible();
+});
+
+test("completed test offers review and a new test attempt", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    testCompleted: true,
+    testPasses: true,
+    testReady: true,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Xem lại bài thi" })).toBeVisible();
+  const newTestButton = page.getByRole("button", {
+    name: "Làm bài thi mới",
+    exact: true,
+  });
+  await expect(newTestButton).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Bài học kế tiếp Đây là bài học cuối cùng",
+    }),
+  ).toBeDisabled();
+  await expect(newTestButton).toHaveClass(/border-emerald-500/);
+  await expect(newTestButton).toHaveClass(/bg-white/);
+
+  await page.getByRole("button", { name: "Xem lại bài thi" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+  await page.getByRole("button", { name: "Xem lại tất cả" }).click();
+  const reviewScreen = page.getByTestId("test-review-screen");
+  await expect(reviewScreen.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
+  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await reviewScreen.getByRole("button", { name: "Quay lại kết quả Bài thi" }).click();
+
+  const retryTestButton = page.getByRole("button", { name: "Làm lại bài thi mới" });
+  await expect(retryTestButton).toBeVisible();
+  await retryTestButton.click();
+  await expect(page.getByTestId("test-runner-screen")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("empty Quiz, Flashcard, and Test disable start actions", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCardCount: 0,
+    omitFlashcardSet: true,
+    omitQuizSet: true,
+    omitTestSet: true,
+    quizQuestionCount: 0,
+    testQuestionCount: 0,
+    testFlashcardCompleted: false,
+    testPasses: false,
+    testQuizCompleted: false,
+    testReady: false,
+  });
+
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await expect(page.getByText("0 câu", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeDisabled();
+
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+  await expect(page.getByText("0 thẻ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeDisabled();
+
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+  await expect(page.getByText("0 câu", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("test-duration-badge")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Làm Quiz" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Làm Flashcard" })).toBeDisabled();
+});
+
+test("test history shows the current unfinished test and starts it", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setupStudentLearningApiMock(page, {
+    testPasses: false,
+    testReady: true,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  const settingsButton = page.getByRole("button", { name: "Mở cài đặt Bài thi" });
+  const [durationBox, settingsBox] = await Promise.all([
+    page.getByTestId("test-duration-badge").boundingBox(),
+    settingsButton.boundingBox(),
+  ]);
+  expect(durationBox).not.toBeNull();
+  expect(settingsBox).not.toBeNull();
+  expect(settingsBox!.x).toBeGreaterThan(durationBox!.x + durationBox!.width);
+
+  await settingsButton.click();
+  await page.getByRole("menuitem", { name: "Lịch sử Bài thi" }).click();
+  const historyDialog = page.getByRole("dialog", { name: "Lịch sử Bài thi" });
+  const currentTestBadge = historyDialog
+    .locator("article")
+    .first()
+    .getByText("Bài thi hiện tại");
+  await expect(currentTestBadge).toHaveClass(/bg-emerald-200/);
+  await expect(currentTestBadge).toHaveClass(/border-emerald-400/);
+  await expect(historyDialog.getByText("Bài thi hiện tại")).toHaveCount(1);
+  await expect(historyDialog.getByText("Chưa làm")).toBeVisible();
+  await expect(historyDialog.getByText("10:00", { exact: true })).toHaveCount(0);
+  await expect(
+    historyDialog.getByRole("button", { name: "Bắt đầu bài thi" }),
+  ).toBeVisible();
+  await expect(
+    historyDialog.getByRole("button", { name: "Xem lại bài thi" }),
+  ).toHaveCount(0);
+
+  await historyDialog.getByRole("button", { name: "Bắt đầu bài thi" }).click();
+  await expect(page.getByTestId("test-runner-screen")).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("completed test history only offers review and marks the current test", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setupStudentLearningApiMock(page, {
+    testCompleted: true,
+    testPasses: true,
+    testReady: true,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  await page.getByRole("button", { name: "Mở cài đặt Bài thi" }).click();
+  await page.getByRole("menuitem", { name: "Lịch sử Bài thi" }).click();
+  const historyDialog = page.getByRole("dialog", { name: "Lịch sử Bài thi" });
+  const currentTestBadge = historyDialog
+    .locator("article")
+    .first()
+    .getByText("Bài thi hiện tại");
+  await expect(currentTestBadge).toHaveClass(/bg-emerald-200/);
+  await expect(currentTestBadge).toHaveClass(/border-emerald-400/);
+  await expect(historyDialog.getByText("Bài thi hiện tại")).toHaveCount(1);
+  await expect(historyDialog.getByRole("heading", { name: "Bộ đề 2" })).toBeVisible();
+  await expect(historyDialog.getByRole("heading", { name: "Bộ đề 1" })).toBeVisible();
+  await expect(historyDialog.getByText("Đã hoàn thành")).toHaveCount(2);
+  await expect(historyDialog.getByText("00:45", { exact: true })).toHaveCount(0);
+  await expect(
+    historyDialog.getByRole("button", { name: "Xem lại bài thi" }),
+  ).toHaveCount(2);
+  await expect(historyDialog.getByRole("button", { name: /Làm lại/ })).toHaveCount(0);
+
+  await historyDialog.getByRole("button", { name: "Xem lại bài thi" }).first().click();
+  await expect(page.getByTestId("test-history-review-screen")).toBeVisible();
+  await expect(page.getByTestId("learning-history-overlay")).toHaveAttribute(
+    "data-covered-by-child-surface",
+    "true",
+  );
+  await expectNoFrameworkOverlay(page);
+});
+
+test("Quiz and Flashcard history label active sessions with activity-specific copy", async ({
+  page,
+}) => {
+  let quizHistoryRequestCount = 0;
+  let flashcardHistoryRequestCount = 0;
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith(`/student/lessons/${lessonId}/quiz-history`)) {
+      quizHistoryRequestCount += 1;
+    }
+    if (pathname.endsWith(`/student/lessons/${lessonId}/flashcard-history`)) {
+      flashcardHistoryRequestCount += 1;
+    }
+  });
+  await setupStudentLearningApiMock(page, { testReady: false, testPasses: false });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await expect(page.getByRole("heading", { name: "Quiz" })).toHaveClass(/text-lg/);
+
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+  const quizAnswerAutosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH",
+  );
+  await page.getByRole("button", { name: /A.*3/ }).click();
+  await quizAnswerAutosave;
+  await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
+  await page
+    .getByRole("dialog", { name: "Thoát bài Quiz?" })
+    .getByRole("button", { name: "Vẫn thoát" })
+    .click();
+  const quizSettingsButton = page.getByRole("button", {
+    name: "Mở cài đặt Quiz",
+  });
+  const quizCountPill = quizSettingsButton.locator("xpath=preceding-sibling::span[1]");
+  await expectLearningHistoryControlsToBeVisuallyDistinct(
+    quizCountPill,
+    quizSettingsButton,
+  );
+  expect(quizHistoryRequestCount).toBe(0);
+  await quizSettingsButton.click();
+  expect(quizHistoryRequestCount).toBe(0);
+  const quizHistoryMenu = page.getByRole("menu");
+  await expectLearningHistoryMenuToBeDistinct(quizHistoryMenu);
+  const quizHistoryMenuItem = page.getByRole("menuitem", {
+    name: "Các bộ Quiz đã làm",
+  });
+  const menuItemColorsBeforeHover = await quizHistoryMenuItem.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      text: style.color,
+    };
+  });
+  await quizHistoryMenuItem.hover();
+  const menuItemColorsAfterHover = await quizHistoryMenuItem.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      text: style.color,
+    };
+  });
+  expect(menuItemColorsAfterHover.background).toBe(menuItemColorsBeforeHover.background);
+  if (await page.evaluate(() => window.matchMedia("(hover: hover)").matches)) {
+    expect(menuItemColorsAfterHover.text).not.toBe(menuItemColorsBeforeHover.text);
+  }
+  await expect(page.getByRole("button", { name: "Đóng menu" })).toHaveCount(0);
+  await quizHistoryMenuItem.click();
+  expect(quizHistoryRequestCount).toBe(1);
+  const quizHistory = page.getByRole("dialog", { name: "Các bộ Quiz đã làm" });
+  await expect(quizHistory.getByText("Mỗi lượt được lưu thành một bộ riêng")).toHaveCount(
+    0,
+  );
+  await expect(quizHistory.getByText("Đang làm")).toHaveClass(/bg-sky-100/);
+  await expect(quizHistory.getByText("1/1 câu đã làm")).toBeVisible();
+  await expect(quizHistory.getByText(/^\d{2}:\d{2} \d{2}-\d{2}-\d{4}$/)).toBeVisible();
+  await expect(quizHistory.getByRole("button", { name: "Tiếp tục làm" })).toBeVisible();
+  await quizHistory.getByRole("button", { name: "Đóng" }).click();
+  await quizSettingsButton.click();
+  await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).click();
+  expect(quizHistoryRequestCount).toBe(1);
+  await expect(page.getByText("Đang tải lịch sử")).toHaveCount(0);
+  await page
+    .getByRole("dialog", { name: "Các bộ Quiz đã làm" })
+    .getByRole("button", { name: "Tiếp tục làm" })
+    .click();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Các bộ Quiz đã làm" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toHaveCount(0);
+
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+  await expect(page.getByRole("heading", { name: "Flashcard" })).toHaveClass(/text-lg/);
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+  await page.getByRole("button", { name: "Quay lại màn Flashcard" }).click();
+  await page
+    .getByRole("dialog", { name: "Thoát lượt học Flashcard?" })
+    .getByRole("button", { name: "Vẫn thoát" })
+    .click();
+  const flashcardSettingsButton = page.getByRole("button", {
+    name: "Mở cài đặt Flashcard",
+  });
+  const flashcardCountPill = flashcardSettingsButton.locator(
+    "xpath=preceding-sibling::span[1]",
+  );
+  await expectLearningHistoryControlsToBeVisuallyDistinct(
+    flashcardCountPill,
+    flashcardSettingsButton,
+  );
+  expect(flashcardHistoryRequestCount).toBe(0);
+  await flashcardSettingsButton.click();
+  expect(flashcardHistoryRequestCount).toBe(0);
+  await expectLearningHistoryMenuToBeDistinct(page.getByRole("menu"));
+  await expect(page.getByRole("button", { name: "Đóng menu" })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Các bộ Flashcard đã học" }).click();
+  expect(flashcardHistoryRequestCount).toBe(1);
+  const flashcardHistory = page.getByRole("dialog", {
+    name: "Các bộ Flashcard đã học",
+  });
+  await expect(flashcardHistory.getByText("Đang học")).toHaveClass(/bg-violet-100/);
+  await expect(
+    flashcardHistory.getByRole("button", { name: "Tiếp tục học" }),
+  ).toBeVisible();
+  await flashcardHistory.getByRole("button", { name: "Tiếp tục học" }).click();
+  await expect(
+    page.getByRole("status", { name: "Đang chuẩn bị Flashcard" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Các bộ Flashcard đã học" }),
+  ).toBeVisible();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Flashcard" })).toHaveCount(
+    0,
+  );
+});
+
+test("quiz history keeps the same scrolled modal mounted behind review", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    quizHistoryCompletedItemCount: 12,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Mở cài đặt Quiz" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).click();
+  const historyDialog = page.getByRole("dialog", {
+    name: "Các bộ Quiz đã làm",
+  });
+  const historyOverlay = page.getByTestId("learning-history-overlay");
+  const historyDialogElement = historyOverlay.locator('[role="dialog"]');
+  const historyScrollRegion = historyDialog.getByTestId("learning-history-scroll-region");
+  const reviewButton = historyDialog.getByRole("button", { name: "Xem lại" }).nth(7);
+  await reviewButton.scrollIntoViewIfNeeded();
+  const scrollTopBeforeReview = await historyScrollRegion.evaluate(
+    (element) => element.scrollTop,
+  );
+  expect(scrollTopBeforeReview).toBeGreaterThan(0);
+  await historyScrollRegion.evaluate((element) => {
+    (
+      window as typeof window & {
+        __quizHistoryScrollRegion?: HTMLElement;
+      }
+    ).__quizHistoryScrollRegion = element as HTMLElement;
+  });
+
+  await reviewButton.click();
+  await expect(
+    page.getByTestId("quiz-review-screen").getByText("Bộ 5", { exact: true }),
+  ).toBeVisible();
+  await expect(historyDialogElement).toHaveAttribute("aria-hidden", "true");
+  await expect(historyOverlay).toHaveCSS("z-index", "110");
+  await expect(page.getByTestId("quiz-review-screen")).toHaveCSS("z-index", "115");
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __quizHistoryScrollRegion?: HTMLElement;
+          }
+        ).__quizHistoryScrollRegion?.isConnected ?? false,
+    ),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Trở về", exact: true }).click();
+  await expect(historyDialogElement).not.toHaveAttribute("aria-hidden", "true");
+
+  const restoredHistoryDialog = page.getByRole("dialog", {
+    name: "Các bộ Quiz đã làm",
+  });
+  const restoredScrollRegion = restoredHistoryDialog.getByTestId(
+    "learning-history-scroll-region",
+  );
+  const restoredState = await restoredScrollRegion.evaluate((element) => ({
+    isSameElement:
+      (
+        window as typeof window & {
+          __quizHistoryScrollRegion?: HTMLElement;
+        }
+      ).__quizHistoryScrollRegion === (element as HTMLElement),
+    scrollTop: element.scrollTop,
+  }));
+  expect(restoredState.isSameElement).toBe(true);
+  expect(restoredState.scrollTop).toBeCloseTo(scrollTopBeforeReview, 0);
+});
+
+test("quiz history modal survives review of a non-active set during status loading", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    alternateQuizStatusDelayMs: 2_000,
+    includeAlternateQuizSet: true,
+    quizHistoryCompletedItemCount: 1,
+    quizHistorySetId: "quiz-set-m7-history",
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Mở cài đặt Quiz" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).click();
+  const historyOverlay = page.getByTestId("learning-history-overlay");
+  const historyDialog = page.getByRole("dialog", {
+    name: "Các bộ Quiz đã làm",
+  });
+  await historyOverlay.evaluate((element) => {
+    (
+      window as typeof window & {
+        __quizHistoryOverlayBeforeCrossSetReview?: HTMLElement;
+      }
+    ).__quizHistoryOverlayBeforeCrossSetReview = element as HTMLElement;
+  });
+
+  await historyDialog.getByRole("button", { name: "Xem lại" }).click();
+  await expect(page.getByTestId("quiz-review-screen")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __quizHistoryOverlayBeforeCrossSetReview?: HTMLElement;
+          }
+        ).__quizHistoryOverlayBeforeCrossSetReview?.isConnected ?? false,
+    ),
+  ).toBe(true);
+
+  await page.getByRole("button", { name: "Trở về", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Các bộ Quiz đã làm" })).toBeVisible();
+});
+
+test("quiz review uses history title and boundary exit actions", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    quizHistoryCompletedItemCount: 1,
+    quizReviewQuestionCount: 3,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Mở cài đặt Quiz" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).click();
+  const historyDialog = page.getByRole("dialog", {
+    name: "Các bộ Quiz đã làm",
+  });
+  const reviewButton = historyDialog.getByRole("button", {
+    name: "Xem lại",
+  });
+  await reviewButton.click();
+
+  const reviewScreen = page.getByTestId("quiz-review-screen");
+  await expect(reviewScreen.getByText("Bộ 1", { exact: true })).toBeVisible();
+  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/3" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Trở về" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Câu tiếp" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Câu trước" })).toHaveCount(0);
+  await reviewScreen.getByRole("button", { name: "Trở về" }).click();
+  await expect(historyDialog).toBeVisible();
+
+  await reviewButton.click();
+  await reviewScreen.getByRole("button", { name: "Câu tiếp" }).click();
+  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Câu trước" })).toBeVisible();
+  await reviewScreen.getByRole("button", { name: "Câu tiếp" }).click();
+  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }),
+  ).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Câu tiếp" })).toHaveCount(0);
+  await reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }).click();
+  await expect(historyDialog).toBeVisible();
+});
+
+test("flashcard review keeps history mounted and uses boundary exit actions", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCardCount: 3,
+    flashcardCompleted: true,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Mở cài đặt Flashcard" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Flashcard đã học" }).click();
+  const historyDialog = page.getByRole("dialog", {
+    name: "Các bộ Flashcard đã học",
+  });
+  const historyOverlay = page.getByTestId("learning-history-overlay");
+  const historyDialogElement = historyOverlay.locator('[role="dialog"]');
+  const historyScrollRegion = historyDialog.getByTestId("learning-history-scroll-region");
+  await historyScrollRegion.evaluate((element) => {
+    (
+      window as typeof window & {
+        __flashcardHistoryScrollRegion?: HTMLElement;
+      }
+    ).__flashcardHistoryScrollRegion = element as HTMLElement;
+  });
+  const reviewButton = historyDialog.getByRole("button", {
+    name: "Xem lại",
+  });
+  await reviewButton.click();
+
+  const reviewScreen = page.getByTestId("flashcard-runner-screen");
+  await expect(historyDialogElement).toHaveAttribute("aria-hidden", "true");
+  await expect(historyOverlay).toHaveAttribute("data-covered-by-child-surface", "true");
+  await expect(reviewScreen).toHaveCSS("z-index", "115");
+  await expect(reviewScreen.getByText("Bộ 1", { exact: true })).toBeVisible();
+  await expect(reviewScreen.getByRole("heading", { name: "Thẻ 1/3" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Trở về" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Thẻ sau" })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __flashcardHistoryScrollRegion?: HTMLElement;
+          }
+        ).__flashcardHistoryScrollRegion?.isConnected ?? false,
+    ),
+  ).toBe(true);
+  await reviewScreen.getByRole("button", { name: "Trở về" }).click();
+  await expect(historyDialogElement).not.toHaveAttribute("aria-hidden", "true");
+  await expect(historyOverlay).not.toHaveAttribute(
+    "data-covered-by-child-surface",
+    "true",
+  );
+  await expect(historyDialog).toBeVisible();
+  expect(
+    await historyDialog.getByTestId("learning-history-scroll-region").evaluate(
+      (element) =>
+        (
+          window as typeof window & {
+            __flashcardHistoryScrollRegion?: HTMLElement;
+          }
+        ).__flashcardHistoryScrollRegion === (element as HTMLElement),
+    ),
+  ).toBe(true);
+
+  await reviewButton.click();
+  await reviewScreen.getByRole("button", { name: "Thẻ sau" }).click();
+  await expect(reviewScreen.getByRole("heading", { name: "Thẻ 2/3" })).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Thẻ trước" })).toBeVisible();
+  await reviewScreen.getByRole("button", { name: "Thẻ sau" }).click();
+  await expect(reviewScreen.getByRole("heading", { name: "Thẻ 3/3" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }),
+  ).toBeVisible();
+  await expect(reviewScreen.getByRole("button", { name: "Hoàn thành" })).toHaveCount(0);
+  await reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }).click();
+  await expect(historyDialog).toBeVisible();
+});
+
+test("mobile tap keeps the Quiz history sheet mounted behind review", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.endsWith("-mobile"));
+
+  await setupStudentLearningApiMock(page, {
+    quizHistoryCompletedItemCount: 12,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Mở cài đặt Quiz" }).tap();
+  await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).tap();
+
+  const historyOverlay = page.getByTestId("learning-history-overlay");
+  const historyDialog = page.getByRole("dialog", {
+    name: "Các bộ Quiz đã làm",
+  });
+  const historyScrollRegion = historyDialog.getByTestId("learning-history-scroll-region");
+  const reviewButton = historyDialog.getByRole("button", { name: "Xem lại" }).nth(7);
+  await reviewButton.scrollIntoViewIfNeeded();
+  const scrollTopBeforeReview = await historyScrollRegion.evaluate(
+    (element) => element.scrollTop,
+  );
+  await historyOverlay.evaluate((element) => {
+    (
+      window as typeof window & {
+        __mobileQuizHistoryOverlay?: HTMLElement;
+      }
+    ).__mobileQuizHistoryOverlay = element as HTMLElement;
+  });
+
+  await reviewButton.tap();
+  const reviewScreen = page.getByTestId("quiz-review-screen");
+  await expect(reviewScreen.getByText("Bộ 5", { exact: true })).toBeVisible();
+  await expect(historyOverlay).toHaveAttribute("data-covered-by-child-surface", "true");
+  await expect(historyOverlay).not.toHaveAttribute("inert", "");
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __mobileQuizHistoryOverlay?: HTMLElement;
+          }
+        ).__mobileQuizHistoryOverlay?.isConnected ?? false,
+    ),
+  ).toBe(true);
+
+  await reviewScreen.getByRole("button", { name: "Trở về" }).tap();
+  await expect(historyDialog).toBeVisible();
+  await expect(historyOverlay).not.toHaveAttribute(
+    "data-covered-by-child-surface",
+    "true",
+  );
+  const restoredState = await historyScrollRegion.evaluate((element) => ({
+    isSameElement:
+      (
+        window as typeof window & {
+          __mobileQuizHistoryOverlay?: HTMLElement;
+        }
+      ).__mobileQuizHistoryOverlay ===
+      element.closest('[data-testid="learning-history-overlay"]'),
+    scrollTop: element.scrollTop,
+  }));
+  expect(restoredState.isSameElement).toBe(true);
+  expect(restoredState.scrollTop).toBeCloseTo(scrollTopBeforeReview, 0);
+});
+
+async function expectLearningHistoryControlsToBeVisuallyDistinct(
+  countPill: Locator,
+  settingsButton: Locator,
+) {
+  const [countBox, settingsBox] = await Promise.all([
+    countPill.boundingBox(),
+    settingsButton.boundingBox(),
+  ]);
+  expect(countBox).not.toBeNull();
+  expect(settingsBox).not.toBeNull();
+  expect(
+    Math.abs((countBox?.height ?? 0) - (settingsBox?.height ?? 0)),
+  ).toBeLessThanOrEqual(0.5);
+  expect(countBox?.height).toBeCloseTo(32, 0);
+  await expect(countPill).toHaveCSS("padding-left", "11px");
+  expect(
+    (settingsBox?.x ?? 0) - ((countBox?.x ?? 0) + (countBox?.width ?? 0)),
+  ).toBeCloseTo(6, 0);
+  await expect(settingsButton.locator("svg")).toHaveCSS("width", "21px");
+  await expect(countPill).toHaveCSS("font-size", "13px");
+
+  const [countBackground, settingsBackground] = await Promise.all([
+    countPill.evaluate((element) => getComputedStyle(element).backgroundColor),
+    settingsButton.evaluate((element) => getComputedStyle(element).backgroundColor),
+  ]);
+  expect(settingsBackground).not.toBe(countBackground);
+}
+
+async function expectLearningHistoryMenuToBeDistinct(menu: Locator) {
+  await expect(menu).toHaveCSS("outline-width", "1px");
+  const menuBox = await menu.boundingBox();
+  expect(menuBox?.width ?? 0).toBeLessThan(288);
+  expect(menuBox?.height).toBeCloseTo(56, 0);
+  const menuItem = menu.getByRole("menuitem");
+  await expect(menuItem.locator(".lucide-history")).toHaveCSS("width", "18px");
+  expect(
+    await menuItem.evaluate((element) => {
+      return element.scrollWidth <= element.clientWidth;
+    }),
+  ).toBe(true);
+  expect(
+    await menu.evaluate((element) => getComputedStyle(element).backgroundColor),
+  ).not.toBe("rgba(0, 0, 0, 0)");
+}
+
 test("lesson summary and quiz reveal feedback only after explicit actions", async ({
   page,
 }) => {
@@ -184,6 +859,7 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await expect(incompleteAlert).toHaveCount(0);
   await finishButton.click();
   await expect(incompleteAlert).toHaveText("Cần hoàn thành câu hỏi 1 để tiếp tục!");
+  await expect(incompleteAlert).toHaveClass(/items-center/);
   await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toHaveCount(0);
 
   const firstOption = page.getByRole("button", { name: /A.*3/ });
@@ -211,6 +887,7 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await expect(page.getByRole("button", { name: "Xem lại câu sai" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Làm lại tất cả" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm lại câu sai" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Làm bộ Quiz mới" })).toBeVisible();
   await expect(page.getByTestId("assessment-result-confetti")).toBeAttached();
   await page.waitForTimeout(500);
   await expect(page.getByTestId("assessment-result-confetti")).toBeAttached();
@@ -222,6 +899,50 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm bộ Quiz mới" })).toBeVisible();
+  await page.getByRole("button", { name: "Mở cài đặt Quiz" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Quiz đã làm" }).click();
+  const quizHistoryDialog = page.getByRole("dialog", {
+    name: "Các bộ Quiz đã làm",
+  });
+  await expect(quizHistoryDialog.locator("header")).toHaveCSS(
+    "border-bottom-width",
+    "2px",
+  );
+  await expect(quizHistoryDialog.locator("header")).toHaveClass(/bg-sky-100/);
+  await expect(
+    quizHistoryDialog.getByRole("heading", { name: "Các bộ Quiz đã làm" }),
+  ).toHaveClass(/text-sky-800/);
+  await expect(quizHistoryDialog.getByRole("heading", { name: "Bộ 1" })).toBeVisible();
+  await expect(quizHistoryDialog.getByText("Đã hoàn thành")).toBeVisible();
+  await expect(quizHistoryDialog.getByText("Bộ hiện tại")).toHaveClass(/bg-sky-100/);
+  await expect(quizHistoryDialog.getByText("1/1 câu đúng")).toBeVisible();
+  await expect(quizHistoryDialog.getByText("10 điểm")).toBeVisible();
+  await expect(
+    quizHistoryDialog.getByText(/^\d{2}:\d{2} \d{2}-\d{2}-\d{4}$/),
+  ).toBeVisible();
+  await expect(quizHistoryDialog.getByRole("button", { name: "Xem lại" })).toHaveCSS(
+    "border-top-width",
+    "2px",
+  );
+  await expect(quizHistoryDialog.getByRole("button", { name: "Làm lại" })).toBeVisible();
+  await quizHistoryDialog.getByRole("button", { name: "Xem lại" }).click();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
+  await expect(quizHistoryDialog).toBeVisible();
+  await expect(
+    page.getByTestId("quiz-review-screen").getByText("Bộ 1", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Trở về", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Các bộ Quiz đã làm" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Các bộ Quiz đã làm" })
+      .getByRole("heading", { name: "Bộ 1" }),
+  ).toBeVisible();
+  await page
+    .getByRole("dialog", { name: "Các bộ Quiz đã làm" })
+    .getByRole("button", { name: "Đóng" })
+    .click();
   await page.reload();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm bộ Quiz mới" })).toBeVisible();
@@ -234,7 +955,7 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await page.getByRole("button", { name: "Xem lại tất cả" }).click();
   await expect(page.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
-  await page.getByRole("button", { name: "Quay lại kết quả Quiz" }).click();
+  await page.getByRole("button", { name: "Kết thúc xem lại" }).click();
   await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
   await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
   await page.getByRole("button", { name: "Làm bộ Quiz mới" }).click();
@@ -255,7 +976,9 @@ test("flashcard uses the lesson entry panel, fullscreen runner, and fullscreen r
   await expect(
     page.getByRole("button", { name: "Quay lại màn Flashcard" }),
   ).toBeVisible();
-  await expect(page.getByText("Đã thuộc 0")).toBeVisible();
+  await expect(
+    page.getByLabel("Thống kê Flashcard: 0 chưa thuộc, 0 đã thuộc"),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Yêu thích thẻ" }).click();
   await expect(page.getByRole("button", { name: "Bỏ yêu thích thẻ" })).toBeVisible();
@@ -281,6 +1004,7 @@ test("flashcard uses the lesson entry panel, fullscreen runner, and fullscreen r
   await expect(page.getByText("Đã ôn", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Quá đỉnh! Bạn đúng hết rồi!")).toBeVisible();
   await expect(page.getByRole("button", { name: "Ôn lại tất cả" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Học bộ Flashcard mới" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Ôn lại thẻ chưa thuộc" }),
   ).toBeDisabled();
@@ -292,6 +1016,26 @@ test("flashcard uses the lesson entry panel, fullscreen runner, and fullscreen r
   await page.getByRole("button", { name: "Quay lại màn Flashcard" }).click();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Học bộ Flashcard mới" })).toBeVisible();
+  await page.getByRole("button", { name: "Mở cài đặt Flashcard" }).click();
+  await page.getByRole("menuitem", { name: "Các bộ Flashcard đã học" }).click();
+  const flashcardHistoryDialog = page.getByRole("dialog", {
+    name: "Các bộ Flashcard đã học",
+  });
+  await expect(
+    flashcardHistoryDialog.getByRole("heading", { name: "Bộ 1" }),
+  ).toBeVisible();
+  await expect(flashcardHistoryDialog.getByText("Đã hoàn thành")).toBeVisible();
+  await expect(flashcardHistoryDialog.getByText("Bộ hiện tại")).toHaveClass(
+    /bg-violet-100/,
+  );
+  await expect(flashcardHistoryDialog.getByRole("button", { name: "Xem lại" })).toHaveCSS(
+    "border-top-width",
+    "2px",
+  );
+  await expect(
+    flashcardHistoryDialog.getByRole("button", { name: "Học lại" }),
+  ).toBeVisible();
+  await flashcardHistoryDialog.getByRole("button", { name: "Đóng" }).click();
   await page.reload();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toHaveCount(0);
@@ -335,13 +1079,45 @@ test("flashcard restart session stays at start after switching tabs", async ({
     .getByRole("button", { name: "Vẫn thoát" })
     .click();
 
-  await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Tiếp tục học", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Quiz" }).click();
   await page.getByRole("button", { name: "Flashcard" }).click();
 
-  await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Tiếp tục học", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Học bộ Flashcard mới" })).toHaveCount(0);
+});
+
+test("flashcard finishes when the last unreviewed card is not at the final position", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCardCount: 2,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+  await page.getByRole("button", { name: "Thẻ sau" }).click();
+  await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toBeVisible();
+  await page.getByRole("button", { name: "Hoàn thành" }).click();
+  const incompleteAlert = page.getByRole("alert").filter({ hasText: "Cần đánh dấu" });
+  await expect(incompleteAlert).toBeVisible();
+  await expect(incompleteAlert).toHaveClass(/items-center/);
+  await page.getByRole("button", { name: "Chưa thuộc" }).click();
+  await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Thẻ trước" }).click();
+  await expect(page.getByRole("heading", { name: "Thẻ 1/2" })).toBeVisible();
+  await page.getByRole("button", { name: "Đã thuộc" }).click();
+
+  await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
+  await expect(page.getByText("Chưa lưu được tiến độ thẻ")).toHaveCount(0);
 });
 
 test("flashcard unknown retry returns to its result after confirming back", async ({
@@ -375,7 +1151,7 @@ test("flashcard unknown retry returns to its result after confirming back", asyn
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toHaveCount(0);
 });
 
-test("flashcard entry stays at start and resets to the first card without saved progress", async ({
+test("flashcard continues at the last card even before any progress is saved", async ({
   page,
 }) => {
   await setupStudentLearningApiMock(page, {
@@ -394,10 +1170,13 @@ test("flashcard entry stays at start and resets to the first card without saved 
     .getByRole("button", { name: "Vẫn thoát" })
     .click();
 
-  const startButton = page.getByRole("button", { name: "Bắt đầu" });
-  await expect(startButton).toBeVisible();
-  await startButton.click();
-  await expect(page.getByRole("heading", { name: "Thẻ 1/2" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tiếp tục học" })).toBeVisible();
+  await page.evaluate(() => window.sessionStorage.clear());
+  await page.reload();
+  const continueButton = page.getByRole("button", { name: "Tiếp tục học" });
+  await expect(continueButton).toBeVisible();
+  await continueButton.click();
+  await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toBeVisible();
 });
 
 test("flashcard entry continues at the current card after progress is saved", async ({
@@ -419,7 +1198,7 @@ test("flashcard entry continues at the current card after progress is saved", as
     .getByRole("button", { name: "Vẫn thoát" })
     .click();
 
-  const continueButton = page.getByRole("button", { name: "Tiếp tục vào học" });
+  const continueButton = page.getByRole("button", { name: "Tiếp tục học" });
   await expect(continueButton).toBeVisible();
   await continueButton.click();
   await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toBeVisible();
@@ -475,13 +1254,13 @@ test("reload restores the active Flashcard runner and exact session state", asyn
 
   await page.getByRole("button", { name: "Quay lại màn Flashcard" }).click();
   await exitDialog.getByRole("button", { name: "Vẫn thoát" }).click();
-  await expect(page.getByRole("button", { name: "Tiếp tục vào học" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tiếp tục học" })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole("button", { name: "Tiếp tục vào học" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tiếp tục học" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Tiếp tục vào học" }).click();
+  await page.getByRole("button", { name: "Tiếp tục học" }).click();
   await expect(page.getByRole("heading", { name: "Thẻ 2/2" })).toBeVisible();
   await expect(page.getByText("Mặt sau", { exact: true })).toBeVisible();
 });
@@ -672,7 +1451,7 @@ test("quiz status dots navigate directly to the selected question", async ({ pag
   await expectNoFrameworkOverlay(page);
 });
 
-test("quiz start returns to question one when no question has been checked", async ({
+test("quiz continues at the last question with its unchecked answer after back", async ({
   page,
 }) => {
   await setupStudentLearningApiMock(page, {
@@ -684,16 +1463,37 @@ test("quiz start returns to question one when no question has been checked", asy
   await page.getByRole("button", { name: "Bắt đầu" }).click();
   await page.getByRole("button", { name: "Câu 3: chưa làm" }).click();
   await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  const autosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH",
+  );
+  await page.getByRole("button", { name: /A.*3/ }).click();
+  await autosave;
 
   await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
   const exitDialog = page.getByRole("dialog", { name: "Thoát bài Quiz?" });
   await exitDialog.getByRole("button", { name: "Vẫn thoát" }).click();
 
-  const startButton = page.getByRole("button", { name: "Bắt đầu" });
-  await expect(startButton).toBeVisible();
-  await startButton.click();
+  await expect(page.getByRole("button", { name: "Tiếp tục làm" })).toBeVisible();
+  await page.evaluate(() => {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("student-quiz-")) {
+        window.localStorage.removeItem(key);
+      }
+    }
+    window.sessionStorage.clear();
+  });
+  await page.reload();
+  const continueButton = page.getByRole("button", { name: "Tiếp tục làm" });
+  await expect(continueButton).toBeVisible();
+  await continueButton.click();
 
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/3" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /A.*3/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expectNoFrameworkOverlay(page);
 });
 
@@ -774,7 +1574,7 @@ test("unfinished quiz asks for confirmation before leaving the runner", async ({
   await exitDialog.getByRole("button", { name: "Vẫn thoát" }).click();
 
   await expect(exitDialog).toHaveCount(0);
-  const enterQuizButton = page.getByRole("button", { name: "Tiếp tục vào làm" });
+  const enterQuizButton = page.getByRole("button", { name: "Tiếp tục làm" });
   await expect(enterQuizButton).toBeVisible();
   await enterQuizButton.click();
 
@@ -811,7 +1611,7 @@ test("browser back returns from the quiz runner to the lesson detail", async ({
 
   await expect(exitDialog).toHaveCount(0);
   await expect(page).toHaveURL(`/student/lessons/${lessonId}?tab=quiz`);
-  await expect(page.getByRole("button", { name: "Bắt đầu" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tiếp tục làm" })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -830,7 +1630,7 @@ test("reload keeps the quiz overview closed while an unfinished attempt remains"
     .getByRole("button", { name: "Vẫn thoát" })
     .click();
 
-  const enterQuizButton = page.getByRole("button", { name: "Bắt đầu" });
+  const enterQuizButton = page.getByRole("button", { name: "Tiếp tục làm" });
   await expect(enterQuizButton).toBeVisible();
 
   await page.reload();
@@ -843,9 +1643,18 @@ test("reload keeps the quiz overview closed while an unfinished attempt remains"
   await expectNoFrameworkOverlay(page);
 });
 
-test("reload clears unchecked answers and restores only checked quiz results", async ({
+test("answer autosave and checking keep the active Quiz runner mounted", async ({
   page,
 }) => {
+  let currentAttemptReadCount = 0;
+  page.on("request", (request) => {
+    if (
+      request.method() === "GET" &&
+      request.url().endsWith("/student/quiz-sets/quiz-set-m7/attempts/current")
+    ) {
+      currentAttemptReadCount += 1;
+    }
+  });
   await setupStudentLearningApiMock(page, {
     testReady: false,
     testPasses: false,
@@ -853,19 +1662,88 @@ test("reload clears unchecked answers and restores only checked quiz results", a
   await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
   await page.getByRole("button", { name: "Bắt đầu" }).click();
 
+  const runner = page.getByRole("heading", { name: "Câu hỏi 1/1" });
+  const resumeLoadingScreen = page.getByLabel("Đang mở lại lượt Quiz");
+  await expect(runner).toBeVisible();
+  await expect
+    .poll(() => currentAttemptReadCount, { timeout: 1_000 })
+    .toBeGreaterThanOrEqual(1);
+  await page.waitForTimeout(100);
+  const readsBeforeAnswer = currentAttemptReadCount;
+
+  const answerAutosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH",
+  );
+  await page.getByRole("button", { name: /B.*4/ }).click();
+  await answerAutosave;
+  await expect(runner).toBeVisible();
+  await expect(resumeLoadingScreen).toHaveCount(0);
+  expect(currentAttemptReadCount).toBe(readsBeforeAnswer);
+
+  const checkAutosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH" &&
+      response.request().postData()?.includes('"isChecked":true') === true,
+  );
+  await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+  await checkAutosave;
+  await expect(page.getByText("Chính xác!")).toBeVisible();
+  await expect(runner).toBeVisible();
+  await expect(resumeLoadingScreen).toHaveCount(0);
+  expect(currentAttemptReadCount).toBe(readsBeforeAnswer);
+});
+
+test("reload restores unchecked answers and checked quiz results from the API", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+    quizQuestionCount: 3,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+  await page.getByRole("button", { name: "Câu tiếp" }).click();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
+
   const firstOption = page.getByRole("button", { name: /A.*3/ });
   const secondOption = page.getByRole("button", { name: /B.*4/ });
+  const firstAutosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH",
+  );
   await firstOption.click();
+  await firstAutosave;
   await expect(firstOption).toHaveAttribute("aria-pressed", "true");
 
+  await page.evaluate(() => {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("student-quiz-progress:")) {
+        window.localStorage.removeItem(key);
+      }
+    }
+    window.sessionStorage.clear();
+  });
   await page.reload();
 
-  await expect(firstOption).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
+  await expect(firstOption).toHaveAttribute("aria-pressed", "true");
   await expect(secondOption).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByRole("button", { name: "Kiểm tra đáp án" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Kiểm tra đáp án" })).toBeVisible();
 
+  const checkedAutosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH" &&
+      response.request().postData()?.includes('"isChecked":true') === true,
+  );
   await secondOption.click();
   await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+  await checkedAutosave;
   await expect(page.getByText("Chính xác!")).toBeVisible();
 
   await page.reload();
@@ -874,7 +1752,7 @@ test("reload clears unchecked answers and restores only checked quiz results", a
   await expect(page.getByText("Chính xác!")).toBeVisible();
 });
 
-test("reload clears an unchecked text answer", async ({ page }) => {
+test("reload restores an unchecked text answer from the API", async ({ page }) => {
   await setupStudentLearningApiMock(page, {
     testReady: false,
     testPasses: false,
@@ -888,13 +1766,20 @@ test("reload clears an unchecked text answer", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
 
   const answerInput = page.getByPlaceholder("Nhập đáp án");
+  const autosave = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      response.request().method() === "PATCH" &&
+      response.request().postData()?.includes("-2.5") === true,
+  );
   await answerInput.fill("-2.5");
+  await autosave;
   await expect(answerInput).toHaveValue("-2.5");
 
   await page.reload();
 
   await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
-  await expect(page.getByPlaceholder("Nhập đáp án")).toHaveValue("");
+  await expect(page.getByPlaceholder("Nhập đáp án")).toHaveValue("-2.5");
 });
 
 test("multi-statement math matches the emphasized statement typography", async ({
@@ -1312,13 +2197,64 @@ test("test remains locked after open time when quiz and flashcard are incomplete
   await setupStudentLearningApiMock(page, { testReady: false, testPasses: false });
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
 
-  await expect(page.getByRole("heading", { name: "Kiểm tra" })).toBeVisible();
-  await expect(page.getByText("Đang khóa", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bài thi" })).toBeVisible();
   await expect(
-    page.getByText("Hoàn thành xong Quiz và Flashcard để mở khóa bài kiểm tra."),
+    page.getByText("Cần hoàn thành Quiz và Flashcard để bắt đầu bài thi."),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: /Quiz.*Chưa xong/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Flashcard.*Chưa xong/ })).toBeVisible();
+  await expect(page.getByText("Chưa mở", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Làm Quiz" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Làm Flashcard" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
+  await page.getByRole("button", { name: "Làm Quiz" }).click();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("test prerequisite actions reflect partial Quiz completion", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    testFlashcardCompleted: false,
+    testPasses: false,
+    testQuizCompleted: true,
+    testReady: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  await expect(
+    page.getByText("Cần hoàn thành Flashcard để bắt đầu bài thi."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Làm Quiz" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Làm Flashcard" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
+  await page.getByRole("button", { name: "Làm Flashcard" }).click();
+  await expect(
+    page.getByRole("status", { name: "Đang chuẩn bị Flashcard" }),
+  ).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("tab")).toBe("test");
+  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("test prerequisite actions reflect partial Flashcard completion", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testFlashcardCompleted: true,
+    testPasses: false,
+    testQuizCompleted: false,
+    testReady: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+
+  await expect(
+    page.getByText("Cần hoàn thành Quiz để bắt đầu bài thi."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Làm Quiz" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Làm Flashcard" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
+  await page.getByRole("button", { name: "Làm Quiz" }).click();
+  await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -1326,36 +2262,242 @@ test("failed test shows retry warning and cannot use the score", async ({ page }
   await setupStudentLearningApiMock(page, { testReady: true, testPasses: false });
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
 
-  await expect(page.getByText("Ôn lại Quiz và Flashcard để sẵn sàng hơn.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ôn lại Quiz" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ôn lại Flashcard" })).toBeVisible();
-  await page.getByRole("button", { name: "Bắt đầu bài kiểm tra" }).click();
-  await page.getByRole("button", { name: /A.*5/ }).click();
-  await page.getByRole("button", { name: "Nộp bài kiểm tra" }).click();
-
-  await expect(page.getByText("Bạn cần phải làm lại bài kiểm tra mới.")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Làm lại bài kiểm tra mới" }),
+    page.getByText(
+      "Bạn đã đủ điều kiện làm bài thi. Ôn tập lại Quiz và Flashcard để làm bài thi tốt hơn nhé.",
+    ),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Dùng điểm bài này" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Làm Quiz" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Làm Flashcard" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
+  const testTransition = page.getByRole("status", {
+    name: "Đang mở bài thi",
+  });
+  await expect(testTransition).toBeVisible();
+  await expect(testTransition.getByText("Chúc bạn làm bài thi thật tốt!")).toBeVisible();
+  const countdown = testTransition.getByTestId("learning-transition-countdown");
+  await expect(countdown.getByText("3", { exact: true })).toBeVisible();
+  await expect(countdown.getByText("2", { exact: true })).toBeVisible({
+    timeout: 1_200,
+  });
+  await expect(countdown.getByText("1", { exact: true })).toBeVisible({
+    timeout: 1_200,
+  });
+  await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
+  await expect(testTransition).toHaveCount(0);
+  const testRunner = page.getByTestId("test-runner-screen");
+  await page.goBack();
+  const exitDialog = page.getByRole("dialog", { name: "Thoát bài thi?" });
+  await expect(exitDialog).toBeVisible();
+  await expect(
+    exitDialog.getByText(
+      "Nếu quay lại, bài thi hiện tại sẽ bị hủy và bạn phải làm một bài thi mới.",
+    ),
+  ).toBeVisible();
+  await expect(page).toHaveURL(`/student/lessons/${lessonId}?tab=test`);
+  await exitDialog.getByRole("button", { name: "Ở lại" }).click();
+  await expect(exitDialog).toHaveCount(0);
+  await expect(testRunner.getByRole("heading", { name: "Câu 1" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const event = new Event("beforeunload", { cancelable: true });
+        return {
+          defaultPrevented: !window.dispatchEvent(event),
+          returnValue: event.returnValue,
+        };
+      }),
+    )
+    .toEqual({ defaultPrevented: true, returnValue: false });
+  await expect(testRunner.getByText("Bài thi · 1 câu")).toHaveClass(/text-emerald-600/);
+  await expect(testRunner.getByRole("timer")).toHaveClass(/bg-emerald-200/);
+  await expect(testRunner.getByRole("button", { name: "Câu 1: chưa làm" })).toHaveClass(
+    /bg-emerald-500/,
+  );
+  await expect(testRunner.getByRole("button", { name: "Câu tiếp" })).toHaveClass(
+    /disabled:bg-emerald-200/,
+  );
+  await testRunner.getByRole("button", { name: "Nộp bài thi" }).click();
+  const incompleteAlert = testRunner.getByRole("alert");
+  await expect(incompleteAlert).toContainText("Cần hoàn thành câu hỏi 1");
+  await expect(incompleteAlert).toHaveClass(/bg-emerald-200\/80/);
+  await expect(incompleteAlert).toHaveClass(/items-center/);
+  const selectedAnswer = testRunner.getByRole("button", { name: /A.*5/ });
+  await selectedAnswer.click();
+  await expect(selectedAnswer).toHaveClass(/border-emerald-400/);
+  await page.getByRole("button", { name: "Nộp bài thi" }).click();
+
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+  await expect(page.getByTestId("test-result-screen")).toHaveClass(/fixed/);
+  await expect(page.getByText("Bạn cần phải làm lại bài thi mới.")).toBeVisible();
+  await expect(page.getByTestId("test-result-screen").getByRole("alert")).toHaveClass(
+    /bg-emerald-200\/80/,
+  );
+  await expect(page.getByTestId("assessment-result-confetti")).toBeAttached();
+  await expect(page.getByText("Không sao đâu! Xem lại rồi thử lại nhé!")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Làm lại bài thi mới" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dùng điểm bài này" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Xem lại câu sai" }).click();
+  const reviewScreen = page.getByTestId("test-review-screen");
+  await expect(reviewScreen).toHaveClass(/#def8e9/);
+  await expect(reviewScreen.getByText("Xem lại các câu trả lời sai")).toHaveClass(
+    /text-emerald-700/,
+  );
+  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }),
+  ).toHaveClass(/bg-emerald-600/);
+  await reviewScreen.getByRole("button", { name: "Quay lại kết quả Bài thi" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Xem lại tất cả" }).click();
+  await expect(reviewScreen.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
+  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Quay lại màn Bài thi" }).click();
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Xem lại bài thi" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+  await expect(page.getByTestId("test-review-screen")).toHaveCount(0);
+  await page.getByRole("button", { name: "Quay lại màn Bài thi" }).click();
+  await expect(page.getByRole("button", { name: "Làm bài thi mới" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Xem lại bài thi" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Làm bài thi mới" })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
-test("passing test can use the result and opens completion with top five", async ({
+test("reloading an active test shows the browser warning and cancels the local runner", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, { testReady: true, testPasses: false });
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
+  await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
+
+  await page.goBack();
+  const exitDialog = page.getByRole("dialog", { name: "Thoát bài thi?" });
+  await expect(
+    exitDialog.getByText(
+      "Nếu quay lại, bài thi hiện tại sẽ bị hủy và bạn phải làm một bài thi mới.",
+    ),
+  ).toBeVisible();
+  await exitDialog.getByRole("button", { name: "Vẫn thoát" }).click();
+  await expect(page.getByTestId("test-runner-screen")).toHaveCount(0);
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
+  await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
+
+  const beforeUnloadDialog = page.waitForEvent("dialog");
+  const reload = page.reload();
+  const dialog = await beforeUnloadDialog;
+  expect(dialog.type()).toBe("beforeunload");
+  await dialog.accept();
+  await reload;
+
+  await expect(page.getByTestId("test-runner-screen")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("passing test result shows confetti without manual score selection", async ({
   page,
 }) => {
   await setupStudentLearningApiMock(page, { testReady: true, testPasses: true });
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
 
-  await page.getByRole("button", { name: "Bắt đầu bài kiểm tra" }).click();
+  await page.getByRole("button", { name: "Bắt đầu bài thi" }).click();
   await page.getByRole("button", { name: /B.*6/ }).click();
-  await page.getByRole("button", { name: "Nộp bài kiểm tra" }).click();
-  await expect(page.getByRole("button", { name: "Dùng điểm bài này" })).toBeEnabled();
-  await page.getByRole("button", { name: "Dùng điểm bài này" }).click();
+  await page.getByRole("button", { name: "Nộp bài thi" }).click();
 
-  await expect(page.getByRole("heading", { name: "Chúc mừng bạn!" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Top 5 buổi học" })).toBeVisible();
-  await expect(page.getByRole("main").getByText("Học sinh M7")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
+  await expect(page.getByTestId("assessment-result-confetti")).toBeAttached();
+  await expect(page.getByRole("button", { name: "Dùng điểm bài này" })).toHaveCount(0);
+  await expect(page.getByText("Đã hoàn thành")).toHaveClass(/bg-emerald-500/);
+  await expect(page.getByRole("button", { name: "Làm lại bài thi mới" })).toHaveClass(
+    /bg-emerald-500/,
+  );
+  await expectNoFrameworkOverlay(page);
+});
+
+test("Quiz keeps the new active set after back and reload", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    includeAlternateQuizSet: true,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+  await page.getByRole("button", { name: /B.*4/ }).click();
+  await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+  await page.getByRole("button", { name: "Hoàn thành Quiz" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Làm bộ Quiz mới" }).click();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
+  await page
+    .getByRole("dialog", { name: "Thoát bài Quiz?" })
+    .getByRole("button", { name: "Vẫn thoát" })
+    .click();
+
+  await expect(page.getByRole("button", { name: "Tiếp tục làm" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("student-quiz-active-set:student-m7:lesson-m7"),
+      ),
+    )
+    .toBe("quiz-set-m7-history");
+
+  await page.reload();
+
+  const continueButton = page.getByRole("button", { name: "Tiếp tục làm" });
+  await expect(continueButton).toBeVisible();
+  await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toHaveCount(0);
+  await continueButton.click();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("Flashcard keeps the new active set after back and reload", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCompleted: true,
+    includeAlternateFlashcardSet: true,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Học bộ Flashcard mới" }).click();
+  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
+  await page.getByRole("button", { name: "Quay lại màn Flashcard" }).click();
+  await page
+    .getByRole("dialog", { name: "Thoát lượt học Flashcard?" })
+    .getByRole("button", { name: "Vẫn thoát" })
+    .click();
+
+  await expect(page.getByRole("button", { name: "Tiếp tục học" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("student-flashcard-active-set:student-m7:lesson-m7"),
+      ),
+    )
+    .toBe("flashcard-set-m7-new");
+
+  await page.reload();
+
+  const continueButton = page.getByRole("button", { name: "Tiếp tục học" });
+  await expect(continueButton).toBeVisible();
+  await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toHaveCount(0);
+  await continueButton.click();
+  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -1388,9 +2530,19 @@ async function seedStudentSession(page: Page) {
 async function setupStudentLearningApiMock(
   page: Page,
   options: {
+    alternateQuizStatusDelayMs?: number;
     flashcardCardCount?: number;
     flashcardCompleted?: boolean;
+    includeAlternateFlashcardSet?: boolean;
+    includeAlternateQuizSet?: boolean;
+    includeNextLesson?: boolean;
+    omitFlashcardSet?: boolean;
+    omitQuizSet?: boolean;
+    omitTestSet?: boolean;
     quizQuestionCount?: number;
+    quizHistoryCompletedItemCount?: number;
+    quizHistorySetId?: string;
+    quizReviewQuestionCount?: number;
     quizQuestionIncludesMathExamples?: boolean;
     quizSubmitAggregateResult?: {
       id: string;
@@ -1401,11 +2553,20 @@ async function setupStudentLearningApiMock(
     };
     testReady: boolean;
     testPasses: boolean;
+    testCompleted?: boolean;
+    testFlashcardCompleted?: boolean;
+    testQuizCompleted?: boolean;
+    testQuestionCount?: number;
     quizQuestionType?:
       "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";
   },
 ) {
   type CurrentQuizAttempt = ReturnType<typeof quizAttemptPayload> & {
+    currentQuestionIndex: number;
+    savedAnswers: Array<{
+      answerJson: unknown;
+      questionId: string;
+    }>;
     checkedAnswers: Array<{
       answerJson: unknown;
       feedback: ReturnType<typeof quizFeedbackPayload>;
@@ -1428,7 +2589,27 @@ async function setupStudentLearningApiMock(
     ).forEach((flashcardId) => flashcardProgressById.set(flashcardId, true));
   }
   let currentQuizAttempt: CurrentQuizAttempt | null = null;
+  let alternateQuizAttempt: CurrentQuizAttempt | null = null;
   let latestQuizAttempt: QuizAttemptSummaryPayload | null = null;
+  let testCompleted = options.testCompleted ?? false;
+  let testSubmitted = testCompleted;
+  let flashcardSessionCount = 0;
+  const flashcardSessions: Array<{
+    id: string;
+    flashcardSetId: string;
+    state: "IN_PROGRESS" | "COMPLETED";
+    startedAt: string;
+    completedAt: string | null;
+    reviewedCount: number;
+    knownCount: number;
+    unknownCount: number;
+    totalCount: number;
+    items: Array<{
+      flashcardId: string;
+      isKnown: boolean | null;
+      reviewedAt: string | null;
+    }>;
+  }> = [];
 
   await page.route(`${apiBaseUrl}/**`, async (route) => {
     const request = route.request();
@@ -1446,22 +2627,124 @@ async function setupStudentLearningApiMock(
       });
     }
     if (method === "GET" && pathname === `/student/lessons/${lessonId}`) {
-      return fulfillJson(route, 200, { data: lessonPayload() });
+      return fulfillJson(route, 200, {
+        data: lessonPayload(
+          options.includeAlternateQuizSet,
+          options.includeAlternateFlashcardSet,
+          options.includeNextLesson,
+          options.quizQuestionCount,
+          options.flashcardCardCount,
+          options.omitFlashcardSet,
+          options.omitQuizSet,
+        ),
+      });
+    }
+    if (method === "GET" && pathname === "/student/lessons/lesson-m7-next") {
+      return fulfillJson(route, 200, {
+        data: {
+          ...lessonPayload(),
+          id: "lesson-m7-next",
+          title: "Buổi 2: Giá trị tuyệt đối",
+          navigation: {
+            previous: { id: lessonId, title: "Buổi 1: Số hữu tỉ" },
+            next: null,
+          },
+        },
+      });
     }
     if (method === "GET" && pathname === `/student/lessons/${lessonId}/flashcard-sets`) {
       return fulfillJson(route, 200, {
-        data: flashcardPayload(
-          options.flashcardCardCount,
-          flashcardProgressById,
-          favoriteFlashcardIds,
-        ),
+        data: options.omitFlashcardSet
+          ? []
+          : flashcardPayload(
+              options.flashcardCardCount,
+              flashcardProgressById,
+              favoriteFlashcardIds,
+              options.includeAlternateFlashcardSet,
+            ),
+      });
+    }
+    if (
+      method === "GET" &&
+      pathname === `/student/lessons/${lessonId}/flashcard-history`
+    ) {
+      const visibleSessions = [...flashcardSessions].reverse();
+      return fulfillJson(route, 200, {
+        data: {
+          total: visibleSessions.length,
+          items: visibleSessions.map((session, index) => ({
+            ...session,
+            setId: session.flashcardSetId,
+            displayName: `Bộ ${visibleSessions.length - index}`,
+          })),
+        },
+      });
+    }
+    if (
+      method === "POST" &&
+      /^\/student\/flashcard-sets\/flashcard-set-m7(?:-new)?\/sessions$/.test(pathname)
+    ) {
+      const body = request.postDataJSON() as {
+        resumeExistingProgress?: boolean;
+      };
+      for (let index = flashcardSessions.length - 1; index >= 0; index -= 1) {
+        if (flashcardSessions[index]?.state === "IN_PROGRESS") {
+          flashcardSessions.splice(index, 1);
+        }
+      }
+      const flashcardSetId = pathname.split("/")[3] ?? "flashcard-set-m7";
+      const isAlternateSet = flashcardSetId === "flashcard-set-m7-new";
+      const totalCount = isAlternateSet ? 1 : (options.flashcardCardCount ?? 1);
+      const startedAt = new Date().toISOString();
+      const items = Array.from({ length: totalCount }, (_, index) => {
+        const flashcardId = isAlternateSet
+          ? "flashcard-m7-new"
+          : index === 0
+            ? "flashcard-m7"
+            : `flashcard-m7-${index + 1}`;
+        const savedValue = body.resumeExistingProgress
+          ? flashcardProgressById.get(flashcardId)
+          : undefined;
+        return {
+          flashcardId,
+          isKnown: savedValue ?? null,
+          reviewedAt: savedValue === undefined ? null : startedAt,
+        };
+      });
+      const reviewedItems = items.filter((item) => item.isKnown !== null);
+      const session = {
+        id: `flashcard-session-m7-${++flashcardSessionCount}`,
+        flashcardSetId,
+        state: "IN_PROGRESS" as const,
+        startedAt,
+        completedAt: null,
+        reviewedCount: reviewedItems.length,
+        knownCount: reviewedItems.filter((item) => item.isKnown === true).length,
+        unknownCount: reviewedItems.filter((item) => item.isKnown === false).length,
+        totalCount,
+        items,
+      };
+      flashcardSessions.push(session);
+      return fulfillJson(route, 200, { data: session });
+    }
+    if (
+      method === "GET" &&
+      /^\/student\/flashcard-sessions\/flashcard-session-m7-\d+$/.test(pathname)
+    ) {
+      const sessionId = pathname.split("/").at(-1);
+      const session = flashcardSessions.find((candidate) => candidate.id === sessionId);
+      return fulfillJson(route, session ? 200 : 404, {
+        data: session ?? null,
       });
     }
     if (
       method === "PATCH" &&
       /^\/student\/flashcards\/flashcard-m7(?:-\d+)?\/progress$/.test(pathname)
     ) {
-      const body = request.postDataJSON() as { isKnown: boolean };
+      const body = request.postDataJSON() as {
+        isKnown: boolean;
+        sessionId?: string;
+      };
       const flashcardId = pathname.split("/")[3] ?? "flashcard-m7";
       flashcardProgressById.set(flashcardId, body.isKnown);
       const reviewedCount = flashcardProgressById.size;
@@ -1469,10 +2752,35 @@ async function setupStudentLearningApiMock(
         Boolean,
       ).length;
       const totalCount = options.flashcardCardCount ?? 1;
+      const studySession = body.sessionId
+        ? flashcardSessions.find((session) => session.id === body.sessionId)
+        : undefined;
+      if (studySession) {
+        const item = studySession.items.find(
+          (candidate) => candidate.flashcardId === flashcardId,
+        );
+        if (item) {
+          item.isKnown = body.isKnown;
+          item.reviewedAt = new Date().toISOString();
+        }
+        const reviewedItems = studySession.items.filter(
+          (candidate) => candidate.isKnown !== null,
+        );
+        studySession.reviewedCount = reviewedItems.length;
+        studySession.knownCount = reviewedItems.filter(
+          (candidate) => candidate.isKnown === true,
+        ).length;
+        studySession.unknownCount = studySession.reviewedCount - studySession.knownCount;
+        if (studySession.reviewedCount === studySession.totalCount) {
+          studySession.state = "COMPLETED";
+          studySession.completedAt = new Date().toISOString();
+        }
+      }
       return fulfillJson(route, 200, {
         data: {
           flashcardId,
           isKnown: body.isKnown,
+          studySession: studySession ?? null,
           setProgress: {
             totalCount,
             reviewedCount,
@@ -1499,19 +2807,30 @@ async function setupStudentLearningApiMock(
       pathname === `/student/lessons/${lessonId}/test-sets/status`
     ) {
       return fulfillJson(route, 200, {
-        data: testStatusPayload(options.testReady),
+        data: testStatusPayload(
+          options.testReady,
+          testSubmitted,
+          testCompleted,
+          options.testPasses ?? testCompleted,
+          options.testQuizCompleted,
+          options.testFlashcardCompleted,
+          options.testQuestionCount,
+          options.omitTestSet,
+        ),
       });
     }
     if (
       method === "GET" &&
       pathname === "/student/quiz-sets/quiz-set-m7/attempts/status"
     ) {
+      const answeredCount = currentQuizAttempt?.savedAnswers.length ?? 0;
       const checkedCount = currentQuizAttempt?.checkedAnswers.length ?? 0;
       return fulfillJson(route, 200, {
         data: currentQuizAttempt
           ? {
               state: "IN_PROGRESS",
               currentAttemptId: currentQuizAttempt.id,
+              answeredCount,
               checkedCount,
               latestSubmittedAttempt: latestQuizAttempt,
             }
@@ -1519,12 +2838,14 @@ async function setupStudentLearningApiMock(
             ? {
                 state: "COMPLETED",
                 currentAttemptId: null,
+                answeredCount: latestQuizAttempt.totalCount,
                 checkedCount: latestQuizAttempt.totalCount,
                 latestSubmittedAttempt: latestQuizAttempt,
               }
             : {
                 state: "NOT_STARTED",
                 currentAttemptId: null,
+                answeredCount: 0,
                 checkedCount: 0,
                 latestSubmittedAttempt: null,
               },
@@ -1532,9 +2853,97 @@ async function setupStudentLearningApiMock(
     }
     if (
       method === "GET" &&
+      pathname === "/student/quiz-sets/quiz-set-m7-history/attempts/status"
+    ) {
+      if (options.alternateQuizStatusDelayMs) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, options.alternateQuizStatusDelayMs);
+        });
+      }
+      return fulfillJson(route, 200, {
+        data: alternateQuizAttempt
+          ? {
+              state: "IN_PROGRESS",
+              currentAttemptId: alternateQuizAttempt.id,
+              answeredCount: alternateQuizAttempt.savedAnswers.length,
+              checkedCount: alternateQuizAttempt.checkedAnswers.length,
+              latestSubmittedAttempt: null,
+            }
+          : {
+              state: "NOT_STARTED",
+              currentAttemptId: null,
+              answeredCount: 0,
+              checkedCount: 0,
+              latestSubmittedAttempt: null,
+            },
+      });
+    }
+    if (method === "GET" && pathname === `/student/lessons/${lessonId}/quiz-history`) {
+      const historyCompletedItemCount = options.quizHistoryCompletedItemCount ?? 0;
+      const seededCompletedItems = Array.from(
+        { length: historyCompletedItemCount },
+        (_, index) => ({
+          id: `quiz-history-attempt-${historyCompletedItemCount - index}`,
+          setId: options.quizHistorySetId ?? "quiz-set-m7",
+          displayName: `Bộ ${historyCompletedItemCount - index}`,
+          state: "COMPLETED",
+          startedAt: new Date(Date.now() - (index + 2) * 60_000).toISOString(),
+          completedAt: new Date(Date.now() - (index + 1) * 60_000).toISOString(),
+          correctCount: 1,
+          wrongCount: 0,
+          totalCount: 1,
+          answeredCount: 1,
+          accuracyPercent: 100,
+        }),
+      );
+      const items = [
+        ...(currentQuizAttempt
+          ? [
+              {
+                id: currentQuizAttempt.id,
+                setId: "quiz-set-m7",
+                displayName: latestQuizAttempt ? "Bộ 2" : "Bộ 1",
+                state: "IN_PROGRESS",
+                startedAt: new Date().toISOString(),
+                completedAt: null,
+                answeredCount: currentQuizAttempt.savedAnswers.length,
+                correctCount: 0,
+                wrongCount: 0,
+                totalCount: currentQuizAttempt.totalCount,
+                accuracyPercent: 0,
+              },
+            ]
+          : []),
+        ...(latestQuizAttempt
+          ? [
+              {
+                ...latestQuizAttempt,
+                setId: "quiz-set-m7",
+                displayName: "Bộ 1",
+                state: "COMPLETED",
+                startedAt: new Date(Date.now() - 60_000).toISOString(),
+                completedAt: new Date().toISOString(),
+                answeredCount: latestQuizAttempt.totalCount,
+              },
+            ]
+          : []),
+        ...seededCompletedItems,
+      ];
+      return fulfillJson(route, 200, {
+        data: { total: items.length, items },
+      });
+    }
+    if (
+      method === "GET" &&
       pathname === "/student/quiz-sets/quiz-set-m7/attempts/current"
     ) {
       return fulfillJson(route, 200, { data: currentQuizAttempt });
+    }
+    if (
+      method === "GET" &&
+      pathname === "/student/quiz-sets/quiz-set-m7-history/attempts/current"
+    ) {
+      return fulfillJson(route, 200, { data: alternateQuizAttempt });
     }
     if (method === "POST" && pathname === "/student/quiz-sets/quiz-set-m7/attempts") {
       const nextAttempt = quizAttemptPayload(
@@ -1544,6 +2953,92 @@ async function setupStudentLearningApiMock(
       );
       currentQuizAttempt = {
         ...nextAttempt,
+        currentQuestionIndex: 0,
+        savedAnswers: [],
+        checkedAnswers: [],
+      };
+      return fulfillJson(route, 200, {
+        data: nextAttempt,
+      });
+    }
+    const quizProgressMatch = pathname.match(
+      /^\/student\/quiz-attempts\/([^/]+)\/progress$/,
+    );
+    if (method === "PATCH" && quizProgressMatch) {
+      const attemptId = quizProgressMatch[1];
+      const targetAttempt =
+        currentQuizAttempt?.id === attemptId
+          ? currentQuizAttempt
+          : alternateQuizAttempt?.id === attemptId
+            ? alternateQuizAttempt
+            : null;
+      if (!targetAttempt) {
+        return fulfillJson(route, 404, {
+          error: { code: "QUIZ_ATTEMPT_NOT_FOUND", message: "Không tìm thấy lượt Quiz" },
+        });
+      }
+      const body = request.postDataJSON() as {
+        currentQuestionIndex: number;
+        answer?: {
+          answerJson: unknown;
+          isChecked?: boolean;
+          questionId: string;
+        };
+      };
+      targetAttempt.currentQuestionIndex = body.currentQuestionIndex;
+      if (body.answer) {
+        targetAttempt.savedAnswers = [
+          ...targetAttempt.savedAnswers.filter(
+            (answer) => answer.questionId !== body.answer?.questionId,
+          ),
+          {
+            answerJson: body.answer.answerJson,
+            questionId: body.answer.questionId,
+          },
+        ];
+        if (body.answer.isChecked) {
+          targetAttempt.checkedAnswers = [
+            ...targetAttempt.checkedAnswers.filter(
+              (answer) => answer.questionId !== body.answer?.questionId,
+            ),
+            {
+              answerJson: body.answer.answerJson,
+              feedback: quizFeedbackPayload(),
+              questionId: body.answer.questionId,
+            },
+          ];
+        }
+      }
+      return fulfillJson(route, 200, {
+        data: {
+          attemptId: targetAttempt.id,
+          currentQuestionIndex: targetAttempt.currentQuestionIndex,
+          answeredCount: targetAttempt.savedAnswers.length,
+          checkedCount: targetAttempt.checkedAnswers.length,
+        },
+      });
+    }
+    if (
+      method === "POST" &&
+      pathname === "/student/quiz-sets/quiz-set-m7-history/attempts"
+    ) {
+      const baseAttempt = quizAttemptPayload(
+        options.quizQuestionType,
+        1,
+        options.quizQuestionIncludesMathExamples,
+      );
+      const nextAttempt = {
+        ...baseAttempt,
+        id: "quiz-attempt-m7-history",
+        quizSet: {
+          id: "quiz-set-m7-history",
+          title: "Quiz lịch sử",
+        },
+      };
+      alternateQuizAttempt = {
+        ...nextAttempt,
+        currentQuestionIndex: 0,
+        savedAnswers: [],
         checkedAnswers: [],
       };
       return fulfillJson(route, 200, {
@@ -1593,11 +3088,10 @@ async function setupStudentLearningApiMock(
         },
       });
     }
-    if (
-      method === "GET" &&
-      pathname.startsWith("/student/quiz-attempts/quiz-attempt-m7/review")
-    ) {
-      return fulfillJson(route, 200, { data: quizReviewPayload() });
+    if (method === "GET" && /^\/student\/quiz-attempts\/[^/]+\/review$/.test(pathname)) {
+      return fulfillJson(route, 200, {
+        data: quizReviewPayload(options.quizReviewQuestionCount),
+      });
     }
     if (
       method === "POST" &&
@@ -1605,10 +3099,64 @@ async function setupStudentLearningApiMock(
     ) {
       return fulfillJson(route, 200, { data: testAttemptPayload() });
     }
+    if (method === "GET" && pathname === `/student/lessons/${lessonId}/test-history`) {
+      const historyItems = testSubmitted
+        ? [
+            {
+              id: "test-attempt-m7",
+              attemptId: "test-attempt-m7",
+              setId: "test-set-m7",
+              displayName: "Bộ đề 2",
+              state: "COMPLETED",
+              startedAt: new Date(Date.now() - 60_000).toISOString(),
+              completedAt: new Date().toISOString(),
+              durationSeconds: 45,
+              score: options.testPasses ? 10 : 0,
+              correctCount: options.testPasses ? 1 : 0,
+              totalCount: 1,
+            },
+            {
+              id: "test-attempt-history-m7",
+              attemptId: "test-attempt-history-m7",
+              setId: "test-set-m7",
+              displayName: "Bộ đề 1",
+              state: "COMPLETED",
+              startedAt: new Date(Date.now() - 180_000).toISOString(),
+              completedAt: new Date(Date.now() - 120_000).toISOString(),
+              durationSeconds: 55,
+              score: options.testPasses ? 10 : 0,
+              correctCount: options.testPasses ? 1 : 0,
+              totalCount: 1,
+            },
+          ]
+        : [
+            {
+              id: "not-started:test-set-m7",
+              attemptId: null,
+              setId: "test-set-m7",
+              displayName: "Bộ đề 1",
+              state: "NOT_STARTED",
+              startedAt: null,
+              completedAt: null,
+              durationSeconds: 600,
+              score: null,
+              correctCount: 0,
+              totalCount: 1,
+            },
+          ];
+      return fulfillJson(route, 200, {
+        data: {
+          total: historyItems.length,
+          currentItemId: historyItems[0]!.id,
+          items: historyItems,
+        },
+      });
+    }
     if (
       method === "POST" &&
       pathname === "/student/test-attempts/test-attempt-m7/submit"
     ) {
+      testSubmitted = true;
       return fulfillJson(route, 200, {
         data: {
           id: "test-attempt-m7",
@@ -1626,6 +3174,7 @@ async function setupStudentLearningApiMock(
       method === "POST" &&
       pathname === "/student/test-attempts/test-attempt-m7/use-result"
     ) {
+      testCompleted = true;
       return fulfillJson(route, 200, {
         data: {
           lessonId,
@@ -1655,7 +3204,13 @@ async function setupStudentLearningApiMock(
       method === "GET" &&
       pathname.startsWith(`/student/test-attempts/test-attempt-m7/review`)
     ) {
-      return fulfillJson(route, 200, { data: testReviewPayload(options.testPasses) });
+      const reviewScope =
+        new URL(request.url()).searchParams.get("scope") === "INCORRECT"
+          ? "INCORRECT"
+          : "ALL";
+      return fulfillJson(route, 200, {
+        data: testReviewPayload(options.testPasses, reviewScope),
+      });
     }
 
     return fulfillJson(route, 404, {
@@ -1673,29 +3228,35 @@ function quizFeedbackPayload() {
   };
 }
 
-function quizReviewPayload() {
-  const [question] = quizAttemptPayload().questions;
+function quizReviewPayload(questionCount = 1) {
+  const questions = quizAttemptPayload("MULTIPLE_CHOICE", questionCount).questions.map(
+    (question) => ({
+      ...question,
+      answerJson: ["quiz-option-b"],
+      ...quizFeedbackPayload(),
+    }),
+  );
 
   return {
     id: "quiz-attempt-m7",
     scope: "ALL",
-    correctCount: 1,
+    correctCount: questionCount,
     wrongCount: 0,
-    totalCount: 1,
+    totalCount: questionCount,
     accuracyPercent: 100,
-    questions: question
-      ? [
-          {
-            ...question,
-            answerJson: ["quiz-option-b"],
-            ...quizFeedbackPayload(),
-          },
-        ]
-      : [],
+    questions,
   };
 }
 
-function lessonPayload() {
+function lessonPayload(
+  includeAlternateQuizSet = false,
+  includeAlternateFlashcardSet = false,
+  includeNextLesson = false,
+  quizQuestionCount = 1,
+  flashcardCardCount = 1,
+  omitFlashcardSet = false,
+  omitQuizSet = false,
+) {
   return {
     id: lessonId,
     title: "Buổi 1: Số hữu tỉ",
@@ -1716,10 +3277,42 @@ function lessonPayload() {
       updatedAt: new Date().toISOString(),
     },
     materials: [{ id: "material-hidden", title: "Tài liệu không được hiển thị" }],
-    quizSets: [{ id: "quiz-set-m7", title: "Quiz số hữu tỉ", questionCount: 1 }],
-    flashcardSets: [
-      { id: "flashcard-set-m7", title: "Flashcard số hữu tỉ", cardCount: 1 },
-    ],
+    quizSets: omitQuizSet
+      ? []
+      : [
+          {
+            id: "quiz-set-m7",
+            title: "Quiz số hữu tỉ",
+            questionCount: quizQuestionCount,
+          },
+          ...(includeAlternateQuizSet
+            ? [
+                {
+                  id: "quiz-set-m7-history",
+                  title: "Quiz lịch sử",
+                  questionCount: 1,
+                },
+              ]
+            : []),
+        ],
+    flashcardSets: omitFlashcardSet
+      ? []
+      : [
+          {
+            id: "flashcard-set-m7",
+            title: "Flashcard số hữu tỉ",
+            cardCount: flashcardCardCount,
+          },
+          ...(includeAlternateFlashcardSet
+            ? [
+                {
+                  id: "flashcard-set-m7-new",
+                  title: "Flashcard bộ mới",
+                  cardCount: 1,
+                },
+              ]
+            : []),
+        ],
     testSets: [
       {
         id: "test-set-m7",
@@ -1728,7 +3321,12 @@ function lessonPayload() {
         durationSeconds: 600,
       },
     ],
-    navigation: { previous: null, next: null },
+    navigation: {
+      previous: null,
+      next: includeNextLesson
+        ? { id: "lesson-m7-next", title: "Buổi 2: Giá trị tuyệt đối" }
+        : null,
+    },
   };
 }
 
@@ -1802,6 +3400,7 @@ function flashcardPayload(
   cardCount = 1,
   progressById: ReadonlyMap<string, boolean> = new Map(),
   favoriteIds: ReadonlySet<string> = new Set(),
+  includeAlternateSet = false,
 ) {
   const cards = Array.from({ length: cardCount }, (_, index) => {
     const id = index === 0 ? "flashcard-m7" : `flashcard-m7-${index + 1}`;
@@ -1826,7 +3425,7 @@ function flashcardPayload(
   const reviewedCount = cards.filter((card) => card.progress !== null).length;
   const knownCount = cards.filter((card) => card.progress?.isKnown === true).length;
 
-  return [
+  const sets = [
     {
       id: "flashcard-set-m7",
       lessonId,
@@ -1843,26 +3442,80 @@ function flashcardPayload(
       },
     },
   ];
+
+  if (includeAlternateSet) {
+    sets.push({
+      id: "flashcard-set-m7-new",
+      lessonId,
+      title: "Flashcard bộ mới",
+      cardCount: 1,
+      flashcards: [
+        {
+          id: "flashcard-m7-new",
+          frontJson: documentWithText("3 + 3"),
+          backJson: documentWithText("6"),
+          explanation: null,
+          isFavorite: favoriteIds.has("flashcard-m7-new"),
+          progress: null,
+        },
+      ],
+      progress: {
+        totalCount: 1,
+        reviewedCount: 0,
+        knownCount: 0,
+        unknownCount: 0,
+        unreviewedCount: 1,
+        isCompleted: false,
+      },
+    });
+  }
+
+  return sets;
 }
 
-function testStatusPayload(ready: boolean) {
+function testStatusPayload(
+  ready: boolean,
+  submitted = false,
+  completed = false,
+  passed = completed,
+  quizCompleted = ready,
+  flashcardCompleted = ready,
+  questionCount = 1,
+  omitTestSet = false,
+) {
   return {
     canStart: ready,
     examOpenAt: new Date(Date.now() - 60_000).toISOString(),
     evaluatedAt: new Date().toISOString(),
     lockReason: ready ? null : "PREREQUISITES_INCOMPLETE",
-    quiz: { isRequired: true, isCompleted: ready },
-    flashcard: { isRequired: true, isCompleted: ready },
-    bestAttempt: null,
-    sets: [
-      {
-        id: "test-set-m7",
-        title: "Bài kiểm tra số hữu tỉ",
-        durationSeconds: 600,
-        totalScore: 10,
-        questionCount: 1,
-      },
-    ],
+    quiz: { isRequired: true, isCompleted: quizCompleted },
+    flashcard: { isRequired: true, isCompleted: flashcardCompleted },
+    bestAttempt: completed
+      ? {
+          id: "test-attempt-m7",
+          score: 10,
+          durationSeconds: 45,
+        }
+      : null,
+    latestSubmittedAttempt: submitted
+      ? {
+          id: "test-attempt-m7",
+          score: passed ? 10 : 0,
+          durationSeconds: 45,
+          submittedAt: new Date().toISOString(),
+        }
+      : null,
+    sets: omitTestSet
+      ? []
+      : [
+          {
+            id: "test-set-m7",
+            title: "Bài kiểm tra số hữu tỉ",
+            durationSeconds: 600,
+            totalScore: 10,
+            questionCount,
+          },
+        ],
   };
 }
 
@@ -1893,10 +3546,12 @@ function testAttemptPayload() {
   };
 }
 
-function testReviewPayload(passed: boolean) {
+function testReviewPayload(passed: boolean, scope: "ALL" | "INCORRECT") {
+  const question = testAttemptPayload().questions[0];
+
   return {
     id: "test-attempt-m7",
-    scope: "ALL",
+    scope,
     durationSeconds: 45,
     score: passed ? 10 : 0,
     completionMinScore: 7,
@@ -1904,7 +3559,21 @@ function testReviewPayload(passed: boolean) {
     correctCount: passed ? 1 : 0,
     wrongCount: passed ? 0 : 1,
     totalCount: 1,
-    questions: [],
+    questions:
+      question && (scope === "ALL" || !passed)
+        ? [
+            {
+              ...question,
+              answerJson: [passed ? "B" : "A"],
+              correctAnswerJson: ["B"],
+              explanationJson: null,
+              isCorrect: passed,
+              pointsAwarded: passed ? 10 : 0,
+              questionNumber: 1,
+              statementResults: null,
+            },
+          ]
+        : [],
   };
 }
 

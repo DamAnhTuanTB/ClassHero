@@ -4,6 +4,7 @@ const QUIZ_RUNNER_SET_HISTORY_STATE_KEY = "__classheroQuizRunnerSetId";
 const QUIZ_RESULT_SET_HISTORY_STATE_KEY = "__classheroQuizResultSetId";
 const QUIZ_RUNNER_SET_STORAGE_KEY = "student-quiz-surface:runner-set";
 const QUIZ_RESULT_SET_STORAGE_KEY = "student-quiz-surface:result-set";
+const QUIZ_ACTIVE_SET_STORAGE_PREFIX = "student-quiz-active-set:";
 
 export function getQuizRunnerHistoryAttemptId() {
   if (typeof window === "undefined") return null;
@@ -37,6 +38,36 @@ export function getQuizResultHistorySetId() {
   return typeof setId === "string"
     ? setId
     : readSessionStorageString(QUIZ_RESULT_SET_STORAGE_KEY);
+}
+
+export function readStoredQuizActiveSetId(lessonId: string, userId?: string) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const value = window.localStorage.getItem(
+      getQuizActiveSetStorageKey(lessonId, userId),
+    );
+    return value && value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredQuizActiveSetId(
+  lessonId: string,
+  quizSetId: string,
+  userId?: string,
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      getQuizActiveSetStorageKey(lessonId, userId),
+      quizSetId,
+    );
+  } catch {
+    // The current React state remains usable when browser storage is unavailable.
+  }
 }
 
 export function pushQuizRunnerHistoryEntry(attemptId: string, quizSetId: string) {
@@ -165,6 +196,10 @@ function removeSessionStorageValue(key: string) {
   } catch {
     // Ignore unavailable browser storage during cleanup.
   }
+}
+
+function getQuizActiveSetStorageKey(lessonId: string, userId?: string) {
+  return `${QUIZ_ACTIVE_SET_STORAGE_PREFIX}${userId ?? "guest"}:${lessonId}`;
 }
 
 function getCurrentHistoryState(): Record<string, unknown> {

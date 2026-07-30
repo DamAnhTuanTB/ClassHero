@@ -1,41 +1,54 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useReducedMotion } from "framer-motion";
 import {
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
   Brain,
-  CheckCircle2,
   ClipboardCheck,
   Clock3,
+  Eye,
   HelpCircle,
   Loader2,
   LockKeyhole,
   Medal,
   Play,
   RefreshCcw,
-  Search,
   Trophy,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  getTestHistory,
   reviewStudentTest,
   startStudentTest,
   submitStudentTest,
   useStudentTestResult,
 } from "@/features/student/lessons/api/student-lessons-api";
-import { AssessmentQuestionCard } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-question-card";
+import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
+import {
+  LearningHistoryControl,
+  type LearningHistoryDisplayItem,
+} from "@/features/student/lessons/screens/student-lesson-screen/components/learning-history-control";
+import { QuizReviewScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-review-screen";
+import { TestResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/test-result-screen";
+import { TestRunnerScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/test-runner-screen";
 import type {
   AssessmentReview,
   CompletionResult,
   StudentAnswer,
   StudentLesson,
-  StudentLessonTab,
   StudentTestAttempt,
   StudentTestResult,
   StudentTestStatus,
 } from "@/features/student/lessons/types/student-lesson-types";
+import type { PracticeTabTarget } from "@/features/student/lessons/hooks/use-practice-tab-transition";
+import {
+  pickQuizTransitionVariant,
+  quizTransitionTimings,
+  type QuizTransitionPhase,
+  type QuizTransitionVariant,
+} from "@/features/student/lessons/utils/quiz-transition-variant";
 import {
   formatDuration,
   isStudentAnswerComplete,
@@ -43,18 +56,34 @@ import {
 import { cn } from "@/lib/utils";
 
 export function TestLearningPanel({
+  hasFlashcardContent,
+  hasQuizContent,
   lesson,
   onProgressChanged,
-  onSelectTab,
+  onStartPrerequisite,
   status,
   token,
 }: {
+  hasFlashcardContent: boolean;
+  hasQuizContent: boolean;
   lesson: StudentLesson;
   onProgressChanged: () => Promise<void>;
-  onSelectTab: (tab: StudentLessonTab) => void;
+  onStartPrerequisite: (tab: PracticeTabTarget) => Promise<void>;
   status: StudentTestStatus | undefined;
   token: string;
 }) {
+  const queryClient = useQueryClient();
+  const userId = useAuthSessionStore((state) => state.session?.user.id);
+  const historyQueryKey = useMemo(
+    () => ["student", "lesson", lesson.id, "test-history", userId ?? "guest"] as const,
+    [lesson.id, userId],
+  );
+  const historyQuery = useQuery({
+    queryKey: historyQueryKey,
+    queryFn: () => getTestHistory(lesson.id, token),
+    enabled: false,
+    staleTime: 15_000,
+  });
   const [attempt, setAttempt] = useState<StudentTestAttempt | null>(null);
   const [answers, setAnswers] = useState<Record<string, StudentAnswer>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -63,9 +92,20 @@ export function TestLearningPanel({
   const [review, setReview] = useState<(AssessmentReview & StudentTestResult) | null>(
     null,
   );
+  const [reviewOrigin, setReviewOrigin] = useState<"HISTORY" | "RESULT">("RESULT");
+  const [historyReviewTitle, setHistoryReviewTitle] = useState<string | null>(null);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [completion, setCompletion] = useState<CompletionResult | null>(null);
+  const [latestSubmittedAttemptId, setLatestSubmittedAttemptId] = useState<string | null>(
+    null,
+  );
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [shouldCelebrateResult, setShouldCelebrateResult] = useState(false);
+  const [curtainPhase, setCurtainPhase] = useState<QuizTransitionPhase>("idle");
+  const [transitionVariant, setTransitionVariant] =
+    useState<QuizTransitionVariant>("book");
+  const lastTransitionVariantRef = useRef<QuizTransitionVariant | null>(null);
+  const shouldReduceMotion = Boolean(useReducedMotion());
 
   const allAnswersComplete = useMemo(
     () =>
@@ -77,10 +117,26 @@ export function TestLearningPanel({
     [answers, attempt],
   );
 
+  function renderWithCurtain(content: ReactNode) {
+    return (
+      <>
+        {content}
+        <QuizCurtainTransition
+          animateStatusFill={false}
+          ariaLabel="Đang mở bài thi"
+          countdownFrom={3}
+          phase={curtainPhase}
+          statusText="Chúc bạn làm bài thi thật tốt!"
+          variant={transitionVariant}
+        />
+      </>
+    );
+  }
+
   const handleSubmit = useCallback(
     async (autoSubmit = false) => {
-      if (!attempt || pendingAction) return;
-      if (!autoSubmit && !allAnswersComplete) return;
+      if (!attempt || pendingAction) return false;
+      if (!autoSubmit && !allAnswersComplete) return false;
       setPendingAction("submit");
       try {
         const submittedAnswers = attempt.questions.map((question) => ({
@@ -93,16 +149,33 @@ export function TestLearningPanel({
         }));
         const nextResult = await submitStudentTest(attempt.id, submittedAnswers, token);
         setResult(nextResult);
+        setLatestSubmittedAttemptId(nextResult.id);
+        setShouldCelebrateResult(true);
         setAttempt(null);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: historyQueryKey }),
+          onProgressChanged(),
+        ]);
+        return true;
       } catch (error) {
-        toast.error("Chưa nộp được bài kiểm tra", {
+        toast.error("Chưa nộp được bài thi", {
           description: getErrorMessage(error),
         });
+        return false;
       } finally {
         setPendingAction(null);
       }
     },
-    [allAnswersComplete, answers, attempt, pendingAction, token],
+    [
+      allAnswersComplete,
+      answers,
+      attempt,
+      historyQueryKey,
+      onProgressChanged,
+      pendingAction,
+      queryClient,
+      token,
+    ],
   );
 
   useEffect(() => {
@@ -119,11 +192,36 @@ export function TestLearningPanel({
     }
   }, [attempt, handleSubmit, pendingAction, remainingSeconds, result]);
 
-  async function handleStart() {
-    if (!token || pendingAction) return;
-    setPendingAction("start");
+  async function handleStart(pendingKey = "start") {
+    if (
+      !token ||
+      pendingAction ||
+      !status?.sets[0] ||
+      status.sets[0].questionCount === 0
+    ) {
+      return;
+    }
+    setShouldCelebrateResult(false);
+    setPendingAction(pendingKey);
+    const nextTransitionVariant = pickQuizTransitionVariant(
+      lastTransitionVariantRef.current,
+    );
+    lastTransitionVariantRef.current = nextTransitionVariant;
+    setTransitionVariant(nextTransitionVariant);
+    setCurtainPhase("closing");
+
+    const closeDelay = waitForTestCurtain(2_200);
+    const prepareAttempt = startStudentTest(lesson.id, token);
+    const [, prepareResult] = await Promise.allSettled([closeDelay, prepareAttempt]);
+    setCurtainPhase("closed");
+
     try {
-      const nextAttempt = await startStudentTest(lesson.id, token);
+      if (prepareResult.status === "rejected") {
+        throw prepareResult.reason;
+      }
+
+      await waitForTestCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
+      const nextAttempt = prepareResult.value;
       setAttempt(nextAttempt);
       setAnswers({});
       setCurrentIndex(0);
@@ -132,19 +230,37 @@ export function TestLearningPanel({
       setReview(null);
       setCompletion(null);
     } catch (error) {
-      toast.error("Chưa bắt đầu được bài kiểm tra", {
+      toast.error("Chưa bắt đầu được bài thi", {
         description: getErrorMessage(error),
       });
     } finally {
+      setCurtainPhase("opening");
+      await waitForTestCurtain(
+        shouldReduceMotion
+          ? quizTransitionTimings.reducedOpenMs
+          : quizTransitionTimings.openMs,
+      );
+      setCurtainPhase("idle");
       setPendingAction(null);
     }
   }
 
-  async function handleReview(scope: "ALL" | "INCORRECT") {
-    if (!result || pendingAction) return;
-    setPendingAction(`review-${scope}`);
+  async function handleReviewAttempt(
+    attemptId: string,
+    scope: "ALL" | "INCORRECT",
+    origin: "HISTORY" | "RESULT" = "RESULT",
+    nextHistoryReviewTitle?: string,
+    actionKey = origin === "HISTORY" ? `history-review:${attemptId}` : `review-${scope}`,
+  ) {
+    if (pendingAction) return;
+    setPendingAction(actionKey);
     try {
-      const nextReview = await reviewStudentTest(result.id, scope, token);
+      const nextReview = await reviewStudentTest(attemptId, scope, token);
+      setShouldCelebrateResult(false);
+      setReviewOrigin(origin);
+      setHistoryReviewTitle(
+        origin === "HISTORY" ? (nextHistoryReviewTitle ?? null) : null,
+      );
       setReview(nextReview);
       setReviewIndex(0);
     } catch (error) {
@@ -154,6 +270,28 @@ export function TestLearningPanel({
     } finally {
       setPendingAction(null);
     }
+  }
+
+  async function handleOpenResult(attemptId: string) {
+    if (pendingAction) return;
+    setPendingAction("open-result");
+    try {
+      const restoredResult = await reviewStudentTest(attemptId, "ALL", token);
+      setShouldCelebrateResult(false);
+      setReview(null);
+      setResult(restoredResult);
+    } catch (error) {
+      toast.error("Chưa tải được kết quả bài thi", {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleReview(scope: "ALL" | "INCORRECT") {
+    if (!result) return;
+    await handleReviewAttempt(result.id, scope);
   }
 
   async function handleUseResult() {
@@ -170,6 +308,28 @@ export function TestLearningPanel({
     } finally {
       setPendingAction(null);
     }
+  }
+
+  function findTestHistoryItem(item: LearningHistoryDisplayItem) {
+    return historyQuery.data?.items.find((candidate) => candidate.id === item.id);
+  }
+
+  function handleHistoryReview(item: LearningHistoryDisplayItem) {
+    const source = findTestHistoryItem(item);
+    if (!source?.attemptId) return;
+    void handleReviewAttempt(
+      source.attemptId,
+      "ALL",
+      "HISTORY",
+      item.displayName,
+      `history-review:${item.id}`,
+    );
+  }
+
+  function handleHistoryStart(item: LearningHistoryDisplayItem) {
+    const source = findTestHistoryItem(item);
+    if (!source || source.state !== "NOT_STARTED") return;
+    void handleStart(`history-start:${item.id}`);
   }
 
   if (completion) {
@@ -226,130 +386,42 @@ export function TestLearningPanel({
     );
   }
 
-  if (review) {
-    const question = review.questions[reviewIndex];
-    return (
-      <div className="space-y-4">
-        <PanelHeader
-          title={review.scope === "INCORRECT" ? "Xem lại câu sai" : "Xem lại tất cả"}
-          trailing={`${reviewIndex + 1}/${review.questions.length}`}
-        />
-        {question ? (
-          <AssessmentQuestionCard
-            question={question}
-            answer={question.answerJson}
-            feedback={question}
-            onChange={() => undefined}
-            readOnly
-          />
-        ) : (
-          <EmptyPanel copy="Không có câu sai để xem lại." />
-        )}
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setReview(null)}
-            className="inline-flex min-h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2 text-[15px] font-black text-slate-600 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text)] sm:px-3 sm:text-base"
-          >
-            <Trophy className="h-5 w-5" aria-hidden="true" />
-            Kết quả
-          </button>
-          <button
-            type="button"
-            disabled={reviewIndex === 0}
-            onClick={() => setReviewIndex((index) => Math.max(0, index - 1))}
-            className="inline-flex min-h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-slate-100 px-2 text-[15px] font-black disabled:opacity-40 dark:bg-[var(--theme-surface-muted)] sm:px-3 sm:text-base"
-          >
-            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-            Câu trước
-          </button>
-          <button
-            type="button"
-            disabled={reviewIndex >= review.questions.length - 1}
-            onClick={() =>
-              setReviewIndex((index) => Math.min(review.questions.length - 1, index + 1))
-            }
-            className="inline-flex min-h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-600 px-2 text-[15px] font-black text-white disabled:opacity-40 sm:px-3 sm:text-base"
-          >
-            Câu sau
-            <ArrowRight className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+  if (review && reviewOrigin === "RESULT") {
+    return renderWithCurtain(
+      <QuizReviewScreen
+        accent="emerald"
+        activityLabel="Bài thi"
+        backLabel="Quay lại kết quả Bài thi"
+        currentIndex={reviewIndex}
+        displayScope={review.scope}
+        onBack={() => setReview(null)}
+        onCurrentIndexChange={setReviewIndex}
+        review={review}
+        reviewTitle={
+          review.scope === "INCORRECT"
+            ? "Xem lại các câu trả lời sai"
+            : "Xem lại tất cả câu trả lời"
+        }
+        testId="test-review-screen"
+      />,
     );
   }
 
   if (result) {
-    return (
-      <section className="rounded-[1.5rem] border border-sky-100 bg-white p-5 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-7">
-        <div className="text-center">
-          <span
-            className={cn(
-              "mx-auto grid h-16 w-16 place-items-center rounded-full",
-              result.passed
-                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
-                : "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
-            )}
-          >
-            {result.passed ? (
-              <CheckCircle2 className="h-9 w-9" />
-            ) : (
-              <AlertTriangle className="h-9 w-9" />
-            )}
-          </span>
-          <h2 className="mt-4 text-2xl font-black text-slate-950 dark:text-[var(--theme-text-strong)]">
-            Kết quả bài kiểm tra
-          </h2>
-          <p className="mt-3 text-4xl font-black text-sky-600 dark:text-sky-300">
-            {result.score.toFixed(2)}
-            <span className="text-lg text-slate-400">/10</span>
-          </p>
-          <p className="mt-2 text-sm font-bold text-slate-500 dark:text-[var(--theme-text-muted)]">
-            {result.correctCount}/{result.totalCount} câu đúng ·{" "}
-            {formatDuration(result.durationSeconds)}
-          </p>
-        </div>
-
-        {!result.passed ? (
-          <div
-            role="alert"
-            className="mt-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-black text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300"
-          >
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-            Bạn cần phải làm lại bài kiểm tra mới.
-          </div>
-        ) : null}
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <ResultAction
-            icon={Search}
-            label="Xem lại tất cả"
-            pending={pendingAction === "review-ALL"}
-            onClick={() => void handleReview("ALL")}
-          />
-          <ResultAction
-            icon={Search}
-            label="Xem lại câu sai"
-            pending={pendingAction === "review-INCORRECT"}
-            disabled={result.wrongCount === 0}
-            onClick={() => void handleReview("INCORRECT")}
-          />
-          <ResultAction
-            icon={RefreshCcw}
-            label="Làm lại bài kiểm tra mới"
-            pending={pendingAction === "start"}
-            onClick={() => void handleStart()}
-          />
-          <ResultAction
-            icon={CheckCircle2}
-            label="Dùng điểm bài này"
-            pending={pendingAction === "use-result"}
-            disabled={!result.passed}
-            primary
-            onClick={() => void handleUseResult()}
-          />
-        </div>
-      </section>
+    return renderWithCurtain(
+      <TestResultScreen
+        result={result}
+        pendingAction={pendingAction}
+        shouldCelebrate={shouldCelebrateResult}
+        onBack={() => {
+          setShouldCelebrateResult(false);
+          setResult(null);
+        }}
+        onReviewAll={() => void handleReview("ALL")}
+        onReviewIncorrect={() => void handleReview("INCORRECT")}
+        onStartNewTest={() => void handleStart()}
+        onUseResult={() => void handleUseResult()}
+      />,
     );
   }
 
@@ -357,94 +429,57 @@ export function TestLearningPanel({
     const question = attempt.questions[currentIndex];
     if (!question) return <EmptyPanel copy="Bộ đề chưa có câu hỏi phù hợp." />;
     const answer = answers[question.id];
-    const isLast = currentIndex === attempt.questions.length - 1;
-    return (
-      <div className="space-y-4">
-        <div className="flex items-end justify-between gap-4">
-          <PanelHeader
-            title={`Câu ${currentIndex + 1}`}
-            trailing={`${currentIndex + 1}/${attempt.questions.length}`}
-          />
-          <span
-            className={cn(
-              "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-black",
-              remainingSeconds <= 60
-                ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
-                : "bg-slate-100 text-slate-700 dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text)]",
-            )}
-          >
-            <Clock3 className="h-4 w-4" />
-            {formatDuration(remainingSeconds)}
-          </span>
-        </div>
-        <AssessmentQuestionCard
-          question={question}
-          answer={answer}
-          onChange={(nextAnswer) =>
-            setAnswers((current) => ({ ...current, [question.id]: nextAnswer }))
-          }
-        />
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-          <button
-            type="button"
-            disabled={currentIndex === 0 || Boolean(pendingAction)}
-            onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
-            className="grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600 disabled:opacity-40 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
-            aria-label="Câu trước"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          {isLast ? (
-            <button
-              type="button"
-              disabled={!allAnswersComplete || Boolean(pendingAction)}
-              onClick={() => void handleSubmit()}
-              className="inline-flex min-h-14 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-600 px-5 text-lg font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
-            >
-              {pendingAction === "submit" ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
-              ) : (
-                <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
-              )}
-              Nộp bài kiểm tra
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() =>
-                setCurrentIndex((index) =>
-                  Math.min(attempt.questions.length - 1, index + 1),
-                )
-              }
-              className="inline-flex min-h-14 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-sky-600 px-5 text-lg font-black text-white"
-            >
-              Câu tiếp theo
-              <ArrowRight className="h-6 w-6" />
-            </button>
-          )}
-        </div>
-        {!allAnswersComplete && isLast ? (
-          <p className="text-center text-xs font-bold text-slate-500 dark:text-[var(--theme-text-muted)]">
-            Hãy trả lời đủ các câu trước khi nộp bài.
-          </p>
-        ) : null}
-      </div>
+    const answeredQuestionIds = attempt.questions.flatMap((item) =>
+      isStudentAnswerComplete(item, answers[item.id]) ? [item.id] : [],
+    );
+
+    return renderWithCurtain(
+      <TestRunnerScreen
+        answer={answer}
+        answeredQuestionIds={answeredQuestionIds}
+        attempt={attempt}
+        currentIndex={currentIndex}
+        pendingAction={pendingAction}
+        remainingSeconds={remainingSeconds}
+        onAnswerChange={(nextAnswer) =>
+          setAnswers((current) => ({ ...current, [question.id]: nextAnswer }))
+        }
+        onBack={() => {
+          setAttempt(null);
+          setAnswers({});
+          setCurrentIndex(0);
+          setRemainingSeconds(0);
+        }}
+        onNext={() =>
+          setCurrentIndex((index) => Math.min(attempt.questions.length - 1, index + 1))
+        }
+        onPrevious={() => setCurrentIndex((index) => Math.max(0, index - 1))}
+        onQuestionSelect={(index) =>
+          setCurrentIndex(
+            Math.min(Math.max(0, index), Math.max(0, attempt.questions.length - 1)),
+          )
+        }
+        onSubmit={handleSubmit}
+      />,
     );
   }
 
   if (!status) {
-    return <EmptyPanel copy="Đang kiểm tra điều kiện mở bài kiểm tra…" />;
+    return <EmptyPanel copy="Đang tải điều kiện mở bài thi…" />;
   }
 
-  if (!status.canStart) {
+  if (
+    status.lockReason === "BEFORE_OPEN_TIME" ||
+    status.lockReason === "TRIAL_NOT_ALLOWED"
+  ) {
     return (
       <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
             <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
           </span>
-          <h2 className="min-w-0 text-base font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-lg">
-            Kiểm tra
+          <h2 className="min-w-0 text-lg font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-xl">
+            Bài thi
           </h2>
           <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
             <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
@@ -452,182 +487,207 @@ export function TestLearningPanel({
           </span>
         </div>
         <p className="mt-3 text-sm font-bold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)]">
-          {status.lockReason === "PREREQUISITES_INCOMPLETE"
-            ? "Hoàn thành xong Quiz và Flashcard để mở khóa bài kiểm tra."
-            : status.lockReason === "BEFORE_OPEN_TIME"
-              ? `Bài kiểm tra sẽ mở lúc ${formatDateTime(status.examOpenAt)}.`
-              : "Bài kiểm tra không mở trong chế độ học thử."}
+          {status.lockReason === "BEFORE_OPEN_TIME"
+            ? `Bài thi sẽ mở lúc ${formatDateTime(status.examOpenAt)}.`
+            : "Bài thi không mở trong chế độ học thử."}
         </p>
-        {status.lockReason === "PREREQUISITES_INCOMPLETE" ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <PrerequisiteRow
-              label="Quiz"
-              completed={status.quiz.isCompleted}
-              tone="quiz"
-              onClick={() => onSelectTab("quiz")}
-            />
-            <PrerequisiteRow
-              label="Flashcard"
-              completed={status.flashcard.isCompleted}
-              tone="flashcard"
-              onClick={() => onSelectTab("flashcard")}
-            />
-          </div>
-        ) : null}
       </section>
     );
   }
 
-  return (
-    <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
-      <div className="flex items-center gap-2 sm:gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-          <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
-        </span>
-        <h2 className="min-w-0 text-base font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-lg">
-          Kiểm tra
-        </h2>
-        <span className="ml-auto shrink-0 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-          {status.sets[0] ? `${status.sets[0].questionCount} câu` : "Sẵn sàng"}
-        </span>
-      </div>
-      <p className="mt-3 text-sm font-bold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)]">
-        Ôn lại Quiz và Flashcard để sẵn sàng hơn.
-      </p>
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => onSelectTab("quiz")}
-          className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-sky-200 bg-sky-50 px-2 text-[15px] font-black text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300 sm:px-3 sm:text-base"
-        >
-          <HelpCircle className="h-5 w-5" aria-hidden="true" />
-          Ôn lại QuizBN
-        </button>
-        <button
-          type="button"
-          onClick={() => onSelectTab("flashcard")}
-          className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-violet-200 bg-violet-50 px-2 text-[15px] font-black text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-300 sm:px-3 sm:text-base"
-        >
-          <Brain className="h-5 w-5" aria-hidden="true" />
-          Ôn lại Flashcard
-        </button>
-      </div>
-      <button
-        type="button"
-        disabled={Boolean(pendingAction)}
-        onClick={() => void handleStart()}
-        className="student-test-cta-3d mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-5 text-lg font-black text-white hover:bg-emerald-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
-      >
-        {pendingAction === "start" ? (
-          <Loader2 className="h-6 w-6 animate-spin" />
-        ) : (
-          <Play className="h-6 w-6" aria-hidden="true" />
-        )}
-        Bắt đầu bài kiểm tra
-      </button>
-    </section>
-  );
-}
+  const prerequisitesComplete = status.quiz.isCompleted && status.flashcard.isCompleted;
+  const showQuizPrerequisiteAction = !status.quiz.isCompleted;
+  const showFlashcardPrerequisiteAction = !status.flashcard.isCompleted;
+  const prerequisiteDescription = prerequisitesComplete
+    ? "Bạn đã đủ điều kiện làm bài thi. Ôn tập lại Quiz và Flashcard để làm bài thi tốt hơn nhé."
+    : status.quiz.isCompleted
+      ? "Cần hoàn thành Flashcard để bắt đầu bài thi."
+      : status.flashcard.isCompleted
+        ? "Cần hoàn thành Quiz để bắt đầu bài thi."
+        : "Cần hoàn thành Quiz và Flashcard để bắt đầu bài thi.";
+  const completedAttemptId =
+    latestSubmittedAttemptId ??
+    status.latestSubmittedAttempt?.id ??
+    status.bestAttempt?.id ??
+    null;
+  const activeTestSet = status.sets[0];
+  const hasTestQuestions = Boolean(activeTestSet && activeTestSet.questionCount > 0);
+  const canStartTest =
+    status.canStart && prerequisitesComplete && hasTestQuestions;
+  const testStatusLabel =
+    !activeTestSet || activeTestSet.questionCount === 0
+      ? "0 câu"
+      : canStartTest && activeTestSet
+        ? `${activeTestSet.questionCount} câu`
+        : "Chưa mở";
+  const testHistoryItems: LearningHistoryDisplayItem[] = (
+    historyQuery.data?.items ?? []
+  ).map((item) => ({
+    id: item.id,
+    setId: item.setId,
+    displayName: item.displayName,
+    state: item.state,
+    startedAt: item.startedAt,
+    completedAt: item.completedAt,
+    summary:
+      item.state === "NOT_STARTED"
+        ? `${item.totalCount} câu`
+        : `${item.correctCount}/${item.totalCount} câu đúng`,
+    score:
+      item.state === "COMPLETED" && item.score !== null
+        ? `${formatTestScore(item.score)} điểm`
+        : undefined,
+  }));
 
-function PanelHeader({ title, trailing }: { title: string; trailing: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-xs font-black uppercase tracking-[0.15em] text-sky-600 dark:text-sky-300">
-        Bài kiểm tra
-      </p>
-      <div className="mt-1 flex items-center gap-3">
-        <h2 className="truncate text-xl font-black text-slate-950 dark:text-[var(--theme-text-strong)]">
-          {title}
-        </h2>
-        <span className="shrink-0 rounded-xl bg-sky-100 px-3 py-2 text-xs font-black text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-          {trailing}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function PrerequisiteRow({
-  completed,
-  label,
-  onClick,
-  tone,
-}: {
-  completed: boolean;
-  label: string;
-  onClick: () => void;
-  tone: "flashcard" | "quiz";
-}) {
-  const Icon = tone === "quiz" ? HelpCircle : Brain;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-12 items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 text-left dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)]"
-    >
-      <span className="inline-flex items-center gap-2.5 text-base font-black text-slate-700 dark:text-[var(--theme-text)]">
-        <Icon
-          className={cn(
-            "h-5 w-5 shrink-0",
-            tone === "quiz"
-              ? "text-amber-600 dark:text-amber-300"
-              : "text-violet-600 dark:text-violet-300",
+  return renderWithCurtain(
+    <>
+      <section className="rounded-[1.5rem] border border-sky-100 bg-white p-4 shadow-[0_20px_50px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+            <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <h2 className="min-w-0 text-lg font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-xl">
+            Bài thi
+          </h2>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <span className="inline-flex h-8 items-center rounded-xl bg-emerald-100 px-[11px] text-[13px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              {testStatusLabel}
+            </span>
+            {activeTestSet && activeTestSet.questionCount > 0 ? (
+              <span
+                data-testid="test-duration-badge"
+                className="inline-flex items-center gap-1 rounded-xl bg-sky-100 px-2.5 py-2 text-xs font-black text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+              >
+                <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                {formatDuration(activeTestSet.durationSeconds)}
+              </span>
+            ) : null}
+            <LearningHistoryControl
+              accent="test"
+              countLabel={testStatusLabel}
+              currentItemId={historyQuery.data?.currentItemId ?? undefined}
+              errorMessage={
+                historyQuery.error
+                  ? "Chưa tải được lịch sử Bài thi. Vui lòng thử lại."
+                  : null
+              }
+              isCoveredByChildSurface={Boolean(review && reviewOrigin === "HISTORY")}
+              isLoading={historyQuery.isLoading && !historyQuery.data}
+              isStartDisabled={!canStartTest}
+              items={testHistoryItems}
+              onOpenHistory={() => {
+                if (!historyQuery.data) {
+                  return historyQuery.refetch().then(() => undefined);
+                }
+              }}
+              onReview={handleHistoryReview}
+              onStart={handleHistoryStart}
+              pendingActionKey={
+                pendingAction?.startsWith("history-")
+                  ? pendingAction.slice("history-".length)
+                  : null
+              }
+              showCountLabel={false}
+            />
+          </div>
+        </div>
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+          {prerequisiteDescription}
+        </p>
+        <div className="mt-5 grid grid-cols-2 gap-x-2 gap-y-3">
+          {showQuizPrerequisiteAction ? (
+            <button
+              type="button"
+              disabled={!hasQuizContent}
+              onClick={() => void onStartPrerequisite("quiz")}
+              className={cn(
+                "student-quiz-cta-3d inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-2 text-[15px] font-black text-white focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:px-3 sm:text-base",
+                !showFlashcardPrerequisiteAction && "col-span-2",
+              )}
+            >
+              <HelpCircle className="h-5 w-5" aria-hidden="true" />
+              Làm Quiz
+            </button>
+          ) : null}
+          {showFlashcardPrerequisiteAction ? (
+            <button
+              type="button"
+              disabled={!hasFlashcardContent}
+              onClick={() => void onStartPrerequisite("flashcard")}
+              className={cn(
+                "student-flashcard-cta-3d inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-violet-500 px-2 text-[15px] font-black text-white hover:bg-violet-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 sm:px-3 sm:text-base",
+                !showQuizPrerequisiteAction && "col-span-2",
+              )}
+            >
+              <Brain className="h-5 w-5" aria-hidden="true" />
+              Làm Flashcard
+            </button>
+          ) : null}
+          {completedAttemptId ? (
+            <>
+              <button
+                type="button"
+                aria-busy={pendingAction === "open-result"}
+                disabled={pendingAction === "open-result"}
+                onClick={() => void handleOpenResult(completedAttemptId)}
+                className="student-test-cta-3d col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-emerald-500 px-3 text-base font-black text-white hover:bg-emerald-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 sm:text-lg lg:col-span-1"
+              >
+                {pendingAction === "open-result" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-6 w-6 shrink-0" aria-hidden="true" />
+                )}
+                Xem lại bài thi
+              </button>
+              <button
+                type="button"
+                aria-busy={pendingAction === "start"}
+                disabled={!canStartTest || pendingAction === "start"}
+                onClick={() => void handleStart()}
+                className="col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-emerald-500 bg-white px-3 text-base font-black text-emerald-700 transition hover:bg-emerald-50 active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 sm:text-lg lg:col-span-1"
+              >
+                {pendingAction === "start" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <RefreshCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
+                )}
+                Làm bài thi mới
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              aria-busy={pendingAction === "start"}
+              disabled={!canStartTest || pendingAction === "start"}
+              onClick={() => void handleStart()}
+              className="student-test-cta-3d col-span-2 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-5 text-lg font-black text-white hover:bg-emerald-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {pendingAction === "start" ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <Play className="h-6 w-6" aria-hidden="true" />
+              )}
+              Bắt đầu bài thi
+            </button>
           )}
-          aria-hidden="true"
+        </div>
+      </section>
+      {review && reviewOrigin === "HISTORY" ? (
+        <QuizReviewScreen
+          accent="emerald"
+          activityLabel="Bài thi"
+          backLabel="Quay lại lịch sử Bài thi"
+          currentIndex={reviewIndex}
+          displayScope={review.scope}
+          onBack={() => setReview(null)}
+          onCurrentIndexChange={setReviewIndex}
+          review={review}
+          reviewTitle={historyReviewTitle ?? undefined}
+          stackedOverDialog
+          testId="test-history-review-screen"
         />
-        {label}
-      </span>
-      <span
-        className={cn(
-          "rounded-lg px-2 py-1 text-xs font-black",
-          completed
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-            : tone === "quiz"
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
-              : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-        )}
-      >
-        {completed ? "Đã xong" : "Chưa xong"}
-      </span>
-    </button>
-  );
-}
-
-function ResultAction({
-  disabled = false,
-  icon: Icon,
-  label,
-  onClick,
-  pending,
-  primary = false,
-}: {
-  disabled?: boolean;
-  icon: typeof Search;
-  label: string;
-  onClick: () => void;
-  pending: boolean;
-  primary?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled || pending}
-      onClick={onClick}
-      className={cn(
-        "inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl px-4 text-base font-black transition disabled:cursor-not-allowed disabled:opacity-45",
-        primary
-          ? "bg-emerald-600 text-white"
-          : "border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300",
-      )}
-    >
-      {pending ? (
-        <Loader2 className="h-5 w-5 animate-spin" />
-      ) : (
-        <Icon className="h-5 w-5" aria-hidden="true" />
-      )}
-      {label}
-    </button>
+      ) : null}
+    </>,
   );
 }
 
@@ -649,4 +709,14 @@ function formatDateTime(value: string | null) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Vui lòng thử lại.";
+}
+
+function formatTestScore(score: number) {
+  return Number.isInteger(score) ? score.toFixed(0) : score.toFixed(2);
+}
+
+function waitForTestCurtain(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
 }

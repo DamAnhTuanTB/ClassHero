@@ -147,19 +147,29 @@ flowchart TD
   chưa chấm rồi mới submit, còn backend vẫn giữ invariant chỉ submit attempt đã
   được chấm đủ.
 - React state không đủ để giữ runner qua F5. Khi mount tab Quiz, frontend gọi
-  endpoint current attempt: server trả lại tập câu và feedback của những câu đã
-  kiểm tra; browser storage chỉ bổ sung `attemptId` và vị trí câu hiện tại,
-  không lưu đáp án nháp. Nếu dữ liệu cục bộ không cùng attempt đang mở,
-  frontend bỏ qua để không ghép nhầm hai lượt làm.
-- Copy CTA và vị trí mở runner phải dùng cùng một tín hiệu tiến độ. Khi chưa có
-  câu nào được kiểm tra và panel hiển thị `Bắt đầu`, phải bỏ qua `currentIndex`
-  cũ trong browser storage và mở từ câu 1; chỉ `Tiếp tục vào làm` mới khôi phục
-  vị trí đã lưu. Riêng F5 khi runner vẫn đang mở tiếp tục dùng history marker và
-  vị trí local để giữ nguyên câu người học đang xem.
+  endpoint current attempt: server trả lại tập câu, mọi đáp án đã autosave,
+  feedback của câu đã kiểm tra và vị trí câu hiện tại. Browser storage chỉ là
+  cache tùy chọn; server là nguồn chính để resume chéo thiết bị.
+- Response autosave có thể cập nhật `answeredCount` hoặc `checkedCount` trong
+  TanStack Query cache, nhưng đây không phải tín hiệu cần resume lại runner.
+  Effect khôi phục phải thoát sớm khi `attemptId` trên history marker chính là
+  attempt đang hiển thị; nếu phụ thuộc trực tiếp vào toàn bộ object status, mỗi
+  lần chọn hoặc kiểm tra đáp án sẽ dựng màn loading fullscreen rồi tải lại
+  current attempt, tạo cảm giác nháy màn.
+- Copy CTA và vị trí mở runner phải dùng trạng thái đã từng mở lượt. Chưa có
+  attempt dùng `Bắt đầu` và luôn mở câu 1; mọi attempt `IN_PROGRESS` dùng
+  `Tiếp tục làm` dù chưa kiểm tra câu nào và khôi phục `currentIndex` đã lưu.
+  History marker chỉ quyết định F5 có tự mở runner hay giữ panel, không quyết
+  định nhãn CTA.
 - Attempt `IN_PROGRESS` là trạng thái nghiệp vụ, không phải trạng thái màn hình.
   Chỉ history entry riêng của runner mới cho biết F5 cần tự mở lại runner. Nếu
   entry này đã được pop khi student xác nhận thoát, tab Quiz phải giữ ở panel
   tổng quan; nút bắt đầu sau đó mới chủ động resume attempt đang dở.
+- Với lesson có nhiều Quiz set, `activeQuizSetId` cũng là state cần sống qua F5.
+  Lưu ID này theo `user + lesson`, ưu tiên marker runner/result khi surface vẫn
+  mở và luôn đối chiếu với danh sách set mới tải. Khi Back khỏi runner, chỉ xóa
+  surface marker; không xóa active set, nếu không lần refetch/F5 tiếp theo sẽ
+  rơi về set đầu tiên và hiển thị kết quả cũ thay cho lượt mới đang dở.
 - Result cũng là một surface toàn màn hình nằm trên cùng route lesson, nên React
   state một mình không giữ được nó qua F5. Khi submit hoặc bấm `Xem lại`,
   frontend ghi `attemptId` gốc vào history state; lúc mount, UI đối chiếu marker
@@ -223,6 +233,12 @@ của ít nhất một bộ được duyệt, không ép tất cả thẻ phải
 có thể còn thẻ chưa thuộc nhưng vẫn tiếp tục bài kiểm tra sau khi hoàn thành
 vòng học.
 
+Một prerequisite chỉ được hoàn thành khi vừa có nội dung được duyệt vừa có tiến
+độ thật của student. Danh sách bộ hợp lệ rỗng không có nghĩa là student đã hoàn
+thành; đó là trạng thái content chưa sẵn sàng và phải khóa bài thi. Nếu dùng
+biểu thức kiểu `sets.length === 0 || hasProgress`, lesson thiếu Quiz/Flashcard
+sẽ bị mở khóa sai dù student chưa học gì.
+
 Runner Flashcard có thể được mở từ panel hoặc từ một action trên màn kết quả.
 Điểm quay về khi thoát phải được lưu như state riêng của phiên, không hard-code
 mọi runner về panel và cũng không suy đoán từ danh sách thẻ. Ví dụ phiên
@@ -234,11 +250,17 @@ History marker chỉ trả lời runner/result có đang là surface hiện tạ
 nó không thể tự dựng lại một phiên Flashcard. Phiên đang học cần lưu riêng tập
 `cardIds` đã chốt, các thẻ đã đánh dấu trong lượt, vị trí hiện tại, mặt trước/sau
 và điểm quay về. Sau F5, frontend ghép session state này với progress/favorite
-mới đọc từ server: server vẫn là nguồn dữ liệu nghiệp vụ, còn session storage
-chỉ giữ ngữ cảnh trình bày của tab hiện tại. Khi student xác nhận thoát, history
-entry runner bị pop nhưng session vẫn còn để CTA `Tiếp tục vào học` resume; khi
-hoàn thành, session được xóa và result marker tiếp quản việc khôi phục màn kết
-quả.
+mới đọc từ server: server vẫn là nguồn dữ liệu nghiệp vụ, còn local storage giữ
+ngữ cảnh trình bày và vị trí chính xác trên cùng trình duyệt qua cả việc đóng/mở
+lại web. Khi student xác nhận thoát, history entry runner bị pop nhưng session
+vẫn còn để CTA `Tiếp tục học` resume; khi hoàn thành, session được xóa và result
+marker tiếp quản việc khôi phục màn kết quả.
+
+Identity của bộ Flashcard hiện tại cũng phải lưu riêng theo `user + lesson`.
+Session lưu vị trí trong một bộ, còn active-set storage cho biết panel cần ghép
+session/progress của bộ nào sau refetch hoặc F5. Xác nhận thoát chỉ xóa marker
+fullscreen; nếu xóa luôn active set, panel sẽ quay về bộ hoàn thành đầu tiên và
+đổi sai CTA `Tiếp tục học` thành `Xem lại`.
 
 Flashcard panel được lazy-load sau khi lesson query hoàn tất, nên custom field
 trong `window.history.state` có thể đã bị Next.js chuẩn hóa trước lúc panel đọc
@@ -248,6 +270,47 @@ cùng một helper để tránh tình trạng UI đã về panel nhưng reload l
 runner. Cleanup marker stale chỉ chạy một lần lúc mount; nếu effect cleanup chạy
 lại theo object query sau progress refetch, nó sẽ xóa nhầm marker của runner vừa
 được mở.
+
+### Lịch sử là lịch sử lượt làm, không phải danh sách set duy nhất
+
+Tên `Bộ 1`, `Bộ 2`, ... mô tả thứ tự các lượt đầy đủ mà học sinh đã bắt đầu
+trong lesson. Vì vậy không được group lịch sử theo `quizSetId` hoặc
+`flashcardSetId`: khi chưa có AI sinh thêm bộ và UI quay vòng tái sử dụng cùng
+set, lượt mới vẫn phải có attempt/session riêng và có số `Bộ N` mới.
+
+Quiz đã có `quiz_attempts`, nên lịch sử chỉ lấy attempt gốc
+`sourceAttemptId=null`; retry câu sai/toàn bộ thuộc chuỗi kết quả hiện tại và
+không tạo tên bộ mới. Flashcard trước đây chỉ có progress toàn cục theo card,
+không đủ phân biệt hai lượt dùng cùng set, nên cần thêm session cùng item
+snapshot. Progress vẫn là nguồn prerequisite và trạng thái mới nhất, còn
+session là nguồn resume/lịch sử của từng lượt.
+
+Test cũng phải đánh số `Bộ đề N` theo từng `test_attempt`, không dùng
+`test_sets.title` làm tên lịch sử. Một test set có thể được chọn lại nhiều lần,
+nên dùng title của set sẽ tạo nhiều mục trùng tên và làm mất ý nghĩa thứ tự lượt
+làm; mục chưa bắt đầu dùng số kế tiếp sau tổng attempt đã hoàn thành.
+
+Danh sách chỉ có tối đa một mục `IN_PROGRESS` hiện hành với badge `Đang làm`.
+Tạo lượt mới phải hủy lượt đang dở cũ trong cùng lesson để UI không có hai mục
+cùng mang ý nghĩa hiện tại. Mục hoàn thành điều hướng bằng ID attempt/session
+của chính nó; nếu chỉ truyền set ID, thao tác xem lại rất dễ mở nhầm kết quả gần
+nhất của một lượt khác dùng chung set.
+
+Surface xem lại có thể được mở từ nhiều nguồn nên Back không được suy đoán rằng
+đích luôn là màn kết quả. Frontend cần lưu `review origin` riêng: xem lại từ
+result thì Back về result, còn xem lại từ modal lịch sử thì giữ nguyên modal
+mounted bên dưới child surface. Back chỉ bỏ child surface để lộ lại chính modal
+cũ, nhờ vậy scroll và state không bị reset. Action xem lại chỉ cần attempt/session
+ID, không được đổi active set của panel nguồn; nếu đổi, query trạng thái của set
+mới có thể chuyển panel sang loading skeleton và vô tình unmount modal theo một
+race condition phụ thuộc cache/tốc độ mạng.
+
+Lịch sử là action có xác suất mở thấp nên không nên prefetch mỗi khi student vào
+tab. Query chỉ chạy khi student chọn item lịch sử trong menu. Trong lúc request
+chạy, dropdown giữ nguyên và hiển thị pending; dialog chỉ mount sau khi request
+kết thúc để tránh nháy do chuyển `loading -> danh sách`. Sau khi cache đã có dữ
+liệu, background refetch không được dùng `isFetching` để thay toàn bộ list bằng
+loading; chỉ `isLoading` khi chưa có data mới được phép hiển thị loading surface.
 
 ### Test: submit và dùng kết quả là hai hành động
 
@@ -409,14 +472,13 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 - Trial là quyền đọc giới hạn, không tương đương enrollment. Mọi action nhạy cảm
   như bắt đầu test phải kiểm tra `access.mode` ở backend dù lesson bật trial.
 - Không giữ một flow làm bài dài chỉ bằng `useState`. Sau reload, React mount lại
-  từ đầu; dữ liệu nghiệp vụ phải resume từ server, còn browser storage chỉ phù
-  hợp cho state trình bày như vị trí câu. Không lưu đáp án nháp chưa gửi vì F5
-  phải xóa mọi giá trị chưa bấm kiểm tra.
-- State phiên tạm cần sống qua thao tác đổi tab trong cùng trang cũng sẽ mất nếu
-  panel được render bằng nhánh điều kiện rồi unmount. Với phiên Flashcard mới đã
-  tạo nhưng chưa đánh dấu thẻ nào, giữ panel được mount và chỉ ẩn khi tab khác
-  active, hoặc nâng state lên owner có vòng đời dài hơn; không suy lại CTA từ
-  progress server cũ sau mỗi lần đổi tab.
+  từ đầu; dữ liệu Quiz gồm đáp án nháp, trạng thái đã kiểm tra và vị trí câu
+  phải resume từ server. Autosave cần phân biệt `is_answered` với `is_checked`
+  để lịch sử đếm đúng câu đã làm mà không tự hiển thị feedback trước khi student
+  chủ động kiểm tra.
+- State phiên Flashcard cần sống qua đổi tab, F5 và đóng/mở lại web. Với session
+  đã tạo nhưng chưa đánh dấu thẻ nào, lưu snapshot trình bày vào local storage
+  và dùng CTA `Tiếp tục học`; không suy lại CTA chỉ từ progress server cũ.
 - API trả `videoUrl` không đồng nghĩa student đã nhìn thấy video. Lesson screen
   phải compose player thật trước thanh tab và truyền `customVideoSettings`; tab
   `Bài học` chỉ thay nội dung summary bên dưới. E2E cần assert vùng player để

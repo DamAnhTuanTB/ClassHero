@@ -4,6 +4,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -18,6 +19,7 @@ import { RolesGuard } from "#api/common/auth/roles.guard";
 import {
   CheckStudentQuizAnswerDto,
   QuizAttemptScopeDto,
+  SaveStudentQuizProgressDto,
   StartStudentQuizAttemptDto,
   SubmitStudentQuizAttemptDto,
 } from "#api/modules/quiz/dto/student-quiz-attempt.dto";
@@ -33,6 +35,12 @@ export class StudentQuizAttemptsController {
     @Inject(StudentQuizAttemptsService)
     private readonly studentQuizAttemptsService: StudentQuizAttemptsService,
   ) {}
+
+  @Get("lessons/:lessonId/quiz-history")
+  @ApiOperation({ summary: "List Quiz attempts shown in the student's lesson history" })
+  history(@Param("lessonId") lessonId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.studentQuizAttemptsService.getLessonHistory(lessonId, user.id);
+  }
 
   @Get("quiz-sets/:quizSetId/attempts/status")
   @ApiOperation({ summary: "Get the quiz entry state for the current student" })
@@ -56,6 +64,16 @@ export class StudentQuizAttemptsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.studentQuizAttemptsService.startAttempt(quizSetId, user.id, body);
+  }
+
+  @Patch("quiz-attempts/:attemptId/progress")
+  @ApiOperation({ summary: "Autosave Quiz answers and the current question" })
+  saveProgress(
+    @Param("attemptId") attemptId: string,
+    @Body() body: SaveStudentQuizProgressDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.studentQuizAttemptsService.saveProgress(attemptId, user.id, body);
   }
 
   @Post("quiz-attempts/:attemptId/questions/:questionId/check")

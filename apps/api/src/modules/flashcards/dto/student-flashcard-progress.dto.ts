@@ -1,11 +1,23 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { FavoriteTargetType } from "@prisma/client";
-import { IsBoolean, IsEnum, IsUUID } from "class-validator";
+import { IsBoolean, IsEnum, IsOptional, IsUUID } from "class-validator";
 
 export class UpdateStudentFlashcardProgressDto {
   @ApiProperty()
   @IsBoolean()
   isKnown!: boolean;
+
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string;
+}
+
+export class StartStudentFlashcardSessionDto {
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  resumeExistingProgress?: boolean;
 }
 
 export class ToggleStudentFavoriteDto {

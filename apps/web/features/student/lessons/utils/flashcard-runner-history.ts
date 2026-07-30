@@ -3,6 +3,7 @@ const FLASHCARD_RESULT_HISTORY_STATE_KEY = "__classheroFlashcardResultSetId";
 const FLASHCARD_RUNNER_SURFACE_STORAGE_KEY = "student-flashcard-surface:runner";
 const FLASHCARD_RESULT_SURFACE_STORAGE_KEY = "student-flashcard-surface:result";
 const FLASHCARD_SESSION_STORAGE_PREFIX = "student-flashcard-session:";
+const FLASHCARD_ACTIVE_SET_STORAGE_PREFIX = "student-flashcard-active-set:";
 
 export type StoredFlashcardSession = {
   backDestination: "PANEL" | "RESULT";
@@ -11,6 +12,7 @@ export type StoredFlashcardSession = {
   isBackVisible: boolean;
   resumesSavedProgress: boolean;
   reviewedCardIds: string[];
+  sessionId?: string;
 };
 
 export function getFlashcardRunnerHistorySetId() {
@@ -29,6 +31,39 @@ export function getFlashcardResultHistorySetId() {
   return typeof setId === "string"
     ? setId
     : readSessionStorageString(FLASHCARD_RESULT_SURFACE_STORAGE_KEY);
+}
+
+export function readStoredFlashcardActiveSetId(
+  lessonId: string,
+  userId?: string,
+) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const value = window.localStorage.getItem(
+      getFlashcardActiveSetStorageKey(lessonId, userId),
+    );
+    return value && value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredFlashcardActiveSetId(
+  lessonId: string,
+  setId: string,
+  userId?: string,
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      getFlashcardActiveSetStorageKey(lessonId, userId),
+      setId,
+    );
+  } catch {
+    // The current React state remains usable when browser storage is unavailable.
+  }
 }
 
 export function pushFlashcardRunnerHistoryEntry(setId: string) {
@@ -115,7 +150,7 @@ export function readStoredFlashcardSession(
   if (typeof window === "undefined") return null;
 
   try {
-    const rawValue = window.sessionStorage.getItem(getFlashcardSessionStorageKey(setId));
+    const rawValue = window.localStorage.getItem(getFlashcardSessionStorageKey(setId));
     if (!rawValue) return null;
 
     const parsed = JSON.parse(rawValue) as unknown;
@@ -137,7 +172,7 @@ export function writeStoredFlashcardSession(
   if (typeof window === "undefined") return;
 
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       getFlashcardSessionStorageKey(setId),
       JSON.stringify(session),
     );
@@ -150,7 +185,7 @@ export function clearStoredFlashcardSession(setId: string) {
   if (typeof window === "undefined") return;
 
   try {
-    window.sessionStorage.removeItem(getFlashcardSessionStorageKey(setId));
+    window.localStorage.removeItem(getFlashcardSessionStorageKey(setId));
   } catch {
     // Ignore unavailable browser storage during cleanup.
   }
@@ -183,6 +218,10 @@ function removeSessionStorageValue(key: string) {
 
 function getFlashcardSessionStorageKey(setId: string) {
   return `${FLASHCARD_SESSION_STORAGE_PREFIX}${setId}`;
+}
+
+function getFlashcardActiveSetStorageKey(lessonId: string, userId?: string) {
+  return `${FLASHCARD_ACTIVE_SET_STORAGE_PREFIX}${userId ?? "guest"}:${lessonId}`;
 }
 
 function isStoredFlashcardSession(
@@ -223,7 +262,8 @@ function isStoredFlashcardSession(
 
   return (
     typeof candidate.isBackVisible === "boolean" &&
-    typeof candidate.resumesSavedProgress === "boolean"
+    typeof candidate.resumesSavedProgress === "boolean" &&
+    (candidate.sessionId === undefined || typeof candidate.sessionId === "string")
   );
 }
 

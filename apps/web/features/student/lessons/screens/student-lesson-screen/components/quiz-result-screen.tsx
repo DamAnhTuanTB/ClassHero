@@ -8,6 +8,7 @@ import {
   RefreshCcw,
   RotateCcw,
   SearchX,
+  Sparkles,
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
@@ -22,6 +23,7 @@ export function QuizResultScreen({
   onRestartIncorrect,
   onReviewAll,
   onReviewIncorrect,
+  onStartNewSet,
   pendingAction,
   result,
   shouldCelebrate,
@@ -31,6 +33,7 @@ export function QuizResultScreen({
   onRestartIncorrect: () => void;
   onReviewAll: () => void;
   onReviewIncorrect: () => void;
+  onStartNewSet: () => void;
   pendingAction: string | null;
   result: AttemptSummary;
   shouldCelebrate: boolean;
@@ -52,6 +55,7 @@ export function QuizResultScreen({
       onClick: onReviewIncorrect,
       pending: pendingAction === "review-INCORRECT",
       primary: false,
+      showsLocalPending: true,
     },
     {
       disabled: false,
@@ -60,6 +64,7 @@ export function QuizResultScreen({
       onClick: onReviewAll,
       pending: pendingAction === "review-ALL",
       primary: false,
+      showsLocalPending: true,
     },
     {
       disabled: result.wrongCount === 0,
@@ -68,6 +73,7 @@ export function QuizResultScreen({
       onClick: onRestartIncorrect,
       pending: pendingAction === "start-INCORRECT",
       primary: true,
+      showsLocalPending: false,
     },
     {
       disabled: false,
@@ -76,6 +82,7 @@ export function QuizResultScreen({
       onClick: onRestartAll,
       pending: pendingAction === "start-ALL",
       primary: true,
+      showsLocalPending: false,
     },
   ];
 
@@ -145,8 +152,8 @@ export function QuizResultScreen({
           </div>
 
           <div className="mt-6 grid grid-cols-3 gap-2 text-center">
-            <Metric label="Câu đúng" value={result.correctCount} tone="success" />
             <Metric label="Câu sai" value={result.wrongCount} tone="danger" />
+            <Metric label="Câu đúng" value={result.correctCount} tone="success" />
             <Metric label="Điểm" value={scoreOnTen} tone="primary" />
           </div>
         </section>
@@ -167,7 +174,7 @@ export function QuizResultScreen({
                     : "student-mobile-border border border-sky-500 bg-white text-sky-700 shadow-[0_4px_0_rgb(186_230_253)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(186_230_253)] enabled:hover:bg-sky-50 dark:border-sky-400 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:active:shadow-[0_1px_0_rgb(7_89_133)] dark:enabled:hover:bg-sky-500/10",
                 )}
               >
-                {action.pending ? (
+                {action.pending && action.showsLocalPending ? (
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                 ) : (
                   <Icon className="h-5 w-5" aria-hidden="true" />
@@ -176,6 +183,16 @@ export function QuizResultScreen({
               </button>
             );
           })}
+          <button
+            type="button"
+            aria-busy={pendingAction === "start-new-set"}
+            disabled={pendingAction === "start-new-set"}
+            onClick={onStartNewSet}
+            className="student-preserve-mobile-shadow col-span-2 inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-sky-500 bg-sky-500 px-4 text-base font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition enabled:hover:border-sky-600 enabled:hover:bg-sky-600 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-wait disabled:opacity-60 dark:border-sky-600 dark:bg-sky-600 dark:text-white dark:shadow-[0_4px_0_rgb(7_89_133)] dark:enabled:hover:border-sky-700 dark:enabled:hover:bg-sky-700 dark:focus-visible:ring-sky-500/30"
+          >
+            <Sparkles className="h-5 w-5" aria-hidden="true" />
+            Làm bộ Quiz mới
+          </button>
         </div>
       </main>
     </div>
