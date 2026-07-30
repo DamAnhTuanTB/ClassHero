@@ -348,7 +348,7 @@ export function LessonVideoChaptersForm({
             disabled={
               fields.length === 0 || !isValid || isSubmitting || updateMutation.isPending
             }
-            className="flex items-center gap-2 rounded-lg bg-[var(--theme-primary)] px-6 py-2 text-sm font-semibold text-white shadow-sm enabled:hover:bg-[var(--theme-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)] focus:ring-offset-2 focus:ring-offset-[var(--theme-surface)] disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+            className="flex items-center gap-2 rounded-lg bg-[var(--theme-primary)] px-6 py-2 text-sm font-semibold text-white shadow-sm enabled:hover:bg-[var(--theme-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)] focus:ring-offset-2 focus:ring-offset-[var(--theme-surface)] disabled:cursor-not-allowed disabled:opacity-50 transition-all dark:text-[var(--theme-primary-foreground)]"
           >
             {isSubmitting || updateMutation.isPending ? (
               <>

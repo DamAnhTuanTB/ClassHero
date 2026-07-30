@@ -178,8 +178,27 @@ test("admin formula input keeps its focused placeholder clear and keyboard toggl
   });
   expect(darkThemeColors.placeholderBackground).toBe("rgba(0, 0, 0, 0)");
   expect(darkThemeColors.keyboardBackground).not.toBe("rgba(0, 0, 0, 0)");
+  const darkVirtualKeyboardColors = await page.locator(".ML__keyboard").evaluate(
+    (element) => {
+      const styles = getComputedStyle(element);
+
+      return {
+        background: styles.getPropertyValue("--_background").trim(),
+        keycapBackground: styles.getPropertyValue("--_keycap-background").trim(),
+        keycapText: styles.getPropertyValue("--_keycap-text").trim(),
+      };
+    },
+  );
+  expect(darkVirtualKeyboardColors).toEqual({
+    background: "#0f172a",
+    keycapBackground: "#1e293b",
+    keycapText: "#f8fafc",
+  });
   await mathfield.screenshot({
     path: testInfo.outputPath("formula-input-focused-keyboard-open-dark.png"),
+  });
+  await page.screenshot({
+    path: testInfo.outputPath("formula-virtual-keyboard-open-dark.png"),
   });
 
   expect(browserErrors).toEqual([]);

@@ -144,7 +144,7 @@ export function LessonVideoSettingsForm({
         <label className="flex items-center gap-3 p-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-sunken)] cursor-pointer hover:bg-[var(--theme-border)] transition-colors">
           <input
             type="checkbox"
-            className="w-5 h-5 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] bg-[var(--theme-surface)]"
+            className="w-5 h-5 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] bg-[var(--theme-surface)] dark:border-slate-500"
             {...register("isDisabled")}
           />
           <div className="flex-1">
@@ -207,7 +207,7 @@ export function LessonVideoSettingsForm({
               <label className="flex items-center gap-3 cursor-pointer mb-2">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] bg-[var(--theme-surface)]"
+                  className="w-4 h-4 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)] bg-[var(--theme-surface)] dark:border-slate-500"
                   {...register("hasWatermark")}
                 />
                 <span className="font-semibold text-[var(--theme-text-strong)] text-sm">

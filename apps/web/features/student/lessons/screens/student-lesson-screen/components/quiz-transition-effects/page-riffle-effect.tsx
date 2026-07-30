@@ -6,14 +6,14 @@ import type { QuizTransitionEffectProps } from "@/features/student/lessons/utils
 import { cn } from "@/lib/utils";
 
 const rifflePages = [
-  "bg-slate-200",
-  "bg-sky-100",
-  "bg-amber-100",
-  "bg-cyan-100",
-  "bg-slate-100",
-  "bg-emerald-50",
-  "bg-amber-50",
-  "bg-white",
+  "bg-slate-200 dark:bg-slate-800",
+  "bg-sky-100 dark:bg-sky-950",
+  "bg-amber-100 dark:bg-amber-950",
+  "bg-cyan-100 dark:bg-cyan-950",
+  "bg-slate-100 dark:bg-slate-900",
+  "bg-emerald-50 dark:bg-emerald-950",
+  "bg-amber-50 dark:bg-amber-950",
+  "bg-white dark:bg-slate-900",
 ] as const;
 
 type PageFormula = {
@@ -57,7 +57,7 @@ export function PageRiffleEffect({ panelDuration, phase }: QuizTransitionEffectP
         initial={{ opacity: 0 }}
         animate={{ opacity: isOpening ? 0 : 1 }}
         transition={{ duration: panelDuration * 0.65 }}
-        className="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-amber-50 dark:from-slate-200 dark:via-slate-50 dark:to-amber-100"
+        className="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-amber-950"
       />
 
       {rifflePages.map((pageColor, index) => (
@@ -102,7 +102,7 @@ export function PageRiffleEffect({ panelDuration, phase }: QuizTransitionEffectP
                 "repeating-linear-gradient(0deg,transparent 0,transparent 35px,rgb(14 165 233 / 16%) 36px,rgb(14 165 233 / 16%) 37px)",
             }}
           />
-          <span className="absolute right-[9%] top-[8%] rounded-full border border-slate-300 bg-white/85 px-3 py-1 text-xs font-black text-slate-500 shadow-sm">
+          <span className="absolute right-[9%] top-[8%] rounded-full border border-slate-300 bg-white/85 px-3 py-1 text-xs font-black text-slate-500 shadow-sm dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-300">
             {index + 1}
           </span>
           <span className="absolute left-[19%] top-[17%] -rotate-6 text-7xl font-black text-sky-700/15">

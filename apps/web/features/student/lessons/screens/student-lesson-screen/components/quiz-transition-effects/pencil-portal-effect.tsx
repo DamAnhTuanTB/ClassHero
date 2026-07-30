@@ -18,7 +18,7 @@ export function PencilPortalEffect({
           initial={shouldReduceMotion ? false : { scale: 0 }}
           animate={{ scale: isOpening ? 0 : 26 }}
           transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-          className="h-full w-full rounded-full bg-gradient-to-br from-[#fffdf8] via-sky-50 to-amber-100 shadow-[0_0_70px_rgb(14_165_233_/_18%)] dark:from-slate-50 dark:via-sky-100 dark:to-amber-100"
+          className="h-full w-full rounded-full bg-gradient-to-br from-[#fffdf8] via-sky-50 to-amber-100 shadow-[0_0_70px_rgb(14_165_233_/_18%)] dark:from-slate-950 dark:via-sky-950 dark:to-amber-950"
         />
       </div>
 

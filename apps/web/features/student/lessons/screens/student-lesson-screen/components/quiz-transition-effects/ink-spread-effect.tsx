@@ -23,7 +23,7 @@ export function InkSpreadEffect({ panelDuration, phase }: QuizTransitionEffectPr
             : { opacity: 1, rotate: 0, x: "0%", y: "0%" }
         }
         transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-        className="absolute -inset-[4%] overflow-hidden bg-[#fffdf6] shadow-[0_0_65px_rgb(15_23_42_/_45%)] [will-change:transform,opacity] dark:bg-slate-50"
+        className="absolute -inset-[4%] overflow-hidden bg-[#fffdf6] shadow-[0_0_65px_rgb(15_23_42_/_45%)] [will-change:transform,opacity] dark:bg-slate-950"
       >
         <div className="absolute bottom-0 left-[14%] top-0 w-0.5 bg-red-300/45" />
         <div
@@ -62,7 +62,7 @@ export function InkSpreadEffect({ panelDuration, phase }: QuizTransitionEffectPr
             duration: panelDuration * 0.66,
             ease: [0.22, 1, 0.36, 1],
           }}
-          className="absolute left-[35%] top-[6%] h-40 w-40 rounded-full bg-amber-400/80 mix-blend-multiply"
+          className="absolute left-[35%] top-[6%] h-40 w-40 rounded-full bg-amber-400/80 mix-blend-multiply dark:mix-blend-screen"
         />
 
         <motion.svg

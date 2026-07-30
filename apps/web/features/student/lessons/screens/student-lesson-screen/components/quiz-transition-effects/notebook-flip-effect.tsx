@@ -7,17 +7,17 @@ import { cn } from "@/lib/utils";
 
 const notebookPages = [
   {
-    className: "bg-sky-100 dark:bg-slate-200",
+    className: "bg-sky-100 dark:bg-slate-800",
     delay: 0,
     rotate: -5,
   },
   {
-    className: "bg-amber-100 dark:bg-amber-100",
+    className: "bg-amber-100 dark:bg-amber-950",
     delay: 0.06,
     rotate: 4,
   },
   {
-    className: "bg-white dark:bg-slate-50",
+    className: "bg-white dark:bg-slate-900",
     delay: 0.12,
     rotate: 0,
   },
@@ -38,7 +38,7 @@ export function NotebookFlipEffect({ panelDuration, phase }: QuizTransitionEffec
         initial={{ opacity: 0 }}
         animate={{ opacity: isOpening ? 0 : 1 }}
         transition={{ duration: panelDuration * 0.72 }}
-        className="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-amber-50 dark:from-slate-200 dark:via-slate-50 dark:to-amber-100"
+        className="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-amber-50 dark:from-slate-950 dark:via-slate-900 dark:to-amber-950"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
@@ -126,7 +126,7 @@ export function NotebookFlipEffect({ panelDuration, phase }: QuizTransitionEffec
         {spiralRings.map((ring) => (
           <span
             key={ring}
-            className="h-10 w-4 rounded-full border-[4px] border-slate-700 bg-slate-200 shadow-sm"
+            className="h-10 w-4 rounded-full border-[4px] border-slate-700 bg-slate-200 shadow-sm dark:border-slate-300 dark:bg-slate-700"
           />
         ))}
       </motion.div>

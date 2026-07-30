@@ -25,7 +25,7 @@ export function EraserWipeEffect({
           clipPath: isOpening ? "inset(0 0 0 100%)" : "inset(0 0 0 0)",
         }}
         transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-        className="absolute inset-0 bg-[linear-gradient(135deg,#f7fff9_0%,#ecfdf5_48%,#ecfeff_100%)] dark:bg-[linear-gradient(135deg,#f1f5f9_0%,#ecfdf5_48%,#cffafe_100%)]"
+        className="absolute inset-0 bg-[linear-gradient(135deg,#f7fff9_0%,#ecfdf5_48%,#ecfeff_100%)] dark:bg-[linear-gradient(135deg,#020617_0%,#022c22_48%,#083344_100%)]"
       >
         <div className="absolute inset-0 opacity-70 [background-image:repeating-linear-gradient(0deg,transparent_0_42px,rgb(14_165_233_/_12%)_43px_44px)]" />
         <span className="absolute left-[10%] top-[14%] -rotate-6 font-serif text-6xl font-black text-emerald-800/18">

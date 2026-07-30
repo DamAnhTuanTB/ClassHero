@@ -411,7 +411,7 @@ export function LessonVideoTranscriptPanel({
             type="button"
             onClick={handleFetchTranscript}
             disabled={isBusy || !accessToken}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--theme-primary)] px-4 text-sm font-semibold text-white transition enabled:hover:bg-[var(--theme-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--theme-primary)] px-4 text-sm font-semibold text-white transition enabled:hover:bg-[var(--theme-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[var(--theme-primary-foreground)]"
           >
             {fetchMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -547,7 +547,7 @@ export function LessonVideoTranscriptPanel({
             <button
               type="submit"
               disabled={fields.length === 0 || isBusy || !accessToken}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--theme-primary)] px-5 text-sm font-semibold text-white transition enabled:hover:bg-[var(--theme-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--theme-primary)] px-5 text-sm font-semibold text-white transition enabled:hover:bg-[var(--theme-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[var(--theme-primary-foreground)]"
             >
               {saveMutation.isPending || isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

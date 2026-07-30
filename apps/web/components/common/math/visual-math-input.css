@@ -333,6 +333,41 @@
   line-height: 1.45;
 }
 
+/*
+ * MathLive mounts its virtual keyboard directly under <body>, outside the
+ * component tree. Keep these overrides global so opening the keyboard never
+ * flashes a light surface while the app is using dark mode.
+ */
+.dark .ML__keyboard {
+  --_accent-color: var(--theme-primary);
+  --_background: #0f172a;
+  --_keycap-background: #1e293b;
+  --_keycap-background-active: var(--theme-primary);
+  --_keycap-background-hover: #334155;
+  --_keycap-background-pressed: var(--theme-primary);
+  --_keycap-border: #334155;
+  --_keycap-border-bottom: #020617;
+  --_keycap-primary-background: var(--theme-primary);
+  --_keycap-primary-background-hover: var(--theme-primary-hover);
+  --_keycap-primary-text: var(--theme-primary-foreground);
+  --_keycap-secondary-background: #334155;
+  --_keycap-secondary-background-hover: #475569;
+  --_keycap-secondary-border: #475569;
+  --_keycap-secondary-border-bottom: #0f172a;
+  --_keycap-secondary-text: #e2e8f0;
+  --_keycap-shift-color: var(--theme-primary);
+  --_keycap-shift-text: var(--theme-primary);
+  --_keycap-text: #f8fafc;
+  --_keycap-text-active: var(--theme-primary-foreground);
+  --_keycap-text-hover: #ffffff;
+  --_keycap-text-pressed: var(--theme-primary-foreground);
+  --_toolbar-background-hover: #1e293b;
+  --_variant-keycap-background-active: var(--theme-primary);
+  --_variant-keycap-text: #f8fafc;
+  --_variant-keycap-text-active: var(--theme-primary-foreground);
+  --_variant-panel-background: #0f172a;
+}
+
 @media (max-width: 640px) {
   .visual-math-input__category-button {
     min-width: 3.75rem;

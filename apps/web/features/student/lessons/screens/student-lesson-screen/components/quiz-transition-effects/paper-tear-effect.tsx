@@ -20,14 +20,14 @@ export function PaperTearEffect({ panelDuration, phase }: QuizTransitionEffectPr
         initial={{ opacity: 0 }}
         animate={{ opacity: isOpening ? 0 : 1 }}
         transition={{ duration: panelDuration * 0.45 }}
-        className="absolute inset-0 bg-sky-100/90 dark:bg-slate-200"
+        className="absolute inset-0 bg-sky-100/90 dark:bg-slate-950"
       />
 
       <motion.div
         initial={{ x: "-105%" }}
         animate={{ x: isOpening ? "-108%" : "0%" }}
         transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-        className="absolute inset-y-0 left-0 w-[52.5%] overflow-hidden bg-[#edf8ff] shadow-[20px_0_45px_rgb(15_23_42_/_28%)] dark:bg-slate-100"
+        className="absolute inset-y-0 left-0 w-[52.5%] overflow-hidden bg-[#edf8ff] shadow-[20px_0_45px_rgb(15_23_42_/_28%)] dark:bg-sky-950"
         style={{
           clipPath:
             "polygon(0 0,100% 0,96% 5%,100% 11%,95% 17%,99% 24%,94% 31%,100% 38%,95% 46%,99% 54%,94% 62%,100% 70%,95% 78%,99% 86%,95% 93%,100% 100%,0 100%)",
@@ -58,7 +58,7 @@ export function PaperTearEffect({ panelDuration, phase }: QuizTransitionEffectPr
         initial={{ x: "105%" }}
         animate={{ x: isOpening ? "108%" : "0%" }}
         transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-        className="absolute inset-y-0 right-0 w-[52.5%] overflow-hidden bg-[#fff8df] shadow-[-20px_0_45px_rgb(15_23_42_/_24%)] dark:bg-amber-50"
+        className="absolute inset-y-0 right-0 w-[52.5%] overflow-hidden bg-[#fff8df] shadow-[-20px_0_45px_rgb(15_23_42_/_24%)] dark:bg-amber-950"
         style={{
           clipPath:
             "polygon(4% 0,100% 0,100% 100%,4% 100%,0 93%,5% 86%,1% 78%,6% 70%,0 62%,5% 54%,1% 46%,6% 38%,0 31%,5% 24%,1% 17%,6% 11%,1% 5%)",
@@ -111,7 +111,7 @@ export function PaperTearEffect({ panelDuration, phase }: QuizTransitionEffectPr
             duration: panelDuration * 0.55,
             ease: "easeOut",
           }}
-          className="absolute z-10 h-1.5 w-7 rounded-full bg-white shadow-sm"
+          className="absolute z-10 h-1.5 w-7 rounded-full bg-white shadow-sm dark:bg-slate-300"
           style={{
             left: fiber.left,
             rotate: `${fiber.rotate}deg`,

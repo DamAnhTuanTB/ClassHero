@@ -20,7 +20,7 @@ export function BookCurtainEffect({
         initial={shouldReduceMotion ? false : { x: "-100%" }}
         animate={{ x: isOpening ? "-100%" : "0%" }}
         transition={panelTransition}
-        className="absolute inset-y-0 left-0 w-[50.5%] overflow-hidden bg-gradient-to-br from-sky-50 via-sky-100 to-blue-300 dark:from-slate-100 dark:via-sky-200 dark:to-blue-400"
+        className="absolute inset-y-0 left-0 w-[50.5%] overflow-hidden bg-gradient-to-br from-sky-50 via-sky-100 to-blue-300 dark:from-slate-950 dark:via-sky-950 dark:to-blue-900"
         aria-hidden="true"
       >
         <span className="absolute -left-14 top-[12%] h-44 w-44 rounded-full border-[20px] border-sky-500/10" />
@@ -72,7 +72,7 @@ export function BookCurtainEffect({
         initial={shouldReduceMotion ? false : { x: "100%" }}
         animate={{ x: isOpening ? "100%" : "0%" }}
         transition={panelTransition}
-        className="absolute inset-y-0 right-0 w-[50.5%] overflow-hidden bg-gradient-to-bl from-amber-50 via-amber-100 to-orange-200 dark:from-amber-50 dark:via-amber-100 dark:to-orange-300"
+        className="absolute inset-y-0 right-0 w-[50.5%] overflow-hidden bg-gradient-to-bl from-amber-50 via-amber-100 to-orange-200 dark:from-slate-950 dark:via-amber-950 dark:to-orange-950"
         aria-hidden="true"
       >
         <span className="absolute -right-16 bottom-[14%] h-48 w-48 rounded-full border-[22px] border-amber-500/10" />

@@ -7,6 +7,94 @@ test.beforeEach(async ({ page }) => {
   await seedStudentSession(page);
 });
 
+test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Test", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("classhero-theme", "dark");
+  });
+  await setupStudentLearningApiMock(page, { testReady: true, testPasses: false });
+
+  await page.goto(`/student/lessons/${lessonId}`);
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  expect(
+    await page.getByRole("main").evaluate((element) => getComputedStyle(element).background),
+  ).not.toContain("rgb(255, 255, 255)");
+  await page.screenshot({
+    path: testInfo.outputPath("student-lesson-dark.png"),
+  });
+
+  await page.getByRole("button", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+  const quizTransition = page.locator("[data-quiz-transition-variant]");
+  await expect(quizTransition).toBeVisible();
+  await page.waitForTimeout(250);
+  await page.screenshot({
+    path: testInfo.outputPath("student-quiz-transition-dark.png"),
+  });
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await page.getByRole("button", { name: "Gợi ý" }).click();
+  await expect(page.getByText("Hãy cộng hai số.")).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-quiz-runner-dark.png"),
+  });
+  await page.getByRole("button", { name: /B.*4/ }).click();
+  await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+  await page.getByRole("button", { name: "Xem lời giải chi tiết" }).click();
+  await expect(page.getByText("Cộng hai với hai được bốn.")).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-quiz-feedback-dark.png"),
+  });
+  await page.getByRole("button", { name: "Hoàn thành Quiz" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-quiz-result-dark.png"),
+  });
+  await page.getByRole("button", { name: "Xem lại tất cả" }).click();
+  await expect(page.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-quiz-review-dark.png"),
+  });
+
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
+  await page.getByRole("button", { name: "Lật thẻ xem mặt sau" }).click();
+  await expect(page.getByText("Mặt sau", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-flashcard-runner-dark.png"),
+  });
+  await page.getByRole("button", { name: "Quay lại màn Flashcard" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Thoát lượt học Flashcard?" }),
+  ).toBeVisible();
+  await page.waitForTimeout(250);
+  await page.screenshot({
+    path: testInfo.outputPath("student-flashcard-exit-dialog-dark.png"),
+  });
+  await page.getByRole("button", { name: "Ở lại", exact: true }).click();
+  await page.getByRole("button", { name: "Đã thuộc" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-flashcard-result-dark.png"),
+  });
+
+  await page.goto(`/student/lessons/${lessonId}?tab=test`);
+  await page.getByRole("button", { name: "Bắt đầu bài kiểm tra" }).click();
+  await expect(page.getByRole("heading", { name: "Câu 1" })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-test-runner-dark.png"),
+  });
+  await page.getByRole("button", { name: /A.*5/ }).click();
+  await page.getByRole("button", { name: "Nộp bài kiểm tra" }).click();
+  await expect(page.getByText("Bạn cần phải làm lại bài kiểm tra mới.")).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("student-test-result-dark.png"),
+  });
+  await expectNoFrameworkOverlay(page);
+});
+
 test("quiz status preloads before tab click and tab changes do not mount transient loading", async ({
   page,
 }) => {

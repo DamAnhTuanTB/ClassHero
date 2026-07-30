@@ -15,7 +15,7 @@ export function CompassPortalEffect({ panelDuration, phase }: QuizTransitionEffe
           initial={{ rotate: -45, scale: 0 }}
           animate={{ rotate: isOpening ? 220 : 0, scale: isOpening ? 0 : 28 }}
           transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-          className="h-full w-full rounded-full bg-gradient-to-br from-[#fffdf8] via-sky-50 to-cyan-100 shadow-[0_0_90px_rgb(14_165_233_/_18%)] dark:from-slate-50 dark:via-sky-100 dark:to-cyan-200"
+          className="h-full w-full rounded-full bg-gradient-to-br from-[#fffdf8] via-sky-50 to-cyan-100 shadow-[0_0_90px_rgb(14_165_233_/_18%)] dark:from-slate-950 dark:via-sky-950 dark:to-cyan-950"
         />
       </div>
 

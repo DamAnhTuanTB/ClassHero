@@ -309,7 +309,7 @@ export function AdminAssessmentTab({
                     className={cn(
                       "min-w-6 rounded-full px-2 py-0.5 text-center text-xs font-extrabold",
                       isActive
-                        ? "bg-[var(--theme-primary)] text-white"
+                        ? "bg-[var(--theme-primary)] text-white dark:text-[var(--theme-primary-foreground)]"
                         : "bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)]",
                     )}
                   >

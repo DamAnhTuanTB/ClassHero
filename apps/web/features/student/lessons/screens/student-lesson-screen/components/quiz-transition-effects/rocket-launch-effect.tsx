@@ -42,7 +42,7 @@ export function RocketLaunchEffect({
       initial={shouldReduceMotion ? false : { y: "100%" }}
       animate={{ y: isOpening ? "-100%" : "0%" }}
       transition={{ duration: panelDuration, ease: [0.76, 0, 0.24, 1] }}
-      className="absolute inset-0 overflow-hidden bg-gradient-to-b from-[#f7fbff] via-sky-50 to-cyan-100 dark:from-slate-100 dark:via-sky-100 dark:to-cyan-200"
+      className="absolute inset-0 overflow-hidden bg-gradient-to-b from-[#f7fbff] via-sky-50 to-cyan-100 dark:from-slate-950 dark:via-sky-950 dark:to-cyan-950"
       aria-hidden="true"
     >
       <motion.span
@@ -100,10 +100,10 @@ export function RocketLaunchEffect({
 
       <span className="absolute left-[22%] top-[29%] h-3 w-3 rounded-full bg-sky-500/30" />
       <span className="absolute right-[8%] top-[42%] h-2.5 w-2.5 rounded-full bg-amber-500/40" />
-      <span className="absolute bottom-[13%] -left-16 h-40 w-56 rounded-[50%] bg-white/70 blur-sm" />
-      <span className="absolute -right-20 bottom-[7%] h-52 w-72 rounded-[50%] bg-sky-200/60 blur-sm" />
+      <span className="absolute bottom-[13%] -left-16 h-40 w-56 rounded-[50%] bg-white/70 blur-sm dark:bg-slate-700/45" />
+      <span className="absolute -right-20 bottom-[7%] h-52 w-72 rounded-[50%] bg-sky-200/60 blur-sm dark:bg-sky-800/45" />
 
-      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white/70 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white/70 to-transparent dark:from-slate-950/80" />
     </motion.div>
   );
 }

@@ -392,7 +392,7 @@ export function AdminAssessmentQuestionEditorDialog({
                         className={cn(
                           "grid size-[3.35rem] place-items-center self-center rounded-lg border text-sm font-extrabold transition",
                           isCorrect
-                            ? "border-[var(--theme-primary)] bg-[var(--theme-primary)] text-white"
+                            ? "border-[var(--theme-primary)] bg-[var(--theme-primary)] text-white dark:text-[var(--theme-primary-foreground)]"
                             : "border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)]",
                         )}
                       >

@@ -1022,7 +1022,7 @@ function TableContextIconButton({
           tone === "danger"
             ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] hover:bg-[var(--theme-error-bg)]"
             : tone === "primary"
-              ? "border-[var(--theme-primary)] bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)] hover:bg-[var(--theme-primary)] hover:text-white"
+              ? "border-[var(--theme-primary)] bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)] hover:bg-[var(--theme-primary)] hover:text-white dark:hover:text-[var(--theme-primary-foreground)]"
               : "border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)]",
         )}
       >

@@ -220,7 +220,7 @@ export function FlashcardRunnerScreen({
   const isInteractionLocked = Boolean(pendingAction) || markFeedback !== null;
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-y-auto bg-[linear-gradient(180deg,#ede9fe_0%,#faf5ff_100%)] text-slate-950 dark:bg-[var(--theme-bg)] dark:text-[var(--theme-text-strong)]">
+    <div className="fixed inset-0 z-[80] overflow-y-auto bg-[linear-gradient(180deg,#ede9fe_0%,#faf5ff_100%)] text-slate-950 dark:bg-none dark:bg-[var(--theme-bg)] dark:text-[var(--theme-text-strong)]">
       <header className="sticky top-0 z-20 border-b border-violet-100 bg-white/95 py-2 pl-1 pr-2 backdrop-blur dark:border-[var(--theme-border)] dark:bg-[color-mix(in_srgb,var(--theme-surface)_95%,transparent)] sm:pl-2 sm:pr-4">
         <div className="mx-auto flex min-h-14 max-w-2xl items-center gap-1.5">
           <button

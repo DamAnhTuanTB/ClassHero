@@ -98,7 +98,7 @@ function ActiveQuizTransition({
           initial={false}
           animate={{ opacity: isOpening ? 0 : 1 }}
           transition={{ duration: 0.08 }}
-          className="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-amber-100 dark:from-slate-200 dark:via-slate-50 dark:to-sky-200"
+          className="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-amber-100 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950"
           aria-hidden="true"
         />
       ) : (
