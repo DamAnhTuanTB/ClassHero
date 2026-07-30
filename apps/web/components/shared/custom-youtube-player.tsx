@@ -24,6 +24,12 @@ import {
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 
+const STUDENT_START_ANIMATION_FALLBACK_MS = 1300;
+const STUDENT_START_ANIMATION_NAMES = new Set([
+  "student-video-loading-mascot",
+  "student-video-loading-mascot-reduced",
+]);
+
 export interface CustomVideoSettings {
   isDisabled: boolean;
   startTimeInSeconds: number;
@@ -134,9 +140,11 @@ export const CustomYoutubePlayer = forwardRef<
 
   const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const firstStartUiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const studentStartFallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const startRequestedAtRef = useRef(0);
   const durationRef = useRef<number>(0);
   const isFirstPlayStartedRef = useRef<boolean>(false);
+  const isWaitingForStudentStartAnimationRef = useRef(false);
   const isMobileTimelineDraggingRef = useRef(false);
 
   const isPhoneViewport = windowSize.w > 0 && windowSize.w < 640;
@@ -268,6 +276,11 @@ export const CustomYoutubePlayer = forwardRef<
         clearTimeout(firstStartUiTimeoutRef.current);
         firstStartUiTimeoutRef.current = null;
       }
+      if (studentStartFallbackTimeoutRef.current) {
+        clearTimeout(studentStartFallbackTimeoutRef.current);
+        studentStartFallbackTimeoutRef.current = null;
+      }
+      isWaitingForStudentStartAnimationRef.current = false;
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
@@ -322,6 +335,11 @@ export const CustomYoutubePlayer = forwardRef<
         },
         onStateChange: (event: any) => {
           if (event.data === window.YT.PlayerState.PLAYING) {
+            isWaitingForStudentStartAnimationRef.current = false;
+            if (studentStartFallbackTimeoutRef.current) {
+              clearTimeout(studentStartFallbackTimeoutRef.current);
+              studentStartFallbackTimeoutRef.current = null;
+            }
             setIsPlaying(true);
             if (!isFirstPlayStartedRef.current) {
               isFirstPlayStartedRef.current = true;
@@ -374,6 +392,11 @@ export const CustomYoutubePlayer = forwardRef<
           }
         },
         onError: () => {
+          isWaitingForStudentStartAnimationRef.current = false;
+          if (studentStartFallbackTimeoutRef.current) {
+            clearTimeout(studentStartFallbackTimeoutRef.current);
+            studentStartFallbackTimeoutRef.current = null;
+          }
           setIsStarting(false);
           setIsPlaying(false);
         },
@@ -482,6 +505,36 @@ export const CustomYoutubePlayer = forwardRef<
     }
   };
 
+  const playVideoAfterStudentStartAnimation = () => {
+    if (!isWaitingForStudentStartAnimationRef.current) return;
+
+    isWaitingForStudentStartAnimationRef.current = false;
+    if (studentStartFallbackTimeoutRef.current) {
+      clearTimeout(studentStartFallbackTimeoutRef.current);
+      studentStartFallbackTimeoutRef.current = null;
+    }
+
+    if (!playerRef.current) {
+      setIsStarting(false);
+      return;
+    }
+
+    playerRef.current.playVideo();
+  };
+
+  const handleStudentStartAnimationEnd = (
+    event: React.AnimationEvent<HTMLSpanElement>,
+  ) => {
+    if (
+      event.currentTarget !== event.target ||
+      !STUDENT_START_ANIMATION_NAMES.has(event.animationName)
+    ) {
+      return;
+    }
+
+    playVideoAfterStudentStartAnimation();
+  };
+
   const handleStart = () => {
     if (isStarting || !isReady || !playerRef.current) return;
 
@@ -489,6 +542,16 @@ export const CustomYoutubePlayer = forwardRef<
     setIsStarting(true);
     setShowOverlay(true);
     hideOverlayDelayed();
+
+    if (startButtonVariant === "student") {
+      isWaitingForStudentStartAnimationRef.current = true;
+      studentStartFallbackTimeoutRef.current = setTimeout(
+        playVideoAfterStudentStartAnimation,
+        STUDENT_START_ANIMATION_FALLBACK_MS,
+      );
+      return;
+    }
+
     playerRef.current.playVideo();
   };
 
@@ -812,6 +875,7 @@ export const CustomYoutubePlayer = forwardRef<
                     <span
                       aria-hidden="true"
                       className="student-video-loading-mascot absolute left-0 top-1/2 z-10 grid h-10 w-10 place-items-center text-[35px] leading-none drop-shadow-[0_3px_4px_rgba(14,165,233,0.7)] sm:text-[36px] lg:h-11 lg:w-11 lg:text-[40px]"
+                      onAnimationEnd={handleStudentStartAnimationEnd}
                     >
                       <span className="student-video-loading-rocket">🚀</span>
                     </span>
