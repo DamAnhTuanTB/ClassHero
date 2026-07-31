@@ -589,7 +589,7 @@ export function TestLearningPanel({
             Đang khóa
           </span>
         </div>
-        <p className="mt-3 text-sm font-bold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)]">
+        <p className="mt-3 text-sm font-bold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] lg:text-base lg:leading-7">
           {status.lockReason === "BEFORE_OPEN_TIME"
             ? `Bài thi sẽ mở lúc ${formatDateTime(status.examOpenAt)}.`
             : "Bài thi không mở trong chế độ học thử."}
@@ -712,7 +712,7 @@ export function TestLearningPanel({
             />
           </div>
         </div>
-        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4 lg:text-base lg:leading-7">
           {prerequisiteDescription}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-x-2 gap-y-3">

@@ -8,7 +8,7 @@ export function LessonTypeBadge({ lessonType }: { lessonType: AdminLessonType })
 
   return (
     <span
-      className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 text-xs font-extrabold text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-300"
+      className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 text-xs font-extrabold text-rose-700 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-300"
       aria-label="Buổi học live"
     >
       <RadioTower className="h-3.5 w-3.5" aria-hidden="true" />

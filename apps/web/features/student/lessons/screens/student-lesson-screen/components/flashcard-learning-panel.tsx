@@ -778,7 +778,7 @@ export function FlashcardLearningPanel({
             }
           />
         </div>
-        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4 lg:text-base lg:leading-7">
           Cùng ghi nhớ các kiến thức đã học nhé.
         </p>
         <div

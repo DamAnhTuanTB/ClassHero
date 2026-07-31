@@ -20,3 +20,4 @@
 ## Khác
 - Bổ sung các utilities như `query-render-state.ts`, `server-sidebar-collapse-state.ts`.
 - Cập nhật tài liệu UI Design System, Code Index, và Learning Notes.
+- Cập nhật kích thước chữ dòng miêu tả các tab Quiz, Flashcard, Bài thi trên màn hình laptop; đồng nhất text và bỏ nền xám tab Kiến thức trọng tâm; đổi màu nhãn Live sang màu đỏ.

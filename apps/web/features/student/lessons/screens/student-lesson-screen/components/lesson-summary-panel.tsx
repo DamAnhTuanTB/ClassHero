@@ -22,9 +22,9 @@ export function LessonSummaryPanel({ lesson }: { lesson: StudentLesson }) {
           className="mt-3 sm:mt-4"
         />
       ) : (
-        <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm font-bold text-slate-500 dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)] sm:mt-4">
-          Bài học này chưa có bản tóm tắt.
-        </div>
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4 lg:text-base lg:leading-7">
+          Bài học này chưa có bản kiến thức trọng tâm.
+        </p>
       )}
     </section>
   );

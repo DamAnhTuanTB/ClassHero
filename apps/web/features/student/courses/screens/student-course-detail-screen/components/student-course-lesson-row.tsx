@@ -99,7 +99,7 @@ export function StudentCourseLessonRow({
             )}
             {lesson.lessonType === "LIVE" ? (
               <span
-                className="inline-flex min-h-5 shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-1.5 text-[10px] font-extrabold leading-none text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-300"
+                className="inline-flex min-h-5 shrink-0 items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-1.5 text-[10px] font-extrabold leading-none text-rose-700 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-300"
                 aria-label="Buổi học live"
               >
                 <RadioTower className="h-3 w-3" aria-hidden="true" />

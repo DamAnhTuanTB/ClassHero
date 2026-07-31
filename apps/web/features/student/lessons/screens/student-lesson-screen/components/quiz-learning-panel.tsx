@@ -899,7 +899,7 @@ export function QuizLearningPanel({
               }
             />
           </div>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4">
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-[var(--theme-text-muted)] sm:mt-4 lg:text-base lg:leading-7">
             Cùng luyện tập kiến thức vừa học xong nhé.
           </p>
           <div
