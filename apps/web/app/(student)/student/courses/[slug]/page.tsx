@@ -1,4 +1,5 @@
 import { StudentCourseDetailScreen } from "@/features/student/courses/screens/student-course-detail-screen";
+import { getServerStudentLearningPathDetail } from "@/features/student/shared/api/server-student-learning-paths-api";
 import { getServerThemeMode } from "@/lib/server-theme";
 
 export default async function StudentCourseDetailPage({
@@ -6,7 +7,17 @@ export default async function StudentCourseDetailPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const [{ slug }, initialThemeMode] = await Promise.all([params, getServerThemeMode()]);
+  const { slug } = await params;
+  const [initialData, initialThemeMode] = await Promise.all([
+    getServerStudentLearningPathDetail(slug),
+    getServerThemeMode(),
+  ]);
 
-  return <StudentCourseDetailScreen initialThemeMode={initialThemeMode} slug={slug} />;
+  return (
+    <StudentCourseDetailScreen
+      initialData={initialData}
+      initialThemeMode={initialThemeMode}
+      slug={slug}
+    />
+  );
 }

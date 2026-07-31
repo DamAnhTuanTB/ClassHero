@@ -27,6 +27,7 @@ import {
 } from "@/features/admin/courses/admin-courses-utils";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
+import { getQueryRenderState } from "@/lib/query-render-state";
 import {
   adminSidebarCollapsedDatasetKey,
   adminSidebarCollapsedStorageKey,
@@ -62,9 +63,7 @@ export function useAdminCoursesManager(
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
   const { replaceFilterSearchParams, searchParams } = useFilterSearchParams();
-  const [paths, setPaths] = useState<AdminLearningPath[]>(
-    () => learningPathsQuery.data ?? [],
-  );
+  const paths = learningPathsQuery.data ?? [];
   const [pathEditorMode, setPathEditorMode] = useState<EditorMode>("edit");
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [isPathEditorOpen, setIsPathEditorOpen] = useState(false);
@@ -86,12 +85,6 @@ export function useAdminCoursesManager(
 
   const editingPath = paths.find((path) => path.id === editingPathId) ?? null;
   const isSavingPath = mutations.createPath.isPending || mutations.updatePath.isPending;
-
-  useEffect(() => {
-    if (learningPathsQuery.data) {
-      setPaths(learningPathsQuery.data);
-    }
-  }, [learningPathsQuery.data]);
 
   const activePaths = useMemo(() => getActiveLearningPaths(paths), [paths]);
   const deletingPaths = useMemo(
@@ -354,12 +347,17 @@ export function useAdminCoursesManager(
     void learningPathsQuery.refetch();
   }
 
+  const queryRenderState = getQueryRenderState(learningPathsQuery);
+  const canUseServerDataBeforeAuthHydration =
+    !isAuthHydrated && initialLearningPaths !== undefined;
   const viewState: ViewState =
-    !isAuthHydrated || !hasAdminAccess || learningPathsQuery.isLoading
+    canUseServerDataBeforeAuthHydration
+      ? queryRenderState
+      : !isAuthHydrated || !hasAdminAccess
       ? "loading"
-      : learningPathsQuery.isError || !session?.accessToken
+      : !session?.accessToken
         ? "error"
-        : "ready";
+        : queryRenderState;
 
   return {
     allFilteredPathsSelected,

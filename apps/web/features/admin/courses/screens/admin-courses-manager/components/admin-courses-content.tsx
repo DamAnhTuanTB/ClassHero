@@ -15,7 +15,6 @@ import type {
   SortDirection,
   ViewState,
 } from "@/features/admin/courses/admin-courses-types";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 type AdminCoursesContentProps = {
   allFilteredPathsSelected: boolean;
@@ -73,23 +72,14 @@ export function AdminCoursesContent({
   onToggleSort,
 }: AdminCoursesContentProps) {
   const isInitialPending = viewState === "loading";
-  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
 
   return (
     <section className="mt-5">
-      {isInitialPending || shouldShowInitialLoading ? (
-        shouldShowInitialLoading ? (
-          <LoadingState
-            title="Đang tải danh sách khóa học"
-            description="ClassHero đang lấy dữ liệu khóa học mới nhất."
-            variant="list"
-          />
-        ) : (
-          <div aria-busy="true" className="min-h-80 lg:min-h-[calc(100svh-16rem)]" />
-        )
+      {isInitialPending ? (
+        <LoadingState title="Đang tải danh sách khóa học" variant="list" />
       ) : null}
       {viewState === "error" ? <ErrorState onRetry={onRetryLoad} /> : null}
-      {viewState === "ready" && !shouldShowInitialLoading ? (
+      {viewState === "ready" ? (
         <div className="min-w-0">
           <FilterBar
             isDarkTheme={isDarkTheme}

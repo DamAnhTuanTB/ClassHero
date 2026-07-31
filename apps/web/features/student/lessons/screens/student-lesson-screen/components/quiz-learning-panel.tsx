@@ -45,21 +45,19 @@ import type {
   QuizProgressSnapshot,
   ResumableQuizAttempt,
   StudentAnswer,
+  StudentLearningSurface,
   StudentLesson,
 } from "@/features/student/lessons/types/student-lesson-types";
 import {
   clearQuizResultHistoryMarker,
   clearQuizRunnerHistoryMarker,
-  getQuizResultHistoryAttemptId,
-  getQuizResultHistorySetId,
-  getQuizRunnerHistoryAttemptId,
-  getQuizRunnerHistorySetId,
   readStoredQuizActiveSetId,
   setQuizResultHistoryMarker,
   writeStoredQuizActiveSetId,
 } from "@/features/student/lessons/utils/quiz-runner-history";
 import { getQuizEntryActionLabel } from "@/features/student/lessons/utils/quiz-entry-state";
 import { getNextLearningSet } from "@/features/student/lessons/utils/learning-set-selection";
+import { getBrowserStudentLearningSurface } from "@/features/student/lessons/utils/student-learning-surface-route";
 import {
   gradeStudentQuizAnswer,
   isStudentAnswerComplete,
@@ -84,12 +82,19 @@ type StudentQuizSet = StudentLesson["quizSets"][number];
 
 export function QuizLearningPanel({
   autoStart,
+  initialQuizSetId,
+  initialSurface,
   lesson,
   onAutoStartHandled,
   onProgressChanged,
   token,
 }: {
   autoStart: boolean;
+  initialQuizSetId: string | null;
+  initialSurface: Extract<
+    StudentLearningSurface,
+    { kind: "quiz-runner" | "quiz-result" }
+  > | null;
   lesson: StudentLesson;
   onAutoStartHandled: (target: "flashcard" | "quiz") => void;
   onProgressChanged: () => Promise<void>;
@@ -98,10 +103,7 @@ export function QuizLearningPanel({
   const queryClient = useQueryClient();
   const userId = useAuthSessionStore((state) => state.session?.user.id);
   const [activeQuizSetId, setActiveQuizSetId] = useState(() => {
-    const candidateId =
-      getQuizRunnerHistorySetId() ??
-      getQuizResultHistorySetId() ??
-      readStoredQuizActiveSetId(lesson.id, userId);
+    const candidateId = initialSurface?.setId ?? initialQuizSetId;
 
     return (
       lesson.quizSets.find((candidate) => candidate.id === candidateId)?.id ??
@@ -155,11 +157,12 @@ export function QuizLearningPanel({
   );
   const [reviewIndex, setReviewIndex] = useState(0);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [isResumePending, setIsResumePending] = useState(() =>
-    Boolean(getQuizRunnerHistoryAttemptId() || getQuizResultHistoryAttemptId()),
+  const [isBrowserStateResolved, setIsBrowserStateResolved] = useState(false);
+  const [isResumePending, setIsResumePending] = useState(
+    initialSurface !== null,
   );
   const [isFullscreenResumePending, setIsFullscreenResumePending] =
-    useState(isResumePending);
+    useState(initialSurface !== null);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
   const [curtainPhase, setCurtainPhase] = useState<QuizTransitionPhase>("idle");
@@ -174,9 +177,36 @@ export function QuizLearningPanel({
   const activeAttemptId = attempt?.id ?? null;
 
   useEffect(() => {
+    const candidateId =
+      initialSurface?.setId ??
+      initialQuizSetId ??
+      readStoredQuizActiveSetId(lesson.id, userId);
+    const nextSetId =
+      lesson.quizSets.find((candidate) => candidate.id === candidateId)?.id ??
+      lesson.quizSets[0]?.id ??
+      "";
+
+    setActiveQuizSetId(nextSetId);
+    if (initialSurface?.kind !== "quiz-runner") {
+      clearQuizRunnerHistoryMarker();
+    }
+    if (initialSurface?.kind !== "quiz-result") {
+      clearQuizResultHistoryMarker();
+    }
+    setIsBrowserStateResolved(true);
+  }, [
+    initialQuizSetId,
+    initialSurface,
+    lesson.id,
+    lesson.quizSets,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!isBrowserStateResolved) return;
     if (!quizSetId) return;
     writeStoredQuizActiveSetId(lesson.id, quizSetId, userId);
-  }, [lesson.id, quizSetId, userId]);
+  }, [isBrowserStateResolved, lesson.id, quizSetId, userId]);
 
   useEffect(() => {
     if (!autoStart) {
@@ -287,13 +317,21 @@ export function QuizLearningPanel({
   });
 
   useEffect(() => {
+    if (!isBrowserStateResolved) return;
     if (!quizSetId || !token) {
       setIsResumePending(false);
       return;
     }
 
-    const runnerAttemptId = getQuizRunnerHistoryAttemptId();
-    const resultAttemptId = getQuizResultHistoryAttemptId();
+    const currentSurface = getBrowserStudentLearningSurface();
+    const runnerAttemptId =
+      currentSurface?.kind === "quiz-runner"
+        ? currentSurface.attemptId
+        : null;
+    const resultAttemptId =
+      currentSurface?.kind === "quiz-result"
+        ? currentSurface.attemptId
+        : null;
     if (!runnerAttemptId && !resultAttemptId) {
       setIsFullscreenResumePending(false);
       setIsResumePending(false);
@@ -381,6 +419,7 @@ export function QuizLearningPanel({
   }, [
     activeAttemptId,
     attemptStatus,
+    isBrowserStateResolved,
     isAttemptStatusPending,
     quizSetId,
     result,

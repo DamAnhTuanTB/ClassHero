@@ -1,4 +1,5 @@
 import { AdminCourseDetailManager } from "@/features/admin/courses/screens/admin-course-detail-manager";
+import { getServerAdminLearningPath } from "@/features/admin/courses/api/server-admin-course-data";
 import { getServerThemeMode } from "@/lib/server-theme";
 
 export default async function AdminCourseDetailPage({
@@ -14,12 +15,16 @@ export default async function AdminCourseDetailPage({
     typeof resolvedSearchParams.enrollmentId === "string"
       ? resolvedSearchParams.enrollmentId
       : null;
-  const initialThemeMode = await getServerThemeMode();
+  const [initialLearningPath, initialThemeMode] = await Promise.all([
+    getServerAdminLearningPath(id),
+    getServerThemeMode(),
+  ]);
 
   return (
     <AdminCourseDetailManager
       pathId={id}
       enrollmentId={enrollmentId}
+      initialLearningPath={initialLearningPath ?? undefined}
       initialThemeMode={initialThemeMode}
     />
   );

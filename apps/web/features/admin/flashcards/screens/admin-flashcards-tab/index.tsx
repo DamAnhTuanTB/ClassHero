@@ -17,8 +17,8 @@ import {
 } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
 import { FlashcardSetPanel } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-panel";
 import { FlashcardSetTabs } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-tabs";
+import { getQueryRenderState } from "@/lib/query-render-state";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
 
 const FlashcardSetEditorDialog = dynamic(() =>
@@ -38,8 +38,9 @@ type DeleteTarget =
   | null;
 
 export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
-  const { data: sets, isError, isLoading, refetch } = useAdminFlashcardSets(lessonId);
-  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
+  const setsQuery = useAdminFlashcardSets(lessonId);
+  const { data: sets, refetch } = setsQuery;
+  const queryRenderState = getQueryRenderState(setsQuery);
   const { deleteSet } = useAdminFlashcardSetMutations(lessonId);
   const [selectedSetId, setSelectedSetId] = useState("");
   const [setEditorTarget, setSetEditorTarget] = useState<
@@ -82,15 +83,11 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
   );
   const { deleteCard } = useAdminFlashcardMutations(selectedSetId, lessonId);
 
-  if (isLoading || shouldShowInitialLoading) {
-    return shouldShowInitialLoading ? (
-      <FlashcardSetsSkeleton />
-    ) : (
-      <div aria-busy="true" className="min-h-72" />
-    );
+  if (queryRenderState === "loading") {
+    return <FlashcardSetsSkeleton />;
   }
 
-  if (isError) {
+  if (queryRenderState === "error") {
     return (
       <div className="flex min-h-48 items-center justify-center rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-6 text-center">
         <div>

@@ -1,3 +1,8 @@
+import {
+  getBrowserStudentLearningSurface,
+  getStudentLearningSurfaceHref,
+} from "@/features/student/lessons/utils/student-learning-surface-route";
+
 const QUIZ_RUNNER_HISTORY_STATE_KEY = "__classheroQuizRunnerAttemptId";
 const QUIZ_RESULT_HISTORY_STATE_KEY = "__classheroQuizResultAttemptId";
 const QUIZ_RUNNER_SET_HISTORY_STATE_KEY = "__classheroQuizRunnerSetId";
@@ -11,7 +16,12 @@ export function getQuizRunnerHistoryAttemptId() {
 
   const currentState = getCurrentHistoryState();
   const attemptId = currentState[QUIZ_RUNNER_HISTORY_STATE_KEY];
-  return typeof attemptId === "string" ? attemptId : null;
+  if (typeof attemptId === "string") return attemptId;
+
+  const routeSurface = getBrowserStudentLearningSurface();
+  return routeSurface?.kind === "quiz-runner"
+    ? routeSurface.attemptId
+    : null;
 }
 
 export function getQuizResultHistoryAttemptId() {
@@ -19,15 +29,23 @@ export function getQuizResultHistoryAttemptId() {
 
   const currentState = getCurrentHistoryState();
   const attemptId = currentState[QUIZ_RESULT_HISTORY_STATE_KEY];
-  return typeof attemptId === "string" ? attemptId : null;
+  if (typeof attemptId === "string") return attemptId;
+
+  const routeSurface = getBrowserStudentLearningSurface();
+  return routeSurface?.kind === "quiz-result"
+    ? routeSurface.attemptId
+    : null;
 }
 
 export function getQuizRunnerHistorySetId() {
   if (typeof window === "undefined") return null;
 
   const setId = getCurrentHistoryState()[QUIZ_RUNNER_SET_HISTORY_STATE_KEY];
-  return typeof setId === "string"
-    ? setId
+  if (typeof setId === "string") return setId;
+
+  const routeSurface = getBrowserStudentLearningSurface();
+  return routeSurface?.kind === "quiz-runner"
+    ? routeSurface.setId
     : readSessionStorageString(QUIZ_RUNNER_SET_STORAGE_KEY);
 }
 
@@ -35,8 +53,11 @@ export function getQuizResultHistorySetId() {
   if (typeof window === "undefined") return null;
 
   const setId = getCurrentHistoryState()[QUIZ_RESULT_SET_HISTORY_STATE_KEY];
-  return typeof setId === "string"
-    ? setId
+  if (typeof setId === "string") return setId;
+
+  const routeSurface = getBrowserStudentLearningSurface();
+  return routeSurface?.kind === "quiz-result"
+    ? routeSurface.setId
     : readSessionStorageString(QUIZ_RESULT_SET_STORAGE_KEY);
 }
 
@@ -71,13 +92,23 @@ export function writeStoredQuizActiveSetId(
 }
 
 export function pushQuizRunnerHistoryEntry(attemptId: string, quizSetId: string) {
+  if (typeof window === "undefined") return;
+
   const currentState = getCurrentHistoryState();
+  const nextHref = getStudentLearningSurfaceHref({
+    attemptId,
+    kind: "quiz-runner",
+    setId: quizSetId,
+  });
   writeSessionStorageString(QUIZ_RUNNER_SET_STORAGE_KEY, quizSetId);
   removeSessionStorageValue(QUIZ_RESULT_SET_STORAGE_KEY);
   if (
     currentState[QUIZ_RUNNER_HISTORY_STATE_KEY] === attemptId &&
     currentState[QUIZ_RUNNER_SET_HISTORY_STATE_KEY] === quizSetId
   ) {
+    if (getCurrentHref() !== nextHref) {
+      window.history.replaceState(currentState, "", nextHref);
+    }
     return;
   }
 
@@ -92,7 +123,7 @@ export function pushQuizRunnerHistoryEntry(attemptId: string, quizSetId: string)
       [QUIZ_RUNNER_SET_HISTORY_STATE_KEY]: quizSetId,
     },
     "",
-    window.location.href,
+    nextHref,
   );
 }
 
@@ -111,7 +142,15 @@ export function setQuizResultHistoryMarker(attemptId: string, quizSetId?: string
     delete nextState[QUIZ_RESULT_SET_HISTORY_STATE_KEY];
     removeSessionStorageValue(QUIZ_RESULT_SET_STORAGE_KEY);
   }
-  window.history.replaceState(nextState, "", window.location.href);
+  window.history.replaceState(
+    nextState,
+    "",
+    getStudentLearningSurfaceHref({
+      attemptId,
+      kind: "quiz-result",
+      setId: quizSetId ?? getQuizResultHistorySetId() ?? "",
+    }),
+  );
 }
 
 export function popQuizRunnerHistoryEntryPreservingResult() {
@@ -142,9 +181,12 @@ export function clearQuizRunnerHistoryMarker() {
 
   removeSessionStorageValue(QUIZ_RUNNER_SET_STORAGE_KEY);
   const currentState = getCurrentHistoryState();
+  const routeSurface = getBrowserStudentLearningSurface();
+  const shouldClearRoute = routeSurface?.kind === "quiz-runner";
   if (
     !(QUIZ_RUNNER_HISTORY_STATE_KEY in currentState) &&
-    !(QUIZ_RUNNER_SET_HISTORY_STATE_KEY in currentState)
+    !(QUIZ_RUNNER_SET_HISTORY_STATE_KEY in currentState) &&
+    !shouldClearRoute
   ) {
     return;
   }
@@ -152,7 +194,11 @@ export function clearQuizRunnerHistoryMarker() {
   const nextState = { ...currentState };
   delete nextState[QUIZ_RUNNER_HISTORY_STATE_KEY];
   delete nextState[QUIZ_RUNNER_SET_HISTORY_STATE_KEY];
-  window.history.replaceState(nextState, "", window.location.href);
+  window.history.replaceState(
+    nextState,
+    "",
+    shouldClearRoute ? getStudentLearningSurfaceHref(null) : window.location.href,
+  );
 }
 
 export function clearQuizResultHistoryMarker() {
@@ -160,9 +206,12 @@ export function clearQuizResultHistoryMarker() {
 
   removeSessionStorageValue(QUIZ_RESULT_SET_STORAGE_KEY);
   const currentState = getCurrentHistoryState();
+  const routeSurface = getBrowserStudentLearningSurface();
+  const shouldClearRoute = routeSurface?.kind === "quiz-result";
   if (
     !(QUIZ_RESULT_HISTORY_STATE_KEY in currentState) &&
-    !(QUIZ_RESULT_SET_HISTORY_STATE_KEY in currentState)
+    !(QUIZ_RESULT_SET_HISTORY_STATE_KEY in currentState) &&
+    !shouldClearRoute
   ) {
     return;
   }
@@ -170,7 +219,11 @@ export function clearQuizResultHistoryMarker() {
   const nextState = { ...currentState };
   delete nextState[QUIZ_RESULT_HISTORY_STATE_KEY];
   delete nextState[QUIZ_RESULT_SET_HISTORY_STATE_KEY];
-  window.history.replaceState(nextState, "", window.location.href);
+  window.history.replaceState(
+    nextState,
+    "",
+    shouldClearRoute ? getStudentLearningSurfaceHref(null) : window.location.href,
+  );
 }
 
 function readSessionStorageString(key: string) {
@@ -212,4 +265,8 @@ function getCurrentHistoryState(): Record<string, unknown> {
   }
 
   return window.history.state as Record<string, unknown>;
+}
+
+function getCurrentHref() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }

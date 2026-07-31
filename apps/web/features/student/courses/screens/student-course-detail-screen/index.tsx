@@ -23,6 +23,7 @@ import {
   useStudentMockPurchaseMutation,
 } from "@/features/student/shared/hooks/use-student-courses-query";
 import type { StudentCourseDetailChapter } from "@/features/student/shared/student-courses-types";
+import type { StudentCourseDetailResult } from "@/features/student/shared/types/student-course-api-results";
 import {
   formatVnd,
   getCoursePrice,
@@ -31,21 +32,24 @@ import {
 import { getStudentCourseContinueLessonCopy } from "@/features/student/shared/utils/student-course-continue-lesson";
 import { cn } from "@/lib/utils";
 import type { AppThemeMode } from "@/lib/theme-store";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function StudentCourseDetailScreen({
+  initialData,
   initialThemeMode,
   slug,
 }: {
+  initialData?: StudentCourseDetailResult | null;
   initialThemeMode: AppThemeMode;
   slug: string;
 }) {
-  const { isAuthHydrated, query: courseDetailQuery } = useStudentCourseDetailQuery(slug);
+  const { isAuthHydrated, query: courseDetailQuery } =
+    useStudentCourseDetailQuery(slug, initialData);
   const mockPurchaseMutation = useStudentMockPurchaseMutation(slug);
   const course = courseDetailQuery.data?.course;
   const detail = courseDetailQuery.data?.detail;
-  const isInitialPending = !isAuthHydrated || courseDetailQuery.isLoading;
-  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
+  const isInitialPending =
+    courseDetailQuery.data === undefined &&
+    (!isAuthHydrated || courseDetailQuery.isLoading);
   const defaultExpandedChapterId = useMemo(
     () =>
       detail?.chapters.find((chapter) => chapter.progressPercent > 0)?.id ??
@@ -60,23 +64,28 @@ export function StudentCourseDetailScreen({
     setExpandedChapterIds(defaultExpandedChapterId ? [defaultExpandedChapterId] : []);
   }, [defaultExpandedChapterId]);
 
-  if (isInitialPending || shouldShowInitialLoading) {
+  if (isInitialPending) {
     return (
       <main
-        className="grid min-h-screen place-items-center px-4 py-4 sm:px-6 lg:px-8"
+        aria-busy="true"
+        className="min-h-screen px-4 py-4 sm:px-6 lg:px-8"
         data-theme={initialThemeMode}
         style={{ background: "var(--student-screen-bg)" }}
       >
-        {shouldShowInitialLoading ? (
-          <div className="mx-auto w-full max-w-3xl">
-            <EmptyCourseState
-              isLoading
-              loadingVariant="detail"
-              title="Đang tải khóa học"
-              description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
-            />
-          </div>
-        ) : null}
+        <div className="hidden lg:block">
+          <StudentCoursesHeader
+            title="Đang tải khóa học"
+            initialThemeMode={initialThemeMode}
+          />
+        </div>
+        <div className="mx-auto grid min-h-[calc(100svh-6rem)] w-full max-w-3xl place-items-center">
+          <EmptyCourseState
+            isLoading
+            loadingVariant="detail"
+            title="Đang tải khóa học"
+            description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
+          />
+        </div>
       </main>
     );
   }
@@ -162,6 +171,7 @@ export function StudentCourseDetailScreen({
   return (
     <main
       className="min-h-screen px-4 py-4 sm:px-6 lg:px-8"
+      data-student-course-detail="true"
       data-theme={initialThemeMode}
       style={{ background: "var(--student-screen-bg)" }}
     >

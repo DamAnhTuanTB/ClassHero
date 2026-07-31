@@ -135,6 +135,14 @@ Response:
 }
 ```
 
+Web session bridge:
+
+- NestJS vẫn nhận access token bằng header `Authorization: Bearer ...`; không đổi request/response contract của endpoint login.
+- Sau login thành công, Next.js web gọi route nội bộ `POST /api/auth/session` để lưu một bản access token vào cookie `HttpOnly`, `SameSite=Lax` có hạn dùng không vượt quá `exp` của token. Route nội bộ kiểm tra same-origin và shape/expiry trước khi set cookie.
+- Layout protected đọc cookie này rồi gọi `GET /me` với `cache: no-store`. Chỉ response thật từ API mới được dùng để server-render shell Admin/Student và xác nhận role; payload JWT decode tại web không thay thế verify của backend.
+- `DELETE /api/auth/session` xóa cookie token và marker khi logout hoặc khi client phát hiện session thiếu/hết hạn.
+- Browser storage hiện vẫn giữ session để các API client phía client gửi Bearer token. Cookie server là cầu nối SSR nhằm loại bỏ màn trống khi hard refresh, không phải nguồn phân quyền độc lập.
+
 ### `POST /auth/refresh`
 
 Role: authenticated by refresh token.

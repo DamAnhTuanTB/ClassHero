@@ -9,6 +9,7 @@ import {
   deleteAdminQuizQuestion,
   updateAdminQuizQuestion,
   updateAdminQuizSet,
+  type AdminQuizQuestion,
   type AdminQuizQuestionPayload,
   type AdminQuizSet,
   type QuizDifficulty,
@@ -56,7 +57,11 @@ export function getAdminQuizQuestionsQueryOptions({
   };
 }
 
-export function useAdminQuizSets(lessonId: string, enabled = true) {
+export function useAdminQuizSets(
+  lessonId: string,
+  enabled = true,
+  initialData?: AdminQuizSet[],
+) {
   const session = useAuthSessionStore((state) => state.session);
 
   return useQuery({
@@ -66,6 +71,7 @@ export function useAdminQuizSets(lessonId: string, enabled = true) {
       userId: session?.user.id,
     }),
     enabled: enabled && !!session?.accessToken && !!lessonId,
+    initialData,
   });
 }
 
@@ -130,7 +136,11 @@ export function useAdminQuizSetMutations(lessonId: string) {
   };
 }
 
-export function useAdminQuizQuestions(setId: string, enabled = true) {
+export function useAdminQuizQuestions(
+  setId: string,
+  enabled = true,
+  initialData?: AdminQuizQuestion[],
+) {
   const session = useAuthSessionStore((state) => state.session);
 
   return useQuery({
@@ -140,6 +150,7 @@ export function useAdminQuizQuestions(setId: string, enabled = true) {
       userId: session?.user.id,
     }),
     enabled: enabled && !!session?.accessToken && !!setId,
+    initialData,
   });
 }
 

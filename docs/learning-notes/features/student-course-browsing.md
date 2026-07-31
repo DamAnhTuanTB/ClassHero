@@ -12,18 +12,19 @@ Trong giai đoạn test UI trước payOS thật, nút `Mua ngay` ở chi tiết
 
 ```mermaid
 flowchart TD
-  A[Học sinh mở danh sách hoặc chi tiết lộ trình] --> B[Đọc session/token đã lưu trong trình duyệt]
-  B --> C[Web gọi public learning path API]
-  C --> D[API kiểm token nếu có, vẫn cho guest xem dữ liệu public]
+  A[Học sinh mở hoặc F5 route course/lesson] --> B[Server đọc auth cookie và gọi /me]
+  B --> C[Server gọi learning path hoặc lesson API với token]
+  C --> D[API kiểm token và trả access/progress theo học sinh]
   D --> E[Service lấy lộ trình published, enrollment active và lesson progress]
   E --> F[Serializer trả summary, access, progress và chapters]
   F --> G[API mapper đổi DTO về kiểu UI student course]
-  G --> H[Màn Courses, Explore hoặc Detail hiển thị loading/empty/error/data]
-  H --> I{Bấm Mua ngay?}
-  I -->|Có| J[Web gọi mock payment API]
-  J --> K[API tạo payment PAID giả và enrollment active]
-  K --> L[Web invalidate/refetch course list/detail]
-  L --> H
+  G --> H[Server truyền initial data vào TanStack Query và render HTML đủ header/content]
+  H --> I[Client hydrate cùng dữ liệu rồi refetch nền khi cần]
+  I --> J{Bấm Mua ngay?}
+  J -->|Có| K[Web gọi mock payment API]
+  K --> L[API tạo payment PAID giả và enrollment active]
+  L --> M[Web invalidate/refetch course list/detail]
+  M --> I
 ```
 
 ## Front-end
@@ -31,15 +32,18 @@ flowchart TD
 Luồng đọc dữ liệu student course đi qua:
 
 ```txt
-shared/student-courses-api.ts
+shared/api/server-student-learning-paths-api.ts
+-> shared/api/student-learning-paths-api.ts
 -> shared/hooks/use-student-courses-query.ts
 -> screens/<screen>/index.tsx
 -> local/shared components
 ```
 
-`student-courses-api.ts` là boundary đổi public API DTO về type UI đang được các màn student dùng. Màn hình không tự biết shape backend chi tiết như `chapters`, `access` hoặc `progress`; màn chỉ nhận `StudentCourse` và `StudentCourseDetail`.
+`student-learning-paths-api.ts` là boundary đổi public API DTO về type UI đang được các màn student dùng. Màn hình không tự biết shape backend chi tiết như `chapters`, `access` hoặc `progress`; màn chỉ nhận `StudentCourse` và `StudentCourseDetail`.
 
-`useStudentCoursesQuery` đọc session/token từ auth store sau khi trình duyệt đã khôi phục session local. Nếu chưa có token hoặc người dùng chưa đăng nhập, hook vẫn gọi public API như guest để `/student/explore` xem được các lộ trình published.
+Ở hard refresh route student, server dùng auth cookie để lấy current user và gọi learning path/lesson API trước khi trả HTML. Kết quả được truyền vào `useStudentCoursesQuery`, `useStudentCourseDetailQuery` hoặc `useStudentLessonQueries` dưới dạng `initialData`, nên shared header, card, breadcrumb, video và nội dung chính đã tồn tại trong response đầu. Sau hydration, auth store phía client tiếp tục cung cấp token để TanStack Query refetch nền mà không dỡ nội dung đang hiển thị.
+
+Nếu server initial fetch tạm thất bại, màn vẫn phải render skeleton cấu trúc ngay. Không trì hoãn skeleton theo cách để response/first frame chỉ còn background xanh, vì khi header và surface trắng được mount sau đó người dùng sẽ thấy một lần nháy sáng rõ rệt.
 
 `useStudentMockPurchaseMutation` dùng TanStack Mutation để gọi mock payment API. Khi mutation thành công, hook invalidate cache list/detail theo user hiện tại để course detail lấy lại `access.hasActiveEnrollment = true`; UI tự ẩn box giá và hiện trạng thái học.
 
@@ -73,13 +77,17 @@ Mock buy-now nằm trong `apps/api/src/modules/payments`, tách khỏi `learning
 - Nguyên nhân: web gọi public API như guest vì đọc token quá sớm trước khi browser khôi phục session local.
 - Cách tránh: query hook phải đợi trạng thái đã đọc session/token trong trình duyệt trước khi gọi API cho màn cần phân biệt enrollment.
 
+- Lỗi: F5 thấy nền xanh ổn định nhưng header trắng, course card hoặc lesson content nháy sáng một lần.
+- Nguyên nhân: server chỉ render shared shell/background; screen trả vùng rỗng trong lúc `isHydrated = false`, còn skeleton bị trì hoãn. Header và payload riêng của trang chỉ được mount sau hydration/client query.
+- Cách tránh: đọc auth session và dữ liệu course/lesson ở server, truyền làm TanStack Query `initialData`, giữ dữ liệu cũ khi refetch và render skeleton cấu trúc ngay nếu initial fetch không có dữ liệu. Regression test phải assert marker/title của course detail và lesson ngay trong response HTML; marker của shared shell không đủ.
+
 - Lỗi: API guest vô tình lộ progress/enrollment.
 - Nguyên nhân: serializer không tách viewer context theo role/token hợp lệ.
 - Cách tránh: chỉ attach enrollment/progress khi optional auth xác thực được user `STUDENT`; guest hoặc role khác vẫn nhận response public an toàn.
 
 - Lỗi: sidebar/profile hoặc filter lớp của học sinh hiện sai lớp so với database.
-- Nguyên nhân: student shell hoặc filter Explore dùng `studentProfile.grade` từ mock UI trong `student-courses-data.ts` thay vì đọc profile thật từ `/me` hoặc `meta.priorityGrade` của learning path API.
-- Cách tránh: khi student route đã bật auth thật, shell/profile phải lấy lớp từ current user API bằng access token; filter course phải chờ grade thật từ API và hiển thị trạng thái loading nếu chưa có. Mock chỉ dùng cho dữ liệu demo chưa nối API, không dùng cho thông tin định danh/profile của user đã đăng nhập.
+- Nguyên nhân: student shell hoặc filter Explore dùng `studentProfile.grade` từ mock UI, hoặc server chỉ có `AuthUser` nên render `Học sinh` rồi client `/me` mới đổi riêng thành `Học sinh lớp 6`.
+- Cách tránh: student layout phải giữ trọn current-user response từ `/me` và seed nó vào shell/query ngay ở render server; filter course dùng `meta.priorityGrade`. Mock chỉ dùng cho dữ liệu demo chưa nối API, không dùng cho thông tin định danh/profile của user đã đăng nhập.
 
 - Lỗi: admin course đã lưu `thumbnailFileId` nhưng màn Khám phá vẫn hiện hình minh họa mặc định.
 - Nguyên nhân: admin API resolve `thumbnailFile.url`, còn public learning path API chỉ trả `thumbnailFileId`; mapper web không có URL ảnh để đưa vào `ExploreCourseCard`.
@@ -107,8 +115,10 @@ Mock buy-now nằm trong `apps/api/src/modules/payments`, tách khỏi `learning
 
 ## File quan trọng
 
-- `apps/web/features/student/shared/student-courses-api.ts`
+- `apps/web/features/student/shared/api/student-learning-paths-api.ts`
+- `apps/web/features/student/shared/api/server-student-learning-paths-api.ts`
 - `apps/web/features/student/shared/hooks/use-student-courses-query.ts`
+- `apps/web/features/student/lessons/api/server-student-lessons-api.ts`
 - `apps/web/components/student/layout/student-shell.tsx`
 - `apps/web/features/student/courses/screens/purchased-courses-screen/index.tsx`
 - `apps/web/features/student/courses/screens/student-course-detail-screen/index.tsx`

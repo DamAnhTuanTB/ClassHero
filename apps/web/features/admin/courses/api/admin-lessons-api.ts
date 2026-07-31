@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, type ApiRequestOptions } from "@/lib/api-client";
 import { mapLesson } from "@/features/admin/courses/mappers/admin-course-api-mappers";
 import {
   toCustomVideoSettingsApiPayload,
@@ -88,8 +88,13 @@ export async function archiveAdminLesson(lessonId: string, token: string) {
   });
 }
 
-export async function getAdminLesson(lessonId: string, token: string) {
+export async function getAdminLesson(
+  lessonId: string,
+  token: string,
+  options: Pick<ApiRequestOptions, "cache"> = {},
+) {
   const lesson = await apiRequest<AdminLessonApi>(`/admin/lessons/${lessonId}`, {
+    cache: options.cache,
     method: "GET",
     token,
   });

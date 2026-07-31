@@ -27,6 +27,42 @@ import { cn } from "@/lib/utils";
 const FLASHCARD_MARK_FEEDBACK_DURATION_MS = 700;
 const FLASHCARD_MARK_FEEDBACK_REDUCED_MOTION_DURATION_MS = 420;
 
+export function FlashcardRunnerLoadingScreen() {
+  useDocumentScrollLock();
+
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Đang mở lại lượt Flashcard"
+      className="fixed inset-0 z-[80] overflow-hidden bg-[linear-gradient(180deg,#f5f3ff_0%,#faf5ff_100%)] text-slate-950 dark:bg-none dark:bg-[var(--theme-bg)] dark:text-[var(--theme-text-strong)]"
+      data-testid="flashcard-runner-loading-screen"
+    >
+      <header className="border-b border-violet-100 bg-white/95 py-2 pl-1 pr-2 dark:border-[var(--theme-border)] dark:bg-[color-mix(in_srgb,var(--theme-surface)_95%,transparent)] sm:pl-2 sm:pr-4">
+        <div className="mx-auto flex min-h-14 max-w-2xl items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="grid h-11 w-10 shrink-0 place-items-center rounded-xl text-slate-300 dark:text-slate-600"
+          >
+            <ChevronLeft className="h-8 w-8" strokeWidth={2.8} />
+          </span>
+          <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-2xl animate-pulse px-4 py-6 motion-reduce:animate-none sm:px-6">
+        <div className="h-5 w-48 rounded-lg bg-violet-200/80 dark:bg-slate-700" />
+        <div className="mt-3 h-9 w-28 rounded-xl bg-violet-200/90 dark:bg-slate-700" />
+        <div className="mt-4 h-3 rounded-full bg-violet-200/75 dark:bg-slate-700" />
+        <div className="mt-7 h-[min(31rem,58vh)] rounded-[2rem] border border-violet-100 bg-white shadow-[0_24px_55px_-42px_rgb(124_58_237_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]">
+          <div className="mx-auto mt-[20%] h-4 w-28 rounded-full bg-violet-200 dark:bg-violet-500/20" />
+          <div className="mx-auto mt-12 h-10 w-24 rounded-xl bg-slate-200 dark:bg-slate-700" />
+          <div className="mx-auto mt-20 h-5 w-32 rounded-lg bg-slate-200 dark:bg-slate-700" />
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export function FlashcardRunnerScreen({
   card,
   currentIndex,

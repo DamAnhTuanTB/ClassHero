@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StudentDetailMobileBrandBar } from "@/components/student/layout/student-detail-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { usePracticeTabTransition } from "@/features/student/lessons/hooks/use-practice-tab-transition";
@@ -19,9 +19,15 @@ import { LessonSummaryPanel } from "@/features/student/lessons/screens/student-l
 import { LessonVideoPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-video-panel";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
 import { QuizLearningPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-learning-panel";
+import { QuizRunnerLoadingScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen";
+import { FlashcardRunnerLoadingScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen";
 import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 import { useStudentLessonQueries } from "@/features/student/lessons/hooks/use-student-lesson-queries";
-import type { StudentLessonTab } from "@/features/student/lessons/types/student-lesson-types";
+import type {
+  StudentLearningSurface,
+  StudentLesson,
+  StudentLessonTab,
+} from "@/features/student/lessons/types/student-lesson-types";
 import { cn } from "@/lib/utils";
 import type { AppThemeMode } from "@/lib/theme-store";
 
@@ -103,29 +109,50 @@ const tabItems: Array<{
 ];
 
 export function StudentLessonScreen({
+  initialLearningSurface,
+  initialLesson,
   initialTab,
   initialThemeMode,
   lessonId,
 }: {
+  initialLearningSurface: StudentLearningSurface | null;
+  initialLesson?: StudentLesson | null;
   initialTab: StudentLessonTab;
   initialThemeMode: AppThemeMode;
   lessonId: string;
 }) {
   const [activeTab, setActiveTab] = useState<StudentLessonTab>(initialTab);
+  const [learningSurface, setLearningSurface] = useState(initialLearningSurface);
+  const [pendingTab, setPendingTab] = useState<StudentLessonTab | null>(null);
+  const [preparedQuizSetId, setPreparedQuizSetId] = useState<string | null>(
+    initialLearningSurface?.kind === "quiz-runner" ||
+      initialLearningSurface?.kind === "quiz-result"
+      ? initialLearningSurface.setId
+      : initialLesson?.quizSets[0]?.id ?? null,
+  );
+  const tabRequestIdRef = useRef(0);
   const {
     flashcardsQuery,
     isAuthHydrated,
     lessonQuery,
+    prepareQuizTab,
     refreshLearningProgress,
     testStatusQuery,
     token,
-  } = useStudentLessonQueries(lessonId);
-  const isInitialPending = !isAuthHydrated || lessonQuery.isLoading;
-  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
+  } = useStudentLessonQueries(lessonId, initialLesson);
+  const isInitialPending =
+    lessonQuery.data === undefined &&
+    (!isAuthHydrated || lessonQuery.isLoading);
   const shouldShowFlashcardsLoading = useStableLoadingVisibility(
     flashcardsQuery.isLoading,
   );
   const shouldShowTestLoading = useStableLoadingVisibility(testStatusQuery.isLoading);
+  const isQuizSurfaceResume =
+    learningSurface?.kind === "quiz-runner" ||
+    learningSurface?.kind === "quiz-result";
+  const isFlashcardSurfaceResume =
+    learningSurface?.kind === "flashcard-runner" ||
+    learningSurface?.kind === "flashcard-result";
 
   useEffect(() => {
     if (!lessonQuery.data) return;
@@ -133,30 +160,67 @@ export function StudentLessonScreen({
     void loadTestLearningPanel();
   }, [lessonQuery.data]);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    void prepareQuizTab()
+      .then((quizSetId) => {
+        if (!isCancelled && quizSetId) {
+          setPreparedQuizSetId(quizSetId);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [prepareQuizTab]);
+
   const selectTab = useCallback((tab: StudentLessonTab) => {
     setActiveTab(tab);
+    setLearningSurface(null);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("tab", tab);
+    nextUrl.searchParams.delete("learningSurface");
+    nextUrl.searchParams.delete("learningSetId");
+    nextUrl.searchParams.delete("learningAttemptId");
     window.history.replaceState(
       window.history.state,
       "",
       `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
     );
   }, []);
+  const handleTabSelect = useCallback(
+    (tab: StudentLessonTab) => {
+      const requestId = ++tabRequestIdRef.current;
+
+      if (tab !== "quiz" || activeTab === "quiz") {
+        setPendingTab(null);
+        selectTab(tab);
+        return;
+      }
+
+      setPendingTab("quiz");
+      void prepareQuizTab()
+        .then((quizSetId) => {
+          if (tabRequestIdRef.current !== requestId) return;
+          if (quizSetId) setPreparedQuizSetId(quizSetId);
+          setPendingTab(null);
+          selectTab("quiz");
+        })
+        .catch(() => {
+          if (tabRequestIdRef.current !== requestId) return;
+          setPendingTab(null);
+          selectTab("quiz");
+        });
+    },
+    [activeTab, prepareQuizTab, selectTab],
+  );
   const practiceTabTransition = usePracticeTabTransition(selectTab);
 
-  if (isInitialPending || shouldShowInitialLoading) {
-    if (!shouldShowInitialLoading) {
-      return (
-        <main
-          aria-busy="true"
-          className="min-h-screen"
-          data-theme={initialThemeMode}
-          style={{ background: "var(--student-screen-bg)" }}
-        />
-      );
-    }
-
+  if (isInitialPending) {
+    if (isQuizSurfaceResume) return <QuizRunnerLoadingScreen />;
+    if (isFlashcardSurfaceResume) return <FlashcardRunnerLoadingScreen />;
     return <StudentLessonPageSkeleton initialThemeMode={initialThemeMode} />;
   }
 
@@ -176,6 +240,14 @@ export function StudentLessonScreen({
     );
   }
 
+  if (
+    isFlashcardSurfaceResume &&
+    flashcardsQuery.data === undefined &&
+    !flashcardsQuery.isError
+  ) {
+    return <FlashcardRunnerLoadingScreen />;
+  }
+
   const currentTestScore =
     testStatusQuery.data?.latestSubmittedAttempt?.score ??
     testStatusQuery.data?.bestAttempt?.score;
@@ -186,6 +258,7 @@ export function StudentLessonScreen({
   return (
     <main
       className="min-h-screen px-2 py-4 sm:px-6 lg:px-8"
+      data-student-lesson-detail="true"
       data-theme={initialThemeMode}
       style={{ background: "var(--student-screen-bg)" }}
     >
@@ -258,13 +331,15 @@ export function StudentLessonScreen({
 
           {tabItems.map((item, index) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = (pendingTab ?? activeTab) === item.id;
+            const isCurrent = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => selectTab(item.id)}
-                aria-current={isActive ? "page" : undefined}
+                onClick={() => handleTabSelect(item.id)}
+                aria-current={isCurrent ? "page" : undefined}
+                aria-busy={pendingTab === item.id ? true : undefined}
                 className={cn(
                   "group relative z-10 flex min-w-0 flex-col items-center gap-2 bg-transparent p-0 text-[11px] font-black transition-transform duration-200 active:scale-95 focus-visible:outline-none lg:gap-2.5",
                   index % 2 === 0 ? "-translate-y-2" : "translate-y-2",
@@ -312,6 +387,13 @@ export function StudentLessonScreen({
           ) : activeTab === "quiz" ? (
             <QuizLearningPanel
               autoStart={practiceTabTransition.autoStartTarget === "quiz"}
+              initialQuizSetId={preparedQuizSetId}
+              initialSurface={
+                learningSurface?.kind === "quiz-runner" ||
+                learningSurface?.kind === "quiz-result"
+                  ? learningSurface
+                  : null
+              }
               lesson={lesson}
               onAutoStartHandled={
                 practiceTabTransition.completePracticeTabOpen
@@ -351,10 +433,18 @@ export function StudentLessonScreen({
             )
           ) : null}
 
-          {!flashcardsQuery.isLoading && !shouldShowFlashcardsLoading ? (
-            <div hidden={activeTab !== "flashcard"}>
+          {!flashcardsQuery.isLoading &&
+          !shouldShowFlashcardsLoading &&
+          activeTab === "flashcard" ? (
+            <div>
               <FlashcardLearningPanel
                 autoStart={practiceTabTransition.autoStartTarget === "flashcard"}
+                initialSurface={
+                  learningSurface?.kind === "flashcard-runner" ||
+                  learningSurface?.kind === "flashcard-result"
+                    ? learningSurface
+                    : null
+                }
                 lesson={lesson}
                 onAutoStartHandled={
                   practiceTabTransition.completePracticeTabOpen
@@ -437,7 +527,14 @@ function StudentLessonPageSkeleton({
       data-theme={initialThemeMode}
       style={{ background: "var(--student-screen-bg)" }}
     >
+      <div className="hidden lg:block">
+        <StudentCoursesHeader
+          title="Đang tải bài học"
+          initialThemeMode={initialThemeMode}
+        />
+      </div>
       <div className="mx-auto max-w-4xl animate-pulse">
+        <StudentDetailMobileBrandBar />
         <div className="h-16 rounded-2xl bg-white dark:bg-[var(--theme-surface)]" />
         <div className="mt-5 h-5 w-52 rounded-full bg-slate-200 dark:bg-slate-700" />
         <div className="mt-4 h-8 w-3/4 rounded-full bg-slate-200 dark:bg-slate-700" />

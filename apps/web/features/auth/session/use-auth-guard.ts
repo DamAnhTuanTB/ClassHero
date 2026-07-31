@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthRole } from "@/features/auth/types/auth-api-types";
 import {
-  clearAuthSession,
+  clearAuthSessionEverywhere,
   isAuthSessionAccessTokenExpired,
   useAuthSessionStore,
 } from "@/features/auth/session/auth-session";
@@ -44,7 +44,10 @@ export function useAuthGuard({
     }
 
     if (failureReason === "missing-session" || failureReason === "expired-session") {
-      clearAuthSession();
+      void clearAuthSessionEverywhere().then(() => {
+        router.replace(redirectTo);
+      });
+      return;
     }
 
     router.replace(redirectTo);

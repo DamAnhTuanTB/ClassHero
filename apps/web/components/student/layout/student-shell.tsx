@@ -23,9 +23,10 @@ import { StudentLearningTransitionProvider } from "@/components/student/learning
 import { useStudentScrollRestoration } from "@/components/student/layout/use-student-scroll-restoration";
 import { getCurrentUser, logout } from "@/features/auth/api/auth-api";
 import {
-  clearAuthSession,
+  clearAuthSessionEverywhere,
   useAuthSessionStore,
 } from "@/features/auth/session/auth-session";
+import type { CurrentUserResponse } from "@/features/auth/types/auth-api-types";
 import { studentProfile } from "@/features/student/shared/student-courses-data";
 import type { StudentCourseNavItem } from "@/features/student/shared/student-courses-types";
 import {
@@ -79,9 +80,11 @@ const mobileNavIconStrokeWidth = 1.75;
 
 export function StudentShell({
   children,
+  initialCurrentUser = null,
   initialThemeMode = "light",
 }: {
   children: ReactNode;
+  initialCurrentUser?: CurrentUserResponse | null;
   initialThemeMode?: AppThemeMode;
 }) {
   const pathname = usePathname();
@@ -98,13 +101,16 @@ export function StudentShell({
     false,
     studentSidebarCollapsedDatasetKey,
   );
+  const activeUser = session?.user ?? initialCurrentUser?.user;
   const studentFullName =
-    session?.user.role === "STUDENT" ? session.user.fullName?.trim() : "";
+    activeUser?.role === "STUDENT" ? activeUser.fullName?.trim() : "";
   const studentDisplayName = studentFullName || studentProfile.name;
   const currentUserQuery = useQuery({
-    queryKey: ["auth", "current-user", session?.user.id ?? "guest"],
+    queryKey: ["auth", "current-user", activeUser?.id ?? "guest"],
     queryFn: () => getCurrentUser(session?.accessToken ?? ""),
     enabled: session?.user.role === "STUDENT" && Boolean(session.accessToken),
+    initialData: initialCurrentUser ?? undefined,
+    staleTime: 60_000,
   });
   const studentGrade = currentUserQuery.data?.studentProfile?.grade ?? null;
   const studentGradeLabel =
@@ -131,7 +137,7 @@ export function StudentShell({
         description: "Chưa xác nhận được phiên máy chủ. Vui lòng đăng nhập lại nếu cần.",
       });
     } finally {
-      clearAuthSession();
+      await clearAuthSessionEverywhere();
       router.replace("/login");
       router.refresh();
     }
@@ -215,6 +221,7 @@ export function StudentShell({
                   {studentDisplayName}
                 </p>
                 <p
+                  data-student-profile-grade-label={studentGradeLabel}
                   className="inline-flex min-w-0 items-center text-[13px] font-semibold leading-tight"
                   style={{ color: "var(--student-profile-role-color, #0369a1)" }}
                 >

@@ -125,10 +125,7 @@ export function AdminCoursesSidebar({
         </button>
         <div className="flex min-w-0 items-center">
           <div className="min-w-0">
-            <ClassHeroLogo className="h-8 max-w-[9.25rem]" priority />
-            <p className="truncate text-xs font-semibold text-[var(--theme-text-muted)]">
-              {subtitle}
-            </p>
+            <ClassHeroLogo className="h-12 max-w-[13rem]" priority />
           </div>
         </div>
       </div>

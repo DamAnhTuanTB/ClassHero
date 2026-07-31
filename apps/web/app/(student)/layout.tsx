@@ -1,22 +1,20 @@
 import type { ReactNode } from "react";
 import { AuthenticatedRouteGuard } from "@/components/common/auth/authenticated-route-guard";
 import { StudentShell } from "@/components/student/layout/student-shell";
+import { getServerAuthSession } from "@/features/auth/session/server-auth-session";
 import { getServerThemeMode } from "@/lib/server-theme";
 import "./student-theme.css";
 
-const studentReloadScrollBootstrap = `
-  try {
-    const [navigationEntry] = performance.getEntriesByType("navigation");
-
-    if (navigationEntry?.type === "reload") {
-      history.scrollRestoration = "manual";
-      window.scrollTo(0, 0);
-    }
-  } catch {}
-`;
-
 export default async function StudentLayout({ children }: { children: ReactNode }) {
-  const initialThemeMode = await getServerThemeMode();
+  const [initialThemeMode, serverAuthSession] = await Promise.all([
+    getServerThemeMode(),
+    getServerAuthSession(),
+  ]);
+  const initialCurrentUser =
+    serverAuthSession?.currentUser.user.role === "STUDENT"
+      ? serverAuthSession.currentUser
+      : null;
+  const initialUser = initialCurrentUser?.user ?? null;
 
   return (
     <div
@@ -24,13 +22,13 @@ export default async function StudentLayout({ children }: { children: ReactNode 
       data-theme={initialThemeMode}
       data-theme-root="true"
     >
-      <script
-        dangerouslySetInnerHTML={{
-          __html: studentReloadScrollBootstrap,
-        }}
-      />
-      <AuthenticatedRouteGuard allowedRoles={["STUDENT"]}>
-        <StudentShell initialThemeMode={initialThemeMode}>{children}</StudentShell>
+      <AuthenticatedRouteGuard allowedRoles={["STUDENT"]} initialUser={initialUser}>
+        <StudentShell
+          initialCurrentUser={initialCurrentUser}
+          initialThemeMode={initialThemeMode}
+        >
+          {children}
+        </StudentShell>
       </AuthenticatedRouteGuard>
     </div>
   );

@@ -3,13 +3,17 @@
 import { useMemo } from "react";
 import { useStudentCoursesQuery } from "@/features/student/shared/hooks/use-student-courses-query";
 import type { StudentCourseSubjectFilter } from "@/features/student/shared/student-courses-types";
+import type { StudentCoursesListResult } from "@/features/student/shared/types/student-course-api-results";
 import { filterStudentCourses } from "@/features/student/shared/utils/student-courses-utils";
 import { useFilterSearchParams } from "@/lib/use-filter-search-params";
 
 export type StudentCourseGradeFilter = number | "ALL" | null;
 
-export function useStudentCoursesFilter() {
-  const { isAuthHydrated, query: coursesQuery } = useStudentCoursesQuery();
+export function useStudentCoursesFilter(
+  initialData?: StudentCoursesListResult | null,
+) {
+  const { isAuthHydrated, query: coursesQuery } =
+    useStudentCoursesQuery(initialData);
   const { replaceFilterSearchParams, searchParams } = useFilterSearchParams();
   const courses = coursesQuery.data?.courses ?? [];
   const priorityGrade =
@@ -46,7 +50,9 @@ export function useStudentCoursesFilter() {
     filteredCourses,
     grade,
     isError: coursesQuery.isError,
-    isLoading: !isAuthHydrated || coursesQuery.isLoading,
+    isLoading:
+      coursesQuery.data === undefined &&
+      (!isAuthHydrated || coursesQuery.isLoading),
     query,
     refetch: coursesQuery.refetch,
     setGrade: handleGradeChange,

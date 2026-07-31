@@ -3,6 +3,24 @@
 import { useCallback, useLayoutEffect, useState } from "react";
 
 type PersistentBooleanUpdater = boolean | ((currentValue: boolean) => boolean);
+const persistentBooleanCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
+
+function readCookieValue(cookieKey: string) {
+  const encodedCookieKey = encodeURIComponent(cookieKey);
+
+  return (
+    document.cookie
+      .split("; ")
+      .find((cookie) => cookie.startsWith(`${encodedCookieKey}=`))
+      ?.slice(encodedCookieKey.length + 1) ?? null
+  );
+}
+
+function writeCookieValue(cookieKey: string, value: boolean) {
+  const secureAttribute = window.location.protocol === "https:" ? "; Secure" : "";
+
+  document.cookie = `${encodeURIComponent(cookieKey)}=${String(value)}; path=/; max-age=${persistentBooleanCookieMaxAgeSeconds}; SameSite=Lax${secureAttribute}`;
+}
 
 export function usePersistentBooleanState(
   storageKey: string,
@@ -22,15 +40,21 @@ export function usePersistentBooleanState(
 
   useLayoutEffect(() => {
     try {
-      const storedValue = window.localStorage.getItem(storageKey);
+      const storedValue =
+        readCookieValue(storageKey) ?? window.localStorage.getItem(storageKey);
       if (storedValue === "true") {
         setValue(true);
         syncDocumentDataset(true);
+        window.localStorage.setItem(storageKey, "true");
+        writeCookieValue(storageKey, true);
       } else if (storedValue === "false") {
         setValue(false);
         syncDocumentDataset(false);
+        window.localStorage.setItem(storageKey, "false");
+        writeCookieValue(storageKey, false);
       } else {
         syncDocumentDataset(defaultValue);
+        writeCookieValue(storageKey, defaultValue);
       }
     } catch {
       syncDocumentDataset(defaultValue);
@@ -48,6 +72,7 @@ export function usePersistentBooleanState(
 
         try {
           window.localStorage.setItem(storageKey, String(resolvedValue));
+          writeCookieValue(storageKey, resolvedValue);
         } catch {
           document.documentElement.dataset.storage = "unavailable";
         }

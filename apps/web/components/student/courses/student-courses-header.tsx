@@ -36,7 +36,10 @@ export function StudentCoursesHeader({
           href="/student/explore"
           className="inline-flex min-w-0 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
         >
-          <ClassHeroLogo className="h-10 max-w-[9rem]" priority />
+          <ClassHeroLogo
+            className="h-10 max-w-[9rem] min-[360px]:h-11 min-[360px]:max-w-[10rem] lg:h-12 lg:max-w-[11rem]"
+            priority
+          />
         </Link>
 
         <h1 className="hidden min-w-0 flex-1 truncate text-center text-base font-extrabold text-[var(--theme-text-strong)] md:block lg:hidden">

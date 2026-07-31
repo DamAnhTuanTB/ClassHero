@@ -1,4 +1,8 @@
-import { apiRequest, apiRequestEnvelope } from "@/lib/api-client";
+import {
+  apiRequest,
+  apiRequestEnvelope,
+  type ApiRequestOptions,
+} from "@/lib/api-client";
 import {
   mapLearningPathToCourseDetail,
   mapLearningPathsToCoursesList,
@@ -9,19 +13,28 @@ import type {
   StudentCoursesListMeta,
 } from "@/features/student/shared/types/student-course-api-types";
 
-export async function listStudentLearningPaths(token?: string) {
+type StudentLearningPathReadOptions = Pick<ApiRequestOptions, "cache">;
+
+export async function listStudentLearningPaths(
+  token?: string,
+  options: StudentLearningPathReadOptions = {},
+) {
   const response = await apiRequestEnvelope<
     PublicLearningPathApi[],
     StudentCoursesListMeta
-  >("/learning-paths?pageSize=100", { token });
+  >("/learning-paths?pageSize=100", { cache: options.cache, token });
 
   return mapLearningPathsToCoursesList(response.data, response.meta);
 }
 
-export async function getStudentLearningPathDetail(slug: string, token?: string) {
+export async function getStudentLearningPathDetail(
+  slug: string,
+  token?: string,
+  options: StudentLearningPathReadOptions = {},
+) {
   const learningPath = await apiRequest<PublicLearningPathApi>(
     `/learning-paths/${encodeURIComponent(slug)}`,
-    { token },
+    { cache: options.cache, token },
   );
 
   return mapLearningPathToCourseDetail(learningPath);

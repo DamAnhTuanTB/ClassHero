@@ -1,3 +1,8 @@
+import {
+  getBrowserStudentLearningSurface,
+  getStudentLearningSurfaceHref,
+} from "@/features/student/lessons/utils/student-learning-surface-route";
+
 const FLASHCARD_RUNNER_HISTORY_STATE_KEY = "__classheroFlashcardRunnerSetId";
 const FLASHCARD_RESULT_HISTORY_STATE_KEY = "__classheroFlashcardResultSetId";
 const FLASHCARD_RUNNER_SURFACE_STORAGE_KEY = "student-flashcard-surface:runner";
@@ -19,8 +24,11 @@ export function getFlashcardRunnerHistorySetId() {
   if (typeof window === "undefined") return null;
 
   const setId = getCurrentHistoryState()[FLASHCARD_RUNNER_HISTORY_STATE_KEY];
-  return typeof setId === "string"
-    ? setId
+  if (typeof setId === "string") return setId;
+
+  const routeSurface = getBrowserStudentLearningSurface();
+  return routeSurface?.kind === "flashcard-runner"
+    ? routeSurface.setId
     : readSessionStorageString(FLASHCARD_RUNNER_SURFACE_STORAGE_KEY);
 }
 
@@ -28,8 +36,11 @@ export function getFlashcardResultHistorySetId() {
   if (typeof window === "undefined") return null;
 
   const setId = getCurrentHistoryState()[FLASHCARD_RESULT_HISTORY_STATE_KEY];
-  return typeof setId === "string"
-    ? setId
+  if (typeof setId === "string") return setId;
+
+  const routeSurface = getBrowserStudentLearningSurface();
+  return routeSurface?.kind === "flashcard-result"
+    ? routeSurface.setId
     : readSessionStorageString(FLASHCARD_RESULT_SURFACE_STORAGE_KEY);
 }
 
@@ -70,9 +81,18 @@ export function pushFlashcardRunnerHistoryEntry(setId: string) {
   if (typeof window === "undefined") return;
 
   const currentState = getCurrentHistoryState();
+  const nextHref = getStudentLearningSurfaceHref({
+    kind: "flashcard-runner",
+    setId,
+  });
   writeSessionStorageString(FLASHCARD_RUNNER_SURFACE_STORAGE_KEY, setId);
   removeSessionStorageValue(FLASHCARD_RESULT_SURFACE_STORAGE_KEY);
-  if (currentState[FLASHCARD_RUNNER_HISTORY_STATE_KEY] === setId) return;
+  if (currentState[FLASHCARD_RUNNER_HISTORY_STATE_KEY] === setId) {
+    if (getCurrentHref() !== nextHref) {
+      window.history.replaceState(currentState, "", nextHref);
+    }
+    return;
+  }
 
   const nextState = { ...currentState };
   delete nextState[FLASHCARD_RESULT_HISTORY_STATE_KEY];
@@ -82,7 +102,7 @@ export function pushFlashcardRunnerHistoryEntry(setId: string) {
       [FLASHCARD_RUNNER_HISTORY_STATE_KEY]: setId,
     },
     "",
-    window.location.href,
+    nextHref,
   );
 }
 
@@ -94,7 +114,14 @@ export function setFlashcardResultHistoryMarker(setId: string) {
   nextState[FLASHCARD_RESULT_HISTORY_STATE_KEY] = setId;
   writeSessionStorageString(FLASHCARD_RESULT_SURFACE_STORAGE_KEY, setId);
   removeSessionStorageValue(FLASHCARD_RUNNER_SURFACE_STORAGE_KEY);
-  window.history.replaceState(nextState, "", window.location.href);
+  window.history.replaceState(
+    nextState,
+    "",
+    getStudentLearningSurfaceHref({
+      kind: "flashcard-result",
+      setId,
+    }),
+  );
 }
 
 export function popFlashcardRunnerHistoryEntryPreservingResult() {
@@ -124,11 +151,22 @@ export function clearFlashcardResultHistoryMarker() {
 
   removeSessionStorageValue(FLASHCARD_RESULT_SURFACE_STORAGE_KEY);
   const currentState = getCurrentHistoryState();
-  if (!(FLASHCARD_RESULT_HISTORY_STATE_KEY in currentState)) return;
+  const routeSurface = getBrowserStudentLearningSurface();
+  const shouldClearRoute = routeSurface?.kind === "flashcard-result";
+  if (
+    !(FLASHCARD_RESULT_HISTORY_STATE_KEY in currentState) &&
+    !shouldClearRoute
+  ) {
+    return;
+  }
 
   const nextState = { ...currentState };
   delete nextState[FLASHCARD_RESULT_HISTORY_STATE_KEY];
-  window.history.replaceState(nextState, "", window.location.href);
+  window.history.replaceState(
+    nextState,
+    "",
+    shouldClearRoute ? getStudentLearningSurfaceHref(null) : window.location.href,
+  );
 }
 
 export function clearFlashcardRunnerHistoryMarker() {
@@ -136,11 +174,22 @@ export function clearFlashcardRunnerHistoryMarker() {
 
   removeSessionStorageValue(FLASHCARD_RUNNER_SURFACE_STORAGE_KEY);
   const currentState = getCurrentHistoryState();
-  if (!(FLASHCARD_RUNNER_HISTORY_STATE_KEY in currentState)) return;
+  const routeSurface = getBrowserStudentLearningSurface();
+  const shouldClearRoute = routeSurface?.kind === "flashcard-runner";
+  if (
+    !(FLASHCARD_RUNNER_HISTORY_STATE_KEY in currentState) &&
+    !shouldClearRoute
+  ) {
+    return;
+  }
 
   const nextState = { ...currentState };
   delete nextState[FLASHCARD_RUNNER_HISTORY_STATE_KEY];
-  window.history.replaceState(nextState, "", window.location.href);
+  window.history.replaceState(
+    nextState,
+    "",
+    shouldClearRoute ? getStudentLearningSurfaceHref(null) : window.location.href,
+  );
 }
 
 export function readStoredFlashcardSession(
@@ -277,4 +326,8 @@ function getCurrentHistoryState(): Record<string, unknown> {
   }
 
   return window.history.state as Record<string, unknown>;
+}
+
+function getCurrentHref() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }

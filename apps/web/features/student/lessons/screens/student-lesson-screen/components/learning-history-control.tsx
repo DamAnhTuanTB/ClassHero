@@ -8,16 +8,19 @@ import {
   Eye,
   History,
   ListChecks,
+  ListOrdered,
   Loader2,
   Play,
   RefreshCcw,
   RotateCcw,
   Settings,
   Star,
+  Tag,
   X,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 
 export type LearningHistoryDisplayItem = {
   id: string;
@@ -70,6 +73,7 @@ export function LearningHistoryControl({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOpeningHistory, setIsOpeningHistory] = useState(false);
+  useDocumentScrollLock(isHistoryOpen);
   const shouldReduceMotion = useReducedMotion();
   const isQuiz = accent === "quiz";
   const isTest = accent === "test";
@@ -82,8 +86,8 @@ export function LearningHistoryControl({
     items.length > 0 && items.every((item) => item.state === "COMPLETED");
   const currentBadgeItemId = isTest
     ? items[0]?.id
-    : currentItemId ??
-      (currentSetId ? items.find((item) => item.setId === currentSetId)?.id : undefined);
+    : (currentItemId ??
+      (currentSetId ? items.find((item) => item.setId === currentSetId)?.id : undefined));
   const accentClasses = isQuiz
     ? {
         badge: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
@@ -171,8 +175,6 @@ export function LearningHistoryControl({
 
   useEffect(() => {
     if (!isHistoryOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !isCoveredByChildSurface) {
         setIsHistoryOpen(false);
@@ -181,7 +183,6 @@ export function LearningHistoryControl({
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isCoveredByChildSurface, isHistoryOpen, onHistoryClose]);
@@ -210,10 +211,15 @@ export function LearningHistoryControl({
         {showCountLabel ? (
           <span
             className={cn(
-              "inline-flex h-8 items-center rounded-xl px-[11px] text-[13px] font-black",
+              "inline-flex h-8 items-center gap-1.5 rounded-xl px-[11px] text-[13px] font-black",
               accentClasses.badge,
             )}
           >
+            {isQuiz ? (
+              <ListOrdered className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : isFlashcard ? (
+              <Tag className="h-3.5 w-3.5 shrink-0 rotate-45" aria-hidden="true" />
+            ) : null}
             {countLabel}
           </span>
         ) : null}
@@ -222,7 +228,7 @@ export function LearningHistoryControl({
           aria-label={`Mở cài đặt ${label}`}
           aria-expanded={isMenuOpen}
           onClick={() => setIsMenuOpen((open) => !open)}
-          className="relative grid h-8 w-8 cursor-pointer place-items-center rounded-xl bg-slate-100 text-slate-500 transition after:absolute after:-inset-1.5 after:content-[''] hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 dark:bg-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white dark:focus-visible:ring-slate-500/30"
+          className="relative grid h-8 w-8 cursor-pointer place-items-center rounded-xl bg-slate-100 text-slate-500 transition after:absolute after:-inset-1.5 after:content-[''] hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-white dark:focus-visible:ring-slate-500/30"
         >
           <Settings className="h-[21px] w-[21px]" aria-hidden="true" />
         </button>
@@ -438,7 +444,7 @@ export function LearningHistoryControl({
                                           ? "border border-emerald-400 bg-emerald-200 text-emerald-900 dark:border-emerald-300/60 dark:bg-emerald-400/25 dark:text-emerald-100"
                                           : isQuiz
                                             ? "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
-                                          : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+                                            : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
                                       )}
                                     >
                                       {isTest ? "Bài thi hiện tại" : "Bộ hiện tại"}

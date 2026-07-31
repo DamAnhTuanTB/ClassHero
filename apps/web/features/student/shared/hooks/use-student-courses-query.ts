@@ -8,6 +8,10 @@ import {
   mockPurchaseLearningPath,
 } from "@/features/student/shared/api/student-learning-paths-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import type {
+  StudentCourseDetailResult,
+  StudentCoursesListResult,
+} from "@/features/student/shared/types/student-course-api-results";
 
 export const studentLearningPathsQueryKey = (userId?: string) => [
   "student",
@@ -42,7 +46,9 @@ function getStudentLearningPathDetailQueryOptions(
   };
 }
 
-export function useStudentCoursesQuery() {
+export function useStudentCoursesQuery(
+  initialData?: StudentCoursesListResult | null,
+) {
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const session = useAuthSessionStore((state) => state.session);
 
@@ -52,11 +58,15 @@ export function useStudentCoursesQuery() {
     query: useQuery({
       ...getStudentLearningPathsQueryOptions(session?.accessToken, session?.user.id),
       enabled: isAuthHydrated,
+      initialData: initialData ?? undefined,
     }),
   };
 }
 
-export function useStudentCourseDetailQuery(slug: string) {
+export function useStudentCourseDetailQuery(
+  slug: string,
+  initialData?: StudentCourseDetailResult | null,
+) {
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const session = useAuthSessionStore((state) => state.session);
 
@@ -70,6 +80,7 @@ export function useStudentCourseDetailQuery(slug: string) {
         session?.user.id,
       ),
       enabled: isAuthHydrated && slug.length > 0,
+      initialData: initialData ?? undefined,
     }),
   };
 }

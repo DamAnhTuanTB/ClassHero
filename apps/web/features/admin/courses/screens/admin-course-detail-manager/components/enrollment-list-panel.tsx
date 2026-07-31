@@ -18,7 +18,6 @@ import { TextField } from "@/components/common/forms/text-field";
 import { CloneStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/clone-status-badge";
 import { useEnrollmentListPanel } from "@/features/admin/courses/hooks/use-enrollment-list-panel";
 import type { PersonalizationStatus } from "@/features/admin/courses/types/admin-course-api-types";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 const CreatePersonalPathConfirmDialog = dynamic(() =>
   import("@/features/admin/courses/screens/admin-course-detail-manager/components/create-personal-path-confirm-dialog").then(
@@ -43,8 +42,7 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
     search,
     statusFilter,
     confirmingEnrollment,
-    isLoading,
-    isError,
+    queryRenderState,
     isSubmitting,
     handleSearchChange,
     handleStatusFilterChange,
@@ -55,7 +53,8 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
     handlePageChange,
     refetch,
   } = useEnrollmentListPanel(learningPathId);
-  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
+  const isInitialPending = queryRenderState === "loading";
+  const isBlockingError = queryRenderState === "error";
 
   return (
     <section
@@ -75,7 +74,7 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
             <h2 className="text-base font-bold text-[var(--theme-text-strong)]">
               Học sinh đã mua
             </h2>
-            {!isLoading && (
+            {!isInitialPending && (
               <p className="text-sm text-[var(--theme-text-muted)]">{total} học sinh</p>
             )}
           </div>
@@ -132,13 +131,9 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
 
       {/* Content */}
       <div className="p-5">
-        {isLoading || shouldShowInitialLoading ? (
-          shouldShowInitialLoading ? (
-            <EnrollmentTableSkeleton />
-          ) : (
-            <div aria-busy="true" className="min-h-48" />
-          )
-        ) : isError ? (
+        {isInitialPending ? (
+          <EnrollmentTableSkeleton />
+        ) : isBlockingError ? (
           <div className="flex min-h-48 items-center justify-center text-center">
             <div>
               <p className="text-sm text-[var(--theme-danger-text)]">
@@ -269,7 +264,7 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
         )}
 
         {/* Pagination */}
-        {!isLoading && !isError && totalPages > 1 && (
+        {!isInitialPending && !isBlockingError && totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between border-t border-[var(--theme-border)] pt-4">
             <p className="text-sm text-[var(--theme-text-muted)]">
               Trang {page} / {totalPages}

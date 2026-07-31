@@ -19,6 +19,7 @@ import type {
   PersonalLearningPathEnrollmentApi,
 } from "@/features/admin/courses/types/admin-course-api-types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { getQueryRenderState } from "@/lib/query-render-state";
 
 export const enrollmentListQueryKeys = {
   all: ["admin", "course-enrollments"] as const,
@@ -139,6 +140,10 @@ export function useEnrollmentListPanel(learningPathId: string) {
   const enrollments = enrollmentsQuery.data?.items ?? [];
   const total = enrollmentsQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const queryRenderState = getQueryRenderState({
+    ...enrollmentsQuery,
+    isPrerequisitePending: !isAuthHydrated,
+  });
 
   return {
     // State
@@ -150,9 +155,8 @@ export function useEnrollmentListPanel(learningPathId: string) {
     statusFilter,
     confirmingEnrollment,
     // Query state
-    isLoading: enrollmentsQuery.isLoading,
+    queryRenderState,
     isFetching: enrollmentsQuery.isFetching,
-    isError: enrollmentsQuery.isError,
     isSubmitting: createCloneMutation.isPending,
     // Actions
     handleSearchChange,

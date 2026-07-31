@@ -1,6 +1,25 @@
 import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type StudentLessonTab = "lesson" | "quiz" | "flashcard" | "test";
+export type StudentLearningSurface =
+  | {
+      kind: "quiz-runner";
+      attemptId: string;
+      setId: string;
+    }
+  | {
+      kind: "quiz-result";
+      attemptId: string;
+      setId: string;
+    }
+  | {
+      kind: "flashcard-runner";
+      setId: string;
+    }
+  | {
+      kind: "flashcard-result";
+      setId: string;
+    };
 export type AssessmentQuestionType =
   "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";
 export type StudentAnswer =

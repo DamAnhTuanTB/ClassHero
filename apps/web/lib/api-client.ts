@@ -3,6 +3,7 @@ const defaultApiBaseUrl = "http://localhost:4000/api/v1";
 export type ApiRequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: BodyInit | unknown;
+  cache?: RequestCache;
   token?: string;
   headers?: HeadersInit;
   keepalive?: boolean;
@@ -139,6 +140,7 @@ export async function apiRequestEnvelope<
     method: options.method ?? "GET",
     headers,
     body: requestBody,
+    cache: options.cache,
     keepalive: options.keepalive,
   });
   const payload = await readJsonResponse(response);

@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, type ApiRequestOptions } from "@/lib/api-client";
 import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type QuizDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
@@ -67,8 +67,21 @@ export interface AdminQuizQuestion {
   reviewStatus: string;
 }
 
-export async function getAdminQuizSets(lessonId: string, token: string) {
+export interface AdminQuizInitialData {
+  questions: AdminQuizQuestion[];
+  questionSetId: string | null;
+  sets: AdminQuizSet[];
+}
+
+type AdminQuizReadOptions = Pick<ApiRequestOptions, "cache">;
+
+export async function getAdminQuizSets(
+  lessonId: string,
+  token: string,
+  options: AdminQuizReadOptions = {},
+) {
   return apiRequest<AdminQuizSet[]>(`/admin/lessons/${lessonId}/quiz-sets`, {
+    cache: options.cache,
     method: "GET",
     token,
   });
@@ -105,8 +118,13 @@ export async function deleteAdminQuizSet(setId: string, token: string) {
   });
 }
 
-export async function getAdminQuizQuestions(setId: string, token: string) {
+export async function getAdminQuizQuestions(
+  setId: string,
+  token: string,
+  options: AdminQuizReadOptions = {},
+) {
   return apiRequest<AdminQuizQuestion[]>(`/admin/quiz-sets/${setId}/questions`, {
+    cache: options.cache,
     method: "GET",
     token,
   });

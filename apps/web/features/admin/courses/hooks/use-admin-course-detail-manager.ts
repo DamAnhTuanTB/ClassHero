@@ -1,5 +1,5 @@
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   createAdminLessonDocument,
@@ -28,6 +28,7 @@ import { readRecord } from "@/features/admin/courses/admin-course-documents-util
 import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
+import { getQueryRenderState } from "@/lib/query-render-state";
 import {
   adminSidebarCollapsedDatasetKey,
   adminSidebarCollapsedStorageKey,
@@ -56,7 +57,7 @@ export function useAdminCourseDetailManager(
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
-  const [path, setPath] = useState(learningPathQuery.data ?? null);
+  const path = learningPathQuery.data ?? null;
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [deletingPathId, setDeletingPathId] = useState<string | null>(null);
@@ -91,12 +92,6 @@ export function useAdminCourseDetailManager(
     mutations.createLesson.isPending ||
     mutations.updateLesson.isPending ||
     isSavingLessonReferences;
-
-  useEffect(() => {
-    if (learningPathQuery.data !== undefined) {
-      setPath(learningPathQuery.data);
-    }
-  }, [learningPathQuery.data]);
 
   const courseStats = useMemo(() => getAdminCourseDetailStats(path), [path]);
 
@@ -603,12 +598,19 @@ export function useAdminCourseDetailManager(
     void learningPathQuery.refetch();
   }
 
+  const queryRenderState = getQueryRenderState(learningPathQuery);
+  const canUseServerDataBeforeAuthHydration =
+    !isAuthHydrated && initialLearningPath !== undefined;
   const viewState: ViewState =
-    !isAuthHydrated || !hasAdminAccess || learningPathQuery.isLoading
+    canUseServerDataBeforeAuthHydration
+      ? queryRenderState
+      : !isAuthHydrated || !hasAdminAccess
       ? "loading"
-      : learningPathQuery.isError || !path || !session?.accessToken
-        ? "error"
-        : "ready";
+      : queryRenderState === "loading"
+        ? "loading"
+        : !session?.accessToken || queryRenderState === "error" || !path
+          ? "error"
+          : "ready";
 
   return {
     chapterEditorMode,

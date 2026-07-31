@@ -83,6 +83,7 @@ Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới 
 - Ưu tiên semantic token/CSS variable hoặc class Tailwind có biến thể dark mode thay vì hard-code màu chỉ hợp light mode.
 - Kiểm tra text, border, surface, shadow, icon, trạng thái success/warning/error/info và skeleton/loading vẫn đủ contrast ở cả light và dark.
 - Tránh dùng ảnh, gradient, overlay hoặc shadow chỉ đẹp trên nền sáng; nếu dùng phải có fallback/variant cho dark mode.
+- Không giữ `inset` highlight màu trắng của light mode trên surface tối; phải bỏ hoặc override bằng màu semantic rất nhẹ để tránh tạo vệt trắng giả ở mép border.
 - Với chart, badge, toast, form, table và dashboard/card, thiết kế state màu theo vai trò semantic để sau này đổi theme không phải sửa từng component.
 - Nếu task chưa triển khai toggle theme thật, vẫn không được viết UI khóa cứng vào light-only style trừ khi có lý do rõ trong final response.
 
@@ -309,6 +310,8 @@ Mục tiêu:
 Frontend rules:
 
 - Dùng TanStack Query cho server state, cache, refetch, mutation và invalidate; không tự fetch rải rác trong component sâu.
+- Dữ liệu TanStack Query dùng để render phải được đọc trực tiếp từ query/cache; không copy `query.data` sang local state rồi đồng bộ bằng `useEffect`, vì render thành công và effect lệch nhau một frame có thể làm UI nháy empty/error trước khi dữ liệu xuất hiện. Chỉ giữ local draft khi người dùng thật sự chỉnh sửa độc lập với server state.
+- Initial fetch hoặc auth hydration phải hiện skeleton ngay và giữ skeleton khi query đang retry/refetch mà chưa có dữ liệu. Error toàn màn chỉ được hiện khi request đã dừng và vẫn thất bại; background refetch đã có dữ liệu phải giữ nội dung cũ.
 - Với action có độ trễ như submit quiz, lưu note, favorite, thanh toán, gửi chat AI: hiển thị pending/disabled state ngay khi người dùng thao tác.
 - Dùng optimistic UI chỉ khi rollback an toàn và không ảnh hưởng nghiệp vụ nhạy cảm; không optimistic cho payment, auth hoặc dữ liệu cần xác nhận server nghiêm ngặt.
 - Debounce search/filter/input gọi API liên tục; không gọi API mỗi ký tự nếu không cần.
@@ -317,6 +320,9 @@ Frontend rules:
 - Tách component nặng theo route/feature; lazy load phần ít dùng như editor nặng, chart lớn, AI panel hoặc admin tool nếu phù hợp.
 - Với trang có form/modal/drawer/editor/chart chỉ dùng sau thao tác của user, không kéo toàn bộ stack đó vào bundle tải đầu. Lazy-load dialog/form nặng, giữ screen list/detail ban đầu nhẹ nhất có thể.
 - Khi mock data hoặc nối API thật, ưu tiên server render/initial data/placeholder data an toàn để màn đầu không giữ skeleton lâu. Không thêm mock latency mặc định trừ khi task đang test trạng thái loading.
+- Với route có auth và dữ liệu riêng của trang, hard refresh phải đưa shared header cùng payload chính (hoặc skeleton cùng hình học) vào HTML response đầu tiên. Chỉ render shell/background ở server rồi đợi auth store hydrate để gắn header/card/video ở client sẽ tạo nháy sáng dù nền trang vẫn ổn định.
+- Route admin cấp trang phải verify session ở server và seed dữ liệu chính vào TanStack Query/component ngay trong HTML đầu; auth-store hydration phía client chỉ được bật revalidate/action, không được thay dữ liệu server bằng skeleton toàn màn. Nếu tab mặc định chiếm viewport đầu như Quiz trong chi tiết buổi học, set và nội dung tab đó cũng phải có initial data, nếu không phần vỏ ổn định nhưng panel con vẫn nháy riêng.
+- Dữ liệu định danh dùng trong shell như tên, role và lớp học sinh phải được seed từ cùng server current-user response dùng để authorize route. Không render nhãn chung như `Học sinh` ở server rồi đổi riêng thành `Học sinh lớp 6` sau hydration.
 - Route transition phải nhẹ: prefetch/cache khi hợp lý, chỉ tải chunk cần cho route đích, không để màn trắng, và tránh refetch lại dữ liệu đã có nếu cache còn đúng.
 - Asset/font/image phải phục vụ mobile trước: không dùng ảnh quá lớn, không kéo nhiều font/weight, không tải chart/editor/media ngoài viewport hoặc chưa cần.
 - API/data load phải trả đúng phần UI cần, phân trang/list limit rõ, tránh include/rich text/blob lớn ở màn chỉ cần metadata.
@@ -324,6 +330,8 @@ Frontend rules:
 - Ảnh phải tối ưu kích thước, dùng responsive image, lazy load ảnh ngoài viewport và tránh ảnh quá lớn cho mobile.
 - Không dùng animation trên thuộc tính gây layout/reflow nặng; ưu tiên transform/opacity.
 - Với tab dữ liệu có panel lớn hoặc chiều cao khác nhau, không dùng shared-layout measurement/`layoutId`, animation `height` hoặc exit-before-enter làm việc đổi tab phải chờ đo lại toàn bộ DOM. Indicator nên chạy bằng `transform` trên một layout tab ổn định; panel dữ liệu đổi trực tiếp và dùng skeleton có kích thước phù hợp nếu phải tải lazy. Nếu panel mới hoặc query của nested tab có thể tạm co thấp hơn panel cũ, giữ `min-height` ít nhất bằng chiều cao panel đang hiển thị ngay trong cùng lần đổi state để document không co giãn qua nhiều frame; rule này áp dụng cả tab cấp trang lẫn tab set con như bộ Quiz/Flashcard.
+- Nếu tab đích cần một status/query nhỏ để quyết định ngay nội dung đầu tiên, prefetch query đó từ lúc màn cha sẵn sàng. Khi người dùng bấm trước lúc prefetch xong, giữ nguyên panel hiện tại, đánh dấu tab đích đang pending và chỉ đổi panel một lần sau khi dữ liệu sẵn sàng; không commit tab vào một vùng trống/skeleton thoáng qua rồi thay ngay bằng card thật.
+- CSS `hidden`, `display: none` hoặc opacity chỉ ẩn giao diện, không unmount React component và không dừng effect. Panel/tab không hoạt động không được tiếp tục sở hữu global side effect như khóa scroll, listener toàn trang hoặc portal fullscreen. Chỉ mount surface đang hoạt động hoặc truyền cờ `enabled` rõ ràng; mọi document scroll lock phải đi qua helper dùng reference count và chỉ tồn tại khi modal/fullscreen surface thật sự đang nhìn thấy.
 - Root page phải giữ scrollbar gutter ổn định khi các tab/route có thể làm scrollbar dọc xuất hiện hoặc biến mất, tránh toàn bộ shell dịch ngang giữa hai trạng thái.
 - Tôn trọng `prefers-reduced-motion` khi thêm animation đáng kể.
 
@@ -364,6 +372,11 @@ lại` phải chuyển sang runner hoặc result toàn màn hình có cùng head
   fullscreen boundary và giữ gần đúng bố cục đích ngay từ HTML đầu tiên. Không
   render loading dạng card trong shell rồi mới phủ runner lên sau khi API trả về,
   vì sẽ làm màn trước nháy lên dù dữ liệu resume vẫn đúng.
+- Danh tính của fullscreen surface cần resume (loại runner/result, set và
+  attempt nếu có) phải nằm trong URL để server đọc được ở request F5. History
+  state chỉ giữ semantics Back/Forward, còn browser storage chỉ giữ chi tiết
+  phiên; nếu chỉ dùng hai nguồn browser-only này, server sẽ render lesson panel
+  trước rồi client mới đổi sang runner và gây nháy/hydration mismatch.
 - Khi API chậm, ưu tiên skeleton, inline progress hoặc retry thân thiện thay vì màn hình trắng.
 
 Local dev/browser guardrails:
@@ -378,6 +391,7 @@ Performance budget/checklist:
 | ---------------- | --------------------------------------------------------------------------------------- |
 | Core Web Vitals  | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile                                        |
 | Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn                             |
+| Hard refresh     | HTML đầu có header và payload/skeleton riêng của trang; không chỉ có shared shell        |
 | Mobile load      | Mọi đường load trên điện thoại phải nhẹ nhất có thể: cold load, transition, data, asset |
 | Interaction      | Button/action đổi state ngay sau thao tác                                               |
 | List dài         | Có pagination/infinite/virtualization                                                   |
@@ -404,7 +418,7 @@ Mỗi màn hình hoặc block có data fetching phải có:
 - Error state: message dễ hiểu và retry nếu hợp lý.
 - Disabled state: action chưa dùng được phải có lý do hoặc tooltip/helper text.
 - Full-page loading/error phải căn giữa theo cả chiều ngang và chiều dọc của viewport. Nếu màn nằm trong shell có header/sidebar thì căn giữa phần content còn lại; loading/error của tab hoặc card chỉ căn giữa vùng của chính tab/card.
-- Initial loading dưới khoảng `250-300ms` không nên xuất hiện ngay vì tạo nháy khi hydrate/F5. Nếu loading đã hiện, giữ tối thiểu khoảng `300ms` để trạng thái ổn định trước khi chuyển sang nội dung.
+- Có thể trì hoãn skeleton khoảng `250-300ms` ở client transition chỉ khi header và surface ổn định của trang vẫn được giữ nguyên trong lúc chờ. Ở cold load/F5, không được dùng delay để trả một vùng trống chỉ có background; HTML đầu phải có dữ liệu server hoặc skeleton cấu trúc ngay. Nếu loading đã hiện, giữ tối thiểu khoảng `300ms` để trạng thái ổn định trước khi chuyển sang nội dung.
 - Dữ liệu của các tab cùng một màn phải được fetch/prefetch sớm nhất có thể ngay khi đủ dependency và chạy song song khi độc lập; không đợi người dùng mở tab mới bắt đầu request. Chuyển tab phải ưu tiên dữ liệu cache và không đưa panel đã có dữ liệu quay lại skeleton khi background refetch.
 
 Không để trắng màn hình hoặc chỉ hiện lỗi raw.
@@ -421,6 +435,7 @@ Một màn hình UI chỉ xem là xong khi:
 - Tương tác chính trên mobile phản hồi nhanh, có pending/pressed/loading state rõ.
 - Không dùng animation hoặc render list làm chậm thao tác học/chấm bài/submit.
 - Có loading/empty/error/disabled state nếu màn hình có data/action.
+- Với màn auth/data, test hard refresh phải đọc HTML response đầu và assert marker/nội dung riêng của trang cùng các nhãn profile có thể đổi sau `/me`; chỉ assert marker của layout/shared shell là chưa đủ để kết luận không nháy.
 - Không text tràn, overlap, button cắt chữ hoặc layout nhảy mạnh.
 - Không hard-code khác API contract nếu API đã có trong `docs/05-api-contract.md`.
 - Không thêm tính năng ngoài MVP.

@@ -6,8 +6,12 @@ let activeScrollLocks = 0;
 let previousBodyOverflow = "";
 let previousDocumentOverflow = "";
 
-export function useDocumentScrollLock() {
+export function useDocumentScrollLock(isLocked = true) {
   useEffect(() => {
+    if (!isLocked) {
+      return;
+    }
+
     const body = document.body;
     const documentElement = document.documentElement;
 
@@ -28,5 +32,5 @@ export function useDocumentScrollLock() {
         documentElement.style.overflow = previousDocumentOverflow;
       }
     };
-  }, []);
+  }, [isLocked]);
 }

@@ -9,6 +9,8 @@ import {
   getStudentTestStatus,
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import type { StudentLesson } from "@/features/student/lessons/types/student-lesson-types";
+import { readStoredQuizActiveSetId } from "@/features/student/lessons/utils/quiz-runner-history";
 
 export const studentLessonQueryKey = (lessonId: string, userId?: string) => [
   "student",
@@ -130,7 +132,10 @@ export function useStudentLessonPrefetch() {
   );
 }
 
-export function useStudentLessonQueries(lessonId: string) {
+export function useStudentLessonQueries(
+  lessonId: string,
+  initialLesson?: StudentLesson | null,
+) {
   const queryClient = useQueryClient();
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const session = useAuthSessionStore((state) => state.session);
@@ -140,6 +145,7 @@ export function useStudentLessonQueries(lessonId: string) {
   const lessonQuery = useQuery({
     ...getStudentLessonQueryOptions(lessonId, session?.accessToken, session?.user.id),
     enabled,
+    initialData: initialLesson ?? undefined,
   });
   const flashcardsQuery = useQuery({
     ...getStudentFlashcardsQueryOptions(lessonId, session?.accessToken, session?.user.id),
@@ -149,21 +155,48 @@ export function useStudentLessonQueries(lessonId: string) {
     ...getStudentTestStatusQueryOptions(lessonId, session?.accessToken, session?.user.id),
     enabled,
   });
-  const quizSetId = lessonQuery.data?.quizSets[0]?.id;
+  const prepareQuizTab = useCallback(async () => {
+    const quizSets = lessonQuery.data?.quizSets ?? [];
+    const storedQuizSetId = readStoredQuizActiveSetId(
+      lessonId,
+      session?.user.id,
+    );
+    const quizSetId =
+      quizSets.find((quizSet) => quizSet.id === storedQuizSetId)?.id ??
+      quizSets[0]?.id ??
+      null;
 
-  useEffect(() => {
     if (!enabled || !quizSetId) {
-      return;
+      return quizSetId;
     }
 
-    void queryClient.prefetchQuery(
-      getStudentQuizAttemptStatusQueryOptions(
-        quizSetId,
-        session?.accessToken,
-        session?.user.id,
-      ),
+    const queryOptions = getStudentQuizAttemptStatusQueryOptions(
+      quizSetId,
+      session?.accessToken,
+      session?.user.id,
     );
-  }, [enabled, queryClient, quizSetId, session?.accessToken, session?.user.id]);
+    const cachedStatus = queryClient.getQueryData(queryOptions.queryKey);
+
+    if (cachedStatus !== undefined) {
+      void queryClient.prefetchQuery(queryOptions);
+      return quizSetId;
+    }
+
+    await queryClient.fetchQuery(queryOptions);
+
+    return quizSetId;
+  }, [
+    enabled,
+    lessonId,
+    lessonQuery.data?.quizSets,
+    queryClient,
+    session?.accessToken,
+    session?.user.id,
+  ]);
+
+  useEffect(() => {
+    void prepareQuizTab().catch(() => undefined);
+  }, [prepareQuizTab]);
 
   useEffect(() => {
     const nextLessonId = lessonQuery.data?.navigation.next?.id;
@@ -206,6 +239,7 @@ export function useStudentLessonQueries(lessonId: string) {
     flashcardsQuery,
     testStatusQuery,
     token: session?.accessToken ?? "",
+    prepareQuizTab,
     refreshLearningProgress,
   };
 }

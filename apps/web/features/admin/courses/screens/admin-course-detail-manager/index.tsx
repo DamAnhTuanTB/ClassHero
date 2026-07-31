@@ -29,7 +29,6 @@ import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-d
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import type { AppThemeMode } from "@/lib/theme-store";
 import { cn } from "@/lib/utils";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 const ChapterEditorDialog = dynamic(() =>
   import("@/features/admin/courses/screens/admin-course-detail-manager/components/chapter-editor-dialog").then(
@@ -99,7 +98,6 @@ export function AdminCourseDetailManager({
     viewState,
   } = useAdminCourseDetailManager(pathId, initialLearningPath, initialThemeMode);
   const isInitialPending = viewState === "loading";
-  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
 
   return (
     <main data-admin-theme="true" className="theme-page">
@@ -122,124 +120,119 @@ export function AdminCourseDetailManager({
         />
 
         <section className="min-w-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-          <header className="flex flex-col gap-4 border-b border-[var(--theme-border)] pb-5 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <Link
-                href="/admin/courses"
-                className="theme-button-neutral inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold transition"
-              >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Danh sách khóa học
-              </Link>
-              <p className="mt-4 text-sm font-bold text-[var(--theme-primary)]">
-                {path?.kind === "PERSONALIZED"
-                  ? "Chi tiết khóa học cá nhân hóa"
-                  : "Chi tiết khóa học"}
-              </p>
-              <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
-                {path?.title ?? "Không tìm thấy khóa học"}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
-                Xem thông tin khóa học, quản lý chương học, buổi học và tài liệu dùng
-                trong từng buổi.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {/* Quản lý danh sách học sinh */}
-              {path?.kind !== "PERSONALIZED" && (
-                <button
-                  type="button"
-                  onClick={() => setIsEnrollmentListOpen(true)}
-                  disabled={viewState !== "ready" || !path}
-                  className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Users className="h-4 w-4" aria-hidden="true" />
-                  Học sinh đã mua
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={actions.startEditPath}
-                disabled={viewState !== "ready" || !path}
-                className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-                Sửa thông tin
-              </button>
-              {/* Ẩn nút Xóa cho bản cá nhân — không được archive/delete root khi đang gắn enrollment */}
-              {path?.kind !== "PERSONALIZED" && (
-                <button
-                  type="button"
-                  onClick={actions.requestDeletePath}
-                  disabled={viewState !== "ready" || !path || isDeletingPath}
-                  aria-label={path ? `Xóa khóa học ${path.title}` : "Xóa khóa học"}
-                  className="theme-button-danger-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  Xóa
-                </button>
-              )}
-            </div>
-          </header>
+          {isInitialPending ? (
+            <LoadingState title="Đang tải chi tiết khóa học" variant="detail-page" />
+          ) : (
+            <>
+              <header className="flex flex-col gap-4 border-b border-[var(--theme-border)] pb-5 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <Link
+                    href="/admin/courses"
+                    className="theme-button-neutral inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold transition"
+                  >
+                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    Danh sách khóa học
+                  </Link>
+                  <p className="mt-4 text-sm font-bold text-[var(--theme-primary)]">
+                    {path?.kind === "PERSONALIZED"
+                      ? "Chi tiết khóa học cá nhân hóa"
+                      : "Chi tiết khóa học"}
+                  </p>
+                  <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
+                    {path?.title ?? "Không tìm thấy khóa học"}
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
+                    Xem thông tin khóa học, quản lý chương học, buổi học và tài liệu dùng
+                    trong từng buổi.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {/* Quản lý danh sách học sinh */}
+                  {path?.kind !== "PERSONALIZED" && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEnrollmentListOpen(true)}
+                      disabled={viewState !== "ready" || !path}
+                      className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Users className="h-4 w-4" aria-hidden="true" />
+                      Học sinh đã mua
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={actions.startEditPath}
+                    disabled={viewState !== "ready" || !path}
+                    className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                    Sửa thông tin
+                  </button>
+                  {/* Ẩn nút Xóa cho bản cá nhân — không được archive/delete root khi đang gắn enrollment */}
+                  {path?.kind !== "PERSONALIZED" && (
+                    <button
+                      type="button"
+                      onClick={actions.requestDeletePath}
+                      disabled={viewState !== "ready" || !path || isDeletingPath}
+                      aria-label={path ? `Xóa khóa học ${path.title}` : "Xóa khóa học"}
+                      className="theme-button-danger-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      Xóa
+                    </button>
+                  )}
+                </div>
+              </header>
 
-          <section className="mt-5">
-            {isInitialPending || shouldShowInitialLoading ? (
-              shouldShowInitialLoading ? (
-                <LoadingState
-                  title="Đang tải chi tiết khóa học"
-                  description="ClassHero đang lấy thông tin chương học và buổi học mới nhất."
-                />
-              ) : (
-                <div
-                  aria-busy="true"
-                  className="min-h-80 lg:min-h-[calc(100svh-16rem)]"
-                />
-              )
-            ) : null}
-            {viewState === "error" ? <ErrorState onRetry={actions.retryLoad} /> : null}
-            {viewState === "ready" && !shouldShowInitialLoading && path ? (
-              <div className="grid gap-5">
-                {/* Banner bản cá nhân — chỉ hiển thị khi kind = PERSONALIZED */}
-                {path.kind === "PERSONALIZED" && (
-                  <PersonalPathBanner
-                    enrollmentId={enrollmentId}
-                    basePathId={path.sourceLearningPathId}
-                  />
-                )}
+              <section className="mt-5">
+                {viewState === "error" ? (
+                  <ErrorState onRetry={actions.retryLoad} />
+                ) : null}
+                {viewState === "ready" && path ? (
+                  <div className="grid gap-5">
+                    {/* Banner bản cá nhân — chỉ hiển thị khi kind = PERSONALIZED */}
+                    {path.kind === "PERSONALIZED" && (
+                      <PersonalPathBanner
+                        enrollmentId={enrollmentId}
+                        basePathId={path.sourceLearningPathId}
+                      />
+                    )}
 
-                {/* Stat chỉ hiển thị cho khóa catalog */}
-                {path.kind !== "PERSONALIZED" && (
-                  <section className="max-w-sm">
-                    <StatCard
+                    {/* Stat chỉ hiển thị cho khóa catalog */}
+                    {path.kind !== "PERSONALIZED" && (
+                      <section className="max-w-sm">
+                        <StatCard
+                          isDarkTheme={isDarkTheme}
+                          label="Học sinh đang học"
+                          value={courseStats.enrolledStudents}
+                          tone="sky"
+                        />
+                      </section>
+                    )}
+
+                    <LearningPathSummaryPanel path={path} isDarkTheme={isDarkTheme} />
+
+                    <AdminCourseDocumentPanel path={path} />
+
+                    <ChapterLessonPanel
                       isDarkTheme={isDarkTheme}
-                      label="Học sinh đang học"
-                      value={courseStats.enrolledStudents}
-                      tone="sky"
+                      path={path}
+                      selectedChapterId={selectedChapterId}
+                      selectedLessonId={selectedLessonId}
+                      onCreateChapter={actions.startCreateChapter}
+                      onEditChapter={actions.startEditChapter}
+                      onArchiveChapter={actions.requestDeleteChapter}
+                      onCreateLesson={actions.startCreateLesson}
+                      onEditLesson={actions.startEditLesson}
+                      onArchiveLesson={actions.requestDeleteLesson}
+                      onReorderChapter={actions.reorderChapters}
+                      onReorderLesson={actions.reorderLessons}
                     />
-                  </section>
-                )}
-
-                <LearningPathSummaryPanel path={path} isDarkTheme={isDarkTheme} />
-
-                <AdminCourseDocumentPanel path={path} />
-
-                <ChapterLessonPanel
-                  isDarkTheme={isDarkTheme}
-                  path={path}
-                  selectedChapterId={selectedChapterId}
-                  selectedLessonId={selectedLessonId}
-                  onCreateChapter={actions.startCreateChapter}
-                  onEditChapter={actions.startEditChapter}
-                  onArchiveChapter={actions.requestDeleteChapter}
-                  onCreateLesson={actions.startCreateLesson}
-                  onEditLesson={actions.startEditLesson}
-                  onArchiveLesson={actions.requestDeleteLesson}
-                  onReorderChapter={actions.reorderChapters}
-                  onReorderLesson={actions.reorderLessons}
-                />
-              </div>
-            ) : null}
-          </section>
+                  </div>
+                ) : null}
+              </section>
+            </>
+          )}
         </section>
       </div>
 

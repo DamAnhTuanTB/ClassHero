@@ -1,17 +1,24 @@
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, type ApiRequestOptions } from "@/lib/api-client";
 import { mapLearningPath } from "@/features/admin/courses/mappers/admin-course-api-mappers";
 import { toLearningPathApiPayload } from "@/features/admin/courses/payloads/admin-course-api-payloads";
 import type { LearningPathFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import type { AdminLearningPathApi } from "@/features/admin/courses/types/admin-course-api-types";
 
-export async function listAdminLearningPaths(token: string) {
+type AdminLearningPathReadOptions = Pick<ApiRequestOptions, "cache">;
+
+export async function listAdminLearningPaths(
+  token: string,
+  options: AdminLearningPathReadOptions = {},
+) {
   const [activePaths, archivedPaths] = await Promise.all([
     apiRequest<AdminLearningPathApi[]>("/admin/learning-paths?pageSize=100", {
+      cache: options.cache,
       token,
     }),
     apiRequest<AdminLearningPathApi[]>(
       "/admin/learning-paths?status=ARCHIVED&pageSize=100",
       {
+        cache: options.cache,
         token,
       },
     ),
@@ -20,8 +27,13 @@ export async function listAdminLearningPaths(token: string) {
   return [...activePaths, ...archivedPaths].map(mapLearningPath);
 }
 
-export async function getAdminLearningPath(pathId: string, token: string) {
+export async function getAdminLearningPath(
+  pathId: string,
+  token: string,
+  options: AdminLearningPathReadOptions = {},
+) {
   const path = await apiRequest<AdminLearningPathApi>(`/admin/learning-paths/${pathId}`, {
+    cache: options.cache,
     token,
   });
 

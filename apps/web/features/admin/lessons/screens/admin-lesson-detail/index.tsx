@@ -20,6 +20,8 @@ import {
   type AdminCoursesSidebarItem,
 } from "@/components/admin/courses/admin-courses-sidebar";
 import { statusLabels, statusStyles } from "@/features/admin/courses/admin-courses-data";
+import type { AdminLesson } from "@/features/admin/courses/admin-courses-data";
+import type { AdminQuizInitialData } from "@/features/admin/quiz/api/admin-quiz-api";
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
 import {
   CustomYoutubePlayer,
@@ -29,7 +31,7 @@ import {
 import { LessonVideoSettingsForm } from "../../components/lesson-video-settings-form";
 import { LessonVideoChaptersForm } from "../../components/lesson-video-chapters-form";
 import { LessonVideoTranscriptPanel } from "@/features/admin/lessons/components/lesson-video-transcript-panel";
-import { useThemeStore } from "@/lib/theme-store";
+import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 import {
   adminSidebarCollapsedDatasetKey,
   adminSidebarCollapsedStorageKey,
@@ -39,7 +41,8 @@ import {
   type LessonContentTabKey,
 } from "@/features/admin/lessons/screens/admin-lesson-detail/components/lesson-content-tabs";
 import { useAdminLessonContentPrefetch } from "@/features/admin/lessons/hooks/use-admin-lesson-content-prefetch";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
+import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { getQueryRenderState } from "@/lib/query-render-state";
 
 const LessonDetailEditorDialog = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
@@ -70,6 +73,9 @@ const AdminTestsTab = dynamic(() =>
 );
 
 interface AdminLessonDetailManagerProps {
+  initialLesson?: AdminLesson | null;
+  initialQuizData?: AdminQuizInitialData;
+  initialThemeMode?: AppThemeMode;
   lessonId: string;
 }
 
@@ -79,11 +85,21 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Tài liệu", icon: FileText, active: false },
 ];
 
-export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerProps) {
+export function AdminLessonDetailManager({
+  initialLesson,
+  initialQuizData,
+  initialThemeMode = "light",
+  lessonId,
+}: AdminLessonDetailManagerProps) {
   const router = useRouter();
-  const { data: lesson, isLoading, error, refetch } = useAdminLesson(lessonId);
+  const lessonQuery = useAdminLesson(lessonId, initialLesson);
+  const { data: lesson, error, refetch } = lessonQuery;
+  const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
+  const queryRenderState = getQueryRenderState({
+    ...lessonQuery,
+    isPrerequisitePending: !isAuthHydrated && initialLesson === undefined,
+  });
   useAdminLessonContentPrefetch(lessonId, Boolean(lesson));
-  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
   const [activeTab, setActiveTab] = useState<LessonContentTabKey>("quiz");
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
   const [tabPanelMinHeight, setTabPanelMinHeight] = useState(400);
@@ -187,7 +203,9 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
-  const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : false;
+  const isDarkTheme = isThemeHydrated
+    ? storeIsDarkTheme
+    : initialThemeMode === "dark";
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
     adminSidebarCollapsedStorageKey,
@@ -195,7 +213,7 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
     adminSidebarCollapsedDatasetKey,
   );
 
-  if (isLoading || shouldShowInitialLoading) {
+  if (queryRenderState === "loading") {
     return (
       <main data-admin-theme="true" className="theme-page">
         <div
@@ -216,14 +234,14 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
             onToggleDarkTheme={toggleTheme}
           />
           <div className="min-h-[calc(100svh-4rem)] p-5 sm:p-8">
-            {shouldShowInitialLoading ? <AdminLessonDetailSkeleton /> : null}
+            <AdminLessonDetailSkeleton />
           </div>
         </div>
       </main>
     );
   }
 
-  if (error || !lesson) {
+  if (queryRenderState === "error" || !lesson) {
     return (
       <main data-admin-theme="true" className="theme-page">
         <div
@@ -543,7 +561,10 @@ export function AdminLessonDetailManager({ lessonId }: AdminLessonDetailManagerP
 
                 {activeTab === "quiz" && (
                   <div className="h-full sm:p-6">
-                    <AdminQuizTab lessonId={lessonId} />
+                    <AdminQuizTab
+                      initialQuizData={initialQuizData}
+                      lessonId={lessonId}
+                    />
                   </div>
                 )}
 

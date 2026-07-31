@@ -104,6 +104,10 @@ Changelog is not written during UI iteration. It is written only during `/commit
 - Do not create or leave fake-static interaction. Any visible button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control, or clickable-looking icon must use semantic elements, real state/handlers, and pressed/pending/disabled/loading feedback as appropriate. If API is not connected, implement local/mock state that behaves like the production interaction.
 - Avoid large redesign unless requested.
 - Do not make desktop-only layouts.
+- For sidebar/drawer layouts with a bottom-pinned profile or action footer, keep
+  the footer after the scrollable navigation/content region in DOM order and use
+  a full-height `min-h-0` flex chain. Do not rely only on CSS `order` to move the
+  footer visually because browser layout and keyboard focus order can diverge.
 - Keep text from overflowing on mobile/tablet/desktop.
 - Keep user-facing copy concise and action-focused. For student/parent auth/register/forgot/reset screens, avoid explanatory side panels and repeated cards; use only text that helps the user complete the action.
 - For student/parent auth/register screens, keep the UI lively and age-appropriate: use a bright but controlled learning palette, clear CTA emphasis, suitable photo/illustration or light visual accents, and fitting typography instead of flat gray enterprise styling.

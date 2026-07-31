@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { logout } from "@/features/auth/api/auth-api";
 import {
-  clearAuthSession,
+  clearAuthSessionEverywhere,
   useAuthSessionStore,
 } from "@/features/auth/session/auth-session";
 import type { AdminCoursesSidebarItem } from "@/components/admin/courses/admin-courses-sidebar";
@@ -33,7 +33,6 @@ type AdminCoursesSidebarContentProps = {
 };
 
 export function AdminCoursesSidebarContent({
-  subtitle,
   items,
   isDarkTheme,
   isCollapsed,
@@ -66,14 +65,14 @@ export function AdminCoursesSidebarContent({
         description: "Chưa xác nhận được phiên máy chủ. Vui lòng đăng nhập lại nếu cần.",
       });
     } finally {
-      clearAuthSession();
+      await clearAuthSessionEverywhere();
       router.replace("/login");
       router.refresh();
     }
   }
 
   return (
-    <div className="flex flex-col lg:min-h-0 lg:flex-1">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         className={cn(
           "flex items-center gap-3 pr-12 lg:pr-0",
@@ -81,22 +80,57 @@ export function AdminCoursesSidebarContent({
         )}
       >
         <div className={cn("min-w-0", isCollapsed && "lg:w-11 lg:overflow-hidden")}>
-          <ClassHeroLogo className="h-8 max-w-none" priority />
-          <p
-            className={cn(
-              "truncate text-xs font-semibold text-[var(--theme-text-muted)]",
-              isCollapsed && "lg:hidden",
-            )}
-          >
-            {subtitle}
-          </p>
+          <ClassHeroLogo className="h-12 max-w-[13rem]" priority />
         </div>
       </div>
+
+      {onToggleCollapsed ? (
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className={cn(
+            "theme-button-neutral mt-4 hidden min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition lg:inline-flex",
+            isCollapsed && "lg:px-0",
+          )}
+          aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+          )}
+          <span className={cn(isCollapsed && "lg:hidden")}>
+            {isCollapsed ? "Mở rộng" : "Thu gọn"}
+          </span>
+        </button>
+      ) : null}
+
+      <nav className="mb-4 mt-5 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            title={isCollapsed ? item.label : undefined}
+            className={cn(
+              "inline-flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition",
+              isCollapsed && "lg:justify-center lg:px-0",
+              item.active
+                ? "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)] ring-1 ring-[var(--theme-primary-border)]"
+                : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
+            )}
+          >
+            <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className={cn("truncate", isCollapsed && "lg:hidden")}>
+              {item.label}
+            </span>
+          </button>
+        ))}
+      </nav>
 
       {showAdminProfileTools && onToggleDarkTheme ? (
         <div
           className={cn(
-            "mt-4 grid gap-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-2 lg:order-last lg:mt-auto",
+            "mt-auto grid shrink-0 gap-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-2",
             isCollapsed && "lg:place-items-center lg:p-2",
           )}
         >
@@ -161,49 +195,6 @@ export function AdminCoursesSidebarContent({
           </button>
         </div>
       ) : null}
-
-      {onToggleCollapsed ? (
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          className={cn(
-            "theme-button-neutral mt-4 hidden min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition lg:inline-flex",
-            isCollapsed && "lg:px-0",
-          )}
-          aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-        >
-          {isCollapsed ? (
-            <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-          )}
-          <span className={cn(isCollapsed && "lg:hidden")}>
-            {isCollapsed ? "Mở rộng" : "Thu gọn"}
-          </span>
-        </button>
-      ) : null}
-
-      <nav className="mt-5 grid gap-2">
-        {items.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            title={isCollapsed ? item.label : undefined}
-            className={cn(
-              "inline-flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition",
-              isCollapsed && "lg:justify-center lg:px-0",
-              item.active
-                ? "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)] ring-1 ring-[var(--theme-primary-border)]"
-                : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
-            )}
-          >
-            <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className={cn("truncate", isCollapsed && "lg:hidden")}>
-              {item.label}
-            </span>
-          </button>
-        ))}
-      </nav>
     </div>
   );
 }

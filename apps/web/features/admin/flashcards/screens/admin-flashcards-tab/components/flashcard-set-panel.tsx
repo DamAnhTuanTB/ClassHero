@@ -9,7 +9,7 @@ import type {
 } from "@/features/admin/flashcards/api/admin-flashcards-api";
 import { useAdminFlashcards } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
 import { FlashcardCardRow } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-card-row";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
+import { getQueryRenderState } from "@/lib/query-render-state";
 
 const difficultyLabels = {
   EASY: "Dễ",
@@ -37,8 +37,9 @@ export function FlashcardSetPanel({
   onEditCard: (card: AdminFlashcard) => void;
   onEditSet: () => void;
 }) {
-  const { data: cards, isError, isLoading, refetch } = useAdminFlashcards(set.id);
-  const shouldShowCardsLoading = useStableLoadingVisibility(isLoading);
+  const cardsQuery = useAdminFlashcards(set.id);
+  const { data: cards, refetch } = cardsQuery;
+  const queryRenderState = getQueryRenderState(cardsQuery);
 
   return (
     <section
@@ -90,31 +91,27 @@ export function FlashcardSetPanel({
         </div>
       </div>
 
-      {isLoading || shouldShowCardsLoading ? (
-        shouldShowCardsLoading ? (
-          <div
-            aria-busy="true"
-            aria-label={`Đang tải flashcard của ${set.title}`}
-            className="min-h-48 animate-pulse"
-          >
-            {Array.from({ length: 3 }, (_, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-[2rem_minmax(0,1fr)_5rem] items-center gap-3 border-b border-[var(--theme-border)] p-4 last:border-b-0"
-              >
-                <SkeletonBlock className="h-7 w-7 rounded-lg" />
-                <div className="space-y-2">
-                  <SkeletonBlock className="h-4 w-2/5 rounded-full" />
-                  <SkeletonBlock className="h-3.5 w-3/5 rounded-full opacity-70" />
-                </div>
-                <SkeletonBlock className="h-9 rounded-lg" />
+      {queryRenderState === "loading" ? (
+        <div
+          aria-busy="true"
+          aria-label={`Đang tải flashcard của ${set.title}`}
+          className="min-h-48 animate-pulse"
+        >
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-[2rem_minmax(0,1fr)_5rem] items-center gap-3 border-b border-[var(--theme-border)] p-4 last:border-b-0"
+            >
+              <SkeletonBlock className="h-7 w-7 rounded-lg" />
+              <div className="space-y-2">
+                <SkeletonBlock className="h-4 w-2/5 rounded-full" />
+                <SkeletonBlock className="h-3.5 w-3/5 rounded-full opacity-70" />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div aria-busy="true" className="min-h-48" />
-        )
-      ) : isError ? (
+              <SkeletonBlock className="h-9 rounded-lg" />
+            </div>
+          ))}
+        </div>
+      ) : queryRenderState === "error" ? (
         <div className="flex min-h-32 items-center justify-center p-6 text-center">
           <div>
             <p className="text-sm font-semibold text-[var(--theme-error-text)]">

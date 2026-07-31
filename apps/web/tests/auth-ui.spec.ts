@@ -63,6 +63,7 @@ test.describe("M2.4 auth UI", () => {
           exp: Math.floor(Date.now() / 1000) + 3_600,
           role: "STUDENT",
           sub: "student-user",
+          tokenType: "access",
         }),
       ).toString("base64url"),
       "signature",
@@ -103,9 +104,23 @@ test.describe("M2.4 auth UI", () => {
     await page
       .getByRole("textbox", { name: "Mật khẩu", exact: true })
       .fill("Password123!");
+    const serverSessionResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/auth/session") &&
+        response.request().method() === "POST",
+    );
+    const pendingButtonExpectation = expect(
+      page.getByRole("button", { name: "Đang xử lý..." }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Đăng nhập" }).click();
+    await pendingButtonExpectation;
 
-    await expect(page.getByRole("button", { name: "Đang xử lý..." })).toBeVisible();
+    const serverSessionResponse = await serverSessionResponsePromise;
+    const serverSessionHeaders = await serverSessionResponse.allHeaders();
+
+    expect(serverSessionResponse.ok()).toBe(true);
+    expect(serverSessionHeaders["set-cookie"]).toContain("HttpOnly");
+    expect(serverSessionHeaders["set-cookie"]).toContain("SameSite=lax");
     await expect(page.getByText("Đăng nhập học sinh thành công")).toBeVisible();
   });
 });

@@ -12,12 +12,14 @@ import {
   hasMixedExploreCourseAccess,
 } from "@/features/student/shared/utils/student-courses-utils";
 import { useStudentCourseDetailPrefetch } from "@/features/student/shared/hooks/use-student-courses-query";
+import type { StudentCoursesListResult } from "@/features/student/shared/types/student-course-api-results";
 import type { AppThemeMode } from "@/lib/theme-store";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function ExploreCoursesScreen({
+  initialData,
   initialThemeMode = "light",
 }: {
+  initialData?: StudentCoursesListResult | null;
   initialThemeMode?: AppThemeMode;
 }) {
   const {
@@ -33,7 +35,7 @@ export function ExploreCoursesScreen({
     setSubject,
     subject,
     total,
-  } = useStudentCoursesFilter();
+  } = useStudentCoursesFilter(initialData);
   const prefetchCourseDetail = useStudentCourseDetailPrefetch();
   const { otherCourses, purchasedCourses } = getExploreCourseGroups(filteredCourses);
   const apiHasMixedCourseAccess = hasMixedExploreCourseAccess(
@@ -42,9 +44,8 @@ export function ExploreCoursesScreen({
   const visibleHasMixedCourseAccess = hasMixedExploreCourseAccess(filteredCourses);
   const shouldShowCourseRibbons = apiHasMixedCourseAccess && visibleHasMixedCourseAccess;
   const screenBackground = "var(--student-screen-bg)";
-  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
 
-  if (isLoading || shouldShowInitialLoading) {
+  if (isLoading) {
     return (
       <main
         aria-busy="true"
@@ -59,11 +60,7 @@ export function ExploreCoursesScreen({
             title="Danh sách khóa học"
             initialThemeMode={initialThemeMode}
           />
-          {shouldShowInitialLoading ? (
-            <ExploreCoursesSkeleton />
-          ) : (
-            <div className="min-h-[calc(100svh-6rem)]" />
-          )}
+          <ExploreCoursesSkeleton />
         </div>
       </main>
     );

@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api-client";
+import type { ApiRequestOptions } from "@/lib/api-client";
 import type {
   AssessmentReview,
   CompletionResult,
@@ -22,8 +23,13 @@ import type {
   StudentTestStatus,
 } from "@/features/student/lessons/types/student-lesson-types";
 
-export function getStudentLesson(lessonId: string, token?: string) {
+export function getStudentLesson(
+  lessonId: string,
+  token?: string,
+  options: Pick<ApiRequestOptions, "cache"> = {},
+) {
   return apiRequest<StudentLesson>(`/student/lessons/${encodeURIComponent(lessonId)}`, {
+    cache: options.cache,
     token,
   });
 }

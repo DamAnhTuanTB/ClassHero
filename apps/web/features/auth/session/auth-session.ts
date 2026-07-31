@@ -1,6 +1,12 @@
 "use client";
 
 import { create } from "zustand";
+import { readAuthAccessTokenExpiresAtMs } from "@/features/auth/session/auth-access-token";
+import {
+  clearServerAuthSessionCookie,
+  hasServerAuthSessionMarker,
+  persistServerAuthSessionCookie,
+} from "@/features/auth/session/auth-session-cookie-client";
 import type { AuthTokenResponse, AuthUser } from "@/features/auth/types/auth-api-types";
 import { getAuthSessionErrorReason } from "@/features/auth/session/auth-session-errors";
 
@@ -44,7 +50,7 @@ function clearStoredSession() {
   window.sessionStorage.removeItem(authSessionStorageKey);
 }
 
-export function saveAuthSession(response: AuthTokenResponse, remember: boolean) {
+export async function saveAuthSession(response: AuthTokenResponse, remember: boolean) {
   const session: AuthSession = {
     accessToken: response.accessToken,
     refreshToken: response.refreshToken,
@@ -53,6 +59,7 @@ export function saveAuthSession(response: AuthTokenResponse, remember: boolean) 
   };
   const storage = getBrowserStorage(remember);
 
+  await persistServerAuthSessionCookie(session.accessToken);
   clearStoredSession();
   storage?.setItem(authSessionStorageKey, JSON.stringify(session));
   useAuthSessionStore.getState().setSession(session);
@@ -68,11 +75,31 @@ export function hydrateAuthSession() {
     readStoredSession(window.sessionStorage.getItem(authSessionStorageKey));
 
   useAuthSessionStore.getState().setSession(storedSession);
+
+  if (
+    storedSession &&
+    !isAuthSessionAccessTokenExpired(storedSession) &&
+    !hasServerAuthSessionMarker()
+  ) {
+    void persistServerAuthSessionCookie(storedSession.accessToken).catch(() => undefined);
+  }
 }
 
 export function clearAuthSession() {
   clearStoredSession();
   useAuthSessionStore.getState().clearSession();
+  void clearServerAuthSessionCookie().catch(() => undefined);
+}
+
+export async function clearAuthSessionEverywhere() {
+  clearStoredSession();
+  useAuthSessionStore.getState().clearSession();
+
+  try {
+    await clearServerAuthSessionCookie();
+  } catch {
+    // Local state must still be cleared when the web session endpoint is unavailable.
+  }
 }
 
 export function clearExpiredAuthSession(error: unknown) {
@@ -88,36 +115,13 @@ export function isAuthSessionAccessTokenExpired(
   session: AuthSession | null,
   nowMs = Date.now(),
 ) {
-  const expiresAtMs = getAccessTokenExpiresAtMs(session?.accessToken);
+  const expiresAtMs = readAuthAccessTokenExpiresAtMs(session?.accessToken);
 
   if (expiresAtMs === null) {
     return true;
   }
 
   return expiresAtMs <= nowMs;
-}
-
-function getAccessTokenExpiresAtMs(token?: string) {
-  const encodedPayload = token?.split(".")[1];
-
-  if (!encodedPayload) {
-    return null;
-  }
-
-  try {
-    const normalizedPayload = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const paddedPayload = normalizedPayload.padEnd(
-      Math.ceil(normalizedPayload.length / 4) * 4,
-      "=",
-    );
-    const payload = JSON.parse(globalThis.atob(paddedPayload)) as Partial<{
-      exp: unknown;
-    }>;
-
-    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
 }
 
 function readStoredSession(value: string | null): AuthSession | null {

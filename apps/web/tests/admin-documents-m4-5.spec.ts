@@ -504,6 +504,9 @@ async function seedAdminSession(page: Page) {
     sub: "admin-user",
   });
 
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ status: 204 }),
+  );
   await page.addInitScript(
     (session) => {
       window.localStorage.setItem("classhero.auth.session", JSON.stringify(session));

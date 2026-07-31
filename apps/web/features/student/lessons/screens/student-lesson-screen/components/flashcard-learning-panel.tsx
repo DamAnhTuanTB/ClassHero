@@ -25,6 +25,7 @@ import type {
   FlashcardStudySession,
   StudentFlashcard,
   StudentFlashcardSet,
+  StudentLearningSurface,
   StudentLesson,
 } from "@/features/student/lessons/types/student-lesson-types";
 import {
@@ -52,6 +53,7 @@ type FlashcardScreen = "PANEL" | "RUNNER" | "RESULT";
 
 export function FlashcardLearningPanel({
   autoStart,
+  initialSurface,
   lesson,
   onAutoStartHandled,
   onProgressChanged,
@@ -59,6 +61,10 @@ export function FlashcardLearningPanel({
   token,
 }: {
   autoStart: boolean;
+  initialSurface: Extract<
+    StudentLearningSurface,
+    { kind: "flashcard-runner" | "flashcard-result" }
+  > | null;
   lesson: StudentLesson;
   onAutoStartHandled: (target: "flashcard" | "quiz") => void;
   onProgressChanged: () => Promise<void>;
@@ -68,8 +74,7 @@ export function FlashcardLearningPanel({
   const userId = useAuthSessionStore((state) => state.session?.user.id);
   const [activeSetId, setActiveSetId] = useState(() => {
     const candidateId =
-      getFlashcardRunnerHistorySetId() ??
-      getFlashcardResultHistorySetId() ??
+      initialSurface?.setId ??
       readStoredFlashcardActiveSetId(lesson.id, userId);
 
     return (
@@ -89,9 +94,14 @@ export function FlashcardLearningPanel({
     staleTime: 15_000,
   });
   const [screen, setScreen] = useState<FlashcardScreen>(() =>
-    set?.progress.isCompleted && getFlashcardResultHistorySetId() === set.id
+    initialSurface?.kind === "flashcard-result" &&
+    set?.progress.isCompleted &&
+    initialSurface.setId === set.id
       ? "RESULT"
-      : set && initialSession && getFlashcardRunnerHistorySetId() === set.id
+      : initialSurface?.kind === "flashcard-runner" &&
+          set &&
+          initialSession &&
+          initialSurface.setId === set.id
         ? "RUNNER"
         : "PANEL",
   );
@@ -123,7 +133,7 @@ export function FlashcardLearningPanel({
   const [curtainPhase, setCurtainPhase] = useState<QuizTransitionPhase>("idle");
   const [transitionVariant, setTransitionVariant] =
     useState<QuizTransitionVariant>("book");
-  const didValidateInitialRunnerMarkerRef = useRef(false);
+  const didValidateInitialSurfaceRef = useRef(false);
   const autoStartTriggeredRef = useRef(false);
   const autoStartWasPendingRef = useRef(false);
   const entryActionButtonRef = useRef<HTMLButtonElement>(null);
@@ -136,12 +146,25 @@ export function FlashcardLearningPanel({
   }, [lesson.id, set, userId]);
 
   useEffect(() => {
-    if (didValidateInitialRunnerMarkerRef.current || !set) return;
-    didValidateInitialRunnerMarkerRef.current = true;
-    if (!initialSession && getFlashcardRunnerHistorySetId() === set.id) {
+    if (didValidateInitialSurfaceRef.current || !set) return;
+    didValidateInitialSurfaceRef.current = true;
+
+    const runnerMarkerSetId = getFlashcardRunnerHistorySetId();
+    const resultMarkerSetId = getFlashcardResultHistorySetId();
+    if (
+      initialSurface?.kind !== "flashcard-runner" ||
+      initialSurface.setId !== runnerMarkerSetId ||
+      !initialSession
+    ) {
       clearFlashcardRunnerHistoryMarker();
     }
-  }, [initialSession, set]);
+    if (
+      initialSurface?.kind !== "flashcard-result" ||
+      initialSurface.setId !== resultMarkerSetId
+    ) {
+      clearFlashcardResultHistoryMarker();
+    }
+  }, [initialSession, initialSurface, set]);
 
   useEffect(() => {
     sessionReviewedIdsRef.current = sessionReviewedIds;

@@ -23,6 +23,7 @@ import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-d
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import type {
   AdminMultiStatementAnswer,
+  AdminQuizInitialData,
   AdminQuizQuestion,
   AdminQuizSet,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -44,9 +45,9 @@ import {
   useAdminTestSets,
 } from "@/features/admin/tests/hooks/use-admin-tests";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
+import { getQueryRenderState } from "@/lib/query-render-state";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 import { cn } from "@/lib/utils";
 
 const AdminAssessmentQuestionEditorDialog = dynamic(
@@ -75,6 +76,7 @@ const AdminTestSetEditorDialog = dynamic(
 
 interface AdminAssessmentTabProps {
   assessmentKind?: "quiz" | "test";
+  initialQuizData?: AdminQuizInitialData;
   lessonId: string;
 }
 
@@ -85,19 +87,25 @@ type DeleteTarget =
 
 export function AdminAssessmentTab({
   assessmentKind = "quiz",
+  initialQuizData,
   lessonId,
 }: AdminAssessmentTabProps) {
   const isTest = assessmentKind === "test";
-  const quizSetsQuery = useAdminQuizSets(lessonId, !isTest);
+  const quizSetsQuery = useAdminQuizSets(
+    lessonId,
+    !isTest,
+    isTest ? undefined : initialQuizData?.sets,
+  );
   const testSetsQuery = useAdminTestSets(lessonId, isTest);
   const quizSetMutations = useAdminQuizSetMutations(lessonId);
   const testSetMutations = useAdminTestSetMutations(lessonId);
-  const quizSets = isTest ? testSetsQuery.data : quizSetsQuery.data;
-  const isLoading = isTest ? testSetsQuery.isLoading : quizSetsQuery.isLoading;
-  const shouldShowInitialLoading = useStableLoadingVisibility(isLoading);
-  const isError = isTest ? testSetsQuery.isError : quizSetsQuery.isError;
+  const setsQuery = isTest ? testSetsQuery : quizSetsQuery;
+  const quizSets = setsQuery.data;
+  const queryRenderState = getQueryRenderState(setsQuery);
   const copy = getAssessmentCopy(assessmentKind);
-  const [selectedSetId, setSelectedSetId] = useState("");
+  const [selectedSetId, setSelectedSetId] = useState(
+    isTest ? "" : (initialQuizData?.questionSetId ?? ""),
+  );
   const [editorQuestion, setEditorQuestion] = useState<
     AdminQuizQuestion | AdminTestQuestion | null
   >(null);
@@ -228,15 +236,11 @@ export function AdminAssessmentTab({
     }
   };
 
-  if (isLoading || shouldShowInitialLoading) {
-    return shouldShowInitialLoading ? (
-      <QuizLoadingState />
-    ) : (
-      <div aria-busy="true" className="min-h-72" />
-    );
+  if (queryRenderState === "loading") {
+    return <QuizLoadingState />;
   }
 
-  if (isError) {
+  if (queryRenderState === "error") {
     return (
       <div className="flex min-h-32 items-center justify-center rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-5 text-center text-sm font-semibold text-[var(--theme-error-text)]">
         <p>Không tải được danh sách {copy.setNamePlural}. Hãy thử tải lại trang.</p>
@@ -327,6 +331,11 @@ export function AdminAssessmentTab({
             <QuizSetPanel
               assessmentKind={assessmentKind}
               activeSet={activeSet}
+              initialQuestions={
+                !isTest && initialQuizData?.questionSetId === activeSet.id
+                  ? initialQuizData.questions
+                  : undefined
+              }
               minHeight={quizSetPanelMinHeight}
               panelRef={quizSetPanelRef}
               onAddQuestion={() => {
@@ -454,6 +463,7 @@ export function AdminAssessmentTab({
 function QuizSetPanel({
   assessmentKind,
   activeSet,
+  initialQuestions,
   minHeight,
   panelRef,
   onAddQuestion,
@@ -464,6 +474,7 @@ function QuizSetPanel({
 }: {
   assessmentKind: "quiz" | "test";
   activeSet: AdminQuizSet | AdminTestSet;
+  initialQuestions?: AdminQuizQuestion[];
   minHeight: number;
   panelRef: Ref<HTMLElement>;
   onAddQuestion: () => void;
@@ -473,12 +484,15 @@ function QuizSetPanel({
   onEditQuestion: (question: AdminQuizQuestion | AdminTestQuestion) => void;
 }) {
   const isTest = assessmentKind === "test";
-  const quizQuestionsQuery = useAdminQuizQuestions(activeSet.id, !isTest);
+  const quizQuestionsQuery = useAdminQuizQuestions(
+    activeSet.id,
+    !isTest,
+    isTest ? undefined : initialQuestions,
+  );
   const testQuestionsQuery = useAdminTestQuestions(activeSet.id, isTest);
-  const questions = isTest ? testQuestionsQuery.data : quizQuestionsQuery.data;
-  const isLoading = isTest ? testQuestionsQuery.isLoading : quizQuestionsQuery.isLoading;
-  const shouldShowQuestionsLoading = useStableLoadingVisibility(isLoading);
-  const isError = isTest ? testQuestionsQuery.isError : quizQuestionsQuery.isError;
+  const questionsQuery = isTest ? testQuestionsQuery : quizQuestionsQuery;
+  const questions = questionsQuery.data;
+  const queryRenderState = getQueryRenderState(questionsQuery);
   return (
     <section
       ref={panelRef}
@@ -536,13 +550,9 @@ function QuizSetPanel({
         </div>
       </div>
 
-      {isLoading || shouldShowQuestionsLoading ? (
-        shouldShowQuestionsLoading ? (
-          <QuizLoadingState />
-        ) : (
-          <div aria-busy="true" className="min-h-48" />
-        )
-      ) : isError ? (
+      {queryRenderState === "loading" ? (
+        <QuizLoadingState />
+      ) : queryRenderState === "error" ? (
         <div className="flex min-h-32 items-center justify-center p-6 text-center text-sm font-semibold text-[var(--theme-error-text)]">
           Không tải được câu hỏi của bộ này.
         </div>

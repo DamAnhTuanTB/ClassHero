@@ -97,16 +97,24 @@ test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Tes
   await expectNoFrameworkOverlay(page);
 });
 
-test("quiz status preloads before tab click and tab changes do not mount transient loading", async ({
+test("quiz tab keeps the current panel stable until its preloaded status is ready", async ({
   page,
 }) => {
   let statusRequestCount = 0;
+  let releaseQuizStatus: () => void = () => undefined;
+  const quizStatusGate = new Promise<void>((resolve) => {
+    releaseQuizStatus = resolve;
+  });
   page.on("request", (request) => {
     if (request.url().endsWith("/student/quiz-sets/quiz-set-m7/attempts/status")) {
       statusRequestCount += 1;
     }
   });
-  await setupStudentLearningApiMock(page, { testReady: false, testPasses: false });
+  await setupStudentLearningApiMock(page, {
+    quizStatusGate,
+    testReady: false,
+    testPasses: false,
+  });
   await page.goto(`/student/lessons/${lessonId}`);
 
   await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
@@ -134,11 +142,14 @@ test("quiz status preloads before tab click and tab changes do not mount transie
     };
   });
 
-  await page.getByRole("button", { name: "Flashcard" }).click();
-  await page.getByRole("button", { name: "Quiz" }).click();
+  const quizTab = page.getByRole("button", { name: "Quiz", exact: true });
+  await quizTab.click();
+  await expect(quizTab).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  releaseQuizStatus();
   await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Bài học" }).click();
-  await page.getByRole("button", { name: "Quiz" }).click();
+  await page.getByRole("button", { name: "Bài học", exact: true }).click();
+  await quizTab.click();
   await expect(page.getByRole("button", { name: "Bắt đầu", exact: true })).toBeVisible();
 
   const observedQuizLoading = await page.evaluate(() => {
@@ -155,6 +166,87 @@ test("quiz status preloads before tab click and tab changes do not mount transie
   });
   expect(observedQuizLoading).toBe(false);
   expect(statusRequestCount).toBe(1);
+});
+
+test("stale Quiz runner history never flashes or reopens over the plain Quiz tab", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(page).toHaveURL(/learningSurface=quiz-runner/);
+
+  await page.evaluate(() => {
+    const lessonTab = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Bài học",
+    );
+    lessonTab?.click();
+  });
+  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expect(page).not.toHaveURL(/learningSurface=/);
+
+  await page.evaluate(() => {
+    const probe = {
+      observedResumeLoading: false,
+      observedRunner: false,
+    };
+    const sample = () => {
+      probe.observedResumeLoading ||= Boolean(
+        document.querySelector('[aria-label="Đang mở lại lượt Quiz"]'),
+      );
+      probe.observedRunner ||= Boolean(
+        document.querySelector('[data-testid="quiz-runner-screen"]'),
+      );
+    };
+    const observer = new MutationObserver(sample);
+    observer.observe(document.body, { childList: true, subtree: true });
+    (
+      window as typeof window & {
+        __staleQuizSurfaceProbe?: {
+          observer: MutationObserver;
+          probe: typeof probe;
+        };
+      }
+    ).__staleQuizSurfaceProbe = { observer, probe };
+  });
+
+  await page.getByRole("button", { name: "Quiz" }).click();
+  await expect(
+    page.getByRole("button", { name: "Tiếp tục làm", exact: true }),
+  ).toBeVisible();
+
+  const staleSurfaceProbe = await page.evaluate(() => {
+    const value = (
+      window as typeof window & {
+        __staleQuizSurfaceProbe?: {
+          observer: MutationObserver;
+          probe: {
+            observedResumeLoading: boolean;
+            observedRunner: boolean;
+          };
+        };
+      }
+    ).__staleQuizSurfaceProbe;
+    value?.observer.disconnect();
+    return value?.probe;
+  });
+  expect(staleSurfaceProbe).toEqual({
+    observedResumeLoading: false,
+    observedRunner: false,
+  });
+  expect(
+    await page.evaluate(() => ({
+      bodyOverflow: document.body.style.overflow,
+      htmlOverflow: document.documentElement.style.overflow,
+    })),
+  ).toEqual({ bodyOverflow: "", htmlOverflow: "" });
+  await expect(page).not.toHaveURL(/learningSurface=/);
+  await expectNoFrameworkOverlay(page);
 });
 
 test("lesson navigation stays visible and unlocks the next lesson after a passing test", async ({
@@ -1227,7 +1319,35 @@ test("reload restores the active Flashcard runner and exact session state", asyn
       ),
     )
     .toBe("flashcard-set-m7");
+  await expect(page).toHaveURL(/learningSurface=flashcard-runner/);
+  await expect(page).toHaveURL(/learningSetId=flashcard-set-m7/);
 
+  await page.addInitScript(() => {
+    const probe = { sawUncoveredLessonDetail: false };
+    (
+      window as typeof window & {
+        __flashcardReloadSurfaceProbe?: typeof probe;
+      }
+    ).__flashcardReloadSurfaceProbe = probe;
+    const sample = () => {
+      const hasLessonDetail = Boolean(
+        document.querySelector("[data-student-lesson-detail]"),
+      );
+      const hasFlashcardSurface = Boolean(
+        document.querySelector(
+          '[aria-label="Đang mở lại lượt Flashcard"], [data-testid="flashcard-runner-screen"]',
+        ),
+      );
+      if (hasLessonDetail && !hasFlashcardSurface) {
+        probe.sawUncoveredLessonDetail = true;
+      }
+    };
+    new MutationObserver(sample).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+    document.addEventListener("DOMContentLoaded", sample);
+  });
   await page.reload();
 
   expect(
@@ -1242,6 +1362,19 @@ test("reload restores the active Flashcard runner and exact session state", asyn
   await expect(
     page.getByRole("button", { name: "Thẻ 2: chưa đánh dấu" }),
   ).toHaveAttribute("aria-current", "step");
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __flashcardReloadSurfaceProbe?: {
+              sawUncoveredLessonDetail: boolean;
+            };
+          }
+        ).__flashcardReloadSurfaceProbe?.sawUncoveredLessonDetail,
+    ),
+  ).toBe(false);
+  await expectNoFrameworkOverlay(page);
 
   await page.goBack();
   const exitDialog = page.getByRole("dialog", {
@@ -1265,6 +1398,38 @@ test("reload restores the active Flashcard runner and exact session state", asyn
   await expect(page.getByText("Mặt sau", { exact: true })).toBeVisible();
 });
 
+test("inactive Flashcard state never locks lesson scrolling after navigation or reload", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCardCount: 2,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+  await expect(page.getByRole("heading", { name: "Thẻ 1/2" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.sessionStorage.getItem("student-flashcard-surface:runner"),
+      ),
+    )
+    .toBe("flashcard-set-m7");
+
+  await page.goto(`/student/lessons/${lessonId}`);
+  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expectLessonDocumentToScroll(page);
+  await expect(page).not.toHaveURL(/learningSurface=/);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Kiến thức trọng tâm" })).toBeVisible();
+  await expectLessonDocumentToScroll(page);
+  await expect(page).not.toHaveURL(/learningSurface=/);
+  await expectNoFrameworkOverlay(page);
+});
+
 test("quiz counts a completed answer before checking and auto-checks it on finish", async ({
   page,
 }) => {
@@ -1282,6 +1447,34 @@ test("quiz counts a completed answer before checking and auto-checks it on finis
   await page.getByRole("button", { name: "Hoàn thành Quiz" }).click();
   await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
 });
+
+async function expectLessonDocumentToScroll(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        bodyOverflow: document.body.style.overflow,
+        hasHiddenFlashcardRunner: Boolean(
+          document.querySelector(
+            '[hidden] [data-testid="flashcard-runner-screen"]',
+          ),
+        ),
+        htmlOverflow: document.documentElement.style.overflow,
+        isScrollable:
+          document.documentElement.scrollHeight >
+          document.documentElement.clientHeight,
+      })),
+    )
+    .toEqual({
+      bodyOverflow: "",
+      hasHiddenFlashcardRunner: false,
+      htmlOverflow: "",
+      isScrollable: true,
+    });
+
+  await page.evaluate(() => window.scrollTo({ behavior: "auto", top: 0 }));
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+}
 
 test("text Quiz checks locally without a per-question request", async ({ page }) => {
   const perQuestionCheckRequests: string[] = [];
@@ -1719,6 +1912,8 @@ test("reload restores unchecked answers and checked quiz results from the API", 
   await firstOption.click();
   await firstAutosave;
   await expect(firstOption).toHaveAttribute("aria-pressed", "true");
+  await expect(page).toHaveURL(/learningSurface=quiz-runner/);
+  await expect(page).toHaveURL(/learningAttemptId=quiz-attempt-m7/);
 
   await page.evaluate(() => {
     for (const key of Object.keys(window.localStorage)) {
@@ -1728,12 +1923,51 @@ test("reload restores unchecked answers and checked quiz results from the API", 
     }
     window.sessionStorage.clear();
   });
+  await page.addInitScript(() => {
+    const probe = { sawUncoveredLessonDetail: false };
+    (
+      window as typeof window & {
+        __quizReloadSurfaceProbe?: typeof probe;
+      }
+    ).__quizReloadSurfaceProbe = probe;
+    const sample = () => {
+      const hasLessonDetail = Boolean(
+        document.querySelector("[data-student-lesson-detail]"),
+      );
+      const hasQuizSurface = Boolean(
+        document.querySelector(
+          '[aria-label="Đang mở lại lượt Quiz"], [data-testid="quiz-runner-screen"]',
+        ),
+      );
+      if (hasLessonDetail && !hasQuizSurface) {
+        probe.sawUncoveredLessonDetail = true;
+      }
+    };
+    new MutationObserver(sample).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+    document.addEventListener("DOMContentLoaded", sample);
+  });
   await page.reload();
 
   await expect(page.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
   await expect(firstOption).toHaveAttribute("aria-pressed", "true");
   await expect(secondOption).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Kiểm tra đáp án" })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __quizReloadSurfaceProbe?: {
+              sawUncoveredLessonDetail: boolean;
+            };
+          }
+        ).__quizReloadSurfaceProbe?.sawUncoveredLessonDetail,
+    ),
+  ).toBe(false);
+  await expectNoFrameworkOverlay(page);
 
   const checkedAutosave = page.waitForResponse(
     (response) =>
@@ -1750,6 +1984,18 @@ test("reload restores unchecked answers and checked quiz results from the API", 
 
   await expect(secondOption).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Chính xác!")).toBeVisible();
+
+  await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
+  await page
+    .getByRole("dialog", { name: "Thoát bài Quiz?" })
+    .getByRole("button", { name: "Vẫn thoát" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Tiếp tục làm", exact: true }),
+  ).toBeVisible();
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId("quiz-runner-screen")).toHaveCount(0);
+  await expect(page).not.toHaveURL(/learningSurface=/);
 });
 
 test("reload restores an unchecked text answer from the API", async ({ page }) => {
@@ -2199,9 +2445,9 @@ test("test remains locked after open time when quiz and flashcard are incomplete
 
   await expect(page.getByRole("heading", { name: "Bài thi" })).toBeVisible();
   await expect(
-    page.getByText("Cần hoàn thành Quiz và Flashcard để bắt đầu bài thi."),
+    page.getByText("Cần hoàn thành Quiz và Flashcard để mở khóa bài thi."),
   ).toBeVisible();
-  await expect(page.getByText("Chưa mở", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đang khóa", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Quiz" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Flashcard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
@@ -2221,7 +2467,7 @@ test("test prerequisite actions reflect partial Quiz completion", async ({ page 
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
 
   await expect(
-    page.getByText("Cần hoàn thành Flashcard để bắt đầu bài thi."),
+    page.getByText("Cần hoàn thành Flashcard để mở khóa bài thi."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Quiz" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Làm Flashcard" })).toBeVisible();
@@ -2247,7 +2493,7 @@ test("test prerequisite actions reflect partial Flashcard completion", async ({
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
 
   await expect(
-    page.getByText("Cần hoàn thành Quiz để bắt đầu bài thi."),
+    page.getByText("Cần hoàn thành Quiz để mở khóa bài thi."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Quiz" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Flashcard" })).toHaveCount(0);
@@ -2264,7 +2510,7 @@ test("failed test shows retry warning and cannot use the score", async ({ page }
 
   await expect(
     page.getByText(
-      "Bạn đã đủ điều kiện làm bài thi. Ôn tập lại Quiz và Flashcard để làm bài thi tốt hơn nhé.",
+      "Bài thi đã được mở khóa. Ôn tập lại Quiz và Flashcard để sẵn sàng thi nhé!",
     ),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Quiz" })).toHaveCount(0);
@@ -2540,6 +2786,7 @@ async function setupStudentLearningApiMock(
     omitQuizSet?: boolean;
     omitTestSet?: boolean;
     quizQuestionCount?: number;
+    quizStatusGate?: Promise<void>;
     quizHistoryCompletedItemCount?: number;
     quizHistorySetId?: string;
     quizReviewQuestionCount?: number;
@@ -2823,6 +3070,9 @@ async function setupStudentLearningApiMock(
       method === "GET" &&
       pathname === "/student/quiz-sets/quiz-set-m7/attempts/status"
     ) {
+      if (options.quizStatusGate) {
+        await options.quizStatusGate;
+      }
       const answeredCount = currentQuizAttempt?.savedAnswers.length ?? 0;
       const checkedCount = currentQuizAttempt?.checkedAnswers.length ?? 0;
       return fulfillJson(route, 200, {

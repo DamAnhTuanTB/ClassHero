@@ -9,6 +9,7 @@ import {
   type AdminCoursesSidebarItem,
 } from "@/components/admin/courses/admin-courses-sidebar";
 import { AdminCoursesStatsRow } from "@/features/admin/courses/screens/admin-courses-manager/components/admin-courses-stats-row";
+import { LoadingState } from "@/components/admin/courses/loading-state";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import { useAdminCoursesManager } from "@/features/admin/courses/hooks/use-admin-courses-manager";
 import { useAdminLearningPathPrefetch } from "@/features/admin/courses/hooks/use-admin-course-queries";
@@ -99,43 +100,49 @@ export function AdminCoursesManager({
         />
 
         <section className="min-w-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-          <AdminCoursesHeader
-            stats={stats}
-            isDarkTheme={isDarkTheme}
-            onCreatePath={actions.startCreatePath}
-            onOpenArchiveDialog={actions.openArchiveDialog}
-            onRetryLoad={actions.retryLoad}
-          />
-          <AdminCoursesStatsRow isDarkTheme={isDarkTheme} stats={stats} />
-          <AdminCoursesContent
-            allFilteredPathsSelected={allFilteredPathsSelected}
-            filteredPaths={filteredPaths}
-            gradeFilter={gradeFilter}
-            isDarkTheme={isDarkTheme}
-            query={query}
-            selectedPathIds={selectedPathIds}
-            sortDirection={sortDirection}
-            sortKey={sortKey}
-            statusFilter={statusFilter}
-            subjectFilter={subjectFilter}
-            viewState={viewState}
-            onArchivePath={actions.requestDeletePath}
-            onClearSelected={actions.clearSelectedPaths}
-            onCreatePath={actions.startCreatePath}
-            onEditPath={actions.startEditPath}
-            onPrefetchPath={(pathId) => {
-              void prefetchLearningPath(pathId);
-            }}
-            onGradeChange={actions.setGradeFilter}
-            onQueryChange={actions.setQuery}
-            onRequestDeleteSelected={actions.requestDeleteSelectedPaths}
-            onRetryLoad={actions.retryLoad}
-            onSelectPath={actions.toggleSelectPath}
-            onStatusChange={actions.setStatusFilter}
-            onSubjectChange={actions.setSubjectFilter}
-            onToggleSelectAll={actions.toggleSelectAllPaths}
-            onToggleSort={actions.toggleSort}
-          />
+          {viewState === "loading" ? (
+            <LoadingState title="Đang tải danh sách khóa học" variant="list-page" />
+          ) : (
+            <>
+              <AdminCoursesHeader
+                stats={stats}
+                isDarkTheme={isDarkTheme}
+                onCreatePath={actions.startCreatePath}
+                onOpenArchiveDialog={actions.openArchiveDialog}
+                onRetryLoad={actions.retryLoad}
+              />
+              <AdminCoursesStatsRow isDarkTheme={isDarkTheme} stats={stats} />
+              <AdminCoursesContent
+                allFilteredPathsSelected={allFilteredPathsSelected}
+                filteredPaths={filteredPaths}
+                gradeFilter={gradeFilter}
+                isDarkTheme={isDarkTheme}
+                query={query}
+                selectedPathIds={selectedPathIds}
+                sortDirection={sortDirection}
+                sortKey={sortKey}
+                statusFilter={statusFilter}
+                subjectFilter={subjectFilter}
+                viewState={viewState}
+                onArchivePath={actions.requestDeletePath}
+                onClearSelected={actions.clearSelectedPaths}
+                onCreatePath={actions.startCreatePath}
+                onEditPath={actions.startEditPath}
+                onPrefetchPath={(pathId) => {
+                  void prefetchLearningPath(pathId);
+                }}
+                onGradeChange={actions.setGradeFilter}
+                onQueryChange={actions.setQuery}
+                onRequestDeleteSelected={actions.requestDeleteSelectedPaths}
+                onRetryLoad={actions.retryLoad}
+                onSelectPath={actions.toggleSelectPath}
+                onStatusChange={actions.setStatusFilter}
+                onSubjectChange={actions.setSubjectFilter}
+                onToggleSelectAll={actions.toggleSelectAllPaths}
+                onToggleSort={actions.toggleSort}
+              />
+            </>
+          )}
         </section>
       </div>
       {isPathEditorOpen ? (

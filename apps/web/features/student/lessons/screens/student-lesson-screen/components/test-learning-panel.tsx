@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Clock3,
   Eye,
+  FileText,
   HelpCircle,
   Loader2,
   LockKeyhole,
@@ -481,7 +482,7 @@ export function TestLearningPanel({
           <h2 className="min-w-0 text-lg font-black text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-xl">
             Bài thi
           </h2>
-          <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-rose-100 px-3 py-2 text-xs font-black text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
             <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
             Đang khóa
           </span>
@@ -499,12 +500,12 @@ export function TestLearningPanel({
   const showQuizPrerequisiteAction = !status.quiz.isCompleted;
   const showFlashcardPrerequisiteAction = !status.flashcard.isCompleted;
   const prerequisiteDescription = prerequisitesComplete
-    ? "Bạn đã đủ điều kiện làm bài thi. Ôn tập lại Quiz và Flashcard để làm bài thi tốt hơn nhé."
+    ? "Bài thi đã được mở khóa. Ôn tập lại Quiz và Flashcard để sẵn sàng thi nhé!"
     : status.quiz.isCompleted
-      ? "Cần hoàn thành Flashcard để bắt đầu bài thi."
+      ? "Cần hoàn thành Flashcard để mở khóa bài thi."
       : status.flashcard.isCompleted
-        ? "Cần hoàn thành Quiz để bắt đầu bài thi."
-        : "Cần hoàn thành Quiz và Flashcard để bắt đầu bài thi.";
+        ? "Cần hoàn thành Quiz để mở khóa bài thi."
+        : "Cần hoàn thành Quiz và Flashcard để mở khóa bài thi.";
   const completedAttemptId =
     latestSubmittedAttemptId ??
     status.latestSubmittedAttempt?.id ??
@@ -512,14 +513,13 @@ export function TestLearningPanel({
     null;
   const activeTestSet = status.sets[0];
   const hasTestQuestions = Boolean(activeTestSet && activeTestSet.questionCount > 0);
-  const canStartTest =
-    status.canStart && prerequisitesComplete && hasTestQuestions;
+  const canStartTest = status.canStart && prerequisitesComplete && hasTestQuestions;
   const testStatusLabel =
     !activeTestSet || activeTestSet.questionCount === 0
       ? "0 câu"
       : canStartTest && activeTestSet
         ? `${activeTestSet.questionCount} câu`
-        : "Chưa mở";
+        : "Đang khóa";
   const testHistoryItems: LearningHistoryDisplayItem[] = (
     historyQuery.data?.items ?? []
   ).map((item) => ({
@@ -550,7 +550,19 @@ export function TestLearningPanel({
             Bài thi
           </h2>
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            <span className="inline-flex h-8 items-center rounded-xl bg-emerald-100 px-[11px] text-[13px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+            <span
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-xl px-[11px] text-[13px] font-black",
+                testStatusLabel === "Đang khóa"
+                  ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+              )}
+            >
+              {testStatusLabel === "Đang khóa" ? (
+                <LockKeyhole className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              )}
               {testStatusLabel}
             </span>
             {activeTestSet && activeTestSet.questionCount > 0 ? (

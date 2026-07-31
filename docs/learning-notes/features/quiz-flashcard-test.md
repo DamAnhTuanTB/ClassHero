@@ -146,25 +146,38 @@ flowchart TD
   `Hoàn thành`, frontend tự gọi endpoint check song song cho các answer đầy đủ
   chưa chấm rồi mới submit, còn backend vẫn giữ invariant chỉ submit attempt đã
   được chấm đủ.
-- React state không đủ để giữ runner qua F5. Khi mount tab Quiz, frontend gọi
-  endpoint current attempt: server trả lại tập câu, mọi đáp án đã autosave,
-  feedback của câu đã kiểm tra và vị trí câu hiện tại. Browser storage chỉ là
-  cache tùy chọn; server là nguồn chính để resume chéo thiết bị.
+- React state không đủ để giữ runner qua F5. URL lesson phải mang
+  `learningSurface`, `learningSetId` và `learningAttemptId` để server biết ngay
+  request đầu cần render fullscreen runner/result thay vì lesson panel. Sau đó
+  frontend gọi endpoint current attempt: server trả lại tập câu, mọi đáp án đã
+  autosave, feedback của câu đã kiểm tra và vị trí câu hiện tại. Browser storage
+  chỉ là cache tùy chọn; server là nguồn chính để resume chéo thiết bị.
 - Response autosave có thể cập nhật `answeredCount` hoặc `checkedCount` trong
   TanStack Query cache, nhưng đây không phải tín hiệu cần resume lại runner.
-  Effect khôi phục phải thoát sớm khi `attemptId` trên history marker chính là
-  attempt đang hiển thị; nếu phụ thuộc trực tiếp vào toàn bộ object status, mỗi
+  Effect khôi phục phải thoát sớm khi `attemptId` trên surface URL/history chính
+  là attempt đang hiển thị; nếu phụ thuộc trực tiếp vào toàn bộ object status, mỗi
   lần chọn hoặc kiểm tra đáp án sẽ dựng màn loading fullscreen rồi tải lại
   current attempt, tạo cảm giác nháy màn.
 - Copy CTA và vị trí mở runner phải dùng trạng thái đã từng mở lượt. Chưa có
   attempt dùng `Bắt đầu` và luôn mở câu 1; mọi attempt `IN_PROGRESS` dùng
   `Tiếp tục làm` dù chưa kiểm tra câu nào và khôi phục `currentIndex` đã lưu.
-  History marker chỉ quyết định F5 có tự mở runner hay giữ panel, không quyết
-  định nhãn CTA.
+  Surface URL quyết định F5 có tự mở runner hay giữ panel; history marker giữ
+  semantics Browser Back, và cả hai không quyết định nhãn CTA.
 - Attempt `IN_PROGRESS` là trạng thái nghiệp vụ, không phải trạng thái màn hình.
-  Chỉ history entry riêng của runner mới cho biết F5 cần tự mở lại runner. Nếu
-  entry này đã được pop khi student xác nhận thoát, tab Quiz phải giữ ở panel
-  tổng quan; nút bắt đầu sau đó mới chủ động resume attempt đang dở.
+  Chỉ URL/entry riêng của runner mới cho biết F5 cần tự mở lại runner. Nếu entry
+  này đã được pop và surface query đã được xóa khi student xác nhận thoát, tab
+  Quiz phải giữ ở panel tổng quan; nút bắt đầu sau đó mới chủ động resume
+  attempt đang dở.
+- URL là nguồn định danh canonical của fullscreen surface. Marker runner/result
+  còn sót trong `history.state` hoặc `sessionStorage` không được phép tự mở lại
+  surface khi URL chỉ còn tab Quiz thường; panel phải xóa marker stale trước khi
+  chạy logic resume. Quy tắc này ngăn chuỗi một frame card Quiz, một frame
+  loading rồi mới đổi sang runner hoặc quay lại card.
+- Status quyết định CTA `Bắt đầu`/`Tiếp tục làm`/`Xem lại` được prefetch ngay
+  khi lesson sẵn sàng. Nếu student bấm Quiz trước khi request đầu hoàn tất,
+  navigation giữ panel Bài học hiện tại và đánh dấu tab Quiz pending; chỉ sau
+  khi status đã vào cache mới mount panel Quiz. Nhờ vậy thao tác vẫn có feedback
+  tức thì nhưng card không đi qua vùng trống hoặc skeleton ngắn.
 - Với lesson có nhiều Quiz set, `activeQuizSetId` cũng là state cần sống qua F5.
   Lưu ID này theo `user + lesson`, ưu tiên marker runner/result khi surface vẫn
   mở và luôn đối chiếu với danh sách set mới tải. Khi Back khỏi runner, chỉ xóa
@@ -172,12 +185,12 @@ flowchart TD
   rơi về set đầu tiên và hiển thị kết quả cũ thay cho lượt mới đang dở.
 - Result cũng là một surface toàn màn hình nằm trên cùng route lesson, nên React
   state một mình không giữ được nó qua F5. Khi submit hoặc bấm `Xem lại`,
-  frontend ghi `attemptId` gốc vào history state; lúc mount, UI đối chiếu marker
-  với summary mới nhất từ server rồi mới khôi phục result. Khi quay về panel,
-  marker phải bị xóa. Result được khôi phục không phát lại confetti vì đó không
-  còn là khoảnh khắc submit mới. Effect khôi phục phải bỏ qua nếu đúng result đó
-  đã đang hiển thị từ submit hiện tại; nếu không, cache update ngay sau submit sẽ
-  bị hiểu nhầm là F5 và tắt confetti vừa bật.
+  frontend ghi `attemptId` gốc vào surface query và history state; lúc mount, UI
+  đối chiếu marker với summary mới nhất từ server rồi mới khôi phục result. Khi
+  quay về panel, cả query lẫn marker phải bị xóa. Result được khôi phục không
+  phát lại confetti vì đó không còn là khoảnh khắc submit mới. Effect khôi phục
+  phải bỏ qua nếu đúng result đó đã đang hiển thị từ submit hiện tại; nếu không,
+  cache update ngay sau submit sẽ bị hiểu nhầm là F5 và tắt confetti vừa bật.
 - Runner dùng một history entry phụ để chặn Browser Back. Sau submit, entry phụ
   được pop âm thầm; marker result đã ghi trên entry đó phải được chuyển sang
   entry lesson trong callback `popstate`. Nếu chỉ `replaceState` trước
@@ -246,8 +259,8 @@ mọi runner về panel và cũng không suy đoán từ danh sách thẻ. Ví d
 học mới từ panel vẫn quay về panel. Cách này giữ Back nhất quán ngay cả khi hai
 phiên dùng chung component runner và history-entry xác nhận thoát.
 
-History marker chỉ trả lời runner/result có đang là surface hiện tại hay không;
-nó không thể tự dựng lại một phiên Flashcard. Phiên đang học cần lưu riêng tập
+Surface query/history chỉ trả lời runner/result có đang là surface hiện tại hay
+không; nó không thể tự dựng lại một phiên Flashcard. Phiên đang học cần lưu riêng tập
 `cardIds` đã chốt, các thẻ đã đánh dấu trong lượt, vị trí hiện tại, mặt trước/sau
 và điểm quay về. Sau F5, frontend ghép session state này với progress/favorite
 mới đọc từ server: server vẫn là nguồn dữ liệu nghiệp vụ, còn local storage giữ
@@ -264,12 +277,19 @@ fullscreen; nếu xóa luôn active set, panel sẽ quay về bộ hoàn thành 
 
 Flashcard panel được lazy-load sau khi lesson query hoàn tất, nên custom field
 trong `window.history.state` có thể đã bị Next.js chuẩn hóa trước lúc panel đọc
-nó. Marker surface vì vậy được mirror vào `sessionStorage`; history entry vẫn
-phục vụ Browser Back, còn storage fallback phục vụ F5. Hai nơi phải được set/xóa
-cùng một helper để tránh tình trạng UI đã về panel nhưng reload lại tự bật
-runner. Cleanup marker stale chỉ chạy một lần lúc mount; nếu effect cleanup chạy
-lại theo object query sau progress refetch, nó sẽ xóa nhầm marker của runner vừa
-được mở.
+nó. URL query là nguồn surface mà server và client cùng đọc được khi F5;
+history entry vẫn phục vụ Browser Back, còn `sessionStorage` chỉ là fallback cho
+marker legacy. Các nguồn này phải được set/xóa trong cùng helper để tránh tình
+trạng UI đã về panel nhưng reload lại tự bật runner. Cleanup marker stale chỉ
+chạy một lần lúc mount; nếu effect cleanup chạy lại theo object query sau
+progress refetch, nó sẽ xóa nhầm marker của runner vừa được mở.
+
+Ẩn một panel bằng attribute `hidden` không dừng lifecycle React. Nếu runner
+Flashcard vẫn được mount dưới panel ẩn, hook khóa scroll của runner vẫn có thể
+đặt `overflow: hidden` lên `html/body` sau hydration: thanh cuộn hiện ở HTML đầu
+rồi biến mất ngay sau đó. Tab không hoạt động phải unmount runner; modal,
+history và fullscreen surface dùng chung scroll-lock reference-counted để việc
+đóng một lớp không vô tình mở khóa hoặc giữ khóa của lớp còn lại.
 
 ### Lịch sử là lịch sử lượt làm, không phải danh sách set duy nhất
 

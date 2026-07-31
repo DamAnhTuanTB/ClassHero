@@ -130,6 +130,14 @@ apps/web/app/
 - Zustand cho client state nhỏ như selected child, notification dropdown, UI preference.
 - Không dùng Zustand thay thế database/API state.
 
+### Web auth session và protected SSR
+
+- Browser vẫn dùng access token qua `Authorization: Bearer ...` cho REST API hiện tại; session runtime/persistence nằm trong feature auth.
+- Sau login, web đồng bộ một bản access token vào cookie `HttpOnly`, `SameSite=Lax` qua route nội bộ Next.js `/api/auth/session`. Cookie này chỉ làm cầu nối để Server Component xác thực request đầu tiên, không thay đổi contract JWT của NestJS.
+- Layout protected của Admin/Student đọc cookie server-side, gọi `GET /me` với `cache: no-store` và chỉ truyền `initialUser` xuống route guard khi API xác nhận đúng role. Không dùng kết quả decode JWT phía web làm bằng chứng phân quyền.
+- Nhờ server verification, HTML đầu tiên của hard refresh đã có shell/loading state đúng role; route guard client tiếp tục quản lý redirect, token hết hạn và các lần điều hướng sau hydrate.
+- Logout phải xóa đồng thời browser storage, Zustand session, cookie token `HttpOnly` và cookie marker. Route auth cũng kiểm tra phiên server để user hợp lệ không nhìn thấy lại form login trong lúc client chưa hydrate.
+
 ### Source organization
 
 Cấu trúc source front-end bắt buộc theo `docs/14-source-code-structure.md`.

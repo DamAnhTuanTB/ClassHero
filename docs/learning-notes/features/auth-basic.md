@@ -16,6 +16,25 @@ Register chỉ tạo tài khoản và profile. Login mới cấp cặp access/re
 
 `M2.4` thêm lớp UI auth và đã nối với API thật. UI vẫn giữ layout đã duyệt, nhưng phần submit dùng API client, TanStack Query mutation và session store thay cho mock handler.
 
+## Sơ đồ luồng dễ hiểu
+
+```mermaid
+sequenceDiagram
+  participant Browser
+  participant Next as Next.js web
+  participant API as NestJS API
+
+  Browser->>API: POST /auth/login
+  API-->>Browser: access token + refresh token + user
+  Browser->>Next: POST /api/auth/session (access token)
+  Next-->>Browser: Set-Cookie HttpOnly + session marker
+  Browser->>Next: F5 /student/* hoặc /admin/*
+  Next->>API: GET /me với Bearer token từ cookie
+  API-->>Next: user đã verify
+  Next-->>Browser: HTML đầu tiên đã có shell đúng role
+  Browser->>Browser: hydrate Zustand/browser storage
+```
+
 ## Luồng code end-to-end
 
 1. Request đi vào `AuthController` ở route `/api/v1/auth/...`.
@@ -29,8 +48,9 @@ Register chỉ tạo tài khoản và profile. Login mới cấp cặp access/re
 9. API cần role cụ thể đi qua `RolesGuard` và `@Roles(...)`; sai role trả `403`.
 10. Response đi qua global API envelope thành `{ data, meta }`.
 11. Với UI `M2.4`, route Next.js render từng form public, React Hook Form validate bằng Zod, rồi TanStack Query mutation gọi API thật qua `apiRequest`.
-12. Login thành công lưu access token, refresh token và user vào Zustand store, đồng thời persist vào `localStorage` hoặc `sessionStorage` theo lựa chọn "Ghi nhớ đăng nhập".
-13. Register student/parent gọi endpoint tạo tài khoản thật; khi thành công UI hiển thị toast rồi redirect về `/login`. Forgot password gửi tên đăng nhập/số điện thoại, họ tên và khối lớp; nếu 3 thông tin khớp database thì API trả reset token để UI chuyển ngay sang bước đổi mật khẩu, còn mismatch trả lỗi cho toast. Reset password dùng token đó hoặc token từ URL/email nếu có.
+12. Login thành công gọi route nội bộ Next.js `/api/auth/session` để set access-token cookie `HttpOnly`, rồi mới lưu access token, refresh token và user vào Zustand/browser storage theo lựa chọn "Ghi nhớ đăng nhập".
+13. Khi hard refresh route protected, layout Admin/Student đọc cookie server-side, gọi `GET /me` với `cache: no-store`, kiểm tra role và truyền `initialUser` cho shared route guard. Vì vậy HTML đầu tiên có shell/loading state thay vì div nền rỗng chờ browser hydrate.
+14. Register student/parent gọi endpoint tạo tài khoản thật; khi thành công UI hiển thị toast rồi redirect về `/login`. Forgot password gửi tên đăng nhập/số điện thoại, họ tên và khối lớp; nếu 3 thông tin khớp database thì API trả reset token để UI chuyển ngay sang bước đổi mật khẩu, còn mismatch trả lỗi cho toast. Reset password dùng token đó hoặc token từ URL/email nếu có.
 
 ## Front-end
 
@@ -50,7 +70,8 @@ UI tách thành:
 - field/helper/option nội bộ lần lượt nằm trong `apps/web/components/common/auth/`, `apps/web/features/auth/utils/`, `apps/web/features/auth/auth-form-options.ts`,
 - Zod schema trong `apps/web/features/auth/auth-schemas.ts`,
 - auth API wrappers trong `apps/web/features/auth/api/`,
-- auth session store trong `apps/web/features/auth/session/`,
+- auth session store, cookie bridge và server verification trong `apps/web/features/auth/session/`,
+- Next.js session bridge route trong `apps/web/app/api/auth/session/route.ts`,
 - protected route guard dùng chung trong `apps/web/components/common/auth/authenticated-route-guard.tsx` và hook `useAuthGuard`,
 - guest route guard trong `apps/web/components/common/auth/guest-route-guard.tsx` để chặn user đã đăng nhập quay lại login/register/forgot/reset,
 - API envelope/error parser dùng chung trong `apps/web/lib/api-client.ts`,
@@ -96,6 +117,9 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - API response luôn qua envelope `{ data, meta }`, nên front-end dùng `apiRequest<T>()` để lấy đúng `data` và chuyển error envelope thành `ApiRequestError`.
 - Auth mutation dùng TanStack Query để có pending/error state rõ. Không optimistic UI cho auth vì đây là flow bảo mật và cần server xác nhận.
 - Login token raw chỉ nên lưu phía client sau khi API trả thành công. Store hiện tại dùng Zustand cho state runtime và browser storage cho persistence theo lựa chọn ghi nhớ đăng nhập.
+- Protected SSR không được chỉ decode role từ JWT rồi tin kết quả. Web có thể đọc `exp`/shape để từ chối token sai sớm, nhưng phải gọi `GET /me` để backend verify chữ ký, trạng thái user và role trước khi render shell có quyền.
+- Cookie token `HttpOnly` là bản cầu nối cho Server Component; API client phía browser hiện vẫn dùng session trong browser storage để gắn Bearer token. Khi logout phải xóa cả hai nguồn và chờ route xóa cookie hoàn tất trước khi redirect.
+- Component phụ thuộc DOM API như `react-pdf/pdfjs` phải được tách vào dynamic import `ssr: false`; chỉ thêm `"use client"` không ngăn Next.js đánh giá module trong quá trình SSR. Nếu không, hard refresh route Admin có thể trả `500 DOMMatrix is not defined` rồi client mới phục hồi, tạo cảm giác nháy/trắng khó thấy khi chỉ test sau hydrate.
 - Khi `/task-connect` một UI đã được owner duyệt, API/client phải thích nghi với UI đó. Không tự thêm field hoặc xóa field trên form chỉ vì DTO hiện tại chưa khớp; nếu contract thiếu thì sửa contract/API hoặc map payload rõ ràng.
 - Password không được lưu plain text; repo dùng `scrypt` với salt riêng khi tạo tài khoản mới.
 - Seed dev cũ cũng dùng format `scrypt`, nên AuthService vẫn verify được user seed.
@@ -123,6 +147,8 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - Nếu màn protected hiện error state như "Chưa tải được danh sách" sau khi để máy lâu, kiểm tra access token đã hết hạn chưa. Đúng flow là Query/Mutation nhận 401, provider clear session, route guard đưa về `/login`; không để từng feature tự kiểm `statusCode === 401` rải rác.
 - Nếu đã đăng nhập mà browser Back hoặc gõ tay `/login`/`/register/...` vẫn thấy form auth, thiếu guard ở `(auth)/layout.tsx`. Đúng flow là auth layout kiểm session, gọi `/me`, rồi redirect user hợp lệ về màn theo role.
 - Nếu trang admin vẫn đọc được dữ liệu nhưng mutation báo "Chưa đăng nhập", kiểm tra đồng thời ba lớp: route-group admin phải còn `AuthenticatedRouteGuard`, query không được fallback sang token giả, và controller admin phải có `JwtAuthGuard + RolesGuard + @Roles(UserRole.ADMIN)`. Không để GET mở công khai che giấu session rỗng rồi chỉ lỗi khi POST/PATCH cần `@CurrentUser`.
+- Nếu F5 route protected nháy nền trắng nhưng điều hướng client bình thường, kiểm tra HTML response đầu tiên: layout có verify cookie qua `/me` và render shell chưa, hay `AuthenticatedRouteGuard` vẫn trả div rỗng đến khi Zustand hydrate.
+- Nếu route Admin động trả `500` ở request HTML nhưng vài trăm mili giây sau vẫn hiện nội dung, kiểm tra trace/network thay vì chỉ nhìn DOM cuối. Lỗi `DOMMatrix is not defined` cho biết `pdfjs` đã lọt vào server bundle; tách implementation viewer thành client-only dynamic module.
 
 ## File quan trọng
 
@@ -141,12 +167,15 @@ M2.3 chưa thêm worker email riêng. Với UI quên mật khẩu đã duyệt, 
 - `apps/web/app/(auth)/reset-password/page.tsx`
 - `apps/web/features/auth/screens/`
 - `apps/web/features/auth/api/`, `components/`, `data/`, `schemas/`, `session/`, `layout/`, `utils/`
+- `apps/web/app/api/auth/session/route.ts`
 - `apps/web/components/common/auth/authenticated-route-guard.tsx`
 - `apps/web/components/common/auth/guest-route-guard.tsx`
 - `apps/web/features/auth/session/use-auth-guard.ts`
 - `apps/web/features/auth/session/auth-session-errors.ts`
 - `apps/web/lib/api-client.ts`
 - `apps/web/app/providers.tsx`
+- `apps/web/components/shared/pdf-page-preview.tsx`
+- `apps/web/components/shared/pdf-page-preview-client.tsx`
 - `docs/api/auth-profile.md`
 
 ## Task liên quan

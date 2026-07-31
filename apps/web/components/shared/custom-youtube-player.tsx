@@ -25,6 +25,7 @@ import {
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 
 const STUDENT_START_ANIMATION_FALLBACK_MS = 1300;
+const YOUTUBE_PLAYER_INIT_TIMEOUT_MS = 12_000;
 const STUDENT_START_ANIMATION_NAMES = new Set([
   "student-video-loading-mascot",
   "student-video-loading-mascot-reduced",
@@ -81,6 +82,7 @@ interface CustomYoutubePlayerProps {
   settings?: CustomVideoSettings | null;
   title?: string;
   startButtonVariant?: "default" | "student";
+  onError?: () => void;
   onPlaybackTimeChange?: (timeInSeconds: number) => void;
 }
 
@@ -99,7 +101,14 @@ export const CustomYoutubePlayer = forwardRef<
   CustomYoutubePlayerHandle,
   CustomYoutubePlayerProps
 >(function CustomYoutubePlayer(
-  { videoUrl, settings, title, startButtonVariant = "default", onPlaybackTimeChange },
+  {
+    videoUrl,
+    settings,
+    title,
+    startButtonVariant = "default",
+    onError,
+    onPlaybackTimeChange,
+  },
   ref,
 ) {
   const rawSettings = { ...DEFAULT_CUSTOM_VIDEO_SETTINGS, ...settings };
@@ -240,6 +249,15 @@ export const CustomYoutubePlayer = forwardRef<
   };
 
   const videoId = getVideoId(videoUrl);
+  const handlePlayerError = useCallback(() => {
+    onError?.();
+  }, [onError]);
+
+  useEffect(() => {
+    if (!videoId && videoUrl.trim()) {
+      handlePlayerError();
+    }
+  }, [handlePlayerError, videoId, videoUrl]);
 
   useEffect(() => {
     if (!videoId) return;
@@ -247,9 +265,15 @@ export const CustomYoutubePlayer = forwardRef<
 
     let isMounted = true;
     let checkTimeout: NodeJS.Timeout;
+    const initFailureTimeout = setTimeout(() => {
+      if (isMounted && (!window.YT || !window.YT.Player)) {
+        handlePlayerError();
+      }
+    }, YOUTUBE_PLAYER_INIT_TIMEOUT_MS);
 
     const tryInitPlayer = () => {
       if (window.YT && window.YT.Player) {
+        clearTimeout(initFailureTimeout);
         if (isMounted) initPlayer();
       } else {
         checkTimeout = setTimeout(tryInitPlayer, 100);
@@ -272,6 +296,7 @@ export const CustomYoutubePlayer = forwardRef<
     return () => {
       isMounted = false;
       if (checkTimeout) clearTimeout(checkTimeout);
+      clearTimeout(initFailureTimeout);
       if (firstStartUiTimeoutRef.current) {
         clearTimeout(firstStartUiTimeoutRef.current);
         firstStartUiTimeoutRef.current = null;
@@ -288,7 +313,7 @@ export const CustomYoutubePlayer = forwardRef<
         playerRef.current = null;
       }
     };
-  }, [videoId, currentSettings.isDisabled]);
+  }, [currentSettings.isDisabled, handlePlayerError, videoId]);
 
   const initPlayer = () => {
     if (!playerNodeRef.current || !window.YT) return;
@@ -399,6 +424,7 @@ export const CustomYoutubePlayer = forwardRef<
           }
           setIsStarting(false);
           setIsPlaying(false);
+          handlePlayerError();
         },
       },
     });
@@ -756,6 +782,7 @@ export const CustomYoutubePlayer = forwardRef<
           className="w-full h-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
+          onError={handlePlayerError}
         ></iframe>
       </div>
     );

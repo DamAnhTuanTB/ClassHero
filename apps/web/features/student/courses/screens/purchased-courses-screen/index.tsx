@@ -15,24 +15,30 @@ import {
   buildTodayLearningGoals,
   getPurchasedCourses,
 } from "@/features/student/shared/utils/student-courses-utils";
+import type { StudentCoursesListResult } from "@/features/student/shared/types/student-course-api-results";
 import type { AppThemeMode } from "@/lib/theme-store";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function PurchasedCoursesScreen({
+  initialData,
+  initialStudentName,
   initialThemeMode = "light",
 }: {
+  initialData?: StudentCoursesListResult | null;
+  initialStudentName?: string | null;
   initialThemeMode?: AppThemeMode;
 }) {
-  const { isAuthHydrated, query: coursesQuery, session } = useStudentCoursesQuery();
+  const { isAuthHydrated, query: coursesQuery, session } =
+    useStudentCoursesQuery(initialData);
   const prefetchCourseDetail = useStudentCourseDetailPrefetch();
   const courses = coursesQuery.data?.courses ?? [];
   const purchasedCourses = getPurchasedCourses(courses);
   const likelyNextCourseSlug = purchasedCourses[0]?.slug;
-  const studentName = session?.user.fullName ?? "bạn";
+  const studentName = session?.user.fullName ?? initialStudentName ?? "bạn";
   const todayGoals = buildTodayLearningGoals(courses);
   const screenBackground = "var(--student-screen-bg)";
-  const isInitialPending = !isAuthHydrated || coursesQuery.isLoading;
-  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
+  const isInitialPending =
+    coursesQuery.data === undefined &&
+    (!isAuthHydrated || coursesQuery.isLoading);
 
   useEffect(() => {
     if (likelyNextCourseSlug) {
@@ -40,7 +46,7 @@ export function PurchasedCoursesScreen({
     }
   }, [likelyNextCourseSlug, prefetchCourseDetail]);
 
-  if (isInitialPending || shouldShowInitialLoading) {
+  if (isInitialPending) {
     return (
       <main
         aria-busy="true"
@@ -52,11 +58,7 @@ export function PurchasedCoursesScreen({
           style={{ background: screenBackground }}
         >
           <StudentCoursesHeader title="Học tập" initialThemeMode={initialThemeMode} />
-          {shouldShowInitialLoading ? (
-            <PurchasedCoursesSkeleton />
-          ) : (
-            <div className="min-h-[calc(100svh-6rem)]" />
-          )}
+          <PurchasedCoursesSkeleton />
         </div>
       </main>
     );

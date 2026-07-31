@@ -20,7 +20,6 @@ import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { LessonDocumentsFields } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-documents-fields";
 import { prepareLessonFormValuesForSubmit } from "@/features/admin/courses/utils/prepare-lesson-form-values";
-import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
 
 export function LessonDocumentsTab({
   learningPathId,
@@ -45,7 +44,6 @@ export function LessonDocumentsTab({
     loadAllSourcePages: viewState === "ready",
   });
   const isInitialPending = viewState === "loading" || documentsManager.isLoading;
-  const shouldShowInitialLoading = useStableLoadingVisibility(isInitialPending);
   const selectableSourceDocuments = useMemo(
     () =>
       documentsManager.sourceDocuments.filter((sourceDocument) => {
@@ -207,12 +205,8 @@ export function LessonDocumentsTab({
     void form.handleSubmit(submit)(event);
   }
 
-  if (isInitialPending || shouldShowInitialLoading) {
-    return shouldShowInitialLoading ? (
-      <LessonDocumentsSkeleton />
-    ) : (
-      <div aria-busy="true" className="min-h-72" />
-    );
+  if (isInitialPending) {
+    return <LessonDocumentsSkeleton />;
   }
 
   if (viewState === "error" || !path || !lessonMatch) {

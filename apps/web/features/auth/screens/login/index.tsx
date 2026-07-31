@@ -47,7 +47,7 @@ export function LoginForm() {
         password: values.password,
       });
 
-      saveAuthSession(response, rememberLogin);
+      await saveAuthSession(response, rememberLogin);
       const successToast = getPostLoginSuccessToast(response.user.role);
 
       toast.success(successToast.title, {
