@@ -19,6 +19,16 @@ export type StudentLearningSurface =
   | {
       kind: "flashcard-result";
       setId: string;
+    }
+  | {
+      kind: "test-runner";
+      attemptId: string;
+      setId: string;
+    }
+  | {
+      kind: "test-result";
+      attemptId: string;
+      setId: string;
     };
 export type AssessmentQuestionType =
   "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";

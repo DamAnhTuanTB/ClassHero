@@ -26,14 +26,18 @@ export function LessonNavigationControl({
 }) {
   const isPrevious = direction === "previous";
   const isBackToCourse = isPrevious && !lesson && Boolean(backHref);
+  const isFinalLesson = !isPrevious && !lesson;
   const label = isBackToCourse
     ? "Trở về"
     : isPrevious
       ? "Bài học trước"
       : "Bài học kế tiếp";
-  const fallbackTitle = isPrevious ? "Khóa học" : "Đây là bài học cuối cùng";
-  const displayTitle = lesson?.title ?? fallbackTitle;
-  const canNavigate = isBackToCourse || (Boolean(lesson) && isEnabled);
+  const fallbackTitle = isPrevious ? "Khóa học" : "Đi đến khóa học khác";
+  const displayTitle = isFinalLesson
+    ? "Đi đến khóa học khác"
+    : lesson?.title ?? fallbackTitle;
+  const canNavigate =
+    isBackToCourse || (Boolean(lesson) && isEnabled) || isFinalLesson;
   const className = cn(
     "flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-base font-black transition focus-visible:outline-none focus-visible:ring-4",
     isPrevious ? "text-left" : "justify-end text-right",
@@ -45,12 +49,16 @@ export function LessonNavigationControl({
     <>
       {isPrevious ? <ArrowLeft className="h-6 w-6 shrink-0" aria-hidden="true" /> : null}
       <span className="min-w-0">
-        <span className={cn("block", !isBackToCourse && "text-xs opacity-75")}>
-          {label}
-        </span>
-        {!isBackToCourse ? (
+        {isBackToCourse ? (
+          <span className="block">{label}</span>
+        ) : isFinalLesson ? (
           <span className="block truncate">{displayTitle}</span>
-        ) : null}
+        ) : (
+          <>
+            <span className="block text-xs opacity-75">{label}</span>
+            <span className="block truncate">{displayTitle}</span>
+          </>
+        )}
       </span>
       {!isPrevious ? (
         <ArrowRight className="h-6 w-6 shrink-0" aria-hidden="true" />
@@ -63,6 +71,18 @@ export function LessonNavigationControl({
       <Link
         href={backHref}
         aria-label={label}
+        className={className}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  if (isFinalLesson) {
+    return (
+      <Link
+        href="/student/courses"
+        aria-label={displayTitle}
         className={className}
       >
         {content}

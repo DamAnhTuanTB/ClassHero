@@ -28,7 +28,10 @@ export function parseStudentLearningSurface(
   }
   if (
     attemptId &&
-    (kind === "quiz-runner" || kind === "quiz-result")
+    (kind === "quiz-runner" ||
+      kind === "quiz-result" ||
+      kind === "test-runner" ||
+      kind === "test-result")
   ) {
     return { attemptId, kind, setId };
   }
@@ -77,7 +80,9 @@ export function isLearningSurfaceKind(
 function getSurfaceTab(
   kind: StudentLearningSurface["kind"],
 ): StudentLessonTab {
-  return kind.startsWith("quiz-") ? "quiz" : "flashcard";
+  if (kind.startsWith("quiz-")) return "quiz";
+  if (kind.startsWith("test-")) return "test";
+  return "flashcard";
 }
 
 function readSearchParam(

@@ -17,6 +17,7 @@ import {
   Star,
   Tag,
   X,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export type LearningHistoryDisplayItem = {
   completedAt: string | null;
   summary: string;
   score?: string;
+  passed?: boolean;
 };
 
 export function LearningHistoryControl({
@@ -386,6 +388,18 @@ export function LearningHistoryControl({
                         pendingActionKey === `continue:${item.id}`;
                       const isReviewPending = pendingActionKey === `review:${item.id}`;
                       const isRestartPending = pendingActionKey === `restart:${item.id}`;
+                      const parsedScore = item.score ? parseFloat(item.score) : NaN;
+                      const matchFlashcardSummary = isFlashcard && item.summary
+                        ? item.summary.match(/^(\d+)\/(\d+)\s+thẻ đã thuộc/)
+                        : null;
+                      const isFlashcardAllKnown = matchFlashcardSummary
+                        ? Number(matchFlashcardSummary[1]) >= Number(matchFlashcardSummary[2])
+                        : false;
+                      const isItemPassed =
+                        item.passed ??
+                        (isFlashcard
+                          ? isFlashcardAllKnown
+                          : !isNaN(parsedScore) && parsedScore >= 7);
 
                       return (
                         <div key={item.id}>
@@ -408,7 +422,11 @@ export function LearningHistoryControl({
                                         ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
                                         : item.state === "IN_PROGRESS"
                                           ? accentClasses.badge
-                                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+                                          : isTest || isFlashcard
+                                            ? isItemPassed
+                                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                                              : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+                                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
                                     )}
                                   >
                                     {item.state === "NOT_STARTED" ? (
@@ -418,6 +436,11 @@ export function LearningHistoryControl({
                                       />
                                     ) : item.state === "IN_PROGRESS" ? (
                                       <Clock3
+                                        className="h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                      />
+                                    ) : (isTest || isFlashcard) && !isItemPassed ? (
+                                      <XCircle
                                         className="h-3.5 w-3.5"
                                         aria-hidden="true"
                                       />
@@ -433,18 +456,21 @@ export function LearningHistoryControl({
                                         ? isFlashcard
                                           ? "Đang học"
                                           : "Đang làm"
-                                        : "Đã hoàn thành"}
+                                        : isTest
+                                          ? isItemPassed
+                                            ? "Đạt"
+                                            : "Chưa Đạt"
+                                          : isFlashcard
+                                            ? isItemPassed
+                                              ? "Đã thuộc hết"
+                                              : "Chưa thuộc hết"
+                                            : "Đã hoàn thành"}
                                   </span>
-                                  {(isTest || areAllItemsCompleted) &&
-                                  currentBadgeItemId === item.id ? (
+                                  {currentBadgeItemId === item.id ? (
                                     <span
                                       className={cn(
                                         "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-black",
-                                        isTest
-                                          ? "border border-emerald-400 bg-emerald-200 text-emerald-900 dark:border-emerald-300/60 dark:bg-emerald-400/25 dark:text-emerald-100"
-                                          : isQuiz
-                                            ? "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
-                                            : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+                                        "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
                                       )}
                                     >
                                       {isTest ? "Bài thi hiện tại" : "Bộ hiện tại"}
@@ -471,9 +497,25 @@ export function LearningHistoryControl({
                                     {item.summary}
                                   </span>
                                   {item.score ? (
-                                    <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-300">
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1.5 font-bold",
+                                        isTest
+                                          ? isItemPassed
+                                            ? "text-emerald-600 dark:text-emerald-400"
+                                            : "text-rose-600 dark:text-rose-400"
+                                          : "text-sky-600 dark:text-sky-300",
+                                      )}
+                                    >
                                       <Star
-                                        className="h-4 w-4 shrink-0"
+                                        className={cn(
+                                          "h-4 w-4 shrink-0",
+                                          isTest
+                                            ? isItemPassed
+                                              ? "text-emerald-500 dark:text-emerald-400"
+                                              : "text-rose-500 dark:text-rose-400"
+                                            : "text-sky-500 dark:text-sky-400",
+                                        )}
                                         aria-hidden="true"
                                       />
                                       {item.score}
@@ -581,7 +623,7 @@ export function LearningHistoryControl({
                                 )}
                               >
                                 <Eye className="h-5 w-5" aria-hidden="true" />
-                                Xem lại bài thi
+                                {isTest ? "Xem lại bài thi" : "Xem lại"}
                               </button>
                             )}
                           </article>

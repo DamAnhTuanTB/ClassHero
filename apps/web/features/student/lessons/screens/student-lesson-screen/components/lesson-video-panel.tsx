@@ -133,12 +133,8 @@ export function LessonVideoPanel({
                 Bài học chưa có video
               </p>
               <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-500 dark:text-[var(--theme-text-muted)] sm:text-sm sm:leading-6">
-                Bạn vẫn có thể học phần tóm tắt, Quiz và Flashcard bên dưới.
+                Bạn vẫn có thể làm Quiz, học Flashcard và hoàn thành Bài thi.
               </p>
-              <span className="mt-4 hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300 sm:inline-flex">
-                <BookOpenCheck className="h-4 w-4" aria-hidden="true" />
-                Nội dung học vẫn sẵn sàng
-              </span>
             </div>
           </div>
         </div>

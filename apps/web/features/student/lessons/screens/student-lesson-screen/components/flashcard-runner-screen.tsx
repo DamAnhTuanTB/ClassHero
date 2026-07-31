@@ -216,17 +216,9 @@ export function FlashcardRunnerScreen({
       return;
     }
 
-    const remainingIncompleteCardNumbers = incompleteCardNumbers.filter(
-      (cardNumber) => cardNumber !== currentIndex + 1,
-    );
-    if (remainingIncompleteCardNumbers.length === 0) {
-      finishSession();
-      return;
+    if (currentIndex < totalCount - 1) {
+      onNext();
     }
-
-    if (currentIndex >= totalCount - 1) return;
-
-    onNext();
   }
 
   function handleComplete() {
@@ -278,7 +270,7 @@ export function FlashcardRunnerScreen({
   );
   const isIncompleteAlertVisible =
     isIncompleteAlertRequested && incompleteCardNumbers.length > 0;
-  const isInteractionLocked = Boolean(pendingAction) || markFeedback !== null;
+  const isInteractionLocked = Boolean(pendingAction);
 
   return (
     <div
@@ -312,7 +304,7 @@ export function FlashcardRunnerScreen({
               id="flashcard-runner-title"
               className="shrink-0 whitespace-nowrap text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
             >
-              Thẻ {currentIndex + 1}/{totalCount}
+              Thẻ {currentIndex + 1}
             </h1>
             <div
               className="ml-auto flex shrink-0 items-center gap-2"
@@ -325,6 +317,9 @@ export function FlashcardRunnerScreen({
               <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-2xl border border-emerald-400/60 bg-emerald-500 px-3 py-2 text-xs font-black text-white shadow-[0_3px_0_rgb(4_120_87)]">
                 <Check className="h-4 w-4" aria-hidden="true" />
                 {knownCount}
+              </span>
+              <span className="inline-flex items-center whitespace-nowrap rounded-2xl border border-violet-300 bg-violet-200 px-3 py-2 text-xs font-black text-violet-800 shadow-[0_3px_0_rgb(196_181_253)] dark:border-violet-400/30 dark:bg-violet-500/25 dark:text-violet-200 dark:shadow-[0_3px_0_rgb(76_29_149)]">
+                {totalCount} thẻ
               </span>
             </div>
           </div>
@@ -367,7 +362,7 @@ export function FlashcardRunnerScreen({
             onClick={handleFlip}
             disabled={isInteractionLocked}
             aria-label={isBackVisible ? "Lật thẻ xem mặt trước" : "Lật thẻ xem mặt sau"}
-            className="absolute inset-0 z-0 rounded-[1.6rem] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-300 disabled:cursor-wait dark:focus-visible:ring-violet-500/40"
+            className="absolute inset-0 z-0 rounded-[1.6rem] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-violet-300 dark:focus-visible:ring-violet-500/40"
           />
           {visibleReviewStatus !== null ? (
             <motion.span
@@ -445,7 +440,7 @@ export function FlashcardRunnerScreen({
             disabled={isInteractionLocked}
             aria-label={isFavorite ? "Bỏ yêu thích thẻ" : "Yêu thích thẻ"}
             className={cn(
-              "absolute right-4 top-4 z-20 grid h-12 w-12 place-items-center rounded-full border shadow-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:cursor-wait disabled:opacity-60 dark:focus-visible:ring-violet-500/30",
+              "absolute right-4 top-4 z-20 grid h-12 w-12 place-items-center rounded-full border shadow-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:opacity-60 dark:focus-visible:ring-violet-500/30",
               isFavorite
                 ? "border-rose-200 bg-rose-50 text-rose-500 dark:border-rose-400/30 dark:bg-rose-500/10"
                 : "border-slate-200 bg-white text-slate-400 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]",
@@ -499,7 +494,7 @@ export function FlashcardRunnerScreen({
               }`}
               aria-current={index === currentIndex ? "step" : undefined}
               className={cn(
-                "relative h-3 shrink-0 rounded-full transition-[width,background-color,filter,transform] duration-200 before:absolute before:-inset-x-1 before:-inset-y-2 before:rounded-lg before:content-[''] hover:brightness-95 active:scale-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-wait disabled:opacity-100 motion-reduce:transition-none dark:focus-visible:ring-violet-500/30",
+                "relative h-3 shrink-0 rounded-full transition-[width,background-color,filter,transform] duration-200 before:absolute before:-inset-x-1 before:-inset-y-2 before:rounded-lg before:content-[''] hover:brightness-95 active:scale-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 disabled:opacity-100 motion-reduce:transition-none dark:focus-visible:ring-violet-500/30",
                 index === currentIndex ? "w-8" : "w-3",
                 status === true
                   ? "bg-emerald-400"
@@ -530,7 +525,7 @@ export function FlashcardRunnerScreen({
             disabled={isInteractionLocked}
             aria-busy={markFeedback === false || pendingAction === unknownProgressAction}
             onClick={() => void handleMark(false)}
-            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-rose-300 bg-white px-2 text-[15px] font-black text-rose-700 shadow-[0_4px_0_rgb(254_205_211)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(254_205_211)] disabled:cursor-wait dark:border-rose-400/40 dark:bg-[var(--theme-surface)] dark:text-rose-300 dark:shadow-[0_4px_0_rgb(136_19_55)] sm:text-base"
+            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-rose-300 bg-white px-2 text-[15px] font-black text-rose-700 shadow-[0_4px_0_rgb(254_205_211)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(254_205_211)] disabled:opacity-60 dark:border-rose-400/40 dark:bg-[var(--theme-surface)] dark:text-rose-300 dark:shadow-[0_4px_0_rgb(136_19_55)] sm:text-base"
           >
             <X className="h-5 w-5" aria-hidden="true" />
             Chưa thuộc
@@ -540,7 +535,7 @@ export function FlashcardRunnerScreen({
             disabled={isInteractionLocked}
             aria-busy={markFeedback === true || pendingAction === knownProgressAction}
             onClick={() => void handleMark(true)}
-            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-emerald-500 px-2 text-[15px] font-black text-white shadow-[0_4px_0_rgb(4_120_87)] transition enabled:hover:bg-emerald-400 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] disabled:cursor-wait sm:text-base"
+            className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-emerald-500 px-2 text-[15px] font-black text-white shadow-[0_4px_0_rgb(4_120_87)] transition enabled:hover:bg-emerald-400 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] disabled:opacity-60 sm:text-base"
           >
             <Check className="h-5 w-5" aria-hidden="true" />
             Đã thuộc
@@ -562,7 +557,7 @@ export function FlashcardRunnerScreen({
               type="button"
               disabled={isInteractionLocked}
               onClick={finishReview}
-              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-sm font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:cursor-wait disabled:opacity-60 sm:gap-2.5 sm:px-3 sm:text-base"
+              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-sm font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:opacity-60 sm:gap-2.5 sm:px-3 sm:text-base"
             >
               <Flag className="h-5 w-5" aria-hidden="true" />
               Kết thúc xem lại
@@ -572,7 +567,7 @@ export function FlashcardRunnerScreen({
               type="button"
               disabled={isInteractionLocked}
               onClick={handleComplete}
-              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border border-sky-400/60 bg-sky-500 px-3 text-base font-black text-white shadow-[0_5px_0_rgb(3_105_161),0_12px_22px_-10px_rgb(14_165_233_/_70%)] transition enabled:hover:bg-sky-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(3_105_161),0_6px_12px_-10px_rgb(14_165_233_/_55%)] disabled:cursor-wait disabled:opacity-60"
+              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border border-sky-400/60 bg-sky-500 px-3 text-base font-black text-white shadow-[0_5px_0_rgb(3_105_161),0_12px_22px_-10px_rgb(14_165_233_/_70%)] transition enabled:hover:bg-sky-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(3_105_161),0_6px_12px_-10px_rgb(14_165_233_/_55%)] disabled:opacity-60"
             >
               <Flag className="h-5 w-5" aria-hidden="true" />
               Hoàn thành

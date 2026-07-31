@@ -14,6 +14,7 @@ import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentQuestionCard } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-question-card";
 import { QuizExitConfirmDialog } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-exit-confirm-dialog";
+import { TestSubmitConfirmDialog } from "@/features/student/lessons/screens/student-lesson-screen/components/test-submit-confirm-dialog";
 import type {
   StudentAnswer,
   StudentTestAttempt,
@@ -53,6 +54,7 @@ export function TestRunnerScreen({
   useDocumentScrollLock();
 
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
+  const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
   const [showIncompleteAlert, setShowIncompleteAlert] = useState(false);
   const isConfirmedHistoryExitRef = useRef(false);
   const isRunnerHistoryEntryActiveRef = useRef(false);
@@ -125,13 +127,13 @@ export function TestRunnerScreen({
     onQuestionSelect(index);
   }
 
-  async function handleSubmit() {
-    if (incompleteQuestionNumbers.length > 0) {
-      setShowIncompleteAlert(true);
-      return;
-    }
-
+  function handleSubmit() {
     dismissIncompleteAlert();
+    setIsSubmitConfirmOpen(true);
+  }
+
+  async function handleConfirmSubmit() {
+    setIsSubmitConfirmOpen(false);
     const didSubmit = await onSubmit();
     if (didSubmit && isRunnerHistoryEntryActiveRef.current) {
       isSilentHistoryExitRef.current = true;
@@ -349,6 +351,14 @@ export function TestRunnerScreen({
         isOpen={isExitDialogOpen}
         onCancel={handleCancelExit}
         onConfirm={handleConfirmExit}
+      />
+
+      <TestSubmitConfirmDialog
+        incompleteQuestionNumbers={incompleteQuestionNumbers}
+        isPending={pendingAction === "submit"}
+        isOpen={isSubmitConfirmOpen}
+        onCancel={() => setIsSubmitConfirmOpen(false)}
+        onConfirm={() => void handleConfirmSubmit()}
       />
     </div>
   );

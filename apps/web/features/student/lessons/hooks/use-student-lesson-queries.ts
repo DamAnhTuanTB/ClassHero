@@ -7,6 +7,7 @@ import {
   getStudentFlashcards,
   getStudentLesson,
   getStudentTestStatus,
+  getTestHistory,
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import type { StudentLesson } from "@/features/student/lessons/types/student-lesson-types";
@@ -32,6 +33,14 @@ export const studentTestStatusQueryKey = (lessonId: string, userId?: string) => 
   "lesson",
   lessonId,
   "test-status",
+  userId ?? "guest",
+];
+
+export const studentTestHistoryQueryKey = (lessonId: string, userId?: string) => [
+  "student",
+  "lesson",
+  lessonId,
+  "test-history",
   userId ?? "guest",
 ];
 
@@ -76,6 +85,18 @@ function getStudentTestStatusQueryOptions(
     queryKey: studentTestStatusQueryKey(lessonId, userId),
     queryFn: () => getStudentTestStatus(lessonId, accessToken),
     staleTime: 30_000,
+  };
+}
+
+function getStudentTestHistoryQueryOptions(
+  lessonId: string,
+  accessToken?: string,
+  userId?: string,
+) {
+  return {
+    queryKey: studentTestHistoryQueryKey(lessonId, userId),
+    queryFn: () => getTestHistory(lessonId, accessToken ?? ""),
+    staleTime: 15_000,
   };
 }
 
@@ -155,6 +176,10 @@ export function useStudentLessonQueries(
     ...getStudentTestStatusQueryOptions(lessonId, session?.accessToken, session?.user.id),
     enabled,
   });
+  const testHistoryQuery = useQuery({
+    ...getStudentTestHistoryQueryOptions(lessonId, session?.accessToken, session?.user.id),
+    enabled,
+  });
   const prepareQuizTab = useCallback(async () => {
     const quizSets = lessonQuery.data?.quizSets ?? [];
     const storedQuizSetId = readStoredQuizActiveSetId(
@@ -228,16 +253,26 @@ export function useStudentLessonQueries(
         queryKey: studentTestStatusQueryKey(lessonId, session?.user.id),
       }),
       queryClient.invalidateQueries({
+        queryKey: studentTestHistoryQueryKey(lessonId, session?.user.id),
+      }),
+      queryClient.invalidateQueries({
         queryKey: studentLessonQueryKey(lessonId, session?.user.id),
       }),
     ]);
   }
 
+  const isFlashcardsPending = flashcardsQuery.isPending;
+
+  const isTestStatusPending = testStatusQuery.isPending;
+
   return {
     isAuthHydrated,
+    isFlashcardsPending,
+    isTestStatusPending,
     lessonQuery,
     flashcardsQuery,
     testStatusQuery,
+    testHistoryQuery,
     token: session?.accessToken ?? "",
     prepareQuizTab,
     refreshLearningProgress,

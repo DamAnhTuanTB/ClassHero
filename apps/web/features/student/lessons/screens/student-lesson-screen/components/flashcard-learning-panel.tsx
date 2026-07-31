@@ -377,13 +377,14 @@ export function FlashcardLearningPanel({
     targetSet: StudentFlashcardSet = activeSet,
     trackedSession: FlashcardStudySession | null = null,
     nextHistoryReviewTitle: string | null = null,
+    reviewSessionId: string | null = null,
   ) {
     setShouldCelebrateResult(false);
     setHistoryReviewTitle(nextHistoryReviewTitle);
     setRunnerBackDestination(backDestination);
     writeStoredFlashcardActiveSetId(lesson.id, targetSet.id, userId);
     setActiveSetId(targetSet.id);
-    setStudySessionId(trackedSession?.id ?? null);
+    setStudySessionId(trackedSession?.id ?? reviewSessionId ?? null);
     const trackedCardIds = new Set(
       trackedSession?.items.map((item) => item.flashcardId) ?? [],
     );
@@ -449,11 +450,13 @@ export function FlashcardLearningPanel({
     targetSet: StudentFlashcardSet,
     resumeExistingProgress = false,
     backDestination: Exclude<FlashcardScreen, "RUNNER"> = "PANEL",
+    restartSessionId?: string,
   ) {
     const trackedSession = await startFlashcardStudySession(
       targetSet.id,
       token,
       resumeExistingProgress,
+      restartSessionId,
     );
     startSession("ALL", backDestination, targetSet, trackedSession);
     if (historyQuery.data) void historyQuery.refetch();
@@ -612,16 +615,28 @@ export function FlashcardLearningPanel({
         await startTrackedSession(targetSet, true);
         return;
       }
+      const cardIdSet = new Set(targetSet.flashcards.map((c) => c.id));
+      const storedSession = readStoredFlashcardSession(targetSet.id, cardIdSet);
       const trackedSession = await getFlashcardStudySession(item.id, token);
       startSession("ALL", "PANEL", targetSet, trackedSession);
+      if (
+        storedSession &&
+        storedSession.sessionId === item.id &&
+        storedSession.currentIndex > 0
+      ) {
+        const safeIndex = Math.min(storedSession.currentIndex, targetSet.flashcards.length - 1);
+        setCurrentIndex(safeIndex);
+        persistSessionPatch({ nextCurrentIndex: safeIndex });
+      }
     }, `history-continue:${item.id}`);
   }
 
   function handleHistoryReview(item: LearningHistoryDisplayItem) {
     const targetSet = findHistorySet(item);
     if (!targetSet) return;
+    const sessionId = item.id.startsWith("legacy:") ? null : item.id;
     void transitionTo(
-      () => startSession("REVIEW_ALL", "PANEL", targetSet, null, item.displayName),
+      () => startSession("REVIEW_ALL", "PANEL", targetSet, null, item.displayName, sessionId),
       `history-review:${item.id}`,
     );
   }
@@ -649,16 +664,19 @@ export function FlashcardLearningPanel({
         }}
         onReviewFavorites={() =>
           void transitionTo(
-            () => startSession("FAVORITE"),
+            () => startSession("FAVORITE", "RESULT", activeSet, null, null, studySessionId),
             "review-favorites",
           )
         }
         onRestartAll={() =>
-          void transitionTo(() => startTrackedSession(activeSet), "restart-all")
+          void transitionTo(
+            () => startTrackedSession(activeSet, false, "PANEL", studySessionId ?? undefined),
+            "restart-all",
+          )
         }
         onRestartUnknown={() =>
           void transitionTo(
-            () => startSession("UNKNOWN", "RESULT"),
+            () => startSession("UNKNOWN", "RESULT", activeSet, null, null, studySessionId),
             "restart-unknown",
           )
         }
@@ -684,11 +702,8 @@ export function FlashcardLearningPanel({
         lessonTitle={lesson.title}
         onBack={() => {
           clearFlashcardRunnerHistoryMarker();
-          if (runnerBackDestination === "RESULT") {
-            setFlashcardResultHistoryMarker(activeSet.id);
-          }
           setShouldCelebrateResult(false);
-          setScreen(runnerBackDestination);
+          setScreen("PANEL");
         }}
         onComplete={() => {
           clearStoredFlashcardSession(activeSet.id);
@@ -747,6 +762,7 @@ export function FlashcardLearningPanel({
                 item.state === "IN_PROGRESS"
                   ? `${item.reviewedCount}/${item.totalCount} thẻ đã học`
                   : `${item.knownCount}/${item.totalCount} thẻ đã thuộc`,
+              passed: item.knownCount >= item.totalCount,
             }))}
             onContinue={handleHistoryContinue}
             onOpenHistory={() => {
@@ -754,7 +770,6 @@ export function FlashcardLearningPanel({
                 return historyQuery.refetch().then(() => undefined);
               }
             }}
-            onRestart={handleHistoryRestart}
             onReview={handleHistoryReview}
             pendingActionKey={
               pendingAction?.startsWith("history-")

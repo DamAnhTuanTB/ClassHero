@@ -308,12 +308,17 @@ export function QuizRunnerScreen({
                 id="quiz-question-title"
                 className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
               >
-                Câu hỏi {questionNumber}/{originalTotalCount}
+                Câu hỏi {questionNumber}
               </h1>
             </div>
-            <span className="shrink-0 rounded-2xl border border-blue-300 bg-blue-200 px-3 py-2 text-xs font-black text-blue-800 shadow-[0_3px_0_rgb(147_197_253)] dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200 dark:shadow-[0_3px_0_rgb(30_58_138)]">
-              Đã làm {answeredQuestionIds.length}
-            </span>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="rounded-2xl border border-blue-300 bg-blue-200 px-3 py-2 text-xs font-black text-blue-800 shadow-[0_3px_0_rgb(147_197_253)] dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200 dark:shadow-[0_3px_0_rgb(30_58_138)]">
+                Đã làm {answeredQuestionIds.length}
+              </span>
+              <span className="rounded-2xl border border-sky-300 bg-sky-200 px-3 py-2 text-xs font-black text-sky-800 shadow-[0_3px_0_rgb(125_211_252)] dark:border-sky-400/30 dark:bg-sky-500/25 dark:text-sky-200 dark:shadow-[0_3px_0_rgb(12_74_110)]">
+                {totalCount} câu
+              </span>
+            </div>
           </div>
 
           <div

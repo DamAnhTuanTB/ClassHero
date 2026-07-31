@@ -23,7 +23,9 @@ export default async function StudentLessonPage({
     ? "quiz"
     : initialLearningSurface?.kind.startsWith("flashcard-")
       ? "flashcard"
-      : null;
+      : initialLearningSurface?.kind.startsWith("test-")
+        ? "test"
+        : null;
   const initialTab =
     surfaceTab ??
     (validTabs.has(query.tab as StudentLessonTab)

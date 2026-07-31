@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
   Brain,
   ClipboardCheck,
@@ -26,6 +27,7 @@ import {
   useStudentTestResult,
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { useStudentLearningTransition } from "@/components/student/learning-transition/student-learning-transition-provider";
 import { QuizCurtainTransition } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-curtain-transition";
 import {
   LearningHistoryControl,
@@ -34,16 +36,22 @@ import {
 import { QuizReviewScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-review-screen";
 import { TestResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/test-result-screen";
 import { TestRunnerScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/test-runner-screen";
+import { QuizRunnerLoadingScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen";
 import type {
   AssessmentReview,
   CompletionResult,
   StudentAnswer,
+  StudentLearningSurface,
   StudentLesson,
   StudentTestAttempt,
   StudentTestResult,
   StudentTestStatus,
 } from "@/features/student/lessons/types/student-lesson-types";
 import type { PracticeTabTarget } from "@/features/student/lessons/hooks/use-practice-tab-transition";
+import {
+  getBrowserStudentLearningSurface,
+  getStudentLearningSurfaceHref,
+} from "@/features/student/lessons/utils/student-learning-surface-route";
 import {
   pickQuizTransitionVariant,
   quizTransitionTimings,
@@ -56,9 +64,18 @@ import {
 } from "@/features/student/lessons/utils/student-answer-utils";
 import { cn } from "@/lib/utils";
 
+function syncTestResultUrl(attemptId: string, testSetId: string) {
+  // Logic removed at user's request: do not sync result surface to URL
+}
+
+function clearTestSurfaceUrl() {
+  // Logic removed at user's request: do not sync result surface to URL
+}
+
 export function TestLearningPanel({
   hasFlashcardContent,
   hasQuizContent,
+  initialSurface,
   lesson,
   onProgressChanged,
   onStartPrerequisite,
@@ -67,6 +84,10 @@ export function TestLearningPanel({
 }: {
   hasFlashcardContent: boolean;
   hasQuizContent: boolean;
+  initialSurface?: Extract<
+    StudentLearningSurface,
+    { kind: "test-runner" | "test-result" }
+  > | null;
   lesson: StudentLesson;
   onProgressChanged: () => Promise<void>;
   onStartPrerequisite: (tab: PracticeTabTarget) => Promise<void>;
@@ -74,6 +95,8 @@ export function TestLearningPanel({
   token: string;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const { openLesson } = useStudentLearningTransition();
   const userId = useAuthSessionStore((state) => state.session?.user.id);
   const historyQueryKey = useMemo(
     () => ["student", "lesson", lesson.id, "test-history", userId ?? "guest"] as const,
@@ -82,7 +105,7 @@ export function TestLearningPanel({
   const historyQuery = useQuery({
     queryKey: historyQueryKey,
     queryFn: () => getTestHistory(lesson.id, token),
-    enabled: false,
+    enabled: Boolean(token) && Boolean(lesson.id),
     staleTime: 15_000,
   });
   const [attempt, setAttempt] = useState<StudentTestAttempt | null>(null);
@@ -90,6 +113,15 @@ export function TestLearningPanel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [result, setResult] = useState<StudentTestResult | null>(null);
+  const [isRestoringSurface, setIsRestoringSurface] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const surface = initialSurface ?? getBrowserStudentLearningSurface();
+    return (
+      (surface?.kind === "test-result" || surface?.kind === "test-runner") &&
+      Boolean(surface.attemptId)
+    );
+  });
+  const restoredAttemptIdRef = useRef<string | null>(null);
   const [review, setReview] = useState<(AssessmentReview & StudentTestResult) | null>(
     null,
   );
@@ -135,9 +167,8 @@ export function TestLearningPanel({
   }
 
   const handleSubmit = useCallback(
-    async (autoSubmit = false) => {
+    async (_autoSubmit = false) => {
       if (!attempt || pendingAction) return false;
-      if (!autoSubmit && !allAnswersComplete) return false;
       setPendingAction("submit");
       try {
         const submittedAnswers = attempt.questions.map((question) => ({
@@ -149,12 +180,14 @@ export function TestLearningPanel({
             } satisfies StudentAnswer),
         }));
         const nextResult = await submitStudentTest(attempt.id, submittedAnswers, token);
+        const testSetId = status?.sets[0]?.id ?? "";
         setResult(nextResult);
+        syncTestResultUrl(nextResult.id, testSetId);
         setLatestSubmittedAttemptId(nextResult.id);
         setShouldCelebrateResult(true);
         setAttempt(null);
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: historyQueryKey }),
+          queryClient.refetchQueries({ queryKey: historyQueryKey }),
           onProgressChanged(),
         ]);
         return true;
@@ -168,13 +201,13 @@ export function TestLearningPanel({
       }
     },
     [
-      allAnswersComplete,
       answers,
       attempt,
       historyQueryKey,
       onProgressChanged,
       pendingAction,
       queryClient,
+      status?.sets,
       token,
     ],
   );
@@ -192,6 +225,53 @@ export function TestLearningPanel({
       void handleSubmit(true);
     }
   }, [attempt, handleSubmit, pendingAction, remainingSeconds, result]);
+
+  useEffect(() => {
+    if (!token || result || attempt) return;
+    const surface = initialSurface ?? getBrowserStudentLearningSurface();
+    if (
+      !surface ||
+      (surface.kind !== "test-result" && surface.kind !== "test-runner") ||
+      !surface.attemptId
+    ) {
+      setIsRestoringSurface(false);
+      return;
+    }
+
+    if (restoredAttemptIdRef.current === surface.attemptId) {
+      setIsRestoringSurface(false);
+      return;
+    }
+
+    let isCancelled = false;
+    restoredAttemptIdRef.current = surface.attemptId;
+    setPendingAction("restore-result");
+
+    void reviewStudentTest(surface.attemptId, "ALL", token)
+      .then((restoredResult) => {
+        if (!isCancelled && restoredResult) {
+          setShouldCelebrateResult(false);
+          setResult(restoredResult);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        // ALWAYS clear restoring flags, but only reset pending action if we were the ones who set it
+        setIsRestoringSurface(false);
+        if (!isCancelled) {
+          setPendingAction((prev) => (prev === "restore-result" ? null : prev));
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+      setPendingAction((prev) => (prev === "restore-result" ? null : prev));
+    };
+  }, [attempt, initialSurface, result, token]);
+
+  if (isRestoringSurface && !result && !attempt) {
+    return renderWithCurtain(<QuizRunnerLoadingScreen />);
+  }
 
   async function handleStart(pendingKey = "start") {
     if (
@@ -278,9 +358,11 @@ export function TestLearningPanel({
     setPendingAction("open-result");
     try {
       const restoredResult = await reviewStudentTest(attemptId, "ALL", token);
+      const testSetId = status?.sets[0]?.id ?? "";
       setShouldCelebrateResult(false);
       setReview(null);
       setResult(restoredResult);
+      syncTestResultUrl(restoredResult.id, testSetId);
     } catch (error) {
       toast.error("Chưa tải được kết quả bài thi", {
         description: getErrorMessage(error),
@@ -409,26 +491,46 @@ export function TestLearningPanel({
   }
 
   if (result) {
+    const historyMaxScore = historyQuery.data?.items
+      ? Math.max(
+          -1,
+          ...historyQuery.data.items.map((item) => item.score ?? -1),
+        )
+      : -1;
+
+    const currentBestScore = Math.max(
+      status?.bestAttempt?.score ?? -1,
+      historyMaxScore,
+      result.score,
+    );
+
     return renderWithCurtain(
       <TestResultScreen
         result={result}
+        bestScore={currentBestScore}
         pendingAction={pendingAction}
         shouldCelebrate={shouldCelebrateResult}
         onBack={() => {
           setShouldCelebrateResult(false);
           setResult(null);
+          clearTestSurfaceUrl();
         }}
         onReviewAll={() => void handleReview("ALL")}
         onReviewIncorrect={() => void handleReview("INCORRECT")}
         onStartNewTest={() => void handleStart()}
         onUseResult={() => void handleUseResult()}
+        onNextLesson={
+          lesson.navigation.next
+            ? () => void openLesson(lesson.navigation.next!.id)
+            : undefined
+        }
       />,
     );
   }
 
   if (attempt) {
     const question = attempt.questions[currentIndex];
-    if (!question) return <EmptyPanel copy="Bộ đề chưa có câu hỏi phù hợp." />;
+    if (!question) return <EmptyPanel copy="Bài thi chưa có câu hỏi phù hợp." />;
     const answer = answers[question.id];
     const answeredQuestionIds = attempt.questions.flatMap((item) =>
       isStudentAnswerComplete(item, answers[item.id]) ? [item.id] : [],
@@ -522,22 +624,29 @@ export function TestLearningPanel({
         : "Đang khóa";
   const testHistoryItems: LearningHistoryDisplayItem[] = (
     historyQuery.data?.items ?? []
-  ).map((item) => ({
-    id: item.id,
-    setId: item.setId,
-    displayName: item.displayName,
-    state: item.state,
-    startedAt: item.startedAt,
-    completedAt: item.completedAt,
-    summary:
-      item.state === "NOT_STARTED"
-        ? `${item.totalCount} câu`
-        : `${item.correctCount}/${item.totalCount} câu đúng`,
-    score:
-      item.state === "COMPLETED" && item.score !== null
-        ? `${formatTestScore(item.score)} điểm`
-        : undefined,
-  }));
+  ).map((item) => {
+    const isPassed =
+      item.state === "COMPLETED" &&
+      typeof item.score === "number" &&
+      item.score >= lesson.completionMinScore;
+    return {
+      id: item.id,
+      setId: item.setId,
+      displayName: item.displayName.replace("Bộ đề", "Bài thi"),
+      state: item.state,
+      startedAt: item.startedAt,
+      completedAt: item.completedAt,
+      summary:
+        item.state === "NOT_STARTED"
+          ? `${item.totalCount} câu`
+          : `${item.correctCount}/${item.totalCount} câu đúng`,
+      score:
+        item.state === "COMPLETED" && item.score !== null
+          ? `${formatTestScore(item.score)} điểm`
+          : undefined,
+      passed: isPassed,
+    };
+  });
 
   return renderWithCurtain(
     <>
@@ -658,11 +767,7 @@ export function TestLearningPanel({
                 onClick={() => void handleStart()}
                 className="col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-emerald-500 bg-white px-3 text-base font-black text-emerald-700 transition hover:bg-emerald-50 active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 sm:text-lg lg:col-span-1"
               >
-                {pendingAction === "start" ? (
-                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                ) : (
-                  <RefreshCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
-                )}
+                <RefreshCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
                 Làm bài thi mới
               </button>
             </>
@@ -674,11 +779,7 @@ export function TestLearningPanel({
               onClick={() => void handleStart()}
               className="student-test-cta-3d col-span-2 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-5 text-lg font-black text-white hover:bg-emerald-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {pendingAction === "start" ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
-              ) : (
-                <Play className="h-6 w-6" aria-hidden="true" />
-              )}
+              <Play className="h-6 w-6" aria-hidden="true" />
               Bắt đầu bài thi
             </button>
           )}

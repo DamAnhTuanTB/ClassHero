@@ -27,11 +27,7 @@ export function QuizExitConfirmDialog({
         ? "border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-400/20 dark:text-emerald-200"
         : "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-300/40 dark:bg-sky-400/20 dark:text-sky-200";
   const closeButtonColorClassName =
-    accent === "flashcard"
-      ? "border border-violet-300 bg-violet-100 text-violet-700 hover:bg-violet-200 dark:border-violet-300/40 dark:bg-violet-400/20 dark:text-violet-200 dark:hover:bg-violet-400/30"
-      : accent === "test"
-        ? "border border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:border-emerald-300/40 dark:bg-emerald-400/20 dark:text-emerald-200 dark:hover:bg-emerald-400/30"
-        : "theme-button-primary-subtle";
+    "text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-[var(--theme-text-muted)] dark:hover:bg-[var(--theme-surface-muted)] dark:hover:text-[var(--theme-text-strong)]";
   const confirmButtonColorClassName =
     accent === "flashcard"
       ? "bg-violet-500 text-white shadow-[var(--theme-shadow-sm)] hover:bg-violet-400 dark:bg-violet-500 dark:hover:bg-violet-400"
@@ -92,7 +88,7 @@ export function QuizExitConfirmDialog({
                 className={`grid h-10 w-10 place-items-center rounded-xl transition ${closeButtonColorClassName}`}
                 aria-label="Đóng"
               >
-                <X className="h-4 w-4" aria-hidden="true" />
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 

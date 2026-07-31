@@ -122,6 +122,7 @@ export function QuizLearningPanel({
       questionCount: 0,
     } satisfies StudentQuizSet);
   const quizSetId = activeQuizSet.id;
+  const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const attemptStatusQuery = useQuery({
     queryKey: studentQuizAttemptStatusQueryKey(quizSetId, userId),
     queryFn: () => getQuizAttemptStatus(quizSetId, token),
@@ -135,7 +136,11 @@ export function QuizLearningPanel({
     enabled: false,
     staleTime: 15_000,
   });
-  const isAttemptStatusPending = attemptStatusQuery.isLoading;
+  const isAttemptStatusPending =
+    Boolean(quizSetId && activeQuizSet.questionCount > 0) &&
+    !attemptStatusQuery.data &&
+    !attemptStatusQuery.error &&
+    (!isAuthHydrated || Boolean(token));
   const attemptStatusError = attemptStatusQuery.error;
   const shouldShowAttemptStatusLoading =
     useStableLoadingVisibility(isAttemptStatusPending);
@@ -458,6 +463,7 @@ export function QuizLearningPanel({
     targetQuizSet: StudentQuizSet = activeQuizSet,
     forceNewAttempt = false,
     actionKey = `start-${scope}`,
+    restartAttemptId?: string,
   ) {
     if (!token || pendingAction || targetQuizSet.questionCount === 0) return;
     clearQuizResultHistoryMarker();
@@ -481,6 +487,7 @@ export function QuizLearningPanel({
       scope,
       sourceAttemptId,
       forceNewAttempt,
+      restartAttemptId,
     );
     const [, prepareResult] = await Promise.allSettled([closeDelay, prepareAttempt]);
     setCurtainPhase("closed");
@@ -512,8 +519,9 @@ export function QuizLearningPanel({
     scope: "ALL" | "INCORRECT",
     sourceAttemptId?: string,
     forceNewAttempt = false,
+    restartAttemptId?: string,
   ): Promise<PreparedQuizAttempt> {
-    if (scope === "ALL" && !sourceAttemptId && !forceNewAttempt) {
+    if (scope === "ALL" && !sourceAttemptId && !forceNewAttempt && !restartAttemptId) {
       const currentAttempt = await getCurrentQuizAttempt(targetQuizSet.id, token);
       if (currentAttempt && !currentAttempt.sourceAttemptId) {
         const resumedState = createResumedQuizState(currentAttempt, targetQuizSet.id);
@@ -536,6 +544,7 @@ export function QuizLearningPanel({
     const nextAttempt = await startQuizAttempt(targetQuizSet.id, token, {
       scope,
       sourceAttemptId,
+      restartAttemptId,
     });
 
     return {
@@ -749,12 +758,6 @@ export function QuizLearningPanel({
     );
   }
 
-  function handleHistoryRestart(item: LearningHistoryDisplayItem) {
-    const source = findHistoryItem(item);
-    const targetSet = source ? findQuizSet(source.setId) : undefined;
-    if (!targetSet) return;
-    void handleStart("ALL", undefined, targetSet, true, `history-restart:${item.id}`);
-  }
 
   if (review && reviewOrigin === "RESULT") {
     return renderWithCurtain(
@@ -784,7 +787,9 @@ export function QuizLearningPanel({
         }}
         onReviewAll={() => void handleReview("ALL")}
         onReviewIncorrect={() => void handleReview("INCORRECT")}
-        onRestartAll={() => void handleStart("ALL")}
+        onRestartAll={() =>
+          void handleStart("ALL", undefined, activeQuizSet, false, "start-ALL", result.id)
+        }
         onRestartIncorrect={() => void handleStart("INCORRECT", result.id)}
         onStartNewSet={() =>
           void handleStart(
@@ -884,11 +889,8 @@ export function QuizLearningPanel({
               }))}
               onContinue={handleHistoryContinue}
               onOpenHistory={() => {
-                if (!historyQuery.data) {
-                  return historyQuery.refetch().then(() => undefined);
-                }
+                return historyQuery.refetch().then(() => undefined);
               }}
-              onRestart={handleHistoryRestart}
               onReview={handleHistoryReview}
               pendingActionKey={
                 pendingAction?.startsWith("history-")

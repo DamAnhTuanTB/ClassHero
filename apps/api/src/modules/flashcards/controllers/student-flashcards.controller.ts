@@ -56,6 +56,7 @@ export class StudentFlashcardsController {
       setId,
       user.id,
       body.resumeExistingProgress ?? false,
+      body.restartSessionId,
     );
   }
 

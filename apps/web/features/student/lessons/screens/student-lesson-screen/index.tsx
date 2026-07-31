@@ -134,25 +134,31 @@ export function StudentLessonScreen({
   const {
     flashcardsQuery,
     isAuthHydrated,
+    isFlashcardsPending,
+    isTestStatusPending,
     lessonQuery,
     prepareQuizTab,
     refreshLearningProgress,
     testStatusQuery,
+    testHistoryQuery,
     token,
   } = useStudentLessonQueries(lessonId, initialLesson);
   const isInitialPending =
     lessonQuery.data === undefined &&
     (!isAuthHydrated || lessonQuery.isLoading);
   const shouldShowFlashcardsLoading = useStableLoadingVisibility(
-    flashcardsQuery.isLoading,
+    isFlashcardsPending,
   );
-  const shouldShowTestLoading = useStableLoadingVisibility(testStatusQuery.isLoading);
+  const shouldShowTestLoading = useStableLoadingVisibility(isTestStatusPending);
   const isQuizSurfaceResume =
     learningSurface?.kind === "quiz-runner" ||
     learningSurface?.kind === "quiz-result";
   const isFlashcardSurfaceResume =
     learningSurface?.kind === "flashcard-runner" ||
     learningSurface?.kind === "flashcard-result";
+  const isTestSurfaceResume =
+    learningSurface?.kind === "test-runner" ||
+    learningSurface?.kind === "test-result";
 
   useEffect(() => {
     if (!lessonQuery.data) return;
@@ -177,22 +183,25 @@ export function StudentLessonScreen({
   }, [prepareQuizTab]);
 
   const selectTab = useCallback((tab: StudentLessonTab) => {
+    tabRequestIdRef.current += 1;
     setActiveTab(tab);
     setLearningSurface(null);
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("tab", tab);
-    nextUrl.searchParams.delete("learningSurface");
-    nextUrl.searchParams.delete("learningSetId");
-    nextUrl.searchParams.delete("learningAttemptId");
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
-    );
+    if (typeof window !== "undefined") {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("tab", tab);
+      nextUrl.searchParams.delete("learningSurface");
+      nextUrl.searchParams.delete("learningSetId");
+      nextUrl.searchParams.delete("learningAttemptId");
+      if (window.location.search !== nextUrl.search) {
+        window.history.replaceState(window.history.state, "", nextUrl.pathname + nextUrl.search);
+      }
+    }
   }, []);
+
   const handleTabSelect = useCallback(
     (tab: StudentLessonTab) => {
-      const requestId = ++tabRequestIdRef.current;
+      const requestId = tabRequestIdRef.current + 1;
+      tabRequestIdRef.current = requestId;
 
       if (tab !== "quiz" || activeTab === "quiz") {
         setPendingTab(null);
@@ -219,7 +228,8 @@ export function StudentLessonScreen({
   const practiceTabTransition = usePracticeTabTransition(selectTab);
 
   if (isInitialPending) {
-    if (isQuizSurfaceResume) return <QuizRunnerLoadingScreen />;
+    if (isQuizSurfaceResume || isTestSurfaceResume)
+      return <QuizRunnerLoadingScreen />;
     if (isFlashcardSurfaceResume) return <FlashcardRunnerLoadingScreen />;
     return <StudentLessonPageSkeleton initialThemeMode={initialThemeMode} />;
   }
@@ -248,12 +258,25 @@ export function StudentLessonScreen({
     return <FlashcardRunnerLoadingScreen />;
   }
 
-  const currentTestScore =
-    testStatusQuery.data?.latestSubmittedAttempt?.score ??
-    testStatusQuery.data?.bestAttempt?.score;
+  if (
+    isTestSurfaceResume &&
+    testStatusQuery.data === undefined &&
+    !testStatusQuery.isError
+  ) {
+    return <QuizRunnerLoadingScreen />;
+  }
+
+  const testHistoryMaxScore = testHistoryQuery.data?.items
+    ? Math.max(-1, ...testHistoryQuery.data.items.map((item) => item.score ?? -1))
+    : -1;
+
+  const bestTestScore = Math.max(
+    testStatusQuery.data?.bestAttempt?.score ?? -1,
+    testStatusQuery.data?.latestSubmittedAttempt?.score ?? -1,
+    testHistoryMaxScore,
+  );
   const hasPassedCurrentLessonTest =
-    typeof currentTestScore === "number" &&
-    currentTestScore >= lesson.completionMinScore;
+    bestTestScore >= lesson.completionMinScore;
 
   return (
     <main
@@ -402,7 +425,7 @@ export function StudentLessonScreen({
               onProgressChanged={refreshLearningProgress}
             />
           ) : activeTab === "test" ? (
-            testStatusQuery.isLoading || shouldShowTestLoading ? (
+            isTestStatusPending || shouldShowTestLoading ? (
               shouldShowTestLoading ? (
                 <LearningPanelSkeleton />
               ) : (
@@ -418,6 +441,12 @@ export function StudentLessonScreen({
                 hasQuizContent={lesson.quizSets.some(
                   (set) => set.questionCount > 0,
                 )}
+                initialSurface={
+                  learningSurface?.kind === "test-runner" ||
+                  learningSurface?.kind === "test-result"
+                    ? learningSurface
+                    : null
+                }
                 lesson={lesson}
                 status={testStatusQuery.data}
                 token={token}
@@ -425,7 +454,7 @@ export function StudentLessonScreen({
                 onProgressChanged={refreshLearningProgress}
               />
             )
-          ) : flashcardsQuery.isLoading || shouldShowFlashcardsLoading ? (
+          ) : isFlashcardsPending || shouldShowFlashcardsLoading ? (
             shouldShowFlashcardsLoading ? (
               <LearningPanelSkeleton />
             ) : (
@@ -433,7 +462,7 @@ export function StudentLessonScreen({
             )
           ) : null}
 
-          {!flashcardsQuery.isLoading &&
+          {!isFlashcardsPending &&
           !shouldShowFlashcardsLoading &&
           activeTab === "flashcard" ? (
             <div>
@@ -472,7 +501,7 @@ export function StudentLessonScreen({
                 ? "Cần hoàn thành bài thi của bài học hiện tại."
                 : "Không có bài học kế tiếp trong lộ trình."
             }
-            isEnabled={Boolean(lesson.navigation.next) && hasPassedCurrentLessonTest}
+            isEnabled={!lesson.navigation.next || hasPassedCurrentLessonTest}
             lesson={lesson.navigation.next}
           />
         </nav>

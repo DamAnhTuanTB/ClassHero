@@ -474,6 +474,53 @@ export class StudentQuizAttemptsService {
     }
 
     const attempt = await this.prisma.$transaction(async (transaction) => {
+      if (input.restartAttemptId) {
+        await transaction.quizAttempt.updateMany({
+          where: {
+            studentUserId,
+            lessonId: quizSet.lessonId,
+            status: AttemptStatus.IN_PROGRESS,
+            id: { not: input.restartAttemptId },
+          },
+          data: {
+            status: AttemptStatus.CANCELLED,
+          },
+        });
+
+        await transaction.quizAttemptAnswer.deleteMany({
+          where: { attemptId: input.restartAttemptId },
+        });
+
+        await transaction.quizAttemptAnswer.createMany({
+          data: allowedQuestionIds.map((questionId) => ({
+            attemptId: input.restartAttemptId!,
+            questionId,
+            answerJson: createPendingAnswerJson(),
+            isCorrect: false,
+          })),
+        });
+
+        return transaction.quizAttempt.update({
+          where: { id: input.restartAttemptId },
+          data: {
+            status: AttemptStatus.IN_PROGRESS,
+            currentQuestionIndex: 0,
+            startedAt: new Date(),
+            submittedAt: null,
+            correctCount: 0,
+            wrongCount: 0,
+            totalCount: allowedQuestionIds.length,
+          },
+          select: {
+            id: true,
+            startedAt: true,
+            status: true,
+            totalCount: true,
+            currentQuestionIndex: true,
+          },
+        });
+      }
+
       await transaction.quizAttempt.updateMany({
         where: sourceAttemptId
           ? {

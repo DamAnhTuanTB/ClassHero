@@ -33,6 +33,13 @@ export class StartStudentQuizAttemptDto {
   @IsOptional()
   @IsUUID()
   sourceAttemptId?: string;
+
+  @ApiPropertyOptional({
+    description: "ID lượt làm bài cũ muốn làm lại trực tiếp",
+  })
+  @IsOptional()
+  @IsUUID()
+  restartAttemptId?: string;
 }
 
 export class CheckStudentQuizAnswerDto {

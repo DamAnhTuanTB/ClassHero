@@ -558,6 +558,7 @@ export class FlashcardsService {
     flashcardSetId: string,
     studentUserId: string,
     resumeExistingProgress = false,
+    restartSessionId?: string,
   ) {
     const set = await this.prisma.flashcardSet.findFirst({
       where: {
@@ -589,6 +590,49 @@ export class FlashcardsService {
       );
     }
     await this.studentLessonAccessService.assertCanRead(set.lessonId, studentUserId);
+
+    if (restartSessionId) {
+      await this.prisma.$transaction(async (transaction) => {
+        await transaction.flashcardStudySession.updateMany({
+          where: {
+            lessonId: set.lessonId,
+            studentUserId,
+            status: AttemptStatus.IN_PROGRESS,
+            id: { not: restartSessionId },
+          },
+          data: { status: AttemptStatus.CANCELLED },
+        });
+
+        await transaction.flashcardStudySessionItem.deleteMany({
+          where: { sessionId: restartSessionId },
+        });
+
+        await transaction.flashcardStudySessionItem.createMany({
+          data: set.flashcards.map((flashcard, index) => ({
+            sessionId: restartSessionId,
+            flashcardId: flashcard.id,
+            sortOrder: flashcard.sortOrder || index,
+            isKnown: undefined,
+            reviewedAt: undefined,
+          })),
+        });
+
+        await transaction.flashcardStudySession.update({
+          where: { id: restartSessionId },
+          data: {
+            status: AttemptStatus.IN_PROGRESS,
+            startedAt: new Date(),
+            completedAt: null,
+            reviewedCount: 0,
+            knownCount: 0,
+            unknownCount: 0,
+            totalCount: set.flashcards.length,
+          },
+        });
+      });
+
+      return this.getStudentStudySession(restartSessionId, studentUserId);
+    }
 
     const savedProgress = resumeExistingProgress
       ? await this.prisma.flashcardProgress.findMany({
@@ -680,10 +724,10 @@ export class FlashcardsService {
         where: {
           sessionId,
           flashcardId,
-          session: {
+           session: {
             studentUserId,
             flashcardSetId: flashcard.flashcardSetId,
-            status: AttemptStatus.IN_PROGRESS,
+            status: { in: [AttemptStatus.IN_PROGRESS, AttemptStatus.SUBMITTED] },
           },
         },
         select: { id: true },

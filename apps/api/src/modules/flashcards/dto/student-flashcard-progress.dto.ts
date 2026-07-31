@@ -18,6 +18,11 @@ export class StartStudentFlashcardSessionDto {
   @IsOptional()
   @IsBoolean()
   resumeExistingProgress?: boolean;
+
+  @ApiPropertyOptional({ format: "uuid", description: "Reset an existing session instead of creating a new one" })
+  @IsOptional()
+  @IsUUID()
+  restartSessionId?: string;
 }
 
 export class ToggleStudentFavoriteDto {

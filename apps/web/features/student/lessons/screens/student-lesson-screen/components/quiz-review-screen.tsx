@@ -100,8 +100,7 @@ export function QuizReviewScreen({
 
       <main className="mx-auto w-full max-w-2xl px-4 py-5 pb-10 sm:px-6 sm:py-7">
         <section aria-labelledby="quiz-review-question-title">
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
+          <div className="min-w-0">
               <p
                 className={cn(
                   "text-xs font-black",
@@ -120,25 +119,10 @@ export function QuizReviewScreen({
                 className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
               >
                 {question
-                  ? `Câu hỏi ${questionNumber}/${totalCount}`
+                  ? `Câu hỏi ${questionNumber}`
                   : `Xem lại ${activityLabel}`}
               </h1>
             </div>
-            {question ? (
-              <span
-                className={cn(
-                  "shrink-0 rounded-2xl border px-3 py-2 text-xs font-black",
-                  usesEmeraldAccent
-                    ? "border-emerald-300 bg-emerald-200 text-emerald-800 shadow-[0_3px_0_rgb(110_231_183)] dark:border-emerald-300/30 dark:bg-emerald-500/20 dark:text-emerald-200 dark:shadow-[0_3px_0_rgb(6_78_59)]"
-                    : "border-blue-300 bg-blue-200 text-blue-800 shadow-[0_3px_0_rgb(147_197_253)] dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200 dark:shadow-[0_3px_0_rgb(30_58_138)]",
-                )}
-              >
-                {displayScope === "INCORRECT"
-                  ? `Câu sai ${currentIndex + 1}/${visibleQuestions.length}`
-                  : `Đã xem ${currentIndex + 1}`}
-              </span>
-            ) : null}
-          </div>
 
           {question ? (
             <div

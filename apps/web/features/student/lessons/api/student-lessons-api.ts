@@ -37,7 +37,11 @@ export function getStudentLesson(
 export function startQuizAttempt(
   quizSetId: string,
   token: string,
-  input: { scope: "ALL" | "INCORRECT"; sourceAttemptId?: string },
+  input: {
+    scope: "ALL" | "INCORRECT";
+    sourceAttemptId?: string;
+    restartAttemptId?: string;
+  },
 ) {
   return apiRequest<QuizAttempt>(
     `/student/quiz-sets/${encodeURIComponent(quizSetId)}/attempts`,
@@ -137,12 +141,13 @@ export function startFlashcardStudySession(
   setId: string,
   token: string,
   resumeExistingProgress = false,
+  restartSessionId?: string,
 ) {
   return apiRequest<FlashcardStudySession>(
     `/student/flashcard-sets/${encodeURIComponent(setId)}/sessions`,
     {
       method: "POST",
-      body: { resumeExistingProgress },
+      body: { resumeExistingProgress, restartSessionId },
       token,
     },
   );

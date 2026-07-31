@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ChevronLeft,
   Clock3,
@@ -10,8 +11,8 @@ import {
   Medal,
   RefreshCcw,
   SearchX,
-  TrendingUp,
   Trophy,
+  XCircle,
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
@@ -22,7 +23,9 @@ import { formatDuration } from "@/features/student/lessons/utils/student-answer-
 import { cn } from "@/lib/utils";
 
 export function TestResultScreen({
+  bestScore,
   onBack,
+  onNextLesson,
   onReviewAll,
   onReviewIncorrect,
   onStartNewTest,
@@ -30,11 +33,13 @@ export function TestResultScreen({
   result,
   shouldCelebrate,
 }: {
+  bestScore?: number | null;
   onBack: () => void;
   onReviewAll: () => void;
   onReviewIncorrect: () => void;
   onStartNewTest: () => void;
-  onUseResult: () => void;
+  onNextLesson?: () => void;
+  onUseResult?: () => void;
   pendingAction: string | null;
   result: StudentTestResult;
   shouldCelebrate: boolean;
@@ -46,34 +51,62 @@ export function TestResultScreen({
   );
   const resultComment = getTestResultComment(result.score);
   const ResultCommentIcon =
-    result.score >= 9 ? Trophy : result.score >= 7 ? Medal : TrendingUp;
+    result.score >= 9 ? Trophy : result.score >= 7 ? Medal : XCircle;
   const scoreRingColor = result.passed ? "rgb(16 185 129)" : "rgb(244 63 94)";
-  const actions = [
+  
+  const actions: Array<{
+    disabled: boolean;
+    fullWidth: boolean;
+    icon: typeof SearchX;
+    label: string;
+    onClick: () => void;
+    pending: boolean;
+    variant: "primary" | "teal" | "secondary";
+  }> = [
     {
       disabled: result.wrongCount === 0,
+      fullWidth: false,
       icon: SearchX,
       label: "Xem lại câu sai",
       onClick: onReviewIncorrect,
       pending: pendingAction === "review-INCORRECT",
-      primary: false,
+      variant: "secondary",
     },
     {
       disabled: false,
+      fullWidth: false,
       icon: ListChecks,
       label: "Xem lại tất cả",
       onClick: onReviewAll,
       pending: pendingAction === "review-ALL",
-      primary: false,
+      variant: "secondary",
     },
     {
       disabled: false,
+      fullWidth: true,
       icon: RefreshCcw,
       label: "Làm lại bài thi mới",
       onClick: onStartNewTest,
-      pending: pendingAction === "start",
-      primary: true,
+      pending: false,
+      variant: "primary",
     },
   ];
+
+  const isAllTimePassed =
+    result.passed || (typeof bestScore === "number" && bestScore >= 7);
+
+  if (isAllTimePassed && onNextLesson) {
+    actions.push({
+      disabled: false,
+      fullWidth: true,
+      icon: ArrowRight,
+      label: "Bài học kế tiếp",
+      onClick: onNextLesson,
+      pending: false,
+      variant: "teal",
+    });
+  }
+
   const metrics = [
     {
       className: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
@@ -178,10 +211,16 @@ export function TestResultScreen({
             ))}
           </div>
 
-          <p className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-            <Clock3 className="h-5 w-5" aria-hidden="true" />
-            Thời gian làm bài: {formatDuration(result.durationSeconds)}
-          </p>
+          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <p className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <Clock3 className="h-5 w-5 shrink-0" aria-hidden="true" />
+              Thời gian: {formatDuration(result.durationSeconds)}
+            </p>
+            <p className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              <Trophy className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+              Điểm cao nhất: {Number((bestScore != null ? Math.max(bestScore, result.score) : result.score).toFixed(2))}
+            </p>
+          </div>
         </section>
 
         {!result.passed ? (
@@ -210,10 +249,13 @@ export function TestResultScreen({
                 onClick={action.onClick}
                 className={cn(
                   "student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-45 dark:focus-visible:ring-emerald-500/30 sm:px-3 sm:text-[17px]",
-                  action.primary
-                    ? "bg-emerald-500 text-white shadow-[0_4px_0_rgb(4_120_87)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] enabled:hover:bg-emerald-400"
-                    : "student-mobile-border border border-emerald-500 bg-white text-emerald-700 shadow-[0_4px_0_rgb(167_243_208)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(167_243_208)] enabled:hover:bg-emerald-50 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_4px_0_rgb(6_78_59)] dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:enabled:hover:bg-emerald-500/10",
-                  action.primary && "col-span-2",
+                  action.variant === "primary" &&
+                    "bg-emerald-500 text-white shadow-[0_4px_0_rgb(4_120_87)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] enabled:hover:bg-emerald-400",
+                  action.variant === "teal" &&
+                    "bg-teal-600 text-white shadow-[0_4px_0_rgb(15_118_110)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(15_118_110)] enabled:hover:bg-teal-500 dark:bg-teal-700 dark:shadow-[0_4px_0_rgb(13_94_88)] dark:enabled:hover:bg-teal-600",
+                  action.variant === "secondary" &&
+                    "student-mobile-border border border-emerald-500 bg-white text-emerald-700 shadow-[0_4px_0_rgb(167_243_208)] active:translate-y-[3px] active:shadow-[0_1px_0_rgb(167_243_208)] enabled:hover:bg-emerald-50 dark:border-emerald-400 dark:bg-[var(--theme-surface)] dark:text-emerald-300 dark:shadow-[0_4px_0_rgb(6_78_59)] dark:active:shadow-[0_1px_0_rgb(6_78_59)] dark:enabled:hover:bg-emerald-500/10",
+                  action.fullWidth && "col-span-2",
                 )}
               >
                 {action.pending ? (
