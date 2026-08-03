@@ -29,6 +29,7 @@ export function ExploreCourseSection({
   onPrefetch,
   targetAudienceGrade,
   targetAudienceByCourseId,
+  targetAudienceCode,
   targetAudienceName,
   title,
   tone = "sky",
@@ -40,8 +41,9 @@ export function ExploreCourseSection({
   targetAudienceGrade?: number | null;
   targetAudienceByCourseId?: Record<
     string,
-    { grade: number | null; name: string }
+    { code: string; grade: number | null; name: string }
   >;
+  targetAudienceCode?: string;
   targetAudienceName?: string;
   title: string;
   tone?: ExploreCourseSectionTone;
@@ -71,6 +73,7 @@ export function ExploreCourseSection({
               accentCount={accentCount}
               accentIndex={accentOffset + index}
               targetAudienceGrade={courseAudience?.grade ?? targetAudienceGrade}
+              targetAudienceCode={courseAudience?.code ?? targetAudienceCode}
               targetAudienceName={courseAudience?.name ?? targetAudienceName}
             />
           );

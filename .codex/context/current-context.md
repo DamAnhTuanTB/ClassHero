@@ -34,6 +34,8 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - Với card có nhánh UI theo enrollment/`nextLesson`, phải lần theo route và điều kiện render đang hoạt động trước khi tinh chỉnh CSS; không dùng nhánh có class tương tự làm proxy cho UI thực tế.
 - Với thay đổi chỉ dành cho một màn, phải ưu tiên wrapper/variant theo screen thay vì sửa component card dùng chung, để không làm lệch màn khác đang tái sử dụng card đó.
 - Với accent của danh sách card, khi owner yêu cầu màu ngẫu nhiên riêng từng card thì phải sinh màu biến thiên theo từng card trong danh sách hiện tại, không dùng palette nhỏ luân phiên hoặc mapping màu cố định theo slug. Phải phân bổ theo tổng card đang thấy để các hue cách nhau rõ về thị giác, không chỉ khác mã màu. Nếu không có chỉ dẫn trái ngược, ưu tiên cyan → sky → blue, loại xanh lá, đỏ, tím và vàng khỏi dải sinh màu.
+- Nhãn đối tượng hướng đến của khóa học phải map theo code audience (không chỉ theo grade): từng nhãn trong toàn bộ tập Khối 3–12, Tiểu học, THCS, THPT, Toàn khối và Người đi làm phải có tone xanh dương riêng, khác biệt rõ về thị giác (hue và/hoặc độ đậm/độ sáng), không chỉ khác vài đơn vị hue. Không dùng sắc ngả xanh lá.
+- Tất cả nhãn đối tượng hướng đến dùng nền nhạt và chữ/icon xanh dương tươi có độ tương phản rõ nhưng không ngả navy quá đậm; không dùng nền đậm cho badge trong card. Riêng nhãn nhóm Tiểu học/THCS/THPT/Toàn khối/Người đi làm không dùng border.
 - Khi tái sử dụng thiết kế action/navigation giữa các activity học, chỉ đồng
   bộ cấu trúc, kích thước, độ sâu, trạng thái và nhịp tương tác; màu phải theo
   palette chủ đạo của activity đích. Ví dụ Flashcard dùng violet, không sao

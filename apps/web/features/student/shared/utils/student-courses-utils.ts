@@ -81,29 +81,50 @@ export const accessLabels: Record<StudentCourseAccess, string> = {
 };
 
 const gradeTextClasses: Record<number, string> = {
-  3: "text-rose-900 dark:text-rose-300",
-  4: "text-orange-900 dark:text-orange-300",
-  5: "text-amber-900 dark:text-amber-300",
-  6: "text-lime-900 dark:text-lime-300",
-  7: "text-blue-900 dark:text-blue-300",
-  8: "text-teal-900 dark:text-teal-300",
-  9: "text-violet-900 dark:text-violet-300",
-  10: "text-fuchsia-900 dark:text-fuchsia-300",
-  11: "text-cyan-900 dark:text-cyan-300",
-  12: "text-emerald-900 dark:text-emerald-300",
+  3: "text-[hsl(200_88%_40%)] dark:text-sky-200",
+  4: "text-[hsl(213_86%_44%)] dark:text-blue-200",
+  5: "text-[hsl(226_84%_46%)] dark:text-blue-200",
+  6: "text-[hsl(208_80%_39%)] dark:text-sky-200",
+  7: "text-[hsl(221_78%_43%)] dark:text-blue-200",
+  8: "text-[hsl(204_88%_45%)] dark:text-sky-200",
+  9: "text-[hsl(217_88%_40%)] dark:text-blue-200",
+  10: "text-[hsl(230_80%_45%)] dark:text-blue-200",
+  11: "text-[hsl(211_76%_39%)] dark:text-sky-200",
+  12: "text-[hsl(224_86%_47%)] dark:text-blue-200",
 };
 
 const gradeBadgeClasses: Record<number, string> = {
-  3: "bg-rose-50 dark:bg-rose-950/50",
-  4: "bg-orange-50 dark:bg-orange-950/50",
-  5: "bg-amber-50 dark:bg-amber-950/50",
-  6: "bg-lime-50 dark:bg-lime-950/50",
-  7: "bg-blue-50 dark:bg-blue-950/50",
-  8: "bg-teal-50 dark:bg-teal-950/50",
-  9: "bg-violet-50 dark:bg-violet-950/50",
-  10: "bg-fuchsia-50 dark:bg-fuchsia-950/50",
-  11: "bg-cyan-50 dark:bg-cyan-950/50",
-  12: "bg-emerald-50 dark:bg-emerald-950/50",
+  3: "bg-[hsl(200_100%_94%)] dark:bg-[hsl(200_74%_20%/.55)]",
+  4: "bg-[hsl(213_98%_92%)] dark:bg-[hsl(213_74%_20%/.55)]",
+  5: "bg-[hsl(226_96%_93%)] dark:bg-[hsl(226_74%_20%/.55)]",
+  6: "bg-[hsl(208_98%_94%)] dark:bg-[hsl(208_74%_20%/.55)]",
+  7: "bg-[hsl(221_96%_92%)] dark:bg-[hsl(221_74%_20%/.55)]",
+  8: "bg-[hsl(204_100%_93%)] dark:bg-[hsl(204_74%_20%/.55)]",
+  9: "bg-[hsl(217_98%_94%)] dark:bg-[hsl(217_74%_20%/.55)]",
+  10: "bg-[hsl(230_96%_92%)] dark:bg-[hsl(230_74%_20%/.55)]",
+  11: "bg-[hsl(211_94%_94%)] dark:bg-[hsl(211_74%_20%/.55)]",
+  12: "bg-[hsl(224_100%_92%)] dark:bg-[hsl(224_74%_20%/.55)]",
+};
+
+const targetAudienceTextClassesByCode: Record<string, string> = {
+  ALL_STUDENTS: "text-[hsl(215_84%_46%)] dark:text-blue-200",
+  HIGH_SCHOOL: "text-[hsl(228_76%_43%)] dark:text-blue-200",
+  PRIMARY_SCHOOL: "text-[hsl(202_84%_44%)] dark:text-sky-200",
+  SECONDARY_SCHOOL: "text-[hsl(219_82%_42%)] dark:text-blue-200",
+  WORKING_ADULT: "text-[hsl(232_76%_41%)] dark:text-blue-200",
+};
+
+const targetAudienceBadgeClassesByCode: Record<string, string> = {
+  ALL_STUDENTS:
+    "!border-0 bg-[hsl(215_98%_91%)] dark:bg-[hsl(215_74%_20%/.6)]",
+  HIGH_SCHOOL:
+    "!border-0 bg-[hsl(228_94%_91%)] dark:bg-[hsl(228_74%_20%/.6)]",
+  PRIMARY_SCHOOL:
+    "!border-0 bg-[hsl(202_98%_92%)] dark:bg-[hsl(202_74%_20%/.6)]",
+  SECONDARY_SCHOOL:
+    "!border-0 bg-[hsl(219_96%_93%)] dark:bg-[hsl(219_74%_20%/.6)]",
+  WORKING_ADULT:
+    "!border-0 bg-[hsl(232_92%_92%)] dark:bg-[hsl(232_72%_20%/.6)]",
 };
 
 export function getGradeTextClass(grade: number) {
@@ -112,6 +133,28 @@ export function getGradeTextClass(grade: number) {
 
 export function getGradeBadgeClass(grade: number) {
   return gradeBadgeClasses[grade] ?? "bg-slate-100 dark:bg-slate-800";
+}
+
+export function getTargetAudienceTextClass(
+  targetAudienceCode: string | undefined,
+  grade: number,
+) {
+  return (
+    (targetAudienceCode
+      ? targetAudienceTextClassesByCode[targetAudienceCode]
+      : undefined) ?? getGradeTextClass(grade)
+  );
+}
+
+export function getTargetAudienceBadgeClass(
+  targetAudienceCode: string | undefined,
+  grade: number,
+) {
+  return (
+    (targetAudienceCode
+      ? targetAudienceBadgeClassesByCode[targetAudienceCode]
+      : undefined) ?? getGradeBadgeClass(grade)
+  );
 }
 
 export function getSubjectBadgeClass(subject: StudentCourseSubject) {
@@ -167,7 +210,7 @@ export function getExploreAllCourseSections(
       const audience = getRecommendedAudience(course, studentGrade, targetAudiences);
 
       return audience
-        ? [[course.id, { grade: audience.grade, name: audience.name }]]
+        ? [[course.id, { code: audience.code, grade: audience.grade, name: audience.name }]]
         : [];
     }),
   );
@@ -192,6 +235,7 @@ export function getExploreAllCourseSections(
             courses: audienceCourses,
             grade: audience.grade,
             id: audience.id,
+            targetAudienceCode: audience.code,
             targetAudienceName: audience.name,
             title: getAudienceSectionTitle(audience),
             tone: getAudienceRibbonTone(audience),

@@ -184,6 +184,7 @@ export function ExploreCoursesScreen({
                     courses={audienceGroup.courses}
                     onPrefetch={prefetchCourseDetail}
                     targetAudienceGrade={audienceGroup.grade}
+                    targetAudienceCode={audienceGroup.targetAudienceCode}
                     targetAudienceName={audienceGroup.targetAudienceName}
                     title={audienceGroup.title}
                     tone={audienceGroup.tone}
@@ -209,6 +210,7 @@ export function ExploreCoursesScreen({
                       accentCount={filteredCourses.length}
                       accentIndex={index}
                       targetAudienceGrade={displayedAudience?.grade}
+                      targetAudienceCode={displayedAudience?.code}
                       targetAudienceName={displayedAudience?.name}
                     />
                   );

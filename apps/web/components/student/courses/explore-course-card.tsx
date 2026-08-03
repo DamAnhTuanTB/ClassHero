@@ -16,9 +16,9 @@ import { CourseStatusBadge } from "@/components/student/courses/course-status-ba
 import type { StudentCourse } from "@/features/student/shared/student-courses-types";
 import {
   formatVnd,
-  getGradeBadgeClass,
   getCoursePrice,
-  getGradeTextClass,
+  getTargetAudienceBadgeClass,
+  getTargetAudienceTextClass,
 } from "@/features/student/shared/utils/student-courses-utils";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,7 @@ export function ExploreCourseCard({
   onPrefetch,
   targetAudienceGrade,
   targetAudienceName,
+  targetAudienceCode,
 }: {
   accentCount?: number;
   accentIndex?: number;
@@ -47,6 +48,7 @@ export function ExploreCourseCard({
   onPrefetch?: (slug: string) => void;
   targetAudienceGrade?: number | null;
   targetAudienceName?: string;
+  targetAudienceCode?: string;
 }) {
   const isEnrolled = course.access === "completed" || course.access === "enrolled";
   const isUnderMaintenance = course.isUnderMaintenance === true;
@@ -133,8 +135,14 @@ export function ExploreCourseCard({
               data-grade={displayedTargetAudienceGrade}
               className={cn(
                 "student-grade-label inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-transparent px-2.5 py-1.5 text-sm font-extrabold leading-none lg:px-3 lg:py-1.5 lg:text-xs",
-                getGradeBadgeClass(displayedTargetAudienceGrade),
-                getGradeTextClass(displayedTargetAudienceGrade),
+                getTargetAudienceBadgeClass(
+                  targetAudienceCode,
+                  displayedTargetAudienceGrade,
+                ),
+                getTargetAudienceTextClass(
+                  targetAudienceCode,
+                  displayedTargetAudienceGrade,
+                ),
               )}
             >
               <GraduationCap className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />

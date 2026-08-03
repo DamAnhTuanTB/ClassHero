@@ -439,46 +439,6 @@
     border-color: rgb(2 132 199 / 58%) !important;
   }
 
-  [data-student-shell="true"] .student-grade-label[data-grade="3"] {
-    color: rgb(225 29 72) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="4"] {
-    color: rgb(234 88 12) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="5"] {
-    color: rgb(217 119 6) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="6"] {
-    color: rgb(101 163 13) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="7"] {
-    color: rgb(37 99 235) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="8"] {
-    color: rgb(13 148 136) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="9"] {
-    color: rgb(124 58 237) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="10"] {
-    color: rgb(192 38 211) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="11"] {
-    color: rgb(8 145 178) !important;
-  }
-
-  [data-student-shell="true"] .student-grade-label[data-grade="12"] {
-    color: rgb(5 150 105) !important;
-  }
-
   [data-student-shell="true"] .student-progress-label {
     color: rgb(71 85 105) !important;
   }
@@ -1075,46 +1035,6 @@
   border-color: rgb(2 132 199 / 58%) !important;
 }
 
-[data-student-shell="true"] .student-grade-label[data-grade="3"] {
-  color: rgb(225 29 72) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="4"] {
-  color: rgb(234 88 12) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="5"] {
-  color: rgb(217 119 6) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="6"] {
-  color: rgb(101 163 13) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="7"] {
-  color: rgb(37 99 235) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="8"] {
-  color: rgb(13 148 136) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="9"] {
-  color: rgb(124 58 237) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="10"] {
-  color: rgb(192 38 211) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="11"] {
-  color: rgb(8 145 178) !important;
-}
-
-[data-student-shell="true"] .student-grade-label[data-grade="12"] {
-  color: rgb(5 150 105) !important;
-}
-
 [data-student-shell="true"] .student-progress-label {
   color: rgb(71 85 105) !important;
 }
@@ -1516,131 +1436,131 @@
 }
 
 [data-student-shell="true"] .student-section-ribbon--audience {
-  --student-ribbon-strip: rgb(129 140 248);
-  --student-ribbon-shadow: rgb(67 56 202 / 24%);
-  --student-ribbon-top: #a5b4fc;
-  --student-ribbon-middle: #6366f1;
-  --student-ribbon-bottom: #4338ca;
+  --student-ribbon-strip: hsl(237 82% 68%);
+  --student-ribbon-shadow: hsl(237 76% 30% / 24%);
+  --student-ribbon-top: hsl(237 88% 82%);
+  --student-ribbon-middle: hsl(237 78% 52%);
+  --student-ribbon-bottom: hsl(237 72% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--high-school {
-  --student-ribbon-strip: rgb(244 114 182);
-  --student-ribbon-shadow: rgb(157 23 77 / 24%);
-  --student-ribbon-top: #f9a8d4;
-  --student-ribbon-middle: #db2777;
-  --student-ribbon-bottom: #9d174d;
+  --student-ribbon-strip: hsl(228 84% 68%);
+  --student-ribbon-shadow: hsl(228 78% 30% / 24%);
+  --student-ribbon-top: hsl(228 90% 82%);
+  --student-ribbon-middle: hsl(228 80% 52%);
+  --student-ribbon-bottom: hsl(228 74% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--secondary-school {
-  --student-ribbon-strip: rgb(129 140 248);
-  --student-ribbon-shadow: rgb(55 48 163 / 24%);
-  --student-ribbon-top: #a5b4fc;
-  --student-ribbon-middle: #4f46e5;
-  --student-ribbon-bottom: #3730a3;
+  --student-ribbon-strip: hsl(219 82% 68%);
+  --student-ribbon-shadow: hsl(219 76% 30% / 24%);
+  --student-ribbon-top: hsl(219 88% 82%);
+  --student-ribbon-middle: hsl(219 78% 52%);
+  --student-ribbon-bottom: hsl(219 72% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--primary-school {
-  --student-ribbon-strip: rgb(250 204 21);
-  --student-ribbon-shadow: rgb(133 77 14 / 24%);
-  --student-ribbon-top: #fde047;
-  --student-ribbon-middle: #ca8a04;
-  --student-ribbon-bottom: #854d0e;
+  --student-ribbon-strip: hsl(202 80% 68%);
+  --student-ribbon-shadow: hsl(202 74% 30% / 24%);
+  --student-ribbon-top: hsl(202 86% 82%);
+  --student-ribbon-middle: hsl(202 76% 52%);
+  --student-ribbon-bottom: hsl(202 70% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--all-students {
-  --student-ribbon-strip: rgb(14 165 233);
-  --student-ribbon-shadow: rgb(7 89 133 / 24%);
-  --student-ribbon-top: #38bdf8;
-  --student-ribbon-middle: #0284c7;
-  --student-ribbon-bottom: #075985;
+  --student-ribbon-strip: hsl(215 86% 68%);
+  --student-ribbon-shadow: hsl(215 80% 30% / 24%);
+  --student-ribbon-top: hsl(215 92% 82%);
+  --student-ribbon-middle: hsl(215 82% 52%);
+  --student-ribbon-bottom: hsl(215 76% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--working-adult {
-  --student-ribbon-strip: rgb(100 116 139);
-  --student-ribbon-shadow: rgb(30 41 59 / 24%);
-  --student-ribbon-top: #94a3b8;
-  --student-ribbon-middle: #475569;
-  --student-ribbon-bottom: #1e293b;
+  --student-ribbon-strip: hsl(232 84% 68%);
+  --student-ribbon-shadow: hsl(232 78% 30% / 24%);
+  --student-ribbon-top: hsl(232 90% 82%);
+  --student-ribbon-middle: hsl(232 80% 52%);
+  --student-ribbon-bottom: hsl(232 74% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-3 {
-  --student-ribbon-strip: rgb(251 113 133);
-  --student-ribbon-shadow: rgb(159 18 57 / 24%);
-  --student-ribbon-top: #fb7185;
-  --student-ribbon-middle: #e11d48;
-  --student-ribbon-bottom: #9f1239;
+  --student-ribbon-strip: hsl(200 78% 68%);
+  --student-ribbon-shadow: hsl(200 72% 30% / 24%);
+  --student-ribbon-top: hsl(200 84% 82%);
+  --student-ribbon-middle: hsl(200 74% 52%);
+  --student-ribbon-bottom: hsl(200 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-4 {
-  --student-ribbon-strip: rgb(251 146 60);
-  --student-ribbon-shadow: rgb(154 52 18 / 24%);
-  --student-ribbon-top: #fb923c;
-  --student-ribbon-middle: #ea580c;
-  --student-ribbon-bottom: #9a3412;
+  --student-ribbon-strip: hsl(213 78% 68%);
+  --student-ribbon-shadow: hsl(213 72% 30% / 24%);
+  --student-ribbon-top: hsl(213 84% 82%);
+  --student-ribbon-middle: hsl(213 74% 52%);
+  --student-ribbon-bottom: hsl(213 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-5 {
-  --student-ribbon-strip: rgb(251 191 36);
-  --student-ribbon-shadow: rgb(146 64 14 / 24%);
-  --student-ribbon-top: #fbbf24;
-  --student-ribbon-middle: #d97706;
-  --student-ribbon-bottom: #92400e;
+  --student-ribbon-strip: hsl(226 78% 68%);
+  --student-ribbon-shadow: hsl(226 72% 30% / 24%);
+  --student-ribbon-top: hsl(226 84% 82%);
+  --student-ribbon-middle: hsl(226 74% 52%);
+  --student-ribbon-bottom: hsl(226 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-6 {
-  --student-ribbon-strip: rgb(163 230 53);
-  --student-ribbon-shadow: rgb(63 98 18 / 24%);
-  --student-ribbon-top: #a3e635;
-  --student-ribbon-middle: #65a30d;
-  --student-ribbon-bottom: #3f6212;
+  --student-ribbon-strip: hsl(208 78% 68%);
+  --student-ribbon-shadow: hsl(208 72% 30% / 24%);
+  --student-ribbon-top: hsl(208 84% 82%);
+  --student-ribbon-middle: hsl(208 74% 52%);
+  --student-ribbon-bottom: hsl(208 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-7 {
-  --student-ribbon-strip: rgb(96 165 250);
-  --student-ribbon-shadow: rgb(30 58 138 / 24%);
-  --student-ribbon-top: #60a5fa;
-  --student-ribbon-middle: #2563eb;
-  --student-ribbon-bottom: #1e3a8a;
+  --student-ribbon-strip: hsl(221 78% 68%);
+  --student-ribbon-shadow: hsl(221 72% 30% / 24%);
+  --student-ribbon-top: hsl(221 84% 82%);
+  --student-ribbon-middle: hsl(221 74% 52%);
+  --student-ribbon-bottom: hsl(221 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-8 {
-  --student-ribbon-strip: rgb(45 212 191);
-  --student-ribbon-shadow: rgb(17 94 89 / 24%);
-  --student-ribbon-top: #2dd4bf;
-  --student-ribbon-middle: #0d9488;
-  --student-ribbon-bottom: #115e59;
+  --student-ribbon-strip: hsl(204 78% 68%);
+  --student-ribbon-shadow: hsl(204 72% 30% / 24%);
+  --student-ribbon-top: hsl(204 84% 82%);
+  --student-ribbon-middle: hsl(204 74% 52%);
+  --student-ribbon-bottom: hsl(204 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-9 {
-  --student-ribbon-strip: rgb(167 139 250);
-  --student-ribbon-shadow: rgb(76 29 149 / 24%);
-  --student-ribbon-top: #a78bfa;
-  --student-ribbon-middle: #7c3aed;
-  --student-ribbon-bottom: #4c1d95;
+  --student-ribbon-strip: hsl(217 78% 68%);
+  --student-ribbon-shadow: hsl(217 72% 30% / 24%);
+  --student-ribbon-top: hsl(217 84% 82%);
+  --student-ribbon-middle: hsl(217 74% 52%);
+  --student-ribbon-bottom: hsl(217 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-10 {
-  --student-ribbon-strip: rgb(232 121 249);
-  --student-ribbon-shadow: rgb(134 25 143 / 24%);
-  --student-ribbon-top: #e879f9;
-  --student-ribbon-middle: #c026d3;
-  --student-ribbon-bottom: #86198f;
+  --student-ribbon-strip: hsl(230 78% 68%);
+  --student-ribbon-shadow: hsl(230 72% 30% / 24%);
+  --student-ribbon-top: hsl(230 84% 82%);
+  --student-ribbon-middle: hsl(230 74% 52%);
+  --student-ribbon-bottom: hsl(230 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-11 {
-  --student-ribbon-strip: rgb(34 211 238);
-  --student-ribbon-shadow: rgb(21 94 117 / 24%);
-  --student-ribbon-top: #22d3ee;
-  --student-ribbon-middle: #0891b2;
-  --student-ribbon-bottom: #155e75;
+  --student-ribbon-strip: hsl(211 78% 68%);
+  --student-ribbon-shadow: hsl(211 72% 30% / 24%);
+  --student-ribbon-top: hsl(211 84% 82%);
+  --student-ribbon-middle: hsl(211 74% 52%);
+  --student-ribbon-bottom: hsl(211 68% 35%);
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-12 {
-  --student-ribbon-strip: rgb(74 222 128);
-  --student-ribbon-shadow: rgb(22 101 52 / 24%);
-  --student-ribbon-top: #4ade80;
-  --student-ribbon-middle: #16a34a;
-  --student-ribbon-bottom: #166534;
+  --student-ribbon-strip: hsl(224 78% 68%);
+  --student-ribbon-shadow: hsl(224 72% 30% / 24%);
+  --student-ribbon-top: hsl(224 84% 82%);
+  --student-ribbon-middle: hsl(224 74% 52%);
+  --student-ribbon-bottom: hsl(224 68% 35%);
 }
 
 @media (max-width: 767px) {
