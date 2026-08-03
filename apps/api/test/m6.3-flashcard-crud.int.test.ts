@@ -4,7 +4,6 @@ import {
   Difficulty,
   PublishStatus,
   ReviewStatus,
-  Subject,
   UserRole,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,6 +11,7 @@ import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
 import type { FlashcardRequestContext } from "#api/modules/flashcards/types/flashcard.types";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 describe("M6.3 flashcard CRUD integration", () => {
   let moduleRef: TestingModule;
@@ -56,12 +56,12 @@ describe("M6.3 flashcard CRUD integration", () => {
       },
     });
     studentUserId = student.id;
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 8);
     const learningPath = await prisma.learningPath.create({
       data: {
         title: `M6.3 Path ${suffix}`,
         slug: `m6-3-path-${suffix}`,
-        subject: Subject.MATH,
-        grade: 8,
+        ...courseCatalog,
         originalPriceVnd: 100_000,
       },
     });

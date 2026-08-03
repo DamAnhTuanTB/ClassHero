@@ -4,7 +4,6 @@ import {
   AiExplanationTargetType,
   Difficulty,
   QuestionType,
-  Subject,
   UserRole,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,6 +11,7 @@ import { AppModule } from "#api/app.module";
 import type { RequestContext } from "#api/common/api/request-context";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { TestsService } from "#api/modules/tests/services/tests.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 describe("M6.4 test CRUD integration", () => {
   let moduleRef: TestingModule;
@@ -44,12 +44,12 @@ describe("M6.4 test CRUD integration", () => {
       },
     });
     actorUserId = actor.id;
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 8);
     const learningPath = await prisma.learningPath.create({
       data: {
         title: `M6.4 Path ${suffix}`,
         slug: `m6-4-path-${suffix}`,
-        subject: Subject.MATH,
-        grade: 8,
+        ...courseCatalog,
         originalPriceVnd: 100_000,
       },
     });

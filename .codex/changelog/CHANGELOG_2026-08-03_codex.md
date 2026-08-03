@@ -6,3 +6,4 @@
 - 2026-08-03: Thay môn/lớp cố định bằng catalog Lĩnh vực và Đối tượng hướng đến, bổ sung metadata lịch học, quản trị lĩnh vực và bộ lọc động cho khóa học.
 - 2026-08-03: Hoàn thiện flow thanh toán payOS với tạo/đối soát đơn, webhook idempotent, màn kết quả học sinh và quyền học sau thanh toán.
 - 2026-08-03: Đồng nhất skeleton xám và các trạng thái lỗi/điều hướng hồi phục ở bề mặt học tập của học sinh.
+- 2026-08-03: Migration fixture test API sang catalog Lĩnh vực và Đối tượng hướng đến, đồng thời đồng bộ assertion lịch sử bài thi.

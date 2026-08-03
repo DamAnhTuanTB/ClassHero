@@ -5,13 +5,13 @@ import {
   LearningPathKind,
   PaymentStatus,
   PublishStatus,
-  Subject,
   UserRole,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { WebhookPaymentsService } from "#api/modules/payments/services/webhook-payments.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 describe("M8.3 Webhook Payments Service Integration", () => {
   let moduleRef: TestingModule;
@@ -36,6 +36,7 @@ describe("M8.3 Webhook Payments Service Integration", () => {
     webhookPaymentsService = moduleRef.get(WebhookPaymentsService);
 
     // Seed data
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 10);
     const [student, lp] = await Promise.all([
       prisma.user.create({
         data: {
@@ -53,8 +54,7 @@ describe("M8.3 Webhook Payments Service Integration", () => {
           status: PublishStatus.PUBLISHED,
           originalPriceVnd: 500000,
           salePriceVnd: 299000,
-          subject: Subject.MATH,
-          grade: 10,
+          ...courseCatalog,
           publishedAt: new Date(),
         },
       }),

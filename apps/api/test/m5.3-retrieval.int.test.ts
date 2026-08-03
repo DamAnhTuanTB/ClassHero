@@ -9,7 +9,6 @@ import {
   FileStatus,
   FileVisibility,
   PublishStatus,
-  Subject,
   UserRole,
   UserStatus,
 } from "@prisma/client";
@@ -19,6 +18,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
 import type { AiService } from "#api/modules/ai/services/ai.service";
 import { RetrievalService } from "#api/modules/ai/services/retrieval.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 const embeddingModel = "text-embedding-3-small";
 const embeddingDimensions = 1536;
@@ -144,17 +144,17 @@ async function createFixture(prisma: PrismaService) {
       passwordHash: "test-only",
     },
   });
+  const courseCatalog = await createTestCourseCatalogRelation(prisma, 7);
   await prisma.learningPath.create({
     data: {
       id: ids.learningPath,
-      subject: Subject.MATH,
-      grade: 7,
+      ...courseCatalog,
       title: "M5 retrieval fixture",
       slug: `m5-retrieval-${testRunId}`,
       originalPriceVnd: 100_000,
       status: PublishStatus.PUBLISHED,
-      createdById: ids.user,
-      updatedById: ids.user,
+      createdBy: { connect: { id: ids.user } },
+      updatedBy: { connect: { id: ids.user } },
     },
   });
   await prisma.learningPathChapter.create({

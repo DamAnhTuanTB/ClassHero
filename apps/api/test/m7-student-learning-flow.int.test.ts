@@ -6,7 +6,6 @@ import {
   PublishStatus,
   QuestionType,
   ReviewStatus,
-  Subject,
   UserRole,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,6 +16,7 @@ import { QuizAttemptScopeDto } from "#api/modules/quiz/dto/student-quiz-attempt.
 import { StudentQuizAttemptsService } from "#api/modules/quiz/services/student-quiz-attempts.service";
 import { StudentLessonsService } from "#api/modules/student-learning/services/student-lessons.service";
 import { StudentTestAttemptsService } from "#api/modules/tests/services/student-test-attempts.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 describe("M7 student learning flow integration", () => {
   let moduleRef: TestingModule;
@@ -63,16 +63,16 @@ describe("M7 student learning flow integration", () => {
     adminUserId = admin.id;
     studentUserId = student.id;
 
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 7);
     const path = await prisma.learningPath.create({
       data: {
         title: `M7 Path ${suffix}`,
         slug: `m7-path-${suffix}`,
-        subject: Subject.MATH,
-        grade: 7,
+        ...courseCatalog,
         originalPriceVnd: 100_000,
         status: PublishStatus.PUBLISHED,
-        createdById: admin.id,
-        updatedById: admin.id,
+        createdBy: { connect: { id: admin.id } },
+        updatedBy: { connect: { id: admin.id } },
       },
     });
     learningPathId = path.id;
@@ -683,7 +683,7 @@ describe("M7 student learning flow integration", () => {
     );
     expect(initialTestHistory.items[0]).toMatchObject({
       attemptId: null,
-      displayName: "Bộ đề 1",
+      displayName: "Bài thi 1",
       state: "NOT_STARTED",
     });
 
@@ -712,13 +712,13 @@ describe("M7 student learning flow integration", () => {
     );
     expect(historyAfterFailedAttempt.items[0]).toMatchObject({
       attemptId: null,
-      displayName: "Bộ đề 2",
+      displayName: "Bài thi 2",
       state: "NOT_STARTED",
     });
     expect(historyAfterFailedAttempt.items[1]).toMatchObject({
       id: failedAttempt.id,
       attemptId: failedAttempt.id,
-      displayName: "Bộ đề 1",
+      displayName: "Bài thi 1",
       score: 0,
       state: "COMPLETED",
     });
@@ -755,13 +755,13 @@ describe("M7 student learning flow integration", () => {
     );
     expect(historyAfterPassingAttempt.items[0]).toMatchObject({
       id: passingAttempt.id,
-      displayName: "Bộ đề 2",
+      displayName: "Bài thi 2",
       score: 10,
       state: "COMPLETED",
     });
     expect(historyAfterPassingAttempt.items.map((item) => item.displayName)).toEqual([
-      "Bộ đề 2",
-      "Bộ đề 1",
+      "Bài thi 2",
+      "Bài thi 1",
     ]);
 
     const completion = await testAttemptsService.useResult(

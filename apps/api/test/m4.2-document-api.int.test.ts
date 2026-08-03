@@ -13,7 +13,6 @@ import {
   LessonDocumentKind,
   PrismaClient,
   PublishStatus,
-  Subject,
   UserRole,
   UserStatus,
 } from "@prisma/client";
@@ -26,6 +25,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { createValidationException } from "#api/common/validation/validation-error";
 import { AuthTokenService } from "#api/modules/auth/services/auth-token.service";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 const testRunId = randomUUID();
 const ids = {
@@ -728,17 +728,17 @@ async function createFixtureData(prisma: PrismaClient) {
     ],
   });
 
+  const courseCatalog = await createTestCourseCatalogRelation(prisma, 7);
   await prisma.learningPath.create({
     data: {
       id: ids.learningPath,
-      subject: Subject.MATH,
-      grade: 7,
+      ...courseCatalog,
       title: "M4.2 Integration Path",
       slug: `m4-2-integration-${testRunId}`,
       originalPriceVnd: 1_000_000,
       status: PublishStatus.DRAFT,
-      createdById: ids.adminUser,
-      updatedById: ids.adminUser,
+      createdBy: { connect: { id: ids.adminUser } },
+      updatedBy: { connect: { id: ids.adminUser } },
     },
   });
 

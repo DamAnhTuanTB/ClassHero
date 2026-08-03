@@ -3,9 +3,10 @@ import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/common/prisma/prisma.service";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { QuizService } from "../src/modules/quiz/services/quiz.service";
-import { QuestionType, Difficulty, UserRole, Subject } from "@prisma/client";
+import { QuestionType, Difficulty, UserRole } from "@prisma/client";
 import { RequestContext } from "../src/common/api/request-context";
 import { randomUUID } from "crypto";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 describe("M6.2 Quiz CRUD Integration Test", () => {
   let moduleRef: TestingModule;
@@ -43,11 +44,11 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     });
     testUserId = user.id;
 
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 10);
     const lp = await prisma.learningPath.create({
       data: {
         title: "Test Path",
-        subject: Subject.MATH,
-        grade: 10,
+        ...courseCatalog,
         slug: `test-path-${Date.now()}`,
         originalPriceVnd: 100000,
       },

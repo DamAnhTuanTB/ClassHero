@@ -16,7 +16,6 @@ import {
   PrismaClient,
   PublishStatus,
   QuestionType,
-  Subject,
   UserRole,
   UserStatus,
 } from "@prisma/client";
@@ -26,6 +25,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 import { MockPaymentsService } from "#api/modules/payments/services/mock-payments.service";
 import { PersonalLearningPathClonerService } from "#api/workers/services/personal-learning-path-cloner.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 const testRunId = randomUUID();
 const ids = {
@@ -221,18 +221,18 @@ async function createFixture(prisma: PrismaClient) {
       },
     ],
   });
+  const courseCatalog = await createTestCourseCatalogRelation(prisma, 7);
   await prisma.learningPath.create({
     data: {
       id: ids.basePath,
       kind: LearningPathKind.CATALOG,
-      subject: Subject.MATH,
-      grade: 7,
+      ...courseCatalog,
       title: "Khóa học gốc",
       slug: `m3-6-base-${testRunId}`,
       originalPriceVnd: 1_000_000,
       status: PublishStatus.PUBLISHED,
-      createdById: ids.admin,
-      updatedById: ids.admin,
+      createdBy: { connect: { id: ids.admin } },
+      updatedBy: { connect: { id: ids.admin } },
       totalChapterCount: 1,
       totalLessonCount: 1,
     },

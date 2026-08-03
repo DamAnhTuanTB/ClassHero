@@ -14,7 +14,6 @@ import {
   PublishStatus,
   QuestionType,
   ReviewStatus,
-  Subject,
   UserRole,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -22,6 +21,7 @@ import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
 import { StudentLessonsService } from "#api/modules/student-learning/services/student-lessons.service";
+import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
 
 describe("M6.5 student lesson content integration", () => {
   let moduleRef: TestingModule;
@@ -56,16 +56,16 @@ describe("M6.5 student lesson content integration", () => {
     trialStudentId = trialStudent.id;
     outsiderStudentId = outsiderStudent.id;
 
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 7);
     const learningPath = await prisma.learningPath.create({
       data: {
         title: `M6.5 Path ${suffix}`,
         slug: `m6-5-path-${suffix}`,
-        subject: Subject.MATH,
-        grade: 7,
+        ...courseCatalog,
         originalPriceVnd: 200_000,
         status: PublishStatus.PUBLISHED,
-        createdById: admin.id,
-        updatedById: admin.id,
+        createdBy: { connect: { id: admin.id } },
+        updatedBy: { connect: { id: admin.id } },
       },
     });
     learningPathId = learningPath.id;
@@ -438,14 +438,14 @@ describe("M6.5 student lesson content integration", () => {
   });
 
   it("isolates personalized lesson content to its delivered enrollment", async () => {
+    const courseCatalog = await createTestCourseCatalogRelation(prisma, 7);
     const personalPath = await prisma.learningPath.create({
       data: {
         kind: LearningPathKind.PERSONALIZED,
-        sourceLearningPathId: learningPathId,
+        sourceLearningPath: { connect: { id: learningPathId } },
         title: `M6.5 Personal ${suffix}`,
         slug: `m6-5-personal-${suffix}`,
-        subject: Subject.MATH,
-        grade: 7,
+        ...courseCatalog,
         originalPriceVnd: 200_000,
         status: PublishStatus.DRAFT,
       },

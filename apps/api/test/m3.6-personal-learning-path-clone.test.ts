@@ -5,7 +5,6 @@ import {
   EnrollmentStatus,
   LearningPathKind,
   PublishStatus,
-  Subject,
 } from "@prisma/client";
 import { Job } from "bullmq";
 import { describe, expect, it, vi } from "vitest";
@@ -282,8 +281,18 @@ function createEnrollmentRecord() {
       sourceLearningPathId: null,
       title: "Toán 7",
       slug: "toan-7",
-      subject: Subject.MATH,
-      grade: 7,
+      domain: { id: "domain-toan", name: "Toán", slug: "toan" },
+      targetAudiences: [
+        {
+          targetAudience: {
+            id: "audience-grade-7",
+            code: "GRADE_7",
+            name: "Khối 7",
+            grade: 7,
+            sortOrder: 7,
+          },
+        },
+      ],
       status: PublishStatus.PUBLISHED,
       totalChapterCount: 1,
       totalLessonCount: 2,
