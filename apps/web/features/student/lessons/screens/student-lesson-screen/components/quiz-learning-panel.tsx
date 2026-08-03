@@ -1069,16 +1069,16 @@ function QuizPanelSkeleton() {
     <section
       aria-busy="true"
       aria-label="Đang tải nội dung Quiz"
-      className="min-h-56 animate-pulse rounded-[1.5rem] border border-sky-100 bg-white p-4 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5"
+      className="min-h-56 animate-pulse rounded-[1.5rem] border border-[var(--theme-skeleton-strong)] bg-white p-4 dark:bg-[var(--theme-surface)] sm:p-5"
     >
       <div className="flex items-center gap-3">
-        <div className="h-11 w-11 rounded-2xl bg-sky-100 dark:bg-sky-500/15" />
-        <div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-700" />
-        <div className="ml-auto h-9 w-16 rounded-xl bg-sky-100 dark:bg-sky-500/15" />
+        <div className="h-11 w-11 rounded-2xl bg-[var(--theme-skeleton)]" />
+        <div className="h-5 w-20 rounded-full bg-[var(--theme-skeleton)]" />
+        <div className="ml-auto h-9 w-16 rounded-xl bg-[var(--theme-skeleton)]" />
       </div>
-      <div className="mt-5 h-4 w-3/4 rounded-full bg-slate-200 dark:bg-slate-700" />
-      <div className="mt-3 h-4 w-1/2 rounded-full bg-slate-100 dark:bg-slate-800" />
-      <div className="mt-6 h-14 w-full rounded-2xl bg-sky-100 dark:bg-sky-500/15" />
+      <div className="mt-5 h-4 w-3/4 rounded-full bg-[var(--theme-skeleton)]" />
+      <div className="mt-3 h-4 w-1/2 rounded-full bg-[var(--theme-skeleton-soft)]" />
+      <div className="mt-6 h-14 w-full rounded-2xl bg-[var(--theme-skeleton)]" />
     </section>
   );
 }

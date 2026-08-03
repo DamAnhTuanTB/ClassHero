@@ -1,18 +1,19 @@
 "use client";
 
 import {
-  ArrowLeft,
   BookOpen,
   Brain,
   ChevronRight,
   ClipboardCheck,
   HelpCircle,
+  Home,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StudentDetailMobileBrandBar } from "@/components/student/layout/student-detail-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
+import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
 import { usePracticeTabTransition } from "@/features/student/lessons/hooks/use-practice-tab-transition";
 import { LessonNavigationControl } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-navigation-control";
 import { LessonSummaryPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-summary-panel";
@@ -237,14 +238,31 @@ export function StudentLessonScreen({
   const lesson = lessonQuery.data;
   if (!lesson || lessonQuery.isError) {
     return (
-      <StatePage
+      <StudentFullScreenState
         initialThemeMode={initialThemeMode}
-        icon={<BookOpen className="h-8 w-8" />}
         title="Chưa mở được bài học"
-        copy={
+        description={
           lessonQuery.error instanceof Error
             ? lessonQuery.error.message
             : "Bạn kiểm tra lại quyền học hoặc quay về khóa học."
+        }
+        action={
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            <Link
+              href="/student/courses"
+              className="student-learn-cta-3d inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-600 px-5 text-sm font-black text-white"
+            >
+              <BookOpen className="h-5 w-5" aria-hidden="true" />
+              Về khóa học của tôi
+            </Link>
+            <Link
+              href="/student/explore"
+              className="student-learn-cta-3d-emerald inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white"
+            >
+              <Home className="h-5 w-5" aria-hidden="true" />
+              Về Trang chủ
+            </Link>
+          </div>
         }
       />
     );
@@ -529,16 +547,16 @@ function LearningPanelSkeleton() {
     <section
       aria-busy="true"
       aria-label="Đang tải nội dung"
-      className="min-h-56 animate-pulse rounded-[1.5rem] border border-sky-100 bg-white p-4 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:p-5"
+      className="min-h-56 animate-pulse rounded-[1.5rem] border border-[var(--theme-skeleton-strong)] bg-white p-4 dark:bg-[var(--theme-surface)] sm:p-5"
     >
       <div className="flex items-center gap-3">
-        <div className="h-11 w-11 rounded-2xl bg-slate-200 dark:bg-slate-700" />
-        <div className="h-5 w-28 rounded-full bg-slate-200 dark:bg-slate-700" />
-        <div className="ml-auto h-9 w-16 rounded-xl bg-slate-200 dark:bg-slate-700" />
+        <div className="h-11 w-11 rounded-2xl bg-[var(--theme-skeleton)]" />
+        <div className="h-5 w-28 rounded-full bg-[var(--theme-skeleton)]" />
+        <div className="ml-auto h-9 w-16 rounded-xl bg-[var(--theme-skeleton)]" />
       </div>
-      <div className="mt-5 h-4 w-3/4 rounded-full bg-slate-200 dark:bg-slate-700" />
-      <div className="mt-3 h-4 w-1/2 rounded-full bg-slate-100 dark:bg-slate-800" />
-      <div className="mt-6 h-14 w-full rounded-2xl bg-slate-200 dark:bg-slate-700" />
+      <div className="mt-5 h-4 w-3/4 rounded-full bg-[var(--theme-skeleton)]" />
+      <div className="mt-3 h-4 w-1/2 rounded-full bg-[var(--theme-skeleton-soft)]" />
+      <div className="mt-6 h-14 w-full rounded-2xl bg-[var(--theme-skeleton)]" />
     </section>
   );
 }
@@ -579,45 +597,6 @@ function StudentLessonPageSkeleton({
         <div className="mt-8">
           <LearningPanelSkeleton />
         </div>
-      </div>
-    </main>
-  );
-}
-
-function StatePage({
-  copy,
-  icon,
-  initialThemeMode,
-  title,
-}: {
-  copy: string;
-  icon: React.ReactNode;
-  initialThemeMode: AppThemeMode;
-  title: string;
-}) {
-  return (
-    <main
-      className="grid min-h-screen place-items-center px-4 py-8 sm:px-6 lg:px-8"
-      data-theme={initialThemeMode}
-      style={{ background: "var(--student-screen-bg)" }}
-    >
-      <div className="mx-auto w-full max-w-2xl rounded-[1.5rem] border border-sky-100 bg-white px-5 py-12 text-center dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300">
-          {icon}
-        </span>
-        <h1 className="mt-5 text-2xl font-black text-slate-950 dark:text-[var(--theme-text-strong)]">
-          {title}
-        </h1>
-        <p className="mt-3 text-sm font-bold leading-6 text-slate-500 dark:text-[var(--theme-text-muted)]">
-          {copy}
-        </p>
-        <Link
-          href="/student/courses"
-          className="mt-6 inline-flex min-h-12 items-center gap-2.5 whitespace-nowrap rounded-xl bg-sky-600 px-5 text-base font-black text-white"
-        >
-          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-          Về khóa học của tôi
-        </Link>
       </div>
     </main>
   );

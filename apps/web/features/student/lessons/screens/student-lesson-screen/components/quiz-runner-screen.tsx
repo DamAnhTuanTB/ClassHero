@@ -53,49 +53,49 @@ export function QuizRunnerLoadingScreen() {
       <main className="mx-auto w-full max-w-2xl animate-pulse px-4 py-5 pb-10 motion-reduce:animate-none sm:px-6 sm:py-7">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="h-3 w-32 rounded-full bg-sky-200/80 dark:bg-slate-700" />
-            <div className="mt-3 h-8 w-44 rounded-xl bg-sky-200/90 dark:bg-slate-700" />
+            <div className="h-3 w-32 rounded-full bg-[var(--theme-skeleton)]" />
+            <div className="mt-3 h-8 w-44 rounded-xl bg-[var(--theme-skeleton)]" />
           </div>
-          <div className="h-9 w-24 rounded-2xl bg-sky-200/90 dark:bg-slate-700" />
+          <div className="h-9 w-24 rounded-2xl bg-[var(--theme-skeleton)]" />
         </div>
 
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-[var(--theme-surface-muted)]">
-          <div className="h-full w-1/4 rounded-full bg-sky-400/70" />
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--theme-skeleton-soft)]">
+          <div className="h-full w-1/4 rounded-full bg-[var(--theme-skeleton-strong)]" />
         </div>
 
-        <div className="mt-5 rounded-[1.6rem] border border-sky-100 bg-white p-4 shadow-[0_24px_55px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]">
+        <div className="mt-5 rounded-[1.6rem] border border-[var(--theme-skeleton-strong)] bg-white p-4 shadow-[0_24px_55px_-42px_rgb(15_23_42_/_16%)] dark:bg-[var(--theme-surface)]">
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 items-center gap-3">
-              <div className="h-11 w-11 shrink-0 rounded-2xl bg-sky-100 dark:bg-sky-500/15" />
-              <div className="h-5 w-36 rounded-lg bg-slate-200 dark:bg-slate-700" />
+              <div className="h-11 w-11 shrink-0 rounded-2xl bg-[var(--theme-skeleton)]" />
+              <div className="h-5 w-36 rounded-lg bg-[var(--theme-skeleton)]" />
             </div>
-            <div className="h-8 w-14 rounded-xl bg-amber-100 dark:bg-amber-500/15" />
+            <div className="h-8 w-14 rounded-xl bg-[var(--theme-skeleton)]" />
           </div>
 
-          <div className="mt-8 h-6 w-2/3 rounded-lg bg-slate-200 dark:bg-slate-700" />
+          <div className="mt-8 h-6 w-2/3 rounded-lg bg-[var(--theme-skeleton)]" />
           <div className="mt-7 space-y-4">
             {Array.from({ length: 4 }, (_, index) => (
               <div
                 key={index}
-                className="h-16 rounded-2xl bg-slate-100 dark:bg-[var(--theme-surface-soft)]"
+                className="h-16 rounded-2xl bg-[var(--theme-skeleton-soft)]"
               />
             ))}
           </div>
         </div>
 
         <div className="mt-5 flex justify-center gap-2">
-          <div className="h-3 w-8 rounded-full bg-sky-400" />
+          <div className="h-3 w-8 rounded-full bg-[var(--theme-skeleton-strong)]" />
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
-              className="h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-600"
+              className="h-3 w-3 rounded-full bg-[var(--theme-skeleton)]"
             />
           ))}
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="h-12 rounded-2xl bg-white/80 dark:bg-[var(--theme-surface)]" />
-          <div className="h-12 rounded-2xl bg-sky-300/80 dark:bg-sky-800/60" />
+          <div className="h-12 rounded-2xl bg-[var(--theme-skeleton-soft)]" />
+          <div className="h-12 rounded-2xl bg-[var(--theme-skeleton)]" />
         </div>
       </main>
     </div>

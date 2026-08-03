@@ -50,13 +50,13 @@ export function FlashcardRunnerLoadingScreen() {
       </header>
 
       <main className="mx-auto w-full max-w-2xl animate-pulse px-4 py-6 motion-reduce:animate-none sm:px-6">
-        <div className="h-5 w-48 rounded-lg bg-violet-200/80 dark:bg-slate-700" />
-        <div className="mt-3 h-9 w-28 rounded-xl bg-violet-200/90 dark:bg-slate-700" />
-        <div className="mt-4 h-3 rounded-full bg-violet-200/75 dark:bg-slate-700" />
-        <div className="mt-7 h-[min(31rem,58vh)] rounded-[2rem] border border-violet-100 bg-white shadow-[0_24px_55px_-42px_rgb(124_58_237_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]">
-          <div className="mx-auto mt-[20%] h-4 w-28 rounded-full bg-violet-200 dark:bg-violet-500/20" />
-          <div className="mx-auto mt-12 h-10 w-24 rounded-xl bg-slate-200 dark:bg-slate-700" />
-          <div className="mx-auto mt-20 h-5 w-32 rounded-lg bg-slate-200 dark:bg-slate-700" />
+        <div className="h-5 w-48 rounded-lg bg-[var(--theme-skeleton)]" />
+        <div className="mt-3 h-9 w-28 rounded-xl bg-[var(--theme-skeleton)]" />
+        <div className="mt-4 h-3 rounded-full bg-[var(--theme-skeleton)]" />
+        <div className="mt-7 h-[min(31rem,58vh)] rounded-[2rem] border border-[var(--theme-skeleton-strong)] bg-white shadow-[0_24px_55px_-42px_rgb(15_23_42_/_16%)] dark:bg-[var(--theme-surface)]">
+          <div className="mx-auto mt-[20%] h-4 w-28 rounded-full bg-[var(--theme-skeleton)]" />
+          <div className="mx-auto mt-12 h-10 w-24 rounded-xl bg-[var(--theme-skeleton)]" />
+          <div className="mx-auto mt-20 h-5 w-32 rounded-lg bg-[var(--theme-skeleton)]" />
         </div>
       </main>
     </div>
