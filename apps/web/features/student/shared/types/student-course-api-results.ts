@@ -2,8 +2,10 @@ import type {
   StudentCourse,
   StudentCourseDetail,
 } from "@/features/student/shared/student-courses-types";
+import type { StudentCourseCatalogOptionsApi } from "@/features/student/shared/types/student-course-api-types";
 
 export type StudentCoursesListResult = {
+  catalog: StudentCourseCatalogOptionsApi;
   courses: StudentCourse[];
   meta: {
     page: number;

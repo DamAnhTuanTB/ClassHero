@@ -56,7 +56,7 @@ export function PdfPagePreviewClient({
 function PdfPageSkeleton({ width }: { width: number }) {
   return (
     <div
-      className="animate-pulse bg-[var(--theme-surface-soft)]"
+      className="animate-pulse bg-[var(--theme-skeleton)]"
       style={{ width, height: Math.round(width * 1.414) }}
     />
   );

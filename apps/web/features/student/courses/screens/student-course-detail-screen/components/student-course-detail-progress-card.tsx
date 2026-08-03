@@ -15,9 +15,9 @@ export function StudentCourseDetailProgressCard({
   detail: StudentCourseDetail;
 }) {
   const progress = course.progressPercent ?? 0;
-  const markerLeft = Math.min(Math.max(progress, 4), 96);
+  const markerLeft = Math.min(Math.max(progress, 0), 100);
   const progressStyle = {
-    "--student-progress-marker": `${markerLeft}%`,
+    "--student-progress-marker": `calc(${markerLeft}% - 1.75rem * (${markerLeft} / 100))`,
     "--student-progress-value": `${progress}%`,
   } as CSSProperties;
   const lessonCopy = getStudentCourseContinueLessonCopy(detail.continueLessonKind);
@@ -44,7 +44,7 @@ export function StudentCourseDetailProgressCard({
           />
         </div>
         <span
-          className="student-progress-animated-marker student-progress-star-marker absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-sky-50 text-sky-600 shadow-sm dark:bg-sky-50 dark:text-sky-600"
+          className="student-progress-animated-marker student-progress-star-marker absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-sky-50 text-sky-600 shadow-sm dark:bg-sky-50 dark:text-sky-600"
           style={progressStyle}
         >
           <Star className="h-5 w-5 fill-current" aria-hidden="true" />

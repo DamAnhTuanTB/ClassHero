@@ -10,6 +10,7 @@ import {
 import type {
   MockPurchaseResult,
   PublicLearningPathApi,
+  StudentCourseCatalogOptionsApi,
   StudentCoursesListMeta,
 } from "@/features/student/shared/types/student-course-api-types";
 
@@ -19,12 +20,18 @@ export async function listStudentLearningPaths(
   token?: string,
   options: StudentLearningPathReadOptions = {},
 ) {
-  const response = await apiRequestEnvelope<
-    PublicLearningPathApi[],
-    StudentCoursesListMeta
-  >("/learning-paths?pageSize=100", { cache: options.cache, token });
+  const [response, catalog] = await Promise.all([
+    apiRequestEnvelope<PublicLearningPathApi[], StudentCoursesListMeta>(
+      "/learning-paths?pageSize=100",
+      { cache: options.cache, token },
+    ),
+    apiRequest<StudentCourseCatalogOptionsApi>("/catalog/course-options", {
+      cache: options.cache,
+      token,
+    }),
+  ]);
 
-  return mapLearningPathsToCoursesList(response.data, response.meta);
+  return mapLearningPathsToCoursesList(response.data, response.meta, catalog);
 }
 
 export async function getStudentLearningPathDetail(

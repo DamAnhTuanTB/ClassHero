@@ -2,12 +2,11 @@
 
 import { useMemo } from "react";
 import { useStudentCoursesQuery } from "@/features/student/shared/hooks/use-student-courses-query";
-import type { StudentCourseSubjectFilter } from "@/features/student/shared/student-courses-types";
 import type { StudentCoursesListResult } from "@/features/student/shared/types/student-course-api-results";
 import { filterStudentCourses } from "@/features/student/shared/utils/student-courses-utils";
 import { useFilterSearchParams } from "@/lib/use-filter-search-params";
 
-export type StudentCourseGradeFilter = number | "ALL" | null;
+export type StudentCourseCatalogFilter = string | "ALL";
 
 export function useStudentCoursesFilter(
   initialData?: StudentCoursesListResult | null,
@@ -16,78 +15,72 @@ export function useStudentCoursesFilter(
     useStudentCoursesQuery(initialData);
   const { replaceFilterSearchParams, searchParams } = useFilterSearchParams();
   const courses = coursesQuery.data?.courses ?? [];
-  const priorityGrade =
-    coursesQuery.data?.meta.priorityGrade ??
-    coursesQuery.data?.meta.gradeGroups[0]?.grade ??
-    courses[0]?.grade ??
-    null;
-  const grade = parseGradeFilter(searchParams.get("grade")) ?? priorityGrade;
-  const activeGrade = grade === "ALL" ? null : (grade ?? priorityGrade);
+  const catalog = coursesQuery.data?.catalog ?? {
+    domains: [],
+    targetAudiences: [],
+  };
+  const studentGrade = coursesQuery.data?.meta.priorityGrade ?? null;
+  const targetAudienceId = parseCatalogFilter(
+    searchParams.get("targetAudience"),
+    catalog.targetAudiences.map((option) => option.id),
+  );
+  const domainId = parseCatalogFilter(
+    searchParams.get("domain"),
+    catalog.domains.map((option) => option.id),
+  );
   const query = searchParams.get("q") ?? "";
-  const subject = parseSubjectFilter(searchParams.get("subject"));
 
   const filteredCourses = useMemo(
     () =>
-      grade === null && priorityGrade === null
-        ? []
-        : filterStudentCourses({
-            courses,
-            grade: activeGrade,
-            query,
-            subject,
-          }),
-    [activeGrade, courses, grade, priorityGrade, query, subject],
+      filterStudentCourses({
+        courses,
+        domainId: domainId === "ALL" ? null : domainId,
+        query,
+        targetAudienceId:
+          targetAudienceId === "ALL" ? null : targetAudienceId,
+      }),
+    [courses, domainId, query, targetAudienceId],
   );
 
-  function handleGradeChange(nextGrade: Exclude<StudentCourseGradeFilter, null>) {
+  function handleTargetAudienceChange(nextTargetAudienceId: string) {
     replaceFilterSearchParams({
-      grade: nextGrade === "ALL" ? "all" : nextGrade,
+      targetAudience:
+        nextTargetAudienceId === "ALL" ? null : nextTargetAudienceId,
     });
   }
 
   return {
     coursesQuery,
+    catalog,
+    domainId,
     filteredCourses,
-    grade,
     isError: coursesQuery.isError,
     isLoading:
       coursesQuery.data === undefined &&
       (!isAuthHydrated || coursesQuery.isLoading),
     query,
     refetch: coursesQuery.refetch,
-    setGrade: handleGradeChange,
+    setDomainId: (nextDomainId: string) => {
+      replaceFilterSearchParams({
+        domain: nextDomainId === "ALL" ? null : nextDomainId,
+      });
+    },
     setQuery: (nextQuery: string) => {
       replaceFilterSearchParams({ q: nextQuery });
     },
-    setSubject: (nextSubject: StudentCourseSubjectFilter) => {
-      replaceFilterSearchParams({
-        subject: nextSubject === "ALL" ? null : nextSubject.toLowerCase(),
-      });
-    },
-    subject,
-    total: filteredCourses.length,
+    setTargetAudienceId: handleTargetAudienceChange,
+    studentGrade,
+    targetAudienceId,
   };
 }
 
-function parseGradeFilter(value: string | null): StudentCourseGradeFilter {
-  if (value?.toLowerCase() === "all") {
+function parseCatalogFilter(
+  value: string | null,
+  validIds: string[],
+): StudentCourseCatalogFilter {
+  if (!value || value.toLowerCase() === "all") {
     return "ALL";
   }
 
-  const parsedGrade = Number(value);
-
-  return Number.isInteger(parsedGrade) && parsedGrade >= 3 && parsedGrade <= 12
-    ? parsedGrade
-    : null;
-}
-
-function parseSubjectFilter(value: string | null): StudentCourseSubjectFilter {
-  switch (value?.toUpperCase()) {
-    case "MATH":
-    case "PHYSICS":
-    case "CHEMISTRY":
-      return value.toUpperCase() as StudentCourseSubjectFilter;
-    default:
-      return "ALL";
-  }
+  return validIds.includes(value) ? value : "ALL";
 }

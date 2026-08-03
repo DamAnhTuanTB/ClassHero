@@ -50,7 +50,7 @@ export function StudentCoursesHeader({
           <Link
             href="/student/notifications"
             aria-label="Thông báo"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 transition hover:text-blue-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-muted)] dark:hover:text-[var(--theme-primary)] sm:h-11 sm:w-11"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:text-blue-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 dark:text-[var(--theme-text-muted)] dark:hover:text-[var(--theme-primary)] sm:h-11 sm:w-11"
           >
             <span className="relative flex h-7 w-7 items-center justify-center">
               <Bell
@@ -69,7 +69,7 @@ export function StudentCoursesHeader({
             title={themeToggleLabel}
             data-theme-toggle="true"
             onClick={toggleTheme}
-            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-600 transition hover:text-blue-600 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-muted)] dark:hover:text-[var(--theme-primary)] sm:h-11 sm:w-11"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-600 transition hover:text-blue-600 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-muted)] dark:hover:text-[var(--theme-primary)] sm:h-11 sm:w-11 lg:hidden"
           >
             {isDarkTheme ? (
               <Sun

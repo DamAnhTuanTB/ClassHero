@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type StudentCourseSubject = "MATH" | "PHYSICS" | "CHEMISTRY";
-export type StudentCourseSubjectFilter = StudentCourseSubject | "ALL";
+export type StudentCourseSubject = string;
 export type StudentCourseAccess = "completed" | "enrolled" | "locked";
 export type StudentCourseTone = "math" | "physics" | "chemistry";
 
@@ -53,17 +52,25 @@ export type StudentCourse = {
   access: StudentCourseAccess;
   chapterCount: number;
   description: string;
+  domainId: string;
   exerciseCount: number;
   grade: number;
+  grades: number[];
   id: string;
   isUnderMaintenance?: boolean;
   lessonCount: number;
+  lessonCountMin?: number;
+  lessonCountMax?: number;
   nextLesson?: StudentCourseLesson;
   originalPriceVnd: number;
   progressPercent?: number;
   salePriceVnd?: number;
   slug: string;
   subject: StudentCourseSubject;
+  targetAudienceId: string;
+  targetAudienceIds: string[];
+  targetAudienceName: string;
+  targetAudienceNames: string[];
   thumbnailImageUrl?: string;
   title: string;
   tone: StudentCourseTone;

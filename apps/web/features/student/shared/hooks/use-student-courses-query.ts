@@ -12,6 +12,7 @@ import type {
   StudentCourseDetailResult,
   StudentCoursesListResult,
 } from "@/features/student/shared/types/student-course-api-results";
+import { ApiRequestError } from "@/lib/api-client";
 
 export const studentLearningPathsQueryKey = (userId?: string) => [
   "student",
@@ -42,6 +43,13 @@ function getStudentLearningPathDetailQueryOptions(
   return {
     queryKey: studentLearningPathDetailQueryKey(slug, userId),
     queryFn: () => getStudentLearningPathDetail(slug, accessToken),
+    retry: (failureCount: number, error: Error) => {
+      if (error instanceof ApiRequestError && error.statusCode >= 400 && error.statusCode < 500) {
+        return false;
+      }
+
+      return failureCount < 3;
+    },
     staleTime: 60_000,
   };
 }

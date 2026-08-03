@@ -31,6 +31,9 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   - API: `docs/05-api-contract.md` + `docs/api/*.md`
 - Owner đã duyệt milestone mở rộng `M15 Smart video learning`: theo dõi khoảng xem/resume, note/checkpoint theo timestamp, contextual AI, chapter summary/flashcard, semantic search, adaptive review/mastery và admin analytics. Ưu tiên `M15.1-M15.3` sau core student `M7.1-M7.5`; phần AI `M15.4-M15.8` chờ dependency `M3.8`, `M5.x`, `M9.x`.
 - UI direction là mobile-first, vẫn phải ổn trên tablet/iPad và laptop/desktop, đồng thời ưu tiên cảm giác mượt, phản hồi nhanh và độ trễ cảm nhận thấp.
+- Với card có nhánh UI theo enrollment/`nextLesson`, phải lần theo route và điều kiện render đang hoạt động trước khi tinh chỉnh CSS; không dùng nhánh có class tương tự làm proxy cho UI thực tế.
+- Với thay đổi chỉ dành cho một màn, phải ưu tiên wrapper/variant theo screen thay vì sửa component card dùng chung, để không làm lệch màn khác đang tái sử dụng card đó.
+- Với accent của danh sách card, khi owner yêu cầu màu ngẫu nhiên riêng từng card thì phải sinh màu biến thiên theo từng card trong danh sách hiện tại, không dùng palette nhỏ luân phiên hoặc mapping màu cố định theo slug. Phải phân bổ theo tổng card đang thấy để các hue cách nhau rõ về thị giác, không chỉ khác mã màu. Nếu không có chỉ dẫn trái ngược, ưu tiên cyan → sky → blue, loại xanh lá, đỏ, tím và vàng khỏi dải sinh màu.
 - Khi tái sử dụng thiết kế action/navigation giữa các activity học, chỉ đồng
   bộ cấu trúc, kích thước, độ sâu, trạng thái và nhịp tương tác; màu phải theo
   palette chủ đạo của activity đích. Ví dụ Flashcard dùng violet, không sao

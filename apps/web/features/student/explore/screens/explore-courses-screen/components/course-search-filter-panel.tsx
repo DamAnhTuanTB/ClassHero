@@ -3,34 +3,38 @@
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 import { CourseFilterSelect } from "@/features/student/explore/screens/explore-courses-screen/components/course-filter-select";
-import type { StudentCourseGradeFilter } from "@/features/student/explore/hooks/use-student-courses-filter";
-import {
-  gradeOptions,
-  subjectOptions,
-} from "@/features/student/shared/student-courses-data";
-import type { StudentCourseSubjectFilter } from "@/features/student/shared/student-courses-types";
+import type { StudentCourseCatalogOptionsApi } from "@/features/student/shared/types/student-course-api-types";
 import { cn } from "@/lib/utils";
 
 export function CourseSearchFilterPanel({
-  grade,
+  catalog,
+  domainId,
   query,
-  subject,
-  onGradeChange,
+  targetAudienceId,
+  onDomainChange,
   onQueryChange,
-  onSubjectChange,
+  onTargetAudienceChange,
 }: {
-  grade: StudentCourseGradeFilter;
+  catalog: StudentCourseCatalogOptionsApi;
+  domainId: string;
   query: string;
-  subject: StudentCourseSubjectFilter;
-  onGradeChange: (grade: Exclude<StudentCourseGradeFilter, null>) => void;
+  targetAudienceId: string;
+  onDomainChange: (domainId: string) => void;
   onQueryChange: (query: string) => void;
-  onSubjectChange: (subject: StudentCourseSubjectFilter) => void;
+  onTargetAudienceChange: (targetAudienceId: string) => void;
 }) {
-  const gradeSelectOptions = [
+  const targetAudienceOptions = [
     { label: "Tất cả", value: "ALL" },
-    ...gradeOptions.map((option) => ({
-      label: `Lớp ${option}`,
-      value: String(option),
+    ...catalog.targetAudiences.map((option) => ({
+      label: option.name,
+      value: option.id,
+    })),
+  ];
+  const domainOptions = [
+    { label: "Tất cả", value: "ALL" },
+    ...catalog.domains.map((option) => ({
+      label: option.name,
+      value: option.id,
     })),
   ];
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -70,7 +74,7 @@ export function CourseSearchFilterPanel({
               value={query}
               inputMode="search"
               autoComplete="off"
-              placeholder="Nhập khóa học, lớp, môn học,..."
+              placeholder="Nhập tên khóa học, khối lớp, môn học,..."
               className="student-filter-select-3d h-12 w-full rounded-2xl border border-sky-100 bg-white pl-12 pr-3 text-[15px] font-semibold text-slate-700 shadow-none outline-none transition placeholder:font-semibold placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-strong)] dark:focus:border-sky-500/60 dark:focus:ring-1 dark:focus:ring-sky-500/25"
               onChange={(event) => onQueryChange(event.target.value)}
             />
@@ -102,21 +106,9 @@ export function CourseSearchFilterPanel({
           <CourseFilterSelect
             ariaLabel="Chọn khối lớp"
             className="student-filter-select-3d"
-            disabled={grade === null}
-            value={grade === null ? "loading-grade" : String(grade)}
-            options={gradeSelectOptions}
-            onChange={(nextGrade) => {
-              if (nextGrade === "ALL") {
-                onGradeChange("ALL");
-                return;
-              }
-
-              const parsedGrade = Number(nextGrade);
-
-              if (Number.isFinite(parsedGrade)) {
-                onGradeChange(parsedGrade);
-              }
-            }}
+            value={targetAudienceId}
+            options={targetAudienceOptions}
+            onChange={onTargetAudienceChange}
           />
         </div>
 
@@ -127,9 +119,9 @@ export function CourseSearchFilterPanel({
           <CourseFilterSelect
             ariaLabel="Chọn môn học"
             className="student-filter-select-3d"
-            value={subject}
-            options={subjectOptions}
-            onChange={onSubjectChange}
+            value={domainId}
+            options={domainOptions}
+            onChange={onDomainChange}
           />
         </div>
       </div>

@@ -1,16 +1,16 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { BookOpen, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { CourseSearchFilterPanel } from "@/features/student/explore/screens/explore-courses-screen/components/course-search-filter-panel";
+import { ExploreCourseSection } from "@/features/student/explore/screens/explore-courses-screen/components/explore-course-section";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
 import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
+import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
 import { useStudentCoursesFilter } from "@/features/student/explore/hooks/use-student-courses-filter";
-import {
-  getExploreCourseGroups,
-  hasMixedExploreCourseAccess,
-} from "@/features/student/shared/utils/student-courses-utils";
+import { getExploreAllCourseSections } from "@/features/student/shared/utils/student-courses-utils";
 import { useStudentCourseDetailPrefetch } from "@/features/student/shared/hooks/use-student-courses-query";
 import type { StudentCoursesListResult } from "@/features/student/shared/types/student-course-api-results";
 import type { AppThemeMode } from "@/lib/theme-store";
@@ -23,26 +23,42 @@ export function ExploreCoursesScreen({
   initialThemeMode?: AppThemeMode;
 }) {
   const {
+    catalog,
     coursesQuery,
+    domainId,
     filteredCourses,
-    grade,
     isError,
     isLoading,
     query,
     refetch,
-    setGrade,
+    setDomainId,
     setQuery,
-    setSubject,
-    subject,
-    total,
+    setTargetAudienceId,
+    studentGrade,
+    targetAudienceId,
   } = useStudentCoursesFilter(initialData);
   const prefetchCourseDetail = useStudentCourseDetailPrefetch();
-  const { otherCourses, purchasedCourses } = getExploreCourseGroups(filteredCourses);
-  const apiHasMixedCourseAccess = hasMixedExploreCourseAccess(
-    coursesQuery.data?.courses ?? [],
-  );
-  const visibleHasMixedCourseAccess = hasMixedExploreCourseAccess(filteredCourses);
-  const shouldShowCourseRibbons = apiHasMixedCourseAccess && visibleHasMixedCourseAccess;
+  const isAllCoursesView = targetAudienceId === "ALL";
+  const selectedTargetAudience =
+    targetAudienceId === "ALL"
+      ? null
+      : (catalog.targetAudiences.find(
+          (audience) => audience.id === targetAudienceId,
+        ) ?? null);
+  const {
+    audienceGroups,
+    purchasedCourses,
+    recommendedCourseContexts,
+    recommendedCourses,
+  } = getExploreAllCourseSections(
+      filteredCourses,
+      studentGrade,
+      catalog.targetAudiences,
+    );
+  const allCourseCardCount =
+    purchasedCourses.length +
+    recommendedCourses.length +
+    audienceGroups.reduce((total, group) => total + group.courses.length, 0);
   const screenBackground = "var(--student-screen-bg)";
 
   if (isLoading) {
@@ -53,7 +69,7 @@ export function ExploreCoursesScreen({
         style={{ background: screenBackground }}
       >
         <div
-          className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden lg:max-w-6xl"
+          className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden md:max-w-[960px] lg:max-w-[1320px]"
           style={{ background: screenBackground }}
         >
           <StudentCoursesHeader
@@ -66,13 +82,46 @@ export function ExploreCoursesScreen({
     );
   }
 
+  if (isError) {
+    return (
+      <StudentFullScreenState
+        initialThemeMode={initialThemeMode}
+        title="Chưa tải được danh sách khóa học"
+        description="Bạn thử tải lại danh sách hoặc quay lại sau ít phút nhé."
+        action={
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              disabled={coursesQuery.isFetching}
+              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-wait disabled:opacity-70"
+            >
+              <RotateCcw
+                className={coursesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+                aria-hidden="true"
+              />
+              {coursesQuery.isFetching ? "Đang tải lại" : "Tải lại"}
+            </button>
+            <Link
+              href="/student/courses"
+              className="student-learn-cta-3d-emerald inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white transition hover:bg-emerald-400"
+            >
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+              Về khóa học của tôi
+            </Link>
+          </div>
+        }
+      />
+    );
+  }
+
   return (
     <main
       className="min-h-screen w-full min-w-0 overflow-x-hidden"
       style={{ background: screenBackground }}
     >
       <div
-        className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden lg:max-w-6xl"
+        className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden md:max-w-[960px] lg:max-w-[1320px]"
         style={{ background: screenBackground }}
       >
         <StudentCoursesHeader
@@ -82,100 +131,88 @@ export function ExploreCoursesScreen({
 
         <div className="grid min-w-0 gap-4 px-4 sm:px-6 lg:px-6">
           <CourseSearchFilterPanel
-            grade={grade}
+            catalog={catalog}
+            domainId={domainId}
             query={query}
-            subject={subject}
-            onGradeChange={setGrade}
+            targetAudienceId={targetAudienceId}
+            onDomainChange={setDomainId}
             onQueryChange={setQuery}
-            onSubjectChange={setSubject}
+            onTargetAudienceChange={setTargetAudienceId}
           />
-
-          <div className="flex min-w-0 items-center gap-2">
-            <Star
-              className="h-5 w-5 shrink-0 fill-amber-400 text-amber-400"
-              aria-hidden="true"
-            />
-            <p className="student-course-count-text min-w-0 truncate text-base font-extrabold text-sky-700 dark:text-sky-300">
-              {total} khóa học phù hợp
-            </p>
-          </div>
         </div>
 
-        {isError ? (
-          <div className="px-4 sm:px-6 lg:px-6">
-            <EmptyCourseState
-              action={
-                <button
-                  type="button"
-                  onClick={() => void refetch()}
-                  className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-                >
-                  Tải lại
-                </button>
-              }
-              isPageState
-              title="Chưa tải được danh sách khóa học"
-              description="Bạn thử tải lại danh sách hoặc quay lại sau ít phút nhé."
-            />
-          </div>
-        ) : filteredCourses.length > 0 ? (
+        {filteredCourses.length > 0 ? (
           <section
             className="grid min-w-0 gap-5 px-4 pb-2 sm:px-6 lg:px-6"
             aria-label="Danh sách tất cả khóa học"
           >
-            {shouldShowCourseRibbons ? (
+            {isAllCoursesView ? (
               <>
                 {purchasedCourses.length > 0 ? (
-                  <div className="grid min-w-0 gap-4">
-                    <div className="relative z-10 -mb-2 flex min-w-0 items-center">
-                      <h2 className="student-section-ribbon relative min-w-0 overflow-visible text-base font-extrabold text-white">
-                        <span className="relative z-10 block truncate">
-                          Khóa học đã mua
-                        </span>
-                      </h2>
-                    </div>
-                    <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
-                      {purchasedCourses.map((course) => (
-                        <ExploreCourseCard
-                          key={course.id}
-                          course={course}
-                          onPrefetch={prefetchCourseDetail}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  <ExploreCourseSection
+                    accentCount={allCourseCardCount}
+                    accentOffset={0}
+                    courses={purchasedCourses}
+                    onPrefetch={prefetchCourseDetail}
+                    title="Khóa học đã mua"
+                    tone="emerald"
+                  />
                 ) : null}
 
-                {otherCourses.length > 0 ? (
-                  <div className="grid min-w-0 gap-4">
-                    <div className="relative z-10 -mb-2 flex min-w-0 items-center">
-                      <h2 className="student-section-ribbon student-section-ribbon--emerald relative min-w-0 overflow-visible text-base font-extrabold text-white">
-                        <span className="relative z-10 block truncate">
-                          Các khóa học khác
-                        </span>
-                      </h2>
-                    </div>
-                    <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
-                      {otherCourses.map((course) => (
-                        <ExploreCourseCard
-                          key={course.id}
-                          course={course}
-                          onPrefetch={prefetchCourseDetail}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="grid min-w-0 gap-6 xl:grid-cols-2 xl:gap-10">
-                {filteredCourses.map((course) => (
-                  <ExploreCourseCard
-                    key={course.id}
-                    course={course}
+                {recommendedCourses.length > 0 ? (
+                  <ExploreCourseSection
+                    accentCount={allCourseCardCount}
+                    accentOffset={purchasedCourses.length}
+                    courses={recommendedCourses}
                     onPrefetch={prefetchCourseDetail}
+                    targetAudienceByCourseId={recommendedCourseContexts}
+                    title="Khóa học phù hợp với bạn"
+                  />
+                ) : null}
+
+                {audienceGroups.map((audienceGroup, index) => (
+                  <ExploreCourseSection
+                    accentCount={allCourseCardCount}
+                    accentOffset={
+                      purchasedCourses.length +
+                      recommendedCourses.length +
+                      audienceGroups
+                        .slice(0, index)
+                        .reduce((total, group) => total + group.courses.length, 0)
+                    }
+                    key={audienceGroup.id}
+                    courses={audienceGroup.courses}
+                    onPrefetch={prefetchCourseDetail}
+                    targetAudienceGrade={audienceGroup.grade}
+                    targetAudienceName={audienceGroup.targetAudienceName}
+                    title={audienceGroup.title}
+                    tone={audienceGroup.tone}
                   />
                 ))}
+              </>
+            ) : (
+              <div className="grid min-w-0 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredCourses.map((course, index) => {
+                  const studentAudience = catalog.targetAudiences.find(
+                    (audience) =>
+                      audience.grade === studentGrade &&
+                      course.targetAudienceIds.includes(audience.id),
+                  );
+                  const displayedAudience =
+                    selectedTargetAudience ?? studentAudience ?? null;
+
+                  return (
+                    <ExploreCourseCard
+                      key={course.id}
+                      course={course}
+                      onPrefetch={prefetchCourseDetail}
+                      accentCount={filteredCourses.length}
+                      accentIndex={index}
+                      targetAudienceGrade={displayedAudience?.grade}
+                      targetAudienceName={displayedAudience?.name}
+                    />
+                  );
+                })}
               </div>
             )}
           </section>
@@ -186,7 +223,7 @@ export function ExploreCoursesScreen({
               description={
                 coursesQuery.data?.meta.total === 0
                   ? "Hiện chưa có khóa học đã xuất bản nào để hiển thị."
-                  : "Bạn thử đổi lớp, môn học hoặc từ khóa tìm kiếm để xem thêm khóa học khác nhé."
+                  : "Bạn thử đổi khối lớp, môn học hoặc từ khóa tìm kiếm để xem thêm khóa học khác nhé."
               }
             />
           </div>

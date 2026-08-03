@@ -2,10 +2,10 @@ import {
   ArrowRight,
   CalendarDays,
   Crown,
+  GraduationCap,
   LockKeyhole,
   PlayCircle,
   Star,
-  Video,
 } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
@@ -13,57 +13,40 @@ import { CourseIllustration } from "@/components/student/courses/course-illustra
 import { CourseMetaRow } from "@/components/student/courses/course-meta-row";
 import { CourseProgressBar } from "@/components/student/courses/course-progress-bar";
 import { CourseStatusBadge } from "@/components/student/courses/course-status-badge";
-import { CourseSubjectBadge } from "@/components/student/courses/course-subject-badge";
 import type { StudentCourse } from "@/features/student/shared/student-courses-types";
 import {
   formatVnd,
+  getGradeBadgeClass,
   getCoursePrice,
   getGradeTextClass,
 } from "@/features/student/shared/utils/student-courses-utils";
 import { cn } from "@/lib/utils";
 
-const courseAccentStripClassBySlug: Record<string, string> = {
-  "hoa-9-on-thi": "bg-orange-500 dark:bg-orange-400",
-  "toan-7-nang-cao": "bg-indigo-500 dark:bg-indigo-400",
-  "toan-7-nen-tang": "bg-sky-500 dark:bg-sky-400",
-  "toan-7-tang-toc": "bg-cyan-500 dark:bg-cyan-400",
-  "vat-ly-8-nhap-mon-trial": "bg-emerald-500 dark:bg-emerald-400",
-};
+function getCourseAccentStyle(accentIndex: number, accentCount: number): CSSProperties {
+  const safeAccentCount = Math.max(accentCount, 1);
+  const hue = 180 + ((accentIndex + 0.5) / safeAccentCount) * 55;
+  const saturation = 62 + ((accentIndex * 29) % 29);
+  const lightness = 54 + ((accentIndex * 17) % 19);
 
-const fallbackCourseAccentStripClasses = [
-  "bg-sky-500 dark:bg-sky-400",
-  "bg-indigo-500 dark:bg-indigo-400",
-  "bg-cyan-500 dark:bg-cyan-400",
-  "bg-teal-600 dark:bg-teal-400",
-  "bg-emerald-500 dark:bg-emerald-400",
-  "bg-orange-500 dark:bg-orange-400",
-  "bg-rose-500 dark:bg-rose-400",
-];
-
-function getCourseAccentStripClass(course: StudentCourse) {
-  const mappedClass = courseAccentStripClassBySlug[course.slug];
-
-  if (mappedClass) {
-    return mappedClass;
-  }
-
-  const hash = Array.from(course.id).reduce(
-    (total, character) => total + character.charCodeAt(0),
-    0,
-  );
-
-  return (
-    fallbackCourseAccentStripClasses[hash % fallbackCourseAccentStripClasses.length] ??
-    "bg-blue-600 dark:bg-blue-400"
-  );
+  return {
+    "--student-course-accent": `hsl(${hue.toFixed(3)} ${saturation}% ${lightness}%)`,
+  } as CSSProperties;
 }
 
 export function ExploreCourseCard({
+  accentCount = 1,
+  accentIndex = 0,
   course,
   onPrefetch,
+  targetAudienceGrade,
+  targetAudienceName,
 }: {
+  accentCount?: number;
+  accentIndex?: number;
   course: StudentCourse;
   onPrefetch?: (slug: string) => void;
+  targetAudienceGrade?: number | null;
+  targetAudienceName?: string;
 }) {
   const isEnrolled = course.access === "completed" || course.access === "enrolled";
   const isUnderMaintenance = course.isUnderMaintenance === true;
@@ -96,15 +79,18 @@ export function ExploreCourseCard({
       : 0;
   const progressMarkerLeft =
     typeof course.progressPercent === "number"
-      ? Math.min(Math.max(course.progressPercent, 4), 96)
+      ? Math.min(Math.max(course.progressPercent, 0), 100)
       : 0;
   const progressStyle =
     typeof course.progressPercent === "number"
       ? ({
-          "--student-progress-marker": `${progressMarkerLeft}%`,
+          "--student-progress-marker": `calc(${progressMarkerLeft}% - 1.25rem * (${progressMarkerLeft} / 100))`,
           "--student-progress-value": `${course.progressPercent}%`,
         } as CSSProperties)
       : undefined;
+  const displayedTargetAudienceGrade = targetAudienceGrade ?? course.grade;
+  const displayedTargetAudienceName =
+    targetAudienceName ?? course.targetAudienceNames[0] ?? course.targetAudienceName;
 
   return (
     <Link
@@ -114,45 +100,46 @@ export function ExploreCourseCard({
       onPointerEnter={() => onPrefetch?.(course.slug)}
       onTouchStart={() => onPrefetch?.(course.slug)}
       aria-label={`Xem chi tiết ${course.title}`}
-      className="group relative block min-w-0 cursor-pointer overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-5 shadow-none transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-6 sm:pl-7"
+      className="group relative block min-w-0 cursor-pointer overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-6 shadow-none transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-3.5 sm:pl-[22px]"
     >
       <span
+        style={getCourseAccentStyle(accentIndex, accentCount)}
         className={cn(
-          "absolute inset-y-0 left-0 w-2 rounded-l-[1.75rem]",
-          getCourseAccentStripClass(course),
+          "absolute inset-y-0 left-0 w-2 rounded-l-[1.75rem] bg-[var(--student-course-accent)] dark:brightness-110",
         )}
         aria-hidden="true"
       />
-      <div className="grid min-w-0 grid-cols-[40%_minmax(0,1fr)] gap-3">
-        {course.thumbnailImageUrl ? (
-          <img
-            src={course.thumbnailImageUrl}
-            alt={`Ảnh khóa học ${course.title}`}
-            loading="lazy"
-            decoding="async"
-            className="aspect-square h-auto min-h-0 w-full rounded-2xl object-cover"
-          />
-        ) : (
-          <CourseIllustration
-            tone={course.tone}
-            visualTone={course.access === "locked" ? "blue" : undefined}
-            className="h-auto min-h-0 w-full"
-          />
-        )}
+      <div className="grid min-w-0 grid-cols-1 gap-1.5">
+        <div className="min-w-0">
+          {course.thumbnailImageUrl ? (
+            <img
+              src={course.thumbnailImageUrl}
+              alt={`Ảnh khóa học ${course.title}`}
+              loading="lazy"
+              decoding="async"
+              className="aspect-[3/2] h-auto min-h-0 w-full rounded-2xl object-cover"
+            />
+          ) : (
+            <CourseIllustration
+              tone={course.tone}
+              visualTone={course.access === "locked" ? "blue" : undefined}
+              className="aspect-[3/2] h-auto min-h-0 w-full"
+            />
+          )}
+        </div>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <CourseSubjectBadge subject={course.subject} />
-              <span
-                data-grade={course.grade}
-                className={cn(
-                  "student-grade-label shrink-0 whitespace-nowrap text-xs font-extrabold lg:text-sm",
-                  getGradeTextClass(course.grade),
-                )}
-              >
-                Lớp {course.grade}
-              </span>
-            </div>
+            <span
+              data-grade={displayedTargetAudienceGrade}
+              className={cn(
+                "student-grade-label inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-transparent px-2.5 py-1.5 text-sm font-extrabold leading-none lg:px-3 lg:py-1.5 lg:text-xs",
+                getGradeBadgeClass(displayedTargetAudienceGrade),
+                getGradeTextClass(displayedTargetAudienceGrade),
+              )}
+            >
+              <GraduationCap className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
+              {displayedTargetAudienceName}
+            </span>
             <span className="ml-auto shrink-0">
               <CourseStatusBadge
                 access={course.access}
@@ -160,41 +147,26 @@ export function ExploreCourseCard({
               />
             </span>
           </div>
-          <h2 className="student-soft-bold-text mt-2 line-clamp-2 text-base font-extrabold leading-snug text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-lg">
+          <h2 className="student-soft-bold-text mt-0.5 line-clamp-2 text-lg font-extrabold leading-snug text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-lg">
             {course.title}
           </h2>
-          <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-[var(--theme-text-muted)] sm:mt-2 sm:text-sm sm:leading-6">
+          <p className="mt-0 text-[15px] leading-6 text-slate-500 dark:text-[var(--theme-text-muted)] sm:mt-0.5 sm:text-sm sm:leading-6">
             {course.description}
           </p>
-          <div className="mt-3">
+          <div className="mt-0.5">
             <CourseMetaRow course={course} />
           </div>
         </div>
       </div>
 
-      {!isEnrolled ? (
-        <p className="mt-3 flex min-w-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-xs font-semibold leading-5 text-slate-700 dark:text-[var(--theme-text)] sm:gap-x-2 sm:text-base sm:leading-6">
-          <span className="font-semibold text-slate-500 dark:text-[var(--theme-text-muted)]">
-            Hình thức học:
-          </span>{" "}
-          <span className="inline-flex min-w-0 items-center gap-1">
-            <Video
-              className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300 sm:h-5 sm:w-5"
-              aria-hidden="true"
-            />
-            <span>Học online tương tác</span>
-          </span>
-        </p>
-      ) : null}
-
       {isStudying && course.nextLesson && typeof course.progressPercent === "number" ? (
-        <div className="student-course-progress-panel student-mobile-border mt-3 rounded-2xl border border-sky-200/80 p-3 dark:border-[var(--theme-primary-border)]">
-          <div className="grid min-w-0 gap-3">
+        <div className="student-course-progress-panel student-mobile-border mt-1.5 rounded-2xl border border-sky-200/80 p-2.5 dark:border-[var(--theme-primary-border)]">
+            <div className="grid min-w-0 gap-1.5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="student-progress-label shrink-0 text-xs font-bold text-sky-700 dark:text-sky-300 lg:text-[15px]">
+              <span className="student-progress-label shrink-0 text-[15px] font-bold text-sky-700 dark:text-sky-300 lg:text-sm">
                 Tiến độ
               </span>
-              <span className="student-progress-accent-text shrink-0 text-sm font-extrabold text-sky-600 dark:text-sky-300 lg:text-[17px]">
+              <span className="student-progress-accent-text shrink-0 text-[17px] font-extrabold text-sky-600 dark:text-sky-300 lg:text-base">
                 {course.progressPercent}%
               </span>
               <div className="relative h-4 min-w-0 flex-1">
@@ -205,7 +177,7 @@ export function ExploreCourseCard({
                   />
                 </div>
                 <span
-                  className="student-progress-animated-marker student-progress-star-marker absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-sky-50 text-sky-600 shadow-sm dark:bg-sky-50 dark:text-sky-600"
+                  className="student-progress-animated-marker student-progress-star-marker absolute top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-sky-100 text-sky-700 shadow-sm dark:bg-sky-100 dark:text-sky-700"
                   style={progressStyle}
                 >
                   <Star className="h-4 w-4 fill-current" aria-hidden="true" />
@@ -213,22 +185,22 @@ export function ExploreCourseCard({
               </div>
             </div>
 
-            <div className="student-next-lesson-box student-mobile-border grid min-w-0 grid-cols-1 items-center gap-3 rounded-xl border border-sky-200/80 bg-sky-50 p-3 sm:grid-cols-[minmax(0,1fr)_8.25rem]">
+            <div className="student-next-lesson-box student-mobile-border grid min-w-0 grid-cols-1 items-center gap-2.5 rounded-xl border border-sky-200/80 bg-sky-50 px-2.5 py-2.5 sm:gap-1.5 sm:py-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="student-progress-accent-text flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-[0_8px_18px_-8px_rgb(2_132_199_/_55%),0_3px_7px_-4px_rgb(3_105_161_/_45%)] dark:bg-[var(--theme-surface)] dark:text-sky-300">
                   <CalendarDays className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
-                  <p className="student-progress-accent-text text-[11px] font-bold leading-4 text-sky-600 dark:text-sky-300 sm:text-sm sm:leading-5">
+                  <p className="student-progress-accent-text text-sm font-bold leading-4 text-sky-600 dark:text-sky-300 sm:text-sm sm:leading-5">
                     {nextLessonLabel}
                   </p>
-                  <p className="student-soft-bold-text line-clamp-2 text-sm font-extrabold leading-5 text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-base sm:leading-6">
+                  <p className="student-soft-bold-text line-clamp-2 text-base font-extrabold leading-5 text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-base sm:leading-6">
                     {course.nextLesson.title}
                   </p>
                 </div>
               </div>
 
-              <span className="student-learn-cta-3d inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-500 px-3 text-sm font-extrabold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100">
+              <span className="student-learn-cta-3d inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-500 px-3 text-[17px] font-extrabold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:text-base">
                 <PlayCircle
                   className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
                   aria-hidden="true"
@@ -241,29 +213,34 @@ export function ExploreCourseCard({
       ) : (
         <>
           {isUnderMaintenance ? (
-            <div className="student-mobile-border mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-black leading-5 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]">
+            <div className="student-mobile-border mt-1.5 flex min-w-0 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-sm font-black leading-5 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]">
               <LockKeyhole className="h-5 w-5 shrink-0" aria-hidden="true" />
               <span className="min-w-0 break-words">Khóa học đang được bảo trì</span>
             </div>
           ) : null}
           <div
             className={cn(
-              "student-mobile-border mt-3 rounded-xl border p-3",
+              "student-mobile-border mt-2 rounded-xl border px-2.5 py-3",
               isUnderMaintenance
                 ? "border-amber-200 bg-amber-50/75 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)]"
                 : isEnrolled
-                  ? "border-slate-100 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
-                  : "student-course-price-box border border-emerald-200/80 bg-emerald-50/70 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)]",
+                  ? "border-slate-200 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
+                  : "student-course-price-box border border-sky-200/80 bg-sky-50/70 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)]",
             )}
           >
-            <div className="grid min-w-0 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_6.75rem] min-[400px]:items-center sm:grid-cols-[minmax(0,1fr)_8.25rem]">
+            <div
+              className={cn(
+                "grid min-w-0 grid-cols-1",
+                !isEnrolled && !isUnderMaintenance ? "gap-2" : "gap-3",
+              )}
+            >
               {isUnderMaintenance ? (
                 <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm dark:bg-[var(--theme-surface)] dark:text-[var(--theme-warning-text)]">
                     <LockKeyhole className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <div className="grid min-w-0 gap-0.5">
-                    <p className="truncate text-xs font-bold text-amber-700 dark:text-[var(--theme-warning-text)] sm:text-sm">
+                    <p className="truncate text-sm font-bold text-amber-700 dark:text-[var(--theme-warning-text)] sm:text-sm">
                       Nội dung tạm khóa
                     </p>
                     <p className="truncate text-sm font-extrabold leading-tight text-slate-700 dark:text-[var(--theme-text)] sm:text-base">
@@ -275,12 +252,12 @@ export function ExploreCourseCard({
                 <CourseProgressBar value={course.progressPercent} />
               ) : (
                 <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                  <span className="student-course-price-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm dark:bg-[var(--theme-surface)] dark:text-[var(--theme-success-text)]">
+                  <span className="student-course-price-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-[var(--theme-surface)] dark:text-sky-300">
                     <LockKeyhole className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <div className="grid min-w-0 gap-0.5">
                     <div className="flex w-fit max-w-full min-w-0 flex-nowrap items-center gap-1.5">
-                      <p className="shrink-0 text-xs font-bold text-emerald-700 dark:text-[var(--theme-success-text)] sm:text-sm">
+                      <p className="shrink-0 text-sm font-bold text-sky-700 dark:text-sky-300 sm:text-sm">
                         Giá khóa học
                       </p>
                       {discountPercent > 0 ? (
@@ -296,7 +273,7 @@ export function ExploreCourseCard({
                       ) : null}
                     </div>
                     <p
-                      className="truncate text-base font-extrabold leading-tight sm:text-lg"
+                      className="truncate text-lg font-extrabold leading-tight sm:text-lg"
                       style={{
                         color: "var(--student-sale-price-text)",
                         WebkitTextFillColor: "var(--student-sale-price-text)",
@@ -317,10 +294,10 @@ export function ExploreCourseCard({
 
               <span
                 className={cn(
-                  "inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4",
+                  "inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-[17px] font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 sm:px-4 sm:text-base",
                   isEnrolled && !isUnderMaintenance
                     ? "student-learn-cta-3d bg-sky-500 text-white hover:bg-sky-600 focus-visible:ring-sky-100"
-                    : "student-detail-cta-outline border border-emerald-400/70 bg-white text-emerald-700 hover:border-emerald-500/80 hover:bg-emerald-50 focus-visible:ring-emerald-100 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-success-text)]",
+                    : "student-detail-cta-outline border border-sky-400/70 bg-white text-sky-700 hover:border-sky-500/80 hover:bg-sky-50 focus-visible:ring-sky-100 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-surface)] dark:text-sky-300",
                 )}
               >
                 {ctaLabel}
@@ -340,13 +317,13 @@ export function ExploreCourseCard({
           </div>
 
           {hasFreeTrial ? (
-            <div className="student-course-trial-box student-mobile-border mt-2 grid min-w-0 grid-cols-[minmax(0,1fr)_6.75rem] items-center gap-3 rounded-xl border border-amber-200/80 bg-amber-50 p-3 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] sm:grid-cols-[minmax(0,1fr)_8.25rem]">
+            <div className="student-course-trial-box student-mobile-border mt-1.5 grid min-w-0 grid-cols-1 items-center gap-1.5 rounded-xl border border-amber-200/80 bg-amber-50 p-2.5 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)]">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="student-course-trial-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-amber-500 shadow-sm dark:bg-[var(--theme-surface)] dark:text-[var(--theme-warning-text)]">
                   <Crown className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-[11px] font-bold leading-4 text-amber-700 dark:text-[var(--theme-warning-text)] sm:text-sm sm:leading-5">
+                  <p className="truncate text-sm font-bold leading-5 text-amber-700 dark:text-[var(--theme-warning-text)] sm:text-sm sm:leading-5">
                     Học thử miễn phí
                   </p>
                   <p className="student-soft-bold-text truncate text-sm font-extrabold text-slate-600 dark:text-[var(--theme-text-strong)]">
@@ -355,7 +332,7 @@ export function ExploreCourseCard({
                 </div>
               </div>
 
-              <span className="student-trial-cta-3d inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-amber-400 px-3 text-sm font-extrabold text-white transition hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-100">
+              <span className="student-trial-cta-3d inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-amber-400 px-3 text-[17px] font-extrabold text-white transition hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-100 sm:text-base">
                 <PlayCircle
                   className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
                   aria-hidden="true"

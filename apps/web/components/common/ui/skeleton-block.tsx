@@ -5,7 +5,7 @@ export function SkeletonBlock({ className }: { className?: string }) {
     <div
       aria-hidden="true"
       className={cn(
-        "bg-[var(--theme-surface-soft)] ring-1 ring-inset ring-[var(--theme-border)]",
+        "bg-[var(--theme-skeleton)] ring-1 ring-inset ring-[var(--theme-skeleton-strong)]",
         className,
       )}
     />

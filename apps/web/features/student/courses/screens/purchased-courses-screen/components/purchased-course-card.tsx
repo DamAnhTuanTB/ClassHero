@@ -5,7 +5,10 @@ import { CourseStatusBadge } from "@/components/student/courses/course-status-ba
 import { CourseSubjectBadge } from "@/components/student/courses/course-subject-badge";
 import { StudentLessonTransitionLink } from "@/components/student/learning-transition/student-lesson-transition-link";
 import type { StudentCourse } from "@/features/student/shared/student-courses-types";
-import { getGradeTextClass } from "@/features/student/shared/utils/student-courses-utils";
+import {
+  getGradeBadgeClass,
+  getGradeTextClass,
+} from "@/features/student/shared/utils/student-courses-utils";
 import { cn } from "@/lib/utils";
 
 export function PurchasedCourseCard({
@@ -120,11 +123,12 @@ function CourseCardBadges({ course }: { course: StudentCourse }) {
         <span
           data-grade={course.grade}
           className={cn(
-            "student-grade-label shrink-0 whitespace-nowrap text-xs font-extrabold lg:text-sm",
+            "student-grade-label inline-flex shrink-0 items-center rounded-xl px-2 py-1 text-xs font-extrabold leading-none lg:px-3 lg:py-1.5 lg:text-xs",
+            getGradeBadgeClass(course.grade),
             getGradeTextClass(course.grade),
           )}
         >
-          Lớp {course.grade}
+          {course.targetAudienceName}
         </span>
       </span>
       <span className="ml-auto shrink-0">
@@ -135,9 +139,9 @@ function CourseCardBadges({ course }: { course: StudentCourse }) {
 }
 
 function ProgressLine({ compact = false, value }: { compact?: boolean; value: number }) {
-  const markerLeft = Math.min(Math.max(value, 4), 96);
+  const markerLeft = Math.min(Math.max(value, 0), 100);
   const progressStyle = {
-    "--student-progress-marker": `${markerLeft}%`,
+    "--student-progress-marker": `calc(${markerLeft}% - 1.25rem * (${markerLeft} / 100))`,
     "--student-progress-value": `${value}%`,
   } as CSSProperties;
 
@@ -167,7 +171,7 @@ function ProgressLine({ compact = false, value }: { compact?: boolean; value: nu
           />
         </span>
         <span
-          className="student-progress-animated-marker student-progress-star-marker absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-sky-50 text-sky-600 shadow-sm dark:bg-sky-50 dark:text-sky-600"
+          className="student-progress-animated-marker student-progress-star-marker absolute top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-sky-50 text-sky-600 shadow-sm dark:bg-sky-50 dark:text-sky-600"
           style={progressStyle}
         >
           <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />

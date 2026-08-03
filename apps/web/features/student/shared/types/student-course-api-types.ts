@@ -4,8 +4,25 @@ import type {
   StudentCourseLessonType,
 } from "@/features/student/shared/student-courses-types";
 
-export type PublicLearningPathSubject = "MATH" | "PHYSICS" | "CHEMISTRY";
+export type PublicLearningPathDomain = { id: string; name: string; slug: string };
+export type PublicLearningPathTargetAudience = { id: string; code: string; name: string; grade: number | null };
 export type PublicLearningPathPublishStatus = StudentCourseDetailChapterStatus;
+
+export type StudentCourseCatalogOptionsApi = {
+  domains: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    sortOrder: number;
+  }>;
+  targetAudiences: Array<{
+    id: string;
+    code: string;
+    name: string;
+    grade: number | null;
+    sortOrder: number;
+  }>;
+};
 
 export type PublicLearningPathProgressApi = {
   completedLessonCount: number;
@@ -55,8 +72,8 @@ export type PublicLearningPathThumbnailApi = {
 
 export type PublicLearningPathApi = {
   id: string;
-  subject: PublicLearningPathSubject;
-  grade: number;
+  domain: PublicLearningPathDomain;
+  targetAudiences: PublicLearningPathTargetAudience[];
   title: string;
   slug: string;
   status: PublicLearningPathPublishStatus;
@@ -67,6 +84,8 @@ export type PublicLearningPathApi = {
   thumbnailFileId: string | null;
   thumbnailFile: PublicLearningPathThumbnailApi | null;
   descriptionJson: unknown;
+  lessonCountMin: number | null;
+  lessonCountMax: number | null;
   trialEnabled: boolean;
   publishedAt: string | null;
   summary: {

@@ -6,6 +6,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 type FilterSearchParamValue = number | string | null | undefined;
 type FilterSearchParamUpdates = Record<string, FilterSearchParamValue>;
 
+export const resetFilterSearchParamsEvent = "learning-path:reset-filter-search-params";
+
 export function useFilterSearchParams() {
   const pathname = usePathname();
   const routeSearchParams = useSearchParams();
@@ -31,9 +33,14 @@ export function useFilterSearchParams() {
     }
 
     window.addEventListener("popstate", syncSearchParamsFromBrowserHistory);
+    window.addEventListener(resetFilterSearchParamsEvent, syncSearchParamsFromBrowserHistory);
 
     return () => {
       window.removeEventListener("popstate", syncSearchParamsFromBrowserHistory);
+      window.removeEventListener(
+        resetFilterSearchParamsEvent,
+        syncSearchParamsFromBrowserHistory,
+      );
     };
   }, []);
 

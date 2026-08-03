@@ -11,6 +11,10 @@
   --student-screen-bg: var(--theme-bg);
 }
 
+[data-student-shell="true"] .student-course-price-box {
+  --student-sale-price-text: rgb(3 105 161);
+}
+
 [data-student-shell="true"] .student-goal-item--sky {
   background: rgb(240 249 255 / 70%);
 }
@@ -229,8 +233,9 @@
   [data-student-shell="true"]
   .student-course-price-box,
 [data-student-shell="true"].dark .student-course-price-box {
-  background: linear-gradient(135deg, rgb(6 78 59 / 34%), rgb(15 23 42 / 88%)) !important;
-  border-color: rgb(52 211 153 / 36%) !important;
+  --student-sale-price-text: rgb(125 211 252);
+  background: linear-gradient(135deg, rgb(7 89 133 / 34%), rgb(15 23 42 / 88%)) !important;
+  border-color: rgb(56 189 248 / 36%) !important;
 }
 
 :where(.dark [data-theme-root], [data-theme-root].dark)
@@ -272,6 +277,10 @@
 
   [data-student-shell="true"] :is(.border-t, .border-y) {
     border-top-width: 0 !important;
+  }
+
+  [data-student-shell="true"] .student-preserve-mobile-top-border {
+    border-top-width: 1px !important;
   }
 
   [data-student-shell="true"] :is(.border-r, .border-x) {
@@ -420,14 +429,14 @@
   }
 
   [data-student-shell="true"] .student-detail-cta-outline {
-    border-color: rgb(16 185 129 / 46%) !important;
+    border-color: rgb(14 165 233 / 46%) !important;
     border-style: solid !important;
     border-width: 1px !important;
-    box-shadow: inset 0 0 0 1px rgb(167 243 208 / 24%) !important;
+    box-shadow: inset 0 0 0 1px rgb(186 230 253 / 24%) !important;
   }
 
   [data-student-shell="true"] .student-detail-cta-outline:is(:hover, :focus-visible) {
-    border-color: rgb(5 150 105 / 58%) !important;
+    border-color: rgb(2 132 199 / 58%) !important;
   }
 
   [data-student-shell="true"] .student-grade-label[data-grade="3"] {
@@ -483,8 +492,8 @@
   }
 
   [data-student-shell="true"] .student-progress-star-marker {
-    background: rgb(240 249 255) !important;
-    color: rgb(2 132 199) !important;
+    background: rgb(224 242 254) !important;
+    color: rgb(14 165 233) !important;
     box-shadow: 0 4px 10px -8px rgb(2 132 199 / 70%) !important;
   }
 
@@ -971,6 +980,35 @@
     0 12px 18px -13px rgb(14 165 233 / 92%) !important;
 }
 
+[data-student-shell="true"] .student-learn-cta-3d-emerald {
+  box-shadow:
+    0 4px 0 rgb(5 150 105),
+    0 12px 18px -13px rgb(16 185 129 / 92%) !important;
+  transform: translateY(-2px);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+[data-student-shell="true"] .student-learn-cta-3d-emerald:hover {
+  background-color: rgb(52 211 153) !important;
+}
+
+[data-student-shell="true"] .student-learn-cta-3d-emerald:active {
+  box-shadow:
+    0 1px 0 rgb(5 150 105),
+    0 7px 12px -12px rgb(16 185 129 / 80%) !important;
+  transform: translateY(1px);
+}
+
+[data-student-shell="true"] .student-learn-cta-3d-emerald:focus-visible {
+  box-shadow:
+    0 4px 0 rgb(5 150 105),
+    0 0 0 4px rgb(167 243 208 / 88%),
+    0 12px 18px -13px rgb(16 185 129 / 92%) !important;
+}
+
 [data-student-shell="true"] .student-trial-cta-3d {
   box-shadow:
     0 4px 0 rgb(217 119 6),
@@ -1027,14 +1065,14 @@
 }
 
 [data-student-shell="true"] .student-detail-cta-outline {
-  border-color: rgb(16 185 129 / 46%) !important;
+  border-color: rgb(14 165 233 / 46%) !important;
   border-style: solid !important;
   border-width: 1px !important;
-  box-shadow: inset 0 0 0 1px rgb(167 243 208 / 24%) !important;
+  box-shadow: inset 0 0 0 1px rgb(186 230 253 / 24%) !important;
 }
 
 [data-student-shell="true"] .student-detail-cta-outline:is(:hover, :focus-visible) {
-  border-color: rgb(5 150 105 / 58%) !important;
+  border-color: rgb(2 132 199 / 58%) !important;
 }
 
 [data-student-shell="true"] .student-grade-label[data-grade="3"] {
@@ -1090,8 +1128,8 @@
 }
 
 [data-student-shell="true"] .student-progress-star-marker {
-  background: rgb(240 249 255) !important;
-  color: rgb(2 132 199) !important;
+  background: rgb(224 242 254) !important;
+  color: rgb(14 165 233) !important;
   box-shadow: 0 4px 10px -8px rgb(2 132 199 / 70%) !important;
 }
 
@@ -1180,6 +1218,32 @@
   box-shadow:
     0 1px 0 rgb(3 105 161),
     0 7px 12px -13px rgb(14 165 233 / 36%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-learn-cta-3d-emerald,
+[data-student-shell="true"].dark .student-learn-cta-3d-emerald {
+  background-color: rgb(5 150 105) !important;
+  box-shadow:
+    0 4px 0 rgb(4 120 87),
+    0 12px 18px -14px rgb(16 185 129 / 44%) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-learn-cta-3d-emerald:hover,
+[data-student-shell="true"].dark .student-learn-cta-3d-emerald:hover {
+  background-color: rgb(4 120 87) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-learn-cta-3d-emerald:active,
+[data-student-shell="true"].dark .student-learn-cta-3d-emerald:active {
+  box-shadow:
+    0 1px 0 rgb(4 120 87),
+    0 7px 12px -13px rgb(16 185 129 / 36%) !important;
 }
 
 :where(.dark [data-theme-root], [data-theme-root].dark)
@@ -1418,6 +1482,195 @@
   box-shadow:
     0 1px 0 rgb(4 120 87),
     0 7px 12px -13px rgb(16 185 129 / 34%);
+}
+
+/* Explore ribbons use a distinct, semantic tone for every section. */
+[data-student-shell="true"] .student-section-ribbon {
+  --student-ribbon-strip: rgb(14 165 233);
+  --student-ribbon-shadow: rgb(7 89 133 / 26%);
+  --student-ribbon-top: #38bdf8;
+  --student-ribbon-middle: #0284c7;
+  --student-ribbon-bottom: #0369a1;
+  background:
+    linear-gradient(
+      90deg,
+      rgb(255 255 255 / 24%),
+      rgb(255 255 255 / 8%) 45%,
+      rgb(255 255 255 / 0%)
+    ),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 2.4%) 0 1px, transparent 1px 8px),
+    linear-gradient(
+      180deg,
+      var(--student-ribbon-top) 0%,
+      var(--student-ribbon-middle) 48%,
+      var(--student-ribbon-bottom) 100%
+    );
+}
+
+[data-student-shell="true"] .student-section-ribbon--emerald {
+  --student-ribbon-strip: rgb(16 185 129);
+  --student-ribbon-shadow: rgb(6 78 59 / 24%);
+  --student-ribbon-top: #34d399;
+  --student-ribbon-middle: #059669;
+  --student-ribbon-bottom: #047857;
+}
+
+[data-student-shell="true"] .student-section-ribbon--audience {
+  --student-ribbon-strip: rgb(129 140 248);
+  --student-ribbon-shadow: rgb(67 56 202 / 24%);
+  --student-ribbon-top: #a5b4fc;
+  --student-ribbon-middle: #6366f1;
+  --student-ribbon-bottom: #4338ca;
+}
+
+[data-student-shell="true"] .student-section-ribbon--high-school {
+  --student-ribbon-strip: rgb(244 114 182);
+  --student-ribbon-shadow: rgb(157 23 77 / 24%);
+  --student-ribbon-top: #f9a8d4;
+  --student-ribbon-middle: #db2777;
+  --student-ribbon-bottom: #9d174d;
+}
+
+[data-student-shell="true"] .student-section-ribbon--secondary-school {
+  --student-ribbon-strip: rgb(129 140 248);
+  --student-ribbon-shadow: rgb(55 48 163 / 24%);
+  --student-ribbon-top: #a5b4fc;
+  --student-ribbon-middle: #4f46e5;
+  --student-ribbon-bottom: #3730a3;
+}
+
+[data-student-shell="true"] .student-section-ribbon--primary-school {
+  --student-ribbon-strip: rgb(250 204 21);
+  --student-ribbon-shadow: rgb(133 77 14 / 24%);
+  --student-ribbon-top: #fde047;
+  --student-ribbon-middle: #ca8a04;
+  --student-ribbon-bottom: #854d0e;
+}
+
+[data-student-shell="true"] .student-section-ribbon--all-students {
+  --student-ribbon-strip: rgb(14 165 233);
+  --student-ribbon-shadow: rgb(7 89 133 / 24%);
+  --student-ribbon-top: #38bdf8;
+  --student-ribbon-middle: #0284c7;
+  --student-ribbon-bottom: #075985;
+}
+
+[data-student-shell="true"] .student-section-ribbon--working-adult {
+  --student-ribbon-strip: rgb(100 116 139);
+  --student-ribbon-shadow: rgb(30 41 59 / 24%);
+  --student-ribbon-top: #94a3b8;
+  --student-ribbon-middle: #475569;
+  --student-ribbon-bottom: #1e293b;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-3 {
+  --student-ribbon-strip: rgb(251 113 133);
+  --student-ribbon-shadow: rgb(159 18 57 / 24%);
+  --student-ribbon-top: #fb7185;
+  --student-ribbon-middle: #e11d48;
+  --student-ribbon-bottom: #9f1239;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-4 {
+  --student-ribbon-strip: rgb(251 146 60);
+  --student-ribbon-shadow: rgb(154 52 18 / 24%);
+  --student-ribbon-top: #fb923c;
+  --student-ribbon-middle: #ea580c;
+  --student-ribbon-bottom: #9a3412;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-5 {
+  --student-ribbon-strip: rgb(251 191 36);
+  --student-ribbon-shadow: rgb(146 64 14 / 24%);
+  --student-ribbon-top: #fbbf24;
+  --student-ribbon-middle: #d97706;
+  --student-ribbon-bottom: #92400e;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-6 {
+  --student-ribbon-strip: rgb(163 230 53);
+  --student-ribbon-shadow: rgb(63 98 18 / 24%);
+  --student-ribbon-top: #a3e635;
+  --student-ribbon-middle: #65a30d;
+  --student-ribbon-bottom: #3f6212;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-7 {
+  --student-ribbon-strip: rgb(96 165 250);
+  --student-ribbon-shadow: rgb(30 58 138 / 24%);
+  --student-ribbon-top: #60a5fa;
+  --student-ribbon-middle: #2563eb;
+  --student-ribbon-bottom: #1e3a8a;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-8 {
+  --student-ribbon-strip: rgb(45 212 191);
+  --student-ribbon-shadow: rgb(17 94 89 / 24%);
+  --student-ribbon-top: #2dd4bf;
+  --student-ribbon-middle: #0d9488;
+  --student-ribbon-bottom: #115e59;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-9 {
+  --student-ribbon-strip: rgb(167 139 250);
+  --student-ribbon-shadow: rgb(76 29 149 / 24%);
+  --student-ribbon-top: #a78bfa;
+  --student-ribbon-middle: #7c3aed;
+  --student-ribbon-bottom: #4c1d95;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-10 {
+  --student-ribbon-strip: rgb(232 121 249);
+  --student-ribbon-shadow: rgb(134 25 143 / 24%);
+  --student-ribbon-top: #e879f9;
+  --student-ribbon-middle: #c026d3;
+  --student-ribbon-bottom: #86198f;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-11 {
+  --student-ribbon-strip: rgb(34 211 238);
+  --student-ribbon-shadow: rgb(21 94 117 / 24%);
+  --student-ribbon-top: #22d3ee;
+  --student-ribbon-middle: #0891b2;
+  --student-ribbon-bottom: #155e75;
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-12 {
+  --student-ribbon-strip: rgb(74 222 128);
+  --student-ribbon-shadow: rgb(22 101 52 / 24%);
+  --student-ribbon-top: #4ade80;
+  --student-ribbon-middle: #16a34a;
+  --student-ribbon-bottom: #166534;
+}
+
+@media (max-width: 767px) {
+  [data-student-shell="true"] .student-section-ribbon {
+    width: min(100%, 17rem);
+  }
+
+  [data-student-shell="true"] .student-section-ribbon > span {
+    padding: 0.45rem 1.5rem 0.45rem 1.1rem;
+  }
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-section-ribbon,
+[data-student-shell="true"].dark .student-section-ribbon {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(255 255 255 / 10%),
+      rgb(255 255 255 / 3%) 45%,
+      rgb(255 255 255 / 0%)
+    ),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 1.2%) 0 1px, transparent 1px 8px),
+    linear-gradient(
+      180deg,
+      var(--student-ribbon-top) 0%,
+      var(--student-ribbon-middle) 48%,
+      var(--student-ribbon-bottom) 100%
+    ) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

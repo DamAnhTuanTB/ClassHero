@@ -2,7 +2,6 @@ import type {
   StudentCourse,
   StudentCourseDetail,
   StudentCourseStat,
-  StudentCourseSubject,
   StudentTodayGoal,
 } from "@/features/student/shared/student-courses-types";
 
@@ -12,26 +11,16 @@ export const studentProfile = {
   name: "Minh Anh",
 };
 
-export const gradeOptions = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-export const subjectOptions: Array<{
-  label: string;
-  value: StudentCourseSubject | "ALL";
-}> = [
-  { label: "Tất cả", value: "ALL" },
-  { label: "Toán", value: "MATH" },
-  { label: "Lý", value: "PHYSICS" },
-  { label: "Hóa", value: "CHEMISTRY" },
-];
-
 export const studentCourses: StudentCourse[] = [
   {
     access: "enrolled",
     chapterCount: 12,
     description:
       "Nắm vững kiến thức trọng tâm, rèn luyện kỹ năng giải bài tập và bứt phá điểm số.",
+    domainId: "mock-domain-math",
     exerciseCount: 96,
     grade: 7,
+    grades: [7],
     id: "course-math-7-foundation",
     lessonCount: 48,
     nextLesson: {
@@ -45,6 +34,10 @@ export const studentCourses: StudentCourse[] = [
     salePriceVnd: 1_500_000,
     slug: "toan-7-nen-tang",
     subject: "MATH",
+    targetAudienceId: "mock-audience-grade-7",
+    targetAudienceIds: ["mock-audience-grade-7"],
+    targetAudienceName: "Khối 7",
+    targetAudienceNames: ["Khối 7"],
     title: "Toán 7 - Bứt phá học kỳ 1",
     tone: "math",
     updatedLabel: "Hôm nay",
@@ -54,8 +47,10 @@ export const studentCourses: StudentCourse[] = [
     chapterCount: 3,
     description:
       "Luyện tư duy giải bài khó theo chuyên đề, phù hợp học sinh muốn tăng tốc.",
+    domainId: "mock-domain-math",
     exerciseCount: 118,
     grade: 7,
+    grades: [7],
     id: "course-math-7-advanced",
     lessonCount: 28,
     nextLesson: {
@@ -68,6 +63,10 @@ export const studentCourses: StudentCourse[] = [
     salePriceVnd: 1_650_000,
     slug: "toan-7-nang-cao",
     subject: "MATH",
+    targetAudienceId: "mock-audience-grade-7",
+    targetAudienceIds: ["mock-audience-grade-7"],
+    targetAudienceName: "Khối 7",
+    targetAudienceNames: ["Khối 7"],
     title: "Toán 7 nâng cao",
     tone: "math",
     updatedLabel: "Mới học",
@@ -77,8 +76,10 @@ export const studentCourses: StudentCourse[] = [
     chapterCount: 5,
     description:
       "Ôn chắc từng chuyên đề qua bài tập ngắn, giúp em giữ nhịp học đều mỗi tuần.",
+    domainId: "mock-domain-math",
     exerciseCount: 90,
     grade: 7,
+    grades: [7],
     id: "course-math-7-practice",
     lessonCount: 24,
     nextLesson: {
@@ -91,6 +92,10 @@ export const studentCourses: StudentCourse[] = [
     salePriceVnd: 1_400_000,
     slug: "toan-7-luyen-tap",
     subject: "MATH",
+    targetAudienceId: "mock-audience-grade-7",
+    targetAudienceIds: ["mock-audience-grade-7"],
+    targetAudienceName: "Khối 7",
+    targetAudienceNames: ["Khối 7"],
     title: "Toán 7 luyện tập",
     tone: "math",
     updatedLabel: "Hôm qua",
@@ -99,8 +104,10 @@ export const studentCourses: StudentCourse[] = [
     access: "enrolled",
     chapterCount: 6,
     description: "Hệ thống hóa kiến thức quan trọng trước khi kết thúc học kỳ.",
+    domainId: "mock-domain-math",
     exerciseCount: 104,
     grade: 7,
+    grades: [7],
     id: "course-math-7-final-review",
     lessonCount: 36,
     nextLesson: {
@@ -113,6 +120,10 @@ export const studentCourses: StudentCourse[] = [
     salePriceVnd: 1_600_000,
     slug: "toan-7-tong-on",
     subject: "MATH",
+    targetAudienceId: "mock-audience-grade-7",
+    targetAudienceIds: ["mock-audience-grade-7"],
+    targetAudienceName: "Khối 7",
+    targetAudienceNames: ["Khối 7"],
     title: "Toán 7 tổng ôn",
     tone: "math",
     updatedLabel: "Sắp hoàn thành",
@@ -121,14 +132,20 @@ export const studentCourses: StudentCourse[] = [
     access: "locked",
     chapterCount: 3,
     description: "Mở rộng kỹ năng giải toán lớp 7 bằng hệ thống bài tập chọn lọc.",
+    domainId: "mock-domain-math",
     exerciseCount: 84,
     grade: 7,
+    grades: [7],
     id: "course-math-7-speed",
     lessonCount: 20,
     originalPriceVnd: 1_850_000,
     salePriceVnd: 1_650_000,
     slug: "toan-7-tang-toc",
     subject: "MATH",
+    targetAudienceId: "mock-audience-grade-7",
+    targetAudienceIds: ["mock-audience-grade-7"],
+    targetAudienceName: "Khối 7",
+    targetAudienceNames: ["Khối 7"],
     title: "Toán 7 tăng tốc",
     tone: "math",
     trialLessonCount: 2,
@@ -137,8 +154,10 @@ export const studentCourses: StudentCourse[] = [
     access: "locked",
     chapterCount: 3,
     description: "Làm quen chuyển động, lực và các hiện tượng vật lý qua ví dụ gần gũi.",
+    domainId: "mock-domain-physics",
     exerciseCount: 72,
     grade: 8,
+    grades: [8],
     id: "course-physics-8-trial",
     lessonCount: 18,
     nextLesson: {
@@ -149,6 +168,10 @@ export const studentCourses: StudentCourse[] = [
     salePriceVnd: 1_450_000,
     slug: "vat-ly-8-nhap-mon-trial",
     subject: "PHYSICS",
+    targetAudienceId: "mock-audience-grade-8",
+    targetAudienceIds: ["mock-audience-grade-8"],
+    targetAudienceName: "Khối 8",
+    targetAudienceNames: ["Khối 8"],
     title: "Vật lý 8 nhập môn",
     tone: "physics",
     trialLessonCount: 2,
@@ -157,14 +180,20 @@ export const studentCourses: StudentCourse[] = [
     access: "locked",
     chapterCount: 4,
     description: "Khóa học ôn thi vào 10 hiệu quả, hệ thống hóa kiến thức trọng tâm.",
+    domainId: "mock-domain-chemistry",
     exerciseCount: 128,
     grade: 9,
+    grades: [9],
     id: "course-chemistry-9-exam",
     lessonCount: 32,
     originalPriceVnd: 2_200_000,
     salePriceVnd: 1_850_000,
     slug: "hoa-9-on-thi",
     subject: "CHEMISTRY",
+    targetAudienceId: "mock-audience-grade-9",
+    targetAudienceIds: ["mock-audience-grade-9"],
+    targetAudienceName: "Khối 9",
+    targetAudienceNames: ["Khối 9"],
     title: "Hóa 9 ôn thi",
     tone: "chemistry",
     trialLessonCount: 2,

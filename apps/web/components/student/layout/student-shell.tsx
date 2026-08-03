@@ -35,6 +35,7 @@ import {
 } from "@/lib/sidebar-collapse-state";
 import { useThemeStore, type AppThemeMode } from "@/lib/theme-store";
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
+import { resetFilterSearchParamsEvent } from "@/lib/use-filter-search-params";
 import { cn } from "@/lib/utils";
 
 const navItems: StudentCourseNavItem[] = [
@@ -187,6 +188,14 @@ export function StudentShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={(event) => {
+                    if (isActive) {
+                      event.preventDefault();
+                      window.history.replaceState(window.history.state, "", item.href);
+                      window.dispatchEvent(new Event(resetFilterSearchParamsEvent));
+                      router.replace(item.href);
+                    }
+                  }}
                   aria-current={isActive ? "page" : undefined}
                   title={item.label}
                   className={cn(
@@ -285,6 +294,14 @@ export function StudentShell({
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={(event) => {
+                  if (isActive) {
+                    event.preventDefault();
+                    window.history.replaceState(window.history.state, "", item.href);
+                    window.dispatchEvent(new Event(resetFilterSearchParamsEvent));
+                    router.replace(item.href);
+                  }
+                }}
                 aria-label={item.label}
                 aria-current={isActive ? "page" : undefined}
                 title={item.label}

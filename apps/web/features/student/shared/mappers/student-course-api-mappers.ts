@@ -2,6 +2,7 @@ import type {
   PublicLearningPathApi,
   PublicLearningPathChapterApi,
   PublicLearningPathLessonApi,
+  StudentCourseCatalogOptionsApi,
   StudentCoursesListMeta,
 } from "@/features/student/shared/types/student-course-api-types";
 import type {
@@ -21,8 +22,10 @@ import type {
 export function mapLearningPathsToCoursesList(
   learningPaths: PublicLearningPathApi[],
   meta: StudentCoursesListMeta | undefined,
+  catalog: StudentCourseCatalogOptionsApi,
 ) {
   return {
+    catalog,
     courses: learningPaths.map(mapLearningPathToCourse),
     meta: normalizeListMeta(meta),
   } satisfies StudentCoursesListResult;
@@ -71,6 +74,15 @@ export function mapLearningPathToCourseDetail(
 function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCourse {
   const progress = learningPath.progress;
   const access = getCourseAccess(learningPath);
+  const primaryTargetAudience =
+    learningPath.targetAudiences.find((audience) => audience.grade !== null) ??
+    learningPath.targetAudiences[0];
+  const grades = learningPath.targetAudiences.flatMap((audience) =>
+    audience.grade === null ? [] : [audience.grade],
+  );
+  const targetAudienceNames = learningPath.targetAudiences.map(
+    (audience) => audience.name,
+  );
   const isUnderMaintenance =
     learningPath.status !== "PUBLISHED" && learningPath.access.hasActiveEnrollment;
   const continueLesson = isUnderMaintenance ? undefined : getContinueLesson(learningPath);
@@ -79,11 +91,17 @@ function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCo
     access,
     chapterCount: learningPath.summary.chapterCount,
     description: extractDescriptionText(learningPath.descriptionJson),
+    domainId: learningPath.domain.id,
     exerciseCount: 0,
-    grade: learningPath.grade,
+    grade: primaryTargetAudience?.grade ?? 0,
+    grades,
     id: learningPath.id,
     isUnderMaintenance,
     lessonCount: learningPath.summary.lessonCount,
+    lessonCountMin:
+      learningPath.lessonCountMin ?? learningPath.summary.lessonCount,
+    lessonCountMax:
+      learningPath.lessonCountMax ?? learningPath.summary.lessonCount,
     nextLesson: continueLesson
       ? {
           examOpenLabel: getExamOpenLabel(continueLesson.examOpenAt),
@@ -99,10 +117,14 @@ function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCo
         : undefined,
     salePriceVnd: learningPath.salePriceVnd ?? undefined,
     slug: learningPath.slug,
-    subject: learningPath.subject,
+    subject: learningPath.domain.name,
+    targetAudienceId: primaryTargetAudience?.id ?? "",
+    targetAudienceIds: learningPath.targetAudiences.map((audience) => audience.id),
+    targetAudienceName: targetAudienceNames[0] ?? "",
+    targetAudienceNames,
     thumbnailImageUrl: learningPath.thumbnailFile?.url ?? undefined,
     title: learningPath.title,
-    tone: subjectToneBySubject[learningPath.subject],
+    tone: subjectToneBySubject[learningPath.domain.slug] ?? "math",
     trialLessonCount:
       access === "locked" && learningPath.access.trialAvailable ? 1 : undefined,
     updatedLabel: isUnderMaintenance

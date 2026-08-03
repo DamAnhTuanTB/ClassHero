@@ -1,15 +1,20 @@
 "use client";
 
 import {
+  ArrowLeft,
   BadgeCheck,
   BookOpen,
   Calculator,
   GraduationCap,
+  Home,
+  Loader2,
   LockKeyhole,
   Play,
   PlayCircle,
   ShoppingCart,
 } from "lucide-react";
+import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { StudentCourseChapterCard } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-chapter-card";
@@ -18,10 +23,14 @@ import { StudentCourseDetailProgressCard } from "@/features/student/courses/scre
 import { StudentCourseMobileBrandBar } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
+import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
 import {
+  studentLearningPathsQueryKey,
   useStudentCourseDetailQuery,
   useStudentMockPurchaseMutation,
 } from "@/features/student/shared/hooks/use-student-courses-query";
+import { useCreatePaymentMutation } from "@/features/student/payments/hooks/use-student-payment";
+import { rememberPaymentCheckoutHistory } from "@/features/student/payments/utils/payment-checkout-history";
 import type { StudentCourseDetailChapter } from "@/features/student/shared/student-courses-types";
 import type { StudentCourseDetailResult } from "@/features/student/shared/types/student-course-api-results";
 import {
@@ -42,9 +51,14 @@ export function StudentCourseDetailScreen({
   initialThemeMode: AppThemeMode;
   slug: string;
 }) {
-  const { isAuthHydrated, query: courseDetailQuery } =
+  const queryClient = useQueryClient();
+  const [isNavigatingToCheckout, setIsNavigatingToCheckout] = useState(false);
+  const [bfCacheKey, setBfCacheKey] = useState(0);
+  const { isAuthHydrated, query: courseDetailQuery, session } =
     useStudentCourseDetailQuery(slug, initialData);
   const mockPurchaseMutation = useStudentMockPurchaseMutation(slug);
+  const createPaymentMutation = useCreatePaymentMutation();
+  const refetchCourseDetail = courseDetailQuery.refetch;
   const course = courseDetailQuery.data?.course;
   const detail = courseDetailQuery.data?.detail;
   const isInitialPending =
@@ -63,6 +77,26 @@ export function StudentCourseDetailScreen({
   useEffect(() => {
     setExpandedChapterIds(defaultExpandedChapterId ? [defaultExpandedChapterId] : []);
   }, [defaultExpandedChapterId]);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setIsNavigatingToCheckout(false);
+        setBfCacheKey((prev) => prev + 1);
+        void Promise.all([
+          refetchCourseDetail(),
+          queryClient.invalidateQueries({
+            queryKey: studentLearningPathsQueryKey(session?.user.id),
+          }),
+        ]);
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [queryClient, refetchCourseDetail, session?.user.id]);
 
   if (isInitialPending) {
     return (
@@ -92,18 +126,29 @@ export function StudentCourseDetailScreen({
 
   if (!course || !detail || courseDetailQuery.isError) {
     return (
-      <main
-        className="grid min-h-screen place-items-center px-4 py-4 sm:px-6 lg:px-8"
-        style={{ background: "var(--student-screen-bg)" }}
-        data-theme={initialThemeMode}
-      >
-        <div className="mx-auto w-full max-w-3xl">
-          <EmptyCourseState
-            title="Chưa tìm thấy khóa học này"
-            description="Bạn quay lại danh sách học tập để chọn khóa học đang học nhé."
-          />
-        </div>
-      </main>
+      <StudentFullScreenState
+        initialThemeMode={initialThemeMode}
+        title="Chưa tìm thấy khóa học này"
+        description="Bạn quay lại danh sách học tập để chọn khóa học đang học nhé."
+        action={
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            <Link
+              href="/student/courses"
+              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-black text-white transition hover:bg-sky-600"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Về danh sách khóa học
+            </Link>
+            <Link
+              href="/student/explore"
+              className="student-learn-cta-3d-emerald inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white transition hover:bg-emerald-400"
+            >
+              <Home className="h-4 w-4" aria-hidden="true" />
+              Về Trang chủ
+            </Link>
+          </div>
+        }
+      />
     );
   }
 
@@ -147,6 +192,24 @@ export function StudentCourseDetailScreen({
         ? currentIds.filter((chapterId) => chapterId !== chapter.id)
         : [...currentIds, chapter.id],
     );
+  }
+
+  async function handlePurchase() {
+    try {
+      const result = await createPaymentMutation.mutateAsync(courseId);
+
+      if (result.checkoutUrl) {
+        setIsNavigatingToCheckout(true);
+        rememberPaymentCheckoutHistory(result.id);
+        window.location.assign(result.checkoutUrl);
+      } else {
+        toast.error("Không thể tạo liên kết thanh toán");
+      }
+    } catch (error) {
+      toast.error("Chưa tạo được đơn thanh toán", {
+        description: getErrorMessage(error),
+      });
+    }
   }
 
   async function handleMockPurchase() {
@@ -194,11 +257,11 @@ export function StudentCourseDetailScreen({
               <div className="mt-4 grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2">
                 <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-50 px-2.5 text-xs font-black text-blue-700 dark:bg-[var(--theme-primary-soft)] dark:text-sky-300 sm:gap-2 sm:px-3 sm:text-sm">
                   <Calculator className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-                  {subjectLabels[course.subject]}
+                  {subjectLabels[course.subject] ?? course.subject}
                 </span>
                 <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-violet-50 px-2.5 text-xs font-black text-blue-700 dark:bg-violet-500/15 dark:text-sky-300 sm:gap-2 sm:px-3 sm:text-sm">
                   <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-                  Lớp {course.grade}
+                  {course.targetAudienceName}
                 </span>
                 <span
                   className={cn(
@@ -206,7 +269,7 @@ export function StudentCourseDetailScreen({
                     isCourseUnderMaintenance
                       ? "border-amber-100 bg-amber-50 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]"
                       : course.access === "locked"
-                        ? "border-slate-200 bg-slate-50 text-slate-500 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)]"
+                        ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-300"
                         : course.access === "completed"
                           ? "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-[var(--theme-success-border)] dark:bg-[var(--theme-success-bg)] dark:text-[var(--theme-success-text)]"
                           : "border-sky-100 bg-sky-50 text-sky-600 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] dark:text-sky-300",
@@ -218,7 +281,7 @@ export function StudentCourseDetailScreen({
                       isCourseUnderMaintenance
                         ? "bg-amber-500"
                         : course.access === "locked"
-                          ? "bg-slate-400"
+                          ? "bg-rose-500"
                           : course.access === "completed"
                             ? "bg-emerald-500"
                             : "bg-sky-600 dark:bg-sky-300 dark:text-slate-950",
@@ -273,7 +336,7 @@ export function StudentCourseDetailScreen({
                 </div>
               </div>
               {isLockedCourse ? (
-                <div className="student-mobile-border mt-5 grid min-w-0 gap-3 rounded-2xl border border-sky-100 bg-sky-50/80 p-3 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center">
+                <div className="student-mobile-border mt-5 grid min-w-0 gap-3 rounded-2xl border border-sky-100 bg-sky-50/80 p-3 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase text-slate-500 dark:text-[var(--theme-text-muted)]">
                       Giá khóa học
@@ -294,15 +357,36 @@ export function StudentCourseDetailScreen({
                       ) : null}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleMockPurchase()}
-                    disabled={mockPurchaseMutation.isPending}
-                    className="student-learn-cta-3d inline-flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-wait disabled:opacity-70"
-                  >
-                    <ShoppingCart className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    {mockPurchaseMutation.isPending ? "Đang mua" : "Mua ngay"}
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      key={`btn-buy-${bfCacheKey}`}
+                      type="button"
+                      onClick={() => void handlePurchase()}
+                      disabled={createPaymentMutation.isPending || isNavigatingToCheckout}
+                      className="student-learn-cta-3d inline-flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:opacity-70"
+                    >
+                      {createPaymentMutation.isPending || isNavigatingToCheckout ? (
+                        <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <ShoppingCart className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      )}
+                      {createPaymentMutation.isPending || isNavigatingToCheckout
+                        ? "Đang tạo đơn"
+                        : "Mua ngay"}
+                    </button>
+                    <button
+                      key={`btn-mock-${bfCacheKey}`}
+                      type="button"
+                      onClick={() => void handleMockPurchase()}
+                      disabled={mockPurchaseMutation.isPending || isNavigatingToCheckout}
+                      className="inline-flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-100 disabled:opacity-70 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)] dark:hover:bg-[var(--theme-surface)]"
+                    >
+                      {mockPurchaseMutation.isPending ? (
+                        <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+                      ) : null}
+                      Mua test (dev)
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>

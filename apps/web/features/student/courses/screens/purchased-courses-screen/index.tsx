@@ -1,11 +1,14 @@
 "use client";
 
+import { Home, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import { useEffect } from "react";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
 import { StudentLearningGreetingPanel } from "@/features/student/courses/screens/purchased-courses-screen/components/student-learning-greeting-panel";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
+import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
 import { TodayLearningGoalsPanel } from "@/features/student/courses/screens/purchased-courses-screen/components/today-learning-goals-panel";
 import {
   useStudentCourseDetailPrefetch,
@@ -54,7 +57,7 @@ export function PurchasedCoursesScreen({
         style={{ background: screenBackground }}
       >
         <div
-          className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden lg:max-w-3xl"
+          className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden md:max-w-[960px] lg:max-w-[900px]"
           style={{ background: screenBackground }}
         >
           <StudentCoursesHeader title="Học tập" initialThemeMode={initialThemeMode} />
@@ -64,13 +67,46 @@ export function PurchasedCoursesScreen({
     );
   }
 
+  if (coursesQuery.isError) {
+    return (
+      <StudentFullScreenState
+        initialThemeMode={initialThemeMode}
+        title="Chưa tải được khóa học"
+        description="Bạn thử tải lại trang hoặc kiểm tra kết nối mạng rồi quay lại nhé."
+        action={
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => void coursesQuery.refetch()}
+              disabled={coursesQuery.isFetching}
+              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-black text-white transition hover:bg-sky-600 disabled:cursor-wait disabled:opacity-70"
+            >
+              <RotateCcw
+                className={coursesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+                aria-hidden="true"
+              />
+              {coursesQuery.isFetching ? "Đang tải lại" : "Tải lại"}
+            </button>
+            <Link
+              href="/student/explore"
+              className="student-learn-cta-3d-emerald inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white transition hover:bg-emerald-400"
+            >
+              <Home className="h-4 w-4" aria-hidden="true" />
+              Về Trang chủ
+            </Link>
+          </div>
+        }
+      />
+    );
+  }
+
   return (
     <main
       className="min-h-screen w-full min-w-0 overflow-x-hidden"
       style={{ background: screenBackground }}
     >
       <div
-        className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden lg:max-w-3xl"
+        className="mx-auto grid w-full min-w-0 max-w-[560px] gap-4 overflow-x-hidden md:max-w-[960px] lg:max-w-[900px]"
         style={{ background: screenBackground }}
       >
         <StudentCoursesHeader title="Học tập" initialThemeMode={initialThemeMode} />
@@ -81,15 +117,7 @@ export function PurchasedCoursesScreen({
           <TodayLearningGoalsPanel goals={todayGoals} />
         </div>
 
-        {coursesQuery.isError ? (
-          <div className="px-4 sm:px-6 lg:px-6">
-            <EmptyCourseState
-              isPageState
-              title="Chưa tải được khóa học"
-              description="Bạn thử tải lại trang hoặc kiểm tra kết nối mạng rồi quay lại nhé."
-            />
-          </div>
-        ) : purchasedCourses.length > 0 ? (
+        {purchasedCourses.length > 0 ? (
           <section
             className="grid min-w-0 gap-4 px-4 pb-2 sm:px-6 lg:px-6"
             aria-label="Danh sách khóa học của tôi"
@@ -99,12 +127,14 @@ export function PurchasedCoursesScreen({
                 <span className="relative z-10 block truncate">Khóa học của tôi</span>
               </h2>
             </div>
-            <div className="grid min-w-0 gap-6">
-              {purchasedCourses.map((course) => (
+            <div className="grid min-w-0 gap-6 md:grid-cols-2">
+              {purchasedCourses.map((course, index) => (
                 <ExploreCourseCard
                   key={course.id}
                   course={course}
                   onPrefetch={prefetchCourseDetail}
+                  accentCount={purchasedCourses.length}
+                  accentIndex={index}
                 />
               ))}
             </div>
