@@ -22,8 +22,8 @@ export function serializeLearningPath(
     id: record.id,
     kind: record.kind,
     sourceLearningPathId: record.sourceLearningPathId,
-    subject: record.subject,
-    grade: record.grade,
+    domain: record.domain,
+    targetAudiences: record.targetAudiences.map((item) => item.targetAudience),
     title: record.title,
     slug: record.slug,
     originalPriceVnd: record.originalPriceVnd,
@@ -40,6 +40,10 @@ export function serializeLearningPath(
         }
       : null,
     descriptionJson: record.descriptionJson,
+    startDate: record.startDate,
+    endDate: record.endDate,
+    lessonCountMin: record.lessonCountMin,
+    lessonCountMax: record.lessonCountMax,
     status: record.status,
     trialEnabled: record.trialEnabled,
     publishedAt: record.publishedAt,
@@ -67,8 +71,8 @@ export function serializePublicLearningPath(
 
   return {
     id: record.id,
-    subject: record.subject,
-    grade: record.grade,
+    domain: record.domain,
+    targetAudiences: record.targetAudiences.map((item) => item.targetAudience),
     title: record.title,
     slug: record.slug,
     originalPriceVnd: record.originalPriceVnd,
@@ -84,6 +88,10 @@ export function serializePublicLearningPath(
         }
       : null,
     descriptionJson: record.descriptionJson,
+    startDate: record.startDate,
+    endDate: record.endDate,
+    lessonCountMin: record.lessonCountMin,
+    lessonCountMax: record.lessonCountMax,
     status: record.status,
     trialEnabled: Boolean(trialLesson),
     publishedAt: record.publishedAt,

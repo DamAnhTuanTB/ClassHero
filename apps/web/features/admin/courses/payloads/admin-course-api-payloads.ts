@@ -14,8 +14,8 @@ export function toLearningPathApiPayload(
   values: LearningPathFormValues,
   mode: "create" | "update",
 ): AdminLearningPathPayload {
-  if (!values.subject || values.grade === "") {
-    throw new Error("Course subject and grade are required");
+  if (!values.domainId || values.targetAudienceIds.length !== 1) {
+    throw new Error("Course domain and exactly one target audience are required");
   }
 
   const thumbnailFileId = values.thumbnailFileId.trim();
@@ -24,11 +24,15 @@ export function toLearningPathApiPayload(
   return {
     title: values.title.trim(),
     ...(slug ? { slug } : {}),
-    subject: values.subject,
-    grade: Number(values.grade),
+    domainId: values.domainId,
+    targetAudienceIds: values.targetAudienceIds,
     originalPriceVnd:
       values.originalPriceVnd === "" ? 0 : Number(values.originalPriceVnd),
     salePriceVnd: values.salePriceVnd === "" ? null : Number(values.salePriceVnd),
+    startDate: values.startDate || null,
+    endDate: values.endDate || null,
+    lessonCountMin: values.lessonCountMin === "" ? null : values.lessonCountMin,
+    lessonCountMax: values.lessonCountMax === "" ? null : values.lessonCountMax,
     thumbnailFileId: thumbnailFileId || (mode === "update" ? null : undefined),
     descriptionJson: { text: values.description.trim() },
     status: values.status,

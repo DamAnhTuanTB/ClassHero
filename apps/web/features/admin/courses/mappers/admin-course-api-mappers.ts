@@ -11,6 +11,10 @@ import type {
 
 export function mapLearningPath(path: AdminLearningPathApi): AdminLearningPath {
   const chapters = (path.chapters ?? []).map(mapChapter);
+  const primaryTargetAudience =
+    path.targetAudiences.find((audience) => audience.grade !== null) ??
+    path.targetAudiences[0];
+  const targetAudienceNames = path.targetAudiences.map((audience) => audience.name);
 
   return {
     id: path.id,
@@ -22,8 +26,16 @@ export function mapLearningPath(path: AdminLearningPathApi): AdminLearningPath {
     thumbnailFileName: path.thumbnailFile?.originalName ?? "",
     thumbnailImageUrl: path.thumbnailFile?.url ?? "",
     description: descriptionJsonToText(path.descriptionJson),
-    subject: path.subject,
-    grade: path.grade,
+    startDate: toDateOnlyValue(path.startDate),
+    endDate: toDateOnlyValue(path.endDate),
+    lessonCountMin: path.lessonCountMin,
+    lessonCountMax: path.lessonCountMax,
+    subject: path.domain.name,
+    grade: primaryTargetAudience?.grade ?? 0,
+    domainId: path.domain.id,
+    targetAudienceIds: path.targetAudiences.map((audience) => audience.id),
+    targetAudienceNames,
+    targetAudienceName: targetAudienceNames.join(", "),
     originalPriceVnd: path.originalPriceVnd,
     salePriceVnd: path.salePriceVnd,
     enrolledStudentCount: path.enrolledStudentCount,
@@ -118,6 +130,10 @@ function toDateTimeLocalValue(value: string | null) {
 
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return localDate.toISOString().slice(0, 16);
+}
+
+function toDateOnlyValue(value: string | null) {
+  return value ? value.slice(0, 10) : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

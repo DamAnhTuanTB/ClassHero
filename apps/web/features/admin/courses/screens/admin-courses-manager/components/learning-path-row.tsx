@@ -38,7 +38,7 @@ export function LearningPathRow({
   return (
     <article
       className={cn(
-        "grid grid-cols-[2.75rem_minmax(0,1fr)_auto] gap-3 border-b px-4 py-4 transition-colors last:border-b-0 lg:grid-cols-[2.75rem_1.2fr_0.42fr_0.42fr_0.75fr_0.55fr_7rem] lg:items-center",
+        "grid grid-cols-[2.75rem_minmax(0,1fr)_auto] gap-3 border-b px-4 py-4 transition-colors last:border-b-0 lg:grid-cols-[2.75rem_1.2fr_0.35fr_1fr_0.65fr_0.4fr_6rem] lg:items-center",
         "border-[var(--theme-border)]",
         isSelected
           ? "bg-[var(--theme-primary-soft)]"
@@ -80,9 +80,6 @@ export function LearningPathRow({
             aria-hidden="true"
           />
         </div>
-        <p className="mt-1 truncate text-sm font-semibold text-[var(--theme-text-muted)]">
-          {path.slug}
-        </p>
       </Link>
       <div
         className={cn(
@@ -90,8 +87,8 @@ export function LearningPathRow({
           mobileCellClass,
         )}
       >
-        <span className={mobileLabelClass}>Môn học</span>
-        <span className={mobileValueClass}>{subjectLabels[path.subject]}</span>
+        <span className={mobileLabelClass}>Lĩnh vực</span>
+        <span className={mobileValueClass}>{subjectLabels[path.subject] ?? path.subject}</span>
       </div>
       <div
         className={cn(
@@ -99,8 +96,8 @@ export function LearningPathRow({
           mobileCellClass,
         )}
       >
-        <span className={mobileLabelClass}>Khối lớp</span>
-        <span className={mobileValueClass}>Lớp {path.grade}</span>
+        <span className={mobileLabelClass}>Đối tượng hướng đến</span>
+        <span className={mobileValueClass}>{path.targetAudienceName ?? `Khối ${path.grade}`}</span>
       </div>
       <div
         className={cn(

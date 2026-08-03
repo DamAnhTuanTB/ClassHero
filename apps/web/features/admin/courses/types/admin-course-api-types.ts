@@ -2,7 +2,6 @@ import type {
   AdminChapter,
   AdminLessonType,
   AdminPublishStatus,
-  AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
 
 export type AdminLearningPathKind = "CATALOG" | "PERSONALIZED";
@@ -20,8 +19,18 @@ export type AdminLearningPathApi = {
     url: string | null;
   } | null;
   descriptionJson: unknown;
-  subject: AdminSubject;
-  grade: number;
+  startDate: string | null;
+  endDate: string | null;
+  lessonCountMin: number | null;
+  lessonCountMax: number | null;
+  domain: { id: string; name: string; slug: string };
+  targetAudiences: Array<{
+    id: string;
+    code: string;
+    name: string;
+    grade: number | null;
+    sortOrder: number;
+  }>;
   originalPriceVnd: number;
   salePriceVnd: number | null;
   enrolledStudentCount: number;
@@ -100,7 +109,7 @@ export type AdminLessonApi = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
-  customVideoSettings?: any;
+  customVideoSettings?: unknown;
 };
 
 export type UploadedFileApi = {
@@ -116,13 +125,17 @@ export type SignedUrlApi = {
 
 export type AdminLearningPathPayload = {
   descriptionJson?: Record<string, unknown>;
-  grade: number;
+  targetAudienceIds: string[];
   originalPriceVnd: number;
   salePriceVnd?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  lessonCountMin?: number | null;
+  lessonCountMax?: number | null;
   slug?: string;
   sortOrder: number;
   status: Exclude<AdminPublishStatus, "ARCHIVED">;
-  subject: AdminSubject;
+  domainId: string;
   thumbnailFileId?: string | null;
   title: string;
 };

@@ -60,7 +60,7 @@ export function PersonalPathBanner({
           <p className="mt-0.5 font-bold text-purple-800 dark:text-purple-200">
             {isInitialPending ? (
               <span
-                className="inline-block h-4 w-32 animate-pulse rounded bg-purple-200 dark:bg-purple-800"
+                className="inline-block h-4 w-32 animate-pulse rounded bg-[var(--theme-skeleton)]"
                 aria-label="Đang tải tên học sinh"
               />
             ) : (
@@ -72,7 +72,7 @@ export function PersonalPathBanner({
             <span className="truncate">
               Khóa nguồn:{" "}
               {isInitialPending ? (
-                <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-purple-200 dark:bg-purple-800" />
+                <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-[var(--theme-skeleton)]" />
               ) : (
                 <span className="font-semibold">{basePathTitle}</span>
               )}

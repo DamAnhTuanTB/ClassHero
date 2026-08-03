@@ -10,6 +10,7 @@ export type AdminCoursesSidebarItem = {
   label: string;
   icon: LucideIcon;
   active: boolean;
+  href?: string;
 };
 
 type AdminCoursesSidebarProps = {

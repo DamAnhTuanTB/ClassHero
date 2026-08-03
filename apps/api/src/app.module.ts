@@ -6,6 +6,7 @@ import { PrismaModule } from "#api/common/prisma/prisma.module";
 import { validateEnv } from "#api/config/env.validation";
 import { AiModule } from "#api/modules/ai/ai.module";
 import { AuthModule } from "#api/modules/auth/auth.module";
+import { DomainsModule } from "#api/modules/domains/domains.module";
 import { FilesModule } from "#api/modules/files/files.module";
 import { FlashcardsModule } from "#api/modules/flashcards/flashcards.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
@@ -25,6 +26,7 @@ import { TestsModule } from "#api/modules/tests/tests.module";
     PrismaModule,
     AiModule,
     AuthModule,
+    DomainsModule,
     FilesModule,
     FlashcardsModule,
     JobsModule,

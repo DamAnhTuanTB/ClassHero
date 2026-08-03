@@ -1,19 +1,15 @@
 "use client";
 
-import { BookOpen, Hash, Layers3, Loader2, Save, SlidersHorizontal } from "lucide-react";
+import { BookOpen, ListOrdered, Loader2, Save, SlidersHorizontal } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import { MoneyField } from "@/features/admin/courses/screens/admin-courses-manager/components/money-field";
+import { CourseDateField } from "@/features/admin/courses/screens/admin-courses-manager/components/course-date-field";
 import { PathCoverUpload } from "@/features/admin/courses/screens/admin-courses-manager/components/path-cover-upload";
 import { PathDescriptionField } from "@/features/admin/courses/screens/admin-courses-manager/components/path-description-field";
-import {
-  adminGrades,
-  adminStatuses,
-  adminSubjects,
-  statusLabels,
-  subjectLabels,
-} from "@/features/admin/courses/admin-courses-data";
+import { adminStatuses, statusLabels } from "@/features/admin/courses/admin-courses-data";
+import type { AdminDomain, AdminTargetAudience } from "@/features/admin/domains/api/admin-domains-api";
 import type { LearningPathFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 
@@ -24,6 +20,8 @@ export function PathEditor({
   onClose,
   onSubmit,
   onUploadCover,
+  domains,
+  targetAudiences,
 }: {
   mode: EditorMode;
   form: UseFormReturn<LearningPathFormValues>;
@@ -35,11 +33,44 @@ export function PathEditor({
     fileName: string;
     imageUrl: string;
   }>;
+  domains: AdminDomain[];
+  targetAudiences: AdminTargetAudience[];
 }) {
+  const startDate = form.watch("startDate");
+  const endDate = form.watch("endDate");
+  const dateRangeError = getDateRangeError(startDate, endDate);
+  const endDateFieldError = dateRangeError
+    ? { type: "validate" as const, message: dateRangeError }
+    : form.formState.errors.endDate;
+  const targetAudienceErrorMessage =
+    form.formState.errors.targetAudienceIds?.message ??
+    form.formState.errors.targetAudienceIds?.root?.message;
+  const targetAudienceFieldError = targetAudienceErrorMessage
+    ? { type: "validate" as const, message: targetAudienceErrorMessage }
+    : undefined;
+
+  function updateCourseDate(
+    field: "startDate" | "endDate",
+    value: string,
+  ) {
+    form.setValue(field, value, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  }
+
+  function handleSubmit(values: LearningPathFormValues) {
+    if (getDateRangeError(values.startDate, values.endDate)) {
+      return;
+    }
+
+    return onSubmit(values);
+  }
+
   return (
     <form
       className="flex min-h-0 flex-1 flex-col"
-      onSubmit={form.handleSubmit(onSubmit)}
+      onSubmit={form.handleSubmit(handleSubmit)}
       noValidate
     >
       <div className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-20 sm:px-5 sm:py-3 sm:pr-20">
@@ -50,7 +81,7 @@ export function PathEditor({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
         <div className="grid gap-3">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_16rem]">
+          <div className="grid gap-3 sm:grid-cols-2">
             <TextField
               id="admin-course-title"
               label="Tên khóa học"
@@ -102,39 +133,41 @@ export function PathEditor({
             error={form.formState.errors.description}
             {...form.register("description")}
           />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3">
             <OptionField
-              id="admin-course-subject"
-              label="Môn"
-              value={form.watch("subject")}
-              placeholder="Chọn môn"
-              icon={<Layers3 className="h-5 w-5" aria-hidden="true" />}
-              error={form.formState.errors.subject}
-              options={adminSubjects.map((subject) => ({
-                value: subject,
-                label: subjectLabels[subject],
+              id="admin-course-domain"
+              label="Lĩnh vực"
+              value={form.watch("domainId")}
+              placeholder="Chọn lĩnh vực"
+              icon={null}
+              error={form.formState.errors.domainId}
+              options={domains.map((domain) => ({
+                value: domain.id,
+                label: domain.name,
               }))}
+              disabled={domains.length === 0}
               onChange={(value) =>
-                form.setValue("subject", value as LearningPathFormValues["subject"], {
+                form.setValue("domainId", value, {
                   shouldDirty: true,
                   shouldValidate: true,
                 })
               }
             />
             <OptionField
-              id="admin-course-grade"
-              label="Lớp"
-              value={form.watch("grade") === "" ? "" : String(form.watch("grade"))}
-              placeholder="Chọn lớp"
-              icon={<Hash className="h-5 w-5" aria-hidden="true" />}
-              error={form.formState.errors.grade}
-              options={adminGrades.map((grade) => ({
-                value: String(grade),
-                label: `Lớp ${grade}`,
+              id="admin-course-target-audience"
+              label="Đối tượng hướng đến"
+              value={form.watch("targetAudienceIds")[0] ?? ""}
+              placeholder="Chọn đối tượng"
+              error={targetAudienceFieldError}
+              options={targetAudiences.map((audience) => ({
+                value: audience.id,
+                label: audience.name,
               }))}
+              disabled={targetAudiences.length === 0}
               onChange={(value) =>
-                form.setValue("grade", value === "" ? "" : Number(value), {
+                form.setValue("targetAudienceIds", [value], {
                   shouldDirty: true,
+                  shouldTouch: true,
                   shouldValidate: true,
                 })
               }
@@ -169,6 +202,62 @@ export function PathEditor({
               }
             />
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CourseDateField
+              id="admin-course-start-date"
+              label="Ngày bắt đầu"
+              value={startDate}
+              error={form.formState.errors.startDate}
+              onChange={(value) => updateCourseDate("startDate", value)}
+            />
+            <CourseDateField
+              id="admin-course-end-date"
+              label="Ngày kết thúc"
+              value={endDate}
+              error={endDateFieldError}
+              onChange={(value) => updateCourseDate("endDate", value)}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField
+              id="admin-course-lesson-count-min"
+              label="Số buổi tối thiểu"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              isOptional
+              icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
+              value={form.watch("lessonCountMin")}
+              error={form.formState.errors.lessonCountMin}
+              onChange={(event) => {
+                const digits = event.currentTarget.value.replace(/\D/g, "");
+                form.setValue("lessonCountMin", digits === "" ? "" : Number(digits), {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true,
+                });
+              }}
+            />
+            <TextField
+              id="admin-course-lesson-count-max"
+              label="Số buổi tối đa"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              isOptional
+              icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
+              value={form.watch("lessonCountMax")}
+              error={form.formState.errors.lessonCountMax}
+              onChange={(event) => {
+                const digits = event.currentTarget.value.replace(/\D/g, "");
+                form.setValue("lessonCountMax", digits === "" ? "" : Number(digits), {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true,
+                });
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -196,4 +285,10 @@ export function PathEditor({
       </div>
     </form>
   );
+}
+
+function getDateRangeError(startDate: string, endDate: string) {
+  return startDate && endDate && endDate < startDate
+    ? "Ngày kết thúc không được sớm hơn ngày bắt đầu"
+    : null;
 }

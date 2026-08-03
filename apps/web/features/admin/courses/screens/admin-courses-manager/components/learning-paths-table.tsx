@@ -57,7 +57,7 @@ export function LearningPathsTable({
           selectedPathIds.length > 0 ? "mt-3" : "mt-4",
         )}
       >
-        <div className="hidden grid-cols-[2.75rem_1.2fr_0.42fr_0.42fr_0.75fr_0.55fr_7rem] items-center gap-3 border-b border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-3 text-xs font-extrabold uppercase text-[var(--theme-text-muted)] lg:grid">
+        <div className="hidden grid-cols-[2.75rem_1.2fr_0.35fr_1fr_0.65fr_0.4fr_6rem] items-center gap-3 border-b border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-3 text-xs font-extrabold uppercase text-[var(--theme-text-muted)] lg:grid">
           <label className="flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-primary)] transition hover:border-[var(--theme-primary-border)]">
             <input
               type="checkbox"
@@ -80,14 +80,14 @@ export function LearningPathsTable({
             onClick={() => onToggleSort("title")}
           />
           <SortHeaderButton
-            label="Môn"
+            label="Lĩnh vực"
             isActive={sortKey === "subject"}
             direction={sortDirection}
             isDarkTheme={isDarkTheme}
             onClick={() => onToggleSort("subject")}
           />
           <SortHeaderButton
-            label="Lớp"
+            label="Đối tượng"
             isActive={sortKey === "grade"}
             direction={sortDirection}
             isDarkTheme={isDarkTheme}

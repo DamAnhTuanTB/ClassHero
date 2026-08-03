@@ -47,7 +47,9 @@ Nếu server initial fetch tạm thất bại, màn vẫn phải render skeleton
 
 `useStudentMockPurchaseMutation` dùng TanStack Mutation để gọi mock payment API. Khi mutation thành công, hook invalidate cache list/detail theo user hiện tại để course detail lấy lại `access.hasActiveEnrollment = true`; UI tự ẩn box giá và hiện trạng thái học.
 
-Filter ở `/student/explore` vẫn là state client-side vì API hiện đã trả đủ dữ liệu published cho MVP browsing. Khi danh sách lớn hơn hoặc cần SEO public list, mới tách sang query server-side/pagination/filter sâu hơn.
+Filter ở `/student/explore` vẫn lọc danh sách khóa học ở client vì API hiện đã trả đủ dữ liệu published cho MVP browsing. Tuy nhiên option không còn hard-code: `listStudentLearningPaths` tải song song danh sách khóa học và `GET /catalog/course-options`, rồi gộp cả hai vào cùng TanStack Query result để server render và client hydrate dùng chung một snapshot. Hai select giữ copy `Khối lớp`/`Môn học`, nhưng giá trị là ID của `target_audiences`/`domains`; vì vậy admin đổi tên hoặc thứ tự catalog không làm sai logic filter. Khi danh sách khóa học lớn hơn hoặc cần SEO public list, mới tách filter sâu sang query server-side/pagination.
+
+Màn Khám phá vẫn đọc `targetAudiences[]` để tương thích dữ liệu lịch sử, nhưng UI/API admin mới chỉ gán một đối tượng. Khi `Khối lớp = Tất cả`, khóa đã mua đứng đầu và bị loại khỏi toàn bộ phần dưới. Nhóm phù hợp gồm khóa chưa mua khớp đúng grade, khớp cấp Tiểu học/THCS/THPT của grade, hoặc `Toàn khối`; khóa phù hợp vẫn lặp lại ở dải đối tượng tương ứng. Các dải còn lại bám thứ tự nghiệp vụ 12→10, THPT, 9→6, THCS, 5→3, Tiểu học, toàn khối học sinh, Người đi làm và ẩn nhóm rỗng.
 
 ## Back-end
 
@@ -89,6 +91,10 @@ Mock buy-now nằm trong `apps/api/src/modules/payments`, tách khỏi `learning
 - Nguyên nhân: student shell hoặc filter Explore dùng `studentProfile.grade` từ mock UI, hoặc server chỉ có `AuthUser` nên render `Học sinh` rồi client `/me` mới đổi riêng thành `Học sinh lớp 6`.
 - Cách tránh: student layout phải giữ trọn current-user response từ `/me` và seed nó vào shell/query ngay ở render server; filter course dùng `meta.priorityGrade`. Mock chỉ dùng cho dữ liệu demo chưa nối API, không dùng cho thông tin định danh/profile của user đã đăng nhập.
 
+- Lỗi: admin thêm Lĩnh vực hoặc Đối tượng hướng đến nhưng select student không xuất hiện option mới.
+- Nguyên nhân: màn Khám phá giữ mảng khối/môn hard-code hoặc dùng tên hiển thị làm value.
+- Cách tránh: tải `GET /catalog/course-options` cùng request danh sách khóa học, giữ thứ tự backend và filter bằng UUID; label student có thể khác thuật ngữ quản trị mà không làm thay đổi nguồn dữ liệu.
+
 - Lỗi: admin course đã lưu `thumbnailFileId` nhưng màn Khám phá vẫn hiện hình minh họa mặc định.
 - Nguyên nhân: admin API resolve `thumbnailFile.url`, còn public learning path API chỉ trả `thumbnailFileId`; mapper web không có URL ảnh để đưa vào `ExploreCourseCard`.
 - Cách tránh: selector/serializer public phải trả `thumbnailFile: { id, originalName, url } | null` với URL đã resolve qua FilesService; mapper student đổi URL đó thành `StudentCourse.thumbnailImageUrl` và card chỉ dùng fallback illustration khi không có URL.
@@ -113,9 +119,19 @@ Mock buy-now nằm trong `apps/api/src/modules/payments`, tách khỏi `learning
 - Nguyên nhân: public detail selector lọc chapter theo `PUBLISHED`, hoặc mapper UI chỉ nhìn trạng thái lesson mà bỏ qua `chapter.status`.
 - Cách tránh: detail API vẫn trả chapter chưa bị xóa mềm kể cả `DRAFT/HIDDEN`; mapper UI phải dùng `chapter.status` làm gate cấp chương. Nếu chapter không phải `PUBLISHED`, mọi lesson bên trong hiển thị trạng thái `locked`.
 
+- Lỗi: route course không tồn tại bị giữ ở skeleton lâu rồi skeleton co thành một cột hẹp giữa màn hình.
+- Nguyên nhân: TanStack Query retry cả lỗi HTTP `404` vốn không thể tự hồi phục, đồng thời root skeleton không có `w-full` khi nằm trong grid `place-items-center`.
+- Cách tránh: không retry lỗi client `4xx`, chuyển ngay sang error/not-found state có hành động quay lại; skeleton detail/list phải tự khai báo chiều rộng đầy đủ thay vì phụ thuộc vào parent kéo giãn.
+
+- Lỗi: thanh toán thành công rồi Back về course detail nhưng CTA vẫn là `Mua ngay`.
+- Nguyên nhân: browser khôi phục nguyên document trước checkout từ BFCache, bao gồm TanStack Query snapshot `locked`; cache invalidation ở payment result thuộc document khác nên không đi ngược vào snapshot này.
+- Cách tránh: khi `pageshow.persisted = true`, course detail refetch chính query detail và invalidate query danh sách theo user. UI chỉ đổi quyền sau response backend, không optimistic-update trạng thái payment.
+
 ## File quan trọng
 
 - `apps/web/features/student/shared/api/student-learning-paths-api.ts`
+- `apps/web/features/student/explore/hooks/use-student-courses-filter.ts`
+- `apps/api/src/modules/domains/controllers/public-domains.controller.ts`
 - `apps/web/features/student/shared/api/server-student-learning-paths-api.ts`
 - `apps/web/features/student/shared/hooks/use-student-courses-query.ts`
 - `apps/web/features/student/lessons/api/server-student-lessons-api.ts`

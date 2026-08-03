@@ -40,6 +40,10 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 
 ## Luồng lỗi thường gặp
 
+- Lỗi: admin mở danh sách khóa học nhưng chỉ thấy trạng thái “Chưa tải được danh sách” ngay sau khi bổ sung field mới cho `learning_paths`.
+- Nguyên nhân: API đã select cột mới trong Prisma nhưng database local chưa áp migration tạo các cột đó. Query list lỗi ở database trước khi API có thể trả dữ liệu cho TanStack Query.
+- Cách tránh: sau mọi thay đổi Prisma schema có migration, chạy `pnpm --filter @learning-path/api prisma migrate status` trước khi mở UI; nếu có migration pending ở local, áp bằng `pnpm --filter @learning-path/api prisma migrate deploy`. Chỉ typecheck/generate Prisma là chưa đủ vì chúng không thay đổi schema database đang chạy.
+- Nếu task đồng thời thêm Nest module/controller mới, phải kiểm tra route startup log hoặc gọi endpoint thật trên port `4000`. Process API build cũ có thể vẫn trả `404` dù source code và typecheck đã đúng; restart `pnpm --filter api dev` để API và worker cùng nạp schema/module mới trước khi browser test.
 - Lỗi: chọn ảnh trong modal, lưu, đóng modal, bấm edit lại thì ảnh đại diện hiển thị broken image.
 - Nguyên nhân: state form/mock giữ `blob:` URL tạo bằng `URL.createObjectURL`, nhưng component upload đã revoke URL khi unmount.
 - Cách tránh khi còn mock UI: dùng `FileReader.readAsDataURL` để lưu data URL ổn định trong state local, và thêm fallback placeholder khi ảnh hiện tại không load được. Khi đã nối API thật, phải upload lên Files API trước và lưu `thumbnailFileId`; không lưu URL tạm vào dữ liệu production-connected.
@@ -104,6 +108,10 @@ Với upload ảnh thật, UI upload file trước qua `POST /files/upload` vớ
 - Lỗi: dòng phương án trong `useFieldArray` đã hiện dấu chọn đáp án đúng nhưng Zod vẫn báo “Hãy chọn một phương án đúng”.
 - Nguyên nhân: UI so sánh với ID nằm trên snapshot `fields`, còn `optionId` không được đăng ký vào React Hook Form nên resolver có thể nhận shape khác với trạng thái đang hiển thị; rule chọn đáp án đúng còn phụ thuộc nhầm vào việc phương án đã có nội dung.
 - Cách tránh: đăng ký cả ID ổn định của mỗi dòng bằng hidden input, lưu đáp án đúng bằng ID đó và validate hai việc độc lập: từng phương án phải có nội dung, còn đáp án đúng chỉ cần trỏ tới một ID đang tồn tại. Không gọi `trigger()` cho toàn bộ field array ở mỗi ký tự vì sẽ làm các dòng chưa chạm vào hiện lỗi; để `mode/reValidateMode: onChange` xử lý field đang nhập, validate field phụ thuộc khi action chọn thay đổi và dùng `handleSubmit` để kiểm tra toàn form lúc lưu.
+
+## Đối tượng hướng đến chọn đơn
+
+Modal khóa học chỉ cho chọn một đối tượng và gửi `targetAudienceIds[]` với đúng một phần tử. Backend vẫn lưu bằng bảng nối `learning_path_target_audiences` để tương thích dữ liệu cũ; khi update phải thay liên kết trong cùng thao tác ghi, còn response admin/public vẫn trả `targetAudiences[]` theo thứ tự catalog. Dữ liệu lịch sử có nhiều liên kết không bị xóa tự động, nhưng phải chọn lại một đối tượng trước lần lưu tiếp theo.
 
 ## File quan trọng
 

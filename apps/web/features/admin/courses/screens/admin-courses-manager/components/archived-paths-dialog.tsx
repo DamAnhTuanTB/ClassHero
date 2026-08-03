@@ -112,8 +112,8 @@ export function ArchivedPathsDialog({
                       </p>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                      <Badge>{subjectLabels[path.subject]}</Badge>
-                      <Badge>Lớp {path.grade}</Badge>
+                      <Badge>{subjectLabels[path.subject] ?? path.subject}</Badge>
+                      <Badge>{path.targetAudienceName ?? `Khối ${path.grade}`}</Badge>
                       <Badge>
                         {formatPrice(path.salePriceVnd ?? path.originalPriceVnd)}
                       </Badge>

@@ -1,4 +1,4 @@
-export type AdminSubject = "MATH" | "PHYSICS" | "CHEMISTRY";
+export type AdminSubject = string;
 export type AdminPublishStatus = "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED";
 export type AdminEditableStatus = Exclude<AdminPublishStatus, "ARCHIVED">;
 export type AdminLessonType = "BASIC" | "LIVE";
@@ -43,8 +43,16 @@ export type AdminLearningPath = {
   thumbnailFileName?: string;
   thumbnailImageUrl: string;
   description: string;
+  startDate: string | null;
+  endDate: string | null;
+  lessonCountMin: number | null;
+  lessonCountMax: number | null;
   subject: AdminSubject;
   grade: number;
+  domainId?: string;
+  targetAudienceIds?: string[];
+  targetAudienceNames?: string[];
+  targetAudienceName?: string;
   originalPriceVnd: number;
   salePriceVnd: number | null;
   enrolledStudentCount: number;
@@ -101,6 +109,10 @@ export const adminLearningPaths: AdminLearningPath[] = [
     thumbnailImageUrl: "",
     description:
       "Khóa học củng cố nền tảng Toán 7 theo từng buổi học, giúp học sinh nắm chắc lý thuyết và luyện bài tập trọng tâm.",
+    startDate: null,
+    endDate: null,
+    lessonCountMin: null,
+    lessonCountMax: null,
     subject: "MATH",
     grade: 7,
     originalPriceVnd: 2_000_000,
@@ -173,6 +185,10 @@ export const adminLearningPaths: AdminLearningPath[] = [
     thumbnailImageUrl: "",
     description:
       "Chuỗi buổi học Vật lý 8 tập trung vào chuyển động, lực và các dạng bài vận dụng thường gặp.",
+    startDate: null,
+    endDate: null,
+    lessonCountMin: null,
+    lessonCountMax: null,
     subject: "PHYSICS",
     grade: 8,
     originalPriceVnd: 1_800_000,
@@ -221,6 +237,10 @@ export const adminLearningPaths: AdminLearningPath[] = [
     thumbnailImageUrl: "",
     description:
       "Khóa học ôn tập Hóa 9 theo chuyên đề, kết hợp lý thuyết ngắn gọn và bài tập nhận biết.",
+    startDate: null,
+    endDate: null,
+    lessonCountMin: null,
+    lessonCountMax: null,
     subject: "CHEMISTRY",
     grade: 9,
     originalPriceVnd: 2_200_000,

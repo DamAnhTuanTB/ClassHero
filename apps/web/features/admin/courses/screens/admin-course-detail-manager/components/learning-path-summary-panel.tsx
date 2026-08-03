@@ -61,16 +61,16 @@ export function LearningPathSummaryPanel({
             <div className={cellClass}>
               <div className={labelClass}>
                 <Layers3 className="h-4 w-4" aria-hidden="true" />
-                Môn học
+                Lĩnh vực
               </div>
-              <p className={valueClass}>{subjectLabels[path.subject]}</p>
+              <p className={valueClass}>{subjectLabels[path.subject] ?? path.subject}</p>
             </div>
             <div className={cellClass}>
               <div className={labelClass}>
                 <Hash className="h-4 w-4" aria-hidden="true" />
-                Khối lớp
+                Đối tượng hướng đến
               </div>
-              <p className={valueClass}>Lớp {path.grade}</p>
+              <p className={valueClass}>{path.targetAudienceName ?? `Khối ${path.grade}`}</p>
             </div>
             <div className={cellClass}>
               <div className={labelClass}>

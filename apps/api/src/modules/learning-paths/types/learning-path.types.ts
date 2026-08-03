@@ -25,8 +25,10 @@ export type LearningPathResponse = {
   id: string;
   kind: LearningPathRecord["kind"];
   sourceLearningPathId: string | null;
-  subject: LearningPathRecord["subject"];
-  grade: number;
+  domain: LearningPathRecord["domain"];
+  targetAudiences: Array<
+    LearningPathRecord["targetAudiences"][number]["targetAudience"]
+  >;
   title: string;
   slug: string;
   originalPriceVnd: number;
@@ -41,6 +43,10 @@ export type LearningPathResponse = {
     url: string | null;
   } | null;
   descriptionJson: Prisma.JsonValue | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  lessonCountMin: number | null;
+  lessonCountMax: number | null;
   status: PublishStatus;
   trialEnabled: boolean;
   publishedAt: Date | null;

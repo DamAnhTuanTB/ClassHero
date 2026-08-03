@@ -8,8 +8,8 @@ import { LearningPathsTable } from "@/features/admin/courses/screens/admin-cours
 import type {
   AdminLearningPath,
   AdminPublishStatus,
-  AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
+import type { AdminCatalogOptions } from "@/features/admin/domains/api/admin-domains-api";
 import type {
   LearningPathSortKey,
   SortDirection,
@@ -18,56 +18,58 @@ import type {
 
 type AdminCoursesContentProps = {
   allFilteredPathsSelected: boolean;
+  catalogOptions: AdminCatalogOptions;
+  domainFilter: string | "ALL";
   filteredPaths: AdminLearningPath[];
-  gradeFilter: number | "ALL";
   isDarkTheme: boolean;
   query: string;
   selectedPathIds: string[];
   sortDirection: SortDirection;
   sortKey: LearningPathSortKey;
   statusFilter: AdminPublishStatus | "ALL";
-  subjectFilter: AdminSubject | "ALL";
+  targetAudienceFilter: string | "ALL";
   viewState: ViewState;
   onArchivePath: (pathId: string) => void;
   onClearSelected: () => void;
   onCreatePath: () => void;
   onEditPath: (pathId: string) => void;
   onPrefetchPath: (pathId: string) => void;
-  onGradeChange: (value: number | "ALL") => void;
+  onDomainChange: (value: string | "ALL") => void;
   onQueryChange: (value: string) => void;
   onRequestDeleteSelected: () => void;
   onRetryLoad: () => void;
   onSelectPath: (pathId: string) => void;
   onStatusChange: (value: AdminPublishStatus | "ALL") => void;
-  onSubjectChange: (value: AdminSubject | "ALL") => void;
+  onTargetAudienceChange: (value: string | "ALL") => void;
   onToggleSelectAll: () => void;
   onToggleSort: (sortKey: LearningPathSortKey) => void;
 };
 
 export function AdminCoursesContent({
   allFilteredPathsSelected,
+  catalogOptions,
+  domainFilter,
   filteredPaths,
-  gradeFilter,
   isDarkTheme,
   query,
   selectedPathIds,
   sortDirection,
   sortKey,
   statusFilter,
-  subjectFilter,
+  targetAudienceFilter,
   viewState,
   onArchivePath,
   onClearSelected,
   onCreatePath,
   onEditPath,
   onPrefetchPath,
-  onGradeChange,
+  onDomainChange,
   onQueryChange,
   onRequestDeleteSelected,
   onRetryLoad,
   onSelectPath,
   onStatusChange,
-  onSubjectChange,
+  onTargetAudienceChange,
   onToggleSelectAll,
   onToggleSort,
 }: AdminCoursesContentProps) {
@@ -83,14 +85,16 @@ export function AdminCoursesContent({
         <div className="min-w-0">
           <FilterBar
             isDarkTheme={isDarkTheme}
+            domains={catalogOptions.domains}
+            domainFilter={domainFilter}
             query={query}
-            subjectFilter={subjectFilter}
             statusFilter={statusFilter}
-            gradeFilter={gradeFilter}
+            targetAudiences={catalogOptions.targetAudiences}
+            targetAudienceFilter={targetAudienceFilter}
+            onDomainChange={onDomainChange}
             onQueryChange={onQueryChange}
-            onSubjectChange={onSubjectChange}
             onStatusChange={onStatusChange}
-            onGradeChange={onGradeChange}
+            onTargetAudienceChange={onTargetAudienceChange}
           />
 
           {filteredPaths.length === 0 ? (

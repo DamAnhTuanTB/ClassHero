@@ -42,8 +42,14 @@ export class PublicLearningPathsService {
     const where: Prisma.LearningPathWhereInput = {
       kind: LearningPathKind.CATALOG,
       deletedAt: null,
-      ...(query.subject ? { subject: query.subject } : {}),
-      ...(query.grade ? { grade: query.grade } : {}),
+      ...(query.domainId ? { domainId: query.domainId } : {}),
+      ...(query.targetAudienceId
+        ? {
+            targetAudiences: {
+              some: { targetAudienceId: query.targetAudienceId },
+            },
+          }
+        : {}),
       ...(enrolledLearningPathIds.length > 0
         ? {
             OR: [
@@ -61,19 +67,9 @@ export class PublicLearningPathsService {
         : { status: PublishStatus.PUBLISHED }),
     };
 
-    const [items, total, gradeGroups] = await Promise.all([
-      this.findVisiblePage(where, query.grade, viewer.studentGrade, page, pageSize),
+    const [items, total] = await Promise.all([
+      this.findVisiblePage(where, query.targetAudienceId, viewer.studentGrade, page, pageSize),
       this.prisma.learningPath.count({ where }),
-      this.prisma.learningPath.groupBy({
-        by: ["grade"],
-        where,
-        _count: {
-          _all: true,
-        },
-        orderBy: {
-          grade: "asc",
-        },
-      }),
     ]);
 
     await this.attachStudentLearningState(viewer, items);
@@ -95,11 +91,8 @@ export class PublicLearningPathsService {
         pageSize,
         total,
         totalPages: Math.ceil(total / pageSize),
-        priorityGrade: query.grade ?? viewer.studentGrade ?? null,
-        gradeGroups: gradeGroups.map((group) => ({
-          grade: group.grade,
-          count: group._count._all,
-        })),
+        priorityGrade: viewer.studentGrade ?? null,
+        gradeGroups: [],
       },
     };
   }
@@ -132,7 +125,7 @@ export class PublicLearningPathsService {
       throwNotFound();
     }
 
-    let finalLearningPath = learningPath;
+    let finalLearningPath: PublicLearningPathDetailRecord = learningPath;
 
     if (activeEnrollment?.deliveryLearningPathId) {
       const deliveryPath = await this.prisma.learningPath.findUnique({
@@ -147,7 +140,7 @@ export class PublicLearningPathsService {
           lessons: deliveryPath.lessons,
           totalChapterCount: deliveryPath.totalChapterCount,
           totalLessonCount: deliveryPath.totalLessonCount,
-        } as any;
+        };
 
         await this.attachLessonProgress(
           viewer,
@@ -165,7 +158,7 @@ export class PublicLearningPathsService {
 
   private async findVisiblePage(
     where: Prisma.LearningPathWhereInput,
-    explicitGrade: number | undefined,
+    explicitAudienceId: string | undefined,
     priorityGrade: number | undefined,
     page: number,
     pageSize: number,
@@ -173,7 +166,7 @@ export class PublicLearningPathsService {
     const orderBy = getPublicLearningPathOrderBy();
     const skip = (page - 1) * pageSize;
 
-    if (explicitGrade || !priorityGrade) {
+    if (explicitAudienceId || !priorityGrade) {
       return this.prisma.learningPath.findMany({
         where,
         select: publicLearningPathSelect,
@@ -185,12 +178,16 @@ export class PublicLearningPathsService {
 
     const priorityWhere: Prisma.LearningPathWhereInput = {
       ...where,
-      grade: priorityGrade,
+      targetAudiences: {
+        some: { targetAudience: { grade: priorityGrade } },
+      },
     };
     const otherWhere: Prisma.LearningPathWhereInput = {
       ...where,
       NOT: {
-        grade: priorityGrade,
+        targetAudiences: {
+          some: { targetAudience: { grade: priorityGrade } },
+        },
       },
     };
     const priorityTotal = await this.prisma.learningPath.count({

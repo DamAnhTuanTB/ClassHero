@@ -4,9 +4,9 @@
 
 Hệ thống là nền tảng học theo lộ trình rõ ràng cho học sinh.
 
-Mỗi lộ trình tương ứng với một môn học theo khối lớp, ví dụ:
+Mỗi lộ trình tương ứng với một Lĩnh vực và một hoặc nhiều Đối tượng hướng đến, ví dụ:
 
-- Toán 7.
+- Toán — Khối 7, Khối 8.
 - Toán 8.
 - Lý 8.
 - Hóa 9.

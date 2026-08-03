@@ -1,21 +1,17 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { Subject } from "@prisma/client";
-import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class PublicLearningPathQueryDto {
-  @ApiPropertyOptional({ enum: Subject, example: Subject.MATH })
+  @ApiPropertyOptional({ example: "10000000-0000-4000-8000-000000000001" })
   @IsOptional()
-  @IsEnum(Subject)
-  subject?: Subject;
+  @IsString()
+  domainId?: string;
 
-  @ApiPropertyOptional({ example: 7, minimum: 3, maximum: 12 })
+  @ApiPropertyOptional({ example: "20000000-0000-4000-8000-000000000007" })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(3)
-  @Max(12)
-  grade?: number;
+  @IsString()
+  targetAudienceId?: string;
 
   @ApiPropertyOptional({ example: 1, minimum: 1, default: 1 })
   @IsOptional()

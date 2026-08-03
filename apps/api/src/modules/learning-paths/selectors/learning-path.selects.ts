@@ -8,12 +8,22 @@ const thumbnailFileSelect = {
   publicUrl: true,
 } satisfies Prisma.FileSelect;
 
+const targetAudiencesRelation = {
+  select: {
+    targetAudience: {
+      select: { id: true, code: true, name: true, grade: true, sortOrder: true },
+    },
+  },
+  orderBy: { targetAudience: { sortOrder: "asc" } },
+} satisfies Prisma.LearningPathTargetAudienceFindManyArgs;
+
 export const learningPathSelect = {
   id: true,
   kind: true,
   sourceLearningPathId: true,
-  subject: true,
-  grade: true,
+  domainId: true,
+  domain: { select: { id: true, name: true, slug: true } },
+  targetAudiences: targetAudiencesRelation,
   title: true,
   slug: true,
   originalPriceVnd: true,
@@ -25,6 +35,10 @@ export const learningPathSelect = {
     select: thumbnailFileSelect,
   },
   descriptionJson: true,
+  startDate: true,
+  endDate: true,
+  lessonCountMin: true,
+  lessonCountMax: true,
   status: true,
   trialEnabled: true,
   publishedAt: true,
@@ -95,8 +109,9 @@ const publicFlatLessonMetadataRelation = {
 
 export const publicLearningPathSelect = {
   id: true,
-  subject: true,
-  grade: true,
+  domainId: true,
+  domain: { select: { id: true, name: true, slug: true } },
+  targetAudiences: targetAudiencesRelation,
   title: true,
   slug: true,
   originalPriceVnd: true,
@@ -108,6 +123,10 @@ export const publicLearningPathSelect = {
     select: thumbnailFileSelect,
   },
   descriptionJson: true,
+  startDate: true,
+  endDate: true,
+  lessonCountMin: true,
+  lessonCountMax: true,
   status: true,
   trialEnabled: true,
   publishedAt: true,

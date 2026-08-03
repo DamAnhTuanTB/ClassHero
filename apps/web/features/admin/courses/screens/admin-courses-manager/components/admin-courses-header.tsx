@@ -23,9 +23,6 @@ export function AdminCoursesHeader({
         <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
           Danh sách khóa học
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text)]">
-          Theo dõi khóa học theo môn, lớp, giá và trạng thái hiển thị.
-        </p>
       </div>
       <div className="order-1 grid grid-cols-[0.8fr_1fr_1.15fr] gap-2 md:order-2 md:flex md:flex-wrap">
         <button

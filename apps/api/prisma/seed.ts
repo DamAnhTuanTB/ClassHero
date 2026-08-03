@@ -29,7 +29,6 @@ import {
   ReportStatus,
   ReportTargetType,
   ReviewStatus,
-  Subject,
   UserRole,
   UserStatus,
   XpEventSource,
@@ -275,12 +274,73 @@ async function seedUsers() {
 
 async function seedLearningContent(adminId: string) {
   const now = new Date();
+  await Promise.all([
+    prisma.targetAudience.upsert({
+      where: { code: "PRIMARY_SCHOOL" },
+      update: { name: "Khối Tiểu học", grade: null, sortOrder: 20 },
+      create: {
+        id: "20000000-0000-4000-8000-000000000090",
+        code: "PRIMARY_SCHOOL",
+        name: "Khối Tiểu học",
+        grade: null,
+        sortOrder: 20,
+      },
+    }),
+    prisma.targetAudience.upsert({
+      where: { code: "SECONDARY_SCHOOL" },
+      update: { name: "Khối THCS", grade: null, sortOrder: 21 },
+      create: {
+        id: "20000000-0000-4000-8000-000000000091",
+        code: "SECONDARY_SCHOOL",
+        name: "Khối THCS",
+        grade: null,
+        sortOrder: 21,
+      },
+    }),
+    prisma.targetAudience.upsert({
+      where: { code: "HIGH_SCHOOL" },
+      update: { name: "Khối THPT", grade: null, sortOrder: 22 },
+      create: {
+        id: "20000000-0000-4000-8000-000000000092",
+        code: "HIGH_SCHOOL",
+        name: "Khối THPT",
+        grade: null,
+        sortOrder: 22,
+      },
+    }),
+    prisma.targetAudience.upsert({
+      where: { code: "ALL_STUDENTS" },
+      update: { name: "Toàn khối", grade: null, sortOrder: 23 },
+      create: {
+        id: "20000000-0000-4000-8000-000000000093",
+        code: "ALL_STUDENTS",
+        name: "Toàn khối",
+        grade: null,
+        sortOrder: 23,
+      },
+    }),
+  ]);
+  const mathDomain = await prisma.domain.upsert({
+    where: { slug: "toan" },
+    update: { name: "Toán", sortOrder: 1 },
+    create: { id: "10000000-0000-4000-8000-000000000001", name: "Toán", slug: "toan", sortOrder: 1 },
+  });
+  const gradeSevenAudience = await prisma.targetAudience.upsert({
+    where: { code: "GRADE_7" },
+    update: { name: "Khối 7", grade: 7, sortOrder: 7 },
+    create: { id: "20000000-0000-4000-8000-000000000007", code: "GRADE_7", name: "Khối 7", grade: 7, sortOrder: 7 },
+  });
 
   const learningPath = await prisma.learningPath.upsert({
     where: { slug: "toan-7" },
     update: {
-      subject: Subject.MATH,
-      grade: 7,
+      domainId: mathDomain.id,
+      targetAudiences: {
+        deleteMany: {},
+        create: {
+          targetAudience: { connect: { id: gradeSevenAudience.id } },
+        },
+      },
       title: "Toán 7",
       originalPriceVnd: 2_000_000,
       salePriceVnd: 1_500_000,
@@ -294,8 +354,12 @@ async function seedLearningContent(adminId: string) {
     },
     create: {
       id: ids.learningPath,
-      subject: Subject.MATH,
-      grade: 7,
+      domainId: mathDomain.id,
+      targetAudiences: {
+        create: {
+          targetAudience: { connect: { id: gradeSevenAudience.id } },
+        },
+      },
       title: "Toán 7",
       slug: "toan-7",
       originalPriceVnd: 2_000_000,

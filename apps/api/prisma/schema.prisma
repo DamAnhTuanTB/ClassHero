@@ -25,12 +25,6 @@ enum Gender {
   UNKNOWN
 }
 
-enum Subject {
-  MATH
-  PHYSICS
-  CHEMISTRY
-}
-
 enum PublishStatus {
   DRAFT
   PUBLISHED
@@ -494,8 +488,9 @@ model LearningPath {
   sourceLearningPathId String?               @map("source_learning_path_id") @db.Uuid
   sourceLearningPath   LearningPath?         @relation("PersonalLearningPathSource", fields: [sourceLearningPathId], references: [id], onDelete: Restrict)
   personalizedCopies   LearningPath[]        @relation("PersonalLearningPathSource")
-  subject              Subject
-  grade                Int
+  domainId             String                @map("domain_id") @db.Uuid
+  domain               Domain                @relation(fields: [domainId], references: [id], onDelete: Restrict)
+  targetAudiences      LearningPathTargetAudience[]
   title                String
   slug                 String                @unique
   originalPriceVnd     Int                   @map("original_price_vnd")
@@ -505,6 +500,10 @@ model LearningPath {
   thumbnailFileId      String?               @map("thumbnail_file_id") @db.Uuid
   thumbnailFile        File?                 @relation("LearningPathThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
   descriptionJson      Json?                 @map("description_json")
+  startDate            DateTime?             @map("start_date") @db.Date
+  endDate              DateTime?             @map("end_date") @db.Date
+  lessonCountMin       Int?                  @map("lesson_count_min")
+  lessonCountMax       Int?                  @map("lesson_count_max")
   status               PublishStatus         @default(DRAFT)
   trialEnabled         Boolean               @default(false) @map("trial_enabled")
   publishedAt          DateTime?             @map("published_at")
@@ -525,13 +524,52 @@ model LearningPath {
 
   @@index([kind, status])
   @@index([sourceLearningPathId])
-  @@index([subject, grade])
+  @@index([domainId])
   @@index([status])
   @@index([sortOrder])
   @@index([thumbnailFileId])
   @@index([createdById])
   @@index([updatedById])
   @@map("learning_paths")
+}
+
+model Domain {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String         @db.VarChar(120)
+  slug          String         @unique @db.VarChar(140)
+  sortOrder     Int            @default(0) @map("sort_order")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  learningPaths LearningPath[]
+
+  @@index([sortOrder, name])
+  @@map("domains")
+}
+
+model TargetAudience {
+  id            String                       @id @default(uuid()) @db.Uuid
+  code          String                       @unique @db.VarChar(80)
+  name          String                       @db.VarChar(120)
+  grade         Int?                         @unique
+  sortOrder     Int                          @default(0) @map("sort_order")
+  createdAt     DateTime                     @default(now()) @map("created_at")
+  updatedAt     DateTime                     @updatedAt @map("updated_at")
+  learningPaths LearningPathTargetAudience[]
+
+  @@index([sortOrder, name])
+  @@map("target_audiences")
+}
+
+model LearningPathTargetAudience {
+  learningPathId   String         @map("learning_path_id") @db.Uuid
+  learningPath     LearningPath   @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  targetAudienceId String         @map("target_audience_id") @db.Uuid
+  targetAudience   TargetAudience @relation(fields: [targetAudienceId], references: [id], onDelete: Restrict)
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@id([learningPathId, targetAudienceId])
+  @@index([targetAudienceId, learningPathId])
+  @@map("learning_path_target_audiences")
 }
 
 model LearningPathChapter {

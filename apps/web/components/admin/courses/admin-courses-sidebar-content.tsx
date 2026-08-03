@@ -20,6 +20,7 @@ import {
   useAuthSessionStore,
 } from "@/features/auth/session/auth-session";
 import type { AdminCoursesSidebarItem } from "@/components/admin/courses/admin-courses-sidebar";
+import { resetFilterSearchParamsEvent } from "@/lib/use-filter-search-params";
 import { cn } from "@/lib/utils";
 
 type AdminCoursesSidebarContentProps = {
@@ -110,6 +111,21 @@ export function AdminCoursesSidebarContent({
           <button
             key={item.label}
             type="button"
+            onClick={() => {
+              if (!item.href) {
+                return;
+              }
+
+              if (item.active) {
+                window.history.replaceState(window.history.state, "", item.href);
+                window.dispatchEvent(new Event(resetFilterSearchParamsEvent));
+                router.replace(item.href);
+                return;
+              }
+
+              router.push(item.href);
+            }}
+            aria-current={item.active ? "page" : undefined}
             title={isCollapsed ? item.label : undefined}
             className={cn(
               "inline-flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition",

@@ -2,34 +2,38 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import {
-  adminGrades,
   adminStatuses,
-  adminSubjects,
   statusLabels,
-  subjectLabels,
   type AdminPublishStatus,
-  type AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
+import type {
+  AdminDomain,
+  AdminTargetAudience,
+} from "@/features/admin/domains/api/admin-domains-api";
 
 export function FilterBar({
+  domains,
+  domainFilter,
   query,
-  subjectFilter,
   statusFilter,
-  gradeFilter,
+  targetAudiences,
+  targetAudienceFilter,
+  onDomainChange,
   onQueryChange,
-  onSubjectChange,
   onStatusChange,
-  onGradeChange,
+  onTargetAudienceChange,
 }: {
   isDarkTheme?: boolean;
+  domains: AdminDomain[];
+  domainFilter: string | "ALL";
   query: string;
-  subjectFilter: AdminSubject | "ALL";
   statusFilter: AdminPublishStatus | "ALL";
-  gradeFilter: number | "ALL";
+  targetAudiences: AdminTargetAudience[];
+  targetAudienceFilter: string | "ALL";
+  onDomainChange: (value: string | "ALL") => void;
   onQueryChange: (value: string) => void;
-  onSubjectChange: (value: AdminSubject | "ALL") => void;
   onStatusChange: (value: AdminPublishStatus | "ALL") => void;
-  onGradeChange: (value: number | "ALL") => void;
+  onTargetAudienceChange: (value: string | "ALL") => void;
 }) {
   return (
     <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3">
@@ -47,7 +51,7 @@ export function FilterBar({
           hideLabel
           value={query}
           icon={<Search className="h-5 w-5" aria-hidden="true" />}
-          placeholder="Tìm tên hoặc slug"
+          placeholder="Tìm khóa học, lĩnh vực, đối tượng"
           onChange={(event) => onQueryChange(event.target.value)}
           trailingAction={
             query ? (
@@ -64,31 +68,31 @@ export function FilterBar({
         />
         <OptionField
           id="admin-course-filter-grade"
-          label="Lớp"
+          label="Đối tượng"
           hideLabel
-          value={String(gradeFilter)}
+          value={targetAudienceFilter}
           icon={null}
-          onChange={(value) => onGradeChange(value === "ALL" ? "ALL" : Number(value))}
+          onChange={onTargetAudienceChange}
           options={[
-            { value: "ALL", label: "Tất cả lớp" },
-            ...adminGrades.map((grade) => ({
-              value: String(grade),
-              label: `Lớp ${grade}`,
+            { value: "ALL", label: "Tất cả đối tượng" },
+            ...targetAudiences.map((audience) => ({
+              value: audience.id,
+              label: audience.name,
             })),
           ]}
         />
         <OptionField
           id="admin-course-filter-subject"
-          label="Môn"
+          label="Lĩnh vực"
           hideLabel
-          value={subjectFilter}
+          value={domainFilter}
           icon={null}
-          onChange={(value) => onSubjectChange(value as AdminSubject | "ALL")}
+          onChange={onDomainChange}
           options={[
-            { value: "ALL", label: "Tất cả môn" },
-            ...adminSubjects.map((subject) => ({
-              value: subject,
-              label: subjectLabels[subject],
+            { value: "ALL", label: "Tất cả lĩnh vực" },
+            ...domains.map((domain) => ({
+              value: domain.id,
+              label: domain.name,
             })),
           ]}
         />

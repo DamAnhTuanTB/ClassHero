@@ -9,6 +9,9 @@ import {
 import { PrismaService } from "#api/common/prisma/prisma.service";
 
 const cloneGraphInclude = {
+  targetAudiences: {
+    select: { targetAudienceId: true },
+  },
   sourceDocuments: {
     where: { deletedAt: null },
     include: {
@@ -314,8 +317,12 @@ export class PersonalLearningPathClonerService {
         id: personalLearningPathId,
         kind: LearningPathKind.PERSONALIZED,
         sourceLearningPathId: source.id,
-        subject: source.subject,
-        grade: source.grade,
+        domainId: source.domainId,
+        targetAudiences: {
+          create: source.targetAudiences.map(({ targetAudienceId }) => ({
+            targetAudience: { connect: { id: targetAudienceId } },
+          })),
+        },
         title: source.title,
         slug: `personal-${enrollment.id}`,
         originalPriceVnd: source.originalPriceVnd,
@@ -324,6 +331,10 @@ export class PersonalLearningPathClonerService {
         totalLessonCount: lessons.length,
         thumbnailFileId: source.thumbnailFileId,
         descriptionJson: nullableJson(source.descriptionJson),
+        startDate: source.startDate,
+        endDate: source.endDate,
+        lessonCountMin: source.lessonCountMin,
+        lessonCountMax: source.lessonCountMax,
         status: PublishStatus.PUBLISHED,
         trialEnabled: false,
         publishedAt: new Date(),

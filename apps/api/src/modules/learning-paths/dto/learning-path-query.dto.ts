@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { PublishStatus, Subject } from "@prisma/client";
+import { PublishStatus } from "@prisma/client";
 import {
   IsEnum,
   IsInt,
@@ -18,18 +18,15 @@ export class LearningPathQueryDto {
   @IsEnum(PublishStatus)
   status?: PublishStatus;
 
-  @ApiPropertyOptional({ enum: Subject, example: Subject.MATH })
+  @ApiPropertyOptional({ example: "10000000-0000-4000-8000-000000000001" })
   @IsOptional()
-  @IsEnum(Subject)
-  subject?: Subject;
+  @IsString()
+  domainId?: string;
 
-  @ApiPropertyOptional({ example: 7, minimum: 3, maximum: 12 })
+  @ApiPropertyOptional({ example: "20000000-0000-4000-8000-000000000007" })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(3)
-  @Max(12)
-  grade?: number;
+  @IsString()
+  targetAudienceId?: string;
 
   @ApiPropertyOptional({ example: "Toán", minLength: 2, maxLength: 120 })
   @IsOptional()

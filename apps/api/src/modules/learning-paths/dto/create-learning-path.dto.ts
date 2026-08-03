@@ -1,7 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { PublishStatus, Subject } from "@prisma/client";
+import { PublishStatus } from "@prisma/client";
 import {
+  ArrayMinSize,
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsEnum,
+  IsDateString,
   IsInt,
   IsObject,
   IsOptional,
@@ -36,15 +41,19 @@ export class CreateLearningPathDto {
   @MaxLength(180)
   slug?: string;
 
-  @ApiProperty({ enum: Subject, example: Subject.MATH })
-  @IsEnum(Subject)
-  subject!: Subject;
+  @ApiProperty({ example: "10000000-0000-4000-8000-000000000001" })
+  @IsUUID()
+  domainId!: string;
 
-  @ApiProperty({ example: 7, minimum: 3, maximum: 12 })
-  @IsInt()
-  @Min(3)
-  @Max(12)
-  grade!: number;
+  @ApiProperty({
+    example: ["20000000-0000-4000-8000-000000000007"],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1)
+  @ArrayUnique()
+  @IsUUID("4", { each: true })
+  targetAudienceIds!: string[];
 
   @ApiProperty({ example: 2000000, minimum: 0 })
   @IsInt()
@@ -66,6 +75,46 @@ export class CreateLearningPathDto {
   @IsOptional()
   @IsObject()
   descriptionJson?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    example: "2026-09-05",
+    format: "date",
+    description: "Optional calendar date when the main course starts.",
+  })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  startDate?: string | null;
+
+  @ApiPropertyOptional({
+    example: "2027-05-31",
+    format: "date",
+    description: "Optional calendar date when the main course ends.",
+  })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  endDate?: string | null;
+
+  @ApiPropertyOptional({
+    example: 50,
+    minimum: 1,
+    description: "Optional lower bound for the planned number of lessons.",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  lessonCountMin?: number | null;
+
+  @ApiPropertyOptional({
+    example: 100,
+    minimum: 1,
+    description: "Optional upper bound for the planned number of lessons.",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  lessonCountMax?: number | null;
 
   @ApiPropertyOptional({ enum: PublishStatus, example: PublishStatus.DRAFT })
   @IsOptional()

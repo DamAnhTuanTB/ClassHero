@@ -6,6 +6,18 @@ Chi tiết tách từ `docs/05-api-contract.md`. File index chính vẫn là `do
 
 ## 4. Public learning path API
 
+### `GET /catalog/course-options`
+
+Role: public hoặc authenticated.
+
+Behavior:
+
+- Trả `domains` và `targetAudiences` dùng chung cho bộ lọc catalog khóa học.
+- `domains` được sắp xếp theo `sortOrder ASC`, sau đó `name ASC`.
+- `targetAudiences` được sắp xếp theo `sortOrder ASC`, sau đó `name ASC`.
+- Response chỉ chứa dữ liệu catalog công khai cần cho select; không trả timestamp quản trị.
+- Student dùng ID trong `targetAudiences` cho filter có nhãn `Khối lớp` và `domain.id` cho filter có nhãn `Môn học`, nên admin đổi tên không làm hỏng URL/filter đang dùng.
+
 ### `GET /learning-paths`
 
 Role: public hoặc authenticated.
@@ -13,7 +25,7 @@ Role: public hoặc authenticated.
 Query:
 
 ```txt
-subject=MATH&grade=7&page=1&pageSize=20
+domainId=<uuid>&targetAudienceId=<uuid>&page=1&pageSize=20
 ```
 
 Behavior:
@@ -23,9 +35,11 @@ Behavior:
 - M3.3 bổ sung ưu tiên lộ trình theo grade của student và enrollment/trial state khi authenticated.
 - Nếu request có `Authorization: Bearer <access_token>` hợp lệ của student, danh sách ưu tiên lộ trình cùng `student_profiles.grade` khi query không truyền `grade`.
 - Response item có `summary` cho course card/detail và `access` gồm active enrollment/trial state an toàn cho UI.
+- Response item trả `targetAudiences[]` theo `sortOrder`; một khóa học có thể khớp nhiều đối tượng và query `targetAudienceId` khớp nếu mảng chứa ID được chọn.
 - Nếu authenticated student đã có enrollment active, response item có thêm `progress` để UI dựng tiến độ và buổi học tiếp theo; guest hoặc user chưa mua nhận `progress: null`.
 - Nếu authenticated student đã mua một lộ trình đang `DRAFT` hoặc `HIDDEN`, list được phép trả thêm chính lộ trình đó để màn Học tập/Khám phá hiển thị nhãn bảo trì; không trả các lộ trình chưa phát hành cho học sinh chưa mua.
 - Response `meta` có `priorityGrade` và `gradeGroups` để UI group/filter theo grade.
+- Trong từng nhóm ưu tiên, danh sách được xếp theo `domain.sortOrder`, tiếp theo `learningPath.sortOrder`, rồi `publishedAt` giảm dần.
 
 ### `GET /learning-paths/:idOrSlug`
 
@@ -116,11 +130,32 @@ Ghi chú:
 
 ## 5. Admin learning path API
 
+### Catalog Lĩnh vực
+
+- `GET /admin/domains`: trả danh sách lĩnh vực theo `sortOrder ASC`, sau đó `name ASC`.
+- `POST /admin/domains`: tạo lĩnh vực; nếu không truyền `sortOrder`, lĩnh vực mới được thêm ở cuối danh sách.
+- `PATCH /admin/domains/:id`: sửa tên hoặc `sortOrder` của một lĩnh vực.
+- `PATCH /admin/domains/reorder`: nhận toàn bộ `domainIds` theo thứ tự mới, cập nhật `sortOrder` trong một transaction và trả danh sách đã sắp xếp.
+- `DELETE /admin/domains/:id`: chỉ xóa lĩnh vực chưa được khóa học sử dụng.
+
+Body reorder:
+
+```json
+{
+  "domainIds": [
+    "10000000-0000-4000-8000-000000000001",
+    "10000000-0000-4000-8000-000000000002"
+  ]
+}
+```
+
+Nếu catalog thay đổi trong lúc admin đang sắp xếp, API trả `DOMAIN_CATALOG_CHANGED`; UI phải tải lại trước khi thử lại.
+
 ### `GET /admin/learning-paths`
 
 Role: `ADMIN`.
 
-Query: `status`, `subject`, `grade`, `search`, pagination.
+Query: `status`, `domainId`, `targetAudienceId`, `search`, pagination.
 
 Behavior:
 
@@ -146,12 +181,18 @@ Body:
 {
   "title": "Toán 7",
   "slug": "toan-7",
-  "subject": "MATH",
-  "grade": 7,
+  "domainId": "10000000-0000-4000-8000-000000000001",
+  "targetAudienceIds": [
+    "20000000-0000-4000-8000-000000000007"
+  ],
   "originalPriceVnd": 2000000,
   "salePriceVnd": 1500000,
   "thumbnailFileId": "uuid",
   "descriptionJson": {},
+  "startDate": "2026-09-05",
+  "endDate": "2027-05-31",
+  "lessonCountMin": 50,
+  "lessonCountMax": 100,
   "status": "DRAFT",
   "sortOrder": 1
 }
@@ -161,7 +202,10 @@ Ghi chú:
 
 - `slug` optional; nếu không gửi, backend tự tạo từ `title` và đảm bảo unique.
 - `status` default là `DRAFT`.
+- `targetAudienceIds` bắt buộc có đúng một UUID. Contract giữ kiểu mảng để tương thích schema/bảng nối hiện tại; PATCH mảng này sẽ thay đối tượng của khóa học.
 - `thumbnailFileId` phải trỏ tới file upload purpose `EDITOR_IMAGE` trong Files API. Nếu chưa có purpose thumbnail riêng, admin course cover tạm dùng `EDITOR_IMAGE`.
+- `startDate` và `endDate` là optional, dùng format `YYYY-MM-DD`; nếu gửi cả hai, `endDate` không được sớm hơn `startDate`. Gửi `null` khi PATCH để xóa ngày đã lưu.
+- `lessonCountMin` và `lessonCountMax` là optional, nhận số nguyên từ 1 đến 500; nếu gửi cả hai, max không được nhỏ hơn min. Gửi `null` khi PATCH để xóa giá trị đã lưu.
 
 Side effects:
 

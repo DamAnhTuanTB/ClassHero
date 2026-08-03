@@ -1,10 +1,5 @@
 import { z } from "zod";
-import type {
-  AdminEditableStatus,
-  AdminLessonType,
-  AdminPublishStatus,
-  AdminSubject,
-} from "@/features/admin/courses/admin-courses-data";
+import type { AdminEditableStatus, AdminLessonType, AdminPublishStatus } from "@/features/admin/courses/admin-courses-data";
 import { getMaximumPrintedPageNumber } from "@/features/admin/courses/admin-course-documents-utils";
 import {
   isAllowedVideoUrl,
@@ -87,10 +82,10 @@ export const learningPathSchema = z.object({
   thumbnailFileName: z.string().trim().max(180).optional(),
   thumbnailImageUrl: z.string().trim().optional(),
   description: z.string().trim().max(600, "Mô tả tối đa 600 ký tự"),
-  subject: z.enum(["MATH", "PHYSICS", "CHEMISTRY"], {
-    error: "Chọn môn",
-  }),
-  grade: z.coerce.number({ error: "Chọn lớp" }).int().min(3, "Chọn lớp").max(12),
+  domainId: z.string().uuid("Chọn lĩnh vực"),
+  targetAudienceIds: z
+    .array(z.string().uuid())
+    .length(1, "Chỉ chọn một đối tượng hướng đến"),
   originalPriceVnd: z
     .number({ error: "Nhập giá gốc" })
     .int("Giá phải là số nguyên")
@@ -101,8 +96,33 @@ export const learningPathSchema = z.object({
     .min(0, "Giá không âm")
     .optional()
     .or(z.literal("")),
+  startDate: z.string().date("Ngày bắt đầu không hợp lệ").optional().or(z.literal("")),
+  endDate: z.string().date("Ngày kết thúc không hợp lệ").optional().or(z.literal("")),
+  lessonCountMin: z.number().int().min(1, "Nhập ít nhất 1 buổi học").max(500, "Tối đa 500 buổi học").optional().or(z.literal("")),
+  lessonCountMax: z.number().int().min(1, "Nhập ít nhất 1 buổi học").max(500, "Tối đa 500 buổi học").optional().or(z.literal("")),
   status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN"]),
   sortOrder: z.coerce.number().int().min(0),
+}).superRefine((values, context) => {
+  if (values.startDate && values.endDate && values.endDate < values.startDate) {
+    context.addIssue({
+      code: "custom",
+      message: "Ngày kết thúc không được sớm hơn ngày bắt đầu",
+      path: ["endDate"],
+    });
+  }
+  if (
+    values.lessonCountMin !== "" &&
+    values.lessonCountMax !== "" &&
+    values.lessonCountMin !== undefined &&
+    values.lessonCountMax !== undefined &&
+    values.lessonCountMax < values.lessonCountMin
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Số buổi học đến không được nhỏ hơn số buổi học từ",
+      path: ["lessonCountMax"],
+    });
+  }
 });
 
 const referenceDocumentSchema = z
@@ -370,10 +390,14 @@ export type LearningPathFormValues = {
   thumbnailFileName: string;
   thumbnailImageUrl: string;
   description: string;
-  subject: AdminSubject | "";
-  grade: number | "";
+  domainId: string;
+  targetAudienceIds: string[];
   originalPriceVnd: number | "";
   salePriceVnd: number | "";
+  startDate: string;
+  endDate: string;
+  lessonCountMin: number | "";
+  lessonCountMax: number | "";
   status: AdminEditableStatus;
   sortOrder: number;
 };
@@ -428,10 +452,14 @@ export const emptyPathValues: LearningPathFormValues = {
   thumbnailFileName: "",
   thumbnailImageUrl: "",
   description: "",
-  subject: "",
-  grade: "",
+  domainId: "",
+  targetAudienceIds: [],
   originalPriceVnd: "",
   salePriceVnd: "",
+  startDate: "",
+  endDate: "",
+  lessonCountMin: "",
+  lessonCountMax: "",
   status: "DRAFT",
   sortOrder: 0,
 };

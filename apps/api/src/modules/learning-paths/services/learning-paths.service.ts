@@ -17,12 +17,15 @@ import { LearningPathQueryDto } from "#api/modules/learning-paths/dto/learning-p
 import { UpdateLearningPathDto } from "#api/modules/learning-paths/dto/update-learning-path.dto";
 import {
   assertPriceValid,
+  assertLearningPathDateRange,
+  assertLearningPathLessonCountRange,
   createSlug,
   getStatusAuditAction,
   handleKnownPrismaError,
   normalizeText,
   throwNotFound,
   toInputJson,
+  toDateOnly,
 } from "#api/modules/learning-paths/utils/learning-path.helpers";
 import {
   learningPathDetailSelect,
@@ -52,8 +55,14 @@ export class LearningPathsService {
       ...(query.status
         ? { status: query.status }
         : { status: { not: PublishStatus.ARCHIVED } }),
-      ...(query.subject ? { subject: query.subject } : {}),
-      ...(query.grade ? { grade: query.grade } : {}),
+      ...(query.domainId ? { domainId: query.domainId } : {}),
+      ...(query.targetAudienceId
+        ? {
+            targetAudiences: {
+              some: { targetAudienceId: query.targetAudienceId },
+            },
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [
@@ -68,7 +77,11 @@ export class LearningPathsService {
       this.prisma.learningPath.findMany({
         where,
         select: learningPathSelect,
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+        orderBy: [
+          { domain: { sortOrder: "asc" } },
+          { sortOrder: "asc" },
+          { createdAt: "desc" },
+        ],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -104,13 +117,23 @@ export class LearningPathsService {
     const slug = dto.slug ?? (await this.createUniqueSlug(dto.title));
     const status = dto.status ?? PublishStatus.DRAFT;
     const now = new Date();
+    const startDate = toDateOnly(dto.startDate);
+    const endDate = toDateOnly(dto.endDate);
+    assertLearningPathDateRange(startDate, endDate);
+    const lessonCountMin = dto.lessonCountMin ?? null;
+    const lessonCountMax = dto.lessonCountMax ?? null;
+    assertLearningPathLessonCountRange(lessonCountMin, lessonCountMax);
 
     try {
       const learningPath = await this.prisma.$transaction(async (tx) => {
         const created = await tx.learningPath.create({
           data: {
-            subject: dto.subject,
-            grade: dto.grade,
+            domain: { connect: { id: dto.domainId } },
+            targetAudiences: {
+              create: dto.targetAudienceIds.map((targetAudienceId) => ({
+                targetAudience: { connect: { id: targetAudienceId } },
+              })),
+            },
             title: normalizeText(dto.title),
             slug,
             originalPriceVnd: dto.originalPriceVnd,
@@ -125,6 +148,10 @@ export class LearningPathsService {
                 }
               : {}),
             descriptionJson: toInputJson(dto.descriptionJson),
+            startDate,
+            endDate,
+            lessonCountMin,
+            lessonCountMax,
             status,
             publishedAt: status === PublishStatus.PUBLISHED ? now : null,
             sortOrder: dto.sortOrder ?? 0,
@@ -202,12 +229,32 @@ export class LearningPathsService {
         assertPriceValid(originalPriceVnd, salePriceVnd);
 
         const status = dto.status ?? before.status;
+        const startDate =
+          dto.startDate === undefined ? before.startDate : toDateOnly(dto.startDate);
+        const endDate = dto.endDate === undefined ? before.endDate : toDateOnly(dto.endDate);
+        assertLearningPathDateRange(startDate, endDate);
+        const lessonCountMin =
+          dto.lessonCountMin === undefined ? before.lessonCountMin : dto.lessonCountMin;
+        const lessonCountMax =
+          dto.lessonCountMax === undefined ? before.lessonCountMax : dto.lessonCountMax;
+        assertLearningPathLessonCountRange(lessonCountMin, lessonCountMax);
         const now = new Date();
         const data: Prisma.LearningPathUpdateInput = {
           ...(dto.title !== undefined ? { title: normalizeText(dto.title) } : {}),
           ...(dto.slug !== undefined ? { slug: dto.slug } : {}),
-          ...(dto.subject !== undefined ? { subject: dto.subject } : {}),
-          ...(dto.grade !== undefined ? { grade: dto.grade } : {}),
+          ...(dto.domainId !== undefined
+            ? { domain: { connect: { id: dto.domainId } } }
+            : {}),
+          ...(dto.targetAudienceIds !== undefined
+            ? {
+                targetAudiences: {
+                  deleteMany: {},
+                  create: dto.targetAudienceIds.map((targetAudienceId) => ({
+                    targetAudience: { connect: { id: targetAudienceId } },
+                  })),
+                },
+              }
+            : {}),
           ...(dto.originalPriceVnd !== undefined
             ? { originalPriceVnd: dto.originalPriceVnd }
             : {}),
@@ -230,6 +277,10 @@ export class LearningPathsService {
           ...(dto.descriptionJson !== undefined
             ? { descriptionJson: toInputJson(dto.descriptionJson) }
             : {}),
+          ...(dto.startDate !== undefined ? { startDate } : {}),
+          ...(dto.endDate !== undefined ? { endDate } : {}),
+          ...(dto.lessonCountMin !== undefined ? { lessonCountMin } : {}),
+          ...(dto.lessonCountMax !== undefined ? { lessonCountMax } : {}),
           ...(dto.status !== undefined ? { status } : {}),
           ...(dto.status === PublishStatus.PUBLISHED &&
           before.status !== PublishStatus.PUBLISHED
@@ -395,6 +446,53 @@ export class LearningPathsService {
           throwNotFound();
         }
         this.assertCanDeleteLearningPath(before.kind);
+
+        await tx.payment.deleteMany({
+          where: { learningPathId: id },
+        });
+
+        await tx.enrollment.deleteMany({
+          where: { learningPathId: id },
+        });
+
+        const lessons = await tx.lesson.findMany({
+          where: { OR: [{ learningPathId: id }, { learningPath: { sourceLearningPathId: id } }] },
+          select: { id: true },
+        });
+        const lessonIds = lessons.map((l) => l.id);
+
+        if (lessonIds.length > 0) {
+          const quizSets = await tx.quizSet.findMany({ where: { lessonId: { in: lessonIds } }, select: { id: true } });
+          if (quizSets.length > 0) {
+            await tx.quizAttempt.deleteMany({ where: { quizSetId: { in: quizSets.map((q) => q.id) } } });
+          }
+
+          const testSets = await tx.testSet.findMany({ where: { lessonId: { in: lessonIds } }, select: { id: true } });
+          if (testSets.length > 0) {
+            await tx.testAttempt.deleteMany({ where: { testSetId: { in: testSets.map((t) => t.id) } } });
+          }
+
+          const flashcardSets = await tx.flashcardSet.findMany({ where: { lessonId: { in: lessonIds } }, select: { id: true } });
+          if (flashcardSets.length > 0) {
+            const flashcardSetIds = flashcardSets.map((f) => f.id);
+            await tx.flashcardStudySession.deleteMany({ where: { flashcardSetId: { in: flashcardSetIds } } });
+            const flashcards = await tx.flashcard.findMany({ where: { flashcardSetId: { in: flashcardSetIds } }, select: { id: true } });
+            if (flashcards.length > 0) {
+              await tx.flashcardProgress.deleteMany({ where: { flashcardId: { in: flashcards.map((f) => f.id) } } });
+            }
+          }
+        }
+
+        const copies = await tx.learningPath.findMany({
+          where: { sourceLearningPathId: id },
+          select: { id: true },
+        });
+
+        if (copies.length > 0) {
+          await tx.learningPath.deleteMany({
+            where: { id: { in: copies.map((c) => c.id) } },
+          });
+        }
 
         await tx.auditLog.create({
           data: {

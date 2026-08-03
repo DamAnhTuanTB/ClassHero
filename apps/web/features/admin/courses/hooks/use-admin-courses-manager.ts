@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  adminGrades,
   adminStatuses,
-  adminSubjects,
   type AdminLearningPath,
   type AdminPublishStatus,
-  type AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
 import {
   useAdminCourseMutations,
@@ -26,6 +23,7 @@ import {
   getArchivedLearningPaths,
 } from "@/features/admin/courses/admin-courses-utils";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
+import { useAdminCatalogOptions } from "@/features/admin/domains/hooks/use-admin-catalog-options";
 import { ApiRequestError } from "@/lib/api-client";
 import { getQueryRenderState } from "@/lib/query-render-state";
 import {
@@ -49,6 +47,7 @@ export function useAdminCoursesManager(
   initialThemeMode: AppThemeMode = "light",
 ) {
   const learningPathsQuery = useAdminLearningPathsQuery(initialLearningPaths);
+  const catalogOptionsQuery = useAdminCatalogOptions();
   const {
     isAuthHydrated,
     isAuthorized: hasAdminAccess,
@@ -77,9 +76,19 @@ export function useAdminCoursesManager(
     adminSidebarCollapsedDatasetKey,
   );
   const query = searchParams.get("q") ?? "";
-  const subjectFilter = parseAdminSubjectFilter(searchParams.get("subject"));
+  const catalogOptions = catalogOptionsQuery.data ?? {
+    domains: [],
+    targetAudiences: [],
+  };
+  const domainFilter = parseCatalogFilter(
+    searchParams.get("domain"),
+    catalogOptions.domains.map((domain) => domain.id),
+  );
   const statusFilter = parseAdminStatusFilter(searchParams.get("status"));
-  const gradeFilter = parseAdminGradeFilter(searchParams.get("grade"));
+  const targetAudienceFilter = parseCatalogFilter(
+    searchParams.get("targetAudience"),
+    catalogOptions.targetAudiences.map((audience) => audience.id),
+  );
   const sortKey = parseLearningPathSortKey(searchParams.get("sort"));
   const sortDirection = parseSortDirection(searchParams.get("direction"));
 
@@ -101,21 +110,21 @@ export function useAdminCoursesManager(
   const filteredPaths = useMemo(
     () =>
       filterAndSortLearningPaths(activePaths, {
-        gradeFilter,
+        domainFilter,
         query,
         sortDirection,
         sortKey,
         statusFilter,
-        subjectFilter,
+        targetAudienceFilter,
       }),
     [
       activePaths,
-      gradeFilter,
+      domainFilter,
       query,
       sortDirection,
       sortKey,
       statusFilter,
-      subjectFilter,
+      targetAudienceFilter,
     ],
   );
   const filteredPathIds = useMemo(
@@ -344,7 +353,7 @@ export function useAdminCoursesManager(
   }
 
   function retryLoad() {
-    void learningPathsQuery.refetch();
+    void Promise.all([learningPathsQuery.refetch(), catalogOptionsQuery.refetch()]);
   }
 
   const queryRenderState = getQueryRenderState(learningPathsQuery);
@@ -362,8 +371,9 @@ export function useAdminCoursesManager(
   return {
     allFilteredPathsSelected,
     archivedPaths,
+    catalogOptions,
+    domainFilter,
     filteredPaths,
-    gradeFilter,
     isArchiveDialogOpen,
     isPathEditorOpen,
     isSavingPath,
@@ -379,7 +389,7 @@ export function useAdminCoursesManager(
     sortKey,
     stats,
     statusFilter,
-    subjectFilter,
+    targetAudienceFilter,
     viewState,
     actions: {
       clearSelectedPaths: () => setSelectedPathIds([]),
@@ -396,8 +406,8 @@ export function useAdminCoursesManager(
       retryLoad,
       restorePaths,
       savePath,
-      setGradeFilter: (value: number | "ALL") => {
-        replaceFilterSearchParams({ grade: value === "ALL" ? null : value });
+      setDomainFilter: (value: string | "ALL") => {
+        replaceFilterSearchParams({ domain: value === "ALL" ? null : value });
       },
       setQuery: (value: string) => {
         replaceFilterSearchParams({ q: value });
@@ -407,9 +417,9 @@ export function useAdminCoursesManager(
           status: value === "ALL" ? null : value.toLowerCase(),
         });
       },
-      setSubjectFilter: (value: AdminSubject | "ALL") => {
+      setTargetAudienceFilter: (value: string | "ALL") => {
         replaceFilterSearchParams({
-          subject: value === "ALL" ? null : value.toLowerCase(),
+          targetAudience: value === "ALL" ? null : value,
         });
       },
       startCreatePath,
@@ -435,14 +445,6 @@ function getErrorMessage(error: unknown) {
   return "Vui lòng thử lại sau ít phút.";
 }
 
-function parseAdminGradeFilter(value: string | null): number | "ALL" {
-  const parsedGrade = Number(value);
-
-  return Number.isInteger(parsedGrade) && adminGrades.includes(parsedGrade)
-    ? parsedGrade
-    : "ALL";
-}
-
 function parseAdminStatusFilter(value: string | null): AdminPublishStatus | "ALL" {
   const normalizedValue = value?.toUpperCase() as AdminPublishStatus | undefined;
 
@@ -451,12 +453,8 @@ function parseAdminStatusFilter(value: string | null): AdminPublishStatus | "ALL
     : "ALL";
 }
 
-function parseAdminSubjectFilter(value: string | null): AdminSubject | "ALL" {
-  const normalizedValue = value?.toUpperCase() as AdminSubject | undefined;
-
-  return normalizedValue && adminSubjects.includes(normalizedValue)
-    ? normalizedValue
-    : "ALL";
+function parseCatalogFilter(value: string | null, optionIds: string[]): string | "ALL" {
+  return value && optionIds.includes(value) ? value : "ALL";
 }
 
 function parseLearningPathSortKey(value: string | null): LearningPathSortKey {

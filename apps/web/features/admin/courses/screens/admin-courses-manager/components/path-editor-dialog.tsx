@@ -13,6 +13,7 @@ import {
 } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 import { toPathFormValues } from "@/features/admin/courses/admin-courses-utils";
+import { useAdminCatalogOptions } from "@/features/admin/domains/hooks/use-admin-catalog-options";
 
 export function PathEditorDialog({
   isOpen,
@@ -35,6 +36,7 @@ export function PathEditorDialog({
     imageUrl: string;
   }>;
 }) {
+  const catalogOptionsQuery = useAdminCatalogOptions();
   const form = useForm<LearningPathFormValues>({
     mode: "onChange",
     reValidateMode: "onChange",
@@ -65,6 +67,8 @@ export function PathEditorDialog({
         onClose={onClose}
         onSubmit={onSubmit}
         onUploadCover={onUploadCover}
+        domains={catalogOptionsQuery.data?.domains ?? []}
+        targetAudiences={catalogOptionsQuery.data?.targetAudiences ?? []}
       />
     </EditorDialogShell>
   );

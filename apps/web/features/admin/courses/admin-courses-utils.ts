@@ -7,7 +7,6 @@ import {
   statusLabels,
   subjectLabels,
   type AdminPublishStatus,
-  type AdminSubject,
 } from "@/features/admin/courses/admin-courses-data";
 import type {
   ChapterFormValues,
@@ -22,9 +21,9 @@ import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admi
 
 export type LearningPathFilterInput = {
   query: string;
-  subjectFilter: AdminSubject | "ALL";
+  domainFilter: string | "ALL";
   statusFilter: AdminPublishStatus | "ALL";
-  gradeFilter: number | "ALL";
+  targetAudienceFilter: string | "ALL";
   sortKey: LearningPathSortKey;
   sortDirection: SortDirection;
 };
@@ -66,18 +65,22 @@ export function toPathFormValues(path: AdminLearningPath): LearningPathFormValue
     thumbnailFileName: path.thumbnailFileName ?? "",
     thumbnailImageUrl: path.thumbnailImageUrl,
     description: path.description,
-    subject: path.subject,
-    grade: path.grade,
+    domainId: path.domainId ?? "",
+    targetAudienceIds: path.targetAudienceIds ?? [],
     originalPriceVnd: path.originalPriceVnd,
     salePriceVnd: path.salePriceVnd ?? "",
+    startDate: path.startDate ?? "",
+    endDate: path.endDate ?? "",
+    lessonCountMin: path.lessonCountMin ?? "",
+    lessonCountMax: path.lessonCountMax ?? "",
     status: path.status === "ARCHIVED" ? "DRAFT" : path.status,
     sortOrder: path.sortOrder,
   };
 }
 
 export function toLearningPathPayload(values: LearningPathFormValues) {
-  if (!values.subject || values.grade === "") {
-    throw new Error("Course subject and grade are required");
+  if (!values.domainId || values.targetAudienceIds.length === 0) {
+    throw new Error("Course domain and at least one target audience are required");
   }
 
   return {
@@ -87,11 +90,15 @@ export function toLearningPathPayload(values: LearningPathFormValues) {
     thumbnailFileName: values.thumbnailFileName.trim(),
     thumbnailImageUrl: values.thumbnailImageUrl.trim(),
     description: values.description.trim(),
-    subject: values.subject,
-    grade: Number(values.grade),
+    domainId: values.domainId,
+    targetAudienceIds: values.targetAudienceIds,
     originalPriceVnd:
       values.originalPriceVnd === "" ? 0 : Number(values.originalPriceVnd),
     salePriceVnd: values.salePriceVnd === "" ? null : Number(values.salePriceVnd),
+    startDate: values.startDate || null,
+    endDate: values.endDate || null,
+    lessonCountMin: values.lessonCountMin === "" ? null : values.lessonCountMin,
+    lessonCountMax: values.lessonCountMax === "" ? null : values.lessonCountMax,
     status: values.status,
     sortOrder: Number(values.sortOrder),
   };
@@ -274,15 +281,19 @@ export function filterAndSortLearningPaths(
     const matchesKeyword =
       !keyword ||
       path.title.toLowerCase().includes(keyword) ||
-      path.slug.toLowerCase().includes(keyword);
-    const matchesSubject =
-      filters.subjectFilter === "ALL" || path.subject === filters.subjectFilter;
+      path.subject.toLowerCase().includes(keyword) ||
+      (path.targetAudienceNames ?? [path.targetAudienceName ?? `Khối ${path.grade}`]).some(
+        (audienceName) => audienceName.toLowerCase().includes(keyword),
+      );
+    const matchesDomain =
+      filters.domainFilter === "ALL" || path.domainId === filters.domainFilter;
     const matchesStatus =
       filters.statusFilter === "ALL" || path.status === filters.statusFilter;
-    const matchesGrade =
-      filters.gradeFilter === "ALL" || path.grade === filters.gradeFilter;
+    const matchesTargetAudience =
+      filters.targetAudienceFilter === "ALL" ||
+      path.targetAudienceIds?.includes(filters.targetAudienceFilter);
 
-    return matchesKeyword && matchesSubject && matchesStatus && matchesGrade;
+    return matchesKeyword && matchesDomain && matchesStatus && matchesTargetAudience;
   });
 
   return [...matchedPaths].sort((leftPath, rightPath) => {
@@ -418,8 +429,8 @@ function compareLearningPaths(
       return compareText(leftPath.title, rightPath.title);
     case "subject":
       return compareText(
-        subjectLabels[leftPath.subject],
-        subjectLabels[rightPath.subject],
+        subjectLabels[leftPath.subject] ?? leftPath.subject,
+        subjectLabels[rightPath.subject] ?? rightPath.subject,
       );
     case "grade":
       return compareNumber(leftPath.grade, rightPath.grade);

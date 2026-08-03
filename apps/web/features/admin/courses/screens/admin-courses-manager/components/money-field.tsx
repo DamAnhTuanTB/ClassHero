@@ -63,7 +63,7 @@ export function MoneyField({
           className="theme-form-control min-h-[3.35rem] w-full rounded-xl py-0 pl-12 pr-16 text-base font-semibold outline-none transition disabled:cursor-not-allowed lg:text-sm"
         />
         <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[var(--theme-text-subtle)]">
-          đ
+          VNĐ
         </span>
       </div>
       {error ? (

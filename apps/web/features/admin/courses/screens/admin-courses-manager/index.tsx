@@ -1,13 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { BookOpen, FileText, Layers3 } from "lucide-react";
 import { AdminCoursesContent } from "@/features/admin/courses/screens/admin-courses-manager/components/admin-courses-content";
 import { AdminCoursesHeader } from "@/features/admin/courses/screens/admin-courses-manager/components/admin-courses-header";
-import {
-  AdminCoursesSidebar,
-  type AdminCoursesSidebarItem,
-} from "@/components/admin/courses/admin-courses-sidebar";
+import { AdminCoursesSidebar } from "@/components/admin/courses/admin-courses-sidebar";
+import { getAdminNavigationItems } from "@/components/admin/courses/admin-navigation-items";
 import { AdminCoursesStatsRow } from "@/features/admin/courses/screens/admin-courses-manager/components/admin-courses-stats-row";
 import { LoadingState } from "@/components/admin/courses/loading-state";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -32,11 +29,7 @@ const PathEditorDialog = dynamic(() =>
   ),
 );
 
-const adminNavItems: AdminCoursesSidebarItem[] = [
-  { label: "Khóa học", icon: Layers3, active: true },
-  { label: "Buổi học", icon: BookOpen, active: false },
-  { label: "Tài liệu", icon: FileText, active: false },
-];
+const adminNavItems = getAdminNavigationItems("courses");
 
 export function AdminCoursesManager({
   initialLearningPaths,
@@ -49,10 +42,11 @@ export function AdminCoursesManager({
     actions,
     allFilteredPathsSelected,
     archivedPaths,
+    catalogOptions,
     deletingPaths,
+    domainFilter,
     editingPath,
     filteredPaths,
-    gradeFilter,
     isArchiveDialogOpen,
     isDarkTheme,
     isDeletingPath,
@@ -69,7 +63,7 @@ export function AdminCoursesManager({
     sortKey,
     stats,
     statusFilter,
-    subjectFilter,
+    targetAudienceFilter,
     viewState,
     uploadCover,
   } = useAdminCoursesManager(initialLearningPaths, initialThemeMode);
@@ -114,15 +108,16 @@ export function AdminCoursesManager({
               <AdminCoursesStatsRow isDarkTheme={isDarkTheme} stats={stats} />
               <AdminCoursesContent
                 allFilteredPathsSelected={allFilteredPathsSelected}
+                catalogOptions={catalogOptions}
+                domainFilter={domainFilter}
                 filteredPaths={filteredPaths}
-                gradeFilter={gradeFilter}
                 isDarkTheme={isDarkTheme}
                 query={query}
                 selectedPathIds={selectedPathIds}
                 sortDirection={sortDirection}
                 sortKey={sortKey}
                 statusFilter={statusFilter}
-                subjectFilter={subjectFilter}
+                targetAudienceFilter={targetAudienceFilter}
                 viewState={viewState}
                 onArchivePath={actions.requestDeletePath}
                 onClearSelected={actions.clearSelectedPaths}
@@ -131,13 +126,13 @@ export function AdminCoursesManager({
                 onPrefetchPath={(pathId) => {
                   void prefetchLearningPath(pathId);
                 }}
-                onGradeChange={actions.setGradeFilter}
+                onDomainChange={actions.setDomainFilter}
                 onQueryChange={actions.setQuery}
                 onRequestDeleteSelected={actions.requestDeleteSelectedPaths}
                 onRetryLoad={actions.retryLoad}
                 onSelectPath={actions.toggleSelectPath}
                 onStatusChange={actions.setStatusFilter}
-                onSubjectChange={actions.setSubjectFilter}
+                onTargetAudienceChange={actions.setTargetAudienceFilter}
                 onToggleSelectAll={actions.toggleSelectAllPaths}
                 onToggleSort={actions.toggleSort}
               />

@@ -1,0 +1,17 @@
+INSERT INTO "target_audiences" (
+  "id",
+  "code",
+  "name",
+  "grade",
+  "sort_order",
+  "updated_at"
+) VALUES
+  ('20000000-0000-4000-8000-000000000090', 'PRIMARY_SCHOOL', 'Khối Tiểu học', NULL, 20, CURRENT_TIMESTAMP),
+  ('20000000-0000-4000-8000-000000000091', 'SECONDARY_SCHOOL', 'Khối THCS', NULL, 21, CURRENT_TIMESTAMP),
+  ('20000000-0000-4000-8000-000000000092', 'HIGH_SCHOOL', 'Khối THPT', NULL, 22, CURRENT_TIMESTAMP),
+  ('20000000-0000-4000-8000-000000000093', 'ALL_STUDENTS', 'Toàn Học sinh', NULL, 23, CURRENT_TIMESTAMP)
+ON CONFLICT ("code") DO UPDATE SET
+  "name" = EXCLUDED."name",
+  "grade" = EXCLUDED."grade",
+  "sort_order" = EXCLUDED."sort_order",
+  "updated_at" = CURRENT_TIMESTAMP;

@@ -123,6 +123,7 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 16     | `M3.3`  | Public/student learning path listing                                    |
 | 17     | `M3.4`  | Admin learning path/chapter/lesson UI cơ bản                            |
 | 18     | `M3.5`  | Public/student course browsing UI                                       |
+| 18.1   | `M3.9`  | Catalog lĩnh vực và đối tượng hướng đến khóa học                       |
 | 19     | `M4.1`  | FilesModule và storage service                                          |
 | 20     | `M4.2`  | Source document và lesson page mapping API                              |
 | 21     | `M4.3`  | BullMQ worker foundation                                                |
@@ -230,6 +231,7 @@ Ghi chú:
 - `M3.6` phụ thuộc `M3.1`, `M3.2`, `M4.3` và enrollment thật từ `M8.3`.
 - `M3.7` phụ thuộc `M3.4`, `M3.6`.
 - `M3.8` phụ thuộc `M3.2`, `M3.4`; transcript là optional và không chặn phát video.
+- `M3.9` phụ thuộc `M3.1`, `M3.4`; thay enum môn/lớp của khóa học bằng catalog Lĩnh vực và Đối tượng hướng đến.
 - Từ M3 trở đi, cấu trúc course detail là `learning path -> chapters -> lessons`; chapter chỉ chứa thông tin tổng quan, còn nội dung học chi tiết nằm ở lesson.
 
 ### File/document/worker

@@ -6,8 +6,15 @@ export const personalLearningPathSummarySelect = {
   sourceLearningPathId: true,
   title: true,
   slug: true,
-  subject: true,
-  grade: true,
+  domain: { select: { id: true, name: true, slug: true } },
+  targetAudiences: {
+    select: {
+      targetAudience: {
+        select: { id: true, name: true, code: true, grade: true, sortOrder: true },
+      },
+    },
+    orderBy: { targetAudience: { sortOrder: "asc" } },
+  },
   status: true,
   totalChapterCount: true,
   totalLessonCount: true,

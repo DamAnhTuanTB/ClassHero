@@ -11,7 +11,11 @@ import {
 } from "#api/common/errors/api-exception";
 
 export function getPublicLearningPathOrderBy(): Prisma.LearningPathOrderByWithRelationInput[] {
-  return [{ sortOrder: "asc" }, { publishedAt: "desc" }];
+  return [
+    { domain: { sortOrder: "asc" } },
+    { sortOrder: "asc" },
+    { publishedAt: "desc" },
+  ];
 }
 
 export function getIdOrSlugWhere(idOrSlug: string): Prisma.LearningPathWhereInput {
@@ -36,6 +40,42 @@ export function assertPriceValid(originalPriceVnd: number, salePriceVnd?: number
         "Giá sau khuyến mãi không được lớn hơn giá gốc",
       );
     }
+  }
+}
+
+export function toDateOnly(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export function assertLearningPathDateRange(
+  startDate: Date | null,
+  endDate: Date | null,
+) {
+  if (startDate && endDate && endDate < startDate) {
+    throwBadRequest(
+      "VALIDATION_ERROR",
+      "Ngày kết thúc không được sớm hơn ngày bắt đầu",
+    );
+  }
+}
+
+export function assertLearningPathLessonCountRange(
+  lessonCountMin: number | null,
+  lessonCountMax: number | null,
+) {
+  if (
+    lessonCountMin !== null &&
+    lessonCountMax !== null &&
+    lessonCountMax < lessonCountMin
+  ) {
+    throwBadRequest(
+      "VALIDATION_ERROR",
+      "Số buổi học đến không được nhỏ hơn số buổi học từ",
+    );
   }
 }
 

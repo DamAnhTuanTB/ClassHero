@@ -12,8 +12,7 @@ Chi tiết tách từ `docs/04-database-model.md`. File index chính vẫn là `
 id uuid pk
 kind LearningPathKind default CATALOG
 source_learning_path_id uuid? fk learning_paths.id
-subject Subject
-grade int
+domain_id uuid fk domains.id
 title string
 slug string unique
 original_price_vnd int
@@ -22,6 +21,10 @@ total_chapter_count int default 0
 total_lesson_count int default 0
 thumbnail_file_id uuid? fk files.id
 description_json jsonb?
+start_date date?
+end_date date?
+lesson_count_min int?
+lesson_count_max int?
 status PublishStatus default DRAFT
 published_at timestamp?
 sort_order int default 0
@@ -32,13 +35,34 @@ updated_at timestamp
 deleted_at timestamp?
 ```
 
-Index:
+### 5.1.1. `learning_path_target_audiences`
 
-- `(subject, grade)`.
+UI/API tạo và sửa khóa học hiện bắt buộc đúng một Đối tượng hướng đến. Bảng nối vẫn được giữ để không phá dữ liệu lịch sử và cho phép migration không mất dữ liệu; contract ghi mới giới hạn một liên kết cho mỗi khóa học.
+
+```txt
+learning_path_id uuid fk learning_paths.id
+target_audience_id uuid fk target_audiences.id
+created_at timestamp
+```
+
+Constraint/index:
+
+- primary key `(learning_path_id, target_audience_id)`.
+- index `(target_audience_id, learning_path_id)` để filter catalog theo đối tượng.
+- xóa learning path cascade các liên kết; không được xóa target audience đang được khóa học sử dụng.
+
+### 5.0. Catalog khóa học
+
+- `domains`: lĩnh vực động do admin quản lý (`name`, `slug`, `sort_order`); `sort_order` là thứ tự catalog và là khóa sắp xếp đầu tiên khi hiển thị khóa học theo lĩnh vực.
+- `target_audiences`: các đối tượng hướng đến seed sẵn Khối 3–12, Khối Tiểu học,
+  Khối THCS, Khối THPT, Toàn khối và Người đi làm; `grade` chỉ có với nhóm
+  theo từng khối cụ thể để ưu tiên catalog cho học sinh.
 - `status`.
 - `sort_order`.
 - `(kind, status)`.
 - `source_learning_path_id`.
+
+Thứ tự catalog khóa học mặc định: `domains.sort_order ASC`, sau đó `learning_paths.sort_order ASC`, rồi mốc phát hành/tạo mới để kết quả ổn định.
 
 Status behavior:
 
@@ -49,6 +73,8 @@ Status behavior:
 - `CATALOG` là khóa học có thể xuất hiện trong catalog và được mua.
 - `PERSONALIZED` là private fork của một khóa `CATALOG`; bắt buộc có `source_learning_path_id`, không được xuất hiện trong catalog và không thể tạo payment/enrollment trực tiếp.
 - Bản `PERSONALIZED` dùng slug nội bộ opaque nếu schema vẫn bắt buộc slug; public/student route không được dùng slug này để discovery.
+- `start_date` và `end_date` là ngày lịch tùy chọn của khóa học chính; nếu cùng tồn tại, `end_date` không được sớm hơn `start_date`. Chúng hiện là metadata lịch học, chưa tự thay đổi quyền truy cập/enrollment.
+- `lesson_count_min` và `lesson_count_max` là khoảng số buổi học dự kiến tùy chọn (1-500), tách biệt với `total_lesson_count` là số buổi thực tế hệ thống đếm. Nếu cùng tồn tại, giá trị max không được nhỏ hơn min.
 
 ### 5.2. `learning_path_chapters`
 
