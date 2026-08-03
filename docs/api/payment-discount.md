@@ -24,10 +24,24 @@ Behavior:
 
 - Kiểm tra student chưa có active enrollment còn hạn.
 - Nếu có payment `PENDING` chưa hết hạn cho cùng student + learning path, có thể trả payment cũ.
+- Trước khi reuse payment `PENDING`, server đối soát trạng thái hiện tại với payOS. Payment đã hủy/hết hạn không được reuse.
 - Server tính giá, không tin amount từ client.
 - Tạo payOS order.
 - Lưu payment `PENDING`.
 - Trả checkout/QR.
+- `cancelUrl` và `returnUrl` cùng quay về màn result của payment để UI đọc trạng thái cuối từ API.
+
+### `GET /student/payments/:paymentId`
+
+Role: `STUDENT`, chỉ được xem payment mình là payer/student.
+
+Behavior:
+
+- Trả payment, learning path và enrollment liên quan.
+- Nếu database còn `PENDING`, server gọi payOS Get Payment Link để đối soát.
+- Map trạng thái payOS `PAID`, `CANCELLED`, `EXPIRED`, `FAILED`; `UNDERPAID` được map thành `FAILED`, còn `PROCESSING` tiếp tục chờ.
+- Nếu payOS đã `PAID` nhưng webhook đến chậm, server vẫn update payment và tạo enrollment 12 tháng bằng cùng settlement idempotent.
+- Nếu provider tạm lỗi, giữ trạng thái hiện tại và thử lại ở lần polling sau; không tự suy đoán thành công.
 
 ### `POST /student/payments/mock-success`
 
@@ -92,11 +106,13 @@ Behavior:
 
 - Lưu `payment_webhook_logs` ngay khi nhận.
 - Verify signature/checksum.
+- Phải `await` kết quả verify của SDK trước khi đánh dấu log `verified` hoặc xử lý payment.
 - Idempotency theo `provider_order_code` và event id nếu có.
 - Update payment.
 - Create enrollment 12 tháng nếu paid.
 - Trigger notification.
 - Không xử lý paid hai lần.
+- Webhook signature sai vẫn trả HTTP 200 để tránh provider retry vô hạn, nhưng log phải `verified = false`, payment/enrollment không được thay đổi.
 
 ---
 

@@ -36,6 +36,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "11.1.27",
     "@nestjs/swagger": "^11.4.5",
+    "@payos/node": "^2.0.5",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bullmq": "^5.80.5",

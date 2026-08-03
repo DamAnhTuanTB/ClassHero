@@ -41,6 +41,7 @@ student_user_id uuid fk users.id
 learning_path_id uuid fk learning_paths.id
 discount_code_id uuid? fk discount_codes.id
 idempotency_key string?
+reference_code string? unique
 provider_order_code string unique
 provider_payment_link_id string?
 checkout_url string?
@@ -58,6 +59,7 @@ updated_at timestamp
 Index/constraint:
 
 - unique `provider_order_code`.
+- unique `reference_code` nếu có; mã nghiệp vụ dễ đọc theo dạng `{subjectCode}{grade}MS{randomNumber}`.
 - index `(payer_user_id, status)`.
 - index `(student_user_id, learning_path_id, status)`.
 - index `idempotency_key` nếu not null.

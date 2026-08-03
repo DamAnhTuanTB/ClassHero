@@ -1329,6 +1329,7 @@ model Payment {
   discountCodeId        String?         @map("discount_code_id") @db.Uuid
   discountCode          DiscountCode?   @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
   idempotencyKey        String?         @map("idempotency_key")
+  referenceCode         String?         @unique @map("reference_code")
   providerOrderCode     String          @unique @map("provider_order_code")
   providerPaymentLinkId String?         @map("provider_payment_link_id")
   checkoutUrl           String?         @map("checkout_url") @db.Text

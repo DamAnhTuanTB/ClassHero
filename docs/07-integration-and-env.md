@@ -304,6 +304,9 @@ Payment creation:
 - Server tính giá.
 - Server apply discount.
 - Server tạo order payOS.
+- Mô tả payOS dùng `payments.reference_code`, ví dụ `Toan7MS64646464`; mã này
+  gồm môn, lớp và số ngẫu nhiên, được lưu để tra soát. Backend vẫn liên kết
+  chính xác webhook bằng `payments.provider_order_code`.
 - Lưu payment `PENDING`.
 - Trả QR/checkout cho client.
 

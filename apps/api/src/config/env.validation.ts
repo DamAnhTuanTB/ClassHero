@@ -64,6 +64,11 @@ const envSchema = z
     AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
     AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // payOS
+    PAYOS_CLIENT_ID: z.string().min(1).optional(),
+    PAYOS_API_KEY: z.string().min(1).optional(),
+    PAYOS_CHECKSUM_KEY: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {
