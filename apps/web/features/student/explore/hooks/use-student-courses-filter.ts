@@ -28,6 +28,10 @@ export function useStudentCoursesFilter(
     searchParams.get("domain"),
     catalog.domains.map((option) => option.id),
   );
+  const selectedDomainName =
+    domainId === "ALL"
+      ? null
+      : (catalog.domains.find((option) => option.id === domainId)?.name ?? null);
   const query = searchParams.get("q") ?? "";
 
   const filteredCourses = useMemo(
@@ -35,11 +39,12 @@ export function useStudentCoursesFilter(
       filterStudentCourses({
         courses,
         domainId: domainId === "ALL" ? null : domainId,
+        domainName: selectedDomainName,
         query,
         targetAudienceId:
           targetAudienceId === "ALL" ? null : targetAudienceId,
       }),
-    [courses, domainId, query, targetAudienceId],
+    [courses, domainId, query, selectedDomainName, targetAudienceId],
   );
 
   function handleTargetAudienceChange(nextTargetAudienceId: string) {

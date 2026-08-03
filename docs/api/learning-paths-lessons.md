@@ -48,7 +48,7 @@ Role: public hoặc authenticated.
 Behavior:
 
 - Trả thông tin lộ trình.
-- Trả chapters public metadata, mỗi chapter chứa lessons public metadata theo thứ tự.
+- Trả `structureItems` là danh sách top-level có thứ tự gồm chapter và lesson không thuộc chapter; item chapter chứa lessons public metadata theo thứ tự.
 - Lesson public metadata trả `lessonType` để UI phân biệt buổi học cơ bản và buổi học live; không trả `liveUrl` qua endpoint public.
 - Mặc định chỉ trả lộ trình `PUBLISHED`.
 - Nếu authenticated student đã có active enrollment với lộ trình đó, detail vẫn trả lộ trình `DRAFT` hoặc `HIDDEN` chưa bị xóa mềm để học sinh thấy khóa học đã mua; UI phải coi `status != PUBLISHED` là trạng thái bảo trì và khóa toàn bộ lesson.
@@ -116,14 +116,47 @@ Response detail có thêm `chapters`:
 }
 ```
 
+Response detail có cấu trúc phân biệt bằng `type`:
+
+```json
+{
+  "structureItems": [
+    {
+      "type": "LESSON",
+      "id": "uuid",
+      "chapterId": null,
+      "orderIndex": 1,
+      "title": "Buổi 1: Làm quen khóa học",
+      "shortDescription": "Nội dung nhập môn",
+      "lessonType": "BASIC",
+      "examOpenAt": null,
+      "trialEnabled": true,
+      "status": "PUBLISHED"
+    },
+    {
+      "type": "CHAPTER",
+      "id": "uuid-chapter",
+      "orderIndex": 2,
+      "title": "Chương 1: Số hữu tỉ",
+      "overview": "Tổng quan chương học",
+      "status": "PUBLISHED",
+      "lessons": []
+    }
+  ]
+}
+```
+
 Ghi chú:
 
 - Response item trả `thumbnailFileId` và `thumbnailFile: { id, originalName, url } | null`. `url` là public URL hoặc signed URL đã resolve từ Files API để màn student/public hiển thị ảnh khóa học thật.
 - Response item có `status`; list public/student vẫn chỉ trả `PUBLISHED`, còn detail có thể trả `DRAFT`/`HIDDEN` cho student đã mua để hiển thị nhãn "Khóa học đang được bảo trì".
 - Response detail vẫn trả chapter chưa bị xóa mềm kể cả khi `status` là `DRAFT` hoặc `HIDDEN`; front-end phải hiển thị chapter đó nhưng khóa toàn bộ lesson bên trong nếu chapter không phải `PUBLISHED`.
+- `structureItems` sắp xếp theo `orderIndex` và có thể xen kẽ item `LESSON`/`CHAPTER`. Trong chapter, `lessons` tiếp tục sắp xếp theo `orderIndex` riêng.
+- `chapters` nested cũ có thể được giữ tạm cho client tương thích, nhưng client mới phải dùng `structureItems` làm canonical để không mất vị trí lesson top-level.
 - Nếu learning path `status != PUBLISHED`, front-end phải khóa toàn bộ lesson dù từng chapter/lesson đang `PUBLISHED`, ẩn progress/CTA học và hiển thị nhãn bảo trì.
 - `hasActiveEnrollment` chỉ tính cho authenticated student và yêu cầu enrollment `ACTIVE`, `startsAt <= now`, `expiresAt > now`.
-- `progress.progressPercent` tính theo số lesson `COMPLETED` trên tổng lesson published thuộc chapter `PUBLISHED`; `continueLessonKind` chỉ là gợi ý UI để chọn copy CTA, không thay thế permission học thật ở API lesson sau này.
+- `progress.progressPercent` tính theo số lesson `COMPLETED` trên tổng lesson published, gồm lesson không thuộc chapter và lesson thuộc chapter `PUBLISHED`; `continueLessonKind` chỉ là gợi ý UI để chọn copy CTA, không thay thế permission học thật ở API lesson sau này.
+- Thứ tự học/điều hướng course-level flatten `structureItems` theo depth-first từ trên xuống: lesson top-level tại chỗ của nó, còn chapter đóng góp các lesson con theo `orderIndex`.
 - Parent selected child/enrollment state sẽ nối ở milestone parent/payment sau; hiện parent token vẫn xem được dữ liệu public an toàn như guest.
 
 ---
@@ -169,7 +202,7 @@ Role: `ADMIN`.
 Behavior:
 
 - Trả chi tiết learning path chưa bị soft delete.
-- Response include `totalChapterCount`, `totalLessonCount`, `enrolledStudentCount`, `thumbnailFile` và `chapters`; mỗi chapter chứa lesson metadata để admin dựng màn chi tiết.
+- Response include `totalChapterCount`, `totalLessonCount`, `enrolledStudentCount`, `thumbnailFile` và canonical `structureItems`; item chapter chứa lesson metadata để admin dựng cây có thứ tự. `chapters` có thể được giữ tạm cho client cũ.
 
 ### `POST /admin/learning-paths`
 
@@ -182,9 +215,7 @@ Body:
   "title": "Toán 7",
   "slug": "toan-7",
   "domainId": "10000000-0000-4000-8000-000000000001",
-  "targetAudienceIds": [
-    "20000000-0000-4000-8000-000000000007"
-  ],
+  "targetAudienceIds": ["20000000-0000-4000-8000-000000000007"],
   "originalPriceVnd": 2000000,
   "salePriceVnd": 1500000,
   "thumbnailFileId": "uuid",
@@ -284,7 +315,6 @@ Body:
 
 ```json
 {
-  "orderIndex": 1,
   "title": "Chương 1: Số hữu tỉ",
   "overview": "Tổng quan các kiến thức nền về số hữu tỉ",
   "objectivesJson": {
@@ -296,7 +326,7 @@ Body:
 
 Behavior:
 
-- `orderIndex` phải unique trong cùng learning path.
+- Client không truyền `orderIndex`. Backend khóa cấu trúc, tự nối chapter vào cuối canonical `structureItems`, compact lại thứ tự liên tục từ `1` và lưu trong cùng transaction.
 - Chapter chỉ chứa thông tin tổng quan; không nhận video URL, document/material, summary học tập, quiz, flashcard hoặc test.
 
 Side effects:
@@ -317,7 +347,7 @@ Behavior:
 
 Role: `ADMIN`.
 
-Body: partial của body create.
+Body: partial metadata của body create; `orderIndex` optional chỉ dành cho flow reorder chapter hiện có, không xuất hiện trong modal tạo/sửa.
 
 Behavior:
 
@@ -348,24 +378,17 @@ Behavior:
 
 ## 7. Admin lesson API
 
-### `GET /admin/chapters/:chapterId/lessons`
+### `POST /admin/learning-paths/:learningPathId/lessons`
 
 Role: `ADMIN`.
 
-Behavior:
-
-- Trả danh sách lesson chưa bị soft delete trong một chapter, sắp xếp theo `orderIndex` tăng dần.
-- Nếu chapter không tồn tại hoặc đã bị xóa mềm, trả `404 NOT_FOUND`.
-
-### `POST /admin/chapters/:chapterId/lessons`
-
-Role: `ADMIN`.
+Endpoint canonical để tạo lesson trực tiếp từ course detail.
 
 Body:
 
 ```json
 {
-  "orderIndex": 1,
+  "chapterId": null,
   "title": "Buổi 1: Số hữu tỉ",
   "shortDescription": "Ôn tập số hữu tỉ và phép tính cơ bản",
   "lessonType": "LIVE",
@@ -376,34 +399,34 @@ Body:
   "completionMinScore": 7,
   "trialEnabled": false,
   "status": "DRAFT",
-  "sourceDocumentExtractions": [
-    {
-      "sourceDocumentId": "uuid-source-a",
-      "pageStart": 20,
-      "pageEnd": 22,
-      "sortOrder": 0
-    },
-    {
-      "sourceDocumentId": "uuid-source-a",
-      "pageStart": 30,
-      "pageEnd": 35,
-      "sortOrder": 2
-    }
-  ]
+  "sourceDocumentExtractions": []
 }
 ```
 
 Behavior:
 
-- `completionMinScore` mặc định là `7` nếu không gửi.
-- `trialEnabled` mặc định là `false`; học thử thuộc từng buổi học, không thuộc lộ trình.
-- `lessonType` nhận `BASIC | LIVE`, mặc định `BASIC`.
-- `liveUrl` là optional. Nếu có ở lesson `LIVE`, giá trị phải là URL HTTP(S) hợp lệ. Với lesson `BASIC`, backend luôn lưu `liveUrl = null`.
-- `orderIndex` phải unique trong cùng chapter.
-- `title` được trim, thu gọn khoảng trắng và không được trùng (không phân biệt hoa/thường) với lesson đang hoạt động khác trong cùng chapter. Hai chapter khác nhau có thể dùng cùng tên lesson. Nếu trùng trong chapter, trả `409` với `error.code = "LESSON_TITLE_DUPLICATE"` và message `Buổi học đã trùng tên`.
-- `videoUrl` chỉ chấp nhận YouTube hoặc Google Drive.
-- `sourceDocumentExtractions` là ordered collection optional của flow M4.x. Mỗi item trỏ tới một source document thuộc cùng learning path và một range. Gửi `[]` khi lesson không có khối trích xuất.
-- Nhiều item có thể dùng cùng `sourceDocumentId`, nhưng range không được giao nhau theo biên inclusive. Các source document khác nhau có thể dùng cùng số trang.
+- `chapterId` optional/nullable. `null` hoặc bỏ field tạo lesson không thuộc chapter; UUID tạo lesson trong chapter tương ứng.
+- Nếu có `chapterId`, chapter phải active và thuộc đúng `learningPathId` trên URL.
+- Client không truyền `orderIndex`. Nếu `chapterId = null`, backend nối lesson vào cuối canonical `structureItems`; nếu có `chapterId`, backend nối lesson vào cuối `chapter.lessons`.
+- Backend khóa cấu trúc, validate title/chapter, compact dãy thứ tự liên tục từ `1` và lưu trong cùng transaction. Đổi vị trí sau khi tạo dùng endpoint `move`.
+- Tăng `learning_paths.total_lesson_count` và ghi `audit_logs` như flow create hiện có.
+
+Các field metadata/document khác giữ nguyên rule create lesson hiện hành: score mặc định `7`, `trialEnabled` mặc định `false`, `lessonType` mặc định `BASIC`, `liveUrl` chỉ giữ cho `LIVE`, video chỉ nhận YouTube/Google Drive và `sourceDocumentExtractions` phải thuộc cùng learning path.
+
+### `POST /admin/chapters/:chapterId/lessons`
+
+Role: `ADMIN`.
+
+Endpoint compatibility cho client cũ. Behavior tương đương endpoint canonical với `chapterId` lấy từ URL và không cho body ghi đè sang chapter khác/null.
+
+### `GET /admin/chapters/:chapterId/lessons`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả danh sách lesson chưa bị soft delete trong một chapter, sắp xếp theo `orderIndex` tăng dần.
+- Nếu chapter không tồn tại hoặc đã bị xóa mềm, trả `404 NOT_FOUND`.
 
 Side effects:
 
@@ -420,13 +443,13 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả lesson chưa bị soft delete, gồm `lessonType` và `liveUrl`.
+- Trả lesson chưa bị soft delete, gồm `chapterId: string | null`, `chapterTitle: string | null`, `lessonType` và `liveUrl`.
 
 ### `PATCH /admin/lessons/:lessonId`
 
 Role: `ADMIN`.
 
-Body: partial của body create. `sourceDocumentExtractions` là collection đầy đủ sau chỉnh sửa: gửi `[]` để xóa tất cả khối, hoặc bỏ field khi chỉ sửa metadata lesson. Item hiện có gửi thêm `id` của page range để backend reconcile ổn định.
+Body: partial metadata của body create. `sourceDocumentExtractions` là collection đầy đủ sau chỉnh sửa: gửi `[]` để xóa tất cả khối, hoặc bỏ field khi chỉ sửa metadata lesson. Item hiện có gửi thêm `id` của page range để backend reconcile ổn định. Di chuyển container/vị trí dùng endpoint `move` riêng bên dưới.
 
 `customVideoSettings.chapters` là danh sách mốc thời gian optional của video:
 
@@ -464,11 +487,35 @@ Behavior:
 - Cho phép đổi `orderIndex`, metadata, `lessonType`, `liveUrl`, thời điểm mở bài thi, video URL, custom video settings/chapters, completion score, `trialEnabled` và `status`.
 - `shortDescription`, `liveUrl`, `scheduledAt`, `examOpenAt`, `videoUrl` có thể set `null` để clear.
 - Khi đổi `lessonType` về `BASIC`, backend clear `liveUrl` kể cả request không gửi lại field này.
-- Nếu đổi `orderIndex`, thứ tự mới vẫn không được trùng trong cùng chapter.
-- Nếu đổi `title`, tên mới vẫn phải duy nhất trong cùng chapter theo cùng quy tắc của API tạo lesson; lesson hiện tại được loại khỏi phép kiểm tra.
+- Nếu đổi `orderIndex` qua endpoint PATCH cũ, chỉ reorder trong container hiện tại để tương thích; chuyển container phải dùng endpoint `move`.
+- Nếu đổi `title`, backend kiểm tra uniqueness trong container hiện tại; lesson hiện tại được loại khỏi phép kiểm tra.
 - Nếu gửi `sourceDocumentExtractions`, backend validate source document cùng learning path, readiness, thứ tự range và same-source overlap; sau đó tạo/cập nhật/xóa đúng từng mapping và enqueue chunking khi nguồn/range đổi.
 - Same-source overlap trả `400` với `error.code = "LESSON_SOURCE_EXTRACTION_OVERLAP"` và details của hai range xung đột.
 - Ghi `audit_logs`.
+
+### `PATCH /admin/lessons/:lessonId/move`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{
+  "chapterId": null,
+  "targetOrderIndex": 3
+}
+```
+
+Behavior:
+
+- `chapterId` bắt buộc hiện diện nhưng nhận UUID hoặc `null`. UUID là chapter đích trong cùng learning path; `null` là top-level.
+- `targetOrderIndex` là vị trí chèn 1-based. Với chapter đích, vị trí tính trong `chapter.lessons`; với top-level, vị trí tính trong canonical `structureItems` gồm cả chapter và lesson top-level.
+- Hỗ trợ move trong cùng container, chapter A sang chapter B, chapter ra top-level và top-level vào chapter.
+- Trong một transaction: khóa/đọc structure liên quan, dựng cây sau move, kiểm tra completion guard, compact container nguồn, shift container đích, validate title ở đích và cập nhật `chapter_id`/`order_index`. Response trả lesson sau move; client refetch course detail để nhận `structureItems` mới.
+- Completion guard bỏ qua chính lesson đang move, nhưng chặn nếu trong cây kết quả lesson đó đứng trước bất kỳ lesson khác có ít nhất một `lesson_progress.status = COMPLETED`. Trả `409` với `error.code = "LESSON_MOVE_BEFORE_COMPLETED"`, message `Không thể di chuyển trước buổi học đã có học sinh hoàn thành` và details của lesson mốc đầu tiên.
+- Admin course detail trả `hasStudentCompletion` trên từng lesson bằng aggregate/existence query, không trả danh sách học sinh hoặc progress nhạy cảm.
+- Request sai chapter learning path trả validation error. `targetOrderIndex` hợp lệ theo DTO nhưng lớn hơn độ dài container được chuẩn hóa về vị trí cuối; conflict đồng thời phải rollback toàn bộ và UI refetch trước khi thử lại.
+- Ghi `audit_logs` gồm container/vị trí trước và sau.
 
 ### `POST /admin/lessons/:lessonId/video-transcript/fetch`
 
@@ -490,9 +537,7 @@ Behavior:
   "videoDuration": 1863,
   "playbackStartTime": 5,
   "playbackEndTime": 1841,
-  "chapters": [
-    { "time": 908, "title": "2. Đơn thức đồng dạng" }
-  ],
+  "chapters": [{ "time": 908, "title": "2. Đơn thức đồng dạng" }],
   "segments": [
     {
       "time": 908.275,
@@ -515,7 +560,7 @@ Role: `ADMIN`.
 Behavior:
 
 - Soft delete lesson và set status `ARCHIVED`.
-- Giải phóng `orderIndex` để admin có thể tạo lesson mới cùng thứ tự trong learning path nếu cần.
+- Compact vị trí trong container hiện tại; nếu lesson ở top-level thì compact canonical structure gồm cả chapter và lesson top-level.
 - Giảm `learning_paths.total_lesson_count`.
 - Ghi `audit_logs`.
 
@@ -589,6 +634,11 @@ Behavior:
 
 Role: `ADMIN`.
 
+Behavior:
+
+- Trả summary hiện tại hoặc `data: null` nếu lesson chưa có summary.
+- Không trả summary đã xóa mềm.
+
 ### `PUT /admin/lessons/:lessonId/summary`
 
 Role: `ADMIN`.
@@ -607,6 +657,8 @@ Side effects:
 
 - Upsert `lesson_summaries`.
 - Ghi audit log.
+- Giữ `ai_generation_id` hiện có để không mất provenance khi admin review/sửa
+  một summary vốn được AI tạo.
 
 ### `POST /admin/lessons/:lessonId/summary/generate-ai`
 
@@ -620,6 +672,15 @@ Body:
   "style": "student_friendly"
 }
 ```
+
+Rules:
+
+- `documentIds` là `lesson_documents.id`, bắt buộc unique và thuộc đúng
+  `lessonId` trên URL.
+- Mọi document phải active, `READY` và có chunks; API không nhận raw PDF/text.
+- Nếu cùng lesson đang có job summary `QUEUED`/`RUNNING`, API trả lại `jobId`
+  đó thay vì enqueue provider call thứ hai.
+- Sau khi job terminal `SUCCEEDED`/`FAILED`, admin có thể yêu cầu regenerate.
 
 Response: `202 Accepted`.
 
@@ -638,6 +699,8 @@ Side effects:
 - Tạo `background_jobs` queue `AI_GENERATION`.
 - Tạo `ai_generations` type `SUMMARY`.
 - Enqueue AI generation job.
+- Worker upsert summary với `source = AI`, `reviewStatus = NEEDS_REVIEW` và
+  `aiGenerationId` để admin review trước khi student nhìn thấy.
 
 ### `GET /student/lessons/:lessonId/summary`
 

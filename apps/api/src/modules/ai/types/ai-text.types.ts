@@ -4,8 +4,11 @@
  * Dùng cho interface AiProvider.generateText() và AiProvider.generateStructured().
  * Xem docs/06-ai-rag-spec.md §2.2 cho spec gốc.
  *
- * M5.1 chỉ khai báo types. Implementation đầy đủ sẽ ở M9.1.
+ * M9.1 dùng các type này cho OpenAI Responses API và lifecycle log.
  */
+
+import type { AiProviderName } from "@prisma/client";
+import type { ZodType } from "zod";
 
 export interface RetrievedChunk {
   id: string;
@@ -20,23 +23,39 @@ export interface AiTextInput {
   contextChunks?: RetrievedChunk[];
   temperature?: number;
   maxTokens?: number;
+  /** Model runtime resolved by provider-operations; embedding does not use this field. */
+  model?: string;
   metadata?: Record<string, unknown>;
 }
 
-export interface AiTextOutput {
-  text: string;
+export interface AiTokenUsage {
+  promptTokens?: number;
+  cachedInputTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+}
+
+export interface AiProviderOutputMetadata {
+  provider: AiProviderName;
   model: string;
-  usage?: {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  };
+  usage?: AiTokenUsage;
   providerRequestId?: string;
   latencyMs?: number;
+}
+
+export interface AiTextOutput extends AiProviderOutputMetadata {
+  text: string;
 }
 
 export interface AiStructuredInput extends AiTextInput {
   outputName: string;
   promptVersion: string;
   schemaVersion: string;
+}
+
+export type AiOutputSchema<TOutput> = ZodType<TOutput>;
+
+export interface AiStructuredOutput<TOutput>
+  extends AiProviderOutputMetadata {
+  data: TOutput;
 }

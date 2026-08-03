@@ -194,10 +194,9 @@ describe("M4.2 document API integration", () => {
       cleanupIds.lessonDocumentIds.add(document.id);
       cleanupIds.jobIds.add(document.processingJobId);
     }
-    const lessonOnePageRangeDocument =
-      rangesResponse.body.data.lessonDocuments.find(
-        (document: { lessonId: string }) => document.lessonId === ids.lessonOne,
-      );
+    const lessonOnePageRangeDocument = rangesResponse.body.data.lessonDocuments.find(
+      (document: { lessonId: string }) => document.lessonId === ids.lessonOne,
+    );
     expect(lessonOnePageRangeDocument).toBeDefined();
 
     const supplementResponse = await request(httpServer)
@@ -240,9 +239,7 @@ describe("M4.2 document API integration", () => {
 
     cleanupIds.lessonDocumentIds.add(secondHomeworkResponse.body.data.id);
     cleanupIds.jobIds.add(secondHomeworkResponse.body.data.processingJobId);
-    expect(secondHomeworkResponse.body.data.kind).toBe(
-      LessonDocumentKind.HOMEWORK,
-    );
+    expect(secondHomeworkResponse.body.data.kind).toBe(LessonDocumentKind.HOMEWORK);
 
     const uploadedPrimaryResponse = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lessonOne}/documents`)
@@ -442,7 +439,6 @@ describe("M4.2 document API integration", () => {
       .set("Authorization", `Bearer ${accessToken}`)
       .send({
         completionMinScore: 7,
-        orderIndex: 3,
         sourceDocumentPageRange: {
           pageEnd: 2,
           pageStart: 1,
@@ -561,7 +557,6 @@ describe("M4.2 document API integration", () => {
       .set("Authorization", `Bearer ${accessToken}`)
       .send({
         completionMinScore: 7,
-        orderIndex: 4,
         sourceDocumentExtractions: [
           {
             pageEnd: 3,
@@ -632,9 +627,7 @@ describe("M4.2 document API integration", () => {
       })
       .expect(400);
 
-    expect(overlapResponse.body.error.code).toBe(
-      "LESSON_SOURCE_EXTRACTION_OVERLAP",
-    );
+    expect(overlapResponse.body.error.code).toBe("LESSON_SOURCE_EXTRACTION_OVERLAP");
   });
 
   it("rejects page range mapping until the source document is fully ready", async () => {

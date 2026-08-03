@@ -112,13 +112,23 @@ export function getJobStatusLabel(status: AdminBackgroundJobStatus | null | unde
 }
 
 export function getLessonsWithChapter(path: AdminLearningPath): AdminLessonWithChapter[] {
-  return path.chapters.flatMap((chapter) =>
-    chapter.lessons.map((lesson) => ({
-      chapterOrder: chapter.orderIndex,
-      chapterTitle: chapter.title,
+  const topLevelLessons = (path.structureItems ?? [])
+    .filter((item) => item.type === "LESSON")
+    .map((lesson) => ({
+      chapterOrder: lesson.orderIndex,
+      chapterTitle: "Không thuộc chương",
       lesson,
-    })),
-  );
+    }));
+  return [
+    ...topLevelLessons,
+    ...path.chapters.flatMap((chapter) =>
+      chapter.lessons.map((lesson) => ({
+        chapterOrder: chapter.orderIndex,
+        chapterTitle: chapter.title,
+        lesson,
+      })),
+    ),
+  ];
 }
 
 export function groupLessonDocumentsByLessonId(documents: AdminLessonDocumentApi[]) {

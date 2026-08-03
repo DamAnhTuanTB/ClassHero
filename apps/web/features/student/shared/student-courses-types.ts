@@ -32,6 +32,7 @@ export type StudentCourseDetailChapterTone = "amber" | "emerald" | "violet";
 export type StudentCourseDetailChapter = {
   description: string;
   id: string;
+  isStandaloneGroup?: boolean;
   lessons: StudentCourseDetailLesson[];
   order: number;
   progressPercent: number;

@@ -39,7 +39,6 @@ export function TestResultScreen({
   onReviewIncorrect: () => void;
   onStartNewTest: () => void;
   onNextLesson?: () => void;
-  onUseResult?: () => void;
   pendingAction: string | null;
   result: StudentTestResult;
   shouldCelebrate: boolean;

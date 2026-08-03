@@ -398,7 +398,7 @@ export class StudentTestAttemptsService {
           },
         });
       }
-      return transaction.testAttempt.update({
+      const submittedAttempt = await transaction.testAttempt.update({
         where: { id: attempt.id },
         data: {
           status: AttemptStatus.SUBMITTED,
@@ -422,6 +422,21 @@ export class StudentTestAttemptsService {
           },
         },
       });
+
+      const completionMinScore = Number(
+        submittedAttempt.lesson.completionMinScore,
+      );
+      if (Number(submittedAttempt.score) >= completionMinScore) {
+        await this.applyPassingResult(transaction, {
+          attemptId: submittedAttempt.id,
+          durationSeconds,
+          lessonId: attempt.lessonId,
+          score: Number(submittedAttempt.score),
+          studentUserId,
+        });
+      }
+
+      return submittedAttempt;
     });
 
     const { lesson, ...submittedAttempt } = result;
@@ -551,145 +566,89 @@ export class StudentTestAttemptsService {
     };
   }
 
-  async useResult(attemptId: string, studentUserId: string) {
-    const candidate = await this.prisma.testAttempt.findFirst({
+  private async applyPassingResult(
+    transaction: Prisma.TransactionClient,
+    input: {
+      attemptId: string;
+      durationSeconds: number;
+      lessonId: string;
+      score: number;
+      studentUserId: string;
+    },
+  ) {
+    const currentProgress = await transaction.lessonProgress.findUnique({
       where: {
-        id: attemptId,
-        studentUserId,
-        status: { in: [AttemptStatus.SUBMITTED, AttemptStatus.GRADED] },
+        studentUserId_lessonId: {
+          studentUserId: input.studentUserId,
+          lessonId: input.lessonId,
+        },
       },
       select: {
-        id: true,
-        lessonId: true,
-        score: true,
-        durationSeconds: true,
-        submittedAt: true,
-        lesson: {
-          select: {
-            completionMinScore: true,
-          },
-        },
+        bestTestAttemptId: true,
+        bestScore: true,
+        bestDurationSeconds: true,
+        completedAt: true,
       },
     });
-    if (!candidate || candidate.score === null || candidate.durationSeconds === null) {
-      throw notFoundException(
-        "TEST_ATTEMPT_RESULT_NOT_FOUND",
-        "Không tìm thấy kết quả kiểm tra",
-      );
-    }
-    await this.studentLessonAccessService.assertCanRead(
-      candidate.lessonId,
-      studentUserId,
+    const currentBestScore =
+      currentProgress?.bestScore === null ||
+      currentProgress?.bestScore === undefined
+        ? null
+        : Number(currentProgress.bestScore);
+    const isBetter = isCandidateBetter(
+      input.score,
+      input.durationSeconds,
+      currentBestScore,
+      currentProgress?.bestDurationSeconds ?? null,
     );
-    const candidateScore = Number(candidate.score);
-    const completionMinScore = Number(candidate.lesson.completionMinScore);
-    if (candidateScore < completionMinScore) {
-      throw badRequestException(
-        "TEST_SCORE_BELOW_COMPLETION_THRESHOLD",
-        "Bạn cần phải làm lại bài kiểm tra mới.",
-        { score: candidateScore, completionMinScore },
-      );
+
+    if (isBetter && currentProgress?.bestTestAttemptId !== input.attemptId) {
+      await transaction.testAttempt.updateMany({
+        where: {
+          studentUserId: input.studentUserId,
+          lessonId: input.lessonId,
+          isBestForLesson: true,
+        },
+        data: { isBestForLesson: false },
+      });
+      await transaction.testAttempt.update({
+        where: { id: input.attemptId },
+        data: {
+          isBestForLesson: true,
+          status: AttemptStatus.GRADED,
+        },
+      });
     }
 
-    const result = await this.prisma.$transaction(async (transaction) => {
-      const currentProgress = await transaction.lessonProgress.findUnique({
-        where: {
-          studentUserId_lessonId: {
-            studentUserId,
-            lessonId: candidate.lessonId,
-          },
+    const completedAt = currentProgress?.completedAt ?? new Date();
+    await transaction.lessonProgress.upsert({
+      where: {
+        studentUserId_lessonId: {
+          studentUserId: input.studentUserId,
+          lessonId: input.lessonId,
         },
-        select: {
-          id: true,
-          bestTestAttemptId: true,
-          bestScore: true,
-          bestDurationSeconds: true,
-          completedAt: true,
-        },
-      });
-      const isBetter = isCandidateBetter(
-        candidateScore,
-        candidate.durationSeconds!,
-        currentProgress?.bestScore ? Number(currentProgress.bestScore) : null,
-        currentProgress?.bestDurationSeconds ?? null,
-      );
-
-      if (isBetter && currentProgress?.bestTestAttemptId !== candidate.id) {
-        await transaction.testAttempt.updateMany({
-          where: {
-            studentUserId,
-            lessonId: candidate.lessonId,
-            isBestForLesson: true,
-          },
-          data: { isBestForLesson: false },
-        });
-        await transaction.testAttempt.update({
-          where: { id: candidate.id },
-          data: {
-            isBestForLesson: true,
-            status: AttemptStatus.GRADED,
-          },
-        });
-      }
-      const completedAt = currentProgress?.completedAt ?? new Date();
-      const progress = await transaction.lessonProgress.upsert({
-        where: {
-          studentUserId_lessonId: {
-            studentUserId,
-            lessonId: candidate.lessonId,
-          },
-        },
-        create: {
-          studentUserId,
-          lessonId: candidate.lessonId,
-          status: LessonProgressStatus.COMPLETED,
-          bestTestAttemptId: candidate.id,
-          bestScore: candidateScore,
-          bestDurationSeconds: candidate.durationSeconds,
-          completedAt,
-        },
-        update: {
-          status: LessonProgressStatus.COMPLETED,
-          completedAt,
-          ...(isBetter
-            ? {
-                bestTestAttemptId: candidate.id,
-                bestScore: candidateScore,
-                bestDurationSeconds: candidate.durationSeconds,
-              }
-            : {}),
-        },
-        select: {
-          status: true,
-          bestTestAttempt: {
-            select: {
-              id: true,
-              score: true,
-              durationSeconds: true,
-            },
-          },
-          completedAt: true,
-        },
-      });
-      return { progress, isBetter };
+      },
+      create: {
+        studentUserId: input.studentUserId,
+        lessonId: input.lessonId,
+        status: LessonProgressStatus.COMPLETED,
+        bestTestAttemptId: input.attemptId,
+        bestScore: input.score,
+        bestDurationSeconds: input.durationSeconds,
+        completedAt,
+      },
+      update: {
+        status: LessonProgressStatus.COMPLETED,
+        completedAt,
+        ...(isBetter
+          ? {
+              bestTestAttemptId: input.attemptId,
+              bestScore: input.score,
+              bestDurationSeconds: input.durationSeconds,
+            }
+          : {}),
+      },
     });
-    const leaderboard = await this.getLeaderboard(candidate.lessonId, studentUserId);
-
-    return {
-      lessonId: candidate.lessonId,
-      usedAttemptId: candidate.id,
-      promotedToBest: result.isBetter,
-      status: result.progress.status,
-      completedAt: result.progress.completedAt,
-      bestAttempt: result.progress.bestTestAttempt
-        ? {
-            id: result.progress.bestTestAttempt.id,
-            score: Number(result.progress.bestTestAttempt.score),
-            durationSeconds: result.progress.bestTestAttempt.durationSeconds,
-          }
-        : null,
-      leaderboard: leaderboard.entries,
-    };
   }
 
   async getLeaderboard(lessonId: string, studentUserId: string) {

@@ -10,6 +10,7 @@
 import { Logger } from "@nestjs/common";
 import { AiProviderName } from "@prisma/client";
 import OpenAI from "openai";
+import { zodTextFormat } from "openai/helpers/zod";
 
 import type {
   AiEmbeddingInput,
@@ -18,6 +19,8 @@ import type {
 import type { AiProvider } from "#api/modules/ai/types/ai-provider.interface";
 import type {
   AiStructuredInput,
+  AiStructuredOutput,
+  AiOutputSchema,
   AiTextInput,
   AiTextOutput,
 } from "#api/modules/ai/types/ai-text.types";
@@ -26,6 +29,12 @@ import {
   assertEmbeddingInput,
   assertEmbeddingOutput,
 } from "#api/modules/ai/utils/embedding-validation";
+import {
+  AiOutputValidationError,
+  assertAiOutputName,
+  parseAiStructuredOutput,
+} from "#api/modules/ai/utils/ai-output-validation";
+import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 
 export class OpenAiProvider implements AiProvider {
   readonly name = AiProviderName.OPENAI;
@@ -35,7 +44,12 @@ export class OpenAiProvider implements AiProvider {
 
   constructor(config: AiOpenAiConfig) {
     this.config = config;
-    this.client = new OpenAI({ apiKey: config.apiKey });
+    this.client = new OpenAI({
+      apiKey: config.apiKey,
+      timeout: config.requestTimeoutMs,
+      // BullMQ owns retries so one durable attempt maps to one provider call.
+      maxRetries: 0,
+    });
   }
 
   async createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput> {
@@ -97,26 +111,91 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  /**
-   * Text completion — stub cho M5.1.
-   * TODO: Implement đầy đủ ở M9.1.
-   */
-  async generateText(_input: AiTextInput): Promise<AiTextOutput> {
-    throw new Error(
-      "OpenAiProvider.generateText() is not yet implemented. Will be completed in M9.1.",
-    );
+  async generateText(input: AiTextInput): Promise<AiTextOutput> {
+    const startedAt = Date.now();
+    const response = await this.client.responses.create({
+      model: input.model ?? this.config.chatModel,
+      instructions: input.systemPrompt,
+      input: buildAiUserPrompt(input),
+      ...(input.temperature === undefined
+        ? {}
+        : { temperature: input.temperature }),
+      ...(input.maxTokens === undefined
+        ? {}
+        : { max_output_tokens: input.maxTokens }),
+    });
+    const text = response.output_text.trim();
+
+    if (!text) {
+      throw new Error("OpenAI returned an empty text response.");
+    }
+
+    return {
+      text,
+      provider: this.name,
+      model: response.model ?? this.config.chatModel,
+      usage: toTokenUsage(response.usage),
+      providerRequestId: response.id,
+      latencyMs: Date.now() - startedAt,
+    };
   }
 
-  /**
-   * Structured output — stub cho M5.1.
-   * TODO: Implement đầy đủ ở M9.1.
-   */
   async generateStructured<TOutput>(
-    _input: AiStructuredInput,
-    _schema: unknown,
-  ): Promise<TOutput> {
-    throw new Error(
-      "OpenAiProvider.generateStructured() is not yet implemented. Will be completed in M9.1.",
-    );
+    input: AiStructuredInput,
+    schema: AiOutputSchema<TOutput>,
+  ): Promise<AiStructuredOutput<TOutput>> {
+    assertAiOutputName(input.outputName);
+    const startedAt = Date.now();
+    const response = await this.client.responses.parse({
+      model: input.model ?? this.config.structuredModel,
+      instructions: input.systemPrompt,
+      input: buildAiUserPrompt(input),
+      text: {
+        format: zodTextFormat(schema, input.outputName),
+      },
+      ...(input.temperature === undefined
+        ? {}
+        : { temperature: input.temperature }),
+      ...(input.maxTokens === undefined
+        ? {}
+        : { max_output_tokens: input.maxTokens }),
+    });
+
+    if (response.output_parsed === null) {
+      throw new AiOutputValidationError(
+        "OpenAI did not return a parsed structured output. The response may have been refused or incomplete.",
+      );
+    }
+
+    const data = parseAiStructuredOutput(schema, response.output_parsed);
+
+    return {
+      data,
+      provider: this.name,
+      model: response.model ?? this.config.structuredModel,
+      usage: toTokenUsage(response.usage),
+      providerRequestId: response.id,
+      latencyMs: Date.now() - startedAt,
+    };
   }
+}
+
+function toTokenUsage(
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    input_tokens_details?: { cached_tokens?: number } | null;
+  } | null | undefined,
+) {
+  if (!usage) {
+    return undefined;
+  }
+
+  return {
+    promptTokens: usage.input_tokens,
+    cachedInputTokens: usage.input_tokens_details?.cached_tokens,
+    completionTokens: usage.output_tokens,
+    totalTokens: usage.total_tokens,
+  };
 }

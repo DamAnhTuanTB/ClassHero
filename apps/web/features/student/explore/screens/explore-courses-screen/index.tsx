@@ -6,7 +6,6 @@ import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { CourseSearchFilterPanel } from "@/features/student/explore/screens/explore-courses-screen/components/course-search-filter-panel";
 import { ExploreCourseSection } from "@/features/student/explore/screens/explore-courses-screen/components/explore-course-section";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
-import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
 import { useStudentCoursesFilter } from "@/features/student/explore/hooks/use-student-courses-filter";
@@ -192,30 +191,15 @@ export function ExploreCoursesScreen({
                 ))}
               </>
             ) : (
-              <div className="grid min-w-0 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filteredCourses.map((course, index) => {
-                  const studentAudience = catalog.targetAudiences.find(
-                    (audience) =>
-                      audience.grade === studentGrade &&
-                      course.targetAudienceIds.includes(audience.id),
-                  );
-                  const displayedAudience =
-                    selectedTargetAudience ?? studentAudience ?? null;
-
-                  return (
-                    <ExploreCourseCard
-                      key={course.id}
-                      course={course}
-                      onPrefetch={prefetchCourseDetail}
-                      accentCount={filteredCourses.length}
-                      accentIndex={index}
-                      targetAudienceGrade={displayedAudience?.grade}
-                      targetAudienceCode={displayedAudience?.code}
-                      targetAudienceName={displayedAudience?.name}
-                    />
-                  );
-                })}
-              </div>
+              <ExploreCourseSection
+                accentCount={filteredCourses.length}
+                courses={filteredCourses}
+                onPrefetch={prefetchCourseDetail}
+                targetAudienceCode={selectedTargetAudience?.code}
+                targetAudienceGrade={selectedTargetAudience?.grade}
+                targetAudienceName={selectedTargetAudience?.name}
+                title={`Dành cho ${selectedTargetAudience?.name ?? "đối tượng đã chọn"}`}
+              />
             )}
           </section>
         ) : (

@@ -119,9 +119,8 @@ flowchart TD
   G -- Chưa --> H[Giữ Test bị khóa]
   G -- Rồi --> I[Làm và submit Test]
   I --> J{Điểm đạt ngưỡng?}
-  J -- Chưa --> K[Yêu cầu làm bài mới]
-  J -- Rồi --> L[Học sinh bấm Dùng điểm bài này]
-  L --> M[Cập nhật best, completion và Top 5]
+  J -- Chưa --> K[Lưu lịch sử, giữ nguyên completion cũ]
+  J -- Rồi --> L[Tự động cập nhật best, completion và Top 5]
 ```
 
 ### Quiz: phản hồi từng câu nhưng không tự mở
@@ -284,6 +283,13 @@ trạng UI đã về panel nhưng reload lại tự bật runner. Cleanup marker
 chạy một lần lúc mount; nếu effect cleanup chạy lại theo object query sau
 progress refetch, nó sẽ xóa nhầm marker của runner vừa được mở.
 
+Màn result có hai đường vào khác nhau nên không được dùng chung một
+thao tác history. Khi hoàn thành từ runner, result thay thế entry runner hiện tại;
+entry lesson bên dưới đã có sẵn. Khi bấm `Xem lại` từ panel, result phải
+`pushState` thành entry mới; nếu `replaceState`, chính entry lesson bị ghi đè và
+Browser Back sẽ nhảy thẳng về trang đã mở lesson, thường là chi tiết khóa học.
+Regression test phải bao phủ cả hai đường vào này.
+
 Ẩn một panel bằng attribute `hidden` không dừng lifecycle React. Nếu runner
 Flashcard vẫn được mount dưới panel ẩn, hook khóa scroll của runner vẫn có thể
 đặt `overflow: hidden` lên `html/body` sau hydration: thanh cuộn hiện ở HTML đầu
@@ -332,13 +338,12 @@ kết thúc để tránh nháy do chuyển `loading -> danh sách`. Sau khi cach
 liệu, background refetch không được dùng `isFetching` để thay toàn bộ list bằng
 loading; chỉ `isLoading` khi chưa có data mới được phép hiển thị loading surface.
 
-### Test: submit và dùng kết quả là hai hành động
+### Test: submit tự động ghi nhận mốc đã đạt
 
-Submit chỉ chấm và lưu lịch sử. `Dùng điểm bài này` là quyết định rõ ràng của
-student để cập nhật best/completion. Backend từ chối kết quả dưới ngưỡng; với kết
-quả đạt, transaction so điểm cao hơn rồi thời gian thấp hơn, đổi cờ best và
-upsert lesson progress idempotently. Việc tách hai bước tránh một lượt làm thử
-vô tình thay đổi kết quả đang dùng.
+Submit luôn chấm và lưu lịch sử. Với kết quả đạt, cùng transaction so
+điểm cao hơn rồi thời gian thấp hơn, đổi cờ best và upsert lesson progress
+idempotently. Completion là mốc cao nhất đã đạt: một lượt thi lại chưa đạt
+chỉ thêm lịch sử, không được hạ progress hoặc thay best attempt đã đạt.
 
 Timer tự submit dùng marker unanswered có chủ đích cho câu chưa trả lời. Marker
 này khác placeholder nội bộ lúc start: placeholder không bao giờ là một answer

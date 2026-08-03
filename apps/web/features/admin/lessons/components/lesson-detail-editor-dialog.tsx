@@ -80,7 +80,6 @@ export function LessonDetailEditorDialog({
     return (
       <LessonEditorDialog
         mode="edit"
-        defaultOrderIndex={selectedChapter.lessons.length + 1}
         isOpen={isOpen}
         isSaving={isSavingLesson}
         learningPath={path}

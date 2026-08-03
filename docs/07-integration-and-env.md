@@ -82,8 +82,8 @@ OPENAI_EMBEDDING_DIMENSIONS=1536
 
 # Gemini
 GEMINI_API_KEY=change-me
-GEMINI_STRUCTURED_MODEL=gemini-2.0-flash
-GEMINI_CHAT_MODEL=gemini-2.0-flash
+GEMINI_STRUCTURED_MODEL=gemini-2.5-flash
+GEMINI_CHAT_MODEL=gemini-2.5-flash
 
 # Paid OCR
 OCR_PROVIDER=mathpix
@@ -91,6 +91,7 @@ OCR_PROVIDER=mathpix
 OCR_PAID_ENABLED=false
 OCR_ALLOW_FREE_FALLBACK=false
 OCR_ARTIFACT_CACHE_ENABLED=true
+OCR_DEBUG_ARTIFACTS_ENABLED=false
 OCR_ARTIFACT_PREFIX=ocr-artifacts
 MATHPIX_APP_ID=change-me
 MATHPIX_APP_KEY=change-me
@@ -99,6 +100,7 @@ OCR_MAX_CONCURRENT_DOCUMENTS=2
 OCR_MONTHLY_BUDGET_VND=1000000
 
 # AI budget/rate limit
+AI_PROVIDER_TIMEOUT_MS=60000
 AI_MONTHLY_BUDGET_VND=1500000
 AI_STUDENT_CHAT_DAILY_LIMIT=20
 AI_STUDENT_GENERATE_DAILY_LIMIT=5
@@ -273,6 +275,8 @@ Dùng phụ cho:
 - Mọi call AI đi qua `AiProvider` abstraction.
 - Output structured phải validate schema.
 - Log `ai_generations`.
+- `AI_PROVIDER_TIMEOUT_MS` giới hạn một provider request; BullMQ quản lý retry
+  durable nên OpenAI SDK không tự retry lồng bên trong một attempt.
 - Không gửi toàn bộ tài liệu mỗi lần học sinh hỏi.
 - Cần rate limit và budget guard.
 

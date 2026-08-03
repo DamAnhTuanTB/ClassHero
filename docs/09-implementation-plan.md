@@ -123,12 +123,13 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 16     | `M3.3`  | Public/student learning path listing                                    |
 | 17     | `M3.4`  | Admin learning path/chapter/lesson UI cơ bản                            |
 | 18     | `M3.5`  | Public/student course browsing UI                                       |
-| 18.1   | `M3.9`  | Catalog lĩnh vực và đối tượng hướng đến khóa học                       |
+| 18.1   | `M3.9`  | Catalog lĩnh vực và đối tượng hướng đến khóa học                        |
 | 19     | `M4.1`  | FilesModule và storage service                                          |
 | 20     | `M4.2`  | Source document và lesson page mapping API                              |
 | 21     | `M4.3`  | BullMQ worker foundation                                                |
 | 22     | `M4.4`  | Paid OCR artifact và chunking                                           |
 | 23     | `M4.5`  | Lesson document upload UI/status                                        |
+| 23.1   | `M4.6`  | OCR accounting, retry-resume và budget guard                            |
 | 24     | `M6.1`  | Rich text JSON và shared content schema                                 |
 | 25     | `M6.2`  | Quiz CRUD API và admin UI tối thiểu                                     |
 | 26     | `M6.3`  | Flashcard CRUD API và admin UI tối thiểu                                |
@@ -157,11 +158,14 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 49     | `M9.1`  | AiModule structured output foundation                                   |
 | 50     | `M9.2`  | Admin generate lesson summary                                           |
 | 51     | `M9.3`  | Admin generate quiz/flashcard/test                                      |
-| 52     | `M9.4`  | Student request-new reserve-first flow                                  |
-| 53     | `M9.5`  | AI explanation cache inline                                             |
-| 54     | `M9.6`  | Chat AI trong lesson bằng RAG                                           |
-| 55     | `M9.7`  | Conversation summary và diagram placeholder                             |
-| 56     | `M9.8`  | Admin AI generation panel UI                                            |
+| 52     | `M9.8`  | Admin AI generation panel UI                                            |
+| 52.1   | `M9.9`  | Provider catalog, AI routing, Gemini fallback và usage accounting       |
+| 52.2   | `M9.10` | Admin provider operations API                                           |
+| 52.3   | `M9.11` | Admin Cài đặt AI/OCR UI                                                  |
+| 53     | `M9.4`  | Student request-new reserve-first UI + API                              |
+| 54     | `M9.5`  | AI explanation cache inline UI + API                                    |
+| 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                           |
+| 56     | `M9.7`  | Conversation summary và diagram placeholder                             |
 | 57     | `M15.4` | Contextual AI `Hỏi đoạn này` và `Em chưa hiểu`                          |
 | 58     | `M15.5` | AI chapter summary và flashcard từ video                                |
 | 59     | `M15.6` | Semantic search inside video                                            |
@@ -232,7 +236,7 @@ Ghi chú:
 - `M3.7` phụ thuộc `M3.4`, `M3.6`.
 - `M3.8` phụ thuộc `M3.2`, `M3.4`; transcript là optional và không chặn phát video.
 - `M3.9` phụ thuộc `M3.1`, `M3.4`; thay enum môn/lớp của khóa học bằng catalog Lĩnh vực và Đối tượng hướng đến.
-- Từ M3 trở đi, cấu trúc course detail là `learning path -> chapters -> lessons`; chapter chỉ chứa thông tin tổng quan, còn nội dung học chi tiết nằm ở lesson.
+- Từ M3 trở đi, lesson luôn thuộc một learning path và có thể thuộc chapter hoặc không. Chapter là lớp nhóm tổng quan tùy chọn; course detail dùng `structureItems` để chapter và lesson top-level xen kẽ, còn lesson trong chapter giữ thứ tự con riêng.
 
 ### File/document/worker
 
@@ -241,6 +245,7 @@ Ghi chú:
 - `M4.3` phụ thuộc background job model và Redis/Docker local.
 - `M4.4` phụ thuộc `M4.2`, `M4.3`.
 - `M4.5` phụ thuộc `M4.1`, `M4.2`, `M4.3`; trạng thái chunk/ready đầy đủ phụ thuộc `M4.4`.
+- `M4.6` phụ thuộc `M4.4`, provider operations schema của `M9.9`; hoàn thiện cost event, cache saving, budget và retry-resume Mathpix.
 
 ### Quiz/flashcard/test và student learning
 
@@ -268,8 +273,21 @@ Ghi chú:
 - `M5.3` phụ thuộc `M5.2`.
 - `M5.4` phụ thuộc `M5.3`.
 - `M9.1` phụ thuộc `M5.1`, background job/AI log models.
-- `M9.2` đến `M9.6` phụ thuộc `M5.x`, `M9.1` và content/student flow liên quan.
-- `M9.8` phụ thuộc `M9.2`, `M9.3`; job status UI phụ thuộc `M4.3`.
+- `M9.2` phụ thuộc `M5.3`, `M9.1` và lesson content.
+- `M9.3` phụ thuộc `M6.2-M6.4`, `M5.3`, `M9.1`.
+- `M9.8` phụ thuộc `M9.2`, `M9.3`; job status UI phụ thuộc `M4.3`. Task này
+  được xếp ngay sau `M9.3` để admin có UI kiểm thử generation trước khi làm
+  luồng học sinh.
+- `M9.4` phụ thuộc `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
+  nối luôn các action request-new hiện có trên UI học sinh.
+- `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline
+  explanation UI trong cùng task.
+- `M9.6` phụ thuộc `M5.4`, `M9.1`, `M7.1`; triển khai sau `M9.5` để nhận context
+  từ action `Chat thêm với AI`.
+- `M9.7` phụ thuộc `M9.6`.
+- `M9.9` phụ thuộc `M9.1` và nền Prisma/job; tạo catalog/price/usage, snapshot routing, OpenAI/Gemini fallback và cost calculator.
+- `M9.10` phụ thuộc `M9.9`, cung cấp RBAC API cho cấu hình, giá, budget, thống kê và audit.
+- `M9.11` phụ thuộc `M9.10` và admin shell; nối route `/admin/ai-settings` với dữ liệu thật.
 
 ### Smart video learning
 

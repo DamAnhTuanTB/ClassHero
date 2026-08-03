@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
+import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 import { QuizAttemptScopeDto } from "#api/modules/quiz/dto/student-quiz-attempt.dto";
 import { StudentQuizAttemptsService } from "#api/modules/quiz/services/student-quiz-attempts.service";
 import { StudentLessonsService } from "#api/modules/student-learning/services/student-lessons.service";
@@ -22,6 +23,7 @@ describe("M7 student learning flow integration", () => {
   let moduleRef: TestingModule;
   let prisma: PrismaService;
   let flashcardsService: FlashcardsService;
+  let publicLearningPathsService: PublicLearningPathsService;
   let quizAttemptsService: StudentQuizAttemptsService;
   let lessonsService: StudentLessonsService;
   let testAttemptsService: StudentTestAttemptsService;
@@ -39,6 +41,7 @@ describe("M7 student learning flow integration", () => {
     moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     prisma = moduleRef.get(PrismaService);
     flashcardsService = moduleRef.get(FlashcardsService);
+    publicLearningPathsService = moduleRef.get(PublicLearningPathsService);
     quizAttemptsService = moduleRef.get(StudentQuizAttemptsService);
     lessonsService = moduleRef.get(StudentLessonsService);
     testAttemptsService = moduleRef.get(StudentTestAttemptsService);
@@ -723,8 +726,10 @@ describe("M7 student learning flow integration", () => {
       state: "COMPLETED",
     });
     await expect(
-      testAttemptsService.useResult(failedAttempt.id, studentUserId),
-    ).rejects.toThrow();
+      prisma.lessonProgress.findUnique({
+        where: { studentUserId_lessonId: { studentUserId, lessonId } },
+      }),
+    ).resolves.toBeNull();
 
     const passingAttempt = await testAttemptsService.startAttempt(
       lessonId,
@@ -764,23 +769,68 @@ describe("M7 student learning flow integration", () => {
       "Bài thi 1",
     ]);
 
-    const completion = await testAttemptsService.useResult(
-      passingAttempt.id,
+    const progressAfterPassingAttempt = await prisma.lessonProgress.findUniqueOrThrow({
+      where: { studentUserId_lessonId: { studentUserId, lessonId } },
+    });
+    expect(progressAfterPassingAttempt).toMatchObject({
+      status: "COMPLETED",
+      bestTestAttemptId: passingAttempt.id,
+      bestDurationSeconds: passingResult.durationSeconds,
+    });
+    expect(Number(progressAfterPassingAttempt.bestScore)).toBe(10);
+    await expect(
+      publicLearningPathsService.getPublished(learningPathId, {
+        id: studentUserId,
+        role: UserRole.STUDENT,
+      }),
+    ).resolves.toMatchObject({
+      progress: {
+        completedLessonCount: 1,
+        progressPercent: 50,
+      },
+    });
+    const leaderboardAfterPassingAttempt = await testAttemptsService.getLeaderboard(
+      lessonId,
       studentUserId,
     );
-    expect(completion.status).toBe("COMPLETED");
-    expect(completion.bestAttempt?.id).toBe(passingAttempt.id);
-    expect(completion.leaderboard[0]).toMatchObject({
+    expect(leaderboardAfterPassingAttempt.entries[0]).toMatchObject({
       rank: 1,
       isCurrentStudent: true,
       score: 10,
     });
 
-    const idempotent = await testAttemptsService.useResult(
-      passingAttempt.id,
+    const failedRetake = await testAttemptsService.startAttempt(
+      lessonId,
       studentUserId,
     );
-    expect(idempotent.promotedToBest).toBe(false);
+    const failedRetakeResult = await testAttemptsService.submitAttempt(
+      failedRetake.id,
+      studentUserId,
+      [{ questionId: failedRetake.questions[0]!.id, answerJson: ["A"] }],
+    );
+    expect(failedRetakeResult.passed).toBe(false);
+
+    const progressAfterFailedRetake = await prisma.lessonProgress.findUniqueOrThrow({
+      where: { studentUserId_lessonId: { studentUserId, lessonId } },
+    });
+    expect(progressAfterFailedRetake).toMatchObject({
+      status: "COMPLETED",
+      bestTestAttemptId: passingAttempt.id,
+      bestDurationSeconds: passingResult.durationSeconds,
+      completedAt: progressAfterPassingAttempt.completedAt,
+    });
+    expect(Number(progressAfterFailedRetake.bestScore)).toBe(10);
+    await expect(
+      publicLearningPathsService.getPublished(learningPathId, {
+        id: studentUserId,
+        role: UserRole.STUDENT,
+      }),
+    ).resolves.toMatchObject({
+      progress: {
+        completedLessonCount: 1,
+        progressPercent: 50,
+      },
+    });
   });
 });
 

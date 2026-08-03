@@ -48,6 +48,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | Quiz, flashcard, test, attempts | `docs/database/quiz-flashcard-tests.md` |
 | Background jobs, queue/job status | `docs/database/background-jobs.md` |
 | AI logs, explanation cache, chat, RAG | `docs/database/ai-rag-chat.md` |
+| AI/OCR provider catalog, bảng giá, routing, usage, budget | `docs/database/provider-operations.md` |
 | Payment, payOS, discount, webhook logs | `docs/database/payment-discount.md` |
 | Notification, report, moderation, news/events/livestream | `docs/database/notification-report-news.md` |
 | Notes, private comments, favorites, gamification, audit log | `docs/database/notes-gamification-audit.md` |
@@ -67,7 +68,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | `M6.x` | `quiz-flashcard-tests` |
 | `M7.x` | `progress-enrollment`, `quiz-flashcard-tests`, `notes-gamification-audit` |
 | `M8.x` | `payment-discount`, `progress-enrollment` |
-| `M9.x` | `ai-rag-chat`, `background-jobs`, `files-documents` |
+| `M9.x` | `ai-rag-chat`, `provider-operations`, `background-jobs`, `files-documents` |
 | `M10.x` | `notification-report-news`, `background-jobs` |
 | `M11.x` | `auth-users`, `progress-enrollment`, `payment-discount` |
 | `M12.x` | `notification-report-news`, `ai-rag-chat` nếu moderation AI |

@@ -13,6 +13,7 @@ import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { LearningPathsModule } from "#api/modules/learning-paths/learning-paths.module";
 import { PaymentsModule } from "#api/modules/payments/payments.module";
 import { QuizModule } from "#api/modules/quiz/quiz.module";
+import { ProviderOperationsModule } from "#api/modules/provider-operations/provider-operations.module";
 import { StudentLearningModule } from "#api/modules/student-learning/student-learning.module";
 import { TestsModule } from "#api/modules/tests/tests.module";
 
@@ -32,6 +33,7 @@ import { TestsModule } from "#api/modules/tests/tests.module";
     JobsModule,
     LearningPathsModule,
     PaymentsModule,
+    ProviderOperationsModule,
     QuizModule,
     StudentLearningModule,
     TestsModule,

@@ -12,12 +12,15 @@ import {
   AdminLessonDocumentsController,
 } from "#api/modules/learning-paths/controllers/admin-lesson-documents.controller";
 import { AdminLearningPathsController } from "#api/modules/learning-paths/controllers/admin-learning-paths.controller";
+import { AdminLessonSummariesController } from "#api/modules/learning-paths/controllers/admin-lesson-summaries.controller";
 import { AdminPersonalLearningPathsController } from "#api/modules/learning-paths/controllers/admin-personal-learning-paths.controller";
 import { AdminLessonsController } from "#api/modules/learning-paths/controllers/admin-lessons.controller";
 import { AdminSourceDocumentsController } from "#api/modules/learning-paths/controllers/admin-source-documents.controller";
 import { ChaptersService } from "#api/modules/learning-paths/services/chapters.service";
 import { LessonDocumentsService } from "#api/modules/learning-paths/services/lesson-documents.service";
 import { LearningPathsService } from "#api/modules/learning-paths/services/learning-paths.service";
+import { LearningPathStructureService } from "#api/modules/learning-paths/services/learning-path-structure.service";
+import { LessonSummariesService } from "#api/modules/learning-paths/services/lesson-summaries.service";
 import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
 import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 import { PersonalLearningPathsService } from "#api/modules/learning-paths/services/personal-learning-paths.service";
@@ -33,6 +36,7 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
     AdminChaptersController,
     AdminLearningPathLessonDocumentsController,
     AdminLessonDocumentsController,
+    AdminLessonSummariesController,
     AdminLearningPathsController,
     AdminPersonalLearningPathsController,
     AdminLessonsController,
@@ -43,6 +47,8 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
     ChaptersService,
     LessonDocumentsService,
     LearningPathsService,
+    LearningPathStructureService,
+    LessonSummariesService,
     LessonsService,
     PublicLearningPathsService,
     PersonalLearningPathsService,

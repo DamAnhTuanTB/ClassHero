@@ -119,7 +119,7 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Student lesson page                       | `M7.1-M7.5`            | `M7.1-M7.5`, `M6.5`               | `M1.3`, `M1.4`            | `M4.4`, `M5.x` khi có tài liệu/AI             | Core learning Done; tab Bài học mở summary, có previous/next và panel Quiz/Flashcard/Test dùng API thật.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Quiz runner                               | `M7.2`                 | `M7.2`                            | `M1.4`                    | `M9.5` nếu có giải thích AI                   | Done; hint/check local tức thì không gọi API từng câu, batch submit, explanation chủ động, review/retry tất cả hoặc câu sai.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Flashcard deck                            | `M7.3`                 | `M7.3`                            | `M1.4`                    | `M9.5` nếu có giải thích AI                   | Done; panel vào bài dùng CTA Bắt đầu/Tiếp tục/Xem lại, runner và kết quả toàn màn hình đồng nhất Quiz, progress/favorite, review tất cả/chưa thuộc/yêu thích.                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Test runner/review                        | `M7.4-M7.5`            | `M7.4-M7.5`                       | `M1.4`                    | -                                             | Done; prerequisite gate, timer, review, use-result, completion và Top 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Test runner/review                        | `M7.4-M7.5`            | `M7.4-M7.5`                       | `M1.4`                    | -                                             | Done; prerequisite gate, timer, review, auto-completion khi submit đạt và Top 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Student dashboard                         | `M7.7`                 | `M7.5`, `M10.1`, `M13.1`          | `M1.3`, `M1.4`, `M1.5`    | `M10.5`, `M13.1`                              | Notification/XP thật phụ thuộc `M10.x`, `M13.x`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Student notes/private comments            | `M7.6`                 | `M7.6`                            | `M1.4`                    | -                                             | Comment là private dưới video, không phải chat realtime.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Student smart video learning              | `M15.1-M15.7`          | `M15.1-M15.7`                     | `M15.1-M15.3`, `M15.7`    | `M3.8`, `M5.x`, `M9.x`                        | Ưu tiên sau core lesson/quiz/test. Gồm resume, watched progress, timestamp note, checkpoint/mastery, contextual AI, semantic search và adaptive review; không đổi completion rule `M7.5`.                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -133,10 +133,11 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Parent notifications/news                 | `M11.4`, `M12.5`       | `M10.1`, `M12.4`, `M12.5`         | `M1.5`                    | `M10.3`, `M10.6`                              | News/event/livestream public cho student/parent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Admin dashboard                           | `M13.5`                | `M13.5` hoặc API module liên quan | `M1.x` theo metric        | `M4.3`, `M10.5` nếu hiển thị job/notification | Cho phép placeholder với metric chưa có API.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Admin video learning analytics            | `M15.8`                | `M15.8`                           | `M15.1`, `M15.3`, `M15.7` | aggregate pipeline tùy volume                 | Chỉ hiện metric tổng hợp theo lesson/chapter với ngưỡng riêng tư; không hiển thị raw surveillance log từng student.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Admin course/chapter/lesson management    | `M3.4`                 | `M3.1`, `M3.2`                    | `M1.3`                    | -                                             | Quản lý lộ trình, chương học tổng quan và buổi học. Modal khóa học có `Ngày bắt đầu`/`Ngày kết thúc` date-only tùy chọn, cùng khoảng `Số buổi học từ`/`Số buổi học đến` tùy chọn (1-500); các giá trị kết thúc không được nhỏ hơn giá trị bắt đầu, số buổi là kế hoạch chứ không phải counter thực tế. Modal lesson có select `Loại buổi học` mặc định `Học cơ bản`; chọn `Học live` mới hiện input `Link học live` optional.                                                                                                                                                                                                                                                                                                                                                  |
+| Admin course/chapter/lesson management    | `M3.4`                 | `M3.1`, `M3.2`                    | `M1.3`                    | -                                             | Quản lý lộ trình, chương học tổng quan và buổi học. Modal khóa học có `Ngày bắt đầu`/`Ngày kết thúc` date-only tùy chọn, cùng khoảng `Số buổi học từ`/`Số buổi học đến` tùy chọn (1-500); các giá trị kết thúc không được nhỏ hơn giá trị bắt đầu, số buổi là kế hoạch chứ không phải counter thực tế. Modal lesson có select `Loại buổi học` mặc định `Học cơ bản`; chọn `Học live` mới hiện input `Link học live` optional.                                                                                                                                                               |
 | Admin lesson document upload/status       | `M4.5`                 | `M4.2`                            | `M1.2`, `M1.3`            | `M4.1`, `M4.3`, `M4.4`                        | Course quản lý nhiều source PDF ngang hàng theo thứ tự upload cũ đến mới và hiện badge readiness. Modal lesson có nhiều khối `Tài liệu trích xuất` + range và nhiều file nền tảng trực tiếp; source select chỉ chứa nguồn đã xác nhận hết trang in, mặc định phần tử hợp lệ đầu tiên, hiển thị tên kèm tổng số trang, chặn realtime khi `Từ trang in` hoặc `Đến trang in` vượt số trang in lớn nhất, cùng-source range được validate không giao nhau realtime/API, thứ tự UI bám thứ tự thao tác. Tài liệu bổ sung và bài tập về nhà đều cho thêm nhiều file bằng cùng pattern dòng upload. |
 | Admin quiz/flashcard/test CRUD UI         | `M6.2`, `M6.3`, `M6.4` | `M6.2`, `M6.3`, `M6.4`            | `M1.4`                    | `M6.1` content schema                         | Rich text/LaTeX dùng schema chung.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Admin AI generation panel                 | `M9.8`                 | `M9.2`, `M9.3`                    | `M1.4`, `M1.5`            | `M5.x`, `M9.1`                                | Front-end không gọi AI trực tiếp.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Admin Cài đặt AI và OCR                   | `M9.11`                | `M9.10`                           | provider operations       | `M9.9`, `M4.6`                                | Route `/admin/ai-settings`; cấu hình model, OCR, chi phí ngày/tuần/tháng, budget, bảng giá và audit; không hiển thị secret. |
 | Admin report moderation                   | `M12.2`                | `M12.2`                           | `M1.5`                    | -                                             | Student tạo report ở `M12.1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Admin AI unreviewed content               | `M12.3`                | `M12.3`                           | `M1.5`                    | `M9.2`, `M9.3`                                | Duyệt nội dung AI trước khi dùng chính thức nếu cần.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Admin discount codes                      | `M8.5`                 | `M8.1`                            | `M1.5`                    | -                                             | Validation discount server-side trong `M8.1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -295,7 +296,9 @@ Rules:
 - Khi Test status đã có `latestSubmittedAttempt`, entry panel thay CTA
   `Bắt đầu bài thi` bằng cặp action `Xem lại bài thi` và
   `Làm bài thi mới`; action xem lại mở review toàn bộ attempt đã nộp gần nhất
-  (kể cả chưa đạt), action làm mới tiếp tục dùng transition/start flow hiện có.
+  (kể cả chưa đạt). Trước `M9.4`, action làm mới dùng transition/start flow
+  hiện có; sau `M9.4`, action gọi request-new reserve-first, xử lý
+  `200 EXISTING`/`202 QUEUED` và chỉ mở runner khi set sẵn sàng.
 - Nếu không có quyền truy cập, hiển thị paywall/trial message.
 - Chat AI chỉ có input text.
 - Smart video controls chỉ hiện sau khi video/lesson foundation sẵn sàng; thiếu transcript thì ẩn tính năng phụ thuộc transcript nhưng không chặn player.
@@ -349,9 +352,11 @@ Component:
   kiểm tra câu nào và mở đúng câu gần nhất đã lưu local. Lượt đã submit và
   không còn lượt đang làm dùng `Xem lại`.
 - Bộ Quiz có `0 câu` vẫn hiển thị count `0 câu`; CTA tạo attempt phải disabled.
-- Trạng thái đã hoàn thành hiển thị thêm action `Làm bộ Quiz mới` để tạo lượt
-  đầy đủ mới của bộ quiz hiện tại. `Xem lại` mở màn kết quả của lượt submit gần
-  nhất; student chọn xem lại tất cả hoặc các câu sai từ màn kết quả.
+- Trạng thái đã hoàn thành hiển thị thêm action `Làm bộ Quiz mới`. Trước `M9.4`,
+  action dùng fallback bộ khả dụng kế tiếp; khi `M9.4` hoàn tất, action phải gọi
+  request-new reserve-first, xử lý `200 EXISTING`/`202 QUEUED` và không còn quay
+  vòng local. `Xem lại` mở màn kết quả của lượt submit gần nhất; student chọn
+  xem lại tất cả hoặc các câu sai từ màn kết quả.
 - Cạnh pill số câu có icon bánh răng. Menu có item `Các bộ Quiz đã làm`, mở
   dialog trên desktop và bottom sheet trên mobile. Lịch sử dùng tên mặc định
   `Bộ 1`, `Bộ 2`, ...; chỉ lượt hiện tại có badge `Đang làm` và summary
@@ -376,9 +381,10 @@ Component:
   summary riêng cho lượt con.
 - Mọi action xem lại/làm lại trên result dùng kết quả gốc đã cộng dồn.
   `Làm lại tất cả` mở một lượt đầy đủ mới và reset kết quả.
-- Result có thêm `Làm bộ Quiz mới`; action này chọn bộ khả dụng kế tiếp, quay
-  vòng về bộ cũ khi cần và mở runner ngay.
-- Inline explanation block chỉ mở khi student bấm xem lời giải.
+- Result có thêm `Làm bộ Quiz mới`; sau `M9.4`, action dùng cùng request-new flow
+  với queued/polling/error/retry và mở runner ngay khi có set.
+- `M9.5` thêm action `Giải thích cho tôi`; lời giải cache hiển thị inline ngay,
+  còn lời giải đang tạo có queued/polling/error/retry rõ ràng.
 - Report button từng câu.
 - Favorite button từng câu.
 
@@ -418,8 +424,11 @@ Component:
   animation mở modal lần nữa.
 - Inline explanation.
 - Report/favorite từng card.
-- Result có thêm `Học bộ Flashcard mới`; action này mở thẳng session đầy đủ mới
-  của bộ khả dụng kế tiếp, kể cả khi phải quay vòng tái sử dụng set cũ.
+- Result có thêm `Học bộ Flashcard mới`. Trước `M9.4`, action dùng fallback bộ
+  khả dụng kế tiếp; sau `M9.4`, action gọi request-new reserve-first, xử lý
+  `200 EXISTING`/`202 QUEUED` và mở session khi set sẵn sàng.
+- `M9.5` thêm action `Giải thích cho tôi` trên từng card, cùng inline
+  cache/queued/polling/error/retry như Quiz.
 
 ### 4.7. Test runner
 
@@ -431,7 +440,8 @@ Component:
 - Submit confirmation.
 - Result page.
 - Review page.
-- Inline explanation chỉ sau submit.
+- `M9.5` chỉ hiển thị action `Giải thích cho tôi` sau submit; cache hit mở inline
+  ngay, cache miss/stale dùng queued/polling/error/retry.
 
 Rules:
 
@@ -442,8 +452,10 @@ Rules:
   `Bắt đầu bài thi`; không hiển thị `Ôn lại` hoặc `Sẵn sàng`.
 - Hết giờ tự submit; câu chưa trả lời nhận 0 điểm.
 - Review summary không liệt kê sẵn câu hỏi; action xem lại mới mở từng câu.
-- Kết quả chưa đạt hiển thị cảnh báo làm lại và không cho dùng kết quả.
-- `Dùng điểm bài này` mới cập nhật completion và mở Completion + Top 5.
+- Kết quả chưa đạt hiển thị cảnh báo làm lại và không thay
+  completion/best đã có.
+- Submit kết quả đạt tự động cập nhật completion/Top 5; UI không có action
+  `Dùng điểm bài này`.
 - Icon bánh răng nằm ngoài cùng sát mép phải của header, sau pill số câu và
   duration, mở menu `Lịch sử Bài thi`. Dialog/bottom sheet dùng cùng shell lịch
   sử Quiz/Flashcard và tải dữ liệu khi mở.
@@ -454,6 +466,8 @@ Rules:
   đúng modal và vị trí cuộn cũ.
 - Với lịch sử Quiz/Flashcard, khi mọi mục đều đã hoàn thành, gắn `Bộ hiện tại`
   vào đúng mục mới nhất của set đang được chọn.
+- `M9.4` nối `Làm bài thi mới` vào request-new Test với trạng thái
+  queued/polling/error/retry; không tạo attempt cho tới khi có set hợp lệ.
 
 ### 4.8. AI chat panel
 
@@ -466,6 +480,17 @@ Component:
 - Refusal message khi ngoài scope.
 
 Không có upload file/ảnh.
+
+Phân quyền UI theo task:
+
+- `M9.4` sở hữu các action request-new Quiz/Flashcard/Test và mọi trạng thái
+  chờ/error/retry của chúng.
+- `M9.5` sở hữu action `Giải thích cho tôi`, lời giải inline và action bàn giao
+  `Chat thêm với AI`.
+- `M9.6` sở hữu chat panel, cả mở trực tiếp từ lesson lẫn nhận target item/lời
+  giải đã lưu từ `M9.5`.
+- `M9.8` chỉ sở hữu panel AI của admin trong lesson detail, không thay thế ba
+  UI học sinh trên.
 
 ### 4.9. Notes và private comments
 
@@ -580,24 +605,35 @@ Course detail có khu vực `Học sinh đã mua`:
 - Editor bản cá nhân reuse course detail/chapter/lesson editor hiện có và luôn có banner riêng tư kèm tên học sinh, khóa nguồn và action quay lại enrollment.
 - Bản cá nhân đang gắn enrollment không có action archive/delete root; admin sửa trực tiếp nội dung bên trong.
 
+Course detail có khu vực `Cấu trúc khóa học`:
+
+- Header luôn có hai action ngang hàng `Thêm chương` và `Thêm buổi học`; không bắt buộc tạo chương trước.
+- Khi chưa có cả chương lẫn buổi, empty state dùng copy `Chưa có nội dung khóa học`, giải thích có thể bắt đầu bằng chương hoặc buổi học và hiển thị đủ hai CTA.
+- Course structure render một cây có thứ tự chung: chapter và lesson không thuộc chapter là sibling top-level và có thể xen kẽ; lesson trong chapter nằm ở vùng con của chapter.
+- Admin có thể kéo lesson đến mọi drop zone hợp lệ: trong cùng chapter, chapter khác, hoặc giữa bất kỳ hai item top-level. Drop target thể hiện rõ container/vị trí sẽ nhận.
+- Mobile/keyboard có action `Di chuyển` mở control chọn `Top-level`/chapter và vị trí đích; không bắt người dùng chỉ dùng drag/drop.
+- Lesson có `hasStudentCompletion = true` hiển thị mốc khóa thứ tự. Move option làm lesson đứng trước bất kỳ mốc khóa nào phải disabled; drag/drop phải chạy preflight, từ chối và giải thích rõ. API conflict do dữ liệu stale hiển thị toast rồi refetch structure.
+- Nếu khóa chỉ có lesson không thuộc chương, không hiển thị empty state `Chưa có chương học` như một blocker.
+- Mọi state/action hỗ trợ light/dark, responsive và pending/disabled theo cùng pattern admin CRUD hiện có.
+
 ### 6.3. Chapter management
 
 CRUD chapter:
 
 - Title.
-- Order index.
 - Overview/short description.
 - Objectives/focus points.
 - Status.
 
 Chapter không có video, tài liệu/PDF, summary, quiz, flashcard hoặc test riêng.
+Chapter là nhóm tùy chọn; course không bắt buộc có chapter.
 
 ### 6.4. Lesson management
 
 CRUD lesson:
 
+- Optional chapter assignment; option đầu là `Không thuộc chương nào`. Khi sửa container/vị trí từ cây, dùng cùng move mutation thay vì chỉ đổi local state.
 - Title.
-- Order index.
 - Short description.
 - Scheduled/exam open time.
 - Video URL.
@@ -609,11 +645,13 @@ CRUD lesson:
 - Flashcard.
 - Test.
 
+Modal tạo/sửa chapter và lesson không hiển thị field thứ tự. Khi tạo, backend tự append vào cuối container và lưu dãy thứ tự chuẩn; khi cần đổi vị trí, admin dùng kéo-thả hoặc action `Di chuyển` trong cây cấu trúc.
+
 Màn chi tiết buổi học admin:
 
 - Route chính: `/admin/lessons/[lessonId]`.
 - Đây là workspace theo từng buổi học, không phải màn cấp course/chapter.
-- Vào từ danh sách buổi học trong `/admin/courses/[id]`.
+- Vào từ danh sách buổi học thuộc chapter hoặc section `Buổi học chưa thuộc chương` trong `/admin/courses/[id]`.
 - Header có action `Chỉnh sửa buổi học`. Khi bấm, UI lazy-load và mở lại đúng modal sửa lesson đang dùng ở course detail; lưu thành công phải đóng modal và refresh metadata/video của lesson detail, không duy trì một form sửa thứ hai.
 - Tab `Tài liệu` lazy-load và render lại đúng ba section upload đang dùng trong modal lesson (`Tài liệu nền tảng`, `Tài liệu bổ sung`, `Bài tập về nhà`), có action `Lưu tài liệu` và dùng chung schema/mutation/document manager; không tạo bộ field upload thứ hai chỉ giống về hình thức.
 - Hiển thị metadata buổi học, trạng thái tài liệu/OCR/chunk của riêng buổi đó và các khu vực Summary, Documents, Quiz, Flashcard, Test.

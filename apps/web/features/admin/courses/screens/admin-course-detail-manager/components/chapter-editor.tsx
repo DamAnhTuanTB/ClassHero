@@ -1,7 +1,6 @@
 "use client";
 
-import { Check, FileText, ListOrdered, Loader2, SlidersHorizontal } from "lucide-react";
-import type { ChangeEvent } from "react";
+import { Check, FileText, Loader2, SlidersHorizontal } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -26,14 +25,8 @@ export function ChapterEditor({
   onClose: () => void;
   onSubmit: (values: ChapterFormValues) => void | Promise<void>;
 }) {
-  const orderIndexField = form.register("orderIndex");
   const { errors } = form.formState;
   const isSubmitDisabled = disabled || isSaving;
-
-  function handleOrderIndexChange(event: ChangeEvent<HTMLInputElement>) {
-    event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "");
-    orderIndexField.onChange(event);
-  }
 
   return (
     <form
@@ -53,26 +46,13 @@ export function ChapterEditor({
         disabled={disabled || isSaving}
         className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5"
       >
-        <div className="grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
-          <TextField
-            id="admin-chapter-order"
-            label="Thứ tự"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
-            error={errors.orderIndex}
-            {...orderIndexField}
-            onChange={handleOrderIndexChange}
-          />
-          <TextField
-            id="admin-chapter-title"
-            label="Tên chương học"
-            icon={<FileText className="h-5 w-5" aria-hidden="true" />}
-            error={errors.title}
-            {...form.register("title")}
-          />
-        </div>
+        <TextField
+          id="admin-chapter-title"
+          label="Tên chương học"
+          icon={<FileText className="h-5 w-5" aria-hidden="true" />}
+          error={errors.title}
+          {...form.register("title")}
+        />
 
         <div>
           <FieldLabel id="admin-chapter-overview" label="Tổng quan chương" isOptional />

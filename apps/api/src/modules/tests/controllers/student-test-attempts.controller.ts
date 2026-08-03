@@ -70,15 +70,6 @@ export class StudentTestAttemptsController {
     );
   }
 
-  @Post("test-attempts/:attemptId/use-result")
-  @ApiOperation({ summary: "Use a passing result for best score and completion" })
-  useResult(
-    @Param("attemptId") attemptId: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    return this.studentTestAttemptsService.useResult(attemptId, user.id);
-  }
-
   @Get("lessons/:lessonId/leaderboard/top-tests")
   @ApiOperation({ summary: "Read the top five selected lesson test results" })
   leaderboard(

@@ -47,6 +47,10 @@ pnpm --filter @learning-path/web e2e:auth-ui
 - Khi cần chụp ảnh màn hình cho owner review UI.
 - Khi muốn kiểm tra responsive nhanh trên desktop/tablet/mobile.
 - Khi trước khi commit UI cần bằng chứng route render được và form cơ bản hoạt động.
+- Khi debug Browser Back/history, test phải bắt đầu từ đúng đường vào đã
+  gây lỗi, ví dụ `panel -> Xem lại -> result`, rồi gọi Back thật và assert
+  URL lẫn surface sau Back. Chỉ test `runner -> result` không chứng minh được
+  nhánh result mở từ panel, dù hai nhánh có cùng giao diện đích.
 
 ## Task liên quan
 

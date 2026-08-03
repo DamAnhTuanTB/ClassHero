@@ -1,7 +1,10 @@
 import { apiRequest } from "@/lib/api-client";
 import { mapChapter } from "@/features/admin/courses/mappers/admin-course-api-mappers";
 import { toChapterApiPayload } from "@/features/admin/courses/payloads/admin-course-api-payloads";
-import type { ChapterFormValues } from "@/features/admin/courses/admin-courses-schemas";
+import type {
+  ChapterFormValues,
+  ChapterUpdateValues,
+} from "@/features/admin/courses/admin-courses-schemas";
 import type { AdminChapterApi } from "@/features/admin/courses/types/admin-course-api-types";
 
 export async function createAdminChapter(
@@ -23,7 +26,7 @@ export async function createAdminChapter(
 
 export async function updateAdminChapter(
   chapterId: string,
-  values: Partial<ChapterFormValues>,
+  values: ChapterUpdateValues,
   token: string,
 ) {
   const chapter = await apiRequest<AdminChapterApi>(`/admin/chapters/${chapterId}`, {

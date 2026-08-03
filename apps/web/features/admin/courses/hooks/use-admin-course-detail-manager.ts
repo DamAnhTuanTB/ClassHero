@@ -22,6 +22,7 @@ import {
   findLessonMatch,
   getAdminCourseDetailStats,
   getLessonReferenceDocumentUploads,
+  getLessonsInContainer,
   resolveFoundationDocumentSortOrder,
 } from "@/features/admin/courses/admin-courses-utils";
 import { readRecord } from "@/features/admin/courses/admin-course-documents-utils";
@@ -91,6 +92,7 @@ export function useAdminCourseDetailManager(
   const isSavingLesson =
     mutations.createLesson.isPending ||
     mutations.updateLesson.isPending ||
+    mutations.moveLesson.isPending ||
     isSavingLessonReferences;
 
   const courseStats = useMemo(() => getAdminCourseDetailStats(path), [path]);
@@ -178,16 +180,6 @@ export function useAdminCourseDetailManager(
       return;
     }
 
-    const duplicatedOrder = path.chapters.some(
-      (chapter) =>
-        chapter.orderIndex === values.orderIndex &&
-        (chapterEditorMode === "create" || chapter.id !== selectedChapter?.id),
-    );
-
-    if (duplicatedOrder) {
-      throw new Error("DUPLICATED_CHAPTER_ORDER");
-    }
-
     try {
       if (chapterEditorMode === "create") {
         const createdChapter = await mutations.createChapter.mutateAsync({
@@ -213,30 +205,19 @@ export function useAdminCourseDetailManager(
       setChapterEditorMode("create");
       setIsChapterEditorOpen(false);
     } catch (error) {
-      if (isConflictError(error)) {
-        throw new Error("DUPLICATED_CHAPTER_ORDER", { cause: error });
-      }
-
       toast.error("Chưa lưu được chương học", {
         description: getErrorMessage(error),
       });
     }
   }
 
-  function startCreateLesson(chapterId?: string) {
-    const targetChapter =
-      path?.chapters.find((chapter) => chapter.id === chapterId) ??
-      selectedChapter ??
-      path?.chapters[0] ??
-      null;
-
-    if (!targetChapter) {
-      toast.warning("Hãy tạo chương học trước");
+  function startCreateLesson(chapterId: string | null = null) {
+    if (chapterId && !path?.chapters.some((chapter) => chapter.id === chapterId)) {
       return;
     }
 
     setLessonEditorMode("create");
-    setSelectedChapterId(targetChapter.id);
+    setSelectedChapterId(chapterId);
     setSelectedLessonId(null);
     setIsLessonEditorOpen(true);
   }
@@ -247,7 +228,7 @@ export function useAdminCourseDetailManager(
       return;
     }
 
-    setSelectedChapterId(match.chapter.id);
+    setSelectedChapterId(match.chapter?.id ?? null);
     setSelectedLessonId(match.lesson.id);
     setLessonEditorMode("edit");
     setIsLessonEditorOpen(true);
@@ -260,7 +241,7 @@ export function useAdminCourseDetailManager(
       actions: { reloadDocuments: () => void };
     },
     options: {
-      chapterId?: string;
+      chapterId?: string | null;
       closeEditor?: boolean;
       lessonId?: string;
     } = {},
@@ -269,21 +250,28 @@ export function useAdminCourseDetailManager(
       ? findLessonMatch(path, options.lessonId)
       : null;
     const targetChapterId =
-      options.chapterId ?? explicitLessonMatch?.chapter.id ?? selectedChapterId;
+      options.chapterId !== undefined
+        ? options.chapterId
+        : explicitLessonMatch
+          ? (explicitLessonMatch.chapter?.id ?? null)
+          : selectedChapterId;
     const targetLesson = explicitLessonMatch?.lesson ?? selectedLesson;
     const targetEditorMode = options.lessonId ? "edit" : lessonEditorMode;
 
-    if (!path || !targetChapterId) {
+    if (!path) {
       return false;
     }
 
-    const targetChapter = path.chapters.find((chapter) => chapter.id === targetChapterId);
-    if (!targetChapter) {
+    if (
+      targetChapterId &&
+      !path.chapters.some((chapter) => chapter.id === targetChapterId)
+    ) {
       return false;
     }
 
     const normalizedTitle = normalizeLessonTitleForComparison(values.title);
-    const duplicatedTitle = targetChapter.lessons.some(
+    const targetLessons = getLessonsInContainer(path, targetChapterId);
+    const duplicatedTitle = targetLessons.some(
       (lesson) =>
         lesson.id !== targetLesson?.id &&
         normalizeLessonTitleForComparison(lesson.title) === normalizedTitle,
@@ -293,22 +281,13 @@ export function useAdminCourseDetailManager(
       throw new Error("DUPLICATED_LESSON_TITLE");
     }
 
-    const duplicatedOrder = targetChapter.lessons.some(
-      (lesson) =>
-        lesson.orderIndex === values.orderIndex &&
-        (targetEditorMode === "create" || lesson.id !== targetLesson?.id),
-    );
-
-    if (duplicatedOrder) {
-      throw new Error("DUPLICATED_LESSON_ORDER");
-    }
-
     try {
       let referenceUploadError: unknown = null;
 
       if (targetEditorMode === "create") {
         const createdLesson = await mutations.createLesson.mutateAsync({
           chapterId: targetChapterId,
+          pathId: path.id,
           values,
         });
 
@@ -410,7 +389,7 @@ export function useAdminCourseDetailManager(
         toast.success(
           targetEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",
           {
-            description: "Danh sách buổi học trong chương đã được cập nhật.",
+            description: "Cấu trúc buổi học của khóa học đã được cập nhật.",
           },
         );
       }
@@ -423,10 +402,6 @@ export function useAdminCourseDetailManager(
     } catch (error) {
       if (isLessonTitleConflictError(error)) {
         throw new Error("DUPLICATED_LESSON_TITLE", { cause: error });
-      }
-
-      if (isConflictError(error)) {
-        throw new Error("DUPLICATED_LESSON_ORDER", { cause: error });
       }
 
       toast.error("Chưa lưu được buổi học", {
@@ -507,7 +482,7 @@ export function useAdminCourseDetailManager(
       return;
     }
 
-    setSelectedChapterId(match.chapter.id);
+    setSelectedChapterId(match.chapter?.id ?? null);
     setDeletingLessonId(match.lesson.id);
   }
 
@@ -531,28 +506,21 @@ export function useAdminCourseDetailManager(
     }
   }
 
-  async function reorderChapters(sourceChapterId: string, targetChapterId: string) {
-    if (sourceChapterId === targetChapterId) {
-      return;
-    }
-
-    const targetChapter = path?.chapters.find(
-      (chapter) => chapter.id === targetChapterId,
-    );
-    if (!targetChapter) {
+  async function moveChapter(chapterId: string, targetOrderIndex: number) {
+    if (!path || targetOrderIndex < 1) {
       return;
     }
 
     try {
       await mutations.updateChapter.mutateAsync({
-        chapterId: sourceChapterId,
+        chapterId,
         values: {
-          orderIndex: targetChapter.orderIndex,
+          orderIndex: targetOrderIndex,
         },
       });
       await mutations.invalidateLearningPath(pathId);
       await learningPathQuery.refetch();
-      setSelectedChapterId(sourceChapterId);
+      setSelectedChapterId(chapterId);
     } catch (error) {
       toast.error("Chưa đổi được thứ tự chương", {
         description: getErrorMessage(error),
@@ -560,37 +528,37 @@ export function useAdminCourseDetailManager(
     }
   }
 
-  async function reorderLessons(
-    chapterId: string,
-    sourceLessonId: string,
-    targetLessonId: string,
+  async function moveLesson(
+    lessonId: string,
+    chapterId: string | null,
+    targetOrderIndex: number,
   ) {
-    if (sourceLessonId === targetLessonId) {
-      return;
-    }
-
-    const targetLesson = path?.chapters
-      .find((chapter) => chapter.id === chapterId)
-      ?.lessons.find((lesson) => lesson.id === targetLessonId);
-    if (!targetLesson) {
-      return;
+    if (!path || targetOrderIndex < 1) {
+      return false;
     }
 
     try {
-      await mutations.updateLesson.mutateAsync({
-        lessonId: sourceLessonId,
-        values: {
-          orderIndex: targetLesson.orderIndex,
-        },
+      await mutations.moveLesson.mutateAsync({
+        chapterId,
+        lessonId,
+        targetOrderIndex,
       });
       await mutations.invalidateLearningPath(pathId);
       await learningPathQuery.refetch();
       setSelectedChapterId(chapterId);
-      setSelectedLessonId(sourceLessonId);
+      setSelectedLessonId(lessonId);
+      toast.success("Đã di chuyển buổi học");
+      return true;
     } catch (error) {
-      toast.error("Chưa đổi được thứ tự buổi học", {
+      toast.error(
+        isLessonMoveBeforeCompletedError(error)
+          ? "Không thể đặt buổi học ở vị trí này"
+          : "Chưa di chuyển được buổi học",
+        {
         description: getErrorMessage(error),
-      });
+        },
+      );
+      return false;
     }
   }
 
@@ -625,6 +593,7 @@ export function useAdminCourseDetailManager(
     isPathEditorOpen,
     isSavingChapter,
     isSavingLesson,
+    isMovingLesson: mutations.moveLesson.isPending,
     isSavingPath,
     isDarkTheme,
     isSidebarCollapsed,
@@ -654,8 +623,8 @@ export function useAdminCourseDetailManager(
       requestDeleteChapter,
       requestDeleteLesson,
       retryLoad,
-      reorderChapters,
-      reorderLessons,
+      moveChapter,
+      moveLesson,
       saveChapter,
       saveLesson,
       savePath,
@@ -671,12 +640,14 @@ export function useAdminCourseDetailManager(
   };
 }
 
-function isConflictError(error: unknown) {
-  return error instanceof ApiRequestError && error.code === "CONFLICT";
-}
-
 function isLessonTitleConflictError(error: unknown) {
   return error instanceof ApiRequestError && error.code === "LESSON_TITLE_DUPLICATE";
+}
+
+function isLessonMoveBeforeCompletedError(error: unknown) {
+  return (
+    error instanceof ApiRequestError && error.code === "LESSON_MOVE_BEFORE_COMPLETED"
+  );
 }
 
 function normalizeLessonTitleForComparison(title: string) {

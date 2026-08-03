@@ -4,6 +4,7 @@ import { throwBadRequest } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { CreateChapterDto } from "#api/modules/learning-paths/dto/create-chapter.dto";
 import { UpdateChapterDto } from "#api/modules/learning-paths/dto/update-chapter.dto";
+import { LearningPathStructureService } from "#api/modules/learning-paths/services/learning-path-structure.service";
 import {
   chapterDetailSelect,
   chapterSelect,
@@ -25,7 +26,11 @@ import {
 
 @Injectable()
 export class ChaptersService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(LearningPathStructureService)
+    private readonly structureService: LearningPathStructureService,
+  ) {}
 
   async listForAdmin(learningPathId: string) {
     await this.assertLearningPathExists(learningPathId);
@@ -58,10 +63,14 @@ export class ChaptersService {
         await this.assertLearningPathExists(learningPathId, tx);
 
         const status = dto.status ?? PublishStatus.DRAFT;
+        const temporaryOrderIndex = await this.structureService.getTemporaryChapterOrder(
+          tx,
+          learningPathId,
+        );
         const created = await tx.learningPathChapter.create({
           data: {
             learningPathId,
-            orderIndex: dto.orderIndex,
+            orderIndex: temporaryOrderIndex,
             title: normalizeText(dto.title),
             overview: normalizeOptionalText(dto.overview),
             objectivesJson: toInputJson(dto.objectivesJson),
@@ -71,6 +80,7 @@ export class ChaptersService {
           },
           select: chapterSelect,
         });
+        await this.structureService.insertChapter(tx, learningPathId, created.id);
 
         await tx.learningPath.update({
           where: { id: learningPathId },
@@ -81,6 +91,10 @@ export class ChaptersService {
             updatedById: actorUserId,
           },
         });
+        const ordered = await tx.learningPathChapter.findUniqueOrThrow({
+          where: { id: created.id },
+          select: chapterSelect,
+        });
 
         await tx.auditLog.create({
           data: {
@@ -88,13 +102,13 @@ export class ChaptersService {
             action: getStatusAuditAction("CHAPTER_CREATED", status),
             entityType: "LearningPathChapter",
             entityId: created.id,
-            after: toInputJson(serializeChapter(created)),
+            after: toInputJson(serializeChapter(ordered)),
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
           },
         });
 
-        return created;
+        return ordered;
       });
 
       return serializeChapter(chapter);
@@ -131,7 +145,12 @@ export class ChaptersService {
         }
 
         if (dto.orderIndex !== undefined && dto.orderIndex !== before.orderIndex) {
-          await this.moveChapterOrder(tx, before, dto.orderIndex);
+          await this.structureService.moveChapter(
+            tx,
+            before.learningPathId,
+            before.id,
+            dto.orderIndex,
+          );
         }
 
         const status = dto.status ?? before.status;
@@ -235,6 +254,7 @@ export class ChaptersService {
           },
           select: chapterSelect,
         });
+        await this.structureService.removeChapter(tx, before.learningPathId);
 
         await tx.learningPath.update({
           where: { id: before.learningPathId },
@@ -349,73 +369,6 @@ export class ChaptersService {
     }
 
     return chapter;
-  }
-
-  private async moveChapterOrder(
-    tx: Prisma.TransactionClient,
-    before: Prisma.LearningPathChapterGetPayload<{ select: typeof chapterSelect }>,
-    targetOrderIndex: number,
-  ) {
-    const maxOrder = await tx.learningPathChapter.count({
-      where: {
-        learningPathId: before.learningPathId,
-        deletedAt: null,
-      },
-    });
-    const normalizedTarget = Math.min(Math.max(targetOrderIndex, 1), maxOrder);
-
-    if (normalizedTarget === before.orderIndex) {
-      return;
-    }
-
-    const temporaryOrderIndex = await this.getNextArchivedOrderIndex(
-      tx,
-      before.learningPathId,
-    );
-
-    await tx.learningPathChapter.update({
-      where: { id: before.id },
-      data: { orderIndex: temporaryOrderIndex },
-    });
-
-    if (normalizedTarget < before.orderIndex) {
-      await tx.learningPathChapter.updateMany({
-        where: {
-          learningPathId: before.learningPathId,
-          deletedAt: null,
-          orderIndex: {
-            gte: normalizedTarget,
-            lt: before.orderIndex,
-          },
-        },
-        data: {
-          orderIndex: {
-            increment: 1,
-          },
-        },
-      });
-    } else {
-      await tx.learningPathChapter.updateMany({
-        where: {
-          learningPathId: before.learningPathId,
-          deletedAt: null,
-          orderIndex: {
-            gt: before.orderIndex,
-            lte: normalizedTarget,
-          },
-        },
-        data: {
-          orderIndex: {
-            decrement: 1,
-          },
-        },
-      });
-    }
-
-    await tx.learningPathChapter.update({
-      where: { id: before.id },
-      data: { orderIndex: normalizedTarget },
-    });
   }
 
   private async getNextArchivedOrderIndex(

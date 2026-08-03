@@ -55,13 +55,6 @@ export class LessonSourceDocumentExtractionDto {
 export class LessonSourceDocumentPageRangeDto extends LessonSourceDocumentExtractionDto {}
 
 export class CreateLessonDto {
-  @ApiProperty({ example: 1, minimum: 1 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  orderIndex!: number;
-
   @ApiProperty({ example: "Buổi 1: Số hữu tỉ", minLength: 2, maxLength: 180 })
   @IsString()
   @MinLength(2)

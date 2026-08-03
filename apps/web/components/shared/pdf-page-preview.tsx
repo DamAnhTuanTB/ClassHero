@@ -46,7 +46,7 @@ export function PdfPagePreview({
     >
       <div
         aria-hidden="true"
-        className="absolute inset-0 animate-pulse border border-[var(--theme-skeleton-strong)] bg-[var(--theme-skeleton)]"
+        className="absolute inset-0 animate-pulse bg-[var(--theme-skeleton)]"
       />
       <div className="relative">
         <PdfPagePreviewClient

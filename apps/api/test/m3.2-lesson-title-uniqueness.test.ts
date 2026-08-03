@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
 import type { PrismaService } from "#api/common/prisma/prisma.service";
 import type { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
+import type { LearningPathStructureService } from "#api/modules/learning-paths/services/learning-path-structure.service";
 
 const chapterId = "00000000-0000-0000-0000-000000000002";
 const lessonId = "00000000-0000-0000-0000-000000000003";
@@ -20,6 +21,9 @@ describe("M3.2 lesson title uniqueness", () => {
   it("rejects a duplicate title in the same chapter when creating a lesson", async () => {
     const transaction = {
       $executeRaw: vi.fn().mockResolvedValue(1),
+      learningPath: {
+        findFirst: vi.fn().mockResolvedValue({ id: learningPathId }),
+      },
       learningPathChapter: {
         findFirst: vi.fn().mockResolvedValue({
           id: chapterId,
@@ -32,6 +36,9 @@ describe("M3.2 lesson title uniqueness", () => {
       },
     };
     const prisma = {
+      learningPathChapter: {
+        findFirst: vi.fn().mockResolvedValue({ learningPathId }),
+      },
       $transaction: vi.fn(
         async (callback: (tx: typeof transaction) => Promise<unknown>) =>
           callback(transaction),
@@ -40,11 +47,11 @@ describe("M3.2 lesson title uniqueness", () => {
     const service = new LessonsService(
       prisma as unknown as PrismaService,
       {} as SourceDocumentsService,
+      {} as LearningPathStructureService,
     );
 
     try {
-      await service.create(chapterId, "admin-id", {
-        orderIndex: 1,
+      await service.createInChapter(chapterId, "admin-id", {
         title: "  Bài   1  ",
       });
       throw new Error("Expected duplicate title validation to fail");
@@ -54,6 +61,7 @@ describe("M3.2 lesson title uniqueness", () => {
 
     expect(transaction.lesson.findFirst).toHaveBeenCalledWith({
       where: {
+        learningPathId,
         chapterId,
         deletedAt: null,
         title: {
@@ -95,6 +103,7 @@ describe("M3.2 lesson title uniqueness", () => {
     const service = new LessonsService(
       prisma as unknown as PrismaService,
       {} as SourceDocumentsService,
+      {} as LearningPathStructureService,
     );
 
     try {
@@ -108,6 +117,7 @@ describe("M3.2 lesson title uniqueness", () => {
 
     expect(transaction.lesson.findFirst).toHaveBeenLastCalledWith({
       where: {
+        learningPathId,
         chapterId,
         deletedAt: null,
         title: {

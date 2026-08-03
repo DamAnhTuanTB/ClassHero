@@ -53,7 +53,7 @@ export function FlashcardRunnerLoadingScreen() {
         <div className="h-5 w-48 rounded-lg bg-[var(--theme-skeleton)]" />
         <div className="mt-3 h-9 w-28 rounded-xl bg-[var(--theme-skeleton)]" />
         <div className="mt-4 h-3 rounded-full bg-[var(--theme-skeleton)]" />
-        <div className="mt-7 h-[min(31rem,58vh)] rounded-[2rem] border border-[var(--theme-skeleton-strong)] bg-white shadow-[0_24px_55px_-42px_rgb(15_23_42_/_16%)] dark:bg-[var(--theme-surface)]">
+        <div className="mt-7 h-[min(31rem,58vh)] rounded-[2rem] bg-white shadow-[0_24px_55px_-42px_rgb(15_23_42_/_16%)] dark:bg-[var(--theme-surface)]">
           <div className="mx-auto mt-[20%] h-4 w-28 rounded-full bg-[var(--theme-skeleton)]" />
           <div className="mx-auto mt-12 h-10 w-24 rounded-xl bg-[var(--theme-skeleton)]" />
           <div className="mx-auto mt-20 h-5 w-32 rounded-lg bg-[var(--theme-skeleton)]" />
@@ -77,12 +77,14 @@ export function FlashcardRunnerScreen({
   onMark,
   onNext,
   onPrevious,
+  onResultHistoryCollapsed,
   pendingAction,
   knownCount,
   reviewMode = false,
   reviewTitle,
   reviewStatuses,
   setId,
+  shouldCollapseResultHistoryOnComplete,
   stackedOverDialog = false,
   totalCount,
 }: {
@@ -99,12 +101,14 @@ export function FlashcardRunnerScreen({
   onMark: (isKnown: boolean) => Promise<boolean>;
   onNext: () => void;
   onPrevious: () => void;
+  onResultHistoryCollapsed: () => void;
   pendingAction: string | null;
   knownCount: number;
   reviewMode?: boolean;
   reviewTitle?: string;
   reviewStatuses: Array<boolean | null>;
   setId: string;
+  shouldCollapseResultHistoryOnComplete: boolean;
   stackedOverDialog?: boolean;
   totalCount: number;
 }) {
@@ -233,7 +237,15 @@ export function FlashcardRunnerScreen({
 
   function finishSession() {
     onComplete();
-    window.setTimeout(popFlashcardRunnerHistoryEntryPreservingResult, 0);
+    if (shouldCollapseResultHistoryOnComplete) {
+      window.setTimeout(
+        () =>
+          popFlashcardRunnerHistoryEntryPreservingResult(
+            onResultHistoryCollapsed,
+          ),
+        0,
+      );
+    }
   }
 
   function finishReview() {

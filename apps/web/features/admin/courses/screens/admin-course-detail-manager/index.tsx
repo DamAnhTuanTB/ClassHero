@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   BookOpen,
+  Bot,
   FileText,
   Layers3,
   Pencil,
@@ -55,6 +56,7 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Khóa học", icon: Layers3, active: true },
   { label: "Buổi học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
+  { label: "Cài đặt AI", icon: Bot, active: false, href: "/admin/ai-settings" },
 ];
 
 export function AdminCourseDetailManager({
@@ -225,8 +227,8 @@ export function AdminCourseDetailManager({
                       onCreateLesson={actions.startCreateLesson}
                       onEditLesson={actions.startEditLesson}
                       onArchiveLesson={actions.requestDeleteLesson}
-                      onReorderChapter={actions.reorderChapters}
-                      onReorderLesson={actions.reorderLessons}
+                      onMoveChapter={actions.moveChapter}
+                      onMoveLesson={actions.moveLesson}
                     />
                   </div>
                 ) : null}
@@ -239,7 +241,6 @@ export function AdminCourseDetailManager({
       {isChapterEditorOpen ? (
         <ChapterEditorDialog
           mode={chapterEditorMode}
-          defaultOrderIndex={(path?.chapters.length ?? 0) + 1}
           isOpen={isChapterEditorOpen}
           isSaving={isSavingChapter}
           selectedChapter={selectedChapter}
@@ -251,7 +252,6 @@ export function AdminCourseDetailManager({
       {isLessonEditorOpen ? (
         <LessonEditorDialog
           mode={lessonEditorMode}
-          defaultOrderIndex={(selectedChapter?.lessons.length ?? 0) + 1}
           isOpen={isLessonEditorOpen}
           isSaving={isSavingLesson}
           learningPath={path}

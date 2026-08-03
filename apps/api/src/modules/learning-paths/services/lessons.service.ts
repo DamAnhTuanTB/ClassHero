@@ -3,6 +3,8 @@ import { LessonType, Prisma, PublishStatus } from "@prisma/client";
 import { throwBadRequest } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { CreateLessonDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
+import { CreateLearningPathLessonDto } from "#api/modules/learning-paths/dto/create-learning-path-lesson.dto";
+import { MoveLessonDto } from "#api/modules/learning-paths/dto/move-lesson.dto";
 import { UpdateLessonDto } from "#api/modules/learning-paths/dto/update-lesson.dto";
 import {
   assertVideoUrlAllowed,
@@ -13,12 +15,14 @@ import {
   normalizeText,
   throwChapterNotFound,
   throwDuplicatedLessonTitle,
+  throwLearningPathNotFound,
   throwLessonNotFound,
   toInputJson,
 } from "#api/modules/learning-paths/utils/lesson.helpers";
 import { lessonSelect } from "#api/modules/learning-paths/selectors/lesson.selects";
 import { serializeLesson } from "#api/modules/learning-paths/serializers/lesson.serializers";
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
+import { LearningPathStructureService } from "#api/modules/learning-paths/services/learning-path-structure.service";
 import type { LessonDocumentRecord } from "#api/modules/learning-paths/types/document.types";
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
 
@@ -28,6 +32,8 @@ export class LessonsService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(SourceDocumentsService)
     private readonly sourceDocumentsService: SourceDocumentsService,
+    @Inject(LearningPathStructureService)
+    private readonly structureService: LearningPathStructureService,
   ) {}
 
   async listForAdmin(chapterId: string) {
@@ -53,14 +59,14 @@ export class LessonsService {
       },
       select: {
         ...lessonSelect,
+        learningPath: {
+          select: {
+            title: true,
+          },
+        },
         chapter: {
           select: {
             title: true,
-            learningPath: {
-              select: {
-                title: true,
-              },
-            },
           },
         },
       },
@@ -72,16 +78,42 @@ export class LessonsService {
 
     return {
       ...serializeLesson(lesson),
-      courseTitle: lesson.chapter?.learningPath?.title ?? null,
+      courseTitle: lesson.learningPath.title,
       chapterTitle: lesson.chapter?.title ?? null,
       learningPathId: lesson.learningPathId,
     };
   }
 
-  async create(
+  async createInChapter(
     chapterId: string,
     actorUserId: string,
     dto: CreateLessonDto,
+    context: RequestContext = {},
+  ) {
+    const chapter = await this.prisma.learningPathChapter.findFirst({
+      where: {
+        id: chapterId,
+        deletedAt: null,
+        learningPath: { deletedAt: null },
+      },
+      select: { learningPathId: true },
+    });
+    if (!chapter) {
+      throwChapterNotFound();
+    }
+
+    return this.createForLearningPath(
+      chapter.learningPathId,
+      actorUserId,
+      Object.assign(new CreateLearningPathLessonDto(), dto, { chapterId }),
+      context,
+    );
+  }
+
+  async createForLearningPath(
+    learningPathId: string,
+    actorUserId: string,
+    dto: CreateLearningPathLessonDto,
     context: RequestContext = {},
   ) {
     assertVideoUrlAllowed(dto.videoUrl);
@@ -90,33 +122,44 @@ export class LessonsService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        const chapter = await tx.learningPathChapter.findFirst({
-          where: {
-            id: chapterId,
-            deletedAt: null,
-            learningPath: {
-              deletedAt: null,
-            },
-          },
-          select: {
-            id: true,
-            learningPathId: true,
-          },
+        const learningPath = await tx.learningPath.findFirst({
+          where: { id: learningPathId, deletedAt: null },
+          select: { id: true },
         });
+        if (!learningPath) {
+          throwLearningPathNotFound();
+        }
 
-        if (!chapter) {
-          throwChapterNotFound();
+        const chapterId = dto.chapterId ?? null;
+        if (chapterId) {
+          const chapter = await tx.learningPathChapter.findFirst({
+            where: { id: chapterId, learningPathId, deletedAt: null },
+            select: { id: true },
+          });
+          if (!chapter) {
+            throwChapterNotFound();
+          }
         }
 
         const normalizedTitle = normalizeText(dto.title);
-        await this.assertLessonTitleAvailable(tx, chapter.id, normalizedTitle);
+        await this.assertLessonTitleAvailable(
+          tx,
+          learningPathId,
+          chapterId,
+          normalizedTitle,
+        );
 
         const status = dto.status ?? PublishStatus.DRAFT;
+        const temporaryOrderIndex = await this.structureService.getTemporaryLessonOrder(
+          tx,
+          learningPathId,
+          chapterId,
+        );
         const created = await tx.lesson.create({
           data: {
-            learningPathId: chapter.learningPathId,
-            chapterId: chapter.id,
-            orderIndex: dto.orderIndex,
+            learningPathId,
+            chapterId,
+            orderIndex: temporaryOrderIndex,
             title: normalizedTitle,
             shortDescription: normalizeOptionalText(dto.shortDescription),
             lessonType,
@@ -132,9 +175,18 @@ export class LessonsService {
           },
           select: lessonSelect,
         });
+        await this.structureService.insertLesson(tx, {
+          chapterId,
+          learningPathId,
+          lessonId: created.id,
+        });
+        const ordered = await tx.lesson.findUniqueOrThrow({
+          where: { id: created.id },
+          select: lessonSelect,
+        });
 
         await tx.learningPath.update({
-          where: { id: chapter.learningPathId },
+          where: { id: learningPathId },
           data: {
             totalLessonCount: {
               increment: 1,
@@ -149,7 +201,7 @@ export class LessonsService {
             action: getStatusAuditAction("LESSON_CREATED", status),
             entityType: "Lesson",
             entityId: created.id,
-            after: toInputJson(serializeLesson(created)),
+            after: toInputJson(serializeLesson(ordered)),
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
           },
@@ -171,7 +223,7 @@ export class LessonsService {
               )
             : [];
 
-        return { lesson: created, lessonDocuments };
+        return { lesson: ordered, lessonDocuments };
       });
 
       await this.enqueueLessonDocuments(result.lessonDocuments);
@@ -199,12 +251,10 @@ export class LessonsService {
           where: {
             id: lessonId,
             deletedAt: null,
-            chapter: {
-              deletedAt: null,
-            },
             learningPath: {
               deletedAt: null,
             },
+            OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
           },
           select: lessonSelect,
         });
@@ -224,6 +274,7 @@ export class LessonsService {
         if (normalizedTitle !== undefined) {
           await this.assertLessonTitleAvailable(
             tx,
+            before.learningPathId,
             before.chapterId,
             normalizedTitle,
             before.id,
@@ -231,7 +282,12 @@ export class LessonsService {
         }
 
         if (dto.orderIndex !== undefined && dto.orderIndex !== before.orderIndex) {
-          await this.moveLessonOrder(tx, before, dto.orderIndex);
+          await this.structureService.moveLesson(tx, {
+            chapterId: before.chapterId,
+            learningPathId: before.learningPathId,
+            lessonId: before.id,
+            targetOrderIndex: dto.orderIndex,
+          });
         }
 
         const status = dto.status ?? before.status;
@@ -317,6 +373,79 @@ export class LessonsService {
     }
   }
 
+  async move(
+    lessonId: string,
+    actorUserId: string,
+    dto: MoveLessonDto,
+    context: RequestContext = {},
+  ) {
+    try {
+      const moved = await this.prisma.$transaction(async (tx) => {
+        const before = await tx.lesson.findFirst({
+          where: {
+            id: lessonId,
+            deletedAt: null,
+            learningPath: { deletedAt: null },
+            OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
+          },
+          select: lessonSelect,
+        });
+        if (!before) {
+          throwLessonNotFound();
+        }
+
+        if (dto.chapterId) {
+          const destination = await tx.learningPathChapter.findFirst({
+            where: {
+              id: dto.chapterId,
+              learningPathId: before.learningPathId,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (!destination) {
+            throwChapterNotFound();
+          }
+        }
+
+        await this.assertLessonTitleAvailable(
+          tx,
+          before.learningPathId,
+          dto.chapterId,
+          before.title,
+          before.id,
+        );
+        await this.structureService.moveLesson(tx, {
+          chapterId: dto.chapterId,
+          learningPathId: before.learningPathId,
+          lessonId: before.id,
+          targetOrderIndex: dto.targetOrderIndex,
+        });
+        const updated = await tx.lesson.findUniqueOrThrow({
+          where: { id: before.id },
+          select: lessonSelect,
+        });
+        await tx.auditLog.create({
+          data: {
+            actorUserId,
+            action: "LESSON_MOVED",
+            entityType: "Lesson",
+            entityId: updated.id,
+            before: toInputJson(serializeLesson(before)),
+            after: toInputJson(serializeLesson(updated)),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+        return updated;
+      });
+
+      return serializeLesson(moved);
+    } catch (error) {
+      handleKnownPrismaError(error);
+    }
+  }
+
   private assertTranscriptIsChronological(
     transcript: NonNullable<UpdateLessonDto["customVideoSettings"]>["transcript"],
   ) {
@@ -359,12 +488,10 @@ export class LessonsService {
           where: {
             id: lessonId,
             deletedAt: null,
-            chapter: {
-              deletedAt: null,
-            },
             learningPath: {
               deletedAt: null,
             },
+            OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
           },
           select: lessonSelect,
         });
@@ -375,6 +502,7 @@ export class LessonsService {
 
         const archivedOrderIndex = await this.getNextArchivedOrderIndex(
           tx,
+          before.learningPathId,
           before.chapterId,
         );
         const deleted = await tx.lesson.update({
@@ -387,6 +515,11 @@ export class LessonsService {
           },
           select: lessonSelect,
         });
+        await this.structureService.removeLesson(
+          tx,
+          before.learningPathId,
+          before.chapterId,
+        );
 
         await tx.learningPath.update({
           where: { id: before.learningPathId },
@@ -425,12 +558,10 @@ export class LessonsService {
           where: {
             id: lessonId,
             deletedAt: null,
-            chapter: {
-              deletedAt: null,
-            },
             learningPath: {
               deletedAt: null,
             },
+            OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
           },
           select: lessonSelect,
         });
@@ -492,12 +623,10 @@ export class LessonsService {
       where: {
         id: lessonId,
         deletedAt: null,
-        chapter: {
-          deletedAt: null,
-        },
         learningPath: {
           deletedAt: null,
         },
+        OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
       },
       select: lessonSelect,
     });
@@ -511,10 +640,12 @@ export class LessonsService {
 
   private async getNextArchivedOrderIndex(
     tx: Prisma.TransactionClient,
-    chapterId: string,
+    learningPathId: string,
+    chapterId: string | null,
   ) {
     const lesson = await tx.lesson.findFirst({
       where: {
+        learningPathId,
         chapterId,
         orderIndex: {
           lt: 0,
@@ -541,19 +672,21 @@ export class LessonsService {
 
   private async assertLessonTitleAvailable(
     tx: Prisma.TransactionClient,
-    chapterId: string,
+    learningPathId: string,
+    chapterId: string | null,
     title: string,
     excludedLessonId?: string,
   ) {
     await tx.$executeRaw`
       SELECT pg_advisory_xact_lock(
         hashtext('lesson-title'),
-        hashtext(${chapterId})
+        hashtext(${chapterId ?? learningPathId})
       )
     `;
 
     const duplicatedLesson = await tx.lesson.findFirst({
       where: {
+        learningPathId,
         chapterId,
         deletedAt: null,
         title: {
@@ -570,72 +703,5 @@ export class LessonsService {
     if (duplicatedLesson) {
       throwDuplicatedLessonTitle();
     }
-  }
-
-  private async moveLessonOrder(
-    tx: Prisma.TransactionClient,
-    before: Prisma.LessonGetPayload<{ select: typeof lessonSelect }>,
-    targetOrderIndex: number,
-  ) {
-    const maxOrder = await tx.lesson.count({
-      where: {
-        chapterId: before.chapterId,
-        deletedAt: null,
-      },
-    });
-    const normalizedTarget = Math.min(Math.max(targetOrderIndex, 1), maxOrder);
-
-    if (normalizedTarget === before.orderIndex) {
-      return;
-    }
-
-    const temporaryOrderIndex = await this.getNextArchivedOrderIndex(
-      tx,
-      before.chapterId,
-    );
-
-    await tx.lesson.update({
-      where: { id: before.id },
-      data: { orderIndex: temporaryOrderIndex },
-    });
-
-    if (normalizedTarget < before.orderIndex) {
-      await tx.lesson.updateMany({
-        where: {
-          chapterId: before.chapterId,
-          deletedAt: null,
-          orderIndex: {
-            gte: normalizedTarget,
-            lt: before.orderIndex,
-          },
-        },
-        data: {
-          orderIndex: {
-            increment: 1,
-          },
-        },
-      });
-    } else {
-      await tx.lesson.updateMany({
-        where: {
-          chapterId: before.chapterId,
-          deletedAt: null,
-          orderIndex: {
-            gt: before.orderIndex,
-            lte: normalizedTarget,
-          },
-        },
-        data: {
-          orderIndex: {
-            decrement: 1,
-          },
-        },
-      });
-    }
-
-    await tx.lesson.update({
-      where: { id: before.id },
-      data: { orderIndex: normalizedTarget },
-    });
   }
 }

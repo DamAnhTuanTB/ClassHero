@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -21,6 +23,9 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
+import { LessonContentGenerationJobService } from "#api/modules/ai/services/lesson-content-generation-job.service";
+import { ReviewContentSetDto } from "#api/modules/ai/types/review-content-set.dto";
+import { GenerateQuizDto } from "#api/modules/quiz/dto/generate-quiz.dto";
 import {
   QuizQuestionContentDto,
   UpdateQuizQuestionContentDto,
@@ -61,12 +66,25 @@ export class AdminQuizController {
   constructor(
     @Inject(QuizService)
     private readonly quizService: QuizService,
+    @Inject(LessonContentGenerationJobService)
+    private readonly generationJobs: LessonContentGenerationJobService,
   ) {}
 
   @Get("lessons/:lessonId/quiz-sets")
   @ApiOperation({ summary: "List quiz sets in a lesson" })
   listSets(@Param("lessonId") lessonId: string) {
     return this.quizService.listQuizSetsByLesson(lessonId);
+  }
+
+  @Post("lessons/:lessonId/quiz-sets/generate-ai")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Queue AI generation for a quiz set" })
+  generate(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GenerateQuizDto,
+  ) {
+    return this.generationJobs.queueQuiz(lessonId, user.id, dto);
   }
 
   @Post("lessons/:lessonId/quiz-sets")
@@ -99,6 +117,17 @@ export class AdminQuizController {
       dto,
       getRequestContext(request),
     );
+  }
+
+  @Post("quiz-sets/:setId/review")
+  @ApiOperation({ summary: "Review a quiz set and its generated content" })
+  reviewSet(
+    @Param("setId") setId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ReviewContentSetDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.quizService.reviewQuizSet(setId, user.id, dto, getRequestContext(request));
   }
 
   @Delete("quiz-sets/:setId")

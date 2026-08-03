@@ -47,27 +47,94 @@ export function mapLearningPathToCourseDetail(
       "")
     : "";
   const continueLessonKind = learningPath.progress?.continueLessonKind ?? "first";
-  const chapterSource = learningPath.chapters ?? [];
+  const structureSource =
+    learningPath.structureItems ??
+    (learningPath.chapters ?? []).map((chapter) => ({
+      type: "CHAPTER" as const,
+      ...chapter,
+    }));
+  let chapterDisplayOrder = 0;
 
   return {
     course,
     detail: {
-      chapters: chapterSource.map((chapter, chapterIndex) =>
-        mapChapterToDetail({
-          chapter,
-          chapterIndex,
-          completedLessonCount,
-          continueLessonId,
-          hasActiveEnrollment: learningPath.access.hasActiveEnrollment,
-          isCoursePublished,
-          orderedLessons,
-        }),
+      chapters: structureSource.map((item, sectionIndex) =>
+        item.type === "CHAPTER"
+          ? mapChapterToDetail({
+              chapter: item,
+              chapterDisplayOrder: ++chapterDisplayOrder,
+              completedLessonCount,
+              continueLessonId,
+              hasActiveEnrollment: learningPath.access.hasActiveEnrollment,
+              isCoursePublished,
+              orderedLessons,
+            })
+          : mapStandaloneLessonToDetail({
+              completedLessonCount,
+              continueLessonId,
+              hasActiveEnrollment: learningPath.access.hasActiveEnrollment,
+              isCoursePublished,
+              lesson: item,
+              orderedLessons,
+              sectionIndex,
+            }),
       ),
       continueLessonId,
       continueLessonKind,
       continueLessonTitle,
       totalHours: Math.ceil((orderedLessons.length * 40) / 60),
     },
+  };
+}
+
+function mapStandaloneLessonToDetail({
+  completedLessonCount,
+  continueLessonId,
+  hasActiveEnrollment,
+  isCoursePublished,
+  lesson,
+  orderedLessons,
+  sectionIndex,
+}: {
+  completedLessonCount: number;
+  continueLessonId: string;
+  hasActiveEnrollment: boolean;
+  isCoursePublished: boolean;
+  lesson: PublicLearningPathLessonApi;
+  orderedLessons: PublicLearningPathLessonApi[];
+  sectionIndex: number;
+}): StudentCourseDetailChapter {
+  const completedLessonIds = new Set(
+    orderedLessons.slice(0, completedLessonCount).map((item) => item.id),
+  );
+
+  return {
+    description: lesson.shortDescription ?? "Buổi học độc lập trong khóa học.",
+    id: `standalone-${lesson.id}`,
+    isStandaloneGroup: true,
+    lessons: [
+      {
+        durationMinutes: 40,
+        id: lesson.id,
+        isTrial: isCoursePublished && !hasActiveEnrollment && lesson.trialEnabled,
+        lessonType: lesson.lessonType,
+        status: getLessonStatus({
+          completedLessonIds,
+          continueLessonId,
+          hasActiveEnrollment,
+          isCoursePublished,
+          isChapterPublished: true,
+          lessonId: lesson.id,
+          trialEnabled: lesson.trialEnabled,
+        }),
+        title: lesson.title,
+      },
+    ],
+    order: lesson.orderIndex,
+    progressPercent: completedLessonIds.has(lesson.id) ? 100 : 0,
+    status: lesson.status,
+    title: "Buổi học không thuộc chương",
+    tone: chapterToneSequence[sectionIndex % chapterToneSequence.length] ?? "emerald",
   };
 }
 
@@ -98,10 +165,8 @@ function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCo
     id: learningPath.id,
     isUnderMaintenance,
     lessonCount: learningPath.summary.lessonCount,
-    lessonCountMin:
-      learningPath.lessonCountMin ?? learningPath.summary.lessonCount,
-    lessonCountMax:
-      learningPath.lessonCountMax ?? learningPath.summary.lessonCount,
+    lessonCountMin: learningPath.lessonCountMin ?? learningPath.summary.lessonCount,
+    lessonCountMax: learningPath.lessonCountMax ?? learningPath.summary.lessonCount,
     nextLesson: continueLesson
       ? {
           examOpenLabel: getExamOpenLabel(continueLesson.examOpenAt),
@@ -137,7 +202,7 @@ function mapLearningPathToCourse(learningPath: PublicLearningPathApi): StudentCo
 
 function mapChapterToDetail({
   chapter,
-  chapterIndex,
+  chapterDisplayOrder,
   completedLessonCount,
   continueLessonId,
   hasActiveEnrollment,
@@ -145,7 +210,7 @@ function mapChapterToDetail({
   orderedLessons,
 }: {
   chapter: PublicLearningPathChapterApi;
-  chapterIndex: number;
+  chapterDisplayOrder: number;
   completedLessonCount: number;
   continueLessonId: string;
   hasActiveEnrollment: boolean;
@@ -184,11 +249,13 @@ function mapChapterToDetail({
       }),
       title: lesson.title,
     })),
-    order: chapter.orderIndex,
+    order: chapterDisplayOrder,
     progressPercent,
     status: chapter.status,
-    title: normalizeChapterTitle(chapter.title, chapter.orderIndex),
-    tone: chapterToneSequence[chapterIndex % chapterToneSequence.length] ?? "emerald",
+    title: chapter.title,
+    tone:
+      chapterToneSequence[(chapterDisplayOrder - 1) % chapterToneSequence.length] ??
+      "emerald",
   };
 }
 
@@ -317,10 +384,6 @@ function getExamOpenLabel(value: string | null) {
   }
 
   return `Mở bài kiểm tra ${date.toLocaleDateString("vi-VN")}`;
-}
-
-function normalizeChapterTitle(title: string, orderIndex: number) {
-  return title.replace(new RegExp(`^chương\\s*${orderIndex}\\s*[-:.]?\\s*`, "i"), "");
 }
 
 const subjectToneBySubject: Record<StudentCourseSubject, StudentCourseTone> = {

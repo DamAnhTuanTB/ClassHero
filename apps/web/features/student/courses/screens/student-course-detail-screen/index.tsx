@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { StudentCourseChapterCard } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-chapter-card";
 import { StudentCourseDetailHeroArt } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-detail-hero-art";
 import { StudentCourseDetailProgressCard } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-detail-progress-card";
+import { StudentCourseLessonRow } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-lesson-row";
 import { StudentCourseMobileBrandBar } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
@@ -37,6 +38,7 @@ import {
   getCoursePrice,
 } from "@/features/student/shared/utils/student-courses-utils";
 import { getStudentCourseAudienceStyle } from "@/features/student/shared/utils/student-course-audience-palette";
+import { getStudentCourseAccentStyle } from "@/features/student/shared/utils/student-course-accent-palette";
 import { getStudentCourseContinueLessonCopy } from "@/features/student/shared/utils/student-course-continue-lesson";
 import { cn } from "@/lib/utils";
 import type { AppThemeMode } from "@/lib/theme-store";
@@ -406,20 +408,43 @@ export function StudentCourseDetailScreen({
             </div>
             <div className="grid gap-3">
               {detail.chapters.length > 0 ? (
-                detail.chapters.map((chapter) => (
-                  <StudentCourseChapterCard
-                    key={chapter.id}
-                    chapter={chapter}
-                    continueLessonActionLabel={continueLessonCopy.actionLabel}
-                    continueLessonId={detail.continueLessonId}
-                    expanded={expandedChapterIds.includes(chapter.id)}
-                    onToggle={() => handleToggleChapter(chapter)}
-                    showProgress={shouldShowLearningProgress}
-                  />
-                ))
+                detail.chapters.map((chapter, chapterIndex) =>
+                  chapter.isStandaloneGroup ? (
+                    <ul
+                      key={chapter.id}
+                      style={getStudentCourseAccentStyle({
+                        accentCount: detail.chapters.length,
+                        accentIndex: chapterIndex,
+                      })}
+                      className="student-mobile-border student-curriculum-accent-card relative overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]"
+                    >
+                      {chapter.lessons.map((lesson, lessonIndex) => (
+                        <StudentCourseLessonRow
+                          key={lesson.id}
+                          continueLessonActionLabel={continueLessonCopy.actionLabel}
+                          continueLessonId={detail.continueLessonId}
+                          lesson={lesson}
+                          showSeparator={lessonIndex > 0}
+                        />
+                      ))}
+                    </ul>
+                  ) : (
+                    <StudentCourseChapterCard
+                      key={chapter.id}
+                      accentCount={detail.chapters.length}
+                      accentIndex={chapterIndex}
+                      chapter={chapter}
+                      continueLessonActionLabel={continueLessonCopy.actionLabel}
+                      continueLessonId={detail.continueLessonId}
+                      expanded={expandedChapterIds.includes(chapter.id)}
+                      onToggle={() => handleToggleChapter(chapter)}
+                      showProgress={shouldShowLearningProgress}
+                    />
+                  ),
+                )
               ) : (
                 <div className="student-mobile-border rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-sm font-semibold leading-6 text-slate-500 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)]">
-                  Khóa học này chưa có chương học nào.
+                  Khóa học này chưa có chương hoặc buổi học nào.
                 </div>
               )}
             </div>

@@ -12,6 +12,7 @@ import {
   publicLearningPathSelect,
 } from "#api/modules/learning-paths/selectors/learning-path.selects";
 import type { ChapterDetailResponse } from "#api/modules/learning-paths/types/chapter.types";
+import type { LessonResponse } from "#api/modules/learning-paths/types/lesson.types";
 
 export type LearningPathRecord = Prisma.LearningPathGetPayload<{
   select: typeof learningPathSelect;
@@ -56,6 +57,10 @@ export type LearningPathResponse = {
   createdAt: Date;
   updatedAt: Date;
   chapters?: ChapterDetailResponse[];
+  structureItems?: Array<
+    | ({ type: "CHAPTER" } & ChapterDetailResponse)
+    | ({ type: "LESSON" } & LessonResponse)
+  >;
 };
 
 export type PublicLearningPathRecord = Prisma.LearningPathGetPayload<{

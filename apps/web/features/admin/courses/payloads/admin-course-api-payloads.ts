@@ -1,5 +1,5 @@
 import type {
-  ChapterFormValues,
+  ChapterUpdateValues,
   LearningPathFormValues,
   LessonFormValues,
 } from "@/features/admin/courses/admin-courses-schemas";
@@ -40,9 +40,7 @@ export function toLearningPathApiPayload(
   };
 }
 
-export function toChapterApiPayload(
-  values: Partial<ChapterFormValues>,
-): AdminChapterPayload {
+export function toChapterApiPayload(values: ChapterUpdateValues): AdminChapterPayload {
   return {
     ...(values.orderIndex !== undefined ? { orderIndex: Number(values.orderIndex) } : {}),
     ...(values.title !== undefined ? { title: values.title.trim() } : {}),
@@ -65,7 +63,6 @@ export function toLessonApiPayload(
   );
 
   return {
-    ...(values.orderIndex !== undefined ? { orderIndex: Number(values.orderIndex) } : {}),
     ...(values.title !== undefined ? { title: values.title.trim() } : {}),
     ...(values.shortDescription !== undefined
       ? { shortDescription: values.shortDescription?.trim() || null }

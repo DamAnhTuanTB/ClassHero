@@ -7,13 +7,21 @@ Update note 2026-07-07:
 - File này là baseline execution plan được tạo ở bước `M0.P`.
 - Roadmap hiện tại đã được bổ sung `Mode` và các task UI còn thiếu trong `docs/09-implementation-plan.md` + `docs/implementation/M*.md`.
 - Khi chọn task tiếp theo, ưu tiên đọc `docs/09-implementation-plan.md` và file milestone tương ứng thay vì dùng danh sách task cũ trong file này.
-- Danh sách task trong mục 3 là snapshot lịch sử, có thể thiếu task UI mới như `M2.4`, `M3.5`, `M4.5`, `M7.7`, `M8.5`, `M9.8`, `M13.5`; không dùng mục đó làm roadmap hiện hành.
+- Danh sách task trong mục 3 là snapshot lịch sử và có thể thiếu task UI mới;
+  không dùng mục đó làm roadmap hiện hành.
 
 Update note 2026-07-26:
 
 - Owner đã duyệt scope mở rộng `M15 Smart video learning`; chi tiết nằm ở `docs/implementation/M15.md`.
 - Ưu tiên phần nền `M15.1-M15.3` sau khi hoàn tất core student `M7.1-M7.5`; các phần AI `M15.4-M15.8` chỉ chạy khi dependency `M3.8`, `M5.x`, `M9.x` tương ứng đã sẵn sàng.
 - Mục 3 bên dưới tiếp tục là snapshot lịch sử. Thứ tự hiện hành chỉ lấy từ `docs/09-implementation-plan.md`.
+
+Update note 2026-08-03:
+
+- Riêng cụm AI được đồng bộ lại theo thứ tự
+  `M9.1 -> M9.2 -> M9.3 -> M9.8 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
+- `M9.4` và `M9.5` là `UI + API`; `M9.8` chỉ là panel quản trị cho
+  `M9.2-M9.3`, không thay thế UI học sinh.
 
 ## 1. Phạm vi bước này
 
@@ -140,37 +148,42 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 40. `M9.1` - AiModule structured output foundation.
 41. `M9.2` - Admin generate lesson summary.
 42. `M9.3` - Admin generate quiz/flashcard/test.
-43. `M9.4` - Student request-new reserve-first flow.
-44. `M9.5` - AI explanation cache inline.
-45. `M9.6` - Chat AI trong lesson bằng RAG.
-46. `M9.7` - Conversation summary và diagram placeholder.
-47. `M10.1` - Notification in-app API.
-48. `M10.2` - NotificationBell UI.
-49. `M10.3` - Socket.IO realtime notification.
-50. `M10.4` - Admin manual notification.
-51. `M10.5` - Automatic notification triggers.
-52. `M10.6` - Email/Zalo delivery workers.
-53. `M11.1` - Parent-child link và selected child.
-54. `M11.2` - Parent dashboard và progress view.
-55. `M11.3` - Parent course list và payment for child.
-56. `M11.4` - Parent notifications và news view.
-57. `M12.1` - Student report item.
-58. `M12.2` - Admin report moderation.
-59. `M12.3` - AI unreviewed content moderation.
-60. `M12.4` - News/events/livestream CRUD admin.
-61. `M12.5` - Student/parent news/events view.
-62. `M13.1` - XP events và level calculation.
-63. `M13.2` - Global student leaderboard.
-64. `M13.3` - Student profile editable fields.
-65. `M13.4` - Avatar upload integration.
-66. `M14.1` - Unit tests cho service quan trọng.
-67. `M14.2` - API tests cho flow nhạy cảm.
-68. `M14.3` - Playwright E2E cho flow chính.
-69. `M14.4` - Security hardening và rate limit.
-70. `M14.5` - Logging, monitoring và error tracking.
-71. `M14.6` - Docker Compose production, Nginx và health checks.
-72. `M14.7` - Backup/restore và vận hành production notes.
-73. `M14.8` - Frontend loading, prefetch và transition hardening. `Done 2026-07-29`.
+43. `M9.8` - Admin AI generation panel UI.
+43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
+43.2. `M4.6` - OCR accounting, retry-resume và budget guard.
+43.3. `M9.10` - Admin provider operations API.
+43.4. `M9.11` - Admin Cài đặt AI/OCR UI.
+44. `M9.4` - Student request-new reserve-first UI + API.
+45. `M9.5` - AI explanation cache inline UI + API.
+46. `M9.6` - Chat AI trong lesson bằng RAG.
+47. `M9.7` - Conversation summary và diagram placeholder.
+48. `M10.1` - Notification in-app API.
+49. `M10.2` - NotificationBell UI.
+50. `M10.3` - Socket.IO realtime notification.
+51. `M10.4` - Admin manual notification.
+52. `M10.5` - Automatic notification triggers.
+53. `M10.6` - Email/Zalo delivery workers.
+54. `M11.1` - Parent-child link và selected child.
+55. `M11.2` - Parent dashboard và progress view.
+56. `M11.3` - Parent course list và payment for child.
+57. `M11.4` - Parent notifications và news view.
+58. `M12.1` - Student report item.
+59. `M12.2` - Admin report moderation.
+60. `M12.3` - AI unreviewed content moderation.
+61. `M12.4` - News/events/livestream CRUD admin.
+62. `M12.5` - Student/parent news/events view.
+63. `M13.1` - XP events và level calculation.
+64. `M13.2` - Global student leaderboard.
+65. `M13.3` - Student profile editable fields.
+66. `M13.4` - Avatar upload integration.
+67. `M14.1` - Unit tests cho service quan trọng.
+68. `M14.2` - API tests cho flow nhạy cảm.
+69. `M14.3` - Playwright E2E cho flow chính.
+70. `M14.4` - Security hardening và rate limit.
+71. `M14.5` - Logging, monitoring và error tracking.
+72. `M14.6` - Docker Compose production, Nginx và health checks.
+73. `M14.7` - Backup/restore và vận hành production notes.
+74. `M14.8` - Frontend loading, prefetch và transition hardening. `Done 2026-07-29`.
 
 Ghi chú: `docs/09-implementation-plan.md` đặt nhóm `M8.x` trước `M5.x`/`M9.x` trong danh sách ưu tiên khi thiếu thời gian. Điều này hợp lý cho MVP có payment/enrollment trước AI nâng cao. Tuy nhiên, mọi subtask AI/RAG dựa trên tài liệu vẫn cần các phần `M4.x` và `M5.x` tương ứng trước khi hoàn thiện.
 
@@ -229,9 +242,14 @@ Phụ thuộc AI/RAG:
 - `M9.1` phụ thuộc `M5.1`, `M1.5`, `M4.3`.
 - `M9.2` phụ thuộc `M5.3`, `M9.1`, `M1.3`.
 - `M9.3` phụ thuộc `M6.2` đến `M6.4`, `M5.3`, `M9.1`.
-- `M9.4` phụ thuộc `M9.3`, `M6.2` đến `M6.4`, `M7.1`.
-- `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2` đến `M6.4`, `M7.2`/`M7.4` cho permission sau submit.
-- `M9.6` phụ thuộc `M5.4`, `M9.1`, `M7.1`.
+- `M9.8` phụ thuộc `M9.2`, `M9.3`, `M4.3`; xếp ngay sau `M9.3` để generation
+  có UI quản trị kiểm thử trước khi chuyển sang student flow.
+- `M9.4` phụ thuộc `M9.3`, `M6.2` đến `M6.4`, `M7.1-M7.4`; task bao gồm nối
+  action request-new trên UI học sinh, không chỉ endpoint/worker.
+- `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2` đến `M6.4`, `M7.2-M7.4`; task bao
+  gồm inline explanation UI và trạng thái polling/error/retry.
+- `M9.6` phụ thuộc `M5.4`, `M9.1`, `M7.1`; làm sau `M9.5` để nhận context từ
+  `Chat thêm với AI`.
 - `M9.7` phụ thuộc `M9.6`; diagram rendering thật phụ thuộc `M4.1` và queue/worker.
 
 Phụ thuộc notification:

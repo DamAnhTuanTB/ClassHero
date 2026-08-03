@@ -20,6 +20,7 @@ export function serializeLesson(record: LessonRecord): LessonResponse {
     completionMinScore: Number(record.completionMinScore),
     trialEnabled: record.trialEnabled,
     status: record.status,
+    hasStudentCompletion: record._count.progressEntries > 0,
     createdById: record.createdById,
     updatedById: record.updatedById,
     createdAt: record.createdAt,

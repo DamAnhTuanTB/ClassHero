@@ -46,6 +46,7 @@ export type PublicLearningPathAccessApi = {
 
 export type PublicLearningPathLessonApi = {
   id: string;
+  chapterId: string | null;
   orderIndex: number;
   title: string;
   shortDescription: string | null;
@@ -63,6 +64,10 @@ export type PublicLearningPathChapterApi = {
   status: PublicLearningPathPublishStatus;
   lessons: PublicLearningPathLessonApi[];
 };
+
+export type PublicLearningPathStructureItemApi =
+  | ({ type: "CHAPTER" } & PublicLearningPathChapterApi)
+  | ({ type: "LESSON" } & PublicLearningPathLessonApi);
 
 export type PublicLearningPathThumbnailApi = {
   id: string;
@@ -99,6 +104,7 @@ export type PublicLearningPathApi = {
   progress: PublicLearningPathProgressApi | null;
   lessons: PublicLearningPathLessonApi[];
   chapters?: PublicLearningPathChapterApi[];
+  structureItems?: PublicLearningPathStructureItemApi[];
 };
 
 export type StudentCoursesListMeta = Record<string, unknown> & {

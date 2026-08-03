@@ -17,9 +17,7 @@ export class StudentLessonAccessService {
         id: lessonId,
         deletedAt: null,
         status: PublishStatus.PUBLISHED,
-        chapter: {
-          deletedAt: null,
-        },
+        OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
         learningPath: {
           deletedAt: null,
           status: {
@@ -97,7 +95,7 @@ export class StudentLessonAccessService {
     if (
       lesson.trialEnabled &&
       lesson.learningPath.status === PublishStatus.PUBLISHED &&
-      lesson.chapter.status === PublishStatus.PUBLISHED
+      (lesson.chapter?.status ?? PublishStatus.PUBLISHED) === PublishStatus.PUBLISHED
     ) {
       return {
         evaluatedAt,

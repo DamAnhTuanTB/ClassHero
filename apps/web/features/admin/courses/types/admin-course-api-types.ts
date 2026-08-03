@@ -40,6 +40,7 @@ export type AdminLearningPathApi = {
   sortOrder: number;
   updatedAt: string;
   chapters?: AdminChapterApi[];
+  structureItems?: AdminCourseStructureItemApi[];
 };
 
 export type PersonalizationStatus = "BASE" | "CLONING" | "FAILED" | "PERSONALIZED";
@@ -73,7 +74,6 @@ export type PersonalLearningPathEnrollmentApi = {
 
 export type PersonalLearningPathDetailApi = PersonalLearningPathEnrollmentApi;
 
-
 export type PersonalLearningPathEnrollmentsListApi = {
   items: PersonalLearningPathEnrollmentApi[];
   total: number;
@@ -95,7 +95,7 @@ export type AdminChapterApi = {
 export type AdminLessonApi = {
   id: string;
   learningPathId: string;
-  chapterId: string;
+  chapterId: string | null;
   courseTitle?: string | null;
   chapterTitle?: string | null;
   orderIndex: number;
@@ -109,8 +109,12 @@ export type AdminLessonApi = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
+  hasStudentCompletion: boolean;
   customVideoSettings?: unknown;
 };
+
+export type AdminCourseStructureItemApi =
+  ({ type: "CHAPTER" } & AdminChapterApi) | ({ type: "LESSON" } & AdminLessonApi);
 
 export type UploadedFileApi = {
   id: string;
@@ -149,11 +153,11 @@ export type AdminChapterPayload = {
 };
 
 export type AdminLessonPayload = {
+  chapterId?: string | null;
   completionMinScore?: number;
   examOpenAt?: string | null;
   lessonType?: AdminLessonType;
   liveUrl?: string | null;
-  orderIndex?: number;
   scheduledAt?: string | null;
   shortDescription?: string | null;
   status?: AdminPublishStatus;

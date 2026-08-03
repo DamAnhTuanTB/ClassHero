@@ -12,10 +12,8 @@ import {
   HelpCircle,
   Loader2,
   LockKeyhole,
-  Medal,
   Play,
   RefreshCcw,
-  Trophy,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -24,7 +22,6 @@ import {
   reviewStudentTest,
   startStudentTest,
   submitStudentTest,
-  useStudentTestResult,
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { useStudentLearningTransition } from "@/components/student/learning-transition/student-learning-transition-provider";
@@ -39,7 +36,6 @@ import { TestRunnerScreen } from "@/features/student/lessons/screens/student-les
 import { QuizRunnerLoadingScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen";
 import type {
   AssessmentReview,
-  CompletionResult,
   StudentAnswer,
   StudentLearningSurface,
   StudentLesson,
@@ -128,7 +124,6 @@ export function TestLearningPanel({
   const [reviewOrigin, setReviewOrigin] = useState<"HISTORY" | "RESULT">("RESULT");
   const [historyReviewTitle, setHistoryReviewTitle] = useState<string | null>(null);
   const [reviewIndex, setReviewIndex] = useState(0);
-  const [completion, setCompletion] = useState<CompletionResult | null>(null);
   const [latestSubmittedAttemptId, setLatestSubmittedAttemptId] = useState<string | null>(
     null,
   );
@@ -309,7 +304,6 @@ export function TestLearningPanel({
       setRemainingSeconds(nextAttempt.testSet.durationSeconds);
       setResult(null);
       setReview(null);
-      setCompletion(null);
     } catch (error) {
       toast.error("Chưa bắt đầu được bài thi", {
         description: getErrorMessage(error),
@@ -377,22 +371,6 @@ export function TestLearningPanel({
     await handleReviewAttempt(result.id, scope);
   }
 
-  async function handleUseResult() {
-    if (!result?.passed || pendingAction) return;
-    setPendingAction("use-result");
-    try {
-      const nextCompletion = await useStudentTestResult(result.id, token);
-      setCompletion(nextCompletion);
-      await onProgressChanged();
-    } catch (error) {
-      toast.error("Chưa dùng được kết quả này", {
-        description: getErrorMessage(error),
-      });
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
   function findTestHistoryItem(item: LearningHistoryDisplayItem) {
     return historyQuery.data?.items.find((candidate) => candidate.id === item.id);
   }
@@ -413,60 +391,6 @@ export function TestLearningPanel({
     const source = findTestHistoryItem(item);
     if (!source || source.state !== "NOT_STARTED") return;
     void handleStart(`history-start:${item.id}`);
-  }
-
-  if (completion) {
-    return (
-      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 dark:border-emerald-400/20 dark:bg-[var(--theme-surface)] sm:p-7">
-        <div className="text-center">
-          <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
-            <Trophy className="h-9 w-9" aria-hidden="true" />
-          </span>
-          <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-emerald-600">
-            Hoàn thành buổi học
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-[var(--theme-text-strong)]">
-            Chúc mừng bạn!
-          </h2>
-          <p className="mt-2 text-sm font-bold text-slate-500 dark:text-[var(--theme-text-muted)]">
-            Điểm tốt nhất: {completion.bestAttempt?.score.toFixed(2) ?? "0.00"}/10
-          </p>
-        </div>
-        <div className="mt-7">
-          <div className="mb-3 flex items-center gap-2">
-            <Medal className="h-5 w-5 text-amber-500" aria-hidden="true" />
-            <h3 className="font-black text-slate-950 dark:text-[var(--theme-text-strong)]">
-              Top 5 buổi học
-            </h3>
-          </div>
-          {completion.leaderboard.length > 0 ? (
-            <div className="grid gap-2">
-              {completion.leaderboard.map((entry) => (
-                <div
-                  key={entry.attemptId}
-                  className={cn(
-                    "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl px-4 py-3",
-                    entry.isCurrentStudent
-                      ? "bg-sky-50 text-sky-800 dark:bg-sky-500/10 dark:text-sky-200"
-                      : "bg-slate-50 text-slate-700 dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text)]",
-                  )}
-                >
-                  <span className="text-center text-sm font-black">#{entry.rank}</span>
-                  <span className="truncate text-sm font-black">{entry.studentName}</span>
-                  <span className="text-sm font-black">
-                    {entry.score.toFixed(2)} · {formatDuration(entry.durationSeconds)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-bold text-slate-500 dark:bg-[var(--theme-surface-muted)]">
-              Chưa có dữ liệu xếp hạng.
-            </p>
-          )}
-        </div>
-      </section>
-    );
   }
 
   if (review && reviewOrigin === "RESULT") {
@@ -518,7 +442,6 @@ export function TestLearningPanel({
         onReviewAll={() => void handleReview("ALL")}
         onReviewIncorrect={() => void handleReview("INCORRECT")}
         onStartNewTest={() => void handleStart()}
-        onUseResult={() => void handleUseResult()}
         onNextLesson={
           lesson.navigation.next
             ? () => void openLesson(lesson.navigation.next!.id)

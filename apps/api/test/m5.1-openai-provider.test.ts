@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { AiProviderName } from "@prisma/client";
+import { z } from "zod";
 
 import type { AiEmbeddingInput } from "#api/modules/ai/types/ai-embedding.types";
 import type { AiProvider } from "#api/modules/ai/types/ai-provider.interface";
@@ -7,10 +8,16 @@ import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
 
 // Mock OpenAI SDK
 const mockEmbeddingsCreate = vi.fn();
+const mockResponsesCreate = vi.fn();
+const mockResponsesParse = vi.fn();
 vi.mock("openai", () => {
   return {
     default: class MockOpenAI {
       embeddings = { create: mockEmbeddingsCreate };
+      responses = {
+        create: mockResponsesCreate,
+        parse: mockResponsesParse,
+      };
       constructor() {}
     },
   };
@@ -20,6 +27,7 @@ describe("OpenAiProvider", () => {
   let provider: AiProvider;
   const testConfig: AiOpenAiConfig = {
     apiKey: "test-api-key",
+    requestTimeoutMs: 60_000,
     structuredModel: "gpt-4.1-mini",
     chatModel: "gpt-4.1-mini",
     embeddingModel: "text-embedding-3-small",
@@ -170,30 +178,149 @@ describe("OpenAiProvider", () => {
   });
 
   describe("generateText", () => {
-    it("should throw not implemented error", async () => {
+    it("returns text with provider usage metadata", async () => {
+      mockResponsesCreate.mockResolvedValueOnce({
+        id: "resp-text-1",
+        model: "gpt-4.1-mini-2025-04-14",
+        output_text: "  Xin chào em.  ",
+        usage: {
+          input_tokens: 12,
+          output_tokens: 5,
+          total_tokens: 17,
+        },
+      });
+
       await expect(
         provider.generateText({
-          systemPrompt: "test",
-          userPrompt: "test",
+          systemPrompt: "Bạn là trợ giảng.",
+          userPrompt: "Giải thích ngắn.",
+          contextChunks: [
+            { id: "chunk-1", content: "2 + 2 = 4" },
+          ],
+          maxTokens: 100,
         }),
-      ).rejects.toThrow("not yet implemented");
+      ).resolves.toMatchObject({
+        text: "Xin chào em.",
+        provider: AiProviderName.OPENAI,
+        model: "gpt-4.1-mini-2025-04-14",
+        providerRequestId: "resp-text-1",
+        usage: {
+          promptTokens: 12,
+          completionTokens: 5,
+          totalTokens: 17,
+        },
+      });
+      expect(mockResponsesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "gpt-4.1-mini",
+          instructions: "Bạn là trợ giảng.",
+          input: expect.stringContaining("<chunk id=\"chunk-1\">"),
+          max_output_tokens: 100,
+        }),
+      );
+    });
+
+    it("rejects an empty text response", async () => {
+      mockResponsesCreate.mockResolvedValueOnce({
+        id: "resp-empty",
+        model: "gpt-4.1-mini",
+        output_text: "  ",
+        usage: null,
+      });
+
+      await expect(
+        provider.generateText({ systemPrompt: "test", userPrompt: "test" }),
+      ).rejects.toThrow("empty text response");
     });
   });
 
   describe("generateStructured", () => {
-    it("should throw not implemented error", async () => {
+    const schema = z.object({
+      status: z.literal("ok"),
+      value: z.number().int().positive(),
+    });
+
+    it("returns only output that passes the Zod schema", async () => {
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-structured-1",
+        model: "gpt-4.1-mini-2025-04-14",
+        output_parsed: { status: "ok", value: 2 },
+        usage: {
+          input_tokens: 20,
+          output_tokens: 8,
+          total_tokens: 28,
+        },
+      });
+
+      await expect(
+        provider.generateStructured(
+          {
+            systemPrompt: "Return structured output.",
+            userPrompt: "Return value two.",
+            outputName: "m9_1_smoke",
+            promptVersion: "m9.1-v1",
+            schemaVersion: "m9.1-v1",
+            temperature: 0,
+          },
+          schema,
+        ),
+      ).resolves.toMatchObject({
+        data: { status: "ok", value: 2 },
+        provider: AiProviderName.OPENAI,
+        providerRequestId: "resp-structured-1",
+        usage: { totalTokens: 28 },
+      });
+      expect(mockResponsesParse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "gpt-4.1-mini",
+          temperature: 0,
+          text: { format: expect.any(Object) },
+        }),
+      );
+    });
+
+    it("rejects parsed data that fails local Zod validation", async () => {
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-invalid",
+        model: "gpt-4.1-mini",
+        output_parsed: { status: "ok", value: -1 },
+        usage: null,
+      });
+
       await expect(
         provider.generateStructured(
           {
             systemPrompt: "test",
             userPrompt: "test",
-            outputName: "test",
+            outputName: "test_output",
             promptVersion: "v1",
             schemaVersion: "v1",
           },
-          {},
+          schema,
         ),
-      ).rejects.toThrow("not yet implemented");
+      ).rejects.toMatchObject({ code: "AI_OUTPUT_INVALID" });
+    });
+
+    it("rejects refusal or incomplete output", async () => {
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-refusal",
+        model: "gpt-4.1-mini",
+        output_parsed: null,
+        usage: null,
+      });
+
+      await expect(
+        provider.generateStructured(
+          {
+            systemPrompt: "test",
+            userPrompt: "test",
+            outputName: "test_output",
+            promptVersion: "v1",
+            schemaVersion: "v1",
+          },
+          schema,
+        ),
+      ).rejects.toThrow("did not return a parsed structured output");
     });
   });
 });

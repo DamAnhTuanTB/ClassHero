@@ -66,11 +66,20 @@ M14 testing/hardening/deploy
 
 - `M2.4` auth UI có thể làm mock sau `M0.2`, nhưng nối API thật cần `M2.2` và `M2.3`.
 - `M3.5` public/student course UI cần `M3.3`; CTA mua thật cần `M8.4`.
-- Course detail từ M3.3/M3.5 hiển thị `chapters -> lessons`; chapter chỉ có metadata tổng quan.
+- Course detail từ M3.3/M3.5 dùng ordered `structureItems`: chapter và lesson không thuộc chapter có thể xen kẽ, chapter chứa lessons con; lesson vẫn là đơn vị nội dung bắt buộc thuộc learning path.
 - `M4.5` source document upload/page mapping UI cần `M4.1`, `M4.2`, `M4.3`; paid OCR artifact/page-level content và chunk theo lesson đầy đủ cần `M4.4`.
 - `M7.1` lesson page skeleton cần `M6.5` để đọc lesson content.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
-- `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3` và `M9.1`.
+- Thứ tự triển khai cụm AI là
+  `M9.1 -> M9.2 -> M9.3 -> M9.8 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
+- Provider operations là lát dọc độc lập:
+  `M9.9 -> M4.6 -> M9.10 -> M9.11`; dùng nền `M9.1`, `M4.4` và admin shell.
+  `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI; mã task
+  không đổi để giữ ổn định lịch sử tham chiếu.
+- `M9.4` và `M9.5` là `UI + API`: mỗi task phải kết thúc bằng flow học sinh bấm
+  kiểm thử được, không tách UI sang `M9.8` hoặc một task chưa xác định.
+- `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3`, `M9.1` và đi
+  sau `M9.5` để nhận context từ `Chat thêm với AI`; `M9.7` đi sau `M9.6`.
 - `M13.5` admin dashboard có thể dùng placeholder cho metric chưa có API, nhưng phải ghi rõ.
 - `M3.6` cần enrollment thật từ `M8.3` và worker foundation `M4.3`; không được kích hoạt clone trước khi job hoàn tất.
 - `M3.7` cần `M3.6`; `M7.8` cần `M3.6`, `M7.1`, `M7.5`; `M11.5` cần `M7.8`, `M11.1`, `M11.2`.

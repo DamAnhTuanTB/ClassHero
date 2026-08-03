@@ -71,6 +71,8 @@ Side effects:
 - Tạo `background_jobs` queue `AI_GENERATION`.
 - Tạo `ai_generations` type `QUIZ`.
 - Enqueue AI job.
+- Worker lưu set/item vào cùng schema CRUD quản trị với `source=AI`,
+  `reviewStatus=NEEDS_REVIEW`; mỗi item có `sourceMetadataJson` cho admin.
 
 #### `PATCH /admin/quiz-sets/:quizSetId`
 
@@ -564,6 +566,11 @@ Body:
 
 Response: `202 Accepted` với `jobId`.
 
+Behavior:
+
+- Flashcard AI sinh `front`, `back`, `explanation`, difficulty và provenance;
+  không sinh/ghi `hintJson` legacy.
+
 #### `PATCH /admin/flashcard-sets/:setId`
 
 Role: `ADMIN`.
@@ -787,6 +794,11 @@ Body:
 
 Response: `202 Accepted` với `jobId`.
 
+Behavior:
+
+- Worker validate đủ bốn question shape, tỷ lệ difficulty và item provenance
+  trước khi lưu atomically với `source=AI`, `reviewStatus=NEEDS_REVIEW`.
+
 #### `PATCH /admin/test-sets/:testSetId`
 
 Role: `ADMIN`.
@@ -954,7 +966,10 @@ Behavior:
   mỗi mệnh đề đúng nhận `P / N`, mệnh đề sai nhận 0; tổng điểm câu không dùng
   all-or-nothing.
 - Lưu attempt answers.
-- Chỉ chấm/lưu attempt và trả `passed`; chưa cập nhật best/completion.
+- Trả `passed`; nếu đạt `lesson.completion_min_score`, cùng transaction sẽ
+  cập nhật best attempt nếu tốt hơn và upsert lesson completion.
+- Attempt chưa đạt chỉ được lưu vào lịch sử; không hủy completion, không
+  đổi `completedAt` hoặc best attempt đã có.
 - Client có thể gửi marker unanswered khi timer tự nộp; câu đó nhận 0 điểm.
 
 #### `GET /student/test-attempts/:attemptId/review?scope=ALL|INCORRECT`
@@ -968,26 +983,13 @@ Behavior:
   `MULTI_STATEMENT_TRUE_FALSE`, response có kết quả và điểm nhận được theo từng
   `statementId`; `isCorrect` của cả câu chỉ true khi mọi mệnh đề đều đúng.
 
-#### `POST /student/test-attempts/:attemptId/use-result`
-
-Role: `STUDENT`.
-
-Behavior:
-
-- Chỉ nhận attempt đã submit của chính student và đạt
-  `lesson.completion_min_score`.
-- Trong transaction, so sánh score cao hơn rồi duration thấp hơn; cập nhật
-  `is_best_for_lesson`, `lesson_progress` và completion idempotently.
-- Response trả Completion, best attempt và Top 5. Attempt không đạt bị từ chối
-  với `TEST_SCORE_BELOW_COMPLETION_THRESHOLD`.
-
 #### `GET /student/lessons/:lessonId/leaderboard/top-tests`
 
 Role: `STUDENT`.
 
 Behavior:
 
-- Trả tối đa 5 best result đã được student lựa chọn, sort score giảm dần,
+- Trả tối đa 5 best result được hệ thống tự động ghi nhận, sort score giảm dần,
   duration tăng dần rồi thời điểm submit.
 
 #### `POST /student/lessons/:lessonId/test-sets/request-new`

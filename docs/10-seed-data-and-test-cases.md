@@ -349,6 +349,8 @@ ASSUMPTION: Seed dev có thể tạo document_chunks không embedding để test
 - Best attempt chọn điểm cao hơn.
 - Nếu điểm bằng, best attempt chọn thời gian nhanh hơn.
 - Score >= 7 đánh dấu lesson completed.
+- Sau khi đã có một attempt đạt, submit attempt mới dưới 7 vẫn giữ lesson
+  completed, `completed_at` và best attempt trước đó.
 - XP không cộng trùng cho cùng lesson.
 
 ### 9.8. AI/RAG

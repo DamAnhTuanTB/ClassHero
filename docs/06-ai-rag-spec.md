@@ -63,12 +63,34 @@ export interface AiProvider {
 
   generateStructured<TOutput>(
     input: AiStructuredInput,
-    schema: unknown,
-  ): Promise<TOutput>;
+    schema: ZodType<TOutput>,
+  ): Promise<AiStructuredOutput<TOutput>>;
 
   createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput>;
 }
 ```
+
+`AiStructuredOutput<TOutput>` trả cả dữ liệu đã validate và metadata provider:
+
+```ts
+interface AiStructuredOutput<TOutput> {
+  data: TOutput;
+  provider: AiProviderName;
+  model: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+  providerRequestId?: string;
+  latencyMs?: number;
+}
+```
+
+OpenAI provider dùng strict JSON Schema do SDK chuyển từ Zod, sau đó backend
+parse lại `output_parsed` bằng chính Zod schema. Hai lớp này không thay thế nhau:
+JSON Schema hướng model tạo đúng shape, còn Zod là cổng tin cậy cuối cùng trước
+khi worker được phép gọi logic lưu domain.
 
 Types gợi ý:
 
@@ -127,6 +149,15 @@ Mục đích:
 - biết prompt/schema nào đã tạo nội dung,
 - hỗ trợ regenerate có kiểm soát,
 - theo dõi chi phí.
+
+### 2.4. Model routing và provider accounting
+
+- `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST` resolve model chính/dự phòng từ `ai_feature_model_configs`; job chụp route snapshot khi enqueue để không đổi model giữa chừng.
+- OpenAI là primary, Gemini là fallback khi có credential. Fallback chỉ chạy cho timeout, 429 và 5xx; lỗi schema/Zod, business hoặc safety không được gọi model thứ hai.
+- Embedding không đi qua màn Cài đặt AI: vẫn cố định OpenAI model/dimension của vector space hiện tại.
+- Mỗi provider attempt ghi `provider_usage_events` với model, price version, token/page, latency, USD/VND và quan hệ job/generation/document.
+- Bảng giá được nhập thủ công từ nguồn chính thức, có ngày hiệu lực; không scrape tự động và không tính lại lịch sử bằng giá mới.
+- Budget mặc định cảnh báo mềm ở 70/90/100%; hard stop chỉ có hiệu lực khi admin chủ động bật.
 
 ---
 
@@ -405,6 +436,9 @@ AI generation dùng document chunks để bám đúng buổi học, nhưng khôn
 - Lưu source chunk/page metadata ở mức item để truy vết nội bộ: generated item này dựa trên phần kiến thức nào, không phải để chứng minh đã copy từ trang đó.
 - UI cho học sinh không cần hiển thị source page cho quiz/test mặc định. Source page hữu ích hơn cho admin review, debug AI generation, report sai câu và chat Q&A theo tài liệu.
 - Validation/prompt guard cần reject hoặc yêu cầu regenerate nếu output lặp lại nguyên văn câu hỏi/bài tập từ context ở mức quá giống.
+- M9.3 hiện reject khi phần nội dung chính của item chứa một chuỗi liên tiếp từ
+  12 token đã xuất hiện trong context retrieval; đồng thời mọi
+  `sourceChunkIds` phải thuộc đúng tập chunks đã đưa vào lần generate đó.
 
 ### 5.1. Summary generation
 
@@ -438,6 +472,21 @@ Output schema:
 ```
 
 Backend chuyển output sang `lesson_summaries.content_json` tương thích Tiptap nếu cần.
+
+Summary context rules:
+
+- `documentIds` là các `lesson_documents.id` active, `READY`, thuộc đúng
+  `lessonId` và đã có `document_chunks`.
+- API/worker chỉ truyền ordered chunk text vào provider, không truyền raw PDF,
+  object-storage URL hoặc toàn bộ tài liệu cấp learning path/chapter.
+- Tổng context cho một summary request giới hạn `12.000` tokens ước tính; vượt
+  ngưỡng phải fail `AI_CONTEXT_TOO_LARGE`, không âm thầm cắt mất phần cuối bài.
+- API lưu `sourceHash`; worker tải lại chunks và fail
+  `AI_SOURCE_CONTEXT_STALE` nếu tài liệu đổi trong lúc job đang chờ.
+- Chỉ một job `SUMMARY` `QUEUED`/`RUNNING` được active trên một lesson. Job
+  terminal không chặn admin regenerate.
+- AI summary được map sang Tiptap rồi upsert với `source = AI`,
+  `review_status = NEEDS_REVIEW` và liên kết `ai_generation_id`.
 
 ### 5.2. Quiz generation
 
@@ -917,6 +966,10 @@ Khi cần AI generation:
 3. Enqueue BullMQ job với `backgroundJobId` và `aiGenerationId`.
 4. Trả `jobId = background_jobs.id` cho client nếu job async.
 
+Foundation `M9.1` tạo hai record trong cùng transaction. Nếu enqueue Redis lỗi,
+`background_jobs` và `ai_generations` đều phải chuyển sang `FAILED`; idempotency
+key hợp lệ phải trả lại cặp record đang có thay vì enqueue thêm lần nữa.
+
 ### 10.4. Worker xử lý
 
 1. Update `background_jobs.status = RUNNING`.
@@ -928,6 +981,12 @@ Khi cần AI generation:
 7. Update `background_jobs.result_json` với resource type/id.
 8. Update statuses `SUCCEEDED`.
 9. Nếu lỗi, update `FAILED`, lưu `error_message`.
+
+Processor phải tách `generate` và `persist` thành hai bước theo đúng thứ tự.
+`persist` chỉ được gọi sau khi provider trả output đã qua strict JSON Schema và
+Zod. Refusal, output rỗng hoặc schema-invalid là lỗi không recoverable trong
+foundation để không vừa lưu dữ liệu sai vừa retry tốn phí; lỗi timeout/network
+tạm thời vẫn đi qua retry BullMQ.
 
 ### 10.5. Retry
 

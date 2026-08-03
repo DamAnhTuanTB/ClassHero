@@ -63,7 +63,7 @@ export function StudentCourseDetailProgressCard({
       <div className="mt-5">
         <StudentLessonTransitionLink
           lessonId={detail.continueLessonId}
-          className="student-learn-cta-3d inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-lg font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
+          className="student-learn-cta-3d inline-flex min-h-12 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-lg font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
         >
           <Play className="h-7 w-7 shrink-0 fill-current" aria-hidden="true" />
           {lessonCopy.actionLabel}

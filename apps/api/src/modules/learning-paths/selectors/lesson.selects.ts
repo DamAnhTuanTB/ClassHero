@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { LessonProgressStatus, Prisma } from "@prisma/client";
 
 export const lessonSelect = {
   id: true,
@@ -20,4 +20,13 @@ export const lessonSelect = {
   updatedById: true,
   createdAt: true,
   updatedAt: true,
+  _count: {
+    select: {
+      progressEntries: {
+        where: {
+          status: LessonProgressStatus.COMPLETED,
+        },
+      },
+    },
+  },
 } satisfies Prisma.LessonSelect;

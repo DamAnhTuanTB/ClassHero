@@ -13,12 +13,14 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Embedding và retrieval theo lesson](features/embedding-retrieval.md) | OpenAI embedding, durable worker, pgvector isolation, hybrid search và token budget                  | `M5.1`-`M5.4`  | Đã cập nhật |
 | [Quiz, flashcard và test](features/quiz-flashcard-test.md)            | Rich content, CRUD, student runner, prerequisite, review, best/completion và Top 5                    | `M6.1`-`M7.5`  | Đã cập nhật |
 | [Student course browsing](features/student-course-browsing.md)        | Student danh sách/khám phá/chi tiết lộ trình nối public API thật                                     | `M3.5`         | Đã cập nhật |
+| [Cài đặt AI và provider operations](features/ai-provider-operations.md) | Model routing, Gemini fallback, OCR retry, price snapshot, usage, budget và admin UI                  | `M9.9-M9.11`, `M4.6` | Đã cập nhật |
 
 ## Foundation Notes
 
 | Note                                                                                     | Chủ đề                                                                        | Task liên quan    | Trạng thái  |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------- | ----------- |
 | [API foundation](foundation/api-foundation.md)                                           | NestJS env validation, global validation, error envelope, Swagger, logger     | `M2.1`            | Đã cập nhật |
+| [AI structured output và durable jobs](foundation/ai-structured-output-jobs.md)          | OpenAI structured output, Zod gate, durable jobs và lesson summary handler    | `M9.1`, `M9.2`    | Đã cập nhật |
 | [Codex notification and Telegram control](foundation/codex-notification-and-telegram.md) | macOS notification, Telegram notification/control, LaunchAgent, transcript    | Codex tooling     | Đã cập nhật |
 | [Frontend bundle isolation](foundation/frontend-bundle-isolation.md)                     | Tách bundle/CSS/provider theo route group khi admin và client chung Next app  | Performance audit | Đã cập nhật |
 | [Fullscreen media layout](foundation/fullscreen-media-layout.md)                         | Full-bleed mobile và fullscreen fallback không bị transform/overflow cắt      | `M7.1`, `M15.1`   | Đã cập nhật |

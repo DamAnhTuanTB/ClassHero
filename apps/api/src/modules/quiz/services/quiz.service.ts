@@ -113,6 +113,57 @@ export class QuizService {
     });
   }
 
+  async reviewQuizSet(
+    setId: string,
+    userId: string,
+    input: { reviewStatus: ReviewStatus },
+    context: RequestContext,
+  ) {
+    const current = await this.prisma.quizSet.findUnique({
+      where: { id: setId, deletedAt: null },
+      select: { id: true, reviewStatus: true },
+    });
+    if (!current) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
+    }
+    return this.prisma.$transaction(async (transaction) => {
+      const questions = await transaction.quizQuestion.findMany({
+        where: { quizSetId: setId, deletedAt: null },
+        select: { explanationId: true },
+      });
+      await transaction.quizQuestion.updateMany({
+        where: { quizSetId: setId, deletedAt: null },
+        data: { reviewStatus: input.reviewStatus },
+      });
+      const explanationIds = questions.flatMap((question) =>
+        question.explanationId ? [question.explanationId] : [],
+      );
+      if (explanationIds.length > 0) {
+        await transaction.aiExplanation.updateMany({
+          where: { id: { in: explanationIds } },
+          data: { reviewStatus: input.reviewStatus },
+        });
+      }
+      const updated = await transaction.quizSet.update({
+        where: { id: setId },
+        data: { reviewStatus: input.reviewStatus, updatedById: userId },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "QUIZ_SET_REVIEWED",
+          entityType: "QuizSet",
+          entityId: setId,
+          before: toInputJson(current),
+          after: toInputJson({ id: updated.id, reviewStatus: updated.reviewStatus }),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return updated;
+    });
+  }
+
   async deleteQuizSet(setId: string, userId: string, _context: RequestContext) {
     const set = await this.prisma.quizSet.findUnique({
       where: { id: setId, deletedAt: null },

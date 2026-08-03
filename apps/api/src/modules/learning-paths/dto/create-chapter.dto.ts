@@ -2,23 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PublishStatus } from "@prisma/client";
 import {
   IsEnum,
-  IsInt,
   IsObject,
   IsOptional,
   IsString,
-  Max,
   MaxLength,
-  Min,
   MinLength,
 } from "class-validator";
 
 export class CreateChapterDto {
-  @ApiProperty({ example: 1, minimum: 1 })
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  orderIndex!: number;
-
   @ApiProperty({ example: "Chương 1: Số hữu tỉ", minLength: 2, maxLength: 180 })
   @IsString()
   @MinLength(2)

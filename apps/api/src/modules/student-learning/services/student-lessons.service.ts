@@ -141,30 +141,83 @@ export class StudentLessonsService {
   }
 
   private async getLessonNavigation(learningPathId: string, lessonId: string) {
-    const lessons = await this.prisma.lesson.findMany({
-      where: {
-        learningPathId,
-        deletedAt: null,
-        status: "PUBLISHED",
-        chapter: {
+    const [chapters, topLevelLessons] = await Promise.all([
+      this.prisma.learningPathChapter.findMany({
+        where: {
+          learningPathId,
           deletedAt: null,
           status: "PUBLISHED",
         },
-      },
-      orderBy: [{ chapter: { orderIndex: "asc" } }, { orderIndex: "asc" }],
-      select: {
-        id: true,
-        title: true,
-        orderIndex: true,
-        chapter: {
-          select: {
-            id: true,
-            title: true,
-            orderIndex: true,
+        select: {
+          id: true,
+          orderIndex: true,
+          title: true,
+          lessons: {
+            where: { deletedAt: null, status: "PUBLISHED" },
+            orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              title: true,
+              orderIndex: true,
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.lesson.findMany({
+        where: {
+          learningPathId,
+          chapterId: null,
+          deletedAt: null,
+          status: "PUBLISHED",
+        },
+        orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          title: true,
+          orderIndex: true,
+        },
+      }),
+    ]);
+    const structureItems = [
+      ...chapters.map((chapter) => ({
+        type: "CHAPTER" as const,
+        orderIndex: chapter.orderIndex,
+        chapter,
+      })),
+      ...topLevelLessons.map((lesson) => ({
+        type: "LESSON" as const,
+        orderIndex: lesson.orderIndex,
+        lesson,
+      })),
+    ]
+      .sort(
+        (left, right) =>
+          left.orderIndex - right.orderIndex || left.type.localeCompare(right.type),
+      );
+    const lessons: Array<{
+      id: string;
+      title: string;
+      orderIndex: number;
+      chapter: { id: string; title: string; orderIndex: number } | null;
+    }> = [];
+
+    for (const item of structureItems) {
+      if (item.type === "LESSON") {
+        lessons.push({ ...item.lesson, chapter: null });
+        continue;
+      }
+
+      lessons.push(
+        ...item.chapter.lessons.map((lesson) => ({
+          ...lesson,
+          chapter: {
+            id: item.chapter.id,
+            title: item.chapter.title,
+            orderIndex: item.chapter.orderIndex,
+          },
+        })),
+      );
+    }
     const currentIndex = lessons.findIndex((lesson) => lesson.id === lessonId);
     return {
       previous: currentIndex > 0 ? lessons[currentIndex - 1] : null,

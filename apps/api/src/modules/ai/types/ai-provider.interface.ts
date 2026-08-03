@@ -18,6 +18,8 @@ import type {
 } from "#api/modules/ai/types/ai-embedding.types";
 import type {
   AiStructuredInput,
+  AiStructuredOutput,
+  AiOutputSchema,
   AiTextInput,
   AiTextOutput,
 } from "#api/modules/ai/types/ai-text.types";
@@ -31,14 +33,14 @@ export interface AiProvider {
   /** Tạo embedding vectors cho danh sách texts. */
   createEmbedding(input: AiEmbeddingInput): Promise<AiEmbeddingOutput>;
 
-  /** Tạo text completion. Implementation đầy đủ ở M9.1. */
+  /** Tạo text completion và trả metadata usage/provider. */
   generateText(input: AiTextInput): Promise<AiTextOutput>;
 
-  /** Tạo structured output có validate schema. Implementation đầy đủ ở M9.1. */
+  /** Tạo structured output, bắt buộc parse lại qua Zod trước khi trả. */
   generateStructured<TOutput>(
     input: AiStructuredInput,
-    schema: unknown,
-  ): Promise<TOutput>;
+    schema: AiOutputSchema<TOutput>,
+  ): Promise<AiStructuredOutput<TOutput>>;
 }
 
 /** Map lưu trữ các provider đã register. */

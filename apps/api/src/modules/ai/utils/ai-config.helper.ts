@@ -16,6 +16,7 @@ export interface AiEmbeddingConfig {
 
 export interface AiOpenAiConfig {
   apiKey: string;
+  requestTimeoutMs: number;
   structuredModel: string;
   chatModel: string;
   embeddingModel: string;
@@ -38,6 +39,9 @@ export function getOpenAiConfig(
 
   return {
     apiKey,
+    requestTimeoutMs: configService.get("AI_PROVIDER_TIMEOUT_MS", {
+      infer: true,
+    }),
     structuredModel: configService.get("OPENAI_STRUCTURED_MODEL", {
       infer: true,
     }),

@@ -1223,12 +1223,13 @@ test("flashcard unknown retry returns to its result after confirming back", asyn
 
   await page.getByRole("button", { name: "Bắt đầu" }).click();
   await page.getByRole("button", { name: "Chưa thuộc" }).click();
+  await page.getByRole("button", { name: "Hoàn thành" }).click();
   await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
 
   await page.getByRole("button", { name: "Ôn lại thẻ chưa thuộc" }).click();
-  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Thẻ 1", exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Thẻ 1/1" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Thẻ 1", exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Thẻ 1: chưa đánh dấu" }),
   ).toHaveAttribute("aria-current", "step");
@@ -1241,6 +1242,47 @@ test("flashcard unknown retry returns to its result after confirming back", asyn
   await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ôn lại thẻ chưa thuộc" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toHaveCount(0);
+});
+
+test("browser back from a reopened flashcard result returns to the lesson detail", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    flashcardCompleted: true,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Xem lại", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
+  await expect(page).toHaveURL(/learningSurface=flashcard-result/);
+
+  await page.goBack();
+
+  await expect(page).toHaveURL(`/student/lessons/${lessonId}?tab=flashcard`);
+  await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toHaveCount(0);
+});
+
+test("browser back from a newly completed flashcard result returns to the lesson detail", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
+
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+  await page.getByRole("button", { name: "Đã thuộc" }).click();
+  await page.getByRole("button", { name: "Hoàn thành" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Flashcard" })).toBeVisible();
+
+  await page.goBack();
+
+  await expect(page).toHaveURL(`/student/lessons/${lessonId}?tab=flashcard`);
+  await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toBeVisible();
 });
 
 test("flashcard continues at the last card even before any progress is saved", async ({
@@ -3407,6 +3449,7 @@ async function setupStudentLearningApiMock(
       pathname === "/student/test-attempts/test-attempt-m7/submit"
     ) {
       testSubmitted = true;
+      testCompleted ||= Boolean(options.testPasses);
       return fulfillJson(route, 200, {
         data: {
           id: "test-attempt-m7",
@@ -3417,36 +3460,6 @@ async function setupStudentLearningApiMock(
           correctCount: options.testPasses ? 1 : 0,
           wrongCount: options.testPasses ? 0 : 1,
           totalCount: 1,
-        },
-      });
-    }
-    if (
-      method === "POST" &&
-      pathname === "/student/test-attempts/test-attempt-m7/use-result"
-    ) {
-      testCompleted = true;
-      return fulfillJson(route, 200, {
-        data: {
-          lessonId,
-          usedAttemptId: "test-attempt-m7",
-          promotedToBest: true,
-          status: "COMPLETED",
-          completedAt: new Date().toISOString(),
-          bestAttempt: {
-            id: "test-attempt-m7",
-            score: 10,
-            durationSeconds: 45,
-          },
-          leaderboard: [
-            {
-              rank: 1,
-              attemptId: "test-attempt-m7",
-              studentName: "Học sinh M7",
-              score: 10,
-              durationSeconds: 45,
-              isCurrentStudent: true,
-            },
-          ],
         },
       });
     }

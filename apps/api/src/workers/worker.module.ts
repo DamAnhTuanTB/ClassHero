@@ -16,6 +16,12 @@ import { ImageExtractionService } from "#api/workers/services/image-extraction.s
 import { PersonalLearningPathCloneProcessor } from "#api/workers/processors/personal-learning-path-clone.processor";
 import { PersonalLearningPathCloneWorkerService } from "#api/workers/services/personal-learning-path-clone-worker.service";
 import { PersonalLearningPathClonerService } from "#api/workers/services/personal-learning-path-cloner.service";
+import { AiGenerationProcessor } from "#api/workers/processors/ai-generation.processor";
+import { AiGenerationExecutionService } from "#api/workers/services/ai-generation-execution.service";
+import { AiGenerationWorkerService } from "#api/workers/services/ai-generation-worker.service";
+import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
+import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
+import { ProviderOperationsModule } from "#api/modules/provider-operations/provider-operations.module";
 
 @Module({
   imports: [
@@ -25,6 +31,7 @@ import { PersonalLearningPathClonerService } from "#api/workers/services/persona
       validate: validateEnv,
     }),
     PrismaModule,
+    ProviderOperationsModule,
     AiModule,
     FilesModule,
   ],
@@ -41,7 +48,11 @@ import { PersonalLearningPathClonerService } from "#api/workers/services/persona
     PersonalLearningPathCloneProcessor,
     PersonalLearningPathCloneWorkerService,
     PersonalLearningPathClonerService,
+    AiGenerationProcessor,
+    AiGenerationExecutionService,
+    AiGenerationWorkerService,
+    LessonSummaryGenerationService,
+    LessonContentGenerationService,
   ],
 })
 export class WorkerModule {}
-

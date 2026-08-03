@@ -1,7 +1,7 @@
 # ADR-0004 - Learning path chapters
 
 Date: 2026-07-10
-Status: Accepted
+Status: Superseded by ADR-0012
 
 ## Context
 
@@ -34,3 +34,5 @@ Chapter không có video, tài liệu/PDF riêng, lesson summary riêng, quiz, f
 - Admin UI cần quản lý chapter trong màn chi tiết lộ trình trước khi quản lý lesson.
 - File upload, document chunks, RAG, AI generation, quiz, flashcard, test, progress và chat vẫn gắn với lesson.
 - Các task M1.3, M3.2, M3.4, M3.5 là nhóm bị ảnh hưởng trực tiếp.
+
+Quyết định bắt buộc mọi lesson thuộc chapter đã được thay thế bởi `ADR-0012-optional-learning-path-chapters.md`. Chapter vẫn giữ vai trò metadata/tổng quan nhưng không còn là lớp bắt buộc.

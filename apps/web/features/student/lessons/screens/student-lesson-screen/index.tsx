@@ -547,7 +547,7 @@ function LearningPanelSkeleton() {
     <section
       aria-busy="true"
       aria-label="Đang tải nội dung"
-      className="min-h-56 animate-pulse rounded-[1.5rem] border border-[var(--theme-skeleton-strong)] bg-white p-4 dark:bg-[var(--theme-surface)] sm:p-5"
+      className="min-h-56 animate-pulse rounded-[1.5rem] bg-white p-4 dark:bg-[var(--theme-surface)] sm:p-5"
     >
       <div className="flex items-center gap-3">
         <div className="h-11 w-11 rounded-2xl bg-[var(--theme-skeleton)]" />

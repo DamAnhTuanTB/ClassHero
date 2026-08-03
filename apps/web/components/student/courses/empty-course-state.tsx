@@ -73,7 +73,7 @@ function StudentCourseListSkeleton({
       {Array.from({ length: 3 }, (_, index) => (
         <div
           key={index}
-          className="overflow-hidden rounded-2xl border border-[var(--theme-skeleton-strong)] bg-white dark:bg-[var(--theme-surface)] sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]"
+          className="overflow-hidden rounded-2xl bg-white dark:bg-[var(--theme-surface)] sm:grid sm:grid-cols-[10rem_minmax(0,1fr)]"
         >
           <SkeletonBlock className="aspect-[16/9] rounded-none sm:aspect-auto sm:h-full" />
           <div className="space-y-3 p-4">
@@ -110,7 +110,7 @@ function StudentCourseDetailSkeleton({
       {Array.from({ length: 3 }, (_, index) => (
         <div
           key={index}
-          className="rounded-2xl border border-[var(--theme-skeleton-strong)] bg-white p-4 dark:bg-[var(--theme-surface)]"
+          className="rounded-2xl bg-white p-4 dark:bg-[var(--theme-surface)]"
         >
           <SkeletonBlock className="h-5 w-2/5 rounded-full" />
           <SkeletonBlock className="mt-4 h-14 rounded-xl" />

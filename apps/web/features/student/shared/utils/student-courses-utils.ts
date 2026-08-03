@@ -331,11 +331,13 @@ function getAudienceRibbonTone(audience: TargetAudienceOption): AudienceRibbonTo
 export function filterStudentCourses({
   courses,
   domainId,
+  domainName,
   query,
   targetAudienceId,
 }: {
   courses: StudentCourse[];
   domainId: string | null;
+  domainName: string | null;
   query: string;
   targetAudienceId: string | null;
 }) {
@@ -344,7 +346,11 @@ export function filterStudentCourses({
   return courses.filter((course) => {
     const matchesTargetAudience =
       targetAudienceId === null || course.targetAudienceIds.includes(targetAudienceId);
-    const matchesDomain = domainId === null || course.domainId === domainId;
+    const matchesDomain =
+      domainId === null ||
+      course.domainId === domainId ||
+      (domainName !== null &&
+        normalizeSearchableText(course.subject) === normalizeSearchableText(domainName));
     const matchesQuery =
       !normalizedQuery ||
       normalizeSearchableText(

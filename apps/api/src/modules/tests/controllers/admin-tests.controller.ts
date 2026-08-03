@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -21,6 +23,9 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
+import { LessonContentGenerationJobService } from "#api/modules/ai/services/lesson-content-generation-job.service";
+import { ReviewContentSetDto } from "#api/modules/ai/types/review-content-set.dto";
+import { GenerateTestDto } from "#api/modules/tests/dto/generate-test.dto";
 import {
   CreateTestSetDto,
   TestQuestionContentDto,
@@ -38,12 +43,25 @@ export class AdminTestsController {
   constructor(
     @Inject(TestsService)
     private readonly testsService: TestsService,
+    @Inject(LessonContentGenerationJobService)
+    private readonly generationJobs: LessonContentGenerationJobService,
   ) {}
 
   @Get("lessons/:lessonId/test-sets")
   @ApiOperation({ summary: "List test sets in a lesson" })
   listSets(@Param("lessonId") lessonId: string) {
     return this.testsService.listSetsByLesson(lessonId);
+  }
+
+  @Post("lessons/:lessonId/test-sets/generate-ai")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Queue AI generation for a test set" })
+  generate(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GenerateTestDto,
+  ) {
+    return this.generationJobs.queueTest(lessonId, user.id, dto);
   }
 
   @Post("lessons/:lessonId/test-sets")
@@ -71,6 +89,17 @@ export class AdminTestsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.testsService.updateSet(setId, user.id, dto, getRequestContext(request));
+  }
+
+  @Post("test-sets/:setId/review")
+  @ApiOperation({ summary: "Review a test set and its generated content" })
+  reviewSet(
+    @Param("setId") setId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ReviewContentSetDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.testsService.reviewSet(setId, user.id, dto, getRequestContext(request));
   }
 
   @Delete("test-sets/:setId")

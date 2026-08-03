@@ -35,13 +35,15 @@ export function serializeStudentLessonContent(
     access: {
       mode: access.mode,
     },
-    chapter: {
-      id: record.chapter.id,
-      orderIndex: record.chapter.orderIndex,
-      title: record.chapter.title,
-      overview: record.chapter.overview,
-    },
-    learningPath: record.chapter.learningPath,
+    chapter: record.chapter
+      ? {
+          id: record.chapter.id,
+          orderIndex: record.chapter.orderIndex,
+          title: record.chapter.title,
+          overview: record.chapter.overview,
+        }
+      : null,
+    learningPath: record.learningPath,
     materials: record.materials.map((material) => ({
       id: material.id,
       type: material.type,

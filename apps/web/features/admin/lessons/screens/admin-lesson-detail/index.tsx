@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAdminLesson } from "../../hooks/use-admin-lesson";
 import {
   BookOpen,
+  Bot,
   FileText,
   Layers,
   ChevronRight,
@@ -83,6 +84,7 @@ const adminNavItems: AdminCoursesSidebarItem[] = [
   { label: "Khóa học", icon: Layers3, active: true },
   { label: "Buổi học", icon: BookOpen, active: false },
   { label: "Tài liệu", icon: FileText, active: false },
+  { label: "Cài đặt AI", icon: Bot, active: false, href: "/admin/ai-settings" },
 ];
 
 export function AdminLessonDetailManager({

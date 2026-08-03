@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { SourceDocumentRangePreview } from "@/components/admin/courses/source-document-range-preview";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -17,6 +17,7 @@ import type {
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { suggestLessonPageRange } from "@/features/admin/courses/utils/suggest-lesson-page-range";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 export function LessonSourceExtractionBlock({
   disabled,
@@ -33,11 +34,13 @@ export function LessonSourceExtractionBlock({
   sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]>;
   onRemove: () => void;
 }) {
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const sourceDocumentId =
     form.watch(`sourceDocumentExtractions.${index}.sourceDocumentId`) ?? "";
   const pageStart = form.watch(`sourceDocumentExtractions.${index}.pageStart`) ?? "";
   const pageEnd = form.watch(`sourceDocumentExtractions.${index}.pageEnd`) ?? "";
   const lessonTitle = form.watch("title") ?? "";
+  const debouncedLessonTitle = useDebouncedValue(lessonTitle);
   const selectedSourceDocument =
     sourceDocuments.find((document) => document.id === sourceDocumentId) ?? null;
   const pages = sourcePagesByDocumentId[sourceDocumentId] ?? [];
@@ -59,8 +62,8 @@ export function LessonSourceExtractionBlock({
       ? `Tài liệu chỉ có ${pageLimit} trang.`
       : null;
   const suggestedRange = useMemo(
-    () => suggestLessonPageRange(lessonTitle, pages),
-    [lessonTitle, pages],
+    () => suggestLessonPageRange(debouncedLessonTitle, pages),
+    [debouncedLessonTitle, pages],
   );
   const startField = form.register(`sourceDocumentExtractions.${index}.pageStart`, {
     onChange: () => markInteractedAndValidate(form, index),
@@ -158,6 +161,7 @@ export function LessonSourceExtractionBlock({
                 suggestedRange.end,
                 { shouldDirty: true, shouldValidate: true },
               );
+              setIsPreviewExpanded(true);
               markInteractedAndValidate(form, index);
             }}
           >
@@ -201,9 +205,11 @@ export function LessonSourceExtractionBlock({
       </div>
 
       <SourceDocumentRangePreview
+        expanded={isPreviewExpanded}
         pages={previewPages}
         sourceDocument={selectedSourceDocument}
         warning={rangeWarning}
+        onExpandedChange={setIsPreviewExpanded}
       />
     </div>
   );

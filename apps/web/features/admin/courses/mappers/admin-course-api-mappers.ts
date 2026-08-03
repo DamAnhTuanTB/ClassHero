@@ -10,7 +10,17 @@ import type {
 } from "@/features/admin/courses/types/admin-course-api-types";
 
 export function mapLearningPath(path: AdminLearningPathApi): AdminLearningPath {
-  const chapters = (path.chapters ?? []).map(mapChapter);
+  const fallbackChapters = (path.chapters ?? []).map(mapChapter);
+  const structureItems = path.structureItems
+    ? path.structureItems.map((item) =>
+        item.type === "CHAPTER"
+          ? { type: item.type, ...mapChapter(item) }
+          : { type: item.type, ...mapLesson(item) },
+      )
+    : fallbackChapters.map((chapter) => ({ type: "CHAPTER" as const, ...chapter }));
+  const chapters = structureItems
+    .filter((item) => item.type === "CHAPTER")
+    .map(({ type: _type, ...chapter }) => chapter);
   const primaryTargetAudience =
     path.targetAudiences.find((audience) => audience.grade !== null) ??
     path.targetAudiences[0];
@@ -45,6 +55,7 @@ export function mapLearningPath(path: AdminLearningPathApi): AdminLearningPath {
     sortOrder: path.sortOrder,
     updatedAt: path.updatedAt,
     chapters,
+    structureItems,
   };
 }
 
@@ -78,6 +89,7 @@ export function mapLesson(lesson: AdminLessonApi): AdminLesson {
     completionMinScore: lesson.completionMinScore,
     trialEnabled: lesson.trialEnabled ?? false,
     status: lesson.status,
+    hasStudentCompletion: lesson.hasStudentCompletion ?? false,
     customVideoSettings: lesson.customVideoSettings,
   };
 }

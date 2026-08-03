@@ -11,7 +11,7 @@ Mỗi lộ trình tương ứng với một Lĩnh vực và một hoặc nhiều
 - Lý 8.
 - Hóa 9.
 
-Mỗi lộ trình gồm nhiều chương học được sắp xếp theo thứ tự. Mỗi chương học gồm nhiều buổi học/bài học được sắp xếp theo thứ tự. Học sinh học lần lượt từng chương và từng buổi cho đến hết lộ trình.
+Mỗi lộ trình gồm các buổi học/bài học được sắp xếp theo thứ tự. Chương học là lớp nhóm tùy chọn: admin có thể tạo khóa chỉ gồm các buổi học không thuộc chương, khóa chỉ dùng chương chứa buổi học, hoặc kết hợp cả hai. Học sinh học lần lượt các buổi cho đến hết lộ trình.
 
 MVP tập trung vào việc giúp:
 
@@ -31,7 +31,8 @@ MVP tập trung vào việc giúp:
 - Chỉ làm các môn: Toán, Lý, Hóa.
 - Có các role: Admin, Student, Parent.
 - Có lộ trình học theo môn và khối lớp.
-- Mỗi lộ trình có nhiều chương học; mỗi chương có nhiều buổi học.
+- Mỗi lộ trình có nhiều buổi học; mỗi buổi có thể thuộc một chương hoặc không thuộc chương nào.
+- Chương học là lớp nhóm tùy chọn và có thể không tồn tại trong một khóa học.
 - Admin có thể tạo một bản lộ trình cá nhân riêng tư từ khóa học mà học sinh đã mua để chỉnh sửa độc lập cho đúng học sinh đó.
 - Có học thử ở buổi học cụ thể do admin bật.
 - Có thanh toán QR/đối soát tự động bằng payOS.
@@ -89,6 +90,7 @@ Admin có quyền:
 - Dùng AI tạo flashcard.
 - Tạo, sửa, xóa bài kiểm tra.
 - Dùng AI tạo câu hỏi bài kiểm tra.
+- Cấu hình model chính/dự phòng cho từng chức năng AI, xem bảng giá/usage AI và OCR, đặt ngân sách và xem audit thay đổi; không xem hoặc sửa API key trên UI.
 - Tạo hoặc cập nhật lời giải chi tiết cho từng câu bằng AI.
 - Xem và xử lý report lỗi.
 - Xem, sửa, duyệt hoặc ẩn nội dung AI chưa duyệt.
@@ -167,8 +169,11 @@ Quy tắc liên kết:
 ### 4.1. Lộ trình học
 
 - Mỗi lộ trình gắn với một môn và một khối lớp.
-- Mỗi lộ trình gồm nhiều chương học theo thứ tự.
-- Mỗi chương học gồm nhiều buổi học theo thứ tự.
+- Mỗi lộ trình gồm nhiều buổi học theo thứ tự; buổi học có thể thuộc một chương hoặc nằm trực tiếp trong lộ trình.
+- Chương học là lớp nhóm tùy chọn. Một lộ trình có thể không có chương, hoặc có cả chương và các buổi học không thuộc chương.
+- Cấu trúc top-level của khóa học là một danh sách có thứ tự chung gồm chapter và lesson không thuộc chapter; hai loại có thể xen kẽ tùy ý.
+- Admin có thể di chuyển lesson tới bất kỳ vị trí nào trong cùng chapter, sang chapter khác, ra top-level hoặc từ top-level vào chapter.
+- Giới hạn bảo toàn tiến độ: sau một thao tác move, lesson đang di chuyển không được đứng trước bất kỳ lesson khác đã có ít nhất một học sinh hoàn thành. Các lesson đã có completion tạo thành mốc khóa thứ tự; backend kiểm tra authoritative.
 - Lộ trình có thể có giá gốc, giá sau khuyến mãi và mã giảm giá.
 - Học thử được bật/tắt ở từng buổi học cụ thể, không cấu hình ở cấp lộ trình.
 - Sau khi thanh toán thành công, enrollment có hạn 12 tháng.
@@ -189,7 +194,7 @@ Quy tắc liên kết:
 
 ### 4.2. Chương học
 
-Chương học là lớp nhóm nội dung trong một lộ trình. Mỗi chương chỉ chứa thông tin tổng quan:
+Chương học là lớp nhóm nội dung tùy chọn trong một lộ trình. Khóa học không bắt buộc phải có chương. Mỗi chương chỉ chứa thông tin tổng quan:
 
 - Tên chương học.
 - Thứ tự trong lộ trình.
@@ -205,6 +210,7 @@ ASSUMPTION: Ở MVP, chương học chỉ dùng để chia cấu trúc và giả
 
 Mỗi buổi học gồm:
 
+- Chương học tùy chọn; để trống khi buổi nằm trực tiếp trong lộ trình.
 - Tên buổi học.
 - Loại buổi học: học cơ bản hoặc học live; mặc định là học cơ bản.
 - Link học live tùy chọn khi loại buổi học là học live.
@@ -235,10 +241,13 @@ Nhưng chưa được làm bài kiểm tra.
 Ở MVP, tiêu chí hoàn thành buổi học là:
 
 - Học sinh đạt điểm bài kiểm tra từ 7/10 trở lên.
+- Chỉ cần một attempt đã nộp từng đạt ngưỡng thì buổi học giữ trạng thái
+  hoàn thành; các lần thi lại chưa đạt không hủy tiến độ đã có.
 - Hai nút `Bài học trước` và `Bài học kế tiếp` luôn xuất hiện ở cuối trang
   lesson. Ở bài đầu tiên, nút trái đổi thành `Trở về` và dẫn về chi tiết khóa
   học; từ bài thứ hai, nút này là `Bài học trước`. Nút kế tiếp chỉ bật khi có
-  bài đứng sau và bài thi hiện tại đạt ngưỡng hoàn thành của lesson.
+  bài đứng sau và học sinh đã từng nộp một bài thi đạt ngưỡng hoàn
+  thành của lesson.
 
 ASSUMPTION: Nếu một buổi học có nhiều bộ đề/bài kiểm tra, kết quả dùng để xét hoàn thành là kết quả tốt nhất của học sinh trong buổi học.
 

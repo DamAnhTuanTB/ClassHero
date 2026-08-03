@@ -5,7 +5,6 @@ import {
   BookOpen,
   FileText,
   Link2,
-  ListOrdered,
   Loader2,
   SlidersHorizontal,
   Trophy,
@@ -87,25 +86,14 @@ export function LessonEditor({
         className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto"
       >
         <div className="min-w-0 space-y-3 p-4 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
-            <TextField
-              id="admin-lesson-order"
-              label="Thứ tự"
-              inputMode="numeric"
-              icon={<ListOrdered className="h-5 w-5" aria-hidden="true" />}
-              error={form.formState.errors.orderIndex}
-              disabled={disabled || isSaving}
-              {...form.register("orderIndex", { setValueAs: toNumericFormValue })}
-            />
-            <TextField
-              id="admin-lesson-title"
-              label="Tên buổi học"
-              icon={<FileText className="h-5 w-5" aria-hidden="true" />}
-              error={form.formState.errors.title}
-              disabled={disabled || isSaving}
-              {...form.register("title")}
-            />
-          </div>
+          <TextField
+            id="admin-lesson-title"
+            label="Tên buổi học"
+            icon={<FileText className="h-5 w-5" aria-hidden="true" />}
+            error={form.formState.errors.title}
+            disabled={disabled || isSaving}
+            {...form.register("title")}
+          />
           <div className="grid gap-3 sm:grid-cols-2">
             <OptionField
               id="admin-lesson-type"

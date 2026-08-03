@@ -50,19 +50,19 @@ export const studentLessonContentSelect = {
   customVideoSettings: true,
   completionMinScore: true,
   trialEnabled: true,
+  learningPath: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+    },
+  },
   chapter: {
     select: {
       id: true,
       orderIndex: true,
       title: true,
       overview: true,
-      learningPath: {
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-        },
-      },
     },
   },
   materials: {

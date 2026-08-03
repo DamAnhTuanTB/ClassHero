@@ -353,17 +353,3 @@ export type LeaderboardEntry = {
   durationSeconds: number;
   isCurrentStudent: boolean;
 };
-
-export type CompletionResult = {
-  lessonId: string;
-  usedAttemptId: string;
-  promotedToBest: boolean;
-  status: "COMPLETED";
-  completedAt: string;
-  bestAttempt: {
-    id: string;
-    score: number;
-    durationSeconds: number;
-  } | null;
-  leaderboard: LeaderboardEntry[];
-};

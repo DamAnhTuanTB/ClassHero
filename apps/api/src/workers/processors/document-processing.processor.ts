@@ -1,9 +1,10 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   BackgroundJobQueue,
   BackgroundJobStatus,
   DocumentStatus,
   Prisma,
+  ProviderCatalogCategory,
 } from "@prisma/client";
 import { Job, UnrecoverableError } from "bullmq";
 import { ConfigService } from "@nestjs/config";
@@ -49,6 +50,7 @@ import {
   scorePageQualityWithConfidence,
 } from "#api/workers/utils/quality-score";
 import { chunkText } from "#api/workers/utils/chunking";
+import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 
 const PAID_OCR_TEXT_SOURCE = "paid_ocr";
 
@@ -137,6 +139,9 @@ export class DocumentProcessingProcessor {
     private readonly imageExtraction: ImageExtractionService,
     @Inject(EmbeddingJobEnqueuer)
     private readonly embeddingEnqueuer: EmbeddingJobEnqueuer,
+    @Optional()
+    @Inject(ProviderUsageService)
+    private readonly providerUsage?: ProviderUsageService,
   ) {}
 
   async process(
@@ -253,6 +258,7 @@ export class DocumentProcessingProcessor {
       select: {
         id: true,
         fileId: true,
+        metadataJson: true,
         file: {
           select: {
             id: true,
@@ -267,6 +273,10 @@ export class DocumentProcessingProcessor {
       objectKey: sourceDoc.file.objectKey,
       originalName: sourceDoc.file.originalName ?? "document.pdf",
       ownerId: sourceDocId,
+      ownerType: "SOURCE_DOCUMENT",
+      ownerMetadata: sourceDoc.metadataJson,
+      backgroundJobId: record.id,
+      sourceDocumentId: sourceDocId,
       onProgress: async (progress) => {
         await this.prisma.backgroundJob.update({
           where: { id: record.id },
@@ -342,6 +352,7 @@ export class DocumentProcessingProcessor {
         status: DocumentStatus.READY,
         processedAt: new Date(),
         metadataJson: this.toJson({
+          ...asRecord(sourceDoc.metadataJson),
           ocr: this.buildOcrMetadata(ocr),
           contentHash: ocr.contentHash,
           pageCount: ocr.pageCount,
@@ -699,6 +710,9 @@ export class DocumentProcessingProcessor {
       originalName:
         lessonDoc.file.originalName ?? lessonDoc.title ?? "lesson-document.pdf",
       ownerId: lessonDoc.id,
+      ownerType: "LESSON_DOCUMENT",
+      ownerMetadata: lessonDoc.metadataJson,
+      backgroundJobId: record.id,
       onProgress: async (progress) => {
         await this.prisma.backgroundJob.update({
           where: { id: record.id },
@@ -1092,11 +1106,19 @@ export class DocumentProcessingProcessor {
     objectKey,
     originalName,
     ownerId,
+    ownerType,
+    ownerMetadata,
+    backgroundJobId,
+    sourceDocumentId,
     onProgress,
   }: {
     objectKey: string;
     originalName: string;
     ownerId: string;
+    ownerType: "SOURCE_DOCUMENT" | "LESSON_DOCUMENT";
+    ownerMetadata: Prisma.JsonValue | null;
+    backgroundJobId: string;
+    sourceDocumentId?: string;
     onProgress?: (progress: number) => Promise<void>;
   }): Promise<OcrProcessingResult> {
     this.logger.log(`Downloading PDF from storage: ${objectKey}`);
@@ -1118,33 +1140,114 @@ export class DocumentProcessingProcessor {
     let bundle: OcrArtifactBundle;
     let manifest: OcrArtifactCacheManifest;
 
+    const catalogItem = this.providerUsage
+      ? await this.prisma.providerCatalogItem.findFirst({
+          where: {
+            category: ProviderCatalogCategory.OCR_SERVICE,
+            provider: { equals: provider, mode: "insensitive" },
+          },
+          select: { id: true },
+        })
+      : null;
+    const activePrice = catalogItem && this.providerUsage
+      ? await this.providerUsage.getActiveRates(catalogItem.id)
+      : { priceVersionId: null, rates: [] };
+
     if (cacheHit) {
       this.logger.log("Loading OCR artifacts from cache...");
       if (onProgress) {
-        // Giả lập tiến độ chạy % để UI có thể hiển thị khi lấy từ cache
-        for (let i = 10; i <= 100; i += 30) {
-          await onProgress(i);
-          await new Promise((resolve) => setTimeout(resolve, 600));
-        }
+        await onProgress(100);
       }
       const cached = await this.artifactCache.loadBundle(descriptor);
       bundle = cached;
       manifest = cached.manifest;
+      if (this.providerUsage) {
+        const event = await this.providerUsage.start({
+          category: ProviderCatalogCategory.OCR_SERVICE,
+          provider: provider.toUpperCase(),
+          catalogItemId: catalogItem?.id,
+          priceVersionId: activePrice.priceVersionId,
+          backgroundJobId,
+          sourceDocumentId,
+          cacheStatus: "HIT",
+        });
+        await this.providerUsage.succeed(event.id, {
+          pages: pageCount,
+          requestCount: 0,
+          rates: activePrice.rates,
+          savedCost: true,
+        });
+      }
     } else if (ocrEnabled) {
-      this.logger.log("Cache miss — submitting to Mathpix...");
+      await this.providerUsage?.assertBudgetAllows(
+        ProviderCatalogCategory.OCR_SERVICE,
+      );
+      this.logger.log("Cache miss — submitting to Mathpix or resuming its pdf_id...");
       const startTime = Date.now();
-      const { pdfId } = await this.mathpixOcr.submitPdf(pdfBuffer, originalName);
-      const { numPages } = await this.mathpixOcr.pollUntilComplete(
-        pdfId,
-        15 * 60 * 1000,
-        onProgress,
-      );
-      bundle = await this.mathpixOcr.downloadAllArtifacts(
-        pdfId,
-        numPages || pageCount,
-        startTime,
-      );
-      manifest = await this.artifactCache.saveBundle(descriptor, bundle);
+      const runtime = asRecord(asRecord(ownerMetadata).ocrRuntime);
+      const canResume =
+        readString(runtime, "contentHash") === contentHash &&
+        Boolean(readString(runtime, "pdfId"));
+      let pdfId = canResume ? readString(runtime, "pdfId")! : "";
+      let usageEventId = canResume ? readString(runtime, "usageEventId") : null;
+      if (!usageEventId && this.providerUsage) {
+        const usageEvent = await this.providerUsage.start({
+          category: ProviderCatalogCategory.OCR_SERVICE,
+          provider: provider.toUpperCase(),
+          catalogItemId: catalogItem?.id,
+          priceVersionId: activePrice.priceVersionId,
+          backgroundJobId,
+          sourceDocumentId,
+          cacheStatus: "MISS",
+        });
+        usageEventId = usageEvent.id;
+      }
+
+      try {
+        if (!pdfId) {
+          pdfId = (await this.mathpixOcr.submitPdf(pdfBuffer, originalName)).pdfId;
+          await this.persistOcrRuntime(ownerType, ownerId, ownerMetadata, {
+            pdfId,
+            usageEventId,
+            contentHash,
+            status: "SUBMITTED",
+            submittedAt: new Date().toISOString(),
+          });
+        }
+        const { numPages } = await this.mathpixOcr.pollUntilComplete(
+          pdfId,
+          15 * 60 * 1000,
+          onProgress,
+        );
+        bundle = await this.mathpixOcr.downloadAllArtifacts(
+          pdfId,
+          numPages || pageCount,
+          startTime,
+        );
+        manifest = await this.artifactCache.saveBundle(descriptor, bundle);
+        if (usageEventId && this.providerUsage) {
+          await this.providerUsage.succeed(usageEventId, {
+            pages: numPages || pageCount,
+            requestCount: 1,
+            rates: activePrice.rates,
+            latencyMs: Date.now() - startTime,
+            providerRequestId: pdfId,
+            rawUsage: { pages: numPages || pageCount },
+          });
+        }
+        await this.persistOcrRuntime(ownerType, ownerId, ownerMetadata, {
+          pdfId,
+          usageEventId,
+          contentHash,
+          status: "COMPLETED",
+          completedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        if (usageEventId && this.providerUsage) {
+          await this.providerUsage.fail(usageEventId, error);
+        }
+        throw error;
+      }
     } else {
       throw new UnrecoverableError(
         "Paid OCR is disabled (OCR_PAID_ENABLED=false) and no cached artifacts found. " +
@@ -1204,6 +1307,29 @@ export class DocumentProcessingProcessor {
       mmdZip: bundle.mmdZip,
       linesJson: bundle.linesJson,
     };
+  }
+
+  private async persistOcrRuntime(
+    ownerType: "SOURCE_DOCUMENT" | "LESSON_DOCUMENT",
+    ownerId: string,
+    ownerMetadata: Prisma.JsonValue | null,
+    runtime: Record<string, unknown>,
+  ) {
+    const metadataJson = this.toJson({
+      ...asRecord(ownerMetadata),
+      ocrRuntime: runtime,
+    });
+    if (ownerType === "SOURCE_DOCUMENT") {
+      await this.prisma.sourceDocument.update({
+        where: { id: ownerId },
+        data: { metadataJson },
+      });
+      return;
+    }
+    await this.prisma.lessonDocument.update({
+      where: { id: ownerId },
+      data: { metadataJson },
+    });
   }
 
   private buildOcrMetadata(ocr: OcrProcessingResult) {

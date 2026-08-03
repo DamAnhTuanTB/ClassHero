@@ -1,5 +1,6 @@
 import type {
   AdminChapter,
+  AdminCourseStructureItem,
   AdminLearningPath,
   AdminLesson,
 } from "@/features/admin/courses/admin-courses-data";
@@ -46,7 +47,7 @@ export type AdminCourseDetailStats = {
 };
 
 export type LessonMatch = {
-  chapter: AdminChapter;
+  chapter: AdminChapter | null;
   lesson: AdminLesson;
 };
 
@@ -109,7 +110,6 @@ export function toLessonFormValues(
   existingSupplements?: AdminLessonDocumentApi[],
 ): LessonFormValues {
   return {
-    orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription,
     lessonType: lesson.lessonType,
@@ -141,9 +141,10 @@ export function toLessonFormValues(
   };
 }
 
-export function toLessonPayload(values: LessonFormValues): Omit<AdminLesson, "id"> {
+export function toLessonPayload(
+  values: LessonFormValues,
+): Omit<AdminLesson, "id" | "orderIndex"> {
   return {
-    orderIndex: Number(values.orderIndex),
     title: values.title.trim(),
     shortDescription: values.shortDescription?.trim() ?? "",
     lessonType: values.lessonType,
@@ -195,7 +196,6 @@ export function resolveFoundationDocumentSortOrder(
 
 export function toChapterFormValues(chapter: AdminChapter): ChapterFormValues {
   return {
-    orderIndex: chapter.orderIndex,
     title: chapter.title,
     overview: chapter.overview,
     objectives: chapter.objectives,
@@ -205,9 +205,8 @@ export function toChapterFormValues(chapter: AdminChapter): ChapterFormValues {
 
 export function toChapterPayload(
   values: ChapterFormValues,
-): Omit<AdminChapter, "id" | "lessons"> {
+): Omit<AdminChapter, "id" | "lessons" | "orderIndex"> {
   return {
-    orderIndex: Number(values.orderIndex),
     title: values.title.trim(),
     overview: values.overview?.trim() ?? "",
     objectives: values.objectives?.trim() ?? "",
@@ -261,7 +260,112 @@ export function reindexLessons(lessons: AdminLesson[]) {
 }
 
 export function getLessonsFromPath(path: AdminLearningPath) {
-  return path.chapters.flatMap((chapter) => chapter.lessons);
+  const topLevelLessons = getCourseStructureItems(path)
+    .filter((item) => item.type === "LESSON")
+    .map((item) => item as AdminLesson & { type: "LESSON" });
+  return [...topLevelLessons, ...path.chapters.flatMap((chapter) => chapter.lessons)];
+}
+
+export function getCourseStructureItems(
+  path: AdminLearningPath,
+): AdminCourseStructureItem[] {
+  return (
+    path.structureItems ??
+    path.chapters.map((chapter) => ({ type: "CHAPTER" as const, ...chapter }))
+  );
+}
+
+export function getCourseStructureDisplayOrders(path: AdminLearningPath) {
+  const chapterById = new Map<string, number>();
+  const lessonById = new Map<string, number>();
+  let chapterNumber = 0;
+  let lessonNumber = 0;
+
+  for (const item of getCourseStructureItems(path)) {
+    if (item.type === "LESSON") {
+      lessonById.set(item.id, ++lessonNumber);
+      continue;
+    }
+
+    chapterById.set(item.id, ++chapterNumber);
+    for (const lesson of item.lessons) {
+      lessonById.set(lesson.id, ++lessonNumber);
+    }
+  }
+
+  return { chapterById, lessonById };
+}
+
+export function getLessonsInContainer(path: AdminLearningPath, chapterId: string | null) {
+  if (chapterId) {
+    return path.chapters.find((chapter) => chapter.id === chapterId)?.lessons ?? [];
+  }
+
+  return getCourseStructureItems(path).filter(
+    (item): item is AdminLesson & { type: "LESSON" } => item.type === "LESSON",
+  );
+}
+
+export function canMoveLessonToPosition(
+  path: AdminLearningPath,
+  lessonId: string,
+  chapterId: string | null,
+  targetOrderIndex: number,
+) {
+  const movingMatch = findLessonMatch(path, lessonId);
+  if (!movingMatch) {
+    return false;
+  }
+  if (
+    (movingMatch.chapter?.id ?? null) === chapterId &&
+    movingMatch.lesson.orderIndex === targetOrderIndex
+  ) {
+    return true;
+  }
+
+  const structureItems = getCourseStructureItems(path)
+    .filter((item) => item.id !== lessonId)
+    .map((item) =>
+      item.type === "CHAPTER"
+        ? {
+            ...item,
+            lessons: item.lessons.filter((lesson) => lesson.id !== lessonId),
+          }
+        : item,
+    );
+
+  if (chapterId === null) {
+    structureItems.splice(
+      normalizeUiInsertIndex(targetOrderIndex, structureItems.length),
+      0,
+      { type: "LESSON", ...movingMatch.lesson, chapterId: null },
+    );
+  } else {
+    const destination = structureItems.find(
+      (item) => item.type === "CHAPTER" && item.id === chapterId,
+    );
+    if (!destination || destination.type !== "CHAPTER") {
+      return false;
+    }
+    destination.lessons.splice(
+      normalizeUiInsertIndex(targetOrderIndex, destination.lessons.length),
+      0,
+      { ...movingMatch.lesson, chapterId },
+    );
+  }
+
+  const flattenedLessons = structureItems.flatMap((item) =>
+    item.type === "LESSON" ? [item] : item.lessons,
+  );
+  const movedIndex = flattenedLessons.findIndex((lesson) => lesson.id === lessonId);
+
+  return !flattenedLessons
+    .slice(movedIndex + 1)
+    .some((lesson) => lesson.hasStudentCompletion);
+}
+
+function normalizeUiInsertIndex(targetOrderIndex: number, currentLength: number) {
+  return Math.min(Math.max(targetOrderIndex, 1), currentLength + 1) - 1;
 }
 
 export function getActiveLearningPaths(paths: AdminLearningPath[]) {
@@ -282,9 +386,9 @@ export function filterAndSortLearningPaths(
       !keyword ||
       path.title.toLowerCase().includes(keyword) ||
       path.subject.toLowerCase().includes(keyword) ||
-      (path.targetAudienceNames ?? [path.targetAudienceName ?? `Khối ${path.grade}`]).some(
-        (audienceName) => audienceName.toLowerCase().includes(keyword),
-      );
+      (
+        path.targetAudienceNames ?? [path.targetAudienceName ?? `Khối ${path.grade}`]
+      ).some((audienceName) => audienceName.toLowerCase().includes(keyword));
     const matchesDomain =
       filters.domainFilter === "ALL" || path.domainId === filters.domainFilter;
     const matchesStatus =
@@ -354,6 +458,13 @@ export function findLessonMatch(
     }
   }
 
+  const topLevelLesson = (path.structureItems ?? []).find(
+    (item) => item.type === "LESSON" && item.id === lessonId,
+  );
+  if (topLevelLesson?.type === "LESSON") {
+    return { chapter: null, lesson: topLevelLesson };
+  }
+
   return null;
 }
 
@@ -389,7 +500,7 @@ export function formatDateTime(value: string) {
     return "Chưa đặt";
   }
 
-  return `${padDatePart(dateParts.day)}/${padDatePart(dateParts.month)}/${dateParts.year} ${padDatePart(dateParts.hour)}:${padDatePart(dateParts.minute)}`;
+  return `${padDatePart(dateParts.hour)}:${padDatePart(dateParts.minute)} ${padDatePart(dateParts.day)}-${padDatePart(dateParts.month)}-${dateParts.year}`;
 }
 
 export function isAllowedVideoUrl(value: string) {

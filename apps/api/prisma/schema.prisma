@@ -273,6 +273,48 @@ enum BackgroundJobStatus {
   CANCELLED
 }
 
+enum ProviderCatalogCategory {
+  AI_MODEL
+  OCR_SERVICE
+}
+
+enum ProviderCatalogStatus {
+  ACTIVE
+  DEPRECATED
+  DISABLED
+}
+
+enum ProviderBillingMode {
+  TOKEN
+  PAGE
+  REQUEST
+}
+
+enum ProviderUsageMetric {
+  INPUT_TOKEN
+  CACHED_INPUT_TOKEN
+  OUTPUT_TOKEN
+  PAGE
+  REQUEST
+}
+
+enum ProviderUsageStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ProviderUsageSource {
+  MEASURED
+  RECONSTRUCTED
+}
+
+enum ProviderBudgetScope {
+  ALL
+  AI
+  OCR
+}
+
 model User {
   id                          String                    @id @default(uuid()) @db.Uuid
   role                        UserRole
@@ -462,6 +504,7 @@ model BackgroundJob {
   lessonDocuments LessonDocument[]    @relation("LessonDocumentProcessingJob")
   sourceDocuments SourceDocument[]    @relation("SourceDocumentProcessingJob")
   aiGenerations   AiGeneration[]      @relation("AiGenerationBackgroundJob")
+  providerUsageEvents ProviderUsageEvent[] @relation("ProviderUsageBackgroundJob")
   resourceType    String?             @map("resource_type")
   resourceId      String?             @map("resource_id") @db.Uuid
   inputMeta       Json?               @map("input_meta_json")
@@ -608,8 +651,8 @@ model Lesson {
   personalizedCopies     Lesson[]                  @relation("PersonalLearningPathLessonSource")
   learningPathId         String                    @map("learning_path_id") @db.Uuid
   learningPath           LearningPath              @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  chapterId              String                    @map("chapter_id") @db.Uuid
-  chapter                LearningPathChapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapterId              String?                   @map("chapter_id") @db.Uuid
+  chapter                LearningPathChapter?      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   orderIndex             Int                       @map("order_index")
   title                  String
   shortDescription       String?                   @map("short_description")
@@ -659,6 +702,7 @@ model Lesson {
   @@unique([chapterId, orderIndex])
   @@index([sourceLessonId])
   @@index([chapterId, status])
+  @@index([learningPathId, chapterId, orderIndex])
   @@index([learningPathId, status])
   @@index([scheduledAt])
   @@index([examOpenAt])
@@ -707,6 +751,7 @@ model SourceDocument {
   pages           SourceDocumentPage[]
   pageRanges      LessonDocumentPageRange[]
   lessonDocuments LessonDocument[]          @relation("LessonDocumentSourceDocument")
+  providerUsageEvents ProviderUsageEvent[]   @relation("ProviderUsageSourceDocument")
 
   @@index([learningPathId])
   @@index([status])
@@ -946,6 +991,7 @@ model QuizQuestion {
   correctAnswerJson Json                @map("correct_answer_json")
   hintJson          Json?               @map("hint_json")
   gradingConfigJson Json?               @map("grading_config_json")
+  sourceMetadataJson Json?              @map("source_metadata_json")
   difficulty        Difficulty          @default(MEDIUM)
   reviewStatus      ReviewStatus        @default(APPROVED) @map("review_status")
   explanationId     String?             @map("explanation_id") @db.Uuid
@@ -1053,6 +1099,7 @@ model Flashcard {
   frontJson         Json                        @map("front_json")
   backJson          Json                        @map("back_json")
   hintJson          Json?                       @map("hint_json")
+  sourceMetadataJson Json?                      @map("source_metadata_json")
   explanationId     String?                     @map("explanation_id") @db.Uuid
   explanation       AiExplanation?              @relation("FlashcardExplanation", fields: [explanationId], references: [id], onDelete: SetNull)
   difficulty        Difficulty                  @default(MEDIUM)
@@ -1183,6 +1230,7 @@ model TestQuestion {
   correctAnswerJson Json                @map("correct_answer_json")
   hintJson          Json?               @map("hint_json")
   gradingConfigJson Json?               @map("grading_config_json")
+  sourceMetadataJson Json?              @map("source_metadata_json")
   points            Decimal?            @db.Decimal(5, 2)
   difficulty        Difficulty          @default(MEDIUM)
   reviewStatus      ReviewStatus        @default(APPROVED) @map("review_status")
@@ -1486,6 +1534,7 @@ model AiGeneration {
   explanations      AiExplanation[]
   chatMessages      AiChatMessage[]
   summaries         ConversationSummary[]
+  providerUsageEvents ProviderUsageEvent[] @relation("ProviderUsageAiGeneration")
 
   @@index([lessonId, type, status])
   @@index([backgroundJobId])
@@ -1493,6 +1542,161 @@ model AiGeneration {
   @@index([createdByUserId])
   @@index([status])
   @@map("ai_generations")
+}
+
+model ProviderCatalogItem {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  category              ProviderCatalogCategory
+  provider              String
+  externalKey           String                  @map("external_key")
+  displayName           String                  @map("display_name")
+  capabilitiesJson      Json?                   @map("capabilities_json")
+  status                ProviderCatalogStatus   @default(ACTIVE)
+  deprecationNote       String?                 @map("deprecation_note") @db.Text
+  credentialEnvVar      String?                 @map("credential_env_var")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  priceVersions         ProviderPriceVersion[]
+  primaryConfigurations AiFeatureModelConfig[]  @relation("AiFeaturePrimaryCatalogItem")
+  fallbackConfigurations AiFeatureModelConfig[] @relation("AiFeatureFallbackCatalogItem")
+  usageEvents           ProviderUsageEvent[]
+
+  @@unique([category, provider, externalKey])
+  @@index([category, status])
+  @@index([provider, status])
+  @@map("provider_catalog_items")
+}
+
+model ProviderPriceVersion {
+  id                 String                @id @default(uuid()) @db.Uuid
+  catalogItemId      String                @map("catalog_item_id") @db.Uuid
+  catalogItem        ProviderCatalogItem   @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+  billingMode        ProviderBillingMode   @map("billing_mode")
+  currency           String                @default("USD")
+  sourceUrl          String?               @map("source_url")
+  effectiveFrom      DateTime              @map("effective_from")
+  effectiveTo        DateTime?             @map("effective_to")
+  createdByUserId    String?               @map("created_by_user_id") @db.Uuid
+  createdAt          DateTime              @default(now()) @map("created_at")
+  rates              ProviderPriceRate[]
+  usageEvents        ProviderUsageEvent[]
+
+  @@index([catalogItemId, effectiveFrom])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("provider_price_versions")
+}
+
+model ProviderPriceRate {
+  id                 String                @id @default(uuid()) @db.Uuid
+  priceVersionId     String                @map("price_version_id") @db.Uuid
+  priceVersion       ProviderPriceVersion  @relation(fields: [priceVersionId], references: [id], onDelete: Cascade)
+  metric             ProviderUsageMetric
+  unitSize           Decimal               @default(1) @map("unit_size") @db.Decimal(20, 6)
+  unitPriceUsd       Decimal               @map("unit_price_usd") @db.Decimal(20, 10)
+  tierFrom           Int?                  @map("tier_from")
+  tierTo             Int?                  @map("tier_to")
+  conditionsJson     Json?                 @map("conditions_json")
+  createdAt          DateTime              @default(now()) @map("created_at")
+
+  @@index([priceVersionId, metric])
+  @@map("provider_price_rates")
+}
+
+model AiFeatureModelConfig {
+  id                    String               @id @default(uuid()) @db.Uuid
+  feature               AiGenerationType     @unique
+  primaryCatalogItemId  String               @map("primary_catalog_item_id") @db.Uuid
+  primaryCatalogItem    ProviderCatalogItem  @relation("AiFeaturePrimaryCatalogItem", fields: [primaryCatalogItemId], references: [id], onDelete: Restrict)
+  fallbackCatalogItemId String?              @map("fallback_catalog_item_id") @db.Uuid
+  fallbackCatalogItem   ProviderCatalogItem? @relation("AiFeatureFallbackCatalogItem", fields: [fallbackCatalogItemId], references: [id], onDelete: SetNull)
+  temperature           Decimal?             @db.Decimal(4, 3)
+  maxOutputTokens       Int?                 @map("max_output_tokens")
+  version               Int                  @default(1)
+  updatedByUserId       String?              @map("updated_by_user_id") @db.Uuid
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  @@index([primaryCatalogItemId])
+  @@index([fallbackCatalogItemId])
+  @@map("ai_feature_model_configs")
+}
+
+model ProviderUsageEvent {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  category              ProviderCatalogCategory
+  provider              String
+  catalogItemId         String?                @map("catalog_item_id") @db.Uuid
+  catalogItem           ProviderCatalogItem?   @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+  priceVersionId        String?                @map("price_version_id") @db.Uuid
+  priceVersion          ProviderPriceVersion?  @relation(fields: [priceVersionId], references: [id], onDelete: SetNull)
+  aiGenerationId        String?                @map("ai_generation_id") @db.Uuid
+  aiGeneration          AiGeneration?          @relation("ProviderUsageAiGeneration", fields: [aiGenerationId], references: [id], onDelete: SetNull)
+  backgroundJobId       String?                @map("background_job_id") @db.Uuid
+  backgroundJob         BackgroundJob?         @relation("ProviderUsageBackgroundJob", fields: [backgroundJobId], references: [id], onDelete: SetNull)
+  sourceDocumentId      String?                @map("source_document_id") @db.Uuid
+  sourceDocument        SourceDocument?        @relation("ProviderUsageSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  feature               AiGenerationType?
+  attempt               Int                    @default(1)
+  providerRequestId     String?                @map("provider_request_id")
+  status                ProviderUsageStatus    @default(RUNNING)
+  source                ProviderUsageSource    @default(MEASURED)
+  cacheStatus           String?                @map("cache_status")
+  promptTokens          Int                    @default(0) @map("prompt_tokens")
+  cachedInputTokens     Int                    @default(0) @map("cached_input_tokens")
+  completionTokens      Int                    @default(0) @map("completion_tokens")
+  totalTokens           Int                    @default(0) @map("total_tokens")
+  pages                 Int                    @default(0)
+  requestCount          Int                    @default(1) @map("request_count")
+  rawUsageJson          Json?                  @map("raw_usage_json")
+  estimatedCostUsd      Decimal                @default(0) @map("estimated_cost_usd") @db.Decimal(20, 10)
+  costVnd               Int                    @default(0) @map("cost_vnd")
+  fxRateVndPerUsd       Decimal                @default(25000) @map("fx_rate_vnd_per_usd") @db.Decimal(12, 4)
+  estimatedSavedCostUsd Decimal                @default(0) @map("estimated_saved_cost_usd") @db.Decimal(20, 10)
+  estimatedSavedCostVnd Int                    @default(0) @map("estimated_saved_cost_vnd")
+  latencyMs             Int?                   @map("latency_ms")
+  errorCode             String?                @map("error_code")
+  startedAt             DateTime               @default(now()) @map("started_at")
+  finishedAt            DateTime?              @map("finished_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([category, createdAt])
+  @@index([provider, catalogItemId, createdAt])
+  @@index([feature, createdAt])
+  @@index([status, createdAt])
+  @@index([aiGenerationId])
+  @@index([backgroundJobId])
+  @@index([sourceDocumentId])
+  @@map("provider_usage_events")
+}
+
+model ProviderBudgetPolicy {
+  id                 String              @id @default(uuid()) @db.Uuid
+  scope              ProviderBudgetScope @unique
+  monthlyLimitVnd    Int                 @map("monthly_limit_vnd")
+  warningThresholds  Json                @default("[70,90,100]") @map("warning_thresholds_json")
+  hardStop           Boolean             @default(false) @map("hard_stop")
+  version            Int                 @default(1)
+  updatedByUserId    String?             @map("updated_by_user_id") @db.Uuid
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  @@map("provider_budget_policies")
+}
+
+model ProviderAccountingSetting {
+  id                 String   @id @default(uuid()) @db.Uuid
+  singletonKey       String   @unique @default("default") @map("singleton_key")
+  timezone           String   @default("Asia/Ho_Chi_Minh")
+  weekStartsOn       Int      @default(1) @map("week_starts_on")
+  fxRateVndPerUsd    Decimal  @default(25000) @map("fx_rate_vnd_per_usd") @db.Decimal(12, 4)
+  priceFreshnessDays Int      @default(90) @map("price_freshness_days")
+  version            Int      @default(1)
+  updatedByUserId    String?  @map("updated_by_user_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("provider_accounting_settings")
 }
 
 model AiExplanation {

@@ -11,16 +11,27 @@ import type {
 } from "@/features/admin/courses/types/admin-course-document-types";
 
 export function SourceDocumentRangePreview({
+  expanded,
   pages,
   sourceDocument,
   warning,
+  onExpandedChange,
 }: {
+  expanded?: boolean;
   pages: AdminSourceDocumentPageApi[];
   sourceDocument: AdminSourceDocumentApi | null;
   warning?: string | null;
+  onExpandedChange?: (expanded: boolean) => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
   const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
+  const isExpanded = expanded ?? internalExpanded;
+
+  const toggleExpanded = () => {
+    const nextExpanded = !isExpanded;
+    setInternalExpanded(nextExpanded);
+    onExpandedChange?.(nextExpanded);
+  };
 
   return (
     <div className="min-w-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 py-3">
@@ -57,7 +68,7 @@ export function SourceDocumentRangePreview({
             </div>
             <button
               type="button"
-              onClick={() => setIsExpanded((current) => !current)}
+              onClick={toggleExpanded}
               className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-bold text-[var(--theme-primary)] transition hover:bg-[var(--theme-surface-hover)] sm:min-h-9"
             >
               {isExpanded ? (

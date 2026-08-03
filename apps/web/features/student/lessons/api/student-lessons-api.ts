@@ -2,7 +2,6 @@ import { apiRequest } from "@/lib/api-client";
 import type { ApiRequestOptions } from "@/lib/api-client";
 import type {
   AssessmentReview,
-  CompletionResult,
   FlashcardProgressSummary,
   FlashcardHistory,
   FlashcardStudySession,
@@ -227,13 +226,6 @@ export function reviewStudentTest(
   return apiRequest<AssessmentReview & StudentTestResult>(
     `/student/test-attempts/${encodeURIComponent(attemptId)}/review?scope=${scope}`,
     { token },
-  );
-}
-
-export function useStudentTestResult(attemptId: string, token: string) {
-  return apiRequest<CompletionResult>(
-    `/student/test-attempts/${encodeURIComponent(attemptId)}/use-result`,
-    { method: "POST", token },
   );
 }
 

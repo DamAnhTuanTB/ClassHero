@@ -232,19 +232,24 @@ export class MathpixOcrService {
         `html.zip=${(htmlZip.length / 1024).toFixed(0)}KB`,
     );
 
-    try {
-      const debugDir = path.join(process.cwd(), "debug", "mathpix", pdfId);
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
+    if (
+      this.configService.get("OCR_DEBUG_ARTIFACTS_ENABLED", { infer: true }) &&
+      this.configService.get("NODE_ENV", { infer: true }) !== "production"
+    ) {
+      try {
+        const debugDir = path.join(process.cwd(), "debug", "mathpix", pdfId);
+        if (!fs.existsSync(debugDir)) {
+          fs.mkdirSync(debugDir, { recursive: true });
+        }
+        fs.writeFileSync(path.join(debugDir, "artifact.mmd"), mmd);
+        fs.writeFileSync(path.join(debugDir, "artifact.md"), md);
+        fs.writeFileSync(path.join(debugDir, "artifact.mmd.zip"), mmdZip);
+        fs.writeFileSync(path.join(debugDir, "artifact.lines.json"), linesJson);
+        fs.writeFileSync(path.join(debugDir, "artifact.html.zip"), htmlZip);
+        this.logger.log(`[DEBUG] Saved raw Mathpix artifacts to ${debugDir}`);
+      } catch (error) {
+        this.logger.error("Failed to save debug Mathpix artifacts", error);
       }
-      fs.writeFileSync(path.join(debugDir, "artifact.mmd"), mmd);
-      fs.writeFileSync(path.join(debugDir, "artifact.md"), md);
-      fs.writeFileSync(path.join(debugDir, "artifact.mmd.zip"), mmdZip);
-      fs.writeFileSync(path.join(debugDir, "artifact.lines.json"), linesJson);
-      fs.writeFileSync(path.join(debugDir, "artifact.html.zip"), htmlZip);
-      this.logger.log(`[DEBUG] Saved raw Mathpix artifacts to ${debugDir}`);
-    } catch (err) {
-      this.logger.error("Failed to save debug Mathpix artifacts", err);
     }
 
     return {

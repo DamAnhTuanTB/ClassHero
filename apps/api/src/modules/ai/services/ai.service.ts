@@ -24,6 +24,8 @@ import {
 } from "#api/modules/ai/types/ai-provider.interface";
 import type {
   AiStructuredInput,
+  AiStructuredOutput,
+  AiOutputSchema,
   AiTextInput,
   AiTextOutput,
 } from "#api/modules/ai/types/ai-text.types";
@@ -131,7 +133,7 @@ export class AiService {
 
   /**
    * Tạo text completion bằng provider chỉ định.
-   * TODO: M9.1 sẽ thêm logic chọn provider, logging, budget guard.
+   * Provider trả usage/model/request-id để lifecycle service ghi log.
    */
   async generateText(
     input: AiTextInput,
@@ -143,15 +145,15 @@ export class AiService {
 
   /**
    * Tạo structured output bằng provider chỉ định.
-   * TODO: M9.1 sẽ thêm logic chọn provider, schema validation, logging, budget guard.
+   * Schema Zod được provider dùng để tạo JSON Schema strict và parse runtime.
    */
   async generateStructured<TOutput>(
     input: AiStructuredInput,
-    schema: unknown,
+    schema: AiOutputSchema<TOutput>,
     providerName: AiProviderName = AiProviderName.OPENAI,
-  ): Promise<TOutput> {
+  ): Promise<AiStructuredOutput<TOutput>> {
     const provider = this.getProvider(providerName);
-    return provider.generateStructured<TOutput>(input, schema);
+    return provider.generateStructured(input, schema);
   }
 
   /**

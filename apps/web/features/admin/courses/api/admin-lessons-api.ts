@@ -25,15 +25,34 @@ export interface AdminVideoTranscriptDraft {
 }
 
 export async function createAdminLesson(
-  chapterId: string,
+  learningPathId: string,
+  chapterId: string | null,
   values: LessonFormValues,
   token: string,
 ) {
   const lesson = await apiRequest<AdminLessonApi>(
-    `/admin/chapters/${chapterId}/lessons`,
+    `/admin/learning-paths/${learningPathId}/lessons`,
     {
       method: "POST",
-      body: toLessonApiPayload(values),
+      body: { ...toLessonApiPayload(values), chapterId },
+      token,
+    },
+  );
+
+  return mapLesson(lesson);
+}
+
+export async function moveAdminLesson(
+  lessonId: string,
+  chapterId: string | null,
+  targetOrderIndex: number,
+  token: string,
+) {
+  const lesson = await apiRequest<AdminLessonApi>(
+    `/admin/lessons/${lessonId}/move`,
+    {
+      method: "PATCH",
+      body: { chapterId, targetOrderIndex },
       token,
     },
   );

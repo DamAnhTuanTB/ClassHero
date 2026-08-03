@@ -1,5 +1,6 @@
 import { EnrollmentStatus, Prisma, PublishStatus } from "@prisma/client";
 import { chapterDetailSelect } from "#api/modules/learning-paths/selectors/chapter.selects";
+import { lessonSelect } from "#api/modules/learning-paths/selectors/lesson.selects";
 
 const thumbnailFileSelect = {
   id: true,
@@ -60,6 +61,14 @@ export const learningPathSelect = {
 
 export const learningPathDetailSelect = {
   ...learningPathSelect,
+  lessons: {
+    where: {
+      chapterId: null,
+      deletedAt: null,
+    },
+    select: lessonSelect,
+    orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+  },
   chapters: {
     where: {
       deletedAt: null,
@@ -71,6 +80,7 @@ export const learningPathDetailSelect = {
 
 const publicLessonMetadataSelect = {
   id: true,
+  chapterId: true,
   orderIndex: true,
   title: true,
   shortDescription: true,
@@ -98,13 +108,18 @@ const publicFlatLessonMetadataRelation = {
   where: {
     deletedAt: null,
     status: PublishStatus.PUBLISHED,
-    chapter: {
-      deletedAt: null,
-      status: PublishStatus.PUBLISHED,
-    },
+    OR: [
+      { chapterId: null },
+      {
+        chapter: {
+          deletedAt: null,
+          status: PublishStatus.PUBLISHED,
+        },
+      },
+    ],
   },
   select: publicLessonMetadataSelect,
-  orderBy: [{ chapter: { orderIndex: "asc" } }, ...publicLessonMetadataOrderBy],
+  orderBy: publicLessonMetadataOrderBy,
 } satisfies Prisma.LessonFindManyArgs;
 
 export const publicLearningPathSelect = {

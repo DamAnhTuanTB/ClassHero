@@ -1,5 +1,6 @@
 import { LessonProgressStatus } from "@prisma/client";
 import { serializeChapterDetail } from "#api/modules/learning-paths/serializers/chapter.serializers";
+import { serializeLesson } from "#api/modules/learning-paths/serializers/lesson.serializers";
 import type {
   PublicLearningPathDetailRecord,
   LearningPathDetailRecord,
@@ -18,6 +19,10 @@ export function serializeLearningPath(
   record: LearningPathRecord | LearningPathDetailRecord,
   thumbnailUrl: string | null = null,
 ): LearningPathResponse {
+  const chapters = "chapters" in record ? record.chapters.map(serializeChapterDetail) : [];
+  const ungroupedLessons =
+    "lessons" in record ? record.lessons.map(serializeLesson) : [];
+
   return {
     id: record.id,
     kind: record.kind,
@@ -53,7 +58,16 @@ export function serializeLearningPath(
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     ...("chapters" in record
-      ? { chapters: record.chapters.map(serializeChapterDetail) }
+      ? {
+          chapters,
+          structureItems: [
+            ...chapters.map((chapter) => ({ type: "CHAPTER" as const, ...chapter })),
+            ...ungroupedLessons.map((lesson) => ({
+              type: "LESSON" as const,
+              ...lesson,
+            })),
+          ].sort(compareStructureItems),
+        }
       : {}),
   };
 }
@@ -64,8 +78,9 @@ export function serializePublicLearningPath(
   thumbnailUrl: string | null = null,
 ) {
   const activeEnrollment = viewer.activeEnrollmentByLearningPathId.get(record.id);
-  const firstLesson = record.lessons[0];
-  const trialLesson = record.lessons.find((lesson) => lesson.trialEnabled);
+  const orderedLessons = getOrderedPublicLessons(record);
+  const firstLesson = orderedLessons[0];
+  const trialLesson = orderedLessons.find((lesson) => lesson.trialEnabled);
   const trialLessonId = !activeEnrollment ? trialLesson?.id : null;
   const learningProgress = getStudentLearningProgress(record, viewer);
 
@@ -98,7 +113,7 @@ export function serializePublicLearningPath(
     sortOrder: record.sortOrder,
     summary: {
       chapterCount: record.totalChapterCount,
-      lessonCount: record.lessons.length,
+      lessonCount: orderedLessons.length,
       firstLessonId: firstLesson?.id ?? null,
       effectivePriceVnd: record.salePriceVnd ?? record.originalPriceVnd,
       hasDiscount: record.salePriceVnd !== null,
@@ -117,9 +132,12 @@ export function serializePublicLearningPath(
       trialLessonId,
     },
     progress: learningProgress,
-    lessons: record.lessons.map(serializePublicLesson),
+    lessons: orderedLessons.map(serializePublicLesson),
     ...("chapters" in record
-      ? { chapters: record.chapters.map(serializePublicChapter) }
+      ? {
+          chapters: record.chapters.map(serializePublicChapter),
+          structureItems: serializePublicStructureItems(record),
+        }
       : {}),
   };
 }
@@ -138,6 +156,7 @@ function serializePublicChapter(chapter: PublicChapterRecord) {
 function serializePublicLesson(lesson: PublicLessonRecord) {
   return {
     id: lesson.id,
+    chapterId: lesson.chapterId,
     orderIndex: lesson.orderIndex,
     title: lesson.title,
     shortDescription: lesson.shortDescription,
@@ -154,31 +173,33 @@ function getStudentLearningProgress(
 ) {
   const activeEnrollment = viewer.activeEnrollmentByLearningPathId.get(record.id);
 
-  if (!activeEnrollment || record.lessons.length === 0) {
+  const orderedLessons = getOrderedPublicLessons(record);
+
+  if (!activeEnrollment || orderedLessons.length === 0) {
     return null;
   }
 
-  const completedLessons = record.lessons.filter(
+  const completedLessons = orderedLessons.filter(
     (lesson) =>
       viewer.lessonProgressByLessonId.get(lesson.id)?.status ===
       LessonProgressStatus.COMPLETED,
   );
-  const inProgressLesson = record.lessons.find(
+  const inProgressLesson = orderedLessons.find(
     (lesson) =>
       viewer.lessonProgressByLessonId.get(lesson.id)?.status ===
       LessonProgressStatus.IN_PROGRESS,
   );
   const firstIncompleteLesson =
     inProgressLesson ??
-    record.lessons.find(
+    orderedLessons.find(
       (lesson) =>
         viewer.lessonProgressByLessonId.get(lesson.id)?.status !==
         LessonProgressStatus.COMPLETED,
     ) ??
-    record.lessons.at(-1);
+    orderedLessons.at(-1);
   const completedLessonCount = completedLessons.length;
   const progressPercent = Math.round(
-    (completedLessonCount / record.lessons.length) * 100,
+    (completedLessonCount / orderedLessons.length) * 100,
   );
   const continueLessonKind =
     progressPercent >= 100
@@ -196,4 +217,50 @@ function getStudentLearningProgress(
     continueLessonKind,
     continueLessonTitle: firstIncompleteLesson?.title ?? null,
   };
+}
+
+function getOrderedPublicLessons(record: PublicLearningPathAnyRecord) {
+  if (!("chapters" in record)) {
+    return record.lessons;
+  }
+
+  return getPublicStructureNodes(record).flatMap((item) =>
+    item.type === "LESSON"
+      ? [item.lesson]
+      : item.chapter.status === "PUBLISHED"
+        ? item.chapter.lessons
+        : [],
+  );
+}
+
+function getPublicStructureNodes(record: PublicLearningPathDetailRecord) {
+  const chapters = record.chapters.map((chapter) => ({
+    type: "CHAPTER" as const,
+    orderIndex: chapter.orderIndex,
+    chapter,
+  }));
+  const lessons = record.lessons
+    .filter((lesson) => lesson.chapterId === null)
+    .map((lesson) => ({
+      type: "LESSON" as const,
+      orderIndex: lesson.orderIndex,
+      lesson,
+    }));
+
+  return [...chapters, ...lessons].sort(compareStructureItems);
+}
+
+function serializePublicStructureItems(record: PublicLearningPathDetailRecord) {
+  return getPublicStructureNodes(record).map((item) =>
+    item.type === "LESSON"
+      ? { type: item.type, ...serializePublicLesson(item.lesson) }
+      : { type: item.type, ...serializePublicChapter(item.chapter) },
+  );
+}
+
+function compareStructureItems(
+  left: { orderIndex: number; type: "CHAPTER" | "LESSON" },
+  right: { orderIndex: number; type: "CHAPTER" | "LESSON" },
+) {
+  return left.orderIndex - right.orderIndex || left.type.localeCompare(right.type);
 }

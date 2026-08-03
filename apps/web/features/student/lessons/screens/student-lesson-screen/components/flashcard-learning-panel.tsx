@@ -34,6 +34,7 @@ import {
   clearStoredFlashcardSession,
   getFlashcardRunnerHistorySetId,
   getFlashcardResultHistorySetId,
+  pushFlashcardResultHistoryEntry,
   readStoredFlashcardActiveSetId,
   readStoredFlashcardSession,
   setFlashcardResultHistoryMarker,
@@ -119,6 +120,8 @@ export function FlashcardLearningPanel({
   const [sessionResumesSavedProgress, setSessionResumesSavedProgress] = useState(
     initialSession?.resumesSavedProgress ?? false,
   );
+  const [shouldCollapseResultHistoryOnComplete, setShouldCollapseResultHistoryOnComplete] =
+    useState(initialSession?.shouldCollapseResultHistoryOnComplete ?? false);
   const [studySessionId, setStudySessionId] = useState<string | null>(
     initialSession?.sessionId ?? null,
   );
@@ -171,6 +174,19 @@ export function FlashcardLearningPanel({
   }, [sessionReviewedIds]);
 
   useEffect(() => {
+    if (screen !== "RESULT" || shouldCollapseResultHistoryOnComplete) return;
+
+    function handleResultPopState() {
+      clearFlashcardResultHistoryMarker();
+      setShouldCelebrateResult(false);
+      setScreen("PANEL");
+    }
+
+    window.addEventListener("popstate", handleResultPopState);
+    return () => window.removeEventListener("popstate", handleResultPopState);
+  }, [screen, shouldCollapseResultHistoryOnComplete]);
+
+  useEffect(() => {
     if (!set || sessionCardIds.length === 0 || screen === "RESULT") return;
 
     writeStoredFlashcardSession(set.id, {
@@ -179,6 +195,7 @@ export function FlashcardLearningPanel({
       currentIndex,
       isBackVisible,
       resumesSavedProgress: sessionResumesSavedProgress,
+      shouldCollapseResultHistoryOnComplete,
       reviewedCardIds: Array.from(sessionReviewedIds),
       sessionId: studySessionId ?? undefined,
     });
@@ -191,6 +208,7 @@ export function FlashcardLearningPanel({
     sessionResumesSavedProgress,
     sessionReviewedIds,
     set,
+    shouldCollapseResultHistoryOnComplete,
     studySessionId,
   ]);
 
@@ -379,9 +397,13 @@ export function FlashcardLearningPanel({
     nextHistoryReviewTitle: string | null = null,
     reviewSessionId: string | null = null,
   ) {
+    const nextShouldCollapseResultHistoryOnComplete = screen === "RESULT";
     setShouldCelebrateResult(false);
     setHistoryReviewTitle(nextHistoryReviewTitle);
     setRunnerBackDestination(backDestination);
+    setShouldCollapseResultHistoryOnComplete(
+      nextShouldCollapseResultHistoryOnComplete,
+    );
     writeStoredFlashcardActiveSetId(lesson.id, targetSet.id, userId);
     setActiveSetId(targetSet.id);
     setStudySessionId(trackedSession?.id ?? reviewSessionId ?? null);
@@ -420,6 +442,8 @@ export function FlashcardLearningPanel({
       currentIndex: 0,
       isBackVisible: false,
       resumesSavedProgress: nextResumesSavedProgress,
+      shouldCollapseResultHistoryOnComplete:
+        nextShouldCollapseResultHistoryOnComplete,
       reviewedCardIds: nextReviewedIds,
       sessionId: trackedSession?.id,
     });
@@ -478,6 +502,7 @@ export function FlashcardLearningPanel({
       currentIndex: nextCurrentIndex,
       isBackVisible: nextIsBackVisible,
       resumesSavedProgress: sessionResumesSavedProgress,
+      shouldCollapseResultHistoryOnComplete,
       reviewedCardIds: Array.from(nextReviewedIds),
       sessionId: studySessionId ?? undefined,
     });
@@ -505,7 +530,7 @@ export function FlashcardLearningPanel({
       return;
     }
     if (progress.isCompleted) {
-      setFlashcardResultHistoryMarker(activeSet.id);
+      pushFlashcardResultHistoryEntry(activeSet.id);
       setShouldCelebrateResult(false);
       setScreen("RESULT");
       return;
@@ -703,6 +728,12 @@ export function FlashcardLearningPanel({
         onBack={() => {
           clearFlashcardRunnerHistoryMarker();
           setShouldCelebrateResult(false);
+          setShouldCollapseResultHistoryOnComplete(false);
+          if (runnerBackDestination === "RESULT") {
+            setFlashcardResultHistoryMarker(activeSet.id);
+            setScreen("RESULT");
+            return;
+          }
           setScreen("PANEL");
         }}
         onComplete={() => {
@@ -725,6 +756,12 @@ export function FlashcardLearningPanel({
         pendingAction={pendingAction}
         reviewStatuses={sessionReviewStatuses}
         setId={activeSet.id}
+        onResultHistoryCollapsed={() =>
+          setShouldCollapseResultHistoryOnComplete(false)
+        }
+        shouldCollapseResultHistoryOnComplete={
+          shouldCollapseResultHistoryOnComplete
+        }
         totalCount={sessionCards.length}
       />,
     );
@@ -848,6 +885,8 @@ export function FlashcardLearningPanel({
           reviewStatuses={sessionReviewStatuses}
           reviewTitle={historyReviewTitle}
           setId={activeSet.id}
+          onResultHistoryCollapsed={() => undefined}
+          shouldCollapseResultHistoryOnComplete={false}
           stackedOverDialog
           totalCount={sessionCards.length}
         />

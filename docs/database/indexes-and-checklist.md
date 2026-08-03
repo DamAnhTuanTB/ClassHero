@@ -38,8 +38,9 @@ Migration bù `20260727001000_restore_embedding_hnsw_index` reissue câu lệnh 
 [ ] Có `password_reset_tokens`.
 [ ] Có `background_jobs` và `ai_generations.background_job_id`.
 [ ] `files` có `purpose`.
-[ ] `learning_path_chapters` có unique `(learning_path_id, order_index)`.
-[ ] `lessons` có unique `(chapter_id, order_index)`.
+[ ] `learning_path_chapters` có unique `(learning_path_id, order_index)` và service giữ invariant cross-table với lesson top-level dùng cùng logical order.
+[ ] `lessons.chapter_id` nullable; lesson luôn có `learning_path_id` hợp lệ và chapter nếu có phải thuộc cùng learning path.
+[ ] `lessons` có unique `(chapter_id, order_index)` cho lesson trong chương và partial unique `(learning_path_id, order_index)` cho lesson active không thuộc chương; move/reorder compact source và shift destination trong transaction.
 [ ] `lesson_documents` có `title`, `content_hash`, `processing_job_id`, provider/model/dimension.
 [x] `document_chunks` có provider/model/dimension và filter rule.
 [ ] `quiz_questions`, `flashcards`, `test_questions` có `review_status` để admin ẩn item report.

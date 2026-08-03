@@ -47,6 +47,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | Student lesson content, notes, comments, favorites | `docs/api/student-learning.md` |
 | Quiz, flashcard, test, attempts | `docs/api/quiz-flashcard-tests.md` |
 | AI explanation, chat, generated content | `docs/api/ai-chat.md` |
+| Admin model routing, provider price/usage/budget, OCR accounting | `docs/api/provider-operations.md` |
 | Parent dashboard, child link, parent course/payment view | `docs/api/parent.md` |
 | Payment, payOS webhook, discount | `docs/api/payment-discount.md` |
 | Notification API | `docs/api/notification.md` |
@@ -67,7 +68,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | `M6.x` | `quiz-flashcard-tests`, `conventions-errors-security` |
 | `M7.x` | `student-learning`, `quiz-flashcard-tests`, `conventions-errors-security` |
 | `M8.x` | `payment-discount`, `conventions-errors-security` |
-| `M9.x` | `ai-chat`, `jobs`, `conventions-errors-security` |
+| `M9.x` | `ai-chat`, `provider-operations`, `jobs`, `conventions-errors-security` |
 | `M10.x` | `notification`, `jobs`, `conventions-errors-security` |
 | `M11.x` | `parent`, `payment-discount`, `conventions-errors-security` |
 | `M12.x` | `report-news`, `conventions-errors-security` |

@@ -27,6 +27,12 @@ export function LearningPathSummaryPanel({
 }) {
   const price = path.salePriceVnd ?? path.originalPriceVnd;
   const priceChangePercent = getPriceChangePercent(path.originalPriceVnd, price);
+  const lessonCountMin = path.lessonCountMin;
+  const lessonCountMax = path.lessonCountMax;
+  const hasLessonCountRange =
+    lessonCountMin !== null &&
+    lessonCountMax !== null &&
+    lessonCountMin !== lessonCountMax;
   const labelClass =
     "flex items-center gap-2 text-xs font-extrabold uppercase text-[var(--theme-text-muted)]";
   const valueClass = "mt-1.5 text-sm font-extrabold text-[var(--theme-text-strong)]";
@@ -104,7 +110,23 @@ export function LearningPathSummaryPanel({
                 <FileText className="h-4 w-4" aria-hidden="true" />
                 Buổi học
               </div>
-              <p className={valueClass}>{path.totalLessonCount} buổi học</p>
+              {lessonCountMin === null && lessonCountMax === null ? (
+                <p className={valueClass}>Chưa đặt</p>
+              ) : hasLessonCountRange ? (
+                <p className={`${valueClass} flex items-center gap-1 whitespace-nowrap`}>
+                  <span>{lessonCountMin}</span>
+                  <span
+                    className="relative mr-0.5 inline-block h-px w-2 shrink-0 bg-current after:absolute after:-right-px after:top-1/2 after:h-1.5 after:w-1.5 after:-translate-y-1/2 after:rotate-45 after:border-r after:border-t after:border-current"
+                    aria-hidden="true"
+                  />
+                  <span>{lessonCountMax}</span>
+                  <span>buổi học online</span>
+                </p>
+              ) : (
+                <p className={valueClass}>
+                  {lessonCountMin ?? lessonCountMax} buổi học online
+                </p>
+              )}
             </div>
             <div className={cellClass}>
               <div className={labelClass}>

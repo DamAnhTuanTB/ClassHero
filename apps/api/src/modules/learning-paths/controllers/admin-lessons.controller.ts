@@ -22,6 +22,8 @@ import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
 import { CreateLessonDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
+import { CreateLearningPathLessonDto } from "#api/modules/learning-paths/dto/create-learning-path-lesson.dto";
+import { MoveLessonDto } from "#api/modules/learning-paths/dto/move-lesson.dto";
 import { UpdateLessonDto } from "#api/modules/learning-paths/dto/update-lesson.dto";
 import { LessonsService } from "#api/modules/learning-paths/services/lessons.service";
 import { YoutubeTranscriptService } from "#api/modules/learning-paths/services/youtube-transcript.service";
@@ -53,8 +55,24 @@ export class AdminLessonsController {
     @Body() dto: CreateLessonDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.lessonsService.create(
+    return this.lessonsService.createInChapter(
       chapterId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Post("admin/learning-paths/:learningPathId/lessons")
+  @ApiOperation({ summary: "Create a lesson at course top-level or in a chapter" })
+  createForLearningPath(
+    @Param("learningPathId") learningPathId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateLearningPathLessonDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.lessonsService.createForLearningPath(
+      learningPathId,
       user.id,
       dto,
       getRequestContext(request),
@@ -82,6 +100,22 @@ export class AdminLessonsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.lessonsService.update(lessonId, user.id, dto, getRequestContext(request));
+  }
+
+  @Patch("admin/lessons/:lessonId/move")
+  @ApiOperation({ summary: "Move a lesson to any valid course structure position" })
+  move(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: MoveLessonDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.lessonsService.move(
+      lessonId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Delete("admin/lessons/:lessonId")

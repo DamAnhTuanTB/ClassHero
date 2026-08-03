@@ -8,7 +8,7 @@ const lessonIconClassByStatus: Record<StudentCourseDetailLesson["status"], strin
   current:
     "border-2 border-blue-500 bg-white text-blue-600 dark:bg-[var(--theme-surface)] dark:text-sky-300",
   locked:
-    "border-2 border-slate-300 bg-slate-100 text-slate-500 shadow-[0_0_0_4px_rgb(241_245_249)] dark:border-slate-500 dark:bg-slate-700 dark:text-slate-200 dark:shadow-[0_0_0_4px_rgb(30_41_59)]",
+    "border-2 border-slate-300 bg-slate-100 text-slate-500 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-200",
   next: "bg-blue-50 text-blue-600 dark:bg-[var(--theme-primary-soft)] dark:text-sky-300",
 };
 
@@ -58,7 +58,7 @@ export function StudentCourseLessonRow({
   );
 
   return (
-    <li className="relative z-10 grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-start gap-3 px-3 py-3">
+    <li className="relative z-10 grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-center gap-3 px-3 py-3">
       {showSeparator ? (
         <span
           aria-hidden="true"
@@ -76,7 +76,7 @@ export function StudentCourseLessonRow({
       >
         <StatusIcon
           className={cn(
-            isLocked ? "h-[1.125rem] w-[1.125rem]" : "h-4 w-4",
+            "h-4 w-4",
             isCurrent || shouldShowLessonCta ? "fill-current" : "",
           )}
           aria-hidden="true"
@@ -117,7 +117,7 @@ export function StudentCourseLessonRow({
         {shouldShowLessonCta ? (
           <StudentLessonTransitionLink
             lessonId={lesson.id}
-            className="inline-flex min-h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-sky-500 px-2.5 text-[11px] font-black text-white shadow-sm transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
+            className="inline-flex min-h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-sky-500 px-2.5 text-[11px] font-black text-white shadow-sm transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 lg:min-h-10 lg:px-3.5 lg:text-xs dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
           >
             {lessonCtaLabel}
           </StudentLessonTransitionLink>

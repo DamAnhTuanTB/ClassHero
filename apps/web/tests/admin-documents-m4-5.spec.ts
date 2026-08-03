@@ -209,6 +209,7 @@ test.describe("M4.5 admin lesson documents", () => {
     await expect(extractions).toHaveCount(1);
     await expect(extractions.getByLabel("Từ trang in")).toHaveValue("1");
     await expect(extractions.getByLabel("Đến trang in")).toHaveValue("8");
+    await expect(extractions.getByRole("button", { name: "Thu gọn" })).toBeVisible();
     await expect(editDialog.getByText(/Invalid input:/)).toHaveCount(0);
   });
 

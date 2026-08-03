@@ -31,6 +31,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { adminCourseDocumentQueryKeys } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { toast } from "sonner";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 type ViewMode = "html" | "pages";
 
@@ -53,18 +54,19 @@ export function SourceDocumentPagesDialog({
   const [viewMode, setViewMode] = useState<ViewMode>("html");
   const [filterMode, setFilterMode] = useState<"all" | "warnings">("all");
   const [searchPrintedPage, setSearchPrintedPage] = useState("");
+  const debouncedSearchPrintedPage = useDebouncedValue(searchPrintedPage);
   const [visibleCount, setVisibleCount] = useState(10);
 
   const filteredPages = pages.filter((page) => {
     if (filterMode === "warnings" && !getPrintedPageView(page).warning) {
       return false;
     }
-    if (searchPrintedPage) {
+    if (debouncedSearchPrintedPage) {
       const printed = getPrintedPageView(page);
       if (
         !printed.printedPageLabel
           ?.toLowerCase()
-          .includes(searchPrintedPage.trim().toLowerCase())
+          .includes(debouncedSearchPrintedPage.trim().toLowerCase())
       ) {
         return false;
       }
@@ -94,7 +96,7 @@ export function SourceDocumentPagesDialog({
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [filterMode, searchPrintedPage, viewMode, isOpen]);
+  }, [filterMode, debouncedSearchPrintedPage, viewMode, isOpen]);
 
   const paginatedPages = filteredPages.slice(0, visibleCount);
 

@@ -152,6 +152,23 @@ export class FlashcardsService {
   ) {
     const current = await this.findActiveSet(setId);
     const record = await this.prisma.$transaction(async (transaction) => {
+      const cards = await transaction.flashcard.findMany({
+        where: { flashcardSetId: setId, deletedAt: null },
+        select: { explanationId: true },
+      });
+      await transaction.flashcard.updateMany({
+        where: { flashcardSetId: setId, deletedAt: null },
+        data: { reviewStatus: input.reviewStatus },
+      });
+      const explanationIds = cards.flatMap((card) =>
+        card.explanationId ? [card.explanationId] : [],
+      );
+      if (explanationIds.length > 0) {
+        await transaction.aiExplanation.updateMany({
+          where: { id: { in: explanationIds } },
+          data: { reviewStatus: input.reviewStatus },
+        });
+      }
       const updated = await transaction.flashcardSet.update({
         where: { id: setId },
         data: {

@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -20,6 +22,8 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
+import { LessonContentGenerationJobService } from "#api/modules/ai/services/lesson-content-generation-job.service";
+import { GenerateFlashcardsDto } from "#api/modules/flashcards/dto/generate-flashcards.dto";
 import {
   CreateFlashcardDto,
   UpdateFlashcardDto,
@@ -37,12 +41,26 @@ import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.s
 @Roles(UserRole.ADMIN)
 @Controller("admin")
 export class AdminFlashcardsController {
-  constructor(private readonly flashcardsService: FlashcardsService) {}
+  constructor(
+    private readonly flashcardsService: FlashcardsService,
+    private readonly generationJobs: LessonContentGenerationJobService,
+  ) {}
 
   @Get("lessons/:lessonId/flashcard-sets")
   @ApiOperation({ summary: "List flashcard sets in a lesson" })
   listSets(@Param("lessonId") lessonId: string) {
     return this.flashcardsService.listAdminSetsByLesson(lessonId);
+  }
+
+  @Post("lessons/:lessonId/flashcard-sets/generate-ai")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Queue AI generation for a flashcard set" })
+  generate(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GenerateFlashcardsDto,
+  ) {
+    return this.generationJobs.queueFlashcards(lessonId, user.id, dto);
   }
 
   @Post("lessons/:lessonId/flashcard-sets")

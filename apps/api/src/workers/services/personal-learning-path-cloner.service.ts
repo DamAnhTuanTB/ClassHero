@@ -8,6 +8,65 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 
+const cloneLessonInclude = {
+  materials: {
+    where: { deletedAt: null },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  },
+  documentPageRanges: true,
+  documents: {
+    where: { replacedAt: null },
+    orderBy: [{ kind: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      chunks: {
+        orderBy: { chunkIndex: "asc" },
+      },
+    },
+  },
+  summary: {
+    where: { deletedAt: null },
+  },
+  quizSets: {
+    where: { deletedAt: null },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      questions: {
+        where: { deletedAt: null },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: {
+          explanation: true,
+        },
+      },
+    },
+  },
+  flashcardSets: {
+    where: { deletedAt: null },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      flashcards: {
+        where: { deletedAt: null },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: {
+          explanation: true,
+        },
+      },
+    },
+  },
+  testSets: {
+    where: { deletedAt: null },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      questions: {
+        where: { deletedAt: null },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: {
+          explanation: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.LessonInclude;
+
 const cloneGraphInclude = {
   targetAudiences: {
     select: { targetAudienceId: true },
@@ -20,6 +79,11 @@ const cloneGraphInclude = {
       },
     },
   },
+  lessons: {
+    where: { chapterId: null, deletedAt: null },
+    orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+    include: cloneLessonInclude,
+  },
   chapters: {
     where: { deletedAt: null },
     orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
@@ -27,64 +91,7 @@ const cloneGraphInclude = {
       lessons: {
         where: { deletedAt: null },
         orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
-        include: {
-          materials: {
-            where: { deletedAt: null },
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          },
-          documentPageRanges: true,
-          documents: {
-            where: { replacedAt: null },
-            orderBy: [{ kind: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
-            include: {
-              chunks: {
-                orderBy: { chunkIndex: "asc" },
-              },
-            },
-          },
-          summary: {
-            where: { deletedAt: null },
-          },
-          quizSets: {
-            where: { deletedAt: null },
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-            include: {
-              questions: {
-                where: { deletedAt: null },
-                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-                include: {
-                  explanation: true,
-                },
-              },
-            },
-          },
-          flashcardSets: {
-            where: { deletedAt: null },
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-            include: {
-              flashcards: {
-                where: { deletedAt: null },
-                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-                include: {
-                  explanation: true,
-                },
-              },
-            },
-          },
-          testSets: {
-            where: { deletedAt: null },
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-            include: {
-              questions: {
-                where: { deletedAt: null },
-                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-                include: {
-                  explanation: true,
-                },
-              },
-            },
-          },
-        },
+        include: cloneLessonInclude,
       },
     },
   },
@@ -169,14 +176,14 @@ export class PersonalLearningPathClonerService {
       throw new Error(`Catalog learning path ${enrollment.learningPathId} was not found`);
     }
 
-    const sourceLessonIds = source.chapters.flatMap((chapter) =>
-      chapter.lessons.map((lesson) => lesson.id),
-    );
-    const sourceFlashcardIds = source.chapters.flatMap((chapter) =>
-      chapter.lessons.flatMap((lesson) =>
-        lesson.flashcardSets.flatMap((set) =>
-          set.flashcards.map((flashcard) => flashcard.id),
-        ),
+    const sourceLessons = [
+      ...source.lessons,
+      ...source.chapters.flatMap((chapter) => chapter.lessons),
+    ];
+    const sourceLessonIds = sourceLessons.map((lesson) => lesson.id);
+    const sourceFlashcardIds = sourceLessons.flatMap((lesson) =>
+      lesson.flashcardSets.flatMap((set) =>
+        set.flashcards.map((flashcard) => flashcard.id),
       ),
     );
     const [lessonProgress, flashcardProgress] = await Promise.all([
@@ -252,7 +259,10 @@ export class PersonalLearningPathClonerService {
   }) {
     const personalLearningPathId = randomUUID();
     const chapterIdMap = createIdMap(source.chapters);
-    const lessons = source.chapters.flatMap((chapter) => chapter.lessons);
+    const lessons = [
+      ...source.lessons,
+      ...source.chapters.flatMap((chapter) => chapter.lessons),
+    ];
     const lessonIdMap = createIdMap(lessons);
     const sourceDocumentIdMap = createIdMap(source.sourceDocuments);
     const pageRanges = lessons.flatMap((lesson) => lesson.documentPageRanges);
@@ -401,7 +411,9 @@ export class PersonalLearningPathClonerService {
         id: getMappedId(lessonIdMap, lesson.id),
         sourceLessonId: lesson.id,
         learningPathId: personalLearningPathId,
-        chapterId: getMappedId(chapterIdMap, lesson.chapterId),
+        chapterId: lesson.chapterId
+          ? getMappedId(chapterIdMap, lesson.chapterId)
+          : null,
         orderIndex: lesson.orderIndex,
         title: lesson.title,
         shortDescription: lesson.shortDescription,

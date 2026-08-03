@@ -12,6 +12,10 @@ import {
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import type { StudentLesson } from "@/features/student/lessons/types/student-lesson-types";
 import { readStoredQuizActiveSetId } from "@/features/student/lessons/utils/quiz-runner-history";
+import {
+  studentLearningPathDetailQueryKey,
+  studentLearningPathsQueryKey,
+} from "@/features/student/shared/hooks/use-student-courses-query";
 
 export const studentLessonQueryKey = (lessonId: string, userId?: string) => [
   "student",
@@ -245,6 +249,7 @@ export function useStudentLessonQueries(
   ]);
 
   async function refreshLearningProgress() {
+    const learningPathSlug = lessonQuery.data?.learningPath.slug;
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: studentFlashcardsQueryKey(lessonId, session?.user.id),
@@ -258,6 +263,19 @@ export function useStudentLessonQueries(
       queryClient.invalidateQueries({
         queryKey: studentLessonQueryKey(lessonId, session?.user.id),
       }),
+      queryClient.invalidateQueries({
+        queryKey: studentLearningPathsQueryKey(session?.user.id),
+      }),
+      ...(learningPathSlug
+        ? [
+            queryClient.invalidateQueries({
+              queryKey: studentLearningPathDetailQueryKey(
+                learningPathSlug,
+                session?.user.id,
+              ),
+            }),
+          ]
+        : []),
     ]);
   }
 

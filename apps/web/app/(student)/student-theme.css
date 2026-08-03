@@ -847,15 +847,51 @@
 }
 
 [data-student-shell="true"] .student-chapter-card--amber {
-  border-left-color: rgb(251 146 60) !important;
+  border-left-color: rgb(245 158 11) !important;
 }
 
 [data-student-shell="true"] .student-chapter-card--emerald {
   border-left-color: rgb(16 185 129) !important;
 }
 
-[data-student-shell="true"] .student-chapter-card--violet {
-  border-left-color: rgb(139 92 246) !important;
+[data-student-shell="true"] .student-chapter-card--sky {
+  border-left-color: rgb(14 165 233) !important;
+}
+
+[data-student-shell="true"] .student-curriculum-accent-card {
+  border-left-width: 3px !important;
+  border-left-color: var(--student-course-accent-strong) !important;
+}
+
+[data-student-shell="true"] .student-chapter-number {
+  background-color: var(--student-course-accent-strong) !important;
+}
+
+[data-student-shell="true"] .student-chapter-progress {
+  background-color: var(--student-course-audience-bg) !important;
+  color: var(--student-course-audience-text) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-curriculum-accent-card,
+[data-student-shell="true"].dark .student-curriculum-accent-card {
+  border-left-color: var(--student-course-accent-dark-strong) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-chapter-number,
+[data-student-shell="true"].dark .student-chapter-number {
+  background-color: var(--student-course-accent-dark-strong) !important;
+}
+
+:where(.dark [data-theme-root], [data-theme-root].dark)
+  [data-student-shell="true"]
+  .student-chapter-progress,
+[data-student-shell="true"].dark .student-chapter-progress {
+  background-color: var(--student-course-audience-dark-bg) !important;
+  color: var(--student-course-audience-dark-text) !important;
 }
 
 [data-student-shell="true"] .student-section-ribbon {

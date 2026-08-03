@@ -112,7 +112,7 @@ Rules:
 ```txt
 id uuid pk
 learning_path_id uuid fk learning_paths.id
-chapter_id uuid fk learning_path_chapters.id
+chapter_id uuid? fk learning_path_chapters.id
 source_lesson_id uuid? fk lessons.id
 order_index int
 title string
@@ -135,19 +135,27 @@ deleted_at timestamp?
 
 Constraint:
 
-- unique `(chapter_id, order_index)`.
+- unique `(chapter_id, order_index)` áp dụng cho lesson có chapter.
+- partial unique `(learning_path_id, order_index)` với `chapter_id IS NULL AND deleted_at IS NULL` cho các lesson top-level cùng loại.
 - index `source_lesson_id`.
+- index `(learning_path_id, chapter_id, order_index)` để đọc cấu trúc khóa học ổn định.
 
 Rules:
 
-- Buổi học luôn thuộc một chương học.
+- `chapter_id` là nullable. Buổi học có thể thuộc một chương hoặc nằm trực tiếp trong lộ trình.
+- `learning_path_id` là quan hệ bắt buộc và là source of truth để xác định khóa học của lesson. Nếu có `chapter_id`, chapter phải thuộc đúng `learning_path_id`.
+- Với lesson trong chapter, `order_index` là vị trí trong chapter và unique theo `chapter_id`.
+- Với lesson không thuộc chapter, `order_index` là vị trí trong danh sách top-level dùng chung với `learning_path_chapters.order_index`. Vì hai loại nằm ở hai bảng, service phải giữ invariant cross-table không trùng vị trí logic và renumber cả chapter lẫn lesson top-level trong một transaction.
+- Các vị trí active trong mỗi container là dãy liên tục bắt đầu từ `1`; archive/move phải compact container nguồn và dịch container đích.
+- Khi tạo chapter/lesson, client không chọn `order_index`; service phải khóa cấu trúc, tự append bản ghi vào cuối container hợp lệ rồi compact/check invariant trước khi commit.
+- Tên lesson active unique không phân biệt hoa/thường trong cùng nhóm đích; lesson ở các chương/nhóm khác nhau có thể trùng tên.
 - `lesson_type` chỉ nhận `BASIC` hoặc `LIVE` và mặc định là `BASIC`.
 - `live_url` là optional cho buổi `LIVE`; buổi `BASIC` luôn lưu `live_url = null`.
-- `learning_path_id` trên `lessons` được giữ như denormalized compatibility/filter field trong giai đoạn nối M3.4; source of truth phân cấp vẫn là `chapter_id -> learning_path_chapters.learning_path_id`.
+- Admin có thể chuyển lesson tới bất kỳ vị trí nào giữa một chapter, chapter khác trong cùng learning path và top-level. Service phải validate chapter, order/title, dịch các sibling bị ảnh hưởng và cập nhật lesson trong cùng transaction.
 - `custom_video_settings` (field JSON hiện có trong Prisma) có thể lưu transcript đã được admin duyệt ở `transcript: Array<{ time: number; endTime?: number; text: string }>` và ngôn ngữ ở `transcriptLanguage`; transcript là optional nên M3.8 không cần migration riêng. `time`/`endTime` lưu theo timestamp video nguồn với tối đa 3 chữ số thập phân để có thể ánh xạ lại khi cấu hình cắt thay đổi. API bản nháp và form admin hiển thị `playbackTime = sourceTime - startTimeInSeconds`; khi lưu/phát, frontend đổi ngược về source time. `endTime` optional để dữ liệu transcript cũ vẫn tương thích.
 - Quiz, flashcard, test, document, summary, progress và AI chat vẫn gắn với `lesson_id`.
 - Counter `learning_paths.total_chapter_count` và `learning_paths.total_lesson_count` phải được service cập nhật khi tạo/xóa mềm phần tử liên quan.
-- Chapter/lesson được clone cho bản cá nhân giữ `source_chapter_id`/`source_lesson_id` để ánh xạ lịch sử học trước khi cá nhân hóa.
+- Chapter/lesson được clone cho bản cá nhân giữ `source_chapter_id`/`source_lesson_id` để ánh xạ lịch sử học trước khi cá nhân hóa; lesson nguồn không thuộc chapter tiếp tục có `chapter_id = null` trong bản clone.
 - Clone sao chép các bản ghi nội dung mutable cần chỉnh sửa độc lập; file R2 và OCR artifact bất biến được tham chiếu lại, không upload hoặc gọi paid OCR lần nữa chỉ vì clone.
 - Dữ liệu do student tạo như progress, attempt, note, comment và favorite không được deep-copy như nội dung quản trị.
 
@@ -184,5 +192,13 @@ created_at timestamp
 updated_at timestamp
 deleted_at timestamp?
 ```
+
+Rules:
+
+- Mỗi lesson có tối đa một summary active nhờ unique `lesson_id`.
+- Worker AI upsert summary với `source = AI`, `review_status = NEEDS_REVIEW` và
+  `ai_generation_id`; admin có thể sửa/duyệt bằng cùng record sau đó.
+- Khi admin sửa summary từng được AI tạo, giữ `ai_generation_id` để không mất
+  provenance ban đầu.
 
 ---

@@ -132,6 +132,7 @@ Codex phải kiểm tra index khi thêm hoặc sửa query chính:
 - Enrollment active lookup.
 - Notification recipient/time.
 - Attempt/progress theo student/course/chapter/lesson.
+- Completion guard khi reorder lesson dùng existence/aggregate theo index `(lesson_id, status)`, không N+1 từng lesson và không trả danh sách student progress ra course detail.
 - Report moderation status.
 - Vector index cho embedding search khi triển khai pgvector.
 
@@ -155,6 +156,11 @@ Tác vụ nên dùng worker/job:
 - AI generate quiz/flashcard/test/summary.
 - Email/Zalo notification.
 - Ảnh minh họa/render nặng nếu có.
+
+Provider operations rules:
+
+- Timeline/breakdown lọc tối đa 366 ngày, event list phân trang và có index theo thời gian/category/provider/feature; chart admin không thêm thư viện nặng.
+- OCR cache hit không tạo delay giả. Mathpix retry resume `pdfId` đã lưu để tránh double-charge; debug artifact local tắt mặc định ở production.
 
 Rules:
 

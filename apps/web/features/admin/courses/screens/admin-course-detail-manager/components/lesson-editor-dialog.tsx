@@ -23,7 +23,6 @@ import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/u
 import { prepareLessonFormValuesForSubmit } from "@/features/admin/courses/utils/prepare-lesson-form-values";
 
 export function LessonEditorDialog({
-  defaultOrderIndex,
   disabled,
   isOpen,
   isSaving,
@@ -33,7 +32,6 @@ export function LessonEditorDialog({
   onClose,
   onSubmit,
 }: {
-  defaultOrderIndex: number;
   disabled: boolean;
   isOpen: boolean;
   isSaving: boolean;
@@ -106,7 +104,6 @@ export function LessonEditorDialog({
     const editorKey = [
       mode,
       selectedLesson?.id ?? "new",
-      defaultOrderIndex,
       ...sourceDocumentExtractions.flatMap((extraction) => [
         ("id" in extraction ? extraction.id : undefined) ?? extraction.clientKey,
         extraction.sourceDocumentId,
@@ -161,14 +158,12 @@ export function LessonEditorDialog({
           }
         : {
             ...emptyLessonValues,
-            orderIndex: defaultOrderIndex,
             sourceDocumentExtractions,
             foundationDocumentOrder,
           },
     );
     resetKeyRef.current = editorKey;
   }, [
-    defaultOrderIndex,
     documentsManager.documentsByLessonId,
     documentsManager.sourceDocuments,
     documentsManager.sourcePagesByDocumentId,
@@ -239,14 +234,6 @@ export function LessonEditorDialog({
         form.setError("title", {
           type: "manual",
           message: "Buổi học đã trùng tên",
-        });
-        return;
-      }
-
-      if (error instanceof Error && error.message === "DUPLICATED_LESSON_ORDER") {
-        form.setError("orderIndex", {
-          type: "manual",
-          message: "Thứ tự này đã có trong chương",
         });
         return;
       }

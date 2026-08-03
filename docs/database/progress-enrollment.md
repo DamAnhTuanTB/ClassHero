@@ -72,8 +72,9 @@ Constraint:
 Rules:
 
 - Buổi học completed khi bài kiểm tra đạt `completion_min_score`, mặc định 7.
-- Chỉ attempt đã được student chủ động chọn qua action `Dùng điểm bài này` mới
-  được xét cập nhật best/completed; submit attempt đơn thuần không đổi progress.
+- Submit attempt đạt ngưỡng tự động cập nhật best/completed trong transaction.
+- Completion là sticky: attempt thi lại chưa đạt không hạ `status`, không đổi
+  `completed_at` và không thay best attempt đã đạt.
 - `best_test_attempt_id` là nguồn chính cho kết quả tốt nhất.
 - Nếu dùng thêm `test_attempts.is_best_for_lesson`, phải cập nhật trong transaction.
 - Khi tạo bản cá nhân, backend dùng `source_lesson_id` để upsert trạng thái tiến độ tương ứng cho lesson clone; lesson mới không có source bắt đầu `NOT_STARTED`.

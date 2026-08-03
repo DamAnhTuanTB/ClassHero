@@ -6,7 +6,7 @@ export type AdminLessonType = "BASIC" | "LIVE";
 export type AdminLesson = {
   id: string;
   learningPathId?: string;
-  chapterId?: string;
+  chapterId?: string | null;
   courseTitle?: string;
   chapterTitle?: string;
   orderIndex: number;
@@ -20,7 +20,8 @@ export type AdminLesson = {
   completionMinScore: number;
   trialEnabled: boolean;
   status: AdminPublishStatus;
-  customVideoSettings?: any;
+  hasStudentCompletion?: boolean;
+  customVideoSettings?: unknown;
 };
 
 export type AdminChapter = {
@@ -32,6 +33,10 @@ export type AdminChapter = {
   status: AdminPublishStatus;
   lessons: AdminLesson[];
 };
+
+export type AdminCourseStructureItem =
+  | ({ type: "CHAPTER" } & AdminChapter)
+  | ({ type: "LESSON" } & AdminLesson);
 
 export type AdminLearningPath = {
   id: string;
@@ -62,6 +67,7 @@ export type AdminLearningPath = {
   sortOrder: number;
   updatedAt: string;
   chapters: AdminChapter[];
+  structureItems?: AdminCourseStructureItem[];
 };
 
 export const subjectLabels: Record<AdminSubject, string> = {

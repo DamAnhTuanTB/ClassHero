@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { AdminEditableStatus, AdminLessonType, AdminPublishStatus } from "@/features/admin/courses/admin-courses-data";
+import type {
+  AdminEditableStatus,
+  AdminLessonType,
+  AdminPublishStatus,
+} from "@/features/admin/courses/admin-courses-data";
 import { getMaximumPrintedPageNumber } from "@/features/admin/courses/admin-course-documents-utils";
 import {
   isAllowedVideoUrl,
@@ -75,55 +79,69 @@ const sourceDocumentExtractionSchema = z
     }
   });
 
-export const learningPathSchema = z.object({
-  title: requiredTrimmedText({ requiredMessage: "Nhập tên khóa học" }),
-  slug: z.string().trim().max(180).optional(),
-  thumbnailFileId: z.string().trim().optional(),
-  thumbnailFileName: z.string().trim().max(180).optional(),
-  thumbnailImageUrl: z.string().trim().optional(),
-  description: z.string().trim().max(600, "Mô tả tối đa 600 ký tự"),
-  domainId: z.string().uuid("Chọn lĩnh vực"),
-  targetAudienceIds: z
-    .array(z.string().uuid())
-    .length(1, "Chỉ chọn một đối tượng hướng đến"),
-  originalPriceVnd: z
-    .number({ error: "Nhập giá gốc" })
-    .int("Giá phải là số nguyên")
-    .min(0, "Giá không âm"),
-  salePriceVnd: z
-    .number()
-    .int("Giá phải là số nguyên")
-    .min(0, "Giá không âm")
-    .optional()
-    .or(z.literal("")),
-  startDate: z.string().date("Ngày bắt đầu không hợp lệ").optional().or(z.literal("")),
-  endDate: z.string().date("Ngày kết thúc không hợp lệ").optional().or(z.literal("")),
-  lessonCountMin: z.number().int().min(1, "Nhập ít nhất 1 buổi học").max(500, "Tối đa 500 buổi học").optional().or(z.literal("")),
-  lessonCountMax: z.number().int().min(1, "Nhập ít nhất 1 buổi học").max(500, "Tối đa 500 buổi học").optional().or(z.literal("")),
-  status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN"]),
-  sortOrder: z.coerce.number().int().min(0),
-}).superRefine((values, context) => {
-  if (values.startDate && values.endDate && values.endDate < values.startDate) {
-    context.addIssue({
-      code: "custom",
-      message: "Ngày kết thúc không được sớm hơn ngày bắt đầu",
-      path: ["endDate"],
-    });
-  }
-  if (
-    values.lessonCountMin !== "" &&
-    values.lessonCountMax !== "" &&
-    values.lessonCountMin !== undefined &&
-    values.lessonCountMax !== undefined &&
-    values.lessonCountMax < values.lessonCountMin
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Số buổi học đến không được nhỏ hơn số buổi học từ",
-      path: ["lessonCountMax"],
-    });
-  }
-});
+export const learningPathSchema = z
+  .object({
+    title: requiredTrimmedText({ requiredMessage: "Nhập tên khóa học" }),
+    slug: z.string().trim().max(180).optional(),
+    thumbnailFileId: z.string().trim().optional(),
+    thumbnailFileName: z.string().trim().max(180).optional(),
+    thumbnailImageUrl: z.string().trim().optional(),
+    description: z.string().trim().max(600, "Mô tả tối đa 600 ký tự"),
+    domainId: z.string().uuid("Chọn lĩnh vực"),
+    targetAudienceIds: z
+      .array(z.string().uuid())
+      .length(1, "Chỉ chọn một đối tượng hướng đến"),
+    originalPriceVnd: z
+      .number({ error: "Nhập giá gốc" })
+      .int("Giá phải là số nguyên")
+      .min(0, "Giá không âm"),
+    salePriceVnd: z
+      .number()
+      .int("Giá phải là số nguyên")
+      .min(0, "Giá không âm")
+      .optional()
+      .or(z.literal("")),
+    startDate: z.string().date("Ngày bắt đầu không hợp lệ").optional().or(z.literal("")),
+    endDate: z.string().date("Ngày kết thúc không hợp lệ").optional().or(z.literal("")),
+    lessonCountMin: z
+      .number()
+      .int()
+      .min(1, "Nhập ít nhất 1 buổi học")
+      .max(500, "Tối đa 500 buổi học")
+      .optional()
+      .or(z.literal("")),
+    lessonCountMax: z
+      .number()
+      .int()
+      .min(1, "Nhập ít nhất 1 buổi học")
+      .max(500, "Tối đa 500 buổi học")
+      .optional()
+      .or(z.literal("")),
+    status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN"]),
+    sortOrder: z.coerce.number().int().min(0),
+  })
+  .superRefine((values, context) => {
+    if (values.startDate && values.endDate && values.endDate < values.startDate) {
+      context.addIssue({
+        code: "custom",
+        message: "Ngày kết thúc không được sớm hơn ngày bắt đầu",
+        path: ["endDate"],
+      });
+    }
+    if (
+      values.lessonCountMin !== "" &&
+      values.lessonCountMax !== "" &&
+      values.lessonCountMin !== undefined &&
+      values.lessonCountMax !== undefined &&
+      values.lessonCountMax < values.lessonCountMin
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Số buổi học đến không được nhỏ hơn số buổi học từ",
+        path: ["lessonCountMax"],
+      });
+    }
+  });
 
 const referenceDocumentSchema = z
   .object({
@@ -168,7 +186,6 @@ const referenceDocumentSchema = z
   });
 
 export const lessonSchema = z.object({
-  orderIndex: z.coerce.number().int().min(1, "Thứ tự bắt đầu từ 1").max(500),
   title: requiredTrimmedText({
     requiredMessage: "Nhập tên buổi học",
     maxLength: 180,
@@ -373,7 +390,6 @@ export function createLessonSchema(
 }
 
 export const chapterSchema = z.object({
-  orderIndex: z.coerce.number().int().min(1, "Thứ tự bắt đầu từ 1").max(200),
   title: requiredTrimmedText({
     requiredMessage: "Nhập tên chương học",
     maxLength: 180,
@@ -403,7 +419,6 @@ export type LearningPathFormValues = {
 };
 
 export type LessonFormValues = {
-  orderIndex: number;
   title: string;
   shortDescription?: string;
   lessonType: AdminLessonType;
@@ -438,11 +453,14 @@ export type LessonFormValues = {
 };
 
 export type ChapterFormValues = {
-  orderIndex: number;
   title: string;
   overview?: string;
   objectives?: string;
   status: AdminPublishStatus;
+};
+
+export type ChapterUpdateValues = Partial<ChapterFormValues> & {
+  orderIndex?: number;
 };
 
 export const emptyPathValues: LearningPathFormValues = {
@@ -465,7 +483,6 @@ export const emptyPathValues: LearningPathFormValues = {
 };
 
 export const emptyLessonValues: LessonFormValues = {
-  orderIndex: 1,
   title: "",
   shortDescription: "",
   lessonType: "BASIC",
@@ -490,7 +507,6 @@ export const emptyLessonValues: LessonFormValues = {
 };
 
 export const emptyChapterValues: ChapterFormValues = {
-  orderIndex: 1,
   title: "",
   overview: "",
   objectives: "",

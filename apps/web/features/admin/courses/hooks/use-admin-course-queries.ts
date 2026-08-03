@@ -19,12 +19,14 @@ import {
 import {
   archiveAdminLesson,
   createAdminLesson,
+  moveAdminLesson,
   updateAdminLesson,
 } from "@/features/admin/courses/api/admin-lessons-api";
 import { uploadAdminCourseCover } from "@/features/admin/courses/api/admin-course-files-api";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import type {
   ChapterFormValues,
+  ChapterUpdateValues,
   LearningPathFormValues,
   LessonFormValues,
 } from "@/features/admin/courses/admin-courses-schemas";
@@ -158,12 +160,25 @@ export function useAdminCourseMutations() {
     createLesson: useMutation({
       mutationFn: ({
         chapterId,
+        pathId,
         values,
       }: {
-        chapterId: string;
+        chapterId: string | null;
+        pathId: string;
         values: LessonFormValues;
-      }) => createAdminLesson(chapterId, values, token),
+      }) => createAdminLesson(pathId, chapterId, values, token),
       onSuccess: () => invalidateDocumentState(),
+    }),
+    moveLesson: useMutation({
+      mutationFn: ({
+        chapterId,
+        lessonId,
+        targetOrderIndex,
+      }: {
+        chapterId: string | null;
+        lessonId: string;
+        targetOrderIndex: number;
+      }) => moveAdminLesson(lessonId, chapterId, targetOrderIndex, token),
     }),
     createPath: useMutation({
       mutationFn: (values: LearningPathFormValues) =>
@@ -186,7 +201,7 @@ export function useAdminCourseMutations() {
         values,
       }: {
         chapterId: string;
-        values: Partial<ChapterFormValues>;
+        values: ChapterUpdateValues;
       }) => updateAdminChapter(chapterId, values, token),
     }),
     updateLesson: useMutation({

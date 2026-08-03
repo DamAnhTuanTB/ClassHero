@@ -18,52 +18,8 @@ import {
   formatVnd,
   getCoursePrice,
 } from "@/features/student/shared/utils/student-courses-utils";
-import { getStudentCourseAudienceStyle } from "@/features/student/shared/utils/student-course-audience-palette";
+import { getStudentCourseAccentStyle } from "@/features/student/shared/utils/student-course-accent-palette";
 import { cn } from "@/lib/utils";
-
-function getCourseAccentStyle(
-  accentIndex: number,
-  accentCount: number,
-  targetAudienceCode: string | undefined,
-  targetAudienceGrade: number,
-  targetAudienceName: string,
-): CSSProperties {
-  const normalizedAccentIndex = Math.max(0, Math.floor(accentIndex));
-  const safeAccentCount = Math.max(1, Math.floor(accentCount), normalizedAccentIndex + 1);
-  const isSupportingAccent = normalizedAccentIndex % 2 === 1;
-  const supportingAccentCount = Math.floor(safeAccentCount / 2);
-  const blueAccentCount = safeAccentCount - supportingAccentCount;
-  const supportingAccentIndex = Math.floor(normalizedAccentIndex / 2);
-  const blueAccentIndex = normalizedAccentIndex - supportingAccentIndex;
-
-  const hue = isSupportingAccent
-    ? getSupportingAccentHue(supportingAccentIndex)
-    : 196 + ((blueAccentIndex + 0.5) / blueAccentCount) * 36;
-  const saturation = 58 + ((normalizedAccentIndex * 7) % 11);
-  const lightness = 79 + ((normalizedAccentIndex * 5) % 6);
-  const darkSaturation = Math.max(46, saturation - 12);
-  const darkLightness = 58 + ((normalizedAccentIndex * 3) % 5);
-
-  return {
-    ...getStudentCourseAudienceStyle({
-      fallbackHue: hue,
-      targetAudienceCode,
-      targetAudienceGrade,
-      targetAudienceName,
-    }),
-    "--student-course-accent": `hsl(${hue.toFixed(3)} ${saturation}% ${lightness}%)`,
-    "--student-course-accent-dark": `hsl(${hue.toFixed(3)} ${darkSaturation}% ${darkLightness}%)`,
-  } as CSSProperties;
-}
-
-function getSupportingAccentHue(accentIndex: number): number {
-  const supportingHues = [48, 8, 142, 252, 332, 25, 172, 185] as const;
-  const paletteCycle = Math.floor(accentIndex / supportingHues.length);
-  const baseHue =
-    supportingHues[accentIndex % supportingHues.length] ?? supportingHues[0];
-
-  return baseHue + paletteCycle * 2.75;
-}
 
 export function ExploreCourseCard({
   accentCount = 1,
@@ -134,13 +90,13 @@ export function ExploreCourseCard({
       onPointerEnter={() => onPrefetch?.(course.slug)}
       onTouchStart={() => onPrefetch?.(course.slug)}
       aria-label={`Xem chi tiết ${course.title}`}
-      style={getCourseAccentStyle(
-        accentIndex,
+      style={getStudentCourseAccentStyle({
         accentCount,
+        accentIndex,
         targetAudienceCode,
-        displayedTargetAudienceGrade,
-        displayedTargetAudienceName,
-      )}
+        targetAudienceGrade: displayedTargetAudienceGrade,
+        targetAudienceName: displayedTargetAudienceName,
+      })}
       className="group relative block min-w-0 cursor-pointer overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-6 shadow-none transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-3.5 sm:pl-[22px]"
     >
       <span

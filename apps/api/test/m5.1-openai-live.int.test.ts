@@ -17,6 +17,7 @@ describe.skipIf(!runLiveTest)("M5.1 OpenAI live smoke", () => {
 
     const provider = new OpenAiProvider({
       apiKey,
+      requestTimeoutMs: 60_000,
       embeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
       embeddingDimensions: Number(process.env.OPENAI_EMBEDDING_DIMENSIONS ?? 1536),
       chatModel: process.env.OPENAI_CHAT_MODEL ?? "gpt-4.1-mini",

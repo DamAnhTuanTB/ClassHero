@@ -1,4 +1,7 @@
+"use client";
+
 import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import {
@@ -10,6 +13,7 @@ import type {
   AdminDomain,
   AdminTargetAudience,
 } from "@/features/admin/domains/api/admin-domains-api";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 export function FilterBar({
   domains,
@@ -35,6 +39,19 @@ export function FilterBar({
   onStatusChange: (value: AdminPublishStatus | "ALL") => void;
   onTargetAudienceChange: (value: string | "ALL") => void;
 }) {
+  const [queryInput, setQueryInput] = useState(query);
+  const debouncedQuery = useDebouncedValue(queryInput);
+
+  useEffect(() => {
+    setQueryInput(query);
+  }, [query]);
+
+  useEffect(() => {
+    if (debouncedQuery !== query) {
+      onQueryChange(debouncedQuery);
+    }
+  }, [debouncedQuery, onQueryChange, query]);
+
   return (
     <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3">
       <div className="flex items-center gap-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
@@ -49,16 +66,19 @@ export function FilterBar({
           id="admin-course-filter-query"
           label="Tìm khóa học"
           hideLabel
-          value={query}
+          value={queryInput}
           icon={<Search className="h-5 w-5" aria-hidden="true" />}
           placeholder="Tìm khóa học, lĩnh vực, đối tượng"
-          onChange={(event) => onQueryChange(event.target.value)}
+          onChange={(event) => setQueryInput(event.target.value)}
           trailingAction={
-            query ? (
+            queryInput ? (
               <button
                 type="button"
                 aria-label="Xóa từ khóa tìm kiếm"
-                onClick={() => onQueryChange("")}
+                onClick={() => {
+                  setQueryInput("");
+                  onQueryChange("");
+                }}
                 className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] dark:focus:ring-1 dark:focus:ring-sky-500/15"
               >
                 <X className="h-4 w-4" aria-hidden="true" />

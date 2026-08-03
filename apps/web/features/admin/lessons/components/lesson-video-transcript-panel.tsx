@@ -34,6 +34,7 @@ import {
   type TranscriptFormValues,
 } from "@/features/admin/lessons/schemas/lesson-video-transcript-schema";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { cn } from "@/lib/utils";
 
 interface LessonVideoTranscriptPanelProps {
@@ -53,6 +54,7 @@ export function LessonVideoTranscriptPanel({
   const accessToken = useAuthSessionStore((state) => state.session?.accessToken) ?? "";
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery);
   const [draftLanguage, setDraftLanguage] = useState(
     initialSettings?.transcriptLanguage ?? "",
   );
@@ -133,7 +135,7 @@ export function LessonVideoTranscriptPanel({
     if (
       !isOpen ||
       !isAutoScrollEnabled ||
-      searchQuery.trim() ||
+      debouncedSearchQuery.trim() ||
       activeTranscriptIndex === null
     ) {
       return;
@@ -160,10 +162,10 @@ export function LessonVideoTranscriptPanel({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTranscriptIndex, isAutoScrollEnabled, isOpen, searchQuery]);
+  }, [activeTranscriptIndex, debouncedSearchQuery, isAutoScrollEnabled, isOpen]);
 
   const visibleRows = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLocaleLowerCase("vi");
+    const normalizedQuery = debouncedSearchQuery.trim().toLocaleLowerCase("vi");
     const currentSegments = getValues("segments");
     const filteredRows = fields
       .map((field, index) => ({
@@ -198,7 +200,7 @@ export function LessonVideoTranscriptPanel({
             previousChapter.title !== chapter?.title),
       };
     });
-  }, [draftChapters, fields, getValues, searchQuery, timelineRevision]);
+  }, [debouncedSearchQuery, draftChapters, fields, getValues, timelineRevision]);
 
   const fetchMutation = useMutation({
     mutationFn: () => {

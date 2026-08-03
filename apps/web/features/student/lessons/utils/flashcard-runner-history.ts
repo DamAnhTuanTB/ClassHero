@@ -16,6 +16,7 @@ export type StoredFlashcardSession = {
   currentIndex: number;
   isBackVisible: boolean;
   resumesSavedProgress: boolean;
+  shouldCollapseResultHistoryOnComplete?: boolean;
   reviewedCardIds: string[];
   sessionId?: string;
 };
@@ -124,7 +125,39 @@ export function setFlashcardResultHistoryMarker(setId: string) {
   );
 }
 
-export function popFlashcardRunnerHistoryEntryPreservingResult() {
+export function pushFlashcardResultHistoryEntry(setId: string) {
+  if (typeof window === "undefined") return;
+
+  const currentState = getCurrentHistoryState();
+  const nextHref = getStudentLearningSurfaceHref({
+    kind: "flashcard-result",
+    setId,
+  });
+  writeSessionStorageString(FLASHCARD_RESULT_SURFACE_STORAGE_KEY, setId);
+  removeSessionStorageValue(FLASHCARD_RUNNER_SURFACE_STORAGE_KEY);
+
+  if (currentState[FLASHCARD_RESULT_HISTORY_STATE_KEY] === setId) {
+    if (getCurrentHref() !== nextHref) {
+      window.history.replaceState(currentState, "", nextHref);
+    }
+    return;
+  }
+
+  const nextState = { ...currentState };
+  delete nextState[FLASHCARD_RUNNER_HISTORY_STATE_KEY];
+  window.history.pushState(
+    {
+      ...nextState,
+      [FLASHCARD_RESULT_HISTORY_STATE_KEY]: setId,
+    },
+    "",
+    nextHref,
+  );
+}
+
+export function popFlashcardRunnerHistoryEntryPreservingResult(
+  onHistoryPopped?: () => void,
+) {
   if (typeof window === "undefined") return;
 
   const resultSetId = getFlashcardResultHistorySetId();
@@ -137,6 +170,7 @@ export function popFlashcardRunnerHistoryEntryPreservingResult() {
   const handlePopState = () => {
     window.clearTimeout(cleanupTimeoutId);
     setFlashcardResultHistoryMarker(resultSetId);
+    onHistoryPopped?.();
   };
 
   window.addEventListener("popstate", handlePopState, { once: true });
@@ -312,6 +346,8 @@ function isStoredFlashcardSession(
   return (
     typeof candidate.isBackVisible === "boolean" &&
     typeof candidate.resumesSavedProgress === "boolean" &&
+    (candidate.shouldCollapseResultHistoryOnComplete === undefined ||
+      typeof candidate.shouldCollapseResultHistoryOnComplete === "boolean") &&
     (candidate.sessionId === undefined || typeof candidate.sessionId === "string")
   );
 }

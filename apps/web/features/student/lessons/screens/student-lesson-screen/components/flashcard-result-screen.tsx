@@ -138,7 +138,7 @@ export function FlashcardResultScreen({
             aria-busy={pendingAction === "restart-all"}
             disabled={pendingAction === "restart-all"}
             onClick={onRestartAll}
-            className="student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-400/60 bg-violet-500 px-2 text-sm font-black text-white shadow-[0_5px_0_rgb(109_40_217),0_12px_22px_-10px_rgb(76_29_149_/_70%)] transition enabled:hover:bg-violet-400 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(109_40_217),0_6px_12px_-10px_rgb(76_29_149_/_55%)] disabled:cursor-wait disabled:border-slate-300 disabled:bg-slate-300 disabled:opacity-60 disabled:shadow-none dark:disabled:border-slate-700 dark:disabled:bg-slate-700 sm:text-[17px]"
+            className="student-preserve-mobile-shadow inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-violet-300/70 bg-violet-500/90 px-2 text-sm font-black text-white shadow-[0_5px_0_rgb(124_58_237),0_12px_22px_-10px_rgb(124_58_237_/_38%)] transition enabled:hover:bg-violet-400/90 active:translate-y-[3px] active:shadow-[0_2px_0_rgb(124_58_237),0_6px_12px_-10px_rgb(124_58_237_/_30%)] disabled:cursor-wait disabled:border-slate-300 disabled:bg-slate-300 disabled:opacity-60 disabled:shadow-none dark:border-violet-400/50 dark:bg-violet-600/90 dark:shadow-[0_5px_0_rgb(91_33_182),0_12px_22px_-10px_rgb(91_33_182_/_45%)] dark:disabled:border-slate-700 dark:disabled:bg-slate-700 sm:text-[17px]"
           >
             <RefreshCcw className="h-5 w-5 shrink-0" aria-hidden="true" />
             Ôn lại tất cả
@@ -161,7 +161,7 @@ export function FlashcardResultScreen({
             aria-busy={pendingAction === "start-new-set"}
             disabled={pendingAction === "start-new-set"}
             onClick={onStartNewSet}
-            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-4 text-sm font-black text-violet-700 shadow-[0_4px_0_rgb(221_214_254)] transition enabled:hover:bg-violet-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(221_214_254)] disabled:cursor-wait disabled:opacity-60 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:shadow-[0_4px_0_rgb(76_29_149)] dark:enabled:hover:bg-violet-500/10 sm:text-[17px]"
+            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-purple-400/70 bg-purple-500/90 px-4 text-sm font-black text-white shadow-[0_4px_0_rgb(147_51_234)] transition enabled:hover:border-purple-600 enabled:hover:bg-purple-600/90 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(147_51_234)] disabled:cursor-wait disabled:opacity-60 dark:border-purple-500/60 dark:bg-purple-600/90 dark:text-white dark:shadow-[0_4px_0_rgb(126_34_206)] dark:enabled:hover:border-purple-500 dark:enabled:hover:bg-purple-500/90 sm:text-[17px]"
           >
             <Sparkles className="h-5 w-5 shrink-0" aria-hidden="true" />
             Học bộ Flashcard mới

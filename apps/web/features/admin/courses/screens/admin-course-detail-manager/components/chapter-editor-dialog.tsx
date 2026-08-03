@@ -14,7 +14,6 @@ import { toChapterFormValues } from "@/features/admin/courses/admin-courses-util
 
 export function ChapterEditorDialog({
   disabled,
-  defaultOrderIndex,
   isOpen,
   isSaving,
   mode,
@@ -23,7 +22,6 @@ export function ChapterEditorDialog({
   onSubmit,
 }: {
   disabled: boolean;
-  defaultOrderIndex: number;
   isOpen: boolean;
   isSaving: boolean;
   mode: EditorMode;
@@ -48,26 +46,13 @@ export function ChapterEditorDialog({
         ? toChapterFormValues(selectedChapter)
         : {
             ...emptyChapterValues,
-            orderIndex: defaultOrderIndex,
             status: "PUBLISHED",
           },
     );
-  }, [defaultOrderIndex, form, isOpen, mode, selectedChapter]);
+  }, [form, isOpen, mode, selectedChapter]);
 
   async function submit(values: ChapterFormValues) {
-    try {
-      await onSubmit(values);
-    } catch (error) {
-      if (error instanceof Error && error.message === "DUPLICATED_CHAPTER_ORDER") {
-        form.setError("orderIndex", {
-          type: "manual",
-          message: "Thứ tự này đã có trong khóa học",
-        });
-        return;
-      }
-
-      throw error;
-    }
+    await onSubmit(values);
   }
 
   return (

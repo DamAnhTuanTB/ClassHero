@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useDeferredValue } from "react";
+import { useState, useCallback } from "react";
 import {
   useQuery,
   useMutation,
@@ -20,6 +20,7 @@ import type {
 } from "@/features/admin/courses/types/admin-course-api-types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getQueryRenderState } from "@/lib/query-render-state";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 export const enrollmentListQueryKeys = {
   all: ["admin", "course-enrollments"] as const,
@@ -51,14 +52,14 @@ export function useEnrollmentListPanel(learningPathId: string) {
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState<PersonalizationStatus | "ALL">("ALL");
 
   const [confirmingEnrollment, setConfirmingEnrollment] =
     useState<PersonalLearningPathEnrollmentApi | null>(null);
 
   const queryParams: PersonalLearningPathEnrollmentsQuery = {
-    search: deferredSearch || undefined,
+    search: debouncedSearch || undefined,
     personalizationStatus: statusFilter === "ALL" ? undefined : statusFilter,
     page,
     pageSize: PAGE_SIZE,

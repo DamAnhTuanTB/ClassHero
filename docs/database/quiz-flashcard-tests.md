@@ -44,6 +44,7 @@ options_json jsonb?
 correct_answer_json jsonb
 hint_json jsonb?
 grading_config_json jsonb?
+source_metadata_json jsonb?
 difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
 explanation_id uuid? fk ai_explanations.id
@@ -80,6 +81,8 @@ Rules:
   vẫn giữ boolean và không cần chuyển đổi dữ liệu.
 - Chuỗi đáp án `TEXT_INPUT` có thể chứa LaTeX/mhchem canonical nhưng không lưu
   marks/ảnh vì server cần chuẩn hóa và so khớp đáp án học sinh.
+- Item AI lưu `source_metadata_json` gồm source hash, chunk IDs và metadata
+  document/page dùng cho admin review/debug; field này không trả cho student.
 - Với `TEXT_INPUT`, các đáp án chấp nhận nằm trong `correct_answer_json`; `grading_config_json` chứa cấu hình so khớp như `caseSensitive`, `exactMatch` và có thể mở rộng thêm `trimWhitespace`, `numericTolerance`, `unitRequired`, `acceptedUnits`.
 - Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`: `target_type=QUIZ_QUESTION`, `target_id=quiz_questions.id`, `source=ADMIN`, `review_status=APPROVED`; `quiz_questions.explanation_id` trỏ tới bản ghi này.
 - Khi admin sửa nội dung/correct answer/hint, service phải mark explanation stale hoặc xóa `explanation_id` theo AI/RAG spec.
@@ -191,6 +194,7 @@ lesson_id uuid fk lessons.id
 front_json jsonb
 back_json jsonb
 hint_json jsonb?
+source_metadata_json jsonb?
 explanation_id uuid? fk ai_explanations.id
 difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
@@ -203,6 +207,8 @@ deleted_at timestamp?
 Rules:
 
 - `hint_json` là cột legacy nullable; contract M6.3 mới không đọc/ghi trường này.
+- Flashcard AI không sinh hoặc ghi `hint_json`; provenance được lưu riêng trong
+  `source_metadata_json` và chỉ dùng ở flow quản trị.
 - Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`:
   `target_type=FLASHCARD`, `target_id=flashcards.id`, `source=ADMIN`,
   `review_status=APPROVED`; `flashcards.explanation_id` trỏ tới bản ghi này.
@@ -325,6 +331,7 @@ options_json jsonb?
 correct_answer_json jsonb
 hint_json jsonb?
 grading_config_json jsonb?
+source_metadata_json jsonb?
 points numeric?
 difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
@@ -338,6 +345,7 @@ deleted_at timestamp?
 Rules:
 
 - Nếu `points` null, service tính điểm bằng nhau để tổng là 10.
+- Item AI lưu `source_metadata_json` cùng shape provenance với quiz question.
 - API trả thêm `effectivePoints` (không lưu cột riêng) để UI/flow chấm điểm dùng
   được điểm đã chia đều; phần dư do làm tròn được phân bổ theo thứ tự câu hỏi để
   tổng vẫn đúng `test_sets.total_score`.
@@ -384,8 +392,8 @@ WHERE is_best_for_lesson = true;
 
 Rules:
 
-- Submit chỉ lưu/chấm attempt. Cập nhật best chỉ xảy ra khi student chủ động
-  `use-result` với attempt đạt ngưỡng và phải chạy trong transaction.
+- Submit attempt đạt ngưỡng tự động cập nhật best và lesson completion
+  trong transaction. Attempt chưa đạt không hủy completion/best đã có.
 - Best result ưu tiên điểm cao hơn; nếu bằng điểm, thời gian làm nhanh hơn.
 - `lesson_progress.best_test_attempt_id` là nguồn chính; `is_best_for_lesson` là denormalized để query nhanh.
 

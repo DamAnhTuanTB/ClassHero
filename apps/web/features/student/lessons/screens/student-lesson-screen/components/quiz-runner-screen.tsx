@@ -63,7 +63,7 @@ export function QuizRunnerLoadingScreen() {
           <div className="h-full w-1/4 rounded-full bg-[var(--theme-skeleton-strong)]" />
         </div>
 
-        <div className="mt-5 rounded-[1.6rem] border border-[var(--theme-skeleton-strong)] bg-white p-4 shadow-[0_24px_55px_-42px_rgb(15_23_42_/_16%)] dark:bg-[var(--theme-surface)]">
+        <div className="mt-5 rounded-[1.6rem] bg-white p-4 shadow-[0_24px_55px_-42px_rgb(15_23_42_/_16%)] dark:bg-[var(--theme-surface)]">
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 items-center gap-3">
               <div className="h-11 w-11 shrink-0 rounded-2xl bg-[var(--theme-skeleton)]" />

@@ -119,24 +119,31 @@ Actor: Admin.
 Các bước:
 
 1. Admin vào chi tiết lộ trình.
-2. Admin bấm thêm chương học.
-3. Nhập tên chương, thứ tự, mô tả/tổng quan ngắn, mục tiêu học tập hoặc nội dung trọng tâm nếu có, trạng thái.
-4. Backend tạo `learning_path_chapters`.
-5. Admin mở chương học và bấm thêm buổi học.
-6. Nhập title, order index, loại buổi học, mô tả ngắn, ngày/giờ học hoặc ngày/giờ mở bài thi, video URL và tiêu chí hoàn thành. Loại mặc định là `BASIC`; khi chọn `LIVE`, form hiển thị thêm field link học live tùy chọn.
-7. Backend tạo `lessons` thuộc chương học.
-8. Backend cập nhật tổng số buổi nếu cần.
-9. Backend ghi audit log.
+2. Khu vực `Cấu trúc khóa học` luôn hiển thị hai action ngang hàng: `Thêm chương` và `Thêm buổi học`.
+3. Nếu chọn thêm chương, admin nhập tên chương, mô tả/tổng quan ngắn, mục tiêu học tập hoặc nội dung trọng tâm nếu có và trạng thái; backend tự nối chương vào cuối cấu trúc top-level rồi chuẩn hóa/lưu thứ tự.
+4. Nếu chọn thêm buổi học, admin nhập title, chương học tùy chọn, loại buổi học, mô tả ngắn, ngày/giờ học hoặc ngày/giờ mở bài thi, video URL và tiêu chí hoàn thành. Backend tự nối buổi học vào cuối container đã chọn rồi chuẩn hóa/lưu thứ tự. Loại mặc định là `BASIC`; khi chọn `LIVE`, form hiển thị thêm field link học live tùy chọn.
+5. Khi admin để trống chương, backend tạo `lessons` trực tiếp trong lộ trình với `chapter_id = null`. Khóa học chưa có chương vẫn tạo buổi học bình thường.
+6. Khi admin chọn chương, backend kiểm tra chương thuộc đúng lộ trình rồi tạo lesson trong chương đó.
+7. Backend cập nhật tổng số chương/buổi nếu cần và ghi audit log.
 
 Acceptance Criteria:
 
-- `order_index` của chương không trùng trong cùng lộ trình.
-- `order_index` của buổi học không trùng trong cùng chương.
+- `order_index` top-level là thứ tự chung của chapter và lesson không thuộc chapter trong cùng lộ trình; hai loại có thể xen kẽ và service không để trùng vị trí logic.
+- `order_index` của buổi học trong chapter không trùng trong chapter đó.
+- Create chapter/lesson không nhận thứ tự từ client; backend khóa cấu trúc, tự append vào cuối container, kiểm tra và compact dãy thứ tự liên tục từ `1` trong cùng transaction. Việc đổi vị trí dùng riêng flow kéo-thả/action `Di chuyển`.
+- Tên buổi học active không trùng trong cùng nhóm đích; các nhóm khác nhau vẫn có thể dùng cùng tên.
+- Admin có thể kéo/thả một buổi tới bất kỳ vị trí nào: đổi thứ tự trong cùng chapter, sang vị trí cụ thể của chapter khác, ra vị trí cụ thể ở top-level hoặc từ top-level vào chapter.
+- API move nhận container đích và vị trí đích; backend compact container nguồn, dịch vị trí container đích và cập nhật `chapter_id`/`order_index` trong cùng transaction.
+- Trước khi ghi, backend flatten cây dự kiến và kiểm tra `lesson_progress.status = COMPLETED` (không tính chính lesson đang move). Nếu lesson đang move sẽ nằm trước bất kỳ lesson đã có ít nhất một completion, toàn bộ transaction bị từ chối với `LESSON_MOVE_BEFORE_COMPLETED`.
 - Chương học chỉ chứa thông tin tổng quan, không có video/tài liệu/PDF/quiz/flashcard/test riêng.
 - `completion_min_score` mặc định là 7.
 - `lesson_type` mặc định là `BASIC`; chỉ nhận `BASIC` hoặc `LIVE`.
 - `live_url` là optional, chỉ được giữ khi `lesson_type = LIVE`; khi chuyển về `BASIC`, backend clear field này.
 - Video URL chấp nhận YouTube hoặc Google Drive.
+- Course detail render một cây có thứ tự: chapter và lesson không thuộc chapter là sibling ở top-level; lesson trong chapter là node con. Thứ tự học đi theo depth-first từ trên xuống của cây này.
+- UI Student đánh số chapter bằng dãy riêng `1..n`, không dùng `order_index` top-level khi có lesson xen kẽ. Chip số hiển thị thứ tự; tiêu đề chapter dùng nguyên văn admin nhập và frontend không tự ghép thêm `Chương {n}.`.
+- Desktop hỗ trợ drag/drop; mobile và keyboard có action `Di chuyển` để chọn chapter/top-level và vị trí đích, không phụ thuộc duy nhất vào kéo thả.
+- UI đánh dấu lesson đã có completion là mốc khóa, không cho chọn/drop vào vị trí vi phạm và giải thích `Không thể chèn trước buổi học đã có học sinh hoàn thành`; backend vẫn recheck để chống stale/concurrent state.
 - Chỉ admin được tạo/sửa/xóa.
 
 ---
@@ -318,6 +325,21 @@ Acceptance Criteria:
 - Nội dung có `source = AI` và `review_status` phù hợp.
 - Có log AI generation.
 
+### 7.1. Admin cấu hình model và theo dõi chi phí AI/OCR
+
+1. Admin mở `/admin/ai-settings` từ sidebar.
+2. Chọn model chính/dự phòng cho tóm tắt, Quiz, Flashcard, bài kiểm tra; lưu bằng optimistic version.
+3. Xem OCR provider/cache/credential status, tỷ giá và ngân sách.
+4. Xem chi phí theo ngày/tuần/tháng, breakdown model/chức năng và usage event.
+5. Khi provider đổi giá, thêm price version với nguồn chính thức và ngày hiệu lực; lịch sử cũ không bị tính lại.
+
+Acceptance Criteria:
+
+- Backend enforce role ADMIN và không trả secret.
+- Job đã enqueue giữ route snapshot; fallback chỉ cho lỗi provider tạm thời.
+- OCR retry tiếp tục `pdfId` đã có, cache hit có cost 0 và saving.
+- Đổi model/giá/budget/accounting có audit; version conflict buộc tải lại.
+
 ---
 
 ## 8. Student/Parent thanh toán mua lộ trình
@@ -426,9 +448,9 @@ Acceptance Criteria:
 - Ghi chú riêng chỉ thuộc student đó.
 - Hai ô điều hướng lesson luôn xuất hiện. Ở bài đầu tiên, ô trái là link
   `Trở về` dẫn về chi tiết khóa học; từ bài thứ hai, ô này là `Bài học trước`.
-  Nút kế tiếp disabled khi không có bài đứng sau hoặc điểm của bài thi hiện tại chưa đạt
-  `completionMinScore`; sau khi student nộp một bài thi đạt ngưỡng, nút được
-  bật ngay mà không cần tải lại trang.
+  Nút kế tiếp disabled khi không có bài đứng sau hoặc student chưa từng nộp
+  bài thi đạt `completionMinScore`; sau lần nộp đạt, nút được bật ngay mà
+  không cần tải lại trang và không bị khóa lại nếu lần thi sau chưa đạt.
 - Mọi CTA/link trong student app dẫn trực tiếp tới trang chi tiết buổi học đều
   dùng cùng transition; API lesson phải bắt đầu song song với animation, không
   chờ animation kết thúc mới gọi.
@@ -482,8 +504,9 @@ Các bước:
 3. `Bắt đầu` tạo lượt mới và luôn mở câu đầu tiên. `Tiếp tục làm` khôi phục
    lượt `IN_PROGRESS`, toàn bộ đáp án đã chọn/đã nhập và đúng câu gần nhất
    student đứng trước khi Back, F5, đóng web hoặc đổi thiết bị. `Xem lại` mở
-   kết quả gốc đã cộng dồn của toàn bộ bài Quiz; `Làm bộ Quiz mới` tạo một lượt
-   đầy đủ mới của bộ quiz hiện tại.
+   kết quả gốc đã cộng dồn của toàn bộ bài Quiz. Từ `M9.4`, `Làm bộ Quiz mới`
+   gọi request-new reserve-first: `200 EXISTING` mở ngay set được cấp;
+   `202 QUEUED` hiển thị tiến trình tạo, polling và mở set khi sẵn sàng.
 4. Khi mở/resume attempt, API trả sẵn dữ liệu chấm, lời giải, đáp án đã lưu,
    trạng thái đã kiểm tra và `currentQuestionIndex`. Student trả lời từng câu;
    frontend autosave lựa chọn ngay và debounce input text ngắn. Nút
@@ -613,6 +636,8 @@ Các bước:
 8. Backend lưu attempt và answers.
 9. Backend cập nhật best attempt của lesson nếu tốt hơn.
 10. Nếu điểm >= 7, backend đánh dấu lesson completed.
+    Trạng thái này là sticky: attempt thi lại dưới ngưỡng không hạ lesson
+    về chưa hoàn thành và không thay best attempt đã đạt.
 11. Backend tạo XP event nếu hoàn thành.
 12. Backend gửi notification cho student/parent nếu cần.
 
@@ -627,8 +652,10 @@ Acceptance Criteria:
 - Khi quay lại tab Bài thi và status đã có `latestSubmittedAttempt`, CTA chính đổi từ
   `Bắt đầu bài thi` thành `Làm bài thi mới`, đồng thời hiển thị
   `Xem lại bài thi`. Action xem lại tải attempt đã hoàn thành gần nhất/tốt nhất
-  từ `latestSubmittedAttempt.id`; action làm mới tạo một attempt mới như bình
-  thường. Quy tắc này áp dụng cho mọi attempt đã nộp, kể cả chưa đạt.
+  từ `latestSubmittedAttempt.id`. Trước `M9.4`, action làm mới tạo attempt mới
+  theo flow hiện có; sau `M9.4`, action gọi request-new reserve-first, xử lý
+  `200 EXISTING`/`202 QUEUED`, polling/error/retry và chỉ tạo attempt khi set
+  hợp lệ đã sẵn sàng. Quy tắc này áp dụng cho mọi attempt đã nộp, kể cả chưa đạt.
 - Nếu bộ đề hiện tại có `0 câu`, panel hiển thị `0 câu`, ẩn thời lượng và khóa
   mọi action `Bắt đầu bài thi`/`Làm bài thi mới`, kể cả action trong lịch sử.
 - Nếu chưa có bộ đề nào, panel Bài thi vẫn hiển thị đầy đủ với `0 câu`, không
@@ -645,6 +672,7 @@ Acceptance Criteria:
   `Bộ hiện tại` vào đúng set đang được chọn để phân biệt.
 - Kết quả tốt nhất ưu tiên điểm cao, sau đó thời gian nhanh.
 - Lesson completed khi best score >= 7.
+- Lesson đã completed không bị hủy bởi một lần thi lại chưa đạt.
 - Parent xem được kết quả tốt nhất.
 
 ---
@@ -661,11 +689,14 @@ Các bước:
 2. Backend kiểm tra quyền xem item.
 3. Backend kiểm tra đã có `ai_explanations` cho target chưa.
 4. Nếu có, trả lời giải đã cache.
-5. Nếu chưa có, backend tạo job hoặc gọi AI theo mode phù hợp.
+5. Nếu chưa có hoặc cache stale, backend tạo job và UI hiển thị trạng thái đang
+   tạo, polling, khóa gửi lặp; lỗi phải có retry.
 6. AI tạo lời giải dựa trên tài liệu buổi học.
 7. Backend validate output.
 8. Backend lưu lời giải.
 9. UI hiển thị lời giải ngay dưới câu.
+10. UI hiển thị `Chat thêm với AI`; chỉ khi student bấm action này mới chuyển
+    target item và lời giải đã lưu sang flow chat.
 
 Acceptance Criteria:
 
@@ -673,6 +704,7 @@ Acceptance Criteria:
 - Lời giải không cần cá nhân hóa theo đáp án sai của học sinh.
 - Với test question, nút chỉ hiện sau khi student đã nộp bài.
 - Không chuyển sang chat AI khi chỉ bấm giải thích.
+- Flow cache hit, queued, error và retry đều kiểm thử được trực tiếp trên UI.
 
 ---
 
@@ -696,6 +728,8 @@ Acceptance Criteria:
 - Chat session gắn với student và lesson.
 - AI không trả lời ngoài phạm vi lesson.
 - Không cho upload file/ảnh trong chat.
+- Chat vẫn mở trực tiếp từ lesson khi không đi qua lời giải; context badge chỉ
+  hiện khi được bàn giao từ `M9.5`.
 
 ---
 
