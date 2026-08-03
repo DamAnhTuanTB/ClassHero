@@ -7,7 +7,7 @@ export function StudentCourseDetailHeroArt({
 }) {
   if (thumbnailImageUrl) {
     return (
-      <div className="student-course-detail-hero-art relative min-h-[13.75rem] overflow-hidden rounded-[1.15rem] bg-slate-100 dark:bg-[var(--theme-surface-muted)]">
+      <div className="student-course-detail-hero-art relative min-h-[14.5rem] overflow-hidden rounded-[1.15rem] bg-slate-100 dark:bg-[var(--theme-surface-muted)]">
         <img
           src={thumbnailImageUrl}
           alt={`Ảnh khóa học ${title}`}
@@ -20,7 +20,7 @@ export function StudentCourseDetailHeroArt({
   }
 
   return (
-    <div className="student-course-detail-hero-art relative min-h-[13.75rem] overflow-hidden rounded-[1.15rem] bg-gradient-to-br from-blue-500 via-sky-500 to-cyan-400 text-white dark:from-sky-900 dark:via-blue-950 dark:to-cyan-950">
+    <div className="student-course-detail-hero-art relative min-h-[14.5rem] overflow-hidden rounded-[1.15rem] bg-gradient-to-br from-blue-500 via-sky-500 to-cyan-400 text-white dark:from-sky-900 dark:via-blue-950 dark:to-cyan-950">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_16%,rgb(255_255_255_/_40%)_0_0.38rem,transparent_0.42rem),radial-gradient(circle_at_74%_14%,rgb(255_255_255_/_56%)_0_0.22rem,transparent_0.25rem),radial-gradient(circle_at_94%_52%,rgb(255_255_255_/_11%)_0_3.8rem,transparent_3.9rem)]" />
       <div className="absolute left-8 top-7 text-4xl font-light italic leading-none opacity-90">
         <span className="block">a</span>

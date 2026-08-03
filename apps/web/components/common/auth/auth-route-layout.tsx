@@ -10,7 +10,7 @@ import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 type AuthVariant = "login" | "student" | "parent" | "recovery";
 type IllustrationType = "login" | "student" | "parent" | "secure";
 
-const authBrandSlogan = "Học thông minh, vững tương lai";
+const authBrandSlogan = "Học thông minh - Vững tương lai";
 
 const theme = {
   login: {
@@ -92,9 +92,12 @@ export function AuthRouteLayout({ children }: { children: ReactNode }) {
         <div className="relative h-[25rem] px-6 pb-28 pt-6 sm:h-[26.125rem] sm:px-8 sm:pb-28 sm:pt-8 lg:h-auto lg:min-h-full lg:px-10 lg:pb-12 lg:pt-10 xl:px-14">
           <div className="flex items-center justify-between gap-4">
             <Link href="/" className="inline-flex items-center">
-              <span>
-                <ClassHeroLogo className="h-8 max-w-[10rem]" priority />
-                <span className="block text-xs font-extrabold text-[var(--theme-brand-secondary)]">
+              <span className="inline-grid justify-items-center">
+                <ClassHeroLogo
+                  className="h-12 max-w-[13rem] lg:h-14 lg:max-w-[15rem]"
+                  priority
+                />
+                <span className="block whitespace-nowrap text-center text-xs font-extrabold text-[var(--theme-brand-secondary)]">
                   {authBrandSlogan}
                 </span>
               </span>

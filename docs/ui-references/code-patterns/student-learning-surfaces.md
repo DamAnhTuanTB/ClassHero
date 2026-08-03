@@ -41,6 +41,10 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
 - Card list dùng cấu trúc media trái, nội dung phải trên mobile; desktop/tablet có thể mở rộng thành grid nhiều cột.
 - Card có `min-w-0`, line-clamp/truncate ở title, description, metadata và CTA để không overflow ngang.
 - Phần nhận diện gồm minh họa môn học, accent strip, subject badge, grade label và status badge. Badge dùng mapping chung theo status/subject, không copy màu rời rạc.
+- Accent strip của course card đi qua một helper palette dùng chung: khoảng 50% là các sắc xanh dương pastel, phần còn lại luân phiên màu pastel đa dạng; mỗi index trong cùng list phải tạo màu riêng và không dùng màu đậm. Không copy bảng màu này thành class rời rạc ở từng screen.
+- Màu badge đối tượng phải bám đúng độ chi tiết của label đang hiển thị: `Khối 12` là một identity màu riêng, không được collapse về cùng màu với nhóm cha `Khối THPT` chỉ vì cùng target-audience code; tương tự cho các khối số và nhóm Tiểu học/THCS/THPT. Palette phải đi qua shared helper để cùng một identity có màu ổn định giữa màn Khám phá, Học tập và Chi tiết; các identity khác tên dùng base hue riêng, không đổi màu theo vị trí card.
+- Ribbon section đại diện một khối/nhóm đối tượng phải dùng cùng base hue với badge identity tương ứng; chỉ saturation/lightness được tăng để giữ chữ trắng dễ đọc. Không duy trì một bảng hue riêng cho ribbon khiến `Khối 12` hoặc `Khối THPT` lệch màu badge bên trong card.
+- Các nhãn học tập trọng tâm `Khối THCS`, `Khối 12`, `Khối 9` và `Khối THPT` đều dùng họ xanh dương làm màu chủ đạo, nhưng phải tách rõ bằng hue, saturation và surface lightness chứ không chỉ kiểm giá trị HSL có khác nhau hay không. Riêng Khối 12 dùng royal-blue sáng, nền badge rất nhạt và ribbon có gradient sáng riêng để không nhìn giống ribbon cyan/sky của `Khóa học phù hợp với bạn`; không dùng navy đậm hoặc periwinkle ngả tím/đục.
 - Card có panel theo trạng thái:
   - enrolled: progress, next item và CTA học.
   - locked/not enrolled: price/summary và CTA chi tiết.
@@ -53,6 +57,10 @@ Dùng file này cho các màn học sinh có shell, list/filter, card khóa họ
 
 - Không để card lồng nhiều card nặng hoặc shadow dày khiến list học sinh giống dashboard doanh nghiệp.
 - Không hard-code màu chỉ hợp light mode trong card; dùng token/class role hoặc variant dark tương ứng.
+- Không dùng accent strip bão hòa/đậm, không để hai card trong cùng list trùng màu và không đổi màu ribbon section khi task chỉ yêu cầu dải mép trái card.
+- Không ưu tiên mã nhóm cha trước label khối cụ thể khi resolve màu badge, vì sẽ tạo các nhãn khác tên nhưng trùng màu.
+- Không copy bảng màu badge vào từng screen hoặc tạo biến thể theo index khiến cùng một nhãn đổi màu giữa list và detail.
+- Không coi hai màu đã “khác” chỉ vì HSL lệch vài đơn vị; nếu mắt thường vẫn nhìn như cùng màu thì phải tăng khoảng cách hue và/hoặc thay saturation/lightness trong cùng họ màu.
 - Không để CTA client-only giả thành công khi flow đã được coi là connected/production.
 - Không để badge/status chen vào title hoặc làm title xuống dòng xấu.
 

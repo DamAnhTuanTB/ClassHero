@@ -128,14 +128,20 @@ export function AdminCoursesSidebarContent({
             aria-current={item.active ? "page" : undefined}
             title={isCollapsed ? item.label : undefined}
             className={cn(
-              "inline-flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition",
-              isCollapsed && "lg:justify-center lg:px-0",
+              "relative inline-flex min-h-11 w-full items-center gap-3 overflow-hidden rounded-2xl border border-l-4 px-4 py-1.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--theme-focus-ring)]",
+              isCollapsed && "lg:justify-center lg:border-l lg:px-0",
               item.active
-                ? "bg-[var(--theme-primary-soft)] text-[var(--theme-primary)] ring-1 ring-[var(--theme-primary-border)]"
-                : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
+                ? "border-sky-100 border-l-sky-300 bg-sky-50 text-sky-700 shadow-none dark:border-[var(--theme-primary-border)] dark:border-l-sky-400/70 dark:bg-[var(--theme-primary-soft)] dark:text-[var(--theme-primary)]"
+                : "border-transparent border-l-transparent text-[var(--theme-text-muted)] hover:border-sky-100 hover:border-l-sky-200/70 hover:bg-sky-50/70 hover:text-sky-700 dark:hover:border-[var(--theme-border)] dark:hover:border-l-[var(--theme-primary-border)] dark:hover:bg-[var(--theme-surface-soft)] dark:hover:text-[var(--theme-text-strong)]",
             )}
           >
-            <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <item.icon
+              className={cn(
+                "h-6 w-6 shrink-0 transition",
+                item.active ? "text-sky-600" : "text-inherit",
+              )}
+              aria-hidden="true"
+            />
             <span className={cn("truncate", isCollapsed && "lg:hidden")}>
               {item.label}
             </span>

@@ -258,3 +258,19 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
     tương lai cần cùng entry/runner/result flow.
 - Evidence:
   - Files: `apps/web/features/student/lessons/screens/student-lesson-screen/components/quiz-learning-panel.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/flashcard-learning-panel.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen.tsx`, `apps/web/features/student/lessons/screens/student-lesson-screen/components/flashcard-result-screen.tsx`.
+
+## Student Course Card Pastel Accent Strip - 2026-08-03
+
+- Context: dải màu dọc ở mép trái card khóa học trên màn Khám phá và Học tập.
+- Approved:
+  - Dải mép trái dùng màu pastel sáng, tuyệt đối không dùng màu đậm hoặc bão hòa mạnh.
+  - Khoảng 50% card dùng các sắc xanh dương khác nhau; 50% còn lại luân phiên vàng, đỏ san hô, xanh lá, lavender rất nhạt, hồng, cam, mint và turquoise.
+  - Mỗi card trong cùng danh sách có màu dải mép trái riêng, không trùng nhau; xanh dương vẫn là trục nhận diện nhưng không làm toàn bộ danh sách một màu.
+  - Chỉ đổi màu dải mép trái, không tự kéo palette sang ribbon tiêu đề section hoặc thay đổi hình học, spacing và interaction của card.
+- Avoid:
+  - Không dùng bất kỳ màu đậm nào như một vệt tương phản nặng sát mép card; tím chỉ được dùng ở sắc lavender rất nhạt, không dùng tím đậm hoặc bão hòa.
+  - Không quay lại palette chỉ gồm các hue xanh gần nhau hoặc lặp màu giữa các card trong cùng danh sách.
+- Reuse for:
+  - Course card ở màn Khám phá, Học tập và các danh sách khóa học học viên dùng chung `ExploreCourseCard`.
+- Evidence:
+  - Files: `apps/web/components/student/courses/explore-course-card.tsx`.

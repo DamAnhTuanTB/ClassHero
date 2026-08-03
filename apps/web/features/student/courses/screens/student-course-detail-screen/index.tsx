@@ -9,7 +9,6 @@ import {
   Home,
   Loader2,
   LockKeyhole,
-  Play,
   PlayCircle,
   ShoppingCart,
 } from "lucide-react";
@@ -36,8 +35,8 @@ import type { StudentCourseDetailResult } from "@/features/student/shared/types/
 import {
   formatVnd,
   getCoursePrice,
-  subjectLabels,
 } from "@/features/student/shared/utils/student-courses-utils";
+import { getStudentCourseAudienceStyle } from "@/features/student/shared/utils/student-course-audience-palette";
 import { getStudentCourseContinueLessonCopy } from "@/features/student/shared/utils/student-course-continue-lesson";
 import { cn } from "@/lib/utils";
 import type { AppThemeMode } from "@/lib/theme-store";
@@ -54,8 +53,11 @@ export function StudentCourseDetailScreen({
   const queryClient = useQueryClient();
   const [isNavigatingToCheckout, setIsNavigatingToCheckout] = useState(false);
   const [bfCacheKey, setBfCacheKey] = useState(0);
-  const { isAuthHydrated, query: courseDetailQuery, session } =
-    useStudentCourseDetailQuery(slug, initialData);
+  const {
+    isAuthHydrated,
+    query: courseDetailQuery,
+    session,
+  } = useStudentCourseDetailQuery(slug, initialData);
   const mockPurchaseMutation = useStudentMockPurchaseMutation(slug);
   const createPaymentMutation = useCreatePaymentMutation();
   const refetchCourseDetail = courseDetailQuery.refetch;
@@ -177,7 +179,7 @@ export function StudentCourseDetailScreen({
       ? LockKeyhole
       : course.access === "completed"
         ? BadgeCheck
-        : Play;
+        : PlayCircle;
   const courseStatusLabel = isCourseUnderMaintenance
     ? "Đang bảo trì"
     : course.access === "locked"
@@ -245,21 +247,21 @@ export function StudentCourseDetailScreen({
         <div className="min-w-0 space-y-4">
           <StudentCourseMobileBrandBar />
 
-          <section className="overflow-hidden rounded-[1.35rem] bg-white p-2 dark:bg-[var(--theme-surface)] lg:p-4">
+          <section className="overflow-hidden rounded-[1.35rem] bg-white p-4 dark:bg-[var(--theme-surface)] lg:p-5">
             <StudentCourseDetailHeroArt
               thumbnailImageUrl={course.thumbnailImageUrl}
               title={course.title}
             />
-            <div className="px-3 pb-3 pt-4 sm:px-4">
-              <h1 className="student-soft-bold-text text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl">
-                {course.title}
-              </h1>
-              <div className="mt-4 grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2">
-                <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-50 px-2.5 text-xs font-black text-blue-700 dark:bg-[var(--theme-primary-soft)] dark:text-sky-300 sm:gap-2 sm:px-3 sm:text-sm">
-                  <Calculator className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-                  {subjectLabels[course.subject] ?? course.subject}
-                </span>
-                <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-violet-50 px-2.5 text-xs font-black text-blue-700 dark:bg-violet-500/15 dark:text-sky-300 sm:gap-2 sm:px-3 sm:text-sm">
+            <div className="pt-3">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                <span
+                  style={getStudentCourseAudienceStyle({
+                    fallbackHue: 205,
+                    targetAudienceGrade: course.grade,
+                    targetAudienceName: course.targetAudienceName,
+                  })}
+                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--student-course-audience-bg)] px-2.5 text-xs font-black text-[var(--student-course-audience-text)] dark:bg-[var(--student-course-audience-dark-bg)] dark:text-[var(--student-course-audience-dark-text)] sm:gap-2 sm:px-3 sm:text-sm"
+                >
                   <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
                   {course.targetAudienceName}
                 </span>
@@ -275,50 +277,38 @@ export function StudentCourseDetailScreen({
                           : "border-sky-100 bg-sky-50 text-sky-600 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-primary-soft)] dark:text-sky-300",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "grid h-5 w-5 shrink-0 place-items-center rounded-full text-white",
-                      isCourseUnderMaintenance
-                        ? "bg-amber-500"
-                        : course.access === "locked"
-                          ? "bg-rose-500"
-                          : course.access === "completed"
-                            ? "bg-emerald-500"
-                            : "bg-sky-600 dark:bg-sky-300 dark:text-slate-950",
-                    )}
-                  >
+                  <span className="grid h-5 w-5 shrink-0 place-items-center text-current">
                     <CourseStatusIcon
-                      className={cn(
-                        isCourseUnderMaintenance ? "h-3.5 w-3.5" : "h-3 w-3",
-                        !isCourseUnderMaintenance && course.access === "enrolled"
-                          ? "fill-current"
-                          : "",
-                      )}
-                      strokeWidth={
-                        !isCourseUnderMaintenance && course.access === "enrolled"
-                          ? 0
-                          : 2.5
-                      }
+                      className="h-5 w-5 fill-none"
+                      strokeWidth={2.25}
                       aria-hidden="true"
                     />
                   </span>
                   {courseStatusLabel}
                 </span>
               </div>
+              <h1 className="student-soft-bold-text mt-2 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl">
+                {course.title}
+              </h1>
               {isCourseUnderMaintenance ? (
                 <div className="mt-3 inline-flex min-h-9 max-w-full items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-black leading-5 text-amber-700 dark:border-[var(--theme-warning-border)] dark:bg-[var(--theme-warning-bg)] dark:text-[var(--theme-warning-text)]">
                   <LockKeyhole className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 break-words">Khóa học đang được bảo trì</span>
                 </div>
               ) : null}
-              <p className="mt-4 text-base font-medium leading-7 text-slate-600 dark:text-[var(--theme-text-muted)]">
+              <p
+                className={cn(
+                  "text-base font-medium leading-7 text-slate-600 dark:text-[var(--theme-text-muted)]",
+                  isCourseUnderMaintenance ? "mt-3" : "mt-1",
+                )}
+              >
                 Khóa học giúp bạn nắm vững kiến thức trọng tâm, rèn luyện kỹ năng giải bài
                 tập và tự tin bứt phá điểm số.
               </p>
-              <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-slate-700 dark:text-[var(--theme-text)]">
+              <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-3 text-slate-700 dark:text-[var(--theme-text)]">
                 <div className="inline-flex min-w-0 items-center gap-2">
                   <BookOpen
-                    className="h-6 w-6 shrink-0 text-slate-500"
+                    className="student-chapter-icon h-6 w-6 shrink-0 text-emerald-800 dark:text-emerald-300"
                     aria-hidden="true"
                   />
                   <span className="truncate text-sm font-bold">
@@ -327,7 +317,7 @@ export function StudentCourseDetailScreen({
                 </div>
                 <div className="inline-flex min-w-0 items-center gap-2">
                   <PlayCircle
-                    className="h-6 w-6 shrink-0 text-slate-500"
+                    className="student-progress-accent-text h-6 w-6 shrink-0 text-sky-600 dark:text-sky-300"
                     aria-hidden="true"
                   />
                   <span className="truncate text-sm font-bold">
@@ -366,7 +356,10 @@ export function StudentCourseDetailScreen({
                       className="student-learn-cta-3d inline-flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:opacity-70"
                     >
                       {createPaymentMutation.isPending || isNavigatingToCheckout ? (
-                        <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+                        <Loader2
+                          className="h-5 w-5 shrink-0 animate-spin"
+                          aria-hidden="true"
+                        />
                       ) : (
                         <ShoppingCart className="h-5 w-5 shrink-0" aria-hidden="true" />
                       )}
@@ -382,7 +375,10 @@ export function StudentCourseDetailScreen({
                       className="inline-flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-100 disabled:opacity-70 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-muted)] dark:text-[var(--theme-text-muted)] dark:hover:bg-[var(--theme-surface)]"
                     >
                       {mockPurchaseMutation.isPending ? (
-                        <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+                        <Loader2
+                          className="h-5 w-5 shrink-0 animate-spin"
+                          aria-hidden="true"
+                        />
                       ) : null}
                       Mua test (dev)
                     </button>
@@ -396,9 +392,9 @@ export function StudentCourseDetailScreen({
             <StudentCourseDetailProgressCard course={course} detail={detail} />
           ) : null}
 
-          <section className="rounded-[1.35rem] bg-white/86 p-4 dark:bg-[var(--theme-surface)]">
-            <div className="mb-4 flex min-w-0 items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-950 dark:border-[var(--theme-border)] dark:text-[var(--theme-text-strong)]">
+          <section className="rounded-[1.35rem] bg-white/86 p-4 dark:bg-[var(--theme-surface)] lg:p-5">
+            <div className="mb-4 flex min-w-0 items-center gap-2">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-sky-200 bg-sky-50 text-sky-600 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300">
                 <Calculator className="h-6 w-6" aria-hidden="true" />
               </span>
               <h2 className="min-w-0 flex-1 truncate text-xl font-extrabold text-slate-800 dark:text-[var(--theme-text)]">

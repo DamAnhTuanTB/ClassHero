@@ -27,13 +27,13 @@ export function CourseStatusBadge({
       )}
     >
       {isUnderMaintenance ? (
-        <Wrench className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
+        <Wrench className="h-5 w-5 shrink-0" aria-hidden="true" />
       ) : access === "completed" ? (
-        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
+        <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />
       ) : access === "enrolled" ? (
-        <CirclePlay className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
+        <CirclePlay className="h-5 w-5 shrink-0" aria-hidden="true" />
       ) : (
-        <LockKeyhole className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
+        <LockKeyhole className="h-5 w-5 shrink-0" aria-hidden="true" />
       )}
       {isUnderMaintenance ? "Bảo trì" : accessLabels[access]}
     </span>

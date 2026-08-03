@@ -17,20 +17,52 @@ import type { StudentCourse } from "@/features/student/shared/student-courses-ty
 import {
   formatVnd,
   getCoursePrice,
-  getTargetAudienceBadgeClass,
-  getTargetAudienceTextClass,
 } from "@/features/student/shared/utils/student-courses-utils";
+import { getStudentCourseAudienceStyle } from "@/features/student/shared/utils/student-course-audience-palette";
 import { cn } from "@/lib/utils";
 
-function getCourseAccentStyle(accentIndex: number, accentCount: number): CSSProperties {
-  const safeAccentCount = Math.max(accentCount, 1);
-  const hue = 180 + ((accentIndex + 0.5) / safeAccentCount) * 55;
-  const saturation = 62 + ((accentIndex * 29) % 29);
-  const lightness = 54 + ((accentIndex * 17) % 19);
+function getCourseAccentStyle(
+  accentIndex: number,
+  accentCount: number,
+  targetAudienceCode: string | undefined,
+  targetAudienceGrade: number,
+  targetAudienceName: string,
+): CSSProperties {
+  const normalizedAccentIndex = Math.max(0, Math.floor(accentIndex));
+  const safeAccentCount = Math.max(1, Math.floor(accentCount), normalizedAccentIndex + 1);
+  const isSupportingAccent = normalizedAccentIndex % 2 === 1;
+  const supportingAccentCount = Math.floor(safeAccentCount / 2);
+  const blueAccentCount = safeAccentCount - supportingAccentCount;
+  const supportingAccentIndex = Math.floor(normalizedAccentIndex / 2);
+  const blueAccentIndex = normalizedAccentIndex - supportingAccentIndex;
+
+  const hue = isSupportingAccent
+    ? getSupportingAccentHue(supportingAccentIndex)
+    : 196 + ((blueAccentIndex + 0.5) / blueAccentCount) * 36;
+  const saturation = 58 + ((normalizedAccentIndex * 7) % 11);
+  const lightness = 79 + ((normalizedAccentIndex * 5) % 6);
+  const darkSaturation = Math.max(46, saturation - 12);
+  const darkLightness = 58 + ((normalizedAccentIndex * 3) % 5);
 
   return {
+    ...getStudentCourseAudienceStyle({
+      fallbackHue: hue,
+      targetAudienceCode,
+      targetAudienceGrade,
+      targetAudienceName,
+    }),
     "--student-course-accent": `hsl(${hue.toFixed(3)} ${saturation}% ${lightness}%)`,
+    "--student-course-accent-dark": `hsl(${hue.toFixed(3)} ${darkSaturation}% ${darkLightness}%)`,
   } as CSSProperties;
+}
+
+function getSupportingAccentHue(accentIndex: number): number {
+  const supportingHues = [48, 8, 142, 252, 332, 25, 172, 185] as const;
+  const paletteCycle = Math.floor(accentIndex / supportingHues.length);
+  const baseHue =
+    supportingHues[accentIndex % supportingHues.length] ?? supportingHues[0];
+
+  return baseHue + paletteCycle * 2.75;
 }
 
 export function ExploreCourseCard({
@@ -102,12 +134,18 @@ export function ExploreCourseCard({
       onPointerEnter={() => onPrefetch?.(course.slug)}
       onTouchStart={() => onPrefetch?.(course.slug)}
       aria-label={`Xem chi tiết ${course.title}`}
+      style={getCourseAccentStyle(
+        accentIndex,
+        accentCount,
+        targetAudienceCode,
+        displayedTargetAudienceGrade,
+        displayedTargetAudienceName,
+      )}
       className="group relative block min-w-0 cursor-pointer overflow-hidden rounded-[1.75rem] border border-transparent bg-white p-4 pl-6 shadow-none transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:border-transparent dark:bg-[var(--theme-surface)] sm:p-3.5 sm:pl-[22px]"
     >
       <span
-        style={getCourseAccentStyle(accentIndex, accentCount)}
         className={cn(
-          "absolute inset-y-0 left-0 w-2 rounded-l-[1.75rem] bg-[var(--student-course-accent)] dark:brightness-110",
+          "absolute inset-y-0 left-0 w-2 rounded-l-[1.75rem] bg-[var(--student-course-accent)] dark:bg-[var(--student-course-accent-dark)]",
         )}
         aria-hidden="true"
       />
@@ -134,18 +172,13 @@ export function ExploreCourseCard({
             <span
               data-grade={displayedTargetAudienceGrade}
               className={cn(
-                "student-grade-label inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-transparent px-2.5 py-1.5 text-sm font-extrabold leading-none lg:px-3 lg:py-1.5 lg:text-xs",
-                getTargetAudienceBadgeClass(
-                  targetAudienceCode,
-                  displayedTargetAudienceGrade,
-                ),
-                getTargetAudienceTextClass(
-                  targetAudienceCode,
-                  displayedTargetAudienceGrade,
-                ),
+                "student-grade-label inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-transparent bg-[var(--student-course-audience-bg)] px-2.5 py-1.5 text-sm font-extrabold leading-none text-[var(--student-course-audience-text)] dark:bg-[var(--student-course-audience-dark-bg)] dark:text-[var(--student-course-audience-dark-text)] lg:px-3 lg:py-1.5 lg:text-xs",
               )}
             >
-              <GraduationCap className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
+              <GraduationCap
+                className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4"
+                aria-hidden="true"
+              />
               {displayedTargetAudienceName}
             </span>
             <span className="ml-auto shrink-0">
@@ -169,7 +202,7 @@ export function ExploreCourseCard({
 
       {isStudying && course.nextLesson && typeof course.progressPercent === "number" ? (
         <div className="student-course-progress-panel student-mobile-border mt-1.5 rounded-2xl border border-sky-200/80 p-2.5 dark:border-[var(--theme-primary-border)]">
-            <div className="grid min-w-0 gap-1.5">
+          <div className="grid min-w-0 gap-1.5">
             <div className="flex min-w-0 items-center gap-3">
               <span className="student-progress-label shrink-0 text-[15px] font-bold text-sky-700 dark:text-sky-300 lg:text-sm">
                 Tiến độ
@@ -209,10 +242,7 @@ export function ExploreCourseCard({
               </div>
 
               <span className="student-learn-cta-3d inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-500 px-3 text-[17px] font-extrabold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:text-base">
-                <PlayCircle
-                  className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
-                  aria-hidden="true"
-                />
+                <PlayCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
                 {nextLessonCtaLabel}
               </span>
             </div>

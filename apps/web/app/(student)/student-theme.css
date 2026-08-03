@@ -1277,7 +1277,7 @@
 
 @keyframes student-progress-marker-in {
   from {
-    left: 4%;
+    left: 0%;
   }
 
   to {
@@ -1444,131 +1444,101 @@
 }
 
 [data-student-shell="true"] .student-section-ribbon--audience {
-  --student-ribbon-strip: hsl(237 82% 68%);
-  --student-ribbon-shadow: hsl(237 76% 30% / 24%);
-  --student-ribbon-top: hsl(237 88% 82%);
-  --student-ribbon-middle: hsl(237 78% 52%);
-  --student-ribbon-bottom: hsl(237 72% 35%);
+  --student-ribbon-hue: 205;
 }
 
 [data-student-shell="true"] .student-section-ribbon--high-school {
-  --student-ribbon-strip: hsl(228 84% 68%);
-  --student-ribbon-shadow: hsl(228 78% 30% / 24%);
-  --student-ribbon-top: hsl(228 90% 82%);
-  --student-ribbon-middle: hsl(228 80% 52%);
-  --student-ribbon-bottom: hsl(228 74% 35%);
+  --student-ribbon-hue: 240;
 }
 
 [data-student-shell="true"] .student-section-ribbon--secondary-school {
-  --student-ribbon-strip: hsl(219 82% 68%);
-  --student-ribbon-shadow: hsl(219 76% 30% / 24%);
-  --student-ribbon-top: hsl(219 88% 82%);
-  --student-ribbon-middle: hsl(219 78% 52%);
-  --student-ribbon-bottom: hsl(219 72% 35%);
+  --student-ribbon-hue: 188;
 }
 
 [data-student-shell="true"] .student-section-ribbon--primary-school {
-  --student-ribbon-strip: hsl(202 80% 68%);
-  --student-ribbon-shadow: hsl(202 74% 30% / 24%);
-  --student-ribbon-top: hsl(202 86% 82%);
-  --student-ribbon-middle: hsl(202 76% 52%);
-  --student-ribbon-bottom: hsl(202 70% 35%);
+  --student-ribbon-hue: 48;
 }
 
 [data-student-shell="true"] .student-section-ribbon--all-students {
-  --student-ribbon-strip: hsl(215 86% 68%);
-  --student-ribbon-shadow: hsl(215 80% 30% / 24%);
-  --student-ribbon-top: hsl(215 92% 82%);
-  --student-ribbon-middle: hsl(215 82% 52%);
-  --student-ribbon-bottom: hsl(215 76% 35%);
+  --student-ribbon-hue: 8;
 }
 
 [data-student-shell="true"] .student-section-ribbon--working-adult {
-  --student-ribbon-strip: hsl(232 84% 68%);
-  --student-ribbon-shadow: hsl(232 78% 30% / 24%);
-  --student-ribbon-top: hsl(232 90% 82%);
-  --student-ribbon-middle: hsl(232 80% 52%);
-  --student-ribbon-bottom: hsl(232 74% 35%);
+  --student-ribbon-hue: 172;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-3 {
-  --student-ribbon-strip: hsl(200 78% 68%);
-  --student-ribbon-shadow: hsl(200 72% 30% / 24%);
-  --student-ribbon-top: hsl(200 84% 82%);
-  --student-ribbon-middle: hsl(200 74% 52%);
-  --student-ribbon-bottom: hsl(200 68% 35%);
+  --student-ribbon-hue: 115;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-4 {
-  --student-ribbon-strip: hsl(213 78% 68%);
-  --student-ribbon-shadow: hsl(213 72% 30% / 24%);
-  --student-ribbon-top: hsl(213 84% 82%);
-  --student-ribbon-middle: hsl(213 74% 52%);
-  --student-ribbon-bottom: hsl(213 68% 35%);
+  --student-ribbon-hue: 30;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-5 {
-  --student-ribbon-strip: hsl(226 78% 68%);
-  --student-ribbon-shadow: hsl(226 72% 30% / 24%);
-  --student-ribbon-top: hsl(226 84% 82%);
-  --student-ribbon-middle: hsl(226 74% 52%);
-  --student-ribbon-bottom: hsl(226 68% 35%);
+  --student-ribbon-hue: 92;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-6 {
-  --student-ribbon-strip: hsl(208 78% 68%);
-  --student-ribbon-shadow: hsl(208 72% 30% / 24%);
-  --student-ribbon-top: hsl(208 84% 82%);
-  --student-ribbon-middle: hsl(208 74% 52%);
-  --student-ribbon-bottom: hsl(208 68% 35%);
+  --student-ribbon-hue: 285;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-7 {
-  --student-ribbon-strip: hsl(221 78% 68%);
-  --student-ribbon-shadow: hsl(221 72% 30% / 24%);
-  --student-ribbon-top: hsl(221 84% 82%);
-  --student-ribbon-middle: hsl(221 74% 52%);
-  --student-ribbon-bottom: hsl(221 68% 35%);
+  --student-ribbon-hue: 140;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-8 {
-  --student-ribbon-strip: hsl(204 78% 68%);
-  --student-ribbon-shadow: hsl(204 72% 30% / 24%);
-  --student-ribbon-top: hsl(204 84% 82%);
-  --student-ribbon-middle: hsl(204 74% 52%);
-  --student-ribbon-bottom: hsl(204 68% 35%);
+  --student-ribbon-hue: 65;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-9 {
-  --student-ribbon-strip: hsl(217 78% 68%);
-  --student-ribbon-shadow: hsl(217 72% 30% / 24%);
-  --student-ribbon-top: hsl(217 84% 82%);
-  --student-ribbon-middle: hsl(217 74% 52%);
-  --student-ribbon-bottom: hsl(217 68% 35%);
+  --student-ribbon-hue: 215;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-10 {
-  --student-ribbon-strip: hsl(230 78% 68%);
-  --student-ribbon-shadow: hsl(230 72% 30% / 24%);
-  --student-ribbon-top: hsl(230 84% 82%);
-  --student-ribbon-middle: hsl(230 74% 52%);
-  --student-ribbon-bottom: hsl(230 68% 35%);
+  --student-ribbon-hue: 18;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-11 {
-  --student-ribbon-strip: hsl(211 78% 68%);
-  --student-ribbon-shadow: hsl(211 72% 30% / 24%);
-  --student-ribbon-top: hsl(211 84% 82%);
-  --student-ribbon-middle: hsl(211 74% 52%);
-  --student-ribbon-bottom: hsl(211 68% 35%);
+  --student-ribbon-hue: 338;
 }
 
 [data-student-shell="true"] .student-section-ribbon--grade-12 {
-  --student-ribbon-strip: hsl(224 78% 68%);
-  --student-ribbon-shadow: hsl(224 72% 30% / 24%);
-  --student-ribbon-top: hsl(224 84% 82%);
-  --student-ribbon-middle: hsl(224 74% 52%);
-  --student-ribbon-bottom: hsl(224 68% 35%);
+  --student-ribbon-hue: 220;
+}
+
+[data-student-shell="true"]
+  :is(
+    .student-section-ribbon--audience,
+    .student-section-ribbon--high-school,
+    .student-section-ribbon--secondary-school,
+    .student-section-ribbon--primary-school,
+    .student-section-ribbon--all-students,
+    .student-section-ribbon--working-adult,
+    .student-section-ribbon--grade-3,
+    .student-section-ribbon--grade-4,
+    .student-section-ribbon--grade-5,
+    .student-section-ribbon--grade-6,
+    .student-section-ribbon--grade-7,
+    .student-section-ribbon--grade-8,
+    .student-section-ribbon--grade-9,
+    .student-section-ribbon--grade-10,
+    .student-section-ribbon--grade-11,
+    .student-section-ribbon--grade-12
+  ) {
+  --student-ribbon-strip: hsl(var(--student-ribbon-hue) 72% 68%);
+  --student-ribbon-shadow: hsl(var(--student-ribbon-hue) 66% 30% / 24%);
+  --student-ribbon-top: hsl(var(--student-ribbon-hue) 80% 70%);
+  --student-ribbon-middle: hsl(var(--student-ribbon-hue) 74% 48%);
+  --student-ribbon-bottom: hsl(var(--student-ribbon-hue) 68% 34%);
+}
+
+[data-student-shell="true"] .student-section-ribbon--grade-12 {
+  --student-ribbon-strip: hsl(220 70% 78%);
+  --student-ribbon-shadow: hsl(220 60% 32% / 20%);
+  --student-ribbon-top: hsl(220 82% 76%);
+  --student-ribbon-middle: hsl(220 76% 54%);
+  --student-ribbon-bottom: hsl(220 70% 40%);
 }
 
 @media (max-width: 767px) {

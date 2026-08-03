@@ -8,3 +8,4 @@
 - 2026-08-03: Đồng nhất skeleton xám và các trạng thái lỗi/điều hướng hồi phục ở bề mặt học tập của học sinh.
 - 2026-08-03: Migration fixture test API sang catalog Lĩnh vực và Đối tượng hướng đến, đồng thời đồng bộ assertion lịch sử bài thi.
 - 2026-08-03: Đổi ribbon khu vực khóa học đã mua sang hệ xanh dương để đồng nhất với palette Khám phá.
+- 2026-08-03: Tinh chỉnh UI khóa học học sinh với palette nhãn/ribbon và layout chi tiết nhất quán, đồng thời đồng bộ active sidebar quản trị và tăng nhận diện ClassHero trên các luồng auth.

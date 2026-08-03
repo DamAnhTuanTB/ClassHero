@@ -71,6 +71,7 @@ Nguyên tắc dùng màu:
 - Accent: dùng tiết chế cho trạng thái học tập, streak, progress, CTA phụ.
 - Success/warning/error phải nhất quán, không dùng đỏ cho CTA thường.
 - Không lạm dụng tím/xanh tím, beige, dark slate hoặc gradient làm theme chính.
+- Theo preference đã chốt của owner, không dùng tím/violet đậm hoặc bão hòa trong UI mới hay phần UI đang được chỉnh. Tím lavender rất nhạt vẫn được phép làm accent nhỏ như dải mép card hoặc badge; không dùng tím làm mảng chủ đạo nặng. Ưu tiên xanh dương, cyan, xanh lá, vàng/cam, đỏ san hô hoặc hồng khi không cần lavender.
 - Không tạo palette một màu; mỗi màn nên có nền trung tính, primary rõ và accent vừa đủ.
 - Nếu cần thêm màu mới, thêm vào theme/token trước hoặc ghi rõ lý do trong final response/docs liên quan; changelog chỉ ghi trong workflow `/commit`.
 
