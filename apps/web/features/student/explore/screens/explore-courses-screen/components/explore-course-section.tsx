@@ -8,6 +8,7 @@ export type ExploreCourseSectionTone =
   | "emerald"
   | "high-school"
   | "primary-school"
+  | "purchased"
   | "secondary-school"
   | "grade-3"
   | "grade-4"

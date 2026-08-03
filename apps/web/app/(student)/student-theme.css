@@ -1435,6 +1435,14 @@
   --student-ribbon-bottom: #047857;
 }
 
+[data-student-shell="true"] .student-section-ribbon--purchased {
+  --student-ribbon-strip: rgb(59 130 246);
+  --student-ribbon-shadow: rgb(37 99 235 / 22%);
+  --student-ribbon-top: #60a5fa;
+  --student-ribbon-middle: #3b82f6;
+  --student-ribbon-bottom: #1d4ed8;
+}
+
 [data-student-shell="true"] .student-section-ribbon--audience {
   --student-ribbon-strip: hsl(237 82% 68%);
   --student-ribbon-shadow: hsl(237 76% 30% / 24%);

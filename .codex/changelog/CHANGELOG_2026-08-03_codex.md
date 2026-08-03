@@ -7,3 +7,4 @@
 - 2026-08-03: Hoàn thiện flow thanh toán payOS với tạo/đối soát đơn, webhook idempotent, màn kết quả học sinh và quyền học sau thanh toán.
 - 2026-08-03: Đồng nhất skeleton xám và các trạng thái lỗi/điều hướng hồi phục ở bề mặt học tập của học sinh.
 - 2026-08-03: Migration fixture test API sang catalog Lĩnh vực và Đối tượng hướng đến, đồng thời đồng bộ assertion lịch sử bài thi.
+- 2026-08-03: Đổi ribbon khu vực khóa học đã mua sang hệ xanh dương để đồng nhất với palette Khám phá.

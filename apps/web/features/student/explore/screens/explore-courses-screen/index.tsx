@@ -155,7 +155,7 @@ export function ExploreCoursesScreen({
                     courses={purchasedCourses}
                     onPrefetch={prefetchCourseDetail}
                     title="Khóa học đã mua"
-                    tone="emerald"
+                    tone="purchased"
                   />
                 ) : null}
 
