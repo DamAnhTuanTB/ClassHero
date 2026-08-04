@@ -70,4 +70,16 @@ export class AdminLessonSummariesController {
   ) {
     return this.lessonSummariesService.generate(lessonId, user.id, dto);
   }
+
+  @Post("prompt-preview")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview the exact summary prompts and estimated cost without calling AI",
+  })
+  previewPrompt(
+    @Param("lessonId") lessonId: string,
+    @Body() dto: GenerateLessonSummaryDto,
+  ) {
+    return this.lessonSummariesService.previewPrompt(lessonId, dto);
+  }
 }

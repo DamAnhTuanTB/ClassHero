@@ -15,6 +15,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { cn } from "@/lib/utils";
 import {
   AdminCoursesSidebar,
@@ -44,6 +45,7 @@ import {
 import { useAdminLessonContentPrefetch } from "@/features/admin/lessons/hooks/use-admin-lesson-content-prefetch";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getQueryRenderState } from "@/lib/query-render-state";
+import type { AdminAiGenerationType } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 
 const LessonDetailEditorDialog = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
@@ -72,6 +74,16 @@ const AdminFlashcardsTab = dynamic(() =>
 const AdminTestsTab = dynamic(() =>
   loadAdminTestsTab().then((module) => module.AdminTestsTab),
 );
+const loadAdminAiGenerationPanel = () =>
+  import("@/features/admin/ai-generation/components/admin-ai-generation-panel");
+const AdminAiGenerationPanel = dynamic(() =>
+  loadAdminAiGenerationPanel().then((module) => module.AdminAiGenerationPanel),
+);
+const loadAdminLessonSummaryTab = () =>
+  import("@/features/admin/ai-generation/components/admin-lesson-summary-tab");
+const AdminLessonSummaryTab = dynamic(() =>
+  loadAdminLessonSummaryTab().then((module) => module.AdminLessonSummaryTab),
+);
 
 interface AdminLessonDetailManagerProps {
   initialLesson?: AdminLesson | null;
@@ -95,14 +107,19 @@ export function AdminLessonDetailManager({
 }: AdminLessonDetailManagerProps) {
   const router = useRouter();
   const lessonQuery = useAdminLesson(lessonId, initialLesson);
-  const { data: lesson, error, refetch } = lessonQuery;
+  const { data: lesson, refetch } = lessonQuery;
   const isAuthHydrated = useAuthSessionStore((state) => state.isHydrated);
   const queryRenderState = getQueryRenderState({
     ...lessonQuery,
     isPrerequisitePending: !isAuthHydrated && initialLesson === undefined,
   });
   useAdminLessonContentPrefetch(lessonId, Boolean(lesson));
-  const [activeTab, setActiveTab] = useState<LessonContentTabKey>("quiz");
+  const [activeTab, setActiveTab] = useState<LessonContentTabKey>("documents");
+  const [preferredSetIds, setPreferredSetIds] = useState<
+    Partial<Record<"QUIZ" | "FLASHCARD" | "TEST", string>>
+  >({});
+  const [requestedGenerationType, setRequestedGenerationType] =
+    useState<AdminAiGenerationType | null>(null);
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
   const [tabPanelMinHeight, setTabPanelMinHeight] = useState(400);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
@@ -135,6 +152,8 @@ export function AdminLessonDetailManager({
       void loadAdminAssessmentTab();
       void loadAdminFlashcardsTab();
       void loadAdminTestsTab();
+      void loadAdminAiGenerationPanel();
+      void loadAdminLessonSummaryTab();
     };
 
     if (typeof window.requestIdleCallback === "function") {
@@ -202,12 +221,36 @@ export function AdminLessonDetailManager({
     await refetch();
   }, [refetch]);
 
+  const handleOpenAiResult = useCallback(
+    (type: AdminAiGenerationType, resourceId: string | null) => {
+      const tab: LessonContentTabKey = {
+        SUMMARY: "summary",
+        QUIZ: "quiz",
+        FLASHCARD: "flashcard",
+        TEST: "test",
+      }[type] as LessonContentTabKey;
+      if (resourceId && type !== "SUMMARY") {
+        setPreferredSetIds((current) => ({ ...current, [type]: resourceId }));
+      }
+      handleTabChange(tab);
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(lessonContentPanelId)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    },
+    [handleTabChange, lessonContentPanelId],
+  );
+
+  const handleRequestedGenerationHandled = useCallback(
+    () => setRequestedGenerationType(null),
+    [],
+  );
+
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const storeIsDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
-  const isDarkTheme = isThemeHydrated
-    ? storeIsDarkTheme
-    : initialThemeMode === "dark";
+  const isDarkTheme = isThemeHydrated ? storeIsDarkTheme : initialThemeMode === "dark";
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentBooleanState(
     adminSidebarCollapsedStorageKey,
@@ -263,12 +306,14 @@ export function AdminLessonDetailManager({
             onToggleCollapsed={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             onToggleDarkTheme={toggleTheme}
           />
-          <div className="flex min-h-screen items-center justify-center p-6">
-            <div className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-bg)] p-4 text-[var(--theme-danger-text)]">
-              <p className="text-sm font-bold">
-                {error?.message || "Không tìm thấy buổi học"}
-              </p>
-            </div>
+          <div className="min-h-[calc(100svh-4rem)] p-5 sm:p-8">
+            <AdminDataErrorState
+              description="Vui lòng thử lại để tiếp tục quản lý nội dung buổi học."
+              isRetrying={lessonQuery.isFetching}
+              onRetry={() => refetch()}
+              title="Không tải được thông tin buổi học"
+              variant="page"
+            />
           </div>
         </div>
       </main>
@@ -538,6 +583,13 @@ export function AdminLessonDetailManager({
                 </div>
               </div>
 
+              <AdminAiGenerationPanel
+                lessonId={lessonId}
+                requestedGenerationType={requestedGenerationType}
+                onOpenResult={handleOpenAiResult}
+                onRequestedGenerationHandled={handleRequestedGenerationHandled}
+              />
+
               <LessonContentTabs
                 activeTab={activeTab}
                 panelId={lessonContentPanelId}
@@ -566,20 +618,39 @@ export function AdminLessonDetailManager({
                     <AdminQuizTab
                       initialQuizData={initialQuizData}
                       lessonId={lessonId}
+                      preferredSetId={preferredSetIds.QUIZ}
                     />
                   </div>
                 )}
 
                 {activeTab === "flashcard" && (
                   <div className="h-full sm:p-6">
-                    <AdminFlashcardsTab lessonId={lessonId} />
+                    <AdminFlashcardsTab
+                      lessonId={lessonId}
+                      preferredSetId={preferredSetIds.FLASHCARD}
+                    />
                   </div>
                 )}
 
                 {activeTab === "test" && (
                   <div className="h-full sm:p-6">
-                    <AdminTestsTab lessonId={lessonId} />
+                    <AdminTestsTab
+                      lessonId={lessonId}
+                      preferredSetId={preferredSetIds.TEST}
+                    />
                   </div>
+                )}
+
+                {activeTab === "summary" && (
+                  <AdminLessonSummaryTab
+                    lessonId={lessonId}
+                    onRegenerate={() => {
+                      setRequestedGenerationType("SUMMARY");
+                      document
+                        .getElementById("admin-ai-generation-heading")
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                  />
                 )}
               </div>
             </div>

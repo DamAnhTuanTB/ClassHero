@@ -19,6 +19,7 @@ export type ProviderRouteCandidate = {
   category: ProviderCatalogCategory;
   provider: AiProviderName;
   model: string;
+  maxInputTokens: number | null;
   available: boolean;
   rates: PriceRateSnapshot[];
 };

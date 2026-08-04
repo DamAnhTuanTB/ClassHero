@@ -1,8 +1,8 @@
 "use client";
 
 import { EmptyState } from "@/components/admin/courses/empty-state";
-import { ErrorState } from "@/components/admin/courses/error-state";
 import { LoadingState } from "@/components/admin/courses/loading-state";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { FilterBar } from "@/features/admin/courses/screens/admin-courses-manager/components/filter-bar";
 import { LearningPathsTable } from "@/features/admin/courses/screens/admin-courses-manager/components/learning-paths-table";
 import type {
@@ -80,7 +80,14 @@ export function AdminCoursesContent({
       {isInitialPending ? (
         <LoadingState title="Đang tải danh sách khóa học" variant="list" />
       ) : null}
-      {viewState === "error" ? <ErrorState onRetry={onRetryLoad} /> : null}
+      {viewState === "error" ? (
+        <AdminDataErrorState
+          description="Vui lòng thử lại để tiếp tục quản lý khóa học và buổi học."
+          onRetry={onRetryLoad}
+          title="Không tải được danh sách khóa học"
+          variant="section"
+        />
+      ) : null}
       {viewState === "ready" ? (
         <div className="min-w-0">
           <FilterBar

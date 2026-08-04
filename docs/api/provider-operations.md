@@ -19,6 +19,17 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 
 - PUT configuration/budget/accounting bắt buộc `expectedVersion`; mismatch trả `409` để UI tải lại.
 - Model phải đúng category/capability; fallback khác primary.
+- Catalog trả toàn bộ model AI `ACTIVE` phù hợp capability để UI nhóm ô chọn theo provider; model thiếu credential vẫn được hiển thị nhưng bị vô hiệu hóa kèm lý do.
 - Price version chỉ thêm mới. Backend đóng khoảng hiệu lực cũ thay vì overwrite.
 - Timeline dùng múi giờ `Asia/Ho_Chi_Minh`, tuần bắt đầu thứ Hai.
 - Response chỉ có boolean `credentialConfigured`, tuyệt đối không trả secret/key.
+
+## Hard-stop tuyệt đối (`M9.12`)
+
+- `GET /overview` và `GET /budgets` trả riêng `usedVnd`, `reservedVnd`, `availableVnd` và `enforcementState` cho từng scope. `availableVnd` không âm và được tính từ cùng period/counter logic dùng để chặn provider call.
+- Khi `hardStop=true`, provider gateway phải tạo reservation trước khi gọi dịch vụ ngoài. Reservation kiểm tra đồng thời scope `ALL` và `AI` hoặc `OCR` trong một PostgreSQL transaction có khóa theo `period + scope`.
+- Nếu số tiền giữ chỗ làm vượt một trong các scope, trả domain error `PROVIDER_BUDGET_HARD_LIMIT` với HTTP `409`; `details` chỉ gồm `scope`, `period`, `limitVnd`, `usedVnd`, `reservedVnd`, `requestedVnd`, `availableVnd`.
+- Nếu thiếu bảng giá/tỷ giá/trần usage để chứng minh reservation đủ lớn, trả `PROVIDER_BUDGET_ESTIMATE_UNAVAILABLE` với HTTP `409` và không gọi provider.
+- Hai mã lỗi trên là business/non-transient: không kích hoạt model fallback, không retry job. Job lưu mã lỗi và message tiếng Việt để UI polling hiển thị được.
+- Reservation dùng idempotency key ổn định theo provider attempt/job. Request lặp lại trả cùng reservation, không giữ chỗ lần hai.
+- Khi bật hard-stop, PUT ngân sách thấp hơn số đã dùng + đang giữ bị từ chối; không hủy hoặc giảm reservation đang chạy.

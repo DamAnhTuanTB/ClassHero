@@ -1,11 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, CircleDollarSign, DatabaseZap, Loader2, RefreshCw, Settings2, TableProperties } from "lucide-react";
-import { useState } from "react";
+import {
+  CircleDollarSign,
+  DatabaseZap,
+  RefreshCw,
+  Settings2,
+  TableProperties,
+} from "lucide-react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { AdminCoursesSidebar } from "@/components/admin/courses/admin-courses-sidebar";
 import { getAdminNavigationItems } from "@/components/admin/courses/admin-navigation-items";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
+import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import {
   createProviderPriceVersion,
   getAiConfigurations,
@@ -31,7 +39,10 @@ import type {
   ProviderBudget,
   UsageGranularity,
 } from "@/features/admin/ai-settings/types/provider-operations-types";
-import { formatDateTime, formatVnd } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
+import {
+  formatDateTime,
+  formatVnd,
+} from "@/features/admin/ai-settings/utils/provider-operations-formatters";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import {
@@ -44,10 +55,10 @@ import { cn } from "@/lib/utils";
 
 type TabKey = "models" | "ocr" | "usage" | "catalog";
 const tabs = [
-  { key: "models" as const, label: "Cấu hình model", icon: Settings2 },
-  { key: "ocr" as const, label: "OCR & tài liệu", icon: DatabaseZap },
-  { key: "usage" as const, label: "Chi phí & sử dụng", icon: CircleDollarSign },
-  { key: "catalog" as const, label: "Bảng giá provider", icon: TableProperties },
+  { key: "models" as const, label: "Mô hình AI", icon: Settings2 },
+  { key: "ocr" as const, label: "Đọc tài liệu", icon: DatabaseZap },
+  { key: "usage" as const, label: "Chi phí", icon: CircleDollarSign },
+  { key: "catalog" as const, label: "Bảng giá", icon: TableProperties },
 ];
 const adminNavItems = getAdminNavigationItems("ai-settings");
 
@@ -57,6 +68,7 @@ export function AdminAiSettingsScreen() {
   const token = session?.accessToken ?? "";
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("models");
+  const tabRefs = useRef(new Map<TabKey, HTMLButtonElement>());
   const [granularity, setGranularity] = useState<UsageGranularity>("DAY");
   const isDarkTheme = useThemeStore((state) => state.isDarkTheme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -66,6 +78,35 @@ export function AdminAiSettingsScreen() {
     adminSidebarCollapsedDatasetKey,
   );
   const enabled = isAuthorized && Boolean(token);
+  const activeTabIndex = tabs.findIndex((tab) => tab.key === activeTab);
+
+  const selectTab = (tab: TabKey) => {
+    setActiveTab(tab);
+    window.requestAnimationFrame(() => {
+      tabRefs.current.get(tab)?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    });
+  };
+
+  const handleTabsKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    let nextIndex: number;
+    if (event.key === "ArrowRight") nextIndex = (activeTabIndex + 1) % tabs.length;
+    else if (event.key === "ArrowLeft")
+      nextIndex = (activeTabIndex - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex]?.key;
+    if (nextTab) {
+      selectTab(nextTab);
+      window.requestAnimationFrame(() => tabRefs.current.get(nextTab)?.focus());
+    }
+  };
 
   const overviewQuery = useQuery({
     queryKey: ["provider-operations", "overview"],
@@ -121,34 +162,39 @@ export function AdminAiSettingsScreen() {
       updateAiConfigurations(configurations, token),
     onSuccess: async () => {
       await refreshAll();
-      toast.success("Đã lưu cấu hình model");
+      toast.success("Đã lưu mô hình AI");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Không thể lưu cấu hình model"),
+    onError: () => toast.error("Chưa thể lưu mô hình AI. Vui lòng thử lại."),
   });
   const ocrMutation = useMutation({
     mutationFn: (settings: AccountingSettings) => updateOcrSettings(settings, token),
     onSuccess: async () => {
       await refreshAll();
-      toast.success("Đã lưu thiết lập OCR");
+      toast.success("Đã lưu thiết lập đọc tài liệu");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Không thể lưu thiết lập OCR"),
+    onError: () => toast.error("Chưa thể lưu thiết lập đọc tài liệu. Vui lòng thử lại."),
   });
   const budgetMutation = useMutation({
     mutationFn: (budgets: ProviderBudget[]) => updateProviderBudgets(budgets, token),
     onSuccess: async () => {
       await refreshAll();
-      toast.success("Đã lưu ngân sách provider");
+      toast.success("Đã lưu ngân sách");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Không thể lưu ngân sách"),
+    onError: () => toast.error("Chưa thể lưu ngân sách. Vui lòng thử lại."),
   });
   const priceMutation = useMutation({
-    mutationFn: ({ catalogItemId, input }: { catalogItemId: string; input: Parameters<typeof createProviderPriceVersion>[1] }) =>
-      createProviderPriceVersion(catalogItemId, input, token),
+    mutationFn: ({
+      catalogItemId,
+      input,
+    }: {
+      catalogItemId: string;
+      input: Parameters<typeof createProviderPriceVersion>[1];
+    }) => createProviderPriceVersion(catalogItemId, input, token),
     onSuccess: async () => {
       await refreshAll();
-      toast.success("Đã thêm phiên bản giá");
+      toast.success("Đã cập nhật bảng giá");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Không thể lưu bảng giá"),
+    onError: () => toast.error("Chưa thể lưu bảng giá. Vui lòng thử lại."),
   });
 
   if (!isAuthorized) return null;
@@ -156,9 +202,16 @@ export function AdminAiSettingsScreen() {
   const overview = overviewQuery.data;
   return (
     <main data-admin-theme="true" className="theme-page">
-      <div className={cn("admin-course-shell-grid grid min-h-screen transition-[grid-template-columns] duration-200", isSidebarCollapsed ? "lg:grid-cols-[5.5rem_minmax(0,1fr)]" : "lg:grid-cols-[17rem_minmax(0,1fr)]")}>
+      <div
+        className={cn(
+          "admin-course-shell-grid grid min-h-screen transition-[grid-template-columns] duration-200",
+          isSidebarCollapsed
+            ? "lg:grid-cols-[5.5rem_minmax(0,1fr)]"
+            : "lg:grid-cols-[17rem_minmax(0,1fr)]",
+        )}
+      >
         <AdminCoursesSidebar
-          subtitle="Vận hành AI & OCR"
+          subtitle="Quản lý AI và tài liệu"
           items={adminNavItems}
           isDarkTheme={isDarkTheme}
           isCollapsed={isSidebarCollapsed}
@@ -170,37 +223,215 @@ export function AdminAiSettingsScreen() {
         <section className="min-w-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
           <header className="flex flex-col gap-4 border-b border-[var(--theme-border)] pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 text-sm font-extrabold text-[var(--theme-primary)]"><Bot className="h-4 w-4" /> Trung tâm vận hành provider</div>
-              <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">Cài đặt AI</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-text-muted)]">Chọn model cho từng chức năng, theo dõi AI/OCR và kiểm soát chi phí trong một màn hình.</p>
+              <h1 className="mt-1 text-2xl font-extrabold text-[var(--theme-text-strong)] md:text-3xl">
+                Cài đặt AI
+              </h1>
             </div>
-            <button type="button" onClick={() => void refreshAll()} disabled={overviewQuery.isFetching} className="theme-button-neutral inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"><RefreshCw className={cn("h-4 w-4", overviewQuery.isFetching && "animate-spin")} />Làm mới</button>
+            <button
+              type="button"
+              onClick={() => void refreshAll()}
+              disabled={overviewQuery.isFetching}
+              className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-60"
+            >
+              <RefreshCw
+                className={cn("h-4 w-4", overviewQuery.isFetching && "animate-spin")}
+                aria-hidden="true"
+              />
+              Làm mới
+            </button>
           </header>
 
           {overviewQuery.isLoading ? (
-            <div className="mt-6 grid min-h-40 place-items-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)]"><div className="inline-flex items-center gap-2 font-bold text-[var(--theme-text-muted)]"><Loader2 className="h-5 w-5 animate-spin" />Đang tải tổng quan AI</div></div>
+            <OverviewSkeleton />
           ) : overviewQuery.isError ? (
-            <div className="mt-6 rounded-xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-bg)] p-5"><p className="font-extrabold text-[var(--theme-danger-text)]">Không tải được dữ liệu Cài đặt AI</p><button type="button" onClick={() => void overviewQuery.refetch()} className="mt-3 min-h-10 rounded-lg border border-[var(--theme-danger-border)] px-4 text-sm font-extrabold text-[var(--theme-danger-text)]">Thử lại</button></div>
+            <AdminDataErrorState
+              className="mt-6"
+              description="Vui lòng thử lại để xem tổng quan vận hành và chi phí."
+              isRetrying={overviewQuery.isFetching}
+              onRetry={() => overviewQuery.refetch()}
+              title="Không tải được tổng quan Cài đặt AI"
+              variant="compact"
+            />
           ) : overview ? (
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <KpiCard label="Chi phí tháng này" value={formatVnd(overview.totalCostVnd)} hint={`${overview.calls} lượt provider`} />
-              <KpiCard label="Tiết kiệm nhờ cache" value={formatVnd(overview.savedCostVnd)} hint="OCR/AI cached usage" tone="success" />
-              <KpiCard label="Tỷ lệ thành công" value={`${overview.successRate}%`} hint={`${overview.failedCount} lượt lỗi`} tone={overview.successRate >= 95 ? "success" : "warning"} />
-              <KpiCard label="Dữ liệu gần nhất" value={overview.latestUsageAt ? formatDateTime(overview.latestUsageAt) : "Chưa có"} hint="Asia/Ho_Chi_Minh" />
+              <KpiCard
+                label="Chi phí tháng này"
+                value={formatVnd(overview.totalCostVnd)}
+                hint={`${overview.calls} lượt sử dụng`}
+              />
+              <KpiCard
+                label="Tiết kiệm nhờ dùng lại"
+                value={formatVnd(overview.savedCostVnd)}
+                hint="Nhờ dùng lại kết quả đã có"
+                tone="success"
+              />
+              <KpiCard
+                label="Tỷ lệ thành công"
+                value={`${overview.successRate}%`}
+                hint={`${overview.failedCount} lượt lỗi`}
+                tone={overview.successRate >= 95 ? "primary" : "warning"}
+              />
+              <KpiCard
+                label="Dữ liệu gần nhất"
+                value={
+                  overview.latestUsageAt
+                    ? formatDateTime(overview.latestUsageAt)
+                    : "Chưa có"
+                }
+                hint={overview.latestUsageAt ? "Theo giờ Việt Nam" : "Chưa có hoạt động"}
+              />
             </div>
           ) : null}
 
-          <div className="mt-6 overflow-x-auto border-b border-[var(--theme-border)]">
-            <div className="flex min-w-max gap-1" role="tablist" aria-label="Cài đặt AI">
-              {tabs.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} className={cn("inline-flex min-h-11 items-center gap-2 border-b-2 px-4 text-sm font-extrabold transition", activeTab === tab.key ? "border-[var(--theme-primary)] text-[var(--theme-primary)]" : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]")}><tab.icon className="h-4 w-4" />{tab.label}</button>)}
+          <div className="mt-6 overflow-x-auto overflow-y-hidden border-b border-[var(--theme-border)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              className="relative grid min-w-[38rem] grid-cols-4"
+              role="tablist"
+              aria-label="Cài đặt AI"
+              onKeyDown={handleTabsKeyDown}
+            >
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  ref={(element) => {
+                    if (element) tabRefs.current.set(tab.key, element);
+                    else tabRefs.current.delete(tab.key);
+                  }}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
+                  aria-controls="ai-settings-tab-panel"
+                  tabIndex={activeTab === tab.key ? 0 : -1}
+                  onClick={() => selectTab(tab.key)}
+                  className={cn(
+                    "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-t-lg px-3 py-2 text-sm font-extrabold transition-colors sm:px-4",
+                    activeTab === tab.key
+                      ? "text-[var(--theme-primary)]"
+                      : "text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)]",
+                  )}
+                >
+                  <tab.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {tab.label}
+                </button>
+              ))}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-0 left-0 h-0.5 w-1/4 rounded-full bg-[var(--theme-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
+                style={{ transform: `translateX(${activeTabIndex * 100}%)` }}
+              />
             </div>
           </div>
 
-          <div className="py-6">
-            {activeTab === "models" ? configurationsQuery.isLoading ? <TabLoading /> : configurationsQuery.isError || !configurationsQuery.data ? <TabError onRetry={() => void configurationsQuery.refetch()} /> : <ModelConfigurationsTab data={configurationsQuery.data} isSaving={configurationMutation.isPending} onSave={(items) => configurationMutation.mutate(items)} /> : null}
-            {activeTab === "ocr" ? ocrQuery.isLoading ? <TabLoading /> : ocrQuery.isError || !ocrQuery.data ? <TabError onRetry={() => void ocrQuery.refetch()} /> : <OcrSettingsTab data={ocrQuery.data} isSaving={ocrMutation.isPending} onSave={(settings) => ocrMutation.mutate(settings)} /> : null}
-            {activeTab === "usage" ? <UsageCostTab budgets={budgetsQuery.data ?? overview?.budgets ?? []} timeline={timelineQuery.data} breakdown={breakdownQuery.data} events={eventsQuery.data} granularity={granularity} isLoading={timelineQuery.isLoading || breakdownQuery.isLoading || eventsQuery.isLoading} isSavingBudgets={budgetMutation.isPending} onGranularityChange={setGranularity} onSaveBudgets={(items) => budgetMutation.mutate(items)} /> : null}
-            {activeTab === "catalog" ? catalogQuery.isLoading ? <TabLoading /> : catalogQuery.isError || !catalogQuery.data ? <TabError onRetry={() => void catalogQuery.refetch()} /> : <ProviderCatalogTab catalog={catalogQuery.data} audit={auditQuery.data} isSaving={priceMutation.isPending} onCreatePrice={async (catalogItemId, input) => { await priceMutation.mutateAsync({ catalogItemId, input }); }} /> : null}
+          <div id="ai-settings-tab-panel" role="tabpanel" className="min-h-[28rem] py-6">
+            {activeTab === "models" ? (
+              configurationsQuery.isLoading ? (
+                <TabLoading />
+              ) : configurationsQuery.isError || !configurationsQuery.data ? (
+                <AdminDataErrorState
+                  description="Vui lòng thử lại để tiếp tục chọn mô hình AI."
+                  headingLevel={3}
+                  isRetrying={configurationsQuery.isFetching}
+                  onRetry={() => configurationsQuery.refetch()}
+                  title="Không tải được danh sách mô hình AI"
+                  variant="section"
+                />
+              ) : (
+                <ModelConfigurationsTab
+                  data={configurationsQuery.data}
+                  isSaving={configurationMutation.isPending}
+                  onSave={(items) => configurationMutation.mutate(items)}
+                />
+              )
+            ) : null}
+            {activeTab === "ocr" ? (
+              ocrQuery.isLoading ? (
+                <TabLoading />
+              ) : ocrQuery.isError || !ocrQuery.data ? (
+                <AdminDataErrorState
+                  description="Vui lòng thử lại để tiếp tục thiết lập đọc tài liệu."
+                  headingLevel={3}
+                  isRetrying={ocrQuery.isFetching}
+                  onRetry={() => ocrQuery.refetch()}
+                  title="Không tải được thiết lập đọc tài liệu"
+                  variant="section"
+                />
+              ) : (
+                <OcrSettingsTab
+                  data={ocrQuery.data}
+                  isSaving={ocrMutation.isPending}
+                  onSave={(settings) => ocrMutation.mutate(settings)}
+                />
+              )
+            ) : null}
+            {activeTab === "usage" ? (
+              budgetsQuery.isError ||
+              timelineQuery.isError ||
+              breakdownQuery.isError ||
+              eventsQuery.isError ? (
+                <AdminDataErrorState
+                  description="Vui lòng thử lại để xem thống kê chi phí và ngân sách."
+                  headingLevel={3}
+                  isRetrying={
+                    budgetsQuery.isFetching ||
+                    timelineQuery.isFetching ||
+                    breakdownQuery.isFetching ||
+                    eventsQuery.isFetching
+                  }
+                  onRetry={() =>
+                    Promise.all([
+                      budgetsQuery.refetch(),
+                      timelineQuery.refetch(),
+                      breakdownQuery.refetch(),
+                      eventsQuery.refetch(),
+                    ])
+                  }
+                  title="Không tải được dữ liệu chi phí"
+                  variant="section"
+                />
+              ) : (
+                <UsageCostTab
+                  budgets={budgetsQuery.data ?? overview?.budgets ?? []}
+                  timeline={timelineQuery.data}
+                  breakdown={breakdownQuery.data}
+                  events={eventsQuery.data}
+                  granularity={granularity}
+                  isLoading={
+                    timelineQuery.isLoading ||
+                    breakdownQuery.isLoading ||
+                    eventsQuery.isLoading
+                  }
+                  isSavingBudgets={budgetMutation.isPending}
+                  onGranularityChange={setGranularity}
+                  onSaveBudgets={(items) => budgetMutation.mutate(items)}
+                />
+              )
+            ) : null}
+            {activeTab === "catalog" ? (
+              catalogQuery.isLoading ? (
+                <TabLoading />
+              ) : catalogQuery.isError || auditQuery.isError || !catalogQuery.data ? (
+                <AdminDataErrorState
+                  description="Vui lòng thử lại để xem bảng giá và lịch sử thay đổi."
+                  headingLevel={3}
+                  isRetrying={catalogQuery.isFetching || auditQuery.isFetching}
+                  onRetry={() =>
+                    Promise.all([catalogQuery.refetch(), auditQuery.refetch()])
+                  }
+                  title="Không tải được bảng giá dịch vụ"
+                  variant="section"
+                />
+              ) : (
+                <ProviderCatalogTab
+                  catalog={catalogQuery.data}
+                  audit={auditQuery.data}
+                  fxRateVndPerUsd={overview?.accounting.fxRateVndPerUsd}
+                  isSaving={priceMutation.isPending}
+                  onCreatePrice={async (catalogItemId, input) => {
+                    await priceMutation.mutateAsync({ catalogItemId, input });
+                  }}
+                />
+              )
+            ) : null}
           </div>
         </section>
       </div>
@@ -208,10 +439,67 @@ export function AdminAiSettingsScreen() {
   );
 }
 
-function KpiCard({ label, value, hint, tone = "default" }: { label: string; value: string; hint: string; tone?: "default" | "success" | "warning" }) {
-  const accent = tone === "success" ? "text-[var(--theme-success-text)]" : tone === "warning" ? "text-[var(--theme-warning-text)]" : "text-[var(--theme-text-strong)]";
-  return <article className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4"><p className="text-sm font-bold text-[var(--theme-text-muted)]">{label}</p><p className={cn("mt-2 text-xl font-extrabold", accent)}>{value}</p><p className="mt-1 text-xs font-semibold text-[var(--theme-text-muted)]">{hint}</p></article>;
+function KpiCard({
+  label,
+  value,
+  hint,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  tone?: "default" | "primary" | "success" | "warning";
+}) {
+  const accent =
+    tone === "primary"
+      ? "text-[var(--theme-primary)]"
+      : tone === "success"
+        ? "text-[var(--theme-success-text)]"
+        : tone === "warning"
+          ? "text-[var(--theme-warning-text)]"
+          : "text-[var(--theme-text-strong)]";
+  return (
+    <article className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
+      <p className="text-sm font-bold text-[var(--theme-text-muted)]">{label}</p>
+      <p className={cn("mt-2 text-xl font-extrabold", accent)}>{value}</p>
+      <p className="mt-1 text-xs font-semibold text-[var(--theme-text-muted)]">{hint}</p>
+    </article>
+  );
 }
 
-function TabLoading() { return <div className="grid min-h-56 place-items-center"><div className="inline-flex items-center gap-2 font-bold text-[var(--theme-text-muted)]"><Loader2 className="h-5 w-5 animate-spin" />Đang tải dữ liệu</div></div>; }
-function TabError({ onRetry }: { onRetry: () => void }) { return <div className="rounded-xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-bg)] p-5 text-center"><p className="font-extrabold text-[var(--theme-danger-text)]">Chưa thể tải dữ liệu.</p><button type="button" onClick={onRetry} className="mt-3 rounded-lg border border-[var(--theme-danger-border)] px-4 py-2 text-sm font-extrabold text-[var(--theme-danger-text)]">Thử lại</button></div>; }
+function OverviewSkeleton() {
+  return (
+    <div
+      className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      aria-label="Đang tải tổng quan AI"
+    >
+      {Array.from({ length: 4 }, (_, index) => (
+        <div
+          key={index}
+          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4"
+        >
+          <SkeletonBlock className="h-4 w-28 rounded" />
+          <SkeletonBlock className="mt-3 h-7 w-36 rounded" />
+          <SkeletonBlock className="mt-2 h-3 w-24 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+function TabLoading() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2" aria-label="Đang tải dữ liệu">
+      {Array.from({ length: 4 }, (_, index) => (
+        <div
+          key={index}
+          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-5"
+        >
+          <SkeletonBlock className="h-4 w-24 rounded" />
+          <SkeletonBlock className="mt-3 h-6 w-40 rounded" />
+          <SkeletonBlock className="mt-5 h-12 w-full rounded-xl" />
+          <SkeletonBlock className="mt-3 h-12 w-full rounded-xl" />
+        </div>
+      ))}
+    </div>
+  );
+}

@@ -16,19 +16,13 @@ import {
   LessonSummaryContextService,
 } from "#api/modules/ai/services/lesson-summary-context.service";
 import {
-  LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
-  LESSON_SUMMARY_PROMPT_VERSION,
-  LESSON_SUMMARY_SCHEMA_VERSION,
   lessonSummaryJobInputSchema,
   lessonSummaryOutputSchema,
   type LessonSummaryOutput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { mapLessonSummaryToTiptap } from "#api/modules/ai/utils/lesson-summary-mapper";
 import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validation";
-import {
-  buildLessonSummaryUserPrompt,
-  LESSON_SUMMARY_SYSTEM_PROMPT,
-} from "#api/modules/ai/utils/lesson-summary-prompt";
+import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
 @Injectable()
 export class LessonSummaryGenerationService {
@@ -75,24 +69,16 @@ export class LessonSummaryGenerationService {
       );
     }
 
-    const structuredInput = {
-        systemPrompt: LESSON_SUMMARY_SYSTEM_PROMPT,
-        userPrompt: buildLessonSummaryUserPrompt({
-          lessonTitle: sourceContext.lessonTitle,
-          style: input.data.style,
-        }),
-        contextChunks: sourceContext.chunks,
-        temperature: 0.2,
-        maxTokens: LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
-        metadata: {
-          lessonId: context.lessonId,
-          documentIds: sourceContext.documentIds,
-          sourceHash: sourceContext.sourceHash,
-        },
-        outputName: "lesson_summary",
-        promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
-        schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
-    };
+    const structuredInput = buildLessonSummaryStructuredInput({
+      lessonId: context.lessonId,
+      lessonTitle: sourceContext.lessonTitle,
+      documentIds: sourceContext.documentIds,
+      sourceHash: sourceContext.sourceHash,
+      chunks: sourceContext.chunks,
+      configuration: input.data,
+      systemInstructions: input.data.systemInstructions,
+      userPrompt: input.data.userPrompt,
+    });
     const output = this.providerCall
       ? await this.providerCall.generateStructured(
           {

@@ -37,7 +37,19 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
         systemPrompt: LESSON_SUMMARY_SYSTEM_PROMPT,
         userPrompt: buildLessonSummaryUserPrompt({
           lessonTitle: "Số hữu tỉ",
-          style: "student_friendly",
+          configuration: {
+            style: "student_friendly",
+            styleInstructions: "",
+            length: "standard",
+            targetWordCount: null,
+            focus: "",
+            includeFormulas: true,
+            includeExamples: true,
+            includeCommonMistakes: true,
+            contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
+            reviewQuestionCount: 5,
+            extraInstructions: "",
+          },
         }),
         contextChunks: [
           {

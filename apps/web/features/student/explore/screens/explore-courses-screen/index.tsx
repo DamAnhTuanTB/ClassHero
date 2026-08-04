@@ -1,13 +1,11 @@
 "use client";
 
-import { BookOpen, RotateCcw } from "lucide-react";
-import Link from "next/link";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { CourseSearchFilterPanel } from "@/features/student/explore/screens/explore-courses-screen/components/course-search-filter-panel";
 import { ExploreCourseSection } from "@/features/student/explore/screens/explore-courses-screen/components/explore-course-section";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
-import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import { useStudentCoursesFilter } from "@/features/student/explore/hooks/use-student-courses-filter";
 import { getExploreAllCourseSections } from "@/features/student/shared/utils/student-courses-utils";
 import { useStudentCourseDetailPrefetch } from "@/features/student/shared/hooks/use-student-courses-query";
@@ -83,33 +81,22 @@ export function ExploreCoursesScreen({
 
   if (isError) {
     return (
-      <StudentFullScreenState
+      <StudentDataErrorState
         initialThemeMode={initialThemeMode}
         title="Chưa tải được danh sách khóa học"
         description="Bạn thử tải lại danh sách hoặc quay lại sau ít phút nhé."
-        action={
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              disabled={coursesQuery.isFetching}
-              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-wait disabled:opacity-70"
-            >
-              <RotateCcw
-                className={coursesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-                aria-hidden="true"
-              />
-              {coursesQuery.isFetching ? "Đang tải lại" : "Tải lại"}
-            </button>
-            <Link
-              href="/student/courses"
-              className="student-learn-cta-3d-emerald inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white transition hover:bg-emerald-400"
-            >
-              <BookOpen className="h-4 w-4" aria-hidden="true" />
-              Về khóa học của tôi
-            </Link>
-          </div>
-        }
+        primaryAction={{
+          icon: "retry",
+          label: "Tải lại",
+          onClick: () => void refetch(),
+          pending: coursesQuery.isFetching,
+        }}
+        secondaryAction={{
+          href: "/student/courses",
+          icon: "book",
+          label: "Về khóa học của tôi",
+          tone: "secondary",
+        }}
       />
     );
   }

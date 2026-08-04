@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Loader2, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, type FormEvent } from "react";
+import { Check, Loader2, Pencil, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import {
   createLessonSchema,
@@ -15,6 +15,7 @@ import {
   readRecord,
 } from "@/features/admin/courses/admin-course-documents-utils";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { toLessonFormValues } from "@/features/admin/courses/admin-courses-utils";
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import { useAdminCourseDocumentsManager } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
@@ -76,6 +77,7 @@ export function LessonDocumentsTab({
       foundationDocumentOrder: [],
     },
   });
+  const [isEditing, setIsEditing] = useState(false);
   const resetKeyRef = useRef<string | null>(null);
 
   const formValues = useMemo(() => {
@@ -190,11 +192,17 @@ export function LessonDocumentsTab({
     }
 
     form.reset(values);
+    setIsEditing(false);
     documentsManager.actions.reloadDocuments();
     await onSaved();
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (!isEditing) {
+      event.preventDefault();
+      return;
+    }
+
     form.getValues("sourceDocumentExtractions").forEach((_, index) => {
       form.setValue(`sourceDocumentExtractions.${index}.hasInteracted`, true, {
         shouldDirty: false,
@@ -211,52 +219,66 @@ export function LessonDocumentsTab({
 
   if (viewState === "error" || !path || !lessonMatch) {
     return (
-      <div className="flex min-h-72 items-center justify-center p-6">
-        <div className="max-w-md text-center">
-          <p className="text-sm font-bold text-[var(--theme-text-strong)]">
-            Chưa tải được tài liệu buổi học
-          </p>
-          <p className="mt-1 text-sm leading-6 text-[var(--theme-text-muted)]">
-            Thử tải lại dữ liệu khóa học trước khi quản lý tài liệu.
-          </p>
-          <button
-            type="button"
-            onClick={actions.retryLoad}
-            className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            Thử lại
-          </button>
-        </div>
-      </div>
+      <AdminDataErrorState
+        description="Vui lòng thử lại trước khi tiếp tục quản lý tài liệu."
+        headingLevel={3}
+        onRetry={actions.retryLoad}
+        title="Không tải được tài liệu buổi học"
+        variant="section"
+      />
     );
   }
 
   return (
     <form className="flex min-w-0 flex-col" onSubmit={handleSubmit} noValidate>
+      <div className="theme-dialog-header flex shrink-0 justify-end gap-2 bg-[var(--theme-bg-elevated)] p-3 sm:p-4">
+        {isEditing ? (
+          <>
+            <button
+              type="button"
+              disabled={isSavingLesson}
+              onClick={() => {
+                if (formValues) form.reset(formValues);
+                setIsEditing(false);
+              }}
+              className="theme-button-neutral inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={isSavingLesson}
+              className="theme-button-primary inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            >
+              {isSavingLesson ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Check className="h-4 w-4" aria-hidden="true" />
+              )}
+              {isSavingLesson ? "Đang lưu" : "Lưu tài liệu"}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="theme-button-primary inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition sm:w-auto"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Chỉnh sửa
+          </button>
+        )}
+      </div>
+
       <div className="space-y-3 sm:p-5">
         <LessonDocumentsFields
-          disabled={false}
+          disabled={!isEditing}
           form={form}
           isSaving={isSavingLesson}
           sourceDocuments={selectableSourceDocuments}
           sourcePagesByDocumentId={documentsManager.sourcePagesByDocumentId}
         />
-      </div>
-
-      <div className="theme-dialog-footer sticky bottom-0 z-10 flex shrink-0 justify-end border-t border-[var(--theme-border)] p-3 sm:p-4">
-        <button
-          type="submit"
-          disabled={isSavingLesson}
-          className="theme-button-primary inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          {isSavingLesson ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Check className="h-4 w-4" aria-hidden="true" />
-          )}
-          {isSavingLesson ? "Đang lưu" : "Lưu tài liệu"}
-        </button>
       </div>
     </form>
   );

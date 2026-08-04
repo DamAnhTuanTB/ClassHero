@@ -10,6 +10,10 @@ export type ProviderCostResult = {
   costVnd: number;
 };
 
+export type ProviderReservationEstimate = ProviderCostResult & {
+  missingMetrics: ProviderUsageMetric[];
+};
+
 export function calculateProviderCost(
   usage: ProviderUsageAmounts,
   rates: PriceRateSnapshot[],
@@ -45,4 +49,48 @@ export function calculateProviderCost(
 
 function roundUsd(value: number) {
   return Math.round((value + Number.EPSILON) * 10_000_000_000) / 10_000_000_000;
+}
+
+export function estimateProviderReservation(
+  usageUpperBound: ProviderUsageAmounts,
+  rates: PriceRateSnapshot[],
+  fxRateVndPerUsd: number,
+  requiredMetrics: ProviderUsageMetric[],
+): ProviderReservationEstimate {
+  const amounts: Record<ProviderUsageMetric, number> = {
+    [ProviderUsageMetric.INPUT_TOKEN]: Math.max(0, usageUpperBound.promptTokens ?? 0),
+    [ProviderUsageMetric.CACHED_INPUT_TOKEN]: Math.max(
+      0,
+      usageUpperBound.cachedInputTokens ?? 0,
+    ),
+    [ProviderUsageMetric.OUTPUT_TOKEN]: Math.max(
+      0,
+      usageUpperBound.completionTokens ?? 0,
+    ),
+    [ProviderUsageMetric.PAGE]: Math.max(0, usageUpperBound.pages ?? 0),
+    [ProviderUsageMetric.REQUEST]: Math.max(0, usageUpperBound.requestCount ?? 0),
+  };
+  const ratesByMetric = new Map<ProviderUsageMetric, number>();
+  for (const rate of rates) {
+    if (rate.unitSize <= 0 || rate.unitPriceUsd < 0) continue;
+    const perUnit = rate.unitPriceUsd / rate.unitSize;
+    ratesByMetric.set(
+      rate.metric,
+      Math.max(ratesByMetric.get(rate.metric) ?? 0, perUnit),
+    );
+  }
+
+  const missingMetrics = requiredMetrics.filter(
+    (metric) => amounts[metric] > 0 && !ratesByMetric.has(metric),
+  );
+  const costUsd = Object.values(ProviderUsageMetric).reduce(
+    (sum, metric) => sum + amounts[metric] * (ratesByMetric.get(metric) ?? 0),
+    0,
+  );
+
+  return {
+    costUsd: roundUsd(costUsd),
+    costVnd: Math.max(0, Math.ceil(costUsd * fxRateVndPerUsd)),
+    missingMetrics,
+  };
 }

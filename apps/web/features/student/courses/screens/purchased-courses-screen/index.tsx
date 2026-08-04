@@ -1,14 +1,12 @@
 "use client";
 
-import { Home, RotateCcw } from "lucide-react";
-import Link from "next/link";
 import { useEffect } from "react";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { ExploreCourseCard } from "@/components/student/courses/explore-course-card";
 import { StudentLearningGreetingPanel } from "@/features/student/courses/screens/purchased-courses-screen/components/student-learning-greeting-panel";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
-import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import { TodayLearningGoalsPanel } from "@/features/student/courses/screens/purchased-courses-screen/components/today-learning-goals-panel";
 import {
   useStudentCourseDetailPrefetch,
@@ -69,33 +67,22 @@ export function PurchasedCoursesScreen({
 
   if (coursesQuery.isError) {
     return (
-      <StudentFullScreenState
+      <StudentDataErrorState
         initialThemeMode={initialThemeMode}
         title="Chưa tải được khóa học"
         description="Bạn thử tải lại trang hoặc kiểm tra kết nối mạng rồi quay lại nhé."
-        action={
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => void coursesQuery.refetch()}
-              disabled={coursesQuery.isFetching}
-              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-black text-white transition hover:bg-sky-600 disabled:cursor-wait disabled:opacity-70"
-            >
-              <RotateCcw
-                className={coursesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-                aria-hidden="true"
-              />
-              {coursesQuery.isFetching ? "Đang tải lại" : "Tải lại"}
-            </button>
-            <Link
-              href="/student/explore"
-              className="student-learn-cta-3d-emerald inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white transition hover:bg-emerald-400"
-            >
-              <Home className="h-4 w-4" aria-hidden="true" />
-              Về Trang chủ
-            </Link>
-          </div>
-        }
+        primaryAction={{
+          icon: "retry",
+          label: "Tải lại",
+          onClick: () => void coursesQuery.refetch(),
+          pending: coursesQuery.isFetching,
+        }}
+        secondaryAction={{
+          href: "/student/explore",
+          icon: "home",
+          label: "Về Trang chủ",
+          tone: "secondary",
+        }}
       />
     );
   }

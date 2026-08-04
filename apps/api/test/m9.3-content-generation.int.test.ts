@@ -35,11 +35,20 @@ import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixtur
 
 const runId = randomUUID();
 const ids = {
-  admin: randomUUID(), student: randomUUID(), path: randomUUID(), lesson: randomUUID(),
-  file: randomUUID(), document: randomUUID(), chunk: randomUUID(),
+  admin: randomUUID(),
+  student: randomUUID(),
+  path: randomUUID(),
+  lesson: randomUUID(),
+  file: randomUUID(),
+  sourceDocument: randomUUID(),
+  pageRange: randomUUID(),
+  document: randomUUID(),
+  processingDocument: randomUUID(),
+  chunk: randomUUID(),
 };
 const queueMock = { enqueue: vi.fn(async (jobId: string) => ({ jobId })) };
-const sourceText = "Số hữu tỉ biểu diễn được dưới dạng phân số với mẫu khác không. Phép cộng số hữu tỉ cần quy đồng mẫu số trước khi cộng tử số.";
+const sourceText =
+  "Số hữu tỉ biểu diễn được dưới dạng phân số với mẫu khác không. Phép cộng số hữu tỉ cần quy đồng mẫu số trước khi cộng tử số.";
 const commonQuestion = {
   difficulty: Difficulty.MEDIUM,
   prompt: "Hãy vận dụng kiến thức đã học để giải quyết yêu cầu mới sau đây.",
@@ -48,10 +57,32 @@ const commonQuestion = {
   sourceChunkIds: [ids.chunk],
 };
 const allQuestions = [
-  { ...commonQuestion, questionType: QuestionType.MULTIPLE_CHOICE, options: [{ id: "A", text: "Kết quả phù hợp" }, { id: "B", text: "Kết quả không phù hợp" }], correctOptionIds: ["A"] },
+  {
+    ...commonQuestion,
+    questionType: QuestionType.MULTIPLE_CHOICE,
+    options: [
+      { id: "A", text: "Kết quả phù hợp" },
+      { id: "B", text: "Kết quả không phù hợp" },
+    ],
+    correctOptionIds: ["A"],
+  },
   { ...commonQuestion, questionType: QuestionType.TRUE_FALSE, correctAnswer: true },
-  { ...commonQuestion, questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE, statements: [{ id: "S1", text: "Mệnh đề thứ nhất", value: true }, { id: "S2", text: "Mệnh đề thứ hai", value: false }] },
-  { ...commonQuestion, questionType: QuestionType.TEXT_INPUT, acceptedAnswers: ["một phần hai"], caseSensitive: false, exactMatch: true, keywords: [] },
+  {
+    ...commonQuestion,
+    questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+    statements: [
+      { id: "S1", text: "Mệnh đề thứ nhất", value: true },
+      { id: "S2", text: "Mệnh đề thứ hai", value: false },
+    ],
+  },
+  {
+    ...commonQuestion,
+    questionType: QuestionType.TEXT_INPUT,
+    acceptedAnswers: ["một phần hai"],
+    caseSensitive: false,
+    exactMatch: true,
+    keywords: [],
+  },
 ];
 
 describe("M9.3 API, PostgreSQL persistence and review integration", () => {
@@ -68,10 +99,14 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
       .compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true, forbidNonWhitelisted: true, transform: true,
-      exceptionFactory: createValidationException,
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        exceptionFactory: createValidationException,
+      }),
+    );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ApiResponseInterceptor());
     await app.init();
@@ -80,7 +115,10 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
     await createFixture(prisma);
     const tokens = app.get(AuthTokenService, { strict: false });
     adminToken = await tokens.signAccessToken({ id: ids.admin, role: UserRole.ADMIN });
-    studentToken = await tokens.signAccessToken({ id: ids.student, role: UserRole.STUDENT });
+    studentToken = await tokens.signAccessToken({
+      id: ids.student,
+      role: UserRole.STUDENT,
+    });
   });
 
   afterAll(async () => {
@@ -88,17 +126,86 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
     if (app) await app.close();
   });
 
+  it("exposes admin-only M9.8 readiness without leaking source content", async () => {
+    await request(server)
+      .get(`/api/v1/admin/lessons/${ids.lesson}/ai-generation-panel`)
+      .set("Authorization", `Bearer ${studentToken}`)
+      .expect(403);
+
+    const pending = await request(server)
+      .get(`/api/v1/admin/lessons/${ids.lesson}/ai-generation-panel`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(pending.body.data).toMatchObject({
+      lesson: { id: ids.lesson, title: "Số hữu tỉ" },
+      readiness: {
+        summaryReady: true,
+        generationReady: false,
+        readyDocumentCount: 1,
+        embeddedDocumentCount: 0,
+      },
+      documents: expect.arrayContaining([
+        expect.objectContaining({
+          id: ids.document,
+          title: "Nguồn",
+          chunkCount: 1,
+          pageRange: { pageStart: 5, pageEnd: 9 },
+          canUseForSummary: true,
+          unavailableReason: null,
+          embeddingReady: false,
+        }),
+        expect.objectContaining({
+          id: ids.processingDocument,
+          title: "Phiếu đang xử lý",
+          status: DocumentStatus.PROCESSING,
+          pageRange: null,
+          canUseForSummary: false,
+          unavailableReason: "Đang xử lý",
+        }),
+      ]),
+      jobs: { SUMMARY: null, QUIZ: null, FLASHCARD: null, TEST: null },
+    });
+    expect(JSON.stringify(pending.body.data)).not.toContain(sourceText);
+
+    await prisma.lessonDocument.update({
+      where: { id: ids.document },
+      data: {
+        embeddingProvider: AiProviderName.OPENAI,
+        embeddingModel: "text-embedding-3-small",
+        embeddingDimensions: 1536,
+      },
+    });
+    const ready = await request(server)
+      .get(`/api/v1/admin/lessons/${ids.lesson}/ai-generation-panel`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(ready.body.data.readiness).toMatchObject({
+      summaryReady: true,
+      generationReady: true,
+      embeddedDocumentCount: 1,
+      reason: null,
+    });
+  });
+
   it("enforces RBAC, validates ratios, queues three distinct generation types and persists all item forms", async () => {
     await request(server)
       .post(`/api/v1/admin/lessons/${ids.lesson}/quiz-sets/generate-ai`)
       .set("Authorization", `Bearer ${studentToken}`)
-      .send({ questionCount: 4, difficulty: Difficulty.MEDIUM, questionTypes: Object.values(QuestionType) })
+      .send({
+        questionCount: 4,
+        difficulty: Difficulty.MEDIUM,
+        questionTypes: Object.values(QuestionType),
+      })
       .expect(403);
 
     await request(server)
       .post(`/api/v1/admin/lessons/${ids.lesson}/test-sets/generate-ai`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ questionCount: 4, durationSeconds: 600, difficultyRatio: { easy: 0.2, medium: 0.2, hard: 0.2 } })
+      .send({
+        questionCount: 4,
+        durationSeconds: 600,
+        difficultyRatio: { easy: 0.2, medium: 0.2, hard: 0.2 },
+      })
       .expect(400);
 
     await request(server)
@@ -108,12 +215,19 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
       .expect(400);
 
     const quizJob = await enqueue("quiz-sets", {
-      questionCount: 4, difficulty: Difficulty.MEDIUM, questionTypes: Object.values(QuestionType),
+      questionCount: 4,
+      difficulty: Difficulty.MEDIUM,
+      questionTypes: Object.values(QuestionType),
     });
-    const flashcardJob = await enqueue("flashcard-sets", { cardCount: 3, difficulty: Difficulty.MIXED });
+    const flashcardJob = await enqueue("flashcard-sets", {
+      cardCount: 3,
+      difficulty: Difficulty.MIXED,
+    });
     const testJob = await enqueue("test-sets", {
-      questionCount: 4, durationSeconds: 600,
-      difficultyRatio: { easy: 0, medium: 1, hard: 0 }, questionTypes: Object.values(QuestionType),
+      questionCount: 4,
+      durationSeconds: 600,
+      difficultyRatio: { easy: 0, medium: 1, hard: 0 },
+      questionTypes: Object.values(QuestionType),
     });
     expect(queueMock.enqueue).toHaveBeenCalledTimes(3);
 
@@ -121,24 +235,49 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
       generated_quiz: { title: "Quiz AI", questions: allQuestions },
       generated_flashcards: {
         title: "Flashcard AI",
-        cards: [Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD].map((difficulty) => ({
-          difficulty, front: `Khái niệm ${difficulty}`, back: `Nội dung ${difficulty}`,
-          explanation: `Giải thích ${difficulty}`, sourceChunkIds: [ids.chunk],
-        })),
+        cards: [Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD].map(
+          (difficulty) => ({
+            difficulty,
+            front: `Khái niệm ${difficulty}`,
+            back: `Nội dung ${difficulty}`,
+            explanation: `Giải thích ${difficulty}`,
+            sourceChunkIds: [ids.chunk],
+          }),
+        ),
       },
       generated_test: { title: "Test AI", questions: allQuestions },
     };
     const aiService = {
       generateStructured: vi.fn(async (input: { outputName: keyof typeof outputs }) => ({
-        data: outputs[input.outputName], provider: AiProviderName.OPENAI,
-        model: "gpt-4.1-mini-test", usage: { promptTokens: 100, completionTokens: 100, totalTokens: 200 },
+        data: outputs[input.outputName],
+        provider: AiProviderName.OPENAI,
+        model: "gpt-4.1-mini-test",
+        usage: { promptTokens: 100, completionTokens: 100, totalTokens: 200 },
       })),
     };
     const generationContext = {
       retrieve: vi.fn(async (input: { sourceHash: string }) => ({
-        lessonId: ids.lesson, lessonTitle: "Số hữu tỉ", documentIds: [ids.document],
-        sourceHash: input.sourceHash, query: "test", totalTokens: 40, searchLatencyMs: 1, keywordMatchCount: 1,
-        chunks: [{ chunkId: ids.chunk, documentId: ids.document, lessonId: ids.lesson, content: sourceText, score: 0.9, chunkIndex: 0, tokenCount: 40, metadataJson: { printedPage: 12 }, matchSource: "both" as const }],
+        lessonId: ids.lesson,
+        lessonTitle: "Số hữu tỉ",
+        documentIds: [ids.document],
+        sourceHash: input.sourceHash,
+        query: "test",
+        totalTokens: 40,
+        searchLatencyMs: 1,
+        keywordMatchCount: 1,
+        chunks: [
+          {
+            chunkId: ids.chunk,
+            documentId: ids.document,
+            lessonId: ids.lesson,
+            content: sourceText,
+            score: 0.9,
+            chunkIndex: 0,
+            tokenCount: 40,
+            metadataJson: { printedPage: 12 },
+            matchSource: "both" as const,
+          },
+        ],
       })),
     };
     const worker = new LessonContentGenerationService(
@@ -153,29 +292,76 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
     }
 
     const quiz = await prisma.quizSet.findFirstOrThrow({
-      where: { lessonId: ids.lesson, source: "AI" }, include: { questions: { include: { explanation: true } } },
+      where: { lessonId: ids.lesson, source: "AI" },
+      include: { questions: { include: { explanation: true } } },
     });
-    expect(new Set(quiz.questions.map((question) => question.questionType))).toEqual(new Set(Object.values(QuestionType)));
-    expect(quiz.questions.every((question) => question.reviewStatus === ReviewStatus.NEEDS_REVIEW && question.explanation?.reviewStatus === ReviewStatus.NEEDS_REVIEW)).toBe(true);
-    expect(quiz.questions[0]?.sourceMetadataJson).toMatchObject({ sourceChunkIds: [ids.chunk] });
+    expect(new Set(quiz.questions.map((question) => question.questionType))).toEqual(
+      new Set(Object.values(QuestionType)),
+    );
+    expect(
+      quiz.questions.every(
+        (question) =>
+          question.reviewStatus === ReviewStatus.NEEDS_REVIEW &&
+          question.explanation?.reviewStatus === ReviewStatus.NEEDS_REVIEW,
+      ),
+    ).toBe(true);
+    expect(quiz.questions[0]?.sourceMetadataJson).toMatchObject({
+      sourceChunkIds: [ids.chunk],
+    });
 
     const flashcards = await prisma.flashcardSet.findFirstOrThrow({
-      where: { lessonId: ids.lesson, source: "AI" }, include: { flashcards: { include: { explanation: true } } },
+      where: { lessonId: ids.lesson, source: "AI" },
+      include: { flashcards: { include: { explanation: true } } },
     });
-    expect(new Set(flashcards.flashcards.map((card) => card.difficulty))).toEqual(new Set([Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD]));
+    expect(new Set(flashcards.flashcards.map((card) => card.difficulty))).toEqual(
+      new Set([Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD]),
+    );
     expect(flashcards.flashcards.every((card) => card.hintJson === null)).toBe(true);
 
     const test = await prisma.testSet.findFirstOrThrow({
-      where: { lessonId: ids.lesson, source: "AI" }, include: { questions: { include: { explanation: true } } },
+      where: { lessonId: ids.lesson, source: "AI" },
+      include: { questions: { include: { explanation: true } } },
     });
-    expect(new Set(test.questions.map((question) => question.questionType))).toEqual(new Set(Object.values(QuestionType)));
+    expect(new Set(test.questions.map((question) => question.questionType))).toEqual(
+      new Set(Object.values(QuestionType)),
+    );
 
     await review("quiz-sets", quiz.id);
     await review("flashcard-sets", flashcards.id);
     await review("test-sets", test.id);
-    expect((await prisma.quizQuestion.count({ where: { quizSetId: quiz.id, reviewStatus: ReviewStatus.APPROVED } }))).toBe(4);
-    expect((await prisma.flashcard.count({ where: { flashcardSetId: flashcards.id, reviewStatus: ReviewStatus.APPROVED } }))).toBe(3);
-    expect((await prisma.testQuestion.count({ where: { testSetId: test.id, reviewStatus: ReviewStatus.APPROVED } }))).toBe(4);
+    expect(
+      await prisma.quizQuestion.count({
+        where: { quizSetId: quiz.id, reviewStatus: ReviewStatus.APPROVED },
+      }),
+    ).toBe(4);
+    expect(
+      await prisma.flashcard.count({
+        where: { flashcardSetId: flashcards.id, reviewStatus: ReviewStatus.APPROVED },
+      }),
+    ).toBe(3);
+    expect(
+      await prisma.testQuestion.count({
+        where: { testSetId: test.id, reviewStatus: ReviewStatus.APPROVED },
+      }),
+    ).toBe(4);
+  });
+
+  it("returns one recoverable latest job per generation type", async () => {
+    const response = await request(server)
+      .get(`/api/v1/admin/lessons/${ids.lesson}/ai-generation-panel`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+
+    for (const type of ["QUIZ", "FLASHCARD", "TEST"] as const) {
+      expect(response.body.data.jobs[type]).toMatchObject({
+        type,
+        jobId: expect.any(String),
+        status: "QUEUED",
+      });
+    }
+    expect(response.body.data.jobs.SUMMARY).toBeNull();
+    expect(response.body.data.jobs.QUIZ).not.toHaveProperty("inputMeta");
+    expect(response.body.data.jobs.QUIZ).not.toHaveProperty("outputJson");
   });
 
   async function enqueue(resource: string, body: unknown) {
@@ -196,45 +382,147 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
   }
 });
 
-async function executionContext(prisma: PrismaService, jobId: string): Promise<AiGenerationExecutionContext> {
-  const job = await prisma.backgroundJob.findUniqueOrThrow({ where: { id: jobId }, include: { aiGenerations: true } });
+async function executionContext(
+  prisma: PrismaService,
+  jobId: string,
+): Promise<AiGenerationExecutionContext> {
+  const job = await prisma.backgroundJob.findUniqueOrThrow({
+    where: { id: jobId },
+    include: { aiGenerations: true },
+  });
   const generation = job.aiGenerations[0]!;
   return {
-    backgroundJobId: job.id, aiGenerationId: generation.id, type: generation.type,
-    ownerUserId: job.ownerUserId, lessonId: job.lessonId, targetType: generation.targetType,
-    targetId: generation.targetId, inputMeta: job.inputMeta, attempt: 1, maxAttempts: job.maxAttempts,
+    backgroundJobId: job.id,
+    aiGenerationId: generation.id,
+    type: generation.type,
+    ownerUserId: job.ownerUserId,
+    lessonId: job.lessonId,
+    targetType: generation.targetType,
+    targetId: generation.targetId,
+    inputMeta: job.inputMeta,
+    attempt: 1,
+    maxAttempts: job.maxAttempts,
   };
 }
 
 async function createFixture(prisma: PrismaClient) {
-  await prisma.user.createMany({ data: [
-    { id: ids.admin, role: UserRole.ADMIN, status: UserStatus.ACTIVE, email: `m9-3-admin-${runId}@example.com`, username: `m9_3_admin_${runId.slice(0, 8)}`, passwordHash: "test" },
-    { id: ids.student, role: UserRole.STUDENT, status: UserStatus.ACTIVE, email: `m9-3-student-${runId}@example.com`, username: `m9_3_student_${runId.slice(0, 8)}`, passwordHash: "test" },
-  ] });
-  await prisma.file.create({ data: {
-    id: ids.file, provider: FileProvider.MINIO_LOCAL, purpose: FilePurpose.LESSON_DOCUMENT,
-    bucket: "test", objectKey: `m9.3/${runId}.pdf`, originalName: "source.pdf", mimeType: "application/pdf",
-    sizeBytes: BigInt(1024), visibility: FileVisibility.PRIVATE, status: FileStatus.UPLOADED, uploadedById: ids.admin,
-  } });
+  await prisma.user.createMany({
+    data: [
+      {
+        id: ids.admin,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        email: `m9-3-admin-${runId}@example.com`,
+        username: `m9_3_admin_${runId.slice(0, 8)}`,
+        passwordHash: "test",
+      },
+      {
+        id: ids.student,
+        role: UserRole.STUDENT,
+        status: UserStatus.ACTIVE,
+        email: `m9-3-student-${runId}@example.com`,
+        username: `m9_3_student_${runId.slice(0, 8)}`,
+        passwordHash: "test",
+      },
+    ],
+  });
+  await prisma.file.create({
+    data: {
+      id: ids.file,
+      provider: FileProvider.MINIO_LOCAL,
+      purpose: FilePurpose.LESSON_DOCUMENT,
+      bucket: "test",
+      objectKey: `m9.3/${runId}.pdf`,
+      originalName: "source.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: BigInt(1024),
+      visibility: FileVisibility.PRIVATE,
+      status: FileStatus.UPLOADED,
+      uploadedById: ids.admin,
+    },
+  });
   const catalog = await createTestCourseCatalogRelation(prisma, 7);
-  await prisma.learningPath.create({ data: {
-    id: ids.path, ...catalog, title: "M9.3 Path", slug: `m9-3-${runId}`, originalPriceVnd: 1_000_000,
-    status: PublishStatus.DRAFT,
-    createdBy: { connect: { id: ids.admin } },
-    updatedBy: { connect: { id: ids.admin } },
-  } });
-  await prisma.lesson.create({ data: {
-    id: ids.lesson, learningPathId: ids.path, orderIndex: 1, title: "Số hữu tỉ",
-    status: PublishStatus.DRAFT, createdById: ids.admin, updatedById: ids.admin,
-  } });
-  await prisma.lessonDocument.create({ data: {
-    id: ids.document, lessonId: ids.lesson, fileId: ids.file, title: "Nguồn",
-    status: DocumentStatus.READY, contentHash: "m9-3-doc", chunkCount: 1, processedAt: new Date(),
-  } });
-  await prisma.documentChunk.create({ data: {
-    id: ids.chunk, documentId: ids.document, lessonId: ids.lesson, chunkIndex: 0,
-    content: sourceText, contentHash: "m9-3-chunk", tokenCount: 40, metadataJson: { printedPage: 12 },
-  } });
+  await prisma.learningPath.create({
+    data: {
+      id: ids.path,
+      ...catalog,
+      title: "M9.3 Path",
+      slug: `m9-3-${runId}`,
+      originalPriceVnd: 1_000_000,
+      status: PublishStatus.DRAFT,
+      createdBy: { connect: { id: ids.admin } },
+      updatedBy: { connect: { id: ids.admin } },
+    },
+  });
+  await prisma.lesson.create({
+    data: {
+      id: ids.lesson,
+      learningPathId: ids.path,
+      orderIndex: 1,
+      title: "Số hữu tỉ",
+      status: PublishStatus.DRAFT,
+      createdById: ids.admin,
+      updatedById: ids.admin,
+    },
+  });
+  await prisma.sourceDocument.create({
+    data: {
+      id: ids.sourceDocument,
+      learningPathId: ids.path,
+      fileId: ids.file,
+      title: "Nguồn",
+      status: DocumentStatus.READY,
+      pageCount: 16,
+      processedAt: new Date(),
+    },
+  });
+  await prisma.lessonDocumentPageRange.create({
+    data: {
+      id: ids.pageRange,
+      lessonId: ids.lesson,
+      sourceDocumentId: ids.sourceDocument,
+      pageStart: 5,
+      pageEnd: 9,
+      createdById: ids.admin,
+    },
+  });
+  await prisma.lessonDocument.create({
+    data: {
+      id: ids.document,
+      lessonId: ids.lesson,
+      fileId: ids.file,
+      sourceDocumentId: ids.sourceDocument,
+      pageRangeId: ids.pageRange,
+      title: "Nguồn",
+      status: DocumentStatus.READY,
+      contentHash: "m9-3-doc",
+      chunkCount: 1,
+      processedAt: new Date(),
+    },
+  });
+  await prisma.lessonDocument.create({
+    data: {
+      id: ids.processingDocument,
+      lessonId: ids.lesson,
+      fileId: ids.file,
+      title: "Phiếu đang xử lý",
+      status: DocumentStatus.PROCESSING,
+      chunkCount: 0,
+      sortOrder: 1,
+    },
+  });
+  await prisma.documentChunk.create({
+    data: {
+      id: ids.chunk,
+      documentId: ids.document,
+      lessonId: ids.lesson,
+      chunkIndex: 0,
+      content: sourceText,
+      contentHash: "m9-3-chunk",
+      tokenCount: 40,
+      metadataJson: { printedPage: 12 },
+    },
+  });
 }
 
 async function cleanup(prisma: PrismaClient) {

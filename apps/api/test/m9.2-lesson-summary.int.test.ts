@@ -173,16 +173,92 @@ describe("M9.2 lesson summary API and worker integration", () => {
     expect(queueMock.enqueue).not.toHaveBeenCalled();
   });
 
+  it("previews the exact prompts and estimate without enqueueing or calling AI", async () => {
+    const response = await request(httpServer)
+      .post(`/api/v1/admin/lessons/${ids.lesson}/summary/prompt-preview`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        documentIds: [ids.document],
+        style: "academic",
+        length: "detailed",
+        targetWordCount: 350,
+        focus: "Định nghĩa số hữu tỉ",
+        includeFormulas: false,
+        includeExamples: true,
+        includeCommonMistakes: false,
+        reviewQuestionCount: 3,
+        extraInstructions: "Dùng câu ngắn",
+        styleInstructions: "Dễ hiểu cho học sinh khối 7",
+        contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
+        systemInstructions: "SYSTEM PREVIEW CUSTOM",
+        userPrompt: "USER PREVIEW CUSTOM",
+        temperature: 0.1,
+        maxOutputTokens: 1_500,
+      })
+      .expect(200);
+
+    expect(response.body.data).toMatchObject({
+      promptVersion: "lesson-summary-prompt-v2",
+      schemaVersion: "lesson-summary-schema-v2",
+      systemPrompt: "SYSTEM PREVIEW CUSTOM",
+      userPrompt: "USER PREVIEW CUSTOM",
+      inputPrompt: expect.stringContaining("Số hữu tỉ viết được"),
+      openAiRequest: {
+        model: expect.any(String),
+        instructions: "SYSTEM PREVIEW CUSTOM",
+        input: expect.stringContaining("USER PREVIEW CUSTOM"),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "lesson_summary",
+            strict: true,
+            schema: expect.objectContaining({ type: "object" }),
+          },
+        },
+        temperature: 0.1,
+        max_output_tokens: 1_500,
+      },
+      context: {
+        documentCount: 1,
+        chunkCount: 1,
+        contextTokens: 25,
+        maxContextTokens: 12_000,
+        estimatedTokens: expect.any(Number),
+      },
+      configuration: {
+        temperature: 0.1,
+        maxOutputTokens: 1_500,
+      },
+    });
+    expect(queueMock.enqueue).not.toHaveBeenCalled();
+  });
+
   it("queues once for concurrent clicks, generates from chunks, and allows a later regeneration", async () => {
     const first = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lesson}/summary/generate-ai`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ documentIds: [ids.document], style: "student_friendly" })
+      .send({
+        documentIds: [ids.document],
+        style: "student_friendly",
+        styleInstructions: "Dễ hiểu cho học sinh khối 7",
+        contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
+        reviewQuestionCount: 0,
+        systemInstructions: "SYSTEM GENERATE CUSTOM",
+        userPrompt: "USER GENERATE CUSTOM",
+      })
       .expect(202);
     const duplicate = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lesson}/summary/generate-ai`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ documentIds: [ids.document], style: "student_friendly" })
+      .send({
+        documentIds: [ids.document],
+        style: "student_friendly",
+        styleInstructions: "Dễ hiểu cho học sinh khối 7",
+        contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
+        reviewQuestionCount: 0,
+        systemInstructions: "SYSTEM GENERATE CUSTOM",
+        userPrompt: "USER GENERATE CUSTOM",
+      })
       .expect(202);
 
     expect(duplicate.body.data.jobId).toBe(first.body.data.jobId);
@@ -227,6 +303,8 @@ describe("M9.2 lesson summary API and worker integration", () => {
 
     expect(aiServiceMock.generateStructured).toHaveBeenCalledWith(
       expect.objectContaining({
+        systemPrompt: "SYSTEM GENERATE CUSTOM",
+        userPrompt: "USER GENERATE CUSTOM",
         contextChunks: [expect.objectContaining({ id: ids.chunk })],
       }),
       expect.any(Object),

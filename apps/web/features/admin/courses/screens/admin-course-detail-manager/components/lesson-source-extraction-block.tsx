@@ -149,7 +149,8 @@ export function LessonSourceExtractionBlock({
           Gợi ý:{" "}
           <button
             type="button"
-            className="font-extrabold text-[var(--theme-primary)] hover:underline"
+            disabled={disabled}
+            className="font-extrabold text-[var(--theme-primary)] hover:underline disabled:cursor-not-allowed disabled:text-[var(--theme-text-disabled)] disabled:no-underline"
             onClick={() => {
               form.setValue(
                 `sourceDocumentExtractions.${index}.pageStart`,

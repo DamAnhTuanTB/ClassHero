@@ -9,6 +9,10 @@ import type {
 } from "#api/jobs/background-job-queues";
 import type { AiGenerationLifecycleService } from "#api/modules/ai/services/ai-generation-lifecycle.service";
 import { AiOutputValidationError } from "#api/modules/ai/utils/ai-output-validation";
+import {
+  ProviderBudgetError,
+  providerBudgetErrorCodes,
+} from "#api/modules/provider-operations/utils/provider-budget-error";
 import { AiGenerationProcessor } from "#api/workers/processors/ai-generation.processor";
 import type { AiGenerationExecutionService } from "#api/workers/services/ai-generation-execution.service";
 
@@ -99,9 +103,9 @@ describe("M9.1 AI generation processor", () => {
     });
     expect(execution.generate).toHaveBeenCalledOnce();
     expect(execution.persist).toHaveBeenCalledOnce();
-    expect(
-      execution.generate.mock.invocationCallOrder[0],
-    ).toBeLessThan(execution.persist.mock.invocationCallOrder[0] ?? 0);
+    expect(execution.generate.mock.invocationCallOrder[0]).toBeLessThan(
+      execution.persist.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(lifecycle.markSucceeded).toHaveBeenCalledOnce();
   });
 
@@ -110,9 +114,7 @@ describe("M9.1 AI generation processor", () => {
       new AiOutputValidationError("schema mismatch"),
     );
 
-    await expect(processor.process(makeJob())).rejects.toBeInstanceOf(
-      UnrecoverableError,
-    );
+    await expect(processor.process(makeJob())).rejects.toBeInstanceOf(UnrecoverableError);
     expect(execution.persist).not.toHaveBeenCalled();
     expect(lifecycle.markSucceeded).not.toHaveBeenCalled();
     expect(lifecycle.markFailed).toHaveBeenCalledWith(
@@ -125,14 +127,31 @@ describe("M9.1 AI generation processor", () => {
   it("returns transient provider errors to QUEUED lifecycle for BullMQ retry", async () => {
     execution.generate.mockRejectedValueOnce(new Error("provider timeout"));
 
-    await expect(processor.process(makeJob(0, 3))).rejects.toThrow(
-      "provider timeout",
-    );
+    await expect(processor.process(makeJob(0, 3))).rejects.toThrow("provider timeout");
     expect(execution.persist).not.toHaveBeenCalled();
     expect(lifecycle.markFailed).toHaveBeenCalledWith(
       expect.any(Object),
       expect.any(Error),
       false,
+    );
+  });
+
+  it("marks a budget rejection final and disables BullMQ retry", async () => {
+    execution.generate.mockRejectedValueOnce(
+      new ProviderBudgetError(
+        providerBudgetErrorCodes.HARD_LIMIT,
+        "Đã đạt giới hạn ngân sách tính năng AI trong tháng này.",
+      ),
+    );
+
+    await expect(processor.process(makeJob(0, 3))).rejects.toBeInstanceOf(
+      UnrecoverableError,
+    );
+    expect(execution.persist).not.toHaveBeenCalled();
+    expect(lifecycle.markFailed).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(ProviderBudgetError),
+      true,
     );
   });
 

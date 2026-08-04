@@ -1,8 +1,19 @@
 "use client";
 
-import { CheckCircle2, DatabaseZap, KeyRound, Loader2, Save, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  DatabaseZap,
+  KeyRound,
+  Loader2,
+  Save,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import type { AccountingSettings, OcrSettings } from "@/features/admin/ai-settings/types/provider-operations-types";
+import type {
+  AccountingSettings,
+  OcrSettings,
+} from "@/features/admin/ai-settings/types/provider-operations-types";
+import { NumericSettingsField } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/numeric-settings-field";
 import { formatVnd } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
 
 export function OcrSettingsTab({
@@ -26,95 +37,85 @@ export function OcrSettingsTab({
       <div className="grid gap-4 md:grid-cols-3">
         <StatusCard
           icon={KeyRound}
-          label="Mathpix credential"
+          label="Dịch vụ đọc tài liệu"
           value={data.credentialConfigured ? "Sẵn sàng" : "Chưa cấu hình"}
           ok={data.credentialConfigured}
         />
         <StatusCard
           icon={DatabaseZap}
-          label="Artifact cache"
+          label="Dùng lại kết quả đã có"
           value={data.cacheEnabled ? "Đang bật" : "Đang tắt"}
           ok={data.cacheEnabled}
         />
-        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
-          <p className="text-sm font-bold text-[var(--theme-text-muted)]">Giá OCR hiện tại</p>
+        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
+          <p className="text-sm font-bold text-[var(--theme-text-muted)]">
+            Giá đọc tài liệu hiện tại
+          </p>
           <p className="mt-2 text-xl font-extrabold text-[var(--theme-text-strong)]">
             {pageRate ? `$${pageRate.unitPriceUsd}/trang` : "Chưa nhập giá"}
           </p>
           <p className="mt-1 text-xs font-semibold text-[var(--theme-text-muted)]">
-            Cache hit = 0đ và vẫn ghi nhận chi phí tiết kiệm
+            Kết quả đã có không phát sinh thêm chi phí
           </p>
         </div>
       </div>
 
       {!data.paidEnabled ? (
-        <div className="rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4 text-sm text-[var(--theme-warning-text)]">
-          <p className="font-extrabold">OCR trả phí đang tắt ở môi trường chạy</p>
+        <div className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4 text-sm text-[var(--theme-warning-text)]">
+          <p className="font-extrabold">Tính năng đọc tài liệu mới đang tạm tắt</p>
           <p className="mt-1 leading-6">
-            Cache vẫn được dùng. Cache miss sẽ dừng an toàn cho đến khi bật
-            <code className="mx-1 rounded bg-black/5 px-1 py-0.5 dark:bg-white/10">
-              OCR_PAID_ENABLED
-            </code>
-            và có credential.
+            Hệ thống vẫn dùng được kết quả đã có nhưng chưa thể xử lý tài liệu mới.
           </p>
         </div>
       ) : null}
 
-      <section className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-5">
+      <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4 sm:p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-              Quy đổi và độ mới bảng giá
+              Thiết lập chi phí
             </h3>
-            <p className="mt-1 text-sm text-[var(--theme-text-muted)]">
-              Múi giờ {accounting.timezone}; tuần bắt đầu từ thứ Hai.
-            </p>
           </div>
           <span className="text-sm font-bold text-[var(--theme-text-muted)]">
-            Ngân sách OCR {formatVnd(data.monthlyBudgetVnd)}/tháng
+            Ngân sách đọc tài liệu {formatVnd(data.monthlyBudgetVnd)}/tháng
           </span>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-bold text-[var(--theme-text)]">
-            Tỷ giá VND cho 1 USD
-            <input
-              type="number"
-              min="1"
-              value={accounting.fxRateVndPerUsd}
-              onChange={(event) =>
-                setAccounting((current) => ({
-                  ...current,
-                  fxRateVndPerUsd: Number(event.target.value),
-                }))
-              }
-              className="min-h-11 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-bold text-[var(--theme-text)]">
-            Cảnh báo giá cũ sau (ngày)
-            <input
-              type="number"
-              min="1"
-              value={accounting.priceFreshnessDays}
-              onChange={(event) =>
-                setAccounting((current) => ({
-                  ...current,
-                  priceFreshnessDays: Number(event.target.value),
-                }))
-              }
-              className="min-h-11 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
-            />
-          </label>
+          <NumericSettingsField
+            id="ocr-fx-rate"
+            label="Tỷ giá VNĐ cho 1 USD"
+            value={accounting.fxRateVndPerUsd}
+            min={1}
+            formatThousands
+            suffix="VNĐ"
+            onChange={(value) =>
+              setAccounting((current) => ({ ...current, fxRateVndPerUsd: value }))
+            }
+          />
+          <NumericSettingsField
+            id="ocr-price-freshness-days"
+            label="Nhắc cập nhật giá sau (ngày)"
+            value={accounting.priceFreshnessDays}
+            min={1}
+            max={365}
+            onChange={(value) =>
+              setAccounting((current) => ({ ...current, priceFreshnessDays: value }))
+            }
+          />
         </div>
         <div className="mt-5 flex justify-end">
           <button
             type="button"
             disabled={isSaving}
             onClick={() => onSave(accounting)}
-            className="theme-button-primary inline-flex min-h-11 items-center gap-2 rounded-lg px-5 font-extrabold disabled:cursor-wait disabled:opacity-60"
+            className="theme-button-primary inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-60"
           >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {isSaving ? "Đang lưu" : "Lưu thiết lập OCR"}
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isSaving ? "Đang lưu" : "Lưu thiết lập"}
           </button>
         </div>
       </section>
@@ -134,7 +135,7 @@ function StatusCard({
   ok: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
+    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
       <div className="flex items-center justify-between gap-3">
         <Icon className="h-5 w-5 text-[var(--theme-primary)]" aria-hidden="true" />
         {ok ? (
@@ -144,7 +145,9 @@ function StatusCard({
         )}
       </div>
       <p className="mt-3 text-sm font-bold text-[var(--theme-text-muted)]">{label}</p>
-      <p className="mt-1 text-lg font-extrabold text-[var(--theme-text-strong)]">{value}</p>
+      <p className="mt-1 text-lg font-extrabold text-[var(--theme-text-strong)]">
+        {value}
+      </p>
     </div>
   );
 }

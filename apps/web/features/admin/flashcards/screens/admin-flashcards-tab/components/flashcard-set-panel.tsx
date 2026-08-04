@@ -3,6 +3,7 @@
 import { Layers, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Ref } from "react";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import type {
   AdminFlashcard,
   AdminFlashcardSet,
@@ -10,6 +11,7 @@ import type {
 import { useAdminFlashcards } from "@/features/admin/flashcards/hooks/use-admin-flashcards";
 import { FlashcardCardRow } from "@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-card-row";
 import { getQueryRenderState } from "@/lib/query-render-state";
+import { AdminGeneratedSetReviewActions } from "@/features/admin/ai-generation/components/admin-generated-set-review-actions";
 
 const difficultyLabels = {
   EASY: "Dễ",
@@ -62,6 +64,13 @@ export function FlashcardSetPanel({
           <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
             {cards?.length ?? set.cardCount} flashcard
           </p>
+          <AdminGeneratedSetReviewActions
+            lessonId={set.lessonId}
+            reviewStatus={set.reviewStatus}
+            setId={set.id}
+            source={set.source}
+            type="FLASHCARD"
+          />
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
           <button
@@ -112,20 +121,15 @@ export function FlashcardSetPanel({
           ))}
         </div>
       ) : queryRenderState === "error" ? (
-        <div className="flex min-h-32 items-center justify-center p-6 text-center">
-          <div>
-            <p className="text-sm font-semibold text-[var(--theme-error-text)]">
-              Không tải được flashcard của bộ này.
-            </p>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="theme-button-neutral mt-3 min-h-10 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
-            >
-              Thử lại
-            </button>
-          </div>
-        </div>
+        <AdminDataErrorState
+          className="rounded-none border-0 shadow-none"
+          description="Vui lòng thử lại để tiếp tục quản lý các thẻ trong bộ này."
+          headingLevel={4}
+          isRetrying={cardsQuery.isFetching}
+          onRetry={() => refetch()}
+          title="Không tải được flashcard của bộ này"
+          variant="compact"
+        />
       ) : !cards?.length ? (
         <div className="m-5 flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] px-4 py-10 text-center">
           <Layers className="h-9 w-9 text-[var(--theme-text-muted)]" aria-hidden="true" />

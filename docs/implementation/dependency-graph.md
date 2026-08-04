@@ -73,9 +73,10 @@ M14 testing/hardening/deploy
 - Thứ tự triển khai cụm AI là
   `M9.1 -> M9.2 -> M9.3 -> M9.8 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
 - Provider operations là lát dọc độc lập:
-  `M9.9 -> M4.6 -> M9.10 -> M9.11`; dùng nền `M9.1`, `M4.4` và admin shell.
-  `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI; mã task
-  không đổi để giữ ổn định lịch sử tham chiếu.
+  `M9.9 -> M4.6 -> M9.10 -> M9.11 -> M9.12`; dùng nền `M9.1`, `M4.4` và admin shell. `M9.12` là bước hardening cuối, phải hoàn tất trước khi coi hard-stop là giới hạn tuyệt đối trong production.
+  `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI và đã Done
+  ngày 2026-08-03; mã task không đổi để giữ ổn định lịch sử tham chiếu. Task AI
+  kế tiếp là `M9.4`.
 - `M9.4` và `M9.5` là `UI + API`: mỗi task phải kết thúc bằng flow học sinh bấm
   kiểm thử được, không tách UI sang `M9.8` hoặc một task chưa xác định.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3`, `M9.1` và đi

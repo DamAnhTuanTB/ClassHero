@@ -10,7 +10,6 @@
 import { Logger } from "@nestjs/common";
 import { AiProviderName } from "@prisma/client";
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 
 import type {
   AiEmbeddingInput,
@@ -25,6 +24,7 @@ import type {
   AiTextOutput,
 } from "#api/modules/ai/types/ai-text.types";
 import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
+import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 import {
   assertEmbeddingInput,
   assertEmbeddingOutput,
@@ -70,9 +70,7 @@ export class OpenAiProvider implements AiProvider {
       const sortedData = [...response.data].sort(
         (left, right) => left.index - right.index,
       );
-      const hasInvalidIndexes = sortedData.some(
-        (item, index) => item.index !== index,
-      );
+      const hasInvalidIndexes = sortedData.some((item, index) => item.index !== index);
       if (hasInvalidIndexes) {
         throw new Error(
           "OpenAI embedding response indexes do not match the input order.",
@@ -117,12 +115,8 @@ export class OpenAiProvider implements AiProvider {
       model: input.model ?? this.config.chatModel,
       instructions: input.systemPrompt,
       input: buildAiUserPrompt(input),
-      ...(input.temperature === undefined
-        ? {}
-        : { temperature: input.temperature }),
-      ...(input.maxTokens === undefined
-        ? {}
-        : { max_output_tokens: input.maxTokens }),
+      ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+      ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
     });
     const text = response.output_text.trim();
 
@@ -151,14 +145,10 @@ export class OpenAiProvider implements AiProvider {
       instructions: input.systemPrompt,
       input: buildAiUserPrompt(input),
       text: {
-        format: zodTextFormat(schema, input.outputName),
+        format: buildAiStructuredTextFormat(schema, input.outputName),
       },
-      ...(input.temperature === undefined
-        ? {}
-        : { temperature: input.temperature }),
-      ...(input.maxTokens === undefined
-        ? {}
-        : { max_output_tokens: input.maxTokens }),
+      ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+      ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
     });
 
     if (response.output_parsed === null) {
@@ -181,12 +171,15 @@ export class OpenAiProvider implements AiProvider {
 }
 
 function toTokenUsage(
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    total_tokens: number;
-    input_tokens_details?: { cached_tokens?: number } | null;
-  } | null | undefined,
+  usage:
+    | {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens: number;
+        input_tokens_details?: { cached_tokens?: number } | null;
+      }
+    | null
+    | undefined,
 ) {
   if (!usage) {
     return undefined;

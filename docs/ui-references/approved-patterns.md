@@ -274,3 +274,24 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
   - Course card ở màn Khám phá, Học tập và các danh sách khóa học học viên dùng chung `ExploreCourseCard`.
 - Evidence:
   - Files: `apps/web/components/student/courses/explore-course-card.tsx`.
+
+## Admin Data Error States - 2026-08-03
+
+- Context: trạng thái không tải được dữ liệu ở màn, danh sách, tab, panel và modal trong toàn bộ khu vực admin.
+- Approved:
+  - Mọi fetch/data error của admin dùng cùng shared component `AdminDataErrorState`; giữ thống nhất icon cảnh báo, typography, surface, border, mô tả và action retry ở cả light/dark theme.
+  - Error surface dùng nền trung tính và viền nhẹ; màu đỏ chỉ làm accent cho icon/vùng cảnh báo, không phủ đỏ toàn bộ một vùng lớn.
+  - Nút `Thử lại` là primary action, luôn một dòng; khi refetch phải có trạng thái disabled và copy/icon `Đang tải lại` nếu query cung cấp pending state.
+  - Dùng `compact` cho card/modal/panel nhỏ, `section` cho list/tab/section và `page` chỉ khi toàn bộ content chính của màn bị chặn.
+  - Lỗi danh sách nằm dưới header/stat/filter phải dùng `section`, không kéo cao gần hết viewport. `page` chỉ được dùng khi không còn content hữu ích nào khác có thể hiển thị.
+  - Tiêu đề nói rõ dữ liệu nào không tải được; mô tả ngắn, hướng hành động và không lộ raw error/stack trace.
+- Avoid:
+  - Không tự dựng error card, màu, icon hoặc nút retry riêng theo từng feature admin.
+  - Không dùng `page` hoặc `min-height` theo viewport cho lỗi của list, tab hay panel con.
+  - Không biến toàn bộ màn thành một mảng đỏ lớn, không chỉ hiện một dòng chữ đỏ và không bỏ action retry khi có thể refetch.
+  - Không dùng pattern fetch-error này cho validation field, upload error, lỗi từng OCR page/job hoặc badge trạng thái nghiệp vụ.
+- Reuse for:
+  - Mọi màn admin có TanStack Query/fetch data: list, detail, tab panel, modal load data và panel con.
+  - Các role khác có thể reuse nguyên tắc chọn kích thước theo ownership của surface, nhưng phải dùng shared component phù hợp với role đó.
+- Evidence:
+  - Files: `apps/web/components/admin/admin-data-error-state.tsx`, `apps/web/features/admin/courses/screens/admin-courses-manager/components/admin-courses-content.tsx`, `apps/web/features/admin/ai-settings/screens/admin-ai-settings-screen/index.tsx`, `apps/web/features/admin/domains/screens/admin-domains-manager.tsx`.

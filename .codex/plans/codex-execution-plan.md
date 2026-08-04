@@ -148,11 +148,12 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 40. `M9.1` - AiModule structured output foundation.
 41. `M9.2` - Admin generate lesson summary.
 42. `M9.3` - Admin generate quiz/flashcard/test.
-43. `M9.8` - Admin AI generation panel UI.
-43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
-43.2. `M4.6` - OCR accounting, retry-resume và budget guard.
-43.3. `M9.10` - Admin provider operations API.
-43.4. `M9.11` - Admin Cài đặt AI/OCR UI.
+43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
+    43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
+    43.2. `M4.6` - OCR accounting, retry-resume và budget guard.
+    43.3. `M9.10` - Admin provider operations API.
+    43.4. `M9.11` - Admin Cài đặt AI/OCR UI.
+    43.5. `M9.12` - Hard-stop ngân sách tuyệt đối bằng reservation nguyên tử. Done 2026-08-03.
 44. `M9.4` - Student request-new reserve-first UI + API.
 45. `M9.5` - AI explanation cache inline UI + API.
 46. `M9.6` - Chat AI trong lesson bằng RAG.
@@ -243,7 +244,8 @@ Phụ thuộc AI/RAG:
 - `M9.2` phụ thuộc `M5.3`, `M9.1`, `M1.3`.
 - `M9.3` phụ thuộc `M6.2` đến `M6.4`, `M5.3`, `M9.1`.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`, `M4.3`; xếp ngay sau `M9.3` để generation
-  có UI quản trị kiểm thử trước khi chuyển sang student flow.
+  có UI quản trị kiểm thử trước khi chuyển sang student flow; đã Done
+  2026-08-03, tiếp theo là `M9.4`.
 - `M9.4` phụ thuộc `M9.3`, `M6.2` đến `M6.4`, `M7.1-M7.4`; task bao gồm nối
   action request-new trên UI học sinh, không chỉ endpoint/worker.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2` đến `M6.4`, `M7.2-M7.4`; task bao

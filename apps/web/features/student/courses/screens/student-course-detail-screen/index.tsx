@@ -1,18 +1,15 @@
 "use client";
 
 import {
-  ArrowLeft,
   BadgeCheck,
   BookOpen,
   Calculator,
   GraduationCap,
-  Home,
   Loader2,
   LockKeyhole,
   PlayCircle,
   ShoppingCart,
 } from "lucide-react";
-import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,7 +20,7 @@ import { StudentCourseLessonRow } from "@/features/student/courses/screens/stude
 import { StudentCourseMobileBrandBar } from "@/features/student/courses/screens/student-course-detail-screen/components/student-course-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
 import { EmptyCourseState } from "@/components/student/courses/empty-course-state";
-import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import {
   studentLearningPathsQueryKey,
   useStudentCourseDetailQuery,
@@ -130,28 +127,22 @@ export function StudentCourseDetailScreen({
 
   if (!course || !detail || courseDetailQuery.isError) {
     return (
-      <StudentFullScreenState
+      <StudentDataErrorState
         initialThemeMode={initialThemeMode}
-        title="Chưa tìm thấy khóa học này"
-        description="Bạn quay lại danh sách học tập để chọn khóa học đang học nhé."
-        action={
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <Link
-              href="/student/courses"
-              className="student-learn-cta-3d inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-black text-white transition hover:bg-sky-600"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Về danh sách khóa học
-            </Link>
-            <Link
-              href="/student/explore"
-              className="student-learn-cta-3d-emerald inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white transition hover:bg-emerald-400"
-            >
-              <Home className="h-4 w-4" aria-hidden="true" />
-              Về Trang chủ
-            </Link>
-          </div>
-        }
+        title="Chưa mở được khóa học"
+        description="Thông tin khóa học chưa sẵn sàng. Bạn thử tải lại hoặc quay về danh sách học tập nhé."
+        primaryAction={{
+          icon: "retry",
+          label: "Thử lại",
+          onClick: () => void courseDetailQuery.refetch(),
+          pending: courseDetailQuery.isFetching,
+        }}
+        secondaryAction={{
+          href: "/student/courses",
+          icon: "book",
+          label: "Về danh sách khóa học",
+          tone: "secondary",
+        }}
       />
     );
   }

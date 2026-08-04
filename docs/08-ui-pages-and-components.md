@@ -136,8 +136,8 @@ Các màn UI chính phải được map về task theo từng lớp để tránh
 | Admin course/chapter/lesson management    | `M3.4`                 | `M3.1`, `M3.2`                    | `M1.3`                    | -                                             | Quản lý lộ trình, chương học tổng quan và buổi học. Modal khóa học có `Ngày bắt đầu`/`Ngày kết thúc` date-only tùy chọn, cùng khoảng `Số buổi học từ`/`Số buổi học đến` tùy chọn (1-500); các giá trị kết thúc không được nhỏ hơn giá trị bắt đầu, số buổi là kế hoạch chứ không phải counter thực tế. Modal lesson có select `Loại buổi học` mặc định `Học cơ bản`; chọn `Học live` mới hiện input `Link học live` optional.                                                                                                                                                               |
 | Admin lesson document upload/status       | `M4.5`                 | `M4.2`                            | `M1.2`, `M1.3`            | `M4.1`, `M4.3`, `M4.4`                        | Course quản lý nhiều source PDF ngang hàng theo thứ tự upload cũ đến mới và hiện badge readiness. Modal lesson có nhiều khối `Tài liệu trích xuất` + range và nhiều file nền tảng trực tiếp; source select chỉ chứa nguồn đã xác nhận hết trang in, mặc định phần tử hợp lệ đầu tiên, hiển thị tên kèm tổng số trang, chặn realtime khi `Từ trang in` hoặc `Đến trang in` vượt số trang in lớn nhất, cùng-source range được validate không giao nhau realtime/API, thứ tự UI bám thứ tự thao tác. Tài liệu bổ sung và bài tập về nhà đều cho thêm nhiều file bằng cùng pattern dòng upload. |
 | Admin quiz/flashcard/test CRUD UI         | `M6.2`, `M6.3`, `M6.4` | `M6.2`, `M6.3`, `M6.4`            | `M1.4`                    | `M6.1` content schema                         | Rich text/LaTeX dùng schema chung.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Admin AI generation panel                 | `M9.8`                 | `M9.2`, `M9.3`                    | `M1.4`, `M1.5`            | `M5.x`, `M9.1`                                | Front-end không gọi AI trực tiếp.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Admin Cài đặt AI và OCR                   | `M9.11`                | `M9.10`                           | provider operations       | `M9.9`, `M4.6`                                | Route `/admin/ai-settings`; cấu hình model, OCR, chi phí ngày/tuần/tháng, budget, bảng giá và audit; không hiển thị secret. |
+| Admin AI generation panel                 | `M9.8` Done            | `M9.2`, `M9.3`                    | `M1.4`, `M1.5`            | `M5.x`, `M9.1`                                | Bốn card Summary/Quiz/Flashcard/Test trong lesson detail; custom form, validation realtime, polling durable job, mở đúng editor/review; front-end không gọi AI trực tiếp.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Admin Cài đặt AI và OCR                   | `M9.11`, `M9.12`       | `M9.10`, `M9.12`                  | provider operations       | `M9.9`, `M4.6`, `M9.12`                       | Route `/admin/ai-settings`; cấu hình model, OCR, chi phí ngày/tuần/tháng, budget, bảng giá và audit; không hiển thị secret. Hard-stop tuyệt đối phải phân biệt đã dùng/đang giữ/còn lại, trạng thái đã chặn và lỗi thân thiện.                                                                                                                                                                                                                                                                                                                                                              |
 | Admin report moderation                   | `M12.2`                | `M12.2`                           | `M1.5`                    | -                                             | Student tạo report ở `M12.1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Admin AI unreviewed content               | `M12.3`                | `M12.3`                           | `M1.5`                    | `M9.2`, `M9.3`                                | Duyệt nội dung AI trước khi dùng chính thức nếu cần.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Admin discount codes                      | `M8.5`                 | `M8.1`                            | `M1.5`                    | -                                             | Validation discount server-side trong `M8.1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -491,6 +491,10 @@ Phân quyền UI theo task:
   giải đã lưu từ `M9.5`.
 - `M9.8` chỉ sở hữu panel AI của admin trong lesson detail, không thay thế ba
   UI học sinh trên.
+- Modal tạo Summary của `M9.8` cho phép cấu hình nội dung và cấu hình kỹ thuật
+  theo lần chạy. Phần nâng cao hiển thị read-only ba lớp dữ liệu gửi AI:
+  `System instructions`, `User prompt` và `Input đầy đủ` có context; không hiển
+  thị API key/secret. Preview phải ghi rõ không gọi provider và không tốn phí.
 
 ### 4.9. Notes và private comments
 
@@ -690,7 +694,25 @@ Trong lesson detail `/admin/lessons/[lessonId]`, admin có panel/nút:
 - Xem job status.
 - Xem output.
 - Sửa output.
-- Duyệt/ẩn.
+- Với Summary, `Lưu nội dung` chỉ lưu phần chỉnh sửa thành bản nháp; nếu Summary
+  đang ẩn thì vẫn giữ trạng thái ẩn. Chỉ action `Phát hành` mới chuyển bản hiện
+  tại thành nội dung chính thức học sinh được xem. Bản đã phát hành có action
+  `Thu hồi phát hành` để ngừng hiển thị cho học sinh; muốn dùng lại bản đã thu
+  hồi thì admin bấm `Phát hành`. Không dùng cặp action `Ẩn`/`Hiện lại`. Bản nháp
+  chưa có action thu hồi. Action `Sinh lại` mở lại đúng modal cấu hình Summary
+  để admin chọn tài liệu và tạo một bản mới. Card Summary đã có kết quả cũng
+  dùng `Sinh lại` thay cho `Mở để duyệt`.
+- Quiz/Flashcard/Test vẫn giữ review flow riêng.
+- Form cấu hình dùng shared custom select/input/checkbox, báo lỗi realtime và
+  giữ cùng button/state pattern của các màn admin khác.
+- Form Summary dùng field custom multi-select `Tài liệu dùng để tạo`, hiển thị
+  toàn bộ tài liệu active của buổi học. Tài liệu chưa `READY` hoặc chưa có
+  chunks vẫn hiện trong danh sách nhưng bị khóa và có lý do; mặc định chọn mọi
+  tài liệu đủ điều kiện. Item từ khối trích xuất hiện thêm `Trích xuất trang
+X–Y`; phần giá trị đã chọn cũng kèm `(trang X–Y)` để phân biệt các tài liệu
+  trùng tên.
+- Sau reload, panel lấy job mới nhất theo từng loại; chỉ polling job đang
+  `QUEUED`/`RUNNING`, khi thành công tự mở đúng tab và đúng resource.
 
 ### 6.6. Content editors
 

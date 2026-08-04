@@ -1,0 +1,128 @@
+import { z } from "zod";
+
+const generationTypeSchema = z.enum(["SUMMARY", "QUIZ", "FLASHCARD", "TEST"]);
+const difficultySchema = z.enum(["EASY", "MEDIUM", "HARD", "MIXED"]);
+const questionTypeSchema = z.enum([
+  "MULTIPLE_CHOICE",
+  "TRUE_FALSE",
+  "MULTI_STATEMENT_TRUE_FALSE",
+  "TEXT_INPUT",
+]);
+const summaryStyleSchema = z.enum(["student_friendly", "concise", "academic"]);
+const summaryLengthSchema = z.enum(["short", "standard", "detailed"]);
+const summaryContentSectionSchema = z.enum([
+  "KEY_CONCEPTS",
+  "FORMULAS",
+  "EXAMPLES",
+  "SOLUTION_METHODS",
+  "COMMON_MISTAKES",
+  "MEMORY_TIPS",
+  "SPECIAL_CASES",
+]);
+const numericTextSchema = (label: string, min: number, max: number) =>
+  z
+    .string()
+    .min(1, `Nhập ${label.toLowerCase()}`)
+    .regex(/^\d+$/, `${label} phải là số nguyên`)
+    .refine((value) => Number(value) >= min && Number(value) <= max, {
+      message: `${label} phải từ ${min} đến ${max}`,
+    });
+const optionalNumericTextSchema = (
+  label: string,
+  min: number,
+  max: number,
+  allowDecimal = false,
+) =>
+  z
+    .string()
+    .refine(
+      (value) =>
+        value === "" ||
+        (allowDecimal ? /^\d+(?:\.\d{0,2})?$/.test(value) : /^\d+$/.test(value)),
+      `${label} phải là ${allowDecimal ? "số" : "số nguyên"}`,
+    )
+    .refine(
+      (value) => value === "" || (Number(value) >= min && Number(value) <= max),
+      `${label} phải từ ${min} đến ${max}`,
+    );
+
+export const adminAiGenerationFormSchema = z
+  .object({
+    type: generationTypeSchema,
+    documentIds: z.array(z.string().uuid()).max(20),
+    style: summaryStyleSchema,
+    styleInstructions: z
+      .string()
+      .trim()
+      .min(1, "Nhập cách trình bày")
+      .max(1_000, "Cách trình bày tối đa 1.000 ký tự"),
+    summaryLength: summaryLengthSchema,
+    summaryTargetWordCount: optionalNumericTextSchema("Số lượng từ", 50, 5_000),
+    summaryFocus: z.string().trim().max(1_000, "Trọng tâm tối đa 1.000 ký tự"),
+    includeFormulas: z.boolean(),
+    includeExamples: z.boolean(),
+    includeCommonMistakes: z.boolean(),
+    contentSections: z.array(summaryContentSectionSchema).max(12),
+    reviewQuestionCount: numericTextSchema("Số câu hỏi ôn tập", 0, 10),
+    extraInstructions: z.string().trim().max(2_000, "Yêu cầu bổ sung tối đa 2.000 ký tự"),
+    systemInstructions: z
+      .string()
+      .trim()
+      .max(12_000, "System instructions tối đa 12.000 ký tự"),
+    userPrompt: z.string().trim().max(16_000, "User prompt tối đa 16.000 ký tự"),
+    summaryModel: z.string().max(200),
+    summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),
+    summaryMaxOutputTokens: optionalNumericTextSchema("Số token đầu ra", 500, 4_000),
+    count: numericTextSchema("Số lượng", 1, 60),
+    difficulty: difficultySchema,
+    questionTypes: z.array(questionTypeSchema).max(4),
+    durationMinutes: numericTextSchema("Thời gian", 1, 240),
+    easyRatio: numericTextSchema("Tỷ lệ dễ", 0, 100),
+    mediumRatio: numericTextSchema("Tỷ lệ trung bình", 0, 100),
+    hardRatio: numericTextSchema("Tỷ lệ khó", 0, 100),
+  })
+  .superRefine((values, context) => {
+    if (values.type === "SUMMARY" && values.documentIds.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["documentIds"],
+        message: "Chọn ít nhất một tài liệu",
+      });
+    }
+    if (values.type === "QUIZ" || values.type === "TEST") {
+      if (values.questionTypes.length === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["questionTypes"],
+          message: "Chọn ít nhất một loại câu hỏi",
+        });
+      }
+      if (Number(values.count) < values.questionTypes.length) {
+        context.addIssue({
+          code: "custom",
+          path: ["count"],
+          message: "Số câu phải lớn hơn hoặc bằng số loại câu hỏi đã chọn",
+        });
+      }
+      if (Number(values.count) > 50) {
+        context.addIssue({
+          code: "custom",
+          path: ["count"],
+          message: "Số câu tối đa là 50",
+        });
+      }
+    }
+    if (values.type === "TEST") {
+      const total =
+        Number(values.easyRatio) + Number(values.mediumRatio) + Number(values.hardRatio);
+      if (total !== 100) {
+        context.addIssue({
+          code: "custom",
+          path: ["hardRatio"],
+          message: `Tổng ba tỷ lệ phải bằng 100% (hiện là ${total}%)`,
+        });
+      }
+    }
+  });
+
+export type AdminAiGenerationFormValues = z.infer<typeof adminAiGenerationFormSchema>;

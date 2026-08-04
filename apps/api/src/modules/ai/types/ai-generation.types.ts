@@ -17,6 +17,7 @@ export interface CreateAiGenerationJobInput {
   schemaVersion: string;
   inputFingerprint: unknown;
   inputMeta?: unknown;
+  routeSnapshot?: AiFeatureRoute;
   idempotencyKey?: string;
   deduplicateActive?: boolean;
   maxAttempts?: number;

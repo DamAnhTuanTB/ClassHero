@@ -28,7 +28,10 @@ test("admin lesson preloads flashcard data before tab intent without a transient
   await setupFlashcardApiMock(page);
 
   await page.goto(`/admin/lessons/${lessonId}`);
-  await expect(page.getByRole("heading", { name: "Quản lý Quiz" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Tài liệu" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect.poll(() => flashcardSetRequests).toBe(1);
   await expect.poll(() => flashcardCardRequests).toBe(1);
 
@@ -672,9 +675,7 @@ async function seedAdminSession(page: Page) {
     role: "ADMIN",
     sub: "admin-user",
   });
-  await page.route("**/api/auth/session", (route) =>
-    route.fulfill({ status: 204 }),
-  );
+  await page.route("**/api/auth/session", (route) => route.fulfill({ status: 204 }));
   await page.addInitScript(
     (session) => {
       window.localStorage.setItem("classhero.auth.session", JSON.stringify(session));
@@ -778,6 +779,26 @@ async function setupFlashcardApiMock(
     const request = route.request();
     const pathname = new URL(request.url()).pathname.replace("/api/v1", "");
     const method = request.method();
+
+    if (
+      method === "GET" &&
+      pathname === `/admin/lessons/${lessonId}/ai-generation-panel`
+    ) {
+      return fulfillJson(route, 200, {
+        data: {
+          lesson: { id: lessonId, title: "Buổi 1: Kiến thức nền" },
+          readiness: {
+            summaryReady: false,
+            generationReady: false,
+            readyDocumentCount: 0,
+            embeddedDocumentCount: 0,
+            reason: "Buổi học chưa có tài liệu.",
+          },
+          documents: [],
+          jobs: { SUMMARY: null, QUIZ: null, FLASHCARD: null, TEST: null },
+        },
+      });
+    }
 
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}`) {
       return fulfillJson(route, 200, {

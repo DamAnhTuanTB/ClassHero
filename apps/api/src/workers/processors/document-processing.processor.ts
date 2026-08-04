@@ -5,6 +5,7 @@ import {
   DocumentStatus,
   Prisma,
   ProviderCatalogCategory,
+  ProviderUsageMetric,
 } from "@prisma/client";
 import { Job, UnrecoverableError } from "bullmq";
 import { ConfigService } from "@nestjs/config";
@@ -51,6 +52,7 @@ import {
 } from "#api/workers/utils/quality-score";
 import { chunkText } from "#api/workers/utils/chunking";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
+import { isProviderBudgetError } from "#api/modules/provider-operations/utils/provider-budget-error";
 
 const PAID_OCR_TEXT_SOURCE = "paid_ocr";
 
@@ -235,7 +237,16 @@ export class DocumentProcessingProcessor {
 
       return result;
     } catch (error) {
-      await this.markAttemptFailed(runningJob, error, attempt, maxAttempts);
+      const isBudgetBlocked = isProviderBudgetError(error);
+      await this.markAttemptFailed(
+        runningJob,
+        error,
+        attempt,
+        isBudgetBlocked ? attempt : maxAttempts,
+      );
+      if (isBudgetBlocked) {
+        throw new UnrecoverableError(error.message);
+      }
       throw error;
     }
   }
@@ -594,10 +605,7 @@ export class DocumentProcessingProcessor {
     await this.prisma.lessonDocument.update({
       where: { id: lessonDoc.id },
       data: {
-        status:
-          chunks.length > 0
-            ? DocumentStatus.PROCESSING
-            : DocumentStatus.READY,
+        status: chunks.length > 0 ? DocumentStatus.PROCESSING : DocumentStatus.READY,
         extractedText: fullText || null,
         extractError: null,
         chunkCount: chunks.length,
@@ -786,10 +794,7 @@ export class DocumentProcessingProcessor {
     await this.prisma.lessonDocument.update({
       where: { id: lessonDoc.id },
       data: {
-        status:
-          chunks.length > 0
-            ? DocumentStatus.PROCESSING
-            : DocumentStatus.READY,
+        status: chunks.length > 0 ? DocumentStatus.PROCESSING : DocumentStatus.READY,
         extractedText: fullText || null,
         extractError: null,
         chunkCount: chunks.length,
@@ -1149,9 +1154,10 @@ export class DocumentProcessingProcessor {
           select: { id: true },
         })
       : null;
-    const activePrice = catalogItem && this.providerUsage
-      ? await this.providerUsage.getActiveRates(catalogItem.id)
-      : { priceVersionId: null, rates: [] };
+    const activePrice =
+      catalogItem && this.providerUsage
+        ? await this.providerUsage.getActiveRates(catalogItem.id)
+        : { priceVersionId: null, rates: [] };
 
     if (cacheHit) {
       this.logger.log("Loading OCR artifacts from cache...");
@@ -1179,9 +1185,6 @@ export class DocumentProcessingProcessor {
         });
       }
     } else if (ocrEnabled) {
-      await this.providerUsage?.assertBudgetAllows(
-        ProviderCatalogCategory.OCR_SERVICE,
-      );
       this.logger.log("Cache miss — submitting to Mathpix or resuming its pdf_id...");
       const startTime = Date.now();
       const runtime = asRecord(asRecord(ownerMetadata).ocrRuntime);
@@ -1190,16 +1193,38 @@ export class DocumentProcessingProcessor {
         Boolean(readString(runtime, "pdfId"));
       let pdfId = canResume ? readString(runtime, "pdfId")! : "";
       let usageEventId = canResume ? readString(runtime, "usageEventId") : null;
-      if (!usageEventId && this.providerUsage) {
-        const usageEvent = await this.providerUsage.start({
-          category: ProviderCatalogCategory.OCR_SERVICE,
-          provider: provider.toUpperCase(),
-          catalogItemId: catalogItem?.id,
-          priceVersionId: activePrice.priceVersionId,
-          backgroundJobId,
-          sourceDocumentId,
-          cacheStatus: "MISS",
-        });
+      if (this.providerUsage) {
+        const supportedMetrics = activePrice.rates
+          .map((rate) => rate.metric)
+          .filter(
+            (metric) =>
+              metric === ProviderUsageMetric.PAGE ||
+              metric === ProviderUsageMetric.REQUEST,
+          );
+        const reservation = {
+          idempotencyKey: `ocr:${backgroundJobId}:${contentHash}`,
+          usageUpperBound: { pages: pageCount, requestCount: 1 },
+          rates: activePrice.rates,
+          requiredMetrics: [...new Set(supportedMetrics)],
+          estimateUnavailableReason:
+            supportedMetrics.length === 0
+              ? "Chưa có đơn giá đọc tài liệu nên yêu cầu đã được dừng để bảo vệ ngân sách."
+              : undefined,
+        };
+        const usageEvent = usageEventId
+          ? await this.providerUsage.ensureReservation(usageEventId, reservation)
+          : await this.providerUsage.reserveAndStart(
+              {
+                category: ProviderCatalogCategory.OCR_SERVICE,
+                provider: provider.toUpperCase(),
+                catalogItemId: catalogItem?.id,
+                priceVersionId: activePrice.priceVersionId,
+                backgroundJobId,
+                sourceDocumentId,
+                cacheStatus: "MISS",
+              },
+              reservation,
+            );
         usageEventId = usageEvent.id;
       }
 

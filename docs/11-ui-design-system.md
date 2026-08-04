@@ -417,6 +417,8 @@ Mỗi màn hình hoặc block có data fetching phải có:
 - Spinner chỉ dành cho thao tác ngắn không có bố cục nội dung để mô phỏng, ví dụ pending ngay bên trong nút bấm hoặc bước kết nối đặc thù. Không thay toàn bộ detail/list/tab panel bằng một icon xoay và dòng “Đang tải…”.
 - Empty state: nói rõ chưa có dữ liệu và CTA tiếp theo nếu có.
 - Error state: message dễ hiểu và retry nếu hợp lý.
+- Fetch/data error trong admin phải dùng shared `AdminDataErrorState`: surface nền trung tính, danger accent ở icon, copy ngắn và primary retry action; không tự dựng style riêng ở từng feature.
+- Chọn kích thước error theo surface: `compact` cho modal/card/panel nhỏ, `section` cho list/tab/section, `page` chỉ khi toàn bộ content chính của route bị chặn. Lỗi danh sách nằm dưới header/stat/filter tuyệt đối không dùng viewport-height hoặc variant `page` làm khối lỗi phình gần hết màn hình.
 - Disabled state: action chưa dùng được phải có lý do hoặc tooltip/helper text.
 - Full-page loading/error phải căn giữa theo cả chiều ngang và chiều dọc của viewport. Nếu màn nằm trong shell có header/sidebar thì căn giữa phần content còn lại; loading/error của tab hoặc card chỉ căn giữa vùng của chính tab/card.
 - Có thể trì hoãn skeleton khoảng `250-300ms` ở client transition chỉ khi header và surface ổn định của trang vẫn được giữ nguyên trong lúc chờ. Ở cold load/F5, không được dùng delay để trả một vùng trống chỉ có background; HTML đầu phải có dữ liệu server hoặc skeleton cấu trúc ngay. Nếu loading đã hiện, giữ tối thiểu khoảng `300ms` để trạng thái ổn định trước khi chuyển sang nội dung.

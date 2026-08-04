@@ -669,7 +669,22 @@ Body:
 ```json
 {
   "documentIds": ["uuid"],
-  "style": "student_friendly"
+  "style": "student_friendly",
+  "styleInstructions": "Dễ hiểu cho học sinh khối 7.",
+  "length": "standard",
+  "targetWordCount": 350,
+  "focus": "Định nghĩa và cách biểu diễn số hữu tỉ",
+  "includeFormulas": true,
+  "includeExamples": true,
+  "includeCommonMistakes": true,
+  "contentSections": ["KEY_CONCEPTS", "FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
+  "reviewQuestionCount": 0,
+  "extraInstructions": "Dùng câu ngắn",
+  "systemInstructions": "System instructions đã được admin kiểm tra",
+  "userPrompt": "User prompt đã được admin kiểm tra",
+  "model": "gpt-4.1-mini",
+  "temperature": 0.2,
+  "maxOutputTokens": 2000
 }
 ```
 
@@ -681,6 +696,17 @@ Rules:
 - Nếu cùng lesson đang có job summary `QUEUED`/`RUNNING`, API trả lại `jobId`
   đó thay vì enqueue provider call thứ hai.
 - Sau khi job terminal `SUCCEEDED`/`FAILED`, admin có thể yêu cầu regenerate.
+- `style` nhận `student_friendly | concise | academic`; `length` nhận
+  `short | standard | detailed`. Các field còn lại là cấu hình theo lần chạy;
+  `model` chỉ được chọn trong route `SUMMARY` đang khả dụng.
+- `styleInstructions` là nội dung trình bày tự do; `contentSections` nhận các
+  nhóm nội dung UI hỗ trợ. `systemInstructions` và `userPrompt` cho phép admin
+  sửa prompt của lần chạy, nhưng context chunks vẫn do server tải và ghép sau
+  user prompt, không nhận raw context từ client.
+- `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
+  tiêu gần đúng và được kết hợp với `length` khi dựng user prompt.
+- `temperature` giới hạn `0..1`, `maxOutputTokens` giới hạn `500..4000`; bỏ
+  trống thì dùng Cài đặt AI hiện tại.
 
 Response: `202 Accepted`.
 
@@ -701,6 +727,28 @@ Side effects:
 - Enqueue AI generation job.
 - Worker upsert summary với `source = AI`, `reviewStatus = NEEDS_REVIEW` và
   `aiGenerationId` để admin review trước khi student nhìn thấy.
+
+### `POST /admin/lessons/:lessonId/summary/prompt-preview`
+
+Role: `ADMIN`.
+
+Body giống endpoint `generate-ai` ở trên.
+
+Behavior:
+
+- Dùng cùng context loader và prompt builder với worker để trả đúng
+  `systemPrompt`, `userPrompt` và `inputPrompt` đầy đủ có context chunks.
+- Trả thêm `openAiRequest` ở dạng JSON với các field `model`, `instructions`,
+  `input`, `text.format`, `temperature`, `max_output_tokens`; `text.format` phải
+  chứa đúng structured-output name, strict mode và JSON Schema mà provider sử
+  dụng. Đây phải là payload xem trước đầy đủ sau khi server ghép context, không
+  phải object gần giống request thật và không chứa credential.
+- Trả số document/chunk, token ước tính, model/provider thực tế,
+  temperature, giới hạn output, danh sách model khả dụng và chi phí tối đa ước
+  tính theo bảng giá hiện tại.
+- Chỉ dựng dữ liệu xem trước trong API; không tạo job, không gọi OpenAI/Gemini,
+  không ghi usage và không phát sinh chi phí provider.
+- Không trả API key, secret hoặc credential provider.
 
 ### `GET /student/lessons/:lessonId/summary`
 
@@ -928,6 +976,25 @@ Behavior:
 - Trả cả tài liệu chính từ source document/page range và tài liệu bổ sung upload trực tiếp.
 - Response chỉ dùng ba kind canonical: `PRIMARY_FROM_SOURCE | SUPPLEMENT | HOMEWORK`.
 - Item từ khối trích xuất có `pageRangeId`, object `pageRange` và `sortOrder`; file upload trực tiếp có `pageRangeId = null`.
+
+### `GET /admin/lessons/:lessonId/ai-generation-panel`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Trả readiness của lesson cho Summary và cho nội dung cần embedding, toàn bộ
+  lesson document active, cùng job mới nhất của `SUMMARY`, `QUIZ`, `FLASHCARD`,
+  `TEST`. Mỗi document có `status`, `chunkCount`, `canUseForSummary` và
+  `unavailableReason`. Document được tạo từ khối trích xuất có thêm `pageRange`
+  dạng `{ pageStart, pageEnd }`; document upload trực tiếp trả `pageRange = null`.
+  UI vẫn hiển thị tài liệu chưa sẵn sàng nhưng không cho chọn để tạo Summary.
+- `lesson.targetGrade` trả khối lớp ưu tiên của learning path (hoặc `null`) để UI
+  dựng mặc định cách trình bày theo đúng đối tượng khóa học.
+- Mỗi job chỉ trả trạng thái durable, `jobId`, resource đích, review status,
+  lỗi và timestamps để UI khôi phục/polling sau reload.
+- Không trả chunk text, prompt, `inputMeta`, structured output hay provider
+  payload. Student/Parent không được truy cập endpoint.
 
 ### `GET /admin/learning-paths/:learningPathId/lesson-documents`
 

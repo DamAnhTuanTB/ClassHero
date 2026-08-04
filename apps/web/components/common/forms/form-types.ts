@@ -1,4 +1,9 @@
-import type { InputHTMLAttributes, MouseEventHandler, ReactNode } from "react";
+import type {
+  InputHTMLAttributes,
+  MouseEventHandler,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from "react";
 import type { FieldError } from "react-hook-form";
 
 export type TextFieldProps = {
@@ -23,6 +28,7 @@ export type TextFieldProps = {
 export type OptionItem = {
   value: string;
   label: string;
+  disabled?: boolean;
 };
 
 export type OptionFieldProps = {
@@ -55,6 +61,16 @@ export type CheckboxFieldProps = {
   wrapperClassName?: string;
   labelClassName?: string;
 } & InputHTMLAttributes<HTMLInputElement>;
+
+export type TextareaFieldProps = {
+  id: string;
+  label: string;
+  error?: FieldError;
+  helperText?: string;
+  wrapperClassName?: string;
+  isOptional?: boolean;
+  optionalLabel?: string;
+} & TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 export type FormStatusProps = {
   tone: "success" | "error" | "info";

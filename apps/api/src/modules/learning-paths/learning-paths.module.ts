@@ -7,6 +7,7 @@ import { AuthModule } from "#api/modules/auth/auth.module";
 import { FilesModule } from "#api/modules/files/files.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { AdminChaptersController } from "#api/modules/learning-paths/controllers/admin-chapters.controller";
+import { AdminLessonAiGenerationPanelController } from "#api/modules/learning-paths/controllers/admin-lesson-ai-generation-panel.controller";
 import {
   AdminLearningPathLessonDocumentsController,
   AdminLessonDocumentsController,
@@ -18,6 +19,7 @@ import { AdminLessonsController } from "#api/modules/learning-paths/controllers/
 import { AdminSourceDocumentsController } from "#api/modules/learning-paths/controllers/admin-source-documents.controller";
 import { ChaptersService } from "#api/modules/learning-paths/services/chapters.service";
 import { LessonDocumentsService } from "#api/modules/learning-paths/services/lesson-documents.service";
+import { LessonAiGenerationPanelService } from "#api/modules/learning-paths/services/lesson-ai-generation-panel.service";
 import { LearningPathsService } from "#api/modules/learning-paths/services/learning-paths.service";
 import { LearningPathStructureService } from "#api/modules/learning-paths/services/learning-path-structure.service";
 import { LessonSummariesService } from "#api/modules/learning-paths/services/lesson-summaries.service";
@@ -34,6 +36,7 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
   imports: [AuthModule, FilesModule, JobsModule, JwtModule.register({})],
   controllers: [
     AdminChaptersController,
+    AdminLessonAiGenerationPanelController,
     AdminLearningPathLessonDocumentsController,
     AdminLessonDocumentsController,
     AdminLessonSummariesController,
@@ -46,6 +49,7 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
   providers: [
     ChaptersService,
     LessonDocumentsService,
+    LessonAiGenerationPanelService,
     LearningPathsService,
     LearningPathStructureService,
     LessonSummariesService,

@@ -157,7 +157,11 @@ Mục đích:
 - Embedding không đi qua màn Cài đặt AI: vẫn cố định OpenAI model/dimension của vector space hiện tại.
 - Mỗi provider attempt ghi `provider_usage_events` với model, price version, token/page, latency, USD/VND và quan hệ job/generation/document.
 - Bảng giá được nhập thủ công từ nguồn chính thức, có ngày hiệu lực; không scrape tự động và không tính lại lịch sử bằng giá mới.
+- Ô chọn chỉ lấy model text/structured-output `ACTIVE` trong catalog và nhóm theo provider; preview/audio/image/deprecated không được seed vào luồng sinh nội dung học tập.
 - Budget mặc định cảnh báo mềm ở 70/90/100%; hard stop chỉ có hiệu lực khi admin chủ động bật.
+- Từ `M9.12`, hard stop dùng reservation nguyên tử trước paid call. Gateway khóa và kiểm tra đồng thời ngân sách `ALL` + `AI/OCR`, giữ worst-case cost rồi mới gọi provider; thiếu dữ liệu để ước lượng thì fail-closed.
+- Budget error và estimate-unavailable là lỗi nghiệp vụ không fallback, không retry. Timeout có khả năng đã bill giữ reservation ở trạng thái `UNCERTAIN` cho tới khi reconciliation xác nhận.
+- Cache hit không phát sinh paid call nên không cần reservation và vẫn ghi nhận chi phí tiết kiệm như hiện tại.
 
 ---
 
@@ -448,9 +452,61 @@ Input:
 {
   "lessonId": "uuid",
   "documentIds": ["uuid"],
-  "style": "student_friendly"
+  "style": "student_friendly",
+  "styleInstructions": "Dễ hiểu cho học sinh khối 7.",
+  "length": "standard",
+  "targetWordCount": 350,
+  "focus": "string optional",
+  "includeFormulas": true,
+  "includeExamples": true,
+  "includeCommonMistakes": true,
+  "contentSections": ["KEY_CONCEPTS", "FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
+  "reviewQuestionCount": 0,
+  "extraInstructions": "string optional",
+  "systemInstructions": "string optional",
+  "userPrompt": "string optional",
+  "model": "string optional",
+  "temperature": 0.2,
+  "maxOutputTokens": 2000
 }
 ```
+
+Admin có thể chỉnh `systemInstructions` và `userPrompt` cho riêng lần tạo. API
+không nhận raw context từ UI: worker luôn tải lại đúng `documentIds` của lesson,
+kiểm source hash rồi ghép context chunks phía server trước khi gọi provider.
+Prompt preview trả thêm JSON request theo đúng shape OpenAI nhưng không gọi
+provider. Preview phải được đối chiếu field-by-field với payload tại provider;
+với structured output bắt buộc có cả `text.format` gồm `type`, `name`, `strict`
+và JSON Schema thực tế được tạo từ cùng Zod schema. Không được gọi một object
+thiếu provider field là “input đầy đủ”.
+
+Các lựa chọn `contentSections` trên UI phải đại diện cho những nhóm nội dung có
+khác biệt ngữ nghĩa rõ và dẫn đến chỉ dẫn/output khác nhau. Không tách thành hai
+checkbox nếu người dùng thông thường khó phân biệt hoặc model có khả năng sinh
+nội dung trùng, ví dụ `khái niệm` với `định nghĩa`, hoặc `phương pháp` với `các
+bước thực hiện`; khi đó ưu tiên bỏ lựa chọn trùng và giữ một nhãn đại diện ngắn,
+đơn nghĩa. Nếu cần đổi tên, dùng một tên mới rõ hành động; không ghép hai nhãn cũ
+bằng “và” vì làm admin khó quét và khó đoán phạm vi. Những phần vốn là bản chất
+của toàn bộ artifact, như “tổng kết” trong một bản tóm tắt, không nên trở thành
+checkbox riêng nếu tắt nó không tạo ra behavior hữu ích.
+
+Danh sách checkbox chuẩn cho Summary gồm: `Kiến thức trọng tâm`, `Công thức
+quan trọng`, `Cách giải`, `Ví dụ minh họa`, `Lỗi thường gặp`, `Mẹo ghi nhớ`,
+`Trường hợp đặc biệt`. Mặc định chọn đúng năm mục: `Kiến thức trọng tâm`,
+`Công thức quan trọng`, `Cách giải`, `Ví dụ minh họa`, `Lỗi thường gặp`; các
+mục còn lại không được chọn sẵn.
+
+`targetWordCount` là số từ mục tiêu gần đúng, dùng cùng `length` để mô tả rõ
+mức độ dài mong muốn. Field này không bắt buộc, mặc định để trống; khi có giá
+trị thì prompt phải nêu rõ bản tóm tắt dài khoảng bao nhiêu từ.
+
+Field `focus` không chọn cấu trúc đầu ra và không trùng vai trò với các checkbox
+`contentSections`. Nó là chỉ dẫn tự do về chủ đề/ý kiến thức mà admin muốn AI
+dành nhiều dung lượng hoặc giải thích kỹ hơn trong phạm vi tài liệu đã chọn, ví
+dụ `So sánh hai số hữu tỉ` hoặc `Điều kiện mẫu số khác 0`. Field này không lọc
+tài liệu và không có nghĩa là bỏ qua toàn bộ nội dung còn lại. UI phải dùng nhãn
+và helper text diễn đạt rõ vai trò “nội dung muốn nhấn mạnh”; nếu admin không có
+ưu tiên riêng thì để trống.
 
 Output schema:
 
@@ -477,16 +533,34 @@ Summary context rules:
 
 - `documentIds` là các `lesson_documents.id` active, `READY`, thuộc đúng
   `lessonId` và đã có `document_chunks`.
+- UI Summary hiển thị toàn bộ lesson documents active trong một custom
+  multi-select; chỉ document thỏa rule trên được chọn và các document hợp lệ
+  thuộc `PRIMARY_FROM_SOURCE` được chọn mặc định. Document chưa sẵn sàng vẫn
+  hiện kèm lý do để admin biết trạng thái thay vì bị ẩn khỏi danh sách.
 - API/worker chỉ truyền ordered chunk text vào provider, không truyền raw PDF,
   object-storage URL hoặc toàn bộ tài liệu cấp learning path/chapter.
 - Tổng context cho một summary request giới hạn `12.000` tokens ước tính; vượt
   ngưỡng phải fail `AI_CONTEXT_TOO_LARGE`, không âm thầm cắt mất phần cuối bài.
 - API lưu `sourceHash`; worker tải lại chunks và fail
   `AI_SOURCE_CONTEXT_STALE` nếu tài liệu đổi trong lúc job đang chờ.
+- Summary prompt dùng một shared builder cho cả API preview và worker. Preview
+  phải trả đúng system instructions, user prompt và input cuối cùng sau khi
+  ghép context; không được tự dựng một bản mô phỏng khác với request thật.
+- Admin được sửa System instructions và User prompt theo lần chạy; các field đều
+  có giới hạn độ dài và được đưa vào input fingerprint/job metadata. Context
+  chunks vẫn do server ghép sau user prompt và được đánh dấu là dữ liệu tham
+  khảo không đáng tin cậy, không phải instruction.
+- Route snapshot của job giữ model được chọn, temperature và max output tokens
+  để worker không lệch khỏi cấu hình admin đã xem trước.
+- Prompt preview không gọi provider, không tạo usage event và có chi phí bằng
+  `0`; con số chi phí hiển thị là upper bound ước tính cho lần generate sau đó.
 - Chỉ một job `SUMMARY` `QUEUED`/`RUNNING` được active trên một lesson. Job
   terminal không chặn admin regenerate.
 - AI summary được map sang Tiptap rồi upsert với `source = AI`,
   `review_status = NEEDS_REVIEW` và liên kết `ai_generation_id`.
+- Khi admin tắt công thức, ví dụ, lỗi thường gặp hoặc đặt số câu ôn tập bằng
+  `0`, output schema chấp nhận mảng rỗng và Tiptap mapper không render heading
+  rỗng tương ứng.
 
 ### 5.2. Quiz generation
 

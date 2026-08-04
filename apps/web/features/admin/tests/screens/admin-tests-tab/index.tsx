@@ -4,8 +4,15 @@ import { AdminAssessmentTab } from "@/features/admin/assessments/components/admi
 
 interface AdminTestsTabProps {
   lessonId: string;
+  preferredSetId?: string;
 }
 
-export function AdminTestsTab({ lessonId }: AdminTestsTabProps) {
-  return <AdminAssessmentTab assessmentKind="test" lessonId={lessonId} />;
+export function AdminTestsTab({ lessonId, preferredSetId }: AdminTestsTabProps) {
+  return (
+    <AdminAssessmentTab
+      assessmentKind="test"
+      lessonId={lessonId}
+      preferredSetId={preferredSetId}
+    />
+  );
 }

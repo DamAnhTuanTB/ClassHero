@@ -158,10 +158,11 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 49     | `M9.1`  | AiModule structured output foundation                                   |
 | 50     | `M9.2`  | Admin generate lesson summary                                           |
 | 51     | `M9.3`  | Admin generate quiz/flashcard/test                                      |
-| 52     | `M9.8`  | Admin AI generation panel UI                                            |
+| 52     | `M9.8`  | Admin AI generation panel UI — Done 2026-08-03                          |
 | 52.1   | `M9.9`  | Provider catalog, AI routing, Gemini fallback và usage accounting       |
 | 52.2   | `M9.10` | Admin provider operations API                                           |
-| 52.3   | `M9.11` | Admin Cài đặt AI/OCR UI                                                  |
+| 52.3   | `M9.11` | Admin Cài đặt AI/OCR UI                                                 |
+| 52.4   | `M9.12` | Hard-stop ngân sách tuyệt đối bằng reservation                          |
 | 53     | `M9.4`  | Student request-new reserve-first UI + API                              |
 | 54     | `M9.5`  | AI explanation cache inline UI + API                                    |
 | 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                           |
@@ -277,7 +278,7 @@ Ghi chú:
 - `M9.3` phụ thuộc `M6.2-M6.4`, `M5.3`, `M9.1`.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`; job status UI phụ thuộc `M4.3`. Task này
   được xếp ngay sau `M9.3` để admin có UI kiểm thử generation trước khi làm
-  luồng học sinh.
+  luồng học sinh; đã Done ngày 2026-08-03, task kế tiếp là `M9.4`.
 - `M9.4` phụ thuộc `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
   nối luôn các action request-new hiện có trên UI học sinh.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline
@@ -288,6 +289,7 @@ Ghi chú:
 - `M9.9` phụ thuộc `M9.1` và nền Prisma/job; tạo catalog/price/usage, snapshot routing, OpenAI/Gemini fallback và cost calculator.
 - `M9.10` phụ thuộc `M9.9`, cung cấp RBAC API cho cấu hình, giá, budget, thống kê và audit.
 - `M9.11` phụ thuộc `M9.10` và admin shell; nối route `/admin/ai-settings` với dữ liệu thật.
+- `M9.12` phụ thuộc `M9.9-M9.11` và `M4.6`; harden toàn bộ paid-call gateway bằng reservation nguyên tử, fail-closed, lỗi không retry và UI số dư ngân sách.
 
 ### Smart video learning
 

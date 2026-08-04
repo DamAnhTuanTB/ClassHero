@@ -10,6 +10,33 @@ const model = {
   status: "ACTIVE",
   credentialConfigured: true,
 };
+const modelCatalog = [
+  ["OPENAI", "gpt-5.6-sol", "GPT-5.6 Sol"],
+  ["OPENAI", "gpt-5.6-terra", "GPT-5.6 Terra"],
+  ["OPENAI", "gpt-5.6-luna", "GPT-5.6 Luna"],
+  ["OPENAI", "gpt-5.4", "GPT-5.4"],
+  ["OPENAI", "gpt-5.4-mini", "GPT-5.4 mini"],
+  ["OPENAI", "gpt-5.4-nano", "GPT-5.4 nano"],
+  ["OPENAI", "gpt-4.1", "GPT-4.1"],
+  ["OPENAI", "gpt-4.1-nano", "GPT-4.1 nano"],
+  ["GEMINI", "gemini-3.6-flash", "Gemini 3.6 Flash"],
+  ["GEMINI", "gemini-3.5-flash", "Gemini 3.5 Flash"],
+  ["GEMINI", "gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"],
+  ["GEMINI", "gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite"],
+  ["GEMINI", "gemini-2.5-pro", "Gemini 2.5 Pro"],
+  ["GEMINI", "gemini-2.5-flash", "Gemini 2.5 Flash"],
+  ["GEMINI", "gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"],
+] as const;
+const models = [
+  model,
+  ...modelCatalog.map(([provider, externalKey, displayName]) => ({
+    ...model,
+    id: `model-${externalKey}`,
+    provider,
+    externalKey,
+    displayName,
+  })),
+];
 const price = {
   id: "price-openai",
   billingMode: "TOKEN",
@@ -19,15 +46,72 @@ const price = {
   effectiveTo: null,
   createdAt: now,
   rates: [
-    { id: "rate-input", metric: "INPUT_TOKEN", unitSize: 1_000_000, unitPriceUsd: 0.4, tierFrom: null, tierTo: null },
-    { id: "rate-cached", metric: "CACHED_INPUT_TOKEN", unitSize: 1_000_000, unitPriceUsd: 0.1, tierFrom: null, tierTo: null },
-    { id: "rate-output", metric: "OUTPUT_TOKEN", unitSize: 1_000_000, unitPriceUsd: 1.6, tierFrom: null, tierTo: null },
+    {
+      id: "rate-input",
+      metric: "INPUT_TOKEN",
+      unitSize: 1_000_000,
+      unitPriceUsd: 0.4,
+      tierFrom: null,
+      tierTo: null,
+    },
+    {
+      id: "rate-cached",
+      metric: "CACHED_INPUT_TOKEN",
+      unitSize: 1_000_000,
+      unitPriceUsd: 0.1,
+      tierFrom: null,
+      tierTo: null,
+    },
+    {
+      id: "rate-output",
+      metric: "OUTPUT_TOKEN",
+      unitSize: 1_000_000,
+      unitPriceUsd: 1.6,
+      tierFrom: null,
+      tierTo: null,
+    },
   ],
 };
 const budgets = [
-  { scope: "ALL", monthlyLimitVnd: 3_000_000, warningThresholds: [70, 90, 100], hardStop: false, version: 1, usedVnd: 245_000, usedPercent: 8.17, updatedAt: now },
-  { scope: "AI", monthlyLimitVnd: 2_000_000, warningThresholds: [70, 90, 100], hardStop: false, version: 1, usedVnd: 185_000, usedPercent: 9.25, updatedAt: now },
-  { scope: "OCR", monthlyLimitVnd: 1_000_000, warningThresholds: [70, 90, 100], hardStop: false, version: 1, usedVnd: 60_000, usedPercent: 6, updatedAt: now },
+  {
+    scope: "ALL",
+    monthlyLimitVnd: 3_000_000,
+    warningThresholds: [70, 90, 100],
+    hardStop: false,
+    version: 1,
+    usedVnd: 245_000,
+    reservedVnd: 25_000,
+    availableVnd: 2_730_000,
+    enforcementState: "MONITORING",
+    usedPercent: 8.17,
+    updatedAt: now,
+  },
+  {
+    scope: "AI",
+    monthlyLimitVnd: 2_000_000,
+    warningThresholds: [70, 90, 100],
+    hardStop: false,
+    version: 1,
+    usedVnd: 185_000,
+    reservedVnd: 20_000,
+    availableVnd: 1_795_000,
+    enforcementState: "MONITORING",
+    usedPercent: 9.25,
+    updatedAt: now,
+  },
+  {
+    scope: "OCR",
+    monthlyLimitVnd: 1_000_000,
+    warningThresholds: [70, 90, 100],
+    hardStop: false,
+    version: 1,
+    usedVnd: 60_000,
+    reservedVnd: 5_000,
+    availableVnd: 935_000,
+    enforcementState: "MONITORING",
+    usedPercent: 6,
+    updatedAt: now,
+  },
 ];
 
 test.describe("Admin Cài đặt AI", () => {
@@ -36,39 +120,141 @@ test.describe("Admin Cài đặt AI", () => {
     await setupProviderOperationsMock(page);
   });
 
-  test("hiển thị cấu hình model, OCR, chi phí và bảng giá", async ({ page }) => {
-    await page.goto("/admin/ai-settings");
+  for (const theme of ["light", "dark"] as const) {
+    test(`hiển thị cấu hình model, OCR, chi phí và bảng giá ở theme ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((initialTheme) => {
+        window.localStorage.setItem("classhero-theme", initialTheme);
+      }, theme);
+      await page.goto("/admin/ai-settings");
 
-    await expect(page.getByRole("heading", { name: "Cài đặt AI" })).toBeVisible();
-    await expect(page.getByText("Chi phí tháng này")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Sinh quiz" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Lưu cấu hình model" })).toBeEnabled();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await expect(page.getByRole("heading", { name: "Cài đặt AI" })).toBeVisible();
+      await expect(page.getByText("Chi phí tháng này")).toBeVisible();
+      await expect(page.getByText("245.000 VNĐ")).toBeVisible();
+      await expect(page.getByText("15:00 03-08-2026")).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Sinh câu hỏi ôn tập" }),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Lưu thay đổi" })).toBeEnabled();
+      await page.getByRole("combobox", { name: "Mô hình chính" }).first().click();
+      await expect(page.getByRole("option")).toHaveCount(16);
+      await expect(page.getByRole("option", { name: "GPT-5.6 Terra" })).toBeVisible();
+      await expect(page.getByRole("option", { name: "Gemini 3.6 Flash" })).toBeVisible();
+      await page.keyboard.press("Escape");
 
-    await page.getByRole("tab", { name: "OCR & tài liệu" }).click();
-    await expect(page.getByText("Mathpix credential")).toBeVisible();
-    await expect(page.getByText("Giá OCR hiện tại")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Lưu thiết lập OCR" })).toBeEnabled();
+      await page.getByRole("tab", { name: "Đọc tài liệu" }).click();
+      await expect(page.getByText("Dịch vụ đọc tài liệu")).toBeVisible();
+      await expect(page.getByText("Giá đọc tài liệu hiện tại")).toBeVisible();
+      const fxRateField = page.getByLabel("Tỷ giá VNĐ cho 1 USD");
+      await expect(fxRateField).toHaveValue("25.500");
+      await expect(fxRateField.locator("..").getByText("VNĐ")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Lưu thiết lập" })).toBeEnabled();
 
-    await page.getByRole("tab", { name: "Chi phí & sử dụng" }).click();
-    await expect(page.getByRole("heading", { name: "Chi phí theo thời gian" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Ngân sách tháng" })).toBeVisible();
-    await expect(page.getByRole("img", { name: "Biểu đồ chi phí provider" })).toBeVisible();
-    await expect(page.getByText("GPT-4.1 mini").last()).toBeVisible();
+      await page.getByRole("tab", { name: "Chi phí" }).click();
+      await expect(
+        page.getByRole("heading", { name: "Chi phí theo thời gian" }),
+      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Ngân sách tháng" })).toBeVisible();
+      const budgetFields = page.getByLabel("Mức chi tối đa mỗi tháng");
+      await expect(budgetFields).toHaveCount(3);
+      await expect(budgetFields.nth(0)).toHaveValue("3.000.000");
+      await expect(budgetFields.nth(1)).toHaveValue("2.000.000");
+      await expect(budgetFields.nth(2)).toHaveValue("1.000.000");
+      await expect(budgetFields.nth(0).locator("..").getByText("VNĐ")).toBeVisible();
+      const allServicesBudget = page.locator("article").filter({
+        has: page.getByText("Tất cả dịch vụ", { exact: true }),
+      });
+      await expect(allServicesBudget.getByText("Đang giữ")).toBeVisible();
+      await expect(allServicesBudget.getByText("25.000 VNĐ")).toBeVisible();
+      await expect(allServicesBudget.getByText("Còn lại")).toBeVisible();
+      await expect(allServicesBudget.getByText("2.730.000 VNĐ")).toBeVisible();
+      await budgetFields.nth(0).fill("3500000");
+      await expect(budgetFields.nth(0)).toHaveValue("3.500.000");
+      await expect(
+        page.getByRole("img", { name: "Biểu đồ chi phí sử dụng" }),
+      ).toBeVisible();
+      await expect(page.getByText("GPT-4.1 mini").last()).toBeVisible();
 
-    await page.getByRole("tab", { name: "Bảng giá provider" }).click();
-    await expect(page.getByRole("heading", { name: "GPT-4.1 mini" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Nguồn giá chính thức" })).toHaveAttribute("href", "https://openai.com/api/pricing/");
-    await expect(page.getByRole("heading", { name: "Lịch sử thay đổi" })).toBeVisible();
+      await page.getByRole("tab", { name: "Bảng giá" }).click();
+      await expect(
+        page.getByRole("heading", { name: "OpenAI", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Gemini", exact: true }),
+      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "GPT-4.1 mini" })).toBeVisible();
+      await expect(page.getByText("≈ 10.200 VNĐ").first()).toBeVisible();
+      await expect(page.getByText("Áp dụng từ 03-08-2026").first()).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: "Nguồn giá chính thức" }).first(),
+      ).toHaveAttribute("href", "https://openai.com/api/pricing/");
+      await expect(page.getByRole("heading", { name: "Lịch sử thay đổi" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Thêm phiên bản giá" }).first().click();
-    const dialog = page.getByRole("dialog", { name: "GPT-4.1 mini" });
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "Lưu phiên bản giá" }).click();
-    await expect(dialog).toBeHidden();
+      await page.getByRole("button", { name: "Cập nhật giá" }).first().click();
+      const dialog = page.getByRole("dialog", {
+        name: "Cập nhật giá GPT-4.1 mini",
+      });
+      await expect(dialog).toBeVisible();
+      await expectDialogFitsViewport(page, dialog);
+      await dialog.getByLabel("Đường dẫn nguồn giá").fill("");
+      await dialog.getByRole("button", { name: "Lưu bảng giá" }).click();
+      await expect(dialog.getByText("Nhập đường dẫn nguồn giá")).toBeVisible();
+      await expect(dialog).toBeVisible();
+      await dialog
+        .getByLabel("Đường dẫn nguồn giá")
+        .fill("https://openai.com/api/pricing/");
+      await dialog.getByRole("button", { name: "Lưu bảng giá" }).click();
+      await expect(dialog).toBeHidden();
 
-    await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
-  });
+      await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
+      await expectNoHorizontalOverflow(page);
+    });
+  }
 });
+
+async function expectDialogFitsViewport(
+  page: Page,
+  dialog: ReturnType<Page["getByRole"]>,
+) {
+  const viewport = page.viewportSize();
+  const clientViewport = await page.evaluate(() => ({
+    height: document.documentElement.clientHeight,
+    width: document.documentElement.clientWidth,
+  }));
+  expect(viewport).not.toBeNull();
+  if (!viewport) return;
+
+  const box = await dialog.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  expect(box.height).toBeLessThanOrEqual(viewport.height - 24);
+  await expect
+    .poll(async () => {
+      const currentBox = await dialog.boundingBox();
+      return currentBox
+        ? Math.abs(currentBox.x + currentBox.width / 2 - clientViewport.width / 2)
+        : Number.POSITIVE_INFINITY;
+    })
+    .toBeLessThanOrEqual(8);
+  await expect
+    .poll(async () => {
+      const currentBox = await dialog.boundingBox();
+      return currentBox
+        ? Math.abs(currentBox.y + currentBox.height / 2 - clientViewport.height / 2)
+        : Number.POSITIVE_INFINITY;
+    })
+    .toBeLessThanOrEqual(8);
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const dimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+}
 
 async function seedAdminSession(page: Page) {
   const accessToken = createUnsignedToken({
@@ -77,14 +263,24 @@ async function seedAdminSession(page: Page) {
     sub: "admin-user",
   });
   await page.route("**/api/auth/session", (route) => route.fulfill({ status: 204 }));
-  await page.addInitScript((session) => {
-    window.localStorage.setItem("classhero.auth.session", JSON.stringify(session));
-  }, {
-    accessToken,
-    refreshToken: "refresh-token",
-    remember: true,
-    user: { email: "admin@classhero.test", fullName: "Nguyễn Admin", id: "admin-user", phone: null, role: "ADMIN", username: "admin" },
-  });
+  await page.addInitScript(
+    (session) => {
+      window.localStorage.setItem("classhero.auth.session", JSON.stringify(session));
+    },
+    {
+      accessToken,
+      refreshToken: "refresh-token",
+      remember: true,
+      user: {
+        email: "admin@classhero.test",
+        fullName: "Nguyễn Admin",
+        id: "admin-user",
+        phone: null,
+        role: "ADMIN",
+        username: "admin",
+      },
+    },
+  );
 }
 
 async function setupProviderOperationsMock(page: Page) {
@@ -94,27 +290,204 @@ async function setupProviderOperationsMock(page: Page) {
     if (route.request().method() === "POST" && path.endsWith("/price-versions")) {
       return fulfillJson(route, 201, { data: price });
     }
-    if (path.endsWith("/overview")) return fulfillJson(route, 200, { data: { period: { from: "2026-08-01", to: "2026-08-31" }, totalCostVnd: 245_000, savedCostVnd: 35_000, calls: 128, successCount: 126, failedCount: 2, successRate: 98.44, budgets, accounting: accounting(), latestUsageAt: now } });
-    if (path.endsWith("/ai-configurations")) return fulfillJson(route, 200, { data: { configurations: ["SUMMARY", "QUIZ", "FLASHCARD", "TEST"].map((feature) => ({ feature, primaryCatalogItemId: model.id, fallbackCatalogItemId: null, temperature: 0.2, maxOutputTokens: 4096, version: 1, updatedAt: now })), models: [model] } });
-    if (path.endsWith("/ocr-settings")) return fulfillJson(route, 200, { data: { provider: "MATHPIX", paidEnabled: true, cacheEnabled: true, credentialConfigured: true, monthlyBudgetVnd: 1_000_000, hardStop: false, accounting: accounting(), services: [{ id: "ocr-mathpix", provider: "MATHPIX", displayName: "Mathpix PDF OCR", externalKey: "mathpix-pdf", status: "ACTIVE", latestPrice: { ...price, id: "price-ocr", billingMode: "PAGE", sourceUrl: "https://mathpix.com/pricing", rates: [{ id: "rate-page", metric: "PAGE", unitSize: 1, unitPriceUsd: 0.005, tierFrom: 0, tierTo: null }] } }] } });
+    if (path.endsWith("/overview"))
+      return fulfillJson(route, 200, {
+        data: {
+          period: { from: "2026-08-01", to: "2026-08-31" },
+          totalCostVnd: 245_000,
+          savedCostVnd: 35_000,
+          calls: 128,
+          successCount: 126,
+          failedCount: 2,
+          successRate: 98.44,
+          budgets,
+          accounting: accounting(),
+          latestUsageAt: now,
+        },
+      });
+    if (path.endsWith("/ai-configurations"))
+      return fulfillJson(route, 200, {
+        data: {
+          configurations: ["SUMMARY", "QUIZ", "FLASHCARD", "TEST"].map((feature) => ({
+            feature,
+            primaryCatalogItemId: model.id,
+            fallbackCatalogItemId: null,
+            temperature: 0.2,
+            maxOutputTokens: 4096,
+            version: 1,
+            updatedAt: now,
+          })),
+          models,
+        },
+      });
+    if (path.endsWith("/ocr-settings"))
+      return fulfillJson(route, 200, {
+        data: {
+          provider: "MATHPIX",
+          paidEnabled: true,
+          cacheEnabled: true,
+          credentialConfigured: true,
+          monthlyBudgetVnd: 1_000_000,
+          hardStop: false,
+          accounting: accounting(),
+          services: [
+            {
+              id: "ocr-mathpix",
+              provider: "MATHPIX",
+              displayName: "Mathpix PDF OCR",
+              externalKey: "mathpix-pdf",
+              status: "ACTIVE",
+              latestPrice: {
+                ...price,
+                id: "price-ocr",
+                billingMode: "PAGE",
+                sourceUrl: "https://mathpix.com/pricing",
+                rates: [
+                  {
+                    id: "rate-page",
+                    metric: "PAGE",
+                    unitSize: 1,
+                    unitPriceUsd: 0.005,
+                    tierFrom: 0,
+                    tierTo: null,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      });
     if (path.endsWith("/budgets")) return fulfillJson(route, 200, { data: budgets });
-    if (path.endsWith("/usage/timeline")) return fulfillJson(route, 200, { data: { from: "2026-07-05", to: "2026-08-03", granularity: url.searchParams.get("granularity") ?? "DAY", points: [{ bucket: "03/08", costVnd: 25_000, savedCostVnd: 3_000, calls: 12, failed: 0, totalTokens: 42_000, pages: 8 }] } });
-    if (path.endsWith("/usage/breakdown")) return fulfillJson(route, 200, { data: [{ category: "AI_MODEL", provider: "OPENAI", catalogItemId: model.id, model: { displayName: model.displayName, externalKey: model.externalKey }, feature: "QUIZ", calls: 12, costVnd: 25_000, savedCostVnd: 3_000, totalTokens: 42_000, pages: 0 }] });
-    if (path.endsWith("/usage/events")) return fulfillJson(route, 200, { data: { items: [{ id: "usage-1", category: "AI_MODEL", provider: "OPENAI", feature: "QUIZ", status: "SUCCEEDED", cacheStatus: null, totalTokens: 3_500, pages: 0, costVnd: 2_100, estimatedSavedCostVnd: 0, latencyMs: 850, createdAt: now, catalogItem: { displayName: model.displayName, externalKey: model.externalKey } }], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } } });
-    if (path.endsWith("/catalog")) return fulfillJson(route, 200, { data: [{ ...model, category: "AI_MODEL", priceVersions: [price], deprecationNote: null, updatedAt: now }] });
-    if (path.endsWith("/audit-history")) return fulfillJson(route, 200, { data: [{ id: "audit-1", action: "PROVIDER_PRICE_VERSION_CREATED", entityType: "PROVIDER_PRICE_VERSION", actorUserId: "admin-user", createdAt: now }] });
+    if (path.endsWith("/usage/timeline"))
+      return fulfillJson(route, 200, {
+        data: {
+          from: "2026-07-05",
+          to: "2026-08-03",
+          granularity: url.searchParams.get("granularity") ?? "DAY",
+          points: [
+            {
+              bucket: "03/08",
+              costVnd: 25_000,
+              savedCostVnd: 3_000,
+              calls: 12,
+              failed: 0,
+              totalTokens: 42_000,
+              pages: 8,
+            },
+          ],
+        },
+      });
+    if (path.endsWith("/usage/breakdown"))
+      return fulfillJson(route, 200, {
+        data: [
+          {
+            category: "AI_MODEL",
+            provider: "OPENAI",
+            catalogItemId: model.id,
+            model: { displayName: model.displayName, externalKey: model.externalKey },
+            feature: "QUIZ",
+            calls: 12,
+            costVnd: 25_000,
+            savedCostVnd: 3_000,
+            totalTokens: 42_000,
+            pages: 0,
+          },
+        ],
+      });
+    if (path.endsWith("/usage/events"))
+      return fulfillJson(route, 200, {
+        data: {
+          items: [
+            {
+              id: "usage-1",
+              category: "AI_MODEL",
+              provider: "OPENAI",
+              feature: "QUIZ",
+              status: "SUCCEEDED",
+              cacheStatus: null,
+              totalTokens: 3_500,
+              pages: 0,
+              costVnd: 2_100,
+              estimatedSavedCostVnd: 0,
+              latencyMs: 850,
+              createdAt: now,
+              catalogItem: {
+                displayName: model.displayName,
+                externalKey: model.externalKey,
+              },
+            },
+          ],
+          pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+        },
+      });
+    if (path.endsWith("/catalog"))
+      return fulfillJson(route, 200, {
+        data: [
+          {
+            ...model,
+            category: "AI_MODEL",
+            priceVersions: [price],
+            deprecationNote: null,
+            updatedAt: now,
+          },
+          {
+            ...model,
+            id: "model-gemini",
+            provider: "GEMINI",
+            externalKey: "gemini-2.5-flash",
+            displayName: "Gemini 2.5 Flash",
+            category: "AI_MODEL",
+            priceVersions: [
+              {
+                ...price,
+                id: "price-gemini",
+                sourceUrl: "https://ai.google.dev/gemini-api/docs/pricing",
+              },
+            ],
+            deprecationNote: null,
+            updatedAt: now,
+          },
+        ],
+      });
+    if (path.endsWith("/audit-history"))
+      return fulfillJson(route, 200, {
+        data: [
+          {
+            id: "audit-1",
+            action: "PROVIDER_PRICE_VERSION_CREATED",
+            entityType: "PROVIDER_PRICE_VERSION",
+            actorUserId: "admin-user",
+            createdAt: now,
+          },
+        ],
+      });
     return fulfillJson(route, 404, { error: { code: "MOCK_NOT_FOUND", message: path } });
   });
 }
 
 function accounting() {
-  return { timezone: "Asia/Ho_Chi_Minh", weekStartsOn: 1, fxRateVndPerUsd: 25_500, priceFreshnessDays: 30, version: 1, updatedAt: now };
+  return {
+    timezone: "Asia/Ho_Chi_Minh",
+    weekStartsOn: 1,
+    fxRateVndPerUsd: 25_500,
+    priceFreshnessDays: 30,
+    version: 1,
+    updatedAt: now,
+  };
 }
 
 function fulfillJson(route: Route, status: number, body: unknown) {
-  return route.fulfill({ body: JSON.stringify(body), contentType: "application/json", status });
+  return route.fulfill({
+    body: JSON.stringify(body),
+    contentType: "application/json",
+    status,
+  });
 }
 
 function createUnsignedToken(payload: Record<string, unknown>) {
-  return [Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url"), Buffer.from(JSON.stringify(payload)).toString("base64url"), "signature"].join(".");
+  return [
+    Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url"),
+    Buffer.from(JSON.stringify(payload)).toString("base64url"),
+    "signature",
+  ].join(".");
 }

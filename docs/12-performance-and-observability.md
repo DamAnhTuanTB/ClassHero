@@ -161,6 +161,9 @@ Provider operations rules:
 
 - Timeline/breakdown lọc tối đa 366 ngày, event list phân trang và có index theo thời gian/category/provider/feature; chart admin không thêm thư viện nặng.
 - OCR cache hit không tạo delay giả. Mathpix retry resume `pdfId` đã lưu để tránh double-charge; debug artifact local tắt mặc định ở production.
+- Hard-stop `M9.12` serialize ngắn chỉ ở bước reserve theo `period + scope`; không giữ database lock trong lúc gọi provider. Lock scope theo thứ tự cố định để tránh deadlock.
+- Theo dõi metric/log `budget_reservation_granted`, `budget_reservation_denied`, `budget_reservation_uncertain`, thời gian chờ lock, reconciliation drift và số job bị chặn không retry. Cảnh báo nếu actual cost vượt reservation hoặc có reservation `UNCERTAIN` quá SLA.
+- Có reconciliation idempotent cho reservation bị bỏ lại do crash; fail-safe giữ ngân sách thay vì tự release khi chưa rõ provider đã bill hay chưa.
 
 Rules:
 

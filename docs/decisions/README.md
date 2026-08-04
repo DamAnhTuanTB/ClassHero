@@ -59,3 +59,4 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0011-client-side-quiz-feedback.md`          | Accepted   | Quiz trả grading data khi mở, chấm local tức thì và batch submit để ưu tiên tốc độ trải nghiệm               |
 | `ADR-0012-optional-learning-path-chapters.md`    | Accepted   | Cho phép lesson thuộc trực tiếp learning path; chapter trở thành lớp nhóm tùy chọn                            |
 | `ADR-0013-provider-operations-accounting.md`    | Accepted   | Version hóa bảng giá, snapshot usage AI/OCR, routing fallback và retry Mathpix không double-charge           |
+| `ADR-0014-atomic-provider-budget-reservation.md` | Accepted   | Giữ chỗ ngân sách nguyên tử trước paid call để hard-stop không vượt giới hạn                                 |

@@ -1,14 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-  CircleAlert,
-  BookOpenCheck,
-  ExternalLink,
-  RefreshCcw,
-  VideoOff,
-} from "lucide-react";
+import { ExternalLink, VideoOff } from "lucide-react";
 import { useCallback, useState } from "react";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import type { CustomVideoSettings } from "@/components/shared/custom-youtube-player";
 import type { StudentLesson } from "@/features/student/lessons/types/student-lesson-types";
 import { cn } from "@/lib/utils";
@@ -51,38 +46,18 @@ export function LessonVideoPanel({
     >
       {hasVideoError ? (
         <div className="p-3 sm:p-5">
-          <div
-            role="alert"
-            className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl border border-rose-200/90 bg-gradient-to-br from-rose-50 via-white to-amber-50 px-5 text-center shadow-[inset_0_1px_0_rgb(255_255_255_/_90%),0_18px_45px_-38px_rgb(225_29_72_/_55%)] dark:border-rose-400/20 dark:from-rose-950/35 dark:via-[var(--theme-surface-soft)] dark:to-amber-950/20 dark:shadow-[0_18px_45px_-38px_rgb(225_29_72_/_25%)] sm:px-8"
-          >
-            <span
-              aria-hidden="true"
-              className="absolute -left-10 top-1/4 h-32 w-32 rounded-full bg-rose-300/20 blur-3xl dark:bg-rose-500/10"
+          <div className="aspect-video w-full">
+            <StudentDataErrorState
+              className="h-full min-h-0 border-0 shadow-none"
+              variant="compact"
+              title="Không tải được video"
+              description="Kết nối tới video đang gặp sự cố. Bạn thử tải lại nhé."
+              primaryAction={{
+                icon: "retry",
+                label: "Thử tải lại",
+                onClick: handleRetryVideo,
+              }}
             />
-            <span
-              aria-hidden="true"
-              className="absolute -right-10 bottom-1/4 h-32 w-32 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-500/10"
-            />
-
-            <div className="relative z-10 flex max-w-md flex-col items-center">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl border border-rose-200 bg-white text-rose-600 shadow-[0_14px_30px_-22px_rgb(225_29_72_/_75%)] dark:border-rose-400/20 dark:bg-[var(--theme-surface)] dark:text-rose-300 sm:h-20 sm:w-20">
-                <CircleAlert className="h-8 w-8 sm:h-9 sm:w-9" aria-hidden="true" />
-              </span>
-              <p className="mt-4 text-base font-black text-slate-800 dark:text-[var(--theme-text-strong)] sm:mt-5 sm:text-xl">
-                Không tải được video
-              </p>
-              <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-500 dark:text-[var(--theme-text-muted)] sm:text-sm sm:leading-6">
-                Kết nối tới video đang gặp sự cố. Bạn thử tải lại nhé.
-              </p>
-              <button
-                type="button"
-                onClick={handleRetryVideo}
-                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-600 px-4 text-sm font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition enabled:hover:bg-sky-500 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 dark:bg-sky-600 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:focus-visible:ring-sky-500/30"
-              >
-                <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-                Thử tải lại
-              </button>
-            </div>
           </div>
         </div>
       ) : videoUrl ? (

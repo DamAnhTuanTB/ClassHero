@@ -34,6 +34,42 @@ Dùng cho màn có data/action.
 - Không hiển thị text kỹ thuật như `mock`, task code, stack trace hoặc TODO trong UI.
 - Không thay một detail/list/tab panel bằng icon xoay kèm dòng “Đang tải…”. Spinner chỉ dùng cho pending cục bộ không có layout nội dung để skeleton hóa, ví dụ bên trong nút bấm.
 
+### Admin fetch/data error
+
+Mọi lỗi tải dữ liệu trong admin phải dùng shared component:
+
+```tsx
+<AdminDataErrorState
+  description="Vui lòng thử lại để tiếp tục quản lý dữ liệu."
+  isRetrying={query.isFetching}
+  onRetry={() => query.refetch()}
+  title="Không tải được danh sách"
+  variant="section"
+/>
+```
+
+Chọn variant theo surface sở hữu lỗi:
+
+- `compact`: modal, card hoặc panel con nhỏ.
+- `section`: list, tab hoặc section còn nằm dưới header/stat/filter. Đây là mặc định cho lỗi danh sách.
+- `page`: chỉ khi toàn bộ content chính của route bị chặn và màn không còn surface hữu ích khác để hiển thị.
+
+Quy tắc bắt buộc:
+
+- Giữ nền error surface trung tính; màu danger chỉ dùng làm accent cho icon/vùng cảnh báo.
+- Tiêu đề nói rõ loại dữ liệu bị lỗi; mô tả ngắn, không hiển thị raw error hoặc chi tiết kỹ thuật.
+- Có retry khi query hỗ trợ refetch; truyền `isRetrying` để khóa bấm lặp và hiển thị pending feedback.
+- Dùng `headingLevel` đúng hierarchy của page/panel và giữ button label một dòng.
+- Error trong container đã có border có thể bỏ border/shadow của component bằng `className`, nhưng không được thay đổi cấu trúc, icon, typography và retry behavior.
+
+Không làm:
+
+- Không dùng `page` hoặc viewport-based `min-height` cho lỗi list/tab/panel; lỗi danh sách không được phình cao gần hết màn hình.
+- Không copy một error block riêng vào feature mới.
+- Không áp dụng component fetch-error cho validation field, upload error, lỗi từng item/job hoặc status badge nghiệp vụ.
+
+Evidence: `apps/web/components/admin/admin-data-error-state.tsx`.
+
 ## 2. Animated Connection State
 
 Dùng cho trạng thái chờ ngắn khi hai đầu của một media hoặc dịch vụ đang kết nối.

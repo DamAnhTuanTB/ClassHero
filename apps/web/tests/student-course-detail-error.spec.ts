@@ -2,9 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const apiBaseUrl = "http://localhost:4000/api/v1";
 
-test("course detail 404 không retry và giữ skeleton đúng chiều rộng", async ({
-  page,
-}) => {
+test("course detail 404 dùng màn lỗi chung và không tự retry", async ({ page }) => {
   let detailRequestCount = 0;
 
   await seedStudentSession(page);
@@ -34,8 +32,9 @@ test("course detail 404 không retry và giữ skeleton đúng chiều rộng", 
   expect(skeletonBox?.width).toBeGreaterThan(Math.min(600, viewportWidth * 0.8));
 
   await expect(
-    page.getByRole("heading", { name: "Chưa tìm thấy khóa học này" }),
+    page.getByRole("heading", { name: "Chưa mở được khóa học" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Thử lại" })).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Về danh sách khóa học" }),
   ).toBeVisible();

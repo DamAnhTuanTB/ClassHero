@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { AiGenerationType } from "@prisma/client";
+import { ProviderUsageMetric, type AiGenerationType } from "@prisma/client";
+import { createHash } from "node:crypto";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { AiService } from "#api/modules/ai/services/ai.service";
@@ -47,24 +48,54 @@ export class AiProviderCallService {
     let lastError: unknown;
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]!;
-      await this.usage.assertBudgetAllows(candidate.category);
-      const usageEvent = await this.usage.start({
-        category: candidate.category,
-        provider: candidate.provider,
-        catalogItemId: candidate.catalogItemId,
-        priceVersionId: candidate.priceVersionId,
-        aiGenerationId: context.aiGenerationId,
-        backgroundJobId: context.backgroundJobId,
-        feature: context.feature,
-        attempt: context.attempt,
-      });
+      const maxOutputTokens = route.maxOutputTokens ?? input.maxTokens;
+      const requestFingerprint = createHash("sha256")
+        .update(`${input.systemPrompt}\n${input.userPrompt}`)
+        .digest("hex")
+        .slice(0, 20);
+      const usageEvent = await this.usage.reserveAndStart(
+        {
+          category: candidate.category,
+          provider: candidate.provider,
+          catalogItemId: candidate.catalogItemId,
+          priceVersionId: candidate.priceVersionId,
+          aiGenerationId: context.aiGenerationId,
+          backgroundJobId: context.backgroundJobId,
+          feature: context.feature,
+          attempt: context.attempt,
+        },
+        {
+          idempotencyKey: [
+            "ai",
+            context.backgroundJobId ?? context.aiGenerationId ?? requestFingerprint,
+            context.attempt ?? 1,
+            index,
+            candidate.catalogItemId ?? candidate.model,
+          ].join(":"),
+          usageUpperBound: {
+            promptTokens: candidate.maxInputTokens ?? 0,
+            completionTokens: maxOutputTokens ?? 0,
+          },
+          rates: candidate.rates,
+          requiredMetrics: [
+            ProviderUsageMetric.INPUT_TOKEN,
+            ProviderUsageMetric.OUTPUT_TOKEN,
+          ],
+          estimateUnavailableReason:
+            candidate.maxInputTokens == null || candidate.maxInputTokens <= 0
+              ? "Chưa có giới hạn đầu vào của mô hình nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
+              : maxOutputTokens == null || maxOutputTokens <= 0
+                ? "Chưa có giới hạn độ dài đầu ra nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
+                : undefined,
+        },
+      );
       try {
         const output = await this.aiService.generateStructured(
           {
             ...input,
             model: candidate.model,
             temperature: route.temperature ?? input.temperature,
-            maxTokens: route.maxOutputTokens ?? input.maxTokens,
+            maxTokens: maxOutputTokens,
           },
           schema,
           candidate.provider,

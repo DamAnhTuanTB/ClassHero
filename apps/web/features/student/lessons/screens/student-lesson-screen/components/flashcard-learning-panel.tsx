@@ -788,6 +788,7 @@ export function FlashcardLearningPanel({
             }
             isCoveredByChildSurface={screen === "RUNNER" && historyReviewTitle !== null}
             isLoading={historyQuery.isLoading && !historyQuery.data}
+            isRetrying={historyQuery.isFetching}
             items={flashcardHistoryItems.map((item) => ({
               id: item.id,
               setId: item.setId,
@@ -808,6 +809,7 @@ export function FlashcardLearningPanel({
               }
             }}
             onReview={handleHistoryReview}
+            onRetry={() => void historyQuery.refetch()}
             pendingActionKey={
               pendingAction?.startsWith("history-")
                 ? pendingAction.slice("history-".length)

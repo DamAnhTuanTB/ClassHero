@@ -46,6 +46,7 @@ Rules:
 - `GET /jobs/:jobId` phải kiểm tra owner/role.
 - `M4.2` tạo job rows cho `DOCUMENT_PROCESSING` khi tạo source document, cập nhật page range, thay thế tài liệu chính hoặc upload supplemental document; `M4.3` chịu trách nhiệm enqueue BullMQ thật và cập nhật `bullmq_job_id`.
 - Từ `M4.3`, API enqueue job thật vào BullMQ sau khi DB transaction tạo durable row thành công. Worker chạy tách API, nhận job theo `bullmq_job_id`, cập nhật durable status `QUEUED -> RUNNING -> SUCCEEDED/FAILED`, ghi `attempts`, `started_at`, `finished_at`, `error_message` và `result_json` an toàn.
+- `M9.12`: budget hard-limit/estimate-unavailable là terminal business error; worker không tăng retry cho lỗi này và durable job phải lưu safe error code để UI phân biệt với lỗi provider tạm thời.
 - Processor `DOCUMENT_PROCESSING` ở `M4.3` mới là foundation: xác nhận worker nhận job và cập nhật trạng thái durable. Paid OCR artifact import/chunk tài liệu thật được triển khai ở `M4.4`.
 
 ---

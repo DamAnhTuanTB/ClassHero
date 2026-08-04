@@ -6,14 +6,13 @@ import {
   ChevronRight,
   ClipboardCheck,
   HelpCircle,
-  Home,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StudentDetailMobileBrandBar } from "@/components/student/layout/student-detail-mobile-brand-bar";
 import { StudentCoursesHeader } from "@/components/student/courses/student-courses-header";
-import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import { usePracticeTabTransition } from "@/features/student/lessons/hooks/use-practice-tab-transition";
 import { LessonNavigationControl } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-navigation-control";
 import { LessonSummaryPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/lesson-summary-panel";
@@ -238,32 +237,22 @@ export function StudentLessonScreen({
   const lesson = lessonQuery.data;
   if (!lesson || lessonQuery.isError) {
     return (
-      <StudentFullScreenState
+      <StudentDataErrorState
         initialThemeMode={initialThemeMode}
         title="Chưa mở được bài học"
-        description={
-          lessonQuery.error instanceof Error
-            ? lessonQuery.error.message
-            : "Bạn kiểm tra lại quyền học hoặc quay về khóa học."
-        }
-        action={
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <Link
-              href="/student/courses"
-              className="student-learn-cta-3d inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-600 px-5 text-sm font-black text-white"
-            >
-              <BookOpen className="h-5 w-5" aria-hidden="true" />
-              Về khóa học của tôi
-            </Link>
-            <Link
-              href="/student/explore"
-              className="student-learn-cta-3d-emerald inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-black text-white"
-            >
-              <Home className="h-5 w-5" aria-hidden="true" />
-              Về Trang chủ
-            </Link>
-          </div>
-        }
+        description="Dữ liệu bài học chưa sẵn sàng. Bạn thử tải lại hoặc quay về khóa học của mình nhé."
+        primaryAction={{
+          icon: "retry",
+          label: "Thử lại",
+          onClick: () => void lessonQuery.refetch(),
+          pending: lessonQuery.isFetching,
+        }}
+        secondaryAction={{
+          href: "/student/courses",
+          icon: "book",
+          label: "Về khóa học của tôi",
+          tone: "secondary",
+        }}
       />
     );
   }

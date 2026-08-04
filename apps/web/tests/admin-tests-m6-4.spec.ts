@@ -178,8 +178,9 @@ test("admin formula input keeps its focused placeholder clear and keyboard toggl
   });
   expect(darkThemeColors.placeholderBackground).toBe("rgba(0, 0, 0, 0)");
   expect(darkThemeColors.keyboardBackground).not.toBe("rgba(0, 0, 0, 0)");
-  const darkVirtualKeyboardColors = await page.locator(".ML__keyboard").evaluate(
-    (element) => {
+  const darkVirtualKeyboardColors = await page
+    .locator(".ML__keyboard")
+    .evaluate((element) => {
       const styles = getComputedStyle(element);
 
       return {
@@ -187,8 +188,7 @@ test("admin formula input keeps its focused placeholder clear and keyboard toggl
         keycapBackground: styles.getPropertyValue("--_keycap-background").trim(),
         keycapText: styles.getPropertyValue("--_keycap-text").trim(),
       };
-    },
-  );
+    });
   expect(darkVirtualKeyboardColors).toEqual({
     background: "#0f172a",
     keycapBackground: "#1e293b",
@@ -211,9 +211,7 @@ async function seedAdminSession(page: Page) {
     role: "ADMIN",
     sub: "admin-user",
   });
-  await page.route("**/api/auth/session", (route) =>
-    route.fulfill({ status: 204 }),
-  );
+  await page.route("**/api/auth/session", (route) => route.fulfill({ status: 204 }));
   await page.addInitScript(
     (session) => {
       window.localStorage.setItem("classhero.auth.session", JSON.stringify(session));
@@ -242,6 +240,26 @@ async function setupTestsApiMock(page: Page) {
     const request = route.request();
     const pathname = new URL(request.url()).pathname.replace("/api/v1", "");
     const method = request.method();
+
+    if (
+      method === "GET" &&
+      pathname === `/admin/lessons/${lessonId}/ai-generation-panel`
+    ) {
+      return fulfillJson(route, 200, {
+        data: {
+          lesson: { id: lessonId, title: "Buổi 1: Kiến thức nền" },
+          readiness: {
+            summaryReady: false,
+            generationReady: false,
+            readyDocumentCount: 0,
+            embeddedDocumentCount: 0,
+            reason: "Buổi học chưa có tài liệu.",
+          },
+          documents: [],
+          jobs: { SUMMARY: null, QUIZ: null, FLASHCARD: null, TEST: null },
+        },
+      });
+    }
 
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}`) {
       return fulfillJson(route, 200, {

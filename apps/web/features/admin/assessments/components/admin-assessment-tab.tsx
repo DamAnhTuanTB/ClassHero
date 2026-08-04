@@ -14,12 +14,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
   type Ref,
 } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import type {
   AdminMultiStatementAnswer,
@@ -49,6 +51,7 @@ import { getQueryRenderState } from "@/lib/query-render-state";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { cn } from "@/lib/utils";
+import { AdminGeneratedSetReviewActions } from "@/features/admin/ai-generation/components/admin-generated-set-review-actions";
 
 const AdminAssessmentQuestionEditorDialog = dynamic(
   () =>
@@ -78,6 +81,7 @@ interface AdminAssessmentTabProps {
   assessmentKind?: "quiz" | "test";
   initialQuizData?: AdminQuizInitialData;
   lessonId: string;
+  preferredSetId?: string;
 }
 
 type DeleteTarget =
@@ -89,6 +93,7 @@ export function AdminAssessmentTab({
   assessmentKind = "quiz",
   initialQuizData,
   lessonId,
+  preferredSetId,
 }: AdminAssessmentTabProps) {
   const isTest = assessmentKind === "test";
   const quizSetsQuery = useAdminQuizSets(
@@ -106,6 +111,7 @@ export function AdminAssessmentTab({
   const [selectedSetId, setSelectedSetId] = useState(
     isTest ? "" : (initialQuizData?.questionSetId ?? ""),
   );
+  const appliedPreferredSetIdRef = useRef<string | null>(null);
   const [editorQuestion, setEditorQuestion] = useState<
     AdminQuizQuestion | AdminTestQuestion | null
   >(null);
@@ -146,6 +152,18 @@ export function AdminAssessmentTab({
       }
     }
   }, [quizSets, selectedSetId]);
+
+  useEffect(() => {
+    if (
+      !preferredSetId ||
+      appliedPreferredSetIdRef.current === preferredSetId ||
+      !quizSets?.some((set) => set.id === preferredSetId)
+    ) {
+      return;
+    }
+    appliedPreferredSetIdRef.current = preferredSetId;
+    handleSelectQuizSet(preferredSetId);
+  }, [handleSelectQuizSet, preferredSetId, quizSets]);
 
   const activeSet = useMemo(
     () => quizSets?.find((set) => set.id === selectedSetId) ?? null,
@@ -242,9 +260,14 @@ export function AdminAssessmentTab({
 
   if (queryRenderState === "error") {
     return (
-      <div className="flex min-h-32 items-center justify-center rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-5 text-center text-sm font-semibold text-[var(--theme-error-text)]">
-        <p>Không tải được danh sách {copy.setNamePlural}. Hãy thử tải lại trang.</p>
-      </div>
+      <AdminDataErrorState
+        description={`Vui lòng thử lại để tiếp tục quản lý ${copy.setNamePlural}.`}
+        headingLevel={3}
+        isRetrying={setsQuery.isFetching}
+        onRetry={() => setsQuery.refetch()}
+        title={`Không tải được danh sách ${copy.setNamePlural}`}
+        variant="section"
+      />
     );
   }
 
@@ -336,6 +359,7 @@ export function AdminAssessmentTab({
                   ? initialQuizData.questions
                   : undefined
               }
+              lessonId={lessonId}
               minHeight={quizSetPanelMinHeight}
               panelRef={quizSetPanelRef}
               onAddQuestion={() => {
@@ -464,6 +488,7 @@ function QuizSetPanel({
   assessmentKind,
   activeSet,
   initialQuestions,
+  lessonId,
   minHeight,
   panelRef,
   onAddQuestion,
@@ -475,6 +500,7 @@ function QuizSetPanel({
   assessmentKind: "quiz" | "test";
   activeSet: AdminQuizSet | AdminTestSet;
   initialQuestions?: AdminQuizQuestion[];
+  lessonId: string;
   minHeight: number;
   panelRef: Ref<HTMLElement>;
   onAddQuestion: () => void;
@@ -521,6 +547,13 @@ function QuizSetPanel({
             {questions?.length ?? activeSet._count?.questions ?? activeSet.questionCount}{" "}
             câu hỏi
           </p>
+          <AdminGeneratedSetReviewActions
+            lessonId={lessonId}
+            reviewStatus={activeSet.reviewStatus}
+            setId={activeSet.id}
+            source={activeSet.source}
+            type={isTest ? "TEST" : "QUIZ"}
+          />
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
           <button
@@ -553,9 +586,15 @@ function QuizSetPanel({
       {queryRenderState === "loading" ? (
         <QuizLoadingState />
       ) : queryRenderState === "error" ? (
-        <div className="flex min-h-32 items-center justify-center p-6 text-center text-sm font-semibold text-[var(--theme-error-text)]">
-          Không tải được câu hỏi của bộ này.
-        </div>
+        <AdminDataErrorState
+          className="rounded-none border-0 shadow-none"
+          description="Vui lòng thử lại để tiếp tục quản lý câu hỏi."
+          headingLevel={4}
+          isRetrying={questionsQuery.isFetching}
+          onRetry={() => questionsQuery.refetch()}
+          title="Không tải được câu hỏi của bộ này"
+          variant="compact"
+        />
       ) : !questions?.length ? (
         <div className="m-5 flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] px-4 py-10 text-center">
           <FileQuestion

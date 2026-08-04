@@ -9,6 +9,7 @@ import type {
 import { AiGenerationLifecycleService } from "#api/modules/ai/services/ai-generation-lifecycle.service";
 import type { AiGenerationExecutionContext } from "#api/modules/ai/types/ai-generation.types";
 import { AiOutputValidationError } from "#api/modules/ai/utils/ai-output-validation";
+import { isProviderBudgetError } from "#api/modules/provider-operations/utils/provider-budget-error";
 import { AiGenerationExecutionService } from "#api/workers/services/ai-generation-execution.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 
@@ -63,10 +64,7 @@ export class AiGenerationProcessor {
       providerRouteSnapshot: readRouteSnapshot(record.inputMeta),
     };
 
-    await this.lifecycle.markRunning(
-      context,
-      String(job.id ?? record.id),
-    );
+    await this.lifecycle.markRunning(context, String(job.id ?? record.id));
 
     try {
       // persist() is intentionally unreachable until generate() returns a
@@ -76,8 +74,10 @@ export class AiGenerationProcessor {
       return await this.lifecycle.markSucceeded(context, prepared, persisted);
     } catch (error) {
       const isInvalidOutput = error instanceof AiOutputValidationError;
+      const isBudgetBlocked = isProviderBudgetError(error);
       const isFinalAttempt =
         isInvalidOutput ||
+        isBudgetBlocked ||
         error instanceof UnrecoverableError ||
         attempt >= maxAttempts;
       await this.lifecycle.markFailed(context, error, isFinalAttempt);
@@ -85,6 +85,12 @@ export class AiGenerationProcessor {
       if (isInvalidOutput) {
         this.logger.warn(
           `AI generation ${context.aiGenerationId} rejected invalid output without persistence.`,
+        );
+        throw new UnrecoverableError(error.message);
+      }
+      if (isBudgetBlocked) {
+        this.logger.warn(
+          `AI generation ${context.aiGenerationId} stopped before provider call because its budget is unavailable.`,
         );
         throw new UnrecoverableError(error.message);
       }

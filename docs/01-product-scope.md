@@ -90,7 +90,7 @@ Admin có quyền:
 - Dùng AI tạo flashcard.
 - Tạo, sửa, xóa bài kiểm tra.
 - Dùng AI tạo câu hỏi bài kiểm tra.
-- Cấu hình model chính/dự phòng cho từng chức năng AI, xem bảng giá/usage AI và OCR, đặt ngân sách và xem audit thay đổi; không xem hoặc sửa API key trên UI.
+- Cấu hình model chính/dự phòng cho từng chức năng AI, xem bảng giá/usage AI và OCR, đặt ngân sách, chủ động bật hard-stop tuyệt đối và xem audit thay đổi; không xem hoặc sửa API key trên UI.
 - Tạo hoặc cập nhật lời giải chi tiết cho từng câu bằng AI.
 - Xem và xử lý report lỗi.
 - Xem, sửa, duyệt hoặc ẩn nội dung AI chưa duyệt.

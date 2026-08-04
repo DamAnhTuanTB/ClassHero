@@ -75,7 +75,7 @@ export class AiModelRoutingService {
     if (provider === "MATHPIX") {
       return Boolean(
         this.configService.get("MATHPIX_APP_ID", { infer: true }) &&
-          this.configService.get("MATHPIX_APP_KEY", { infer: true }),
+        this.configService.get("MATHPIX_APP_KEY", { infer: true }),
       );
     }
     return false;
@@ -95,6 +95,7 @@ export class AiModelRoutingService {
         unitPriceUsd: import("@prisma/client").Prisma.Decimal;
         tierFrom: number | null;
         tierTo: number | null;
+        conditionsJson: import("@prisma/client").Prisma.JsonValue | null;
       }>;
     }>;
   }): ProviderRouteCandidate {
@@ -106,6 +107,7 @@ export class AiModelRoutingService {
       category: item.category,
       provider,
       model: item.externalKey,
+      maxInputTokens: readMaxInputTokens(price?.rates ?? []),
       available:
         item.status === ProviderCatalogStatus.ACTIVE &&
         this.isCredentialConfigured(item.provider),
@@ -134,6 +136,7 @@ export class AiModelRoutingService {
           category: ProviderCatalogCategory.AI_MODEL,
           provider: AiProviderName.OPENAI,
           model,
+          maxInputTokens: null,
           available: this.isCredentialConfigured(AiProviderName.OPENAI),
           rates: [],
         },
@@ -157,4 +160,22 @@ function parseAiProvider(provider: string): AiProviderName {
     return provider;
   }
   throw new Error(`Catalog provider ${provider} is not an AI provider.`);
+}
+
+function readMaxInputTokens(
+  rates: Array<{ conditionsJson: import("@prisma/client").Prisma.JsonValue | null }>,
+) {
+  for (const rate of rates) {
+    if (
+      rate.conditionsJson &&
+      typeof rate.conditionsJson === "object" &&
+      !Array.isArray(rate.conditionsJson)
+    ) {
+      const value = (rate.conditionsJson as Record<string, unknown>).maxInputTokens;
+      if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+        return value;
+      }
+    }
+  }
+  return null;
 }

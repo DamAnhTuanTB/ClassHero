@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   BadgeCheck,
   Ban,
   CircleAlert,
@@ -14,7 +13,7 @@ import {
 import Link from "next/link";
 import { useEffect } from "react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
-import { StudentFullScreenState } from "@/components/student/student-full-screen-state";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import {
   useInvalidateCoursesAfterPayment,
   usePaymentStatusQuery,
@@ -38,7 +37,13 @@ function formatDateTime(dateString: string) {
 }
 
 export function StudentPaymentResultScreen({ paymentId }: { paymentId: string }) {
-  const { data: payment, isLoading, isError } = usePaymentStatusQuery(paymentId);
+  const {
+    data: payment,
+    isError,
+    isFetching,
+    isLoading,
+    refetch,
+  } = usePaymentStatusQuery(paymentId);
   const invalidateCourses = useInvalidateCoursesAfterPayment();
   const fallbackHref = payment?.learningPath?.slug
     ? `/student/courses/${payment.learningPath.slug}`
@@ -59,27 +64,21 @@ export function StudentPaymentResultScreen({ paymentId }: { paymentId: string })
 
   if (isError) {
     return (
-      <StudentFullScreenState
-        title="Không tìm thấy thanh toán"
-        description="Bạn quay lại danh sách khóa học để thử lại nhé."
-        action={
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <Link
-              href="/student/courses"
-              className="student-learn-cta-3d inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-5 text-sm font-bold text-white transition hover:bg-sky-600"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Về danh sách khóa học
-            </Link>
-            <Link
-              href="/student/explore"
-              className="student-learn-cta-3d-emerald inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-500 px-5 text-sm font-bold text-white transition hover:bg-emerald-400"
-            >
-              <Home className="h-4 w-4" aria-hidden="true" />
-              Về Trang chủ
-            </Link>
-          </div>
-        }
+      <StudentDataErrorState
+        title="Chưa tải được thông tin thanh toán"
+        description="Thông tin giao dịch chưa sẵn sàng. Bạn thử tải lại hoặc quay về danh sách khóa học nhé."
+        primaryAction={{
+          icon: "retry",
+          label: "Thử lại",
+          onClick: () => void refetch(),
+          pending: isFetching,
+        }}
+        secondaryAction={{
+          href: "/student/courses",
+          icon: "book",
+          label: "Về danh sách khóa học",
+          tone: "secondary",
+        }}
       />
     );
   }

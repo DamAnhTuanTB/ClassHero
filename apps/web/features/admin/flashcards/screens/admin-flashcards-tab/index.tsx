@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { Layers, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import type {
   AdminFlashcard,
@@ -37,12 +38,19 @@ type DeleteTarget =
   | { type: "card"; id: string; label: string }
   | null;
 
-export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
+export function AdminFlashcardsTab({
+  lessonId,
+  preferredSetId,
+}: {
+  lessonId: string;
+  preferredSetId?: string;
+}) {
   const setsQuery = useAdminFlashcardSets(lessonId);
   const { data: sets, refetch } = setsQuery;
   const queryRenderState = getQueryRenderState(setsQuery);
   const { deleteSet } = useAdminFlashcardSetMutations(lessonId);
   const [selectedSetId, setSelectedSetId] = useState("");
+  const appliedPreferredSetIdRef = useRef<string | null>(null);
   const [setEditorTarget, setSetEditorTarget] = useState<
     AdminFlashcardSet | null | undefined
   >(undefined);
@@ -77,6 +85,18 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
     }
   }, [handleSelectSet, selectedSetId, sets]);
 
+  useEffect(() => {
+    if (
+      !preferredSetId ||
+      appliedPreferredSetIdRef.current === preferredSetId ||
+      !sets?.some((set) => set.id === preferredSetId)
+    ) {
+      return;
+    }
+    appliedPreferredSetIdRef.current = preferredSetId;
+    handleSelectSet(preferredSetId);
+  }, [handleSelectSet, preferredSetId, sets]);
+
   const activeSet = useMemo(
     () => sets?.find((set) => set.id === selectedSetId) ?? null,
     [selectedSetId, sets],
@@ -89,20 +109,14 @@ export function AdminFlashcardsTab({ lessonId }: { lessonId: string }) {
 
   if (queryRenderState === "error") {
     return (
-      <div className="flex min-h-48 items-center justify-center rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-6 text-center">
-        <div>
-          <p className="text-sm font-semibold text-[var(--theme-error-text)]">
-            Không tải được danh sách bộ flashcard.
-          </p>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="theme-button-neutral mt-3 min-h-10 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold"
-          >
-            Thử lại
-          </button>
-        </div>
-      </div>
+      <AdminDataErrorState
+        description="Vui lòng thử lại để tiếp tục quản lý các bộ flashcard."
+        headingLevel={3}
+        isRetrying={setsQuery.isFetching}
+        onRetry={() => refetch()}
+        title="Không tải được danh sách bộ flashcard"
+        variant="section"
+      />
     );
   }
 

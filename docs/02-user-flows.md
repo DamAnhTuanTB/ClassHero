@@ -332,6 +332,7 @@ Acceptance Criteria:
 3. Xem OCR provider/cache/credential status, tỷ giá và ngân sách.
 4. Xem chi phí theo ngày/tuần/tháng, breakdown model/chức năng và usage event.
 5. Khi provider đổi giá, thêm price version với nguồn chính thức và ngày hiệu lực; lịch sử cũ không bị tính lại.
+6. Khi bật `Tạm dừng khi hết ngân sách`, UI hiển thị tiền đã dùng, đang giữ chỗ và còn lại. Mỗi paid call phải giữ chỗ nguyên tử trước; nếu không đủ số dư hoặc không ước lượng được upper bound thì job bị chặn trước provider call.
 
 Acceptance Criteria:
 
@@ -339,6 +340,7 @@ Acceptance Criteria:
 - Job đã enqueue giữ route snapshot; fallback chỉ cho lỗi provider tạm thời.
 - OCR retry tiếp tục `pdfId` đã có, cache hit có cost 0 và saving.
 - Đổi model/giá/budget/accounting có audit; version conflict buộc tải lại.
+- Nhiều worker chạy đồng thời không làm tổng `đã dùng + đang giữ chỗ` vượt hard limit; budget error không fallback/retry và hiển thị thông báo thân thiện.
 
 ---
 

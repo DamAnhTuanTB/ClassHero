@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { RotateCcw } from "lucide-react";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { useAdminCourseDetailManager } from "@/features/admin/courses/hooks/use-admin-course-detail-manager";
 import { LessonEditorDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/lesson-editor-dialog";
@@ -107,22 +107,13 @@ export function LessonDetailEditorDialog({
 
         <div className="flex min-h-48 flex-1 items-center justify-center p-5">
           {viewState === "error" ? (
-            <div className="max-w-md text-center">
-              <p className="text-sm font-bold text-[var(--theme-text-strong)]">
-                Chưa tải được thông tin khóa học
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--theme-text-muted)]">
-                Thử tải lại để mở đầy đủ nội dung chỉnh sửa của buổi học.
-              </p>
-              <button
-                type="button"
-                onClick={actions.retryLoad}
-                className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-bold transition"
-              >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                Thử lại
-              </button>
-            </div>
+            <AdminDataErrorState
+              description="Vui lòng thử lại để mở đầy đủ nội dung chỉnh sửa."
+              headingLevel={3}
+              onRetry={actions.retryLoad}
+              title="Không tải được thông tin khóa học"
+              variant="compact"
+            />
           ) : (
             <LessonEditorSkeleton />
           )}

@@ -20,6 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import { cn } from "@/lib/utils";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 
@@ -43,6 +44,7 @@ export function LearningHistoryControl({
   errorMessage,
   isCoveredByChildSurface = false,
   isLoading,
+  isRetrying = false,
   isStartDisabled = false,
   items,
   onContinue,
@@ -50,6 +52,7 @@ export function LearningHistoryControl({
   onOpenHistory,
   onRestart,
   onReview,
+  onRetry,
   onStart,
   pendingActionKey,
   showCountLabel = true,
@@ -61,6 +64,7 @@ export function LearningHistoryControl({
   errorMessage?: string | null;
   isCoveredByChildSurface?: boolean;
   isLoading: boolean;
+  isRetrying?: boolean;
   isStartDisabled?: boolean;
   items: LearningHistoryDisplayItem[];
   onContinue?: (item: LearningHistoryDisplayItem) => void;
@@ -68,6 +72,7 @@ export function LearningHistoryControl({
   onOpenHistory: () => void | Promise<void>;
   onRestart?: (item: LearningHistoryDisplayItem) => void;
   onReview: (item: LearningHistoryDisplayItem) => void;
+  onRetry?: () => unknown;
   onStart?: (item: LearningHistoryDisplayItem) => void;
   pendingActionKey?: string | null;
   showCountLabel?: boolean;
@@ -367,9 +372,21 @@ export function LearningHistoryControl({
                     <span className="sr-only">Đang tải lịch sử</span>
                   </div>
                 ) : errorMessage ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-8 text-center text-sm font-bold text-rose-700 dark:border-rose-400/25 dark:bg-rose-500/10 dark:text-rose-200">
-                    {errorMessage}
-                  </div>
+                  <StudentDataErrorState
+                    variant="compact"
+                    title={`Chưa tải được lịch sử ${label}`}
+                    description="Bạn thử tải lại để xem các lượt học trước nhé."
+                    primaryAction={
+                      onRetry
+                        ? {
+                            icon: "retry",
+                            label: "Thử lại",
+                            onClick: onRetry,
+                            pending: isRetrying,
+                          }
+                        : undefined
+                    }
+                  />
                 ) : items.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center dark:border-[var(--theme-border)]">
                     <Clock3

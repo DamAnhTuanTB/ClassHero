@@ -9,7 +9,11 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
-import { throwBadRequest, throwConflict, throwNotFound } from "#api/common/errors/api-exception";
+import {
+  throwBadRequest,
+  throwConflict,
+  throwNotFound,
+} from "#api/common/errors/api-exception";
 import type { EnvConfig } from "#api/config/env.validation";
 import type { CreatePriceVersionDto } from "#api/modules/provider-operations/dto/create-price-version.dto";
 import type {
@@ -22,6 +26,9 @@ import type { UpdateAiConfigurationsDto } from "#api/modules/provider-operations
 import type { UpdateOcrSettingsDto } from "#api/modules/provider-operations/dto/update-ocr-settings.dto";
 import type { UpdateProviderBudgetsDto } from "#api/modules/provider-operations/dto/update-provider-budgets.dto";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
+import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
+import { lockProviderBudgetScopes } from "#api/modules/provider-operations/utils/provider-budget-lock";
+import { getProviderBudgetPeriod } from "#api/modules/provider-operations/utils/provider-budget-period";
 
 const MANAGED_AI_FEATURES = [
   AiGenerationType.SUMMARY,
@@ -36,6 +43,8 @@ export class ProviderOperationsAdminService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AiModelRoutingService)
     private readonly routing: AiModelRoutingService,
+    @Inject(ProviderUsageService)
+    private readonly usage: ProviderUsageService,
     private readonly configService: ConfigService<EnvConfig, true>,
   ) {}
 
@@ -144,15 +153,15 @@ export class ProviderOperationsAdminService {
     };
   }
 
-  async updateAiConfigurations(
-    actorUserId: string,
-    dto: UpdateAiConfigurationsDto,
-  ) {
+  async updateAiConfigurations(actorUserId: string, dto: UpdateAiConfigurationsDto) {
     const features = new Set(dto.configurations.map((item) => item.feature));
     if (
       features.size !== dto.configurations.length ||
       dto.configurations.some(
-        (item) => !MANAGED_AI_FEATURES.includes(item.feature as (typeof MANAGED_AI_FEATURES)[number]),
+        (item) =>
+          !MANAGED_AI_FEATURES.includes(
+            item.feature as (typeof MANAGED_AI_FEATURES)[number],
+          ),
       )
     ) {
       throwBadRequest(
@@ -322,28 +331,25 @@ export class ProviderOperationsAdminService {
 
   async listBudgets() {
     await this.ensureBudgetDefaults();
-    const budgets = await this.prisma.providerBudgetPolicy.findMany({
-      orderBy: { scope: "asc" },
-    });
-    const monthStart = startOfMonthInHoChiMinh(new Date());
-    const costs = await this.prisma.providerUsageEvent.groupBy({
-      by: ["category"],
-      where: { createdAt: { gte: monthStart } },
-      _sum: { costVnd: true },
-    });
-    const aiCost =
-      costs.find((item) => item.category === ProviderCatalogCategory.AI_MODEL)?._sum
-        .costVnd ?? 0;
-    const ocrCost =
-      costs.find((item) => item.category === ProviderCatalogCategory.OCR_SERVICE)?._sum
-        .costVnd ?? 0;
+    const [budgets, commitments] = await Promise.all([
+      this.prisma.providerBudgetPolicy.findMany({ orderBy: { scope: "asc" } }),
+      this.usage.getCurrentBudgetCommitments(),
+    ]);
     return budgets.map((budget) => {
       const usedVnd =
         budget.scope === ProviderBudgetScope.AI
-          ? aiCost
+          ? commitments.aiUsedVnd
           : budget.scope === ProviderBudgetScope.OCR
-            ? ocrCost
-            : aiCost + ocrCost;
+            ? commitments.ocrUsedVnd
+            : commitments.aiUsedVnd + commitments.ocrUsedVnd;
+      const reservedVnd =
+        budget.scope === ProviderBudgetScope.AI
+          ? commitments.aiReservedVnd
+          : budget.scope === ProviderBudgetScope.OCR
+            ? commitments.ocrReservedVnd
+            : commitments.aiReservedVnd + commitments.ocrReservedVnd;
+      const availableVnd = Math.max(0, budget.monthlyLimitVnd - usedVnd - reservedVnd);
+      const committedVnd = usedVnd + reservedVnd;
       return {
         scope: budget.scope,
         monthlyLimitVnd: budget.monthlyLimitVnd,
@@ -351,10 +357,18 @@ export class ProviderOperationsAdminService {
         hardStop: budget.hardStop,
         version: budget.version,
         usedVnd,
+        reservedVnd,
+        availableVnd,
+        enforcementState:
+          budget.hardStop && availableVnd === 0
+            ? "BLOCKED"
+            : budget.hardStop
+              ? "ENFORCED"
+              : "MONITORING",
         usedPercent:
           budget.monthlyLimitVnd === 0
             ? 0
-            : Math.round((usedVnd / budget.monthlyLimitVnd) * 10_000) / 100,
+            : Math.round((committedVnd / budget.monthlyLimitVnd) * 10_000) / 100,
         updatedAt: budget.updatedAt,
       };
     });
@@ -365,56 +379,89 @@ export class ProviderOperationsAdminService {
     if (scopes.size !== dto.budgets.length) {
       throwBadRequest("PROVIDER_BUDGET_SCOPE_DUPLICATE", "Phạm vi ngân sách bị trùng.");
     }
-    for (const budget of dto.budgets) {
-      const thresholds = [...budget.warningThresholds].sort((a, b) => a - b);
-      if (
-        thresholds.some((value) => value < 1 || value > 100) ||
-        new Set(thresholds).size !== thresholds.length
-      ) {
-        throwBadRequest(
-          "PROVIDER_BUDGET_THRESHOLD_INVALID",
-          "Ngưỡng cảnh báo phải khác nhau và nằm trong khoảng 1-100%.",
+    const settings = await this.getAccountingSettings();
+    const period = getProviderBudgetPeriod(new Date(), settings.timezone);
+    await this.prisma.$transaction(
+      async (transaction) => {
+        await lockProviderBudgetScopes(
+          transaction,
+          period.key,
+          dto.budgets.map((budget) => budget.scope),
         );
-      }
-      const current = await this.prisma.providerBudgetPolicy.findUnique({
-        where: { scope: budget.scope },
-      });
-      if ((current?.version ?? 0) !== budget.expectedVersion) {
-        throwConflict(
-          "PROVIDER_BUDGET_VERSION_CONFLICT",
-          "Ngân sách đã thay đổi. Vui lòng tải lại.",
-          { scope: budget.scope, currentVersion: current?.version ?? 0 },
-        );
-      }
-      const updated = await this.prisma.providerBudgetPolicy.upsert({
-        where: { scope: budget.scope },
-        create: {
-          scope: budget.scope,
-          monthlyLimitVnd: budget.monthlyLimitVnd,
-          hardStop: budget.hardStop,
-          warningThresholds: thresholds,
-          updatedByUserId: actorUserId,
-          version: 1,
-        },
-        update: {
-          monthlyLimitVnd: budget.monthlyLimitVnd,
-          hardStop: budget.hardStop,
-          warningThresholds: thresholds,
-          updatedByUserId: actorUserId,
-          version: { increment: 1 },
-        },
-      });
-      await this.prisma.auditLog.create({
-        data: {
-          actorUserId,
-          action: "PROVIDER_BUDGET_UPDATED",
-          entityType: "ProviderBudgetPolicy",
-          entityId: updated.id,
-          before: current ? toJson(current) : undefined,
-          after: toJson(updated),
-        },
-      });
-    }
+        const commitments = await this.usage.getCurrentBudgetCommitments();
+        for (const budget of dto.budgets) {
+          const thresholds = [...budget.warningThresholds].sort((a, b) => a - b);
+          if (
+            thresholds.some((value) => value < 1 || value > 100) ||
+            new Set(thresholds).size !== thresholds.length
+          ) {
+            throwBadRequest(
+              "PROVIDER_BUDGET_THRESHOLD_INVALID",
+              "Ngưỡng cảnh báo phải khác nhau và nằm trong khoảng 1-100%.",
+            );
+          }
+          const committedVnd =
+            budget.scope === ProviderBudgetScope.AI
+              ? commitments.aiUsedVnd + commitments.aiReservedVnd
+              : budget.scope === ProviderBudgetScope.OCR
+                ? commitments.ocrUsedVnd + commitments.ocrReservedVnd
+                : commitments.aiUsedVnd +
+                  commitments.ocrUsedVnd +
+                  commitments.aiReservedVnd +
+                  commitments.ocrReservedVnd;
+          if (budget.hardStop && budget.monthlyLimitVnd < committedVnd) {
+            throwBadRequest(
+              "PROVIDER_BUDGET_BELOW_COMMITTED",
+              "Mức ngân sách mới thấp hơn số tiền đã dùng và đang giữ.",
+              {
+                scope: budget.scope,
+                committedVnd,
+                monthlyLimitVnd: budget.monthlyLimitVnd,
+              },
+            );
+          }
+          const current = await transaction.providerBudgetPolicy.findUnique({
+            where: { scope: budget.scope },
+          });
+          if ((current?.version ?? 0) !== budget.expectedVersion) {
+            throwConflict(
+              "PROVIDER_BUDGET_VERSION_CONFLICT",
+              "Ngân sách đã thay đổi. Vui lòng tải lại.",
+              { scope: budget.scope, currentVersion: current?.version ?? 0 },
+            );
+          }
+          const updated = await transaction.providerBudgetPolicy.upsert({
+            where: { scope: budget.scope },
+            create: {
+              scope: budget.scope,
+              monthlyLimitVnd: budget.monthlyLimitVnd,
+              hardStop: budget.hardStop,
+              warningThresholds: thresholds,
+              updatedByUserId: actorUserId,
+              version: 1,
+            },
+            update: {
+              monthlyLimitVnd: budget.monthlyLimitVnd,
+              hardStop: budget.hardStop,
+              warningThresholds: thresholds,
+              updatedByUserId: actorUserId,
+              version: { increment: 1 },
+            },
+          });
+          await transaction.auditLog.create({
+            data: {
+              actorUserId,
+              action: "PROVIDER_BUDGET_UPDATED",
+              entityType: "ProviderBudgetPolicy",
+              entityId: updated.id,
+              before: current ? toJson(current) : undefined,
+              after: toJson(updated),
+            },
+          });
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
     return this.listBudgets();
   }
 
@@ -492,7 +539,15 @@ export class ProviderOperationsAdminService {
     });
     const buckets = new Map<
       string,
-      { bucket: string; costVnd: number; savedCostVnd: number; calls: number; failed: number; totalTokens: number; pages: number }
+      {
+        bucket: string;
+        costVnd: number;
+        savedCostVnd: number;
+        calls: number;
+        failed: number;
+        totalTokens: number;
+        pages: number;
+      }
     >();
     for (const event of events) {
       const bucket = getBucketKey(event.createdAt, query.granularity);
@@ -542,7 +597,7 @@ export class ProviderOperationsAdminService {
       category: item.category,
       provider: item.provider,
       catalogItemId: item.catalogItemId,
-      model: item.catalogItemId ? names.get(item.catalogItemId) ?? null : null,
+      model: item.catalogItemId ? (names.get(item.catalogItemId) ?? null) : null,
       feature: item.feature,
       calls: item._count._all,
       costVnd: item._sum.costVnd ?? 0,
@@ -713,7 +768,10 @@ function resolveDateRange(query: ProviderUsageQueryDto) {
     ? new Date(query.from)
     : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
   if (from >= to) {
-    throwBadRequest("PROVIDER_USAGE_DATE_RANGE_INVALID", "Khoảng thời gian không hợp lệ.");
+    throwBadRequest(
+      "PROVIDER_USAGE_DATE_RANGE_INVALID",
+      "Khoảng thời gian không hợp lệ.",
+    );
   }
   if (to.getTime() - from.getTime() > 366 * 24 * 60 * 60 * 1000) {
     throwBadRequest(

@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import { CloneStatusBadge } from "@/features/admin/courses/screens/admin-course-detail-manager/components/clone-status-badge";
@@ -134,21 +135,14 @@ export function EnrollmentListPanel({ learningPathId }: { learningPathId: string
         {isInitialPending ? (
           <EnrollmentTableSkeleton />
         ) : isBlockingError ? (
-          <div className="flex min-h-48 items-center justify-center text-center">
-            <div>
-              <p className="text-sm text-[var(--theme-danger-text)]">
-                Không thể tải danh sách. Vui lòng thử lại.
-              </p>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="theme-button-neutral mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold"
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                Thử lại
-              </button>
-            </div>
-          </div>
+          <AdminDataErrorState
+            className="border-0 shadow-none"
+            description="Vui lòng thử lại để tiếp tục quản lý danh sách học sinh."
+            headingLevel={3}
+            onRetry={() => refetch()}
+            title="Không tải được danh sách học sinh"
+            variant="section"
+          />
         ) : enrollments.length === 0 ? (
           <div className="py-12 text-center">
             <Users

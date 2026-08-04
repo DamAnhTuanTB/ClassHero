@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReducedMotion } from "framer-motion";
-import { Eye, HelpCircle, Play, RefreshCcw, RotateCcw } from "lucide-react";
+import { Eye, HelpCircle, Play, RotateCcw } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -12,6 +12,7 @@ import {
   type SetStateAction,
 } from "react";
 import { toast } from "sonner";
+import { StudentDataErrorState } from "@/components/student/student-data-error-state";
 import {
   getCurrentQuizAttempt,
   getQuizHistory,
@@ -823,6 +824,7 @@ export function QuizLearningPanel({
       <PanelState
         copy="Chưa thể tải trạng thái Quiz."
         actionLabel="Thử lại"
+        isPending={attemptStatusQuery.isFetching}
         onAction={() => void attemptStatusQuery.refetch()}
       />,
     );
@@ -833,6 +835,7 @@ export function QuizLearningPanel({
       <PanelState
         copy="Chưa thể mở lại lượt Quiz đang làm."
         actionLabel="Thử lại"
+        isPending={isResumePending}
         onAction={() => setResumeVersion((version) => version + 1)}
       />,
     );
@@ -871,6 +874,7 @@ export function QuizLearningPanel({
               }
               isCoveredByChildSurface={Boolean(review && reviewOrigin === "HISTORY")}
               isLoading={historyQuery.isLoading && !historyQuery.data}
+              isRetrying={historyQuery.isFetching}
               items={(historyQuery.data?.items ?? []).map((item) => ({
                 id: item.id,
                 setId: item.setId,
@@ -892,6 +896,7 @@ export function QuizLearningPanel({
                 return historyQuery.refetch().then(() => undefined);
               }}
               onReview={handleHistoryReview}
+              onRetry={() => void historyQuery.refetch()}
               pendingActionKey={
                 pendingAction?.startsWith("history-")
                   ? pendingAction.slice("history-".length)
@@ -1086,28 +1091,30 @@ function QuizPanelSkeleton() {
 function PanelState({
   actionLabel,
   copy,
+  isPending = false,
   onAction,
 }: {
   actionLabel?: string;
   copy: string;
+  isPending?: boolean;
   onAction?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-sky-100 bg-white px-5 py-8 text-center dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)]">
-      <div className="flex items-center justify-center gap-2 text-sm font-bold text-slate-600 dark:text-[var(--theme-text-muted)]">
-        <span>{copy}</span>
-      </div>
-      {actionLabel && onAction ? (
-        <button
-          type="button"
-          onClick={onAction}
-          className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-base font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"
-        >
-          <RefreshCcw className="h-5 w-5" aria-hidden="true" />
-          {actionLabel}
-        </button>
-      ) : null}
-    </div>
+    <StudentDataErrorState
+      variant="section"
+      title={copy}
+      description="Bạn thử tải lại để tiếp tục học nhé."
+      primaryAction={
+        actionLabel && onAction
+          ? {
+              icon: "retry",
+              label: actionLabel,
+              onClick: onAction,
+              pending: isPending,
+            }
+          : undefined
+      }
+    />
   );
 }
 

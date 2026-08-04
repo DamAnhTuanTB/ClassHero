@@ -23,7 +23,7 @@ import { LearningPathSummaryPanel } from "@/features/admin/courses/screens/admin
 import { AdminCourseDocumentPanel } from "@/features/admin/courses/screens/admin-course-detail-manager/components/admin-course-document-panel";
 import { EnrollmentListModal } from "@/features/admin/courses/screens/admin-course-detail-manager/components/enrollment-list-modal";
 import { PersonalPathBanner } from "@/features/admin/courses/screens/admin-course-detail-manager/components/personal-path-banner";
-import { ErrorState } from "@/components/admin/courses/error-state";
+import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { LoadingState } from "@/components/admin/courses/loading-state";
 import { StatCard } from "@/components/admin/courses/stat-card";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
@@ -188,7 +188,12 @@ export function AdminCourseDetailManager({
 
               <section className="mt-5">
                 {viewState === "error" ? (
-                  <ErrorState onRetry={actions.retryLoad} />
+                  <AdminDataErrorState
+                    description="Vui lòng thử lại để tiếp tục quản lý khóa học và buổi học."
+                    onRetry={actions.retryLoad}
+                    title="Không tải được thông tin khóa học"
+                    variant="page"
+                  />
                 ) : null}
                 {viewState === "ready" && path ? (
                   <div className="grid gap-5">

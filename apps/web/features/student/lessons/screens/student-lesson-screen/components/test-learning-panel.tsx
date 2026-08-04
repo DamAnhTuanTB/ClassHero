@@ -617,6 +617,7 @@ export function TestLearningPanel({
               }
               isCoveredByChildSurface={Boolean(review && reviewOrigin === "HISTORY")}
               isLoading={historyQuery.isLoading && !historyQuery.data}
+              isRetrying={historyQuery.isFetching}
               isStartDisabled={!canStartTest}
               items={testHistoryItems}
               onOpenHistory={() => {
@@ -625,6 +626,7 @@ export function TestLearningPanel({
                 }
               }}
               onReview={handleHistoryReview}
+              onRetry={() => void historyQuery.refetch()}
               onStart={handleHistoryStart}
               pendingActionKey={
                 pendingAction?.startsWith("history-")

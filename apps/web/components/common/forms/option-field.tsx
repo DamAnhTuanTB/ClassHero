@@ -140,6 +140,8 @@ export function OptionField({
                 type="button"
                 role="option"
                 aria-selected={isSelected}
+                aria-disabled={option.disabled || undefined}
+                disabled={option.disabled}
                 onClick={() => {
                   onChange(option.value);
                   setIsOpen(false);
@@ -150,6 +152,8 @@ export function OptionField({
                   isSelected
                     ? "bg-[var(--theme-primary)] text-[var(--theme-primary-foreground)] shadow-[var(--theme-shadow-sm)] ring-1 ring-[var(--theme-primary-border)] hover:bg-[var(--theme-primary)] focus:bg-[var(--theme-primary)] focus:text-[var(--theme-primary-foreground)]"
                     : "text-[var(--theme-text)] hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)] focus:bg-[var(--theme-primary-soft)] focus:text-[var(--theme-primary)] active:bg-[var(--theme-surface-muted)]",
+                  option.disabled &&
+                    "cursor-not-allowed opacity-55 hover:bg-transparent hover:text-[var(--theme-text)]",
                 )}
               >
                 <span className="absolute left-3 flex h-4 w-4 items-center justify-center">

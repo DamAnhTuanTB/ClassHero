@@ -26,8 +26,10 @@ export function mapLessonSummaryToTiptap(summary: LessonSummaryOutput): TiptapCo
     content.push(bulletList(summary.commonMistakes));
   }
 
-  content.push(heading("Câu hỏi ôn tập", 2));
-  content.push(bulletList(summary.reviewQuestions));
+  if (summary.reviewQuestions.length > 0) {
+    content.push(heading("Câu hỏi ôn tập", 2));
+    content.push(bulletList(summary.reviewQuestions));
+  }
 
   return { type: "doc", content };
 }

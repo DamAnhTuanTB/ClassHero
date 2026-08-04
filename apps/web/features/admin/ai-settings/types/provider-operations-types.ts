@@ -68,6 +68,9 @@ export type ProviderBudget = {
   hardStop: boolean;
   version: number;
   usedVnd: number;
+  reservedVnd: number;
+  availableVnd: number;
+  enforcementState: "BLOCKED" | "ENFORCED" | "MONITORING";
   usedPercent: number;
   updatedAt: string;
 };

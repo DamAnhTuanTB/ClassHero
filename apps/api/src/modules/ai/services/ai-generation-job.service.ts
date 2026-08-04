@@ -24,9 +24,9 @@ export class AiGenerationJobService {
   ) {}
 
   async createAndEnqueue(input: CreateAiGenerationJobInput) {
-    const routeSnapshot = this.modelRouting
-      ? await this.modelRouting.resolve(input.type)
-      : undefined;
+    const routeSnapshot =
+      input.routeSnapshot ??
+      (this.modelRouting ? await this.modelRouting.resolve(input.type) : undefined);
     const persistedInputMeta = mergeRouteSnapshot(input.inputMeta, routeSnapshot);
     const pair = await this.prisma.$transaction(async (transaction) => {
       if (input.deduplicateActive && input.lessonId) {
