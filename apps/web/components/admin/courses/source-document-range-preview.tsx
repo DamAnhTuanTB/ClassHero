@@ -109,7 +109,7 @@ export function SourceDocumentRangePreview({
                     </p>
                   )
                 ) : sourceDocument?.file.publicUrl ? (
-                  <div className="overflow-x-auto rounded-md bg-[var(--theme-surface-soft)] text-center">
+                  <div className="flex justify-center overflow-x-auto rounded-md bg-[var(--theme-surface-soft)] text-center">
                     <PdfPagePreview
                       pdfUrl={sourceDocument.file.publicUrl}
                       pageNumber={page.pageNumber}

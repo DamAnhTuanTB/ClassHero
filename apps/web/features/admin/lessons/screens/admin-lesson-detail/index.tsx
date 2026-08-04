@@ -356,12 +356,16 @@ export function AdminLessonDetailManager({
 
             <div className="flex flex-col gap-4">
               <div className="inline-flex items-center gap-2 text-[var(--theme-text-strong)] text-sm font-medium w-fit">
-                <div className="flex items-center gap-1.5 text-[var(--theme-primary)]">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex items-center gap-1.5 text-[var(--theme-primary)] hover:underline rounded outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--theme-primary)] transition"
+                >
                   <Layers3 className="h-4 w-4" />
                   <span className="truncate max-w-[200px]">
                     {lesson.courseTitle || "Khóa học"}
                   </span>
-                </div>
+                </button>
                 <ChevronRight className="h-4 w-4 text-[var(--theme-text-disabled)]" />
                 <div className="flex items-center gap-1.5">
                   <BookOpen className="h-4 w-4 text-[var(--theme-text-muted)]" />

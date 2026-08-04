@@ -294,7 +294,7 @@ export function LessonPageRangeRow({
                             </p>
                           )
                         ) : (
-                          <div className="border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
+                          <div className="flex justify-center border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
                             {sourceDocument?.file?.publicUrl ? (
                               <div className="inline-block align-top">
                                 <PdfPagePreview
