@@ -16,8 +16,7 @@ const validSummary = {
       examples: ["\\frac{1}{2} là số hữu tỉ."],
     },
   ],
-  commonMistakes: ["Quên điều kiện b khác 0."],
-  reviewQuestions: ["Số hữu tỉ là gì?"],
+  commonMistakes: ["Sai lầm 1"],
 };
 
 describe("M9.2 lesson summary schema and Tiptap mapper", () => {
@@ -32,7 +31,6 @@ describe("M9.2 lesson summary schema and Tiptap mapper", () => {
         expect.objectContaining({ type: "bulletList" }),
       ]),
     );
-    expect(JSON.stringify(document)).toContain("Câu hỏi ôn tập");
     expect(JSON.stringify(document)).toContain("\\\\frac{a}{b}");
   });
 
@@ -60,10 +58,8 @@ describe("M9.2 lesson summary schema and Tiptap mapper", () => {
         examples: [],
       })),
       commonMistakes: [],
-      reviewQuestions: [],
     });
     const document = mapLessonSummaryToTiptap(parsed);
-    expect(JSON.stringify(document)).not.toContain("Câu hỏi ôn tập");
 
     const request = buildLessonSummaryStructuredInput({
       lessonId: "lesson-1",
@@ -79,9 +75,7 @@ describe("M9.2 lesson summary schema and Tiptap mapper", () => {
         focus: "Định nghĩa",
         includeFormulas: false,
         includeExamples: false,
-        includeCommonMistakes: false,
-        contentSections: [],
-        reviewQuestionCount: 0,
+        includeCommonMistakes: true,
         extraInstructions: "Dùng tiêu đề ngắn",
       },
     });

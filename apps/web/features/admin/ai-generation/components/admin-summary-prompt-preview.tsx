@@ -27,6 +27,8 @@ export function AdminSummaryPromptPreview({
   temperature,
   userPrompt,
   userPromptError,
+  activeTab,
+  onTabChange,
 }: {
   preview: AdminLessonSummaryPromptPreview;
   systemInstructions: string;
@@ -38,8 +40,9 @@ export function AdminSummaryPromptPreview({
   userPromptError?: FieldError;
   onSystemInstructionsChange: (value: string) => void;
   onUserPromptChange: (value: string) => void;
+  activeTab: PromptTab;
+  onTabChange: (tab: PromptTab) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<PromptTab>("system");
   const [copiedTab, setCopiedTab] = useState<PromptTab | null>(null);
   const inputWithEditedPrompt = preview.inputPrompt.startsWith(preview.userPrompt)
     ? `${userPrompt}${preview.inputPrompt.slice(preview.userPrompt.length)}`
@@ -115,10 +118,6 @@ export function AdminSummaryPromptPreview({
             }
           />
         </dl>
-        <p className="mt-3 flex items-start gap-2 border-t border-[var(--theme-border)] pt-3 font-semibold text-[var(--theme-success-text)]">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          Chỉ xem trước, chưa bắt đầu tạo.
-        </p>
       </div>
 
       <div>
@@ -133,7 +132,7 @@ export function AdminSummaryPromptPreview({
               type="button"
               role="tab"
               aria-selected={activeTab === tab.value}
-              onClick={() => setActiveTab(tab.value)}
+              onClick={() => onTabChange(tab.value)}
               className={cn(
                 "min-h-10 rounded-lg px-2 text-xs font-extrabold transition sm:text-sm",
                 activeTab === tab.value

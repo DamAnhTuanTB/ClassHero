@@ -47,7 +47,6 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
             includeExamples: true,
             includeCommonMistakes: true,
             contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-            reviewQuestionCount: 5,
             extraInstructions: "",
           },
         }),
@@ -67,7 +66,6 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
     );
 
     expect(result.data.sections.length).toBeGreaterThan(0);
-    expect(result.data.reviewQuestions.length).toBeGreaterThan(0);
     expect(result.usage?.totalTokens).toBeGreaterThan(0);
     console.info(
       `[M9.2 LIVE] model=${result.model} inputTokens=${result.usage?.promptTokens ?? "unknown"} ` +

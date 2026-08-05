@@ -72,8 +72,7 @@ const generatedOutput = {
       examples: ["\\frac{1}{2} là số hữu tỉ."],
     },
   ],
-  commonMistakes: ["Quên điều kiện b khác 0."],
-  reviewQuestions: ["Số hữu tỉ là gì?"],
+  commonMistakes: ["Sai lầm 1"],
 };
 
 describe("M9.2 lesson summary API and worker integration", () => {
@@ -185,8 +184,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
         focus: "Định nghĩa số hữu tỉ",
         includeFormulas: false,
         includeExamples: true,
-        includeCommonMistakes: false,
-        reviewQuestionCount: 3,
+        includeCommonMistakes: true,
         extraInstructions: "Dùng câu ngắn",
         styleInstructions: "Dễ hiểu cho học sinh khối 7",
         contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],

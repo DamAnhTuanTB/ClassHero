@@ -76,7 +76,6 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
             includeExamples: true,
             includeCommonMistakes: true,
             contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-            reviewQuestionCount: 5,
             extraInstructions: "",
           },
         }),
@@ -90,7 +89,6 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     );
     expect(summary.data.sections.length).toBeGreaterThan(0);
     expect(summary.data.objectives.length).toBeGreaterThan(0);
-    expect(summary.data.reviewQuestions.length).toBeGreaterThan(0);
     record(usage, summary, "summary-student-friendly");
 
     for (const quizCase of [

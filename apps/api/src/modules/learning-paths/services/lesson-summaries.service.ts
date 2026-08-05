@@ -342,12 +342,7 @@ function normalizeConfiguration(
     styleInstructions: dto.styleInstructions?.trim() ?? "",
     length: dto.length ?? "standard",
     targetWordCount: dto.targetWordCount ?? null,
-    focus: dto.focus?.trim() ?? "",
-    includeFormulas: dto.includeFormulas ?? true,
-    includeExamples: dto.includeExamples ?? true,
-    includeCommonMistakes: dto.includeCommonMistakes ?? true,
-    contentSections: dto.contentSections ?? [],
-    reviewQuestionCount: dto.reviewQuestionCount ?? 0,
+
     extraInstructions: dto.extraInstructions?.trim() ?? "",
     systemInstructions: dto.systemInstructions?.trim() ?? "",
     userPrompt: dto.userPrompt?.trim() ?? "",

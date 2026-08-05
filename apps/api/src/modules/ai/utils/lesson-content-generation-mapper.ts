@@ -17,7 +17,7 @@ export function mapGeneratedQuestion(question: GeneratedQuestion) {
     questionType: question.questionType,
     difficulty: question.difficulty,
     questionJson: toTiptap(question.prompt),
-    hintJson: question.hint ? toTiptap(question.hint) : null,
+    hintJson: "hint" in question && question.hint ? toTiptap(question.hint) : null,
     explanationJson: toTiptap(question.explanation),
     sourceMetadataJson: { sourceChunkIds: question.sourceChunkIds },
   };

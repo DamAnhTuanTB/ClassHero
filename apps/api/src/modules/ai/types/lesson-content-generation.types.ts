@@ -11,67 +11,73 @@ const optionalText = (max: number) => z.string().trim().max(max);
 const difficultySchema = z.enum([Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD]);
 const sourceChunkIdsSchema = z.array(z.uuid()).min(1).max(8);
 
-const commonQuestionFields = {
+const commonQuizQuestionFields = {
   difficulty: difficultySchema,
   prompt: text(2_000),
-  hint: optionalText(1_000),
+  hint: text(1_000),
+  explanation: text(3_000),
+  sourceChunkIds: sourceChunkIdsSchema,
+};
+
+const commonTestQuestionFields = {
+  difficulty: difficultySchema,
+  prompt: text(2_000),
   explanation: text(3_000),
   sourceChunkIds: sourceChunkIdsSchema,
 };
 
 const optionSchema = z.object({ id: text(40), text: text(1_000) }).strict();
 
-export const generatedQuestionSchema = z.discriminatedUnion("questionType", [
-  z
-    .object({
+function buildQuestionUnion<T extends z.ZodRawShape>(commonFields: T) {
+  return z.discriminatedUnion("questionType", [
+    z.object({
       questionType: z.literal(QuestionType.MULTIPLE_CHOICE),
-      ...commonQuestionFields,
+      ...commonFields,
       options: z.array(optionSchema).min(2).max(6),
       correctOptionIds: z.array(text(40)).min(1).max(6),
-    })
-    .strict(),
-  z
-    .object({
+    }).strict(),
+    z.object({
       questionType: z.literal(QuestionType.TRUE_FALSE),
-      ...commonQuestionFields,
+      ...commonFields,
       correctAnswer: z.boolean(),
-    })
-    .strict(),
-  z
-    .object({
+    }).strict(),
+    z.object({
       questionType: z.literal(QuestionType.MULTI_STATEMENT_TRUE_FALSE),
-      ...commonQuestionFields,
-      statements: z
-        .array(z.object({ id: text(40), text: text(1_000), value: z.boolean() }).strict())
-        .min(2)
-        .max(8),
-    })
-    .strict(),
-  z
-    .object({
+      ...commonFields,
+      statements: z.array(z.object({ id: text(40), text: text(1_000), value: z.boolean() }).strict()).min(2).max(8),
+    }).strict(),
+    z.object({
       questionType: z.literal(QuestionType.TEXT_INPUT),
-      ...commonQuestionFields,
+      ...commonFields,
       acceptedAnswers: z.array(text(500)).min(1).max(12),
       caseSensitive: z.boolean(),
       exactMatch: z.boolean(),
       keywords: z.array(text(120)).max(20),
-    })
-    .strict(),
-]);
+    }).strict(),
+  ]);
+}
+
+export const generatedQuizQuestionSchema = buildQuestionUnion(commonQuizQuestionFields);
+export const generatedTestQuestionSchema = buildQuestionUnion(commonTestQuestionFields);
 
 export const generatedQuizOutputSchema = z
   .object({
     title: text(180),
-    questions: z.array(generatedQuestionSchema).min(1).max(50),
+    questions: z.array(generatedQuizQuestionSchema).min(1).max(50),
   })
   .strict();
 
 export const generatedTestOutputSchema = z
   .object({
     title: text(180),
-    questions: z.array(generatedQuestionSchema).min(1).max(50),
+    questions: z.array(generatedTestQuestionSchema).min(1).max(50),
   })
   .strict();
+
+export const generatedQuestionSchema = z.union([
+  generatedQuizQuestionSchema,
+  generatedTestQuestionSchema,
+]);
 
 export const generatedFlashcardOutputSchema = z
   .object({

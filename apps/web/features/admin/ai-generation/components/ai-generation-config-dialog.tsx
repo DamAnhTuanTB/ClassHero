@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
-import { useEffect, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
@@ -21,10 +21,10 @@ import type {
   AdminAiGenerationType,
   AdminAiPanelDocument,
   AdminAiQuestionType,
-  AdminSummaryContentSection,
   AdminSummaryGenerationPayload,
   AdminSummaryLength,
   AdminSummaryStyle,
+  AdminLessonSummaryPromptPreview,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { cn } from "@/lib/utils";
 
@@ -50,18 +50,6 @@ const questionTypeOptions = [
   { value: "MULTI_STATEMENT_TRUE_FALSE", label: "Nhiều mệnh đề Đúng / Sai" },
   { value: "TEXT_INPUT", label: "Nhập đáp án" },
 ] as const;
-const summaryContentOptions: Array<{
-  value: AdminSummaryContentSection;
-  label: string;
-}> = [
-  { value: "KEY_CONCEPTS", label: "Kiến thức trọng tâm" },
-  { value: "FORMULAS", label: "Công thức quan trọng" },
-  { value: "SOLUTION_METHODS", label: "Cách giải" },
-  { value: "EXAMPLES", label: "Ví dụ minh họa" },
-  { value: "COMMON_MISTAKES", label: "Lỗi thường gặp" },
-  { value: "MEMORY_TIPS", label: "Mẹo ghi nhớ" },
-  { value: "SPECIAL_CASES", label: "Trường hợp đặc biệt" },
-];
 
 export function AiGenerationConfigDialog({
   documents,
@@ -85,6 +73,11 @@ export function AiGenerationConfigDialog({
   const previewMutation = usePreviewAdminLessonSummaryPrompt(lessonId);
   const resetPreview = previewMutation.reset;
   const previewPrompt = previewMutation.mutateAsync;
+  const [summaryPreviewTab, setSummaryPreviewTab] = useState<"system" | "user" | "input">(
+    "system",
+  );
+  const [summaryPreviewData, setSummaryPreviewData] =
+    useState<AdminLessonSummaryPromptPreview | null>(null);
   const form = useForm<AdminAiGenerationFormValues>({
     resolver: zodResolver(adminAiGenerationFormSchema),
     mode: "onChange",
@@ -97,9 +90,12 @@ export function AiGenerationConfigDialog({
       const defaults = getDefaultValues(type, documents, targetGrade);
       form.reset(defaults);
       resetPreview();
+      setSummaryPreviewTab("system");
+      setSummaryPreviewData(null);
       if (type === "SUMMARY" && defaults.documentIds.length > 0) {
         void previewPrompt(toSummaryPayload(defaults))
           .then((preview) => {
+            setSummaryPreviewData(preview);
             form.setValue(
               "summaryTemperature",
               String(preview.configuration.temperature),
@@ -139,7 +135,6 @@ export function AiGenerationConfigDialog({
       "styleInstructions",
       "summaryLength",
       "summaryTargetWordCount",
-      "summaryFocus",
       "extraInstructions",
       "systemInstructions",
       "summaryTemperature",
@@ -152,6 +147,7 @@ export function AiGenerationConfigDialog({
       const preview = await previewMutation.mutateAsync(
         toSummaryPayload(form.getValues(), { includeUserPrompt: false }),
       );
+      setSummaryPreviewData(preview);
       form.setValue("userPrompt", preview.userPrompt, {
         shouldDirty: true,
         shouldValidate: true,
@@ -264,38 +260,6 @@ export function AiGenerationConfigDialog({
                 />
               </div>
               <TextareaField
-                id="ai-summary-focus"
-                label="Trọng tâm cần ưu tiên"
-                placeholder="Ví dụ: tập trung vào định nghĩa và cách biểu diễn số hữu tỉ"
-                isOptional
-                optionalLabel="Không bắt buộc"
-                className="min-h-24"
-                error={form.formState.errors.summaryFocus}
-                {...form.register("summaryFocus")}
-              />
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                  Nội dung cần có
-                </legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {summaryContentOptions.map((option) => (
-                    <CheckboxField
-                      key={option.value}
-                      id={`ai-summary-content-${option.value}`}
-                      label={option.label}
-                      checked={form.watch("contentSections").includes(option.value)}
-                      onChange={(event) =>
-                        updateSummaryContentSections(
-                          form,
-                          option.value,
-                          event.currentTarget.checked,
-                        )
-                      }
-                    />
-                  ))}
-                </div>
-              </fieldset>
-              <TextareaField
                 id="ai-summary-extra-instructions"
                 label="Yêu cầu bổ sung"
                 placeholder="Ví dụ: Dùng câu ngắn, nhấn mạnh các bước giải và hạn chế thuật ngữ khó"
@@ -337,7 +301,7 @@ export function AiGenerationConfigDialog({
                   label="Temperature"
                   inputMode="decimal"
                   icon={null}
-                  helperText="Mặc định lấy từ Cài đặt AI."
+
                   error={form.formState.errors.summaryTemperature}
                   {...temperatureField}
                   onChange={decimalChange(temperatureField.onChange)}
@@ -349,7 +313,7 @@ export function AiGenerationConfigDialog({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 icon={null}
-                helperText="Mặc định lấy từ Cài đặt AI."
+
                 error={form.formState.errors.summaryMaxOutputTokens}
                 {...maxOutputTokensField}
                 onChange={numericChange(maxOutputTokensField.onChange)}
@@ -363,7 +327,7 @@ export function AiGenerationConfigDialog({
                   type="button"
                   disabled={previewMutation.isPending}
                   onClick={() => void refreshSummaryPreview()}
-                  className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:cursor-wait disabled:opacity-60"
+                  className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
                 >
                   <RefreshCw
                     className={cn("h-4 w-4", previewMutation.isPending && "animate-spin")}
@@ -382,37 +346,46 @@ export function AiGenerationConfigDialog({
                     : "Chưa thể dựng dữ liệu gửi AI."}
                 </div>
               ) : null}
-              {previewMutation.isPending && !previewMutation.data ? (
+              {previewMutation.isPending && !summaryPreviewData ? (
                 <div className="flex min-h-32 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--theme-border)] text-sm font-semibold text-[var(--theme-text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   Đang tải dữ liệu...
                 </div>
               ) : null}
-              {previewMutation.data ? (
-                <AdminSummaryPromptPreview
-                  preview={previewMutation.data}
-                  systemInstructions={form.watch("systemInstructions")}
-                  userPrompt={form.watch("userPrompt")}
-                  model={form.watch("summaryModel")}
-                  temperature={form.watch("summaryTemperature")}
-                  maxOutputTokens={form.watch("summaryMaxOutputTokens")}
-                  systemInstructionsError={form.formState.errors.systemInstructions}
-                  userPromptError={form.formState.errors.userPrompt}
-                  onSystemInstructionsChange={(value) =>
-                    form.setValue("systemInstructions", value, {
-                      shouldDirty: true,
-                      shouldTouch: true,
-                      shouldValidate: true,
-                    })
-                  }
-                  onUserPromptChange={(value) =>
-                    form.setValue("userPrompt", value, {
-                      shouldDirty: true,
-                      shouldTouch: true,
-                      shouldValidate: true,
-                    })
-                  }
-                />
+              {summaryPreviewData ? (
+                <div
+                  className={cn(
+                    "relative transition-opacity duration-200",
+                    previewMutation.isPending && "pointer-events-none opacity-50",
+                  )}
+                >
+                  <AdminSummaryPromptPreview
+                    preview={summaryPreviewData}
+                    systemInstructions={form.watch("systemInstructions")}
+                    userPrompt={form.watch("userPrompt")}
+                    model={form.watch("summaryModel")}
+                    temperature={form.watch("summaryTemperature")}
+                    maxOutputTokens={form.watch("summaryMaxOutputTokens")}
+                    systemInstructionsError={form.formState.errors.systemInstructions}
+                    userPromptError={form.formState.errors.userPrompt}
+                    onSystemInstructionsChange={(value) =>
+                      form.setValue("systemInstructions", value, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    onUserPromptChange={(value) =>
+                      form.setValue("userPrompt", value, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    activeTab={summaryPreviewTab}
+                    onTabChange={setSummaryPreviewTab}
+                  />
+                </div>
               ) : null}
             </>
           ) : (
@@ -548,7 +521,7 @@ export function AiGenerationConfigDialog({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+            className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:opacity-60 sm:w-auto"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -573,26 +546,13 @@ function getDefaultValues(
     documentIds: documents
       .filter(
         (document) =>
-          document.canUseForSummary &&
-          document.kind === "PRIMARY_FROM_SOURCE",
+          document.canUseForSummary && document.kind === "PRIMARY_FROM_SOURCE",
       )
       .map((document) => document.id),
     style: "student_friendly",
     styleInstructions: getPresentationPreset("student_friendly", targetGrade),
     summaryLength: "standard",
     summaryTargetWordCount: "",
-    summaryFocus: "",
-    includeFormulas: true,
-    includeExamples: true,
-    includeCommonMistakes: true,
-    contentSections: [
-      "KEY_CONCEPTS",
-      "FORMULAS",
-      "SOLUTION_METHODS",
-      "EXAMPLES",
-      "COMMON_MISTAKES",
-    ],
-    reviewQuestionCount: "0",
     extraInstructions: "",
     systemInstructions: "",
     userPrompt: "",
@@ -645,7 +605,6 @@ function toSummaryPayload(
   values: AdminAiGenerationFormValues,
   options: { includeUserPrompt?: boolean } = {},
 ): AdminSummaryGenerationPayload {
-  const focus = values.summaryFocus.trim();
   const extraInstructions = values.extraInstructions.trim();
   const styleInstructions = values.styleInstructions.trim();
   const systemInstructions = values.systemInstructions.trim();
@@ -659,12 +618,6 @@ function toSummaryPayload(
     ...(values.summaryTargetWordCount
       ? { targetWordCount: Number(values.summaryTargetWordCount) }
       : {}),
-    ...(focus ? { focus } : {}),
-    includeFormulas: values.includeFormulas,
-    includeExamples: values.includeExamples,
-    includeCommonMistakes: values.includeCommonMistakes,
-    contentSections: values.contentSections,
-    reviewQuestionCount: 0,
     ...(extraInstructions ? { extraInstructions } : {}),
     ...(systemInstructions ? { systemInstructions } : {}),
     ...(userPrompt ? { userPrompt } : {}),
@@ -717,28 +670,6 @@ function getPresentationPreset(style: string, targetGrade: number | null) {
   return targetGrade
     ? `Dễ hiểu cho học sinh khối ${targetGrade}.`
     : "Dễ hiểu cho học sinh theo đúng khối lớp của khóa học.";
-}
-
-function updateSummaryContentSections(
-  form: ReturnType<typeof useForm<AdminAiGenerationFormValues>>,
-  section: AdminSummaryContentSection,
-  checked: boolean,
-) {
-  const current = form.getValues("contentSections");
-  form.setValue(
-    "contentSections",
-    checked ? [...current, section] : current.filter((item) => item !== section),
-    { shouldDirty: true, shouldTouch: true, shouldValidate: true },
-  );
-  if (section === "FORMULAS") {
-    form.setValue("includeFormulas", checked, { shouldDirty: true });
-  }
-  if (section === "EXAMPLES") {
-    form.setValue("includeExamples", checked, { shouldDirty: true });
-  }
-  if (section === "COMMON_MISTAKES") {
-    form.setValue("includeCommonMistakes", checked, { shouldDirty: true });
-  }
 }
 
 function updateQuestionTypes(

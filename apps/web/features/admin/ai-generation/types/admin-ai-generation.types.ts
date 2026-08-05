@@ -8,14 +8,6 @@ export type AdminAiQuestionType =
   "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";
 export type AdminSummaryStyle = "student_friendly" | "concise" | "academic";
 export type AdminSummaryLength = "short" | "standard" | "detailed";
-export type AdminSummaryContentSection =
-  | "KEY_CONCEPTS"
-  | "FORMULAS"
-  | "EXAMPLES"
-  | "SOLUTION_METHODS"
-  | "COMMON_MISTAKES"
-  | "MEMORY_TIPS"
-  | "SPECIAL_CASES";
 
 export interface AdminAiPanelDocument {
   id: string;
@@ -81,12 +73,6 @@ export type AdminSummaryGenerationPayload = {
   styleInstructions?: string;
   length: AdminSummaryLength;
   targetWordCount?: number;
-  focus?: string;
-  includeFormulas: boolean;
-  includeExamples: boolean;
-  includeCommonMistakes: boolean;
-  contentSections: AdminSummaryContentSection[];
-  reviewQuestionCount: number;
   extraInstructions?: string;
   systemInstructions?: string;
   userPrompt?: string;

@@ -10,15 +10,6 @@ const questionTypeSchema = z.enum([
 ]);
 const summaryStyleSchema = z.enum(["student_friendly", "concise", "academic"]);
 const summaryLengthSchema = z.enum(["short", "standard", "detailed"]);
-const summaryContentSectionSchema = z.enum([
-  "KEY_CONCEPTS",
-  "FORMULAS",
-  "EXAMPLES",
-  "SOLUTION_METHODS",
-  "COMMON_MISTAKES",
-  "MEMORY_TIPS",
-  "SPECIAL_CASES",
-]);
 const numericTextSchema = (label: string, min: number, max: number) =>
   z
     .string()
@@ -58,12 +49,6 @@ export const adminAiGenerationFormSchema = z
       .max(1_000, "Cách trình bày tối đa 1.000 ký tự"),
     summaryLength: summaryLengthSchema,
     summaryTargetWordCount: optionalNumericTextSchema("Số lượng từ", 50, 5_000),
-    summaryFocus: z.string().trim().max(1_000, "Trọng tâm tối đa 1.000 ký tự"),
-    includeFormulas: z.boolean(),
-    includeExamples: z.boolean(),
-    includeCommonMistakes: z.boolean(),
-    contentSections: z.array(summaryContentSectionSchema).max(12),
-    reviewQuestionCount: numericTextSchema("Số câu hỏi ôn tập", 0, 10),
     extraInstructions: z.string().trim().max(2_000, "Yêu cầu bổ sung tối đa 2.000 ký tự"),
     systemInstructions: z
       .string()

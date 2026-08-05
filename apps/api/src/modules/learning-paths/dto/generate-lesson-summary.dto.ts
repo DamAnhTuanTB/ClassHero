@@ -60,71 +60,7 @@ export class GenerateLessonSummaryDto {
   @Max(5_000)
   targetWordCount?: number;
 
-  @ApiPropertyOptional({ maxLength: 1_000, description: "Trọng tâm admin muốn ưu tiên" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(1_000)
-  focus?: string;
 
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  includeFormulas?: boolean;
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  includeExamples?: boolean;
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  includeCommonMistakes?: boolean;
-
-  @ApiPropertyOptional({
-    type: [String],
-    description: "Các nhóm nội dung admin muốn có trong bản tóm tắt",
-  })
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(12)
-  @ArrayUnique()
-  @IsIn(
-    [
-      "KEY_CONCEPTS",
-      "DEFINITIONS",
-      "FORMULAS",
-      "EXAMPLES",
-      "SOLUTION_METHODS",
-      "STEP_BY_STEP",
-      "COMMON_MISTAKES",
-      "MEMORY_TIPS",
-      "IMPORTANT_NOTES",
-      "SPECIAL_CASES",
-      "SUMMARY",
-    ],
-    { each: true },
-  )
-  contentSections?: Array<
-    | "KEY_CONCEPTS"
-    | "DEFINITIONS"
-    | "FORMULAS"
-    | "EXAMPLES"
-    | "SOLUTION_METHODS"
-    | "STEP_BY_STEP"
-    | "COMMON_MISTAKES"
-    | "MEMORY_TIPS"
-    | "IMPORTANT_NOTES"
-    | "SPECIAL_CASES"
-    | "SUMMARY"
-  >;
-
-  @ApiPropertyOptional({ minimum: 0, maximum: 10, default: 5 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10)
-  reviewQuestionCount?: number;
 
   @ApiPropertyOptional({ maxLength: 2_000 })
   @IsOptional()

@@ -169,13 +169,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByRole("option", { name: "Chi tiết" }).click();
     await expect(dialog.getByLabel("Số lượng từ")).toHaveValue("");
     await dialog.getByLabel("Số lượng từ").fill("350");
-    await dialog.getByLabel("Trọng tâm cần ưu tiên").fill("Định nghĩa số hữu tỉ");
-    await dialog.getByLabel("Công thức quan trọng").uncheck();
-    await expect(dialog.getByLabel("Kiến thức trọng tâm")).toBeChecked();
-    await expect(dialog.getByLabel("Định nghĩa cần nhớ")).toHaveCount(0);
-    await expect(dialog.getByLabel("Các bước thực hiện")).toHaveCount(0);
-    await expect(dialog.getByLabel("Cách giải")).toBeChecked();
-    await expect(dialog.getByLabel("Số câu hỏi ôn tập")).toHaveCount(0);
+
     await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveAttribute(
       "placeholder",
       "Ví dụ: Dùng câu ngắn, nhấn mạnh các bước giải và hạn chế thuật ngữ khó",
@@ -183,7 +177,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByLabel("Yêu cầu bổ sung").fill("Dùng tiêu đề ngắn");
 
     await expect(dialog.getByText("Cấu hình nâng cao và dữ liệu gửi AI")).toHaveCount(0);
-    await expect(dialog.getByText("Chỉ xem trước, chưa bắt đầu tạo.")).toBeVisible();
+    await expect(dialog.getByText("Xem lại dữ liệu theo các lựa chọn hiện tại.")).toBeVisible();
     await expect(dialog.getByRole("tab", { name: "System instructions" })).toBeVisible();
     await dialog.getByLabel("System instructions").fill("SYSTEM CUSTOM");
 
@@ -219,17 +213,6 @@ test.describe("M9.8 admin AI generation panel", () => {
           "Học thuật, chặt chẽ, có cấu trúc rõ ràng và dùng thuật ngữ chính xác.",
         length: "detailed",
         targetWordCount: 350,
-        focus: "Định nghĩa số hữu tỉ",
-        includeFormulas: false,
-        includeExamples: true,
-        includeCommonMistakes: true,
-        contentSections: [
-          "KEY_CONCEPTS",
-          "SOLUTION_METHODS",
-          "EXAMPLES",
-          "COMMON_MISTAKES",
-        ],
-        reviewQuestionCount: 0,
         extraInstructions: "Dùng tiêu đề ngắn",
         systemInstructions: "SYSTEM CUSTOM",
         userPrompt: expect.stringContaining('"targetWordCount":350'),
@@ -262,17 +245,6 @@ test.describe("M9.8 admin AI generation panel", () => {
         style: "student_friendly",
         styleInstructions: "Dễ hiểu cho học sinh khối 7.",
         length: "standard",
-        includeFormulas: true,
-        includeExamples: true,
-        includeCommonMistakes: true,
-        contentSections: [
-          "KEY_CONCEPTS",
-          "FORMULAS",
-          "SOLUTION_METHODS",
-          "EXAMPLES",
-          "COMMON_MISTAKES",
-        ],
-        reviewQuestionCount: 0,
         systemInstructions: "SYSTEM PROMPT THỰC TẾ",
         userPrompt: expect.stringContaining("USER PROMPT"),
         temperature: 0.2,
