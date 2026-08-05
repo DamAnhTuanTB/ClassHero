@@ -86,7 +86,7 @@ export function CourseFilterSelect<TValue extends string>({
           "student-soft-bold-text flex min-h-12 w-full min-w-0 touch-manipulation items-center justify-between gap-2 rounded-xl border border-sky-100 bg-white px-4 text-left text-[15px] font-extrabold text-slate-600 shadow-none outline-none transition hover:border-sky-200 focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] dark:text-[var(--theme-text-strong)] dark:focus:border-sky-500/40 dark:focus:ring-1 dark:focus:ring-sky-500/15",
           isOpen &&
             "border-sky-400 ring-2 ring-sky-100 dark:border-sky-500/40 dark:ring-1 dark:ring-sky-500/15",
-          disabled && "cursor-wait opacity-75 hover:border-sky-100",
+          disabled && " opacity-75 hover:border-sky-100",
           className,
         )}
       >

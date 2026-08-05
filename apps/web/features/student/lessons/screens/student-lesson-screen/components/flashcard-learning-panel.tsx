@@ -75,8 +75,7 @@ export function FlashcardLearningPanel({
   const userId = useAuthSessionStore((state) => state.session?.user.id);
   const [activeSetId, setActiveSetId] = useState(() => {
     const candidateId =
-      initialSurface?.setId ??
-      readStoredFlashcardActiveSetId(lesson.id, userId);
+      initialSurface?.setId ?? readStoredFlashcardActiveSetId(lesson.id, userId);
 
     return (
       sets.find((candidate) => candidate.id === candidateId)?.id ?? sets[0]?.id ?? ""
@@ -120,8 +119,10 @@ export function FlashcardLearningPanel({
   const [sessionResumesSavedProgress, setSessionResumesSavedProgress] = useState(
     initialSession?.resumesSavedProgress ?? false,
   );
-  const [shouldCollapseResultHistoryOnComplete, setShouldCollapseResultHistoryOnComplete] =
-    useState(initialSession?.shouldCollapseResultHistoryOnComplete ?? false);
+  const [
+    shouldCollapseResultHistoryOnComplete,
+    setShouldCollapseResultHistoryOnComplete,
+  ] = useState(initialSession?.shouldCollapseResultHistoryOnComplete ?? false);
   const [studySessionId, setStudySessionId] = useState<string | null>(
     initialSession?.sessionId ?? null,
   );
@@ -278,11 +279,7 @@ export function FlashcardLearningPanel({
       void onAutoStartHandled("flashcard");
       return;
     }
-    if (
-      autoStartTriggeredRef.current ||
-      screen !== "PANEL" ||
-      pendingAction
-    ) {
+    if (autoStartTriggeredRef.current || screen !== "PANEL" || pendingAction) {
       return;
     }
 
@@ -291,13 +288,7 @@ export function FlashcardLearningPanel({
 
     autoStartTriggeredRef.current = true;
     entryActionButton.click();
-  }, [
-    autoStart,
-    hasFlashcards,
-    onAutoStartHandled,
-    pendingAction,
-    screen,
-  ]);
+  }, [autoStart, hasFlashcards, onAutoStartHandled, pendingAction, screen]);
 
   useEffect(() => {
     if (!autoStart || !autoStartTriggeredRef.current) return;
@@ -314,13 +305,7 @@ export function FlashcardLearningPanel({
     autoStartTriggeredRef.current = false;
     autoStartWasPendingRef.current = false;
     void onAutoStartHandled("flashcard");
-  }, [
-    autoStart,
-    curtainPhase,
-    onAutoStartHandled,
-    pendingAction,
-    screen,
-  ]);
+  }, [autoStart, curtainPhase, onAutoStartHandled, pendingAction, screen]);
 
   function renderWithCurtain(content: ReactNode) {
     return (
@@ -401,9 +386,7 @@ export function FlashcardLearningPanel({
     setShouldCelebrateResult(false);
     setHistoryReviewTitle(nextHistoryReviewTitle);
     setRunnerBackDestination(backDestination);
-    setShouldCollapseResultHistoryOnComplete(
-      nextShouldCollapseResultHistoryOnComplete,
-    );
+    setShouldCollapseResultHistoryOnComplete(nextShouldCollapseResultHistoryOnComplete);
     writeStoredFlashcardActiveSetId(lesson.id, targetSet.id, userId);
     setActiveSetId(targetSet.id);
     setStudySessionId(trackedSession?.id ?? reviewSessionId ?? null);
@@ -442,8 +425,7 @@ export function FlashcardLearningPanel({
       currentIndex: 0,
       isBackVisible: false,
       resumesSavedProgress: nextResumesSavedProgress,
-      shouldCollapseResultHistoryOnComplete:
-        nextShouldCollapseResultHistoryOnComplete,
+      shouldCollapseResultHistoryOnComplete: nextShouldCollapseResultHistoryOnComplete,
       reviewedCardIds: nextReviewedIds,
       sessionId: trackedSession?.id,
     });
@@ -649,7 +631,10 @@ export function FlashcardLearningPanel({
         storedSession.sessionId === item.id &&
         storedSession.currentIndex > 0
       ) {
-        const safeIndex = Math.min(storedSession.currentIndex, targetSet.flashcards.length - 1);
+        const safeIndex = Math.min(
+          storedSession.currentIndex,
+          targetSet.flashcards.length - 1,
+        );
         setCurrentIndex(safeIndex);
         persistSessionPatch({ nextCurrentIndex: safeIndex });
       }
@@ -661,7 +646,8 @@ export function FlashcardLearningPanel({
     if (!targetSet) return;
     const sessionId = item.id.startsWith("legacy:") ? null : item.id;
     void transitionTo(
-      () => startSession("REVIEW_ALL", "PANEL", targetSet, null, item.displayName, sessionId),
+      () =>
+        startSession("REVIEW_ALL", "PANEL", targetSet, null, item.displayName, sessionId),
       `history-review:${item.id}`,
     );
   }
@@ -669,10 +655,7 @@ export function FlashcardLearningPanel({
   function handleHistoryRestart(item: LearningHistoryDisplayItem) {
     const targetSet = findHistorySet(item);
     if (!targetSet) return;
-    void transitionTo(
-      () => startTrackedSession(targetSet),
-      `history-restart:${item.id}`,
-    );
+    void transitionTo(() => startTrackedSession(targetSet), `history-restart:${item.id}`);
   }
 
   if (screen === "RESULT") {
@@ -689,19 +672,22 @@ export function FlashcardLearningPanel({
         }}
         onReviewFavorites={() =>
           void transitionTo(
-            () => startSession("FAVORITE", "RESULT", activeSet, null, null, studySessionId),
+            () =>
+              startSession("FAVORITE", "RESULT", activeSet, null, null, studySessionId),
             "review-favorites",
           )
         }
         onRestartAll={() =>
           void transitionTo(
-            () => startTrackedSession(activeSet, false, "PANEL", studySessionId ?? undefined),
+            () =>
+              startTrackedSession(activeSet, false, "PANEL", studySessionId ?? undefined),
             "restart-all",
           )
         }
         onRestartUnknown={() =>
           void transitionTo(
-            () => startSession("UNKNOWN", "RESULT", activeSet, null, null, studySessionId),
+            () =>
+              startSession("UNKNOWN", "RESULT", activeSet, null, null, studySessionId),
             "restart-unknown",
           )
         }
@@ -756,12 +742,8 @@ export function FlashcardLearningPanel({
         pendingAction={pendingAction}
         reviewStatuses={sessionReviewStatuses}
         setId={activeSet.id}
-        onResultHistoryCollapsed={() =>
-          setShouldCollapseResultHistoryOnComplete(false)
-        }
-        shouldCollapseResultHistoryOnComplete={
-          shouldCollapseResultHistoryOnComplete
-        }
+        onResultHistoryCollapsed={() => setShouldCollapseResultHistoryOnComplete(false)}
+        shouldCollapseResultHistoryOnComplete={shouldCollapseResultHistoryOnComplete}
         totalCount={sessionCards.length}
       />,
     );
@@ -849,7 +831,7 @@ export function FlashcardLearningPanel({
               }
               aria-busy={pendingAction === "start-new-set"}
               disabled={pendingAction === "start-new-set"}
-              className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-3 text-base font-black text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:cursor-wait disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:hover:bg-violet-500/10 sm:px-5 sm:text-lg"
+              className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-violet-300 bg-white px-3 text-base font-black text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 disabled:opacity-70 dark:border-violet-400/50 dark:bg-[var(--theme-surface)] dark:text-violet-300 dark:hover:bg-violet-500/10 sm:px-5 sm:text-lg"
             >
               <RotateCcw className="h-6 w-6 shrink-0" aria-hidden="true" />
               Học bộ Flashcard mới

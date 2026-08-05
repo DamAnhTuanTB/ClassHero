@@ -188,7 +188,7 @@ export function QuizResultScreen({
             aria-busy={pendingAction === "start-new-set"}
             disabled={pendingAction === "start-new-set"}
             onClick={onStartNewSet}
-            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-sky-500 bg-sky-500 px-4 text-sm font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition enabled:hover:border-cyan-600 enabled:hover:bg-cyan-600 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-wait disabled:opacity-60 dark:border-sky-600 dark:bg-sky-600 dark:text-white dark:shadow-[0_4px_0_rgb(7_89_133)] dark:enabled:hover:border-cyan-500 dark:enabled:hover:bg-cyan-500 dark:focus-visible:ring-sky-500/30 sm:text-[17px]"
+            className="student-preserve-mobile-shadow col-span-2 inline-flex h-14 w-full items-center justify-center gap-2 whitespace-nowrap rounded-2xl border-2 border-sky-500 bg-sky-500 px-4 text-sm font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition enabled:hover:border-cyan-600 enabled:hover:bg-cyan-600 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:opacity-60 dark:border-sky-600 dark:bg-sky-600 dark:text-white dark:shadow-[0_4px_0_rgb(7_89_133)] dark:enabled:hover:border-cyan-500 dark:enabled:hover:bg-cyan-500 dark:focus-visible:ring-sky-500/30 sm:text-[17px]"
           >
             <Sparkles className="h-5 w-5 shrink-0" aria-hidden="true" />
             Làm bộ Quiz mới

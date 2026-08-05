@@ -18,11 +18,7 @@ export function LessonSupplementDocumentsSection({
   disabled: boolean;
   form: UseFormReturn<LessonFormValues>;
   isSaving: boolean;
-  documentFieldArray: UseFieldArrayReturn<
-    LessonFormValues,
-    "referenceDocuments",
-    "id"
-  >;
+  documentFieldArray: UseFieldArrayReturn<LessonFormValues, "referenceDocuments", "id">;
 }) {
   const { append, fields, remove } = documentFieldArray;
   const isDisabled = disabled || isSaving;

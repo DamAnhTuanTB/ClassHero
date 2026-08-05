@@ -28,8 +28,11 @@ export function PurchasedCoursesScreen({
   initialStudentName?: string | null;
   initialThemeMode?: AppThemeMode;
 }) {
-  const { isAuthHydrated, query: coursesQuery, session } =
-    useStudentCoursesQuery(initialData);
+  const {
+    isAuthHydrated,
+    query: coursesQuery,
+    session,
+  } = useStudentCoursesQuery(initialData);
   const prefetchCourseDetail = useStudentCourseDetailPrefetch();
   const courses = coursesQuery.data?.courses ?? [];
   const purchasedCourses = getPurchasedCourses(courses);
@@ -38,8 +41,7 @@ export function PurchasedCoursesScreen({
   const todayGoals = buildTodayLearningGoals(courses);
   const screenBackground = "var(--student-screen-bg)";
   const isInitialPending =
-    coursesQuery.data === undefined &&
-    (!isAuthHydrated || coursesQuery.isLoading);
+    coursesQuery.data === undefined && (!isAuthHydrated || coursesQuery.isLoading);
 
   useEffect(() => {
     if (likelyNextCourseSlug) {

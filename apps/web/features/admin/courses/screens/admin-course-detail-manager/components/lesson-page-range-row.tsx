@@ -61,7 +61,13 @@ export function LessonPageRangeRow({
       | string
       | boolean
       | null
-      | { id: string; file: File | null; title: string; isPrimary?: boolean; type?: "SUPPLEMENT" | "HOMEWORK" }[],
+      | {
+          id: string;
+          file: File | null;
+          title: string;
+          isPrimary?: boolean;
+          type?: "SUPPLEMENT" | "HOMEWORK";
+        }[],
   ) => void;
 }) {
   const primaryDocument = getPrimaryLessonDocument(documents);
@@ -98,15 +104,14 @@ export function LessonPageRangeRow({
 
   const hasPageError = issues.some(
     (issue) =>
-      issue.message.includes("trang") ||
-      issue.message.includes("số nguyên dương")
+      issue.message.includes("trang") || issue.message.includes("số nguyên dương"),
   );
 
   const inputClass = cn(
     "mt-1 min-h-[2.75rem] w-full rounded-lg border bg-[var(--theme-surface)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
     hasPageError
       ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
-      : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]"
+      : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]",
   );
 
   return (
@@ -433,98 +438,113 @@ export function LessonPageRangeRow({
             })}
 
             {newSupplements.map((newDoc, index) => {
-              const hasTitleError = !newDoc.title.trim() && issues.some(issue => issue.message.includes("tên cho tất cả tài liệu mới"));
-              const hasFileError = !newDoc.file && issues.some(issue => issue.message.includes("file cho tất cả tài liệu mới"));
+              const hasTitleError =
+                !newDoc.title.trim() &&
+                issues.some((issue) =>
+                  issue.message.includes("tên cho tất cả tài liệu mới"),
+                );
+              const hasFileError =
+                !newDoc.file &&
+                issues.some((issue) =>
+                  issue.message.includes("file cho tất cả tài liệu mới"),
+                );
 
               return (
-              <div
-                key={newDoc.id}
-                className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
-              >
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
-                    Tên tài liệu
-                  </span>
-                  <input
-                    type="text"
-                    value={newDoc.title}
-                    onChange={(e) => {
-                      const updated = allNewSupplements.map((doc) =>
-                        doc.id === newDoc.id ? { ...doc, title: e.target.value } : doc,
-                      );
-                      onUpdateRange(item.lesson.id, "newSupplements", updated);
-                    }}
-                    placeholder="Ví dụ: Phiếu đọc thêm"
-                    className={cn(
-                      "min-h-11 w-full rounded-lg border bg-[var(--theme-input-bg)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
-                      hasTitleError
-                        ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
-                        : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]"
-                    )}
-                  />
-                </label>
-
-                <div className="min-w-0">
-                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
-                    File tài liệu {supplements.length + index + 1}
-                  </span>
-                  <label
-                    className={cn(
-                      "mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-[var(--theme-input-bg)] px-4 text-sm font-semibold transition hover:bg-[var(--theme-surface-hover)]",
-                      hasFileError
-                        ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] focus-within:border-[var(--theme-error-border)] focus-within:ring-4 focus-within:ring-[var(--theme-error-ring)]"
-                        : "border-[var(--theme-input-border)] text-[var(--theme-text-strong)] hover:border-[var(--theme-primary)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]"
-                    )}
-                  >
-                    <Upload className={cn("h-5 w-5 shrink-0", hasFileError ? "text-[var(--theme-error-text)]" : "text-[var(--theme-text-muted)]")} />
-                    <span className="min-w-0 truncate">
-                      {newDoc.file?.name ?? "Chọn file PDF"}
+                <div
+                  key={newDoc.id}
+                  className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
+                >
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      Tên tài liệu
                     </span>
                     <input
-                      type="file"
-                      accept="application/pdf"
-                      disabled={isSaving}
-                      className="hidden"
+                      type="text"
+                      value={newDoc.title}
                       onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
                         const updated = allNewSupplements.map((doc) =>
-                          doc.id === newDoc.id ? { ...doc, file } : doc,
+                          doc.id === newDoc.id ? { ...doc, title: e.target.value } : doc,
                         );
                         onUpdateRange(item.lesson.id, "newSupplements", updated);
                       }}
+                      placeholder="Ví dụ: Phiếu đọc thêm"
+                      className={cn(
+                        "min-h-11 w-full rounded-lg border bg-[var(--theme-input-bg)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
+                        hasTitleError
+                          ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
+                          : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]",
+                      )}
                     />
                   </label>
-                </div>
 
-                <div className="flex items-center gap-2 lg:mt-[22px]">
-                  <button
-                    type="button"
-                    disabled={!newDoc.file}
-                    onClick={() => {
-                      if (newDoc.file) {
-                        const objectUrl = URL.createObjectURL(newDoc.file);
-                        window.open(objectUrl, "_blank");
-                      }
-                    }}
-                    className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Eye className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => {
-                      const updated = allNewSupplements.filter(
-                        (doc) => doc.id !== newDoc.id,
-                      );
-                      onUpdateRange(item.lesson.id, "newSupplements", updated);
-                    }}
-                    className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      File tài liệu {supplements.length + index + 1}
+                    </span>
+                    <label
+                      className={cn(
+                        "mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-[var(--theme-input-bg)] px-4 text-sm font-semibold transition hover:bg-[var(--theme-surface-hover)]",
+                        hasFileError
+                          ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] focus-within:border-[var(--theme-error-border)] focus-within:ring-4 focus-within:ring-[var(--theme-error-ring)]"
+                          : "border-[var(--theme-input-border)] text-[var(--theme-text-strong)] hover:border-[var(--theme-primary)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]",
+                      )}
+                    >
+                      <Upload
+                        className={cn(
+                          "h-5 w-5 shrink-0",
+                          hasFileError
+                            ? "text-[var(--theme-error-text)]"
+                            : "text-[var(--theme-text-muted)]",
+                        )}
+                      />
+                      <span className="min-w-0 truncate">
+                        {newDoc.file?.name ?? "Chọn file PDF"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        disabled={isSaving}
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] ?? null;
+                          const updated = allNewSupplements.map((doc) =>
+                            doc.id === newDoc.id ? { ...doc, file } : doc,
+                          );
+                          onUpdateRange(item.lesson.id, "newSupplements", updated);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:mt-[22px]">
+                    <button
+                      type="button"
+                      disabled={!newDoc.file}
+                      onClick={() => {
+                        if (newDoc.file) {
+                          const objectUrl = URL.createObjectURL(newDoc.file);
+                          window.open(objectUrl, "_blank");
+                        }
+                      }}
+                      className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => {
+                        const updated = allNewSupplements.filter(
+                          (doc) => doc.id !== newDoc.id,
+                        );
+                        onUpdateRange(item.lesson.id, "newSupplements", updated);
+                      }}
+                      className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
-              </div>
               );
             })}
           </div>
@@ -637,98 +657,113 @@ export function LessonPageRangeRow({
             })}
 
             {newHomeworks.map((newDoc, index) => {
-              const hasTitleError = !newDoc.title.trim() && issues.some(issue => issue.message.includes("tên cho tất cả tài liệu mới"));
-              const hasFileError = !newDoc.file && issues.some(issue => issue.message.includes("file cho tất cả tài liệu mới"));
-              
-              return (
-              <div
-                key={newDoc.id}
-                className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
-              >
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
-                    Tên tài liệu
-                  </span>
-                  <input
-                    type="text"
-                    value={newDoc.title}
-                    onChange={(e) => {
-                      const updated = allNewSupplements.map((doc) =>
-                        doc.id === newDoc.id ? { ...doc, title: e.target.value } : doc,
-                      );
-                      onUpdateRange(item.lesson.id, "newSupplements", updated);
-                    }}
-                    placeholder="Ví dụ: Phiếu bài tập"
-                    className={cn(
-                      "min-h-11 w-full rounded-lg border bg-[var(--theme-input-bg)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
-                      hasTitleError
-                        ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
-                        : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]"
-                    )}
-                  />
-                </label>
+              const hasTitleError =
+                !newDoc.title.trim() &&
+                issues.some((issue) =>
+                  issue.message.includes("tên cho tất cả tài liệu mới"),
+                );
+              const hasFileError =
+                !newDoc.file &&
+                issues.some((issue) =>
+                  issue.message.includes("file cho tất cả tài liệu mới"),
+                );
 
-                <div className="min-w-0">
-                  <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
-                    File tài liệu
-                  </span>
-                  <label
-                    className={cn(
-                      "mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-[var(--theme-input-bg)] px-4 text-sm font-semibold transition hover:bg-[var(--theme-surface-hover)]",
-                      hasFileError
-                        ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] focus-within:border-[var(--theme-error-border)] focus-within:ring-4 focus-within:ring-[var(--theme-error-ring)]"
-                        : "border-[var(--theme-input-border)] text-[var(--theme-text-strong)] hover:border-[var(--theme-primary)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]"
-                    )}
-                  >
-                    <Upload className={cn("h-5 w-5 shrink-0", hasFileError ? "text-[var(--theme-error-text)]" : "text-[var(--theme-text-muted)]")} />
-                    <span className="min-w-0 truncate">
-                      {newDoc.file?.name ?? "Chọn file PDF"}
+              return (
+                <div
+                  key={newDoc.id}
+                  className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]"
+                >
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      Tên tài liệu
                     </span>
                     <input
-                      type="file"
-                      accept="application/pdf"
-                      disabled={isSaving}
-                      className="hidden"
+                      type="text"
+                      value={newDoc.title}
                       onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
                         const updated = allNewSupplements.map((doc) =>
-                          doc.id === newDoc.id ? { ...doc, file } : doc,
+                          doc.id === newDoc.id ? { ...doc, title: e.target.value } : doc,
                         );
                         onUpdateRange(item.lesson.id, "newSupplements", updated);
                       }}
+                      placeholder="Ví dụ: Phiếu bài tập"
+                      className={cn(
+                        "min-h-11 w-full rounded-lg border bg-[var(--theme-input-bg)] px-3 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-60",
+                        hasTitleError
+                          ? "border-[var(--theme-error-border)] focus:border-[var(--theme-error-border)] focus:ring-4 focus:ring-[var(--theme-error-ring)] text-[var(--theme-error-text)]"
+                          : "border-[var(--theme-input-border)] focus:border-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-focus-ring)] text-[var(--theme-text-strong)]",
+                      )}
                     />
                   </label>
-                </div>
 
-                <div className="flex items-center gap-2 lg:mt-[22px]">
-                  <button
-                    type="button"
-                    disabled={!newDoc.file}
-                    onClick={() => {
-                      if (newDoc.file) {
-                        const objectUrl = URL.createObjectURL(newDoc.file);
-                        window.open(objectUrl, "_blank");
-                      }
-                    }}
-                    className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Eye className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => {
-                      const updated = allNewSupplements.filter(
-                        (doc) => doc.id !== newDoc.id,
-                      );
-                      onUpdateRange(item.lesson.id, "newSupplements", updated);
-                    }}
-                    className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                  <div className="min-w-0">
+                    <span className="mb-1 block text-xs font-bold text-[var(--theme-text-muted)]">
+                      File tài liệu
+                    </span>
+                    <label
+                      className={cn(
+                        "mt-1 flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-[var(--theme-input-bg)] px-4 text-sm font-semibold transition hover:bg-[var(--theme-surface-hover)]",
+                        hasFileError
+                          ? "border-[var(--theme-error-border)] text-[var(--theme-error-text)] focus-within:border-[var(--theme-error-border)] focus-within:ring-4 focus-within:ring-[var(--theme-error-ring)]"
+                          : "border-[var(--theme-input-border)] text-[var(--theme-text-strong)] hover:border-[var(--theme-primary)] focus-within:border-[var(--theme-primary)] focus-within:ring-4 focus-within:ring-[var(--theme-focus-ring)]",
+                      )}
+                    >
+                      <Upload
+                        className={cn(
+                          "h-5 w-5 shrink-0",
+                          hasFileError
+                            ? "text-[var(--theme-error-text)]"
+                            : "text-[var(--theme-text-muted)]",
+                        )}
+                      />
+                      <span className="min-w-0 truncate">
+                        {newDoc.file?.name ?? "Chọn file PDF"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        disabled={isSaving}
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] ?? null;
+                          const updated = allNewSupplements.map((doc) =>
+                            doc.id === newDoc.id ? { ...doc, file } : doc,
+                          );
+                          onUpdateRange(item.lesson.id, "newSupplements", updated);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:mt-[22px]">
+                    <button
+                      type="button"
+                      disabled={!newDoc.file}
+                      onClick={() => {
+                        if (newDoc.file) {
+                          const objectUrl = URL.createObjectURL(newDoc.file);
+                          window.open(objectUrl, "_blank");
+                        }
+                      }}
+                      className="theme-button-neutral inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => {
+                        const updated = allNewSupplements.filter(
+                          (doc) => doc.id !== newDoc.id,
+                        );
+                        onUpdateRange(item.lesson.id, "newSupplements", updated);
+                      }}
+                      className="theme-button-danger-subtle inline-flex h-11 w-11 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
-              </div>
               );
             })}
           </div>

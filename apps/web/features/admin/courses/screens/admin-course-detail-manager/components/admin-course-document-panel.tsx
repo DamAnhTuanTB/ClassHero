@@ -236,7 +236,7 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                   type="button"
                   disabled={manager.isOpeningFile}
                   onClick={manager.actions.openSourceDocumentFile}
-                  className="theme-button-neutral inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60"
+                  className="theme-button-neutral inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:opacity-60"
                 >
                   <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   Mở PDF

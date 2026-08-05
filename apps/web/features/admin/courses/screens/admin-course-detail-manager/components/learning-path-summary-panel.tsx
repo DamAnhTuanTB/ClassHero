@@ -76,7 +76,9 @@ export function LearningPathSummaryPanel({
                 <Hash className="h-4 w-4" aria-hidden="true" />
                 Đối tượng hướng đến
               </div>
-              <p className={valueClass}>{path.targetAudienceName ?? `Khối ${path.grade}`}</p>
+              <p className={valueClass}>
+                {path.targetAudienceName ?? `Khối ${path.grade}`}
+              </p>
             </div>
             <div className={cellClass}>
               <div className={labelClass}>

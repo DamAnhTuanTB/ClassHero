@@ -108,7 +108,7 @@ export function OcrSettingsTab({
             type="button"
             disabled={isSaving}
             onClick={() => onSave(accounting)}
-            className="theme-button-primary inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-60"
+            className="theme-button-primary inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold transition disabled:opacity-60"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 animate-spin" />

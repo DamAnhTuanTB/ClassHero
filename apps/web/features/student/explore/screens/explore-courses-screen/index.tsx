@@ -39,19 +39,14 @@ export function ExploreCoursesScreen({
   const selectedTargetAudience =
     targetAudienceId === "ALL"
       ? null
-      : (catalog.targetAudiences.find(
-          (audience) => audience.id === targetAudienceId,
-        ) ?? null);
+      : (catalog.targetAudiences.find((audience) => audience.id === targetAudienceId) ??
+        null);
   const {
     audienceGroups,
     purchasedCourses,
     recommendedCourseContexts,
     recommendedCourses,
-  } = getExploreAllCourseSections(
-      filteredCourses,
-      studentGrade,
-      catalog.targetAudiences,
-    );
+  } = getExploreAllCourseSections(filteredCourses, studentGrade, catalog.targetAudiences);
   const allCourseCardCount =
     purchasedCourses.length +
     recommendedCourses.length +

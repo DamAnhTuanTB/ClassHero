@@ -282,11 +282,7 @@ export function QuizRichImageNodeView({
                 </button>
               </ImmediateTooltip>
               <ImmediateTooltip content="Xóa ảnh">
-                <button
-                  type="button"
-                  aria-label="Xóa ảnh"
-                  onClick={deleteNode}
-                >
+                <button type="button" aria-label="Xóa ảnh" onClick={deleteNode}>
                   <X />
                 </button>
               </ImmediateTooltip>
@@ -358,18 +354,13 @@ export function QuizRichImageNodeView({
               <span className="quiz-rich-image-crop-grid-line quiz-rich-image-crop-grid-line--horizontal-start" />
               <span className="quiz-rich-image-crop-grid-line quiz-rich-image-crop-grid-line--horizontal-end" />
               {cropHandles.map((handle) => (
-                <ImmediateTooltip
-                  key={handle}
-                  content={cropHandleLabels[handle]}
-                >
+                <ImmediateTooltip key={handle} content={cropHandleLabels[handle]}>
                   <button
                     type="button"
                     data-crop-handle={handle}
                     className="quiz-rich-image-crop-handle"
                     aria-label={cropHandleLabels[handle]}
-                    onPointerDown={(event) =>
-                      beginCropInteraction(event, handle)
-                    }
+                    onPointerDown={(event) => beginCropInteraction(event, handle)}
                     onKeyDown={(event) => {
                       const step = event.shiftKey ? 5 : 1;
                       const deltaX =
@@ -390,12 +381,7 @@ export function QuizRichImageNodeView({
                       event.preventDefault();
                       event.stopPropagation();
                       setCropDraft((current) =>
-                        calculateCropFromPointer(
-                          current,
-                          handle,
-                          deltaX,
-                          deltaY,
-                        ),
+                        calculateCropFromPointer(current, handle, deltaX, deltaY),
                       );
                     }}
                   />
@@ -407,11 +393,7 @@ export function QuizRichImageNodeView({
               onPointerDown={(event) => event.stopPropagation()}
             >
               <ImmediateTooltip content="Hủy">
-                <button
-                  type="button"
-                  aria-label="Hủy cắt ảnh"
-                  onClick={cancelCrop}
-                >
+                <button type="button" aria-label="Hủy cắt ảnh" onClick={cancelCrop}>
                   <X />
                 </button>
               </ImmediateTooltip>

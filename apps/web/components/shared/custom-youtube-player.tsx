@@ -879,7 +879,7 @@ export const CustomYoutubePlayer = forwardRef<
             type="button"
             disabled={!isReady || isStarting}
             className={`absolute inset-0 z-30 bg-black flex flex-col items-center justify-center group/start sm:rounded-lg overflow-hidden ${
-              isReady && !isStarting ? "cursor-pointer" : "cursor-wait"
+              isReady && !isStarting ? "cursor-pointer" : ""
             }`}
             onClick={handleStart}
           >

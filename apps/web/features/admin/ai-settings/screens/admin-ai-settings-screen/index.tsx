@@ -231,7 +231,7 @@ export function AdminAiSettingsScreen() {
               type="button"
               onClick={() => void refreshAll()}
               disabled={overviewQuery.isFetching}
-              className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-60"
+              className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:opacity-60"
             >
               <RefreshCw
                 className={cn("h-4 w-4", overviewQuery.isFetching && "animate-spin")}

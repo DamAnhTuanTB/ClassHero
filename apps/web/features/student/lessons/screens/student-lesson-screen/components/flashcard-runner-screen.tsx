@@ -239,10 +239,7 @@ export function FlashcardRunnerScreen({
     onComplete();
     if (shouldCollapseResultHistoryOnComplete) {
       window.setTimeout(
-        () =>
-          popFlashcardRunnerHistoryEntryPreservingResult(
-            onResultHistoryCollapsed,
-          ),
+        () => popFlashcardRunnerHistoryEntryPreservingResult(onResultHistoryCollapsed),
         0,
       );
     }

@@ -416,10 +416,7 @@ export function TestLearningPanel({
 
   if (result) {
     const historyMaxScore = historyQuery.data?.items
-      ? Math.max(
-          -1,
-          ...historyQuery.data.items.map((item) => item.score ?? -1),
-        )
+      ? Math.max(-1, ...historyQuery.data.items.map((item) => item.score ?? -1))
       : -1;
 
     const currentBestScore = Math.max(
@@ -676,7 +673,7 @@ export function TestLearningPanel({
                 aria-busy={pendingAction === "open-result"}
                 disabled={pendingAction === "open-result"}
                 onClick={() => void handleOpenResult(completedAttemptId)}
-                className="student-test-cta-3d col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-emerald-500 px-3 text-base font-black text-white hover:bg-emerald-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 sm:text-lg lg:col-span-1"
+                className="student-test-cta-3d col-span-2 inline-flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-emerald-500 px-3 text-base font-black text-white hover:bg-emerald-400 focus-visible:outline-none disabled:opacity-50 sm:text-lg lg:col-span-1"
               >
                 {pendingAction === "open-result" ? (
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />

@@ -27,7 +27,7 @@ const subjectIconBySubject: Partial<Record<StudentCourseSubject, LucideIcon>> = 
 const subjectIconByDomainName: Record<string, LucideIcon> = {
   "Hóa học": FlaskConical,
   "Tiếng Anh": Languages,
-  "Toán": Calculator,
+  Toán: Calculator,
   "Vật lý": Atom,
 };
 
@@ -50,10 +50,7 @@ export function CourseSubjectBadge({ subject }: { subject: StudentCourseSubject 
         getSubjectBadgeClass(subject),
       )}
     >
-      <SubjectIcon
-        className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4"
-        aria-hidden="true"
-      />
+      <SubjectIcon className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" aria-hidden="true" />
       {subjectLabels[subject] ?? subject}
     </span>
   );

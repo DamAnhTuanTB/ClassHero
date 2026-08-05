@@ -1,10 +1,4 @@
-import {
-  ArrowLeft,
-  BookOpen,
-  CircleAlert,
-  Home,
-  RefreshCcw,
-} from "lucide-react";
+import { ArrowLeft, BookOpen, CircleAlert, Home, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import type { AppThemeMode } from "@/lib/theme-store";
@@ -64,18 +58,13 @@ export function StudentDataErrorState({
       )}
     >
       {variant === "page" ? (
-        <ClassHeroLogo
-          className="mx-auto mb-6 h-14 max-w-[14rem] sm:h-16"
-          priority
-        />
+        <ClassHeroLogo className="mx-auto mb-6 h-14 max-w-[14rem] sm:h-16" priority />
       ) : null}
 
       <span
         className={cn(
           "mx-auto grid place-items-center border border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-400/20 dark:bg-rose-500/15 dark:text-rose-300",
-          variant === "page"
-            ? "h-20 w-20 rounded-3xl"
-            : "h-12 w-12 rounded-2xl",
+          variant === "page" ? "h-20 w-20 rounded-3xl" : "h-12 w-12 rounded-2xl",
         )}
       >
         <CircleAlert
@@ -89,9 +78,7 @@ export function StudentDataErrorState({
         aria-level={variant === "page" ? 1 : 2}
         className={cn(
           "font-black text-slate-950 dark:text-[var(--theme-text-strong)]",
-          variant === "page"
-            ? "mt-5 text-xl sm:text-2xl"
-            : "mt-4 text-base sm:text-lg",
+          variant === "page" ? "mt-5 text-xl sm:text-2xl" : "mt-4 text-base sm:text-lg",
         )}
       >
         {title}
@@ -141,7 +128,7 @@ export function StudentDataErrorState({
 function StudentErrorActionControl({ action }: { action: StudentErrorAction }) {
   const Icon = getStudentErrorActionIcon(action.icon);
   const className = cn(
-    "inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-70",
+    "inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-4 disabled:opacity-70",
     action.tone === "secondary"
       ? "student-learn-cta-3d-emerald bg-emerald-500 hover:bg-emerald-400 focus-visible:ring-emerald-200 dark:focus-visible:ring-emerald-500/30"
       : "student-learn-cta-3d bg-sky-600 hover:bg-sky-500 focus-visible:ring-sky-200 dark:focus-visible:ring-sky-500/30",

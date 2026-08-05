@@ -67,8 +67,7 @@ export function AdminCoursesSidebarContent({
       });
     } finally {
       await clearAuthSessionEverywhere();
-      router.replace("/login");
-      router.refresh();
+      window.location.href = "/login";
     }
   }
 
@@ -76,8 +75,8 @@ export function AdminCoursesSidebarContent({
     <div className="flex min-h-0 flex-1 flex-col">
       <div
         className={cn(
-          "flex items-center gap-3 pr-12 lg:pr-0",
-          isCollapsed && "lg:justify-center lg:gap-0",
+          "flex items-center justify-center gap-3 pr-12 lg:pr-0",
+          isCollapsed && "lg:gap-0",
         )}
       >
         <div className={cn("min-w-0", isCollapsed && "lg:w-11 lg:overflow-hidden")}>
@@ -201,7 +200,7 @@ export function AdminCoursesSidebarContent({
             onClick={handleLogout}
             disabled={isLoggingOut}
             className={cn(
-              "theme-button-danger-subtle inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-2 text-sm font-bold transition disabled:cursor-wait disabled:opacity-70",
+              "theme-button-danger-subtle inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-2 text-sm font-bold transition disabled:opacity-70",
               isCollapsed && "lg:w-10 lg:px-0",
             )}
             aria-label="Đăng xuất khỏi tài khoản admin"

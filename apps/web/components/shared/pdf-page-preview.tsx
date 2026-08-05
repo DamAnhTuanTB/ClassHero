@@ -23,11 +23,7 @@ export type PdfPagePreviewProps = {
  * Renders a single page of a PDF document given a URL and page number.
  * The pdf.js implementation is loaded client-only because it requires browser DOM APIs.
  */
-export function PdfPagePreview({
-  pageNumber,
-  pdfUrl,
-  width = 280,
-}: PdfPagePreviewProps) {
+export function PdfPagePreview({ pageNumber, pdfUrl, width = 280 }: PdfPagePreviewProps) {
   if (!pdfUrl) {
     return (
       <div
@@ -49,11 +45,7 @@ export function PdfPagePreview({
         className="absolute inset-0 animate-pulse bg-[var(--theme-skeleton)]"
       />
       <div className="relative">
-        <PdfPagePreviewClient
-          pageNumber={pageNumber}
-          pdfUrl={pdfUrl}
-          width={width}
-        />
+        <PdfPagePreviewClient pageNumber={pageNumber} pdfUrl={pdfUrl} width={width} />
       </div>
     </div>
   );

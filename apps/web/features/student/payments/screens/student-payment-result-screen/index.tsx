@@ -150,7 +150,8 @@ function PaymentStatusCard({
 }) {
   const isPending = status === "PENDING";
   const isPaid = status === "PAID";
-  const isTerminal = status === "FAILED" || status === "CANCELLED" || status === "EXPIRED";
+  const isTerminal =
+    status === "FAILED" || status === "CANCELLED" || status === "EXPIRED";
   const terminalContent = getTerminalStatusContent(status);
 
   return (
@@ -243,7 +244,8 @@ function PaymentStatusCard({
                   "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
                 isPending &&
                   "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
-                isTerminal && "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300",
+                isTerminal &&
+                  "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300",
               )}
             >
               {isPaid ? "Đã thanh toán" : isPending ? "Đang chờ" : terminalContent.label}

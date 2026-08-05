@@ -68,14 +68,20 @@ export function CreatePersonalPathConfirmDialog({
             {/* Header */}
             <div className="flex min-h-[4.5rem] items-center gap-3 border-b border-[var(--theme-border)] px-6">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
-                <UserPlus className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                <UserPlus
+                  className="h-5 w-5 text-purple-600 dark:text-purple-400"
+                  aria-hidden="true"
+                />
               </div>
               <div className="min-w-0">
                 <h2 className="truncate text-base font-bold text-[var(--theme-text-strong)]">
                   Tạo bản lộ trình cá nhân
                 </h2>
                 <p className="truncate text-sm text-[var(--theme-text-muted)]">
-                  Cho học sinh: <span className="font-semibold text-[var(--theme-text)]">{studentName}</span>
+                  Cho học sinh:{" "}
+                  <span className="font-semibold text-[var(--theme-text)]">
+                    {studentName}
+                  </span>
                 </p>
               </div>
             </div>
@@ -84,18 +90,27 @@ export function CreatePersonalPathConfirmDialog({
             <div className="overflow-y-auto px-6 py-5">
               <div className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4">
                 <div className="flex gap-3">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--theme-warning-text)]" aria-hidden="true" />
+                  <AlertTriangle
+                    className="mt-0.5 h-5 w-5 shrink-0 text-[var(--theme-warning-text)]"
+                    aria-hidden="true"
+                  />
                   <div className="space-y-1.5 text-sm text-[var(--theme-warning-text)]">
                     <p className="font-bold">Lưu ý quan trọng</p>
                     <ul className="list-inside list-disc space-y-1 text-[var(--theme-warning-text)]">
                       <li>
                         Bản cá nhân được sao chép từ khóa{" "}
-                        <span className="font-semibold">&ldquo;{basePathTitle}&rdquo;</span> tại thời điểm này.
+                        <span className="font-semibold">
+                          &ldquo;{basePathTitle}&rdquo;
+                        </span>{" "}
+                        tại thời điểm này.
                       </li>
                       <li>
-                        Bản cá nhân <strong>không tự nhận</strong> các thay đổi từ khóa gốc trong tương lai.
+                        Bản cá nhân <strong>không tự nhận</strong> các thay đổi từ khóa
+                        gốc trong tương lai.
                       </li>
-                      <li>Sau khi tạo, không thể quay lại khóa gốc cho enrollment này.</li>
+                      <li>
+                        Sau khi tạo, không thể quay lại khóa gốc cho enrollment này.
+                      </li>
                     </ul>
                   </div>
                 </div>

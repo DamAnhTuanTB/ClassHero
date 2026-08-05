@@ -1,10 +1,7 @@
 "use client";
 
 import { Eye, FilePlus2, Trash2, Upload } from "lucide-react";
-import type {
-  FieldArrayWithId,
-  UseFormReturn,
-} from "react-hook-form";
+import type { FieldArrayWithId, UseFormReturn } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { TextField } from "@/components/common/forms/text-field";
 import type { LessonFormValues } from "@/features/admin/courses/admin-courses-schemas";
@@ -31,16 +28,13 @@ export function LessonDocumentUploadRow({
   const selectedFile = form.watch(`referenceDocuments.${index}.file`) ?? null;
   const fileError = form.formState.errors.referenceDocuments?.[index]?.file;
   const isExisting = Boolean(form.watch(`referenceDocuments.${index}.id`));
-  const originalName = form.watch(
-    `referenceDocuments.${index}.originalName`,
-  ) as string | undefined;
+  const originalName = form.watch(`referenceDocuments.${index}.originalName`) as
+    string | undefined;
   const documentUrl = form.watch(`referenceDocuments.${index}.url`);
-  const documentStatus = form.watch(
-    `referenceDocuments.${index}.status`,
-  ) as AdminDocumentStatus | undefined;
-  const documentProgress = form.watch(
-    `referenceDocuments.${index}.progress`,
-  ) as number | undefined;
+  const documentStatus = form.watch(`referenceDocuments.${index}.status`) as
+    AdminDocumentStatus | undefined;
+  const documentProgress = form.watch(`referenceDocuments.${index}.progress`) as
+    number | undefined;
 
   return (
     <div className="grid gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.85fr)_auto]">

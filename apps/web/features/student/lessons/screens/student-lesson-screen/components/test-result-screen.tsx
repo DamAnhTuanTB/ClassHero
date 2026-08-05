@@ -52,7 +52,7 @@ export function TestResultScreen({
   const ResultCommentIcon =
     result.score >= 9 ? Trophy : result.score >= 7 ? Medal : XCircle;
   const scoreRingColor = result.passed ? "rgb(16 185 129)" : "rgb(244 63 94)";
-  
+
   const actions: Array<{
     disabled: boolean;
     fullWidth: boolean;
@@ -216,8 +216,17 @@ export function TestResultScreen({
               Thời gian: {formatDuration(result.durationSeconds)}
             </p>
             <p className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-              <Trophy className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-              Điểm cao nhất: {Number((bestScore != null ? Math.max(bestScore, result.score) : result.score).toFixed(2))}
+              <Trophy
+                className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                aria-hidden="true"
+              />
+              Điểm cao nhất:{" "}
+              {Number(
+                (bestScore != null
+                  ? Math.max(bestScore, result.score)
+                  : result.score
+                ).toFixed(2),
+              )}
             </p>
           </div>
         </section>

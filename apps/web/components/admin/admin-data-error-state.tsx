@@ -57,7 +57,7 @@ export function AdminDataErrorState({
             type="button"
             onClick={() => void onRetry()}
             disabled={isRetrying}
-            className="theme-button-primary mt-4 inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-60"
+            className="theme-button-primary mt-4 inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold transition disabled:opacity-60"
           >
             <RefreshCw
               className={cn("h-4 w-4", isRetrying && "animate-spin")}

@@ -35,9 +35,8 @@ export function LessonNavigationControl({
   const fallbackTitle = isPrevious ? "Khóa học" : "Đi đến khóa học khác";
   const displayTitle = isFinalLesson
     ? "Đi đến khóa học khác"
-    : lesson?.title ?? fallbackTitle;
-  const canNavigate =
-    isBackToCourse || (Boolean(lesson) && isEnabled) || isFinalLesson;
+    : (lesson?.title ?? fallbackTitle);
+  const canNavigate = isBackToCourse || (Boolean(lesson) && isEnabled) || isFinalLesson;
   const className = cn(
     "flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-base font-black transition focus-visible:outline-none focus-visible:ring-4",
     isPrevious ? "text-left" : "justify-end text-right",
@@ -68,11 +67,7 @@ export function LessonNavigationControl({
 
   if (isBackToCourse && backHref) {
     return (
-      <Link
-        href={backHref}
-        aria-label={label}
-        className={className}
-      >
+      <Link href={backHref} aria-label={label} className={className}>
         {content}
       </Link>
     );
@@ -80,11 +75,7 @@ export function LessonNavigationControl({
 
   if (isFinalLesson) {
     return (
-      <Link
-        href="/student/courses"
-        aria-label={displayTitle}
-        className={className}
-      >
+      <Link href="/student/courses" aria-label={displayTitle} className={className}>
         {content}
       </Link>
     );

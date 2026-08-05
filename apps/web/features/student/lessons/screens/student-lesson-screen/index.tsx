@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  BookOpen,
-  Brain,
-  ChevronRight,
-  ClipboardCheck,
-  HelpCircle,
-} from "lucide-react";
+import { BookOpen, Brain, ChevronRight, ClipboardCheck, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -128,7 +122,7 @@ export function StudentLessonScreen({
     initialLearningSurface?.kind === "quiz-runner" ||
       initialLearningSurface?.kind === "quiz-result"
       ? initialLearningSurface.setId
-      : initialLesson?.quizSets[0]?.id ?? null,
+      : (initialLesson?.quizSets[0]?.id ?? null),
   );
   const tabRequestIdRef = useRef(0);
   const {
@@ -144,21 +138,16 @@ export function StudentLessonScreen({
     token,
   } = useStudentLessonQueries(lessonId, initialLesson);
   const isInitialPending =
-    lessonQuery.data === undefined &&
-    (!isAuthHydrated || lessonQuery.isLoading);
-  const shouldShowFlashcardsLoading = useStableLoadingVisibility(
-    isFlashcardsPending,
-  );
+    lessonQuery.data === undefined && (!isAuthHydrated || lessonQuery.isLoading);
+  const shouldShowFlashcardsLoading = useStableLoadingVisibility(isFlashcardsPending);
   const shouldShowTestLoading = useStableLoadingVisibility(isTestStatusPending);
   const isQuizSurfaceResume =
-    learningSurface?.kind === "quiz-runner" ||
-    learningSurface?.kind === "quiz-result";
+    learningSurface?.kind === "quiz-runner" || learningSurface?.kind === "quiz-result";
   const isFlashcardSurfaceResume =
     learningSurface?.kind === "flashcard-runner" ||
     learningSurface?.kind === "flashcard-result";
   const isTestSurfaceResume =
-    learningSurface?.kind === "test-runner" ||
-    learningSurface?.kind === "test-result";
+    learningSurface?.kind === "test-runner" || learningSurface?.kind === "test-result";
 
   useEffect(() => {
     if (!lessonQuery.data) return;
@@ -193,7 +182,11 @@ export function StudentLessonScreen({
       nextUrl.searchParams.delete("learningSetId");
       nextUrl.searchParams.delete("learningAttemptId");
       if (window.location.search !== nextUrl.search) {
-        window.history.replaceState(window.history.state, "", nextUrl.pathname + nextUrl.search);
+        window.history.replaceState(
+          window.history.state,
+          "",
+          nextUrl.pathname + nextUrl.search,
+        );
       }
     }
   }, []);
@@ -228,8 +221,7 @@ export function StudentLessonScreen({
   const practiceTabTransition = usePracticeTabTransition(selectTab);
 
   if (isInitialPending) {
-    if (isQuizSurfaceResume || isTestSurfaceResume)
-      return <QuizRunnerLoadingScreen />;
+    if (isQuizSurfaceResume || isTestSurfaceResume) return <QuizRunnerLoadingScreen />;
     if (isFlashcardSurfaceResume) return <FlashcardRunnerLoadingScreen />;
     return <StudentLessonPageSkeleton initialThemeMode={initialThemeMode} />;
   }
@@ -282,8 +274,7 @@ export function StudentLessonScreen({
     testStatusQuery.data?.latestSubmittedAttempt?.score ?? -1,
     testHistoryMaxScore,
   );
-  const hasPassedCurrentLessonTest =
-    bestTestScore >= lesson.completionMinScore;
+  const hasPassedCurrentLessonTest = bestTestScore >= lesson.completionMinScore;
 
   return (
     <main
@@ -425,9 +416,7 @@ export function StudentLessonScreen({
                   : null
               }
               lesson={lesson}
-              onAutoStartHandled={
-                practiceTabTransition.completePracticeTabOpen
-              }
+              onAutoStartHandled={practiceTabTransition.completePracticeTabOpen}
               token={token}
               onProgressChanged={refreshLearningProgress}
             />
@@ -445,9 +434,7 @@ export function StudentLessonScreen({
                     ? flashcardsQuery.data.some((set) => set.flashcards.length > 0)
                     : lesson.flashcardSets.some((set) => set.cardCount > 0)
                 }
-                hasQuizContent={lesson.quizSets.some(
-                  (set) => set.questionCount > 0,
-                )}
+                hasQuizContent={lesson.quizSets.some((set) => set.questionCount > 0)}
                 initialSurface={
                   learningSurface?.kind === "test-runner" ||
                   learningSurface?.kind === "test-result"
@@ -482,9 +469,7 @@ export function StudentLessonScreen({
                     : null
                 }
                 lesson={lesson}
-                onAutoStartHandled={
-                  practiceTabTransition.completePracticeTabOpen
-                }
+                onAutoStartHandled={practiceTabTransition.completePracticeTabOpen}
                 sets={flashcardsQuery.data ?? []}
                 token={token}
                 onProgressChanged={refreshLearningProgress}

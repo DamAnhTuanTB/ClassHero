@@ -9,9 +9,6 @@ export default async function StudentExploreCoursesPage() {
   ]);
 
   return (
-    <ExploreCoursesScreen
-      initialData={initialData}
-      initialThemeMode={initialThemeMode}
-    />
+    <ExploreCoursesScreen initialData={initialData} initialThemeMode={initialThemeMode} />
   );
 }

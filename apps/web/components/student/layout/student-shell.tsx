@@ -139,8 +139,7 @@ export function StudentShell({
       });
     } finally {
       await clearAuthSessionEverywhere();
-      router.replace("/login");
-      router.refresh();
+      window.location.href = "/login";
     }
   }
 
@@ -260,7 +259,7 @@ export function StudentShell({
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="student-sidebar-tool-button student-sidebar-logout-button inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-2 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-200 disabled:cursor-wait disabled:opacity-70"
+              className="student-sidebar-tool-button student-sidebar-logout-button inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-2 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-200 disabled:opacity-70"
               aria-label="Đăng xuất khỏi tài khoản học sinh"
             >
               {isLoggingOut ? (

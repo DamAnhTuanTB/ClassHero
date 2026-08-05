@@ -362,7 +362,7 @@ export function QuizRunnerScreen({
                 aria-label="Kiểm tra đáp án"
                 disabled={Boolean(pendingAction)}
                 onClick={handleCheck}
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-sky-500 px-5 text-base font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition hover:bg-sky-400 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] disabled:cursor-wait disabled:opacity-60 dark:bg-sky-600 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:hover:bg-sky-500 dark:active:shadow-[0_1px_0_rgb(7_89_133)] sm:w-auto md:px-8"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-sky-500 px-5 text-base font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition hover:bg-sky-400 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] disabled:opacity-60 dark:bg-sky-600 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:hover:bg-sky-500 dark:active:shadow-[0_1px_0_rgb(7_89_133)] sm:w-auto md:px-8"
               >
                 {pendingAction === "check" ? (
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -436,7 +436,7 @@ export function QuizRunnerScreen({
                 }
                 aria-current={index === currentIndex ? "step" : undefined}
                 className={cn(
-                  "relative h-3 shrink-0 rounded-full transition-[width,background-color,filter,transform] duration-200 before:absolute before:-inset-x-1 before:-inset-y-2 before:rounded-lg before:content-[''] hover:brightness-95 active:scale-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:cursor-wait disabled:opacity-100 motion-reduce:transition-none dark:focus-visible:ring-sky-500/30",
+                  "relative h-3 shrink-0 rounded-full transition-[width,background-color,filter,transform] duration-200 before:absolute before:-inset-x-1 before:-inset-y-2 before:rounded-lg before:content-[''] hover:brightness-95 active:scale-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:opacity-100 motion-reduce:transition-none dark:focus-visible:ring-sky-500/30",
                   index === currentIndex ? "w-8" : "w-3",
                   itemFeedback?.isCorrect
                     ? "bg-emerald-400"
@@ -482,7 +482,7 @@ export function QuizRunnerScreen({
               aria-label="Hoàn thành Quiz"
               disabled={Boolean(pendingAction)}
               onClick={handleSubmit}
-              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-3 text-base font-black text-white shadow-[0_4px_0_rgb(4_120_87)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] disabled:cursor-wait disabled:opacity-60 enabled:hover:bg-emerald-400"
+              className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-3 text-base font-black text-white shadow-[0_4px_0_rgb(4_120_87)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(4_120_87)] disabled:opacity-60 enabled:hover:bg-emerald-400"
             >
               {pendingAction === "submit" ? (
                 <Loader2 className="h-5 w-5 animate-spin" />

@@ -131,10 +131,7 @@ function CourseDetailSkeleton({ label }: { label: string }) {
         ))}
       </div>
       {Array.from({ length: 3 }, (_, index) => (
-        <div
-          key={index}
-          className="rounded-xl bg-[var(--theme-surface)] p-5"
-        >
+        <div key={index} className="rounded-xl bg-[var(--theme-surface)] p-5">
           <SkeletonBlock className="h-5 w-2/5 rounded-full" />
           <SkeletonBlock className="mt-4 h-14 rounded-lg" />
           <SkeletonBlock className="mt-3 h-14 rounded-lg" />

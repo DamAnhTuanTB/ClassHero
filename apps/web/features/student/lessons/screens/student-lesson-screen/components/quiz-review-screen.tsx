@@ -101,28 +101,26 @@ export function QuizReviewScreen({
       <main className="mx-auto w-full max-w-2xl px-4 py-5 pb-10 sm:px-6 sm:py-7">
         <section aria-labelledby="quiz-review-question-title">
           <div className="min-w-0">
-              <p
-                className={cn(
-                  "text-xs font-black",
-                  usesEmeraldAccent
-                    ? "text-emerald-700 dark:text-emerald-300"
-                    : "text-sky-600 dark:text-sky-300",
-                )}
-              >
-                {reviewTitle ??
-                  (displayScope === "INCORRECT"
-                    ? "Xem lại các câu trả lời sai"
-                    : "Xem lại tất cả câu trả lời")}
-              </p>
-              <h1
-                id="quiz-review-question-title"
-                className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
-              >
-                {question
-                  ? `Câu hỏi ${questionNumber}`
-                  : `Xem lại ${activityLabel}`}
-              </h1>
-            </div>
+            <p
+              className={cn(
+                "text-xs font-black",
+                usesEmeraldAccent
+                  ? "text-emerald-700 dark:text-emerald-300"
+                  : "text-sky-600 dark:text-sky-300",
+              )}
+            >
+              {reviewTitle ??
+                (displayScope === "INCORRECT"
+                  ? "Xem lại các câu trả lời sai"
+                  : "Xem lại tất cả câu trả lời")}
+            </p>
+            <h1
+              id="quiz-review-question-title"
+              className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
+            >
+              {question ? `Câu hỏi ${questionNumber}` : `Xem lại ${activityLabel}`}
+            </h1>
+          </div>
 
           {question ? (
             <div

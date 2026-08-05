@@ -37,8 +37,7 @@ export function LessonMoveDialog({
 }) {
   const [containerValue, setContainerValue] = useState(topLevelValue);
   const [positionValue, setPositionValue] = useState("1");
-  const destinationChapterId =
-    containerValue === topLevelValue ? null : containerValue;
+  const destinationChapterId = containerValue === topLevelValue ? null : containerValue;
   const isBlockedByCompletion = lesson
     ? !canMoveLessonToPosition(
         path,
@@ -92,11 +91,7 @@ export function LessonMoveDialog({
   const lessonId = lesson.id;
 
   async function submit() {
-    const didMove = await onMove(
-      lessonId,
-      destinationChapterId,
-      Number(positionValue),
-    );
+    const didMove = await onMove(lessonId, destinationChapterId, Number(positionValue));
     if (didMove) {
       onClose();
     }
@@ -172,9 +167,7 @@ export function LessonMoveDialog({
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={
-            isMoving || positionOptions.length === 0 || isBlockedByCompletion
-          }
+          disabled={isMoving || positionOptions.length === 0 || isBlockedByCompletion}
           className="theme-button-primary min-h-11 rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isMoving ? "Đang di chuyển..." : "Di chuyển"}

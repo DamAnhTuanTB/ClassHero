@@ -32,8 +32,7 @@ export function ImmediateTooltipPortal({
       const gap = 8;
       const anchorRect = anchor.getBoundingClientRect();
       const tooltipRect = tooltip.getBoundingClientRect();
-      const centeredLeft =
-        anchorRect.left + anchorRect.width / 2 - tooltipRect.width / 2;
+      const centeredLeft = anchorRect.left + anchorRect.width / 2 - tooltipRect.width / 2;
       const maxLeft = Math.max(
         viewportMargin,
         window.innerWidth - tooltipRect.width - viewportMargin,

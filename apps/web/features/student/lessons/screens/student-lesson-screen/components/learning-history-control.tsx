@@ -406,11 +406,13 @@ export function LearningHistoryControl({
                       const isReviewPending = pendingActionKey === `review:${item.id}`;
                       const isRestartPending = pendingActionKey === `restart:${item.id}`;
                       const parsedScore = item.score ? parseFloat(item.score) : NaN;
-                      const matchFlashcardSummary = isFlashcard && item.summary
-                        ? item.summary.match(/^(\d+)\/(\d+)\s+thẻ đã thuộc/)
-                        : null;
+                      const matchFlashcardSummary =
+                        isFlashcard && item.summary
+                          ? item.summary.match(/^(\d+)\/(\d+)\s+thẻ đã thuộc/)
+                          : null;
                       const isFlashcardAllKnown = matchFlashcardSummary
-                        ? Number(matchFlashcardSummary[1]) >= Number(matchFlashcardSummary[2])
+                        ? Number(matchFlashcardSummary[1]) >=
+                          Number(matchFlashcardSummary[2])
                         : false;
                       const isItemPassed =
                         item.passed ??
@@ -560,7 +562,7 @@ export function LearningHistoryControl({
                                 disabled={isStartDisabled || isStartPending}
                                 onClick={() => onStart(item)}
                                 className={cn(
-                                  "mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-60",
+                                  "mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:opacity-60",
                                   accentClasses.primary,
                                 )}
                               >
@@ -574,7 +576,7 @@ export function LearningHistoryControl({
                                 disabled={isContinuePending}
                                 onClick={() => onContinue(item)}
                                 className={cn(
-                                  "mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-60",
+                                  "mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:opacity-60",
                                   accentClasses.primary,
                                 )}
                               >
@@ -593,7 +595,7 @@ export function LearningHistoryControl({
                                     onReview(item);
                                   }}
                                   className={cn(
-                                    "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border-2 px-2 text-sm font-black transition disabled:cursor-wait disabled:opacity-60",
+                                    "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border-2 px-2 text-sm font-black transition disabled:opacity-60",
                                     accentClasses.button,
                                   )}
                                 >
@@ -606,7 +608,7 @@ export function LearningHistoryControl({
                                   disabled={isRestartPending}
                                   onClick={() => onRestart(item)}
                                   className={cn(
-                                    "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-60",
+                                    "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:opacity-60",
                                     accentClasses.primary,
                                   )}
                                 >
@@ -635,7 +637,7 @@ export function LearningHistoryControl({
                                   onReview(item);
                                 }}
                                 className={cn(
-                                  "mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 px-4 text-base font-black transition disabled:cursor-wait disabled:opacity-60",
+                                  "mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 px-4 text-base font-black transition disabled:opacity-60",
                                   accentClasses.button,
                                 )}
                               >

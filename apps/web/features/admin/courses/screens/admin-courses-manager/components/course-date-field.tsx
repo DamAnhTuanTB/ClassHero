@@ -1,16 +1,14 @@
 "use client";
 
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FieldError } from "react-hook-form";
 import { FieldLabel } from "@/components/common/forms/field-label";
-import { formFocusClass, formFocusVisibleClass } from "@/components/common/forms/form-styles";
+import {
+  formFocusClass,
+  formFocusVisibleClass,
+} from "@/components/common/forms/form-styles";
 import { cn } from "@/lib/utils";
 
 const weekdayLabels = ["Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7", "CN"];
@@ -70,7 +68,10 @@ export function CourseDateField({
     if (triggerRect) {
       const popoverWidth = 328;
       setPopoverPosition({
-        left: Math.min(Math.max(triggerRect.left, 12), window.innerWidth - popoverWidth - 12),
+        left: Math.min(
+          Math.max(triggerRect.left, 12),
+          window.innerWidth - popoverWidth - 12,
+        ),
         top: Math.min(triggerRect.bottom + 8, window.innerHeight - 370),
       });
     }
@@ -102,7 +103,10 @@ export function CourseDateField({
             value && "pr-12",
           )}
         >
-          <CalendarDays className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]" aria-hidden="true" />
+          <CalendarDays
+            className="h-5 w-5 shrink-0 text-[var(--theme-text-muted)]"
+            aria-hidden="true"
+          />
           <span className="min-w-0 flex-1 truncate">
             {selectedDate ? formatDate(selectedDate) : "Chọn ngày"}
           </span>
@@ -202,7 +206,9 @@ export function CourseDateField({
                           : isCurrentMonth
                             ? "text-[var(--theme-text)] hover:bg-[var(--theme-primary-soft)] hover:text-[var(--theme-primary)]"
                             : "text-[var(--theme-text-muted)] opacity-55 hover:bg-[var(--theme-surface-soft)]",
-                        !isSelected && isToday && "ring-1 ring-[var(--theme-primary-border)]",
+                        !isSelected &&
+                          isToday &&
+                          "ring-1 ring-[var(--theme-primary-border)]",
                       )}
                     >
                       {day.getDate()}
@@ -215,7 +221,10 @@ export function CourseDateField({
           )
         : null}
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]">
+        <p
+          id={`${id}-error`}
+          className="mt-1.5 text-sm leading-5 text-[var(--theme-error-text)]"
+        >
           {error.message}
         </p>
       ) : null}

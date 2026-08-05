@@ -273,7 +273,7 @@ export function TestRunnerScreen({
                   }`}
                   aria-current={isCurrent ? "step" : undefined}
                   className={cn(
-                    "student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center rounded-xl text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-70 dark:focus-visible:ring-emerald-500/30",
+                    "student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center rounded-xl text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:opacity-70 dark:focus-visible:ring-emerald-500/30",
                     isCurrent
                       ? "bg-emerald-500 text-white shadow-[0_4px_0_rgb(4_120_87)]"
                       : isAnswered
@@ -333,7 +333,7 @@ export function TestRunnerScreen({
           type="button"
           disabled={isPending}
           onClick={() => void handleSubmit()}
-          className="student-preserve-mobile-shadow mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-4 text-lg font-black text-white shadow-[0_5px_0_rgb(4_120_87)] transition hover:bg-emerald-400 active:translate-y-[4px] active:shadow-[0_1px_0_rgb(4_120_87)] disabled:cursor-wait disabled:opacity-60"
+          className="student-preserve-mobile-shadow mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-emerald-500 px-4 text-lg font-black text-white shadow-[0_5px_0_rgb(4_120_87)] transition hover:bg-emerald-400 active:translate-y-[4px] active:shadow-[0_1px_0_rgb(4_120_87)] disabled:opacity-60"
         >
           {pendingAction === "submit" ? (
             <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />

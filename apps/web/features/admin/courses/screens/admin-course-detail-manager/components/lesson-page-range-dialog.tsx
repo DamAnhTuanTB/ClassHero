@@ -62,7 +62,13 @@ export function LessonPageRangeDialog({
       | string
       | boolean
       | null
-      | { id: string; file: File | null; title: string; isPrimary?: boolean; type?: "SUPPLEMENT" | "HOMEWORK" }[],
+      | {
+          id: string;
+          file: File | null;
+          title: string;
+          isPrimary?: boolean;
+          type?: "SUPPLEMENT" | "HOMEWORK";
+        }[],
   ) => void;
 }) {
   const warnings = localWarnings.length > 0 ? localWarnings : latestWarnings;
@@ -166,7 +172,7 @@ export function LessonPageRangeDialog({
           type="button"
           disabled={isSaving || !sourceDocument || !pageLimit || lessons.length === 0}
           onClick={() => void onSave()}
-          className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-70"
+          className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold transition disabled:opacity-70"
         >
           {isSaving ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

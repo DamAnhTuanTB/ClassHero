@@ -56,10 +56,7 @@ export function LoginForm() {
       router.replace(getPostLoginRedirectPath(response.user.role));
     } catch (error) {
       toast.error("Không thể đăng nhập", {
-        description: getAuthErrorMessage(
-          error,
-          "Chưa thể đăng nhập. Vui lòng thử lại sau ít phút.",
-        ),
+        description: "Tên đăng nhập/SĐT hoặc mật khẩu chưa đúng.",
       });
     }
   }

@@ -30,11 +30,7 @@ export function LessonSourceRangeSection({
     "sourceDocumentExtractions",
     "id"
   >;
-  documentFieldArray: UseFieldArrayReturn<
-    LessonFormValues,
-    "referenceDocuments",
-    "id"
-  >;
+  documentFieldArray: UseFieldArrayReturn<LessonFormValues, "referenceDocuments", "id">;
 }) {
   const { append, fields, remove } = documentFieldArray;
   const {
@@ -55,8 +51,7 @@ export function LessonSourceRangeSection({
     const clientKey = document.clientKey ?? document.id ?? field.id;
     return [{ clientKey, field, index }];
   });
-  const foundationDocumentCount =
-    extractionFields.length + primaryUploadFields.length;
+  const foundationDocumentCount = extractionFields.length + primaryUploadFields.length;
 
   function setFoundationOrder(order: string[]) {
     form.setValue("foundationDocumentOrder", order, {
@@ -78,10 +73,7 @@ export function LessonSourceRangeSection({
       },
       { shouldFocus: false },
     );
-    setFoundationOrder([
-      ...foundationDocumentOrder,
-      `EXTRACTION:${clientKey}`,
-    ]);
+    setFoundationOrder([...foundationDocumentOrder, `EXTRACTION:${clientKey}`]);
     requestAnimationFrame(() => {
       form.clearErrors(`sourceDocumentExtractions.${index}`);
     });
@@ -159,8 +151,8 @@ export function LessonSourceRangeSection({
 
       {sourceDocuments.length === 0 && extractionFields.length > 0 ? (
         <p className="mt-3 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-warning-text)]">
-          Chưa có tài liệu nguồn sẵn sàng. Hãy hoàn tất xử lý và xác nhận tất cả
-          số trang in ở trang chi tiết khóa học trước khi nhập khoảng trang.
+          Chưa có tài liệu nguồn sẵn sàng. Hãy hoàn tất xử lý và xác nhận tất cả số trang
+          in ở trang chi tiết khóa học trước khi nhập khoảng trang.
         </p>
       ) : null}
 
@@ -203,9 +195,7 @@ export function LessonSourceRangeSection({
         })}
 
         {primaryUploadFields.map(({ clientKey, field, index }, fallbackIndex) => {
-          const explicitOrder = foundationDocumentOrder.indexOf(
-            `UPLOAD:${clientKey}`,
-          );
+          const explicitOrder = foundationDocumentOrder.indexOf(`UPLOAD:${clientKey}`);
           return (
             <div
               key={field.id}

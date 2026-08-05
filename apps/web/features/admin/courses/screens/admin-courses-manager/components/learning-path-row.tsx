@@ -88,7 +88,9 @@ export function LearningPathRow({
         )}
       >
         <span className={mobileLabelClass}>Lĩnh vực</span>
-        <span className={mobileValueClass}>{subjectLabels[path.subject] ?? path.subject}</span>
+        <span className={mobileValueClass}>
+          {subjectLabels[path.subject] ?? path.subject}
+        </span>
       </div>
       <div
         className={cn(
@@ -97,7 +99,9 @@ export function LearningPathRow({
         )}
       >
         <span className={mobileLabelClass}>Đối tượng hướng đến</span>
-        <span className={mobileValueClass}>{path.targetAudienceName ?? `Khối ${path.grade}`}</span>
+        <span className={mobileValueClass}>
+          {path.targetAudienceName ?? `Khối ${path.grade}`}
+        </span>
       </div>
       <div
         className={cn(

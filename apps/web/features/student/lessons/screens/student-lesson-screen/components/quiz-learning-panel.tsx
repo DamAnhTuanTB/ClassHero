@@ -164,11 +164,10 @@ export function QuizLearningPanel({
   const [reviewIndex, setReviewIndex] = useState(0);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isBrowserStateResolved, setIsBrowserStateResolved] = useState(false);
-  const [isResumePending, setIsResumePending] = useState(
+  const [isResumePending, setIsResumePending] = useState(initialSurface !== null);
+  const [isFullscreenResumePending, setIsFullscreenResumePending] = useState(
     initialSurface !== null,
   );
-  const [isFullscreenResumePending, setIsFullscreenResumePending] =
-    useState(initialSurface !== null);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
   const [curtainPhase, setCurtainPhase] = useState<QuizTransitionPhase>("idle");
@@ -200,13 +199,7 @@ export function QuizLearningPanel({
       clearQuizResultHistoryMarker();
     }
     setIsBrowserStateResolved(true);
-  }, [
-    initialQuizSetId,
-    initialSurface,
-    lesson.id,
-    lesson.quizSets,
-    userId,
-  ]);
+  }, [initialQuizSetId, initialSurface, lesson.id, lesson.quizSets, userId]);
 
   useEffect(() => {
     if (!isBrowserStateResolved) return;
@@ -331,13 +324,9 @@ export function QuizLearningPanel({
 
     const currentSurface = getBrowserStudentLearningSurface();
     const runnerAttemptId =
-      currentSurface?.kind === "quiz-runner"
-        ? currentSurface.attemptId
-        : null;
+      currentSurface?.kind === "quiz-runner" ? currentSurface.attemptId : null;
     const resultAttemptId =
-      currentSurface?.kind === "quiz-result"
-        ? currentSurface.attemptId
-        : null;
+      currentSurface?.kind === "quiz-result" ? currentSurface.attemptId : null;
     if (!runnerAttemptId && !resultAttemptId) {
       setIsFullscreenResumePending(false);
       setIsResumePending(false);
@@ -759,7 +748,6 @@ export function QuizLearningPanel({
     );
   }
 
-
   if (review && reviewOrigin === "RESULT") {
     return renderWithCurtain(
       <QuizReviewScreen
@@ -935,18 +923,11 @@ export function QuizLearningPanel({
               <button
                 type="button"
                 onClick={() =>
-                  void handleStart(
-                    "ALL",
-                    undefined,
-                    nextQuizSet,
-                    true,
-                    "start-new-set",
-                  )
+                  void handleStart("ALL", undefined, nextQuizSet, true, "start-new-set")
                 }
                 aria-busy={pendingAction === "start-new-set"}
                 disabled={
-                  nextQuizSet.questionCount === 0 ||
-                  pendingAction === "start-new-set"
+                  nextQuizSet.questionCount === 0 || pendingAction === "start-new-set"
                 }
                 className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border-2 border-sky-300 bg-white px-3 text-base font-black text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-400/50 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:hover:bg-sky-500/10 sm:px-5 sm:text-lg"
               >

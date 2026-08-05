@@ -148,10 +148,7 @@ export function AdminDomainsManager() {
     setDraggedDomainId(domainId);
   };
 
-  const handleDomainDragOver = (
-    event: DragEvent<HTMLDivElement>,
-    domainId: string,
-  ) => {
+  const handleDomainDragOver = (event: DragEvent<HTMLDivElement>, domainId: string) => {
     if (!draggedDomainId || draggedDomainId === domainId) {
       return;
     }
@@ -161,10 +158,7 @@ export function AdminDomainsManager() {
     setDomainDropTargetId(domainId);
   };
 
-  const handleDomainDrop = (
-    event: DragEvent<HTMLDivElement>,
-    targetDomainId: string,
-  ) => {
+  const handleDomainDrop = (event: DragEvent<HTMLDivElement>, targetDomainId: string) => {
     event.preventDefault();
     if (draggedDomainId && draggedDomainId !== targetDomainId) {
       reorderDomains(draggedDomainId, targetDomainId);
@@ -232,7 +226,7 @@ export function AdminDomainsManager() {
                 <button
                   type="submit"
                   disabled={pending}
-                  className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 font-extrabold disabled:cursor-wait disabled:opacity-60"
+                  className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 font-extrabold disabled:opacity-60"
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   {editing ? "Lưu thay đổi" : "Thêm lĩnh vực"}
@@ -253,15 +247,13 @@ export function AdminDomainsManager() {
 
               <section className="mt-4 overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]">
                 {/* {domainsQuery.data && domainsQuery.data.length > 0 ? (
-                <div className="border-b border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-3">
-                  <p className="text-sm font-bold text-[var(--theme-text-muted)]">
-                    Kéo biểu tượng ở đầu mỗi dòng để đổi thứ tự hiển thị.
-                  </p>
-                </div>
-                ) : null} */}
-                {domainsQuery.isLoading ? (
-                  <AdminDomainsListSkeleton />
-                ) : null}
+ <div className="border-b border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-4 py-3">
+ <p className="text-sm font-bold text-[var(--theme-text-muted)]">
+ Kéo biểu tượng ở đầu mỗi dòng để đổi thứ tự hiển thị.
+ </p>
+ </div>
+ ) : null} */}
+                {domainsQuery.isLoading ? <AdminDomainsListSkeleton /> : null}
                 {domainsQuery.isError ? (
                   <AdminDataErrorState
                     className="rounded-none border-0 shadow-none"
@@ -295,7 +287,7 @@ export function AdminDomainsManager() {
                         disabled={reorderMutation.isPending}
                         aria-label={`Kéo để đổi vị trí ${domain.name}`}
                         title="Kéo để đổi vị trí lĩnh vực"
-                        className="grid h-10 w-6 shrink-0 cursor-grab place-items-center rounded-md text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] active:cursor-grabbing disabled:cursor-wait disabled:opacity-50"
+                        className="grid h-10 w-6 shrink-0 cursor-grab place-items-center rounded-md text-[var(--theme-text-muted)] transition hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-text-strong)] active:cursor-grabbing disabled:opacity-50"
                       >
                         <GripVertical className="h-5 w-5" aria-hidden="true" />
                       </button>

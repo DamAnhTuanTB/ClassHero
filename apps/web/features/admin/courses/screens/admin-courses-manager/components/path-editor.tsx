@@ -9,7 +9,10 @@ import { CourseDateField } from "@/features/admin/courses/screens/admin-courses-
 import { PathCoverUpload } from "@/features/admin/courses/screens/admin-courses-manager/components/path-cover-upload";
 import { PathDescriptionField } from "@/features/admin/courses/screens/admin-courses-manager/components/path-description-field";
 import { adminStatuses, statusLabels } from "@/features/admin/courses/admin-courses-data";
-import type { AdminDomain, AdminTargetAudience } from "@/features/admin/domains/api/admin-domains-api";
+import type {
+  AdminDomain,
+  AdminTargetAudience,
+} from "@/features/admin/domains/api/admin-domains-api";
 import type { LearningPathFormValues } from "@/features/admin/courses/admin-courses-schemas";
 import type { EditorMode } from "@/features/admin/courses/admin-courses-types";
 
@@ -49,10 +52,7 @@ export function PathEditor({
     ? { type: "validate" as const, message: targetAudienceErrorMessage }
     : undefined;
 
-  function updateCourseDate(
-    field: "startDate" | "endDate",
-    value: string,
-  ) {
+  function updateCourseDate(field: "startDate" | "endDate", value: string) {
     form.setValue(field, value, {
       shouldDirty: true,
       shouldTouch: true,
