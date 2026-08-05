@@ -33,8 +33,8 @@ export function useAdminAiGenerationPanel(lessonId: string) {
     staleTime: 10_000,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (!data) return 5_000;
-      return data.readiness.generationReady ? false : 5_000;
+      if (!data) return false;
+      return data.documents.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
     },
     refetchIntervalInBackground: false,
   });

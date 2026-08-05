@@ -106,7 +106,11 @@ export function useAdminCourseDocumentsManager(
     queryKey: adminCourseDocumentQueryKeys.sourceDocuments(userId, pathId),
     queryFn: () => listAdminSourceDocuments(path?.id ?? "", token),
     enabled: Boolean(token && path),
-    refetchInterval: 5_000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 5_000;
+      return data.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
+    },
     refetchIntervalInBackground: false,
   });
   const sourceDocuments = sourceDocumentsQuery.data ?? EMPTY_SOURCE_DOCUMENTS;
@@ -151,7 +155,11 @@ export function useAdminCourseDocumentsManager(
     queryKey: adminCourseDocumentQueryKeys.lessonDocuments(userId, pathId),
     queryFn: () => listAdminLearningPathLessonDocuments(path?.id ?? "", token),
     enabled: Boolean(token && path),
-    refetchInterval: 5_000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 5_000;
+      return data.some((doc) => doc.status === "PROCESSING") ? 5_000 : false;
+    },
     refetchIntervalInBackground: false,
   });
   const lessonDocuments = lessonDocumentsQuery.data ?? EMPTY_LESSON_DOCUMENTS;
