@@ -378,6 +378,10 @@ export function useAdminCourseDetailManager(
       await learningPathQuery.refetch();
       // Ensure documents are re-fetched to reflect deleted/added supplements
       documentsManager.actions.reloadDocuments();
+      if (targetLesson) {
+        mutations.invalidateAiPanel(targetLesson.id);
+      }
+      
       if (referenceUploadError) {
         toast.warning(
           targetEditorMode === "create" ? "Đã thêm buổi học" : "Đã lưu buổi học",

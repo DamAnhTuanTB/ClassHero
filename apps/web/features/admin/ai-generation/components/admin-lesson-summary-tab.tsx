@@ -119,17 +119,7 @@ export function AdminLessonSummaryTab({
       />
 
       <div className="flex flex-col-reverse gap-2 border-t border-[var(--theme-border)] pt-4 sm:flex-row sm:justify-end">
-        {summary?.reviewStatus === "APPROVED" ? (
-          <button
-            type="button"
-            disabled={upsertMutation.isPending}
-            onClick={() => save("WITHDRAW")}
-            className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
-          >
-            <EyeOff className="h-4 w-4" aria-hidden="true" />
-            Thu hồi phát hành
-          </button>
-        ) : null}
+
         <button
           type="button"
           disabled={upsertMutation.isPending}
@@ -161,6 +151,17 @@ export function AdminLessonSummaryTab({
           >
             <Send className="h-4 w-4" aria-hidden="true" />
             Phát hành
+          </button>
+        ) : null}
+        {summary?.reviewStatus === "APPROVED" ? (
+          <button
+            type="button"
+            disabled={upsertMutation.isPending}
+            onClick={() => save("WITHDRAW")}
+            className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
+          >
+            <EyeOff className="h-4 w-4" aria-hidden="true" />
+            Thu hồi phát hành
           </button>
         ) : null}
       </div>

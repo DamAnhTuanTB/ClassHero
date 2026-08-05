@@ -31,6 +31,12 @@ export function useAdminAiGenerationPanel(lessonId: string) {
     queryFn: () => getAdminAiGenerationPanel(lessonId, session?.accessToken ?? ""),
     enabled: Boolean(lessonId && session?.accessToken),
     staleTime: 10_000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 5_000;
+      return data.readiness.generationReady ? false : 5_000;
+    },
+    refetchIntervalInBackground: false,
   });
 }
 

@@ -381,7 +381,6 @@ function getJobStatus(
   if (job.status === "QUEUED" || job.status === "RUNNING") {
     return {
       label: job.status === "QUEUED" ? "Đang chờ" : "Đang tạo",
-      icon: "loading",
       className:
         "border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] text-[var(--theme-info-text)]",
     };

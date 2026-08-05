@@ -31,6 +31,7 @@ import type {
   LessonFormValues,
 } from "@/features/admin/courses/admin-courses-schemas";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { adminAiGenerationQueryKeys } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 
 export const adminCourseQueryKeys = {
   all: ["admin-courses"] as const,
@@ -138,6 +139,12 @@ export function useAdminCourseMutations() {
     });
   }
 
+  function invalidateAiPanel(lessonId: string) {
+    return queryClient.invalidateQueries({
+      queryKey: adminAiGenerationQueryKeys.panel(lessonId),
+    });
+  }
+
   return {
     archiveChapter: useMutation({
       mutationFn: ({ chapterId }: { chapterId: string }) =>
@@ -167,7 +174,14 @@ export function useAdminCourseMutations() {
         pathId: string;
         values: LessonFormValues;
       }) => createAdminLesson(pathId, chapterId, values, token),
-      onSuccess: () => invalidateDocumentState(),
+      onSuccess: (data) => {
+        invalidateDocumentState();
+        if (data?.id) {
+          queryClient.invalidateQueries({
+            queryKey: adminAiGenerationQueryKeys.panel(data.id),
+          });
+        }
+      },
     }),
     moveLesson: useMutation({
       mutationFn: ({
@@ -212,7 +226,12 @@ export function useAdminCourseMutations() {
         lessonId: string;
         values: Partial<LessonFormValues>;
       }) => updateAdminLesson(lessonId, values, token),
-      onSuccess: () => invalidateDocumentState(),
+      onSuccess: (_data, variables) => {
+        invalidateDocumentState();
+        queryClient.invalidateQueries({
+          queryKey: adminAiGenerationQueryKeys.panel(variables.lessonId),
+        });
+      },
     }),
     updatePath: useMutation({
       mutationFn: ({
@@ -229,5 +248,6 @@ export function useAdminCourseMutations() {
     }),
     invalidateLearningPath,
     invalidateLearningPaths,
+    invalidateAiPanel,
   };
 }
