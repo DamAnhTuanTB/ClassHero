@@ -19,3 +19,10 @@
 - Restructured Admin Lesson Detail page layout to optimize screen estate on mobile devices by decreasing the overall padding from `px-6` to `px-3` on smaller screens.
 - Refined the visual hierarchy of the AI Generation, Quiz, Flashcard, and Test panels by implementing a layered effect: the outer container uses a light gray `bg-[var(--theme-bg-subtle)]` background, while the inner child cards are styled with `bg-white dark:bg-slate-950` and a subtle shadow to create better depth and distinction.
 - Realigned the layout of the Admin Flashcard row component to be symmetrical; detached the front face from the header into its own container with consistent `p-3` padding, mirroring the back face.
+
+## feat(admin): interactive drag-and-drop JSON blocks editor for lesson summary
+- Implemented HTML5 drag-and-drop sorting functionality for sections and content blocks directly within the AI Lesson Summary editor's split-view mode.
+- Added a floating toolbar on JSON blocks and sections to support one-click duplication and deletion of content blocks, modifying the data locally.
+- Applied dynamic ring border colors based on the block type when dragging blocks, providing clear visual feedback that matches the block's inherent pedagogical color coding.
+- Ensured block interactions strictly update local React state; data is only synced to the server when explicitly confirmed via the "Save" or "Publish" actions.
+- Secured the 'Title' and 'Objectives' blocks by hiding drag, copy, and delete controls, maintaining the fixed hierarchical structure of the document.
