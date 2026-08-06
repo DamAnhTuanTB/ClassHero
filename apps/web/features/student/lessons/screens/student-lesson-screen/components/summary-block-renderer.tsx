@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag, GripVertical, Copy, Trash2 } from "lucide-react";
+import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag, GripVertical, Copy, Trash2, Plus } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
@@ -21,6 +21,22 @@ interface SummaryBlockRendererProps {
   displayTitle?: string;
   onChange?: (newData: any) => void;
 }
+
+const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
+  definition: { label: "Định nghĩa", color: "yellow", icon: BookOpen },
+  rule: { label: "Quy tắc", color: "sky", icon: Scale },
+  property: { label: "Tính chất", color: "teal", icon: Bookmark },
+  theorem: { label: "Định lí", color: "green", icon: GraduationCap },
+  remark: { label: "Nhận xét", color: "fuchsia", icon: MessageSquareQuote },
+  note: { label: "Chú ý", color: "amber", icon: Lightbulb },
+  common_mistake: { label: "Lỗi thường gặp", color: "red", icon: AlertOctagon },
+  formula: { label: "Công thức", color: "emerald", icon: Sigma },
+  procedure: { label: "Phương pháp giải", color: "cyan", icon: ListOrdered },
+  proof: { label: "Chứng minh", color: "violet", icon: FileBadge },
+  example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
+  additional_info: { label: "Thông tin bổ sung", color: "slate", icon: Info },
+  section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
+};
 
 export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBlockRendererProps) {
   const isEdit = !!onChange;
@@ -60,16 +76,37 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
       <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
         <div className="text-2xl sm:text-3xl font-black mb-6 tracking-tight text-slate-800 dark:text-slate-100">{displayTitle || data.title}</div>
         {isEdit && (
-          <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto mb-4">
-            <ReactJson 
-              src={{ title: data.title }}
-              onEdit={(e) => onChange({ ...data, title: (e.updated_src as any).title })}
-              theme="rjv-default"
-              style={{ backgroundColor: 'transparent' }}
-              displayDataTypes={false}
-              name={false}
-              enableClipboard={false}
-            />
+          <div className="flex flex-col items-end w-full">
+            <div className="flex justify-end mb-2">
+              <button 
+                type="button"
+                onClick={() => {
+                  const newData = { ...data };
+                  if (!newData.sections) newData.sections = [];
+                  newData.sections.push({
+                    order: newData.sections.length + 1,
+                    displayHeading: "Đề mục mới",
+                    blocks: []
+                  });
+                  onChange(newData);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md font-medium text-sm transition-colors border border-blue-200 dark:border-blue-800 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm đề mục lớn
+              </button>
+            </div>
+            <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto mb-4 w-full">
+              <ReactJson 
+                src={{ title: data.title }}
+                onEdit={(e) => onChange({ ...data, title: (e.updated_src as any).title })}
+                theme="rjv-default"
+                style={{ backgroundColor: 'transparent' }}
+                displayDataTypes={false}
+                name={false}
+                enableClipboard={false}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -120,8 +157,45 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
               </span>
             </h3>
             {isEdit && (
-              <div 
-                className={`relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto group transition-all ${
+              <div className="flex flex-col items-end gap-2 w-full">
+                <div className="relative group/add">
+                  <button 
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 rounded-md transition-colors shadow-sm border border-slate-200 dark:border-slate-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Thêm khối
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 w-48 max-h-[300px] overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2 opacity-0 invisible group-hover/add:opacity-100 group-hover/add:visible transition-all z-20">
+                     {Object.entries(BLOCK_CONFIG).map(([type, config]) => {
+                       const Icon = config.icon;
+                       return (
+                         <button
+                           key={type}
+                           type="button"
+                           onClick={() => {
+                             const newData = { ...data };
+                             if (newData.sections && newData.sections[idx]) {
+                               if (!newData.sections[idx].blocks) newData.sections[idx].blocks = [];
+                               newData.sections[idx].blocks.push({
+                                 type: type,
+                                 title: "Tiêu đề khối mới",
+                                 content: ""
+                               });
+                               onChange(newData);
+                             }
+                           }}
+                           className="w-full flex items-center gap-2 px-2 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
+                         >
+                           <Icon className="w-4 h-4" />
+                           {config.label}
+                         </button>
+                       );
+                     })}
+                  </div>
+                </div>
+                <div 
+                  className={`w-full relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto group transition-all ${
                   draggedSection === idx ? "opacity-50 ring-2 ring-blue-500" : ""
                 } ${
                   dragOverSection === idx ? "ring-2 ring-blue-500 border-blue-500" : ""
@@ -233,6 +307,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                   enableClipboard={false}
                 />
               </div>
+            </div>
             )}
           </div>
           
@@ -428,22 +503,6 @@ function BlockItem({ block }: { block: BlockData }) {
       );
   }
 }
-
-const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
-  definition: { label: "Định nghĩa", color: "yellow", icon: BookOpen },
-  rule: { label: "Quy tắc", color: "sky", icon: Scale },
-  property: { label: "Tính chất", color: "teal", icon: Bookmark },
-  theorem: { label: "Định lí", color: "green", icon: GraduationCap },
-  remark: { label: "Nhận xét", color: "fuchsia", icon: MessageSquareQuote },
-  note: { label: "Chú ý", color: "amber", icon: Lightbulb },
-  common_mistake: { label: "Lỗi thường gặp", color: "red", icon: AlertOctagon },
-  formula: { label: "Công thức", color: "emerald", icon: Sigma },
-  procedure: { label: "Phương pháp giải", color: "cyan", icon: ListOrdered },
-  proof: { label: "Chứng minh", color: "violet", icon: FileBadge },
-  example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
-  additional_info: { label: "Thông tin bổ sung", color: "slate", icon: Info },
-  section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
-};
 
 const COLOR_STYLES: Record<string, any> = {
   blue: { bg: "bg-blue-50/50 dark:bg-blue-900/10", border: "border-blue-200 dark:border-blue-900/50", text: "text-blue-900 dark:text-blue-100", label: "text-blue-600/70 dark:text-blue-400/70" },
