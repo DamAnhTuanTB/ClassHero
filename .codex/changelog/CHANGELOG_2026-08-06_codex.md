@@ -26,7 +26,7 @@
 - Applied dynamic ring border colors based on the block type when dragging blocks, providing clear visual feedback that matches the block's inherent pedagogical color coding.
 - Ensured block interactions strictly update local React state; data is only synced to the server when explicitly confirmed via the "Save" or "Publish" actions.
 - Secured the 'Title' and 'Objectives' blocks by hiding drag, copy, and delete controls, maintaining the fixed hierarchical structure of the document.
-- Added 'Thêm đề mục lớn' button to allow manual creation of new sections.
+- Added 'Thêm đề mục lớn' button to allow manual creation of new sections, with auto-scroll to the newly added section.
 - Added 'Thêm khối' dropdown to allow manual insertion of specific block types (definition, rule, formula, etc.) into any existing section.
 - Improved UX of 'Thêm khối' dropdown by making it state-based (click to toggle), auto-closing on selection, and automatically scrolling the newly added block into view.
 

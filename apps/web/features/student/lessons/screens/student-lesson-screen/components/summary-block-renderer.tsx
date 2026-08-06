@@ -90,6 +90,14 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                     blocks: []
                   });
                   onChange(newData);
+
+                  const newSectionIdx = newData.sections.length - 1;
+                  setTimeout(() => {
+                    const el = document.getElementById(`section-${newSectionIdx}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }, 100);
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md font-medium text-sm transition-colors border border-blue-200 dark:border-blue-800 shadow-sm"
               >
@@ -146,7 +154,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
 
       {/* Sections */}
       {data.sections?.map((section, idx) => (
-        <div key={idx} className="space-y-4">
+        <div key={idx} id={`section-${idx}`} className="space-y-4">
           <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
             <h3 className="group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
               <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
