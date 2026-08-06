@@ -239,9 +239,6 @@ function GenerationCard({
             status.className,
           )}
         >
-          {status.icon === "loading" ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-          ) : null}
           {status.label}
         </span>
       </div>

@@ -20,7 +20,6 @@ import {
   lessonSummaryOutputSchema,
   type LessonSummaryOutput,
 } from "#api/modules/ai/types/lesson-summary.types";
-import { mapLessonSummaryToTiptap } from "#api/modules/ai/utils/lesson-summary-mapper";
 import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validation";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
@@ -110,7 +109,11 @@ export class LessonSummaryGenerationService {
       lessonSummaryOutputSchema,
       prepared.output.data,
     );
-    const contentJson = mapLessonSummaryToTiptap(output) as Prisma.InputJsonValue;
+    const contentJson = {
+      type: "lesson_summary_blocks",
+      version: 1,
+      data: output,
+    } as Prisma.InputJsonValue;
 
     const summary = await this.prisma.$transaction(async (transaction) => {
       const lesson = await transaction.lesson.findFirst({

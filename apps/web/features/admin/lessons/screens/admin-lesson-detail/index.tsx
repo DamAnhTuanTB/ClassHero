@@ -648,6 +648,7 @@ export function AdminLessonDetailManager({
                 {activeTab === "summary" && (
                   <AdminLessonSummaryTab
                     lessonId={lessonId}
+                    lessonTitle={lesson?.title}
                     onRegenerate={() => {
                       setRequestedGenerationType("SUMMARY");
                       document
