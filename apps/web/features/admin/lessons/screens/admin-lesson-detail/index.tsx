@@ -136,6 +136,16 @@ export function AdminLessonDetailManager({
   );
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tab = searchParams.get("tab") as LessonContentTabKey;
+      if (tab && ["documents", "summary", "quiz", "flashcard", "test"].includes(tab)) {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const resetTabPanelMinHeight = () => setTabPanelMinHeight(400);
     window.addEventListener("resize", resetTabPanelMinHeight);
 
@@ -180,6 +190,13 @@ export function AdminLessonDetailManager({
         );
       }
       setActiveTab(nextTab);
+
+      if (typeof window !== "undefined") {
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set("tab", nextTab);
+        const newUrl = `${window.location.pathname}?${searchParams.toString()}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", newUrl);
+      }
     },
     [activeTab],
   );

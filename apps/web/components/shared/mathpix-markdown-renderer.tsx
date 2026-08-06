@@ -8,10 +8,10 @@ import "@/components/shared/mathpix-markdown-renderer.css";
  * Uses the native mathpix-markdown-it library for perfect rendering.
  */
 export function MathpixMarkdownRenderer({
-  content,
+  content = "",
   className,
 }: {
-  content: string;
+  content?: string;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -21,7 +21,7 @@ export function MathpixMarkdownRenderer({
 
     // Dynamic import to avoid SSR issues with mathpix-markdown-it
     import("mathpix-markdown-it").then(({ MathpixMarkdownModel }) => {
-      const html = MathpixMarkdownModel.markdownToHTML(content, {
+      const html = MathpixMarkdownModel.markdownToHTML(content || "", {
         htmlTags: true,
       });
       if (containerRef.current) {
