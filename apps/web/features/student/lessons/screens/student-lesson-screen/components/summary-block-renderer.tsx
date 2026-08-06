@@ -114,6 +114,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                 displayDataTypes={false}
                 name={false}
                 enableClipboard={false}
+                keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
               />
             </div>
           </div>
@@ -146,6 +147,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                 displayDataTypes={false}
                 name="objectives"
                 enableClipboard={false}
+                keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
               />
             </div>
           )}
@@ -324,6 +326,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                   displayDataTypes={false}
                   name={false}
                   enableClipboard={false}
+                  keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
                 />
               </div>
             </div>
@@ -479,6 +482,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                             displayDataTypes={false}
                             name={false}
                             enableClipboard={false}
+                            keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
                           />
                         </div>
                       </div>

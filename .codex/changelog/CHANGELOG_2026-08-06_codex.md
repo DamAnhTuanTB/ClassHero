@@ -29,6 +29,7 @@
 - Added 'Thêm đề mục lớn' button to allow manual creation of new sections, with auto-scroll to the newly added section.
 - Added 'Thêm khối' dropdown to allow manual insertion of specific block types (definition, rule, formula, etc.) into any existing section.
 - Improved UX of 'Thêm khối' dropdown by making it state-based (click to toggle), auto-closing on selection, and automatically scrolling the newly added block into view.
+- Improved JSON block editor UX by allowing users to double-click on any value (instead of ctrl/cmd+click) to immediately enter edit mode.
 
 ## fix(admin): resolve crash in MathpixMarkdownRenderer when adding new blocks
 - Made the `content` prop optional and set a default empty string in `MathpixMarkdownRenderer` to prevent `markdown-it` from crashing with "Input data should be a String" when rendering newly created, empty JSON blocks (like empty Example blocks).
