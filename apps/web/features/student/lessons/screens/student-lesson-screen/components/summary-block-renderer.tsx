@@ -46,6 +46,49 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
   const [dragOverSection, setDragOverSection] = React.useState<number | null>(null);
   const [activeDropdown, setActiveDropdown] = React.useState<number | null>(null);
 
+  const getBlockDefaultData = (type: string) => {
+    const base = { type, title: "Tiêu đề khối mới" };
+    switch (type) {
+      case "example":
+        return {
+          ...base,
+          problem: "",
+          solutionSteps: [{ explanation: "", latex: "" }],
+          answer: ""
+        };
+      case "formula":
+        return {
+          ...base,
+          formulas: [{ latex: "", explanation: "" }]
+        };
+      case "procedure":
+      case "proof":
+        return {
+          ...base,
+          steps: [{ content: "", latex: "" }]
+        };
+      case "common_mistake":
+        return {
+          ...base,
+          mistake: "",
+          correction: ""
+        };
+      case "theorem":
+      case "rule":
+      case "property":
+        return {
+          ...base,
+          statement: "",
+          explanation: ""
+        };
+      default:
+        return {
+          ...base,
+          content: ""
+        };
+    }
+  };
+
   const getBlockDragColor = (type: string) => {
     // We can safely access BLOCK_CONFIG here because it's defined in the module scope
     // and evaluated before this function is called during render.
@@ -190,11 +233,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                              const newData = { ...data };
                              if (newData.sections && newData.sections[idx]) {
                                if (!newData.sections[idx].blocks) newData.sections[idx].blocks = [];
-                               newData.sections[idx].blocks.push({
-                                 type: type,
-                                 title: "Tiêu đề khối mới",
-                                 content: ""
-                               });
+                               newData.sections[idx].blocks.push(getBlockDefaultData(type));
                                onChange(newData);
 
                                const newBlockIdx = newData.sections[idx].blocks.length - 1;
