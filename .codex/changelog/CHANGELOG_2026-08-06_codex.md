@@ -28,6 +28,7 @@
 - Secured the 'Title' and 'Objectives' blocks by hiding drag, copy, and delete controls, maintaining the fixed hierarchical structure of the document.
 - Added 'Thêm đề mục lớn' button to allow manual creation of new sections.
 - Added 'Thêm khối' dropdown to allow manual insertion of specific block types (definition, rule, formula, etc.) into any existing section.
+- Improved UX of 'Thêm khối' dropdown by making it state-based (click to toggle), auto-closing on selection, and automatically scrolling the newly added block into view.
 
 ## fix(admin): resolve crash in MathpixMarkdownRenderer when adding new blocks
 - Made the `content` prop optional and set a default empty string in `MathpixMarkdownRenderer` to prevent `markdown-it` from crashing with "Input data should be a String" when rendering newly created, empty JSON blocks (like empty Example blocks).

@@ -44,6 +44,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
   const [dragOverItem, setDragOverItem] = React.useState<{sectionIdx: number, blockIdx: number} | null>(null);
   const [draggedSection, setDraggedSection] = React.useState<number | null>(null);
   const [dragOverSection, setDragOverSection] = React.useState<number | null>(null);
+  const [activeDropdown, setActiveDropdown] = React.useState<number | null>(null);
 
   const getBlockDragColor = (type: string) => {
     // We can safely access BLOCK_CONFIG here because it's defined in the module scope
@@ -158,15 +159,16 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
             </h3>
             {isEdit && (
               <div className="flex flex-col items-end gap-2 w-full">
-                <div className="relative group/add">
+                <div className="relative">
                   <button 
                     type="button"
+                    onClick={() => setActiveDropdown(activeDropdown === idx ? null : idx)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 rounded-md transition-colors shadow-sm border border-slate-200 dark:border-slate-700"
                   >
                     <Plus className="w-4 h-4" />
                     Thêm khối
                   </button>
-                  <div className="absolute right-0 top-full mt-1 w-48 max-h-[300px] overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2 opacity-0 invisible group-hover/add:opacity-100 group-hover/add:visible transition-all z-20">
+                  <div className={`absolute right-0 top-full mt-1 w-48 max-h-[300px] overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2 transition-all z-20 ${activeDropdown === idx ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}>
                      {Object.entries(BLOCK_CONFIG).map(([type, config]) => {
                        const Icon = config.icon;
                        return (
@@ -174,6 +176,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                            key={type}
                            type="button"
                            onClick={() => {
+                             setActiveDropdown(null);
                              const newData = { ...data };
                              if (newData.sections && newData.sections[idx]) {
                                if (!newData.sections[idx].blocks) newData.sections[idx].blocks = [];
@@ -183,6 +186,14 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                                  content: ""
                                });
                                onChange(newData);
+
+                               const newBlockIdx = newData.sections[idx].blocks.length - 1;
+                               setTimeout(() => {
+                                 const el = document.getElementById(`block-${idx}-${newBlockIdx}`);
+                                 if (el) {
+                                   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                 }
+                               }, 100);
                              }
                            }}
                            className="w-full flex items-center gap-2 px-2 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
@@ -332,6 +343,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                 return (
                   <div 
                     key={bIdx} 
+                    id={`block-${idx}-${bIdx}`}
                     className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}
                   >
                     <BlockItem block={blockToRender} />
