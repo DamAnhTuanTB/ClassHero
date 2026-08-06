@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap } from "lucide-react";
+import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
@@ -81,11 +81,14 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
       {data.sections?.map((section, idx) => (
         <div key={idx} className="space-y-4">
           <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
-            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-3">
-              <span className="flex-none bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 w-8 h-8 rounded-full flex items-center justify-center text-sm font-black">
+            <h3 className="group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+              <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
                 {section.order || idx + 1}
               </span>
-              <span>{section.displayHeading}</span>
+              <span className="relative pb-1">
+                {section.displayHeading}
+                <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
+              </span>
             </h3>
             {isEdit && (
               <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto">
@@ -172,40 +175,25 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
 
 function BlockItem({ block }: { block: BlockData }) {
   switch (block.type) {
-    case "definition":
-      return <CalloutBlock block={block} variant="blue" />;
-    case "rule":
-      return <CalloutBlock block={block} variant="indigo" />;
-    case "property":
-      return <CalloutBlock block={block} variant="teal" />;
-    case "theorem":
-      return <CalloutBlock block={block} variant="rose" />;
-    
-    case "remark":
-      return <CalloutBlock block={block} variant="slate" />;
-      
-    case "note":
-      return <CalloutBlock block={block} variant="amber" />;
-      
-    case "common_mistake":
-      return <CalloutBlock block={block} variant="red" />;
-      
     case "formula":
       return <FormulaBlock block={block} />;
-      
     case "procedure":
     case "proof":
       return <StepsBlock block={block} />;
-      
     case "example":
       return <ExampleBlock block={block} />;
-      
     case "additional_info":
     case "section_recap":
       return <AdditionalInfoBlock block={block} />;
-      
+    case "definition":
+    case "rule":
+    case "property":
+    case "theorem":
+    case "remark":
+    case "note":
+    case "common_mistake":
+      return <CalloutBlock block={block} />;
     default:
-      // Fallback for unknown blocks or extended blocks not implemented yet
       return (
         <div className="p-3 border border-slate-200 rounded text-sm text-slate-500 overflow-auto">
           <em>Unsupported block type: {block.type}</em>
@@ -215,91 +203,92 @@ function BlockItem({ block }: { block: BlockData }) {
   }
 }
 
-// Helper for block type labels
-const getBlockTypeLabel = (type: string) => {
-  switch (type) {
-    case "definition": return "Định nghĩa";
-    case "rule": return "Quy tắc";
-    case "property": return "Tính chất";
-    case "theorem": return "Định lí";
-    case "remark": return "Nhận xét";
-    case "note": return "Chú ý";
-    case "common_mistake": return "Lỗi thường gặp";
-    case "formula": return "Công thức";
-    case "procedure": return "Quy trình";
-    case "proof": return "Chứng minh";
-    case "example": return "Ví dụ";
-    case "additional_info": return "Thông tin bổ sung";
-    case "section_recap": return "Tóm tắt phần";
-    default: return type;
-  }
-}
+const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
+  definition: { label: "Định nghĩa", color: "yellow", icon: BookOpen },
+  rule: { label: "Quy tắc", color: "sky", icon: Scale },
+  property: { label: "Tính chất", color: "teal", icon: Bookmark },
+  theorem: { label: "Định lí", color: "green", icon: GraduationCap },
+  remark: { label: "Nhận xét", color: "fuchsia", icon: MessageSquareQuote },
+  note: { label: "Chú ý", color: "amber", icon: Lightbulb },
+  common_mistake: { label: "Lỗi thường gặp", color: "red", icon: AlertOctagon },
+  formula: { label: "Công thức", color: "emerald", icon: Sigma },
+  procedure: { label: "Phương pháp giải", color: "cyan", icon: ListOrdered },
+  proof: { label: "Chứng minh", color: "violet", icon: FileBadge },
+  example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
+  additional_info: { label: "Thông tin bổ sung", color: "slate", icon: Info },
+  section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
+};
 
-// Reusable Callout Block
-function CalloutBlock({ block, variant }: { block: BlockData, variant: "blue" | "amber" | "red" | "indigo" | "teal" | "rose" | "slate" }) {
-  const styles = {
-    blue: "bg-blue-50/50 border-blue-200 text-blue-900 dark:bg-blue-900/10 dark:border-blue-900/50 dark:text-blue-100",
-    amber: "bg-amber-50/50 border-amber-200 text-amber-900 dark:bg-amber-900/10 dark:border-amber-900/50 dark:text-amber-100",
-    red: "bg-red-50/50 border-red-200 text-red-900 dark:bg-red-900/10 dark:border-red-900/50 dark:text-red-100",
-    indigo: "bg-indigo-50/50 border-indigo-200 text-indigo-900 dark:bg-indigo-900/10 dark:border-indigo-900/50 dark:text-indigo-100",
-    teal: "bg-teal-50/50 border-teal-200 text-teal-900 dark:bg-teal-900/10 dark:border-teal-900/50 dark:text-teal-100",
-    rose: "bg-rose-50/50 border-rose-200 text-rose-900 dark:bg-rose-900/10 dark:border-rose-900/50 dark:text-rose-100",
-    slate: "bg-slate-50/50 border-slate-200 text-slate-900 dark:bg-slate-900/10 dark:border-slate-900/50 dark:text-slate-100",
-  };
-  
-  const Icon = variant === "blue" ? Info 
-             : variant === "amber" ? Lightbulb 
-             : variant === "indigo" ? Scale
-             : variant === "teal" ? Bookmark
-             : variant === "rose" ? GraduationCap
-             : variant === "slate" ? Info
-             : AlertCircle;
+const COLOR_STYLES: Record<string, any> = {
+  blue: { bg: "bg-blue-50/50 dark:bg-blue-900/10", border: "border-blue-200 dark:border-blue-900/50", text: "text-blue-900 dark:text-blue-100", label: "text-blue-600/70 dark:text-blue-400/70" },
+  indigo: { bg: "bg-indigo-50/50 dark:bg-indigo-900/10", border: "border-indigo-200 dark:border-indigo-900/50", text: "text-indigo-900 dark:text-indigo-100", label: "text-indigo-600/70 dark:text-indigo-400/70" },
+  teal: { bg: "bg-teal-50/50 dark:bg-teal-900/10", border: "border-teal-200 dark:border-teal-900/50", text: "text-teal-900 dark:text-teal-100", label: "text-teal-600/70 dark:text-teal-400/70" },
+  rose: { bg: "bg-rose-50/50 dark:bg-rose-900/10", border: "border-rose-200 dark:border-rose-900/50", text: "text-rose-900 dark:text-rose-100", label: "text-rose-600/70 dark:text-rose-400/70" },
+  fuchsia: { bg: "bg-fuchsia-50/50 dark:bg-fuchsia-900/10", border: "border-fuchsia-200 dark:border-fuchsia-900/50", text: "text-fuchsia-900 dark:text-fuchsia-100", label: "text-fuchsia-600/70 dark:text-fuchsia-400/70" },
+  amber: { bg: "bg-amber-50/50 dark:bg-amber-900/10", border: "border-amber-200 dark:border-amber-900/50", text: "text-amber-900 dark:text-amber-100", label: "text-amber-600/70 dark:text-amber-400/70" },
+  yellow: { bg: "bg-yellow-50/50 dark:bg-yellow-900/10", border: "border-yellow-200 dark:border-yellow-900/50", text: "text-yellow-900 dark:text-yellow-100", label: "text-yellow-600/70 dark:text-yellow-400/70" },
+  red: { bg: "bg-red-50/50 dark:bg-red-900/10", border: "border-red-200 dark:border-red-900/50", text: "text-red-900 dark:text-red-100", label: "text-red-600/70 dark:text-red-400/70" },
+  green: { bg: "bg-green-50/50 dark:bg-green-900/10", border: "border-green-200 dark:border-green-900/50", text: "text-green-900 dark:text-green-100", label: "text-green-600/70 dark:text-green-400/70" },
+  emerald: { bg: "bg-emerald-50/50 dark:bg-emerald-900/10", border: "border-emerald-200 dark:border-emerald-900/50", text: "text-emerald-900 dark:text-emerald-100", label: "text-emerald-600/70 dark:text-emerald-400/70" },
+  cyan: { bg: "bg-cyan-50/50 dark:bg-cyan-900/10", border: "border-cyan-200 dark:border-cyan-900/50", text: "text-cyan-900 dark:text-cyan-100", label: "text-cyan-600/70 dark:text-cyan-400/70" },
+  violet: { bg: "bg-violet-50/50 dark:bg-violet-900/10", border: "border-violet-200 dark:border-violet-900/50", text: "text-violet-900 dark:text-violet-100", label: "text-violet-600/70 dark:text-violet-400/70" },
+  purple: { bg: "bg-purple-50/50 dark:bg-purple-900/10", border: "border-purple-200 dark:border-purple-900/50", text: "text-purple-900 dark:text-purple-100", label: "text-purple-600/70 dark:text-purple-400/70" },
+  sky: { bg: "bg-sky-50/50 dark:bg-sky-900/10", border: "border-sky-200 dark:border-sky-900/50", text: "text-sky-900 dark:text-sky-100", label: "text-sky-600/70 dark:text-sky-400/70" },
+  orange: { bg: "bg-orange-50/50 dark:bg-orange-900/10", border: "border-orange-200 dark:border-orange-900/50", text: "text-orange-900 dark:text-orange-100", label: "text-orange-600/70 dark:text-orange-400/70" },
+  slate: { bg: "bg-slate-50/50 dark:bg-slate-900/10", border: "border-slate-200 dark:border-slate-900/50", text: "text-slate-900 dark:text-slate-100", label: "text-slate-600/70 dark:text-slate-400/70" },
+};
+
+function BaseBlockContainer({ block, children }: { block: BlockData, children: React.ReactNode }) {
+  const config = BLOCK_CONFIG[block.type] || { label: block.type, color: "slate", icon: Info };
+  const styles = COLOR_STYLES[config.color] || COLOR_STYLES.slate;
+  const Icon = config.icon;
 
   return (
-    <div className={`rounded-xl border p-4 ${styles[variant]}`}>
-      <div className="text-[11px] font-black uppercase tracking-wider mb-2 opacity-60">
-        {getBlockTypeLabel(block.type)} {block.displayNumber ? block.displayNumber : ""}
+    <div className={`rounded-xl border p-4 ${styles.bg} ${styles.border}`}>
+      <div className={`flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider mb-2 ${styles.label}`}>
+        <Icon className="w-4 h-4" />
+        {config.label} {block.displayNumber ? block.displayNumber : ""}
       </div>
-      <div className="flex items-center gap-2 mb-2 font-bold">
-        <Icon className="w-5 h-5 opacity-70" />
+      <div className={`font-bold mb-3 ${styles.text}`}>
         {block.title}
       </div>
-      <div className="space-y-2 opacity-90 text-[15px] leading-relaxed">
-        {block.definition && (
-          <div>
-            {block.term && block.term.toLowerCase() !== block.title?.toLowerCase() && (
-              <strong className="mr-1">{block.term}:</strong>
-            )}
-            <MathpixMarkdownRenderer content={block.definition} />
-          </div>
-        )}
-        {block.statement && <MathpixMarkdownRenderer content={block.statement} />}
-        {block.explanation && <MathpixMarkdownRenderer content={block.explanation} />}
-        {block.content && <MathpixMarkdownRenderer content={block.content} />}
-        {block.mistake && (
-          <>
-            <div><strong>Lỗi sai:</strong> <MathpixMarkdownRenderer content={block.mistake} /></div>
-            <div><strong>Sửa lại:</strong> <MathpixMarkdownRenderer content={block.correction} /></div>
-          </>
-        )}
+      <div className="space-y-2 opacity-90 text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">
+        {children}
       </div>
     </div>
   );
 }
 
+function CalloutBlock({ block }: { block: BlockData }) {
+  return (
+    <BaseBlockContainer block={block}>
+      {block.definition && (
+        <div>
+          {block.term && block.term.toLowerCase() !== block.title?.toLowerCase() && (
+            <strong className="mr-1">{block.term}:</strong>
+          )}
+          <MathpixMarkdownRenderer content={block.definition} />
+        </div>
+      )}
+      {block.statement && <MathpixMarkdownRenderer content={block.statement} />}
+      {block.explanation && <MathpixMarkdownRenderer content={block.explanation} />}
+      {block.content && <MathpixMarkdownRenderer content={block.content} />}
+      {block.mistake && (
+        <>
+          <div><strong>Lỗi sai:</strong> <MathpixMarkdownRenderer content={block.mistake} /></div>
+          <div><strong>Sửa lại:</strong> <MathpixMarkdownRenderer content={block.correction} /></div>
+        </>
+      )}
+    </BaseBlockContainer>
+  );
+}
+
 function FormulaBlock({ block }: { block: BlockData }) {
   return (
-    <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/10">
-      <div className="text-[11px] font-black uppercase tracking-wider mb-2 text-emerald-600/70 dark:text-emerald-400/70">
-        {getBlockTypeLabel(block.type)} {block.displayNumber ? block.displayNumber : ""}
-      </div>
-      <h4 className="font-bold text-emerald-800 dark:text-emerald-400 mb-3 flex items-center gap-2">
-        <PenTool className="w-4 h-4" />
-        {block.title}
-      </h4>
+    <BaseBlockContainer block={block}>
       <div className="space-y-4">
         {block.formulas?.map((f: any, i: number) => (
-          <div key={i} className="flex flex-col items-center justify-center p-3 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-emerald-50 dark:border-emerald-900/20">
+          <div key={i} className="flex flex-col items-center justify-center p-3 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800">
             <MathpixMarkdownRenderer content={`$$ ${f.latex} $$`} />
             {f.explanation && (
               <div className="mt-2 text-sm text-slate-600 dark:text-slate-400 text-center">
@@ -309,26 +298,20 @@ function FormulaBlock({ block }: { block: BlockData }) {
           </div>
         ))}
       </div>
-    </div>
+    </BaseBlockContainer>
   );
 }
 
 function StepsBlock({ block }: { block: BlockData }) {
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-      <div className="text-[11px] font-black uppercase tracking-wider mb-2 text-slate-500/70">
-        {getBlockTypeLabel(block.type)} {block.displayNumber ? block.displayNumber : ""}
-      </div>
-      <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3">
-        {block.title}
-      </h4>
-      <div className="space-y-3">
+    <BaseBlockContainer block={block}>
+      <div className="space-y-3 mt-1">
         {block.steps?.map((step: any, i: number) => (
           <div key={i} className="flex gap-3">
-            <div className="flex-none w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">
+            <div className="flex-none w-6 h-6 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-xs font-bold">
               {step.order || i + 1}
             </div>
-            <div className="flex-1 text-[15px] text-slate-700 dark:text-slate-300">
+            <div className="flex-1">
               <MathpixMarkdownRenderer content={step.content || step.statement || ""} />
               {step.latex && (
                 <div className="mt-1">
@@ -339,28 +322,21 @@ function StepsBlock({ block }: { block: BlockData }) {
           </div>
         ))}
       </div>
-    </div>
+    </BaseBlockContainer>
   );
 }
 
 function ExampleBlock({ block }: { block: BlockData }) {
   return (
-    <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4 dark:border-purple-900/30 dark:bg-purple-900/10">
-      <div className="text-[11px] font-black uppercase tracking-wider mb-2 text-purple-600/70 dark:text-purple-400/70">
-        {getBlockTypeLabel(block.type)} {block.displayNumber ? block.displayNumber : ""}
-      </div>
-      <h4 className="font-bold text-purple-800 dark:text-purple-300 mb-3 flex items-center gap-2">
-        <FileCheck2 className="w-5 h-5" />
-        {block.title}
-      </h4>
-      <div className="mb-3 text-[15px] font-medium text-slate-800 dark:text-slate-200">
+    <BaseBlockContainer block={block}>
+      <div className="mb-3 font-medium">
         <MathpixMarkdownRenderer content={block.problem} />
       </div>
       
       {block.solutionSteps && block.solutionSteps.length > 0 && (
-        <div className="pl-4 border-l-2 border-purple-200 dark:border-purple-800 space-y-3 mb-3">
+        <div className="pl-4 border-l-2 border-black/10 dark:border-white/10 space-y-3 mb-3">
           {block.solutionSteps.map((step: any, i: number) => (
-            <div key={i} className="text-sm text-slate-700 dark:text-slate-300">
+            <div key={i} className="text-sm">
               {step.explanation && <MathpixMarkdownRenderer content={step.explanation} />}
               {step.latex && (
                 <div className="mt-1 bg-white dark:bg-slate-900/50 p-2 rounded">
@@ -373,31 +349,24 @@ function ExampleBlock({ block }: { block: BlockData }) {
       )}
       
       {block.answer && (
-        <div className="text-[15px] font-semibold text-purple-900 dark:text-purple-200 mt-2">
+        <div className="font-semibold mt-2">
           Kết luận: <MathpixMarkdownRenderer content={block.answer} />
         </div>
       )}
-    </div>
+    </BaseBlockContainer>
   );
 }
 
 function AdditionalInfoBlock({ block }: { block: BlockData }) {
   return (
-    <div className="space-y-2 py-2">
-      <div className="text-[11px] font-black uppercase tracking-wider mb-1 text-slate-500/70 pl-7">
-        {getBlockTypeLabel(block.type)} {block.displayNumber ? block.displayNumber : ""}
-      </div>
-      <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-        <ChevronRight className="w-5 h-5 text-sky-500" />
-        {block.title}
-      </h4>
-      <ul className="list-disc pl-8 space-y-1 text-[15px] text-slate-700 dark:text-slate-300">
+    <BaseBlockContainer block={block}>
+      <ul className="list-disc pl-5 space-y-1">
         {block.points?.map((point: string, i: number) => (
           <li key={i}>
             <MathpixMarkdownRenderer content={point} />
           </li>
         ))}
       </ul>
-    </div>
+    </BaseBlockContainer>
   );
 }

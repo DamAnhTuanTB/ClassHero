@@ -163,53 +163,45 @@ export function AdminLessonSummaryTab({
       </div>
 
       {content?.type === "lesson_summary_blocks" ? (
-        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-6">
-          <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-            <div className="text-sm text-blue-700 dark:text-blue-300">
-              <strong>Lưu ý:</strong> Bản tóm tắt này sử dụng cấu trúc Block động. Trình soạn thảo trực quan đang được phát triển, tạm thời bạn có thể sửa qua JSON ở cột bên phải.
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-slate-950 p-4 sm:p-6 rounded-xl shadow-sm border border-[var(--theme-border)]">
-            {viewMode === "JSON_ONLY" ? (
-              <div className="flex flex-col space-y-3">
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setJsonCollapsed(false)}
-                    className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors"
-                  >
-                    Xổ toàn bộ
-                  </button>
-                  <button 
-                    onClick={() => setJsonCollapsed(2)}
-                    className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors"
-                  >
-                    Thu lại toàn bộ
-                  </button>
-                </div>
-                <div className="w-full overflow-auto max-h-[800px] border border-slate-100 dark:border-slate-800/50 rounded-lg p-2 bg-slate-50 dark:bg-slate-900">
-                  <ReactJson 
-                    src={content} 
-                    onEdit={(e) => setContent(e.updated_src)}
-                    onAdd={(e) => setContent(e.updated_src)}
-                    onDelete={(e) => setContent(e.updated_src)}
-                    theme="rjv-default"
-                    style={{ backgroundColor: 'transparent' }}
-                    collapsed={jsonCollapsed}
-                    displayDataTypes={false}
-                    name={false}
-                    enableClipboard={false}
-                  />
-                </div>
+        <div className="pt-2 pb-4 px-4 sm:px-6 bg-white dark:bg-slate-950 rounded-xl">
+          {viewMode === "JSON_ONLY" ? (
+            <div className="flex flex-col space-y-3">
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setJsonCollapsed(false)}
+                  className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors"
+                >
+                  Xổ toàn bộ
+                </button>
+                <button 
+                  onClick={() => setJsonCollapsed(2)}
+                  className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors"
+                >
+                  Thu lại toàn bộ
+                </button>
               </div>
-            ) : (
-              <SummaryBlockRenderer 
-                data={content.data} 
-                displayTitle={lessonTitle}
-                onChange={viewMode === "SPLIT" ? (newData) => setContent({ ...content, data: newData }) : undefined} 
-              />
-            )}
-          </div>
+              <div className="w-full overflow-auto max-h-[800px] border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-white dark:bg-slate-950 shadow-sm">
+                <ReactJson 
+                  src={content} 
+                  onEdit={(e) => setContent(e.updated_src)}
+                  onAdd={(e) => setContent(e.updated_src)}
+                  onDelete={(e) => setContent(e.updated_src)}
+                  theme="rjv-default"
+                  style={{ backgroundColor: 'transparent' }}
+                  collapsed={jsonCollapsed}
+                  displayDataTypes={false}
+                  name={false}
+                  enableClipboard={false}
+                />
+              </div>
+            </div>
+          ) : (
+            <SummaryBlockRenderer 
+              data={content.data} 
+              displayTitle={lessonTitle}
+              onChange={viewMode === "SPLIT" ? (newData) => setContent({ ...content, data: newData }) : undefined} 
+            />
+          )}
         </div>
       ) : (
         <QuizRichContentEditor
