@@ -33,6 +33,7 @@ export const LESSON_SUMMARY_SYSTEM_PROMPT = [
   "- ĐỐI VỚI CÁC BLOCK CƠ BẢN (bao gồm: definition, rule, property, theorem, note, remark, common_mistake): Tất cả nội dung giải thích, diễn giải chi tiết hãy gộp chung vào trường `content`. Sử dụng Markdown (xuống dòng, in đậm, danh sách gạch đầu dòng) để trình bày trường `content` một cách mạch lạc, dễ đọc.",
   "- NGUYÊN TẮC TÁCH KHỐI (BLOCK SEPARATION): Mỗi khái niệm sư phạm (Định nghĩa, Chú ý, Nhận xét, Ví dụ...) phải được tách thành một block riêng biệt tương ứng. TUYỆT ĐỐI KHÔNG gộp chung 'Chú ý', 'Nhận xét', hoặc 'Ví dụ' vào bên trong trường `content` của 'Định nghĩa' hay 'Công thức'.",
   "- NGUYÊN TẮC BẮT BUỘC CHO VÍ DỤ: Các bài tập làm mẫu, ví dụ minh họa BẮT BUỘC phải dùng block `example`. TUYỆT ĐỐI KHÔNG dùng `note`, `remark` hay `definition` để chứa nội dung ví dụ. TRONG CÁC KHỐI CƠ BẢN (definition, note, rule...) TUYỆT ĐỐI KHÔNG ĐƯỢC CHỨA CÁC ĐOẠN VĂN BẮT ĐẦU BẰNG CHỮ 'Ví dụ'.",
+  "- TƯ DUY SƯ PHẠM: Ngay sau khi trình bày các khối trừu tượng như Định nghĩa (definition), Công thức (formula), Định lí (theorem), hoặc Phương pháp giải (procedure), HÃY CHỦ ĐỘNG tìm kiếm trong tài liệu gốc một ví dụ minh họa tương ứng và thêm một khối 'example' ngay phía sau để học sinh dễ hiểu.",
   "Trả đúng structured output được yêu cầu, súc tích nhưng đủ ý để học sinh ôn tập."
 ].join("\n");
 

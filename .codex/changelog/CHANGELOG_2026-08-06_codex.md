@@ -33,6 +33,7 @@
 - Improved UX of 'Thêm khối' dropdown by making it state-based (click to toggle), auto-closing on selection, and automatically scrolling the newly added block into view.
 - Improved JSON block editor UX by allowing users to double-click on any value (instead of ctrl/cmd+click) to immediately enter edit mode.
 
-## fix(api): resolve "Dữ liệu không hợp lệ" error when saving block-based lesson summaries
+## feat(api): add pedagogical instruction to AI prompt to auto-generate examples
+- Added a new system instruction to the lesson summary generation prompt forcing the AI to proactively search for and append an `example` block immediately after generating abstract blocks like `definition`, `formula`, `theorem`, or `procedure`. This ensures that theoretical concepts are always accompanied by practical, visual examples to enhance student understanding.
 - Updated the backend `tiptapContentSchema` and `IsTiptapJson` validator to explicitly support and validate the new `"type": "lesson_summary_blocks"` format. Previously, the strict validation only allowed standard Tiptap `"doc"` types, causing saves/publishes of the new block structures to be rejected with a 400 Bad Request.
 - Made the `content` prop optional and set a default empty string in `MathpixMarkdownRenderer` to prevent `markdown-it` from crashing with "Input data should be a String" when rendering newly created, empty JSON blocks (like empty Example blocks).
