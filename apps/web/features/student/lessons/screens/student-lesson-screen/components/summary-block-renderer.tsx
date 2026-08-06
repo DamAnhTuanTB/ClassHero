@@ -52,39 +52,39 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
       case "example":
         return {
           ...base,
-          problem: "",
-          solutionSteps: [{ explanation: "", latex: "" }],
-          answer: ""
+          problem: "Nhập đề bài tại đây...",
+          solutionSteps: [{ explanation: "Giải thích bước 1...", latex: "" }],
+          answer: "Đáp án cuối cùng..."
         };
       case "formula":
         return {
           ...base,
-          formulas: [{ latex: "", explanation: "" }]
+          formulas: [{ latex: "a^2 + b^2 = c^2", explanation: "Giải thích công thức..." }]
         };
       case "procedure":
       case "proof":
         return {
           ...base,
-          steps: [{ content: "", latex: "" }]
+          steps: [{ content: "Nội dung bước 1...", latex: "" }]
         };
       case "common_mistake":
         return {
           ...base,
-          mistake: "",
-          correction: ""
+          mistake: "Mô tả lỗi sai thường gặp...",
+          correction: "Cách sửa lại cho đúng..."
         };
       case "theorem":
       case "rule":
       case "property":
         return {
           ...base,
-          statement: "",
-          explanation: ""
+          statement: "Phát biểu định lí/quy tắc...",
+          explanation: "Giải thích chi tiết..."
         };
       default:
         return {
           ...base,
-          content: ""
+          content: "Nhập nội dung tại đây..."
         };
     }
   };

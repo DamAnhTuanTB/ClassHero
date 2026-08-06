@@ -29,6 +29,7 @@
 - Added 'Thêm đề mục lớn' button to allow manual creation of new sections, with auto-scroll to the newly added section.
 - Added 'Thêm khối' dropdown to allow manual insertion of specific block types (definition, rule, formula, etc.) into any existing section.
 - Added comprehensive data templates for newly created blocks, dynamically generating the appropriate schema structure (e.g. `problem`/`solutionSteps` for examples, `formulas` for formula blocks, `steps` for procedure blocks) instead of a generic `content` field.
+- Populated newly generated JSON block fields with context-aware placeholder text (e.g., "Nhập đề bài tại đây...", "a^2 + b^2 = c^2") to guide users on what content to input.
 - Improved UX of 'Thêm khối' dropdown by making it state-based (click to toggle), auto-closing on selection, and automatically scrolling the newly added block into view.
 - Improved JSON block editor UX by allowing users to double-click on any value (instead of ctrl/cmd+click) to immediately enter edit mode.
 
