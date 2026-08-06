@@ -25,7 +25,13 @@ export const tiptapNodeSchema: z.ZodType<any> = z.lazy(() =>
  * Tiptap Content Schema
  * Luôn phải bắt đầu bằng node có type là "doc"
  */
-export const tiptapContentSchema = z.object({
-  type: z.literal("doc"),
-  content: z.array(tiptapNodeSchema).optional(),
-}).passthrough();
+export const tiptapContentSchema = z.union([
+  z.object({
+    type: z.literal("doc"),
+    content: z.array(tiptapNodeSchema).optional(),
+  }).passthrough(),
+  z.object({
+    type: z.literal("lesson_summary_blocks"),
+    data: z.any().optional(),
+  }).passthrough()
+]);

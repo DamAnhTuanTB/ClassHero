@@ -33,5 +33,6 @@
 - Improved UX of 'Thêm khối' dropdown by making it state-based (click to toggle), auto-closing on selection, and automatically scrolling the newly added block into view.
 - Improved JSON block editor UX by allowing users to double-click on any value (instead of ctrl/cmd+click) to immediately enter edit mode.
 
-## fix(admin): resolve crash in MathpixMarkdownRenderer when adding new blocks
+## fix(api): resolve "Dữ liệu không hợp lệ" error when saving block-based lesson summaries
+- Updated the backend `tiptapContentSchema` and `IsTiptapJson` validator to explicitly support and validate the new `"type": "lesson_summary_blocks"` format. Previously, the strict validation only allowed standard Tiptap `"doc"` types, causing saves/publishes of the new block structures to be rejected with a 400 Bad Request.
 - Made the `content` prop optional and set a default empty string in `MathpixMarkdownRenderer` to prevent `markdown-it` from crashing with "Input data should be a String" when rendering newly created, empty JSON blocks (like empty Example blocks).
