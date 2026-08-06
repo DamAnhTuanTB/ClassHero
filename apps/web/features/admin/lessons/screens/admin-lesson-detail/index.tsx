@@ -344,7 +344,7 @@ export function AdminLessonDetailManager({
         />
 
         <section className="min-w-0 flex flex-col h-full bg-[var(--theme-bg)] min-h-screen">
-          <div className="border-b border-[var(--theme-border)] px-6 py-5 space-y-5 bg-[var(--theme-bg-subtle)]">
+          <div className="border-b border-[var(--theme-border)] px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 bg-[var(--theme-bg-subtle)]">
             <button
               onClick={() => router.back()}
               className="theme-button-neutral inline-flex min-h-10 w-fit items-center gap-2 rounded-lg px-3 text-sm font-bold transition"
@@ -404,7 +404,7 @@ export function AdminLessonDetailManager({
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                   {/* Video Section */}
-                  <div className="sm:rounded-xl sm:border border-[var(--theme-border)] sm:bg-[var(--theme-bg)] sm:overflow-hidden sm:shadow-sm w-screen relative left-1/2 -ml-[50vw] sm:w-auto sm:static sm:left-auto sm:ml-0">
+                  <div className="sm:rounded-xl sm:border border-[var(--theme-border)] bg-white dark:bg-slate-950 sm:overflow-hidden sm:shadow-sm w-screen relative left-1/2 -ml-[50vw] sm:w-auto sm:static sm:left-auto sm:ml-0">
                     <div className="px-4 py-3 sm:border-b border-[var(--theme-border)] sm:bg-[var(--theme-bg-subtle)] font-bold text-sm text-[var(--theme-text-strong)] hidden sm:block">
                       Video bài giảng
                     </div>
@@ -482,7 +482,7 @@ export function AdminLessonDetailManager({
                   </div>
 
                   {/* Description Section */}
-                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] overflow-hidden shadow-sm">
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 overflow-hidden shadow-sm">
                     <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-bg-subtle)] font-bold text-sm text-[var(--theme-text-strong)]">
                       Mô tả buổi học
                     </div>
@@ -494,7 +494,7 @@ export function AdminLessonDetailManager({
 
                 <div className="space-y-6">
                   {/* Info Section */}
-                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] overflow-hidden shadow-sm">
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 overflow-hidden shadow-sm">
                     <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-bg-subtle)] font-bold text-sm text-[var(--theme-text-strong)]">
                       Thông tin chi tiết
                     </div>

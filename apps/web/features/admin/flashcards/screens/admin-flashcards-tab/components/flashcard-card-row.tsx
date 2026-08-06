@@ -29,31 +29,23 @@ export function FlashcardCardRow({
   return (
     <article className="space-y-4 p-4 sm:p-5">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-extrabold uppercase tracking-wide text-[var(--theme-primary)]">
-              Flashcard {index + 1}
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-extrabold",
-                card.difficulty === "MEDIUM"
-                  ? "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]"
-                  : "border-transparent bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
-              )}
-            >
-              {card.difficulty === "MEDIUM" ? (
-                <Gauge className="size-3.5" aria-hidden="true" />
-              ) : null}
-              {difficultyLabels[card.difficulty]}
-            </span>
-          </div>
-          <p className="mt-3 text-xs font-bold text-[var(--theme-text-muted)]">
-            Mặt trước
-          </p>
-          <h5 className="mt-1 whitespace-pre-wrap text-base font-extrabold leading-6 text-[var(--theme-text-strong)]">
-            {front}
-          </h5>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-xs font-extrabold uppercase tracking-wide text-[var(--theme-primary)]">
+            Flashcard {index + 1}
+          </span>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-extrabold",
+              card.difficulty === "MEDIUM"
+                ? "border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] text-[var(--theme-warning-text)]"
+                : "border-transparent bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
+            )}
+          >
+            {card.difficulty === "MEDIUM" ? (
+              <Gauge className="size-3.5" aria-hidden="true" />
+            ) : null}
+            {difficultyLabels[card.difficulty]}
+          </span>
         </div>
         <div className="flex shrink-0 gap-2">
           <button
@@ -73,6 +65,13 @@ export function FlashcardCardRow({
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--theme-border)] bg-transparent p-3">
+        <p className="text-xs font-bold text-[var(--theme-text-muted)]">Mặt trước</p>
+        <h5 className="mt-1 whitespace-pre-wrap text-base font-extrabold leading-6 text-[var(--theme-text-strong)]">
+          {front}
+        </h5>
       </div>
 
       <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">

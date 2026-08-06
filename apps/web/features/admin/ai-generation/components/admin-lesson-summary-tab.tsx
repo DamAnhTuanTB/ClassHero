@@ -163,7 +163,7 @@ export function AdminLessonSummaryTab({
       </div>
 
       {content?.type === "lesson_summary_blocks" ? (
-        <div className="pt-2 pb-4 px-4 sm:px-6 bg-white dark:bg-slate-950 rounded-xl">
+        <div className="-mx-3 sm:mx-0 py-6 px-3 sm:p-8 bg-white dark:bg-slate-950 rounded-none sm:rounded-2xl shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-800/50">
           {viewMode === "JSON_ONLY" ? (
             <div className="flex flex-col space-y-3">
               <div className="flex items-center gap-2">

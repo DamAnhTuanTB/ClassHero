@@ -524,7 +524,7 @@ function QuizSetPanel({
       ref={panelRef}
       id={`${assessmentKind}-set-panel-${activeSet.id}`}
       role="tabpanel"
-      className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm"
+      className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 shadow-sm"
       style={{ minHeight: minHeight || undefined }}
     >
       <div className="flex flex-col gap-4 border-b border-[var(--theme-border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
@@ -833,7 +833,7 @@ function QuizLoadingState() {
         <SkeletonBlock className="h-10 w-32 shrink-0 rounded-lg" />
         <SkeletonBlock className="h-10 w-32 shrink-0 rounded-lg" />
       </div>
-      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5">
+      <div className="rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 p-5">
         <div className="flex items-center justify-between gap-4">
           <SkeletonBlock className="h-6 w-2/5 rounded-full" />
           <SkeletonBlock className="h-10 w-32 rounded-lg" />

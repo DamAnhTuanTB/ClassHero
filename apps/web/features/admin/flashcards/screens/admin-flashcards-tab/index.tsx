@@ -267,7 +267,7 @@ function FlashcardSetsSkeleton() {
         <SkeletonBlock className="h-10 w-36 shrink-0 rounded-lg" />
         <SkeletonBlock className="h-10 w-36 shrink-0 rounded-lg" />
       </div>
-      <div className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)]">
+      <div className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950">
         <div className="flex items-center justify-between gap-4 border-b border-[var(--theme-border)] p-5">
           <div className="space-y-2">
             <SkeletonBlock className="h-5 w-40 rounded-full" />

@@ -29,7 +29,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
     <div className="mt-4 space-y-8">
       {/* Title */}
       <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
-        <div className="text-2xl font-black mb-4">{displayTitle || data.title}</div>
+        <div className="text-2xl sm:text-3xl font-black mb-6 tracking-tight text-slate-800 dark:text-slate-100">{displayTitle || data.title}</div>
         {isEdit && (
           <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto mb-4">
             <ReactJson 
@@ -48,7 +48,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
       {/* Objectives */}
       {data.objectives && data.objectives.length > 0 && (
         <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
-          <div className="rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+          <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
             <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
               <BookOpen className="w-5 h-5" />
               Mục tiêu học tập
@@ -244,7 +244,7 @@ function BaseBlockContainer({ block, children }: { block: BlockData, children: R
   const Icon = config.icon;
 
   return (
-    <div className={`rounded-xl border p-4 ${styles.bg} ${styles.border}`}>
+    <div className={`rounded-xl border p-3 sm:p-5 ${styles.bg} ${styles.border}`}>
       <div className={`flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider mb-2 ${styles.label}`}>
         <Icon className="w-4 h-4" />
         {config.label} {block.displayNumber ? block.displayNumber : ""}

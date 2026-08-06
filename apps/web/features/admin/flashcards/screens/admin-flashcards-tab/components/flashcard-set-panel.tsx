@@ -48,7 +48,7 @@ export function FlashcardSetPanel({
       ref={panelRef}
       id={`flashcard-set-panel-${set.id}`}
       role="tabpanel"
-      className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm"
+      className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 shadow-sm"
       style={{ minHeight: minHeight || undefined }}
     >
       <div className="flex flex-col gap-4 border-b border-[var(--theme-border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">

@@ -108,7 +108,7 @@ export function AdminAiGenerationPanel({
   return (
     <section
       aria-labelledby="admin-ai-generation-heading"
-      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4 shadow-sm sm:p-5"
+      className="rounded-xl border border-[var(--theme-border)] bg-slate-50/50 dark:bg-slate-900/40 p-4 shadow-sm sm:p-5"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -228,7 +228,7 @@ function GenerationCard({
 }) {
   const status = getJobStatus(job, isReady, type);
   return (
-    <article className="flex min-h-56 flex-col rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg-subtle)] p-4">
+    <article className="flex min-h-56 flex-col rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--theme-primary-soft)] text-[var(--theme-primary)]">
           <Icon className="h-5 w-5" aria-hidden="true" />
