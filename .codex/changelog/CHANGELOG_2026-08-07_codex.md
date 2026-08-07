@@ -31,3 +31,10 @@
   - Explicitly required that enumerated items (e.g., `a), b), c)`) within `problem` and `content` fields must be split onto separate lines for readability.
   - Solidified the rule explicitly prohibiting `example` and `note` content from bleeding into theoretical `content` fields.
   - Specified exact valid block types (`knowledge`, `theorem`, `note`, `procedure`, `property`) in the formatting rule for the `content` field to improve LLM type matching.
+
+## New Features
+- **Math Toolbar**: Implemented a floating `MathToolbar` component in the `AdminLessonSummaryTab` to streamline writing mathematical equations within `react-json-view`.
+  - The toolbar dynamically tracks the active input/textarea element, matches its width, and perfectly positions itself directly above the input box (auto-adjusting position to prevent overlaps).
+  - Provided 14 pre-configured LaTeX snippet buttons (e.g., Inline/Block Math, Fractions, Square Roots, Sets).
+  - Designed robust `cursorOffset` positioning to perfectly place the user's text cursor inside the LaTeX braces/blocks after insertion.
+  - Implemented advanced escaping logic: dynamically detects if the user is editing a short string (`<input>`, parsed via `JSON.parse`) or a long string (`<textarea>`, raw string). It automatically escapes backslashes and newlines for `<input>` fields to completely prevent `JSON.parse` crashes when saving.

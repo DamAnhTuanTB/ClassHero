@@ -22,6 +22,7 @@ import {
   hasTiptapDocumentContent,
 } from "@/lib/tiptap-rich-content";
 import type { TiptapTextDocument } from "@/types/rich-text";
+import { MathToolbar } from "@/features/student/lessons/screens/student-lesson-screen/components/math-toolbar";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
@@ -104,6 +105,7 @@ export function AdminLessonSummaryTab({
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
+      <MathToolbar />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
