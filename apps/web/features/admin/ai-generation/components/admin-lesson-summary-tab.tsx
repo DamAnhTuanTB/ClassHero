@@ -199,7 +199,8 @@ export function AdminLessonSummaryTab({
             <SummaryBlockRenderer 
               data={content.data} 
               displayTitle={lessonTitle}
-              onChange={viewMode === "SPLIT" ? (newData) => setContent({ ...content, data: newData }) : undefined} 
+              viewMode={viewMode === "UI_ONLY" ? "UI_ONLY" : "SPLIT"}
+              onChange={(newData) => setContent({ ...content, data: newData })} 
             />
           )}
         </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag, GripVertical, Copy, Trash2, Plus } from "lucide-react";
+import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag, GripVertical, Copy, Trash2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
@@ -20,6 +20,7 @@ interface SummaryBlockRendererProps {
   };
   displayTitle?: string;
   onChange?: (newData: any) => void;
+  viewMode?: "UI_ONLY" | "SPLIT";
 }
 
 const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
@@ -34,13 +35,87 @@ const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> 
   section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
 };
 
-export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBlockRendererProps) {
-  const isEdit = !!onChange;
+export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = "SPLIT" }: SummaryBlockRendererProps) {
+  const isReadOnly = !onChange;
   const [draggedItem, setDraggedItem] = React.useState<{sectionIdx: number, blockIdx: number} | null>(null);
   const [dragOverItem, setDragOverItem] = React.useState<{sectionIdx: number, blockIdx: number} | null>(null);
   const [draggedSection, setDraggedSection] = React.useState<number | null>(null);
   const [dragOverSection, setDragOverSection] = React.useState<number | null>(null);
   const [activeDropdown, setActiveDropdown] = React.useState<number | null>(null);
+  const [editingItems, setEditingItems] = React.useState<Set<string>>(new Set());
+
+  // Auto-scroll logic during drag
+  React.useEffect(() => {
+    let scrollInterval: NodeJS.Timeout | null = null;
+    
+    const handleDragOver = (e: DragEvent) => {
+      if (!draggedItem && draggedSection === null) return;
+      
+      const scrollThreshold = 150;
+      const maxScrollSpeed = 80;
+      const { clientY } = e;
+      const { innerHeight } = window;
+      
+      let scrollSpeed = 0;
+      if (clientY < scrollThreshold) {
+        scrollSpeed = -maxScrollSpeed * (1 - clientY / scrollThreshold);
+      } else if (innerHeight - clientY < scrollThreshold) {
+        scrollSpeed = maxScrollSpeed * (1 - (innerHeight - clientY) / scrollThreshold);
+      }
+      
+      if (scrollSpeed !== 0) {
+        if (!scrollInterval) {
+          scrollInterval = setInterval(() => {
+            window.scrollBy(0, scrollSpeed);
+            
+            // Tries to scroll specific scrollable containers if window isn't the one scrolling
+            const scrollableDivs = document.querySelectorAll('.overflow-y-auto, .overflow-auto');
+            scrollableDivs.forEach(div => {
+              if (div.scrollHeight > div.clientHeight) {
+                div.scrollBy(0, scrollSpeed);
+              }
+            });
+          }, 16);
+        }
+      } else {
+        if (scrollInterval) {
+          clearInterval(scrollInterval);
+          scrollInterval = null;
+        }
+      }
+    };
+    
+    const handleDragEnd = () => {
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+      }
+    };
+
+    if (draggedItem || draggedSection !== null) {
+      document.addEventListener('dragover', handleDragOver);
+      document.addEventListener('dragend', handleDragEnd);
+      document.addEventListener('drop', handleDragEnd);
+    }
+
+    return () => {
+      document.removeEventListener('dragover', handleDragOver);
+      document.removeEventListener('dragend', handleDragEnd);
+      document.removeEventListener('drop', handleDragEnd);
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
+    };
+  }, [draggedItem, draggedSection]);
+
+  const toggleEdit = (key: string) => {
+    setEditingItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const getBlockDefaultData = (type: string) => {
     const base = { type, title: "Tiêu đề khối mới" };
@@ -107,14 +182,48 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
 
   const runningCounts: Record<string, number> = {};
 
+  const isTitleEditing = viewMode === "SPLIT" || editingItems.has('title');
+  const isObjectivesEditing = viewMode === "SPLIT" || editingItems.has('objectives');
+
   return (
-    <div className="mt-4 space-y-8">
+    <div className="mt-4 space-y-8 react-json-custom-edit-wrapper">
+
       {/* Title */}
-      <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
-        <div className="text-2xl sm:text-3xl font-black mb-6 tracking-tight text-slate-800 dark:text-slate-100">{displayTitle || data.title}</div>
-        {isEdit && (
-          <div className="flex flex-col items-end w-full">
-            <div className="flex justify-end mb-2">
+      <div className="relative group/title">
+        {(!isReadOnly && viewMode === "SPLIT") && (
+          <div className="flex justify-end mb-2">
+            <button 
+              type="button"
+              onClick={() => {
+                const newData = { ...data };
+                if (!newData.sections) newData.sections = [];
+                newData.sections.push({
+                  order: newData.sections.length + 1,
+                  displayHeading: "Đề mục mới",
+                  blocks: []
+                });
+                onChange(newData);
+
+                const newSectionIdx = newData.sections.length - 1;
+                setTimeout(() => {
+                  const el = document.getElementById(`section-${newSectionIdx}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 100);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md font-medium text-sm transition-colors border border-blue-200 dark:border-blue-800 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Thêm đề mục lớn
+            </button>
+          </div>
+        )}
+        <div className={viewMode === "SPLIT" ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "flex justify-between items-start gap-4"}>
+          <div className="text-2xl sm:text-3xl font-black mb-6 tracking-tight text-slate-800 dark:text-slate-100 pr-10 flex-1">{displayTitle || data.title}</div>
+          
+          {!isReadOnly && viewMode === "UI_ONLY" && (
+            <div className="flex justify-end opacity-0 group-hover/title:opacity-100 transition-opacity">
               <button 
                 type="button"
                 onClick={() => {
@@ -141,26 +250,31 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                 Thêm đề mục lớn
               </button>
             </div>
-            <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto mb-4 w-full">
-              <ReactJson 
-                src={{ title: data.title }}
-                onEdit={(e) => onChange({ ...data, title: (e.updated_src as any).title })}
-                theme="rjv-default"
-                style={{ backgroundColor: 'transparent' }}
-                displayDataTypes={false}
-                name={false}
-                enableClipboard={false}
-                keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
-              />
+          )}
+
+          {(!isReadOnly && viewMode === "SPLIT") && (
+            <div className="flex flex-col items-end w-full">
+              <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto mb-4 w-full">
+                <ReactJson 
+                  src={{ title: data.title }}
+                  onEdit={(e) => onChange({ ...data, title: (e.updated_src as any).title })}
+                  theme="rjv-default"
+                  style={{ backgroundColor: 'transparent' }}
+                  displayDataTypes={false}
+                  name={false}
+                  enableClipboard={false}
+                  keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Objectives */}
       {data.objectives && data.objectives.length > 0 && (
-        <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
-          <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+        <div className={`relative group/obj ${isObjectivesEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}`}>
+          <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 relative">
             <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
               <BookOpen className="w-5 h-5" />
               Mục tiêu học tập
@@ -171,7 +285,19 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
               ))}
             </ul>
           </div>
-          {isEdit && (
+
+          {!isReadOnly && viewMode === "UI_ONLY" && (
+            <button 
+              type="button"
+              onClick={() => toggleEdit('objectives')}
+              className="absolute top-2 right-2 p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors opacity-0 group-hover/obj:opacity-100 z-10"
+              title="Chỉnh sửa Mục tiêu"
+            >
+              <PenTool className="w-4 h-4" />
+            </button>
+          )}
+
+          {(!isReadOnly && isObjectivesEditing) && (
             <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto max-h-[300px]">
               <ReactJson 
                 src={data.objectives}
@@ -191,178 +317,271 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
       )}
 
       {/* Sections */}
-      {data.sections?.map((section, idx) => (
-        <div key={idx} id={`section-${idx}`} className="space-y-4">
-          <div className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
-            <h3 className="group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-              <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
-                {section.order || idx + 1}
-              </span>
-              <span className="relative pb-1">
-                {section.displayHeading}
-                <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
-              </span>
-            </h3>
-            {isEdit && (
-              <div className="flex flex-col items-end gap-2 w-full">
-                <div className="relative">
-                  <button 
-                    type="button"
-                    onClick={() => setActiveDropdown(activeDropdown === idx ? null : idx)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 rounded-md transition-colors shadow-sm border border-slate-200 dark:border-slate-700"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Thêm khối
-                  </button>
-                  <div className={`absolute right-0 top-full mt-1 w-48 max-h-[300px] overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2 transition-all z-20 ${activeDropdown === idx ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}>
-                     {Object.entries(BLOCK_CONFIG).map(([type, config]) => {
-                       const Icon = config.icon;
-                       return (
-                         <button
-                           key={type}
-                           type="button"
-                           onClick={() => {
-                             setActiveDropdown(null);
-                             const newData = { ...data };
-                             if (newData.sections && newData.sections[idx]) {
-                               if (!newData.sections[idx].blocks) newData.sections[idx].blocks = [];
-                               newData.sections[idx].blocks.push(getBlockDefaultData(type));
-                               onChange(newData);
-
-                               const newBlockIdx = newData.sections[idx].blocks.length - 1;
-                               setTimeout(() => {
-                                 const el = document.getElementById(`block-${idx}-${newBlockIdx}`);
-                                 if (el) {
-                                   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                 }
-                               }, 100);
-                             }
-                           }}
-                           className="w-full flex items-center gap-2 px-2 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
-                         >
-                           <Icon className="w-4 h-4" />
-                           {config.label}
-                         </button>
-                       );
-                     })}
-                  </div>
-                </div>
-                <div 
-                  className={`w-full relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto group transition-all ${
-                  draggedSection === idx ? "opacity-50 ring-2 ring-blue-500" : ""
-                } ${
-                  dragOverSection === idx ? "ring-2 ring-blue-500 border-blue-500" : ""
-                }`}
-                draggable
-                onDragStart={(e) => {
-                  setDraggedSection(idx);
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('text/plain', '');
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (draggedSection !== null) {
-                    setDragOverSection(idx);
-                  }
-                }}
-                onDragLeave={() => setDragOverSection(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverSection(null);
-                  if (draggedSection !== null) {
-                    if (draggedSection === idx) {
-                      setDraggedSection(null);
-                      return;
-                    }
-                    const newData = { ...data };
-                    if (newData.sections) {
-                      const sections = [...newData.sections];
-                      const draggedSecData = sections[draggedSection]!;
-                      sections.splice(draggedSection, 1);
-                      sections.splice(idx, 0, draggedSecData);
-                      
-                      // Cập nhật lại số thứ tự (order) cho các section sau khi đổi vị trí
-                      sections.forEach((s, i) => { s.order = i + 1; });
-                      
-                      newData.sections = sections;
-                      onChange(newData);
-                    }
-                    setDraggedSection(null);
-                  }
-                }}
-                onDragEnd={() => {
-                  setDraggedSection(null);
-                  setDragOverSection(null);
-                }}
+      {data.sections?.map((section, idx) => {
+        const isSectionEditing = viewMode === "SPLIT" || editingItems.has(`section-${idx}`);
+        
+        const renderSectionActions = () => (
+          <>
+            {viewMode === "UI_ONLY" && (
+              <button 
+                type="button"
+                onClick={() => toggleEdit(`section-${idx}`)}
+                className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
+                title="Chỉnh sửa Đề mục"
               >
-                {/* Toolbar cho Đề mục */}
-                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      const newData = { ...data };
-                      if (newData.sections) {
-                        const sections = [...newData.sections];
-                        const copiedSection = JSON.parse(JSON.stringify(sections[idx]!));
-                        copiedSection.order = copiedSection.order + 1; // Tạm thời cộng 1
-                        sections.splice(idx + 1, 0, copiedSection);
-                        // Cập nhật lại số thứ tự (order)
-                        sections.forEach((s, i) => { s.order = i + 1; });
-                        newData.sections = sections;
-                        onChange(newData);
-                      }
-                    }}
-                    title="Nhân bản đề mục này" 
-                    className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      const newData = { ...data };
-                      if (newData.sections) {
-                        const sections = [...newData.sections];
-                        sections.splice(idx, 1);
-                        // Cập nhật lại số thứ tự (order)
-                        sections.forEach((s, i) => { s.order = i + 1; });
-                        newData.sections = sections;
-                        onChange(newData);
-                      }
-                    }}
-                    title="Xóa đề mục này" 
-                    className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <div 
-                    title="Kéo thả để sắp xếp đề mục" 
-                    className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-400 cursor-grab active:cursor-grabbing hover:text-slate-700 transition-colors"
-                  >
-                    <GripVertical className="w-3.5 h-3.5" />
-                  </div>
-                </div>
+                <PenTool className="w-4 h-4" />
+              </button>
+            )}
+            <div 
+              title="Kéo thả để sắp xếp đề mục" 
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                setDraggedSection(idx);
+              }}
+              onDragEnd={() => setDraggedSection(null)}
+              className="p-1.5 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm flex items-center justify-center"
+            >
+              <GripVertical className="w-4 h-4" />
+            </div>
+            <button 
+              type="button"
+              disabled={idx === 0}
+              onClick={() => {
+                const newData = { ...data };
+                if (newData.sections) {
+                  const temp = newData.sections[idx];
+                  newData.sections[idx] = newData.sections[idx - 1];
+                  newData.sections[idx - 1] = temp;
+                  newData.sections.forEach((s, i) => { s.order = i + 1; });
+                  onChange?.(newData);
+                }
+              }}
+              className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors disabled:opacity-30 disabled:hover:text-slate-500 flex items-center justify-center"
+              title="Di chuyển lên"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+            <button 
+              type="button"
+              disabled={idx === (data.sections?.length || 0) - 1}
+              onClick={() => {
+                const newData = { ...data };
+                if (newData.sections) {
+                  const temp = newData.sections[idx];
+                  newData.sections[idx] = newData.sections[idx + 1];
+                  newData.sections[idx + 1] = temp;
+                  newData.sections.forEach((s, i) => { s.order = i + 1; });
+                  onChange?.(newData);
+                }
+              }}
+              className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors disabled:opacity-30 disabled:hover:text-slate-500 flex items-center justify-center"
+              title="Di chuyển xuống"
+            >
+              <ArrowDown className="w-4 h-4" />
+            </button>
+            <button 
+              type="button"
+              onClick={() => {
+                if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ đề mục này và các khối bên trong?")) {
+                  const newData = { ...data };
+                  if (newData.sections) {
+                    newData.sections.splice(idx, 1);
+                    newData.sections.forEach((s, i) => { s.order = i + 1; });
+                    onChange?.(newData);
+                  }
+                }
+              }}
+              className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors flex items-center justify-center"
+              title="Xóa toàn bộ đề mục"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <div className="relative">
+              <button 
+                type="button"
+                onClick={() => setActiveDropdown(activeDropdown === idx ? null : idx)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 rounded-md transition-colors shadow-sm border border-slate-200 dark:border-slate-700"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm khối
+              </button>
+              <div className={`absolute right-0 top-full mt-1 w-48 max-h-[300px] overflow-y-auto bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2 transition-all z-20 ${activeDropdown === idx ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}>
+                 {Object.entries(BLOCK_CONFIG).map(([type, config]) => {
+                   const Icon = config.icon;
+                   return (
+                     <button
+                       key={type}
+                       type="button"
+                       onClick={() => {
+                         setActiveDropdown(null);
+                         const newData = { ...data };
+                         if (newData.sections && newData.sections[idx]) {
+                           if (!newData.sections[idx].blocks) newData.sections[idx].blocks = [];
+                           newData.sections[idx].blocks.push(getBlockDefaultData(type));
+                           onChange?.(newData);
 
-                <ReactJson 
-                  src={{ displayHeading: section.displayHeading, order: section.order }}
-                  onEdit={(e) => {
-                    const newData = { ...data };
-                    const updated = e.updated_src as any;
-                    if (newData.sections) {
-                      newData.sections[idx] = { ...newData.sections[idx], displayHeading: updated.displayHeading, order: updated.order } as any;
-                    }
-                    onChange(newData);
-                  }}
-                  theme="rjv-default"
-                  style={{ backgroundColor: 'transparent' }}
-                  displayDataTypes={false}
-                  name={false}
-                  enableClipboard={false}
-                  keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
-                />
+                           const newBlockIdx = newData.sections[idx].blocks.length - 1;
+                           setTimeout(() => {
+                             const el = document.getElementById(`block-${idx}-${newBlockIdx}`);
+                             if (el) {
+                               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                             }
+                           }, 100);
+                         }
+                       }}
+                       className="w-full flex items-center gap-2 px-2 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
+                     >
+                       <Icon className="w-4 h-4" />
+                       {config.label}
+                     </button>
+                   );
+                 })}
               </div>
             </div>
+          </>
+        );
+
+        return (
+        <div 
+          key={idx} 
+          id={`section-${idx}`} 
+          className={`space-y-4 transition-all rounded-2xl ${
+            draggedSection === idx ? "opacity-50 ring-2 ring-blue-500 ring-offset-4 ring-offset-white dark:ring-offset-slate-900" : ""
+          } ${
+            dragOverSection === idx ? "ring-2 ring-blue-500 ring-offset-4 ring-offset-white dark:ring-offset-slate-900 bg-blue-50/30 dark:bg-blue-900/10 scale-[1.01]" : ""
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (draggedSection !== null) {
+              setDragOverSection(idx);
+            } else if (draggedItem !== null) {
+              setDragOverSection(idx);
+            }
+          }}
+          onDragLeave={() => setDragOverSection(null)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverSection(null);
+            if (draggedSection !== null) {
+              if (draggedSection === idx) {
+                setDraggedSection(null);
+                return;
+              }
+              const newData = { ...data };
+              if (newData.sections) {
+                const sections = [...newData.sections];
+                const draggedSecData = sections[draggedSection]!;
+                sections.splice(draggedSection, 1);
+                sections.splice(idx, 0, draggedSecData);
+                
+                sections.forEach((s, i) => { s.order = i + 1; });
+                
+                newData.sections = sections;
+                onChange?.(newData);
+              }
+              setDraggedSection(null);
+            } else if (draggedItem !== null) {
+              const newData = { ...data };
+              if (newData.sections) {
+                const sourceSectionIdx = draggedItem.sectionIdx;
+                const sourceBlockIdx = draggedItem.blockIdx;
+                
+                if (sourceSectionIdx === idx) {
+                  setDraggedItem(null);
+                  return;
+                }
+                
+                const sourceSection = newData.sections[sourceSectionIdx]!;
+                const targetSection = newData.sections[idx]!;
+                
+                const sourceBlocks = [...(sourceSection.blocks || [])];
+                const draggedBlockData = sourceBlocks[sourceBlockIdx];
+                sourceBlocks.splice(sourceBlockIdx, 1);
+                sourceSection.blocks = sourceBlocks;
+                
+                const targetBlocks = [...(targetSection.blocks || [])];
+                targetBlocks.push(draggedBlockData);
+                targetSection.blocks = targetBlocks;
+                
+                onChange?.(newData);
+              }
+              setDraggedItem(null);
+            }
+          }}
+        >
+          <div className="relative">
+            {(!isReadOnly && viewMode === "SPLIT") && (
+              <div className="flex justify-end gap-2 w-full relative mb-2">
+                {renderSectionActions()}
+              </div>
             )}
+            <div className={`transition-all ${viewMode === "SPLIT" ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "flex items-start justify-between group/header gap-6"}`}>
+              <h3 className={`group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 ${viewMode !== "SPLIT" ? "flex-1" : ""}`}>
+                <span className="flex-none bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+                  {section.order || idx + 1}
+                </span>
+                <span className="relative pb-1">
+                  {section.displayHeading}
+                  <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
+                </span>
+              </h3>
+              
+              {/* Tool Bar Section */}
+              {!isReadOnly && (
+                <div className={`flex flex-col items-end gap-2 ${viewMode === "SPLIT" ? "w-full" : "flex-none opacity-0 group-hover/header:opacity-100 transition-opacity z-10"}`}>
+                  {viewMode === "UI_ONLY" && (
+                    <div className="flex justify-end gap-2 w-full relative">
+                      {renderSectionActions()}
+                    </div>
+                  )}
+  
+                  {isSectionEditing && (
+                    <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto w-full mb-4 [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[100px] [&_textarea]:!mt-2 [&_textarea]:!p-2 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
+                      <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                        <button 
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            if (idx === 0) return;
+                            const newData = { ...data };
+                            if (newData.sections) {
+                              const currentBlocks = newData.sections[idx].blocks || [];
+                              const prevBlocks = newData.sections[idx - 1].blocks || [];
+                              newData.sections[idx - 1].blocks = [...prevBlocks, ...currentBlocks];
+                              newData.sections.splice(idx, 1);
+                              
+                              newData.sections.forEach((s, i) => { s.order = i + 1; });
+                              onChange?.(newData);
+                            }
+                          }}
+                          title={idx === 0 ? "Không thể gộp vì đây là đề mục đầu tiên" : "Xóa tiêu đề và gộp khối vào đề mục trên"}
+                          className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <ReactJson 
+                        src={{ displayHeading: section.displayHeading }}
+                        onEdit={(e) => {
+                          const newData = { ...data };
+                          if (newData.sections) {
+                            newData.sections[idx] = { ...newData.sections[idx], ...(e.updated_src as any) };
+                          }
+                          onChange?.(newData);
+                        }}
+                        theme="rjv-default"
+                        style={{ backgroundColor: 'transparent' }}
+                        displayDataTypes={false}
+                        name={false}
+                        enableClipboard={false}
+                        keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="space-y-4">
@@ -376,140 +595,298 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                 const blockToRender = { ...block, displayNumber: computedDisplayNumber };
                 const blockColorClass = getBlockDragColor(blockToRender.type);
 
+                const isBlockEditing = viewMode === "SPLIT" || editingItems.has(`block-${idx}-${bIdx}`);
+
+                const handleMoveUp = () => {
+                  const newData = { ...data };
+                  if (newData.sections) {
+                    if (bIdx > 0) {
+                      const blocks = [...newData.sections[idx].blocks!];
+                      const temp = blocks[bIdx];
+                      blocks[bIdx] = blocks[bIdx - 1];
+                      blocks[bIdx - 1] = temp;
+                      newData.sections[idx].blocks = blocks;
+                    } else if (idx > 0) {
+                      const currentBlocks = [...newData.sections[idx].blocks!];
+                      const blockToMove = currentBlocks.splice(bIdx, 1)[0];
+                      newData.sections[idx].blocks = currentBlocks;
+                      if (!newData.sections[idx - 1].blocks) newData.sections[idx - 1].blocks = [];
+                      newData.sections[idx - 1].blocks!.push(blockToMove);
+                    }
+                    onChange?.(newData);
+                  }
+                };
+
+                const handleMoveDown = () => {
+                  const newData = { ...data };
+                  if (newData.sections) {
+                    const blocks = newData.sections[idx].blocks || [];
+                    if (bIdx < blocks.length - 1) {
+                      const newBlocks = [...blocks];
+                      const temp = newBlocks[bIdx];
+                      newBlocks[bIdx] = newBlocks[bIdx + 1];
+                      newBlocks[bIdx + 1] = temp;
+                      newData.sections[idx].blocks = newBlocks;
+                    } else if (idx < (data.sections?.length || 0) - 1) {
+                      const currentBlocks = [...blocks];
+                      const blockToMove = currentBlocks.splice(bIdx, 1)[0];
+                      newData.sections[idx].blocks = currentBlocks;
+                      if (!newData.sections[idx + 1].blocks) newData.sections[idx + 1].blocks = [];
+                      newData.sections[idx + 1].blocks!.unshift(blockToMove);
+                    }
+                    onChange?.(newData);
+                  }
+                };
+
                 return (
                   <div 
                     key={bIdx} 
                     id={`block-${idx}-${bIdx}`}
-                    className={isEdit ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}
+                    className={`relative transition-all group/block ${isBlockEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""} ${
+                      draggedItem?.sectionIdx === idx && draggedItem?.blockIdx === bIdx 
+                        ? `opacity-50 ring-2 ${blockColorClass} rounded-xl` 
+                        : ""
+                    } ${
+                      dragOverItem?.sectionIdx === idx && dragOverItem?.blockIdx === bIdx
+                        ? `ring-2 ${blockColorClass} rounded-xl bg-${blockColorClass!.split('-')[1]}-50/30 dark:bg-${blockColorClass!.split('-')[1]}-900/10`
+                        : ""
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault(); 
+                      e.stopPropagation();
+                      if (draggedItem) {
+                        setDragOverItem({ sectionIdx: idx, blockIdx: bIdx });
+                      }
+                    }}
+                    onDragLeave={() => {
+                      setDragOverItem(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverItem(null);
+                      if (draggedItem) {
+                        const sourceSectionIdx = draggedItem.sectionIdx;
+                        const sourceBlockIdx = draggedItem.blockIdx;
+                        const targetSectionIdx = idx;
+                        const targetBlockIdx = bIdx;
+                        
+                        if (sourceSectionIdx === targetSectionIdx && sourceBlockIdx === targetBlockIdx) {
+                          setDraggedItem(null);
+                          return;
+                        }
+                        
+                        const newData = { ...data };
+                        if (newData.sections) {
+                          const sourceSection = newData.sections[sourceSectionIdx]!;
+                          const targetSection = newData.sections[targetSectionIdx]!;
+                          
+                          const sourceBlocks = [...(sourceSection.blocks || [])];
+                          const draggedBlockData = sourceBlocks[sourceBlockIdx];
+                          
+                          sourceBlocks.splice(sourceBlockIdx, 1);
+                          sourceSection.blocks = sourceBlocks;
+                          
+                          let targetBlocks;
+                          if (sourceSectionIdx === targetSectionIdx) {
+                            targetBlocks = sourceBlocks;
+                          } else {
+                            targetBlocks = [...(targetSection.blocks || [])];
+                          }
+                          
+                          targetBlocks.splice(targetBlockIdx, 0, draggedBlockData);
+                          
+                          if (sourceSectionIdx !== targetSectionIdx) {
+                            targetSection.blocks = targetBlocks;
+                          }
+                          
+                          onChange?.(newData);
+                        }
+                        setDraggedItem(null);
+                      }
+                    }}
                   >
                     <BlockItem block={blockToRender} />
-                    {isEdit && (
-                      <div 
-                        className={`relative border rounded-lg bg-slate-50 dark:bg-slate-900 group transition-all ${
-                          draggedItem?.sectionIdx === idx && draggedItem?.blockIdx === bIdx 
-                            ? `opacity-50 ring-2 ${blockColorClass}` 
-                            : ""
-                        } ${
-                          dragOverItem?.sectionIdx === idx && dragOverItem?.blockIdx === bIdx
-                            ? `ring-2 ${blockColorClass}`
-                            : ""
-                        }`}
-                        draggable
-                        onDragStart={(e) => {
-                          setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
-                          e.dataTransfer.effectAllowed = 'move';
-                          // For Firefox compatibility
-                          e.dataTransfer.setData('text/plain', '');
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault(); // Necessary to allow dropping
-                          if (draggedItem && draggedItem.sectionIdx === idx) {
-                            setDragOverItem({ sectionIdx: idx, blockIdx: bIdx });
-                          }
-                        }}
-                        onDragLeave={() => {
-                          setDragOverItem(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragOverItem(null);
-                          if (draggedItem && draggedItem.sectionIdx === idx) {
-                            if (draggedItem.blockIdx === bIdx) {
-                              setDraggedItem(null);
-                              return;
-                            }
-                            const newData = { ...data };
-                            if (newData.sections?.[idx]?.blocks) {
-                              const blocks = [...newData.sections[idx].blocks];
-                              const draggedBlockData = blocks[draggedItem.blockIdx];
-                              // Remove from old pos
-                              blocks.splice(draggedItem.blockIdx, 1);
-                              // Insert at new pos
-                              blocks.splice(bIdx, 0, draggedBlockData);
-                              newData.sections[idx].blocks = blocks;
-                              onChange(newData);
-                            }
-                            setDraggedItem(null);
-                          }
-                        }}
-                        onDragEnd={() => {
-                          setDraggedItem(null);
-                          setDragOverItem(null);
-                        }}
-                      >
-                        {/* Toolbar */}
-                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              const newData = { ...data };
-                              if (newData.sections?.[idx]?.blocks) {
-                                const blocks = [...newData.sections[idx].blocks];
-                                // Deep copy to avoid reference issues
-                                const copiedBlock = JSON.parse(JSON.stringify(blocks[bIdx]));
-                                blocks.splice(bIdx + 1, 0, copiedBlock);
-                                newData.sections[idx].blocks = blocks;
-                                onChange(newData);
-                              }
-                            }}
-                            title="Nhân bản khối này" 
-                            className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              const newData = { ...data };
-                              if (newData.sections?.[idx]?.blocks) {
-                                const blocks = [...newData.sections[idx].blocks];
-                                blocks.splice(bIdx, 1);
-                                newData.sections[idx].blocks = blocks;
-                                onChange(newData);
-                              }
-                            }}
-                            title="Xóa khối này" 
-                            className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <div 
-                            title="Kéo thả để sắp xếp" 
-                            className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-400 cursor-grab active:cursor-grabbing hover:text-slate-700 transition-colors"
-                          >
-                            <GripVertical className="w-3.5 h-3.5" />
+                    {!isReadOnly && (
+                      <div className="flex flex-col items-end gap-2 w-full h-full">
+                        {/* Toolbar for UI_ONLY mode (Floating on the UI Block) */}
+                        {!isBlockEditing && (
+                          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/block:opacity-100 transition-opacity z-10 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5">
+                            {viewMode === "UI_ONLY" && (
+                              <button 
+                                type="button"
+                                onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
+                                title="Chỉnh sửa Khối" 
+                                className="p-1.5 rounded text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors mr-1"
+                              >
+                                <PenTool className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button 
+                              type="button"
+                              onClick={handleMoveUp}
+                              title="Di chuyển lên" 
+                              disabled={bIdx === 0 && idx === 0}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={handleMoveDown}
+                              title="Di chuyển xuống" 
+                              disabled={bIdx === (section.blocks?.length || 0) - 1 && idx === (data.sections?.length || 0) - 1}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newData = { ...data };
+                                if (newData.sections?.[idx]?.blocks) {
+                                  const blocks = [...newData.sections[idx].blocks];
+                                  const copiedBlock = JSON.parse(JSON.stringify(blocks[bIdx]));
+                                  blocks.splice(bIdx + 1, 0, copiedBlock);
+                                  newData.sections[idx].blocks = blocks;
+                                  onChange(newData);
+                                }
+                              }}
+                              title="Nhân bản khối này" 
+                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newData = { ...data };
+                                if (newData.sections?.[idx]?.blocks) {
+                                  const blocks = [...newData.sections[idx].blocks];
+                                  blocks.splice(bIdx, 1);
+                                  newData.sections[idx].blocks = blocks;
+                                  onChange(newData);
+                                }
+                              }}
+                              title="Xóa khối này" 
+                              className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                            <div 
+                              title="Kéo thả để sắp xếp" 
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move';
+                                setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
+                              }}
+                              onDragEnd={() => setDraggedItem(null)}
+                              className="p-1.5 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 transition-colors"
+                            >
+                              <GripVertical className="w-3.5 h-3.5" />
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        <div className="p-3 overflow-auto max-h-[500px] [&_textarea]:!w-[450px] [&_textarea]:!min-h-[150px] [&_textarea]:!max-w-full [&_textarea]:!p-2 [&_textarea]:!leading-relaxed">
-                          <ReactJson 
-                            src={block}
-                            onEdit={(e) => {
-                              const newData = { ...data };
-                              const targetSection = newData.sections?.[idx];
-                              if (targetSection && targetSection.blocks) targetSection.blocks[bIdx] = e.updated_src;
-                              onChange(newData);
-                            }}
-                            onAdd={(e) => {
-                              const newData = { ...data };
-                              const targetSection = newData.sections?.[idx];
-                              if (targetSection && targetSection.blocks) targetSection.blocks[bIdx] = e.updated_src;
-                              onChange(newData);
-                            }}
-                            onDelete={(e) => {
-                              const newData = { ...data };
-                              const targetSection = newData.sections?.[idx];
-                              if (targetSection && targetSection.blocks) targetSection.blocks[bIdx] = e.updated_src;
-                              onChange(newData);
-                            }}
-                            theme="rjv-default"
-                            style={{ backgroundColor: 'transparent' }}
-                            displayDataTypes={false}
-                            name={false}
-                            enableClipboard={false}
-                            keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
-                          />
-                        </div>
+                        {/* Toolbar for SPLIT mode (Inside the JSON Editor) */}
+                        {isBlockEditing && (
+                          <div className="w-full h-full relative border rounded-lg bg-slate-50 dark:bg-slate-900 p-3 overflow-auto max-h-[500px] [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[200px] [&_textarea]:!mt-2 [&_textarea]:!p-3 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                              <button 
+                                type="button"
+                                onClick={handleMoveUp}
+                                title="Di chuyển lên" 
+                                disabled={bIdx === 0 && idx === 0}
+                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={handleMoveDown}
+                                title="Di chuyển xuống" 
+                                disabled={bIdx === (section.blocks?.length || 0) - 1 && idx === (data.sections?.length || 0) - 1}
+                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const newData = { ...data };
+                                  if (newData.sections?.[idx]?.blocks) {
+                                    const blocks = [...newData.sections[idx].blocks];
+                                    const copiedBlock = JSON.parse(JSON.stringify(blocks[bIdx]));
+                                    blocks.splice(bIdx + 1, 0, copiedBlock);
+                                    newData.sections[idx].blocks = blocks;
+                                    onChange(newData);
+                                  }
+                                }}
+                                title="Nhân bản khối này" 
+                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const newData = { ...data };
+                                  if (newData.sections?.[idx]?.blocks) {
+                                    const blocks = [...newData.sections[idx].blocks];
+                                    blocks.splice(bIdx, 1);
+                                    newData.sections[idx].blocks = blocks;
+                                    onChange(newData);
+                                  }
+                                }}
+                                title="Xóa khối này" 
+                                className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                              <div 
+                                title="Kéo thả để sắp xếp" 
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
+                                }}
+                                onDragEnd={() => setDraggedItem(null)}
+                                className="p-1.5 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 transition-colors"
+                              >
+                                <GripVertical className="w-3.5 h-3.5" />
+                              </div>
+                            </div>
+                            <ReactJson 
+                              src={block}
+                              onEdit={(e) => {
+                                const newData = { ...data };
+                                const targetSection = newData.sections?.[idx];
+                                if (targetSection && targetSection.blocks) targetSection.blocks[bIdx] = e.updated_src;
+                                onChange?.(newData);
+                              }}
+                              onAdd={(e) => {
+                                const newData = { ...data };
+                                const targetSection = newData.sections?.[idx];
+                                if (targetSection && targetSection.blocks) targetSection.blocks[bIdx] = e.updated_src;
+                                onChange?.(newData);
+                              }}
+                              onDelete={(e) => {
+                                const newData = { ...data };
+                                const targetSection = newData.sections?.[idx];
+                                if (targetSection && targetSection.blocks) targetSection.blocks[bIdx] = e.updated_src;
+                                onChange?.(newData);
+                              }}
+                              theme="rjv-default"
+                              style={{ backgroundColor: 'transparent' }}
+                              displayDataTypes={false}
+                              name={false}
+                              enableClipboard={false}
+                              keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -517,7 +894,8 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
               })}
           </div>
         </div>
-      ))}
+      );
+      })}
     </div>
   );
 }
