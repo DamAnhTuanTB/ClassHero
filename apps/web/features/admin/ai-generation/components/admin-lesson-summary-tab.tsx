@@ -192,6 +192,7 @@ export function AdminLessonSummaryTab({
                   displayDataTypes={false}
                   name={false}
                   enableClipboard={false}
+                  keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
                 />
               </div>
             </div>

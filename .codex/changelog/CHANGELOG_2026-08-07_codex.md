@@ -20,3 +20,4 @@
 
 ## Bug Fixes
 - **JSON Edit View**: Resolved an issue where manipulating the CSS structure for `textarea` would unintentionally apply `display: block` to the ReactJson grid layout wrapper, which broke horizontal alignment.
+- **Admin Lesson JSON View**: Added `keyModifier` prop to `ReactJson` in the 'Chỉ xem JSON' (JSON-Only) view mode so users can double-click to edit values, maintaining consistency with the Split-view mode.
