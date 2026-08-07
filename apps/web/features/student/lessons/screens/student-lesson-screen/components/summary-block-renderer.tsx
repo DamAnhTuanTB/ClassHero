@@ -23,18 +23,14 @@ interface SummaryBlockRendererProps {
 }
 
 const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
-  definition: { label: "Định nghĩa", color: "yellow", icon: BookOpen },
-  rule: { label: "Quy tắc", color: "sky", icon: Scale },
+  knowledge: { label: "Kiến thức", color: "yellow", icon: BookOpen },
   property: { label: "Tính chất", color: "teal", icon: Bookmark },
   theorem: { label: "Định lí", color: "green", icon: GraduationCap },
-  remark: { label: "Nhận xét", color: "fuchsia", icon: MessageSquareQuote },
-  note: { label: "Chú ý", color: "amber", icon: Lightbulb },
-  common_mistake: { label: "Lỗi thường gặp", color: "red", icon: AlertOctagon },
-  formula: { label: "Công thức", color: "emerald", icon: Sigma },
+  note: { label: "Chú ý", color: "rose", icon: AlertCircle },
+
   procedure: { label: "Phương pháp giải", color: "cyan", icon: ListOrdered },
-  proof: { label: "Chứng minh", color: "violet", icon: FileBadge },
+
   example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
-  additional_info: { label: "Thông tin bổ sung", color: "slate", icon: Info },
   section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
 };
 
@@ -49,38 +45,23 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
   const getBlockDefaultData = (type: string) => {
     const base = { type, title: "Tiêu đề khối mới" };
     switch (type) {
+      case "section_recap":
+        return { type, title: "Tổng kết mới", points: ["Điểm tổng kết mới"] };
       case "example":
         return {
           ...base,
           problem: "Nhập đề bài tại đây...",
-          solutionSteps: [{ explanation: "Giải thích bước 1...", latex: "" }],
+          solutionSteps: [{ content: "Giải thích bước 1...", latex: "" }],
           answer: "Đáp án cuối cùng..."
         };
-      case "formula":
-        return {
-          ...base,
-          formulas: [{ latex: "a^2 + b^2 = c^2", explanation: "Giải thích công thức..." }]
-        };
+
       case "procedure":
-      case "proof":
+
         return {
           ...base,
           steps: [{ content: "Nội dung bước 1...", latex: "" }]
         };
-      case "common_mistake":
-        return {
-          ...base,
-          mistake: "Mô tả lỗi sai thường gặp...",
-          correction: "Cách sửa lại cho đúng..."
-        };
-      case "theorem":
-      case "rule":
-      case "property":
-        return {
-          ...base,
-          statement: "Phát biểu định lí/quy tắc...",
-          explanation: "Giải thích chi tiết..."
-        };
+
       default:
         return {
           ...base,
@@ -174,7 +155,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-slate-700 dark:text-slate-300">
               {data.objectives.map((obj, i) => (
-                <li key={i}>{obj}</li>
+                <li key={i}><MathpixMarkdownRenderer content={obj} /></li>
               ))}
             </ul>
           </div>
@@ -495,7 +476,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                           </div>
                         </div>
 
-                        <div className="p-3 overflow-auto max-h-[500px]">
+                        <div className="p-3 overflow-auto max-h-[500px] [&_textarea]:!w-[450px] [&_textarea]:!min-h-[150px] [&_textarea]:!max-w-full [&_textarea]:!p-2 [&_textarea]:!leading-relaxed">
                           <ReactJson 
                             src={block}
                             onEdit={(e) => {
@@ -539,23 +520,18 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
 
 function BlockItem({ block }: { block: BlockData }) {
   switch (block.type) {
-    case "formula":
-      return <FormulaBlock block={block} />;
+
     case "procedure":
-    case "proof":
       return <StepsBlock block={block} />;
     case "example":
       return <ExampleBlock block={block} />;
-    case "additional_info":
     case "section_recap":
-      return <AdditionalInfoBlock block={block} />;
-    case "definition":
-    case "rule":
+      return <SectionRecapBlock block={block} />;
+    case "knowledge":
     case "property":
     case "theorem":
-    case "remark":
     case "note":
-    case "common_mistake":
+
       return <CalloutBlock block={block} />;
     default:
       return (
@@ -591,15 +567,20 @@ function BaseBlockContainer({ block, children }: { block: BlockData, children: R
   const styles = COLOR_STYLES[config.color] || COLOR_STYLES.slate;
   const Icon = config.icon;
 
+  const hideTitleTypes = ["note", "example"];
+  const shouldShowTitle = block.title && !hideTitleTypes.includes(block.type);
+
   return (
     <div className={`rounded-xl border p-3 sm:p-5 ${styles.bg} ${styles.border}`}>
-      <div className={`flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider mb-2 ${styles.label}`}>
+      <div className={`flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider mb-1 ${styles.label}`}>
         <Icon className="w-4 h-4" />
         {config.label} {block.displayNumber ? block.displayNumber : ""}
       </div>
-      <div className={`font-bold mb-3 ${styles.text}`}>
-        {block.title}
-      </div>
+      {shouldShowTitle && (
+        <div className={`font-bold ${styles.text}`}>
+          <MathpixMarkdownRenderer content={block.title} />
+        </div>
+      )}
       <div className="space-y-2 opacity-90 text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">
         {children}
       </div>
@@ -610,42 +591,8 @@ function BaseBlockContainer({ block, children }: { block: BlockData, children: R
 function CalloutBlock({ block }: { block: BlockData }) {
   return (
     <BaseBlockContainer block={block}>
-      {block.definition && (
-        <div>
-          {block.term && block.term.toLowerCase() !== block.title?.toLowerCase() && (
-            <strong className="mr-1">{block.term}:</strong>
-          )}
-          <MathpixMarkdownRenderer content={block.definition} />
-        </div>
-      )}
-      {block.statement && <MathpixMarkdownRenderer content={block.statement} />}
-      {block.explanation && <MathpixMarkdownRenderer content={block.explanation} />}
       {block.content && <MathpixMarkdownRenderer content={block.content} />}
-      {block.mistake && (
-        <>
-          <div><strong>Lỗi sai:</strong> <MathpixMarkdownRenderer content={block.mistake} /></div>
-          <div><strong>Sửa lại:</strong> <MathpixMarkdownRenderer content={block.correction} /></div>
-        </>
-      )}
-    </BaseBlockContainer>
-  );
-}
 
-function FormulaBlock({ block }: { block: BlockData }) {
-  return (
-    <BaseBlockContainer block={block}>
-      <div className="space-y-4">
-        {block.formulas?.map((f: any, i: number) => (
-          <div key={i} className="flex flex-col items-center justify-center p-3 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800">
-            <MathpixMarkdownRenderer content={`$$ ${f.latex} $$`} />
-            {f.explanation && (
-              <div className="mt-2 text-sm text-slate-600 dark:text-slate-400 text-center">
-                <MathpixMarkdownRenderer content={f.explanation} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     </BaseBlockContainer>
   );
 }
@@ -653,7 +600,7 @@ function FormulaBlock({ block }: { block: BlockData }) {
 function StepsBlock({ block }: { block: BlockData }) {
   return (
     <BaseBlockContainer block={block}>
-      <div className="space-y-3 mt-1">
+      <div className="space-y-1.5 mt-2.5">
         {block.steps?.map((step: any, i: number) => (
           <div key={i} className="flex gap-3">
             <div className="flex-none w-6 h-6 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-xs font-bold">
@@ -663,7 +610,7 @@ function StepsBlock({ block }: { block: BlockData }) {
               <MathpixMarkdownRenderer content={step.content || step.statement || ""} />
               {step.latex && (
                 <div className="mt-1">
-                  <MathpixMarkdownRenderer content={`$$ ${step.latex} $$`} />
+                  <MathpixMarkdownRenderer content={`$$ ${step.latex.replace(/^\s*\$\$?|\$\$?\s*$/g, "").trim()} $$`} />
                 </div>
               )}
             </div>
@@ -677,35 +624,34 @@ function StepsBlock({ block }: { block: BlockData }) {
 function ExampleBlock({ block }: { block: BlockData }) {
   return (
     <BaseBlockContainer block={block}>
-      <div className="mb-3 font-medium">
+      <div className="mb-3">
         <MathpixMarkdownRenderer content={block.problem} />
       </div>
       
-      {block.solutionSteps && block.solutionSteps.length > 0 && (
-        <div className="pl-4 border-l-2 border-black/10 dark:border-white/10 space-y-3 mb-3">
-          {block.solutionSteps.map((step: any, i: number) => (
-            <div key={i} className="text-sm">
-              {step.explanation && <MathpixMarkdownRenderer content={step.explanation} />}
+      {( (block.solutionSteps && block.solutionSteps.length > 0) || block.answer ) && (
+        <div className="pl-4 border-l-[3px] border-blue-500/30 dark:border-blue-400/30 space-y-3 mb-3 text-sm">
+          {block.solutionSteps && block.solutionSteps.map((step: any, i: number) => (
+            <div key={i}>
+              {step.content && <MathpixMarkdownRenderer content={step.content} />}
               {step.latex && (
                 <div className="mt-1 bg-white dark:bg-slate-900/50 p-2 rounded">
-                  <MathpixMarkdownRenderer content={`$$ ${step.latex} $$`} />
+                  <MathpixMarkdownRenderer content={`$$ ${step.latex.replace(/^\s*\$\$?|\$\$?\s*$/g, "").trim()} $$`} />
                 </div>
               )}
             </div>
           ))}
-        </div>
-      )}
-      
-      {block.answer && (
-        <div className="font-semibold mt-2">
-          Kết luận: <MathpixMarkdownRenderer content={block.answer} />
+          {block.answer && (
+            <div className="mt-2">
+              <MathpixMarkdownRenderer content={`Kết luận: ${block.answer}`} />
+            </div>
+          )}
         </div>
       )}
     </BaseBlockContainer>
   );
 }
 
-function AdditionalInfoBlock({ block }: { block: BlockData }) {
+function SectionRecapBlock({ block }: { block: BlockData }) {
   return (
     <BaseBlockContainer block={block}>
       <ul className="list-disc pl-5 space-y-1">

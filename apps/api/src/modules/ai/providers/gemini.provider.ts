@@ -42,6 +42,15 @@ export class GeminiProvider implements AiProvider {
 
   constructor(private readonly config: GeminiProviderConfig) {}
 
+  private supportsTemperature(model: string): boolean {
+    const m = model.toLowerCase();
+    // Các model Gemini có chữ 'thinking' (vd: gemini-2.0-flash-thinking) được cấu hình theo reasoning_effort, bỏ qua temperature
+    if (m.includes("thinking") || m.includes("gemini-3")) {
+      return false;
+    }
+    return true;
+  }
+
   createEmbedding(_input: AiEmbeddingInput): Promise<AiEmbeddingOutput> {
     throw new Error(
       "Gemini embedding is disabled because the project uses one OpenAI vector space.",
@@ -55,7 +64,8 @@ export class GeminiProvider implements AiProvider {
       system_instruction: { parts: [{ text: input.systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: buildAiUserPrompt(input) }] }],
       generationConfig: {
-        ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+        ...(input.temperature === undefined || !this.supportsTemperature(model) ? {} : { temperature: input.temperature }),
+        ...(input.reasoningEffort ? { thinkingConfig: { thinkingLevel: input.reasoningEffort.toUpperCase() } } : {}),
         ...(input.maxTokens === undefined
           ? {}
           : { maxOutputTokens: input.maxTokens }),
@@ -84,7 +94,8 @@ export class GeminiProvider implements AiProvider {
       generationConfig: {
         responseMimeType: "application/json",
         responseJsonSchema: z.toJSONSchema(schema),
-        ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+        ...(input.temperature === undefined || !this.supportsTemperature(model) ? {} : { temperature: input.temperature }),
+        ...(input.reasoningEffort ? { thinkingConfig: { thinkingLevel: input.reasoningEffort.toUpperCase() } } : {}),
         ...(input.maxTokens === undefined
           ? {}
           : { maxOutputTokens: input.maxTokens }),

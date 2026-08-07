@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { AiGenerationType, Prisma, ProviderUsageMetric } from "@prisma/client";
+import type { ProviderRouteCandidate } from "#api/modules/provider-operations/types/provider-operations.types";
 
 import { throwBadRequest, throwNotFound } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
@@ -213,6 +214,8 @@ export class LessonSummariesService {
           )
         : null;
 
+    const allActiveModels = await this.modelRouting.getAllActiveModels();
+
     return {
       promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
       schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
@@ -245,10 +248,11 @@ export class LessonSummariesService {
         resolvedModel: resolvedCandidate?.model ?? null,
         temperature: route.temperature ?? request.temperature ?? 0.2,
         maxOutputTokens,
-        modelOptions: baseRoute.candidates.map((candidate) => ({
+        modelOptions: allActiveModels.map((candidate) => ({
           provider: candidate.provider,
           model: candidate.model,
           available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
         })),
       },
       estimatedCost: estimatedCost
@@ -293,10 +297,13 @@ export class LessonSummariesService {
     const baseRoute = await this.modelRouting.resolve(AiGenerationType.SUMMARY);
     let candidates = baseRoute.candidates;
     if (dto.model) {
-      const selectedCandidate = candidates.find(
+      let selectedCandidate: ProviderRouteCandidate | null | undefined = candidates.find(
         (candidate) => candidate.model === dto.model && candidate.available,
       );
       if (!selectedCandidate) {
+        selectedCandidate = await this.modelRouting.resolveCandidateByModel(dto.model);
+      }
+      if (!selectedCandidate || !selectedCandidate.available) {
         throwBadRequest(
           "AI_MODEL_NOT_AVAILABLE",
           "Model đã chọn không còn khả dụng cho chức năng tóm tắt.",

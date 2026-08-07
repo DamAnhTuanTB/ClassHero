@@ -6,7 +6,7 @@ import type {
 } from "@/features/admin/ai-settings/types/provider-operations-types";
 
 export const aiFeatureLabels: Record<AiFeature, string> = {
-  SUMMARY: "Sinh tóm tắt",
+  SUMMARY: "Sinh Kiến thức",
   QUIZ: "Sinh câu hỏi ôn tập",
   FLASHCARD: "Sinh thẻ ghi nhớ",
   TEST: "Sinh bài kiểm tra",

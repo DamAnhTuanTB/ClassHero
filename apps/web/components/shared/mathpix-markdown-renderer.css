@@ -60,6 +60,14 @@
   margin: 0.25rem 0;
 }
 
+.mmd-content ul {
+  list-style-type: disc;
+}
+
+.mmd-content ol {
+  list-style-type: decimal;
+}
+
 .mmd-content li {
   margin-bottom: 0.125rem;
 }
@@ -108,5 +116,15 @@
 
 /* Reset Tailwind's SVG display: block which breaks inline MathJax equations */
 .mmd-content svg {
-  display: inline;
+  display: inline-block;
+}
+
+.mmd-content mjx-container[jax="SVG"] {
+  direction: ltr;
+  display: inline-block;
+}
+
+.mmd-content mjx-container[jax="SVG"][display="true"] {
+  display: flex;
+  margin: 1em 0;
 }

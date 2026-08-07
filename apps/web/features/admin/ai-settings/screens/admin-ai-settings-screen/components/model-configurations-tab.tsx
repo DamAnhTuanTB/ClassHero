@@ -17,6 +17,10 @@ import type {
   AiFeatureConfiguration,
 } from "@/features/admin/ai-settings/types/provider-operations-types";
 import { aiFeatureLabels } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
+import {
+  supportsTemperature,
+  supportsReasoningEffort,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 
 type Props = {
   data: AiConfigurationsResponse;
@@ -79,17 +83,72 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                   })
                 }
               />
-              <NumericSettingsField
-                id={`${configuration.feature.toLocaleLowerCase()}-temperature`}
-                label="Mức sáng tạo"
-                value={configuration.temperature ?? 0.2}
-                min={0}
-                max={2}
-                allowDecimal
-                onChange={(value) =>
-                  update(configuration.feature, { temperature: value })
-                }
-              />
+              {(() => {
+                const primaryModel = data.models.find(
+                  (m) => m.id === configuration.primaryCatalogItemId,
+                );
+                const supportsTemp = supportsTemperature(
+                  primaryModel?.externalKey,
+                  (primaryModel?.capabilities as any)?.aiConfiguration
+                );
+                const supportsReasoning = supportsReasoningEffort(
+                  primaryModel?.externalKey,
+                  (primaryModel?.capabilities as any)?.aiConfiguration
+                );
+
+                return (
+                  <>
+                    {supportsReasoning && (
+                      <div className="flex flex-col gap-2">
+                        <FieldLabel
+                          id={`${configuration.feature.toLocaleLowerCase()}-reasoning-effort`}
+                          label="Reasoning Effort"
+                        />
+                        <Select
+                          value={configuration.reasoningEffort ?? "__default__"}
+                          onValueChange={(value) =>
+                            update(configuration.feature, {
+                              reasoningEffort: value === "__default__" ? null : value,
+                            })
+                          }
+                        >
+                          <SelectTrigger
+                            id={`${configuration.feature.toLocaleLowerCase()}-reasoning-effort`}
+                          >
+                            <SelectValue placeholder="Mặc định của model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__default__">
+                              Mặc định của model
+                            </SelectItem>
+                            <SelectItem value="low">Thấp (Low)</SelectItem>
+                            <SelectItem value="medium">Trung bình (Medium)</SelectItem>
+                            <SelectItem value="high">Cao (High)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {supportsTemp && (
+                      <NumericSettingsField
+                        id={`${configuration.feature.toLocaleLowerCase()}-temperature`}
+                        label="Mức sáng tạo (Temperature)"
+                        value={configuration.temperature ?? 0.2}
+                        min={0}
+                        max={2}
+                        allowDecimal
+                        onChange={(value) =>
+                          update(configuration.feature, { temperature: value })
+                        }
+                      />
+                    )}
+
+                    {!supportsReasoning && !supportsTemp && (
+                      <div className="hidden sm:block" aria-hidden="true" />
+                    )}
+                  </>
+                );
+              })()}
               <NumericSettingsField
                 id={`${configuration.feature.toLocaleLowerCase()}-max-output-tokens`}
                 label="Độ dài tối đa"

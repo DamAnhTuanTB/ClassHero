@@ -1461,6 +1461,92 @@ async function seedNews(adminId: string) {
   });
 }
 
+async function seedAIModels() {
+  const models = [
+    { provider: 'OPENAI', externalKey: 'gpt-5.6-sol', displayName: 'GPT-5.6 Sol', in: 0.005, out: 0.03 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.6-terra', displayName: 'GPT-5.6 Terra', in: 0.002, out: 0.012 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.6-luna', displayName: 'GPT-5.6 Luna', in: 0.0002, out: 0.0012 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.5', displayName: 'GPT-5.5', in: 0.005, out: 0.03 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.5-pro', displayName: 'GPT-5.5 Pro', in: 0.03, out: 0.18 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.4', displayName: 'GPT-5.4', in: 0.0025, out: 0.015 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.4-pro', displayName: 'GPT-5.4 Pro', in: 0.03, out: 0.18 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.4-mini', displayName: 'GPT-5.4 Mini', in: 0.00075, out: 0.0045 },
+    { provider: 'OPENAI', externalKey: 'gpt-5.4-nano', displayName: 'GPT-5.4 Nano', in: 0.0002, out: 0.00125 },
+    { provider: 'OPENAI', externalKey: 'gpt-4.1', displayName: 'GPT-4.1', in: 0.002, out: 0.008 },
+    { provider: 'OPENAI', externalKey: 'gpt-4.1-mini', displayName: 'GPT-4.1 Mini', in: 0.0002, out: 0.001 },
+    { provider: 'OPENAI', externalKey: 'gpt-4.1-nano', displayName: 'GPT-4.1 Nano', in: 0.0001, out: 0.0005 },
+    { provider: 'OPENAI', externalKey: 'o3', displayName: 'o3', in: 0.002, out: 0.008 },
+    { provider: 'OPENAI', externalKey: 'o3-pro', displayName: 'o3 Pro', in: 0.015, out: 0.06 },
+    { provider: 'OPENAI', externalKey: 'o4-mini', displayName: 'o4 Mini', in: 0.0011, out: 0.0044 },
+    { provider: 'GEMINI', externalKey: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', in: 0.0015, out: 0.0075 },
+    { provider: 'GEMINI', externalKey: 'gemini-3.5-flash', displayName: 'Gemini 3.5 Flash', in: 0.0015, out: 0.009 },
+    { provider: 'GEMINI', externalKey: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash-Lite', in: 0.0003, out: 0.0025 },
+    { provider: 'GEMINI', externalKey: 'gemini-3.1-pro', displayName: 'Gemini 3.1 Pro', in: 0.002, out: 0.012 },
+    { provider: 'GEMINI', externalKey: 'gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash-Lite', in: 0.00025, out: 0.0015 },
+    { provider: 'GEMINI', externalKey: 'gemini-3-flash', displayName: 'Gemini 3 Flash', in: 0.0005, out: 0.003 },
+    { provider: 'GEMINI', externalKey: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', in: 0.00125, out: 0.010 },
+    { provider: 'GEMINI', externalKey: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', in: 0.0003, out: 0.0025 },
+    { provider: 'GEMINI', externalKey: 'gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite', in: 0.0001, out: 0.0005 }
+  ];
+
+  for (const m of models) {
+    const item = await prisma.providerCatalogItem.upsert({
+      where: {
+        category_provider_externalKey: {
+          category: 'AI_MODEL',
+          provider: m.provider as any,
+          externalKey: m.externalKey,
+        }
+      },
+      update: {
+        displayName: m.displayName,
+        status: 'ACTIVE',
+        capabilitiesJson: ["SUMMARY","QUIZ","FLASHCARD","TEST"],
+        credentialEnvVar: m.provider === 'OPENAI' ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY',
+      },
+      create: {
+        category: 'AI_MODEL',
+        provider: m.provider as any,
+        externalKey: m.externalKey,
+        displayName: m.displayName,
+        status: 'ACTIVE',
+        capabilitiesJson: ["SUMMARY","QUIZ","FLASHCARD","TEST"],
+        credentialEnvVar: m.provider === 'OPENAI' ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY',
+      }
+    });
+
+    const priceVersion = await prisma.providerPriceVersion.findFirst({
+      where: { catalogItemId: item.id }
+    });
+
+    if (priceVersion) {
+      await prisma.providerPriceRate.deleteMany({
+        where: { priceVersionId: priceVersion.id }
+      });
+      await prisma.providerPriceRate.createMany({
+        data: [
+          { priceVersionId: priceVersion.id, metric: 'INPUT_TOKEN', unitSize: 1000, unitPriceUsd: m.in },
+          { priceVersionId: priceVersion.id, metric: 'OUTPUT_TOKEN', unitSize: 1000, unitPriceUsd: m.out }
+        ]
+      });
+    } else {
+       await prisma.providerPriceVersion.create({
+          data: {
+             catalogItemId: item.id,
+             effectiveFrom: new Date(),
+             billingMode: 'TOKEN' as any,
+             rates: {
+                create: [
+                   { metric: 'INPUT_TOKEN', unitSize: 1000, unitPriceUsd: m.in },
+                   { metric: 'OUTPUT_TOKEN', unitSize: 1000, unitPriceUsd: m.out }
+                ]
+             }
+          }
+       });
+    }
+  }
+}
+
 async function main() {
   const { admin, student, parent } = await seedUsers();
   const { learningPath, lesson1 } = await seedLearningContent(admin.id);
@@ -1470,6 +1556,7 @@ async function main() {
   await seedPaymentAndProgress(student.id, parent.id, learningPath.id, lesson1.id);
   await seedCommunication(student.id, parent.id, lesson1.id);
   await seedNews(admin.id);
+  await seedAIModels();
 
   console.log("Seed data ready:");
   console.log("- admin@example.com / 123456");

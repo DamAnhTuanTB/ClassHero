@@ -26,6 +26,10 @@ import type {
   AdminSummaryStyle,
   AdminLessonSummaryPromptPreview,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import {
+  supportsTemperature,
+  supportsReasoningEffort,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { cn } from "@/lib/utils";
 
 const difficultyOptions = [
@@ -115,7 +119,7 @@ export function AiGenerationConfigDialog({
   }, [documents, form, isOpen, previewPrompt, resetPreview, targetGrade, type]);
 
   const title = {
-    SUMMARY: "Tạo tóm tắt bằng AI",
+    SUMMARY: "Tạo Kiến thức bằng AI",
     QUIZ: "Tạo Quiz bằng AI",
     FLASHCARD: "Tạo Flashcard bằng AI",
     TEST: "Tạo bài Test bằng AI",
@@ -127,7 +131,43 @@ export function AiGenerationConfigDialog({
   const hardRatioField = form.register("hardRatio");
   const targetWordCountField = form.register("summaryTargetWordCount");
   const temperatureField = form.register("summaryTemperature");
+  const reasoningEffortField = form.register("summaryReasoningEffort");
   const maxOutputTokensField = form.register("summaryMaxOutputTokens");
+
+  const selectedModelId = form.watch("summaryModel");
+  const selectedModelInfo = previewMutation.data?.configuration.modelOptions?.find(
+    (opt) => opt.model === selectedModelId
+  );
+  const aiConfigurationCapability = selectedModelInfo?.capabilities?.aiConfiguration;
+  const configuredReasoningEffortLevels = (selectedModelInfo?.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+
+  const reasoningOptions = [
+    { value: "", label: "Mặc định của model" },
+    ...(configuredReasoningEffortLevels?.length
+      ? configuredReasoningEffortLevels.map((level) => ({
+          value: level,
+          label: {
+            low: "Thấp (Low)",
+            medium: "Trung bình (Medium)",
+            high: "Cao (High)",
+            none: "Không (None)",
+            xhigh: "Rất cao (Extra High)",
+            max: "Tối đa (Max)",
+          }[level as string] || level,
+        }))
+      : [
+          { value: "low", label: "Thấp (Low)" },
+          { value: "medium", label: "Trung bình (Medium)" },
+          { value: "high", label: "Cao (High)" },
+        ]),
+  ];
+
+  const showTemperature =
+    selectedModelId !== "" &&
+    supportsTemperature(selectedModelId, aiConfigurationCapability);
+  const showReasoningEffort =
+    selectedModelId !== "" &&
+    supportsReasoningEffort(selectedModelId, aiConfigurationCapability);
 
   async function refreshSummaryPreview() {
     const isValid = await form.trigger([
@@ -232,7 +272,7 @@ export function AiGenerationConfigDialog({
               <div className="grid gap-4 sm:grid-cols-2">
                 <OptionField
                   id="ai-summary-length"
-                  label="Độ dài tóm tắt"
+                  label="Độ dài Kiến thức"
                   value={form.watch("summaryLength")}
                   options={summaryLengthOptions}
                   icon={null}
@@ -296,16 +336,43 @@ export function AiGenerationConfigDialog({
                     })
                   }
                 />
-                <TextField
-                  id="ai-summary-temperature"
-                  label="Temperature"
-                  inputMode="decimal"
-                  icon={null}
-
-                  error={form.formState.errors.summaryTemperature}
-                  {...temperatureField}
-                  onChange={decimalChange(temperatureField.onChange)}
-                />
+                {form.watch("summaryModel") === "" ? (
+                  <div className="hidden sm:block" aria-hidden="true" />
+                ) : (
+                  <>
+                    {showReasoningEffort && (
+                      <OptionField
+                        id="ai-summary-reasoning-effort"
+                        label="Reasoning Effort"
+                        value={form.watch("summaryReasoningEffort") || ""}
+                        options={reasoningOptions}
+                        icon={null}
+                        error={form.formState.errors.summaryReasoningEffort}
+                        onChange={(value) =>
+                          form.setValue("summaryReasoningEffort", value, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          })
+                        }
+                      />
+                    )}
+                    {showTemperature && (
+                      <TextField
+                        id="ai-summary-temperature"
+                        label="Temperature"
+                        inputMode="decimal"
+                        icon={null}
+                        error={form.formState.errors.summaryTemperature}
+                        {...temperatureField}
+                        onChange={decimalChange(temperatureField.onChange)}
+                      />
+                    )}
+                    {!showReasoningEffort && !showTemperature && (
+                      <div className="hidden sm:block" aria-hidden="true" />
+                    )}
+                  </>
+                )}
               </div>
               <TextField
                 id="ai-summary-max-output-tokens"
@@ -365,6 +432,7 @@ export function AiGenerationConfigDialog({
                     userPrompt={form.watch("userPrompt")}
                     model={form.watch("summaryModel")}
                     temperature={form.watch("summaryTemperature")}
+                    reasoningEffort={form.watch("summaryReasoningEffort")}
                     maxOutputTokens={form.watch("summaryMaxOutputTokens")}
                     systemInstructionsError={form.formState.errors.systemInstructions}
                     userPromptError={form.formState.errors.userPrompt}
@@ -558,6 +626,7 @@ function getDefaultValues(
     userPrompt: "",
     summaryModel: "",
     summaryTemperature: "",
+    summaryReasoningEffort: "",
     summaryMaxOutputTokens: "",
     count: type === "FLASHCARD" ? "10" : "8",
     difficulty: "MIXED",
@@ -622,8 +691,15 @@ function toSummaryPayload(
     ...(systemInstructions ? { systemInstructions } : {}),
     ...(userPrompt ? { userPrompt } : {}),
     ...(values.summaryModel ? { model: values.summaryModel } : {}),
-    ...(values.summaryTemperature
+    ...(values.summaryModel &&
+    values.summaryTemperature &&
+    supportsTemperature(values.summaryModel)
       ? { temperature: Number(values.summaryTemperature) }
+      : {}),
+    ...(values.summaryModel &&
+    values.summaryReasoningEffort &&
+    supportsReasoningEffort(values.summaryModel)
+      ? { reasoningEffort: values.summaryReasoningEffort }
       : {}),
     ...(values.summaryMaxOutputTokens
       ? { maxOutputTokens: Number(values.summaryMaxOutputTokens) }

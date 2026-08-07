@@ -22,6 +22,7 @@ export interface AiTextInput {
   userPrompt: string;
   contextChunks?: RetrievedChunk[];
   temperature?: number;
+  reasoningEffort?: string;
   maxTokens?: number;
   /** Model runtime resolved by provider-operations; embedding does not use this field. */
   model?: string;

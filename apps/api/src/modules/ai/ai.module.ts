@@ -62,23 +62,24 @@ const logger = new Logger("AiModule");
           );
         }
 
-        const geminiApiKey = configService.get("GEMINI_API_KEY", { infer: true });
-        if (geminiApiKey) {
-          registry.set(
-            AiProviderName.GEMINI,
-            new GeminiProvider({
-              apiKey: geminiApiKey,
-              structuredModel: configService.get("GEMINI_STRUCTURED_MODEL", {
-                infer: true,
-              }),
-              chatModel: configService.get("GEMINI_CHAT_MODEL", { infer: true }),
-              requestTimeoutMs: configService.get("AI_PROVIDER_TIMEOUT_MS", {
-                infer: true,
-              }),
-            }),
-          );
-          logger.log("Gemini provider registered as structured-output fallback");
-        }
+        // Tạm thời tắt Gemini fallback do chưa có API key hợp lệ
+        // const geminiApiKey = configService.get("GEMINI_API_KEY", { infer: true });
+        // if (geminiApiKey) {
+        //   registry.set(
+        //     AiProviderName.GEMINI,
+        //     new GeminiProvider({
+        //       apiKey: geminiApiKey,
+        //       structuredModel: configService.get("GEMINI_STRUCTURED_MODEL", {
+        //         infer: true,
+        //       }),
+        //       chatModel: configService.get("GEMINI_CHAT_MODEL", { infer: true }),
+        //       requestTimeoutMs: configService.get("AI_PROVIDER_TIMEOUT_MS", {
+        //         infer: true,
+        //       }),
+        //     }),
+        //   );
+        //   logger.log("Gemini provider registered as structured-output fallback");
+        // }
 
         return registry;
       },

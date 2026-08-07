@@ -21,7 +21,11 @@ export function MathpixMarkdownRenderer({
 
     // Dynamic import to avoid SSR issues with mathpix-markdown-it
     import("mathpix-markdown-it").then(({ MathpixMarkdownModel }) => {
-      const html = MathpixMarkdownModel.markdownToHTML(content || "", {
+      // Đã xóa bỏ logic tự động xóa khoảng trắng của AI vì regex cũ bị sai (xóa lầm khoảng trắng bên ngoài $).
+      // AI hiện tại đã được cấu hình prompt không sinh ra khoảng trắng thừa bên trong $.
+      let safeContent = content || "";
+
+      const html = MathpixMarkdownModel.markdownToHTML(safeContent, {
         htmlTags: true,
       });
       if (containerRef.current) {

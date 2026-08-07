@@ -7,6 +7,7 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
   Min,
@@ -36,6 +37,10 @@ export class UpdateAiFeatureConfigurationItemDto {
   @Min(128)
   @Max(100_000)
   maxOutputTokens?: number | null;
+
+  @IsOptional()
+  @IsString()
+  reasoningEffort?: string | null;
 
   @IsInt()
   @Min(0)

@@ -41,7 +41,7 @@ const AiGenerationConfigDialog = dynamic(
 const cards = [
   {
     type: "SUMMARY",
-    label: "Tóm tắt",
+    label: "Kiến thức",
     description: "Tổng hợp nội dung trọng tâm từ tài liệu đã chọn.",
     icon: BookOpenText,
   },

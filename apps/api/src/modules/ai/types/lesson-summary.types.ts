@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v9";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v6";
+export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v10";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v8";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 2_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 500;
-export const LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS = 4_000;
+export const LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
 
 export const lessonSummaryStyleSchema = z.enum([
   "student_friendly",
@@ -22,33 +22,13 @@ const baseBlockSchema = z.object({
   sourceChunkIds: z.array(z.string()).min(1),
 });
 
-const additionalInfoBlockSchema = baseBlockSchema.extend({
-  type: z.literal("additional_info"),
-  title: nonEmptyText(240),
-  points: z.array(nonEmptyText(2000)).min(1),
-}).strict();
-
-const definitionBlockSchema = baseBlockSchema.extend({
-  type: z.literal("definition"),
+const knowledgeBlockSchema = baseBlockSchema.extend({
+  type: z.literal("knowledge"),
   title: nonEmptyText(240),
   content: nonEmptyText(2000),
 }).strict();
 
-const ruleBlockSchema = baseBlockSchema.extend({
-  type: z.literal("rule"),
-  title: nonEmptyText(240),
-  content: nonEmptyText(2000),
-}).strict();
 
-const formulaBlockSchema = baseBlockSchema.extend({
-  type: z.literal("formula"),
-  title: nonEmptyText(240),
-  formulas: z.array(z.object({
-    latex: nonEmptyText(1000),
-    explanation: nonEmptyText(2000).nullable(),
-    conditions: z.array(nonEmptyText(2000)).nullable(),
-  }).strict()).min(1),
-}).strict();
 
 const propertyBlockSchema = baseBlockSchema.extend({
   type: z.literal("property"),
@@ -69,25 +49,17 @@ const procedureBlockSchema = baseBlockSchema.extend({
 
 const exampleBlockSchema = baseBlockSchema.extend({
   type: z.literal("example"),
-  title: nonEmptyText(240),
   problem: nonEmptyText(2000),
   solutionSteps: z.array(z.object({
     order: z.number().int(),
-    explanation: nonEmptyText(2000).nullable(),
+    content: nonEmptyText(2000).nullable(),
     latex: z.string().nullable(),
   }).strict()).nullable(),
-  answer: nonEmptyText(2000).nullable(),
+  answer: nonEmptyText(2000),
 }).strict();
 
 const noteBlockSchema = baseBlockSchema.extend({
   type: z.literal("note"),
-  title: nonEmptyText(240),
-  content: nonEmptyText(2000),
-}).strict();
-
-const commonMistakeBlockSchema = baseBlockSchema.extend({
-  type: z.literal("common_mistake"),
-  title: nonEmptyText(240),
   content: nonEmptyText(2000),
 }).strict();
 
@@ -97,25 +69,8 @@ const theoremBlockSchema = baseBlockSchema.extend({
   content: nonEmptyText(2000),
 }).strict();
 
-const remarkBlockSchema = baseBlockSchema.extend({
-  type: z.literal("remark"),
-  title: nonEmptyText(240),
-  content: nonEmptyText(2000),
-}).strict();
 
-const proofBlockSchema = baseBlockSchema.extend({
-  type: z.literal("proof"),
-  title: nonEmptyText(240),
-  given: z.array(nonEmptyText(2000)).nullable(),
-  goal: nonEmptyText(2000).nullable(),
-  idea: nonEmptyText(2000).nullable(),
-  steps: z.array(z.object({
-    order: z.number().int(),
-    statement: nonEmptyText(2000),
-    reason: nonEmptyText(2000).nullable(),
-  }).strict()).min(1),
-  conclusion: nonEmptyText(2000).nullable(),
-}).strict();
+
 
 const comparisonBlockSchema = baseBlockSchema.extend({
   type: z.literal("comparison"),
@@ -137,7 +92,7 @@ const applicationBlockSchema = baseBlockSchema.extend({
   title: nonEmptyText(240),
   context: nonEmptyText(2000),
   knowledgeUsed: z.array(nonEmptyText(240)).nullable(),
-  explanation: nonEmptyText(2000),
+  content: nonEmptyText(2000),
 }).strict();
 
 const sectionRecapBlockSchema = baseBlockSchema.extend({
@@ -147,33 +102,23 @@ const sectionRecapBlockSchema = baseBlockSchema.extend({
 }).strict();
 
 export const lessonSummaryMvpBlockSchema = z.discriminatedUnion("type", [
-  additionalInfoBlockSchema,
-  definitionBlockSchema,
-  ruleBlockSchema,
-  formulaBlockSchema,
+  knowledgeBlockSchema,
+
   propertyBlockSchema,
   procedureBlockSchema,
   exampleBlockSchema,
   noteBlockSchema,
-  commonMistakeBlockSchema,
   theoremBlockSchema,
-  proofBlockSchema,
-  remarkBlockSchema,
 ]);
 
 export const lessonSummaryExtendedBlockSchema = z.discriminatedUnion("type", [
-  additionalInfoBlockSchema,
-  definitionBlockSchema,
-  ruleBlockSchema,
-  formulaBlockSchema,
+  knowledgeBlockSchema,
+
   propertyBlockSchema,
   procedureBlockSchema,
   exampleBlockSchema,
   noteBlockSchema,
-  commonMistakeBlockSchema,
   theoremBlockSchema,
-  proofBlockSchema,
-  remarkBlockSchema,
   comparisonBlockSchema,
   dataTableBlockSchema,
   applicationBlockSchema,

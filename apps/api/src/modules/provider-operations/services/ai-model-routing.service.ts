@@ -59,10 +59,41 @@ export class AiModelRoutingService {
     return {
       feature,
       version: configuration.version,
+      model: configuration.primaryCatalogItem.externalKey,
       temperature: configuration.temperature?.toNumber() ?? null,
+      reasoningEffort: configuration.reasoningEffort ?? null,
       maxOutputTokens: configuration.maxOutputTokens,
       candidates,
     };
+  }
+
+  async getAllActiveModels(): Promise<ProviderRouteCandidate[]> {
+    const items = await this.prisma.providerCatalogItem.findMany({
+      where: {
+        status: ProviderCatalogStatus.ACTIVE,
+        category: ProviderCatalogCategory.AI_MODEL,
+      },
+      include: { priceVersions: priceVersionInclude },
+      orderBy: [{ provider: "desc" }, { externalKey: "asc" }],
+    });
+    return items
+      .map((item) => this.toCandidate(item))
+      .filter((candidate) => candidate.available);
+  }
+
+  async resolveCandidateByModel(modelName: string): Promise<ProviderRouteCandidate | null> {
+    const item = await this.prisma.providerCatalogItem.findFirst({
+      where: {
+        externalKey: modelName,
+        status: ProviderCatalogStatus.ACTIVE,
+        category: ProviderCatalogCategory.AI_MODEL,
+      },
+      include: { priceVersions: priceVersionInclude },
+    });
+    if (!item) {
+      return null;
+    }
+    return this.toCandidate(item);
   }
 
   isCredentialConfigured(provider: string): boolean {
@@ -87,6 +118,7 @@ export class AiModelRoutingService {
     provider: string;
     externalKey: string;
     status: ProviderCatalogStatus;
+    capabilitiesJson?: import("@prisma/client").Prisma.JsonValue | null;
     priceVersions: Array<{
       id: string;
       rates: Array<{
@@ -111,6 +143,7 @@ export class AiModelRoutingService {
       available:
         item.status === ProviderCatalogStatus.ACTIVE &&
         this.isCredentialConfigured(item.provider),
+      capabilitiesJson: item.capabilitiesJson,
       rates:
         price?.rates.map((rate) => ({
           metric: rate.metric,
@@ -127,7 +160,9 @@ export class AiModelRoutingService {
     return {
       feature,
       version: 0,
+      model: "default-model",
       temperature: null,
+      reasoningEffort: null,
       maxOutputTokens: null,
       candidates: [
         {

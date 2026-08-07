@@ -24,16 +24,17 @@ export function SelectContent({
         )}
         {...props}
       >
-        <SelectScrollUpButton />
+        {position === "item-aligned" && <SelectScrollUpButton />}
         <SelectPrimitive.Viewport
           className={cn(
             "p-0",
-            position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]",
+            position === "popper" &&
+              "w-full min-w-[var(--radix-select-trigger-width)] max-h-[50vh] overflow-y-auto",
           )}
         >
           {children}
         </SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
+        {position === "item-aligned" && <SelectScrollDownButton />}
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

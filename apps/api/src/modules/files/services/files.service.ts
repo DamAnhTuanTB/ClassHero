@@ -240,9 +240,7 @@ export class FilesService {
 
   private getMaxSizeBytes(purpose: FilePurpose) {
     if (purpose === FilePurpose.LESSON_DOCUMENT) {
-      return this.megabytesToBytes(
-        this.configService.get("MAX_PDF_UPLOAD_MB", { infer: true }),
-      );
+      return Infinity;
     }
 
     if (purpose === FilePurpose.AVATAR) {

@@ -15,7 +15,9 @@ import { getAdminNavigationItems } from "@/components/admin/courses/admin-naviga
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import {
+  createProviderCatalogItem,
   createProviderPriceVersion,
+  deleteProviderCatalogItem,
   getAiConfigurations,
   getOcrSettings,
   getProviderAuditHistory,
@@ -28,6 +30,7 @@ import {
   updateAiConfigurations,
   updateOcrSettings,
   updateProviderBudgets,
+  updateProviderCatalogItem,
 } from "@/features/admin/ai-settings/api/provider-operations-api";
 import { ModelConfigurationsTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/model-configurations-tab";
 import { OcrSettingsTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/ocr-settings-tab";
@@ -195,6 +198,38 @@ export function AdminAiSettingsScreen() {
       toast.success("Đã cập nhật bảng giá");
     },
     onError: () => toast.error("Chưa thể lưu bảng giá. Vui lòng thử lại."),
+  });
+  
+  const createModelMutation = useMutation({
+    mutationFn: (input: Parameters<typeof createProviderCatalogItem>[0]) => 
+      createProviderCatalogItem(input, token),
+    onSuccess: async () => {
+      await refreshAll();
+      toast.success("Đã thêm mô hình mới");
+    },
+    onError: () => toast.error("Chưa thể thêm mô hình. Vui lòng thử lại."),
+  });
+  
+  const updateModelMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string, input: Parameters<typeof updateProviderCatalogItem>[1] }) => 
+      updateProviderCatalogItem(id, input, token),
+    onSuccess: async () => {
+      await refreshAll();
+      toast.success("Đã cập nhật mô hình");
+    },
+    onError: () => toast.error("Chưa thể cập nhật mô hình. Vui lòng thử lại."),
+  });
+  
+  const deleteModelMutation = useMutation({
+    mutationFn: (id: string) => deleteProviderCatalogItem(id, token),
+    onSuccess: async () => {
+      await refreshAll();
+      toast.success("Đã xoá mô hình");
+    },
+    onError: (err: any) => {
+      const message = err?.message || "Chưa thể xoá mô hình. Vui lòng thử lại.";
+      toast.error(message);
+    }
   });
 
   if (!isAuthorized) return null;
@@ -424,11 +459,26 @@ export function AdminAiSettingsScreen() {
                 <ProviderCatalogTab
                   catalog={catalogQuery.data}
                   audit={auditQuery.data}
+                  configurations={configurationsQuery.data?.configurations}
                   fxRateVndPerUsd={overview?.accounting.fxRateVndPerUsd}
                   isSaving={priceMutation.isPending}
                   onCreatePrice={async (catalogItemId, input) => {
                     await priceMutation.mutateAsync({ catalogItemId, input });
                   }}
+                  onCreateModel={async (input) => {
+                    await createModelMutation.mutateAsync(input);
+                  }}
+                  onUpdateModel={async (id, input) => {
+                    await updateModelMutation.mutateAsync({ id, input });
+                  }}
+                  onDeleteModel={async (id) => {
+                    await deleteModelMutation.mutateAsync(id);
+                  }}
+                  isMutatingModel={
+                    createModelMutation.isPending || 
+                    updateModelMutation.isPending || 
+                    deleteModelMutation.isPending
+                  }
                 />
               )
             ) : null}

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -23,9 +24,11 @@ import {
   ProviderUsageEventsQueryDto,
   ProviderUsageQueryDto,
 } from "#api/modules/provider-operations/dto/provider-operations-query.dto";
+import { CreateProviderCatalogItemDto } from "#api/modules/provider-operations/dto/create-provider-catalog-item.dto";
 import { UpdateAiConfigurationsDto } from "#api/modules/provider-operations/dto/update-ai-configurations.dto";
 import { UpdateOcrSettingsDto } from "#api/modules/provider-operations/dto/update-ocr-settings.dto";
 import { UpdateProviderBudgetsDto } from "#api/modules/provider-operations/dto/update-provider-budgets.dto";
+import { UpdateProviderCatalogItemDto } from "#api/modules/provider-operations/dto/update-provider-catalog-item.dto";
 import { ProviderOperationsAdminService } from "#api/modules/provider-operations/services/provider-operations-admin.service";
 
 @ApiTags("admin-provider-operations")
@@ -49,6 +52,34 @@ export class AdminProviderOperationsController {
   @ApiOperation({ summary: "List AI/OCR provider catalog and versioned prices" })
   catalog() {
     return this.service.catalog();
+  }
+
+  @Post("catalog")
+  @ApiOperation({ summary: "Create a new AI/OCR model catalog item" })
+  createCatalogItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateProviderCatalogItemDto,
+  ) {
+    return this.service.createCatalogItem(user.id, dto);
+  }
+
+  @Put("catalog/:id")
+  @ApiOperation({ summary: "Update an AI/OCR model catalog item" })
+  updateCatalogItem(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProviderCatalogItemDto,
+  ) {
+    return this.service.updateCatalogItem(id, user.id, dto);
+  }
+
+  @Delete("catalog/:id")
+  @ApiOperation({ summary: "Delete an AI/OCR model catalog item" })
+  deleteCatalogItem(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.deleteCatalogItem(id, user.id);
   }
 
   @Post("catalog/:id/price-versions")

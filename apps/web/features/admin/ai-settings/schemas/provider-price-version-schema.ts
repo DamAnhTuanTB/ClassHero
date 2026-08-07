@@ -33,3 +33,18 @@ export const providerPriceVersionSchema = z.object({
 });
 
 export type ProviderPriceVersionFormValues = z.infer<typeof providerPriceVersionSchema>;
+
+export const providerCatalogItemSchema = z.object({
+  displayName: z.string().trim().min(1, "Vui lòng nhập tên hiển thị"),
+  externalKey: z.string().trim().min(1, "Vui lòng nhập tên model"),
+  aiConfiguration: z.enum(["TEMPERATURE", "REASONING_EFFORT", "NONE"]),
+  reasoningEffortLevels: z.array(z.string()).optional(),
+});
+
+export type ProviderCatalogItemFormValues = z.infer<typeof providerCatalogItemSchema>;
+
+export const createProviderCatalogItemSchema = providerCatalogItemSchema.and(
+  providerPriceVersionSchema.partial()
+);
+
+export type CreateProviderCatalogItemFormValues = z.infer<typeof createProviderCatalogItemSchema>;

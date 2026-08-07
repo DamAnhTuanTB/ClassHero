@@ -21,13 +21,16 @@ export type ProviderRouteCandidate = {
   model: string;
   maxInputTokens: number | null;
   available: boolean;
+  capabilitiesJson?: any;
   rates: PriceRateSnapshot[];
 };
 
 export type AiFeatureRoute = {
   feature: AiGenerationType;
   version: number;
+  model: string;
   temperature: number | null;
+  reasoningEffort: string | null;
   maxOutputTokens: number | null;
   candidates: ProviderRouteCandidate[];
 };

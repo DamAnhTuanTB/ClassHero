@@ -40,6 +40,7 @@ export const updateAiConfigurations = (
         primaryCatalogItemId: configuration.primaryCatalogItemId,
         fallbackCatalogItemId: configuration.fallbackCatalogItemId,
         temperature: configuration.temperature,
+        reasoningEffort: configuration.reasoningEffort,
         maxOutputTokens: configuration.maxOutputTokens,
         expectedVersion: configuration.version,
       })),
@@ -116,4 +117,50 @@ export const createProviderPriceVersion = (
     method: "POST",
     token,
     body: input,
+  });
+
+export const createProviderCatalogItem = (
+  input: {
+    category: "AI_MODEL" | "OCR_SERVICE";
+    provider: string;
+    externalKey: string;
+    displayName: string;
+    aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT";
+    reasoningEffortLevels?: string[];
+    initialPrice?: {
+      billingMode: "TOKEN" | "PAGE" | "REQUEST";
+      sourceUrl: string;
+      effectiveFrom: string;
+      rates: Array<Omit<PriceRate, "id">>;
+    };
+  },
+  token: string,
+) =>
+  apiRequest<ProviderCatalogItem>(`${basePath}/catalog`, {
+    method: "POST",
+    token,
+    body: input,
+  });
+
+export const updateProviderCatalogItem = (
+  catalogItemId: string,
+  input: {
+    displayName?: string;
+    externalKey?: string;
+    aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | null;
+    reasoningEffortLevels?: string[] | null;
+    status?: "ACTIVE" | "DEPRECATED" | "DISABLED";
+  },
+  token: string,
+) =>
+  apiRequest<ProviderCatalogItem>(`${basePath}/catalog/${catalogItemId}`, {
+    method: "PUT",
+    token,
+    body: input,
+  });
+
+export const deleteProviderCatalogItem = (catalogItemId: string, token: string) =>
+  apiRequest<{ success: boolean }>(`${basePath}/catalog/${catalogItemId}`, {
+    method: "DELETE",
+    token,
   });

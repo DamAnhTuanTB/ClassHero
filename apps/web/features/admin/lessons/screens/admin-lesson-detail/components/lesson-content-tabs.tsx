@@ -9,7 +9,7 @@ export type LessonContentTabKey = "documents" | "summary" | "quiz" | "flashcard"
 
 const lessonContentTabs = [
   { key: "documents", label: "Tài liệu", icon: FileText },
-  { key: "summary", label: "Tóm tắt", icon: BookOpenText },
+  { key: "summary", label: "Kiến thức", icon: BookOpenText },
   { key: "quiz", label: "Quiz", icon: HelpCircle },
   { key: "flashcard", label: "Flashcard", icon: Layers },
   { key: "test", label: "Test", icon: ClipboardList },

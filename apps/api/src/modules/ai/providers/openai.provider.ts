@@ -109,13 +109,24 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
+  private supportsTemperature(model: string): boolean {
+    const m = model.toLowerCase();
+    // Các model reasoning o-series (o1, o2, o3...) hoặc gpt-5.x đều không hỗ trợ temperature
+    if (/^(o[1-9]|gpt-5)/.test(m)) {
+      return false;
+    }
+    return true;
+  }
+
   async generateText(input: AiTextInput): Promise<AiTextOutput> {
     const startedAt = Date.now();
+    const modelToUse = input.model ?? this.config.chatModel;
     const response = await this.client.responses.create({
-      model: input.model ?? this.config.chatModel,
+      model: modelToUse,
       instructions: input.systemPrompt,
       input: buildAiUserPrompt(input),
-      ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse) ? {} : { temperature: input.temperature }),
+      ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
       ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
     });
     const text = response.output_text.trim();
@@ -140,18 +151,34 @@ export class OpenAiProvider implements AiProvider {
   ): Promise<AiStructuredOutput<TOutput>> {
     assertAiOutputName(input.outputName);
     const startedAt = Date.now();
+    const modelToUse = input.model ?? this.config.structuredModel;
     const response = await this.client.responses.parse({
-      model: input.model ?? this.config.structuredModel,
+      model: modelToUse,
       instructions: input.systemPrompt,
       input: buildAiUserPrompt(input),
       text: {
         format: buildAiStructuredTextFormat(schema, input.outputName),
       },
-      ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse) ? {} : { temperature: input.temperature }),
+      ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
       ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
     });
 
     if (response.output_parsed === null) {
+      this.logger.error(
+        `OpenAI Structured Generation Failed: ${JSON.stringify(
+          {
+            output_text: response.output_text,
+            model: response.model,
+            usage: response.usage,
+            id: response.id,
+            finish_reason: (response as any).finish_reason,
+            refusal: (response as any).refusal,
+          },
+          null,
+          2,
+        )}`,
+      );
       throw new AiOutputValidationError(
         "OpenAI did not return a parsed structured output. The response may have been refused or incomplete.",
       );

@@ -93,10 +93,15 @@ export class GenerateLessonSummaryDto {
   @Max(1)
   temperature?: number;
 
-  @ApiPropertyOptional({ minimum: 500, maximum: 4_000 })
+  @ApiPropertyOptional({ enum: ["low", "medium", "high"], description: "Mức độ suy luận cho o1/o3-mini" })
+  @IsOptional()
+  @IsIn(["low", "medium", "high"])
+  reasoningEffort?: "low" | "medium" | "high";
+
+  @ApiPropertyOptional({ minimum: 500, maximum: 32_000 })
   @IsOptional()
   @IsInt()
   @Min(500)
-  @Max(4_000)
+  @Max(32_000)
   maxOutputTokens?: number;
 }

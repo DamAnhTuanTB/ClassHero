@@ -72,7 +72,7 @@ export function AdminLessonSummaryTab({
   const save = async (action: "SAVE" | "PUBLISH" | "WITHDRAW") => {
     const isBlocks = content?.type === "lesson_summary_blocks";
     if (!isBlocks && !hasTiptapDocumentContent(content)) {
-      setContentError("Nhập nội dung tóm tắt trước khi lưu");
+      setContentError("Nhập nội dung Kiến thức trước khi lưu");
       return;
     }
     setContentError(undefined);
@@ -108,7 +108,7 @@ export function AdminLessonSummaryTab({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-              Tóm tắt buổi học
+              Kiến thức buổi học
             </h3>
             {summary ? <SummaryStatusBadge status={summary.reviewStatus} job={summaryJob ?? null} /> : null}
           </div>
@@ -205,14 +205,14 @@ export function AdminLessonSummaryTab({
         </div>
       ) : (
         <QuizRichContentEditor
-          ariaLabel="Nội dung tóm tắt buổi học"
+          ariaLabel="Nội dung Kiến thức buổi học"
           disabled={upsertMutation.isPending}
           error={contentError}
           placeholder="Nhập các ý chính, công thức, ví dụ và câu hỏi ôn tập..."
           value={content}
           onBlur={() => {
             if (!hasTiptapDocumentContent(content)) {
-              setContentError("Nhập nội dung tóm tắt trước khi lưu");
+              setContentError("Nhập nội dung Kiến thức trước khi lưu");
             }
           }}
           onChange={(value) => {
@@ -233,7 +233,7 @@ export function AdminLessonSummaryTab({
           className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:opacity-60"
         >
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          {summary ? "Sinh lại" : "Sinh tóm tắt"}
+          {summary ? "Sinh lại" : "Sinh Kiến thức"}
         </button>
         <button
           type="button"

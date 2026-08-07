@@ -54,11 +54,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(
-    FileInterceptor("file", {
-      limits: {
-        fileSize: 60 * 1024 * 1024,
-      },
-    }),
+    FileInterceptor("file"),
   )
   upload(
     @CurrentUser() user: AuthenticatedUser,

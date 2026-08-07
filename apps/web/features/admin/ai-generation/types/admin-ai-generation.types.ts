@@ -9,6 +9,30 @@ export type AdminAiQuestionType =
 export type AdminSummaryStyle = "student_friendly" | "concise" | "academic";
 export type AdminSummaryLength = "short" | "standard" | "detailed";
 
+export function supportsTemperature(
+  modelName: string | null | undefined,
+  aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null
+): boolean {
+  if (aiConfiguration === "TEMPERATURE") return true;
+  if (aiConfiguration === "REASONING_EFFORT") return false;
+  if (!modelName) return true;
+  const m = modelName.toLowerCase();
+  if (/^(o[1-9]|gpt-5)/.test(m)) return false;
+  if (m.includes("thinking") || m.includes("gemini-3")) return false;
+  return true;
+}
+
+export function supportsReasoningEffort(
+  modelName: string | null | undefined,
+  aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null
+): boolean {
+  if (aiConfiguration === "REASONING_EFFORT") return true;
+  if (aiConfiguration === "TEMPERATURE") return false;
+  if (!modelName) return false;
+  const m = modelName.toLowerCase();
+  return /^(o[1-9]|gpt-5)/.test(m) || m.includes("thinking") || m.includes("gemini-3");
+}
+
 export interface AdminAiPanelDocument {
   id: string;
   title: string;
@@ -78,6 +102,7 @@ export type AdminSummaryGenerationPayload = {
   userPrompt?: string;
   model?: string;
   temperature?: number;
+  reasoningEffort?: string;
   maxOutputTokens?: number;
 };
 
@@ -116,6 +141,7 @@ export interface AdminLessonSummaryPromptPreview {
       format: Record<string, unknown>;
     };
     temperature: number;
+    reasoning_effort?: string;
     max_output_tokens: number;
   };
   context: {
@@ -135,6 +161,7 @@ export interface AdminLessonSummaryPromptPreview {
       provider: string;
       model: string;
       available: boolean;
+      capabilities?: any;
     }>;
   };
   estimatedCost: {

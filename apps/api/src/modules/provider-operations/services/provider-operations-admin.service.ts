@@ -21,6 +21,11 @@ import type {
   ProviderUsageEventsQueryDto,
   ProviderUsageQueryDto,
 } from "#api/modules/provider-operations/dto/provider-operations-query.dto";
+import { 
+  CreateProviderCatalogItemDto,
+  AiConfigurationFeature
+} from "#api/modules/provider-operations/dto/create-provider-catalog-item.dto";
+import type { UpdateProviderCatalogItemDto } from "#api/modules/provider-operations/dto/update-provider-catalog-item.dto";
 import { ProviderUsageGranularity } from "#api/modules/provider-operations/dto/provider-operations-query.dto";
 import type { UpdateAiConfigurationsDto } from "#api/modules/provider-operations/dto/update-ai-configurations.dto";
 import type { UpdateOcrSettingsDto } from "#api/modules/provider-operations/dto/update-ocr-settings.dto";
@@ -93,7 +98,7 @@ export class ProviderOperationsAdminService {
     const items = await this.prisma.providerCatalogItem.findMany({
       include: {
         priceVersions: {
-          orderBy: { effectiveFrom: "desc" },
+          orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }],
           include: { rates: { orderBy: [{ metric: "asc" }, { tierFrom: "asc" }] } },
         },
       },
@@ -113,6 +118,200 @@ export class ProviderOperationsAdminService {
       updatedAt: item.updatedAt,
       priceVersions: item.priceVersions.map(serializePriceVersion),
     }));
+  }
+
+  async createCatalogItem(actorUserId: string, dto: CreateProviderCatalogItemDto) {
+    const existing = await this.prisma.providerCatalogItem.findUnique({
+      where: {
+        category_provider_externalKey: {
+          category: dto.category,
+          provider: dto.provider.toUpperCase(),
+          externalKey: dto.externalKey,
+        },
+      },
+    });
+    if (existing) {
+      throwConflict("PROVIDER_CATALOG_ITEM_EXISTS", "Model này đã tồn tại trong hệ thống.");
+    }
+    
+    // Add default capabilities based on category
+    const defaultCapabilities = dto.category === ProviderCatalogCategory.AI_MODEL 
+      ? [...MANAGED_AI_FEATURES] 
+      : [];
+      
+    // Include the aiConfiguration if provided
+    let capabilitiesJson: Record<string, any> = { features: defaultCapabilities };
+    if (dto.aiConfiguration) {
+      capabilitiesJson.aiConfiguration = dto.aiConfiguration;
+      if (dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT && dto.reasoningEffortLevels?.length) {
+        capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+      }
+    }
+
+    const item = await this.prisma.providerCatalogItem.create({
+      data: {
+        category: dto.category,
+        provider: dto.provider.toUpperCase(),
+        externalKey: dto.externalKey,
+        displayName: dto.displayName,
+        capabilitiesJson,
+        priceVersions: dto.initialPrice
+          ? {
+              create: {
+                billingMode: dto.initialPrice.billingMode,
+                sourceUrl: dto.initialPrice.sourceUrl,
+                effectiveFrom: new Date(dto.initialPrice.effectiveFrom),
+                createdByUserId: actorUserId,
+                rates: {
+                  create: dto.initialPrice.rates.map((rate) => ({
+                    metric: rate.metric,
+                    unitSize: rate.unitSize,
+                    unitPriceUsd: rate.unitPriceUsd,
+                    tierFrom: rate.tierFrom,
+                    tierTo: rate.tierTo,
+                  })),
+                },
+              },
+            }
+          : undefined,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorUserId,
+        action: "PROVIDER_CATALOG_ITEM_CREATED",
+        entityType: "ProviderCatalogItem",
+        entityId: item.id,
+        after: toJson(item),
+      },
+    });
+
+    return item;
+  }
+
+  async updateCatalogItem(id: string, actorUserId: string, dto: UpdateProviderCatalogItemDto) {
+    const item = await this.prisma.providerCatalogItem.findUnique({
+      where: { id },
+    });
+    if (!item) {
+      throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model.");
+    }
+    
+    let capabilitiesJson = item.capabilitiesJson as Record<string, any> | null;
+    if (dto.aiConfiguration) {
+      if (!capabilitiesJson || typeof capabilitiesJson !== 'object') {
+        capabilitiesJson = {};
+      }
+      capabilitiesJson.aiConfiguration = dto.aiConfiguration;
+      if (dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT && dto.reasoningEffortLevels) {
+        capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+      } else {
+        delete capabilitiesJson.reasoningEffortLevels;
+      }
+    } else if (dto.aiConfiguration === null && capabilitiesJson) {
+      delete capabilitiesJson.aiConfiguration;
+      delete capabilitiesJson.reasoningEffortLevels;
+    } else if (dto.reasoningEffortLevels !== undefined && capabilitiesJson && capabilitiesJson.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT) {
+       if (dto.reasoningEffortLevels === null) {
+         delete capabilitiesJson.reasoningEffortLevels;
+       } else {
+         capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+       }
+    }
+
+    const updated = await this.prisma.providerCatalogItem.update({
+      where: { id },
+      data: {
+        ...(dto.displayName ? { displayName: dto.displayName } : {}),
+        ...(dto.externalKey ? { externalKey: dto.externalKey } : {}),
+        ...(dto.status ? { status: dto.status } : {}),
+        ...((dto.aiConfiguration !== undefined || dto.reasoningEffortLevels !== undefined) ? { capabilitiesJson: (capabilitiesJson ?? Prisma.DbNull) as import("@prisma/client").Prisma.InputJsonValue } : {}),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorUserId,
+        action: "PROVIDER_CATALOG_ITEM_UPDATED",
+        entityType: "ProviderCatalogItem",
+        entityId: item.id,
+        before: toJson(item),
+        after: toJson(updated),
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteCatalogItem(id: string, actorUserId: string) {
+    const item = await this.prisma.providerCatalogItem.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { usageEvents: true },
+        },
+      },
+    });
+    if (!item) {
+      throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model.");
+    }
+    
+    if (item._count.usageEvents > 0) {
+      throwConflict(
+        "PROVIDER_CATALOG_ITEM_IN_USE",
+        "Không thể xoá model đã có dữ liệu sử dụng. Vui lòng chuyển trạng thái sang ngưng hoạt động (DEPRECATED)."
+      );
+    }
+    
+    // Check if it's currently used in routing configurations
+    const usedInConfig = await this.prisma.aiFeatureModelConfig.findFirst({
+      where: {
+        OR: [
+          { primaryCatalogItemId: id },
+          { fallbackCatalogItemId: id }
+        ]
+      }
+    });
+    
+    if (usedInConfig) {
+      throwConflict(
+        "PROVIDER_CATALOG_ITEM_IN_ROUTING",
+        "Không thể xoá model đang được cấu hình sử dụng trong hệ thống AI. Vui lòng gỡ cấu hình trước khi xoá."
+      );
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      // First delete all price versions and their rates
+      const prices = await transaction.providerPriceVersion.findMany({
+        where: { catalogItemId: id },
+      });
+      for (const price of prices) {
+        await transaction.providerPriceRate.deleteMany({
+          where: { priceVersionId: price.id },
+        });
+      }
+      await transaction.providerPriceVersion.deleteMany({
+        where: { catalogItemId: id },
+      });
+      
+      // Delete the catalog item
+      await transaction.providerCatalogItem.delete({
+        where: { id },
+      });
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId,
+          action: "PROVIDER_CATALOG_ITEM_DELETED",
+          entityType: "ProviderCatalogItem",
+          entityId: item.id,
+          before: toJson(item),
+        },
+      });
+    });
+
+    return { success: true };
   }
 
   async aiConfigurations() {
@@ -137,6 +336,7 @@ export class ProviderOperationsAdminService {
         primaryCatalogItemId: configuration.primaryCatalogItemId,
         fallbackCatalogItemId: configuration.fallbackCatalogItemId,
         temperature: configuration.temperature?.toNumber() ?? null,
+        reasoningEffort: configuration.reasoningEffort ?? null,
         maxOutputTokens: configuration.maxOutputTokens,
         version: configuration.version,
         updatedAt: configuration.updatedAt,
@@ -220,6 +420,7 @@ export class ProviderOperationsAdminService {
             primaryCatalogItemId: item.primaryCatalogItemId,
             fallbackCatalogItemId: item.fallbackCatalogItemId ?? null,
             temperature: item.temperature,
+            reasoningEffort: item.reasoningEffort ?? null,
             maxOutputTokens: item.maxOutputTokens,
             updatedByUserId: actorUserId,
             version: 1,
@@ -228,6 +429,7 @@ export class ProviderOperationsAdminService {
             primaryCatalogItemId: item.primaryCatalogItemId,
             fallbackCatalogItemId: item.fallbackCatalogItemId ?? null,
             temperature: item.temperature,
+            reasoningEffort: item.reasoningEffort ?? null,
             maxOutputTokens: item.maxOutputTokens,
             updatedByUserId: actorUserId,
             version: { increment: 1 },
@@ -256,7 +458,7 @@ export class ProviderOperationsAdminService {
         where: { category: ProviderCatalogCategory.OCR_SERVICE },
         include: {
           priceVersions: {
-            orderBy: { effectiveFrom: "desc" },
+            orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }],
             take: 1,
             include: { rates: true },
           },
@@ -482,7 +684,7 @@ export class ProviderOperationsAdminService {
       await transaction.providerPriceVersion.updateMany({
         where: {
           catalogItemId,
-          effectiveFrom: { lt: effectiveFrom },
+          effectiveFrom: { lte: effectiveFrom },
           OR: [{ effectiveTo: null }, { effectiveTo: { gt: effectiveFrom } }],
         },
         data: { effectiveTo: effectiveFrom },
