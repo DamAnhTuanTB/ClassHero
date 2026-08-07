@@ -21,3 +21,12 @@
 ## Bug Fixes
 - **JSON Edit View**: Resolved an issue where manipulating the CSS structure for `textarea` would unintentionally apply `display: block` to the ReactJson grid layout wrapper, which broke horizontal alignment.
 - **Admin Lesson JSON View**: Added `keyModifier` prop to `ReactJson` in the 'Chỉ xem JSON' (JSON-Only) view mode so users can double-click to edit values, maintaining consistency with the Split-view mode.
+
+## AI Prompt Refinements
+- **Lesson Summary Prompt (`lesson-summary-prompt.ts`)**: Comprehensively refined and renamed system prompt rules to enforce structural integrity and improve output readability.
+  - Re-titled rules (e.g. `CÁCH ĐẶT TIÊU ĐỀ (TITLE)`, `VĂN PHONG LỜI GIẢI (SOLUTION)`) to make them highly explicit for the LLM.
+  - Strictly banned the AI from hallucinating new consolidation sections like "Bài tập" or "Bài tập củng cố". Mandated that only the "Luyện tập với các bài toán thực tế" section is allowed to group exercises.
+  - Enforced a strict paragraphing rule (`\n\n`) for the `content`, `problem`, and `solution` fields.
+  - Forced the LLM to place each logical argument in `solution` on its own line.
+  - Explicitly required that enumerated items (e.g., `a), b), c)`) within `problem` and `content` fields must be split onto separate lines for readability.
+  - Solidified the rule explicitly prohibiting `example` and `note` content from bleeding into theoretical `content` fields.
