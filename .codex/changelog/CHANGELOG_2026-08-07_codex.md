@@ -30,3 +30,4 @@
   - Forced the LLM to place each logical argument in `solution` on its own line.
   - Explicitly required that enumerated items (e.g., `a), b), c)`) within `problem` and `content` fields must be split onto separate lines for readability.
   - Solidified the rule explicitly prohibiting `example` and `note` content from bleeding into theoretical `content` fields.
+  - Specified exact valid block types (`knowledge`, `theorem`, `note`, `procedure`, `property`) in the formatting rule for the `content` field to improve LLM type matching.
