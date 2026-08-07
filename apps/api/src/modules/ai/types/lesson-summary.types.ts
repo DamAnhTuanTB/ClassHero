@@ -43,18 +43,13 @@ const procedureBlockSchema = baseBlockSchema.extend({
   steps: z.array(z.object({
     order: z.number().int(),
     content: nonEmptyText(2000),
-    latex: z.string().nullable(),
   }).strict()).min(1),
 }).strict();
 
 const exampleBlockSchema = baseBlockSchema.extend({
   type: z.literal("example"),
   problem: nonEmptyText(2000),
-  solutionSteps: z.array(z.object({
-    order: z.number().int(),
-    content: nonEmptyText(2000).nullable(),
-    latex: z.string().nullable(),
-  }).strict()).nullable(),
+  solution: nonEmptyText(5000).nullable(),
   answer: nonEmptyText(2000),
 }).strict();
 

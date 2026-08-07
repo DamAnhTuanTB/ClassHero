@@ -51,7 +51,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
         return {
           ...base,
           problem: "Nhập đề bài tại đây...",
-          solutionSteps: [{ content: "Giải thích bước 1...", latex: "" }],
+          solution: "Ta có: $x=2$",
           answer: "Đáp án cuối cùng..."
         };
 
@@ -59,7 +59,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
 
         return {
           ...base,
-          steps: [{ content: "Nội dung bước 1...", latex: "" }]
+          steps: [{ content: "Nội dung bước 1..." }]
         };
 
       default:
@@ -94,6 +94,18 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
     };
     return ringColors[color] || ringColors.slate;
   };
+
+  const globalTypeCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    data.sections?.forEach(s => {
+      s.blocks?.forEach(b => {
+        counts[b.type] = (counts[b.type] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [data.sections]);
+
+  const runningCounts: Record<string, number> = {};
 
   return (
     <div className="mt-4 space-y-8">
@@ -354,18 +366,11 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
           </div>
           
           <div className="space-y-4">
-            {(() => {
-              const typeCounts = section.blocks?.reduce((acc, block) => {
-                acc[block.type] = (acc[block.type] || 0) + 1;
-                return acc;
-              }, {} as Record<string, number>) || {};
-              const currentCounts: Record<string, number> = {};
-
-              return section.blocks?.map((block, bIdx) => {
-                currentCounts[block.type] = (currentCounts[block.type] || 0) + 1;
+            {section.blocks?.map((block, bIdx) => {
+                runningCounts[block.type] = (runningCounts[block.type] || 0) + 1;
                 
-                // Only assign a number if there is more than 1 block of this type in the section
-                const computedDisplayNumber = typeCounts[block.type] > 1 ? currentCounts[block.type] : undefined;
+                // Only assign a number for "example" blocks, if there is more than 1 in the lesson
+                const computedDisplayNumber = (block.type === "example" && (globalTypeCounts[block.type] ?? 0) > 1) ? runningCounts[block.type] : undefined;
                 
                 // Override the AI's displayNumber (if any) with the mathematically correct one
                 const blockToRender = { ...block, displayNumber: computedDisplayNumber };
@@ -509,8 +514,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange }: SummaryBl
                     )}
                   </div>
                 );
-              });
-            })()}
+              })}
           </div>
         </div>
       ))}
@@ -608,11 +612,6 @@ function StepsBlock({ block }: { block: BlockData }) {
             </div>
             <div className="flex-1">
               <MathpixMarkdownRenderer content={step.content || step.statement || ""} />
-              {step.latex && (
-                <div className="mt-1">
-                  <MathpixMarkdownRenderer content={`$$ ${step.latex.replace(/^\s*\$\$?|\$\$?\s*$/g, "").trim()} $$`} />
-                </div>
-              )}
             </div>
           </div>
         ))}
@@ -628,18 +627,13 @@ function ExampleBlock({ block }: { block: BlockData }) {
         <MathpixMarkdownRenderer content={block.problem} />
       </div>
       
-      {( (block.solutionSteps && block.solutionSteps.length > 0) || block.answer ) && (
+      {( block.solution || block.answer ) && (
         <div className="pl-4 border-l-[3px] border-blue-500/30 dark:border-blue-400/30 space-y-3 mb-3 text-sm">
-          {block.solutionSteps && block.solutionSteps.map((step: any, i: number) => (
-            <div key={i}>
-              {step.content && <MathpixMarkdownRenderer content={step.content} />}
-              {step.latex && (
-                <div className="mt-1 bg-white dark:bg-slate-900/50 p-2 rounded">
-                  <MathpixMarkdownRenderer content={`$$ ${step.latex.replace(/^\s*\$\$?|\$\$?\s*$/g, "").trim()} $$`} />
-                </div>
-              )}
+          {block.solution && (
+            <div>
+              <MathpixMarkdownRenderer content={block.solution} />
             </div>
-          ))}
+          )}
           {block.answer && (
             <div className="mt-2">
               <MathpixMarkdownRenderer content={`Kết luận: ${block.answer}`} />
