@@ -25,4 +25,8 @@ export class UpdateProviderCatalogItemDto {
   @IsOptional()
   @IsEnum(ProviderCatalogStatus)
   status?: ProviderCatalogStatus;
+
+  @IsOptional()
+  @IsString()
+  createdAt?: string;
 }

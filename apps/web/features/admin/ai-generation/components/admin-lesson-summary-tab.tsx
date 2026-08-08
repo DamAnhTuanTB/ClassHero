@@ -106,9 +106,7 @@ export function AdminLessonSummaryTab({
         ? "HIDDEN"
         : action === "PUBLISH"
           ? "APPROVED"
-          : summary?.reviewStatus === "HIDDEN"
-            ? "HIDDEN"
-            : "DRAFT";
+          : summary?.reviewStatus || "DRAFT";
     try {
       await upsertMutation.mutateAsync({
         contentJson: content,

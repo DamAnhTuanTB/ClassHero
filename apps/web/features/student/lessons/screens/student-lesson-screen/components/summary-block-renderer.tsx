@@ -19,6 +19,7 @@ interface SummaryBlockRendererProps {
     }[];
   };
   displayTitle?: string;
+  hideTitle?: boolean;
   onChange?: (newData: any) => void;
   viewMode?: "UI_ONLY" | "SPLIT";
 }
@@ -35,7 +36,7 @@ const BLOCK_CONFIG: Record<string, { label: string, color: string, icon: any }> 
   section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
 };
 
-export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = "SPLIT" }: SummaryBlockRendererProps) {
+export function SummaryBlockRenderer({ data, displayTitle, hideTitle, onChange, viewMode = "SPLIT" }: SummaryBlockRendererProps) {
   const isReadOnly = !onChange;
   const [draggedItem, setDraggedItem] = React.useState<{sectionIdx: number, blockIdx: number} | null>(null);
   const [dragOverItem, setDragOverItem] = React.useState<{sectionIdx: number, blockIdx: number} | null>(null);
@@ -189,6 +190,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
     <div className="mt-4 space-y-8 react-json-custom-edit-wrapper">
 
       {/* Title */}
+      {!hideTitle && (
       <div className="relative group/title">
         {(!isReadOnly && viewMode === "SPLIT") && (
           <div className="flex justify-end mb-2">
@@ -270,6 +272,7 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
           )}
         </div>
       </div>
+      )}
 
       {/* Objectives */}
       {data.objectives && data.objectives.length > 0 && (
@@ -281,7 +284,12 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-slate-700 dark:text-slate-300">
               {data.objectives.map((obj, i) => (
-                <li key={i}><MathpixMarkdownRenderer content={obj} /></li>
+                <li key={i}>
+                  <MathpixMarkdownRenderer
+                    className="inline [&>*]:inline"
+                    content={obj}
+                  />
+                </li>
               ))}
             </ul>
           </div>
@@ -1061,7 +1069,10 @@ function SectionRecapBlock({ block }: { block: BlockData }) {
       <ul className="list-disc pl-5 space-y-1">
         {block.points?.map((point: string, i: number) => (
           <li key={i}>
-            <MathpixMarkdownRenderer content={point} />
+            <MathpixMarkdownRenderer
+              className="inline [&>*]:inline"
+              content={point}
+            />
           </li>
         ))}
       </ul>

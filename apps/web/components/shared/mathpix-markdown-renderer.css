@@ -72,6 +72,16 @@
   margin-bottom: 0.125rem;
 }
 
+/*
+ * Mathpix wraps loose-list paragraphs in a block element. Keep the first
+ * paragraph inline with the marker so Safari/WebKit does not place the marker
+ * on an empty line before the list-item content.
+ */
+.mmd-content li > div:first-child,
+.mmd-content li > p:first-child {
+  display: inline;
+}
+
 .mmd-content img {
   display: block;
   max-width: 100%;

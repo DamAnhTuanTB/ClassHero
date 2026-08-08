@@ -22,7 +22,7 @@ export function LessonSummaryPanel({ lesson }: { lesson: StudentLesson }) {
 
       {lesson.summary ? (
         isBlocksFormat ? (
-          <SummaryBlockRenderer data={content.data} displayTitle={lesson.title} />
+          <SummaryBlockRenderer data={content.data} displayTitle={lesson.title} hideTitle={true} viewMode="UI_ONLY" />
         ) : (
           <TiptapContentView
             content={lesson.summary.contentJson}

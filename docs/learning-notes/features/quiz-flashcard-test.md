@@ -398,6 +398,14 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   Read-only renderer phải dùng `(marks ?? []).reduce(..., text)` để luôn giữ
   `text` làm giá trị ban đầu; dùng `marks?.reduce(...)` sẽ trả về `undefined` và
   làm mất toàn bộ chữ thường, trong khi ảnh hoặc công thức vẫn có thể hiển thị.
+- Mathpix Markdown render nội dung sau khi component đã mount và thường sinh
+  thêm một `<div>` gốc. Không đặt renderer block này trực tiếp trong `<li>` mà
+  giữ wrapper cùng phần tử con ở chế độ inline; nếu không Safari/WebKit có thể
+  dành một dòng riêng cho marker rồi mới đặt nội dung ở dòng kế tiếp. Danh sách
+  Markdown có dòng trắng cũng sinh `<li><div>...</div></li>`, nên stylesheet dùng
+  chung phải giữ paragraph đầu tiên trong mỗi item cùng dòng với marker. Quy tắc
+  này áp dụng cho cả `content`, `problem`, `solution`, từng bước và mọi danh sách
+  summary mới, không chỉ riêng mục tiêu học tập.
 - Một số getter của MathLive như `mathfield.macros` cần custom element đã được
   mount, còn MathLive `0.110` không chấp nhận `macros` trong constructor. Thứ tự
   đúng là tạo `new MathfieldElement()`, append vào mount node, rồi gán
@@ -519,6 +527,8 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 - `apps/web/components/common/ui/immediate-tooltip-portal.tsx`
 - `apps/web/features/admin/quiz/components/quiz-text-color-picker.tsx`
 - `apps/web/features/admin/tests/`
+- `apps/web/features/student/lessons/screens/student-lesson-screen/components/summary-block-renderer.tsx`
+- `apps/web/components/shared/mathpix-markdown-renderer.tsx`
 - `apps/api/src/modules/quiz/`
 - `apps/api/src/modules/tests/`
 - `apps/api/src/modules/student-learning/`

@@ -36,6 +36,10 @@ export class CreateProviderCatalogItemDto {
   aiConfiguration?: AiConfigurationFeature;
 
   @IsOptional()
+  @IsString()
+  createdAt?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   reasoningEffortLevels?: string[];

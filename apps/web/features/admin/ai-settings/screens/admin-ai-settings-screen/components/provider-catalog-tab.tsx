@@ -13,6 +13,7 @@ import {
   Trash2,
   Tag,
   RefreshCw,
+  Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -61,6 +62,7 @@ export function ProviderCatalogTab({
   onCreateModel,
   onUpdateModel,
   onDeleteModel,
+  onRefreshCatalog,
 }: {
   catalog: ProviderCatalogItem[];
   configurations?: AiFeatureConfiguration[];
@@ -71,11 +73,13 @@ export function ProviderCatalogTab({
   onCreateModel?: (input: Parameters<typeof createProviderCatalogItem>[0]) => Promise<void>;
   onUpdateModel?: (id: string, input: Parameters<typeof updateProviderCatalogItem>[1]) => Promise<void>;
   onDeleteModel?: (id: string) => Promise<void>;
+  onRefreshCatalog?: () => void;
 }) {
   const [editingPriceItem, setEditingPriceItem] = useState<ProviderCatalogItem | null>(null);
   const [editingModelItem, setEditingModelItem] = useState<{ item?: ProviderCatalogItem, provider?: string } | null>(null);
   const [deletingItem, setDeletingItem] = useState<ProviderCatalogItem | null>(null);
   const [fetchingProvider, setFetchingProvider] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const session = useAuthSessionStore((state) => state.session);
   const token = session?.accessToken ?? "";
 
@@ -92,7 +96,16 @@ export function ProviderCatalogTab({
       ["GEMINI", []],
     ]);
 
+    const lowerQuery = searchQuery.trim().toLowerCase();
+
     for (const item of catalog) {
+      if (lowerQuery) {
+        const match =
+          item.displayName.toLowerCase().includes(lowerQuery) ||
+          item.externalKey.toLowerCase().includes(lowerQuery);
+        if (!match) continue;
+      }
+
       const items = groups.get(item.provider) ?? [];
       items.push(item);
       groups.set(item.provider, items);
@@ -123,12 +136,25 @@ export function ProviderCatalogTab({
           (providerOrder.get(right.provider) ?? 99) ||
         left.provider.localeCompare(right.provider),
     );
-  }, [catalog]);
+  }, [catalog, searchQuery]);
 
   return (
     <div className="grid gap-6">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--theme-text-muted)]" aria-hidden="true" />
+        <input
+          type="text"
+          placeholder="Tìm kiếm model (ví dụ: gpt-4, gemini...)"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full sm:w-[480px] h-11 pl-10 pr-4 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)] focus:border-[var(--theme-primary)] transition-shadow font-medium placeholder:font-normal"
+        />
+      </div>
+
       <section className="grid gap-6">
-        {providerGroups.map((group) => (
+        {providerGroups
+          .filter((group) => !searchQuery.trim() || group.items.length > 0)
+          .map((group) => (
           <section key={group.provider} className="space-y-4">
             <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-3 overflow-hidden rounded-lg border border-[var(--theme-primary-border)] bg-gradient-to-r from-[var(--theme-primary-soft)] to-[var(--theme-surface)] px-4 py-4 sm:py-3 shadow-sm">
               <span
@@ -255,7 +281,7 @@ export function ProviderCatalogTab({
                                 Ngày phát hành:
                               </span>
                               <span className="text-sm font-semibold text-[var(--theme-text-strong)]">
-                                {item.priceVersions[0]?.effectiveFrom ? formatDate(item.priceVersions[0].effectiveFrom) : "Chưa cập nhật"}
+                                {item.createdAt ? formatDate(item.createdAt) : "Chưa cập nhật"}
                               </span>
                             </div>
                           </div>
@@ -294,7 +320,7 @@ export function ProviderCatalogTab({
 
                     {price ? (
                       <div className="mt-5 overflow-hidden rounded-lg border border-[var(--theme-border)]">
-                        <div className="grid gap-px bg-[var(--theme-border)] sm:grid-cols-3">
+                        <div className={`grid gap-px bg-[var(--theme-border)] ${item.category === "OCR_SERVICE" ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
                           {(item.category === "OCR_SERVICE" ? ["PAGE"] : ["INPUT_TOKEN", "CACHED_INPUT_TOKEN", "OUTPUT_TOKEN"]).map((metricStr) => {
                             const metric = metricStr as PriceRate["metric"];
                             const rate = price.rates.find((r) => r.metric === metric) ?? {
@@ -382,13 +408,11 @@ export function ProviderCatalogTab({
             if (!token) throw new Error("Chưa đăng nhập");
             await bulkSyncProviderModels(items, token);
             setFetchingProvider(null);
-            // We should ideally reload the catalog here, but the parent component
-            // handles data fetching and we don't have a reload function passed in.
-            // A page refresh or assuming the parent has a SWR revalidation would work.
-            // I'll assume the parent component will revalidate when the window regains focus
-            // or when we mutate the data if we had a proper mutate function.
-            // For now, I'll just reload the page to be safe.
-            window.location.reload();
+            if (onRefreshCatalog) {
+              onRefreshCatalog();
+            } else {
+              window.location.reload();
+            }
           }}
         />
       ) : null}

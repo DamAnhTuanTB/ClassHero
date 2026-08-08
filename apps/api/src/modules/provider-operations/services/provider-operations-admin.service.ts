@@ -115,6 +115,7 @@ export class ProviderOperationsAdminService {
       status: item.status,
       deprecationNote: item.deprecationNote,
       credentialConfigured: this.routing.isCredentialConfigured(item.provider),
+      createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       priceVersions: item.priceVersions.map(serializePriceVersion),
     }));
@@ -154,6 +155,7 @@ export class ProviderOperationsAdminService {
         provider: dto.provider.toUpperCase(),
         externalKey: dto.externalKey,
         displayName: dto.displayName,
+        createdAt: dto.createdAt ? new Date(dto.createdAt) : undefined,
         capabilitiesJson,
           priceVersions: dto.initialPrice
             ? {
@@ -226,6 +228,7 @@ export class ProviderOperationsAdminService {
         ...(dto.displayName ? { displayName: dto.displayName } : {}),
         ...(dto.externalKey ? { externalKey: dto.externalKey } : {}),
         ...(dto.status ? { status: dto.status } : {}),
+        ...(dto.createdAt ? { createdAt: new Date(dto.createdAt) } : {}),
         ...((dto.aiConfiguration !== undefined || dto.reasoningEffortLevels !== undefined) ? { capabilitiesJson: (capabilitiesJson ?? Prisma.DbNull) as import("@prisma/client").Prisma.InputJsonValue } : {}),
       },
     });
@@ -1016,6 +1019,7 @@ export class ProviderOperationsAdminService {
           displayName: item.displayName,
           aiConfiguration: item.aiConfiguration ?? null,
           reasoningEffortLevels: item.reasoningEffortLevels ?? null,
+          createdAt: item.createdAt,
         };
         results.push(await this.updateCatalogItem(existing.id, actorUserId, dto));
       } else {

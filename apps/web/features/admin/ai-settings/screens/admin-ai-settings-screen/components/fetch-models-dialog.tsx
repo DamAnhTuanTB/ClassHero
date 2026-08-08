@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudDownload, Loader2, Trash2, Copy, Check } from "lucide-react";
+import { CloudDownload, Loader2, Trash2, Copy, Check, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
@@ -13,6 +13,7 @@ import { SelectValue } from "@/components/common/ui/select/value";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { sanitizeNumericInput } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/numeric-settings-field";
 import type { createProviderCatalogItem } from "@/features/admin/ai-settings/api/provider-operations-api";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 type FetchedModel = {
   provider: string;
@@ -54,6 +55,8 @@ export function FetchModelsDialog({
   const [isFetching, setIsFetching] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -77,7 +80,7 @@ export function FetchModelsDialog({
         form.reset({
           models: models.map((m) => {
             const externalKeyLow = m.externalKey.toLowerCase();
-            let aiConfiguration: "TEMPERATURE" | "REASONING_EFFORT" | "" = "";
+            let aiConfiguration: "TEMPERATURE" | "REASONING_EFFORT" | "" = "TEMPERATURE";
             if (/^(o[1-9]|gpt-5)/.test(externalKeyLow) || externalKeyLow.includes("thinking") || externalKeyLow.includes("gemini-3")) {
               aiConfiguration = "REASONING_EFFORT";
             }
@@ -162,6 +165,7 @@ export function FetchModelsDialog({
         provider: m.provider,
         externalKey: m.externalKey,
         displayName: m.displayName,
+        createdAt: m.createdAt || undefined,
         aiConfiguration: m.aiConfiguration as "TEMPERATURE" | "REASONING_EFFORT",
         reasoningEffortLevels: m.aiConfiguration === "REASONING_EFFORT" ? m.reasoningEffortLevels : undefined,
         initialPrice,
@@ -224,9 +228,26 @@ export function FetchModelsDialog({
                   {copied ? "Đã copy" : "Copy tên"}
                 </button>
               </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--theme-text-muted)]" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm model theo tên..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] py-2 pl-9 pr-4 text-sm outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] transition-shadow"
+                />
+              </div>
               
               <div className="grid gap-4">
                 {fields.map((field, index) => {
+                  const matchSearch = !debouncedSearchQuery || 
+                    field.externalKey.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || 
+                    field.displayName.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+                    
+                  if (!matchSearch) return null;
+
                   const inputPriceField = form.register(`models.${index}.inputPrice`);
                   const cachedInputPriceField = form.register(`models.${index}.cachedInputPrice`);
                   const outputPriceField = form.register(`models.${index}.outputPrice`);

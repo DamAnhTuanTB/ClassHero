@@ -437,6 +437,7 @@ export function AdminAiSettingsScreen() {
                   onDeleteModel={async (id) => {
                     await deleteModelMutation.mutateAsync(id);
                   }}
+                  onRefreshCatalog={() => catalogQuery.refetch()}
                   isMutatingModel={
                     createModelMutation.isPending || 
                     updateModelMutation.isPending || 
