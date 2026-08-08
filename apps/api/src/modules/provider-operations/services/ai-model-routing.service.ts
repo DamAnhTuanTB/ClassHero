@@ -64,6 +64,7 @@ export class AiModelRoutingService {
       reasoningEffort: configuration.reasoningEffort ?? null,
       maxOutputTokens: configuration.maxOutputTokens,
       candidates,
+      hasConfiguration: true,
     };
   }
 
@@ -74,8 +75,19 @@ export class AiModelRoutingService {
         category: ProviderCatalogCategory.AI_MODEL,
       },
       include: { priceVersions: priceVersionInclude },
-      orderBy: [{ provider: "desc" }, { externalKey: "asc" }],
     });
+
+    // Sort by provider and then by release date (effectiveFrom desc)
+    items.sort((a, b) => {
+      if (a.provider !== b.provider) {
+        return a.provider.localeCompare(b.provider);
+      }
+      const dateA = a.priceVersions[0]?.effectiveFrom?.getTime() ?? 0;
+      const dateB = b.priceVersions[0]?.effectiveFrom?.getTime() ?? 0;
+      if (dateA !== dateB) return dateB - dateA; // descending
+      return a.externalKey.localeCompare(b.externalKey);
+    });
+
     return items
       .map((item) => this.toCandidate(item))
       .filter((candidate) => candidate.available);
@@ -176,6 +188,7 @@ export class AiModelRoutingService {
           rates: [],
         },
       ],
+      hasConfiguration: false,
     };
   }
 }

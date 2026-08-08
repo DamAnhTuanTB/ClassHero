@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { JsonViewer } from "@/components/common/ui/json-viewer";
 import type { AdminLessonSummaryPromptPreview } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
-import { supportsReasoningEffort } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { supportsReasoningEffort, supportsTemperature } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { cn } from "@/lib/utils";
 
 type PromptTab = "system" | "user" | "input";
@@ -107,17 +107,38 @@ export function AdminSummaryPromptPreview({
                 : "Chưa có model khả dụng"
             }
           />
-          {supportsReasoningEffort(preview.configuration.resolvedModel ?? "") ? (
-            <PreviewDetail
-              label="Reasoning Effort"
-              value={reasoningEffort || "Mặc định"}
-            />
-          ) : (
-            <PreviewDetail
-              label="Temperature"
-              value={preview.configuration.temperature.toString()}
-            />
-          )}
+          {(() => {
+            const resolvedModelCapabilities = preview.configuration.modelOptions?.find(
+              (o) => o.model === preview.configuration.resolvedModel
+            )?.capabilities;
+            const aiConfiguration = (resolvedModelCapabilities as any)?.aiConfiguration;
+
+            const showReasoning = supportsReasoningEffort(
+              preview.configuration.resolvedModel,
+              aiConfiguration
+            );
+            const showTemp = supportsTemperature(
+              preview.configuration.resolvedModel,
+              aiConfiguration
+            );
+
+            return (
+              <>
+                {showReasoning && (
+                  <PreviewDetail
+                    label="Reasoning Effort"
+                    value={reasoningEffort || "Mặc định"}
+                  />
+                )}
+                {showTemp && (
+                  <PreviewDetail
+                    label="Temperature"
+                    value={preview.configuration.temperature.toString()}
+                  />
+                )}
+              </>
+            );
+          })()}
           <PreviewDetail
             label="Giới hạn đầu ra"
             value={`${preview.configuration.maxOutputTokens.toLocaleString("vi-VN")} token`}

@@ -273,7 +273,13 @@ function GenerationCard({
           ) : (
             <Sparkles className="h-4 w-4" aria-hidden="true" />
           )}
-          {isActive ? "Đang xử lý" : job?.status === "FAILED" ? "Thử lại" : "Cấu hình"}
+          {isActive ? (
+            <JobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
+          ) : job?.status === "FAILED" ? (
+            "Thử lại"
+          ) : (
+            "Cấu hình"
+          )}
         </button>
       )}
     </article>
@@ -318,7 +324,7 @@ function AdminAiJobWatcher({
     if (job.status === "SUCCEEDED") {
       toast.success(
         type === "SUMMARY"
-          ? "AI đã tạo xong tóm tắt. Hãy kiểm tra và lưu nội dung."
+          ? "AI đã tạo xong bản kiến thức. Hãy kiểm tra và lưu nội dung."
           : "AI đã tạo xong nội dung. Hãy kiểm tra trước khi duyệt.",
       );
       onCompleted(type, job.resourceId);
@@ -426,4 +432,28 @@ function PanelSkeleton() {
       </div>
     </section>
   );
+}
+
+export function JobTimer({
+  createdAt,
+  prefix,
+  suffix = "",
+}: {
+  createdAt: string;
+  prefix: string;
+  suffix?: string;
+}) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const start = new Date(createdAt).getTime();
+    const update = () => {
+      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [createdAt]);
+
+  return <>{prefix}{elapsed}s{suffix}</>;
 }

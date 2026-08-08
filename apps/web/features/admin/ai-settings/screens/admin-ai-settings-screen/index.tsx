@@ -3,11 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleDollarSign,
-  DatabaseZap,
   RefreshCw,
   Settings2,
   TableProperties,
 } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { AdminCoursesSidebar } from "@/components/admin/courses/admin-courses-sidebar";
@@ -19,8 +19,6 @@ import {
   createProviderPriceVersion,
   deleteProviderCatalogItem,
   getAiConfigurations,
-  getOcrSettings,
-  getProviderAuditHistory,
   getProviderBudgets,
   getProviderCatalog,
   getProviderOverview,
@@ -28,16 +26,13 @@ import {
   getUsageEvents,
   getUsageTimeline,
   updateAiConfigurations,
-  updateOcrSettings,
   updateProviderBudgets,
   updateProviderCatalogItem,
 } from "@/features/admin/ai-settings/api/provider-operations-api";
 import { ModelConfigurationsTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/model-configurations-tab";
-import { OcrSettingsTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/ocr-settings-tab";
 import { ProviderCatalogTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/provider-catalog-tab";
 import { UsageCostTab } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/usage-cost-tab";
 import type {
-  AccountingSettings,
   AiFeatureConfiguration,
   ProviderBudget,
   UsageGranularity,
@@ -56,12 +51,11 @@ import { useThemeStore } from "@/lib/theme-store";
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
 import { cn } from "@/lib/utils";
 
-type TabKey = "models" | "ocr" | "usage" | "catalog";
+type TabKey = "models" | "usage" | "catalog";
 const tabs = [
-  { key: "models" as const, label: "Mô hình AI", icon: Settings2 },
-  { key: "ocr" as const, label: "Đọc tài liệu", icon: DatabaseZap },
-  { key: "usage" as const, label: "Chi phí", icon: CircleDollarSign },
-  { key: "catalog" as const, label: "Bảng giá", icon: TableProperties },
+  { key: "models" as const, label: "Thiết lập mặc định", icon: Settings2 },
+  { key: "usage" as const, label: "Chi phí sử dụng", icon: CircleDollarSign },
+  { key: "catalog" as const, label: "Quản lý model", icon: TableProperties },
 ];
 const adminNavItems = getAdminNavigationItems("ai-settings");
 
@@ -70,7 +64,14 @@ export function AdminAiSettingsScreen() {
   const session = useAuthSessionStore((state) => state.session);
   const token = session?.accessToken ?? "";
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabKey>("models");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const tabParam = searchParams.get("tab") as TabKey | null;
+  const initialTab = tabParam && tabs.some((t) => t.key === tabParam) ? tabParam : "models";
+
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const tabRefs = useRef(new Map<TabKey, HTMLButtonElement>());
   const [granularity, setGranularity] = useState<UsageGranularity>("DAY");
   const isDarkTheme = useThemeStore((state) => state.isDarkTheme);
@@ -85,6 +86,11 @@ export function AdminAiSettingsScreen() {
 
   const selectTab = (tab: TabKey) => {
     setActiveTab(tab);
+    
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
     window.requestAnimationFrame(() => {
       tabRefs.current.get(tab)?.scrollIntoView({
         behavior: "smooth",
@@ -121,11 +127,7 @@ export function AdminAiSettingsScreen() {
     queryFn: () => getAiConfigurations(token),
     enabled,
   });
-  const ocrQuery = useQuery({
-    queryKey: ["provider-operations", "ocr-settings"],
-    queryFn: () => getOcrSettings(token),
-    enabled: enabled && activeTab === "ocr",
-  });
+
   const catalogQuery = useQuery({
     queryKey: ["provider-operations", "catalog"],
     queryFn: () => getProviderCatalog(token),
@@ -146,15 +148,12 @@ export function AdminAiSettingsScreen() {
     queryFn: () => getUsageBreakdown(token),
     enabled: enabled && activeTab === "usage",
   });
+  const [eventsPage, setEventsPage] = useState(1);
+
   const eventsQuery = useQuery({
-    queryKey: ["provider-operations", "events", 1],
-    queryFn: () => getUsageEvents(token),
+    queryKey: ["provider-operations", "events", eventsPage],
+    queryFn: () => getUsageEvents(token, eventsPage),
     enabled: enabled && activeTab === "usage",
-  });
-  const auditQuery = useQuery({
-    queryKey: ["provider-operations", "audit"],
-    queryFn: () => getProviderAuditHistory(token),
-    enabled: enabled && activeTab === "catalog",
   });
 
   const refreshAll = async () => {
@@ -169,14 +168,7 @@ export function AdminAiSettingsScreen() {
     },
     onError: () => toast.error("Chưa thể lưu mô hình AI. Vui lòng thử lại."),
   });
-  const ocrMutation = useMutation({
-    mutationFn: (settings: AccountingSettings) => updateOcrSettings(settings, token),
-    onSuccess: async () => {
-      await refreshAll();
-      toast.success("Đã lưu thiết lập đọc tài liệu");
-    },
-    onError: () => toast.error("Chưa thể lưu thiết lập đọc tài liệu. Vui lòng thử lại."),
-  });
+
   const budgetMutation = useMutation({
     mutationFn: (budgets: ProviderBudget[]) => updateProviderBudgets(budgets, token),
     onSuccess: async () => {
@@ -288,7 +280,7 @@ export function AdminAiSettingsScreen() {
               variant="compact"
             />
           ) : overview ? (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <KpiCard
                 label="Chi phí tháng này"
                 value={formatVnd(overview.totalCostVnd)}
@@ -306,21 +298,12 @@ export function AdminAiSettingsScreen() {
                 hint={`${overview.failedCount} lượt lỗi`}
                 tone={overview.successRate >= 95 ? "primary" : "warning"}
               />
-              <KpiCard
-                label="Dữ liệu gần nhất"
-                value={
-                  overview.latestUsageAt
-                    ? formatDateTime(overview.latestUsageAt)
-                    : "Chưa có"
-                }
-                hint={overview.latestUsageAt ? "Theo giờ Việt Nam" : "Chưa có hoạt động"}
-              />
             </div>
           ) : null}
 
           <div className="mt-6 overflow-x-auto overflow-y-hidden border-b border-[var(--theme-border)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
-              className="relative grid min-w-[38rem] grid-cols-4"
+              className="relative grid min-w-[38rem] grid-cols-3"
               role="tablist"
               aria-label="Cài đặt AI"
               onKeyDown={handleTabsKeyDown}
@@ -351,7 +334,7 @@ export function AdminAiSettingsScreen() {
               ))}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute bottom-0 left-0 h-0.5 w-1/4 rounded-full bg-[var(--theme-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
+                className="pointer-events-none absolute bottom-0 left-0 h-0.5 w-1/3 rounded-full bg-[var(--theme-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
                 style={{ transform: `translateX(${activeTabIndex * 100}%)` }}
               />
             </div>
@@ -378,26 +361,7 @@ export function AdminAiSettingsScreen() {
                 />
               )
             ) : null}
-            {activeTab === "ocr" ? (
-              ocrQuery.isLoading ? (
-                <TabLoading />
-              ) : ocrQuery.isError || !ocrQuery.data ? (
-                <AdminDataErrorState
-                  description="Vui lòng thử lại để tiếp tục thiết lập đọc tài liệu."
-                  headingLevel={3}
-                  isRetrying={ocrQuery.isFetching}
-                  onRetry={() => ocrQuery.refetch()}
-                  title="Không tải được thiết lập đọc tài liệu"
-                  variant="section"
-                />
-              ) : (
-                <OcrSettingsTab
-                  data={ocrQuery.data}
-                  isSaving={ocrMutation.isPending}
-                  onSave={(settings) => ocrMutation.mutate(settings)}
-                />
-              )
-            ) : null}
+
             {activeTab === "usage" ? (
               budgetsQuery.isError ||
               timelineQuery.isError ||
@@ -429,6 +393,7 @@ export function AdminAiSettingsScreen() {
                   timeline={timelineQuery.data}
                   breakdown={breakdownQuery.data}
                   events={eventsQuery.data}
+                  eventsPage={eventsPage}
                   granularity={granularity}
                   isLoading={
                     timelineQuery.isLoading ||
@@ -436,6 +401,7 @@ export function AdminAiSettingsScreen() {
                     eventsQuery.isLoading
                   }
                   isSavingBudgets={budgetMutation.isPending}
+                  onEventsPageChange={setEventsPage}
                   onGranularityChange={setGranularity}
                   onSaveBudgets={(items) => budgetMutation.mutate(items)}
                 />
@@ -444,21 +410,18 @@ export function AdminAiSettingsScreen() {
             {activeTab === "catalog" ? (
               catalogQuery.isLoading ? (
                 <TabLoading />
-              ) : catalogQuery.isError || auditQuery.isError || !catalogQuery.data ? (
+              ) : catalogQuery.isError || !catalogQuery.data ? (
                 <AdminDataErrorState
-                  description="Vui lòng thử lại để xem bảng giá và lịch sử thay đổi."
+                  description="Vui lòng thử lại để xem bảng giá."
                   headingLevel={3}
-                  isRetrying={catalogQuery.isFetching || auditQuery.isFetching}
-                  onRetry={() =>
-                    Promise.all([catalogQuery.refetch(), auditQuery.refetch()])
-                  }
+                  isRetrying={catalogQuery.isFetching}
+                  onRetry={() => catalogQuery.refetch()}
                   title="Không tải được bảng giá dịch vụ"
                   variant="section"
                 />
               ) : (
                 <ProviderCatalogTab
                   catalog={catalogQuery.data}
-                  audit={auditQuery.data}
                   configurations={configurationsQuery.data?.configurations}
                   fxRateVndPerUsd={overview?.accounting.fxRateVndPerUsd}
                   isSaving={priceMutation.isPending}

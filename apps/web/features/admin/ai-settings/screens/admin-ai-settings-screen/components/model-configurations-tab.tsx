@@ -31,7 +31,13 @@ type Props = {
 export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
   const [configurations, setConfigurations] = useState(data.configurations);
 
-  useEffect(() => setConfigurations(data.configurations), [data.configurations]);
+  const stableDataJson = JSON.stringify(
+    data.configurations.map(({ updatedAt, ...rest }) => rest)
+  );
+  useEffect(() => {
+    setConfigurations(data.configurations);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stableDataJson]);
 
   const update = (
     feature: AiFeatureConfiguration["feature"],
@@ -59,106 +65,236 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
               </h3>
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <ModelSelect
-                id={`${configuration.feature.toLocaleLowerCase()}-primary-model`}
-                label="Mô hình chính"
-                value={configuration.primaryCatalogItemId}
-                models={data.models}
-                onChange={(value) =>
-                  update(configuration.feature, { primaryCatalogItemId: value })
-                }
-              />
-              <ModelSelect
-                id={`${configuration.feature.toLocaleLowerCase()}-fallback-model`}
-                label="Mô hình thay thế"
-                allowEmpty
-                value={configuration.fallbackCatalogItemId ?? ""}
-                models={data.models.filter(
-                  (model) => model.id !== configuration.primaryCatalogItemId,
-                )}
-                onChange={(value) =>
-                  update(configuration.feature, {
-                    fallbackCatalogItemId: value || null,
-                  })
-                }
-              />
-              {(() => {
-                const primaryModel = data.models.find(
-                  (m) => m.id === configuration.primaryCatalogItemId,
-                );
-                const supportsTemp = supportsTemperature(
-                  primaryModel?.externalKey,
-                  (primaryModel?.capabilities as any)?.aiConfiguration
-                );
-                const supportsReasoning = supportsReasoningEffort(
-                  primaryModel?.externalKey,
-                  (primaryModel?.capabilities as any)?.aiConfiguration
-                );
+            <div className="mt-5 grid gap-6 sm:grid-cols-2">
+              {/* Cột 1: Mô hình chính */}
+              <div className="flex flex-col gap-4">
+                <ModelSelect
+                  id={`${configuration.feature.toLocaleLowerCase()}-primary-model`}
+                  label="Mô hình chính"
+                  allowEmpty
+                  value={configuration.primaryCatalogItemId ?? ""}
+                  models={data.models}
+                  onChange={(value) =>
+                    update(configuration.feature, { primaryCatalogItemId: value || null })
+                  }
+                />
+                
+                {(() => {
+                  const primaryModel = data.models.find(
+                    (m) => m.id === configuration.primaryCatalogItemId,
+                  );
+                  if (!primaryModel) return null;
 
-                return (
-                  <>
-                    {supportsReasoning && (
-                      <div className="flex flex-col gap-2">
-                        <FieldLabel
-                          id={`${configuration.feature.toLocaleLowerCase()}-reasoning-effort`}
-                          label="Reasoning Effort"
-                        />
-                        <Select
-                          value={configuration.reasoningEffort ?? "__default__"}
-                          onValueChange={(value) =>
-                            update(configuration.feature, {
-                              reasoningEffort: value === "__default__" ? null : value,
-                            })
-                          }
-                        >
-                          <SelectTrigger
+                  const supportsTemp = supportsTemperature(
+                    primaryModel.externalKey,
+                    (primaryModel.capabilities as any)?.aiConfiguration
+                  );
+                  const supportsReasoning = supportsReasoningEffort(
+                    primaryModel.externalKey,
+                    (primaryModel.capabilities as any)?.aiConfiguration
+                  );
+
+                  return (
+                    <>
+                      {supportsReasoning && (
+                        <div className="flex flex-col gap-2">
+                          <FieldLabel
                             id={`${configuration.feature.toLocaleLowerCase()}-reasoning-effort`}
+                            label="Reasoning Effort"
+                          />
+                          <Select
+                            value={configuration.reasoningEffort ?? "__default__"}
+                            onValueChange={(value) =>
+                              update(configuration.feature, {
+                                reasoningEffort: value === "__default__" ? null : value,
+                              })
+                            }
                           >
-                            <SelectValue placeholder="Mặc định của model" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__default__">
-                              Mặc định của model
-                            </SelectItem>
-                            <SelectItem value="low">Thấp (Low)</SelectItem>
-                            <SelectItem value="medium">Trung bình (Medium)</SelectItem>
-                            <SelectItem value="high">Cao (High)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                            <SelectTrigger
+                              id={`${configuration.feature.toLocaleLowerCase()}-reasoning-effort`}
+                            >
+                              <SelectValue placeholder="Mặc định của model" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__default__">
+                                Mặc định của model
+                              </SelectItem>
+                              {(() => {
+                                const levels = (primaryModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                const labels: Record<string, string> = {
+                                  minimal: "Tối thiểu (Minimal)",
+                                  low: "Thấp (Low)",
+                                  medium: "Trung bình (Medium)",
+                                  high: "Cao (High)",
+                                  none: "Không (None)",
+                                  xhigh: "Rất cao (Extra High)",
+                                  max: "Tối đa (Max)",
+                                };
+                                const options = levels?.length
+                                  ? [...levels].sort((a, b) => {
+                                      const order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+                                      return (order.indexOf(a) > -1 ? order.indexOf(a) : 99) - (order.indexOf(b) > -1 ? order.indexOf(b) : 99);
+                                    })
+                                  : [];
+                                return options.map((level) => (
+                                  <SelectItem key={level} value={level}>
+                                    {labels[level] || level}
+                                  </SelectItem>
+                                ));
+                              })()}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                    {supportsTemp && (
-                      <NumericSettingsField
-                        id={`${configuration.feature.toLocaleLowerCase()}-temperature`}
-                        label="Mức sáng tạo (Temperature)"
-                        value={configuration.temperature ?? 0.2}
-                        min={0}
-                        max={2}
-                        allowDecimal
-                        onChange={(value) =>
-                          update(configuration.feature, { temperature: value })
-                        }
-                      />
-                    )}
+                      {supportsTemp && (
+                        <NumericSettingsField
+                          id={`${configuration.feature.toLocaleLowerCase()}-temperature`}
+                          label="Mức sáng tạo (Temperature)"
+                          value={configuration.temperature ?? 0.2}
+                          min={0}
+                          max={2}
+                          allowDecimal
+                          onChange={(value) =>
+                            update(configuration.feature, { temperature: value })
+                          }
+                        />
+                      )}
+                    </>
+                  );
+                })()}
+                
+                {configuration.primaryCatalogItemId && (
+                  <NumericSettingsField
+                    id={`${configuration.feature.toLocaleLowerCase()}-max-output-tokens`}
+                    label="Độ dài tối đa"
+                    value={configuration.maxOutputTokens ?? 4096}
+                    min={128}
+                    max={128000}
+                    onChange={(value) =>
+                      update(configuration.feature, { maxOutputTokens: value })
+                    }
+                  />
+                )}
+              </div>
 
-                    {!supportsReasoning && !supportsTemp && (
-                      <div className="hidden sm:block" aria-hidden="true" />
+              {/* Cột 2: Mô hình thay thế */}
+              {configuration.primaryCatalogItemId && (
+                <div className="flex flex-col gap-4">
+                  <ModelSelect
+                    id={`${configuration.feature.toLocaleLowerCase()}-fallback-model`}
+                    label="Mô hình thay thế"
+                    allowEmpty
+                    value={configuration.fallbackCatalogItemId ?? ""}
+                    models={data.models.filter(
+                      (model) => model.id !== configuration.primaryCatalogItemId,
                     )}
-                  </>
-                );
-              })()}
-              <NumericSettingsField
-                id={`${configuration.feature.toLocaleLowerCase()}-max-output-tokens`}
-                label="Độ dài tối đa"
-                value={configuration.maxOutputTokens ?? 4096}
-                min={128}
-                max={128000}
-                onChange={(value) =>
-                  update(configuration.feature, { maxOutputTokens: value })
-                }
-              />
+                    onChange={(value) =>
+                      update(configuration.feature, {
+                        fallbackCatalogItemId: value || null,
+                      })
+                    }
+                  />
+
+                  {(() => {
+                    const fallbackModel = data.models.find(
+                      (m) => m.id === configuration.fallbackCatalogItemId,
+                    );
+                    if (!fallbackModel) return null;
+
+                    const supportsTemp = supportsTemperature(
+                      fallbackModel.externalKey,
+                      (fallbackModel.capabilities as any)?.aiConfiguration
+                    );
+                    const supportsReasoning = supportsReasoningEffort(
+                      fallbackModel.externalKey,
+                      (fallbackModel.capabilities as any)?.aiConfiguration
+                    );
+
+                    return (
+                      <>
+                        {supportsReasoning && (
+                          <div className="flex flex-col gap-2">
+                            <FieldLabel
+                              id={`${configuration.feature.toLocaleLowerCase()}-fallback-reasoning-effort`}
+                              label="Reasoning Effort"
+                            />
+                            <Select
+                              value={configuration.fallbackReasoningEffort ?? "__default__"}
+                              onValueChange={(value) =>
+                                update(configuration.feature, {
+                                  fallbackReasoningEffort: value === "__default__" ? null : value,
+                                })
+                              }
+                            >
+                              <SelectTrigger
+                                id={`${configuration.feature.toLocaleLowerCase()}-fallback-reasoning-effort`}
+                              >
+                                <SelectValue placeholder="Mặc định của model" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__default__">
+                                  Mặc định của model
+                                </SelectItem>
+                                {(() => {
+                                  const levels = (fallbackModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                  const labels: Record<string, string> = {
+                                    minimal: "Tối thiểu (Minimal)",
+                                    low: "Thấp (Low)",
+                                    medium: "Trung bình (Medium)",
+                                    high: "Cao (High)",
+                                    none: "Không (None)",
+                                    xhigh: "Rất cao (Extra High)",
+                                    max: "Tối đa (Max)",
+                                  };
+                                  const options = levels?.length
+                                    ? [...levels].sort((a, b) => {
+                                        const order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+                                        return (order.indexOf(a) > -1 ? order.indexOf(a) : 99) - (order.indexOf(b) > -1 ? order.indexOf(b) : 99);
+                                      })
+                                    : [];
+                                  return options.map((level) => (
+                                    <SelectItem key={level} value={level}>
+                                      {labels[level] || level}
+                                    </SelectItem>
+                                  ));
+                                })()}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {supportsTemp && (
+                          <NumericSettingsField
+                            id={`${configuration.feature.toLocaleLowerCase()}-fallback-temperature`}
+                            label="Mức sáng tạo (Temperature)"
+                            value={configuration.fallbackTemperature ?? 0.2}
+                            min={0}
+                            max={2}
+                            allowDecimal
+                            onChange={(value) =>
+                              update(configuration.feature, { fallbackTemperature: value })
+                            }
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  {configuration.fallbackCatalogItemId && (
+                    <NumericSettingsField
+                      id={`${configuration.feature.toLocaleLowerCase()}-fallback-max-output-tokens`}
+                      label="Độ dài tối đa"
+                      value={configuration.fallbackMaxOutputTokens ?? 4096}
+                      min={128}
+                      max={128000}
+                      onChange={(value) =>
+                        update(configuration.feature, { fallbackMaxOutputTokens: value })
+                      }
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </article>
         ))}
@@ -220,13 +356,15 @@ function ModelSelect({
             <SelectValue>
               {selected
                 ? `${selected.displayName} · ${selected.provider}`
-                : "Không dùng mô hình thay thế"}
+                : allowEmpty
+                  ? "Không dùng"
+                  : "Chưa chọn mô hình"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {allowEmpty ? (
               <>
-                <SelectItem value="__none__">Không dùng mô hình thay thế</SelectItem>
+                <SelectItem value="__none__">Không dùng</SelectItem>
                 <SelectSeparator />
               </>
             ) : null}
@@ -249,20 +387,7 @@ function ModelSelect({
           </SelectContent>
         </Select>
       </div>
-      <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--theme-text-muted)]">
-        {selected?.credentialConfigured ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-[var(--theme-success-text)]" />
-        ) : selected ? (
-          <ShieldAlert className="h-3.5 w-3.5 text-[var(--theme-warning-text)]" />
-        ) : (
-          <AlertTriangle className="h-3.5 w-3.5" />
-        )}
-        {selected
-          ? selected.credentialConfigured
-            ? "Sẵn sàng sử dụng"
-            : "Chưa thể sử dụng"
-          : "Chưa chọn mô hình"}
-      </span>
+
     </div>
   );
 }

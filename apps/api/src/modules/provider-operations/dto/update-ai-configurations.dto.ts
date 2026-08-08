@@ -19,8 +19,9 @@ export class UpdateAiFeatureConfigurationItemDto {
   @IsEnum(AiGenerationType)
   feature!: AiGenerationType;
 
+  @IsOptional()
   @IsUUID()
-  primaryCatalogItemId!: string;
+  primaryCatalogItemId?: string | null;
 
   @IsOptional()
   @IsUUID()
@@ -41,6 +42,22 @@ export class UpdateAiFeatureConfigurationItemDto {
   @IsOptional()
   @IsString()
   reasoningEffort?: string | null;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  @Max(2)
+  fallbackTemperature?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(128)
+  @Max(100_000)
+  fallbackMaxOutputTokens?: number | null;
+
+  @IsOptional()
+  @IsString()
+  fallbackReasoningEffort?: string | null;
 
   @IsInt()
   @Min(0)

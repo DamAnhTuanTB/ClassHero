@@ -28,7 +28,13 @@ export function NumericSettingsField({
 }) {
   const [draft, setDraft] = useState(String(value));
 
-  useEffect(() => setDraft(String(value)), [value]);
+  useEffect(() => {
+    setDraft((prev) => {
+      const currentNumeric = Number(prev.replace(",", "."));
+      if (value !== currentNumeric) return String(value);
+      return prev;
+    });
+  }, [value]);
 
   const numericValue = Number(draft);
   const errorMessage =

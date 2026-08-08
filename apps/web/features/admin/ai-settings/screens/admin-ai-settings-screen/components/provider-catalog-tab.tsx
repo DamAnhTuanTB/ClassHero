@@ -5,7 +5,6 @@ import {
   BrainCircuit,
   Cpu,
   ExternalLink,
-  History,
   Link2,
   Loader2,
   PencilLine,
@@ -13,6 +12,7 @@ import {
   Thermometer,
   Trash2,
   Tag,
+  RefreshCw,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -30,30 +30,29 @@ import {
 import { sanitizeNumericInput } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/numeric-settings-field";
 import type {
   AiFeatureConfiguration,
-  AuditItem,
   PriceRate,
   ProviderCatalogItem,
 } from "@/features/admin/ai-settings/types/provider-operations-types";
 import {
   aiFeatureLabels,
   formatDate,
-  formatDateTime,
   formatVnd,
   priceMetricLabels,
   providerStatusLabels,
 } from "@/features/admin/ai-settings/utils/provider-operations-formatters";
-import { createProviderCatalogItem, updateProviderCatalogItem } from "@/features/admin/ai-settings/api/provider-operations-api";
+import { createProviderCatalogItem, updateProviderCatalogItem, fetchExternalModels, bulkSyncProviderModels } from "@/features/admin/ai-settings/api/provider-operations-api";
+import { FetchModelsDialog } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/fetch-models-dialog";
+import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
 type PriceInput = {
   billingMode: "TOKEN" | "PAGE" | "REQUEST";
   sourceUrl: string;
-  effectiveFrom: string;
   rates: Array<Omit<PriceRate, "id">>;
 };
 
 export function ProviderCatalogTab({
   catalog,
-  audit,
   configurations,
   fxRateVndPerUsd,
   isSaving,
@@ -64,7 +63,6 @@ export function ProviderCatalogTab({
   onDeleteModel,
 }: {
   catalog: ProviderCatalogItem[];
-  audit?: AuditItem[];
   configurations?: AiFeatureConfiguration[];
   fxRateVndPerUsd?: number;
   isSaving: boolean;
@@ -76,6 +74,10 @@ export function ProviderCatalogTab({
 }) {
   const [editingPriceItem, setEditingPriceItem] = useState<ProviderCatalogItem | null>(null);
   const [editingModelItem, setEditingModelItem] = useState<{ item?: ProviderCatalogItem, provider?: string } | null>(null);
+  const [deletingItem, setDeletingItem] = useState<ProviderCatalogItem | null>(null);
+  const [fetchingProvider, setFetchingProvider] = useState<string | null>(null);
+  const session = useAuthSessionStore((state) => state.session);
+  const token = session?.accessToken ?? "";
 
   const aiFeatureBadgeStyles: Record<string, string> = {
     SUMMARY: "bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
@@ -85,7 +87,10 @@ export function ProviderCatalogTab({
   };
 
   const providerGroups = useMemo(() => {
-    const groups = new Map<string, ProviderCatalogItem[]>();
+    const groups = new Map<string, ProviderCatalogItem[]>([
+      ["OPENAI", []],
+      ["GEMINI", []],
+    ]);
 
     for (const item of catalog) {
       const items = groups.get(item.provider) ?? [];
@@ -98,7 +103,21 @@ export function ProviderCatalogTab({
       ["GEMINI", 1],
     ]);
 
-    return Array.from(groups, ([provider, items]) => ({ provider, items })).sort(
+    return Array.from(groups, ([provider, items]) => {
+      // Sort items by effectiveFrom (latest first) and then by displayName (Z-A)
+      items.sort((a, b) => {
+        const dateAStr = (a.priceVersions?.[0]?.effectiveFrom ?? a.updatedAt).split('T')[0]!;
+        const dateBStr = (b.priceVersions?.[0]?.effectiveFrom ?? b.updatedAt).split('T')[0]!;
+        
+        const dateDiff = new Date(dateBStr).getTime() - new Date(dateAStr).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        
+        // Fallback to displayName descending if dates are equal
+        return b.displayName.localeCompare(a.displayName);
+      });
+
+      return { provider, items };
+    }).sort(
       (left, right) =>
         (providerOrder.get(left.provider) ?? 99) -
           (providerOrder.get(right.provider) ?? 99) ||
@@ -107,11 +126,11 @@ export function ProviderCatalogTab({
   }, [catalog]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className="grid gap-6">
       <section className="grid gap-6">
         {providerGroups.map((group) => (
           <section key={group.provider} className="space-y-4">
-            <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-lg border border-[var(--theme-primary-border)] bg-gradient-to-r from-[var(--theme-primary-soft)] to-[var(--theme-surface)] px-4 py-3 shadow-sm">
+            <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-3 overflow-hidden rounded-lg border border-[var(--theme-primary-border)] bg-gradient-to-r from-[var(--theme-primary-soft)] to-[var(--theme-surface)] px-4 py-4 sm:py-3 shadow-sm">
               <span
                 className="absolute inset-y-0 left-0 w-1 bg-[var(--theme-primary)]"
                 aria-hidden="true"
@@ -124,15 +143,25 @@ export function ProviderCatalogTab({
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--theme-primary)]">
                     Nhà cung cấp
                   </p>
-                  <h2 className="truncate text-xl font-extrabold text-[var(--theme-text-strong)]">
-                    {formatProviderName(group.provider)}
-                  </h2>
+                  <div className="mt-0.5 flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+                    <h2 className="truncate text-xl font-extrabold text-[var(--theme-text-strong)] leading-none">
+                      {formatProviderName(group.provider)}
+                    </h2>
+                    <span className="inline-flex items-center justify-center rounded-full bg-white/60 px-2 py-0.5 text-[11px] font-bold text-[var(--theme-text-muted)] ring-1 ring-inset ring-[var(--theme-border)] dark:bg-black/20 shrink-0">
+                      {group.items.length} dịch vụ
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-1 text-xs font-extrabold text-[var(--theme-text)] shadow-sm">
-                  {group.items.length} dịch vụ
-                </span>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFetchingProvider(group.provider)}
+                  className="theme-button-neutral inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold transition"
+                >
+                  <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                  Lấy lại các model
+                </button>
                 <button
                   type="button"
                   onClick={() => setEditingModelItem({ provider: group.provider })}
@@ -220,6 +249,15 @@ export function ProviderCatalogTab({
                                 )}
                               </div>
                             ) : null}
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wide min-w-24">
+                                Ngày phát hành:
+                              </span>
+                              <span className="text-sm font-semibold text-[var(--theme-text-strong)]">
+                                {item.priceVersions[0]?.effectiveFrom ? formatDate(item.priceVersions[0].effectiveFrom) : "Chưa cập nhật"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -227,9 +265,7 @@ export function ProviderCatalogTab({
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm(`Bạn có chắc chắn muốn xoá ${item.displayName}?`)) {
-                              onDeleteModel?.(item.id);
-                            }
+                            setDeletingItem(item);
                           }}
                           disabled={isMutatingModel}
                           className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold transition text-[var(--theme-danger)] hover:border-[var(--theme-danger-border)] hover:bg-[var(--theme-danger-subtle)] hover:text-[var(--theme-danger-text-strong)]"
@@ -258,20 +294,6 @@ export function ProviderCatalogTab({
 
                     {price ? (
                       <div className="mt-5 overflow-hidden rounded-lg border border-[var(--theme-border)]">
-                        <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--theme-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--theme-text-muted)]">
-                          <span>Áp dụng từ {formatDate(price.effectiveFrom)}</span>
-                          {price.sourceUrl ? (
-                            <a
-                              href={price.sourceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 whitespace-nowrap text-[var(--theme-primary)] hover:underline"
-                            >
-                              Nguồn giá chính thức
-                              <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                            </a>
-                          ) : null}
-                        </div>
                         <div className="grid gap-px bg-[var(--theme-border)] sm:grid-cols-3">
                           {(item.category === "OCR_SERVICE" ? ["PAGE"] : ["INPUT_TOKEN", "CACHED_INPUT_TOKEN", "OUTPUT_TOKEN"]).map((metricStr) => {
                             const metric = metricStr as PriceRate["metric"];
@@ -319,36 +341,6 @@ export function ProviderCatalogTab({
         ))}
       </section>
 
-      <aside className="h-fit rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4 xl:sticky xl:top-5">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-[var(--theme-primary)]" aria-hidden="true" />
-          <h3 className="font-extrabold text-[var(--theme-text-strong)]">
-            Lịch sử thay đổi
-          </h3>
-        </div>
-        <div className="mt-4 space-y-3">
-          {audit?.length ? (
-            audit.map((item) => (
-              <div
-                key={item.id}
-                className="border-l-2 border-[var(--theme-primary-border)] pl-3"
-              >
-                <p className="text-xs font-extrabold text-[var(--theme-text-strong)]">
-                  {auditLabel(item.action)}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-[var(--theme-text-muted)]">
-                  {formatDateTime(item.createdAt)}
-                </p>
-              </div>
-            ))
-          ) : (
-            <p className="py-6 text-center text-sm text-[var(--theme-text-muted)]">
-              Chưa có thay đổi.
-            </p>
-          )}
-        </div>
-      </aside>
-
       {editingPriceItem ? (
         <PriceVersionDialog
           item={editingPriceItem}
@@ -377,6 +369,43 @@ export function ProviderCatalogTab({
           }}
         />
       ) : null}
+      {fetchingProvider ? (
+        <FetchModelsDialog
+          provider={fetchingProvider}
+          isSaving={isSaving || isMutatingModel || false}
+          onClose={() => setFetchingProvider(null)}
+          onFetchModels={async (p) => {
+            if (!token) throw new Error("Chưa đăng nhập");
+            return fetchExternalModels(p as "OPENAI" | "GEMINI", token);
+          }}
+          onSubmit={async (items) => {
+            if (!token) throw new Error("Chưa đăng nhập");
+            await bulkSyncProviderModels(items, token);
+            setFetchingProvider(null);
+            // We should ideally reload the catalog here, but the parent component
+            // handles data fetching and we don't have a reload function passed in.
+            // A page refresh or assuming the parent has a SWR revalidation would work.
+            // I'll assume the parent component will revalidate when the window regains focus
+            // or when we mutate the data if we had a proper mutate function.
+            // For now, I'll just reload the page to be safe.
+            window.location.reload();
+          }}
+        />
+      ) : null}
+
+      {deletingItem && (
+        <DeleteConfirmDialog
+          isOpen={!!deletingItem}
+          itemName={deletingItem.displayName}
+          description="Việc xoá model này có thể ảnh hưởng đến các tính năng đang sử dụng nó. Nếu xoá, các tính năng sử dụng model này sẽ bị chuyển về trạng thái 'Chưa phân bổ'."
+          isConfirming={isMutatingModel}
+          onCancel={() => setDeletingItem(null)}
+          onConfirm={async () => {
+            await onDeleteModel?.(deletingItem.id);
+            setDeletingItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -395,7 +424,7 @@ function CatalogItemDialog({
   onSubmit: (input: any) => Promise<void>;
 }) {
   const isEditing = !!item;
-  const isOcr = false; // Always AI_MODEL for now, according to UI
+  const isOcr = item?.category === "OCR_SERVICE" || provider === "MATHPIX" || item?.provider === "MATHPIX";
   
   const defaultRates = useMemo<ProviderPriceVersionFormValues["rates"]>(
     () =>
@@ -435,9 +464,10 @@ function CatalogItemDialog({
     [isOcr],
   );
 
-  const initialAiConfig = item?.capabilities
+  const initialAiConfigRaw = item?.capabilities
     ? (item.capabilities as any).aiConfiguration
-    : "NONE";
+    : "TEMPERATURE";
+  const initialAiConfig = initialAiConfigRaw === "NONE" ? "TEMPERATURE" : initialAiConfigRaw;
 
   const initialReasoningEffortLevels = item?.capabilities
     ? ((item.capabilities as any).reasoningEffortLevels as string[] | undefined)
@@ -452,7 +482,7 @@ function CatalogItemDialog({
     defaultValues: {
       displayName: item?.displayName ?? "",
       externalKey: item?.externalKey ?? "",
-      aiConfiguration: initialAiConfig ?? "NONE",
+      aiConfiguration: initialAiConfig ?? "TEMPERATURE",
       reasoningEffortLevels: initialReasoningEffortLevels,
       ...(!isEditing && {
         effectiveFrom: new Date().toISOString().slice(0, 10),
@@ -485,7 +515,7 @@ function CatalogItemDialog({
               await onSubmit({
                 displayName: values.displayName,
                 externalKey: values.externalKey,
-                aiConfiguration: values.aiConfiguration === "NONE" ? null : values.aiConfiguration,
+                aiConfiguration: values.aiConfiguration,
                 reasoningEffortLevels: values.aiConfiguration === "REASONING_EFFORT" ? values.reasoningEffortLevels : null,
               });
             } else {
@@ -494,14 +524,11 @@ function CatalogItemDialog({
                 provider: provider!,
                 displayName: values.displayName,
                 externalKey: values.externalKey,
-                aiConfiguration: values.aiConfiguration === "NONE" ? undefined : values.aiConfiguration,
+                aiConfiguration: values.aiConfiguration,
                 reasoningEffortLevels: values.aiConfiguration === "REASONING_EFFORT" ? values.reasoningEffortLevels : undefined,
                 initialPrice: values.rates ? {
                   billingMode: "TOKEN",
                   sourceUrl: values.sourceUrl?.trim() ?? "",
-                  effectiveFrom: new Date(
-                    `${values.effectiveFrom}T00:00:00+07:00`,
-                  ).toISOString(),
                   rates: values.rates.map((rate) => ({
                     ...rate,
                     unitPriceUsd: Number(rate.unitPriceUsd.replace(",", ".")),
@@ -542,93 +569,65 @@ function CatalogItemDialog({
               />
             </div>
             
-            <div className="space-y-3">
-              <label className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                Tuỳ chọn Tham số AI
-              </label>
-              <div className="flex items-center gap-6 pt-1">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="radio"
-                    value="NONE"
-                    {...form.register("aiConfiguration")}
-                    className="h-4 w-4 text-[var(--theme-primary)] border-[var(--theme-border)]"
-                  />
-                  Mặc định
+            {!isOcr && (
+              <div className="space-y-3">
+                <label className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                  Tuỳ chọn Tham số AI
                 </label>
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="radio"
-                    value="TEMPERATURE"
-                    {...form.register("aiConfiguration")}
-                    className="h-4 w-4 text-[var(--theme-primary)] border-[var(--theme-border)]"
-                  />
-                  Hỗ trợ Temperature
-                </label>
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="radio"
-                    value="REASONING_EFFORT"
-                    {...form.register("aiConfiguration")}
-                    className="h-4 w-4 text-[var(--theme-primary)] border-[var(--theme-border)]"
-                  />
-                  Hỗ trợ Reasoning Effort
-                </label>
-              </div>
-              
-              {aiConfiguration === "REASONING_EFFORT" && (
-                <div className="mt-4 rounded-lg bg-[var(--theme-surface)] p-3 border border-[var(--theme-border)] space-y-2">
-                  <label className="text-sm font-semibold text-[var(--theme-text-strong)] block mb-1">
-                    Các mức Reasoning Effort hỗ trợ
+                <div className="flex items-center gap-6 pt-1">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="radio"
+                      value="TEMPERATURE"
+                      {...form.register("aiConfiguration")}
+                      className="h-4 w-4 text-[var(--theme-primary)] border-[var(--theme-border)]"
+                    />
+                    Hỗ trợ Temperature
                   </label>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {["none", "low", "medium", "high", "xhigh", "max"].map((level) => (
-                      <label key={level} className="flex items-center gap-2 text-sm font-medium">
-                        <input
-                          type="checkbox"
-                          value={level}
-                          checked={reasoningEffortLevels.includes(level)}
-                          onChange={(e) => {
-                            const newLevels = e.target.checked
-                              ? [...reasoningEffortLevels, level]
-                              : reasoningEffortLevels.filter((l) => l !== level);
-                            form.setValue("reasoningEffortLevels", newLevels, { shouldDirty: true });
-                          }}
-                          className="h-4 w-4 text-[var(--theme-primary)] rounded border-[var(--theme-border)] focus:ring-[var(--theme-primary)]"
-                        />
-                        <span className="capitalize">{level}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="radio"
+                      value="REASONING_EFFORT"
+                      {...form.register("aiConfiguration")}
+                      className="h-4 w-4 text-[var(--theme-primary)] border-[var(--theme-border)]"
+                    />
+                    Hỗ trợ Reasoning Effort
+                  </label>
                 </div>
-              )}
-            </div>
+                
+                {aiConfiguration === "REASONING_EFFORT" && (
+                  <div className="mt-4 rounded-lg bg-[var(--theme-surface)] p-3 border border-[var(--theme-border)] space-y-2">
+                    <label className="text-sm font-semibold text-[var(--theme-text-strong)] block mb-1">
+                      Các mức Reasoning Effort hỗ trợ
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {["none", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => (
+                        <label key={level} className="flex items-center gap-2 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            value={level}
+                            checked={reasoningEffortLevels.includes(level)}
+                            onChange={(e) => {
+                              const newLevels = e.target.checked
+                                ? [...reasoningEffortLevels, level]
+                                : reasoningEffortLevels.filter((l) => l !== level);
+                              form.setValue("reasoningEffortLevels", newLevels, { shouldDirty: true });
+                            }}
+                            className="h-4 w-4 text-[var(--theme-primary)] rounded border-[var(--theme-border)] focus:ring-[var(--theme-primary)]"
+                          />
+                          <span className="capitalize">{level}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {!isEditing && (
             <div className="space-y-4 pt-4">
-              <h3 className="font-bold text-[var(--theme-text-strong)] border-b border-[var(--theme-border)] pb-2">Thiết lập Bảng giá đầu tiên</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField
-                  id="provider-price-effective-from"
-                  label="Ngày hiệu lực"
-                  type="date"
-                  icon={null}
-                  suppressBrowserSuggestions={false}
-                  error={form.formState.errors.effectiveFrom}
-                  {...form.register("effectiveFrom")}
-                />
-                <TextField
-                  id="provider-price-source-url"
-                  label="Đường dẫn nguồn giá"
-                  placeholder="https://..."
-                  icon={<Link2 className="h-5 w-5" aria-hidden="true" />}
-                  error={form.formState.errors.sourceUrl}
-                  {...form.register("sourceUrl")}
-                />
-              </div>
-
-              <div className="space-y-3">
+              <h3 className="font-bold text-[var(--theme-text-strong)] border-b border-[var(--theme-border)] pb-2">Thiết lập Bảng giá đầu tiên</h3>              <div className="space-y-3">
                 {rates?.map((rate, index) => {
                   const priceField = form.register(`rates.${index}.unitPriceUsd`);
                   return (
@@ -752,7 +751,6 @@ function PriceVersionDialog({
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: {
-      effectiveFrom: new Date().toISOString().slice(0, 10),
       sourceUrl: item.priceVersions[0]?.sourceUrl ?? "",
       rates: defaultRates,
     },
@@ -775,10 +773,7 @@ function PriceVersionDialog({
           try {
             await onSubmit({
               billingMode: isOcr ? "PAGE" : "TOKEN",
-              sourceUrl: values.sourceUrl.trim(),
-              effectiveFrom: new Date(
-                `${values.effectiveFrom}T00:00:00+07:00`,
-              ).toISOString(),
+              sourceUrl: values.sourceUrl?.trim() ?? "",
               rates: values.rates.map((rate) => ({
                 ...rate,
                 unitPriceUsd: Number(rate.unitPriceUsd.replace(",", ".")),
@@ -796,26 +791,6 @@ function PriceVersionDialog({
         </header>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              id="provider-price-effective-from"
-              label="Ngày hiệu lực"
-              type="date"
-              icon={null}
-              suppressBrowserSuggestions={false}
-              error={form.formState.errors.effectiveFrom}
-              {...form.register("effectiveFrom")}
-            />
-            <TextField
-              id="provider-price-source-url"
-              label="Đường dẫn nguồn giá"
-              placeholder="https://..."
-              icon={<Link2 className="h-5 w-5" aria-hidden="true" />}
-              error={form.formState.errors.sourceUrl}
-              {...form.register("sourceUrl")}
-            />
-          </div>
-
           <div className="space-y-3">
             {rates.map((rate, index) => {
               const priceField = form.register(`rates.${index}.unitPriceUsd`);
@@ -882,19 +857,6 @@ function PriceVersionDialog({
       </form>
     </EditorDialogShell>
   );
-}
-
-function auditLabel(action: string) {
-  const labels: Record<string, string> = {
-    AI_FEATURE_MODEL_CONFIGURATION_UPDATED: "Đã đổi mô hình AI",
-    PROVIDER_BUDGET_UPDATED: "Đã đổi ngân sách",
-    PROVIDER_ACCOUNTING_SETTINGS_UPDATED: "Đã đổi quy đổi chi phí",
-    PROVIDER_PRICE_VERSION_CREATED: "Đã cập nhật bảng giá",
-    PROVIDER_CATALOG_ITEM_CREATED: "Đã thêm mô hình",
-    PROVIDER_CATALOG_ITEM_UPDATED: "Đã cập nhật mô hình",
-    PROVIDER_CATALOG_ITEM_DELETED: "Đã xoá mô hình",
-  };
-  return labels[action] ?? "Đã cập nhật cài đặt";
 }
 
 function formatProviderName(provider: string) {

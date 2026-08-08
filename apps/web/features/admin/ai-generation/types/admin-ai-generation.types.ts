@@ -14,12 +14,8 @@ export function supportsTemperature(
   aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null
 ): boolean {
   if (aiConfiguration === "TEMPERATURE") return true;
-  if (aiConfiguration === "REASONING_EFFORT") return false;
-  if (!modelName) return true;
-  const m = modelName.toLowerCase();
-  if (/^(o[1-9]|gpt-5)/.test(m)) return false;
-  if (m.includes("thinking") || m.includes("gemini-3")) return false;
-  return true;
+  if (aiConfiguration === "REASONING_EFFORT" || aiConfiguration === "NONE") return false;
+  return true; // Backward compatibility for unconfigured models
 }
 
 export function supportsReasoningEffort(
@@ -27,10 +23,8 @@ export function supportsReasoningEffort(
   aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null
 ): boolean {
   if (aiConfiguration === "REASONING_EFFORT") return true;
-  if (aiConfiguration === "TEMPERATURE") return false;
-  if (!modelName) return false;
-  const m = modelName.toLowerCase();
-  return /^(o[1-9]|gpt-5)/.test(m) || m.includes("thinking") || m.includes("gemini-3");
+  if (aiConfiguration === "TEMPERATURE" || aiConfiguration === "NONE") return false;
+  return false; // Backward compatibility for unconfigured models
 }
 
 export interface AdminAiPanelDocument {
@@ -57,6 +51,10 @@ export interface AdminAiPanelJob {
   startedAt: string | null;
   finishedAt: string | null;
   updatedAt: string;
+  model?: string | null;
+  latencyMs?: number | null;
+  estimatedCostVnd?: number | null;
+  inputMetaJson?: any | null;
 }
 
 export interface AdminAiGenerationPanelData {
@@ -153,9 +151,11 @@ export interface AdminLessonSummaryPromptPreview {
   };
   configuration: {
     selectedModel: string | null;
+    isDefaultConfigured: boolean;
     resolvedProvider: string | null;
     resolvedModel: string | null;
     temperature: number;
+    reasoningEffort: string | null;
     maxOutputTokens: number;
     modelOptions: Array<{
       provider: string;

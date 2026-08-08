@@ -668,9 +668,6 @@ export function AdminLessonDetailManager({
                     lessonTitle={lesson?.title}
                     onRegenerate={() => {
                       setRequestedGenerationType("SUMMARY");
-                      document
-                        .getElementById("admin-ai-generation-heading")
-                        ?.scrollIntoView({ behavior: "smooth", block: "center" });
                     }}
                   />
                 )}
@@ -707,7 +704,7 @@ function AdminLessonDetailSkeleton() {
         </div>
         <SkeletonBlock className="h-11 w-32 rounded-lg" />
       </div>
-      <SkeletonBlock className="aspect-video rounded-xl bg-slate-800 ring-slate-700" />
+      <SkeletonBlock className="aspect-video rounded-xl" />
       <div className="grid gap-4 sm:grid-cols-3">
         {Array.from({ length: 3 }, (_, index) => (
           <SkeletonBlock key={index} className="h-24 rounded-xl" />

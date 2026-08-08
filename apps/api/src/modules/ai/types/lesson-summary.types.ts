@@ -158,6 +158,10 @@ export const lessonSummaryJobInputSchema = z
     extraInstructions: z.string().trim().max(2_000).default(""),
     systemInstructions: z.string().trim().max(12_000).default(""),
     userPrompt: z.string().trim().max(16_000).default(""),
+    model: z.string().max(200).optional(),
+    temperature: z.number().min(0).max(1).optional(),
+    reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+    maxOutputTokens: z.number().int().min(500).max(32_000).optional(),
   })
   .strict();
 

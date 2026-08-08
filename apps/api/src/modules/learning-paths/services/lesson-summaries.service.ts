@@ -244,9 +244,11 @@ export class LessonSummariesService {
       },
       configuration: {
         selectedModel: dto.model ?? null,
+        isDefaultConfigured: baseRoute.hasConfiguration,
         resolvedProvider: resolvedCandidate?.provider ?? null,
         resolvedModel: resolvedCandidate?.model ?? null,
         temperature: route.temperature ?? request.temperature ?? 0.2,
+        reasoningEffort: route.reasoningEffort ?? null,
         maxOutputTokens,
         modelOptions: allActiveModels.map((candidate) => ({
           provider: candidate.provider,
@@ -353,5 +355,10 @@ function normalizeConfiguration(
     extraInstructions: dto.extraInstructions?.trim() ?? "",
     systemInstructions: dto.systemInstructions?.trim() ?? "",
     userPrompt: dto.userPrompt?.trim() ?? "",
+
+    ...(dto.model ? { model: dto.model } : {}),
+    ...(dto.temperature !== undefined ? { temperature: dto.temperature } : {}),
+    ...(dto.reasoningEffort ? { reasoningEffort: dto.reasoningEffort } : {}),
+    ...(dto.maxOutputTokens !== undefined ? { maxOutputTokens: dto.maxOutputTokens } : {}),
   };
 }

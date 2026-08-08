@@ -19,6 +19,10 @@ const panelGenerationSelect = {
   createdAt: true,
   startedAt: true,
   finishedAt: true,
+  model: true,
+  latencyMs: true,
+  estimatedCostVnd: true,
+  inputMetaJson: true,
   backgroundJob: {
     select: {
       id: true,
@@ -199,6 +203,10 @@ function serializeLatestGeneration(
     startedAt: job?.startedAt ?? generation.startedAt,
     finishedAt: job?.finishedAt ?? generation.finishedAt,
     updatedAt: job?.updatedAt ?? generation.finishedAt ?? generation.createdAt,
+    model: generation.model,
+    latencyMs: generation.latencyMs,
+    estimatedCostVnd: generation.estimatedCostVnd,
+    inputMetaJson: generation.inputMetaJson,
   };
 }
 

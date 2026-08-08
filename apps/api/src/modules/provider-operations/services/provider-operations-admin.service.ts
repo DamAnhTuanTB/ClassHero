@@ -155,14 +155,14 @@ export class ProviderOperationsAdminService {
         externalKey: dto.externalKey,
         displayName: dto.displayName,
         capabilitiesJson,
-        priceVersions: dto.initialPrice
-          ? {
-              create: {
-                billingMode: dto.initialPrice.billingMode,
-                sourceUrl: dto.initialPrice.sourceUrl,
-                effectiveFrom: new Date(dto.initialPrice.effectiveFrom),
-                createdByUserId: actorUserId,
-                rates: {
+          priceVersions: dto.initialPrice
+            ? {
+                create: {
+                  billingMode: dto.initialPrice.billingMode,
+                  sourceUrl: dto.initialPrice.sourceUrl,
+                  effectiveFrom: new Date(),
+                  createdByUserId: actorUserId,
+                  rates: {
                   create: dto.initialPrice.rates.map((rate) => ({
                     metric: rate.metric,
                     unitSize: rate.unitSize,
@@ -257,31 +257,19 @@ export class ProviderOperationsAdminService {
       throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model.");
     }
     
-    if (item._count.usageEvents > 0) {
-      throwConflict(
-        "PROVIDER_CATALOG_ITEM_IN_USE",
-        "Không thể xoá model đã có dữ liệu sử dụng. Vui lòng chuyển trạng thái sang ngưng hoạt động (DEPRECATED)."
-      );
-    }
-    
-    // Check if it's currently used in routing configurations
-    const usedInConfig = await this.prisma.aiFeatureModelConfig.findFirst({
-      where: {
-        OR: [
-          { primaryCatalogItemId: id },
-          { fallbackCatalogItemId: id }
-        ]
-      }
-    });
-    
-    if (usedInConfig) {
-      throwConflict(
-        "PROVIDER_CATALOG_ITEM_IN_ROUTING",
-        "Không thể xoá model đang được cấu hình sử dụng trong hệ thống AI. Vui lòng gỡ cấu hình trước khi xoá."
-      );
-    }
+    // Constraints for usage and routing removed to allow forced deletion
 
     await this.prisma.$transaction(async (transaction) => {
+      // Clear feature configurations using this model
+      await transaction.aiFeatureModelConfig.updateMany({
+        where: { fallbackCatalogItemId: id },
+        data: { fallbackCatalogItemId: null },
+      });
+
+      await transaction.aiFeatureModelConfig.deleteMany({
+        where: { primaryCatalogItemId: id },
+      });
+
       // First delete all price versions and their rates
       const prices = await transaction.providerPriceVersion.findMany({
         where: { catalogItemId: id },
@@ -326,21 +314,43 @@ export class ProviderOperationsAdminService {
       }),
       this.prisma.providerCatalogItem.findMany({
         where: { category: ProviderCatalogCategory.AI_MODEL },
-        orderBy: [{ status: "asc" }, { provider: "asc" }, { displayName: "asc" }],
+        include: { priceVersions: { orderBy: { effectiveFrom: "desc" }, take: 1 } },
       }),
     ]);
 
+    // Sort models by status (ACTIVE first), provider, and then by release date (effectiveFrom desc)
+    catalog.sort((a, b) => {
+      if (a.status !== b.status) {
+        if (a.status === "ACTIVE") return -1;
+        if (b.status === "ACTIVE") return 1;
+        return a.status.localeCompare(b.status);
+      }
+      if (a.provider !== b.provider) {
+        return a.provider.localeCompare(b.provider);
+      }
+      const dateA = a.priceVersions[0]?.effectiveFrom?.getTime() ?? 0;
+      const dateB = b.priceVersions[0]?.effectiveFrom?.getTime() ?? 0;
+      if (dateA !== dateB) return dateB - dateA; // descending
+      return a.displayName.localeCompare(b.displayName);
+    });
+
     return {
-      configurations: configurations.map((configuration) => ({
-        feature: configuration.feature,
-        primaryCatalogItemId: configuration.primaryCatalogItemId,
-        fallbackCatalogItemId: configuration.fallbackCatalogItemId,
-        temperature: configuration.temperature?.toNumber() ?? null,
-        reasoningEffort: configuration.reasoningEffort ?? null,
-        maxOutputTokens: configuration.maxOutputTokens,
-        version: configuration.version,
-        updatedAt: configuration.updatedAt,
-      })),
+      configurations: MANAGED_AI_FEATURES.map((feature) => {
+        const config = configurations.find((c) => c.feature === feature);
+        return {
+          feature,
+          primaryCatalogItemId: config?.primaryCatalogItemId ?? null,
+          fallbackCatalogItemId: config?.fallbackCatalogItemId ?? null,
+          temperature: config?.temperature?.toNumber() ?? null,
+          reasoningEffort: config?.reasoningEffort ?? null,
+          maxOutputTokens: config?.maxOutputTokens ?? null,
+          fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
+          fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
+          fallbackMaxOutputTokens: config?.fallbackMaxOutputTokens ?? null,
+          version: config?.version ?? 0,
+          updatedAt: config?.updatedAt ?? new Date(),
+        };
+      }),
       models: catalog.map((item) => ({
         id: item.id,
         provider: item.provider,
@@ -372,7 +382,10 @@ export class ProviderOperationsAdminService {
 
     await this.prisma.$transaction(async (transaction) => {
       for (const item of dto.configurations) {
-        if (item.primaryCatalogItemId === item.fallbackCatalogItemId) {
+        if (
+          item.primaryCatalogItemId &&
+          item.primaryCatalogItemId === item.fallbackCatalogItemId
+        ) {
           throwBadRequest(
             "AI_CONFIGURATION_FALLBACK_DUPLICATE",
             "Model dự phòng phải khác model chính.",
@@ -413,6 +426,24 @@ export class ProviderOperationsAdminService {
           );
         }
 
+        if (!item.primaryCatalogItemId) {
+          if (before) {
+            await transaction.aiFeatureModelConfig.delete({
+              where: { feature: item.feature },
+            });
+            await transaction.auditLog.create({
+              data: {
+                actorUserId,
+                action: "AI_FEATURE_MODEL_CONFIGURATION_DELETED",
+                entityType: "AiFeatureModelConfig",
+                entityId: before.id,
+                before: toJson(before),
+              },
+            });
+          }
+          continue;
+        }
+
         const after = await transaction.aiFeatureModelConfig.upsert({
           where: { feature: item.feature },
           create: {
@@ -422,6 +453,9 @@ export class ProviderOperationsAdminService {
             temperature: item.temperature,
             reasoningEffort: item.reasoningEffort ?? null,
             maxOutputTokens: item.maxOutputTokens,
+            fallbackTemperature: item.fallbackTemperature,
+            fallbackReasoningEffort: item.fallbackReasoningEffort ?? null,
+            fallbackMaxOutputTokens: item.fallbackMaxOutputTokens,
             updatedByUserId: actorUserId,
             version: 1,
           },
@@ -431,6 +465,9 @@ export class ProviderOperationsAdminService {
             temperature: item.temperature,
             reasoningEffort: item.reasoningEffort ?? null,
             maxOutputTokens: item.maxOutputTokens,
+            fallbackTemperature: item.fallbackTemperature,
+            fallbackReasoningEffort: item.fallbackReasoningEffort ?? null,
+            fallbackMaxOutputTokens: item.fallbackMaxOutputTokens,
             updatedByUserId: actorUserId,
             version: { increment: 1 },
           },
@@ -679,7 +716,7 @@ export class ProviderOperationsAdminService {
     if (!item) {
       throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model/provider.");
     }
-    const effectiveFrom = new Date(dto.effectiveFrom);
+    const effectiveFrom = new Date();
     const created = await this.prisma.$transaction(async (transaction) => {
       await transaction.providerPriceVersion.updateMany({
         where: {
@@ -820,6 +857,7 @@ export class ProviderOperationsAdminService {
         where,
         include: {
           catalogItem: { select: { displayName: true, externalKey: true } },
+          priceVersion: { include: { rates: true } },
         },
         orderBy: { createdAt: "desc" },
         skip: (query.page - 1) * query.pageSize,
@@ -830,6 +868,14 @@ export class ProviderOperationsAdminService {
     return {
       items: items.map((item) => ({
         ...item,
+        priceVersion: item.priceVersion ? {
+          ...item.priceVersion,
+          rates: item.priceVersion.rates.map(r => ({
+            ...r,
+            unitSize: r.unitSize.toNumber(),
+            unitPriceUsd: r.unitPriceUsd.toNumber(),
+          }))
+        } : null,
         estimatedCostUsd: item.estimatedCostUsd.toNumber(),
         fxRateVndPerUsd: item.fxRateVndPerUsd.toNumber(),
         estimatedSavedCostUsd: item.estimatedSavedCostUsd.toNumber(),
@@ -907,6 +953,77 @@ export class ProviderOperationsAdminService {
       updatedAt: settings.updatedAt,
     };
   }
+  async fetchExternalModels(provider: "OPENAI" | "GEMINI") {
+    if (provider === "OPENAI") {
+      const apiKey = this.configService.get("OPENAI_API_KEY", { infer: true });
+      if (!apiKey) throwBadRequest("OPENAI_KEY_NOT_FOUND", "Chưa cấu hình OpenAI API Key");
+      try {
+        const response = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!response.ok) throw new Error("OpenAI request failed");
+        const data = await response.json();
+        const models = (data.data as Array<{ id: string; created: number }>)
+          .filter(model => /^gpt-\d+/.test(model.id) && !/-\d{4}/.test(model.id) && model.created >= 1735689600 && !model.id.includes("codex") && !/(-search|-vision|-audio|-transcribe|-tts)/.test(model.id))
+          .sort((a, b) => b.created - a.created)
+          .map(model => ({
+            provider: "OPENAI",
+            externalKey: model.id,
+            displayName: model.id,
+            createdAt: new Date(model.created * 1000).toISOString(),
+          }));
+        return models;
+      } catch (error) {
+        throwBadRequest("OPENAI_FETCH_FAILED", "Không thể lấy danh sách model OpenAI");
+      }
+    } else if (provider === "GEMINI") {
+      const apiKey = this.configService.get("GEMINI_API_KEY", { infer: true });
+      if (!apiKey) throwBadRequest("GEMINI_KEY_NOT_FOUND", "Chưa cấu hình Gemini API Key");
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (!response.ok) throw new Error("Gemini request failed");
+        const data = await response.json();
+        const models = (data.models as Array<{ name: string, displayName: string }>)
+          .filter(model => model.name.startsWith("models/gemini-"))
+          .map(model => ({
+            provider: "GEMINI",
+            externalKey: model.name.replace("models/", ""),
+            displayName: model.displayName || model.name.replace("models/", ""),
+            createdAt: null,
+          }));
+        return models;
+      } catch (error) {
+        throwBadRequest("GEMINI_FETCH_FAILED", "Không thể lấy danh sách model Gemini");
+      }
+    }
+    throwBadRequest("INVALID_PROVIDER", "Provider không hợp lệ");
+  }
+
+  async bulkSyncModels(actorUserId: string, items: CreateProviderCatalogItemDto[]) {
+    const results = [];
+    for (const item of items) {
+      const existing = await this.prisma.providerCatalogItem.findUnique({
+        where: {
+          category_provider_externalKey: {
+            category: item.category,
+            provider: item.provider.toUpperCase(),
+            externalKey: item.externalKey,
+          },
+        },
+      });
+      if (existing) {
+        const dto: UpdateProviderCatalogItemDto = {
+          displayName: item.displayName,
+          aiConfiguration: item.aiConfiguration ?? null,
+          reasoningEffortLevels: item.reasoningEffortLevels ?? null,
+        };
+        results.push(await this.updateCatalogItem(existing.id, actorUserId, dto));
+      } else {
+        results.push(await this.createCatalogItem(actorUserId, item));
+      }
+    }
+    return results;
+  }
 }
 
 function serializePriceVersion(version: {
@@ -946,7 +1063,14 @@ function serializePriceVersion(version: {
 }
 
 function hasCapability(value: Prisma.JsonValue | null, feature: AiGenerationType) {
-  return Array.isArray(value) && value.includes(feature);
+  if (Array.isArray(value)) {
+    return value.includes(feature);
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const features = (value as any).features;
+    return Array.isArray(features) && features.includes(feature);
+  }
+  return false;
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {

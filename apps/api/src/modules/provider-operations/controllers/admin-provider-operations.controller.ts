@@ -29,6 +29,7 @@ import { UpdateAiConfigurationsDto } from "#api/modules/provider-operations/dto/
 import { UpdateOcrSettingsDto } from "#api/modules/provider-operations/dto/update-ocr-settings.dto";
 import { UpdateProviderBudgetsDto } from "#api/modules/provider-operations/dto/update-provider-budgets.dto";
 import { UpdateProviderCatalogItemDto } from "#api/modules/provider-operations/dto/update-provider-catalog-item.dto";
+import { BulkSyncProviderModelsDto } from "#api/modules/provider-operations/dto/bulk-sync-provider-models.dto";
 import { ProviderOperationsAdminService } from "#api/modules/provider-operations/services/provider-operations-admin.service";
 
 @ApiTags("admin-provider-operations")
@@ -80,6 +81,21 @@ export class AdminProviderOperationsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.service.deleteCatalogItem(id, user.id);
+  }
+
+  @Get("catalog/external-models")
+  @ApiOperation({ summary: "Fetch latest models from external providers (OpenAI, Gemini)" })
+  fetchExternalModels(@Query("provider") provider: "OPENAI" | "GEMINI") {
+    return this.service.fetchExternalModels(provider);
+  }
+
+  @Post("catalog/bulk-sync")
+  @ApiOperation({ summary: "Bulk sync models from external provider" })
+  bulkSyncProviderModels(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkSyncProviderModelsDto,
+  ) {
+    return this.service.bulkSyncModels(user.id, dto.items);
   }
 
   @Post("catalog/:id/price-versions")

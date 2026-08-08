@@ -108,7 +108,6 @@ export const createProviderPriceVersion = (
   input: {
     billingMode: "TOKEN" | "PAGE" | "REQUEST";
     sourceUrl: string;
-    effectiveFrom: string;
     rates: Array<Omit<PriceRate, "id">>;
   },
   token: string,
@@ -130,7 +129,6 @@ export const createProviderCatalogItem = (
     initialPrice?: {
       billingMode: "TOKEN" | "PAGE" | "REQUEST";
       sourceUrl: string;
-      effectiveFrom: string;
       rates: Array<Omit<PriceRate, "id">>;
     };
   },
@@ -163,4 +161,20 @@ export const deleteProviderCatalogItem = (catalogItemId: string, token: string) 
   apiRequest<{ success: boolean }>(`${basePath}/catalog/${catalogItemId}`, {
     method: "DELETE",
     token,
+  });
+
+export const fetchExternalModels = (provider: "OPENAI" | "GEMINI", token: string) =>
+  apiRequest<{ provider: string; externalKey: string; displayName: string; createdAt: string | null }[]>(
+    `${basePath}/catalog/external-models?provider=${provider}`,
+    { token }
+  );
+
+export const bulkSyncProviderModels = (
+  items: Parameters<typeof createProviderCatalogItem>[0][],
+  token: string
+) =>
+  apiRequest<{ success: boolean }>(`${basePath}/catalog/bulk-sync`, {
+    method: "POST",
+    token,
+    body: { items },
   });

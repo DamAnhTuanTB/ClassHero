@@ -48,11 +48,14 @@ export type AiModelOption = {
 
 export type AiFeatureConfiguration = {
   feature: AiFeature;
-  primaryCatalogItemId: string;
+  primaryCatalogItemId: string | null;
   fallbackCatalogItemId: string | null;
   temperature: number | null;
   reasoningEffort: string | null;
   maxOutputTokens: number | null;
+  fallbackTemperature: number | null;
+  fallbackReasoningEffort: string | null;
+  fallbackMaxOutputTokens: number | null;
   version: number;
   updatedAt: string;
 };
@@ -153,11 +156,24 @@ export type UsageEvent = {
   cacheStatus: string | null;
   totalTokens: number;
   pages: number;
+  promptTokens: number;
+  cachedInputTokens: number;
+  completionTokens: number;
+  estimatedCostUsd: number;
+  fxRateVndPerUsd: number;
   costVnd: number;
   estimatedSavedCostVnd: number;
   latencyMs: number | null;
   createdAt: string;
   catalogItem: { displayName: string; externalKey: string } | null;
+  priceVersion?: {
+    rates: Array<{
+      metric: "INPUT_TOKEN" | "CACHED_INPUT_TOKEN" | "OUTPUT_TOKEN" | "PAGE" | "REQUEST";
+      unitSize: number;
+      unitPriceUsd: number;
+    }>;
+  } | null;
+  rawUsageJson?: any;
 };
 
 export type UsageEventsResponse = {

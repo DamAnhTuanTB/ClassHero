@@ -46,7 +46,7 @@ export function formatVnd(value: number) {
 }
 
 export function formatNumber(value: number) {
-  return new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(value);
+  return new Intl.NumberFormat("vi-VN").format(value);
 }
 
 export function formatDateTime(value: string | null) {

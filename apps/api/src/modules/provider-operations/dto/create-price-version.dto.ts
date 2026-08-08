@@ -12,6 +12,7 @@ import {
   Max,
   Min,
   ValidateNested,
+  ValidateIf,
 } from "class-validator";
 import { ProviderBillingMode, ProviderUsageMetric } from "@prisma/client";
 
@@ -43,11 +44,10 @@ export class CreatePriceVersionDto {
   @IsEnum(ProviderBillingMode)
   billingMode!: ProviderBillingMode;
 
+  @IsOptional()
+  @ValidateIf((e) => e.sourceUrl !== "")
   @IsUrl({ require_tld: false })
-  sourceUrl!: string;
-
-  @IsDateString()
-  effectiveFrom!: string;
+  sourceUrl?: string;
 
   @IsArray()
   @ArrayMinSize(1)

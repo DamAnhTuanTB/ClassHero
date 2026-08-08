@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, useRef, type ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
@@ -62,6 +62,7 @@ export function AiGenerationConfigDialog({
   lessonId,
   targetGrade,
   type,
+  initialValues,
   onClose,
   onSubmit,
 }: {
@@ -71,6 +72,7 @@ export function AiGenerationConfigDialog({
   lessonId: string;
   targetGrade: number | null;
   type: AdminAiGenerationType;
+  initialValues?: any;
   onClose: () => void;
   onSubmit: (payload: AdminAiGenerationPayload) => Promise<void>;
 }) {
@@ -82,6 +84,8 @@ export function AiGenerationConfigDialog({
   );
   const [summaryPreviewData, setSummaryPreviewData] =
     useState<AdminLessonSummaryPromptPreview | null>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+
   const form = useForm<AdminAiGenerationFormValues>({
     resolver: zodResolver(adminAiGenerationFormSchema),
     mode: "onChange",
@@ -97,23 +101,24 @@ export function AiGenerationConfigDialog({
       setSummaryPreviewTab("system");
       setSummaryPreviewData(null);
       if (type === "SUMMARY" && defaults.documentIds.length > 0) {
-        void previewPrompt(toSummaryPayload(defaults))
-          .then((preview) => {
-            setSummaryPreviewData(preview);
-            form.setValue(
-              "summaryTemperature",
-              String(preview.configuration.temperature),
-            );
-            form.setValue(
-              "summaryMaxOutputTokens",
-              String(preview.configuration.maxOutputTokens),
-            );
-            form.setValue("systemInstructions", preview.systemPrompt);
-            form.setValue("userPrompt", preview.userPrompt);
-          })
-          .catch(() => {
-            // Mutation state renders the recoverable preview error in the dialog.
-          });
+        void previewPrompt(toSummaryPayload(defaults)).then((data) => {
+          if (data?.configuration?.isDefaultConfigured) {
+            if (!form.getValues("summaryModel") && data.configuration.resolvedModel) {
+              form.setValue("summaryModel", data.configuration.resolvedModel, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+              if (data.configuration.temperature !== null && data.configuration.temperature !== undefined) {
+                form.setValue("summaryTemperature", data.configuration.temperature.toString(), { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+              }
+              if (data.configuration.reasoningEffort) {
+                form.setValue("summaryReasoningEffort", data.configuration.reasoningEffort, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+              }
+              if (data.configuration.maxOutputTokens !== null && data.configuration.maxOutputTokens !== undefined) {
+                form.setValue("summaryMaxOutputTokens", data.configuration.maxOutputTokens.toString(), { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+              }
+            }
+          }
+        }).catch(() => {
+          // Mutation state renders the recoverable preview error in the dialog.
+        });
       }
     }
   }, [documents, form, isOpen, previewPrompt, resetPreview, targetGrade, type]);
@@ -144,9 +149,15 @@ export function AiGenerationConfigDialog({
   const reasoningOptions = [
     { value: "", label: "Mặc định của model" },
     ...(configuredReasoningEffortLevels?.length
-      ? configuredReasoningEffortLevels.map((level) => ({
+      ? [...configuredReasoningEffortLevels]
+          .sort((a, b) => {
+            const order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+            return (order.indexOf(a) > -1 ? order.indexOf(a) : 99) - (order.indexOf(b) > -1 ? order.indexOf(b) : 99);
+          })
+          .map((level) => ({
           value: level,
           label: {
+            minimal: "Tối thiểu (Minimal)",
             low: "Thấp (Low)",
             medium: "Trung bình (Medium)",
             high: "Cao (High)",
@@ -155,11 +166,7 @@ export function AiGenerationConfigDialog({
             max: "Tối đa (Max)",
           }[level as string] || level,
         }))
-      : [
-          { value: "low", label: "Thấp (Low)" },
-          { value: "medium", label: "Trung bình (Medium)" },
-          { value: "high", label: "Cao (High)" },
-        ]),
+      : []),
   ];
 
   const showTemperature =
@@ -185,13 +192,24 @@ export function AiGenerationConfigDialog({
     }
     try {
       const preview = await previewMutation.mutateAsync(
-        toSummaryPayload(form.getValues(), { includeUserPrompt: false }),
+        toSummaryPayload(form.getValues(), { 
+          includeUserPrompt: false, 
+          aiConfigurationCapability 
+        }),
       );
       setSummaryPreviewData(preview);
       form.setValue("userPrompt", preview.userPrompt, {
         shouldDirty: true,
         shouldValidate: true,
       });
+      setTimeout(() => {
+        if (scrollViewportRef.current) {
+          scrollViewportRef.current.scrollTo({
+            top: scrollViewportRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 50);
     } catch {
       // React Query exposes the error state directly in the dialog.
     }
@@ -206,7 +224,25 @@ export function AiGenerationConfigDialog({
     >
       <form
         className="flex min-h-0 flex-1 flex-col"
-        onSubmit={form.handleSubmit(async (values) => onSubmit(toPayload(values)))}
+        onSubmit={form.handleSubmit(async (values) => {
+          if (
+            type === "SUMMARY" &&
+            !values.summaryModel &&
+            !previewMutation.data?.configuration.isDefaultConfigured
+          ) {
+            form.setError("summaryModel", {
+              message: "Vui lòng chọn model",
+            });
+            return;
+          }
+          if (type === "SUMMARY" && values.summaryModel && showTemperature && !values.summaryTemperature) {
+            form.setError("summaryTemperature", {
+              message: "Vui lòng nhập mức độ sáng tạo (temperature)",
+            });
+            return;
+          }
+          await onSubmit(toPayload(values, { aiConfigurationCapability }));
+        })}
       >
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-5 pr-16">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
@@ -214,7 +250,7 @@ export function AiGenerationConfigDialog({
           </h2>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <div ref={scrollViewportRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
           {type === "SUMMARY" ? (
             <>
               <AdminDocumentMultiSelectField
@@ -315,7 +351,9 @@ export function AiGenerationConfigDialog({
                   label="Model"
                   value={form.watch("summaryModel")}
                   options={[
-                    { value: "", label: "Tự động theo Cài đặt AI" },
+                    ...(previewMutation.data?.configuration.isDefaultConfigured
+                      ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
+                      : []),
                     ...(previewMutation.data?.configuration.modelOptions ?? []).map(
                       (option) => ({
                         value: option.model,
@@ -374,17 +412,18 @@ export function AiGenerationConfigDialog({
                   </>
                 )}
               </div>
-              <TextField
-                id="ai-summary-max-output-tokens"
-                label="Giới hạn token đầu ra"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                icon={null}
-
-                error={form.formState.errors.summaryMaxOutputTokens}
-                {...maxOutputTokensField}
-                onChange={numericChange(maxOutputTokensField.onChange)}
-              />
+              {form.watch("summaryModel") !== "" && (
+                <TextField
+                  id="ai-summary-max-output-tokens"
+                  label="Giới hạn token đầu ra"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  icon={null}
+                  error={form.formState.errors.summaryMaxOutputTokens}
+                  {...maxOutputTokensField}
+                  onChange={numericChange(maxOutputTokensField.onChange)}
+                />
+              )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-semibold text-[var(--theme-text-muted)]">
@@ -392,7 +431,12 @@ export function AiGenerationConfigDialog({
                 </p>
                 <button
                   type="button"
-                  disabled={previewMutation.isPending}
+                  disabled={
+                    previewMutation.isPending ||
+                    (!form.watch("summaryModel") && !previewMutation.data?.configuration.isDefaultConfigured) ||
+                    (form.watch("summaryModel") !== "" && !form.watch("summaryMaxOutputTokens")) ||
+                    (showTemperature && !form.watch("summaryTemperature"))
+                  }
                   onClick={() => void refreshSummaryPreview()}
                   className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
                 >
@@ -638,9 +682,12 @@ function getDefaultValues(
   };
 }
 
-function toPayload(values: AdminAiGenerationFormValues): AdminAiGenerationPayload {
+function toPayload(
+  values: AdminAiGenerationFormValues,
+  options?: { aiConfigurationCapability?: any }
+): AdminAiGenerationPayload {
   if (values.type === "SUMMARY") {
-    return toSummaryPayload(values);
+    return toSummaryPayload(values, { aiConfigurationCapability: options?.aiConfigurationCapability });
   }
   if (values.type === "FLASHCARD") {
     return {
@@ -670,9 +717,34 @@ function toPayload(values: AdminAiGenerationFormValues): AdminAiGenerationPayloa
   };
 }
 
+function mapPayloadToFormValues(
+  type: AdminAiGenerationType,
+  payload: any,
+): Partial<AdminAiGenerationFormValues> {
+  if (!payload) return {};
+  const values: Partial<AdminAiGenerationFormValues> = {};
+
+  if (type === "SUMMARY") {
+    if (payload.documentIds) values.documentIds = payload.documentIds;
+    if (payload.style) values.style = payload.style;
+    if (payload.styleInstructions) values.styleInstructions = payload.styleInstructions;
+    if (payload.length) values.summaryLength = payload.length;
+    if (payload.targetWordCount) values.summaryTargetWordCount = String(payload.targetWordCount);
+    if (payload.extraInstructions) values.extraInstructions = payload.extraInstructions;
+    if (payload.systemInstructions) values.systemInstructions = payload.systemInstructions;
+    if (payload.userPrompt) values.userPrompt = payload.userPrompt;
+    if (payload.model) values.summaryModel = payload.model;
+    if (payload.temperature !== undefined) values.summaryTemperature = String(payload.temperature);
+    if (payload.reasoningEffort) values.summaryReasoningEffort = payload.reasoningEffort;
+    if (payload.maxOutputTokens !== undefined) values.summaryMaxOutputTokens = String(payload.maxOutputTokens);
+  }
+
+  return values;
+}
+
 function toSummaryPayload(
   values: AdminAiGenerationFormValues,
-  options: { includeUserPrompt?: boolean } = {},
+  options: { includeUserPrompt?: boolean; aiConfigurationCapability?: any } = {},
 ): AdminSummaryGenerationPayload {
   const extraInstructions = values.extraInstructions.trim();
   const styleInstructions = values.styleInstructions.trim();
@@ -693,12 +765,12 @@ function toSummaryPayload(
     ...(values.summaryModel ? { model: values.summaryModel } : {}),
     ...(values.summaryModel &&
     values.summaryTemperature &&
-    supportsTemperature(values.summaryModel)
+    supportsTemperature(values.summaryModel, options.aiConfigurationCapability)
       ? { temperature: Number(values.summaryTemperature) }
       : {}),
     ...(values.summaryModel &&
     values.summaryReasoningEffort &&
-    supportsReasoningEffort(values.summaryModel)
+    supportsReasoningEffort(values.summaryModel, options.aiConfigurationCapability)
       ? { reasoningEffort: values.summaryReasoningEffort }
       : {}),
     ...(values.summaryMaxOutputTokens

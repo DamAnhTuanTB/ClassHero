@@ -7,12 +7,12 @@ const nonnegativeDecimal = z
   .regex(/^\d+(?:[.,]\d+)?$/, "Đơn giá phải là số không âm");
 
 export const providerPriceVersionSchema = z.object({
-  effectiveFrom: z.string().min(1, "Chọn ngày hiệu lực"),
   sourceUrl: z
     .string()
     .trim()
-    .min(1, "Nhập đường dẫn nguồn giá")
-    .url("Đường dẫn chưa đúng định dạng"),
+    .url("Đường dẫn chưa đúng định dạng")
+    .optional()
+    .or(z.literal('')),
   rates: z
     .array(
       z.object({
@@ -37,7 +37,7 @@ export type ProviderPriceVersionFormValues = z.infer<typeof providerPriceVersion
 export const providerCatalogItemSchema = z.object({
   displayName: z.string().trim().min(1, "Vui lòng nhập tên hiển thị"),
   externalKey: z.string().trim().min(1, "Vui lòng nhập tên model"),
-  aiConfiguration: z.enum(["TEMPERATURE", "REASONING_EFFORT", "NONE"]),
+  aiConfiguration: z.enum(["TEMPERATURE", "REASONING_EFFORT"]),
   reasoningEffortLevels: z.array(z.string()).optional(),
 });
 

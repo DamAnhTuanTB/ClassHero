@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag, GripVertical, Copy, Trash2, Plus, ArrowUp, ArrowDown } from "lucide-react";
+import { BookOpen, AlertCircle, Info, Lightbulb, FileCheck2, ChevronRight, PenTool, Scale, Bookmark, GraduationCap, Layers, MessageSquareQuote, AlertOctagon, Sigma, ListOrdered, FileBadge, PlayCircle, Flag, GripVertical, Copy, Trash2, Plus, ArrowUp, ArrowDown, X } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
@@ -298,7 +298,19 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
           )}
 
           {(!isReadOnly && isObjectivesEditing) && (
-            <div className="border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto max-h-[300px]">
+            <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto max-h-[300px]">
+              {viewMode === "UI_ONLY" && (
+                <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                  <button 
+                    type="button"
+                    onClick={() => toggleEdit('objectives')}
+                    title="Đóng chế độ chỉnh sửa"
+                    className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
               <ReactJson 
                 src={data.objectives}
                 onEdit={(e) => onChange({ ...data, objectives: e.updated_src })}
@@ -351,8 +363,8 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                 const newData = { ...data };
                 if (newData.sections) {
                   const temp = newData.sections[idx];
-                  newData.sections[idx] = newData.sections[idx - 1];
-                  newData.sections[idx - 1] = temp;
+                  newData.sections[idx] = newData.sections[idx - 1]!;
+                  newData.sections[idx - 1] = temp!;
                   newData.sections.forEach((s, i) => { s.order = i + 1; });
                   onChange?.(newData);
                 }
@@ -369,8 +381,8 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                 const newData = { ...data };
                 if (newData.sections) {
                   const temp = newData.sections[idx];
-                  newData.sections[idx] = newData.sections[idx + 1];
-                  newData.sections[idx + 1] = temp;
+                  newData.sections[idx] = newData.sections[idx + 1]!;
+                  newData.sections[idx + 1] = temp!;
                   newData.sections.forEach((s, i) => { s.order = i + 1; });
                   onChange?.(newData);
                 }
@@ -539,6 +551,16 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                   {isSectionEditing && (
                     <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto w-full mb-4 [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[100px] [&_textarea]:!mt-2 [&_textarea]:!p-2 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
                       <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                        {viewMode === "UI_ONLY" && (
+                          <button 
+                            type="button"
+                            onClick={() => toggleEdit(`section-${idx}`)}
+                            title="Đóng chế độ chỉnh sửa"
+                            className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button 
                           type="button"
                           disabled={idx === 0}
@@ -546,10 +568,10 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                             if (idx === 0) return;
                             const newData = { ...data };
                             if (newData.sections) {
-                              const currentBlocks = newData.sections[idx].blocks || [];
-                              const prevBlocks = newData.sections[idx - 1].blocks || [];
-                              newData.sections[idx - 1].blocks = [...prevBlocks, ...currentBlocks];
-                              newData.sections.splice(idx, 1);
+                              const currentBlocks = newData.sections![idx]!.blocks || [];
+                              const prevBlocks = newData.sections![idx - 1]!.blocks || [];
+                              newData.sections![idx - 1]!.blocks = [...prevBlocks, ...currentBlocks];
+                              newData.sections!.splice(idx, 1);
                               
                               newData.sections.forEach((s, i) => { s.order = i + 1; });
                               onChange?.(newData);
@@ -601,17 +623,17 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                   const newData = { ...data };
                   if (newData.sections) {
                     if (bIdx > 0) {
-                      const blocks = [...newData.sections[idx].blocks!];
+                      const blocks = [...newData.sections![idx]!.blocks!];
                       const temp = blocks[bIdx];
-                      blocks[bIdx] = blocks[bIdx - 1];
-                      blocks[bIdx - 1] = temp;
-                      newData.sections[idx].blocks = blocks;
+                      blocks[bIdx] = blocks[bIdx - 1]!;
+                      blocks[bIdx - 1] = temp!;
+                      newData.sections![idx]!.blocks = blocks;
                     } else if (idx > 0) {
-                      const currentBlocks = [...newData.sections[idx].blocks!];
-                      const blockToMove = currentBlocks.splice(bIdx, 1)[0];
-                      newData.sections[idx].blocks = currentBlocks;
-                      if (!newData.sections[idx - 1].blocks) newData.sections[idx - 1].blocks = [];
-                      newData.sections[idx - 1].blocks!.push(blockToMove);
+                      const currentBlocks = [...newData.sections![idx]!.blocks!];
+                      const blockToMove = currentBlocks.splice(bIdx, 1)[0]!;
+                      newData.sections![idx]!.blocks = currentBlocks;
+                      if (!newData.sections![idx - 1]!.blocks) newData.sections![idx - 1]!.blocks = [];
+                      newData.sections![idx - 1]!.blocks!.push(blockToMove);
                     }
                     onChange?.(newData);
                   }
@@ -620,19 +642,19 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                 const handleMoveDown = () => {
                   const newData = { ...data };
                   if (newData.sections) {
-                    const blocks = newData.sections[idx].blocks || [];
+                    const blocks = newData.sections![idx]!.blocks || [];
                     if (bIdx < blocks.length - 1) {
                       const newBlocks = [...blocks];
                       const temp = newBlocks[bIdx];
-                      newBlocks[bIdx] = newBlocks[bIdx + 1];
-                      newBlocks[bIdx + 1] = temp;
-                      newData.sections[idx].blocks = newBlocks;
+                      newBlocks[bIdx] = newBlocks[bIdx + 1]!;
+                      newBlocks[bIdx + 1] = temp!;
+                      newData.sections![idx]!.blocks = newBlocks;
                     } else if (idx < (data.sections?.length || 0) - 1) {
                       const currentBlocks = [...blocks];
-                      const blockToMove = currentBlocks.splice(bIdx, 1)[0];
-                      newData.sections[idx].blocks = currentBlocks;
-                      if (!newData.sections[idx + 1].blocks) newData.sections[idx + 1].blocks = [];
-                      newData.sections[idx + 1].blocks!.unshift(blockToMove);
+                      const blockToMove = currentBlocks.splice(bIdx, 1)[0]!;
+                      newData.sections![idx]!.blocks = currentBlocks;
+                      if (!newData.sections![idx + 1]!.blocks) newData.sections![idx + 1]!.blocks = [];
+                      newData.sections![idx + 1]!.blocks!.unshift(blockToMove);
                     }
                     onChange?.(newData);
                   }
@@ -793,6 +815,16 @@ export function SummaryBlockRenderer({ data, displayTitle, onChange, viewMode = 
                         {isBlockEditing && (
                           <div className="w-full h-full relative border rounded-lg bg-slate-50 dark:bg-slate-900 p-3 overflow-auto max-h-[500px] [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[200px] [&_textarea]:!mt-2 [&_textarea]:!p-3 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
                             <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                              {viewMode === "UI_ONLY" && (
+                                <button 
+                                  type="button"
+                                  onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
+                                  title="Đóng chế độ chỉnh sửa"
+                                  className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button 
                                 type="button"
                                 onClick={handleMoveUp}

@@ -1,6 +1,15 @@
 "use client";
 
-import { EyeOff, Loader2, RefreshCw, Save, Send, LayoutTemplate, Code2, Columns } from "lucide-react";
+import {
+  EyeOff,
+  Loader2,
+  RefreshCw,
+  Save,
+  Send,
+  LayoutTemplate,
+  Code2,
+  Columns,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
@@ -11,9 +20,9 @@ import {
   useAdminLessonSummary,
   useUpsertAdminLessonSummary,
 } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
-import type { 
+import type {
   AdminLessonSummaryReviewStatus,
-  AdminAiPanelJob 
+  AdminAiPanelJob,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { QuizRichContentEditor } from "@/features/admin/quiz/components/quiz-rich-content-editor";
 import { SummaryBlockRenderer } from "@/features/student/lessons/screens/student-lesson-screen/components/summary-block-renderer";
@@ -23,6 +32,7 @@ import {
 } from "@/lib/tiptap-rich-content";
 import type { TiptapTextDocument } from "@/types/rich-text";
 import { MathToolbar } from "@/features/student/lessons/screens/student-lesson-screen/components/math-toolbar";
+import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-metadata";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
@@ -41,10 +51,24 @@ export function AdminLessonSummaryTab({
   const panelQuery = useAdminAiGenerationPanel(lessonId);
   const summaryJob = panelQuery.data?.jobs?.SUMMARY;
   const upsertMutation = useUpsertAdminLessonSummary(lessonId);
-  const [content, setContent] = useState<TiptapTextDocument | any>(createEmptyTiptapDocument());
+  const [content, setContent] = useState<TiptapTextDocument | any>(
+    createEmptyTiptapDocument(),
+  );
   const [contentError, setContentError] = useState<string>();
-  const [viewMode, setViewMode] = useState<ViewMode>("SPLIT");
+  const [viewMode, setViewMode] = useState<ViewMode>("UI_ONLY");
   const [jsonCollapsed, setJsonCollapsed] = useState<boolean | number>(2);
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem("admin-lesson-summary-view-mode");
+    if (savedMode === "UI_ONLY" || savedMode === "JSON_ONLY" || savedMode === "SPLIT") {
+      setViewMode(savedMode);
+    }
+  }, []);
+
+  const handleSetViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem("admin-lesson-summary-view-mode", mode);
+  };
 
   useEffect(() => {
     if (summaryQuery.data?.contentJson) {
@@ -112,18 +136,21 @@ export function AdminLessonSummaryTab({
             <h3 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
               Kiến thức buổi học
             </h3>
-            {summary ? <SummaryStatusBadge status={summary.reviewStatus} job={summaryJob ?? null} /> : null}
+            {summary ? (
+              <SummaryStatusBadge
+                status={summary.reviewStatus}
+                job={summaryJob ?? null}
+              />
+            ) : null}
           </div>
-          <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            Lưu bản chỉnh sửa, sau đó phát hành khi nội dung đã sẵn sàng cho học sinh.
-          </p>
+          <AiJobMetadata job={summaryJob ?? null} onEdit={onRegenerate} />
         </div>
 
         {content?.type === "lesson_summary_blocks" && (
           <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
             <button
               type="button"
-              onClick={() => setViewMode("UI_ONLY")}
+              onClick={() => handleSetViewMode("UI_ONLY")}
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
                 viewMode === "UI_ONLY"
                   ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
@@ -136,7 +163,7 @@ export function AdminLessonSummaryTab({
             </button>
             <button
               type="button"
-              onClick={() => setViewMode("JSON_ONLY")}
+              onClick={() => handleSetViewMode("JSON_ONLY")}
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
                 viewMode === "JSON_ONLY"
                   ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
@@ -149,7 +176,7 @@ export function AdminLessonSummaryTab({
             </button>
             <button
               type="button"
-              onClick={() => setViewMode("SPLIT")}
+              onClick={() => handleSetViewMode("SPLIT")}
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
                 viewMode === "SPLIT"
                   ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
@@ -169,13 +196,13 @@ export function AdminLessonSummaryTab({
           {viewMode === "JSON_ONLY" ? (
             <div className="flex flex-col space-y-3">
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   onClick={() => setJsonCollapsed(false)}
                   className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors"
                 >
                   Xổ toàn bộ
                 </button>
-                <button 
+                <button
                   onClick={() => setJsonCollapsed(2)}
                   className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors"
                 >
@@ -183,13 +210,13 @@ export function AdminLessonSummaryTab({
                 </button>
               </div>
               <div className="w-full overflow-auto max-h-[800px] border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-white dark:bg-slate-950 shadow-sm">
-                <ReactJson 
-                  src={content} 
+                <ReactJson
+                  src={content}
                   onEdit={(e) => setContent(e.updated_src)}
                   onAdd={(e) => setContent(e.updated_src)}
                   onDelete={(e) => setContent(e.updated_src)}
                   theme="rjv-default"
-                  style={{ backgroundColor: 'transparent' }}
+                  style={{ backgroundColor: "transparent" }}
                   collapsed={jsonCollapsed}
                   displayDataTypes={false}
                   name={false}
@@ -199,11 +226,11 @@ export function AdminLessonSummaryTab({
               </div>
             </div>
           ) : (
-            <SummaryBlockRenderer 
-              data={content.data} 
+            <SummaryBlockRenderer
+              data={content.data}
               displayTitle={lessonTitle}
               viewMode={viewMode === "UI_ONLY" ? "UI_ONLY" : "SPLIT"}
-              onChange={(newData) => setContent({ ...content, data: newData })} 
+              onChange={(newData) => setContent({ ...content, data: newData })}
             />
           )}
         </div>
@@ -229,7 +256,6 @@ export function AdminLessonSummaryTab({
       )}
 
       <div className="flex flex-col-reverse gap-2 border-t border-[var(--theme-border)] pt-4 sm:flex-row sm:justify-end">
-
         <button
           type="button"
           disabled={upsertMutation.isPending}
@@ -279,12 +305,21 @@ export function AdminLessonSummaryTab({
   );
 }
 
-function SummaryStatusBadge({ status, job }: { status: AdminLessonSummaryReviewStatus, job?: AdminAiPanelJob | null }) {
+function SummaryStatusBadge({
+  status,
+  job,
+}: {
+  status: AdminLessonSummaryReviewStatus;
+  job?: AdminAiPanelJob | null;
+}) {
   if (job?.status === "QUEUED" || job?.status === "RUNNING") {
-    const label = job.status === "QUEUED" ? "Đang chờ" : "Đang tạo";
     return (
       <span className="inline-flex min-h-7 items-center rounded-full border px-2.5 text-xs font-extrabold border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] text-[var(--theme-info-text)]">
-        {label}
+        {job.status === "QUEUED" ? (
+          "Đang chờ"
+        ) : (
+          "Đang tạo"
+        )}
       </span>
     );
   }

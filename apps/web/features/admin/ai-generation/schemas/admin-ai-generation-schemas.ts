@@ -75,6 +75,15 @@ export const adminAiGenerationFormSchema = z
         message: "Chọn ít nhất một tài liệu",
       });
     }
+    if (values.type === "SUMMARY" && values.summaryModel) {
+      if (!values.summaryMaxOutputTokens) {
+        context.addIssue({
+          code: "custom",
+          path: ["summaryMaxOutputTokens"],
+          message: "Vui lòng nhập số token đầu ra",
+        });
+      }
+    }
     if (values.type === "QUIZ" || values.type === "TEST") {
       if (values.questionTypes.length === 0) {
         context.addIssue({

@@ -1,13 +1,15 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Coins, Loader2, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Coins, Loader2, Save, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CheckboxField } from "@/components/common/forms/checkbox-field";
+import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { NumericSettingsField } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/numeric-settings-field";
 import type {
   ProviderBudget,
   TimelineResponse,
   UsageBreakdownItem,
+  UsageEvent,
   UsageEventsResponse,
   UsageGranularity,
 } from "@/features/admin/ai-settings/types/provider-operations-types";
@@ -28,6 +30,7 @@ export function UsageCostTab({
   granularity,
   isLoading,
   isSavingBudgets,
+  onEventsPageChange,
   onGranularityChange,
   onSaveBudgets,
 }: {
@@ -35,19 +38,63 @@ export function UsageCostTab({
   timeline?: TimelineResponse;
   breakdown?: UsageBreakdownItem[];
   events?: UsageEventsResponse;
+  eventsPage: number;
   granularity: UsageGranularity;
   isLoading: boolean;
   isSavingBudgets: boolean;
+  onEventsPageChange: (page: number) => void;
   onGranularityChange: (value: UsageGranularity) => void;
   onSaveBudgets: (budgets: ProviderBudget[]) => void;
 }) {
   const [budgets, setBudgets] = useState(initialBudgets);
+  const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
+  const [selectedEvent, setSelectedEvent] = useState<UsageEvent | null>(null);
+
   useEffect(() => setBudgets(initialBudgets), [initialBudgets]);
 
   const maxCost = useMemo(
     () => Math.max(1, ...(timeline?.points.map((point) => point.costVnd) ?? [1])),
     [timeline],
   );
+
+  const breakdownGroups = useMemo(() => {
+    type ModelAgg = { name: string, calls: number, costVnd: number };
+    const groups: Record<string, { provider: string, displayName: string, totalCostVnd: number, totalCalls: number, models: Record<string, ModelAgg> }> = {
+      OPENAI: { provider: "OPENAI", displayName: "OPENAI", totalCostVnd: 0, totalCalls: 0, models: {} },
+      MATHPIX: { provider: "MATHPIX", displayName: "Mathpix PDF OCR", totalCostVnd: 0, totalCalls: 0, models: {} },
+      GEMINI: { provider: "GEMINI", displayName: "GEMINI", totalCostVnd: 0, totalCalls: 0, models: {} },
+    };
+    
+    breakdown?.forEach(item => {
+      const p = item.provider;
+      if (!groups[p]) {
+        groups[p] = { provider: p, displayName: p, totalCostVnd: 0, totalCalls: 0, models: {} };
+      }
+      
+      groups[p].totalCostVnd += item.costVnd;
+      groups[p].totalCalls += item.calls;
+      
+      if (p !== "MATHPIX") {
+        const modelName = item.model?.displayName;
+        if (modelName) {
+           if (!groups[p].models[modelName]) {
+             groups[p].models[modelName] = { name: modelName, calls: 0, costVnd: 0 };
+           }
+           groups[p].models[modelName].calls += item.calls;
+           groups[p].models[modelName].costVnd += item.costVnd;
+        }
+      }
+    });
+    
+    return [groups.OPENAI, groups.MATHPIX, groups.GEMINI, ...Object.values(groups).filter(g => !["OPENAI", "GEMINI", "MATHPIX"].includes(g.provider))].filter((g): g is NonNullable<typeof g> => Boolean(g)).map(g => ({
+       ...g,
+       modelsList: Object.values(g.models).sort((a, b) => b.costVnd - a.costVnd)
+    }));
+  }, [breakdown]);
+
+  const toggleProvider = (provider: string) => {
+    setExpandedProviders(prev => ({ ...prev, [provider]: !prev[provider] }));
+  };
 
   return (
     <div className="space-y-6">
@@ -236,33 +283,59 @@ export function UsageCostTab({
       <section className="grid gap-5 xl:grid-cols-[1fr_1.35fr]">
         <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] p-4">
           <h3 className="font-extrabold text-[var(--theme-text-strong)]">
-            Chi phí theo tính năng
+            Chi phí theo Nhà cung cấp & Model
           </h3>
-          <div className="mt-3 space-y-2">
-            {breakdown?.length ? (
-              breakdown.slice(0, 8).map((item) => (
-                <div
-                  key={`${item.provider}-${item.catalogItemId}-${item.feature}`}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-[var(--theme-surface-soft)] px-3 py-2.5 text-sm"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-extrabold text-[var(--theme-text-strong)]">
-                      {item.model?.displayName ?? item.provider}
-                    </p>
-                    <p className="truncate text-xs font-semibold text-[var(--theme-text-muted)]">
-                      {item.feature
-                        ? aiFeatureLabels[item.feature]
-                        : item.category === "OCR_SERVICE"
-                          ? "Đọc tài liệu"
-                          : "Tính năng AI khác"}{" "}
-                      · {item.calls} lượt
-                    </p>
+          <div className="mt-3 space-y-3">
+            {breakdownGroups.length ? (
+              breakdownGroups.map((group) => {
+                const isExpandable = group.provider !== "MATHPIX" && group.modelsList.length > 0;
+                const isExpanded = !!expandedProviders[group.provider];
+                
+                return (
+                  <div key={group.provider} className="rounded-lg bg-[var(--theme-surface-soft)] p-3 space-y-2">
+                    <div 
+                      className={`flex items-center justify-between gap-3 ${isExpandable ? "cursor-pointer select-none" : ""}`}
+                      onClick={() => isExpandable && toggleProvider(group.provider)}
+                    >
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 font-extrabold text-[var(--theme-text-strong)] text-sm">
+                          {group.displayName}
+                          {isExpandable && (
+                            isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                          )}
+                        </div>
+                        {!isExpandable && group.totalCalls > 0 && (
+                          <div className="text-xs text-[var(--theme-text-muted)] mt-0.5">
+                             {group.totalCalls} lượt
+                          </div>
+                        )}
+                      </div>
+                      <div className="font-extrabold text-[var(--theme-text)] text-sm">
+                        {formatVnd(group.totalCostVnd)}
+                      </div>
+                    </div>
+                    
+                    {isExpandable && isExpanded && group.modelsList.map((model) => (
+                      <div
+                        key={model.name}
+                        className="flex items-center justify-between gap-3 pt-2 mt-2 border-t border-[var(--theme-border)] text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-extrabold text-[var(--theme-text-strong)]">
+                            {model.name}
+                          </p>
+                          <p className="truncate text-xs text-[var(--theme-text-muted)] mt-0.5">
+                            {model.calls} lượt
+                          </p>
+                        </div>
+                        <div className="shrink-0 font-extrabold text-[var(--theme-text)]">
+                          {formatVnd(model.costVnd)}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <p className="shrink-0 font-extrabold text-[var(--theme-text)]">
-                    {formatVnd(item.costVnd)}
-                  </p>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="py-8 text-center text-sm font-semibold text-[var(--theme-text-muted)]">
                 Chưa có dữ liệu phân bổ.
@@ -274,7 +347,7 @@ export function UsageCostTab({
         <div className="overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)]">
           <div className="border-b border-[var(--theme-border)] px-4 py-3">
             <h3 className="font-extrabold text-[var(--theme-text-strong)]">
-              Lượt sử dụng gần đây
+              Tất cả lượt sử dụng
             </h3>
           </div>
           <div className="overflow-x-auto">
@@ -289,8 +362,12 @@ export function UsageCostTab({
               </thead>
               <tbody className="divide-y divide-[var(--theme-border)]">
                 {events?.items.length ? (
-                  events.items.slice(0, 10).map((event) => (
-                    <tr key={event.id}>
+                  events.items.map((event) => (
+                    <tr 
+                      key={event.id}
+                      onClick={() => setSelectedEvent(event)}
+                      className="cursor-pointer hover:bg-[var(--theme-surface-soft)] transition-colors"
+                    >
                       <td className="px-4 py-3">
                         <p className="font-extrabold text-[var(--theme-text-strong)]">
                           {event.catalogItem?.displayName ?? event.provider}
@@ -328,8 +405,186 @@ export function UsageCostTab({
               </tbody>
             </table>
           </div>
+          
+          {events?.pagination && events.pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-[var(--theme-border)] px-4 py-3">
+              <span className="text-sm font-medium text-[var(--theme-text-muted)]">
+                Trang {events.pagination.page} / {events.pagination.totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={events.pagination.page <= 1 || isLoading}
+                  onClick={() => onEventsPageChange(events.pagination.page - 1)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] disabled:opacity-50 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={events.pagination.page >= events.pagination.totalPages || isLoading}
+                  onClick={() => onEventsPageChange(events.pagination.page + 1)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)] disabled:opacity-50 transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
+
+      {selectedEvent && (
+        <EditorDialogShell
+          ariaLabel="Chi tiết lượt sử dụng"
+          isOpen
+          onClose={() => setSelectedEvent(null)}
+          panelClassName="max-w-3xl"
+        >
+          <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 py-3 pr-16 sm:px-5">
+            <h2 className="truncate text-lg font-extrabold text-[var(--theme-text-strong)]">
+              Chi tiết chi phí
+            </h2>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-[var(--theme-text-muted)]">Dịch vụ</p>
+                <p className="font-extrabold text-[var(--theme-text-strong)]">
+                  {selectedEvent.catalogItem?.displayName ?? selectedEvent.provider}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--theme-text-muted)] mb-2">Công thức tính chi phí</p>
+                <div className="rounded-lg border border-[var(--theme-border)] overflow-x-auto">
+                  <table className="min-w-[500px] w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-[var(--theme-surface-soft)] text-xs text-[var(--theme-text-muted)] uppercase">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Hạng mục</th>
+                        <th className="px-4 py-3 font-semibold text-right">Số lượng</th>
+                        <th className="px-4 py-3 font-semibold text-right">Đơn giá</th>
+                        <th className="px-4 py-3 font-semibold text-right">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--theme-border)] bg-[var(--theme-surface)]">
+                      {selectedEvent.category === "OCR_SERVICE" ? (
+                        <tr>
+                          <td className="px-4 py-3 text-[var(--theme-text-strong)]">Số trang</td>
+                          <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">{new Intl.NumberFormat("vi-VN").format(selectedEvent.pages ?? 0)}</td>
+                          <td className="px-4 py-3 text-right text-[var(--theme-text-muted)]">
+                            {selectedEvent.priceVersion?.rates?.find(r => r.metric === "PAGE") ? `$${selectedEvent.priceVersion.rates.find(r => r.metric === "PAGE")?.unitPriceUsd} / ${new Intl.NumberFormat("vi-VN").format(selectedEvent.priceVersion.rates.find(r => r.metric === "PAGE")?.unitSize ?? 1)}` : "-"}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
+                            ${((selectedEvent.pages ?? 0) * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "PAGE")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "PAGE")?.unitSize ?? 1)).toFixed(6)}
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const cachedTokens = Math.max(0, selectedEvent.cachedInputTokens ?? 0);
+                        const uncachedPromptTokens = Math.max(0, (selectedEvent.promptTokens ?? 0) - cachedTokens);
+                        return (
+                        <>
+                          <tr>
+                            <td className="px-4 py-3 text-[var(--theme-text-strong)]">Uncached Prompt Tokens</td>
+                            <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">{new Intl.NumberFormat("vi-VN").format(uncachedPromptTokens)}</td>
+                            <td className="px-4 py-3 text-right text-[var(--theme-text-muted)]">
+                              {selectedEvent.priceVersion?.rates?.find(r => r.metric === "INPUT_TOKEN") ? `$${selectedEvent.priceVersion.rates.find(r => r.metric === "INPUT_TOKEN")?.unitPriceUsd} / ${new Intl.NumberFormat("vi-VN").format(selectedEvent.priceVersion.rates.find(r => r.metric === "INPUT_TOKEN")?.unitSize ?? 1)}` : "-"}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
+                              ${(uncachedPromptTokens * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "INPUT_TOKEN")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "INPUT_TOKEN")?.unitSize ?? 1)).toFixed(6)}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 text-[var(--theme-text-strong)]">Cached Tokens</td>
+                            <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">{new Intl.NumberFormat("vi-VN").format(cachedTokens)}</td>
+                            <td className="px-4 py-3 text-right text-[var(--theme-text-muted)]">
+                              {selectedEvent.priceVersion?.rates?.find(r => r.metric === "CACHED_INPUT_TOKEN") ? `$${selectedEvent.priceVersion.rates.find(r => r.metric === "CACHED_INPUT_TOKEN")?.unitPriceUsd} / ${new Intl.NumberFormat("vi-VN").format(selectedEvent.priceVersion.rates.find(r => r.metric === "CACHED_INPUT_TOKEN")?.unitSize ?? 1)}` : "-"}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
+                              ${(cachedTokens * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "CACHED_INPUT_TOKEN")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "CACHED_INPUT_TOKEN")?.unitSize ?? 1)).toFixed(6)}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-3 text-[var(--theme-text-strong)]">Completion Tokens</td>
+                            <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">{new Intl.NumberFormat("vi-VN").format(selectedEvent.completionTokens ?? 0)}</td>
+                            <td className="px-4 py-3 text-right text-[var(--theme-text-muted)]">
+                              {selectedEvent.priceVersion?.rates?.find(r => r.metric === "OUTPUT_TOKEN") ? `$${selectedEvent.priceVersion.rates.find(r => r.metric === "OUTPUT_TOKEN")?.unitPriceUsd} / ${new Intl.NumberFormat("vi-VN").format(selectedEvent.priceVersion.rates.find(r => r.metric === "OUTPUT_TOKEN")?.unitSize ?? 1)}` : "-"}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
+                              ${((selectedEvent.completionTokens ?? 0) * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "OUTPUT_TOKEN")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "OUTPUT_TOKEN")?.unitSize ?? 1)).toFixed(6)}
+                            </td>
+                          </tr>
+                          <tr className="bg-[var(--theme-surface-soft)]">
+                            <td className="px-4 py-3 font-bold text-[var(--theme-text-strong)]">Tổng Token</td>
+                            <td className="px-4 py-3 font-bold text-right text-[var(--theme-text-strong)]">{new Intl.NumberFormat("vi-VN").format(selectedEvent.totalTokens ?? 0)}</td>
+                            <td className="px-4 py-3 text-right text-[var(--theme-text-muted)]"></td>
+                            <td className="px-4 py-3 font-bold text-right text-[var(--theme-text-strong)]">
+                              {(() => {
+                                const pRateUsd = (uncachedPromptTokens * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "INPUT_TOKEN")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "INPUT_TOKEN")?.unitSize ?? 1));
+                                const cRateUsd = (cachedTokens * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "CACHED_INPUT_TOKEN")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "CACHED_INPUT_TOKEN")?.unitSize ?? 1));
+                                const oRateUsd = ((selectedEvent.completionTokens ?? 0) * (selectedEvent.priceVersion?.rates?.find(r => r.metric === "OUTPUT_TOKEN")?.unitPriceUsd ?? 0) / (selectedEvent.priceVersion?.rates?.find(r => r.metric === "OUTPUT_TOKEN")?.unitSize ?? 1));
+                                
+                                return (
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <div className="text-xs font-normal text-[var(--theme-text-muted)] tracking-tight">
+                                      = ${pRateUsd.toFixed(6)} + ${cRateUsd.toFixed(6)} + ${oRateUsd.toFixed(6)}
+                                    </div>
+                                    <div className="text-base text-[var(--theme-primary)] mt-0.5">
+                                      ${selectedEvent.estimatedCostUsd?.toFixed(6) ?? "0.000000"}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        </>
+                        );
+                      })()}
+                      {selectedEvent.category === "OCR_SERVICE" && (
+                        <tr className="bg-[var(--theme-surface-soft)]">
+                          <td colSpan={3} className="px-4 py-3 font-bold text-[var(--theme-text-strong)] text-right">Chi phí ước tính (USD)</td>
+                          <td className="px-4 py-3 font-bold text-right text-[var(--theme-text-strong)]">
+                            ${selectedEvent.estimatedCostUsd?.toFixed(6) ?? "0.000000"}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 rounded-lg bg-[var(--theme-surface-soft)] p-4 border border-[var(--theme-border)] text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--theme-text-muted)] font-medium">Chi phí ước tính (USD):</span>
+                    <span className="font-semibold text-[var(--theme-text-strong)]">${selectedEvent.estimatedCostUsd?.toFixed(6) ?? "0.000000"}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--theme-text-muted)] font-medium">Tỷ giá (VNĐ/USD):</span>
+                    <span className="font-semibold text-[var(--theme-text-strong)]">{new Intl.NumberFormat("vi-VN").format(selectedEvent.fxRateVndPerUsd ?? 25000)} VNĐ / 1 USD</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-[var(--theme-border)] text-[var(--theme-primary)]">
+                    <span className="font-bold">Tổng chi phí (VNĐ):</span>
+                    <span className="font-extrabold text-lg">{formatVnd(selectedEvent.costVnd ?? 0)}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--theme-text-muted)] mb-2">Dữ liệu trả về từ AI (raw usage)</p>
+                <pre className="text-xs font-mono bg-[var(--theme-surface-soft)] p-4 rounded-lg overflow-auto max-h-96 border border-[var(--theme-border)]">
+                  {selectedEvent.rawUsageJson ? JSON.stringify(selectedEvent.rawUsageJson, null, 2) : "Không có dữ liệu"}
+                </pre>
+              </div>
+            </div>
+          </div>
+          <footer className="theme-dialog-footer flex shrink-0 justify-end p-3 sm:p-4">
+            <button
+              type="button"
+              onClick={() => setSelectedEvent(null)}
+              className="theme-button-primary min-h-11 rounded-lg px-6 font-extrabold"
+            >
+              Đóng
+            </button>
+          </footer>
+        </EditorDialogShell>
+      )}
     </div>
   );
 }

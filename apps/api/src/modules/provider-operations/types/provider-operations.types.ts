@@ -33,6 +33,7 @@ export type AiFeatureRoute = {
   reasoningEffort: string | null;
   maxOutputTokens: number | null;
   candidates: ProviderRouteCandidate[];
+  hasConfiguration: boolean;
 };
 
 export type ProviderUsageAmounts = {
