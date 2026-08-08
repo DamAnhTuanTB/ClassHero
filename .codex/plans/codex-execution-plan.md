@@ -147,6 +147,10 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 39. `M5.4` - Hybrid search cho công thức/ký hiệu.
 40. `M9.1` - AiModule structured output foundation.
 41. `M9.2` - Admin generate lesson summary.
+    41.1. Hardening pending: khóa đúng một section cuối `Bài tập vận dụng`, đúng
+    hai bài lấy từ source của lesson; block theory-example phải đi theo cặp xen kẽ,
+    không nhúng ví dụ vào content lý thuyết và không trộn lesson `Luyện tập chung`/
+    `Bài tập cuối chương`.
 42. `M9.3` - Admin generate quiz/flashcard/test.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
     43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.

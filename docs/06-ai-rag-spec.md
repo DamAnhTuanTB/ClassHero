@@ -529,6 +529,96 @@ Output schema:
 
 Backend chuyển output sang `lesson_summaries.content_json` tương thích Tiptap nếu cần.
 
+#### 5.1.1. Cấu trúc phần bài tập của bản kiến thức
+
+Phạm vi nguồn là invariant của lesson:
+
+- Một lần sinh kiến thức cho `Bài N` chỉ dùng document chunks thuộc page range
+  hoặc tài liệu đã gán cho chính `Bài N`.
+- `Luyện tập chung` và `Bài tập cuối chương` được quản lý như các lesson riêng;
+  chúng không thuộc context của `Bài N` và không được dùng để sinh section cho
+  `Bài N`.
+- Các nhãn `Ví dụ`, `Luyện tập`, `Vận dụng` và `BÀI TẬP` nằm bên trong page range
+  của `Bài N` là nguồn ứng viên, không phải yêu cầu giữ nguyên thành các section
+  bài tập độc lập trong output.
+
+Output phải giữ các invariant sau:
+
+- Toàn bộ summary chỉ có đúng một section dành cho bài tập. Section này đứng cuối
+  mảng `sections` và có `displayHeading` chính xác là `Bài tập vận dụng`.
+- Section `Bài tập vận dụng` có đúng hai block `example`, theo đúng thứ tự:
+  1. Một bài tập thông thường, dùng trực tiếp kiến thức/kĩ năng của lesson.
+  2. Một bài toán vận dụng thực tế có ngữ cảnh đời sống hoặc dữ liệu thực tế.
+- Cả hai bài phải có đề bài trong chunks của lesson hiện tại. Model được phép tự
+  suy luận lời giải nếu nguồn chưa có lời giải, nhưng không được đổi đề, thêm giả
+  thiết, thay số liệu hoặc tự sáng tác bài mới.
+- Mỗi block phải dẫn `sourceChunkIds` thuộc đúng tập chunk IDs đã gửi vào request.
+  Section cuối không được lặp lại bài đã xuất hiện ở nơi khác trong summary.
+- Section lý thuyết được phép và bắt buộc có block `example` minh họa riêng. Mỗi
+  block cốt lõi `knowledge`, `theorem`, `property` hoặc `procedure` phải ghép với
+  đúng một `example` nguồn nằm liền sau nó khi hiển thị. Không được gom nhiều block
+  lý thuyết liên tiếp rồi mới gom nhiều example liên tiếp.
+- `knowledge`, `theorem`, `property` và `procedure` không được nhúng đề bài, lời
+  giải, phép tính minh họa hoặc đoạn mở đầu bằng các nhãn như `Ví dụ`, `Chẳng hạn`,
+  `Luyện tập`, `Vận dụng`, `Bài tập` vào field lý thuyết; nội dung đó phải được bóc
+  thành block `example` riêng.
+- `note` là ngoại lệ có chủ đích: mỗi `note.content` phải trình bày một ghi chú,
+  lưu ý hoặc nhận xét từ nguồn và kèm một ví dụ ngắn ngay trong cùng `content`;
+  không tạo block `example` riêng chỉ để minh họa cho note.
+- Nếu số ví dụ nguồn ít hơn số ý lý thuyết có thể tách, model phải gom các ý liên
+  quan thành một block cốt lõi có cùng một ví dụ phù hợp; không được tạo block cốt
+  lõi không có example và không được tự sáng tác example để đủ cặp.
+- Heading bài tập từ nguồn phải được hấp thụ vào section cuối; không được tạo thêm
+  section như `Bài tập`, `Luyện tập`, `Luyện tập chung`, `Bài tập củng cố`,
+  `Vận dụng` hoặc biến thể tương đương.
+- Đây là structural invariant, không chỉ là lời nhắc trong prompt. Backend phải
+  validate sau structured output và reject trước persistence nếu model vi phạm.
+
+Theo đặc điểm bộ tài liệu Toán của dự án, page range của mỗi lesson sinh kiến thức
+luôn có cả bài tập thông thường và bài toán vận dụng thực tế, nên output hợp lệ
+phải có đủ đúng hai block nêu trên; không có nhánh tự bịa bài để bù dữ liệu thiếu.
+
+Generation contract nên khóa cấu trúc trước khi trải phẳng sang schema lưu trữ:
+
+- Provider output dùng `theorySections[].units[]`, trong đó mỗi unit có đúng
+  `theory`, `illustration` và `notes`; `illustration.exampleKind` luôn là
+  `ILLUSTRATION`.
+- Provider output có field bắt buộc riêng `applicationExercises`, gồm đúng
+  `standardExercise` với `exampleKind=STANDARD_EXERCISE` và
+  `realWorldExercise` với `exampleKind=REAL_WORLD_EXERCISE`. Không biểu diễn phần
+  này như một phần tử tùy chọn trong mảng section chung vì JSON Schema không khóa
+  được “phần tử cuối bắt buộc thuộc loại X” với số section lý thuyết thay đổi.
+- Backend mapper trải mỗi unit thành `[theory, illustration, ...notes]`, sau đó nối
+  section `Bài tập vận dụng` vào cuối `sections`. API/persistence có thể tiếp tục
+  dùng shape section/block hiện tại sau bước mapping.
+- Semantic validator phải kiểm tra source ID subset, thứ tự liên tục, đúng cặp,
+  heading bài tập duy nhất, hai loại bài đúng thứ tự, không trùng đề và marker ví
+  dụ trong field của `knowledge`/`theorem`/`property`/`procedure`. Với `note`,
+  validator làm chiều ngược lại: yêu cầu có ghi chú và một ví dụ ngắn trong
+  `content`. Output sai phải được retry có feedback giới hạn; vẫn sai thì fail job,
+  không lưu bản gần đúng.
+- Để giữ nguyên đề bài, context chuẩn hóa nên cung cấp danh sách
+  `exerciseCandidates` có stable ID, loại ứng viên và nguyên văn đề. Model chỉ chọn
+  candidate ID và sinh lời giải; backend lấy `problem` nguyên văn từ candidate,
+  không tin chuỗi đề bài model viết lại.
+- `lessonId` canonical do backend gắn sau generation; không yêu cầu model đoán và
+  trả về lesson ID.
+
+Prompt/input contract:
+
+- System prompt nền và các invariant trên là bắt buộc, không được để custom system
+  prompt của admin thay thế toàn bộ. Custom instruction chỉ được nối như preference
+  bổ sung và không có quyền ghi đè invariant.
+- User prompt sinh tự động luôn được giữ lại; custom user prompt chỉ append vào
+  phần yêu cầu bổ sung thay vì thay thế task contract.
+- Context phải được serialize bằng JSON hoặc cơ chế escaping tương đương; không
+  chèn raw chunk content vào delimiter XML có thể bị đóng thẻ bởi nội dung nguồn.
+- Prompt phải phân biệt rõ `ILLUSTRATION` trong section lý thuyết với hai exercise
+  của section cuối và yêu cầu self-check trước structured output.
+- Ngân sách output mặc định `2_000` token là thấp cho lesson chi tiết có nhiều cặp
+  block. Route summary nên cấp ít nhất khoảng `6_000` token hoặc tính động theo
+  `targetWordCount`, vẫn giữ hard cap và budget reservation hiện có.
+
 Summary context rules:
 
 - `documentIds` là các `lesson_documents.id` active, `READY`, thuộc đúng
