@@ -1,3 +1,4 @@
+import { LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS } from "@learning-path/shared";
 import { z } from "zod";
 
 const generationTypeSchema = z.enum(["SUMMARY", "QUIZ", "FLASHCARD", "TEST"]);
@@ -53,7 +54,10 @@ export const adminAiGenerationFormSchema = z
     systemInstructions: z
       .string()
       .trim()
-      .max(12_000, "System instructions tối đa 12.000 ký tự"),
+      .max(
+        LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
+        "System instructions tối đa 64.000 ký tự",
+      ),
     userPrompt: z.string().trim().max(16_000, "User prompt tối đa 16.000 ký tự"),
     summaryModel: z.string().max(200),
     summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),

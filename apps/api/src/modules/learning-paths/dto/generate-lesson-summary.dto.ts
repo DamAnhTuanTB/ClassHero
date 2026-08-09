@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS } from "@learning-path/shared";
 import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
   IsArray,
-  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -68,10 +68,12 @@ export class GenerateLessonSummaryDto {
   @MaxLength(2_000)
   extraInstructions?: string;
 
-  @ApiPropertyOptional({ maxLength: 12_000 })
+  @ApiPropertyOptional({
+    maxLength: LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
+  })
   @IsOptional()
   @IsString()
-  @MaxLength(12_000)
+  @MaxLength(LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS)
   systemInstructions?: string;
 
   @ApiPropertyOptional({ maxLength: 16_000 })

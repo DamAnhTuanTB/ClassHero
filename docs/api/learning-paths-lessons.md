@@ -697,7 +697,9 @@ Rules:
 - `styleInstructions` là nội dung trình bày tự do. `systemInstructions` và
   `userPrompt` cho phép admin
   sửa prompt của lần chạy, nhưng context chunks vẫn do server tải và ghép sau
-  user prompt, không nhận raw context từ client.
+  user prompt, không nhận raw context từ client. `systemInstructions` cho phép
+  tối đa `64.000` ký tự để nhận lại prompt hiệu lực từ preview; `userPrompt` tối
+  đa `16.000` ký tự.
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
   tiêu gần đúng và được kết hợp với `length` khi dựng user prompt.
 - `temperature` giới hạn `0..1`, `reasoningEffort` nhận `low | medium | high`,

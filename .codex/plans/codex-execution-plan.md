@@ -159,6 +159,23 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     heading lớn exact/OCR-repair có audit, example có provenance, không dùng
     ảnh OCR và dùng safe `diagramSpec`; generation persist summary version 2
     nhưng renderer tiếp tục đọc version 1.
+    41.3. Coverage hardening Toán 3-9 được lập kế hoạch tại
+    `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`: kiểm kê 100% dạng hình,
+    cam kết mức đơn giản/trung bình/khó, dùng semantic `diagramIntent` →
+    deterministic compiler/validator/layout → `diagramSpec` v2. Ngưỡng coverage
+    tối thiểu 90%, mục tiêu >=95%, không lấy số screenshot làm mẫu số. Owner chốt
+    triển khai toàn bộ scope trong một delivery wave M9.2 với các workstream đồng
+    thời và một release gate chung, không tách thành các lần release theo family.
+    Live matrix dự kiến 65 request chính + tối đa 15 retry `gpt-5.4`, hard cap
+    320.000 VNĐ. Trong đó có 21 full lesson: lớp 3-9 × ba mức khó; mỗi output bắt
+    buộc chụp 4 viewport × 2 theme, full lesson chụp từng block hình, tự review và
+    sửa bằng cache trước khi cân nhắc paid retry.
+    Paid test chạy Gate A 44 ví dụ lẻ trước (cap 125.000 VNĐ); chỉ khi toàn bộ
+    semantic/visual/regression pass mới chạy Gate B 21 full lesson (phần cap còn
+    lại tối đa 195.000 VNĐ).
+    Mỗi screenshot PASS phải có reference ID SGK/SBT/SGV/tài liệu NXBGDVN; full
+    lesson đối chiếu đúng trang/bài. Ảnh đạt chuẩn cũ chỉ được dùng làm golden sau
+    khi tái kiểm chứng nguồn và vào `reference-golden-manifest.json`.
 42. `M9.3` - Admin generate quiz/flashcard/test.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
     43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.

@@ -634,7 +634,9 @@ Summary context rules:
   chỉ vì câu lý thuyết dùng từ thông thường như “vận dụng các tính chất” hoặc
   “khi giải bài tập”.
 - Admin được sửa System instructions và User prompt theo lần chạy; các field đều
-  có giới hạn độ dài và được đưa vào input fingerprint/job metadata. Context
+  có giới hạn độ dài và được đưa vào input fingerprint/job metadata. System
+  instructions cho phép tối đa `64.000` ký tự vì field này còn chứa prompt hiệu
+  lực do preview trả về; user prompt cho phép tối đa `16.000` ký tự. Context
   chunks vẫn do server ghép sau user prompt và được đánh dấu là dữ liệu tham
   khảo không đáng tin cậy, không phải instruction.
 - Route snapshot của job giữ model được chọn, temperature và max output tokens
@@ -683,7 +685,105 @@ nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
   nhận raw SVG/URL/script và không gọi image-generation provider. `toScale=true`
   là bắt buộc; tọa độ phải đúng tỉ lệ dữ kiện và marker hình học phải khớp
   quan hệ thực. Tia/đường/đoạn dùng đúng `RAY`/`LINE`/`SEGMENT`; đồ thị cong dùng
-  `POLYLINE` qua các điểm đúng tỉ lệ; `POLYGON` chỉ dành cho hình kín.
+  `POLYLINE` qua các điểm đúng tỉ lệ; `POLYGON` chỉ dành cho hình kín. `viewBox`
+  phải chứa toàn bộ hình và chừa biên cho điểm/nhãn; text trong SVG là text thuần,
+  không dùng `$...$` hoặc lệnh LaTeX. Mapper chuẩn hóa spec trước khi lưu và
+  renderer tiếp tục auto-fit để dữ liệu cũ không bị cắt hình. Point label chỉ
+  được chứa tên một điểm; ID điểm/primitive và nhãn điểm phải duy nhất. Polyline
+  hai điểm được chuẩn hóa thành segment, primitive tròn suy biến bị loại. Renderer
+  vẽ marker góc theo đúng hai arm, neo nhãn bắt đầu bằng tên đoạn vào trung điểm
+  đoạn và căn text theo hướng nhãn để giảm chồng chữ. Contract gửi provider dùng
+  các mảng primitive/marker theo từng loại (`segments`, `arcs`, `rightAngles`,
+  `equalLengths`,...) rồi mapper mới flatten về schema lưu trữ; cách này tránh
+  `anyOf` rộng khiến model chọn circle/polygon thay cho cạnh tam giác. Với ARC,
+  góc theo hệ Descartes (`0°` sang phải, `90°` lên trên), vẽ theo chiều góc tăng
+  dương; auto-fit chỉ tính phần cung thật sự hiển thị, không lấy cả đường tròn.
+  Khi SVG dùng `vector-effect=non-scaling-stroke`, độ dày nét phải là pixel cố
+  định (khoảng `1.75–2px`), không nhân với viewBox; kích thước dấu góc/đoạn phải
+  chặn theo độ dài cạnh cục bộ để hình nhiều cụm không sinh marker quá lớn hoặc
+  nét gần như biến mất.
+- Point trong schema vừa có thể là đỉnh thật, vừa có thể chỉ là điểm điều khiển
+  polyline hoặc neo text. Vì vậy renderer không được vẽ chấm cho mọi point. Field
+  `pointStyle` mặc định `NONE`; dùng `NONE` cho đỉnh tam giác/tứ giác và mọi điểm
+  điều khiển của đồ thị, bảng, biểu đồ; `FILLED`/`OPEN` chỉ cho điểm độc lập hoặc
+  đầu mút đóng/mở cần phân biệt. Ngoại lệ bắt buộc là tâm `CIRCLE` có tên như
+  `O`, `I`: phải có dấu tâm nhỏ; renderer tự phục hồi dấu này cho dữ liệu cũ dù
+  `pointStyle=NONE`. Điểm hiển thị phải nhỏ, còn mọi nhãn điểm đặt sát phía ngoài
+  giao điểm các cạnh hoặc sát dấu tâm, nhưng vẫn tự đổi hướng để không đè nét.
+- Quy ước hình Toán lớp 3–9 phải bám cách trình bày của SGK: độ dài cạnh ghi gọn
+  như `3 cm` sát cạnh tương ứng, không ghi lại `AB = 3 cm`; hai đoạn bằng nhau
+  dùng cùng số tick `EQUAL_LENGTH`; tên góc không lặp lại khi tên đỉnh đã đủ,
+  chỉ hiện text góc khi có số đo. Nhãn bổ sung phải neo vào primitive mà nó mô tả.
+- Hệ trục tọa độ phải có `O`, nhãn `x`/`y`, mũi tên chỉ ở chiều dương, các vạch
+  chia đều và đủ nhãn số để đọc tỉ lệ; đồ thị hàm phải kéo qua cả miền âm khi dữ
+  kiện cần và dùng đủ điểm lấy mẫu để đường cong liên tục. Trên hình chỉ ghi tên
+  điểm ngắn như `A`, không ghép `A(3; -1)`; tọa độ được đọc bằng đường dóng nét
+  đứt và nhãn số trên hai trục. Trục số cũng chỉ có mũi tên
+  chiều dương; `O` là tên gốc và `0` là giá trị tại cùng một vạch, không phải hai
+  điểm khác nhau. Các SEGMENT ngắn làm vạch chia không được dùng trong marker
+  `EQUAL_LENGTH`/`PARALLEL`; renderer bỏ các marker hình học gắn nhầm này để vạch
+  chia không xuất hiện thêm nét màu đè lên trục. Chiều dài vạch phân độ được chặn
+  theo cạnh ngắn của viewBox (mục tiêu khoảng 2%, không quá 3%) để hình dài/hẹp
+  trên mobile không biến vạch chia thành cột nổi bật. Quy tắc này áp dụng cho cả
+  trục số, hệ tọa độ và trục của biểu đồ đường/cột.
+- Điểm dựng nhìn thấy và điểm lấy mẫu làm mượt là hai lớp khác nhau. Đường thẳng
+  phải hiện ít nhất hai điểm dựng có ý nghĩa bằng `FILLED`, ưu tiên giao trục hoặc
+  tọa độ đơn giản trong miền nhìn. Với parabol, provider phải tính đỉnh/trục đối
+  xứng rồi chọn bước x nhỏ nhất phù hợp vạch đơn vị để hiện đỉnh cùng ít nhất hai
+  cặp điểm đối xứng; ưu tiên nghiệm, giao trục và giao điểm của bài. POLYLINE vẫn
+  dùng tối thiểu 17 điểm đúng hàm, nhưng các điểm lấy mẫu phụ giữ `NONE`. Điểm
+  dựng không được chọn tùy ý: phải nằm đúng trên primitive đồ thị; parabol bắt
+  buộc gồm đỉnh và ít nhất hai cặp đối xứng, đường thẳng dùng hai điểm phân biệt
+  ưu tiên giao trục hoặc tọa độ nguyên dễ đọc. Contract sản phẩm cố ý nghiêm hơn
+  một số hình minh họa SGK: mọi điểm dựng phụ đang hiển thị trên mọi loại đồ thị
+  bắt buộc có marker tương phản và tên ngắn duy nhất (giữ tên nguồn trước rồi mới
+  dùng A/B/C... chưa dùng); chỉ điểm lấy mẫu kỹ thuật `NONE` không hiển thị mới
+  được không có tên. Các điểm dựng có tên
+  và đường dóng về Ox/Oy. Mọi điểm `FILLED` nằm trên Ox/Oy phải có nhãn số đúng
+  tọa độ trên trục. Nhãn số trên trục và tên điểm phải nằm gần đúng vạch/
+  dấu điểm; bộ né va chạm đổi hướng trước và chỉ tăng khoảng cách trong bán kính
+  nhỏ có giới hạn. Không tự phát minh marker `PARALLEL` dạng mũi tên khi nguồn không yêu
+  cầu và quan hệ đã được nêu trong đề.
+- Semantic audit của diagram phải kiểm cả phát biểu đi kèm hình, không chỉ tọa
+  độ/ID. Sơ đồ thanh so sánh phải giữ đúng tỉ lệ, cùng điểm đầu và tách rõ phần
+  hơn; nhãn toàn thanh không được nằm như thể thuộc một phần con. Lục giác đều có
+  sáu trục đối xứng; nếu hình chỉ vẽ AD, BE thì nội dung phải gọi đó là hai trong
+  sáu trục. Với tứ giác nội tiếp, hai góc đối bù nhau; chỉ kết luận hai góc nội
+  tiếp bằng nhau khi chúng thật sự cùng chắn một cung/cùng dây trong cấu hình phù
+  hợp. Không chồng thêm `ANGLE` cạnh `RIGHT_ANGLE` tại cùng đỉnh nếu góc thứ hai
+  không thiết yếu cho bài.
+- Provider number-line adapter được phép bổ sung các tick còn thiếu khi và chỉ
+  khi đã có LINE ngang, đúng một O, ít nhất hai nhãn số có anchor theo cùng ánh
+  xạ tuyến tính và đủ thông tin suy ra mẫu số. Adapter nội suy mọi vạch phân số
+  trung gian, không tự đoán lại vị trí nhãn, hướng trục hoặc quan hệ sai.
+- Bảng số liệu căn text vào tâm từng ô và giữ cỡ chữ đủ đọc trên mobile; không
+  thu chữ theo chiều rộng viewBox đến mức chữ trong ô nhỏ hơn text nội dung.
+  Đồng hồ có vạch chia trên đường tròn, một chấm tâm tại giao hai kim và tối thiểu
+  hiển thị rõ `12`, `3`, `6`, `9`. Nhãn `r`, `h`, tường, mặt đất hoặc
+  thang chỉ hợp lệ khi có đoạn biểu diễn tương ứng để neo nhãn; `U` của sơ đồ Venn
+  nằm trong hình chữ nhật nhưng không đè lên biên.
+- Mọi text phải tránh nét vẽ nhưng vẫn ở vùng trống gần nhất và đúng phía so với
+  đối tượng nó biểu diễn. Renderer dùng khoảng dịch có giới hạn: tên điểm chọn
+  hướng gần điểm có clearance tốt nhất; nhãn cạnh dịch vuông góc một khoảng nhỏ;
+  nhãn tập hợp nằm trong miền. Nhãn cạnh tính kích thước chữ theo text scale thích
+  ứng thay vì cạnh dài viewBox để hình nhiều cụm không đẩy số đo ra xa. Điểm dựng
+  đồ thị chỉ hiện tên sát chấm; renderer tự thêm đường dóng nét đứt tới Ox/Oy.
+- Sơ đồ thực tế/dựng hình phải giữ đúng vai trò ngữ nghĩa của từng điểm và đường:
+  ví dụ chân tường/chân thang nằm trên mặt đất, điểm chạm nằm trên tường và thang
+  là đoạn chéo; tâm/bán kính cung tròn phải đúng thao tác dựng. Prompt buộc model
+  đối chiếu từng point/primitive với đề trước khi trả output. JSON hợp cấu trúc
+  nhưng đặt sai vai trò hình học vẫn là lỗi biên tập và không được xem là hình đạt.
+- Đề bài chỉ chứa bản cuối sạch, không kể quá trình phát hiện/sửa kí hiệu. Lời giải
+  chứng minh hoặc dựng hình phải trình bày từng giả thiết, quan hệ và suy luận trên
+  dòng Markdown riêng theo văn phong toán học; không viết cả chứng minh thành một
+  đoạn văn nói liên tục. Mapper phục hồi các lệnh LaTeX thường bị JSON hiểu thành
+  control character và chuẩn hóa dấu gạch chéo lặp trước khi persist.
+- Provider diagram validation coi quan hệ hình học của marker là invariant kỹ
+  thuật, không chỉ là warning biên tập: `RIGHT_ANGLE` phải có tích vô hướng chuẩn
+  hóa không quá `2%`, các đoạn `EQUAL_LENGTH` phải có độ dài tọa độ lệch không quá
+  `2%`, và các đoạn `PARALLEL` phải có sai lệch hướng không quá `2%`. Output có
+  điểm vuông nằm trên cạnh huyền, tam giác suy biến hoặc marker mâu thuẫn tọa độ
+  không được persist dù JSON đúng cấu trúc.
 - Section cuối tiếp tục khóa literal `Bài tập vận dụng`, đúng hai bài theo thứ tự
   standard rồi real-world.
 - Generation mới lưu `lesson_summary_blocks.version=2`; parser/renderer
@@ -691,6 +791,54 @@ nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
 - Không persist/hiển thị warning kỹ thuật trong summary. JSON Schema/Zod/hạ tầng
   không hợp lệ vẫn là lỗi kỹ thuật; nội dung hợp lệ về cấu trúc được lưu để admin
   tự review và sửa, không thêm repair/judge provider call bắt buộc.
+
+#### 5.1.3. Coverage hình Toán 3-9: intent và deterministic compiler
+
+Lượt hardening tiếp theo của `M9.2` phải đo coverage trên inventory chính thống
+SGK/SBT Kết nối tri thức Toán 3-9. Inventory phân loại toàn bộ nội dung cần trực
+quan thành `family + archetype + semanticVariant + difficulty`; chỉ
+`SIMPLE|MEDIUM|HARD` nằm trong mẫu số triển khai hiện tại, còn `VERY_COMPLEX` phải
+được liệt kê riêng thay vì âm thầm bỏ qua. Mục tiêu supported coverage là `>=95%`,
+ngưỡng tối thiểu `90%`, stretch goal `98-100%`.
+
+Với các archetype đã hỗ trợ, provider không tự phát minh raw tọa độ làm nguồn sự
+thật chính. Provider trả `diagramIntent` hẹp gồm entity, vai trò, dữ kiện, quan hệ
+và annotation; backend chọn compiler/template versioned để tính tọa độ, miền nhìn,
+tick, điểm dựng và primitive. Semantic validator kiểm quan hệ theo family, sau đó
+label/layout solver đặt text ở vùng trống gần anchor trước khi adapter sinh
+`diagramSpec` v2 cho safe renderer hiện có. Raw `diagramSpec` chỉ là fallback có
+kiểm soát cho family chưa được compiler hỗ trợ và vẫn bắt buộc `NEEDS_REVIEW`.
+
+Compiler và validator phải chạy deterministic, không tạo provider call thứ hai.
+Coverage được nghiệm thu bằng unit/property test và golden render trên Chromium
+Mobile, WebKit Mobile, iPad, laptop ở light/dark; screenshot lặp viewport không
+được tính thành archetype mới. Kế hoạch, taxonomy, SLO và rollout đầy đủ nằm tại
+`.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
+
+Toàn bộ inventory, intent/compiler, các family engine, label/layout và test matrix
+được thực hiện trong một delivery wave `M9.2`. Các workstream được phát triển và
+tích hợp đồng thời nhưng chỉ có một release gate; không bật production từng family
+khi phần còn lại của scope đã cam kết chưa đạt coverage/quality gate.
+
+Live coverage matrix dùng `gpt-5.4`, hard cap kế hoạch `320.000 VNĐ` cho 65
+request chính và tối đa 15 retry có điều kiện. Ma trận gồm 21 full lesson, mỗi
+lớp 3-9 có một bài `SIMPLE`, `MEDIUM`, `HARD` và toàn tập phủ mỗi family ít nhất
+hai lần. Sau từng live output, hệ thống phải
+cache response/usage, render component thật, chụp Chromium Mobile, WebKit Mobile,
+iPad và laptop ở light/dark rồi review bằng mắt; full lesson chụp riêng mọi block
+hình. Lỗi compiler/validator/layout/renderer chỉ được sửa và re-render từ cache;
+paid retry dành riêng cho lỗi `PROVIDER_INTENT` và không được vượt pool/hard cap.
+Thứ tự paid test bắt buộc là Gate A gồm 44 ví dụ lẻ pass semantic/visual/regression
+trước, sau đó mới Gate B gồm 21 full lesson. Gate A cap 125.000 VNĐ; nếu chưa đạt
+thì không được tiêu phần ngân sách full lesson. Gate B dùng tối đa 195.000 VNĐ còn
+lại trong hard cap toàn wave 320.000 VNĐ.
+
+Manual visual decision phải tham chiếu SGK/SBT/SGV Kết nối tri thức hoặc tài liệu
+tập huấn NXBGDVN chính thức bằng `referenceId`; full lesson ưu tiên trang/figure
+chính xác, ví dụ mới dùng source cùng archetype. Ảnh đạt chuẩn cũ chỉ trở thành
+golden nội bộ sau source-backed re-audit và được ghi vào
+`reference-golden-manifest.json`. Semantic truth đứng trước pixel similarity;
+responsive adaptation được chấp nhận khi giữ nguyên quan hệ và có review note.
 
 ### 5.2. Quiz generation
 

@@ -81,6 +81,12 @@ trí. Chẳng hạn “vận dụng” có thể là nhãn `Vận dụng 1.` nh�
 lệ trong câu “vận dụng các tính chất”. Dù chỉ là warning, giảm false positive vẫn
 giúp admin tập trung vào vấn đề thật.
 
+Provider output và dữ liệu sau mapper là hai contract khác nhau nên phải được
+test độc lập. Ví dụ provider trả `diagramSpec`, mapper đổi thành `visual` để UI
+render; test chỉ parse output của provider sẽ không phát hiện schema lưu trữ quên
+field `visual`. Test hồi quy đúng phải chạy đủ chuỗi provider parse → mapper →
+persisted-output parse, đặc biệt với các field chỉ xuất hiện khi bài cần hình.
+
 ## Handler summary đầu tiên
 
 M9.2 là handler domain đầu tiên dùng nền M9.1. API chỉ nhận
@@ -96,8 +102,110 @@ model chủ động sửa lỗi OCR/chính tả của heading, còn example khô
 classification là dữ liệu hỗ trợ input, không phải metadata phải trả lại. Hình minh họa dùng shared
 `DIAGRAM_SPEC` đã validate và renderer SVG kiểm soát; không persist URL ảnh
 OCR, raw SVG hoặc câu kiểu `xem hình bên`. Contract buộc `toScale=true`; mapper
-kiểm point/viewBox và đối chiếu marker vuông góc, song song, bằng độ dài
-với tọa độ. Nếu không cần hình thì block không lưu field visual.
+kiểm point/viewBox, còn provider Zod gate đối chiếu marker vuông góc, song song,
+bằng độ dài với tọa độ trong sai số `2%`. Các quan hệ marker này là invariant kỹ
+thuật: nếu mâu thuẫn thì output bị reject trước persist, thay vì hạ thành warning
+và render một tam giác suy biến. Trước khi lưu, mapper còn mở rộng viewBox thiếu biên và đổi LaTeX
+trong nhãn SVG thành text thuần; renderer lặp lại bước auto-fit cho summary cũ.
+Nội dung toán cũng phải sửa các control character do JSON hiểu nhầm, chẳng hạn
+`\t` trong `\triangle`, trước khi đưa cho trình render công thức. Nếu không cần
+hình thì block không lưu field visual.
+
+Một `diagramSpec` parse được chưa có nghĩa là hình đúng. Schema chỉ nhìn thấy ID,
+tọa độ và reference; nó không tự hiểu `H` là chân tường hay `B` là điểm thang chạm
+tường. Vì vậy diagram cần ba hàng rào riêng: schema chặn cấu trúc mơ hồ như ID/nhãn
+trùng hoặc point label ghép; mapper chuẩn hóa primitive suy biến; prompt bắt model
+đối chiếu vai trò từng điểm với đề. Renderer cũng phải dùng hình học thật của
+marker/segment để đặt cung góc và text, không tin một tọa độ nhãn cố định từ model.
+
+Trước khi sinh realtime cả bài Hình học, chạy smoke test tiết kiệm bằng đúng một
+provider request chỉ trả hai example + `diagramSpec`, không retry và có output cap.
+Nếu model lặp primitive đến hết token thì dừng, không tăng token hoặc chạy cả bài.
+`superRefine` của Zod chỉ kiểm được sau khi JSON đã hoàn chỉnh; nó không nhất thiết
+biến thành ràng buộc mà provider tuân thủ trong JSON Schema, nên phải giới hạn độ
+phức tạp output ngay trong JSON Schema. Với `diagramSpec`, không nên gửi một mảng
+union `anyOf` cho mọi primitive: model có thể chọn nhánh CIRCLE/POLYGON hợp schema
+nhưng sai ý. Tách thành các mảng giới hạn nhỏ như `segments`, `arcs`, `circles`,
+`rightAngles`, `equalLengths`, rồi flatten về persisted union sau khi nhận output,
+giúp provider thấy rõ số cạnh và loại hình phải sinh mà không đổi format lưu cũ.
+Semantic audit vẫn phải kiểm tọa độ thật: marker bằng nhau không đủ nếu hai đoạn
+lệch độ dài; cung có đúng bán kính cũng chưa đủ nếu endpoint không chạm điểm cần dựng.
+
+Visual audit phải chụp chính component thật, không chỉ kiểm JSON/SVG node. Với
+`vector-effect="non-scaling-stroke"`, `strokeWidth` là độ dày hiển thị nên phải
+dùng giá trị pixel ổn định như `1.75–2`, không dùng `viewBox * 0.008` vì hình rộng
+có thể chỉ còn nét dưới một pixel. Dấu góc vuông, cung góc và tick cạnh bằng nhau
+nên lấy theo `min(tỉ lệ viewBox, tỉ lệ chiều dài hai arm/cạnh)` để tránh marker
+phình to khi một diagram chứa nhiều hình tách rời.
+
+Point trong structured diagram không đồng nghĩa với một chấm phải nhìn thấy. Nó
+có thể chỉ là nút điều khiển để dựng polyline, ô bảng, cột biểu đồ hoặc neo text.
+Nếu renderer vẽ mọi point, hình học sẽ thành sơ đồ nhiều nút đen và đồ thị cong
+sẽ lộ toàn bộ điểm lấy mẫu. Contract nên có quyết định `pointStyle` rõ ràng, mặc
+định `NONE` cho đỉnh hình học thường/điểm điều khiển; `FILLED`/`OPEN` chỉ dành cho
+điểm độc lập hoặc đầu mút đóng/mở có ý nghĩa. Tâm đường tròn có tên là ngoại lệ:
+nếu không có dấu tâm nhỏ thì chữ `O`/`I` không đủ chỉ ra tọa độ chính xác, nên
+renderer cần nhận diện quan hệ `CIRCLE.center` và phục hồi marker cho dữ liệu cũ.
+Nhãn đỉnh nên đặt sát giao của các cạnh; khoảng cách quá lớn làm người học khó
+ghép tên với đúng đỉnh.
+
+Điểm dựng của đồ thị là lớp semantic riêng: chấm phải đủ tương phản và phải được
+chọn theo quy tắc của đồ thị, không tùy ý. Parabol dùng đỉnh cùng các cặp đối xứng
+đúng hàm; đường thẳng dùng hai điểm phân biệt dễ đọc. Mỗi điểm dựng có tên duy nhất
+(giữ tên nguồn trước, rồi dùng tên phụ chưa trùng), nhưng trên hình chỉ hiện tên
+ngắn; tọa độ được đọc qua đường dóng nét đứt và nhãn trục. Nhãn số/tên điểm phải
+tìm vùng trống trong một bán kính nhỏ quanh mục tiêu; đổi
+hướng trước khi tăng khoảng cách và đặt trần dịch chuyển để chữ không trôi xa vạch.
+
+Schema pass cũng không thay thế visual pass. Trước khi chấp nhận một lô diagram,
+render đúng component của app ở cả theme cần kiểm, chụp riêng từng figure rồi xem
+bằng mắt. Kiểm ít nhất: nhãn có đè/cách xa đối tượng không; outline text SVG có
+phình theo viewBox không; trục có mũi tên dương, `O`, tick và đơn vị không; đường
+cong có liên tục/đúng miền không; bảng có căn giữa không; ký hiệu độ dài/góc có
+gọn và đúng quy ước SGK không. Tách ảnh đạt và ảnh lỗi thành hai thư mục độc lập
+để một ảnh chưa duyệt không bị hiểu nhầm là mẫu chuẩn.
+
+Visual pass cũng chưa đủ nếu chỉ đo bounding box. Hình có thể sạch va chạm nhưng
+vẫn dạy sai: nhãn 25 nằm trong phần bằng 15 của sơ đồ thanh; lục giác đều bị gọi
+là có hai trục đối xứng; hai góc đối của tứ giác nội tiếp bị gọi là cùng chắn một
+cung. Vì vậy fixture hồi quy phải khóa cả `problem`/`caption` lẫn primitive và
+marker. Khi chụp locator, cần ẩn mọi node không phải target hoặc ancestor/descendant
+của target; chỉ ẩn `fixed`/`sticky` không đủ để ngăn control tuyệt đối lọt vào mép
+ảnh trên mobile.
+
+Tránh chồng chữ không nên sửa bằng offset cố định theo tám hướng cho mọi loại
+nhãn. Nhãn điểm cần chọn vùng clearance lớn nhất trong bán kính nhỏ quanh đỉnh;
+nhãn độ dài/r/h cần lấy pháp tuyến của segment neo; nhãn miền tròn nên dịch vào
+phía trong miền; marker song song cần tìm vị trí trên đoạn đủ xa vertex của cung
+góc. Các offset đều phải có trần theo diagram scale để text vẫn sát đối tượng.
+
+Một semantic repair có thể an toàn hơn retry provider nếu dữ kiện đã đủ và phép
+sửa là tất định. Với trục số, khi model đã cho trục ngang, O và ít nhất hai nhãn
+số đúng một ánh xạ tuyến tính, adapter có thể suy ra hoành độ các tick theo mẫu
+số và thêm segment ngắn. Không repair nếu thiếu ánh xạ, slope không dương, vượt
+giới hạn primitive/point hoặc O không cùng mốc 0; các trường hợp đó phải fail.
+Các segment tick chỉ mang nghĩa phân độ: nếu provider đưa chúng vào
+`EQUAL_LENGTH`/`PARALLEL`, renderer phải bỏ marker đó thay vì vẽ thêm nét màu đè
+lên trục. Ngoài semantic, tick còn cần giới hạn chiều dài theo cạnh ngắn viewBox
+(mục tiêu khoảng 2%, không quá 3%) và nhận diện cả trục biểu đồ dựng bằng
+`SEGMENT`; nếu chỉ nhận `LINE` hoặc lấy một số tọa độ quá lớn, hình dài/hẹp sẽ
+phóng vạch nhỏ thành cột lớn trên mobile. Bảng rộng cũng cần font floor riêng,
+không thể chỉ suy cỡ chữ từ chiều ngắn viewBox vì nội dung ô sẽ trở nên khó đọc.
+
+Điểm điều khiển đồ thị cũng cần phân loại theo mục đích. Đồ thị đường thẳng trong
+bài “vẽ đồ thị” nên hiện ít nhất hai điểm dựng để học sinh thấy thao tác xác định
+đường; điểm chỉ dùng lấy mẫu đường cong vẫn phải ẩn. Tương tự, marker song song
+không phải trang trí bắt buộc: chỉ sinh khi nguồn thực sự yêu cầu đánh dấu, tránh
+dấu hình mũi tên cạnh tranh với ngữ nghĩa hướng của tia/trục.
+
+Khoảng cách nhãn cạnh phải dùng cùng text scale thích ứng với renderer. Dùng cạnh
+dài nhất của viewBox để ước lượng khung chữ sẽ đẩy `3 cm`, `4 cm`, `r`, `h` quá xa
+trong hình rộng hoặc hình chứa nhiều cụm dù chữ thực tế đã được co nhỏ.
+
+Một lỗi renderer khó thấy là dùng `strokeWidth` text theo đơn vị tuyệt đối trong
+viewBox trong khi hình co giãn. Outline vài đơn vị có thể trở thành mảng trắng/đen
+che cả nhãn và cạnh. Độ dày outline phải tỉ lệ theo `diagramScale` hoặc được kiểm
+soát bằng một cơ chế pixel ổn định, sau đó xác nhận lại trên screenshot thật.
 
 ## File quan trọng
 

@@ -214,6 +214,10 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(dialog.getByLabel("User prompt")).toHaveValue(/"targetWordCount":350/);
     expect(mock.promptPreviewPayloads.at(-1)).not.toHaveProperty("userPrompt");
 
+    const resolvedSystemPrompt = `SYSTEM PROMPT THỰC TẾ\n${"S".repeat(15_501)}`;
+    await dialog.getByRole("tab", { name: "System instructions" }).click();
+    await dialog.getByLabel("System instructions").fill(resolvedSystemPrompt);
+    await expect(dialog.getByText(/System instructions tối đa/u)).toHaveCount(0);
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
       .poll(() => mock.payloads.SUMMARY)
@@ -225,7 +229,7 @@ test.describe("M9.8 admin AI generation panel", () => {
         length: "detailed",
         targetWordCount: 350,
         extraInstructions: "Dùng tiêu đề ngắn",
-        systemInstructions: "SYSTEM PROMPT THỰC TẾ\nSYSTEM CUSTOM",
+        systemInstructions: resolvedSystemPrompt,
         userPrompt: expect.stringContaining('"targetWordCount":350'),
         model: "gpt-4.1-mini",
         temperature: 0.1,
@@ -283,11 +287,26 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       page.getByText("Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ."),
     ).toBeVisible();
-    await expect(
-      page.getByRole("img", {
-        name: "Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ.",
-      }),
-    ).toBeVisible();
+    const diagram = page.getByRole("img", {
+      name: "Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ.",
+    });
+    await expect(diagram).toBeVisible();
+    const renderedViewBox = (await diagram.getAttribute("viewBox"))
+      ?.split(/\s+/u)
+      .map(Number);
+    expect(renderedViewBox).toHaveLength(4);
+    expect((renderedViewBox?.[0] ?? 0) + (renderedViewBox?.[2] ?? 0)).toBeGreaterThan(8);
+    await expect(diagram.locator("line").first()).toHaveAttribute("stroke-width", "1.75");
+    await expect(diagram.locator("circle")).toHaveCount(0);
+    await expect(diagram.locator("polyline").first()).toHaveAttribute(
+      "stroke-width",
+      "2",
+    );
+    await expect(diagram).toContainText("∠B");
+    await expect(diagram).not.toContainText("$\\angle B$");
+    const segmentLabel = diagram.getByText("AC = 7 cm");
+    await expect(segmentLabel).toHaveAttribute("text-anchor", "middle");
+    expect(Number(await segmentLabel.getAttribute("x"))).toBeCloseTo(4.5);
     await expect(page.getByText("Heading OCR gốc: 1 CỌNG HAI SỐ")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("button", { name: "Duyệt tóm tắt" })).toHaveCount(0);
@@ -426,8 +445,8 @@ async function setupAiGenerationMock(
         : "SYSTEM PROMPT THỰC TẾ";
       return fulfillJson(route, 200, {
         data: {
-          promptVersion: "lesson-summary-prompt-v33",
-          schemaVersion: "lesson-summary-schema-v25",
+          promptVersion: "lesson-summary-prompt-v40",
+          schemaVersion: "lesson-summary-schema-v32",
           systemPrompt,
           userPrompt: `USER PROMPT ${JSON.stringify(body)}`,
           inputPrompt: `USER PROMPT ${JSON.stringify(
@@ -676,7 +695,7 @@ function materialize(
                     spec: {
                       version: 1,
                       coordinateSystem: "CARTESIAN",
-                      viewBox: { minX: 0, minY: 0, width: 10, height: 8 },
+                      viewBox: { minX: 0, minY: 0, width: 6, height: 8 },
                       toScale: true,
                       points: [
                         { id: "A", x: 1, y: 1, label: "A", labelPosition: "BOTTOM_LEFT" },
@@ -696,8 +715,20 @@ function materialize(
                       ],
                       markers: [
                         { type: "RIGHT_ANGLE", vertex: "A", armPointIds: ["B", "C"] },
+                        {
+                          type: "ANGLE",
+                          vertex: "B",
+                          armPointIds: ["A", "C"],
+                          label: "$\\angle B$",
+                        },
                       ],
-                      labels: [],
+                      labels: [
+                        {
+                          text: "AC = 7 cm",
+                          anchorPointId: "A",
+                          position: "TOP",
+                        },
+                      ],
                       caption: "Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ.",
                     },
                   },

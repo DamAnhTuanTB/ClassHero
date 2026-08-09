@@ -24,6 +24,18 @@ loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false });
 
 const runLiveTest = process.env.RUN_M9_2_PDF_LIVE_MATRIX === "1";
 const runAiAudit = process.env.M9_2_PDF_LIVE_AI_AUDIT === "1";
+const liveReasoningEffort = z
+  .enum(["low", "medium", "high"])
+  .parse(process.env.M9_2_PDF_LIVE_REASONING_EFFORT ?? "medium");
+const liveLength = z
+  .enum(["short", "standard", "detailed"])
+  .parse(process.env.M9_2_PDF_LIVE_LENGTH ?? "detailed");
+const liveMaxTokens = z.coerce
+  .number()
+  .int()
+  .min(8_000)
+  .max(32_000)
+  .parse(process.env.M9_2_PDF_LIVE_MAX_TOKENS ?? 12_000);
 const selectedLiveCases = new Set(
   (process.env.M9_2_PDF_LIVE_CASES ?? "")
     .split(",")
@@ -36,10 +48,10 @@ const sourcePdf = resolve(
 );
 const models = ["gpt-4.1", "gpt-5.4", "gpt-5.6-luna"] as const;
 const algebraVisualPattern =
-  /(?:đồ\s*thị|trục\s*số|mặt\s*phẳng\s*tọa\s*độ|tọa\s*độ|bảng|biểu\s*đồ|sơ\s*đồ)/iu;
+  /(?:đồ\s*thị|trục\s*số|mặt\s*phẳng\s*tọa\s*độ|tọa\s*độ|biểu\s*đồ|sơ\s*đồ|(?:lập|đọc|quan\s*sát|dựa\s*vào|hoàn\s*thành)\s+bảng)/iu;
 const artifactDirectory = resolve(
   process.cwd(),
-  "../../tmp/pdfs/lesson-summary-v3/live-matrix-v33",
+  "../../tmp/pdfs/lesson-summary-v3/live-matrix-v50",
 );
 const lessons = [
   {
@@ -90,6 +102,13 @@ const lessons = [
     title: "Bài 14. Trường hợp bằng nhau thứ hai và thứ ba của tam giác",
     firstPdfPage: 71,
     lastPdfPage: 74,
+  },
+  {
+    key: "geo-bai-15",
+    group: "Hình học",
+    title: "Bài 15. Ba trường hợp bằng nhau của tam giác vuông",
+    firstPdfPage: 76,
+    lastPdfPage: 80,
   },
 ] as const;
 
@@ -177,7 +196,7 @@ describe.skipIf(!runLiveTest)("M9.2 PDF contract-v3 OpenAI live matrix", () => {
             configuration: {
               style: "student_friendly",
               styleInstructions: "",
-              length: "detailed",
+              length: liveLength,
               targetWordCount: null,
               extraInstructions: "",
             },
@@ -362,8 +381,8 @@ async function generateSummaryForReview(input: {
     {
       ...input.request,
       model: input.model,
-      maxTokens: 12_000,
-      reasoningEffort: "medium",
+      maxTokens: liveMaxTokens,
+      reasoningEffort: liveReasoningEffort,
     },
     lessonSummaryProviderOutputSchema,
   );

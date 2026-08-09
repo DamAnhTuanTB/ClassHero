@@ -227,6 +227,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
   });
 
   it("previews the exact prompts and estimate without enqueueing or calling AI", async () => {
+    const longSystemInstructions = "S".repeat(15_501);
     const response = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lesson}/summary/prompt-preview`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -237,7 +238,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
         targetWordCount: 350,
         extraInstructions: "Dùng câu ngắn",
         styleInstructions: "Dễ hiểu cho học sinh khối 7",
-        systemInstructions: "SYSTEM PREVIEW CUSTOM",
+        systemInstructions: longSystemInstructions,
         userPrompt: "USER PREVIEW CUSTOM",
         temperature: 0.1,
         maxOutputTokens: 8_000,
@@ -245,9 +246,9 @@ describe("M9.2 lesson summary API and worker integration", () => {
       .expect(200);
 
     expect(response.body.data).toMatchObject({
-      promptVersion: "lesson-summary-prompt-v33",
-      schemaVersion: "lesson-summary-schema-v25",
-      systemPrompt: expect.stringContaining("SYSTEM PREVIEW CUSTOM"),
+      promptVersion: "lesson-summary-prompt-v49",
+      schemaVersion: "lesson-summary-schema-v37",
+      systemPrompt: expect.stringContaining(longSystemInstructions),
       userPrompt: expect.stringContaining("USER PREVIEW CUSTOM"),
       inputPrompt: expect.stringContaining("Số hữu tỉ viết được"),
       openAiRequest: {

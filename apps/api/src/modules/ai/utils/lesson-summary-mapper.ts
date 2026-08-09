@@ -1,6 +1,10 @@
-import type { LessonSummaryDiagramSpec } from "@learning-path/shared";
+import {
+  normalizeLessonSummaryDiagramSpec,
+  type LessonSummaryDiagramSpec,
+} from "@learning-path/shared";
 
 import type { RetrievedChunk } from "#api/modules/ai/types/ai-text.types";
+import { mapLessonSummaryProviderDiagramSpec } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
 import type {
   LessonSummaryMvpBlock,
   LessonSummaryOutput,
@@ -28,6 +32,8 @@ const SOURCE_EXERCISE_LABEL_PATTERN =
 const REDUNDANT_SOLUTION_CONCLUSION_PATTERN =
   /(?:^|\n)\s*(?:kết\s*luận|đáp\s*số)\s*:[^\n]*(?=\n|$)/giu;
 const LEADING_HEADING_NUMBER_PATTERN = /^\s*(?:§\s*)?\d+(?:[.,]\d+)*(?:\s*[:.)-])?\s+/u;
+const GEOMETRY_SOLUTION_PATTERN =
+  /\b(?:tam\s*giác|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b/iu;
 
 type ProviderExample =
   | LessonSummaryProviderOutput["theorySections"][number]["units"][number]["illustration"]
@@ -113,7 +119,7 @@ export function mapLessonSummaryProviderOutput(
       validateTheoryContent(unit.theory, `${unitPath}.theory`, addWarning);
       if (unit.theory.diagramSpec) {
         validateDiagramReferences(
-          unit.theory.diagramSpec,
+          mapLessonSummaryProviderDiagramSpec(unit.theory.diagramSpec),
           `${unitPath}.theory.diagramSpec`,
           addWarning,
         );
@@ -347,7 +353,11 @@ function validateExample(example: ProviderExample, path: string, addWarning: Add
     );
   }
   if (example.diagramSpec) {
-    validateDiagramReferences(example.diagramSpec, `${path}.diagramSpec`, addWarning);
+    validateDiagramReferences(
+      mapLessonSummaryProviderDiagramSpec(example.diagramSpec),
+      `${path}.diagramSpec`,
+      addWarning,
+    );
   }
 }
 
@@ -424,6 +434,26 @@ function validateDiagramReferences(
       );
     }
     primitiveIds.add(primitive.id);
+    if (primitive.type === "POLYLINE" && primitive.pointIds.length === 2) {
+      addWarning(
+        "DIAGRAM_SEGMENT_USES_POLYLINE",
+        path,
+        `Primitive ${primitive.id} chỉ có hai điểm và sẽ được chuẩn hóa thành SEGMENT.`,
+        "INFO",
+      );
+    }
+    if (
+      primitive.type === "CIRCLE" &&
+      primitive.radius < Math.max(spec.viewBox.width, spec.viewBox.height, 1) * 0.005 &&
+      spec.primitives.length > 1
+    ) {
+      addWarning(
+        "DIAGRAM_DEGENERATE_CIRCLE_REMOVED",
+        path,
+        `Đường tròn ${primitive.id} quá nhỏ so với hình và sẽ bị loại khi chuẩn hóa.`,
+        "INFO",
+      );
+    }
     if (
       primitive.type === "SEGMENT" ||
       primitive.type === "LINE" ||
@@ -573,7 +603,14 @@ function normalizeTheoryBlock(
     fallbackSourceChunkId,
   );
   const visual = block.diagramSpec
-    ? { visual: { kind: "DIAGRAM_SPEC" as const, spec: block.diagramSpec } }
+    ? {
+        visual: {
+          kind: "DIAGRAM_SPEC" as const,
+          spec: normalizeLessonSummaryDiagramSpec(
+            mapLessonSummaryProviderDiagramSpec(block.diagramSpec),
+          ),
+        },
+      }
     : {};
 
   switch (block.type) {
@@ -614,7 +651,14 @@ function toPersistedExample(example: ProviderExample): LessonSummaryMvpBlock {
     solution: normalizeSolution(example.solution),
     answer: normalizeGeneratedText(example.answer),
     ...(example.diagramSpec
-      ? { visual: { kind: "DIAGRAM_SPEC" as const, spec: example.diagramSpec } }
+      ? {
+          visual: {
+            kind: "DIAGRAM_SPEC" as const,
+            spec: normalizeLessonSummaryDiagramSpec(
+              mapLessonSummaryProviderDiagramSpec(example.diagramSpec),
+            ),
+          },
+        }
       : {}),
   };
 }
@@ -635,13 +679,32 @@ function normalizeSolution(value: string | null) {
   const normalized = normalizeGeneratedText(
     value.replace(REDUNDANT_SOLUTION_CONCLUSION_PATTERN, ""),
   );
-  return normalized || null;
+  if (!normalized) return null;
+  if (normalized.includes("\n") || !GEOMETRY_SOLUTION_PATTERN.test(normalized)) {
+    return normalized;
+  }
+
+  const statements = normalized
+    .split(/(?<=[.!?])\s+(?=[\p{L}$])/u)
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  return statements.length > 1
+    ? statements.map((statement) => `- ${statement}`).join("\n")
+    : normalized;
 }
 
 function normalizeGeneratedText(value: string) {
   const repairedLatex = value
-    .replace(/\u001chat(?=\{)/gu, "\\widehat")
-    .replace(/\u001b0/gu, "\\circ");
+    .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
+    .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
+    .replaceAll(`${String.fromCharCode(8)}eta`, "\\beta")
+    .replaceAll(`${String.fromCharCode(13)}ight`, "\\right")
+    .replaceAll(`${String.fromCharCode(28)}hat{`, "\\widehat{")
+    .replaceAll(`${String.fromCharCode(27)}0`, "\\circ")
+    .replace(
+      /\\{2,}(?=(?:angle|triangle|frac|dfrac|sqrt|cdot|times|left|right|mathrm|text|circ|widehat|overline|perp|parallel|cong|neq|ne|le|ge)\b)/gu,
+      "\\",
+    );
 
   return [...repairedLatex]
     .map((character) => {

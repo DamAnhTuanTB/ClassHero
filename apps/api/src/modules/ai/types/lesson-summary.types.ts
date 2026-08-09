@@ -1,11 +1,13 @@
 import {
-  lessonSummaryDiagramSpecSchema,
+  LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
   lessonSummaryDiagramVisualSchema,
 } from "@learning-path/shared";
 import { z } from "zod";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v33";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v25";
+import { lessonSummaryProviderDiagramSpecSchema } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
+
+export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v49";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v37";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -92,6 +94,7 @@ const exampleBlockSchema = z
     problem: nonEmptyText(2_000),
     solution: nonEmptyText(5_000).nullable(),
     answer: nonEmptyText(2_000),
+    visual: lessonSummaryDiagramVisualSchema.optional(),
     sourceChunkIds: sourceChunkIdsSchema.optional(),
     origin: lessonSummaryExampleOriginSchema.optional(),
     sourceCandidateIds: z.array(nonEmptyText(300)).max(20).optional(),
@@ -184,7 +187,7 @@ export type LessonSummaryExtendedBlock = z.infer<typeof lessonSummaryExtendedBlo
  * Provider-only contract. Its shape makes every theory/example pair and the final
  * two application exercises required by JSON Schema before semantic review.
  */
-const theoryDiagramSpecSchema = lessonSummaryDiagramSpecSchema
+const theoryDiagramSpecSchema = lessonSummaryProviderDiagramSpecSchema
   .describe(
     "Nếu bài học thuộc Hình học thì mọi theory block đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, diagramSpec vẫn bắt buộc khi nội dung cần hình để hiểu đúng; các khối về đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ không được trả null.",
   )
@@ -223,15 +226,15 @@ function createLessonSummaryProviderExampleSchema(
       type: z.literal("example"),
       exampleKind: z.literal(exampleKind),
       problem: nonEmptyText(2_000).describe(
-        `Chỉ ghi nội dung đề bài; không có nhãn hoặc số thứ tự từ tài liệu nguồn như Bài 1.11., Ví dụ 2, Luyện tập 3 hay Vận dụng 1; không có câu xem hình bên. Nếu đề hoặc lời giải cần hình để hiểu đúng thì diagramSpec bắt buộc phải khác null.${illustrationRequirement}`,
+        `Chỉ ghi đề bài hoàn chỉnh cuối cùng; không kể quá trình sửa đề hoặc nói kí hiệu nào sai. Không có nhãn hoặc số thứ tự từ tài liệu nguồn như Bài 1.11., Ví dụ 2, Luyện tập 3 hay Vận dụng 1; không có câu xem hình bên. Nếu đề hoặc lời giải cần hình để hiểu đúng thì diagramSpec bắt buộc phải khác null.${illustrationRequirement}`,
       ),
       solution: nonEmptyText(5_000)
         .describe(
-          `Lời giải đúng và gọn. Với bài tính thuần túy, trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức.${illustrationRequirement}`,
+          `Lời giải đúng, gọn và theo phong cách trình bày toán học. Với chứng minh hoặc dựng hình, mỗi giả thiết, suy luận và kết quả phải nằm trên dòng Markdown riêng, ưu tiên bullet; không kể thành một đoạn văn nói liên tục. Với bài tính thuần túy, trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức.${illustrationRequirement}`,
         )
         .nullable(),
       answer: nonEmptyText(2_000),
-      diagramSpec: lessonSummaryDiagramSpecSchema
+      diagramSpec: lessonSummaryProviderDiagramSpecSchema
         .describe(
           "Một hình minh họa dùng chung cho toàn bộ ví dụ/bài tập. Nếu bài học thuộc Hình học thì mọi example và exercise đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, các bài yêu cầu vẽ, đọc hoặc suy luận từ đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc khác null.",
         )
@@ -347,7 +350,11 @@ export const lessonSummaryJobInputSchema = z
     length: lessonSummaryLengthSchema.default("standard"),
     targetWordCount: z.number().int().min(50).max(5_000).nullable().default(null),
     extraInstructions: z.string().trim().max(2_000).default(""),
-    systemInstructions: z.string().trim().max(12_000).default(""),
+    systemInstructions: z
+      .string()
+      .trim()
+      .max(LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS)
+      .default(""),
     userPrompt: z.string().trim().max(16_000).default(""),
     model: z.string().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),

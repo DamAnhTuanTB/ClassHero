@@ -162,6 +162,24 @@ deterministic trong ứng dụng và không tạo thêm image-generation provide
 Generation vẫn chỉ có một structured-output call; semantic warning không kích
 hoạt repair/judge call. Renderer phải giới hạn số primitive/label và lazy-load ở
 UI khi cần để không làm tăng đáng kể initial bundle hoặc thời gian hiển thị lesson.
+Lượt coverage Toán 3-9 dùng compiler/template và semantic validator deterministic
+sau structured output, không thêm AI call. Full property/golden matrix chạy ở
+test/CI theo tầng, không chạy trong request path: PR chỉ chạy smoke representative,
+còn full 250-400 ô × viewport/theme chạy theo workflow đầy đủ. Nếu thêm thư viện
+hình học/layout, phải benchmark server runtime, client bundle và khả năng tree-shake
+trước khi đưa vào renderer production.
+Các family compiler được phát triển đồng thời trong một delivery wave nhưng chỉ
+rollout production một lần sau global release gate; việc gom phạm vi triển khai
+không được làm tăng số provider call hoặc đưa full coverage suite vào request path.
+Live matrix M9.2 có hard cap kế hoạch 320.000 VNĐ: 65 request chính và tối đa 15
+retry có điều kiện trên `gpt-5.4`; 21 request là full lesson phân đều ba mức khó
+cho từng lớp 3-9. Mỗi output phải cache trước visual review để
+mọi lượt sửa compiler/renderer/layout chỉ re-render và chụp lại local, không tạo
+paid call mới. Queue paid phải dừng khi phát hiện lỗi hệ thống lặp lại hoặc khi
+reservation chạm cap; chỉ `PROVIDER_INTENT` mới được tiêu retry pool.
+Paid queue phải hoàn tất Gate A `44` ví dụ lẻ (cap 125.000 VNĐ) và sửa hết lỗi
+hệ thống trước khi enqueue Gate B `21` full lesson (phần cap còn lại tối đa
+195.000 VNĐ). Không chạy song song hai gate vì sẽ nhân lỗi và lãng phí ngân sách.
 
 Provider operations rules:
 

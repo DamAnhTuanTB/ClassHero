@@ -392,7 +392,7 @@ Performance budget/checklist:
 | ---------------- | --------------------------------------------------------------------------------------- |
 | Core Web Vitals  | Hướng tới LCP tốt, CLS thấp, INP tốt trên mobile                                        |
 | Route transition | Không trắng màn hình; có loading/skeleton nếu data chưa sẵn                             |
-| Hard refresh     | HTML đầu có header và payload/skeleton riêng của trang; không chỉ có shared shell        |
+| Hard refresh     | HTML đầu có header và payload/skeleton riêng của trang; không chỉ có shared shell       |
 | Mobile load      | Mọi đường load trên điện thoại phải nhẹ nhất có thể: cold load, transition, data, asset |
 | Interaction      | Button/action đổi state ngay sau thao tác                                               |
 | List dài         | Có pagination/infinite/virtualization                                                   |
@@ -444,6 +444,79 @@ Một màn hình UI chỉ xem là xong khi:
 - Không thêm tính năng ngoài MVP.
 - Theo preference của owner, Codex không tự kiểm browser/Playwright/responsive thật trừ khi owner yêu cầu rõ; mặc định dùng kiểm tĩnh/focused và để owner tự kiểm UI/tương tác trên app.
 - Chỉ chụp/lưu screenshot khi owner yêu cầu bằng command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`. Khi chụp để owner review, lưu vào `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
+- Riêng visual Toán do AI sinh, khi owner yêu cầu nghiệm thu bằng screenshot phải
+  chụp từng figure từ component thật và tự xem lại ảnh trước khi báo đạt. Ảnh đã
+  đạt và ảnh còn lỗi phải ở hai thư mục cấp cao riêng biệt; không trộn ảnh chưa
+  duyệt vào bộ mẫu chuẩn. Schema/DOM test pass không đủ để kết luận hình đúng.
+- Review visual Toán phải có căn cứ: ưu tiên figure/trang chính xác trong SGK/SBT
+  Kết nối tri thức của lesson, sau đó SGK/SBT/SGV điện tử và tài liệu tập huấn
+  chính thức của NXBGDVN. Mỗi ảnh PASS phải ghi reference ID và comparison mode;
+  nguồn blog/video không rõ xuất xứ không đủ làm bằng chứng nghiệm thu. Không cần
+  giống pixel: tính đúng toán học đứng trước, responsive được phép bố trí lại nếu
+  giữ nguyên quan hệ và ghi rõ adaptation.
+- Ảnh trong `anh-chup-hinh-toan-dat-chuan/` chỉ được dùng làm golden cho ảnh khác
+  sau khi đã tái kiểm chứng với nguồn chính thống và có entry trong
+  `reference-golden-manifest.json`. Tên thư mục không tự chứng minh ảnh đúng; ảnh
+  có feedback cũ chưa xử lý phải chuyển ra khỏi bộ đạt chuẩn.
+- Text trong visual Toán không được đè lên nét hình hoặc marker. Cơ chế tránh va
+  chạm phải ưu tiên vùng trống gần nhất, giữ đúng phía/ngữ nghĩa của nhãn và dùng
+  khoảng dịch nhỏ có giới hạn; không được làm sạch hình bằng cách đẩy nhãn ra xa.
+- Vùng cấm của nhãn phải tính theo toàn bộ khung chữ, không chỉ theo điểm neo. Quy
+  tắc này áp dụng cả tên điểm, phương trình đồ thị, trục, đường dóng và
+  marker; ảnh chỉ được đưa vào bộ đạt chuẩn sau khi kiểm lại trên mobile thật.
+- Visual Toán phải kiểm cả va chạm text–text; hai nhãn có khung chữ giao nhau dù
+  không chạm nét vẫn là lỗi. Với trục số, tên điểm ở trên, trị số đặc biệt ở hàng
+  dưới và mốc nguyên gần trục để giữ quan hệ rõ trên màn hẹp. Tên điểm trên trục
+  số phải giữ cùng hoành độ với dấu điểm/vạch mà nó gọi tên; khi vạch tại chính
+  điểm neo gây va chạm, renderer phải ưu tiên tăng nhẹ khoảng cách theo phương
+  vuông góc với trục và không đẩy nhãn ngang sang gần vạch kế bên.
+- Tên điểm hình học phải dùng khoảng cách nhỏ thống nhất quanh điểm neo rồi chỉ
+  tăng khoảng cách khi khung chữ thật sự đụng nét. Tâm đường tròn có tên (`O`,
+  `I`,...) phải có một dấu tâm nhỏ; không được vì quy tắc ẩn chấm ở đỉnh thường mà
+  làm mất vị trí chính xác của tâm. Cỡ chữ tên điểm phải có sàn theo kích thước
+  SVG thực tế, mục tiêu tối thiểu `10px` trên mobile; không được co theo viewBox
+  rộng đến mức hai hình đặt cạnh nhau làm tên đỉnh khó đọc.
+- Vạch chia trục số là nét phân độ, không phải marker hai đoạn bằng nhau. UI phải
+  bỏ `EQUAL_LENGTH`/`PARALLEL` gắn nhầm vào vạch chia để tránh nét màu chồng lên
+  đường trục. Vạch phải ngắn, đồng đều, mục tiêu khoảng 2% và không quá 3% cạnh
+  ngắn viewBox; trên mobile không được cao như cột hoặc cạnh hình.
+- Text nằm trong ô bảng phải có ngưỡng cỡ chữ tối thiểu theo kích thước hiển thị
+  mobile, căn giữa và không chạm đường viền; không chỉ co chữ theo viewBox rộng.
+- Hình minh họa thao tác dựng đồ thị đường thẳng phải hiện ít nhất hai điểm dựng
+  có ý nghĩa rồi mới nối đường. Với parabol, điểm dựng nhìn thấy không được chọn
+  tùy ý: phải gồm đỉnh và tối thiểu hai cặp đối xứng được suy ra từ hàm/vạch đơn
+  vị; các điểm lấy mẫu phụ chỉ làm mượt POLYLINE và không hiện. Điểm dựng phải nằm
+  đúng trên đồ thị: parabol gồm đỉnh và tối thiểu hai cặp đối xứng; đường thẳng có
+  hai điểm phân biệt ưu tiên giao trục/tọa độ nguyên. Theo contract riêng của sản
+  phẩm, mọi điểm dựng phụ đang hiển thị trên mọi loại đồ thị đều bắt buộc có tên
+  ngắn duy nhất, kể cả khi hình tham khảo SGK bỏ tên ở một số chấm; chỉ điểm lấy
+  mẫu kỹ thuật `NONE` không hiển thị mới được để trống tên. Tên đặt sát chấm và có
+  đường dóng nét đứt về Ox/Oy; không ghép tên với
+  tọa độ. Điểm trên Ox/Oy vẫn cần nhãn số của vạch tương ứng. Nhãn số của trục và
+  tên điểm phải ở trong bán kính nhỏ quanh vạch/dấu điểm: đổi hướng
+  trước khi tăng khoảng cách, không né va chạm bằng cách đẩy chữ ra xa. Marker
+  song song dạng mũi tên là tùy chọn, không được tự thêm khi đề/source không yêu
+  cầu và quan hệ đã rõ bằng nội dung cùng bố cục hình.
+- Nhãn độ dài cạnh phải nằm sát vùng giữa cạnh và chỉ hở đủ để không chạm nét hoặc
+  marker. Khoảng hở tính theo cỡ chữ thích ứng của hình, không lấy cạnh dài viewBox
+  khiến `3 cm`, `4 cm`, `r`, `h` trôi xa trên mobile.
+- Trục số chỉ hiển thị một kí hiệu tại gốc: ưu tiên nhãn số `0`; không đồng thời
+  lặp thêm tên điểm `O` tại cùng vị trí. Hệ trục Oxy làm ngược lại: ưu tiên `O`
+  và bỏ nhãn `0` trùng nghĩa tại gốc.
+- Trên trục số dài bị thu nhỏ theo chiều ngang ở mobile, tên điểm như `P`, `Q`,
+  `C`, `D` phải dùng ngưỡng cỡ chữ riêng đủ đọc, không co cùng tỉ lệ với toàn bộ
+  viewBox; tên vẫn neo sát theo phương vuông góc với đúng dấu điểm.
+- Bộ nghiệm thu visual Toán phải có laptop, iPad, Chromium Mobile và WebKit/iPhone;
+  mobile là cổng bắt buộc quan trọng nhất. Ngoài hình nền tảng, phải có ca phức tạp
+  lớp 9 như tiếp tuyến–đường tròn, tứ giác nội tiếp và đường tròn nội tiếp tam giác.
+- Screenshot riêng từng figure phải cô lập target khỏi mọi phần tử ngoài figure
+  trước khi chụp; không chỉ ẩn `fixed`/`sticky`, vì control tuyệt đối hoặc overlay
+  của shell vẫn có thể lọt vào mép ảnh. Sau khi chụp phải phục hồi DOM rồi mới
+  chuyển figure tiếp theo. Ảnh có vật thể UI lạ dù hình toán đúng vẫn không đạt.
+- Duyệt bằng mắt còn phải kiểm ngữ nghĩa SGK: sơ đồ thanh có tỉ lệ/nhãn phần đúng;
+  lục giác đều không bị mô tả thành chỉ có hai trục đối xứng; góc đối tứ giác nội
+  tiếp được gọi là bù nhau; tâm đồng hồ có chấm; trục đồ thị có đủ vạch/nhãn đơn
+  vị để đọc các điểm đặc biệt. Test overlap pass không thay thế các kiểm tra này.
 
 ## 13. Quy trình làm UI để giảm sửa lại
 

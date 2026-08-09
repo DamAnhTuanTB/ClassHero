@@ -47,6 +47,26 @@ bắt buộc gồm schema/mapper/renderer, 3 bài Số–Đại số, 3 bài Hì
 semantic review. Local checks đã pass; live/manual matrix là cổng còn lại. Chi
 tiết tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
 
+Kế hoạch coverage tiếp theo của `M9.2` không lấy 39 case ID hoặc số screenshot
+đa thiết bị làm mẫu số. Hệ thống sẽ inventory 100% nội dung trực quan SGK/SBT
+Kết nối tri thức Toán 3-9, chuẩn hóa theo dạng-hình × biến-thể × độ khó và tập
+trung `SIMPLE|MEDIUM|HARD`. Ngưỡng supported coverage là `>=90%`, mục tiêu
+`>=95%`, stretch `98-100%`; `VERY_COMPLEX` được báo cáo riêng. Chi tiết tại
+`.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
+Phạm vi này được làm trong một delivery wave M9.2: inventory, compiler các family,
+validator, label/layout và test matrix chạy theo các workstream đồng thời, nhưng
+chỉ nghiệm thu/phát hành khi release gate toàn cục đạt.
+Live coverage gate dùng `gpt-5.4`, dự kiến 65 request chính + tối đa 15 retry,
+hard cap 320.000 VNĐ. Matrix có 21 full lesson: mỗi lớp 3-9 × ba mức khó và mỗi
+family xuất hiện ít nhất hai lần. Mỗi output có screenshot/review 4 viewport × 2
+theme; full lesson chụp từng block hình, lỗi local re-render từ cache, ảnh fail
+không được nằm trong thư mục đạt chuẩn.
+Thứ tự live gate: 44 ví dụ lẻ phải đạt trước (cap 125.000 VNĐ), sau đó mới chạy
+21 full lesson (tối đa 195.000 VNĐ còn lại); không enqueue hai gate song song.
+Mỗi visual PASS phải có reference ID chính thống; full lesson đối chiếu đúng
+trang/bài. Bộ ảnh đạt chuẩn cũ phải re-audit và chỉ entry trong
+`reference-golden-manifest.json` mới được dùng làm golden cho case mới.
+
 ## Khi nào cập nhật file này
 
 - Khi thêm, xóa, hoãn hoặc đổi phạm vi feature.

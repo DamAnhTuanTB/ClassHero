@@ -23,7 +23,7 @@ export function MathpixMarkdownRenderer({
     import("mathpix-markdown-it").then(({ MathpixMarkdownModel }) => {
       // Đã xóa bỏ logic tự động xóa khoảng trắng của AI vì regex cũ bị sai (xóa lầm khoảng trắng bên ngoài $).
       // AI hiện tại đã được cấu hình prompt không sinh ra khoảng trắng thừa bên trong $.
-      let safeContent = content || "";
+      const safeContent = normalizeMathMarkdown(content || "");
 
       const html = MathpixMarkdownModel.markdownToHTML(safeContent, {
         htmlTags: true,
@@ -35,4 +35,18 @@ export function MathpixMarkdownRenderer({
   }, [content]);
 
   return <div ref={containerRef} className={`mmd-content ${className ?? ""}`} />;
+}
+
+function normalizeMathMarkdown(value: string) {
+  return value
+    .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
+    .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
+    .replaceAll(`${String.fromCharCode(8)}eta`, "\\beta")
+    .replaceAll(`${String.fromCharCode(13)}ight`, "\\right")
+    .replaceAll(`${String.fromCharCode(28)}hat{`, "\\widehat{")
+    .replaceAll(`${String.fromCharCode(27)}0`, "\\circ")
+    .replace(
+      /\\{2,}(?=(?:angle|triangle|frac|dfrac|sqrt|cdot|times|left|right|mathrm|text|circ|widehat|overline|perp|parallel|cong|neq|ne|le|ge)\b)/gu,
+      "\\",
+    );
 }

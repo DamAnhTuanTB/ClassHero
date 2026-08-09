@@ -1290,7 +1290,7 @@ function ExampleBlock({
         <div className="pl-4 border-l-[3px] border-blue-500/30 dark:border-blue-400/30 space-y-3 mb-3 text-sm">
           {block.solution && (
             <div>
-              <MathpixMarkdownRenderer content={block.solution} />
+              <MathpixMarkdownRenderer content={formatMathematicalSolution(block.solution)} />
             </div>
           )}
           {block.answer && (
@@ -1302,6 +1302,25 @@ function ExampleBlock({
       )}
     </BaseBlockContainer>
   );
+}
+
+function formatMathematicalSolution(value: string) {
+  if (
+    value.includes("\n") ||
+    !/\b(?:tam\s*giác|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b/iu.test(
+      value,
+    )
+  ) {
+    return value;
+  }
+
+  const statements = value
+    .split(/(?<=[.!?])\s+(?=[\p{L}$])/u)
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  return statements.length > 1
+    ? statements.map((statement) => `- ${statement}`).join("\n")
+    : value;
 }
 
 function SectionRecapBlock({ block }: { block: BlockData }) {

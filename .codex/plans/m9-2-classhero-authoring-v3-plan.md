@@ -1,6 +1,6 @@
 # Kế hoạch M9.2 — ClassHero lesson-summary authoring contract v3
 
-Trạng thái: `Đã triển khai và kiểm thử trên codex/m9-2-classhero-authoring-v3; chờ owner nghiệm thu thủ công trên FE`
+Trạng thái: `Đã triển khai; đang xử lý feedback nghiệm thu diagram Bài 15 và chờ owner kiểm lại trên FE`
 
 Task sở hữu: `M9.2` — Admin generate lesson summary
 
@@ -10,8 +10,8 @@ Baseline rollback: commit `776a69c1` trên contract
 `lesson-summary-prompt-v22` / `lesson-summary-schema-v19` / persisted
 `lesson_summary_blocks.version=1`
 
-Contract hiện tại: `lesson-summary-prompt-v33` (lấy prompt master làm baseline) /
-`lesson-summary-schema-v25` / persisted `lesson_summary_blocks.version=2`
+Contract hiện tại: `lesson-summary-prompt-v49` (lấy prompt master làm baseline) /
+`lesson-summary-schema-v36` / persisted `lesson_summary_blocks.version=2`
 
 Quyết định đơn giản hóa của owner ngày 2026-08-09 thay thế các cơ chế audit
 trước đó: generation mới không trả `sourceAssessment`, `origin`, candidate ID,
@@ -282,6 +282,47 @@ Danh sách primitive v1 chỉ gồm nhu cầu Toán THCS đã biết:
 - `toScale` luôn là `true`. Tọa độ phải đúng tỉ lệ dữ kiện và các marker
   hình học phải khớp quan hệ thực; không render sơ đồ ước lệ.
 - Các kiểm tra hình học đơn giản có thể xác minh bằng tọa độ; quan hệ khó hoặc mâu thuẫn chỉ tạo warning, không chặn lưu bản nháp.
+- Contract nghiệm thu v43 khóa thêm quy ước SGK: cạnh chỉ ghi giá trị gọn và neo
+  vào đoạn; cạnh bằng nhau dùng tick; góc không lặp tên đỉnh; điểm trên Oxy chỉ
+  hiện tên ngắn và đọc tọa độ qua đường dóng/trục; Oxy/trục số có tick, nhãn và mũi tên dương; bảng căn giữa; đồng
+  hồ có vạch và bốn số chính; bán kính/chiều cao/nhãn sơ đồ phải có primitive neo.
+- Mỗi đợt test realtime phải render bằng UI thật, chụp từng figure, đánh giá thủ
+  công và tách ảnh đã đạt khỏi ảnh cần sửa. Hai bài thật dùng toàn bộ output để
+  validate contract nhưng screenshot tập trung vào mọi block `example` để tiết
+  kiệm chi phí và thời gian review.
+- Renderer v43 áp dụng collision avoidance có giới hạn cho toàn bộ text: point
+  label chọn hướng trống gần nhất, segment label đi theo pháp tuyến, nhãn Venn đi
+  vào trong miền, marker song song tránh cung góc; điểm Oxy có đường dóng nét đứt.
+- Nghiệm thu cuối tính toàn bộ bounding box cho va chạm text–nét và text–text,
+  dùng quy ước gốc `0` cho trục số nhưng `O` cho Oxy, và chạy đủ laptop/iPad/
+  Chromium Mobile/WebKit Mobile. Bộ stress có thêm ba hình đường tròn lớp 9 phức tạp.
+- Tâm đường tròn có tên `O`/`I` được phục hồi dấu tâm nhỏ cho cả spec cũ; đỉnh
+  thường vẫn không có chấm. Nhãn điểm dùng offset gần và chữ SVG co theo cả cạnh
+  ngắn của viewBox để biểu đồ dài/hẹp không làm text phình hoặc chồng nhau.
+- Tick trục số không mang nghĩa hai đoạn bằng nhau/song song; renderer bỏ marker
+  hình học gắn nhầm lên tick. Ma trận mở rộng thêm 12 ca lớp 3–9 bao phủ mô hình
+  số học, trục phân số, bảng–biểu đồ, đồ thị hàm, hình học phẳng và đường tròn từ
+  dễ đến nâng cao.
+- Hồi quy v45 chặn tick ở mục tiêu khoảng 2% và không quá 3% cạnh ngắn viewBox,
+  giữ text trong ô bảng đủ đọc trên mobile, hiện tối thiểu hai điểm dựng cho đồ
+  thị đường thẳng, không tự thêm marker song song dạng mũi tên khi nguồn không
+  yêu cầu và tính khoảng cách nhãn độ dài theo text scale thích ứng.
+- Hồi quy v46 kiểm semantic hình trước khi nghiệm thu: tỉ lệ/nhãn sơ đồ thanh,
+  sáu trục đối xứng của lục giác đều, góc đối bù nhau trong tứ giác nội tiếp,
+  marker góc tối giản ở tiếp tuyến, đủ đơn vị trên đồ thị và chấm tâm đồng hồ.
+  Khi chụp từng figure, test ẩn mọi node ngoài target rồi phục hồi DOM để không
+  đưa control/overlay của shell vào ảnh đạt chuẩn.
+- Hồi quy v47 tách điểm dựng nhìn thấy khỏi điểm lấy mẫu làm mượt. Parabol phải
+  hiện đỉnh và ít nhất hai cặp điểm đối xứng được suy ra từ hàm; mọi điểm dựng
+  nằm trên Ox/Oy vẫn có nhãn số tại vạch trục. Nhãn tên điểm trên trục số chỉ
+  dịch theo phương vuông góc với trục để không lệch khỏi dấu điểm.
+- Hồi quy v48 làm rõ điểm dựng không được chọn tùy ý: parabol phải dùng đỉnh và
+  các cặp đối xứng đúng hàm, đường thẳng dùng hai điểm phân biệt dễ đọc. Mỗi điểm
+  dựng có tên duy nhất, chỉ hiện tên ngắn và dóng về Ox/Oy; khoảng cách tên điểm
+  và nhãn số trục có trần nhỏ, ưu tiên đổi hướng thay vì đẩy xa.
+- Provider adapter v43 phục hồi tick trục số bị thiếu bằng nội suy tuyến tính từ
+  các numeric label anchors đã đúng; repair chỉ chạy khi có trục ngang, O và đủ
+  hai giá trị phân biệt, sau đó shared schema vẫn kiểm lại toàn bộ output.
 
 ### 6.4. Nơi persist/render
 
@@ -447,6 +488,15 @@ Không bắt đầu v3 trước bước này để bảo đảm có thể quay l
 
 Chỉ chạy sau khi local test pass và đã báo trước chi phí ước tính:
 
+- preflight bằng đúng 2 example Hình học trong 1 provider request, schema tối giản,
+  không retry và output cap; chỉ chạy ma trận/cả bài nếu preflight không lặp
+  primitive, không incomplete và qua semantic audit;
+- provider-only `diagramSpec` tách primitive/marker thành các mảng theo loại rồi
+  mapper flatten về persisted union; audit kiểm cả độ dài tọa độ của EQUAL_LENGTH
+  và endpoint ARC, không chỉ kiểm ID/bán kính;
+- point provider bắt buộc quyết định `pointStyle`; đỉnh hình học thường và điểm
+  điều khiển/neo text dùng `NONE`, điểm độc lập/đầu mút dùng `FILLED|OPEN`.
+  Persisted summary cũ không có field này vẫn đọc được và mặc định không vẽ chấm;
 - 3 bài Số/Đại số;
 - 3 bài Hình học;
 - ít nhất một model thế hệ cũ và hai model chất lượng cao thế hệ mới còn được provider hỗ trợ;
@@ -509,6 +559,9 @@ Không gọi image generation provider vì diagram được render từ spec.
 - Reference ID thiếu tạo warning/placeholder, không crash trang.
 - Tọa độ NaN/vô hạn, primitive quá số lượng hoặc label nguy hiểm bị schema từ chối kỹ thuật trước persist.
 - Quan hệ right angle/equal length/parallel tham chiếu đúng entity.
+- Point label chỉ chứa một tên điểm; nhãn đoạn/góc không chồng lên point label.
+- Marker góc được vẽ theo hai arm; hình thực tế/dựng hình giữ đúng vai trò từng
+  điểm, đường, tâm và bán kính được mô tả trong đề.
 - `toScale=true` là bắt buộc; equal-length/right-angle/parallel marker phải
   khớp tọa độ trong sai số render cho phép.
 - Bài Đại số không bị ép sinh diagram không cần thiết.
