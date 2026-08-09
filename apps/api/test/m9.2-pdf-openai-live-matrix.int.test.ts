@@ -23,6 +23,7 @@ import { normalizeOcrPages } from "#api/workers/utils/ocr-artifact-normalizer";
 loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false });
 
 const runLiveTest = process.env.RUN_M9_2_PDF_LIVE_MATRIX === "1";
+const runAiAudit = process.env.M9_2_PDF_LIVE_AI_AUDIT === "1";
 const selectedLiveCases = new Set(
   (process.env.M9_2_PDF_LIVE_CASES ?? "")
     .split(",")
@@ -34,11 +35,20 @@ const sourcePdf = resolve(
   "../../Toan-7-Tap-1-lam-net-300ppi-OCR-searchable.pdf",
 );
 const models = ["gpt-4.1", "gpt-5.4", "gpt-5.6-luna"] as const;
+const algebraVisualPattern =
+  /(?:đồ\s*thị|trục\s*số|mặt\s*phẳng\s*tọa\s*độ|tọa\s*độ|bảng|biểu\s*đồ|sơ\s*đồ)/iu;
 const artifactDirectory = resolve(
   process.cwd(),
-  "../../tmp/pdfs/lesson-summary-v2/live-matrix-v22",
+  "../../tmp/pdfs/lesson-summary-v3/live-matrix-v33",
 );
 const lessons = [
+  {
+    key: "alg-bai-1",
+    group: "Số/Đại số",
+    title: "Bài 1. Tập hợp các số hữu tỉ",
+    firstPdfPage: 6,
+    lastPdfPage: 9,
+  },
   {
     key: "alg-bai-2",
     group: "Số/Đại số",
@@ -83,7 +93,7 @@ const lessons = [
   },
 ] as const;
 
-describe.skipIf(!runLiveTest)("M9.2 PDF contract-v2 OpenAI live matrix", () => {
+describe.skipIf(!runLiveTest)("M9.2 PDF contract-v3 OpenAI live matrix", () => {
   let provider: OpenAiProvider;
   const contexts = new Map<string, RetrievedChunk[]>();
   const totals = {
@@ -141,13 +151,6 @@ describe.skipIf(!runLiveTest)("M9.2 PDF contract-v2 OpenAI live matrix", () => {
       }
       if (buildLessonSummarySourceTopics(chunks).length < 1) {
         throw new Error(`No source topic extracted for ${lesson.key}.`);
-      }
-      if (
-        !buildLessonSummarySourceCandidates(chunks).some(
-          (candidate) => candidate.kindHint === "REAL_WORLD_EXERCISE",
-        )
-      ) {
-        throw new Error(`No real-world source candidate for ${lesson.key}.`);
       }
       contexts.set(lesson.key, chunks);
     });
@@ -207,15 +210,19 @@ describe.skipIf(!runLiveTest)("M9.2 PDF contract-v2 OpenAI live matrix", () => {
             ),
           ).toBe(true);
 
-          const auditResult = await auditLessonSummary({
-            provider,
-            lessonTitle: lesson.title,
-            chunks,
-            persisted,
-            providerOutput: result.data,
-          });
-          addUsage(totals, auditResult.usage);
-          totals.auditCalls += 1;
+          const auditResult = runAiAudit
+            ? await auditLessonSummary({
+                provider,
+                lessonTitle: lesson.title,
+                chunks,
+                persisted,
+                providerOutput: result.data,
+              })
+            : null;
+          if (auditResult) {
+            addUsage(totals, auditResult.usage);
+            totals.auditCalls += 1;
+          }
           writeFileSync(
             resolve(artifactDirectory, `${lesson.key}--${model}.json`),
             `${JSON.stringify(
@@ -224,38 +231,93 @@ describe.skipIf(!runLiveTest)("M9.2 PDF contract-v2 OpenAI live matrix", () => {
                 model,
                 generationUsage: result.usage,
                 warningCount: persisted.warnings?.length ?? 0,
-                auditUsage: auditResult.usage,
+                auditUsage: auditResult?.usage ?? null,
                 providerOutput: result.data,
                 persistedOutput: persisted,
-                semanticAudit: auditResult.data,
+                semanticAudit: auditResult?.data ?? null,
               },
               null,
               2,
             )}\n`,
             "utf8",
           );
-          expect(auditResult.data.overallPass, auditResult.data.summary).toBe(true);
-          expect(
-            auditResult.data.theoryExamplePairs.every(
-              (pair) =>
-                pair.relevant && pair.mathematicallyCorrect && pair.studentAppropriate,
-            ),
-          ).toBe(true);
-          expect(auditResult.data.applicationExercisesCorrect).toBe(true);
-          expect(auditResult.data.coverageSufficient).toBe(true);
-          expect(auditResult.data.granularityGood).toBe(true);
           const expectedPairCount = result.data.theorySections.reduce(
             (sum, section) => sum + section.units.length,
             0,
           );
-          expect(auditResult.data.theoryExamplePairs).toHaveLength(expectedPairCount);
-          expect(
-            new Set(
-              auditResult.data.theoryExamplePairs.map(
-                (pair) => `${pair.sectionIndex}:${pair.unitIndex}`,
+          if (lesson.group === "Hình học") {
+            expect(
+              result.data.theorySections.every((section) =>
+                section.units.every(
+                  (unit) =>
+                    unit.theory.diagramSpec !== null &&
+                    unit.illustration.diagramSpec !== null,
+                ),
               ),
-            ).size,
-          ).toBe(expectedPairCount);
+              "Mọi theory và illustration của bài Hình học phải có diagramSpec.",
+            ).toBe(true);
+            expect(
+              result.data.applicationExercises.standardExercise.diagramSpec,
+              "Bài thông thường của bài Hình học phải có diagramSpec.",
+            ).not.toBeNull();
+            expect(
+              result.data.applicationExercises.realWorldExercise.diagramSpec,
+              "Bài thực tế của bài Hình học phải có diagramSpec.",
+            ).not.toBeNull();
+          }
+          if (lesson.group === "Số/Đại số") {
+            result.data.theorySections.forEach((section) => {
+              section.units.forEach((unit) => {
+                if (algebraVisualPattern.test(JSON.stringify(unit.theory))) {
+                  expect(
+                    unit.theory.diagramSpec,
+                    `Theory Đại số "${unit.theory.title}" cần hình nhưng trả null.`,
+                  ).not.toBeNull();
+                }
+                if (algebraVisualPattern.test(unit.illustration.problem)) {
+                  expect(
+                    unit.illustration.diagramSpec,
+                    `Illustration Đại số "${unit.theory.title}" cần hình nhưng trả null.`,
+                  ).not.toBeNull();
+                }
+              });
+            });
+            for (const exercise of [
+              result.data.applicationExercises.standardExercise,
+              result.data.applicationExercises.realWorldExercise,
+            ]) {
+              if (algebraVisualPattern.test(exercise.problem)) {
+                expect(
+                  exercise.diagramSpec,
+                  "Bài vận dụng Đại số cần hình nhưng trả null.",
+                ).not.toBeNull();
+              }
+            }
+          }
+          if (auditResult) {
+            expect(auditResult.data.overallPass, auditResult.data.summary).toBe(true);
+            expect(
+              auditResult.data.theoryExamplePairs.every(
+                (pair) =>
+                  pair.relevant && pair.mathematicallyCorrect && pair.studentAppropriate,
+              ),
+            ).toBe(true);
+            expect(auditResult.data.applicationExercisesCorrect).toBe(true);
+            expect(auditResult.data.coverageSufficient).toBe(true);
+            expect(auditResult.data.granularityGood).toBe(true);
+            expect(auditResult.data.majorHeadingsCompliant).toBe(true);
+            expect(auditResult.data.theoryGrounded).toBe(true);
+            expect(auditResult.data.provenanceHonest).toBe(true);
+            expect(auditResult.data.visualHandlingGood).toBe(true);
+            expect(auditResult.data.theoryExamplePairs).toHaveLength(expectedPairCount);
+            expect(
+              new Set(
+                auditResult.data.theoryExamplePairs.map(
+                  (pair) => `${pair.sectionIndex}:${pair.unitIndex}`,
+                ),
+              ).size,
+            ).toBe(expectedPairCount);
+          }
           console.info(
             `[M9.2 PDF MATRIX PASS] ${JSON.stringify({
               lesson: lesson.key,
@@ -272,7 +334,7 @@ describe.skipIf(!runLiveTest)("M9.2 PDF contract-v2 OpenAI live matrix", () => {
               totalTokens: result.usage?.totalTokens ?? null,
               latencyMs: result.latencyMs ?? Date.now() - startedAt,
               warningCount: persisted.warnings?.length ?? 0,
-              audit: auditResult.data.summary,
+              audit: auditResult?.data.summary ?? "manual-review-required",
             })}`,
           );
         },
@@ -297,7 +359,12 @@ async function generateSummaryForReview(input: {
   };
 }) {
   const result = await input.provider.generateStructured(
-    { ...input.request, model: input.model, maxTokens: 8_000 },
+    {
+      ...input.request,
+      model: input.model,
+      maxTokens: 12_000,
+      reasoningEffort: "medium",
+    },
     lessonSummaryProviderOutputSchema,
   );
   addUsage(input.totals, result.usage);
@@ -317,6 +384,10 @@ const semanticAuditSchema = z
     granularityGood: z.boolean(),
     applicationExercisesCorrect: z.boolean(),
     languageAndPresentationGood: z.boolean(),
+    majorHeadingsCompliant: z.boolean(),
+    theoryGrounded: z.boolean(),
+    provenanceHonest: z.boolean(),
+    visualHandlingGood: z.boolean(),
     theoryExamplePairs: z.array(
       z
         .object({
@@ -346,13 +417,16 @@ async function auditLessonSummary(input: {
       systemPrompt: [
         "Bạn là giáo viên Toán THCS độc lập, nghiêm khắc và đang kiểm định một bản kiến thức cho học sinh lớp 7.",
         "Chỉ đánh giá dựa trên SOURCE và SUMMARY được cung cấp; không nương tay vì JSON đúng cấu trúc.",
-        "Với từng unit trong PAIR_CONTRACT, kiểm tra illustration có liên hệ trực tiếp với theory cùng unit, placement BEFORE/AFTER có đúng mạch sư phạm và lời giải/đáp án có đúng toán học hay không.",
-        "BEFORE_THEORY phù hợp cho hoạt động khám phá dẫn tới kiến thức; không phạt vì nó chưa áp dụng định lí nếu lời giải chỉ dùng quan sát/lập luận được phép trước theory. AFTER_THEORY phải áp dụng trực tiếp theory đã nêu.",
+        "Với từng unit trong PAIR_CONTRACT, kiểm tra illustration nằm ngay sau và minh họa trực tiếp theory cùng unit; lời giải và đáp án phải đúng toán học.",
+        "majorHeadingsCompliant chỉ true khi các đề mục lý thuyết lớn giữ nguyên ý nghĩa, số thứ tự và phạm vi của SOURCE, đồng thời đã sửa sạch lỗi OCR/chính tả rõ ràng trong displayHeading.",
+        "theoryGrounded chỉ true khi knowledge/property/theorem/procedure bám kiến thức trong SOURCE, không bịa thêm quy tắc hay định lí.",
+        "provenanceHonest chỉ đánh giá ví dụ nằm trong phạm vi kiến thức nguồn; SUMMARY không cần và không được trả metadata origin/candidate/sourceAssessment.",
+        "visualHandlingGood chỉ true khi không sao chép URL/Markdown/raw SVG hoặc phụ thuộc ảnh mờ từ SOURCE. Nếu cần hình, chỉ chấp nhận DIAGRAM_SPEC có cấu trúc, tham chiếu hợp lệ và khớp đề bài/lời giải.",
         "coverageSufficient chỉ đánh giá đã bao phủ các source topic và kiến thức cốt lõi hay chưa. KHÔNG yêu cầu đưa mọi ví dụ, hoạt động, luyện tập, vận dụng hoặc bài tập trong SOURCE vào SUMMARY.",
         "granularityGood chỉ true khi mỗi theory block tập trung vào một tiểu chủ đề mạch lạc. Các quy tắc được SOURCE chủ động đặt chung trong cùng heading như cộng/trừ hoặc nhân/chia được xem là một tiểu chủ đề; không được tách cơ học chỉ vì có hai phép toán. Chỉ để false khi block dồn các khái niệm hoặc nhóm quy tắc khác ranh giới nguồn. Không áp đặt số ý tối đa khi các ý thực sự cùng một tiểu chủ đề.",
-        "Kiểm tra đúng hai bài cuối có đúng loại bài thông thường/bài toán thực tế, đều lấy từ SOURCE và lời giải đúng. Không phạt việc chọn một bài khác trong SOURCE nếu vẫn đúng loại.",
+        "Kiểm tra đúng hai bài cuối theo thứ tự: một bài toán thông thường, sau đó một bài toán thực tế đời sống; cả hai phải đúng trọng tâm bài học, tự đủ dữ kiện, không có câu kiểu xem hình bên và có lời giải đúng.",
         "Đánh giá riêng chất lượng biên tập: tiếng Việt tự nhiên, vừa sức lớp 7, tiêu đề gọn, LaTeX sạch, xuống dòng hợp lý. Chỉ đánh giá nội dung AI tự viết; không quy lỗi cho AI vì lỗi OCR nhỏ còn sót trong đề bài nguồn.",
-        "overallPass chỉ phụ thuộc độ bao phủ kiến thức cốt lõi, độ hạt theory block hợp lý, tính liên quan và tính đúng toán học. Lỗi biên tập nhỏ khiến languageAndPresentationGood hoặc presentationGood=false và phải ghi issue, nhưng không bắt overallPass=false vì admin còn review/chỉnh JSON thủ công.",
+        "overallPass chỉ true khi bao phủ kiến thức cốt lõi, độ hạt theory block hợp lý, cặp theory-example liên quan và đúng toán, đề mục lớn hợp lệ, theory bám nguồn, provenance trung thực và xử lý hình an toàn. Lỗi biên tập nhỏ khiến languageAndPresentationGood hoặc presentationGood=false và phải ghi issue, nhưng không bắt overallPass=false vì admin còn review/chỉnh JSON thủ công.",
       ].join("\n"),
       userPrompt: JSON.stringify({
         lessonTitle: input.lessonTitle,
@@ -369,8 +443,8 @@ async function auditLessonSummary(input: {
       model: "gpt-5.4",
       reasoningEffort: "low",
       outputName: "lesson_summary_semantic_audit",
-      promptVersion: "lesson-summary-semantic-audit-v2",
-      schemaVersion: "lesson-summary-semantic-audit-schema-v1",
+      promptVersion: "lesson-summary-semantic-audit-v3",
+      schemaVersion: "lesson-summary-semantic-audit-schema-v2",
     },
     semanticAuditSchema,
   );

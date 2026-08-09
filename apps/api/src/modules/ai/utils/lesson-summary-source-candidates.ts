@@ -5,18 +5,20 @@ import type { RetrievedChunk } from "#api/modules/ai/types/ai-text.types";
 export type LessonSummarySourceCandidate = {
   id: string;
   sourceChunkId: string;
-  relatedTopicId: string | null;
+  relatedTopicIdHint: string | null;
   kindHint: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE" | "UNKNOWN";
   formatHint: "SINGLE" | "MULTI_PART";
   pedagogyHint: "DISCOVERY" | "WORKED_EXAMPLE" | "PRACTICE" | "APPLICATION" | "UNKNOWN";
   completenessHint: "COMPLETE" | "INCOMPLETE" | "REQUIRES_FIGURE";
+  visualDependencyHint: "NONE" | "SOURCE_IMAGE";
   problem: string;
 };
 
 export type LessonSummarySourceTopic = {
   id: string;
   sourceChunkId: string;
-  heading: string;
+  sourceHeadingRaw: string;
+  headingQualityHint: "CLEAN" | "POSSIBLY_BROKEN";
 };
 
 const CANDIDATE_START_PATTERN =
@@ -24,9 +26,9 @@ const CANDIDATE_START_PATTERN =
 const TASK_PATTERN =
   /(?:\?|(?:^|[^\p{L}])(?:tính|tìm|hãy|chứng\s*minh|so\s*sánh|sắp\s*xếp|viết|vẽ|cho\s+tam\s+giác|giải\s+thích|xác\s*định|biểu\s*diễn)(?=$|[^\p{L}]))/iu;
 const SOLUTION_BOUNDARY_PATTERN =
-  /(?:\n|[.!?]\s+)(?:giải|lời\s*giải|đáp\s*án|chú\s*ý|nhận\s*xét)\s*(?=[:.]|\\begin|\n|$)/iu;
+  /(?:\n|[.!?]\s+)(?:giải|lời\s*giải|đáp\s*án|chú\s*ý|nhận\s*xét)\s*(?=[:.(]|\\begin|\n|$)/iu;
 const REAL_WORLD_SIGNAL_PATTERN =
-  /(?:^|[^\p{L}])(?:thực\s*tế|đời\s*sống|người|cửa\s*hàng|thư\s*viện|khoai\s*tây|khinh\s*khí\s*cầu|chiếc\s*thang|chiếc\s*áo|giảm\s*giá|bức\s*tường|bánh\s*chưng|quả\s*cân|mảnh\s*sân|sàn\s*thi\s*đấu|kim\s*tự\s*tháp|giá\s*sách|tấm\s*ảnh|viên\s*gạch|dân\s*số|nhiệt\s*độ|vận\s*tốc|quãng\s*đường|trái\s*đất|mặt\s*trời|mộc\s*tinh|lượng\s*nước|công\s*trình)(?=$|[^\p{L}])/iu;
+  /(?:^|[^\p{L}])(?:thực\s*tế|đời\s*sống|người|cửa\s*hàng|thư\s*viện|khoai\s*tây|khinh\s*khí\s*cầu|chiếc\s*thang|chiếc\s*áo|giảm\s*giá|bức\s*tường|bánh\s*chưng|quả\s*cân|mảnh\s*sân|sàn\s*thi\s*đấu|kim\s*tự\s*tháp|giá\s*sách|tấm\s*ảnh|viên\s*gạch|dân\s*số|nhiệt\s*độ|vận\s*tốc|quãng\s*đường|trái\s*đất|mặt\s*trời|mộc\s*tinh|lượng\s*nước|công\s*trình|mái\s*nhà|biển\s*báo|cổng\s*trang\s*trí|khung\s*kim\s*loại|xưởng|bể\s*chứa|bể\s*hình\s*lập\s*phương)(?=$|[^\p{L}])/iu;
 
 export function buildLessonSummarySourceCandidates(
   chunks: RetrievedChunk[],
@@ -56,7 +58,7 @@ export function buildLessonSummarySourceCandidates(
       candidates.push({
         id: `C${String(candidates.length + 1).padStart(3, "0")}`,
         sourceChunkId: chunk.id,
-        relatedTopicId: findRelatedTopicId({
+        relatedTopicIdHint: findRelatedTopicId({
           chunks,
           chunkIndex,
           chunk,
@@ -66,7 +68,10 @@ export function buildLessonSummarySourceCandidates(
         kindHint: classifyCandidate(problem),
         formatHint: classifyCandidateFormat(problem),
         pedagogyHint: classifyCandidatePedagogy(problem),
-        completenessHint: classifyCandidateCompleteness(problem),
+        completenessHint: classifyCandidateCompleteness(rawProblem),
+        visualDependencyHint: hasSourceVisualDependency(rawProblem)
+          ? "SOURCE_IMAGE"
+          : "NONE",
         problem,
       });
     });
@@ -104,7 +109,7 @@ export function attachLessonSummarySourceCandidates(chunks: RetrievedChunk[]) {
       ...(chunk.metadata ?? {}),
       sourceTopics: (topicsByChunk.get(chunk.id) ?? []).map((topic) => {
         const relatedCandidates = candidates.filter(
-          (candidate) => candidate.relatedTopicId === topic.id,
+          (candidate) => candidate.relatedTopicIdHint === topic.id,
         );
         return {
           ...topic,
@@ -136,17 +141,20 @@ function extractTopicMatches(chunk: RetrievedChunk) {
 
   patterns.forEach(({ pattern, requireUppercase }) => {
     for (const match of chunk.content.matchAll(pattern)) {
-      const heading = (match[1] ?? "").replace(/\\\\/gu, " ").trim();
-      if (!isTheoryTopicHeading(heading, requireUppercase)) continue;
+      const sourceHeadingRaw = (match[1] ?? "").replace(/\\\\/gu, " ").trim();
+      if (!isTheoryTopicHeading(sourceHeadingRaw, requireUppercase)) continue;
       const offset = match.index ?? 0;
-      const normalized = normalizeCandidate(heading);
-      if (matches.some((value) => normalizeCandidate(value.heading) === normalized)) {
+      const normalized = normalizeCandidate(sourceHeadingRaw);
+      if (
+        matches.some((value) => normalizeCandidate(value.sourceHeadingRaw) === normalized)
+      ) {
         continue;
       }
       matches.push({
-        id: `${chunk.id}#topic-${createHash("sha256").update(`${offset}:${heading}`).digest("hex").slice(0, 12)}`,
+        id: `${chunk.id}#topic-${createHash("sha256").update(`${offset}:${sourceHeadingRaw}`).digest("hex").slice(0, 12)}`,
         sourceChunkId: chunk.id,
-        heading,
+        sourceHeadingRaw,
+        headingQualityHint: classifyHeadingQuality(sourceHeadingRaw),
         offset,
       });
     }
@@ -166,14 +174,15 @@ function buildTopicsWithOffsets(chunks: RetrievedChunk[]) {
       /\\section\*?\{\\section\*?\{\d+\}\s*\\\\\s*\\section\*?\{([^}]+)\}\}/iu.exec(
         chunk.content,
       );
-    const heading = nestedLessonHeading?.[1]?.trim();
-    if (!heading) continue;
+    const sourceHeadingRaw = nestedLessonHeading?.[1]?.trim();
+    if (!sourceHeadingRaw) continue;
     const offset = nestedLessonHeading?.index ?? 0;
     return assignCompactTopicIds([
       {
-        id: `${chunk.id}#topic-${createHash("sha256").update(`${offset}:${heading}`).digest("hex").slice(0, 12)}`,
+        id: `${chunk.id}#topic-${createHash("sha256").update(`${offset}:${sourceHeadingRaw}`).digest("hex").slice(0, 12)}`,
         sourceChunkId: chunk.id,
-        heading,
+        sourceHeadingRaw,
+        headingQualityHint: classifyHeadingQuality(sourceHeadingRaw),
         offset,
         chunkId: chunk.id,
       },
@@ -182,7 +191,7 @@ function buildTopicsWithOffsets(chunks: RetrievedChunk[]) {
 
   const fallbackChunk = chunks.find((chunk) => chunk.content.trim().length > 0);
   if (!fallbackChunk) return [];
-  const heading =
+  const sourceHeadingRaw =
     fallbackChunk.content
       .split(/\r?\n/gu)
       .map((line) => line.replace(/^#+\s*/u, "").trim())
@@ -190,9 +199,10 @@ function buildTopicsWithOffsets(chunks: RetrievedChunk[]) {
       ?.slice(0, 240) ?? "Nội dung bài học";
   return assignCompactTopicIds([
     {
-      id: `${fallbackChunk.id}#topic-${createHash("sha256").update(`0:${heading}`).digest("hex").slice(0, 12)}`,
+      id: `${fallbackChunk.id}#topic-${createHash("sha256").update(`0:${sourceHeadingRaw}`).digest("hex").slice(0, 12)}`,
       sourceChunkId: fallbackChunk.id,
-      heading,
+      sourceHeadingRaw,
+      headingQualityHint: classifyHeadingQuality(sourceHeadingRaw),
       offset: 0,
       chunkId: fallbackChunk.id,
     },
@@ -220,6 +230,19 @@ function isTheoryTopicHeading(value: string, requireUppercase: boolean) {
     (character) => character === character.toLocaleUpperCase("vi"),
   );
   return letters.length >= 4 && uppercase.length / letters.length >= 0.65;
+}
+
+function classifyHeadingQuality(
+  value: string,
+): LessonSummarySourceTopic["headingQualityHint"] {
+  if (
+    value.includes("�") ||
+    /(?:\\[A-Za-z]+\{|[_]{2,}|\?{2,}|\b\p{L}\s+\p{L}\s+\p{L}\b)/u.test(value) ||
+    value.replace(/[^\p{L}\p{N}]/gu, "").length < 4
+  ) {
+    return "POSSIBLY_BROKEN";
+  }
+  return "CLEAN";
 }
 
 function findRelatedTopicId(input: {
@@ -275,9 +298,10 @@ function truncateSolution(value: string) {
 function sanitizeCandidateProblem(value: string) {
   return value
     .replace(
-      /\\begin\{figure\}[\s\S]*?\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}[\s\S]*?\\end\{figure\}/gu,
-      (_match, imageUrl: string) => `![](${imageUrl})`,
+      /\\begin\{figure\}[\s\S]*?\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}[\s\S]*?\\end\{figure\}/gu,
+      "",
     )
+    .replace(/!\[[^\]]*\]\([^)]*\)/gu, "")
     .replace(/\\begin\{figure\}[\s\S]*?\\end\{figure\}/gu, "")
     .replace(/\\(?:begin|end)\{itemize\}/gu, "")
     .replace(
@@ -345,10 +369,17 @@ function classifyCandidateCompleteness(
   value: string,
 ): LessonSummarySourceCandidate["completenessHint"] {
   if (isObviouslyIncompleteCandidate(value)) return "INCOMPLETE";
-  if (/\bHình\s*\d+(?:\.\d+)?\b/iu.test(value) || /!\[[^\]]*\]\([^)]*\)/u.test(value)) {
+  if (hasSourceVisualDependency(value)) {
     return "REQUIRES_FIGURE";
   }
   return "COMPLETE";
+}
+
+function hasSourceVisualDependency(value: string) {
+  return (
+    /\\includegraphics|\\begin\{figure\}|!\[[^\]]*\]\([^)]*\)/u.test(value) ||
+    /\b(?:Hình|hình vẽ)\s*\d+(?:\.\d+)?\b/iu.test(value)
+  );
 }
 
 function isObviouslyIncompleteCandidate(value: string) {

@@ -31,10 +31,7 @@ import { AuthTokenService } from "#api/modules/auth/services/auth-token.service"
 import type { AiService } from "#api/modules/ai/services/ai.service";
 import { LessonSummaryContextService } from "#api/modules/ai/services/lesson-summary-context.service";
 import type { AiGenerationExecutionContext } from "#api/modules/ai/types/ai-generation.types";
-import {
-  buildLessonSummarySourceCandidates,
-  buildLessonSummarySourceTopics,
-} from "#api/modules/ai/utils/lesson-summary-source-candidates";
+import { buildLessonSummarySourceTopics } from "#api/modules/ai/utils/lesson-summary-source-candidates";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
 import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
@@ -70,21 +67,18 @@ const chunkContent =
   "Ví dụ 1. Chứng minh số 1/2 là một số hữu tỉ.\n\n" +
   "Luyện tập 1. Viết số 0,25 dưới dạng phân số.\n\n" +
   "Vận dụng 1. Một chiếc áo giá 200 000 đồng được giảm 25%. Tính giá sau khi giảm.";
-const sourceCandidates = buildLessonSummarySourceCandidates([
-  { id: ids.chunk, content: chunkContent },
-]);
 const sourceTopicId = buildLessonSummarySourceTopics([
   { id: ids.chunk, content: chunkContent },
 ])[0]!.id;
-const candidateId = (text: string) =>
-  sourceCandidates.find((candidate) => candidate.problem.includes(text))!.id;
 const generatedOutput = {
   title: "Số hữu tỉ",
   objectives: ["Nhận biết số hữu tỉ"],
   theorySections: [
     {
       sourceTopicId,
-      displayHeading: "Số hữu tỉ",
+      displayHeading: buildLessonSummarySourceTopics([
+        { id: ids.chunk, content: chunkContent },
+      ])[0]!.sourceHeadingRaw,
       sourceChunkIds: [ids.chunk],
       units: [
         {
@@ -93,17 +87,16 @@ const generatedOutput = {
             title: "Khái niệm số hữu tỉ",
             content: "Số hữu tỉ viết được dưới dạng $a/b$ với $b \\ne 0$.",
             sourceChunkIds: [ids.chunk],
+            diagramSpec: null,
           },
           illustration: {
             type: "example",
             exampleKind: "ILLUSTRATION",
-            sourceCandidateId: candidateId("Chứng minh số 1/2"),
-            alignment: "Ví dụ áp dụng trực tiếp định nghĩa số hữu tỉ.",
-            verification: "Đã kiểm tra mẫu số 2 khác 0 và kết luận đúng định nghĩa.",
+            problem: "Chứng minh số $1/2$ là một số hữu tỉ.",
             solution: "Ta có mẫu số 2 khác 0.",
             answer: "$1/2$ là số hữu tỉ.",
+            diagramSpec: null,
           },
-          illustrationPlacement: "AFTER_THEORY",
           notes: [
             {
               type: "note",
@@ -116,27 +109,24 @@ const generatedOutput = {
     },
   ],
   applicationExercises: {
-    sourceHeading: "Bài tập",
     displayHeading: "Bài tập vận dụng",
-    sourceChunkIds: [ids.chunk],
     standardExercise: {
       type: "example",
       exampleKind: "STANDARD_EXERCISE",
-      sourceCandidateId: candidateId("Viết số 0,25"),
+      problem: "Viết số $0,25$ dưới dạng phân số tối giản.",
       solution: "$0,25 = 1/4$.",
       answer: "$1/4$.",
-      verification: "$1/4=0,25$, khớp đề bài.",
+      diagramSpec: null,
     },
     realWorldExercise: {
       type: "example",
       exampleKind: "REAL_WORLD_EXERCISE",
-      sourceCandidateId: candidateId("Một chiếc áo"),
+      problem: "Một chiếc áo giá 200 000 đồng được giảm 25%. Tính giá sau khi giảm.",
       solution: "Số tiền giảm là 50 000 đồng.",
       answer: "150 000 đồng.",
-      verification: "200 000 - 50 000 = 150 000 đồng.",
+      diagramSpec: null,
     },
   },
-  warnings: null,
 };
 
 describe("M9.2 lesson summary API and worker integration", () => {
@@ -250,13 +240,13 @@ describe("M9.2 lesson summary API and worker integration", () => {
         systemInstructions: "SYSTEM PREVIEW CUSTOM",
         userPrompt: "USER PREVIEW CUSTOM",
         temperature: 0.1,
-        maxOutputTokens: 6_000,
+        maxOutputTokens: 8_000,
       })
       .expect(200);
 
     expect(response.body.data).toMatchObject({
-      promptVersion: "lesson-summary-prompt-v22",
-      schemaVersion: "lesson-summary-schema-v19",
+      promptVersion: "lesson-summary-prompt-v33",
+      schemaVersion: "lesson-summary-schema-v25",
       systemPrompt: expect.stringContaining("SYSTEM PREVIEW CUSTOM"),
       userPrompt: expect.stringContaining("USER PREVIEW CUSTOM"),
       inputPrompt: expect.stringContaining("Số hữu tỉ viết được"),
@@ -279,7 +269,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
           },
         },
         temperature: 0.1,
-        max_output_tokens: 6_000,
+        max_output_tokens: 8_000,
       },
       context: {
         documentCount: 1,
@@ -290,7 +280,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
       },
       configuration: {
         temperature: 0.1,
-        maxOutputTokens: 6_000,
+        maxOutputTokens: 8_000,
       },
     });
     expect(queueMock.enqueue).not.toHaveBeenCalled();
@@ -383,10 +373,14 @@ describe("M9.2 lesson summary API and worker integration", () => {
       source: ContentSource.AI,
       reviewStatus: ReviewStatus.NEEDS_REVIEW,
       aiGenerationId: generation!.id,
+      contentJson: expect.objectContaining({
+        type: "lesson_summary_blocks",
+        version: 2,
+      }),
     });
     expect(JSON.stringify(summary.contentJson)).toContain("Bài tập vận dụng");
-    expect(JSON.stringify(summary.contentJson)).toContain("Cần admin kiểm tra");
-    expect(JSON.stringify(summary.contentJson)).toContain("trộn ví dụ/bài tập/ghi chú");
+    expect(JSON.stringify(summary.contentJson)).not.toContain("Cần admin kiểm tra");
+    expect(JSON.stringify(summary.contentJson)).not.toContain("warningDetails");
 
     await prisma.$transaction([
       prisma.backgroundJob.update({

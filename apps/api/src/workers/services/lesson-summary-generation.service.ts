@@ -120,7 +120,7 @@ export class LessonSummaryGenerationService {
     );
     const contentJson = {
       type: "lesson_summary_blocks",
-      version: 1,
+      version: 2,
       data: output,
     } as Prisma.InputJsonValue;
 

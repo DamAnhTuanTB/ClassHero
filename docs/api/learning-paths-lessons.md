@@ -679,7 +679,7 @@ Body:
   "model": "gpt-4.1-mini",
   "temperature": 0.2,
   "reasoningEffort": "medium",
-  "maxOutputTokens": 6000
+  "maxOutputTokens": 8000
 }
 ```
 
@@ -701,8 +701,8 @@ Rules:
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
   tiêu gần đúng và được kết hợp với `length` khi dựng user prompt.
 - `temperature` giới hạn `0..1`, `reasoningEffort` nhận `low | medium | high`,
-  `maxOutputTokens` giới hạn `6000..32000`; bỏ trống thì dùng Cài đặt AI hiện tại
-  với sàn mặc định `6000` cho Summary.
+  `maxOutputTokens` giới hạn `8000..32000`; bỏ trống thì dùng Cài đặt AI hiện tại
+  với sàn mặc định `8000` cho Summary.
 
 Response: `202 Accepted`.
 
@@ -723,17 +723,14 @@ Side effects:
 - Enqueue AI generation job.
 - Worker upsert summary với `source = AI`, `reviewStatus = NEEDS_REVIEW` và
   `aiGenerationId` để admin review trước khi student nhìn thấy.
-- Output qua được JSON Schema/Zod kỹ thuật luôn được lưu; kiểm tra ngữ nghĩa,
-  source reference và cách trình bày chỉ bổ sung `contentJson.data.warnings` để
-  admin xem/sửa, không reject job và không kích hoạt provider call sửa lần hai.
-- Nếu model tham chiếu candidate/chunk không tồn tại, mapper giữ bản nháp ở dạng
-  có thể biên tập, dùng source chunk hợp lệ dự phòng và placeholder có cảnh báo.
+- Output qua được JSON Schema/Zod kỹ thuật luôn được lưu để admin sửa trực tiếp;
+  không trả panel warning kỹ thuật và không kích hoạt provider call sửa lần hai.
   JSON hỏng, sai provider schema hoặc lỗi provider/hạ tầng vẫn làm job thất bại.
-- Target contract v3 của `M9.2` không đổi endpoint/body generation nhưng dự kiến
-  trả `contentJson.type=lesson_summary_blocks`, `version=2`: ví dụ có provenance
-  và optional structured `diagramSpec`; API/FE phải tiếp tục đọc version 1. Đây là
-  thiết kế đã chốt nhưng chưa phải behavior production cho tới khi implementation
-  và live/manual acceptance hoàn tất.
+- Contract v3 không đổi endpoint/body generation và trả
+  `contentJson.type=lesson_summary_blocks`, `version=2`. Example mới chỉ lưu đề,
+  lời giải, đáp án và chỉ có visual khi thật sự có `DIAGRAM_SPEC` bắt buộc
+  `toScale=true`; không có origin/sourceAssessment/candidate metadata. API/FE
+  tiếp tục đọc version 1 và dữ liệu version 2 cũ.
 
 ### `POST /admin/lessons/:lessonId/summary/prompt-preview`
 

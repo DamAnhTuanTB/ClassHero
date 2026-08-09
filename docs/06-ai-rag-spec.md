@@ -461,7 +461,7 @@ Input:
   "model": "string optional",
   "temperature": 0.2,
   "reasoningEffort": "medium",
-  "maxOutputTokens": 6000
+  "maxOutputTokens": 8000
 }
 ```
 
@@ -506,7 +506,11 @@ và trải phẳng sang output lưu trữ:
 
 Backend chuyển output sang `lesson_summaries.content_json` tương thích Tiptap nếu cần.
 
-#### 5.1.1. Cấu trúc phần bài tập của bản kiến thức
+#### 5.1.1. Contract v2 lịch sử
+
+Phần này ghi lại behavior v2 để rollback/so sánh. Generation mới dùng
+contract v3 tại 5.1.2; các yêu cầu v2 về placement trước theory, bắt buộc
+copy mọi bài từ candidate và giữ ảnh OCR không còn áp dụng cho output v2.
 
 Phạm vi nguồn là invariant của lesson:
 
@@ -598,7 +602,7 @@ Prompt/input contract:
   chèn raw chunk content vào delimiter XML có thể bị đóng thẻ bởi nội dung nguồn.
 - Prompt phải phân biệt rõ `ILLUSTRATION` trong section lý thuyết với hai exercise
   của section cuối và yêu cầu self-check trước structured output.
-- Ngân sách output tối thiểu/mặc định là `6_000` token, cho phép cấu hình tới
+- Ngân sách output tối thiểu/mặc định là `8_000` token, cho phép cấu hình tới
   `32_000` token và vẫn giữ budget reservation hiện có.
 - Candidate phụ thuộc hình được gắn warning để admin đối chiếu hình với lời giải
   trước khi duyệt. Provider hiện nhận context dạng text/Markdown; URL ảnh local
@@ -641,17 +645,17 @@ Summary context rules:
   terminal không chặn admin regenerate.
 - AI summary được map sang contract block có thể biên tập rồi upsert với `source = AI`,
   `review_status = NEEDS_REVIEW` và liên kết `ai_generation_id`.
-- FE Summary phải hiển thị panel warning không chặn thao tác, nêu rõ nội dung vẫn
-  được lưu thành bản nháp và liệt kê các điểm admin nên sửa trước khi phát hành.
+- FE Summary không hiển thị mã cảnh báo kỹ thuật hoặc provenance của ví dụ. Admin
+  xem và sửa trực tiếp nội dung block/JSON trước khi phát hành.
 - Chỉ lỗi kỹ thuật khiến output không parse/không qua JSON Schema/Zod hoặc lỗi
   provider/hạ tầng mới làm job thất bại; cảnh báo ngữ nghĩa không phải lỗi job.
 - Khi admin tắt công thức, ví dụ, lỗi thường gặp hoặc đặt số câu ôn tập bằng
   `0`, output schema chấp nhận mảng rỗng và Tiptap mapper không render heading
   rỗng tương ứng.
 
-#### 5.1.2. Target authoring contract v3 (đã chốt, chưa triển khai)
+#### 5.1.2. Authoring contract v3 (current)
 
-Lượt nâng cấp kế tiếp của `M9.2` dùng mô hình “source-grounded ClassHero
+Generation mới của `M9.2` dùng mô hình “source-grounded ClassHero
 authoring”: nguồn quyết định phạm vi kiến thức và đề mục lớn, còn ClassHero quyết
 định cách chia block, diễn giải, ví dụ, bài tập và sơ đồ. Kế hoạch kỹ thuật đầy đủ
 nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
@@ -659,21 +663,34 @@ nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
 - Giữ `theorySections[].units[]`; mỗi unit luôn flatten thành
   `[theory, illustration, ...notes]`, không còn `BEFORE_THEORY` hoặc
   `illustrationPlacement`.
-- `displayHeading` phải bằng heading nguồn. Chỉ lỗi OCR khách quan mới được dùng
-  `OCR_REPAIRED`, kèm `sourceHeadingRaw`, heading sửa, lý do và source chunks.
-- T/C do backend trích chỉ là hint. Model phải audit và trả
-  `CONFIRMED|CORRECTED|UNCERTAIN`; correction không được tạo source ID mới.
-- Theory chỉ dùng kiến thức được source chunks hỗ trợ. Example/exercise dùng một
-  trong `SOURCE_EXACT|SOURCE_ADAPTED|AI_AUTHORED` và luôn có provenance.
+- Các section giữ nguyên thứ tự nguồn. `displayHeading` giữ nguyên ý nghĩa và phạm
+  vi heading nguồn, chủ động sửa sạch lỗi OCR/chính tả và bỏ số thứ tự đầu dòng
+  vì UI tự hiển thị số. Output không trả decision/reason/audit report.
+- T/C và candidate metadata chỉ giúp model hiểu context; không xuất hiện trong
+  output. Không có `sourceAssessment`, `origin`, candidate ID, `alignment` hoặc
+  `verification` trong contract generation mới.
+- Theory chỉ dùng kiến thức được source chunks hỗ trợ. Mỗi unit luôn là một block
+  theory rồi ngay sau là một example minh họa trực tiếp. Example chỉ cần đề bài,
+  lời giải, đáp án và `diagramSpec`.
+- Với bài Hình học, mọi knowledge/theorem/property/procedure và mọi
+  example/exercise đều bắt buộc có đúng một `diagramSpec`. Với bài không thuộc
+  Hình học, khối hoặc bài yêu cầu vẽ, đọc hay suy luận từ đồ thị, trục số, mặt
+  phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc có spec. Hệ thống render
+  hình ngay dưới content của theory hoặc ngay sau đề bài.
 - Candidate phụ thuộc hình không được persist ảnh OCR. Model phải làm đề tự đủ dữ
-  kiện hoặc trả `diagramSpec`; app validate và render sơ đồ deterministic, không
-  nhận raw SVG/URL/script và không gọi image-generation provider.
+  kiện hoặc trả `diagramSpec`; mọi cụm kiểu `xem hình bên`, `quan sát hình dưới`
+  phải bị loại khỏi đề. App validate và render sơ đồ deterministic, không
+  nhận raw SVG/URL/script và không gọi image-generation provider. `toScale=true`
+  là bắt buộc; tọa độ phải đúng tỉ lệ dữ kiện và marker hình học phải khớp
+  quan hệ thực. Tia/đường/đoạn dùng đúng `RAY`/`LINE`/`SEGMENT`; đồ thị cong dùng
+  `POLYLINE` qua các điểm đúng tỉ lệ; `POLYGON` chỉ dành cho hình kín.
 - Section cuối tiếp tục khóa literal `Bài tập vận dụng`, đúng hai bài theo thứ tự
   standard rồi real-world.
-- Generation mới dự kiến lưu `lesson_summary_blocks.version=2`; parser/renderer
+- Generation mới lưu `lesson_summary_blocks.version=2`; parser/renderer
   vẫn hỗ trợ version 1, không migration phá dữ liệu cũ.
-- Semantic issue tiếp tục là warning không chặn; JSON Schema/Zod/hạ tầng không hợp
-  lệ vẫn là lỗi kỹ thuật. Không thêm repair/judge provider call bắt buộc.
+- Không persist/hiển thị warning kỹ thuật trong summary. JSON Schema/Zod/hạ tầng
+  không hợp lệ vẫn là lỗi kỹ thuật; nội dung hợp lệ về cấu trúc được lưu để admin
+  tự review và sửa, không thêm repair/judge provider call bắt buộc.
 
 ### 5.2. Quiz generation
 

@@ -157,7 +157,7 @@ Tác vụ nên dùng worker/job:
 - Email/Zalo notification.
 - Ảnh minh họa/render nặng nếu có.
 
-Riêng target lesson-summary contract v3 của `M9.2`, `diagramSpec` được render
+Riêng lesson-summary contract v3 của `M9.2`, `diagramSpec` được render
 deterministic trong ứng dụng và không tạo thêm image-generation provider call.
 Generation vẫn chỉ có một structured-output call; semantic warning không kích
 hoạt repair/judge call. Renderer phải giới hạn số primitive/label và lazy-load ở
@@ -202,8 +202,9 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 - Retrieval chỉ lấy context cần thiết theo `lesson_id`; không có retrieval cấp chapter ở MVP.
 - Cache AI explanation theo item khi docs đã quy định.
 - Giới hạn số chunk/context đưa vào model.
-- Validate JSON Schema/Zod kỹ thuật trước khi lưu. Kiểm tra ngữ nghĩa của Summary
-  chỉ sinh warning cho admin và không gọi provider repair lần hai.
+- Validate JSON Schema/Zod kỹ thuật trước khi lưu. Summary hợp lệ được lưu để
+  admin sửa trực tiếp; không hiển thị warning kỹ thuật và không gọi provider
+  repair lần hai.
 - Có fallback/error state thân thiện khi provider chậm/lỗi.
 - Ghi log usage/duration khi module AI log đã có.
 - Khi test runtime với provider trả phí, ưu tiên cache/sample trước; forced/full run phải có ước tính usage/chi phí và xác nhận rõ của owner trước khi chạy.

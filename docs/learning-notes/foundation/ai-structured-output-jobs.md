@@ -90,6 +90,15 @@ schema, map sang block contract theo kiểu best-effort reference, gắn semanti
 `lesson_summaries` ở trạng thái `NEEDS_REVIEW`. Raw PDF và raw prompt không được
 lưu trong durable job.
 
+Contract v3 giữ heading/theory bám nguồn nhưng cố ý làm output biên tập đơn giản:
+model chủ động sửa lỗi OCR/chính tả của heading, còn example không mang
+`origin`, candidate ID hay `sourceAssessment`. Backend coi topic/candidate
+classification là dữ liệu hỗ trợ input, không phải metadata phải trả lại. Hình minh họa dùng shared
+`DIAGRAM_SPEC` đã validate và renderer SVG kiểm soát; không persist URL ảnh
+OCR, raw SVG hoặc câu kiểu `xem hình bên`. Contract buộc `toScale=true`; mapper
+kiểm point/viewBox và đối chiếu marker vuông góc, song song, bằng độ dài
+với tọa độ. Nếu không cần hình thì block không lưu field visual.
+
 ## File quan trọng
 
 - `apps/api/src/modules/ai/providers/openai.provider.ts`

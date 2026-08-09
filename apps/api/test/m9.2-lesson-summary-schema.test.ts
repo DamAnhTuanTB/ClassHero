@@ -24,7 +24,7 @@ const contextChunks = [
   {
     id: ids.theory,
     content:
-      "Số hữu tỉ là số viết được dưới dạng a/b, trong đó a, b là số nguyên và b khác 0.",
+      "\\section*{1 SỐ HỮU TỈ}\nSố hữu tỉ là số viết được dưới dạng a/b, trong đó a, b là số nguyên và b khác 0.",
   },
   {
     id: ids.example,
@@ -36,19 +36,7 @@ const contextChunks = [
       "Luyện tập 1. Viết số 0,25 dưới dạng phân số.\n\nVận dụng 1. Một cửa hàng giảm giá chiếc áo 200 000 đồng đi 25%. Tính giá chiếc áo sau khi giảm.",
   },
 ];
-const sourceCandidates = buildLessonSummarySourceCandidates(contextChunks);
 const sourceTopicId = buildLessonSummarySourceTopics(contextChunks)[0]!.id;
-const candidateIds = {
-  illustration: sourceCandidates.find((candidate) =>
-    candidate.problem.includes("Chứng minh số 1/2"),
-  )!.id,
-  standard: sourceCandidates.find((candidate) =>
-    candidate.problem.includes("Viết số 0,25"),
-  )!.id,
-  realWorld: sourceCandidates.find((candidate) =>
-    candidate.problem.includes("Một cửa hàng"),
-  )!.id,
-};
 
 function createProviderOutput() {
   return {
@@ -57,7 +45,7 @@ function createProviderOutput() {
     theorySections: [
       {
         sourceTopicId,
-        displayHeading: "Số hữu tỉ",
+        displayHeading: "SỐ HỮU TỈ",
         sourceChunkIds: [ids.theory],
         units: [
           {
@@ -67,18 +55,16 @@ function createProviderOutput() {
               content:
                 "Số hữu tỉ là số viết được dưới dạng $a/b$, với $a, b$ là số nguyên và $b \\ne 0$.",
               sourceChunkIds: [ids.theory],
+              diagramSpec: null,
             },
             illustration: {
               type: "example" as const,
               exampleKind: "ILLUSTRATION" as const,
-              sourceCandidateId: candidateIds.illustration,
-              alignment: "Ví dụ áp dụng trực tiếp định nghĩa số hữu tỉ.",
-              verification:
-                "Đề chỉ cần kiểm tra dạng phân số và lời giải đã đối chiếu mẫu số khác 0.",
+              problem: "Chứng minh số $1/2$ là một số hữu tỉ.",
               solution: "Ta có $1/2$ là một phân số có mẫu khác 0.",
               answer: "$1/2$ là số hữu tỉ.",
+              diagramSpec: null,
             },
-            illustrationPlacement: "AFTER_THEORY" as const,
             notes: [
               {
                 type: "note" as const,
@@ -91,27 +77,25 @@ function createProviderOutput() {
       },
     ],
     applicationExercises: {
-      sourceHeading: "Bài tập",
       displayHeading: "Bài tập vận dụng" as const,
-      sourceChunkIds: [ids.exercise],
       standardExercise: {
         type: "example" as const,
         exampleKind: "STANDARD_EXERCISE" as const,
-        sourceCandidateId: candidateIds.standard,
+        problem: "Viết số $0,25$ dưới dạng phân số tối giản.",
         solution: "$0,25 = 25/100 = 1/4$.",
         answer: "$1/4$.",
-        verification: "$1/4 = 0,25$, khớp với đề bài.",
+        diagramSpec: null,
       },
       realWorldExercise: {
         type: "example" as const,
         exampleKind: "REAL_WORLD_EXERCISE" as const,
-        sourceCandidateId: candidateIds.realWorld,
-        solution: "Số tiền giảm là $200\,000 \\times 25\\% = 50\,000$ đồng.",
-        answer: "$150\,000$ đồng.",
-        verification: "$200\,000-50\,000=150\,000$ đồng.",
+        problem:
+          "Một cửa hàng giảm giá chiếc áo $200\\,000$ đồng đi $25\\%$. Tính giá chiếc áo sau khi giảm.",
+        solution: "Số tiền giảm là $200\\,000 \\times 25\\% = 50\\,000$ đồng.",
+        answer: "$150\\,000$ đồng.",
+        diagramSpec: null,
       },
     },
-    warnings: null,
   };
 }
 
@@ -132,18 +116,22 @@ describe("M9.2 lesson summary provider contract", () => {
       "example",
       "note",
     ]);
-    const discoveryFirst = createProviderOutput();
-    discoveryFirst.theorySections[0]!.units[0]!.illustrationPlacement = "BEFORE_THEORY";
-    const discoverySummary = mapLessonSummaryProviderOutput({
-      lessonId: "lesson-canonical",
-      output: lessonSummaryProviderOutputSchema.parse(discoveryFirst),
-      contextChunks,
-    });
-    expect(discoverySummary.sections[0]?.blocks.map((block) => block.type)).toEqual([
-      "example",
-      "knowledge",
-      "note",
-    ]);
+    const baseOutput = createProviderOutput();
+    const legacyPlacement = {
+      ...baseOutput,
+      theorySections: [
+        {
+          ...baseOutput.theorySections[0],
+          units: [
+            {
+              ...baseOutput.theorySections[0]!.units[0],
+              illustrationPlacement: "BEFORE_THEORY",
+            },
+          ],
+        },
+      ],
+    };
+    expect(() => lessonSummaryProviderOutputSchema.parse(legacyPlacement)).toThrow();
     expect(summary.sections[1]).toMatchObject({
       order: 2,
       displayHeading: "Bài tập vận dụng",
@@ -155,7 +143,7 @@ describe("M9.2 lesson summary provider contract", () => {
     ]);
   });
 
-  it("keeps semantic issues as admin warnings instead of rejecting the output", () => {
+  it("accepts editable semantic issues without exposing technical warning metadata", () => {
     const output = createProviderOutput();
     output.theorySections[0]!.units[0]!.theory.content += "\nVí dụ: 2/3 là số hữu tỉ.";
 
@@ -164,33 +152,35 @@ describe("M9.2 lesson summary provider contract", () => {
       output: lessonSummaryProviderOutputSchema.parse(output),
       contextChunks,
     });
-    expect(embeddedExample.warnings).toEqual(
-      expect.arrayContaining([expect.stringMatching(/trộn ví dụ\/bài tập\/ghi chú/u)]),
-    );
+    expect(() => lessonSummaryOutputSchema.parse(embeddedExample)).not.toThrow();
+    expect(embeddedExample).not.toHaveProperty("warnings");
+    expect(embeddedExample).not.toHaveProperty("warningDetails");
 
     const embeddedNote = createProviderOutput();
     embeddedNote.theorySections[0]!.units[0]!.theory.content +=
       "\nChú ý: mẫu số phải khác 0.";
-    expect(
-      mapLessonSummaryProviderOutput({
-        lessonId: "lesson-1",
-        output: lessonSummaryProviderOutputSchema.parse(embeddedNote),
-        contextChunks,
-      }).warnings,
-    ).toEqual(
-      expect.arrayContaining([expect.stringMatching(/trộn ví dụ\/bài tập\/ghi chú/u)]),
-    );
+    expect(() =>
+      lessonSummaryOutputSchema.parse(
+        mapLessonSummaryProviderOutput({
+          lessonId: "lesson-1",
+          output: lessonSummaryProviderOutputSchema.parse(embeddedNote),
+          contextChunks,
+        }),
+      ),
+    ).not.toThrow();
 
     const missingNoteExample = createProviderOutput();
     missingNoteExample.theorySections[0]!.units[0]!.notes[0]!.content =
       "Mẫu số phải khác 0.";
-    expect(
-      mapLessonSummaryProviderOutput({
-        lessonId: "lesson-1",
-        output: lessonSummaryProviderOutputSchema.parse(missingNoteExample),
-        contextChunks,
-      }).warnings,
-    ).toEqual(expect.arrayContaining([expect.stringMatching(/phải có một ví dụ ngắn/u)]));
+    expect(() =>
+      lessonSummaryOutputSchema.parse(
+        mapLessonSummaryProviderOutput({
+          lessonId: "lesson-1",
+          output: lessonSummaryProviderOutputSchema.parse(missingNoteExample),
+          contextChunks,
+        }),
+      ),
+    ).not.toThrow();
   });
 
   it("allows ordinary pedagogical wording while still rejecting exercise labels", () => {
@@ -203,23 +193,21 @@ describe("M9.2 lesson summary provider contract", () => {
       output: lessonSummaryProviderOutputSchema.parse(validOutput),
       contextChunks,
     });
-    expect(validSummary.warnings ?? []).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/trộn ví dụ\/bài tập\/ghi chú/u)]),
-    );
+    expect(() => lessonSummaryOutputSchema.parse(validSummary)).not.toThrow();
 
     const invalidOutput = createProviderOutput();
     invalidOutput.theorySections[0]!.units[0]!.theory.content +=
       "\n\nVận dụng 1. Tính giá trị của biểu thức đã cho.";
 
-    expect(
-      mapLessonSummaryProviderOutput({
-        lessonId: "lesson-1",
-        output: lessonSummaryProviderOutputSchema.parse(invalidOutput),
-        contextChunks,
-      }).warnings,
-    ).toEqual(
-      expect.arrayContaining([expect.stringMatching(/trộn ví dụ\/bài tập\/ghi chú/u)]),
-    );
+    expect(() =>
+      lessonSummaryOutputSchema.parse(
+        mapLessonSummaryProviderOutput({
+          lessonId: "lesson-1",
+          output: lessonSummaryProviderOutputSchema.parse(invalidOutput),
+          contextChunks,
+        }),
+      ),
+    ).not.toThrow();
   });
 
   it("warns about a long theory paragraph that should be split into lines or bullets", () => {
@@ -227,17 +215,15 @@ describe("M9.2 lesson summary provider contract", () => {
     output.theorySections[0]!.units[0]!.theory.content =
       "Để cộng hoặc trừ hai số hữu tỉ, ta viết chúng dưới dạng phân số rồi áp dụng quy tắc cộng, trừ phân số. Mỗi số hữu tỉ đều có thể viết dưới dạng phân số với mẫu dương. Phép cộng có tính chất giao hoán và kết hợp giống như với số nguyên. Nếu các số được cho dưới dạng số thập phân thì áp dụng quy tắc của số thập phân.";
 
-    expect(
-      mapLessonSummaryProviderOutput({
-        lessonId: "lesson-1",
-        output: lessonSummaryProviderOutputSchema.parse(output),
-        contextChunks,
-      }).warnings,
-    ).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/phải xuống dòng hoặc dùng bullet/u),
-      ]),
-    );
+    expect(() =>
+      lessonSummaryOutputSchema.parse(
+        mapLessonSummaryProviderOutput({
+          lessonId: "lesson-1",
+          output: lessonSummaryProviderOutputSchema.parse(output),
+          contextChunks,
+        }),
+      ),
+    ).not.toThrow();
 
     output.theorySections[0]!.units[0]!.theory.content =
       output.theorySections[0]!.units[0]!.theory.content.replaceAll(". ", ".\n- ");
@@ -246,22 +232,11 @@ describe("M9.2 lesson summary provider contract", () => {
       output: lessonSummaryProviderOutputSchema.parse(output),
       contextChunks,
     });
-    expect(splitSummary.warnings ?? []).not.toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/phải xuống dòng hoặc dùng bullet/u),
-      ]),
-    );
+    expect(() => lessonSummaryOutputSchema.parse(splitSummary)).not.toThrow();
   });
 
-  it("preserves unknown, duplicated, or wrongly cited outputs with review warnings", () => {
+  it("preserves unknown source topic data as an editable draft", () => {
     for (const mutate of [
-      (output: ReturnType<typeof createProviderOutput>) => {
-        output.applicationExercises.standardExercise.sourceCandidateId = `${ids.exercise}#source-does-not-exist`;
-      },
-      (output: ReturnType<typeof createProviderOutput>) => {
-        output.applicationExercises.standardExercise.sourceCandidateId =
-          output.theorySections[0]!.units[0]!.illustration.sourceCandidateId;
-      },
       (output: ReturnType<typeof createProviderOutput>) => {
         output.theorySections[0]!.sourceChunkIds = [
           "99999999-9999-4999-8999-999999999999",
@@ -278,11 +253,165 @@ describe("M9.2 lesson summary provider contract", () => {
         output: lessonSummaryProviderOutputSchema.parse(output),
         contextChunks,
       });
-      expect(
-        summary.warnings?.some((warning) => warning.includes("Cần admin kiểm tra")),
-      ).toBe(true);
       expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
     }
+  });
+
+  it("uses the spelling-corrected heading returned by AI", () => {
+    const brokenHeadingChunks = [
+      {
+        id: ids.theory,
+        content: "\\section*{1 CỌNG HAI SỐ HỮU TỈ}\nQuy tắc cộng hai số hữu tỉ.",
+      },
+      ...contextChunks.slice(1),
+    ];
+    const repaired = createProviderOutput();
+    repaired.theorySections[0]!.sourceTopicId =
+      buildLessonSummarySourceTopics(brokenHeadingChunks)[0]!.id;
+    repaired.theorySections[0]!.displayHeading = "CỘNG HAI SỐ HỮU TỈ";
+    const repairedSummary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-1",
+      output: lessonSummaryProviderOutputSchema.parse(repaired),
+      contextChunks: brokenHeadingChunks,
+    });
+    expect(repairedSummary.sections[0]).toMatchObject({
+      sourceHeading: "1 CỌNG HAI SỐ HỮU TỈ",
+      displayHeading: "CỘNG HAI SỐ HỮU TỈ",
+    });
+  });
+
+  it("keeps only the first duplicated source topic without rejecting the draft", () => {
+    const output = createProviderOutput();
+    output.theorySections.push(structuredClone(output.theorySections[0]!));
+    const summary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-1",
+      output: lessonSummaryProviderOutputSchema.parse(output),
+      contextChunks,
+    });
+
+    expect(summary.sections).toHaveLength(2);
+    expect(summary.sections[0]?.blocks).toHaveLength(3);
+  });
+
+  it("stores simple examples without origin or source assessment metadata", () => {
+    const baseOutput = createProviderOutput();
+    const output = {
+      ...baseOutput,
+      theorySections: [
+        {
+          ...baseOutput.theorySections[0],
+          units: [
+            {
+              ...baseOutput.theorySections[0]!.units[0],
+              theory: {
+                ...baseOutput.theorySections[0]!.units[0]!.theory,
+              },
+              illustration: {
+                ...baseOutput.theorySections[0]!.units[0]!.illustration,
+                problem:
+                  "Cho angle ABC có số đo $60^\\circ$ và hat{xOz}=65^\u001b0. Hãy đọc tên góc.",
+              },
+            },
+          ],
+        },
+      ],
+      applicationExercises: {
+        ...baseOutput.applicationExercises,
+        standardExercise: {
+          ...baseOutput.applicationExercises.standardExercise,
+          problem:
+            "Bài 1.10. ![Ảnh OCR](https://source.invalid/blur.png) a) Viết $0,5$ dưới dạng phân số tối giản (xem hình bên). b) Viết $0,75$ dưới dạng phân số tối giản.",
+        },
+      },
+    };
+
+    const summary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-1",
+      output: lessonSummaryProviderOutputSchema.parse(output),
+      contextChunks,
+    });
+    const examples = summary.sections.flatMap((section) =>
+      section.blocks.filter((block) => block.type === "example"),
+    );
+    expect(examples.every((example) => !("origin" in example))).toBe(true);
+    expect(examples.every((example) => !("sourceAssessment" in example))).toBe(true);
+    expect(examples.every((example) => !("visual" in example))).toBe(true);
+    expect(examples[1]?.problem).not.toContain("source.invalid");
+    expect(examples[1]?.problem).not.toMatch(/^Bài\s+1\.10/iu);
+    expect(examples[1]?.problem).not.toMatch(/xem hình/iu);
+    expect(examples[1]?.problem).not.toContain("Hình nguồn");
+    expect(examples[0]?.problem).toContain("\\angle ABC");
+    expect(examples[0]?.problem).toContain("\\widehat{xOz}=65^\\circ");
+  });
+
+  it("accepts safe diagram specs and warns about broken references", () => {
+    const baseOutput = createProviderOutput();
+    const diagramSpec = {
+      version: 1,
+      coordinateSystem: "CARTESIAN",
+      viewBox: { minX: 0, minY: 0, width: 10, height: 8 },
+      toScale: true,
+      points: [
+        { id: "A", x: 1, y: 1, label: "A", labelPosition: "BOTTOM_LEFT" },
+        { id: "B", x: 1, y: 6, label: "B", labelPosition: "TOP_LEFT" },
+        { id: "C", x: 4, y: 4, label: "C", labelPosition: "TOP_RIGHT" },
+      ],
+      primitives: [
+        { id: "AB", type: "SEGMENT", from: "A", to: "Z", style: "SOLID" },
+        {
+          id: "curve",
+          type: "POLYLINE",
+          pointIds: ["A", "C", "B"],
+          style: "DASHED",
+        },
+      ],
+      markers: [{ type: "RIGHT_ANGLE", vertex: "A", armPointIds: ["B", "C"] }],
+      labels: [],
+      caption: "Sơ đồ dựng đúng tỉ lệ.",
+    };
+    const output = {
+      ...baseOutput,
+      theorySections: [
+        {
+          ...baseOutput.theorySections[0],
+          units: [
+            {
+              ...baseOutput.theorySections[0]!.units[0],
+              theory: {
+                ...baseOutput.theorySections[0]!.units[0]!.theory,
+                diagramSpec,
+              },
+              illustration: {
+                ...baseOutput.theorySections[0]!.units[0]!.illustration,
+                diagramSpec,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = lessonSummaryProviderOutputSchema.parse(output);
+    const summary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-1",
+      output: parsed,
+      contextChunks,
+    });
+    expect(
+      summary.sections[0]?.blocks.find((block) => block.type === "example"),
+    ).toHaveProperty("visual.kind", "DIAGRAM_SPEC");
+    expect(
+      summary.sections[0]?.blocks.find((block) => block.type === "knowledge"),
+    ).toHaveProperty("visual.kind", "DIAGRAM_SPEC");
+
+    const unsafeOutput = structuredClone(output);
+    unsafeOutput.theorySections[0]!.units[0]!.illustration.diagramSpec!.caption =
+      "https://khong-duoc-phep.example";
+    expect(() => lessonSummaryProviderOutputSchema.parse(unsafeOutput)).toThrow();
+
+    const notToScaleOutput = structuredClone(output);
+    // @ts-expect-error Deliberately violate the provider contract.
+    notToScaleOutput.theorySections[0]!.units[0]!.illustration.diagramSpec!.toScale = false;
+    expect(() => lessonSummaryProviderOutputSchema.parse(notToScaleOutput)).toThrow();
   });
 
   it("keeps the mandatory contract around admin preferences and serializes context as JSON", () => {
@@ -367,6 +496,8 @@ describe("M9.2 lesson summary provider contract", () => {
           "",
           "Ví dụ 1. Tính độ dài đoạn thẳng 5 cm.",
           "",
+          "Ví dụ 2. Tính góc xOy. Giải (H.3.11) Ta có góc xOy bằng 60°.",
+          "",
           "Vän dung. Quả cân ở đĩa bên trái nặng bao nhiêu kilôgam?\n![](https://example.test/balance.jpg)",
           "",
           "Thưchânh",
@@ -405,6 +536,12 @@ describe("M9.2 lesson summary provider contract", () => {
     );
     expect(
       candidates.some((candidate) => candidate.problem.includes("example.test")),
+    ).toBe(false);
+    expect(candidates.some((candidate) => candidate.problem.includes("Ta có"))).toBe(
+      false,
+    );
+    expect(
+      candidates.some((candidate) => candidate.visualDependencyHint === "SOURCE_IMAGE"),
     ).toBe(true);
   });
 
@@ -423,13 +560,13 @@ describe("M9.2 lesson summary provider contract", () => {
     const topics = buildLessonSummarySourceTopics(chunks);
     const candidates = buildLessonSummarySourceCandidates(chunks);
 
-    expect(topics.map((topic) => topic.heading)).toEqual([
+    expect(topics.map((topic) => topic.sourceHeadingRaw)).toEqual([
       "1 KHÁI NIỆM SỐ HỮU TỈ",
       "2 CỘNG HAI SỐ HỮU TỈ",
     ]);
     expect(
       candidates.find((candidate) => candidate.problem.includes("1/2 + 1/3"))
-        ?.relatedTopicId,
+        ?.relatedTopicIdHint,
     ).toBe(topics[1]?.id);
   });
 });

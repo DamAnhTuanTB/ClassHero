@@ -9,7 +9,6 @@ import {
   LayoutTemplate,
   Code2,
   Columns,
-  TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -95,7 +94,6 @@ export function AdminLessonSummaryTab({
   }
 
   const summary = summaryQuery.data;
-  const reviewWarnings = getReviewWarnings(content);
   const save = async (action: "SAVE" | "PUBLISH" | "WITHDRAW") => {
     const isBlocks = content?.type === "lesson_summary_blocks";
     if (!isBlocks && !hasTiptapDocumentContent(content)) {
@@ -191,36 +189,6 @@ export function AdminLessonSummaryTab({
         )}
       </div>
 
-      {reviewWarnings.length > 0 ? (
-        <section
-          aria-labelledby="lesson-summary-review-warnings-title"
-          className="rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4 text-[var(--theme-warning-text)]"
-        >
-          <div className="flex items-start gap-3">
-            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-            <div className="min-w-0 space-y-2">
-              <div>
-                <h4
-                  id="lesson-summary-review-warnings-title"
-                  className="text-sm font-extrabold"
-                >
-                  Có {reviewWarnings.length} điểm cần admin kiểm tra
-                </h4>
-                <p className="mt-1 text-sm font-medium">
-                  Nội dung AI vẫn được lưu thành bản nháp. Hãy chỉnh sửa các điểm dưới đây
-                  trước khi phát hành.
-                </p>
-              </div>
-              <ul className="list-disc space-y-1 pl-5 text-sm font-medium">
-                {reviewWarnings.map((warning, index) => (
-                  <li key={`${index}-${warning}`}>{warning}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       {content?.type === "lesson_summary_blocks" ? (
         <div className="-mx-3 sm:mx-0 py-6 px-3 sm:p-8 bg-white dark:bg-slate-950 rounded-none sm:rounded-2xl shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-800/50">
           {viewMode === "JSON_ONLY" ? (
@@ -260,6 +228,7 @@ export function AdminLessonSummaryTab({
               data={content.data}
               displayTitle={lessonTitle}
               viewMode={viewMode === "UI_ONLY" ? "UI_ONLY" : "SPLIT"}
+              showEditorialMetadata
               onChange={(newData) => setContent({ ...content, data: newData })}
             />
           )}
@@ -332,20 +301,6 @@ export function AdminLessonSummaryTab({
         ) : null}
       </div>
     </div>
-  );
-}
-
-function getReviewWarnings(content: unknown): string[] {
-  if (!content || typeof content !== "object") return [];
-  const record = content as Record<string, unknown>;
-  if (record.type !== "lesson_summary_blocks") return [];
-  const data = record.data;
-  if (!data || typeof data !== "object") return [];
-  const warnings = (data as Record<string, unknown>).warnings;
-  if (!Array.isArray(warnings)) return [];
-  return warnings.filter(
-    (warning): warning is string =>
-      typeof warning === "string" && warning.trim().length > 0,
   );
 }
 

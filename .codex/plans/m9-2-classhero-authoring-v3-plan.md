@@ -1,14 +1,23 @@
 # Kế hoạch M9.2 — ClassHero lesson-summary authoring contract v3
 
-Trạng thái: `Approved design, chưa triển khai`
+Trạng thái: `Đã triển khai và kiểm thử trên codex/m9-2-classhero-authoring-v3; chờ owner nghiệm thu thủ công trên FE`
 
 Task sở hữu: `M9.2` — Admin generate lesson summary
 
 Mode triển khai: `Worker/Integration`, có phần nối `Admin UI` và `Student UI` để review/render contract mới
 
-Contract hiện tại: `lesson-summary-prompt-v22` / `lesson-summary-schema-v19` / persisted `lesson_summary_blocks.version=1`
+Baseline rollback: commit `776a69c1` trên contract
+`lesson-summary-prompt-v22` / `lesson-summary-schema-v19` / persisted
+`lesson_summary_blocks.version=1`
 
-Contract mục tiêu: tên version cụ thể được tăng tại lúc code; persisted target `lesson_summary_blocks.version=2`
+Contract hiện tại: `lesson-summary-prompt-v33` (lấy prompt master làm baseline) /
+`lesson-summary-schema-v25` / persisted `lesson_summary_blocks.version=2`
+
+Quyết định đơn giản hóa của owner ngày 2026-08-09 thay thế các cơ chế audit
+trước đó: generation mới không trả `sourceAssessment`, `origin`, candidate ID,
+heading decision/reason, `alignment`, `verification`, `visual.kind=NONE`,
+`warnings` hoặc `warningDetails`. Các field cũ chỉ còn được parser chấp nhận để
+đọc dữ liệu đã sinh trước khi đổi contract.
 
 ## 1. Mục tiêu sản phẩm đã chốt
 
@@ -19,26 +28,23 @@ Chuyển phần sinh kiến thức từ cách “chọn và chép bài trong OCR
 - Không được sáng tác thêm đề mục lớn hoặc kiến thức ngoài nguồn.
 - Ví dụ luôn đứng ngay sau block lý thuyết mà nó minh họa.
 - Không dùng ảnh OCR mờ của sách làm nội dung học sinh.
-- Bài tập/ví dụ có thể dùng nguyên bản, phỏng theo nguồn hoặc do AI biên soạn, nhưng phải nằm trong kiến thức đã được nguồn xác nhận.
+- Bài tập/ví dụ có thể tham khảo nguồn hoặc do AI biên soạn, nhưng output không
+  cần khai báo nguồn gốc và phải nằm trong phạm vi kiến thức của bài.
 - Section cuối luôn là `Bài tập vận dụng`, gồm đúng hai bài theo thứ tự: một bài thông thường và một bài toán thực tế đời sống.
-- Output đúng JSON/schema được lưu thành bản nháp `NEEDS_REVIEW`; sai ngữ nghĩa chỉ tạo cảnh báo để admin sửa, không làm job thất bại.
+- Output đúng JSON/schema được lưu thành bản nháp `NEEDS_REVIEW`; admin sửa trực
+  tiếp nội dung, không hiển thị panel mã cảnh báo kỹ thuật.
 
 ## 2. Những quyết định không được diễn giải lại
 
 ### 2.1. Đề mục lớn
 
-- `displayHeading` của mỗi theory section phải giống nguyên văn đề mục lớn trong tài liệu nguồn.
-- Không được viết lại heading cho “hay hơn”, “ngắn hơn”, “dễ hiểu hơn” hoặc đồng nhất văn phong.
-- Chỉ được sửa heading khi OCR có lỗi khách quan như mất chữ, sai dấu, ký tự rác, dính/tách từ hoặc công thức bị đọc hỏng.
-- Mọi lần sửa phải trả đủ:
-  - `sourceHeadingRaw`: heading OCR gốc do backend lấy từ source topic, không tin
-    model chép lại;
-  - `displayHeading`: heading đã sửa;
-  - `headingDecision=OCR_REPAIRED`;
-  - `headingRepairReason`: lỗi cụ thể đã sửa;
-  - `sourceChunkIds`: nơi chứa heading.
-- Nếu không chứng minh được OCR hỏng, dùng `headingDecision=EXACT` và `displayHeading === sourceHeadingRaw`.
-- Backend không tự “làm đẹp” heading. Trường hợp model sửa không hợp lệ chỉ sinh warning và ưu tiên heading nguồn khi mapper có đủ dữ liệu để khôi phục an toàn.
+- `displayHeading` phải là chính đề mục lớn trong tài liệu nguồn sau khi AI chủ
+  động sửa sạch lỗi OCR/chính tả, sai dấu, mất chữ, dính/tách từ hoặc ký tự rác.
+- Giữ nguyên số thứ tự, ý nghĩa và phạm vi đề mục; không viết lại cho hay hơn và
+  không tự tạo đề mục mới.
+- Output chỉ trả `sourceTopicId` và `displayHeading` đã sửa. Không trả heading
+  decision, repair reason hoặc source assessment.
+- Mapper dùng trực tiếp heading đã sửa của AI, không ép quay về chuỗi OCR lỗi.
 
 ### 2.2. Cặp lý thuyết — ví dụ
 
@@ -65,7 +71,13 @@ Chuyển phần sinh kiến thức từ cách “chọn và chép bài trong OCR
 
 - Không đưa Markdown image/URL ảnh OCR nguồn vào output học sinh.
 - Không gọi model sinh ảnh raster cho flow này.
-- Khi cần hình, model trả `diagramSpec` có cấu trúc; ứng dụng validate và render deterministic.
+- Model trả `diagramSpec` có cấu trúc; ứng dụng validate và render deterministic.
+- Với bài Hình học, mọi theory block và mọi example/exercise bắt buộc có đúng một
+  `diagramSpec`; không cho phép null.
+- Với bài không thuộc Hình học, nội dung yêu cầu vẽ, đọc hoặc suy luận từ đồ thị,
+  trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc có spec.
+- Tia/đường/đoạn/hình kín dùng đúng `RAY`/`LINE`/`SEGMENT`/`POLYGON`; đồ thị cong
+  dùng `POLYLINE` qua đủ điểm đúng tỉ lệ.
 - Bài phụ thuộc hình nguồn được xử lý bằng một trong hai cách:
   - viết lại thành bài tự đủ dữ kiện, không cần hình; hoặc
   - tạo bài/sơ đồ mới tương đương về kỹ năng bằng `diagramSpec`.
@@ -78,14 +90,15 @@ Lesson-scoped OCR chunks
   -> Source blueprint + T/C hints
   -> Một OpenAI structured-output call
   -> Zod/JSON Schema technical validation
-  -> Mapper + heading guard + provenance + diagramSpec safety
+  -> Mapper giữ heading đã sửa + diagramSpec safety
   -> lesson_summary_blocks v2 / NEEDS_REVIEW
-  -> Admin xem warning, nguồn, sơ đồ và chỉnh sửa
+  -> Admin xem nội dung/sơ đồ và chỉnh sửa trực tiếp
   -> Admin phát hành
   -> Student renderer hiển thị nội dung sạch, không hiện metadata nội bộ
 ```
 
-Không thêm semantic repair call hoặc judge call bắt buộc. `verification` của model chỉ là tự kiểm tra, không được quảng bá là xác minh độc lập.
+Không thêm semantic repair call hoặc judge call bắt buộc. Model tự kiểm tra nội
+dung trước khi trả nhưng không xuất field báo cáo tự kiểm tra.
 
 ## 4. Source blueprint và vai trò của T/C
 
@@ -117,15 +130,10 @@ Mỗi topic/candidate gửi model nên thể hiện độ không chắc chắn:
 
 Không dùng tên field khiến model hiểu backend đã phân loại chắc chắn.
 
-### 4.3. Model tự audit hint
+### 4.3. Model dùng hint nội bộ
 
-Khi dùng T/C, model phải đối chiếu nội dung OCR gốc và trả:
-
-- `CONFIRMED`: hint phù hợp;
-- `CORRECTED`: model đã sửa loại/quan hệ, kèm lý do ngắn;
-- `UNCERTAIN`: OCR không đủ chắc chắn, vẫn đưa phương án tốt nhất và cảnh báo admin.
-
-Model được sửa cách hiểu T/C nhưng không được bịa source ID. Backend vẫn kiểm tra mọi ID là subset của input.
+Model đối chiếu T/C với nội dung OCR để hiểu context nhưng không trả trạng thái
+audit, source assessment hoặc candidate ID. T/C không xuất hiện trong summary.
 
 ### 4.4. Heading blueprint
 
@@ -142,9 +150,9 @@ Source topic cần có tối thiểu:
 
 `headingQualityHint` chỉ hỗ trợ model; quyết định cuối vẫn phải có bằng chứng trong raw chunk.
 
-## 5. Provider contract v3 đề xuất
+## 5. Provider contract v3 hiện tại
 
-Giữ cấu trúc cấp cao `theorySections` hiện tại, thay cách biểu diễn example và provenance:
+Giữ cấu trúc cấp cao `theorySections` và tối giản example:
 
 ```json
 {
@@ -154,13 +162,7 @@ Giữ cấu trúc cấp cao `theorySections` hiện tại, thay cách biểu di�
     {
       "sourceTopicId": "T01",
       "displayHeading": "1 CỘNG, TRỪ HAI SỐ HỮU TỈ",
-      "headingDecision": "EXACT",
-      "headingRepairReason": null,
       "sourceChunkIds": ["uuid"],
-      "sourceAssessment": {
-        "status": "CONFIRMED",
-        "reason": "Heading và nội dung cùng xuất hiện trong chunk nguồn."
-      },
       "units": [
         {
           "theory": {
@@ -172,15 +174,10 @@ Giữ cấu trúc cấp cao `theorySections` hiện tại, thay cách biểu di�
           "illustration": {
             "type": "example",
             "exampleKind": "ILLUSTRATION",
-            "origin": "AI_AUTHORED",
-            "basedOnSourceCandidateIds": [],
-            "sourceChunkIds": ["uuid"],
-            "alignment": "Ví dụ áp dụng trực tiếp quy tắc cộng vừa nêu.",
             "problem": "...",
             "solution": "...",
             "answer": "...",
-            "visual": { "kind": "NONE" },
-            "verification": "..."
+            "diagramSpec": null
           },
           "notes": []
         }
@@ -189,41 +186,30 @@ Giữ cấu trúc cấp cao `theorySections` hiện tại, thay cách biểu di�
   ],
   "applicationExercises": {
     "displayHeading": "Bài tập vận dụng",
-    "sourceChunkIds": ["uuid"],
     "standardExercise": { "...": "cùng contract example" },
     "realWorldExercise": { "...": "cùng contract example" }
-  },
-  "warnings": []
+  }
 }
 ```
 
-### 5.1. Origin/provenance của example
+### 5.1. Example tối giản
 
-Mỗi illustration/exercise bắt buộc có một trong ba origin:
-
-| Origin | Khi dùng | Quy tắc problem |
-| --- | --- | --- |
-| `SOURCE_EXACT` | Đề nguồn đầy đủ, không phụ thuộc ảnh, OCR đủ sạch | Backend lấy problem canonical từ candidate; model không được chép lại tùy ý |
-| `SOURCE_ADAPTED` | Đề nguồn phụ thuộc hình, OCR lỗi nhẹ hoặc cần làm tự đủ dữ kiện | Model được đổi cách nêu/số liệu vừa đủ, phải giữ cùng kỹ năng và dẫn candidate gốc |
-| `AI_AUTHORED` | Không có candidate phù hợp hoặc ví dụ mới dạy tốt hơn | Model tự tạo trong phạm vi theory/lesson và dẫn source chunks của kiến thức |
-
-Luật theo origin:
-
-- `SOURCE_EXACT`: có đúng một `sourceCandidateId`; không có ảnh nguồn; `problem` khi persist lấy từ backend candidate.
-- `SOURCE_ADAPTED`: có ít nhất một `basedOnSourceCandidateIds`; problem do model viết; không tự nhận là nguyên văn sách.
-- `AI_AUTHORED`: `basedOnSourceCandidateIds` có thể rỗng; phải có `sourceChunkIds` chứng minh kiến thức dùng để sinh bài.
-- Tất cả origin đều phải có `alignment`, `solution`, `answer`, `verification` và `visual`.
+- Mỗi example chỉ trả `type`, `exampleKind`, `problem`, `solution`, `answer` và
+  `diagramSpec` nullable.
+- Khi `diagramSpec=null`, mapper không persist field visual.
+- Không trả origin, candidate/source chunk ID, source assessment, alignment hoặc
+  verification cho example.
+- Đề phải tự đủ dữ kiện, không chứa `xem hình bên`, `quan sát hình dưới` hoặc phụ
+  thuộc ảnh OCR nguồn.
+- Bài tính thuần túy trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn các
+  heading thao tác như `Nhóm các số hạng thuận tiện`.
 
 ### 5.2. Contract heading
 
-Schema khóa được enum và nullability:
-
-- Provider chỉ trả `sourceTopicId`, `displayHeading`, decision và reason; mapper
-  lấy `sourceHeadingRaw` canonical từ source blueprint rồi mới persist. Không tin
-  một chuỗi “raw” do model tự chép lại.
-- `EXACT` => `headingRepairReason=null`; semantic guard kiểm `displayHeading === sourceHeadingRaw`.
-- `OCR_REPAIRED` => `headingRepairReason` không rỗng; warning admin hiển thị cặp trước/sau.
-- Nếu `sourceTopicId` sai nhưng model tìm được heading thật trong chunk, mapper giữ section, ghi correction/warning và dùng source chunk hợp lệ.
+- Provider chọn đúng `sourceTopicId` và trả `displayHeading` đã sửa chính tả/OCR.
+- Mapper giữ `sourceHeadingRaw` nội bộ để tương thích nhưng luôn hiển thị
+  `displayHeading` do model đã sửa.
+- Không trả hoặc hiển thị audit metadata của quá trình sửa heading.
 
 ### 5.3. Contract theory
 
@@ -255,7 +241,7 @@ hoặc:
     "version": 1,
     "coordinateSystem": "CARTESIAN",
     "viewBox": { "minX": -1, "minY": -1, "width": 12, "height": 9 },
-    "toScale": false,
+    "toScale": true,
     "points": [
       { "id": "A", "x": 1, "y": 1, "label": "A", "labelPosition": "BOTTOM_LEFT" },
       { "id": "B", "x": 1, "y": 6, "label": "B", "labelPosition": "TOP_LEFT" },
@@ -272,9 +258,7 @@ hoặc:
       { "type": "RIGHT_ANGLE", "vertex": "A", "armPointIds": ["B", "C"] },
       { "type": "EQUAL_LENGTH", "segmentIds": ["AB", "AC"], "markCount": 1 }
     ],
-    "labels": [
-      { "text": "90^\\circ", "anchorPointId": "A", "position": "TOP_RIGHT" }
-    ],
+    "labels": [{ "text": "90^\\circ", "anchorPointId": "A", "position": "TOP_RIGHT" }],
     "caption": "Hình minh họa, không nhất thiết vẽ đúng tỉ lệ."
   }
 }
@@ -295,7 +279,8 @@ Danh sách primitive v1 chỉ gồm nhu cầu Toán THCS đã biết:
 - Giới hạn số point, primitive, marker và label để tránh payload/render quá nặng.
 - Màu/style lấy từ enum semantic của app, không nhận chuỗi CSS tùy ý.
 - Renderer dùng SVG component do ClassHero kiểm soát; hỗ trợ light/dark, responsive và accessibility caption.
-- Khi `toScale=false`, UI hiển thị chú thích “Hình minh họa, không nhất thiết vẽ đúng tỉ lệ”.
+- `toScale` luôn là `true`. Tọa độ phải đúng tỉ lệ dữ kiện và các marker
+  hình học phải khớp quan hệ thực; không render sơ đồ ước lệ.
 - Các kiểm tra hình học đơn giản có thể xác minh bằng tọa độ; quan hệ khó hoặc mâu thuẫn chỉ tạo warning, không chặn lưu bản nháp.
 
 ### 6.4. Nơi persist/render
@@ -319,8 +304,8 @@ Thực hiện:
 - tăng prompt/schema version;
 - giữ `theorySections[].units[]`;
 - bỏ `illustrationPlacement`;
-- thêm heading decision, source assessment, example origin/provenance và `visual`;
-- tạo discriminated union theo origin để JSON Schema khóa các field bắt buộc;
+- provider section chỉ giữ source topic, heading đã sửa, units và source chunks;
+- provider example chỉ giữ problem, solution, answer và diagramSpec nullable;
 - thêm persisted schema version 2 nhưng giữ parser/renderer version 1.
 
 ### 7.2. Source candidate/blueprint
@@ -351,13 +336,13 @@ Thực hiện:
 - giữ system prompt gốc về vai trò, tính sư phạm, block nhỏ và cách trình bày;
 - bổ sung các luật v3 theo thứ tự ưu tiên rõ ràng;
 - ghi rõ source facts và source major headings là hard ground;
-- ghi rõ exercise/example có quyền `EXACT`, `ADAPTED`, `AI_AUTHORED`;
+- ghi rõ exercise/example không cần khai báo nguồn gốc;
 - yêu cầu ví dụ luôn sau theory;
-- yêu cầu tự audit T/C và heading trước khi trả JSON;
+- yêu cầu tự sửa lỗi OCR/chính tả heading trước khi trả JSON;
 - không gửi lời nhắc mâu thuẫn kiểu “mọi đề phải lấy nguyên văn nguồn”;
 - preview FE phải phản ánh đúng system instructions, user prompt, input, metadata và JSON Schema thật.
 
-### 7.4. Mapper và warning
+### 7.4. Mapper
 
 File trọng tâm:
 
@@ -367,15 +352,12 @@ File trọng tâm:
 Thực hiện:
 
 - mapper luôn flatten `[theory, illustration, ...notes]`;
-- `SOURCE_EXACT` lấy problem canonical từ candidate;
-- `SOURCE_ADAPTED` và `AI_AUTHORED` giữ problem model sinh;
+- giữ problem model sinh và loại câu tham chiếu ảnh nguồn dạng `(xem hình bên)`;
 - loại toàn bộ ảnh Markdown nguồn khỏi persisted problem;
 - validate/sanitize `diagramSpec` trước persist;
-- map warning theo path và code ổn định thay vì chỉ string tự do nếu UI cần nhóm;
-- giữ `warnings: string[]` cho compatibility và thêm `warningDetails` dạng
-  `{code, path, message, severity}` trong persisted v2 để admin định vị block;
-- warning không throw; chỉ provider JSON/schema/Zod, hạ tầng hoặc payload không thể persist mới fail job;
-- persist `lesson_summary_blocks.version=2`, `NEEDS_REVIEW` và provenance.
+- không persist warnings/warningDetails cho generation mới;
+- chỉ provider JSON/schema/Zod, hạ tầng hoặc payload không thể persist mới fail job;
+- persist `lesson_summary_blocks.version=2`, `NEEDS_REVIEW`.
 
 ### 7.5. Admin UI
 
@@ -387,12 +369,9 @@ File trọng tâm:
 Thực hiện:
 
 - đọc được cả version 1 và version 2;
-- warning hiển thị theo section/unit/block;
-- badge provenance chỉ dành cho admin: “Nguyên bản nguồn”, “Phỏng theo nguồn”, “ClassHero biên soạn”;
-- OCR repaired heading hiển thị raw/resolved/reason để admin duyệt;
+- không hiển thị warning kỹ thuật, provenance hoặc heading audit;
 - preview `diagramSpec` và cho admin sửa JSON/block theo cơ chế editor hiện có;
-- lỗi diagram spec hiển thị placeholder có cảnh báo, không làm hỏng toàn summary;
-- không hiển thị `verification` như chứng nhận đúng tuyệt đối.
+- lỗi diagram spec hiển thị trạng thái không thể render, không làm hỏng toàn summary.
 
 ### 7.6. Student UI
 
@@ -431,8 +410,8 @@ Không bắt đầu v3 trước bước này để bảo đảm có thể quay l
 ### Giai đoạn 1 — khóa contract bằng test
 
 1. Viết fixture v3 cho Đại số và Hình học.
-2. Viết schema tests cho heading, origin và diagramSpec.
-3. Viết mapper tests cho ordering, provenance, loại ảnh nguồn và warning.
+2. Viết schema tests cho heading đã sửa, example tối giản và diagramSpec.
+3. Viết mapper tests cho ordering, loại ảnh/câu tham chiếu hình nguồn.
 4. Chưa đổi prompt cho tới khi các test đỏ thể hiện đủ behavior mới.
 
 ### Giai đoạn 2 — schema và source blueprint
@@ -446,13 +425,13 @@ Không bắt đầu v3 trước bước này để bảo đảm có thể quay l
 
 1. Viết lại phần invariant, giữ hàm ý sư phạm tốt của system prompt cũ.
 2. Bỏ `BEFORE_THEORY` và candidate bắt buộc cho mọi ví dụ.
-3. Cho phép ba origin với rule rõ ràng.
-4. Triển khai heading guard, image stripping, mapper và warning codes.
+3. Bỏ origin/sourceAssessment/candidate metadata khỏi provider output.
+4. Triển khai corrected heading, image/reference stripping và mapper.
 
 ### Giai đoạn 4 — renderer và editor
 
 1. Tạo shared deterministic diagram renderer.
-2. Nối admin preview/editor/warning/provenance.
+2. Nối admin preview/editor đơn giản, không panel warning/provenance.
 3. Nối student renderer v2.
 4. Kiểm tra responsive và dark/light.
 
@@ -516,12 +495,11 @@ Không gọi image generation provider vì diagram được render từ spec.
 - Solution chia bước, dùng từ phù hợp học sinh lớp 7, answer cụ thể.
 - Công thức và dấu toán học đúng.
 
-### 9.4. Example/exercise provenance
+### 9.4. Example/exercise
 
-- `SOURCE_EXACT` không dùng candidate phụ thuộc hình và giữ đề canonical.
-- Candidate phụ thuộc hình không bao giờ persist ảnh nguồn.
-- `SOURCE_ADAPTED` giữ đúng kỹ năng nhưng đề tự đủ dữ kiện.
-- `AI_AUTHORED` nằm trong nguồn kiến thức, không bịa đề mục/khái niệm.
+- Không persist ảnh nguồn hoặc câu `xem hình bên`.
+- Example nằm trong kiến thức nguồn, không bịa đề mục/khái niệm.
+- Bài tính thuần túy không chèn heading mô tả thao tác giữa các phép tính.
 - Hai bài cuối không trùng illustration và không trùng nhau.
 - Bài thực tế có ngữ cảnh, dữ kiện, đơn vị và kết luận hợp lý.
 
@@ -531,7 +509,8 @@ Không gọi image generation provider vì diagram được render từ spec.
 - Reference ID thiếu tạo warning/placeholder, không crash trang.
 - Tọa độ NaN/vô hạn, primitive quá số lượng hoặc label nguy hiểm bị schema từ chối kỹ thuật trước persist.
 - Quan hệ right angle/equal length/parallel tham chiếu đúng entity.
-- `toScale=false` hiện caption tương ứng.
+- `toScale=true` là bắt buộc; equal-length/right-angle/parallel marker phải
+  khớp tọa độ trong sai số render cho phép.
 - Bài Đại số không bị ép sinh diagram không cần thiết.
 
 ### 9.6. Compatibility/operations
@@ -539,7 +518,7 @@ Không gọi image generation provider vì diagram được render từ spec.
 - Summary v1 cũ vẫn GET, edit và render được.
 - Summary v2 mới persist/read/update được.
 - Prompt preview và provider request giống nhau field-by-field.
-- Structured output hợp lệ nhưng semantic warning vẫn `SUCCEEDED` + `NEEDS_REVIEW`.
+- Structured output hợp lệ được lưu `SUCCEEDED` + `NEEDS_REVIEW` để admin sửa.
 - JSON/schema hỏng vẫn fail rõ ràng.
 - Job dedupe, source hash, budget reservation và usage không thay đổi.
 - Worker mới đã restart trước live/manual test.
@@ -548,7 +527,7 @@ Không gọi image generation provider vì diagram được render từ spec.
 
 Mỗi output được chấm độc lập theo thang pass/fail và ghi nhận lỗi:
 
-1. Heading lớn trung thành nguồn hoặc repair OCR có lý do.
+1. Heading lớn trung thành nguồn và đã sửa sạch lỗi OCR/chính tả.
 2. Coverage kiến thức cốt lõi.
 3. Không bịa kiến thức.
 4. Granularity/readability của theory.
@@ -559,7 +538,7 @@ Mỗi output được chấm độc lập theo thang pass/fail và ghi nhận l�
 9. Bài thực tế hợp lý về ngữ cảnh/đơn vị/kết quả.
 10. Diagram đúng logic, rõ và không gây hiểu nhầm.
 11. Ngôn ngữ phù hợp học sinh lớp 7.
-12. Warning hữu ích, không cảnh báo rác quá nhiều.
+12. Output không chứa metadata kỹ thuật hoặc panel warning rườm rà.
 
 Một JSON đúng schema không được tính là pass semantic. Admin/manual audit vẫn là cổng cuối trước phát hành.
 
@@ -567,35 +546,36 @@ Một JSON đúng schema không được tính là pass semantic. Admin/manual a
 
 Implementation chỉ được coi là hoàn thành khi:
 
-- [ ] Baseline v2 đã commit và v3 nằm ở nhánh riêng.
-- [ ] Docs contract/API/UI/M9 phản ánh v3 và backward compatibility.
-- [ ] `theorySections[].units[]` được giữ, `illustrationPlacement` bị loại bỏ.
-- [ ] 100% unit persist theo thứ tự theory -> illustration.
-- [ ] Heading sạch giữ nguyên văn; mọi repair có raw/resolved/reason/source.
-- [ ] Theory chỉ chứa kiến thức được nguồn hỗ trợ.
-- [ ] Example hỗ trợ đủ ba origin và provenance đúng.
-- [ ] Không có ảnh OCR nguồn trong output v2.
-- [ ] `diagramSpec` schema + safe renderer dùng chung admin/student hoạt động.
-- [ ] Section cuối đúng literal và đúng hai bài.
-- [ ] Semantic issue chỉ warning; technical invalid vẫn fail.
-- [ ] Admin sửa được mọi block và xem được warning/provenance/diagram.
-- [ ] Student render v1/v2 không lộ metadata nội bộ.
-- [ ] Focused API/worker/web tests pass.
-- [ ] Live matrix 3 Đại số + 3 Hình học hoàn tất và có báo cáo semantic/manual.
-- [ ] Worker đã restart trước manual FE acceptance.
+- [x] Baseline v2 đã commit và v3 nằm ở nhánh riêng.
+- [x] Docs contract/API/UI/M9 phản ánh v3 và backward compatibility.
+- [x] `theorySections[].units[]` được giữ, `illustrationPlacement` bị loại bỏ.
+- [x] 100% unit persist theo thứ tự theory -> illustration.
+- [x] Heading giữ nguyên đề mục nguồn và được AI sửa lỗi OCR/chính tả.
+- [x] Theory chỉ chứa kiến thức được nguồn hỗ trợ.
+- [x] Example tối giản, không origin/sourceAssessment/candidate metadata.
+- [x] Không có ảnh OCR nguồn trong output v2.
+- [x] `diagramSpec` schema + safe renderer dùng chung admin/student hoạt động.
+- [x] `diagramSpec.toScale=true`; tọa độ và marker hình học được kiểm tra trước khi render.
+- [x] Section cuối đúng literal và đúng hai bài.
+- [x] Technical invalid vẫn fail; output hợp lệ được lưu để admin sửa.
+- [x] Admin sửa được mọi block và xem được diagram, không panel warning kỹ thuật.
+- [x] Student render v1/v2 không lộ metadata nội bộ.
+- [x] Focused API/worker/web tests pass.
+- [x] Live matrix 3 Đại số + 3 Hình học hoàn tất và có báo cáo semantic/manual.
+- [x] Worker đã restart trước manual FE acceptance.
 
 ## 12. Rủi ro và cách kiểm soát
 
-| Rủi ro | Kiểm soát |
-| --- | --- |
-| Model sửa heading quá tay | Mặc định exact; repair phải có evidence; mapper warning/fallback |
-| T/C backend phân loại sai | Chỉ coi là hint; model audit `CONFIRMED/CORRECTED/UNCERTAIN` |
-| AI-authored exercise sai toán | verification field + semantic lint + live/manual review; luôn `NEEDS_REVIEW` |
-| Diagram đẹp nhưng logic sai | schema reference check, geometry check đơn giản, warning và admin preview |
-| Prompt quá dài/tốn tiền | chỉ một provider call, không gửi ảnh binary, đo token preview, giữ context cap hiện tại |
-| V2/v3 lẫn dữ liệu | persisted version 2, dual renderer/parser, không migration phá dữ liệu cũ |
-| Admin hiểu verification là bảo đảm | không hiện như chứng nhận; UI ghi rõ nội dung AI cần duyệt |
-| Worker chạy code cũ | restart worker bắt buộc sau thay đổi worker |
+| Rủi ro                             | Kiểm soát                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------------- |
+| Model sửa heading quá tay          | Mặc định exact; repair phải có evidence; mapper warning/fallback                        |
+| T/C backend phân loại sai          | Chỉ coi là hint; model audit `CONFIRMED/CORRECTED/UNCERTAIN`                            |
+| AI-authored exercise sai toán      | verification field + semantic lint + live/manual review; luôn `NEEDS_REVIEW`            |
+| Diagram đẹp nhưng logic sai        | schema reference check, geometry check đơn giản, warning và admin preview               |
+| Prompt quá dài/tốn tiền            | chỉ một provider call, không gửi ảnh binary, đo token preview, giữ context cap hiện tại |
+| V2/v3 lẫn dữ liệu                  | persisted version 2, dual renderer/parser, không migration phá dữ liệu cũ               |
+| Admin hiểu verification là bảo đảm | không hiện như chứng nhận; UI ghi rõ nội dung AI cần duyệt                              |
+| Worker chạy code cũ                | restart worker bắt buộc sau thay đổi worker                                             |
 
 ## 13. Ngoài phạm vi lần sửa này
 

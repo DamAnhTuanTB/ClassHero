@@ -1,10 +1,14 @@
+import {
+  lessonSummaryDiagramSpecSchema,
+  lessonSummaryDiagramVisualSchema,
+} from "@learning-path/shared";
 import { z } from "zod";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v22";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v19";
+export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v33";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v25";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
-export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 6_000;
-export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 6_000;
+export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
+export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
 
 export const lessonSummaryStyleSchema = z.enum([
@@ -19,7 +23,25 @@ const sourceChunkIdsSchema = z.array(z.uuid()).min(1).max(20);
 
 const baseBlockSchema = z.object({
   sourceChunkIds: sourceChunkIdsSchema,
+  visual: lessonSummaryDiagramVisualSchema.optional(),
 });
+
+export const lessonSummaryExampleOriginSchema = z.enum([
+  "SOURCE_EXACT",
+  "SOURCE_ADAPTED",
+  "AI_AUTHORED",
+]);
+
+export const lessonSummarySourceAssessmentSchema = z
+  .object({
+    status: z.enum(["CONFIRMED", "CORRECTED", "UNCERTAIN"]),
+    reason: nonEmptyText(1_000),
+    correctedKindHint: z
+      .enum(["ILLUSTRATION", "STANDARD_EXERCISE", "REAL_WORLD_EXERCISE", "UNKNOWN"])
+      .nullable(),
+    correctedRelatedTopicId: nonEmptyText(300).nullable(),
+  })
+  .strict();
 
 const knowledgeBlockSchema = baseBlockSchema
   .extend({
@@ -64,12 +86,16 @@ const procedureBlockSchema = baseBlockSchema
   })
   .strict();
 
-const exampleBlockSchema = baseBlockSchema
-  .extend({
+const exampleBlockSchema = z
+  .object({
     type: z.literal("example"),
     problem: nonEmptyText(2_000),
     solution: nonEmptyText(5_000).nullable(),
     answer: nonEmptyText(2_000),
+    sourceChunkIds: sourceChunkIdsSchema.optional(),
+    origin: lessonSummaryExampleOriginSchema.optional(),
+    sourceCandidateIds: z.array(nonEmptyText(300)).max(20).optional(),
+    sourceAssessment: lessonSummarySourceAssessmentSchema.optional(),
   })
   .strict();
 
@@ -158,60 +184,68 @@ export type LessonSummaryExtendedBlock = z.infer<typeof lessonSummaryExtendedBlo
  * Provider-only contract. Its shape makes every theory/example pair and the final
  * two application exercises required by JSON Schema before semantic review.
  */
+const theoryDiagramSpecSchema = lessonSummaryDiagramSpecSchema
+  .describe(
+    "Nếu bài học thuộc Hình học thì mọi theory block đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, diagramSpec vẫn bắt buộc khi nội dung cần hình để hiểu đúng; các khối về đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ không được trả null.",
+  )
+  .nullable();
+
+const lessonSummaryProviderNoteSchema = noteBlockSchema.omit({ visual: true }).strict();
+
 const lessonSummaryTheoryBlockSchema = z.discriminatedUnion("type", [
-  knowledgeBlockSchema,
-  propertyBlockSchema,
-  procedureBlockSchema,
-  theoremBlockSchema,
+  knowledgeBlockSchema
+    .omit({ visual: true })
+    .extend({ diagramSpec: theoryDiagramSpecSchema })
+    .strict(),
+  propertyBlockSchema
+    .omit({ visual: true })
+    .extend({ diagramSpec: theoryDiagramSpecSchema })
+    .strict(),
+  procedureBlockSchema
+    .omit({ visual: true })
+    .extend({ diagramSpec: theoryDiagramSpecSchema })
+    .strict(),
+  theoremBlockSchema
+    .omit({ visual: true })
+    .extend({ diagramSpec: theoryDiagramSpecSchema })
+    .strict(),
 ]);
 
-const lessonSummaryIllustrationSchema = z
-  .object({
-    type: z.literal("example"),
-    exampleKind: z.literal("ILLUSTRATION"),
-    sourceCandidateId: nonEmptyText(300).describe(
-      "ID duy nhất của source candidate minh họa trực tiếp cho theory; không được trùng bất kỳ candidate nào khác trong output.",
-    ),
-    alignment: nonEmptyText(500).describe(
-      "Một câu giải thích candidate liên hệ trực tiếp với kiến thức nào trong theory cùng unit; chỉ dùng để backend/validator kiểm tra và không hiển thị cho học sinh.",
-    ),
-    verification: nonEmptyText(1_000).describe(
-      "Kiểm tra độc lập rằng lời giải đã giải xong đúng đề, không dùng kiến thức chưa xuất hiện ở vị trí BEFORE và không mâu thuẫn với theory cùng unit; backend không hiển thị field này.",
-    ),
-    solution: nonEmptyText(5_000).nullable(),
-    answer: nonEmptyText(2_000),
-  })
-  .strict();
+function createLessonSummaryProviderExampleSchema(
+  exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+) {
+  const illustrationRequirement =
+    exampleKind === "ILLUSTRATION"
+      ? " Đây là illustration: đề phải kiểm tra đúng kiến thức trong theory cùng unit; lời giải phải gọi tên và trực tiếp áp dụng chính quy tắc/tính chất đó. Nếu phải dùng một quy tắc khác làm lập luận chính thì đổi đề."
+      : "";
+  return z
+    .object({
+      type: z.literal("example"),
+      exampleKind: z.literal(exampleKind),
+      problem: nonEmptyText(2_000).describe(
+        `Chỉ ghi nội dung đề bài; không có nhãn hoặc số thứ tự từ tài liệu nguồn như Bài 1.11., Ví dụ 2, Luyện tập 3 hay Vận dụng 1; không có câu xem hình bên. Nếu đề hoặc lời giải cần hình để hiểu đúng thì diagramSpec bắt buộc phải khác null.${illustrationRequirement}`,
+      ),
+      solution: nonEmptyText(5_000)
+        .describe(
+          `Lời giải đúng và gọn. Với bài tính thuần túy, trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức.${illustrationRequirement}`,
+        )
+        .nullable(),
+      answer: nonEmptyText(2_000),
+      diagramSpec: lessonSummaryDiagramSpecSchema
+        .describe(
+          "Một hình minh họa dùng chung cho toàn bộ ví dụ/bài tập. Nếu bài học thuộc Hình học thì mọi example và exercise đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, các bài yêu cầu vẽ, đọc hoặc suy luận từ đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc khác null.",
+        )
+        .nullable(),
+    })
+    .strict();
+}
 
-const lessonSummaryStandardExerciseSchema = z
-  .object({
-    type: z.literal("example"),
-    exampleKind: z.literal("STANDARD_EXERCISE"),
-    sourceCandidateId: nonEmptyText(300).describe(
-      "ID duy nhất của source candidate là bài tập thông thường; không dùng candidate có kindHint REAL_WORLD_EXERCISE và không trùng candidate khác.",
-    ),
-    solution: nonEmptyText(5_000).nullable(),
-    answer: nonEmptyText(2_000),
-    verification: nonEmptyText(1_000).describe(
-      "Kiểm tra độc lập rằng solution giữ nguyên dữ kiện và answer đúng; backend không hiển thị field này.",
-    ),
-  })
-  .strict();
-
-const lessonSummaryRealWorldExerciseSchema = z
-  .object({
-    type: z.literal("example"),
-    exampleKind: z.literal("REAL_WORLD_EXERCISE"),
-    sourceCandidateId: nonEmptyText(300).describe(
-      "ID duy nhất của source candidate có kindHint REAL_WORLD_EXERCISE; không trùng candidate khác.",
-    ),
-    solution: nonEmptyText(5_000).nullable(),
-    answer: nonEmptyText(2_000),
-    verification: nonEmptyText(1_000).describe(
-      "Kiểm tra độc lập rằng solution giữ nguyên dữ kiện và answer đúng; backend không hiển thị field này.",
-    ),
-  })
-  .strict();
+const lessonSummaryIllustrationSchema =
+  createLessonSummaryProviderExampleSchema("ILLUSTRATION");
+const lessonSummaryStandardExerciseSchema =
+  createLessonSummaryProviderExampleSchema("STANDARD_EXERCISE");
+const lessonSummaryRealWorldExerciseSchema =
+  createLessonSummaryProviderExampleSchema("REAL_WORLD_EXERCISE");
 
 export const lessonSummaryProviderOutputSchema = z
   .object({
@@ -222,22 +256,21 @@ export const lessonSummaryProviderOutputSchema = z
         z
           .object({
             sourceTopicId: nonEmptyText(300).describe(
-              "ID duy nhất trong metadata.sourceTopics; mỗi source topic bắt buộc xuất hiện đúng một lần và số units không vượt relatedCandidateIds của topic.",
+              "ID của đề mục gốc trong metadata.sourceTopics.",
             ),
-            displayHeading: nonEmptyText(240),
+            displayHeading: nonEmptyText(240).describe(
+              "Phần chữ của đề mục gốc sau khi AI chủ động sửa lỗi OCR/chính tả; bỏ số thứ tự đầu heading vì UI tự hiển thị số; không đổi ý nghĩa hay tự tạo đề mục mới.",
+            ),
             sourceChunkIds: sourceChunkIdsSchema,
             units: z
               .array(
                 z
                   .object({
                     theory: lessonSummaryTheoryBlockSchema,
-                    illustration: lessonSummaryIllustrationSchema,
-                    illustrationPlacement: z
-                      .enum(["BEFORE_THEORY", "AFTER_THEORY"])
-                      .describe(
-                        "Đặt BEFORE_THEORY khi candidate là hoạt động khám phá dẫn tới theory; dùng AFTER_THEORY khi candidate áp dụng theory đã nêu. Hai block luôn phải liền kề.",
-                      ),
-                    notes: z.array(noteBlockSchema).max(5),
+                    illustration: lessonSummaryIllustrationSchema.describe(
+                      "Ví dụ phải minh họa trực tiếp đúng theory trong cùng unit. Lời giải phải gọi tên và áp dụng chính quy tắc/tính chất của theory đó; ví dụ không hợp lệ nếu lập luận chính dùng kiến thức của unit khác.",
+                    ),
+                    notes: z.array(lessonSummaryProviderNoteSchema).max(5),
                   })
                   .strict(),
               )
@@ -250,20 +283,28 @@ export const lessonSummaryProviderOutputSchema = z
       .max(19),
     applicationExercises: z
       .object({
-        sourceHeading: nonEmptyText(500),
         displayHeading: z.literal("Bài tập vận dụng"),
-        sourceChunkIds: sourceChunkIdsSchema,
         standardExercise: lessonSummaryStandardExerciseSchema,
         realWorldExercise: lessonSummaryRealWorldExerciseSchema,
       })
       .strict(),
-    warnings: z.array(nonEmptyText(1_000)).max(10).nullable(),
   })
   .strict();
 
 export type LessonSummaryProviderOutput = z.infer<
   typeof lessonSummaryProviderOutputSchema
 >;
+
+export const lessonSummaryWarningDetailSchema = z
+  .object({
+    code: nonEmptyText(100),
+    path: nonEmptyText(500),
+    message: nonEmptyText(1_000),
+    severity: z.enum(["INFO", "WARNING"]),
+  })
+  .strict();
+
+export type LessonSummaryWarningDetail = z.infer<typeof lessonSummaryWarningDetailSchema>;
 
 /** Persisted/API-compatible flat section/block contract. */
 export const lessonSummaryOutputSchema = z
@@ -278,6 +319,9 @@ export const lessonSummaryOutputSchema = z
             order: z.number().int().positive(),
             sourceHeading: nonEmptyText(500),
             displayHeading: nonEmptyText(240),
+            headingDecision: z.enum(["EXACT", "OCR_REPAIRED"]).optional(),
+            headingRepairReason: nonEmptyText(1_000).nullable().optional(),
+            sourceAssessment: lessonSummarySourceAssessmentSchema.optional(),
             sourceChunkIds: sourceChunkIdsSchema,
             blocks: z.array(lessonSummaryMvpBlockSchema).min(1),
           })
@@ -285,7 +329,12 @@ export const lessonSummaryOutputSchema = z
       )
       .min(2)
       .max(20),
-    warnings: z.array(nonEmptyText(1_000)).nullable(),
+    warnings: z.array(nonEmptyText(1_000)).nullable().optional(),
+    warningDetails: z
+      .array(lessonSummaryWarningDetailSchema)
+      .max(100)
+      .nullable()
+      .optional(),
   })
   .strict();
 

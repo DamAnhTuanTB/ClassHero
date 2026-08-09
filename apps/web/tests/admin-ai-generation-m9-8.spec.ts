@@ -205,9 +205,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByLabel("Temperature").fill("0.1");
     await dialog.getByLabel("Giới hạn token đầu ra").fill("5999");
     await expect(
-      dialog.getByText("Số token đầu ra phải từ 6000 đến 32000"),
+      dialog.getByText("Số token đầu ra phải từ 8000 đến 32000"),
     ).toBeVisible();
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("6000");
+    await dialog.getByLabel("Giới hạn token đầu ra").fill("8000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect.poll(() => mock.promptPreviewPayloads.length).toBeGreaterThan(1);
     await dialog.getByRole("tab", { name: "User prompt" }).click();
@@ -229,7 +229,7 @@ test.describe("M9.8 admin AI generation panel", () => {
         userPrompt: expect.stringContaining('"targetWordCount":350'),
         model: "gpt-4.1-mini",
         temperature: 0.1,
-        maxOutputTokens: 6_000,
+        maxOutputTokens: 8_000,
       });
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
@@ -251,7 +251,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await dialog.getByLabel("Temperature").fill("0.2");
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("6000");
+    await dialog.getByLabel("Giới hạn token đầu ra").fill("8000");
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
       .poll(() => mock.payloads.SUMMARY)
@@ -264,7 +264,7 @@ test.describe("M9.8 admin AI generation panel", () => {
         userPrompt: expect.stringContaining("USER PROMPT"),
         model: "gpt-4.1-mini",
         temperature: 0.2,
-        maxOutputTokens: 6_000,
+        maxOutputTokens: 8_000,
       });
 
     await expect(page.getByRole("tab", { name: "Kiến thức" })).toHaveAttribute(
@@ -277,8 +277,18 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Có 1 điểm cần admin kiểm tra" }),
+    ).toHaveCount(0);
+    await expect(page.getByText("Khối lý thuyết đầu tiên cần ngắt dòng.")).toHaveCount(0);
+    await expect(page.getByText("ClassHero biên soạn")).toHaveCount(0);
+    await expect(
+      page.getByText("Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ."),
     ).toBeVisible();
-    await expect(page.getByText("Khối lý thuyết đầu tiên cần ngắt dòng.")).toBeVisible();
+    await expect(
+      page.getByRole("img", {
+        name: "Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ.",
+      }),
+    ).toBeVisible();
+    await expect(page.getByText("Heading OCR gốc: 1 CỌNG HAI SỐ")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("button", { name: "Duyệt tóm tắt" })).toHaveCount(0);
     await page.getByRole("button", { name: "Lưu nội dung" }).click();
@@ -416,8 +426,8 @@ async function setupAiGenerationMock(
         : "SYSTEM PROMPT THỰC TẾ";
       return fulfillJson(route, 200, {
         data: {
-          promptVersion: "lesson-summary-prompt-v22",
-          schemaVersion: "lesson-summary-schema-v19",
+          promptVersion: "lesson-summary-prompt-v33",
+          schemaVersion: "lesson-summary-schema-v25",
           systemPrompt,
           userPrompt: `USER PROMPT ${JSON.stringify(body)}`,
           inputPrompt: `USER PROMPT ${JSON.stringify(
@@ -442,7 +452,7 @@ async function setupAiGenerationMock(
               },
             },
             temperature: body.temperature ?? 0.2,
-            max_output_tokens: body.maxOutputTokens ?? 6_000,
+            max_output_tokens: body.maxOutputTokens ?? 8_000,
           },
           context: {
             documentCount: 1,
@@ -456,7 +466,7 @@ async function setupAiGenerationMock(
             resolvedProvider: "OPENAI",
             resolvedModel: body.model ?? "gpt-4.1-mini",
             temperature: body.temperature ?? 0.2,
-            maxOutputTokens: body.maxOutputTokens ?? 6_000,
+            maxOutputTokens: body.maxOutputTokens ?? 8_000,
             modelOptions: [
               { provider: "OPENAI", model: "gpt-4.1-mini", available: true },
               { provider: "GEMINI", model: "gemini-2.5-flash", available: true },
@@ -644,7 +654,7 @@ function materialize(
       lessonId,
       contentJson: {
         type: "lesson_summary_blocks",
-        version: 1,
+        version: 2,
         data: {
           lessonId,
           title: "Số hữu tỉ",
@@ -652,8 +662,8 @@ function materialize(
           sections: [
             {
               order: 1,
-              sourceHeading: "Số hữu tỉ",
-              displayHeading: "Số hữu tỉ",
+              sourceHeading: "1 CỌNG HAI SỐ",
+              displayHeading: "CỘNG HAI SỐ",
               sourceChunkIds: [documentId],
               blocks: [
                 {
@@ -661,6 +671,42 @@ function materialize(
                   title: "Khái niệm số hữu tỉ",
                   content: "Số hữu tỉ là số viết được dưới dạng phân số.",
                   sourceChunkIds: [documentId],
+                  visual: {
+                    kind: "DIAGRAM_SPEC",
+                    spec: {
+                      version: 1,
+                      coordinateSystem: "CARTESIAN",
+                      viewBox: { minX: 0, minY: 0, width: 10, height: 8 },
+                      toScale: true,
+                      points: [
+                        { id: "A", x: 1, y: 1, label: "A", labelPosition: "BOTTOM_LEFT" },
+                        { id: "B", x: 1, y: 6, label: "B", labelPosition: "TOP_LEFT" },
+                        {
+                          id: "C",
+                          x: 8,
+                          y: 1,
+                          label: "C",
+                          labelPosition: "BOTTOM_RIGHT",
+                        },
+                      ],
+                      primitives: [
+                        { id: "AB", type: "SEGMENT", from: "A", to: "B", style: "SOLID" },
+                        { id: "AC", type: "SEGMENT", from: "A", to: "C", style: "SOLID" },
+                        { id: "BC", type: "SEGMENT", from: "B", to: "C", style: "SOLID" },
+                      ],
+                      markers: [
+                        { type: "RIGHT_ANGLE", vertex: "A", armPointIds: ["B", "C"] },
+                      ],
+                      labels: [],
+                      caption: "Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ.",
+                    },
+                  },
+                },
+                {
+                  type: "example",
+                  problem: "Cho tam giác ABC vuông tại A. Xác định góc vuông.",
+                  solution: "Theo giả thiết, góc A là góc vuông.",
+                  answer: "$\\widehat{A}=90^\\circ$.",
                 },
               ],
             },
@@ -675,19 +721,16 @@ function materialize(
                   problem: "Viết 0,25 dưới dạng phân số.",
                   solution: "$0,25 = 1/4$.",
                   answer: "$1/4$.",
-                  sourceChunkIds: [documentId],
                 },
                 {
                   type: "example",
                   problem: "Một món đồ 100 000 đồng giảm 20%. Tính giá mới.",
                   solution: "$100\\,000 \\times 80\\% = 80\\,000$ đồng.",
                   answer: "$80\\,000$ đồng.",
-                  sourceChunkIds: [documentId],
                 },
               ],
             },
           ],
-          warnings: ["Khối lý thuyết đầu tiên cần ngắt dòng."],
         },
       },
       source: "AI",

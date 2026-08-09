@@ -154,6 +154,11 @@ dụng`, đúng hai bài lấy từ source; theory-example đi theo unit liền 
 chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn được lưu
     `NEEDS_REVIEW`; semantic/reference/presentation issues chỉ thành warning cho
     admin, không gọi model repair lần hai.
+    41.2. Contract v3 đang triển khai trên
+    `codex/m9-2-classhero-authoring-v3`: theory luôn đứng trước example,
+    heading lớn exact/OCR-repair có audit, example có provenance, không dùng
+    ảnh OCR và dùng safe `diagramSpec`; generation persist summary version 2
+    nhưng renderer tiếp tục đọc version 1.
 42. `M9.3` - Admin generate quiz/flashcard/test.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
     43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
@@ -249,10 +254,10 @@ Phụ thuộc AI/RAG:
 - `M5.4` phụ thuộc `M5.3`.
 - `M9.1` phụ thuộc `M5.1`, `M1.5`, `M4.3`.
 - `M9.2` phụ thuộc `M5.3`, `M9.1`, `M1.3`.
-- Lượt nâng cấp `M9.2` contract v3 đã được chốt tại
-  `.codex/plans/m9-2-classhero-authoring-v3-plan.md`: trước tiên commit baseline
-  `codex/m9-2-summary-contract-v2`, sau đó tách nhánh
-  `codex/m9-2-classhero-authoring-v3`; không thay đổi dependency hoặc mã subtask.
+- Lượt nâng cấp `M9.2` contract v3 theo
+  `.codex/plans/m9-2-classhero-authoring-v3-plan.md` đang được triển khai trên
+  `codex/m9-2-classhero-authoring-v3`, tách từ baseline v2 commit `776a69c1`;
+  không thay đổi dependency hoặc mã subtask.
 - `M9.3` phụ thuộc `M6.2` đến `M6.4`, `M5.3`, `M9.1`.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`, `M4.3`; xếp ngay sau `M9.3` để generation
   có UI quản trị kiểm thử trước khi chuyển sang student flow; đã Done
