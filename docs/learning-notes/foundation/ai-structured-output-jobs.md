@@ -56,14 +56,39 @@ event là sổ chi tiết dùng cho accounting/audit.
   input/output luôn có cùng hash bất kể thứ tự key.
 - Source freshness: API hash danh sách lesson chunks, worker tải lại và so hash
   trước khi gọi provider để không tóm tắt tài liệu đã bị thay đổi giữa chừng.
+- Prompt preview round-trip: FE phải lấy `systemPrompt` và `userPrompt` hiệu lực
+  từ response preview để hiển thị, không dùng giá trị form rỗng ghi đè request
+  đã dựng. Nếu admin gửi lại nguyên prompt đã xem trước, shared builder nhận
+  diện và tái sử dụng trực tiếp để base prompt không bị lồng thêm lần nữa.
+
+## Luồng lỗi thường gặp
+
+Một response preview có thể hoàn toàn đúng nhưng tab System vẫn trống nếu UI
+chỉ lưu `userPrompt` vào form. Tình huống này còn làm JSON “Input đầy đủ” sai vì
+giá trị rỗng của form ghi đè `openAiRequest.instructions`. Cách kiểm tra đúng là
+đối chiếu cùng lúc ba nơi: `systemPrompt` trong response, textarea trên FE và
+`instructions` trong JSON cuối. Sau đó phải kiểm thêm vòng gửi lại preview hoặc
+generate để chắc chắn prompt hiệu lực không bị builder bọc lặp.
+
+Phải tách ranh giới kỹ thuật và đánh giá biên tập. JSON Schema/Zod vẫn là ranh
+giới bắt buộc vì JSON hỏng không thể persist/render an toàn. Ngược lại, các nhận
+định như theory có lẫn ví dụ, paragraph quá dài, ví dụ lệch chủ đề hay lời giải
+chưa hay đều có false positive; chúng chỉ nên thành warning trên bản nháp
+`NEEDS_REVIEW`, không reject job và không tự gọi model lần hai tốn phí.
+
+Semantic checker vẫn nên nhận diện nhãn theo cấu trúc thay vì cấm từ khóa mọi vị
+trí. Chẳng hạn “vận dụng” có thể là nhãn `Vận dụng 1.` nhưng cũng là động từ hợp
+lệ trong câu “vận dụng các tính chất”. Dù chỉ là warning, giảm false positive vẫn
+giúp admin tập trung vào vấn đề thật.
 
 ## Handler summary đầu tiên
 
 M9.2 là handler domain đầu tiên dùng nền M9.1. API chỉ nhận
 `lesson_documents.id`, kiểm document active/`READY`/có chunks rồi lưu metadata
 nhỏ vào job. Worker tải chunks theo đúng lesson, giới hạn context, gọi strict
-schema, chuyển kết quả sang Tiptap và upsert một `lesson_summaries` ở trạng thái
-`NEEDS_REVIEW`. Raw PDF và raw prompt không được lưu trong durable job.
+schema, map sang block contract theo kiểu best-effort reference, gắn semantic warning rồi upsert một
+`lesson_summaries` ở trạng thái `NEEDS_REVIEW`. Raw PDF và raw prompt không được
+lưu trong durable job.
 
 ## File quan trọng
 

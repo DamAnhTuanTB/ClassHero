@@ -31,6 +31,10 @@ import { AuthTokenService } from "#api/modules/auth/services/auth-token.service"
 import type { AiService } from "#api/modules/ai/services/ai.service";
 import { LessonSummaryContextService } from "#api/modules/ai/services/lesson-summary-context.service";
 import type { AiGenerationExecutionContext } from "#api/modules/ai/types/ai-generation.types";
+import {
+  buildLessonSummarySourceCandidates,
+  buildLessonSummarySourceTopics,
+} from "#api/modules/ai/utils/lesson-summary-source-candidates";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
 import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
@@ -61,18 +65,78 @@ const manualContent = {
     },
   ],
 };
+const chunkContent =
+  "Số hữu tỉ viết được dưới dạng a/b với a, b là số nguyên và b khác 0.\n\n" +
+  "Ví dụ 1. Chứng minh số 1/2 là một số hữu tỉ.\n\n" +
+  "Luyện tập 1. Viết số 0,25 dưới dạng phân số.\n\n" +
+  "Vận dụng 1. Một chiếc áo giá 200 000 đồng được giảm 25%. Tính giá sau khi giảm.";
+const sourceCandidates = buildLessonSummarySourceCandidates([
+  { id: ids.chunk, content: chunkContent },
+]);
+const sourceTopicId = buildLessonSummarySourceTopics([
+  { id: ids.chunk, content: chunkContent },
+])[0]!.id;
+const candidateId = (text: string) =>
+  sourceCandidates.find((candidate) => candidate.problem.includes(text))!.id;
 const generatedOutput = {
   title: "Số hữu tỉ",
   objectives: ["Nhận biết số hữu tỉ"],
-  sections: [
+  theorySections: [
     {
-      heading: "Khái niệm",
-      content: "Số hữu tỉ viết được dưới dạng a/b với b khác 0.",
-      keyFormulas: ["x = \\frac{a}{b}, b \\ne 0"],
-      examples: ["\\frac{1}{2} là số hữu tỉ."],
+      sourceTopicId,
+      displayHeading: "Số hữu tỉ",
+      sourceChunkIds: [ids.chunk],
+      units: [
+        {
+          theory: {
+            type: "knowledge",
+            title: "Khái niệm số hữu tỉ",
+            content: "Số hữu tỉ viết được dưới dạng $a/b$ với $b \\ne 0$.",
+            sourceChunkIds: [ids.chunk],
+          },
+          illustration: {
+            type: "example",
+            exampleKind: "ILLUSTRATION",
+            sourceCandidateId: candidateId("Chứng minh số 1/2"),
+            alignment: "Ví dụ áp dụng trực tiếp định nghĩa số hữu tỉ.",
+            verification: "Đã kiểm tra mẫu số 2 khác 0 và kết luận đúng định nghĩa.",
+            solution: "Ta có mẫu số 2 khác 0.",
+            answer: "$1/2$ là số hữu tỉ.",
+          },
+          illustrationPlacement: "AFTER_THEORY",
+          notes: [
+            {
+              type: "note",
+              content: "Mẫu số phải khác 0. Ví dụ: số $1/2$ có mẫu bằng 2.",
+              sourceChunkIds: [ids.chunk],
+            },
+          ],
+        },
+      ],
     },
   ],
-  commonMistakes: ["Sai lầm 1"],
+  applicationExercises: {
+    sourceHeading: "Bài tập",
+    displayHeading: "Bài tập vận dụng",
+    sourceChunkIds: [ids.chunk],
+    standardExercise: {
+      type: "example",
+      exampleKind: "STANDARD_EXERCISE",
+      sourceCandidateId: candidateId("Viết số 0,25"),
+      solution: "$0,25 = 1/4$.",
+      answer: "$1/4$.",
+      verification: "$1/4=0,25$, khớp đề bài.",
+    },
+    realWorldExercise: {
+      type: "example",
+      exampleKind: "REAL_WORLD_EXERCISE",
+      sourceCandidateId: candidateId("Một chiếc áo"),
+      solution: "Số tiền giảm là 50 000 đồng.",
+      answer: "150 000 đồng.",
+      verification: "200 000 - 50 000 = 150 000 đồng.",
+    },
+  },
+  warnings: null,
 };
 
 describe("M9.2 lesson summary API and worker integration", () => {
@@ -181,40 +245,41 @@ describe("M9.2 lesson summary API and worker integration", () => {
         style: "academic",
         length: "detailed",
         targetWordCount: 350,
-        focus: "Định nghĩa số hữu tỉ",
-        includeFormulas: false,
-        includeExamples: true,
-        includeCommonMistakes: true,
         extraInstructions: "Dùng câu ngắn",
         styleInstructions: "Dễ hiểu cho học sinh khối 7",
-        contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
         systemInstructions: "SYSTEM PREVIEW CUSTOM",
         userPrompt: "USER PREVIEW CUSTOM",
         temperature: 0.1,
-        maxOutputTokens: 1_500,
+        maxOutputTokens: 6_000,
       })
       .expect(200);
 
     expect(response.body.data).toMatchObject({
-      promptVersion: "lesson-summary-prompt-v2",
-      schemaVersion: "lesson-summary-schema-v2",
-      systemPrompt: "SYSTEM PREVIEW CUSTOM",
-      userPrompt: "USER PREVIEW CUSTOM",
+      promptVersion: "lesson-summary-prompt-v22",
+      schemaVersion: "lesson-summary-schema-v19",
+      systemPrompt: expect.stringContaining("SYSTEM PREVIEW CUSTOM"),
+      userPrompt: expect.stringContaining("USER PREVIEW CUSTOM"),
       inputPrompt: expect.stringContaining("Số hữu tỉ viết được"),
       openAiRequest: {
         model: expect.any(String),
-        instructions: "SYSTEM PREVIEW CUSTOM",
+        instructions: expect.stringContaining("CẤU TRÚC BẮT BUỘC"),
         input: expect.stringContaining("USER PREVIEW CUSTOM"),
         text: {
           format: {
             type: "json_schema",
-            name: "lesson_summary",
+            name: "lesson_summary_provider_contract",
             strict: true,
-            schema: expect.objectContaining({ type: "object" }),
+            schema: expect.objectContaining({
+              type: "object",
+              properties: expect.objectContaining({
+                theorySections: expect.any(Object),
+                applicationExercises: expect.any(Object),
+              }),
+            }),
           },
         },
         temperature: 0.1,
-        max_output_tokens: 1_500,
+        max_output_tokens: 6_000,
       },
       context: {
         documentCount: 1,
@@ -225,7 +290,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
       },
       configuration: {
         temperature: 0.1,
-        maxOutputTokens: 1_500,
+        maxOutputTokens: 6_000,
       },
     });
     expect(queueMock.enqueue).not.toHaveBeenCalled();
@@ -239,8 +304,6 @@ describe("M9.2 lesson summary API and worker integration", () => {
         documentIds: [ids.document],
         style: "student_friendly",
         styleInstructions: "Dễ hiểu cho học sinh khối 7",
-        contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-        reviewQuestionCount: 0,
         systemInstructions: "SYSTEM GENERATE CUSTOM",
         userPrompt: "USER GENERATE CUSTOM",
       })
@@ -252,8 +315,6 @@ describe("M9.2 lesson summary API and worker integration", () => {
         documentIds: [ids.document],
         style: "student_friendly",
         styleInstructions: "Dễ hiểu cho học sinh khối 7",
-        contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-        reviewQuestionCount: 0,
         systemInstructions: "SYSTEM GENERATE CUSTOM",
         userPrompt: "USER GENERATE CUSTOM",
       })
@@ -270,14 +331,17 @@ describe("M9.2 lesson summary API and worker integration", () => {
     expect(generation?.type).toBe(AiGenerationType.SUMMARY);
     expect(durable.inputMeta).not.toHaveProperty("chunks");
 
+    const rejectedOutput = structuredClone(generatedOutput);
+    rejectedOutput.theorySections[0]!.units[0]!.theory.content +=
+      " Ví dụ: 2/3 là số hữu tỉ.";
     const aiServiceMock = {
-      generateStructured: vi.fn(async () => ({
-        data: generatedOutput,
+      generateStructured: vi.fn().mockResolvedValue({
+        data: rejectedOutput,
         provider: AiProviderName.OPENAI,
         model: "gpt-4.1-mini-test",
         usage: { promptTokens: 100, completionTokens: 80, totalTokens: 180 },
         latencyMs: 10,
-      })),
+      }),
     };
     const worker = new LessonSummaryGenerationService(
       prisma,
@@ -301,12 +365,13 @@ describe("M9.2 lesson summary API and worker integration", () => {
 
     expect(aiServiceMock.generateStructured).toHaveBeenCalledWith(
       expect.objectContaining({
-        systemPrompt: "SYSTEM GENERATE CUSTOM",
-        userPrompt: "USER GENERATE CUSTOM",
+        systemPrompt: expect.stringContaining("SYSTEM GENERATE CUSTOM"),
+        userPrompt: expect.stringContaining("USER GENERATE CUSTOM"),
         contextChunks: [expect.objectContaining({ id: ids.chunk })],
       }),
       expect.any(Object),
     );
+    expect(aiServiceMock.generateStructured).toHaveBeenCalledTimes(1);
     expect(persisted).toMatchObject({
       resourceType: "LESSON_SUMMARY",
       resourceId: expect.any(String),
@@ -319,7 +384,9 @@ describe("M9.2 lesson summary API and worker integration", () => {
       reviewStatus: ReviewStatus.NEEDS_REVIEW,
       aiGenerationId: generation!.id,
     });
-    expect(JSON.stringify(summary.contentJson)).toContain("Câu hỏi ôn tập");
+    expect(JSON.stringify(summary.contentJson)).toContain("Bài tập vận dụng");
+    expect(JSON.stringify(summary.contentJson)).toContain("Cần admin kiểm tra");
+    expect(JSON.stringify(summary.contentJson)).toContain("trộn ví dụ/bài tập/ghi chú");
 
     await prisma.$transaction([
       prisma.backgroundJob.update({
@@ -420,7 +487,7 @@ async function createFixtureData(prisma: PrismaClient) {
       documentId: ids.document,
       lessonId: ids.lesson,
       chunkIndex: 0,
-      content: "Số hữu tỉ viết được dưới dạng a/b với a, b là số nguyên và b khác 0.",
+      content: chunkContent,
       contentHash: "m9-2-chunk-hash",
       tokenCount: 25,
     },

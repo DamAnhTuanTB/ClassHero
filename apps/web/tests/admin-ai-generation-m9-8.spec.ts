@@ -26,14 +26,14 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       page.getByRole("heading", { name: "Tạo nội dung bằng AI" }),
     ).toBeVisible();
-    for (const name of ["Tóm tắt", "Quiz", "Flashcard", "Test"]) {
+    for (const name of ["Kiến thức", "Quiz", "Flashcard", "Test"]) {
       await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
     }
 
-    await generationCard(page, "Tóm tắt")
+    await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Cấu hình" })
       .click();
-    const summaryDialog = page.getByRole("dialog", { name: "Tạo tóm tắt bằng AI" });
+    const summaryDialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     await expect(summaryDialog.locator("select")).toHaveCount(0);
     await expect(summaryDialog.getByLabel("Cách trình bày")).toBeVisible();
     const documentSelect = summaryDialog.getByLabel("Tài liệu dùng để tạo", {
@@ -154,10 +154,10 @@ test.describe("M9.8 admin AI generation panel", () => {
     const mock = await setupAiGenerationMock(page);
     await page.goto(`/admin/lessons/${lessonId}`);
 
-    await generationCard(page, "Tóm tắt")
+    await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Cấu hình" })
       .click();
-    const dialog = page.getByRole("dialog", { name: "Tạo tóm tắt bằng AI" });
+    const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     await expect(
       dialog.getByLabel("Tài liệu dùng để tạo", { exact: true }),
     ).toBeVisible();
@@ -165,7 +165,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
       "Học thuật, chặt chẽ, có cấu trúc rõ ràng và dùng thuật ngữ chính xác.",
     );
-    await dialog.getByLabel("Độ dài tóm tắt").click();
+    await dialog.getByLabel("Độ dài Kiến thức").click();
     await dialog.getByRole("option", { name: "Chi tiết" }).click();
     await expect(dialog.getByLabel("Số lượng từ")).toHaveValue("");
     await dialog.getByLabel("Số lượng từ").fill("350");
@@ -177,26 +177,37 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByLabel("Yêu cầu bổ sung").fill("Dùng tiêu đề ngắn");
 
     await expect(dialog.getByText("Cấu hình nâng cao và dữ liệu gửi AI")).toHaveCount(0);
-    await expect(dialog.getByText("Xem lại dữ liệu theo các lựa chọn hiện tại.")).toBeVisible();
+    await expect(
+      dialog.getByText("Xem lại dữ liệu theo các lựa chọn hiện tại."),
+    ).toBeVisible();
     await expect(dialog.getByRole("tab", { name: "System instructions" })).toBeVisible();
+    await expect(dialog.getByLabel("System instructions")).toHaveValue(
+      "SYSTEM PROMPT THỰC TẾ",
+    );
     await dialog.getByLabel("System instructions").fill("SYSTEM CUSTOM");
 
     await dialog.getByRole("tab", { name: "User prompt" }).click();
     await dialog.getByLabel("User prompt").fill("USER CUSTOM");
     await dialog.getByRole("tab", { name: "Input đầy đủ" }).click();
-    await expect(dialog.getByText(/"instructions": "SYSTEM CUSTOM"/)).toBeVisible();
-    await expect(dialog.getByText(/"type": "json_schema"/)).toBeVisible();
-    await expect(dialog.getByText(/"name": "lesson_summary"/)).toBeVisible();
-    await expect(dialog.getByText(/NỘI DUNG CHUNK THỰC TẾ/)).toBeVisible();
+    const fullInputPanel = dialog.getByRole("tabpanel");
+    await fullInputPanel.getByRole("button", { name: "Xổ toàn bộ" }).click();
+    await expect(fullInputPanel).toContainText('"instructions":"SYSTEM CUSTOM"');
+    await expect(fullInputPanel).toContainText('"type":"json_schema"');
+    await expect(fullInputPanel).toContainText(
+      '"name":"lesson_summary_provider_contract"',
+    );
+    await expect(fullInputPanel).toContainText("NỘI DUNG CHUNK THỰC TẾ");
 
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await dialog.getByLabel("Temperature").fill("1.5");
     await expect(dialog.getByText("Temperature phải từ 0 đến 1")).toBeVisible();
     await dialog.getByLabel("Temperature").fill("0.1");
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("499");
-    await expect(dialog.getByText("Số token đầu ra phải từ 500 đến 4000")).toBeVisible();
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("1500");
+    await dialog.getByLabel("Giới hạn token đầu ra").fill("5999");
+    await expect(
+      dialog.getByText("Số token đầu ra phải từ 6000 đến 32000"),
+    ).toBeVisible();
+    await dialog.getByLabel("Giới hạn token đầu ra").fill("6000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect.poll(() => mock.promptPreviewPayloads.length).toBeGreaterThan(1);
     await dialog.getByRole("tab", { name: "User prompt" }).click();
@@ -214,11 +225,11 @@ test.describe("M9.8 admin AI generation panel", () => {
         length: "detailed",
         targetWordCount: 350,
         extraInstructions: "Dùng tiêu đề ngắn",
-        systemInstructions: "SYSTEM CUSTOM",
+        systemInstructions: "SYSTEM PROMPT THỰC TẾ\nSYSTEM CUSTOM",
         userPrompt: expect.stringContaining('"targetWordCount":350'),
         model: "gpt-4.1-mini",
         temperature: 0.1,
-        maxOutputTokens: 1_500,
+        maxOutputTokens: 6_000,
       });
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
@@ -233,10 +244,14 @@ test.describe("M9.8 admin AI generation panel", () => {
     const mock = await setupAiGenerationMock(page, { runningPolls: 1 });
     await page.goto(`/admin/lessons/${lessonId}`);
 
-    await generationCard(page, "Tóm tắt")
+    await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Cấu hình" })
       .click();
-    const dialog = page.getByRole("dialog", { name: "Tạo tóm tắt bằng AI" });
+    const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
+    await dialog.getByRole("button", { name: "Model", exact: true }).click();
+    await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
+    await dialog.getByLabel("Temperature").fill("0.2");
+    await dialog.getByLabel("Giới hạn token đầu ra").fill("6000");
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
       .poll(() => mock.payloads.SUMMARY)
@@ -247,11 +262,12 @@ test.describe("M9.8 admin AI generation panel", () => {
         length: "standard",
         systemInstructions: "SYSTEM PROMPT THỰC TẾ",
         userPrompt: expect.stringContaining("USER PROMPT"),
+        model: "gpt-4.1-mini",
         temperature: 0.2,
-        maxOutputTokens: 2_000,
+        maxOutputTokens: 6_000,
       });
 
-    await expect(page.getByRole("tab", { name: "Tóm tắt" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Kiến thức" })).toHaveAttribute(
       "aria-selected",
       "true",
       { timeout: 10_000 },
@@ -259,10 +275,14 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       page.getByText("Số hữu tỉ là số viết được dưới dạng phân số."),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Có 1 điểm cần admin kiểm tra" }),
+    ).toBeVisible();
+    await expect(page.getByText("Khối lý thuyết đầu tiên cần ngắt dòng.")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("button", { name: "Duyệt tóm tắt" })).toHaveCount(0);
     await page.getByRole("button", { name: "Lưu nội dung" }).click();
-    await expect.poll(() => mock.summary?.reviewStatus).toBe("DRAFT");
+    await expect.poll(() => mock.summary?.reviewStatus).toBe("NEEDS_REVIEW");
     await expect(page.getByText("Bản nháp", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Thu hồi phát hành" })).toHaveCount(0);
 
@@ -283,7 +303,7 @@ test.describe("M9.8 admin AI generation panel", () => {
       page.getByRole("button", { name: "Phát hành", exact: true }),
     ).toHaveCount(0);
 
-    await generationCard(page, "Tóm tắt")
+    await generationCard(page, "Kiến thức")
       .getByRole("button", { name: "Sinh lại" })
       .click();
     await expect(dialog).toBeVisible();
@@ -391,25 +411,28 @@ async function setupAiGenerationMock(
     ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       promptPreviewPayloads.push(body);
+      const systemPrompt = body.systemInstructions
+        ? `SYSTEM PROMPT THỰC TẾ\n${String(body.systemInstructions)}`
+        : "SYSTEM PROMPT THỰC TẾ";
       return fulfillJson(route, 200, {
         data: {
-          promptVersion: "lesson-summary-prompt-v2",
-          schemaVersion: "lesson-summary-schema-v2",
-          systemPrompt: "SYSTEM PROMPT THỰC TẾ",
+          promptVersion: "lesson-summary-prompt-v22",
+          schemaVersion: "lesson-summary-schema-v19",
+          systemPrompt,
           userPrompt: `USER PROMPT ${JSON.stringify(body)}`,
           inputPrompt: `USER PROMPT ${JSON.stringify(
             body,
           )}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
           openAiRequest: {
             model: body.model ?? "gpt-4.1-mini",
-            instructions: "SYSTEM PROMPT THỰC TẾ",
+            instructions: systemPrompt,
             input: `USER PROMPT ${JSON.stringify(
               body,
             )}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
             text: {
               format: {
                 type: "json_schema",
-                name: "lesson_summary",
+                name: "lesson_summary_provider_contract",
                 strict: true,
                 schema: {
                   type: "object",
@@ -419,7 +442,7 @@ async function setupAiGenerationMock(
               },
             },
             temperature: body.temperature ?? 0.2,
-            max_output_tokens: body.maxOutputTokens ?? 2_000,
+            max_output_tokens: body.maxOutputTokens ?? 6_000,
           },
           context: {
             documentCount: 1,
@@ -433,7 +456,7 @@ async function setupAiGenerationMock(
             resolvedProvider: "OPENAI",
             resolvedModel: body.model ?? "gpt-4.1-mini",
             temperature: body.temperature ?? 0.2,
-            maxOutputTokens: body.maxOutputTokens ?? 2_000,
+            maxOutputTokens: body.maxOutputTokens ?? 6_000,
             modelOptions: [
               { provider: "OPENAI", model: "gpt-4.1-mini", available: true },
               { provider: "GEMINI", model: "gemini-2.5-flash", available: true },
@@ -620,15 +643,52 @@ function materialize(
       id: resourceId,
       lessonId,
       contentJson: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              { type: "text", text: "Số hữu tỉ là số viết được dưới dạng phân số." },
-            ],
-          },
-        ],
+        type: "lesson_summary_blocks",
+        version: 1,
+        data: {
+          lessonId,
+          title: "Số hữu tỉ",
+          objectives: ["Nhận biết số hữu tỉ"],
+          sections: [
+            {
+              order: 1,
+              sourceHeading: "Số hữu tỉ",
+              displayHeading: "Số hữu tỉ",
+              sourceChunkIds: [documentId],
+              blocks: [
+                {
+                  type: "knowledge",
+                  title: "Khái niệm số hữu tỉ",
+                  content: "Số hữu tỉ là số viết được dưới dạng phân số.",
+                  sourceChunkIds: [documentId],
+                },
+              ],
+            },
+            {
+              order: 2,
+              sourceHeading: "Bài tập",
+              displayHeading: "Bài tập vận dụng",
+              sourceChunkIds: [documentId],
+              blocks: [
+                {
+                  type: "example",
+                  problem: "Viết 0,25 dưới dạng phân số.",
+                  solution: "$0,25 = 1/4$.",
+                  answer: "$1/4$.",
+                  sourceChunkIds: [documentId],
+                },
+                {
+                  type: "example",
+                  problem: "Một món đồ 100 000 đồng giảm 20%. Tính giá mới.",
+                  solution: "$100\\,000 \\times 80\\% = 80\\,000$ đồng.",
+                  answer: "$80\\,000$ đồng.",
+                  sourceChunkIds: [documentId],
+                },
+              ],
+            },
+          ],
+          warnings: ["Khối lý thuyết đầu tiên cần ngắt dòng."],
+        },
       },
       source: "AI",
       reviewStatus: "NEEDS_REVIEW",

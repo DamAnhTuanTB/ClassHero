@@ -13,9 +13,10 @@ import {
 import {
   LESSON_SUMMARY_MAX_CONTEXT_TOKENS,
   LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
+  LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
   LESSON_SUMMARY_PROMPT_VERSION,
   LESSON_SUMMARY_SCHEMA_VERSION,
-  lessonSummaryOutputSchema,
+  lessonSummaryProviderOutputSchema,
   type LessonSummaryJobInput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
@@ -228,7 +229,7 @@ export class LessonSummariesService {
         input: inputPrompt,
         text: {
           format: buildAiStructuredTextFormat(
-            lessonSummaryOutputSchema,
+            lessonSummaryProviderOutputSchema,
             request.outputName,
           ),
         },
@@ -319,7 +320,10 @@ export class LessonSummariesService {
       ...baseRoute,
       candidates,
       temperature: dto.temperature ?? baseRoute.temperature,
-      maxOutputTokens: dto.maxOutputTokens ?? baseRoute.maxOutputTokens,
+      maxOutputTokens: Math.max(
+        dto.maxOutputTokens ?? baseRoute.maxOutputTokens ?? 0,
+        LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
+      ),
     };
     return { baseRoute, route };
   }
@@ -359,6 +363,8 @@ function normalizeConfiguration(
     ...(dto.model ? { model: dto.model } : {}),
     ...(dto.temperature !== undefined ? { temperature: dto.temperature } : {}),
     ...(dto.reasoningEffort ? { reasoningEffort: dto.reasoningEffort } : {}),
-    ...(dto.maxOutputTokens !== undefined ? { maxOutputTokens: dto.maxOutputTokens } : {}),
+    ...(dto.maxOutputTokens !== undefined
+      ? { maxOutputTokens: dto.maxOutputTokens }
+      : {}),
   };
 }

@@ -673,18 +673,13 @@ Body:
   "styleInstructions": "Dễ hiểu cho học sinh khối 7.",
   "length": "standard",
   "targetWordCount": 350,
-  "focus": "Định nghĩa và cách biểu diễn số hữu tỉ",
-  "includeFormulas": true,
-  "includeExamples": true,
-  "includeCommonMistakes": true,
-  "contentSections": ["KEY_CONCEPTS", "FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-  "reviewQuestionCount": 0,
   "extraInstructions": "Dùng câu ngắn",
   "systemInstructions": "System instructions đã được admin kiểm tra",
   "userPrompt": "User prompt đã được admin kiểm tra",
   "model": "gpt-4.1-mini",
   "temperature": 0.2,
-  "maxOutputTokens": 2000
+  "reasoningEffort": "medium",
+  "maxOutputTokens": 6000
 }
 ```
 
@@ -699,14 +694,15 @@ Rules:
 - `style` nhận `student_friendly | concise | academic`; `length` nhận
   `short | standard | detailed`. Các field còn lại là cấu hình theo lần chạy;
   `model` chỉ được chọn trong route `SUMMARY` đang khả dụng.
-- `styleInstructions` là nội dung trình bày tự do; `contentSections` nhận các
-  nhóm nội dung UI hỗ trợ. `systemInstructions` và `userPrompt` cho phép admin
+- `styleInstructions` là nội dung trình bày tự do. `systemInstructions` và
+  `userPrompt` cho phép admin
   sửa prompt của lần chạy, nhưng context chunks vẫn do server tải và ghép sau
   user prompt, không nhận raw context từ client.
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
   tiêu gần đúng và được kết hợp với `length` khi dựng user prompt.
-- `temperature` giới hạn `0..1`, `maxOutputTokens` giới hạn `500..4000`; bỏ
-  trống thì dùng Cài đặt AI hiện tại.
+- `temperature` giới hạn `0..1`, `reasoningEffort` nhận `low | medium | high`,
+  `maxOutputTokens` giới hạn `6000..32000`; bỏ trống thì dùng Cài đặt AI hiện tại
+  với sàn mặc định `6000` cho Summary.
 
 Response: `202 Accepted`.
 
@@ -727,6 +723,17 @@ Side effects:
 - Enqueue AI generation job.
 - Worker upsert summary với `source = AI`, `reviewStatus = NEEDS_REVIEW` và
   `aiGenerationId` để admin review trước khi student nhìn thấy.
+- Output qua được JSON Schema/Zod kỹ thuật luôn được lưu; kiểm tra ngữ nghĩa,
+  source reference và cách trình bày chỉ bổ sung `contentJson.data.warnings` để
+  admin xem/sửa, không reject job và không kích hoạt provider call sửa lần hai.
+- Nếu model tham chiếu candidate/chunk không tồn tại, mapper giữ bản nháp ở dạng
+  có thể biên tập, dùng source chunk hợp lệ dự phòng và placeholder có cảnh báo.
+  JSON hỏng, sai provider schema hoặc lỗi provider/hạ tầng vẫn làm job thất bại.
+- Target contract v3 của `M9.2` không đổi endpoint/body generation nhưng dự kiến
+  trả `contentJson.type=lesson_summary_blocks`, `version=2`: ví dụ có provenance
+  và optional structured `diagramSpec`; API/FE phải tiếp tục đọc version 1. Đây là
+  thiết kế đã chốt nhưng chưa phải behavior production cho tới khi implementation
+  và live/manual acceptance hoàn tất.
 
 ### `POST /admin/lessons/:lessonId/summary/prompt-preview`
 
@@ -738,6 +745,9 @@ Behavior:
 
 - Dùng cùng context loader và prompt builder với worker để trả đúng
   `systemPrompt`, `userPrompt` và `inputPrompt` đầy đủ có context chunks.
+- `systemPrompt`/`userPrompt` trả về là prompt hiệu lực để FE hiển thị và cho
+  admin chỉnh sửa. Nếu FE gửi lại nguyên hai prompt này khi generate/preview,
+  server tái sử dụng trực tiếp và không lồng thêm một lớp base prompt.
 - Trả thêm `openAiRequest` ở dạng JSON với các field `model`, `instructions`,
   `input`, `text.format`, `temperature`, `max_output_tokens`; `text.format` phải
   chứa đúng structured-output name, strict mode và JSON Schema mà provider sử

@@ -11,21 +11,15 @@ import {
   LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
 } from "#api/modules/ai/types/lesson-content-generation.types";
-import {
-  LESSON_SUMMARY_PROMPT_VERSION,
-  LESSON_SUMMARY_SCHEMA_VERSION,
-  lessonSummaryOutputSchema,
-} from "#api/modules/ai/types/lesson-summary.types";
+import { lessonSummaryProviderOutputSchema } from "#api/modules/ai/types/lesson-summary.types";
+import { mapLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-summary-mapper";
 import {
   buildFlashcardPrompt,
   buildQuizPrompt,
   buildTestPrompt,
   LESSON_CONTENT_SYSTEM_PROMPT,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
-import {
-  buildLessonSummaryUserPrompt,
-  LESSON_SUMMARY_SYSTEM_PROMPT,
-} from "#api/modules/ai/utils/lesson-summary-prompt";
+import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
 loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false });
 const runLiveTest = process.env.RUN_OPENAI_LIVE_TESTS === "1";
@@ -37,12 +31,12 @@ const contextChunks = [
   {
     id: chunkIds[0]!,
     content:
-      "Số hữu tỉ là số viết được dưới dạng a/b, trong đó a và b là số nguyên, b khác 0. Hai phân số bằng nhau khi tích chéo bằng nhau.",
+      "Số hữu tỉ là số viết được dưới dạng a/b, trong đó a và b là số nguyên, b khác 0. Ví dụ: Số 1/2 là một số hữu tỉ.",
   },
   {
     id: chunkIds[1]!,
     content:
-      "Muốn cộng hai số hữu tỉ, quy đồng mẫu số rồi cộng tử số. Phép cộng có tính giao hoán, kết hợp; số đối của a/b là -a/b.",
+      "Bài 1. Viết số 0,25 dưới dạng phân số. Bài 2. Một chiếc áo giá 200 000 đồng được giảm 25%. Tính giá chiếc áo sau khi giảm.",
   },
 ];
 
@@ -62,33 +56,29 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     const allQuestionTypes = Object.values(QuestionType);
 
     const summary = await provider.generateStructured(
-      {
-        systemPrompt: LESSON_SUMMARY_SYSTEM_PROMPT,
-        userPrompt: buildLessonSummaryUserPrompt({
-          lessonTitle: "Số hữu tỉ",
-          configuration: {
-            style: "student_friendly",
-            styleInstructions: "",
-            length: "standard",
-            targetWordCount: null,
-            focus: "",
-            includeFormulas: true,
-            includeExamples: true,
-            includeCommonMistakes: true,
-            contentSections: ["FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-            extraInstructions: "",
-          },
-        }),
-        contextChunks,
-        outputName: "m9_8_summary",
-        promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
-        schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
-        maxTokens: 900,
-      },
-      lessonSummaryOutputSchema,
+      buildLessonSummaryStructuredInput({
+        lessonId: "lesson-m9-8-live",
+        lessonTitle: "Số hữu tỉ",
+        documentIds: ["document-m9-8-live"],
+        sourceHash: "m9-8-live-source",
+        chunks: contextChunks,
+        configuration: {
+          style: "student_friendly",
+          styleInstructions: "",
+          length: "standard",
+          targetWordCount: null,
+          extraInstructions: "",
+        },
+      }),
+      lessonSummaryProviderOutputSchema,
     );
-    expect(summary.data.sections.length).toBeGreaterThan(0);
-    expect(summary.data.objectives.length).toBeGreaterThan(0);
+    const persistedSummary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-m9-8-live",
+      output: summary.data,
+      contextChunks,
+    });
+    expect(persistedSummary.sections.at(-1)?.displayHeading).toBe("Bài tập vận dụng");
+    expect(summary.data.objectives?.length).toBeGreaterThan(0);
     record(usage, summary, "summary-student-friendly");
 
     for (const quizCase of [

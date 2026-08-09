@@ -21,8 +21,10 @@ export interface AiTextInput {
   systemPrompt: string;
   userPrompt: string;
   contextChunks?: RetrievedChunk[];
+  /** Summary uses JSON so chunk content cannot break XML-like delimiters. */
+  contextSerialization?: "xml" | "json";
   temperature?: number;
-  reasoningEffort?: string;
+  reasoningEffort?: "low" | "medium" | "high";
   maxTokens?: number;
   /** Model runtime resolved by provider-operations; embedding does not use this field. */
   model?: string;
@@ -56,7 +58,6 @@ export interface AiStructuredInput extends AiTextInput {
 
 export type AiOutputSchema<TOutput> = ZodType<TOutput>;
 
-export interface AiStructuredOutput<TOutput>
-  extends AiProviderOutputMetadata {
+export interface AiStructuredOutput<TOutput> extends AiProviderOutputMetadata {
   data: TOutput;
 }

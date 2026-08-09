@@ -16,11 +16,14 @@ import {
   LessonSummaryContextService,
 } from "#api/modules/ai/services/lesson-summary-context.service";
 import {
+  LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
   lessonSummaryJobInputSchema,
   lessonSummaryOutputSchema,
+  lessonSummaryProviderOutputSchema,
   type LessonSummaryOutput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validation";
+import { mapLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-summary-mapper";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
 @Injectable()
@@ -78,24 +81,30 @@ export class LessonSummaryGenerationService {
       systemInstructions: input.data.systemInstructions,
       userPrompt: input.data.userPrompt,
     });
-    const output = this.providerCall
+    const providerOutput = this.providerCall
       ? await this.providerCall.generateStructured(
           {
             feature: AiGenerationType.SUMMARY,
             aiGenerationId: context.aiGenerationId,
             backgroundJobId: context.backgroundJobId,
             attempt: context.attempt,
-            routeSnapshot: context.providerRouteSnapshot,
+            callSequence: 1,
+            routeSnapshot: normalizeSummaryRouteSnapshot(context.providerRouteSnapshot),
           },
           structuredInput,
-          lessonSummaryOutputSchema,
+          lessonSummaryProviderOutputSchema,
         )
       : await this.aiService.generateStructured(
           structuredInput,
-          lessonSummaryOutputSchema,
+          lessonSummaryProviderOutputSchema,
         );
 
-    return { action: "SUMMARY", output };
+    const data = mapLessonSummaryProviderOutput({
+      lessonId: context.lessonId,
+      output: providerOutput.data,
+      contextChunks: sourceContext.chunks,
+    });
+    return { action: "SUMMARY", output: { ...providerOutput, data } };
   }
 
   async persist(
@@ -198,4 +207,17 @@ function omitProviderRouteSnapshot(value: unknown) {
       ([key]) => key !== "providerRouteSnapshot",
     ),
   );
+}
+
+function normalizeSummaryRouteSnapshot(
+  route: AiGenerationExecutionContext["providerRouteSnapshot"],
+) {
+  if (!route) return undefined;
+  return {
+    ...route,
+    maxOutputTokens: Math.max(
+      route.maxOutputTokens ?? 0,
+      LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
+    ),
+  };
 }

@@ -450,24 +450,18 @@ Input:
 
 ```json
 {
-  "lessonId": "uuid",
   "documentIds": ["uuid"],
   "style": "student_friendly",
   "styleInstructions": "Dễ hiểu cho học sinh khối 7.",
   "length": "standard",
   "targetWordCount": 350,
-  "focus": "string optional",
-  "includeFormulas": true,
-  "includeExamples": true,
-  "includeCommonMistakes": true,
-  "contentSections": ["KEY_CONCEPTS", "FORMULAS", "EXAMPLES", "COMMON_MISTAKES"],
-  "reviewQuestionCount": 0,
   "extraInstructions": "string optional",
   "systemInstructions": "string optional",
   "userPrompt": "string optional",
   "model": "string optional",
   "temperature": 0.2,
-  "maxOutputTokens": 2000
+  "reasoningEffort": "medium",
+  "maxOutputTokens": 6000
 }
 ```
 
@@ -480,50 +474,33 @@ với structured output bắt buộc có cả `text.format` gồm `type`, `name`
 và JSON Schema thực tế được tạo từ cùng Zod schema. Không được gọi một object
 thiếu provider field là “input đầy đủ”.
 
-Các lựa chọn `contentSections` trên UI phải đại diện cho những nhóm nội dung có
-khác biệt ngữ nghĩa rõ và dẫn đến chỉ dẫn/output khác nhau. Không tách thành hai
-checkbox nếu người dùng thông thường khó phân biệt hoặc model có khả năng sinh
-nội dung trùng, ví dụ `khái niệm` với `định nghĩa`, hoặc `phương pháp` với `các
-bước thực hiện`; khi đó ưu tiên bỏ lựa chọn trùng và giữ một nhãn đại diện ngắn,
-đơn nghĩa. Nếu cần đổi tên, dùng một tên mới rõ hành động; không ghép hai nhãn cũ
-bằng “và” vì làm admin khó quét và khó đoán phạm vi. Những phần vốn là bản chất
-của toàn bộ artifact, như “tổng kết” trong một bản tóm tắt, không nên trở thành
-checkbox riêng nếu tắt nó không tạo ra behavior hữu ích.
-
-Danh sách checkbox chuẩn cho Summary gồm: `Kiến thức trọng tâm`, `Công thức
-quan trọng`, `Cách giải`, `Ví dụ minh họa`, `Lỗi thường gặp`, `Mẹo ghi nhớ`,
-`Trường hợp đặc biệt`. Mặc định chọn đúng năm mục: `Kiến thức trọng tâm`,
-`Công thức quan trọng`, `Cách giải`, `Ví dụ minh họa`, `Lỗi thường gặp`; các
-mục còn lại không được chọn sẵn.
-
 `targetWordCount` là số từ mục tiêu gần đúng, dùng cùng `length` để mô tả rõ
 mức độ dài mong muốn. Field này không bắt buộc, mặc định để trống; khi có giá
 trị thì prompt phải nêu rõ bản tóm tắt dài khoảng bao nhiêu từ.
 
-Field `focus` không chọn cấu trúc đầu ra và không trùng vai trò với các checkbox
-`contentSections`. Nó là chỉ dẫn tự do về chủ đề/ý kiến thức mà admin muốn AI
-dành nhiều dung lượng hoặc giải thích kỹ hơn trong phạm vi tài liệu đã chọn, ví
-dụ `So sánh hai số hữu tỉ` hoặc `Điều kiện mẫu số khác 0`. Field này không lọc
-tài liệu và không có nghĩa là bỏ qua toàn bộ nội dung còn lại. UI phải dùng nhãn
-và helper text diễn đạt rõ vai trò “nội dung muốn nhấn mạnh”; nếu admin không có
-ưu tiên riêng thì để trống.
-
-Output schema:
+Provider output dùng contract lồng để khóa cặp lý thuyết–ví dụ; backend validate
+và trải phẳng sang output lưu trữ:
 
 ```json
 {
-  "title": "string",
-  "objectives": ["string"],
-  "sections": [
+  "theorySections": [
     {
-      "heading": "string",
-      "content": "string",
-      "keyFormulas": ["string"],
-      "examples": ["string"]
+      "sourceTopicId": "T01",
+      "units": [
+        {
+          "theory": { "type": "knowledge|theorem|property|procedure" },
+          "illustration": { "sourceCandidateId": "C001" },
+          "illustrationPlacement": "BEFORE_THEORY|AFTER_THEORY",
+          "notes": []
+        }
+      ]
     }
   ],
-  "commonMistakes": ["string"],
-  "reviewQuestions": ["string"]
+  "applicationExercises": {
+    "displayHeading": "Bài tập vận dụng",
+    "standardExercise": { "sourceCandidateId": "C010" },
+    "realWorldExercise": { "sourceCandidateId": "C011" }
+  }
 }
 ```
 
@@ -554,10 +531,11 @@ Output phải giữ các invariant sau:
   thiết, thay số liệu hoặc tự sáng tác bài mới.
 - Mỗi block phải dẫn `sourceChunkIds` thuộc đúng tập chunk IDs đã gửi vào request.
   Section cuối không được lặp lại bài đã xuất hiện ở nơi khác trong summary.
-- Section lý thuyết được phép và bắt buộc có block `example` minh họa riêng. Mỗi
-  block cốt lõi `knowledge`, `theorem`, `property` hoặc `procedure` phải ghép với
-  đúng một `example` nguồn nằm liền sau nó khi hiển thị. Không được gom nhiều block
-  lý thuyết liên tiếp rồi mới gom nhiều example liên tiếp.
+- Section lý thuyết bắt buộc có block `example` minh họa riêng. Mỗi block cốt lõi
+  `knowledge`, `theorem`, `property` hoặc `procedure` ghép đúng một `example`
+  nguồn nằm liền trước hoặc liền sau theo `illustrationPlacement`. Hoạt động khám
+  phá dùng `BEFORE_THEORY`; ví dụ áp dụng dùng `AFTER_THEORY`. Không được gom một
+  dãy theory rồi mới gom một dãy example.
 - `knowledge`, `theorem`, `property` và `procedure` không được nhúng đề bài, lời
   giải, phép tính minh họa hoặc đoạn mở đầu bằng các nhãn như `Ví dụ`, `Chẳng hạn`,
   `Luyện tập`, `Vận dụng`, `Bài tập` vào field lý thuyết; nội dung đó phải được bóc
@@ -565,14 +543,17 @@ Output phải giữ các invariant sau:
 - `note` là ngoại lệ có chủ đích: mỗi `note.content` phải trình bày một ghi chú,
   lưu ý hoặc nhận xét từ nguồn và kèm một ví dụ ngắn ngay trong cùng `content`;
   không tạo block `example` riêng chỉ để minh họa cho note.
-- Nếu số ví dụ nguồn ít hơn số ý lý thuyết có thể tách, model phải gom các ý liên
-  quan thành một block cốt lõi có cùng một ví dụ phù hợp; không được tạo block cốt
-  lõi không có example và không được tự sáng tác example để đủ cặp.
+- Không áp giới hạn số ý kiểu `1–3 ý/block`. Mỗi block giữ đủ các ý thuộc cùng một
+  tiểu chủ đề/mục tiêu học tập; khi mục tiêu học tập thay đổi thì tách block. Nếu
+  số ví dụ nguồn ít hơn số ý lý thuyết có thể tách, model chỉ gom các ý thực sự
+  cùng tiểu chủ đề; phần chứng minh/giải thích cùng mục tiêu có thể nằm trong block
+  gần nhất, nhưng không được gắn ép một candidate không liên quan.
 - Heading bài tập từ nguồn phải được hấp thụ vào section cuối; không được tạo thêm
   section như `Bài tập`, `Luyện tập`, `Luyện tập chung`, `Bài tập củng cố`,
   `Vận dụng` hoặc biến thể tương đương.
-- Đây là structural invariant, không chỉ là lời nhắc trong prompt. Backend phải
-  validate sau structured output và reject trước persistence nếu model vi phạm.
+- Đây là structural invariant được khóa trực tiếp trong provider JSON Schema khi
+  có thể. Sau khi output đã qua schema kỹ thuật, backend không reject vì đánh giá
+  nội dung; vi phạm còn lại được ghi thành warning để admin tự sửa.
 
 Theo đặc điểm bộ tài liệu Toán của dự án, page range của mỗi lesson sinh kiến thức
 luôn có cả bài tập thông thường và bài toán vận dụng thực tế, nên output hợp lệ
@@ -581,26 +562,28 @@ phải có đủ đúng hai block nêu trên; không có nhánh tự bịa bài 
 Generation contract nên khóa cấu trúc trước khi trải phẳng sang schema lưu trữ:
 
 - Provider output dùng `theorySections[].units[]`, trong đó mỗi unit có đúng
-  `theory`, `illustration` và `notes`; `illustration.exampleKind` luôn là
-  `ILLUSTRATION`.
+  `theory`, `illustration`, `illustrationPlacement` và `notes`;
+  `illustration.exampleKind` luôn là `ILLUSTRATION`. `alignment` và `verification`
+  là field kiểm tra nội bộ, không được persist/hiển thị cho học sinh.
 - Provider output có field bắt buộc riêng `applicationExercises`, gồm đúng
   `standardExercise` với `exampleKind=STANDARD_EXERCISE` và
   `realWorldExercise` với `exampleKind=REAL_WORLD_EXERCISE`. Không biểu diễn phần
   này như một phần tử tùy chọn trong mảng section chung vì JSON Schema không khóa
   được “phần tử cuối bắt buộc thuộc loại X” với số section lý thuyết thay đổi.
-- Backend mapper trải mỗi unit thành `[theory, illustration, ...notes]`, sau đó nối
-  section `Bài tập vận dụng` vào cuối `sections`. API/persistence có thể tiếp tục
-  dùng shape section/block hiện tại sau bước mapping.
-- Semantic validator phải kiểm tra source ID subset, thứ tự liên tục, đúng cặp,
-  heading bài tập duy nhất, hai loại bài đúng thứ tự, không trùng đề và marker ví
-  dụ trong field của `knowledge`/`theorem`/`property`/`procedure`. Với `note`,
-  validator làm chiều ngược lại: yêu cầu có ghi chú và một ví dụ ngắn trong
-  `content`. Output sai phải được retry có feedback giới hạn; vẫn sai thì fail job,
-  không lưu bản gần đúng.
+- Backend mapper trải mỗi unit thành `[theory, illustration, ...notes]` hoặc
+  `[illustration, theory, ...notes]` theo placement, sau đó nối section
+  `Bài tập vận dụng` vào cuối `sections`.
+- Semantic checker kiểm tra source ID subset, đúng cặp, không trùng đề, quan hệ
+  theory-example, marker ví dụ trong field lý thuyết và ví dụ nội bộ của `note`.
+  Các phát hiện này chỉ được ghi vào `warnings`; không fail job và không gọi model
+  lần hai để repair. Mapper xử lý best-effort reference sai (lọc chunk ID ngoài
+  context, dùng chunk hợp lệ dự phòng và placeholder rõ ràng khi candidate ID
+  không tồn tại) để bản nháp vẫn mở được cho admin chỉnh sửa.
 - Để giữ nguyên đề bài, context chuẩn hóa nên cung cấp danh sách
-  `exerciseCandidates` có stable ID, loại ứng viên và nguyên văn đề. Model chỉ chọn
-  candidate ID và sinh lời giải; backend lấy `problem` nguyên văn từ candidate,
-  không tin chuỗi đề bài model viết lại.
+  `sourceTopics` và `sourceCandidates` có stable ID, quan hệ topic, loại ứng viên,
+  vai trò sư phạm, độ hoàn chỉnh và đề đã chuẩn hóa nhãn OCR. Model chỉ chọn
+  candidate ID và sinh lời giải; backend lấy `problem` từ candidate, không tin
+  chuỗi đề bài model viết lại. Markdown ảnh nguồn trong đề phải được giữ lại.
 - `lessonId` canonical do backend gắn sau generation; không yêu cầu model đoán và
   trả về lesson ID.
 
@@ -615,9 +598,12 @@ Prompt/input contract:
   chèn raw chunk content vào delimiter XML có thể bị đóng thẻ bởi nội dung nguồn.
 - Prompt phải phân biệt rõ `ILLUSTRATION` trong section lý thuyết với hai exercise
   của section cuối và yêu cầu self-check trước structured output.
-- Ngân sách output mặc định `2_000` token là thấp cho lesson chi tiết có nhiều cặp
-  block. Route summary nên cấp ít nhất khoảng `6_000` token hoặc tính động theo
-  `targetWordCount`, vẫn giữ hard cap và budget reservation hiện có.
+- Ngân sách output tối thiểu/mặc định là `6_000` token, cho phép cấu hình tới
+  `32_000` token và vẫn giữ budget reservation hiện có.
+- Candidate phụ thuộc hình được gắn warning để admin đối chiếu hình với lời giải
+  trước khi duyệt. Provider hiện nhận context dạng text/Markdown; URL ảnh local
+  không tương đương vision input, nên không được xem lời giải phụ thuộc hình là
+  đã xác minh tự động chỉ vì JSON hợp lệ.
 
 Summary context rules:
 
@@ -636,6 +622,13 @@ Summary context rules:
 - Summary prompt dùng một shared builder cho cả API preview và worker. Preview
   phải trả đúng system instructions, user prompt và input cuối cùng sau khi
   ghép context; không được tự dựng một bản mô phỏng khác với request thật.
+- FE phải nạp `systemPrompt` và `userPrompt` hiệu lực từ preview vào đúng hai tab.
+  Khi admin gửi lại nguyên prompt hiệu lực đã xem trước, shared builder phải tái
+  sử dụng trực tiếp, không bọc lặp base prompt hoặc preference lần thứ hai.
+- Semantic checker chỉ coi `Ví dụ:`, `Chú ý:`, `Bài tập 1.`, `Vận dụng:` và
+  các nhãn cấu trúc tương đương là nội dung bị trộn vào theory. Không được chặn
+  chỉ vì câu lý thuyết dùng từ thông thường như “vận dụng các tính chất” hoặc
+  “khi giải bài tập”.
 - Admin được sửa System instructions và User prompt theo lần chạy; các field đều
   có giới hạn độ dài và được đưa vào input fingerprint/job metadata. Context
   chunks vẫn do server ghép sau user prompt và được đánh dấu là dữ liệu tham
@@ -646,11 +639,41 @@ Summary context rules:
   `0`; con số chi phí hiển thị là upper bound ước tính cho lần generate sau đó.
 - Chỉ một job `SUMMARY` `QUEUED`/`RUNNING` được active trên một lesson. Job
   terminal không chặn admin regenerate.
-- AI summary được map sang Tiptap rồi upsert với `source = AI`,
+- AI summary được map sang contract block có thể biên tập rồi upsert với `source = AI`,
   `review_status = NEEDS_REVIEW` và liên kết `ai_generation_id`.
+- FE Summary phải hiển thị panel warning không chặn thao tác, nêu rõ nội dung vẫn
+  được lưu thành bản nháp và liệt kê các điểm admin nên sửa trước khi phát hành.
+- Chỉ lỗi kỹ thuật khiến output không parse/không qua JSON Schema/Zod hoặc lỗi
+  provider/hạ tầng mới làm job thất bại; cảnh báo ngữ nghĩa không phải lỗi job.
 - Khi admin tắt công thức, ví dụ, lỗi thường gặp hoặc đặt số câu ôn tập bằng
   `0`, output schema chấp nhận mảng rỗng và Tiptap mapper không render heading
   rỗng tương ứng.
+
+#### 5.1.2. Target authoring contract v3 (đã chốt, chưa triển khai)
+
+Lượt nâng cấp kế tiếp của `M9.2` dùng mô hình “source-grounded ClassHero
+authoring”: nguồn quyết định phạm vi kiến thức và đề mục lớn, còn ClassHero quyết
+định cách chia block, diễn giải, ví dụ, bài tập và sơ đồ. Kế hoạch kỹ thuật đầy đủ
+nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
+
+- Giữ `theorySections[].units[]`; mỗi unit luôn flatten thành
+  `[theory, illustration, ...notes]`, không còn `BEFORE_THEORY` hoặc
+  `illustrationPlacement`.
+- `displayHeading` phải bằng heading nguồn. Chỉ lỗi OCR khách quan mới được dùng
+  `OCR_REPAIRED`, kèm `sourceHeadingRaw`, heading sửa, lý do và source chunks.
+- T/C do backend trích chỉ là hint. Model phải audit và trả
+  `CONFIRMED|CORRECTED|UNCERTAIN`; correction không được tạo source ID mới.
+- Theory chỉ dùng kiến thức được source chunks hỗ trợ. Example/exercise dùng một
+  trong `SOURCE_EXACT|SOURCE_ADAPTED|AI_AUTHORED` và luôn có provenance.
+- Candidate phụ thuộc hình không được persist ảnh OCR. Model phải làm đề tự đủ dữ
+  kiện hoặc trả `diagramSpec`; app validate và render sơ đồ deterministic, không
+  nhận raw SVG/URL/script và không gọi image-generation provider.
+- Section cuối tiếp tục khóa literal `Bài tập vận dụng`, đúng hai bài theo thứ tự
+  standard rồi real-world.
+- Generation mới dự kiến lưu `lesson_summary_blocks.version=2`; parser/renderer
+  vẫn hỗ trợ version 1, không migration phá dữ liệu cũ.
+- Semantic issue tiếp tục là warning không chặn; JSON Schema/Zod/hạ tầng không hợp
+  lệ vẫn là lỗi kỹ thuật. Không thêm repair/judge provider call bắt buộc.
 
 ### 5.2. Quiz generation
 

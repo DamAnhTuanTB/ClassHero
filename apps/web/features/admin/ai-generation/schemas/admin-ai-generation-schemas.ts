@@ -58,7 +58,7 @@ export const adminAiGenerationFormSchema = z
     summaryModel: z.string().max(200),
     summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),
     summaryReasoningEffort: z.string().optional(),
-    summaryMaxOutputTokens: optionalNumericTextSchema("Số token đầu ra", 500, 32_000),
+    summaryMaxOutputTokens: optionalNumericTextSchema("Số token đầu ra", 6_000, 32_000),
     count: numericTextSchema("Số lượng", 1, 60),
     difficulty: difficultySchema,
     questionTypes: z.array(questionTypeSchema).max(4),

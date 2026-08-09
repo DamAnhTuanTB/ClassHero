@@ -36,9 +36,7 @@ describe("OpenAiProvider", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const { OpenAiProvider } = await import(
-      "#api/modules/ai/providers/openai.provider"
-    );
+    const { OpenAiProvider } = await import("#api/modules/ai/providers/openai.provider");
     provider = new OpenAiProvider(testConfig);
   });
 
@@ -128,10 +126,7 @@ describe("OpenAiProvider", () => {
     it("should reject a vector with the wrong dimensions", async () => {
       mockEmbeddingsCreate.mockResolvedValueOnce({
         ...mockResponse,
-        data: [
-          { embedding: new Array(100).fill(0.1), index: 0 },
-          mockResponse.data[1],
-        ],
+        data: [{ embedding: new Array(100).fill(0.1), index: 0 }, mockResponse.data[1]],
       });
 
       await expect(provider.createEmbedding(mockInput)).rejects.toThrow(
@@ -152,9 +147,7 @@ describe("OpenAiProvider", () => {
     });
 
     it("should throw on API error", async () => {
-      mockEmbeddingsCreate.mockRejectedValueOnce(
-        new Error("Rate limit exceeded"),
-      );
+      mockEmbeddingsCreate.mockRejectedValueOnce(new Error("Rate limit exceeded"));
 
       await expect(provider.createEmbedding(mockInput)).rejects.toThrow(
         "Rate limit exceeded",
@@ -194,9 +187,7 @@ describe("OpenAiProvider", () => {
         provider.generateText({
           systemPrompt: "Bạn là trợ giảng.",
           userPrompt: "Giải thích ngắn.",
-          contextChunks: [
-            { id: "chunk-1", content: "2 + 2 = 4" },
-          ],
+          contextChunks: [{ id: "chunk-1", content: "2 + 2 = 4" }],
           maxTokens: 100,
         }),
       ).resolves.toMatchObject({
@@ -214,7 +205,7 @@ describe("OpenAiProvider", () => {
         expect.objectContaining({
           model: "gpt-4.1-mini",
           instructions: "Bạn là trợ giảng.",
-          input: expect.stringContaining("<chunk id=\"chunk-1\">"),
+          input: expect.stringContaining('<chunk id="chunk-1">'),
           max_output_tokens: 100,
         }),
       );
@@ -277,6 +268,40 @@ describe("OpenAiProvider", () => {
           text: { format: expect.any(Object) },
         }),
       );
+    });
+
+    it("uses the Responses API reasoning object for supported models", async () => {
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-reasoning-1",
+        model: "gpt-5.4",
+        output_parsed: { status: "ok", value: 2 },
+        usage: null,
+      });
+
+      await provider.generateStructured(
+        {
+          systemPrompt: "Review carefully.",
+          userPrompt: "Return value two.",
+          outputName: "reasoning_smoke",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+          model: "gpt-5.4",
+          reasoningEffort: "medium",
+          temperature: 0.1,
+        },
+        schema,
+      );
+
+      expect(mockResponsesParse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "gpt-5.4",
+          reasoning: { effort: "medium" },
+        }),
+      );
+      expect(mockResponsesParse.mock.calls[0]?.[0]).not.toHaveProperty(
+        "reasoning_effort",
+      );
+      expect(mockResponsesParse.mock.calls[0]?.[0]).not.toHaveProperty("temperature");
     });
 
     it("rejects parsed data that fails local Zod validation", async () => {

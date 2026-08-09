@@ -147,10 +147,13 @@ Thứ tự dưới đây bám theo `docs/09-implementation-plan.md`, ưu tiên n
 39. `M5.4` - Hybrid search cho công thức/ký hiệu.
 40. `M9.1` - AiModule structured output foundation.
 41. `M9.2` - Admin generate lesson summary.
-    41.1. Hardening pending: khóa đúng một section cuối `Bài tập vận dụng`, đúng
-    hai bài lấy từ source của lesson; block theory-example phải đi theo cặp xen kẽ,
-    không nhúng ví dụ vào content lý thuyết và không trộn lesson `Luyện tập chung`/
-    `Bài tập cuối chương`.
+    41.1. Structural hardening done trên nhánh
+    `codex/m9-2-summary-contract-v2`: khóa đúng một section cuối `Bài tập vận
+dụng`, đúng hai bài lấy từ source; theory-example đi theo unit liền trước/sau;
+    prompt/schema ngăn nhúng ví dụ vào theory và không trộn lesson `Luyện tập
+chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn được lưu
+    `NEEDS_REVIEW`; semantic/reference/presentation issues chỉ thành warning cho
+    admin, không gọi model repair lần hai.
 42. `M9.3` - Admin generate quiz/flashcard/test.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
     43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
@@ -246,6 +249,10 @@ Phụ thuộc AI/RAG:
 - `M5.4` phụ thuộc `M5.3`.
 - `M9.1` phụ thuộc `M5.1`, `M1.5`, `M4.3`.
 - `M9.2` phụ thuộc `M5.3`, `M9.1`, `M1.3`.
+- Lượt nâng cấp `M9.2` contract v3 đã được chốt tại
+  `.codex/plans/m9-2-classhero-authoring-v3-plan.md`: trước tiên commit baseline
+  `codex/m9-2-summary-contract-v2`, sau đó tách nhánh
+  `codex/m9-2-classhero-authoring-v3`; không thay đổi dependency hoặc mã subtask.
 - `M9.3` phụ thuộc `M6.2` đến `M6.4`, `M5.3`, `M9.1`.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`, `M4.3`; xếp ngay sau `M9.3` để generation
   có UI quản trị kiểm thử trước khi chuyển sang student flow; đã Done

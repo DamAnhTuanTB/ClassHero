@@ -18,6 +18,7 @@ type RoutedAiCallContext = {
   aiGenerationId?: string | null;
   backgroundJobId?: string | null;
   attempt?: number;
+  callSequence?: number;
   routeSnapshot?: AiFeatureRoute;
 };
 
@@ -69,6 +70,7 @@ export class AiProviderCallService {
             "ai",
             context.backgroundJobId ?? context.aiGenerationId ?? requestFingerprint,
             context.attempt ?? 1,
+            context.callSequence ?? 1,
             index,
             candidate.catalogItemId ?? candidate.model,
           ].join(":"),

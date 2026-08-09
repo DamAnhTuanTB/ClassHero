@@ -118,6 +118,10 @@ export class OpenAiProvider implements AiProvider {
     return true;
   }
 
+  private supportsReasoningEffort(model: string): boolean {
+    return /^(o[1-9]|gpt-5)/u.test(model.toLowerCase());
+  }
+
   async generateText(input: AiTextInput): Promise<AiTextOutput> {
     const startedAt = Date.now();
     const modelToUse = input.model ?? this.config.chatModel;
@@ -125,8 +129,12 @@ export class OpenAiProvider implements AiProvider {
       model: modelToUse,
       instructions: input.systemPrompt,
       input: buildAiUserPrompt(input),
-      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse) ? {} : { temperature: input.temperature }),
-      ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
+      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
+        ? {}
+        : { temperature: input.temperature }),
+      ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
+        ? { reasoning: { effort: input.reasoningEffort } }
+        : {}),
       ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
     });
     const text = response.output_text.trim();
@@ -159,8 +167,12 @@ export class OpenAiProvider implements AiProvider {
       text: {
         format: buildAiStructuredTextFormat(schema, input.outputName),
       },
-      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse) ? {} : { temperature: input.temperature }),
-      ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
+      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
+        ? {}
+        : { temperature: input.temperature }),
+      ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
+        ? { reasoning: { effort: input.reasoningEffort } }
+        : {}),
       ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
     });
 

@@ -16,6 +16,8 @@ import {
   Min,
 } from "class-validator";
 
+import { LESSON_SUMMARY_MIN_OUTPUT_TOKENS } from "#api/modules/ai/types/lesson-summary.types";
+
 export class GenerateLessonSummaryDto {
   @ApiProperty({
     type: [String],
@@ -60,8 +62,6 @@ export class GenerateLessonSummaryDto {
   @Max(5_000)
   targetWordCount?: number;
 
-
-
   @ApiPropertyOptional({ maxLength: 2_000 })
   @IsOptional()
   @IsString()
@@ -93,15 +93,21 @@ export class GenerateLessonSummaryDto {
   @Max(1)
   temperature?: number;
 
-  @ApiPropertyOptional({ enum: ["low", "medium", "high"], description: "Mức độ suy luận cho o1/o3-mini" })
+  @ApiPropertyOptional({
+    enum: ["low", "medium", "high"],
+    description: "Mức độ suy luận cho o1/o3-mini",
+  })
   @IsOptional()
   @IsIn(["low", "medium", "high"])
   reasoningEffort?: "low" | "medium" | "high";
 
-  @ApiPropertyOptional({ minimum: 500, maximum: 32_000 })
+  @ApiPropertyOptional({
+    minimum: LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
+    maximum: 32_000,
+  })
   @IsOptional()
   @IsInt()
-  @Min(500)
+  @Min(LESSON_SUMMARY_MIN_OUTPUT_TOKENS)
   @Max(32_000)
   maxOutputTokens?: number;
 }

@@ -101,24 +101,55 @@ export function AiGenerationConfigDialog({
       setSummaryPreviewTab("system");
       setSummaryPreviewData(null);
       if (type === "SUMMARY" && defaults.documentIds.length > 0) {
-        void previewPrompt(toSummaryPayload(defaults)).then((data) => {
-          if (data?.configuration?.isDefaultConfigured) {
-            if (!form.getValues("summaryModel") && data.configuration.resolvedModel) {
-              form.setValue("summaryModel", data.configuration.resolvedModel, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-              if (data.configuration.temperature !== null && data.configuration.temperature !== undefined) {
-                form.setValue("summaryTemperature", data.configuration.temperature.toString(), { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-              }
-              if (data.configuration.reasoningEffort) {
-                form.setValue("summaryReasoningEffort", data.configuration.reasoningEffort, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-              }
-              if (data.configuration.maxOutputTokens !== null && data.configuration.maxOutputTokens !== undefined) {
-                form.setValue("summaryMaxOutputTokens", data.configuration.maxOutputTokens.toString(), { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+        void previewPrompt(toSummaryPayload(defaults))
+          .then((data) => {
+            setSummaryPreviewData(data);
+            form.setValue("systemInstructions", data.systemPrompt, {
+              shouldValidate: true,
+            });
+            form.setValue("userPrompt", data.userPrompt, {
+              shouldValidate: true,
+            });
+            if (data?.configuration?.isDefaultConfigured) {
+              if (!form.getValues("summaryModel") && data.configuration.resolvedModel) {
+                form.setValue("summaryModel", data.configuration.resolvedModel, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true,
+                });
+                if (
+                  data.configuration.temperature !== null &&
+                  data.configuration.temperature !== undefined
+                ) {
+                  form.setValue(
+                    "summaryTemperature",
+                    data.configuration.temperature.toString(),
+                    { shouldDirty: true, shouldTouch: true, shouldValidate: true },
+                  );
+                }
+                if (data.configuration.reasoningEffort) {
+                  form.setValue(
+                    "summaryReasoningEffort",
+                    data.configuration.reasoningEffort,
+                    { shouldDirty: true, shouldTouch: true, shouldValidate: true },
+                  );
+                }
+                if (
+                  data.configuration.maxOutputTokens !== null &&
+                  data.configuration.maxOutputTokens !== undefined
+                ) {
+                  form.setValue(
+                    "summaryMaxOutputTokens",
+                    data.configuration.maxOutputTokens.toString(),
+                    { shouldDirty: true, shouldTouch: true, shouldValidate: true },
+                  );
+                }
               }
             }
-          }
-        }).catch(() => {
-          // Mutation state renders the recoverable preview error in the dialog.
-        });
+          })
+          .catch(() => {
+            // Mutation state renders the recoverable preview error in the dialog.
+          });
       }
     }
   }, [documents, form, isOpen, previewPrompt, resetPreview, targetGrade, type]);
@@ -141,10 +172,11 @@ export function AiGenerationConfigDialog({
 
   const selectedModelId = form.watch("summaryModel");
   const selectedModelInfo = previewMutation.data?.configuration.modelOptions?.find(
-    (opt) => opt.model === selectedModelId
+    (opt) => opt.model === selectedModelId,
   );
   const aiConfigurationCapability = selectedModelInfo?.capabilities?.aiConfiguration;
-  const configuredReasoningEffortLevels = (selectedModelInfo?.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+  const configuredReasoningEffortLevels = (selectedModelInfo?.capabilities as any)
+    ?.reasoningEffortLevels as string[] | undefined;
 
   const reasoningOptions = [
     { value: "", label: "Mặc định của model" },
@@ -152,20 +184,24 @@ export function AiGenerationConfigDialog({
       ? [...configuredReasoningEffortLevels]
           .sort((a, b) => {
             const order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
-            return (order.indexOf(a) > -1 ? order.indexOf(a) : 99) - (order.indexOf(b) > -1 ? order.indexOf(b) : 99);
+            return (
+              (order.indexOf(a) > -1 ? order.indexOf(a) : 99) -
+              (order.indexOf(b) > -1 ? order.indexOf(b) : 99)
+            );
           })
           .map((level) => ({
-          value: level,
-          label: {
-            minimal: "Tối thiểu (Minimal)",
-            low: "Thấp (Low)",
-            medium: "Trung bình (Medium)",
-            high: "Cao (High)",
-            none: "Không (None)",
-            xhigh: "Rất cao (Extra High)",
-            max: "Tối đa (Max)",
-          }[level as string] || level,
-        }))
+            value: level,
+            label:
+              {
+                minimal: "Tối thiểu (Minimal)",
+                low: "Thấp (Low)",
+                medium: "Trung bình (Medium)",
+                high: "Cao (High)",
+                none: "Không (None)",
+                xhigh: "Rất cao (Extra High)",
+                max: "Tối đa (Max)",
+              }[level as string] || level,
+          }))
       : []),
   ];
 
@@ -192,12 +228,16 @@ export function AiGenerationConfigDialog({
     }
     try {
       const preview = await previewMutation.mutateAsync(
-        toSummaryPayload(form.getValues(), { 
-          includeUserPrompt: false, 
-          aiConfigurationCapability 
+        toSummaryPayload(form.getValues(), {
+          includeUserPrompt: false,
+          aiConfigurationCapability,
         }),
       );
       setSummaryPreviewData(preview);
+      form.setValue("systemInstructions", preview.systemPrompt, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
       form.setValue("userPrompt", preview.userPrompt, {
         shouldDirty: true,
         shouldValidate: true,
@@ -235,7 +275,12 @@ export function AiGenerationConfigDialog({
             });
             return;
           }
-          if (type === "SUMMARY" && values.summaryModel && showTemperature && !values.summaryTemperature) {
+          if (
+            type === "SUMMARY" &&
+            values.summaryModel &&
+            showTemperature &&
+            !values.summaryTemperature
+          ) {
             form.setError("summaryTemperature", {
               message: "Vui lòng nhập mức độ sáng tạo (temperature)",
             });
@@ -250,7 +295,10 @@ export function AiGenerationConfigDialog({
           </h2>
         </header>
 
-        <div ref={scrollViewportRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <div
+          ref={scrollViewportRef}
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5"
+        >
           {type === "SUMMARY" ? (
             <>
               <AdminDocumentMultiSelectField
@@ -433,8 +481,10 @@ export function AiGenerationConfigDialog({
                   type="button"
                   disabled={
                     previewMutation.isPending ||
-                    (!form.watch("summaryModel") && !previewMutation.data?.configuration.isDefaultConfigured) ||
-                    (form.watch("summaryModel") !== "" && !form.watch("summaryMaxOutputTokens")) ||
+                    (!form.watch("summaryModel") &&
+                      !previewMutation.data?.configuration.isDefaultConfigured) ||
+                    (form.watch("summaryModel") !== "" &&
+                      !form.watch("summaryMaxOutputTokens")) ||
                     (showTemperature && !form.watch("summaryTemperature"))
                   }
                   onClick={() => void refreshSummaryPreview()}
@@ -684,10 +734,12 @@ function getDefaultValues(
 
 function toPayload(
   values: AdminAiGenerationFormValues,
-  options?: { aiConfigurationCapability?: any }
+  options?: { aiConfigurationCapability?: any },
 ): AdminAiGenerationPayload {
   if (values.type === "SUMMARY") {
-    return toSummaryPayload(values, { aiConfigurationCapability: options?.aiConfigurationCapability });
+    return toSummaryPayload(values, {
+      aiConfigurationCapability: options?.aiConfigurationCapability,
+    });
   }
   if (values.type === "FLASHCARD") {
     return {
@@ -729,14 +781,18 @@ function mapPayloadToFormValues(
     if (payload.style) values.style = payload.style;
     if (payload.styleInstructions) values.styleInstructions = payload.styleInstructions;
     if (payload.length) values.summaryLength = payload.length;
-    if (payload.targetWordCount) values.summaryTargetWordCount = String(payload.targetWordCount);
+    if (payload.targetWordCount)
+      values.summaryTargetWordCount = String(payload.targetWordCount);
     if (payload.extraInstructions) values.extraInstructions = payload.extraInstructions;
-    if (payload.systemInstructions) values.systemInstructions = payload.systemInstructions;
+    if (payload.systemInstructions)
+      values.systemInstructions = payload.systemInstructions;
     if (payload.userPrompt) values.userPrompt = payload.userPrompt;
     if (payload.model) values.summaryModel = payload.model;
-    if (payload.temperature !== undefined) values.summaryTemperature = String(payload.temperature);
+    if (payload.temperature !== undefined)
+      values.summaryTemperature = String(payload.temperature);
     if (payload.reasoningEffort) values.summaryReasoningEffort = payload.reasoningEffort;
-    if (payload.maxOutputTokens !== undefined) values.summaryMaxOutputTokens = String(payload.maxOutputTokens);
+    if (payload.maxOutputTokens !== undefined)
+      values.summaryMaxOutputTokens = String(payload.maxOutputTokens);
   }
 
   return values;
