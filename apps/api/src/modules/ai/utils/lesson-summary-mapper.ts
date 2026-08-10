@@ -4,7 +4,7 @@ import {
 } from "@learning-path/shared";
 
 import type { RetrievedChunk } from "#api/modules/ai/types/ai-text.types";
-import { mapLessonSummaryProviderDiagramSpec } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
+import { mapLessonSummaryProviderDiagramInput } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
 import type {
   LessonSummaryMvpBlock,
   LessonSummaryOutput,
@@ -119,7 +119,7 @@ export function mapLessonSummaryProviderOutput(
       validateTheoryContent(unit.theory, `${unitPath}.theory`, addWarning);
       if (unit.theory.diagramSpec) {
         validateDiagramReferences(
-          mapLessonSummaryProviderDiagramSpec(unit.theory.diagramSpec),
+          mapLessonSummaryProviderDiagramInput(unit.theory.diagramSpec),
           `${unitPath}.theory.diagramSpec`,
           addWarning,
         );
@@ -354,7 +354,7 @@ function validateExample(example: ProviderExample, path: string, addWarning: Add
   }
   if (example.diagramSpec) {
     validateDiagramReferences(
-      mapLessonSummaryProviderDiagramSpec(example.diagramSpec),
+      mapLessonSummaryProviderDiagramInput(example.diagramSpec),
       `${path}.diagramSpec`,
       addWarning,
     );
@@ -607,7 +607,7 @@ function normalizeTheoryBlock(
         visual: {
           kind: "DIAGRAM_SPEC" as const,
           spec: normalizeLessonSummaryDiagramSpec(
-            mapLessonSummaryProviderDiagramSpec(block.diagramSpec),
+            mapLessonSummaryProviderDiagramInput(block.diagramSpec),
           ),
         },
       }
@@ -655,7 +655,7 @@ function toPersistedExample(example: ProviderExample): LessonSummaryMvpBlock {
           visual: {
             kind: "DIAGRAM_SPEC" as const,
             spec: normalizeLessonSummaryDiagramSpec(
-              mapLessonSummaryProviderDiagramSpec(example.diagramSpec),
+              mapLessonSummaryProviderDiagramInput(example.diagramSpec),
             ),
           },
         }

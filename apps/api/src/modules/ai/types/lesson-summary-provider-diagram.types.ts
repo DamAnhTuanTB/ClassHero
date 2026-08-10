@@ -5,6 +5,9 @@ import {
 } from "@learning-path/shared";
 import { z } from "zod";
 
+import { lessonSummaryDiagramIntentSchema } from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
+import { compileLessonSummaryDiagramIntent } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
+
 const safeId = z
   .string()
   .trim()
@@ -265,6 +268,39 @@ export const lessonSummaryProviderDiagramSpecSchema =
     addProviderGeometryRelationIssues(spec, context);
   });
 
+const providerDiagramIntentEnvelopeSchema = z
+  .object({
+    kind: z.literal("INTENT"),
+    intent: lessonSummaryDiagramIntentSchema.describe(
+      "Mô tả ngữ nghĩa của hình. Backend chịu trách nhiệm dựng tọa độ, vạch chia, điểm phụ, marker và bố trí nhãn theo quy chuẩn.",
+    ),
+  })
+  .strict();
+
+const providerRawDiagramEnvelopeSchema = z
+  .object({
+    kind: z.literal("RAW_SPEC"),
+    spec: lessonSummaryProviderDiagramSpecSchema.describe(
+      "Chỉ dùng khi hình thật sự không thuộc bất kỳ family/archetype INTENT nào đang hỗ trợ.",
+    ),
+  })
+  .strict();
+
+/**
+ * Provider-facing diagram input. New generations should emit the semantic INTENT
+ * envelope. RAW_SPEC and the legacy unwrapped raw shape remain accepted so cached
+ * responses and existing drafts can still be parsed and repaired.
+ */
+export const lessonSummaryProviderDiagramInputSchema = z
+  .union([
+    providerDiagramIntentEnvelopeSchema,
+    providerRawDiagramEnvelopeSchema,
+    lessonSummaryProviderDiagramSpecSchema,
+  ])
+  .describe(
+    "Ưu tiên { kind: 'INTENT', intent: ... } để backend dựng hình chuẩn. RAW_SPEC chỉ là đường lùi cho hình chưa có archetype; dạng raw không bọc chỉ được giữ để tương thích dữ liệu cũ.",
+  );
+
 function addProviderGeometryRelationIssues(
   spec: LessonSummaryProviderDiagramSpecInput,
   context: z.RefinementCtx,
@@ -424,6 +460,18 @@ export function mapLessonSummaryProviderDiagramSpec(
   });
 }
 
+export function mapLessonSummaryProviderDiagramInput(
+  input: LessonSummaryProviderDiagramInput,
+) {
+  if ("kind" in input) {
+    if (input.kind === "INTENT") {
+      return compileLessonSummaryDiagramIntent(input.intent).spec;
+    }
+    return mapLessonSummaryProviderDiagramSpec(input.spec);
+  }
+  return mapLessonSummaryProviderDiagramSpec(input);
+}
+
 function repairProviderNumberLineTicks(
   spec: LessonSummaryProviderDiagramSpecInput,
 ): LessonSummaryProviderDiagramSpecInput {
@@ -560,4 +608,8 @@ function greatestCommonDivisor(left: number, right: number): number {
 
 export type LessonSummaryProviderDiagramSpec = z.infer<
   typeof lessonSummaryProviderDiagramSpecSchema
+>;
+
+export type LessonSummaryProviderDiagramInput = z.infer<
+  typeof lessonSummaryProviderDiagramInputSchema
 >;

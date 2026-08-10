@@ -1,17 +1,26 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const repositoryRoot = path.resolve(process.cwd(), "../..");
-const screenshotRoot = path.join(repositoryRoot, "tmp/m9-2-v50-review-captures");
+const screenshotRoot = path.join(repositoryRoot, "tmp/m9-2-v51-review-captures");
 const apiBaseUrl = "http://localhost:4000/api/v1";
 const lessonId = "lesson-diagram-visual-review";
 const sourceChunkId = "11111111-1111-4111-8111-111111111111";
 
 type JsonRecord = Record<string, unknown>;
 
-const visualCases = [
+type VisualCase = {
+  key: string;
+  theme: "light" | "dark";
+  content: JsonRecord;
+  caseIds?: string[];
+};
+
+const semanticArtifact = readJson("tmp/m9-2-semantic-diagram-review.json");
+
+const visualCases: VisualCase[] = [
   {
     key: "textbook-algebra-recovered",
     theme: "light",
@@ -58,7 +67,6 @@ const visualCases = [
       [
         "multiplication_array",
         "tape_diagram",
-        "fraction_number_line",
         "composite_rectilinear",
         "circle_radius_diameter",
         "regular_hexagon_symmetry",
@@ -82,13 +90,6 @@ const visualCases = [
     ),
   },
   {
-    key: "real-algebra-lesson-1-v43",
-    theme: "light",
-    content: buildRealLessonExampleSummary(
-      readJson("tmp/pdfs/lesson-summary-v3/live-matrix-v42/alg-bai-1--gpt-5.4.json"),
-    ),
-  },
-  {
     key: "real-geometry-lesson-15-v43",
     theme: "dark",
     content: buildRealLessonExampleSummary(
@@ -100,7 +101,120 @@ const visualCases = [
     theme: "light",
     content: buildBai15V50LiveReviewSummary(),
   },
-] as const;
+  semanticReviewCase("semantic-elementary", "light", [
+    "elementary-array",
+    "elementary-tape",
+    "elementary-fraction-bar",
+    "elementary-fraction-circle",
+    "elementary-composite",
+    "elementary-ruler",
+    "elementary-thermometer",
+  ]),
+  semanticReviewCase("semantic-coordinate", "light", [
+    "coordinate-number-line-integers",
+    "coordinate-number-line-fractions",
+    "coordinate-interval",
+    "coordinate-three-points",
+    "coordinate-inequality-region",
+  ]),
+  semanticReviewCase("semantic-algebra", "dark", [
+    "graph-linear",
+    "graph-quadratic",
+    "graph-linear-system",
+    "graph-line-parabola",
+    "graph-inverse",
+  ]),
+  semanticReviewCase("semantic-data", "light", [
+    "data-value-table",
+    "data-pictogram",
+    "data-bar-chart",
+    "data-grouped-bar-chart",
+    "data-line-chart",
+    "data-histogram",
+    "data-pie-chart",
+    "data-clock",
+  ]),
+  semanticReviewCase("semantic-plane", "dark", [
+    "geometry-angle-acute",
+    "geometry-angle-right",
+    "geometry-angle-straight",
+    "geometry-angle-obtuse",
+    "geometry-triangle-general",
+    "geometry-triangle-right",
+    "geometry-triangle-isosceles",
+    "geometry-triangle-equilateral",
+    "geometry-rectangle",
+    "geometry-square",
+    "geometry-parallelogram",
+    "geometry-trapezoid",
+    "geometry-rhombus",
+    "geometry-kite",
+    "geometry-regular-hexagon",
+    "geometry-line-ray-segment",
+    "geometry-midpoint",
+    "geometry-perpendicular-lines",
+    "geometry-parallel-transversal",
+    "geometry-circle-parts",
+    "geometry-circle-sector",
+    "geometry-axial-symmetry",
+    "geometry-central-symmetry",
+    "geometry-congruence-separate",
+    "geometry-congruence-two-legs",
+    "geometry-congruence-hypotenuse-angle",
+    "geometry-congruence-shared",
+  ]),
+  semanticReviewCase("semantic-advanced", "dark", [
+    "advanced-centroid",
+    "advanced-angle-bisectors",
+    "advanced-perpendicular-bisectors",
+    "advanced-altitudes",
+    "advanced-thales",
+    "advanced-right-altitude",
+    "advanced-tangent",
+    "advanced-chords",
+    "advanced-cyclic",
+    "advanced-incircle",
+    "advanced-circumcircle",
+    "advanced-central-inscribed-angles",
+    "advanced-two-circles",
+    "advanced-similarity-aa",
+    "advanced-similarity-sas",
+    "advanced-similarity-sss",
+  ]),
+  semanticReviewCase("semantic-spatial", "light", [
+    "spatial-cuboid",
+    "spatial-cube",
+    "spatial-triangular-prism",
+    "spatial-pyramid",
+    "spatial-triangular-pyramid",
+    "spatial-cube-net",
+    "spatial-cuboid-net",
+    "spatial-cylinder",
+    "spatial-cone",
+    "spatial-sphere",
+    "spatial-ladder",
+    "spatial-shadow",
+  ]),
+  semanticReviewCase("semantic-schematic", "dark", [
+    "schematic-venn",
+    "schematic-venn-three-sets",
+    "schematic-venn-universe",
+    "schematic-tree",
+    "schematic-flow",
+    "schematic-network",
+  ]),
+];
+
+const semanticAlternateThemeCases = visualCases
+  .filter((visualCase) => visualCase.key.startsWith("semantic-"))
+  .map(
+    (visualCase): VisualCase => ({
+      ...visualCase,
+      key: `${visualCase.key}-${visualCase.theme === "light" ? "dark" : "light"}`,
+      theme: visualCase.theme === "light" ? "dark" : "light",
+    }),
+  );
+visualCases.push(...semanticAlternateThemeCases);
 
 mkdirSync(screenshotRoot, { recursive: true });
 
@@ -324,21 +438,8 @@ for (const visualCase of visualCases) {
     }
     if (visualCase.key === "extended-grade3-6") {
       await expect(
-        diagrams.nth(4).locator('[data-diagram-center-marker="true"]'),
+        diagrams.nth(3).locator('[data-diagram-center-marker="true"]'),
       ).toHaveCount(1);
-      await expect(
-        diagrams.nth(2).locator('[data-diagram-marker-type="EQUAL_LENGTH"]'),
-      ).toHaveCount(0);
-      await expect(
-        diagrams.nth(2).locator('[data-diagram-axis-tick="true"]'),
-      ).toHaveCount(9);
-      const maximumTickHeight = await diagrams
-        .nth(2)
-        .locator('[data-diagram-axis-tick="true"]')
-        .evaluateAll((ticks) =>
-          Math.max(...ticks.map((tick) => tick.getBoundingClientRect().height)),
-        );
-      expect(maximumTickHeight).toBeLessThanOrEqual(10);
       await expect(diagrams.nth(1).locator("svg text", { hasText: "15" })).toHaveCount(1);
       await expect(diagrams.nth(1).locator("svg text", { hasText: "25" })).toHaveCount(1);
       await expect(diagrams.nth(1).locator("svg text", { hasText: "10" })).toHaveCount(1);
@@ -400,6 +501,7 @@ for (const visualCase of visualCases) {
           ),
         ].filter((geometry) => !geometry.closest("defs"));
         const overlappingText = textNodes.flatMap((text) => {
+          if (text.getAttribute("data-diagram-container-label") === "true") return [];
           const box = text.getBoundingClientRect();
           const inset = Math.min(0.5, box.height * 0.03);
           const overlappingGeometry = geometries.find((geometry) => {
@@ -419,7 +521,7 @@ for (const visualCase of visualCases) {
           });
           return overlappingGeometry
             ? [
-                `figure-${figureIndex + 1}:${text.textContent?.trim() || "(empty)"}:${overlappingGeometry.tagName.toLowerCase()}:${overlappingGeometry.getAttribute("x1") ?? overlappingGeometry.getAttribute("cx") ?? "shape"}`,
+                `figure-${figureIndex + 1}:${text.textContent?.trim() || "(empty)"}:${overlappingGeometry.tagName.toLowerCase()}[${overlappingGeometry.getAttribute("x1") ?? overlappingGeometry.getAttribute("cx") ?? "shape"},${overlappingGeometry.getAttribute("y1") ?? overlappingGeometry.getAttribute("cy") ?? ""}->${overlappingGeometry.getAttribute("x2") ?? ""},${overlappingGeometry.getAttribute("y2") ?? ""}]`,
               ]
             : [];
         });
@@ -433,7 +535,7 @@ for (const visualCase of visualCases) {
               Math.min(box.bottom, otherBox.bottom) - Math.max(box.top, otherBox.top);
             return overlapWidth > 0.5 && overlapHeight > 0.5
               ? [
-                  `figure-${figureIndex + 1}:${text.textContent?.trim() || "(empty)"}<->${otherText.textContent?.trim() || "(empty)"}`,
+                  `figure-${figureIndex + 1}:${text.textContent?.trim() || "(empty)"}[${text.getAttribute("data-diagram-point-label-id") ?? text.getAttribute("data-diagram-label-anchor-point-id") ?? "implicit"}]<->${otherText.textContent?.trim() || "(empty)"}[${otherText.getAttribute("data-diagram-point-label-id") ?? otherText.getAttribute("data-diagram-label-anchor-point-id") ?? "implicit"}]@${box.x.toFixed(1)},${box.y.toFixed(1)},${box.width.toFixed(1)},${box.height.toFixed(1)}:${otherBox.x.toFixed(1)},${otherBox.y.toFixed(1)},${otherBox.width.toFixed(1)},${otherBox.height.toFixed(1)}`,
                 ]
               : [];
           });
@@ -447,6 +549,17 @@ for (const visualCase of visualCases) {
         };
       }),
     );
+    await expect(
+      diagrams.locator('[data-diagram-arrowhead="true"][fill="context-stroke"]'),
+    ).toHaveCount(0);
+    if (visualCase.theme === "dark") {
+      const arrowheadFills = await diagrams
+        .locator('[data-diagram-arrowhead="true"]')
+        .evaluateAll((arrowheads) =>
+          arrowheads.map((arrowhead) => getComputedStyle(arrowhead).fill),
+        );
+      expect(arrowheadFills.every((fill) => fill !== "rgb(0, 0, 0)")).toBe(true);
+    }
     for (let index = 0; index < expectedCount; index += 1) {
       const diagram = diagrams.nth(index);
       await diagram.evaluate((figure) =>
@@ -455,15 +568,15 @@ for (const visualCase of visualCases) {
       await page.waitForTimeout(50);
       await isolateDiagramCapture(diagram);
       try {
-        await diagram.screenshot({
-          animations: "disabled",
-          caret: "hide",
-          path: path.join(
+        const semanticCaseId = visualCase.caseIds?.[index];
+        await captureVerifiedDiagram(
+          page,
+          diagram,
+          path.join(
             screenshotRoot,
-            `${visualCase.key}-${String(index + 1).padStart(2, "0")}${screenshotVariant}.png`,
+            `${visualCase.key}-${semanticCaseId ?? String(index + 1).padStart(2, "0")}${screenshotVariant}.png`,
           ),
-          scale: "css",
-        });
+        );
       } finally {
         await restoreDiagramCapture(diagram);
       }
@@ -491,6 +604,150 @@ for (const visualCase of visualCases) {
     expect(await page.locator("[data-nextjs-dialog]").count()).toBe(0);
     expect(browserErrors).toEqual([]);
   });
+}
+
+function semanticReviewCase(
+  key: string,
+  theme: "light" | "dark",
+  caseIds: string[],
+): VisualCase {
+  return {
+    key,
+    theme,
+    caseIds,
+    content: buildCoverageSummary(`Semantic compiler: ${key}`, semanticArtifact, caseIds),
+  };
+}
+
+async function captureVerifiedDiagram(
+  page: Page,
+  diagram: ReturnType<Page["locator"]>,
+  screenshotPath: string,
+) {
+  await expect(diagram.locator("svg")).toBeVisible();
+  let screenshotSize = 0;
+  let uniqueColorCount = 0;
+  let lumaStandardDeviation = 0;
+  let contentVerticalSpanRatio = 0;
+  let contentHorizontalSpanRatio = 0;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await diagram.scrollIntoViewIfNeeded();
+    await diagram.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+    });
+    const screenshot = await diagram.screenshot({
+      animations: "disabled",
+      caret: "hide",
+      path: screenshotPath,
+      scale: "device",
+    });
+    screenshotSize = statSync(screenshotPath).size;
+    const screenshotStats = await inspectScreenshotPixels(diagram, screenshot);
+    uniqueColorCount = screenshotStats.uniqueColorCount;
+    lumaStandardDeviation = screenshotStats.lumaStandardDeviation;
+    contentVerticalSpanRatio = screenshotStats.contentVerticalSpanRatio;
+    contentHorizontalSpanRatio = screenshotStats.contentHorizontalSpanRatio;
+    if (
+      screenshotSize > 4_000 &&
+      uniqueColorCount > 12 &&
+      lumaStandardDeviation > 0.035 &&
+      (contentVerticalSpanRatio > 0.18 || contentHorizontalSpanRatio > 0.35)
+    ) {
+      return;
+    }
+    await page.waitForTimeout(120 * attempt);
+  }
+  expect(screenshotSize).toBeGreaterThan(4_000);
+  expect(uniqueColorCount).toBeGreaterThan(12);
+  expect(lumaStandardDeviation).toBeGreaterThan(0.035);
+  expect(
+    contentVerticalSpanRatio > 0.18 || contentHorizontalSpanRatio > 0.35,
+  ).toBe(true);
+}
+
+async function inspectScreenshotPixels(
+  diagram: ReturnType<Page["locator"]>,
+  screenshot: Buffer,
+) {
+  return diagram.evaluate(async (_figure, encodedPng) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${encodedPng}`;
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Unable to decode diagram screenshot."));
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      return {
+        uniqueColorCount: 0,
+        lumaStandardDeviation: 0,
+        contentVerticalSpanRatio: 0,
+        contentHorizontalSpanRatio: 0,
+      };
+    }
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const stride = Math.max(1, Math.floor(Math.sqrt(pixels.length / 4 / 160_000)));
+    const colors = new Set<number>();
+    let sampleCount = 0;
+    let meanLuma = 0;
+    let lumaSquaredDifferenceSum = 0;
+    for (let y = 0; y < canvas.height; y += stride) {
+      for (let x = 0; x < canvas.width; x += stride) {
+        const offset = (y * canvas.width + x) * 4;
+        colors.add(
+          (pixels[offset]! << 24) |
+            (pixels[offset + 1]! << 16) |
+            (pixels[offset + 2]! << 8) |
+            pixels[offset + 3]!,
+        );
+        const luma =
+          pixels[offset]! * 0.2126 +
+          pixels[offset + 1]! * 0.7152 +
+          pixels[offset + 2]! * 0.0722;
+        sampleCount += 1;
+        const delta = luma - meanLuma;
+        meanLuma += delta / sampleCount;
+        lumaSquaredDifferenceSum += delta * (luma - meanLuma);
+      }
+    }
+    const lumaStandardDeviation =
+      Math.sqrt(lumaSquaredDifferenceSum / Math.max(sampleCount, 1)) / 255;
+    const contentThreshold = Math.max(18, lumaStandardDeviation * 255 * 0.55);
+    let contentMinY = canvas.height;
+    let contentMaxY = -1;
+    let contentMinX = canvas.width;
+    let contentMaxX = -1;
+    for (let y = 0; y < canvas.height; y += stride) {
+      for (let x = 0; x < canvas.width; x += stride) {
+        const offset = (y * canvas.width + x) * 4;
+        const luma =
+          pixels[offset]! * 0.2126 +
+          pixels[offset + 1]! * 0.7152 +
+          pixels[offset + 2]! * 0.0722;
+        if (Math.abs(luma - meanLuma) >= contentThreshold) {
+          contentMinY = Math.min(contentMinY, y);
+          contentMaxY = Math.max(contentMaxY, y);
+          contentMinX = Math.min(contentMinX, x);
+          contentMaxX = Math.max(contentMaxX, x);
+        }
+      }
+    }
+    return {
+      uniqueColorCount: colors.size,
+      lumaStandardDeviation,
+      contentVerticalSpanRatio:
+        contentMaxY < contentMinY ? 0 : (contentMaxY - contentMinY) / canvas.height,
+      contentHorizontalSpanRatio:
+        contentMaxX < contentMinX ? 0 : (contentMaxX - contentMinX) / canvas.width,
+    };
+  }, screenshot.toString("base64"));
 }
 
 async function isolateDiagramCapture(diagram: ReturnType<Page["locator"]>) {

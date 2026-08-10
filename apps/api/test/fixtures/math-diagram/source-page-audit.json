@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "series": "Kết nối tri thức với cuộc sống",
+  "auditedAt": "2026-08-10",
+  "records": [
+    {
+      "referenceId": "nxbgd-kntt-math-3-v1",
+      "printedPages": [52, 54, 56, 61, 63, 85, 87, 89, 91, 93],
+      "topics": ["hình tròn", "góc", "tam giác và tứ giác", "hình chữ nhật và hình vuông", "khối lập phương và khối hộp chữ nhật", "mi-li-mét", "gam", "mi-li-lít", "nhiệt độ và đơn vị đo nhiệt độ", "thực hành với đơn vị đo"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4698702815-page-5-1775743939460.png"
+        },
+        {
+          "readerPage": 6,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4698702815-page-6-1775743939746.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-3-v2",
+      "printedPages": [77],
+      "topics": ["xem đồng hồ, tháng - năm"],
+      "evidencePages": [
+        {
+          "readerPage": 78,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714081721-page-78-1776051226120.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-4-v1",
+      "printedPages": [23, 26, 56, 91, 98, 105],
+      "topics": ["góc nhọn, góc tù, góc bẹt", "đơn vị đo góc", "đơn vị đo độ dài", "hai đường thẳng vuông góc", "hai đường thẳng song song", "hình bình hành và hình thoi"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714093295-page-5-1776051377584.png"
+        },
+        {
+          "readerPage": 6,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714093295-page-6-1776051377877.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-5-v1",
+      "printedPages": [11, 14, 16, 20, 23, 26, 42, 53, 56, 60, 91, 98, 105, 113],
+      "topics": ["ôn tập phân số", "phân số thập phân", "các phép tính với phân số", "cộng trừ hai phân số khác mẫu", "hỗn số", "ôn tập hình học và đo lường", "viết số đo đại lượng dưới dạng số thập phân", "ki-lô-mét vuông và héc-ta", "các đơn vị đo diện tích", "thực hành với đơn vị đo đại lượng", "hình tam giác và diện tích hình tam giác", "hình thang và diện tích hình thang", "đường tròn, chu vi và diện tích hình tròn", "đo, vẽ, lắp ghép và tạo hình"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699756373-page-5-1775784444120.png"
+        },
+        {
+          "readerPage": 6,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699756373-page-6-1775784444392.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-5-v2",
+      "printedPages": [4],
+      "topics": ["tỉ số và mô hình biểu diễn tỉ số"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714103431-page-5-1776051523721.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-7-v1",
+      "printedPages": [40, 46, 63, 70, 75, 93, 100],
+      "topics": ["góc", "hai đường thẳng song song", "tam giác bằng nhau", "các trường hợp bằng nhau", "tam giác vuông", "biểu đồ hình quạt tròn", "biểu đồ đoạn thẳng"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714106181-page-5-1776051676675.png"
+        },
+        {
+          "readerPage": 7,
+          "printedPage": 6,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714106181-page-7-1776051677241.png"
+        },
+        {
+          "readerPage": 47,
+          "printedPage": 46,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714106181-page-47-1776051688780.png"
+        },
+        {
+          "readerPage": 101,
+          "printedPage": 100,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714106181-page-101-1776051704398.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-6-v1",
+      "printedPages": [77, 83, 90, 98, 103],
+      "topics": ["tam giác đều và lục giác đều", "hình chữ nhật, hình thoi, hình bình hành và hình thang cân", "chu vi và diện tích", "hình có trục đối xứng", "hình có tâm đối xứng"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699854777-page-5-1775786317582.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-6-v2",
+      "printedPages": [43, 48, 51, 55, 58, 61, 68, 73, 77, 82],
+      "topics": ["điểm và đường thẳng", "tia", "đoạn thẳng", "trung điểm", "góc", "số đo góc", "dữ liệu", "bảng thống kê và biểu đồ tranh", "biểu đồ cột", "biểu đồ cột kép"],
+      "evidencePages": [
+        {
+          "readerPage": 4,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699864675-page-4-1775786437048.png"
+        },
+        {
+          "readerPage": 44,
+          "printedPage": 43,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699864675-page-44-1775786452571.png"
+        },
+        {
+          "readerPage": 51,
+          "printedPage": 50,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699864675-page-51-1775786455246.png"
+        },
+        {
+          "readerPage": 52,
+          "printedPage": 51,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4699864675-page-52-1775786455629.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-7-v2",
+      "printedPages": [72, 77, 85, 94],
+      "topics": ["ba đường trung tuyến và ba đường phân giác", "ba đường trung trực và ba đường cao", "hình hộp chữ nhật và hình lập phương", "lăng trụ đứng tam giác và tứ giác"],
+      "evidencePages": [
+        {
+          "readerPage": 4,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4700015846-page-4-1775788565111.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-8-v2",
+      "printedPages": [40, 47, 78, 93, 112, 117],
+      "topics": ["khái niệm hàm số và đồ thị", "hàm số bậc nhất", "tam giác đồng dạng", "định lí Pythagore", "hình chóp tam giác đều", "hình chóp tứ giác đều"],
+      "evidencePages": [
+        {
+          "readerPage": 4,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/4700102182-page-4-1775790053850.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-9-v1",
+      "printedPages": [5, 11, 38, 39, 40, 66, 74, 83, 87, 91, 99, 104],
+      "topics": ["hệ hai phương trình bậc nhất hai ẩn", "bất phương trình bậc nhất một ẩn và tập nghiệm", "tỉ số lượng giác", "hệ thức lượng trong tam giác vuông", "đường tròn", "cung và dây", "hình quạt tròn", "tiếp tuyến", "hai đường tròn"],
+      "evidencePages": [
+        {
+          "readerPage": 5,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0421/4714692201-page-5-1776736874959.png"
+        },
+        {
+          "readerPage": 40,
+          "printedPage": 39,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0421/4714692201-page-40-1776736888366.png"
+        },
+        {
+          "readerPage": 41,
+          "printedPage": 40,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0421/4714692201-page-41-1776736888715.png"
+        },
+        {
+          "readerPage": 100,
+          "printedPage": 99,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0421/4714692201-page-100-1776736910837.png"
+        }
+      ]
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-9-v2",
+      "printedPages": [4, 32, 38, 46, 67, 72, 80, 93, 94, 101],
+      "topics": ["hàm số y=ax^2", "bảng và biểu đồ tần số", "biểu đồ tần số tương đối", "biểu đồ ghép nhóm", "góc nội tiếp", "đường tròn ngoại tiếp và nội tiếp", "tứ giác nội tiếp", "hình trụ và hình nón", "hình cầu"],
+      "evidencePages": [
+        {
+          "readerPage": 4,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714699696-page-4-1776054368279.png"
+        },
+        {
+          "readerPage": 95,
+          "printedPage": 94,
+          "evidenceUrl": "https://cdn3.olm.vn/upload/taphuan/2026/0413/4714699696-page-95-1776054392670.png"
+        }
+      ]
+    }
+  ]
+}

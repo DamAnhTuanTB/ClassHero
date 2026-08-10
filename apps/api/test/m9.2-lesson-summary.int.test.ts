@@ -31,6 +31,10 @@ import { AuthTokenService } from "#api/modules/auth/services/auth-token.service"
 import type { AiService } from "#api/modules/ai/services/ai.service";
 import { LessonSummaryContextService } from "#api/modules/ai/services/lesson-summary-context.service";
 import type { AiGenerationExecutionContext } from "#api/modules/ai/types/ai-generation.types";
+import {
+  LESSON_SUMMARY_PROMPT_VERSION,
+  LESSON_SUMMARY_SCHEMA_VERSION,
+} from "#api/modules/ai/types/lesson-summary.types";
 import { buildLessonSummarySourceTopics } from "#api/modules/ai/utils/lesson-summary-source-candidates";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
@@ -246,8 +250,8 @@ describe("M9.2 lesson summary API and worker integration", () => {
       .expect(200);
 
     expect(response.body.data).toMatchObject({
-      promptVersion: "lesson-summary-prompt-v49",
-      schemaVersion: "lesson-summary-schema-v37",
+      promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
+      schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
       systemPrompt: expect.stringContaining(longSystemInstructions),
       userPrompt: expect.stringContaining("USER PREVIEW CUSTOM"),
       inputPrompt: expect.stringContaining("Số hữu tỉ viết được"),

@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-08-03
+Last updated: 2026-08-10
 
 File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên làm việc nhanh hơn. Nó không thay thế `AGENTS.md` hoặc docs gốc trong `docs/`.
 
@@ -14,7 +14,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - `M3.8` đã bổ sung luồng admin lấy caption công khai YouTube theo best-effort, lọc/ánh xạ theo khoảng phát sau cắt, duyệt/sửa/lưu transcript trong `customVideoSettings`, phát từ timestamp, highlight/auto-scroll cue đang chạy và dialog xác nhận lấy lại transcript; không có speech-to-text fallback.
 - `M5.1-M5.4` đã Done: OpenAI embedding qua `AiProvider` với vector-space validation 1.536 chiều; durable embedding worker lưu lifecycle/token/latency và retry/final error; personal clone tái sử dụng vector hợp lệ rồi enqueue idempotent phần còn thiếu; retrieval pgvector + keyword chỉ dùng tài liệu active `READY` trong đúng lesson/provider/model/dimension và giữ token budget tuyệt đối. HNSW cosine index đã được phục hồi bằng migration bù; PostgreSQL isolation test và OpenAI live smoke 25 token đã pass.
 - `M9.1` đã Done: `AiProvider`/`AiService` hỗ trợ OpenAI text và strict structured output; Zod là persistence gate cuối sau JSON Schema; provider trả model/request ID/token/latency; service tạo idempotent cặp `background_jobs` + `ai_generations`; AI worker đồng bộ lifecycle/retry/hash/output log và không gọi persistence khi output invalid. PostgreSQL lifecycle và OpenAI live smoke pass (74 input + 10 output tokens ở request đo usage, 2.168 ms). Gemini vẫn là placeholder chưa bật; handler summary/quiz/flashcard/test thuộc `M9.2-M9.3`.
-- `M9.2` đã Done: admin summary GET/PUT/generate API có RBAC/audit; request AI chỉ chọn active `READY` lesson documents có chunks, giới hạn 12.000 context tokens, lưu source hash và chống active job trùng. Worker tải lại context đúng lesson, reject source stale/output sai schema, gọi `AiService`, map structured summary sang Tiptap và upsert `source = AI`, `NEEDS_REVIEW`, `ai_generation_id`; admin vẫn sửa/duyệt cùng summary record. PostgreSQL API/worker integration và opt-in OpenAI lesson-summary live smoke đã pass; smoke dùng một chunk mẫu, không gọi embedding/OCR.
+- `M9.2` core đã Done: admin summary GET/PUT/generate API có RBAC/audit; request AI chỉ chọn active `READY` lesson documents có chunks, giới hạn 12.000 context tokens, lưu source hash và chống active job trùng. Worker tải lại context đúng lesson, reject source stale/output sai schema, gọi `AiService`, map structured summary sang Tiptap và upsert `source = AI`, `NEEDS_REVIEW`, `ai_generation_id`; admin vẫn sửa/duyệt cùng summary record. PostgreSQL API/worker integration và opt-in OpenAI lesson-summary live smoke đã pass; smoke dùng một chunk mẫu, không gọi embedding/OCR. Riêng delivery wave mở rộng coverage hình Toán 3-9 của `M9.2` vẫn `IN_PROGRESS`, chưa đủ điều kiện công bố 90-100%; xem mục resume trong phần 3 và `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
 - `M9.3` đã Done: admin Quiz/Flashcard/Test generate API trả 202 và chống active job trùng theo lesson/type; worker hybrid-retrieve đúng lesson, reject source stale/chunk reference ngoài context/output copy chuỗi từ 12 token, validate strict đủ bốn loại câu, rồi persist atomically vào schema M6 với `source=AI`, `NEEDS_REVIEW`, explanation và `source_metadata_json`. Review set cascade tới item/explanation. PostgreSQL integration và OpenAI live matrix 13 lượt pass (Quiz/Test mixed + từng loại; Flashcard EASY/MEDIUM/HARD), không gọi OCR/PDF.
 - `M9.8` đã bổ sung cấu hình Summary theo lần chạy (phong cách, độ dài,
   trọng tâm, nhóm nội dung, câu ôn tập, yêu cầu bổ sung, model, temperature,
@@ -121,6 +121,80 @@ nháy tab bằng Playwright desktop/mobile. Chi tiết nằm tại
 `docs/implementation/M14.8-frontend-loading-audit.md`.
 
 ## 3. Task tiếp theo nên ưu tiên
+
+### Resume M9.2 coverage hình Toán 3-9 khi owner mở lại
+
+Owner đã yêu cầu lưu phần dở dang ngày 2026-08-10 để tiếp tục sau. Không khởi
+động lại từ đầu và không dùng số screenshot để tuyên bố coverage. Baseline code
+trước wave là commit `7f561b15`; báo cáo resume là
+`anh-chup-hinh-toan-dat-chuan/coverage-report-v51.json`.
+
+- Local/compiler: `50/50` ô inventory đạt (`100%`), 86 fixture semantic và 688
+  ảnh golden đa thiết bị/theme đã duyệt.
+- Live evidence: `39/50` (`78%`); còn 11 ô phải live test.
+- Exact-page SGK/SBT: `19/50` (`38%`); còn 31 ô phải audit nguồn.
+- Đủ đồng thời local + live + exact-page: `11/50` (`22%`). Vì vậy
+  `classificationStatus` và `releaseStatus` vẫn phải là `IN_PROGRESS`, chưa ô
+  nào được tự nâng thành `SUPPORTED` chỉ dựa trên ảnh đẹp.
+- Tổng paid usage đã ghi nhận của wave là `131.848 VNĐ` qua 75 usage event; các
+  lượt compiler/render/screenshot lại từ cache không tốn provider.
+
+Thứ tự tiếp tục bắt buộc:
+
+1. Khóa inventory/source mapping: audit 31 ô còn thiếu tới đúng SGK/SBT Kết nối
+   tri thức, ghi rõ include/exclude và không tự giảm mẫu số.
+2. Live test 11 ô còn thiếu bằng `gpt-5.4`, chạy batch nhỏ có reservation; mỗi
+   output phải chụp Chromium Mobile, WebKit Mobile, iPad, laptop ở light/dark.
+3. Review thủ công source-grounded; lỗi local sửa compiler/validator/layout rồi
+   render lại cache, chỉ paid retry khi sai `PROVIDER_INTENT`.
+4. Chạy lại semantic, schema, API typecheck/build, web lint/typecheck và toàn bộ
+   golden non-regression; ảnh lỗi chuyển khỏi thư mục đạt chuẩn.
+5. Chạy lại một ma trận bài thật đại diện sau khi ví dụ lẻ ổn, cập nhật coverage
+   report và chỉ công bố khi ít nhất `45/50` ô qua đủ mọi gate; mục tiêu chính
+   vẫn `>=95%`, stretch goal `98-100%`.
+6. Hoàn thiện partial persistence gọn (hotfix 4-6 giờ): cơ chế progressive
+   recovery áp dụng cho mọi loại block, không riêng hình vẽ; mọi lỗi có thể quy
+   về một block/field không làm thất bại toàn summary. Mọi field/sub-block còn
+   render-safe và có ý nghĩa vẫn hiện; fallback chỉ thay phần hỏng nhỏ nhất.
+   Hình/block còn render-safe vẫn
+   hiện nguyên dạng cho admin với badge `Cần review`; admin có thể
+   `Chấp nhận hình này` sau review thủ công mà không gọi AI. Payload không
+   render-safe một phần phải cô lập đúng primitive/marker/label lỗi và vẫn vẽ
+   phần còn có ý nghĩa. Chỉ khi không còn hình có ý nghĩa nào có thể render mới
+   dùng placeholder `Hình lỗi`; không in raw validator JSON làm thông báo chính.
+   Hình đã đạt chuẩn phải giữ pass-through invariant: nguyên `diagramSpec`, dùng
+   mapper/renderer cũ và không chạy fallback; golden cache là regression gate.
+   Mọi badge `Cần review` phải có một câu tiếng Việt ngắn chỉ rõ đối tượng và lý
+   do cần kiểm tra; raw validator/path chỉ nằm trong `Chi tiết kỹ thuật`.
+   Mỗi issue còn có `Gợi ý sửa` deterministic từ validator code/path, không gọi
+   AI; field JSON thiếu/sai hiển thị tên tiếng Việt và key/path trong ngoặc, ví
+   dụ `Đáp án (answer)`, nhưng không tự bịa giá trị cần điền.
+   `Cần review`/`Cần sửa` chỉ là warning, không khóa editor: admin vẫn sửa, thêm,
+   xóa, sắp xếp và lưu draft bình thường; save revalidate block đã đổi để tự gỡ
+   hoặc cập nhật issue, còn publish mới bị chặn khi issue chưa resolve.
+   Lượt tạo ban đầu chỉ gọi AI một lần và
+   tuyệt đối không tự repair/retry. Admin sửa/xóa bằng editor hiện có. Nút
+   `Tạo lại` riêng block là phase tùy chọn 3-5 giờ, không thuộc hotfix bỏ chặn;
+   nếu triển khai thì chỉ thao tác chủ động của admin mới phát sinh request AI.
+
+Kế hoạch chi tiết của mục 6 nằm tại
+`.codex/plans/m9-2-summary-partial-block-recovery-plan.md`. Thứ tự resume mới:
+hoàn thành partial persistence/recovery này trước, sau đó mới tiếp tục 11 live
+case coverage còn thiếu; nếu không, một lỗi block cục bộ có thể tiếp tục làm mất
+toàn bộ kết quả của paid full-lesson request.
+
+11 ô thiếu live evidence: `data-pictogram-simple`, `plane-angle-simple`,
+`plane-axial-symmetry-medium`, `plane-central-symmetry-hard`,
+`advanced-centroid-medium`, `advanced-angle-bisectors-medium`,
+`advanced-perpendicular-bisectors-hard`, `advanced-altitudes-hard`,
+`advanced-altitude-hard`, `spatial-cone-sphere-medium` và
+`schematic-flow-medium`.
+
+Ước tính để resume: đạt tối thiểu 90% cần khoảng 8-14 giờ và 20.000-35.000 VNĐ
+live test; cố gắng 100% cần khoảng 14-24 giờ và 45.000-80.000 VNĐ. Đây là estimate,
+không phải quyền tự chi. Trước batch trả phí tiếp theo phải báo model, số request,
+token reserve, upper bound và số đã dùng; trần đề xuất cho phần còn lại là
+80.000 VNĐ, dừng sớm nếu đủ gate.
 
 Core student learning `M7.1-M7.5` đã xong. Theo quyết định owner ngày
 2026-08-03, toàn bộ cụm `M15 Smart video learning` được hoãn lại và không đề

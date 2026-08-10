@@ -283,26 +283,26 @@ export const lessonSummaryDiagramSpecSchema = z
     points: z
       .array(lessonSummaryDiagramPointSchema)
       .min(2)
-      .max(64)
+      .max(160)
       .describe(
         "Mỗi đỉnh chỉ khai báo một lần; point.id và point.label phải duy nhất trong diagramSpec.",
       ),
     primitives: z
       .array(lessonSummaryDiagramPrimitiveSchema)
       .min(1)
-      .max(24)
+      .max(96)
       .describe(
-        "Danh sách tối giản, tối đa 24 phần tử. Không lặp primitive hoặc ID. Tam giác thường dùng đúng 3 SEGMENT; hai tam giác tách rời dùng đúng 6 SEGMENT; chỉ thêm tối đa một POLYGON để tô nền hoặc một ARC khi đề thật sự cần.",
+        "Danh sách tối giản, tối đa 96 phần tử để compiler deterministic có thể dựng đủ tick, đường dóng và đường cong. Không lặp primitive hoặc ID. Tam giác thường dùng đúng 3 SEGMENT; hai tam giác tách rời dùng đúng 6 SEGMENT; chỉ thêm primitive có ý nghĩa toán học.",
       ),
     markers: z
       .array(lessonSummaryDiagramMarkerSchema)
-      .max(24)
+      .max(64)
       .describe("Chỉ tạo marker thể hiện quan hệ có trong đề; không lặp marker."),
     labels: z
       .array(lessonSummaryDiagramLabelSchema)
-      .max(32)
+      .max(128)
       .describe(
-        "Chỉ dùng cho nhãn cạnh/góc bổ sung; không lặp text tại cùng anchorPointId.",
+        "Chỉ dùng cho nhãn cạnh/góc bổ sung; không lặp text tại cùng cặp anchorPointId/anchorPrimitiveId.",
       ),
     caption: safeLabel.nullable(),
   })
@@ -333,7 +333,10 @@ export const lessonSummaryDiagramSpecSchema = z
       context,
     );
     addDuplicateValueIssues(
-      spec.labels.map((label) => `${label.anchorPointId}:${label.text}`),
+      spec.labels.map(
+        (label) =>
+          `${label.anchorPointId}:${label.anchorPrimitiveId ?? "FREE"}:${label.text}`,
+      ),
       ["labels"],
       "label",
       context,
@@ -550,9 +553,15 @@ export const lessonSummaryDiagramSpecSchema = z
       });
     }
 
-    const hasCoordinateAxisLabels = ["x", "y"].every((axisLabel) =>
-      spec.labels.some((label) => label.text.trim().toLowerCase() === axisLabel),
-    );
+    const caption = spec.caption ?? "";
+    const hasCoordinateContext =
+      /tọa\s*độ|trục\s+(?:hoành|tung)|đồ\s*thị|\bOxy\b/iu.test(caption) ||
+      segmentLikePrimitives.some((primitive) => /axis|truc/iu.test(primitive.id));
+    const hasCoordinateAxisLabels =
+      hasCoordinateContext &&
+      ["x", "y"].every((axisLabel) =>
+        spec.labels.some((label) => label.text.trim().toLowerCase() === axisLabel),
+      );
     const geometryMinX = Math.min(...spec.points.map((point) => point.x));
     const geometryMaxX = Math.max(...spec.points.map((point) => point.x));
     const geometryMinY = Math.min(...spec.points.map((point) => point.y));
@@ -589,7 +598,6 @@ export const lessonSummaryDiagramSpecSchema = z
       });
     }
 
-    const caption = spec.caption ?? "";
     const coordinateLabelPattern =
       /^\(\s*(-?\d+(?:[.,]\d+)?)\s*;\s*(-?\d+(?:[.,]\d+)?)\s*\)$/u;
     const visibleCurveConstructionPointIds = new Set(
@@ -969,10 +977,17 @@ export const lessonSummaryDiagramSpecSchema = z
     const fractionLabel = spec.labels
       .map((label) => label.text.match(/^([1-9][0-9]*)\s*\/\s*([1-9][0-9]*)$/u))
       .find((match) => match !== null);
-    if (fractionLabel && /(?:phân\s*số|tô)/iu.test(spec.caption ?? "")) {
+    const areaPolygons = spec.primitives.filter(
+      (primitive) => primitive.type === "POLYGON",
+    );
+    if (
+      fractionLabel &&
+      areaPolygons.length > 0 &&
+      /(?:phân\s*số|tô)/iu.test(spec.caption ?? "")
+    ) {
       const numerator = Number(fractionLabel[1]);
-      const filledPolygonCount = spec.primitives.filter(
-        (primitive) => primitive.type === "POLYGON" && primitive.fill !== "NONE",
+      const filledPolygonCount = areaPolygons.filter(
+        (primitive) => primitive.fill !== "NONE",
       ).length;
       if (filledPolygonCount < numerator) {
         context.addIssue({
@@ -1156,26 +1171,16 @@ export const lessonSummaryDiagramSpecSchema = z
       const numberLineAxis = longHorizontalAxes[0];
       if (numberLineAxis) {
         const axisY = (numberLineAxis.from.y + numberLineAxis.to.y) / 2;
-        const originPoints = spec.points.filter(
-          (point) => point.label === "O" && Math.abs(point.y - axisY) <= 0.02,
-        );
-        if (originPoints.length !== 1) {
+        const originNameCount =
+          spec.points.filter((point) => point.label?.trim().toUpperCase() === "O")
+            .length +
+          spec.labels.filter((label) => label.text.trim().toUpperCase() === "O").length;
+        if (originNameCount > 0) {
           context.addIssue({
             code: "custom",
             path: ["points"],
-            message: "A number line requires exactly one origin point labeled O.",
-          });
-        }
-        const origin = originPoints[0];
-        const duplicateOriginLabels = spec.labels.filter(
-          (label) => label.text.trim() === "O",
-        );
-        if (duplicateOriginLabels.length > 0) {
-          context.addIssue({
-            code: "custom",
-            path: ["labels"],
             message:
-              "Do not duplicate the origin name O in labels; keep O only as the point label.",
+              "A number line must use numeric 0 for the zero mark, not the coordinate-origin name O.",
           });
         }
         const zeroLabels = spec.labels.filter((label) => label.text.trim() === "0");
@@ -1198,19 +1203,22 @@ export const lessonSummaryDiagramSpecSchema = z
         const zeroAnchor = zeroLabels[0]
           ? pointsById.get(zeroLabels[0].anchorPointId)
           : undefined;
+        const axisMinX = Math.min(numberLineAxis.from.x, numberLineAxis.to.x);
+        const axisMaxX = Math.max(numberLineAxis.from.x, numberLineAxis.to.x);
+        const zeroIsVisible = axisMinX <= 0 && axisMaxX >= 0;
         if (
-          !origin ||
-          zeroLabels.length !== 1 ||
-          !zeroAnchor ||
-          Math.abs(zeroAnchor.x - origin.x) > spec.viewBox.width * 0.01 ||
-          (Math.abs(zeroAnchor.y - axisY) > spec.viewBox.height * 0.06 &&
-            !hasTickAt(zeroAnchor.x))
+          (zeroIsVisible &&
+            (zeroLabels.length !== 1 ||
+              !zeroAnchor ||
+              Math.abs(zeroAnchor.x) > spec.viewBox.width * 0.01 ||
+              !hasTickAt(0))) ||
+          (!zeroIsVisible && zeroLabels.length > 0)
         ) {
           context.addIssue({
             code: "custom",
             path: ["labels"],
             message:
-              "A number line requires exactly one numeric 0 label at the same visible origin mark as O.",
+              "A number line that contains zero requires exactly one numeric 0 label at its visible zero tick.",
           });
         }
         const numericNumberLineLabels = spec.labels.filter((label) =>

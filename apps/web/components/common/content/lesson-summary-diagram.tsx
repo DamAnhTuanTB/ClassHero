@@ -11,6 +11,12 @@ import { useEffect, useId, useRef, useState } from "react";
 type Point = LessonSummaryDiagramSpec["points"][number];
 type Primitive = LessonSummaryDiagramSpec["primitives"][number];
 type LabelPosition = LessonSummaryDiagramSpec["labels"][number]["position"];
+type DiagramTextBox = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+};
 const SEGMENT_LABEL_PATTERN =
   /^([A-Z](?:['′″]|[0-9₀-₉]){0,3})([A-Z](?:['′″]|[0-9₀-₉]){0,3})(?=\s*(?:=|≈|≅|⊥|∥|\b))/u;
 const COORDINATE_LABEL_PATTERN = /^\(\s*-?\d+(?:[.,]\d+)?\s*;\s*-?\d+(?:[.,]\d+)?\s*\)$/u;
@@ -161,7 +167,7 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
         })
       : [],
   );
-  const isNumberLine = /trục\s*số/iu.test(spec.caption ?? "");
+  const isNumberLine = /(?:trục|tia)\s*số/iu.test(spec.caption ?? "");
   const hiddenNumberLineOriginLabels = new Set(
     isNumberLine
       ? spec.points.flatMap((point) => {
@@ -240,6 +246,7 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
       return hasVisibleName || isClockPivot ? [center.id] : [];
     }),
   );
+  const occupiedTextBoxes: DiagramTextBox[] = [];
 
   return (
     <figure className="mt-4 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3 dark:bg-slate-950 sm:p-4">
@@ -270,7 +277,11 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
             refY="3"
             viewBox="0 0 6 6"
           >
-            <path d="M 0 0 L 6 3 L 0 6 z" fill="context-stroke" />
+            <path
+              data-diagram-arrowhead="true"
+              d="M 0 0 L 6 3 L 0 6 z"
+              fill="currentColor"
+            />
           </marker>
         </defs>
         <g clipPath={`url(#${clipId})`}>
@@ -328,6 +339,8 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                   ? orientCoordinateAxisEndpoints(clippedEndpoints)
                   : clippedEndpoints;
               const isAxisTick = axisTickSegmentIds.has(primitive.id);
+              const isIntervalSegment = primitive.id === "intervalSegment";
+              const isMeasurementReading = primitive.id === "thermometerReading";
               const endpoints = isAxisTick
                 ? clampSegmentLength(
                     orientedEndpoints,
@@ -342,7 +355,11 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                   y1={toSvgY(endpoints.from.y)}
                   x2={endpoints.to.x}
                   y2={toSvgY(endpoints.to.y)}
-                  className="stroke-current"
+                  className={
+                    isIntervalSegment || isMeasurementReading
+                      ? "stroke-sky-600 dark:stroke-sky-300"
+                      : "stroke-current"
+                  }
                   markerEnd={
                     primitive.type === "RAY" || isCoordinateAxis || isNumberLineAxis
                       ? `url(#${arrowId})`
@@ -350,7 +367,7 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                   }
                   strokeDasharray={dashArray(primitive.style)}
                   strokeLinecap="round"
-                  strokeWidth={1.75}
+                  strokeWidth={isIntervalSegment || isMeasurementReading ? 3.5 : 1.75}
                   vectorEffect="non-scaling-stroke"
                 />
               );
@@ -587,20 +604,13 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
           {spec.points.map((point) => {
             const coordinateLabel = coordinateLabelsByPointId.get(point.id);
             const isGraphConstructionPoint = graphConstructionPointIds.has(point.id);
+            const isIntervalEndpoint =
+              point.id === "intervalLeft" || point.id === "intervalRight";
             const pointLabelFontSize = isGraphConstructionPoint
-              ? Math.max(
-                  diagramScale * 0.034,
-                  minimumReadablePointLabelFontSize,
-                )
+              ? Math.max(diagramScale * 0.034, minimumReadablePointLabelFontSize)
               : isNumberLine
-                ? Math.max(
-                    diagramScale * 0.04,
-                    minimumReadablePointLabelFontSize,
-                  )
-                : Math.max(
-                    textScale * 0.028,
-                    minimumReadablePointLabelFontSize,
-                  );
+                ? Math.max(diagramScale * 0.04, minimumReadablePointLabelFontSize)
+                : Math.max(textScale * 0.028, minimumReadablePointLabelFontSize);
             const pointLabelText = point.label ?? "";
             const pointLabelPlacement = resolvePointLabelPlacement(
               point,
@@ -619,6 +629,44 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
             const visiblePointLabel = Boolean(
               point.label && !hiddenNumberLineOriginLabels.has(point.id),
             );
+            const isCoordinateOriginPoint = Boolean(
+              isCoordinatePlane &&
+              pointLabelText.trim().toUpperCase() === "O" &&
+              Math.abs(point.x) <= width * 0.005 &&
+              Math.abs(point.y) <= height * 0.005,
+            );
+            const pointLabelAnchor = {
+              x: isAxisCoordinate
+                ? point.x +
+                  (pointLabelPlacement.anchor.x - point.x) * axisCoordinateLabelMultiplier
+                : pointLabelPlacement.anchor.x,
+              y: isAxisCoordinate
+                ? point.y +
+                  (pointLabelPlacement.anchor.y - point.y) * axisCoordinateLabelMultiplier
+                : pointLabelPlacement.anchor.y,
+            };
+            const collisionFreePointLabelAnchor = !visiblePointLabel
+              ? pointLabelAnchor
+              : isCoordinateOriginPoint
+                ? reserveFixedTextAnchor({
+                    anchor: pointLabelAnchor,
+                    text: pointLabelText,
+                    position: pointLabelPlacement.position,
+                    fontSize: pointLabelFontSize,
+                    occupiedTextBoxes,
+                  })
+                : reserveCollisionFreeTextAnchor({
+                    anchor: pointLabelAnchor,
+                    text: pointLabelText,
+                    position: pointLabelPlacement.position,
+                    fontSize: pointLabelFontSize,
+                    diagramScale,
+                    spec,
+                    points,
+                    coordinateProjectionPoints,
+                    renderViewBox,
+                    occupiedTextBoxes,
+                  });
             const isVisibleCircleCenter = visibleCircleCenterPointIds.has(point.id);
             const hasExplicitPointMarker = Boolean(
               point.pointStyle && point.pointStyle !== "NONE",
@@ -640,16 +688,24 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                       diagramScale *
                       (isVisibleCircleCenter
                         ? 0.005
-                        : isGraphConstructionPoint
-                          ? 0.0065
-                          : 0.0038)
+                        : isIntervalEndpoint
+                          ? 0.008
+                          : isGraphConstructionPoint
+                            ? 0.0065
+                            : 0.0038)
                     }
                     className={
-                      point.pointStyle === "OPEN"
-                        ? "fill-white stroke-slate-900 dark:fill-slate-950 dark:stroke-slate-100"
-                        : "fill-slate-900 stroke-slate-900 dark:fill-slate-100 dark:stroke-slate-100"
+                      isIntervalEndpoint
+                        ? point.pointStyle === "OPEN"
+                          ? "fill-white stroke-sky-600 dark:fill-slate-950 dark:stroke-sky-300"
+                          : "fill-sky-600 stroke-sky-600 dark:fill-sky-300 dark:stroke-sky-300"
+                        : point.pointStyle === "OPEN"
+                          ? "fill-white stroke-slate-900 dark:fill-slate-950 dark:stroke-slate-100"
+                          : "fill-slate-900 stroke-slate-900 dark:fill-slate-100 dark:stroke-slate-100"
                     }
-                    strokeWidth={isGraphConstructionPoint ? 2.25 : 1.5}
+                    strokeWidth={
+                      isGraphConstructionPoint ? 2.25 : isIntervalEndpoint ? 2 : 1.5
+                    }
                     vectorEffect="non-scaling-stroke"
                   />
                 ) : null}
@@ -658,22 +714,8 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                     data-diagram-point-label-id={point.id}
                     data-diagram-point-source-label-position={point.labelPosition ?? ""}
                     data-diagram-point-label-position={pointLabelPlacement.position}
-                    x={
-                      isAxisCoordinate
-                        ? point.x +
-                          (pointLabelPlacement.anchor.x - point.x) *
-                            axisCoordinateLabelMultiplier
-                        : pointLabelPlacement.anchor.x
-                    }
-                    y={
-                      isAxisCoordinate
-                        ? toSvgY(
-                            point.y +
-                              (pointLabelPlacement.anchor.y - point.y) *
-                                axisCoordinateLabelMultiplier,
-                          )
-                        : toSvgY(pointLabelPlacement.anchor.y)
-                    }
+                    x={collisionFreePointLabelAnchor.x}
+                    y={toSvgY(collisionFreePointLabelAnchor.y)}
                     className="fill-slate-900 stroke-white font-bold dark:fill-slate-100 dark:stroke-slate-950"
                     dominantBaseline="middle"
                     fontSize={pointLabelFontSize}
@@ -706,12 +748,30 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
               ),
             );
             if (isRedundantCoordinateOriginValue) return null;
-            const effectiveLabelPosition =
+            const baseLabelPosition =
               isNumberLine &&
               anchoredPoint?.pointStyle === "FILLED" &&
               NUMBER_LINE_VALUE_LABEL_PATTERN.test(label.text.trim())
                 ? "BOTTOM"
                 : label.position;
+            const axisSafeLabelPosition = resolveAxisNumericLabelPosition(
+              baseLabelPosition,
+              label.text,
+              anchoredPoint,
+              coordinateProjectionPoints,
+              width,
+              height,
+              isCoordinatePlane,
+            );
+            const effectiveLabelPosition =
+              isCoordinatePlane && anchoredPoint && /^y\s*=/iu.test(label.text)
+                ? resolveRenderedFunctionLabelPosition(
+                    axisSafeLabelPosition,
+                    anchoredPoint,
+                    primitives,
+                    points,
+                  )
+                : axisSafeLabelPosition;
             const isNamedPointLabel = Boolean(
               anchoredPoint &&
               !label.anchorPrimitiveId &&
@@ -768,14 +828,17 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
               anchoredPoint?.pointStyle === "FILLED" &&
               NUMBER_LINE_VALUE_LABEL_PATTERN.test(label.text.trim()),
             );
+            const isNumberLineNumericLabel = Boolean(
+              isNumberLine && NUMBER_LINE_VALUE_LABEL_PATTERN.test(label.text.trim()),
+            );
             const isPrimitiveLabel = Boolean(label.anchorPrimitiveId);
             const isLongLabel = label.text.length >= 6;
-            const labelFontSize = Math.max(
-              textScale * (isNamedPointLabel ? 0.028 : isLongLabel ? 0.026 : 0.032),
-              isNumberLine ? diagramScale * 0.028 : 0,
-              isDataTable ? diagramScale * 0.038 : 0,
-            );
             const labelAnchorPoint = resolve(label.anchorPointId);
+            const isFixedContainerLabel = Boolean(
+              effectiveLabelPosition === "CENTER" &&
+              labelAnchorPoint &&
+              (isDataTable || isPointInsideFilledPolygon(labelAnchorPoint, spec, points)),
+            );
             const isAxisNumericLabel = Boolean(
               (isCoordinatePlane || isNumberLine) &&
               labelAnchorPoint &&
@@ -783,54 +846,114 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
               (Math.abs(labelAnchorPoint.x) <= width * 0.02 ||
                 Math.abs(labelAnchorPoint.y) <= height * 0.02),
             );
+            const labelFontSize = Math.max(
+              textScale * (isNamedPointLabel ? 0.028 : isLongLabel ? 0.026 : 0.032),
+              isNumberLine ? diagramScale * 0.028 : 0,
+              isDataTable ? diagramScale * 0.044 : 0,
+              minimumReadablePointLabelFontSize * (isAxisNumericLabel ? 0.84 : 1),
+            );
             const offset = positionOffset(
               effectiveLabelPosition,
               primitiveLabelAnchor || effectiveLabelPosition === "CENTER"
                 ? 0
                 : isNumberLinePointValue
-                  ? Math.max(pointLabelOffset * 1.5, labelFontSize * 0.65)
-                  : isCompactPointValue || isPrimitiveLabel
-                    ? pointLabelOffset
-                    : isAxisNumericLabel
-                      ? pointLabelOffset * 2.3
-                      : labelOffset,
+                  ? Math.max(pointLabelOffset * 1.5, labelFontSize * 1.8)
+                  : isNumberLineNumericLabel
+                    ? Math.max(pointLabelOffset * 2.3, labelFontSize * 1.1)
+                    : isCompactPointValue || isPrimitiveLabel
+                      ? pointLabelOffset
+                      : isAxisNumericLabel
+                        ? pointLabelOffset * 2.3
+                        : labelOffset,
             );
             const positionedAnchor = namedPointLabelPlacement?.anchor ?? {
               x: anchor.x + offset.x,
               y: anchor.y + offset.y,
             };
-            const safeAnchor = namedPointLabelPlacement
-              ? namedPointLabelPlacement.anchor
-              : primitiveLabelAnchor
-                ? positionedAnchor
-                : isAxisNumericLabel
-                  ? avoidAxisNumericLabelStrokeCollision(
-                      positionedAnchor,
-                      label.text,
-                      effectiveLabelPosition,
-                      spec,
-                      points,
-                      coordinateProjectionPoints,
-                      textScale,
-                      labelFontSize,
-                    )
-                  : avoidLabelStrokeCollision(
-                      positionedAnchor,
-                      label.text,
-                      effectiveLabelPosition,
-                      spec,
-                      points,
-                      coordinateProjectionPoints,
-                      textScale,
-                      labelFontSize,
-                    );
+            const safeAnchor = isFixedContainerLabel
+              ? positionedAnchor
+              : namedPointLabelPlacement
+                ? namedPointLabelPlacement.anchor
+                : primitiveLabelAnchor
+                  ? positionedAnchor
+                  : isAxisNumericLabel
+                    ? avoidAxisNumericLabelStrokeCollision(
+                        positionedAnchor,
+                        label.text,
+                        effectiveLabelPosition,
+                        spec,
+                        points,
+                        coordinateProjectionPoints,
+                        textScale,
+                        labelFontSize,
+                      )
+                    : avoidLabelStrokeCollision(
+                        positionedAnchor,
+                        label.text,
+                        effectiveLabelPosition,
+                        spec,
+                        points,
+                        coordinateProjectionPoints,
+                        textScale,
+                        labelFontSize,
+                      );
+            const projectionSafeAnchor =
+              isCoordinatePlane && /^y\s*=/iu.test(label.text)
+                ? keepFunctionLabelClearOfVerticalProjections({
+                    anchor: safeAnchor,
+                    text: label.text,
+                    position: effectiveLabelPosition,
+                    fontSize: labelFontSize,
+                    diagramScale,
+                    primitives,
+                    points,
+                  })
+                : safeAnchor;
+            const collisionFreeLabelAnchor = isFixedContainerLabel
+              ? reserveFixedTextAnchor({
+                  anchor: projectionSafeAnchor,
+                  text: label.text,
+                  position: "CENTER",
+                  fontSize: labelFontSize,
+                  occupiedTextBoxes,
+                })
+              : reserveCollisionFreeTextAnchor({
+                  anchor: projectionSafeAnchor,
+                  text: label.text,
+                  position: namedPointLabelPlacement
+                    ? namedPointLabelPlacement.position
+                    : primitiveLabelAnchor
+                      ? "CENTER"
+                      : effectiveLabelPosition,
+                  fontSize: labelFontSize,
+                  diagramScale,
+                  spec,
+                  points,
+                  coordinateProjectionPoints,
+                  renderViewBox,
+                  occupiedTextBoxes,
+                  constrainAnchor:
+                    isCoordinatePlane && /^y\s*=/iu.test(label.text)
+                      ? (candidate) =>
+                          keepFunctionLabelClearOfVerticalProjections({
+                            anchor: candidate,
+                            text: label.text,
+                            position: effectiveLabelPosition,
+                            fontSize: labelFontSize,
+                            diagramScale,
+                            primitives,
+                            points,
+                          })
+                      : undefined,
+                });
             return (
               <text
                 key={`${label.anchorPointId}-${index}`}
+                data-diagram-container-label={isFixedContainerLabel ? "true" : undefined}
                 data-diagram-label-anchor-point-id={label.anchorPointId}
                 data-diagram-label-text={label.text}
-                x={safeAnchor.x}
-                y={toSvgY(safeAnchor.y)}
+                x={collisionFreeLabelAnchor.x}
+                y={toSvgY(collisionFreeLabelAnchor.y)}
                 className="fill-slate-700 stroke-white font-semibold dark:fill-slate-200 dark:stroke-slate-950"
                 dominantBaseline="middle"
                 fontSize={labelFontSize}
@@ -1045,6 +1168,37 @@ function normalizedVector(from: { x: number; y: number }, to: { x: number; y: nu
 
 function pointDistance(from: { x: number; y: number }, to: { x: number; y: number }) {
   return Math.hypot(to.x - from.x, to.y - from.y);
+}
+
+function isPointInsideFilledPolygon(
+  point: Point,
+  spec: LessonSummaryDiagramSpec,
+  points: Map<string, Point>,
+) {
+  return spec.primitives.some((primitive) => {
+    if (primitive.type !== "POLYGON" || primitive.fill === "NONE") return false;
+    const vertices = primitive.pointIds
+      .map((pointId) => points.get(pointId))
+      .filter((vertex): vertex is Point => Boolean(vertex));
+    if (vertices.length < 3) return false;
+    let inside = false;
+    for (
+      let index = 0, previous = vertices.length - 1;
+      index < vertices.length;
+      previous = index++
+    ) {
+      const currentVertex = vertices[index]!;
+      const previousVertex = vertices[previous]!;
+      const crossesRay =
+        currentVertex.y > point.y !== previousVertex.y > point.y &&
+        point.x <
+          ((previousVertex.x - currentVertex.x) * (point.y - currentVertex.y)) /
+            (previousVertex.y - currentVertex.y) +
+            currentVertex.x;
+      if (crossesRay) inside = !inside;
+    }
+    return inside;
+  });
 }
 
 function rightAnglePoints(vertex: Point, first: Point, second: Point, size: number) {
@@ -1397,7 +1551,7 @@ function resolvePointLabelPlacement(
     };
   };
   const preferred = candidateAt(preferredPosition, 1);
-  const requiredClearance = diagramScale * 0.006;
+  const requiredClearance = Math.max(diagramScale * 0.006, labelFontSize * 0.32);
   const isNamedNumberLinePoint = Boolean(
     point.pointStyle === "FILLED" &&
     POINT_NAME_LABEL_PATTERN.test(point.label ?? "") &&
@@ -1408,14 +1562,14 @@ function resolvePointLabelPlacement(
   }
   if (preferred.score >= requiredClearance) return preferred;
   if (point.labelPosition) {
-    for (const multiplier of [1.3, 1.6, 1.9, 2.2, 2.5]) {
+    for (const multiplier of [1.3, 1.6, 1.9, 2.2, 2.5, 2.8, 3.2]) {
       const candidate = candidateAt(point.labelPosition, multiplier);
       if (candidate.score >= requiredClearance) return candidate;
     }
   }
 
   let best = preferred;
-  for (const multiplier of [1, 1.3, 1.6, 1.9, 2.2, 2.5]) {
+  for (const multiplier of [1, 1.3, 1.6, 1.9, 2.2, 2.5, 2.8, 3.2]) {
     for (const position of uniquePositions) {
       const candidate = candidateAt(position, multiplier);
       if (candidate.score > best.score) best = candidate;
@@ -1430,6 +1584,14 @@ function pointLabelClearance(
   spec: LessonSummaryDiagramSpec,
   diagramScale: number,
 ) {
+  const isCoordinateOrigin = Boolean(
+    point.label?.trim().toUpperCase() === "O" &&
+      Math.abs(point.x) <= spec.viewBox.width * 0.005 &&
+      Math.abs(point.y) <= spec.viewBox.height * 0.005 &&
+      spec.primitives.some((primitive) => primitive.id === "axisX") &&
+      spec.primitives.some((primitive) => primitive.id === "axisY"),
+  );
+  if (isCoordinateOrigin) return diagramScale * 0.05;
   if (point.pointStyle === "FILLED" && /trục\s*số/iu.test(spec.caption ?? "")) {
     return diagramScale * 0.04;
   }
@@ -1473,7 +1635,7 @@ function avoidLabelStrokeCollision(
   diagramScale: number,
   fontSize: number,
 ) {
-  const requiredClearance = diagramScale * 0.003;
+  const requiredClearance = Math.max(diagramScale * 0.007, fontSize * 0.28);
   const currentScore = labelStrokeClearanceScore(
     anchor,
     text,
@@ -1536,7 +1698,7 @@ function avoidLabelStrokeCollision(
         "LEFT",
         "RIGHT",
       ]
-    : isCenteredNumber
+      : isCenteredNumber
       ? [
           "RIGHT",
           "LEFT",
@@ -1558,7 +1720,7 @@ function avoidLabelStrokeCollision(
           "TOP_LEFT",
         ];
   let best = { anchor, score: currentScore };
-  for (const nudgeRatio of [0.018, 0.03, 0.045]) {
+  for (const nudgeRatio of [0.022, 0.038, 0.055, 0.075]) {
     const nudge = diagramScale * nudgeRatio;
     const candidate = candidates
       .map((position) => {
@@ -1606,13 +1768,13 @@ function avoidAxisNumericLabelStrokeCollision(
       points,
       coordinateProjectionPoints,
     );
-  const requiredClearance = diagramScale * 0.003;
+  const requiredClearance = Math.max(diagramScale * 0.005, fontSize * 0.12);
   let best = { anchor, score: score(anchor) };
   if (best.score >= requiredClearance) return anchor;
 
   const slideVertically = preferredPosition === "LEFT" || preferredPosition === "RIGHT";
   if (!slideVertically) {
-    for (const ratio of [0.012, 0.022, 0.034]) {
+    for (const ratio of [0.016, 0.03, 0.048, 0.068]) {
       const distance = diagramScale * ratio;
       const candidate = {
         x: anchor.x,
@@ -1624,7 +1786,7 @@ function avoidAxisNumericLabelStrokeCollision(
       if (candidateScore >= requiredClearance) return candidate;
     }
   }
-  for (const ratio of [0.012, 0.022, 0.034]) {
+  for (const ratio of [0.016, 0.03, 0.048, 0.068]) {
     const distance = diagramScale * ratio;
     const offsets = slideVertically
       ? [
@@ -1646,6 +1808,371 @@ function avoidAxisNumericLabelStrokeCollision(
   return best.anchor;
 }
 
+function reserveCollisionFreeTextAnchor(input: {
+  anchor: { x: number; y: number };
+  text: string;
+  position: Point["labelPosition"] | LabelPosition;
+  fontSize: number;
+  diagramScale: number;
+  spec: LessonSummaryDiagramSpec;
+  points: Map<string, Point>;
+  coordinateProjectionPoints: Point[];
+  renderViewBox: { minX: number; minY: number; width: number; height: number };
+  occupiedTextBoxes: DiagramTextBox[];
+  maxOffsetRatio?: number;
+  constrainAnchor?: (anchor: { x: number; y: number }) => {
+    x: number;
+    y: number;
+  };
+}) {
+  const primary = normalizedLabelDirection(input.position);
+  const tangent = { x: -primary.y, y: primary.x };
+  const unitDirections = uniqueDirections([
+    tangent,
+    { x: -tangent.x, y: -tangent.y },
+    primary,
+    normalizedDirection({ x: primary.x + tangent.x, y: primary.y + tangent.y }),
+    normalizedDirection({ x: primary.x - tangent.x, y: primary.y - tangent.y }),
+    { x: -primary.x, y: -primary.y },
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+  ]);
+  const maxOffsetRatio = input.maxOffsetRatio ?? 0.1;
+  const offsets = [
+    { x: 0, y: 0 },
+    ...[0.012, 0.022, 0.034, 0.048, 0.064, 0.08, 0.1]
+      .filter((ratio) => ratio <= maxOffsetRatio + 1e-9)
+      .flatMap((ratio) =>
+        unitDirections.map((direction) => ({
+          x: direction.x * input.diagramScale * ratio,
+          y: direction.y * input.diagramScale * ratio,
+        })),
+      ),
+  ];
+  const requiredGeometryClearance = Math.max(
+    input.diagramScale * 0.004,
+    input.fontSize * 0.14,
+  );
+  const constrainAnchor = input.constrainAnchor ?? ((anchor) => anchor);
+  const initialAnchor = clampDiagramTextAnchorToViewBox(
+    constrainAnchor(input.anchor),
+    input.text,
+    input.position,
+    input.fontSize,
+    input.renderViewBox,
+  );
+  let best: {
+    anchor: { x: number; y: number };
+    box: DiagramTextBox;
+    score: number;
+  } | null = null;
+  for (const offset of offsets) {
+    const anchor = constrainAnchor({
+      x: initialAnchor.x + offset.x,
+      y: initialAnchor.y + offset.y,
+    });
+    const box = estimateDiagramTextBox(
+      anchor,
+      input.text,
+      input.position,
+      input.fontSize,
+    );
+    if (!textBoxInsideViewBox(box, input.renderViewBox)) continue;
+    const overlapArea = input.occupiedTextBoxes.reduce(
+      (sum, occupied) => sum + textBoxOverlapArea(box, occupied, input.fontSize * 0.16),
+      0,
+    );
+    const geometryClearance = labelStrokeClearanceScore(
+      anchor,
+      input.text,
+      input.position,
+      input.fontSize,
+      input.spec,
+      input.points,
+      input.coordinateProjectionPoints,
+    );
+    const geometryPenalty = Math.max(0, requiredGeometryClearance - geometryClearance);
+    const movement = Math.hypot(offset.x, offset.y);
+    const score =
+      overlapArea * 100 + geometryPenalty * input.diagramScale * 10 + movement;
+    if (!best || score < best.score) best = { anchor, box, score };
+    if (overlapArea <= 1e-10 && geometryClearance >= requiredGeometryClearance) {
+      input.occupiedTextBoxes.push(box);
+      return anchor;
+    }
+  }
+  const selected = best ?? {
+    anchor: initialAnchor,
+    box: estimateDiagramTextBox(
+      initialAnchor,
+      input.text,
+      input.position,
+      input.fontSize,
+    ),
+  };
+  input.occupiedTextBoxes.push(selected.box);
+  return selected.anchor;
+}
+
+function reserveFixedTextAnchor(input: {
+  anchor: { x: number; y: number };
+  text: string;
+  position: Point["labelPosition"] | LabelPosition;
+  fontSize: number;
+  occupiedTextBoxes: DiagramTextBox[];
+}) {
+  input.occupiedTextBoxes.push(
+    estimateDiagramTextBox(input.anchor, input.text, input.position, input.fontSize),
+  );
+  return input.anchor;
+}
+
+function normalizedLabelDirection(position: Point["labelPosition"] | LabelPosition) {
+  const offset = positionOffset(position, 1);
+  if (Math.hypot(offset.x, offset.y) <= 1e-9) return { x: 0, y: 1 };
+  return normalizedDirection(offset);
+}
+
+function normalizedDirection(vector: { x: number; y: number }) {
+  const length = Math.hypot(vector.x, vector.y);
+  return length <= 1e-9 ? { x: 0, y: 0 } : { x: vector.x / length, y: vector.y / length };
+}
+
+function uniqueDirections(directions: { x: number; y: number }[]) {
+  const seen = new Set<string>();
+  return directions.filter((direction) => {
+    const key = `${direction.x.toFixed(3)}:${direction.y.toFixed(3)}`;
+    if (seen.has(key) || Math.hypot(direction.x, direction.y) <= 1e-9) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function estimateDiagramTextBox(
+  anchor: { x: number; y: number },
+  text: string,
+  position: Point["labelPosition"] | LabelPosition,
+  fontSize: number,
+): DiagramTextBox {
+  const textWidth = estimatedDiagramTextWidth(text, fontSize);
+  const textHeight = fontSize * 1.08;
+  const textAnchor = labelTextAnchor(position);
+  const minX =
+    textAnchor === "start"
+      ? anchor.x
+      : textAnchor === "end"
+        ? anchor.x - textWidth
+        : anchor.x - textWidth / 2;
+  return {
+    minX,
+    maxX: minX + textWidth,
+    minY: anchor.y - textHeight / 2,
+    maxY: anchor.y + textHeight / 2,
+  };
+}
+
+function textBoxInsideViewBox(
+  box: DiagramTextBox,
+  viewBox: { minX: number; minY: number; width: number; height: number },
+) {
+  return (
+    box.minX >= viewBox.minX &&
+    box.maxX <= viewBox.minX + viewBox.width &&
+    box.minY >= viewBox.minY &&
+    box.maxY <= viewBox.minY + viewBox.height
+  );
+}
+
+function estimatedDiagramTextWidth(text: string, fontSize: number) {
+  const textLength = Math.max(1, Array.from(text).length);
+  return fontSize * (0.68 * textLength + 0.16);
+}
+
+function clampDiagramTextAnchorToViewBox(
+  anchor: { x: number; y: number },
+  text: string,
+  position: Point["labelPosition"] | LabelPosition,
+  fontSize: number,
+  viewBox: { minX: number; minY: number; width: number; height: number },
+) {
+  const box = estimateDiagramTextBox(anchor, text, position, fontSize);
+  const maxX = viewBox.minX + viewBox.width;
+  const maxY = viewBox.minY + viewBox.height;
+  const shiftX =
+    box.minX < viewBox.minX
+      ? viewBox.minX - box.minX
+      : box.maxX > maxX
+        ? maxX - box.maxX
+        : 0;
+  const shiftY =
+    box.minY < viewBox.minY
+      ? viewBox.minY - box.minY
+      : box.maxY > maxY
+        ? maxY - box.maxY
+        : 0;
+  return { x: anchor.x + shiftX, y: anchor.y + shiftY };
+}
+
+function keepFunctionLabelClearOfVerticalProjections(input: {
+  anchor: { x: number; y: number };
+  text: string;
+  position: LabelPosition;
+  fontSize: number;
+  diagramScale: number;
+  primitives: Map<string, Primitive>;
+  points: Map<string, Point>;
+}) {
+  const gap = Math.max(input.diagramScale * 0.008, input.fontSize * 0.24);
+  let anchor = input.anchor;
+  for (const primitive of input.primitives.values()) {
+    if (
+      primitive.type !== "SEGMENT" ||
+      !primitive.id.startsWith("graphProjectionToX")
+    ) {
+      continue;
+    }
+    const from = input.points.get(primitive.from);
+    const to = input.points.get(primitive.to);
+    if (!from || !to || Math.abs(from.x - to.x) > input.diagramScale * 0.005) {
+      continue;
+    }
+    const box = estimateDiagramTextBox(
+      anchor,
+      input.text,
+      input.position,
+      input.fontSize,
+    );
+    const segmentMinY = Math.min(from.y, to.y);
+    const segmentMaxY = Math.max(from.y, to.y);
+    if (box.maxY < segmentMinY || box.minY > segmentMaxY) continue;
+    const barrierX = (from.x + to.x) / 2;
+    if (barrierX < box.minX - gap || barrierX > box.maxX + gap) continue;
+    const shiftX = input.position.includes("LEFT")
+      ? barrierX - gap - box.maxX
+      : barrierX + gap - box.minX;
+    anchor = { x: anchor.x + shiftX, y: anchor.y };
+  }
+  return anchor;
+}
+
+function textBoxOverlapArea(first: DiagramTextBox, second: DiagramTextBox, gap: number) {
+  const overlapWidth =
+    Math.min(first.maxX, second.maxX) - Math.max(first.minX, second.minX) + gap;
+  const overlapHeight =
+    Math.min(first.maxY, second.maxY) - Math.max(first.minY, second.minY) + gap;
+  return Math.max(0, overlapWidth) * Math.max(0, overlapHeight);
+}
+
+function resolveAxisNumericLabelPosition(
+  fallback: LabelPosition,
+  text: string,
+  anchorPoint: Point | undefined,
+  coordinateProjectionPoints: Point[],
+  width: number,
+  height: number,
+  isCoordinatePlane: boolean,
+): LabelPosition {
+  if (!isCoordinatePlane || !anchorPoint || !/^-?\d+(?:[.,/]\d+)?$/u.test(text.trim())) {
+    return fallback;
+  }
+  const isXAxisTick = Math.abs(anchorPoint.y) <= height * 0.02;
+  const isYAxisTick = Math.abs(anchorPoint.x) <= width * 0.02;
+  if (isXAxisTick) {
+    const aligned = coordinateProjectionPoints.filter(
+      (point) => Math.abs(point.x - anchorPoint.x) <= width * 0.005,
+    );
+    const hasProjectionAbove = aligned.some((point) => point.y > height * 0.005);
+    const hasProjectionBelow = aligned.some((point) => point.y < -height * 0.005);
+    if (hasProjectionAbove && hasProjectionBelow) return "BOTTOM_RIGHT";
+    if (hasProjectionBelow) return "TOP_RIGHT";
+    if (hasProjectionAbove) return "BOTTOM_RIGHT";
+  }
+  if (isYAxisTick) {
+    const aligned = coordinateProjectionPoints.filter(
+      (point) => Math.abs(point.y - anchorPoint.y) <= height * 0.005,
+    );
+    const hasProjectionLeft = aligned.some((point) => point.x < -width * 0.005);
+    const hasProjectionRight = aligned.some((point) => point.x > width * 0.005);
+    if (hasProjectionLeft && hasProjectionRight) {
+      return anchorPoint.y >= 0 ? "TOP_RIGHT" : "BOTTOM_RIGHT";
+    }
+    if (hasProjectionLeft) {
+      return anchorPoint.y >= 0 ? "TOP_LEFT" : "BOTTOM_LEFT";
+    }
+    if (hasProjectionRight) {
+      return anchorPoint.y >= 0 ? "TOP_RIGHT" : "BOTTOM_RIGHT";
+    }
+  }
+  return fallback;
+}
+
+function resolveRenderedFunctionLabelPosition(
+  fallback: LabelPosition,
+  anchor: Point,
+  primitives: Map<string, Primitive>,
+  points: Map<string, Point>,
+): LabelPosition {
+  const candidates = [...primitives.values()].flatMap((primitive) => {
+    if (primitive.type === "LINE") {
+      const from = points.get(primitive.from);
+      const to = points.get(primitive.to);
+      if (!from || !to || Math.abs(to.x - from.x) <= 1e-8) return [];
+      return [
+        {
+          distance: pointToLineDistance(anchor, from, to),
+          slope: (to.y - from.y) / (to.x - from.x),
+        },
+      ];
+    }
+    if (primitive.type !== "POLYLINE") return [];
+    const vertices = primitive.pointIds
+      .map((pointId) => points.get(pointId))
+      .filter((point): point is Point => Boolean(point));
+    return vertices.slice(0, -1).flatMap((from, index) => {
+      const to = vertices[index + 1];
+      if (!to || Math.abs(to.x - from.x) <= 1e-8) return [];
+      return [
+        {
+          distance: pointToSegmentDistance(anchor, from, to),
+          slope: (to.y - from.y) / (to.x - from.x),
+        },
+      ];
+    });
+  });
+  const nearest = candidates.sort((left, right) => left.distance - right.distance)[0];
+  if (!nearest || Math.abs(nearest.slope) <= 0.08) return fallback;
+  let horizontalSide = fallback.includes("LEFT") ? "LEFT" : "RIGHT";
+  const allPoints = [...points.values()];
+  const pointXSpan = Math.max(
+    1,
+    Math.max(...allPoints.map((point) => point.x)) -
+      Math.min(...allPoints.map((point) => point.x)),
+  );
+  const hasNearbyProjectionBarrier = [...primitives.values()].some((primitive) => {
+    if (primitive.type !== "SEGMENT") return false;
+    const from = points.get(primitive.from);
+    const to = points.get(primitive.to);
+    if (!from || !to || Math.abs(from.x - to.x) > pointXSpan * 0.005) return false;
+    const barrierX = (from.x + to.x) / 2;
+    const liesOnPreferredSide =
+      horizontalSide === "RIGHT" ? barrierX > anchor.x : barrierX < anchor.x;
+    return (
+      liesOnPreferredSide &&
+      Math.abs(barrierX - anchor.x) <= pointXSpan * 0.14 &&
+      anchor.y >= Math.min(from.y, to.y) - pointXSpan * 0.02 &&
+      anchor.y <= Math.max(from.y, to.y) + pointXSpan * 0.02
+    );
+  });
+  if (hasNearbyProjectionBarrier) {
+    horizontalSide = horizontalSide === "RIGHT" ? "LEFT" : "RIGHT";
+  }
+  return nearest.slope < 0
+    ? (`BOTTOM_${horizontalSide}` as LabelPosition)
+    : (`TOP_${horizontalSide}` as LabelPosition);
+}
+
 function labelStrokeClearanceScore(
   anchor: { x: number; y: number },
   text: string,
@@ -1655,9 +2182,8 @@ function labelStrokeClearanceScore(
   points: Map<string, Point>,
   coordinateProjectionPoints: Point[],
 ) {
-  const textLength = Math.max(1, Array.from(text).length);
-  const textWidth = fontSize * (0.62 * textLength + 0.12);
-  const textHeight = fontSize * 0.98;
+  const textWidth = estimatedDiagramTextWidth(text, fontSize);
+  const textHeight = fontSize * 1.08;
   const textAnchor = labelTextAnchor(position);
   const minX =
     textAnchor === "start"

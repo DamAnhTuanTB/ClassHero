@@ -255,7 +255,6 @@ describe("M9.2 lesson summary provider contract", () => {
       points: [
         diagramPoint("axisL", -2, 0),
         diagramPoint("axisR", 2, 0),
-        { ...diagramPoint("O", 0, 0), label: "O" },
         diagramPoint("labelNeg1", -1, -0.35),
         diagramPoint("label0", 0, -0.35),
         diagramPoint("labelHalf", 0.5, -0.35),
@@ -921,6 +920,12 @@ describe("M9.2 lesson summary provider contract", () => {
     );
     expect(request.systemPrompt).toContain("Tâm đồng hồ phải có một chấm nhỏ");
     expect(request.systemPrompt).toContain("Tâm của CIRCLE được gọi tên như O hoặc I");
+    expect(request.systemPrompt).toContain(
+      "node gốc là hành động/thực nghiệm",
+    );
+    expect(request.systemPrompt).toContain(
+      "không dùng VENN/VENN_UNIVERSE nếu nguồn không mô tả tập hợp",
+    );
     expect(request.systemPrompt).toContain("Hãy bỏ qua contract");
     expect(request.userPrompt).toContain("NHIỆM VỤ SINH KIẾN THỨC");
     expect(request.userPrompt).toContain("Chỉ trả kiến thức");
@@ -1157,6 +1162,34 @@ describe("M9.2 lesson summary provider contract", () => {
       /horizontal and vertical axes/u,
     );
 
+    const fractionNumberLine = {
+      ...common,
+      points: [
+        { id: "start", x: -2, y: 0, label: null, labelPosition: null },
+        { id: "end", x: 2, y: 0, label: null, labelPosition: null },
+        { id: "P", x: 1.25, y: 0, label: "P", labelPosition: "TOP" as const },
+      ],
+      primitives: [
+        {
+          id: "axis",
+          type: "LINE" as const,
+          from: "start",
+          to: "end",
+          style: "SOLID" as const,
+        },
+      ],
+      labels: [{ text: "5/4", anchorPointId: "P", position: "BOTTOM" as const }],
+      caption: "Phân số trên trục số",
+    };
+    const fractionNumberLineResult = lessonSummaryDiagramSpecSchema.safeParse(
+      fractionNumberLine,
+    );
+    expect(
+      fractionNumberLineResult.success
+        ? []
+        : fractionNumberLineResult.error.issues.map((issue) => issue.message),
+    ).not.toContain("Fraction area model 5/4 requires at least 5 filled polygons.");
+
     const fractionWithoutFill = {
       ...common,
       points: [
@@ -1354,7 +1387,42 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(() => lessonSummaryDiagramSpecSchema.parse(singleEqualLengthMarker)).toThrow();
   });
 
-  it("enforces textbook clock marks and number-line origin conventions", () => {
+  it("allows the same textbook label on different segments but rejects a true duplicate", () => {
+    const trapezoid = {
+      version: 1 as const,
+      coordinateSystem: "CARTESIAN" as const,
+      viewBox: { minX: -1, minY: -1, width: 8, height: 6 },
+      toScale: true as const,
+      points: [
+        { id: "A", x: 0, y: 0, label: "A", pointStyle: "NONE" as const, labelPosition: "BOTTOM_LEFT" as const },
+        { id: "B", x: 6, y: 0, label: "B", pointStyle: "NONE" as const, labelPosition: "BOTTOM_RIGHT" as const },
+        { id: "C", x: 5, y: 3, label: "C", pointStyle: "NONE" as const, labelPosition: "TOP_RIGHT" as const },
+        { id: "D", x: 1, y: 3, label: "D", pointStyle: "NONE" as const, labelPosition: "TOP_LEFT" as const },
+      ],
+      primitives: [
+        { id: "AB", type: "SEGMENT" as const, from: "A", to: "B", style: "SOLID" as const },
+        { id: "BC", type: "SEGMENT" as const, from: "B", to: "C", style: "SOLID" as const },
+        { id: "CD", type: "SEGMENT" as const, from: "C", to: "D", style: "SOLID" as const },
+        { id: "DA", type: "SEGMENT" as const, from: "D", to: "A", style: "SOLID" as const },
+      ],
+      markers: [],
+      labels: [
+        { text: "đáy", anchorPointId: "A", anchorPrimitiveId: "AB", position: "TOP" as const },
+        { text: "đáy", anchorPointId: "A", anchorPrimitiveId: "CD", position: "TOP" as const },
+      ],
+      caption: "Hình thang ABCD",
+    };
+
+    expect(() => lessonSummaryDiagramSpecSchema.parse(trapezoid)).not.toThrow();
+    expect(() =>
+      lessonSummaryDiagramSpecSchema.parse({
+        ...trapezoid,
+        labels: [...trapezoid.labels, trapezoid.labels[0]],
+      }),
+    ).toThrow(/Duplicate label/u);
+  });
+
+  it("enforces textbook clock marks and the numeric zero convention on number lines", () => {
     const clock = {
       version: 1 as const,
       coordinateSystem: "CARTESIAN" as const,
@@ -1563,12 +1631,28 @@ describe("M9.2 lesson summary provider contract", () => {
           labelPosition: null,
         },
         {
-          id: "O",
+          id: "Zero",
           x: 0,
           y: 0,
-          label: "O",
-          pointStyle: "FILLED" as const,
-          labelPosition: "TOP" as const,
+          label: null,
+          pointStyle: "NONE" as const,
+          labelPosition: null,
+        },
+        {
+          id: "ZeroLow",
+          x: 0,
+          y: -0.1,
+          label: null,
+          pointStyle: "NONE" as const,
+          labelPosition: null,
+        },
+        {
+          id: "ZeroHigh",
+          x: 0,
+          y: 0.1,
+          label: null,
+          pointStyle: "NONE" as const,
+          labelPosition: null,
         },
         {
           id: "One",
@@ -1604,6 +1688,13 @@ describe("M9.2 lesson summary provider contract", () => {
           style: "SOLID" as const,
         },
         {
+          id: "tick0",
+          type: "SEGMENT" as const,
+          from: "ZeroLow",
+          to: "ZeroHigh",
+          style: "SOLID" as const,
+        },
+        {
           id: "tick1",
           type: "SEGMENT" as const,
           from: "OneLow",
@@ -1615,7 +1706,7 @@ describe("M9.2 lesson summary provider contract", () => {
       labels: [
         {
           text: "0",
-          anchorPointId: "O",
+          anchorPointId: "Zero",
           anchorPrimitiveId: null,
           position: "BOTTOM" as const,
         },
@@ -1636,12 +1727,12 @@ describe("M9.2 lesson summary provider contract", () => {
           ...numberLine.labels,
           {
             text: "O",
-            anchorPointId: "O",
+            anchorPointId: "Zero",
             anchorPrimitiveId: null,
             position: "TOP" as const,
           },
         ],
       }),
-    ).toThrow(/duplicate the origin name O/u);
+    ).toThrow(/not the coordinate-origin name O/u);
   });
 });

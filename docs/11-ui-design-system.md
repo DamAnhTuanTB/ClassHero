@@ -458,6 +458,11 @@ Một màn hình UI chỉ xem là xong khi:
   sau khi đã tái kiểm chứng với nguồn chính thống và có entry trong
   `reference-golden-manifest.json`. Tên thư mục không tự chứng minh ảnh đúng; ảnh
   có feedback cũ chưa xử lý phải chuyển ra khỏi bộ đạt chuẩn.
+- Mọi sửa compiler, label solver hoặc renderer visual Toán phải chạy lại golden
+  đã tái kiểm chứng trên mobile Chromium, mobile WebKit, iPad và laptop. Không
+  được chấp nhận một case mới bằng cách làm giảm chất lượng case cũ; phát sinh
+  clip, chồng text–nét, chồng text–text, sai marker hoặc thay đổi ngữ nghĩa ở bất
+  kỳ golden nào đều là regression chặn nghiệm thu.
 - Text trong visual Toán không được đè lên nét hình hoặc marker. Cơ chế tránh va
   chạm phải ưu tiên vùng trống gần nhất, giữ đúng phía/ngữ nghĩa của nhãn và dùng
   khoảng dịch nhỏ có giới hạn; không được làm sạch hình bằng cách đẩy nhãn ra xa.
@@ -480,6 +485,13 @@ Một màn hình UI chỉ xem là xong khi:
   bỏ `EQUAL_LENGTH`/`PARALLEL` gắn nhầm vào vạch chia để tránh nét màu chồng lên
   đường trục. Vạch phải ngắn, đồng đều, mục tiêu khoảng 2% và không quá 3% cạnh
   ngắn viewBox; trên mobile không được cao như cột hoặc cạnh hình.
+- Phải phân biệt đúng ba đối tượng cơ bản theo SGK Kết nối tri thức: `LINE` kéo
+  dài qua hai điểm về cả hai phía, `RAY` bắt đầu tại gốc và kéo dài qua điểm thứ
+  hai, `SEGMENT` kết thúc tại hai đầu mút; cả ba không tự gắn đầu mũi tên. Dùng
+  dấu điểm nhỏ tại các điểm định danh/đầu mút để quan hệ vẫn đọc được trên mobile.
+  Hệ trục/trục số là ngoại lệ có mũi tên chiều dương. Với thang đo như nhiệt kế,
+  một giá trị chỉ ghi một lần; mức chất lỏng phải được nhấn trực quan và tách được
+  khỏi hai biên ống, không chồng nét cùng màu khiến mức đo mất ý nghĩa.
 - Text nằm trong ô bảng phải có ngưỡng cỡ chữ tối thiểu theo kích thước hiển thị
   mobile, căn giữa và không chạm đường viền; không chỉ co chữ theo viewBox rộng.
 - Hình minh họa thao tác dựng đồ thị đường thẳng phải hiện ít nhất hai điểm dựng

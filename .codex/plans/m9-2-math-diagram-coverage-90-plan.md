@@ -32,6 +32,31 @@ Không thuộc phạm vi giai đoạn này:
   thể đọc rõ trong một SVG tĩnh trên điện thoại.
 - Raw SVG/script do model trả về và image-generation provider.
 
+### Trạng thái triển khai ngày 2026-08-10
+
+- Baseline trước wave đã được commit tại `7f561b15`.
+- Prompt/schema hiện tại: `lesson-summary-prompt-v54` /
+  `lesson-summary-schema-v39`.
+- Control plane có 50 ô inventory thuộc đủ tám family, 50/50 ô có compiler và
+  golden local đạt; 86 fixture semantic đã qua 100/100 visual test, tạo 688 ảnh
+  locator-only và 32 contact sheet trên bốn thiết bị × hai theme.
+- Gate A đã duyệt 44 ví dụ lẻ, 352 ảnh và 24 contact sheet; Playwright đạt 8/8
+  cấu hình. Chi phí đã commit `18.863 VNĐ`.
+- Gate B đã duyệt 21 bài thật Toán 3-9, 152 block hình, 1.216 ảnh và 21 contact
+  sheet; Playwright đạt 8/8 cấu hình. Chi phí Gate B tăng thêm `112.985 VNĐ`,
+  tổng wave `131.848 VNĐ`. Compiler fingerprint cuối là
+  `1a1c46ddd9865a7b`; lượt biên dịch/chụp cuối dùng cache, không phát sinh paid
+  call mới.
+- Tổng bộ đã duyệt gồm 2.256 ảnh và 77 contact sheet. Bộ ảnh cũ được chuyển phục
+  hồi sang `anh-chup-hinh-toan-can-sua/`; ảnh đạt chuẩn mới khớp đầu ra test cuối.
+- Source catalog đã có chương trình Bộ GDĐT và đủ 14 tập SGK Toán 3-9; page audit
+  hiện xác minh exact page cho 19/50 ô. Báo cáo cuối ghi 39/50 ô có live evidence,
+  11/50 ô đủ ba gate local + live + exact-page, nhưng vẫn giữ `0 SUPPORTED` và
+  `releaseStatus=IN_PROGRESS` cho đến khi W1 khóa đủ inventory/SBT và các ô live
+  còn thiếu được nghiệm thu; không dùng số fixture/screenshot để overclaim coverage.
+- Mọi ảnh ở commit/thư mục đạt chuẩn cũ là golden candidate. Chỉ ảnh có review
+  record source-backed mới được bảo vệ; candidate còn lỗi phải demote linh hoạt.
+
 ## 2. Cách phân loại độ khó
 
 | Mức | Quy tắc phân loại thực dụng |
@@ -546,6 +571,11 @@ hiện sai hoặc nguồn chính thức được cập nhật.
 
 ### 8.5. Vòng sửa lỗi và quản lý ảnh
 
+- Commit nền `7f561b15` là mốc non-regression của đợt triển khai này. Trước khi
+  chấp nhận bất kỳ thay đổi compiler/layout/renderer nào, phải render lại các
+  golden group đã được tái kiểm chứng từ mốc đó trên Chromium mobile, WebKit
+  mobile, iPad và laptop. Case mới pass nhưng làm một golden cũ xấu đi vẫn bị coi
+  là fail và không được merge/promote.
 - Lỗi được phân loại `PROVIDER_INTENT`, `COMPILER`, `SEMANTIC_VALIDATOR`,
   `LABEL_LAYOUT`, `RENDERER` hoặc `RESPONSIVE_THEME`.
 - Mỗi lỗi phải tạo regression fixture trước hoặc cùng lúc với bản sửa; không vá
@@ -631,3 +661,113 @@ workstream không làm hỏng những họ hình khác.
 
 Inventory đầy đủ có thể làm coverage baseline giảm so với cảm giác ban đầu vì mẫu
 số trung thực lớn hơn; task chỉ hoàn tất sau khi đưa tỷ lệ đó lên ngưỡng cam kết.
+
+## 12. Điểm resume sau khi tạm dừng ngày 2026-08-10
+
+Delivery wave này **chưa hoàn tất** và chưa đạt điều kiện công bố 90-100%. Khi
+owner yêu cầu làm tiếp, tiếp tục từ artifact/báo cáo hiện tại, không chạy lại paid
+matrix đã có và không khởi tạo một kế hoạch mới thay thế file này.
+
+### 12.1. Baseline và bằng chứng đã có
+
+- Baseline trước wave: commit `7f561b15`.
+- Báo cáo hiện hành:
+  `anh-chup-hinh-toan-dat-chuan/coverage-report-v51.json`.
+- Prompt/schema: `lesson-summary-prompt-v54` / `lesson-summary-schema-v39`.
+- Compiler/local golden: `50/50` ô; semantic visual `86` fixture, `688` ảnh.
+- Gate A: 44 ví dụ lẻ, 352 ảnh, 8/8 cấu hình.
+- Gate B: 21 bài thật, 152 block, 1.216 ảnh, 8/8 cấu hình.
+- Tổng đã duyệt: 2.256 ảnh và 77 contact sheet. Đây là ảnh lặp theo thiết
+  bị/theme, không phải 2.256 ô coverage.
+- Paid usage đã ghi nhận: 75 event, `131.848 VNĐ`.
+
+### 12.2. Khoảng trống release gate
+
+| Gate | Đã đạt | Còn thiếu |
+| --- | ---: | ---: |
+| Compiler-represented/local golden | 50/50 (100%) | 0 |
+| Live evidence | 39/50 (78%) | 11 |
+| Exact-page SGK/SBT | 19/50 (38%) | 31 |
+| Đủ cả local + live + exact-page | 11/50 (22%) | 34 để đạt 45/50 |
+
+Nếu denominator cuối vẫn là 50 ô, công bố 90% cần ít nhất 45 ô qua đồng thời
+mọi gate. Tối thiểu phải bổ sung 6 live-pass để live đạt 45/50 và 26 exact-page
+để source đạt 45/50, nhưng các bằng chứng phải giao nhau trên cùng 45 ô. Để nhắm
+100%, hoàn tất cả 11 live evidence và 31 source audit còn thiếu.
+
+11 ô thiếu live evidence:
+
+1. `data-pictogram-simple`;
+2. `plane-angle-simple`;
+3. `plane-axial-symmetry-medium`;
+4. `plane-central-symmetry-hard`;
+5. `advanced-centroid-medium`;
+6. `advanced-angle-bisectors-medium`;
+7. `advanced-perpendicular-bisectors-hard`;
+8. `advanced-altitudes-hard`;
+9. `advanced-altitude-hard`;
+10. `spatial-cone-sphere-medium`;
+11. `schematic-flow-medium`.
+
+31 ô thiếu exact-page theo family: `ADVANCED_GEOMETRY` 2,
+`ALGEBRA_GRAPH` 5, `DATA_STATISTICS` 4, `ELEMENTARY_MODEL` 5,
+`NUMBER_COORDINATE` 4, `PLANE_GEOMETRY` 3, `SET_SCHEMATIC` 4 và
+`SPATIAL_APPLIED` 4.
+
+### 12.3. Checklist bắt đầu lại
+
+1. Đọc báo cáo v51, inventory/reference/review manifest và kiểm tra worktree;
+   bảo toàn mọi thay đổi/ảnh hiện có, không xóa hoặc ghi đè artifact cũ.
+2. Hoàn thiện W1 trước: audit 31 exact-page, khóa include/exclude và denominator;
+   exclusion phải có căn cứ nguồn chính thống.
+3. Chạy 11 live case theo batch nhỏ bằng `gpt-5.4`; ưu tiên đủ 6 case để kiểm
+   mốc 90%, nhưng tiếp tục đủ 11 nếu không gặp blocker và còn ngân sách.
+4. Sau từng output: lưu usage, render component thật, chụp đủ 4 viewport × 2
+   theme, review thủ công theo SGK/SBT, tạo defect/regression fixture nếu lỗi.
+5. Sửa lỗi local bằng cache; chỉ retry trả phí khi root cause là
+   `PROVIDER_INTENT`. Sau sửa phải chạy lại toàn bộ golden để bảo vệ ảnh đạt chuẩn.
+6. Khi ví dụ lẻ mới đã ổn, chạy lại bài thật đại diện có nhiều block; cập nhật
+   report, docs M9 và chỉ đổi `releaseStatus` khi release gate thực sự đạt.
+
+### 12.4. Thời gian và ngân sách phần còn lại
+
+- Mốc tối thiểu 90%: khoảng 8-14 giờ làm việc, live test ước tính
+  20.000-35.000 VNĐ.
+- Cố gắng 100%: khoảng 14-24 giờ làm việc, live test ước tính
+  45.000-80.000 VNĐ.
+- Renderer/compiler/source audit và screenshot từ cache không tốn provider.
+- Trần đề xuất cho phần paid còn lại: `80.000 VNĐ`; đây không phải quyền tự chi.
+  Trước mỗi batch phải báo owner số request, model, token reserve, upper bound,
+  số đã dùng và cache hit; dừng sớm khi đủ evidence, không tiêu hết trần nếu
+  không cần.
+
+### 12.5. Failure recovery bắt buộc cho admin
+
+Wave chưa được coi là sẵn sàng công bố nếu UI chỉ in raw Zod/semantic-validator
+error và để admin tự đoán cách xử lý. Cơ chế partial recovery áp dụng cho mọi
+block, không riêng hình vẽ: mọi lỗi có thể quy về một block/field phải được cô
+lập ở phần nhỏ nhất; mọi field/sub-block còn render an toàn và có ý nghĩa vẫn
+hiển thị, placeholder chỉ thay phần không còn render được. Phần hợp lệ persist ở
+`NEEDS_REVIEW`. Chỉ response không đọc được, source stale hoặc lỗi provider,
+database/hạ tầng mới làm toàn job fail. UI phải hiển thị copy tiếng Việt và hành
+động phù hợp cho các lỗi toàn cục đó thay vì raw error.
+
+Các block hợp lệ phải được giữ lại khi có thể; raw error chỉ nằm trong mục
+`Chi tiết kỹ thuật`, không hiển thị làm hướng dẫn chính. Local normalizer chỉ tự
+sửa lỗi cú pháp hoặc dữ liệu dư thừa không đổi ý nghĩa toán học; không tự bịa
+segment/điểm/quan hệ còn thiếu. Lượt tạo summary ban đầu chỉ gọi AI một lần và
+không tự repair. Hotfix giữ mọi hình còn render-safe, gắn `Cần review` và cho
+admin chấp nhận nguyên hình đó mà không gọi AI. Nếu chỉ vài primitive/marker/label
+hỏng thì cô lập đúng phần tử lỗi và vẫn vẽ phần còn có ý nghĩa; chỉ khi không còn
+hình có ý nghĩa nào mới dùng placeholder `Hình lỗi`. Admin cũng có thể sửa/xóa
+bằng editor hiện có. Nút `Tạo lại` riêng
+block là phase tùy chọn: nếu triển khai, mỗi lần bấm chủ động mới tạo đúng một
+request AI riêng và không tự retry. Hotfix cần focused integration test, mobile
+smoke và golden non-regression trước khi hoàn tất.
+
+Kế hoạch triển khai gọn cho partial persistence, placeholder và publish gate
+nằm tại
+`.codex/plans/m9-2-summary-partial-block-recovery-plan.md`. Phải hoàn thành
+bug-fix slice này trước khi chạy tiếp live coverage còn thiếu, để một lỗi cục bộ
+không tiếp tục làm mất toàn bộ artifact của paid full-lesson request. Không có
+AI tự tạo lại ngầm; phase nút tạo lại riêng block không nằm trong hotfix bỏ chặn.

@@ -714,6 +714,13 @@ nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
   như `3 cm` sát cạnh tương ứng, không ghi lại `AB = 3 cm`; hai đoạn bằng nhau
   dùng cùng số tick `EQUAL_LENGTH`; tên góc không lặp lại khi tên đỉnh đã đủ,
   chỉ hiện text góc khi có số đo. Nhãn bổ sung phải neo vào primitive mà nó mô tả.
+- Primitive hình học cơ bản giữ đúng ngữ nghĩa và quy ước SGK Kết nối tri thức:
+  `LINE` kéo dài hai phía, `RAY` chỉ kéo dài từ gốc qua điểm thứ hai, `SEGMENT`
+  dừng ở hai đầu mút; renderer không tự thêm đầu mũi tên cho ba primitive này.
+  Các điểm định danh/đầu mút dùng dấu chấm nhỏ. Trục tọa độ/trục số là ngoại lệ
+  chỉ hướng mũi tên về chiều dương. Thang đo không được lặp cùng một giá trị ở hai
+  phía của một vạch; phần mức đọc phải được compiler biểu diễn riêng, rõ hơn
+  khung/ống của dụng cụ.
 - Hệ trục tọa độ phải có `O`, nhãn `x`/`y`, mũi tên chỉ ở chiều dương, các vạch
   chia đều và đủ nhãn số để đọc tỉ lệ; đồ thị hàm phải kéo qua cả miền âm khi dữ
   kiện cần và dùng đủ điểm lấy mẫu để đường cong liên tục. Trên hình chỉ ghi tên
@@ -839,6 +846,22 @@ chính xác, ví dụ mới dùng source cùng archetype. Ảnh đạt chuẩn c
 golden nội bộ sau source-backed re-audit và được ghi vào
 `reference-golden-manifest.json`. Semantic truth đứng trước pixel similarity;
 responsive adaptation được chấp nhận khi giữ nguyên quan hệ và có review note.
+
+Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v53` và
+schema `lesson-summary-schema-v39`. Provider ưu tiên trả `INTENT`; backend biên
+dịch intent bằng registry deterministic cho tám family. Bộ compiler hiện có 86
+fixture trực quan local, gồm mô hình tiểu học/đo lường, trục số–tọa độ, hàm bậc
+nhất/bậc hai/tỉ lệ nghịch, bảng–biểu đồ, hình học phẳng, đồng dạng–đường tròn,
+hình không gian–hình khai triển và Venn/tree/flow/network. Các con số này chỉ là
+tiến độ triển khai, không đồng nghĩa coverage đạt chuẩn: inventory 50 ô vẫn giữ
+`IN_PROGRESS`, không ô nào được chuyển `SUPPORTED` trước khi có source-page audit,
+semantic invariant, golden bốn viewport và live gate tương ứng.
+
+Source audit lưu một hoặc nhiều `evidencePages` cho mỗi đầu sách, vì các nhóm chủ
+đề của cùng tập có thể nằm trên nhiều trang mục lục hoặc trang bài khác nhau. Mỗi
+evidence URL phải là ảnh do reader chính thức NXBGDVN phục vụ. Tên thư mục hoặc
+commit cũ không đủ để chứng minh ảnh đạt: mọi golden cũ là candidate, được phép
+demote nếu tái kiểm tra phát hiện lỗi toán học, ký hiệu, nhãn hoặc responsive.
 
 ### 5.2. Quiz generation
 

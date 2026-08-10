@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "series": "Kết nối tri thức với cuộc sống",
+  "accessedAt": "2026-08-10",
+  "copyrightUse": "REVIEW_ONLY",
+  "references": [
+    {
+      "referenceId": "moet-gdpt-math-2018",
+      "sourceKind": "CURRICULUM",
+      "publisher": "Bộ Giáo dục và Đào tạo",
+      "grade": null,
+      "volume": null,
+      "title": "Chương trình giáo dục phổ thông môn Toán",
+      "url": "https://moet.gov.vn/content/vanban/Lists/VBPQ/Attachments/1483/vbhn-chuong-trinh-tong-the.pdf",
+      "comparisonClaims": ["CURRICULUM_SCOPE", "GRADE_PROGRESSION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-3-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 3,
+      "volume": 1,
+      "title": "Toán 3, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-3-tap-mot.4698702815",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-3-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 3,
+      "volume": 2,
+      "title": "Toán 3, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-3-tap-hai.4714081721",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-4-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 4,
+      "volume": 1,
+      "title": "Toán 4, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-4-tap-mot.4714093295",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-4-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 4,
+      "volume": 2,
+      "title": "Toán 4, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-4-tap-hai.4698870230",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-5-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 5,
+      "volume": 1,
+      "title": "Toán 5, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-5-tap-mot.4699756373",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-5-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 5,
+      "volume": 2,
+      "title": "Toán 5, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-5-tap-hai.4714103431",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-6-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 6,
+      "volume": 1,
+      "title": "Toán 6, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-6-tap-mot.4699854777",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-6-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 6,
+      "volume": 2,
+      "title": "Toán 6, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-6-tap-hai.4699864675",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-7-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 7,
+      "volume": 1,
+      "title": "Toán 7, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-7-tap-mot.4714106181",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-7-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 7,
+      "volume": 2,
+      "title": "Toán 7, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-7-tap-hai.4700015846",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-8-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 8,
+      "volume": 1,
+      "title": "Toán 8, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-8-tap-mot.4700097446",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-8-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 8,
+      "volume": 2,
+      "title": "Toán 8, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-8-tap-hai.4700102182",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-9-v1",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 9,
+      "volume": 1,
+      "title": "Toán 9, tập một",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-9-tap-mot.4714692201",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "referenceId": "nxbgd-kntt-math-9-v2",
+      "sourceKind": "SGK",
+      "publisher": "Nhà xuất bản Giáo dục Việt Nam",
+      "grade": 9,
+      "volume": 2,
+      "title": "Toán 9, tập hai",
+      "url": "https://taphuan.nxbgd.vn/tap-huan/doc-sach/sgk-toan-9-tap-hai.4714699696",
+      "comparisonClaims": ["EXACT_FIGURE", "SAME_ARCHETYPE", "NOTATION_CONVENTION"],
+      "status": "VERIFIED_OFFICIAL"
+    }
+  ]
+}

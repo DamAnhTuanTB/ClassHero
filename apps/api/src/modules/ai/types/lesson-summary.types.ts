@@ -4,10 +4,10 @@ import {
 } from "@learning-path/shared";
 import { z } from "zod";
 
-import { lessonSummaryProviderDiagramSpecSchema } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
+import { lessonSummaryProviderDiagramInputSchema } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v49";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v37";
+export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v54";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v39";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -187,7 +187,7 @@ export type LessonSummaryExtendedBlock = z.infer<typeof lessonSummaryExtendedBlo
  * Provider-only contract. Its shape makes every theory/example pair and the final
  * two application exercises required by JSON Schema before semantic review.
  */
-const theoryDiagramSpecSchema = lessonSummaryProviderDiagramSpecSchema
+const theoryDiagramSpecSchema = lessonSummaryProviderDiagramInputSchema
   .describe(
     "Nếu bài học thuộc Hình học thì mọi theory block đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, diagramSpec vẫn bắt buộc khi nội dung cần hình để hiểu đúng; các khối về đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ không được trả null.",
   )
@@ -234,7 +234,7 @@ function createLessonSummaryProviderExampleSchema(
         )
         .nullable(),
       answer: nonEmptyText(2_000),
-      diagramSpec: lessonSummaryProviderDiagramSpecSchema
+      diagramSpec: lessonSummaryProviderDiagramInputSchema
         .describe(
           "Một hình minh họa dùng chung cho toàn bộ ví dụ/bài tập. Nếu bài học thuộc Hình học thì mọi example và exercise đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, các bài yêu cầu vẽ, đọc hoặc suy luận từ đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc khác null.",
         )
