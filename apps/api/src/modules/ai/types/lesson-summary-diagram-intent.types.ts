@@ -50,7 +50,7 @@ const tapeComparisonIntentSchema = z
   })
   .strict();
 
-const fractionModelIntentSchema = z
+const fractionModelIntentTransportSchema = z
   .object({
     ...baseIntentShape,
     family: z.literal("ELEMENTARY_MODEL"),
@@ -60,17 +60,20 @@ const fractionModelIntentSchema = z
     shape: z.enum(["BAR", "CIRCLE"]),
     fractionLabel: shortLabel.nullable(),
   })
-  .strict()
-  .superRefine((intent, context) => {
+  .strict();
+
+const fractionModelIntentSchema = fractionModelIntentTransportSchema.superRefine(
+  (intent, context) => {
     if (intent.numerator <= intent.denominator) return;
     context.addIssue({
       code: "custom",
       path: ["numerator"],
       message: "A single fraction model cannot shade more parts than its denominator.",
     });
-  });
+  },
+);
 
-const rectilinearCompositeIntentSchema = z
+const rectilinearCompositeIntentTransportSchema = z
   .object({
     ...baseIntentShape,
     family: z.literal("ELEMENTARY_MODEL"),
@@ -81,8 +84,10 @@ const rectilinearCompositeIntentSchema = z
     cutoutHeight: positiveValue,
     unit: shortLabel,
   })
-  .strict()
-  .superRefine((intent, context) => {
+  .strict();
+
+const rectilinearCompositeIntentSchema =
+  rectilinearCompositeIntentTransportSchema.superRefine((intent, context) => {
     if (
       intent.cutoutWidth < intent.outerWidth &&
       intent.cutoutHeight < intent.outerHeight
@@ -96,7 +101,7 @@ const rectilinearCompositeIntentSchema = z
     });
   });
 
-const measurementScaleIntentSchema = z
+const measurementScaleIntentTransportSchema = z
   .object({
     ...baseIntentShape,
     family: z.literal("ELEMENTARY_MODEL"),
@@ -108,8 +113,10 @@ const measurementScaleIntentSchema = z
     value: finiteValue,
     unit: shortLabel,
   })
-  .strict()
-  .superRefine((intent, context) => {
+  .strict();
+
+const measurementScaleIntentSchema = measurementScaleIntentTransportSchema.superRefine(
+  (intent, context) => {
     if (
       intent.min < intent.max &&
       intent.value >= intent.min &&
@@ -122,7 +129,8 @@ const measurementScaleIntentSchema = z
       path: ["value"],
       message: "Measurement value must lie inside an increasing scale domain.",
     });
-  });
+  },
+);
 
 const numberLinePointSchema = z
   .object({
@@ -221,7 +229,7 @@ const inequalityRegionIntentSchema = z
   })
   .strict();
 
-const graphFunctionSchema = z.discriminatedUnion("kind", [
+const graphFunctionTransportSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("LINEAR"),
@@ -245,10 +253,7 @@ const graphFunctionSchema = z.discriminatedUnion("kind", [
         .regex(/^[A-Za-z][A-Za-z0-9_-]*$/u)
         .max(64),
       label: safeText,
-      a: finiteValue.refine(
-        (value) => value !== 0,
-        "Quadratic coefficient a cannot be zero.",
-      ),
+      a: finiteValue,
       b: finiteValue,
       c: finiteValue,
       constructionXs: z.array(finiteValue).min(3).max(9),
@@ -263,19 +268,39 @@ const graphFunctionSchema = z.discriminatedUnion("kind", [
         .regex(/^[A-Za-z][A-Za-z0-9_-]*$/u)
         .max(64),
       label: safeText,
-      coefficient: finiteValue.refine(
-        (value) => value !== 0,
-        "Inverse coefficient cannot be zero.",
-      ),
-      constructionXs: z
-        .array(finiteValue.refine((value) => value !== 0, "x cannot be zero."))
-        .min(4)
-        .max(10),
+      coefficient: finiteValue,
+      constructionXs: z.array(finiteValue).min(4).max(10),
     })
     .strict(),
 ]);
 
-const algebraGraphIntentSchema = z
+const graphFunctionSchema = graphFunctionTransportSchema.superRefine((fn, context) => {
+  if (fn.kind === "QUADRATIC" && fn.a === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["a"],
+      message: "Quadratic coefficient a cannot be zero.",
+    });
+  }
+  if (fn.kind !== "INVERSE") return;
+  if (fn.coefficient === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["coefficient"],
+      message: "Inverse coefficient cannot be zero.",
+    });
+  }
+  fn.constructionXs.forEach((value, index) => {
+    if (value !== 0) return;
+    context.addIssue({
+      code: "custom",
+      path: ["constructionXs", index],
+      message: "x cannot be zero.",
+    });
+  });
+});
+
+const algebraGraphIntentTransportSchema = z
   .object({
     ...baseIntentShape,
     family: z.literal("ALGEBRA_GRAPH"),
@@ -292,9 +317,25 @@ const algebraGraphIntentSchema = z
     yMax: finiteValue,
     xStep: positiveValue,
     yStep: positiveValue,
-    functions: z.array(graphFunctionSchema).min(1).max(3),
+    functions: z.array(graphFunctionTransportSchema).min(1).max(3),
   })
   .strict();
+
+const algebraGraphIntentSchema = algebraGraphIntentTransportSchema.superRefine(
+  (intent, context) => {
+    intent.functions.forEach((fn, index) => {
+      const result = graphFunctionSchema.safeParse(fn);
+      if (result.success) return;
+      result.error.issues.forEach((issue) =>
+        context.addIssue({
+          code: "custom",
+          path: ["functions", index, ...issue.path],
+          message: issue.message,
+        }),
+      );
+    });
+  },
+);
 
 const dataSeriesSchema = z
   .object({
@@ -313,7 +354,7 @@ const valueTableIntentSchema = z
   })
   .strict();
 
-const chartIntentSchema = z
+const chartIntentTransportSchema = z
   .object({
     ...baseIntentShape,
     family: z.literal("DATA_STATISTICS"),
@@ -323,32 +364,33 @@ const chartIntentSchema = z
     yStep: positiveValue,
     unit: shortLabel.nullable(),
   })
-  .strict()
-  .superRefine((intent, context) => {
-    intent.series.forEach((series, seriesIndex) => {
-      if (series.values.length === intent.categories.length) return;
-      context.addIssue({
-        code: "custom",
-        path: ["series", seriesIndex, "values"],
-        message: "Every chart series must contain one value for each category.",
-      });
+  .strict();
+
+const chartIntentSchema = chartIntentTransportSchema.superRefine((intent, context) => {
+  intent.series.forEach((series, seriesIndex) => {
+    if (series.values.length === intent.categories.length) return;
+    context.addIssue({
+      code: "custom",
+      path: ["series", seriesIndex, "values"],
+      message: "Every chart series must contain one value for each category.",
     });
-    if (intent.archetype !== "PIE_CHART") return;
-    if (intent.series.length !== 1) {
-      context.addIssue({
-        code: "custom",
-        path: ["series"],
-        message: "A pie chart must contain exactly one data series.",
-      });
-    }
-    if ((intent.series[0]?.values.reduce((sum, value) => sum + value, 0) ?? 0) <= 0) {
-      context.addIssue({
-        code: "custom",
-        path: ["series", 0, "values"],
-        message: "Pie chart values must have a positive total.",
-      });
-    }
   });
+  if (intent.archetype !== "PIE_CHART") return;
+  if (intent.series.length !== 1) {
+    context.addIssue({
+      code: "custom",
+      path: ["series"],
+      message: "A pie chart must contain exactly one data series.",
+    });
+  }
+  if ((intent.series[0]?.values.reduce((sum, value) => sum + value, 0) ?? 0) <= 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["series", 0, "values"],
+      message: "Pie chart values must have a positive total.",
+    });
+  }
+});
 
 const clockIntentSchema = z
   .object({
@@ -360,7 +402,7 @@ const clockIntentSchema = z
   })
   .strict();
 
-const pictogramIntentSchema = z
+const pictogramIntentTransportSchema = z
   .object({
     ...baseIntentShape,
     family: z.literal("DATA_STATISTICS"),
@@ -371,8 +413,10 @@ const pictogramIntentSchema = z
     symbol: z.enum(["CIRCLE", "SQUARE", "STAR"]),
     unit: shortLabel,
   })
-  .strict()
-  .superRefine((intent, context) => {
+  .strict();
+
+const pictogramIntentSchema = pictogramIntentTransportSchema.superRefine(
+  (intent, context) => {
     if (intent.categories.length !== intent.values.length) {
       context.addIssue({
         code: "custom",
@@ -388,7 +432,8 @@ const pictogramIntentSchema = z
         message: "Every pictogram value must be divisible by valuePerSymbol.",
       });
     });
-  });
+  },
+);
 
 const planeGeometryIntentSchema = z
   .object({
@@ -564,6 +609,33 @@ const setSchematicIntentSchema = z
     setLabels: z.array(shortLabel).max(4),
   })
   .strict();
+
+export const lessonSummaryDiagramIntentTransportSchema = z.union([
+  z.discriminatedUnion("archetype", [
+    multiplicationArrayIntentSchema,
+    tapeComparisonIntentSchema,
+    fractionModelIntentTransportSchema,
+    rectilinearCompositeIntentTransportSchema,
+    measurementScaleIntentTransportSchema,
+  ]),
+  z.discriminatedUnion("archetype", [
+    numberLineIntentSchema,
+    intervalIntentSchema,
+    coordinatePointsIntentSchema,
+    inequalityRegionIntentSchema,
+  ]),
+  algebraGraphIntentTransportSchema,
+  z.discriminatedUnion("archetype", [
+    valueTableIntentSchema,
+    chartIntentTransportSchema,
+    clockIntentSchema,
+    pictogramIntentTransportSchema,
+  ]),
+  planeGeometryIntentSchema,
+  advancedGeometryIntentSchema,
+  spatialAppliedIntentSchema,
+  setSchematicIntentSchema,
+]);
 
 export const lessonSummaryDiagramIntentSchema = z
   .union([

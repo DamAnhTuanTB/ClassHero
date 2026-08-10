@@ -4,12 +4,14 @@ import type {
   AdminAiGenerationPayload,
   AdminAiJobData,
   AdminAiQueuedJob,
+  AdminLessonSummaryContent,
   AdminLessonSummaryPromptPreview,
   AdminLessonSummary,
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
-import type { TiptapTextDocument } from "@/types/rich-text";
+
+const LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS = 20_000;
 
 export function getAdminAiGenerationPanel(lessonId: string, token: string) {
   return apiRequest<AdminAiGenerationPanelData>(
@@ -54,6 +56,7 @@ export function previewAdminLessonSummaryPrompt(
       method: "POST",
       body,
       token,
+      timeoutMs: LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS,
     },
   );
 }
@@ -68,7 +71,7 @@ export function getAdminLessonSummary(lessonId: string, token: string) {
 export function upsertAdminLessonSummary(
   lessonId: string,
   data: {
-    contentJson: TiptapTextDocument;
+    contentJson: AdminLessonSummaryContent;
     source: "ADMIN" | "AI";
     reviewStatus: AdminLessonSummaryReviewStatus;
   },

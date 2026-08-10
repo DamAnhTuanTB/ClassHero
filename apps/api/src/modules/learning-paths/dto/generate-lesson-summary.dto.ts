@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS } from "@learning-path/shared";
+import {
+  AI_REASONING_EFFORT_LEVELS,
+  LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
+  type AiReasoningEffort,
+} from "@learning-path/shared";
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -96,12 +100,12 @@ export class GenerateLessonSummaryDto {
   temperature?: number;
 
   @ApiPropertyOptional({
-    enum: ["low", "medium", "high"],
-    description: "Mức độ suy luận cho o1/o3-mini",
+    enum: AI_REASONING_EFFORT_LEVELS,
+    description: "Mức độ suy luận mà model đã chọn hỗ trợ",
   })
   @IsOptional()
-  @IsIn(["low", "medium", "high"])
-  reasoningEffort?: "low" | "medium" | "high";
+  @IsIn(AI_REASONING_EFFORT_LEVELS)
+  reasoningEffort?: AiReasoningEffort;
 
   @ApiPropertyOptional({
     minimum: LESSON_SUMMARY_MIN_OUTPUT_TOKENS,

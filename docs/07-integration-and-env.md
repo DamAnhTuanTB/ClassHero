@@ -101,6 +101,7 @@ OCR_MONTHLY_BUDGET_VND=1000000
 
 # AI budget/rate limit
 AI_PROVIDER_TIMEOUT_MS=60000
+AI_GENERATION_TIMEOUT_MS=600000
 AI_MONTHLY_BUDGET_VND=1500000
 AI_STUDENT_CHAT_DAILY_LIMIT=20
 AI_STUDENT_GENERATE_DAILY_LIMIT=5
@@ -275,8 +276,12 @@ Dùng phụ cho:
 - Mọi call AI đi qua `AiProvider` abstraction.
 - Output structured phải validate schema.
 - Log `ai_generations`.
-- `AI_PROVIDER_TIMEOUT_MS` giới hạn một provider request; BullMQ quản lý retry
-  durable nên OpenAI SDK không tự retry lồng bên trong một attempt.
+- `AI_PROVIDER_TIMEOUT_MS` giới hạn các provider request ngắn như embedding.
+- `AI_GENERATION_TIMEOUT_MS` giới hạn riêng request sinh text/structured output dài;
+  mặc định 10 phút để model reasoning cao có đủ thời gian trả kết quả.
+- BullMQ quản lý retry durable nên OpenAI SDK không tự retry lồng bên trong một
+  attempt. Riêng Summary giữ `maxAttempts=1`: một lần admin bấm tạo chỉ phát sinh
+  đúng một provider call, kể cả khi request hết thời gian chờ.
 - Không gửi toàn bộ tài liệu mỗi lần học sinh hỏi.
 - Cần rate limit và budget guard.
 

@@ -1,3 +1,4 @@
+import type { AiReasoningEffort } from "@learning-path/shared";
 import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type AdminAiGenerationType = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
@@ -8,10 +9,12 @@ export type AdminAiQuestionType =
   "MULTIPLE_CHOICE" | "TRUE_FALSE" | "MULTI_STATEMENT_TRUE_FALSE" | "TEXT_INPUT";
 export type AdminSummaryStyle = "student_friendly" | "concise" | "academic";
 export type AdminSummaryLength = "short" | "standard" | "detailed";
+export type AdminAiConfigurationCapability =
+  "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null;
 
 export function supportsTemperature(
   modelName: string | null | undefined,
-  aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null
+  aiConfiguration?: AdminAiConfigurationCapability,
 ): boolean {
   if (aiConfiguration === "TEMPERATURE") return true;
   if (aiConfiguration === "REASONING_EFFORT" || aiConfiguration === "NONE") return false;
@@ -20,7 +23,7 @@ export function supportsTemperature(
 
 export function supportsReasoningEffort(
   modelName: string | null | undefined,
-  aiConfiguration?: "TEMPERATURE" | "REASONING_EFFORT" | "NONE" | null
+  aiConfiguration?: AdminAiConfigurationCapability,
 ): boolean {
   if (aiConfiguration === "REASONING_EFFORT") return true;
   if (aiConfiguration === "TEMPERATURE" || aiConfiguration === "NONE") return false;
@@ -54,7 +57,11 @@ export interface AdminAiPanelJob {
   model?: string | null;
   latencyMs?: number | null;
   estimatedCostVnd?: number | null;
-  inputMetaJson?: any | null;
+  inputMetaJson?: {
+    temperature?: number;
+    reasoningEffort?: string;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface AdminAiGenerationPanelData {
@@ -100,7 +107,7 @@ export type AdminSummaryGenerationPayload = {
   userPrompt?: string;
   model?: string;
   temperature?: number;
-  reasoningEffort?: string;
+  reasoningEffort?: AiReasoningEffort;
   maxOutputTokens?: number;
 };
 
@@ -161,7 +168,11 @@ export interface AdminLessonSummaryPromptPreview {
       provider: string;
       model: string;
       available: boolean;
-      capabilities?: any;
+      capabilities?: {
+        aiConfiguration?: AdminAiConfigurationCapability;
+        reasoningEffortLevels?: string[];
+        [key: string]: unknown;
+      };
     }>;
   };
   estimatedCost: {
@@ -175,10 +186,19 @@ export interface AdminLessonSummaryPromptPreview {
 export type AdminLessonSummaryReviewStatus =
   "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "HIDDEN";
 
+export interface AdminLessonSummaryBlocksContent {
+  type: "lesson_summary_blocks";
+  version: number;
+  data: Record<string, unknown>;
+}
+
+export type AdminLessonSummaryContent =
+  TiptapTextDocument | AdminLessonSummaryBlocksContent;
+
 export interface AdminLessonSummary {
   id: string;
   lessonId: string;
-  contentJson: TiptapTextDocument;
+  contentJson: AdminLessonSummaryContent;
   source: "ADMIN" | "AI";
   reviewStatus: AdminLessonSummaryReviewStatus;
   aiGenerationId: string | null;

@@ -45,30 +45,44 @@ const safePointLabel = z
     "Chỉ là tên một điểm như A, B′ hoặc M₁; không ghép nhiều điểm, độ dài, góc hay công thức vào point.label.",
   );
 
+function normalizeBlankOptionalText(value: unknown) {
+  return value === undefined || value === null ||
+    (typeof value === "string" && value.trim().length === 0)
+    ? null
+    : value;
+}
+
+function normalizeMissingNullableValue(value: unknown) {
+  return value === undefined ? null : value;
+}
+
 export const lessonSummaryDiagramPointSchema = z
   .object({
     id: pointId,
     x: finiteCoordinate,
     y: finiteCoordinate,
-    label: safePointLabel.nullable(),
+    label: z.preprocess(normalizeBlankOptionalText, safePointLabel.nullable()),
     pointStyle: z
       .enum(["NONE", "FILLED", "OPEN"])
       .optional()
       .describe(
         "NONE hoặc bỏ trống cho đỉnh hình học thường, neo text và điểm lấy mẫu làm mượt; FILLED/OPEN cho điểm dựng đồ thị có ý nghĩa, điểm cần nhấn mạnh hoặc đầu mút đóng/mở.",
       ),
-    labelPosition: z
-      .enum([
-        "TOP",
-        "TOP_RIGHT",
-        "RIGHT",
-        "BOTTOM_RIGHT",
-        "BOTTOM",
-        "BOTTOM_LEFT",
-        "LEFT",
-        "TOP_LEFT",
-      ])
-      .nullable(),
+    labelPosition: z.preprocess(
+      normalizeMissingNullableValue,
+      z
+        .enum([
+          "TOP",
+          "TOP_RIGHT",
+          "RIGHT",
+          "BOTTOM_RIGHT",
+          "BOTTOM",
+          "BOTTOM_LEFT",
+          "LEFT",
+          "TOP_LEFT",
+        ])
+        .nullable(),
+    ),
   })
   .strict();
 
@@ -233,7 +247,7 @@ export const lessonSummaryDiagramMarkerSchema = z.discriminatedUnion("type", [
         .array(pointReference)
         .length(2)
         .describe("Hai điểm khác nhau, đều khác vertex, xác định hai cạnh của góc."),
-      label: safeLabel.nullable(),
+      label: z.preprocess(normalizeBlankOptionalText, safeLabel.nullable()),
     })
     .strict(),
 ]);
@@ -264,7 +278,24 @@ export const lessonSummaryDiagramLabelSchema = z
   })
   .strict();
 
-export const lessonSummaryDiagramSpecSchema = z
+function removeEmptyDiagramLabelEntries(value: unknown) {
+  if (!Array.isArray(value)) return value;
+  return value.filter((candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      return true;
+    }
+    const label = candidate as Record<string, unknown>;
+    if (!("text" in label)) return false;
+    return typeof label.text !== "string" || label.text.trim().length > 0;
+  });
+}
+
+/**
+ * Renderer-safety contract. This validates the SVG data shape, finite geometry,
+ * safe labels and bounded collection sizes without enforcing textbook semantic
+ * conventions. Admin review may therefore still display a safe partial diagram.
+ */
+export const lessonSummaryDiagramSpecStructuralSchema = z
   .object({
     version: z.literal(1),
     coordinateSystem: z.literal("CARTESIAN"),
@@ -298,16 +329,22 @@ export const lessonSummaryDiagramSpecSchema = z
       .array(lessonSummaryDiagramMarkerSchema)
       .max(64)
       .describe("Chỉ tạo marker thể hiện quan hệ có trong đề; không lặp marker."),
-    labels: z
-      .array(lessonSummaryDiagramLabelSchema)
-      .max(128)
-      .describe(
-        "Chỉ dùng cho nhãn cạnh/góc bổ sung; không lặp text tại cùng cặp anchorPointId/anchorPrimitiveId.",
-      ),
-    caption: safeLabel.nullable(),
+    labels: z.preprocess(
+      removeEmptyDiagramLabelEntries,
+      z
+        .array(lessonSummaryDiagramLabelSchema)
+        .max(128)
+        .describe(
+          "Chỉ dùng cho nhãn cạnh/góc bổ sung; không lặp text tại cùng cặp anchorPointId/anchorPrimitiveId. Khi admin xóa text hoặc để text rỗng, toàn bộ phần tử nhãn được coi là đã xóa.",
+        ),
+    ),
+    caption: z.preprocess(normalizeBlankOptionalText, safeLabel.nullable()),
   })
-  .strict()
-  .superRefine((spec, context) => {
+  .strict();
+
+/** Full acceptance contract used before publication and for golden fixtures. */
+export const lessonSummaryDiagramSpecSchema =
+  lessonSummaryDiagramSpecStructuralSchema.superRefine((spec, context) => {
     addDuplicateValueIssues(
       spec.points.map((point) => point.id),
       ["points"],
@@ -1259,6 +1296,16 @@ export const lessonSummaryDiagramVisualSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("DIAGRAM_SPEC"),
       spec: lessonSummaryDiagramSpecSchema,
+    })
+    .strict(),
+]);
+
+export const lessonSummaryDiagramStructuralVisualSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("NONE") }).strict(),
+  z
+    .object({
+      kind: z.literal("DIAGRAM_SPEC"),
+      spec: lessonSummaryDiagramSpecStructuralSchema,
     })
     .strict(),
 ]);

@@ -36,7 +36,7 @@ Không thuộc phạm vi giai đoạn này:
 
 - Baseline trước wave đã được commit tại `7f561b15`.
 - Prompt/schema hiện tại: `lesson-summary-prompt-v54` /
-  `lesson-summary-schema-v39`.
+  `lesson-summary-schema-v40`.
 - Control plane có 50 ô inventory thuộc đủ tám family, 50/50 ô có compiler và
   golden local đạt; 86 fixture semantic đã qua 100/100 visual test, tạo 688 ảnh
   locator-only và 32 contact sheet trên bốn thiết bị × hai theme.
@@ -673,7 +673,7 @@ matrix đã có và không khởi tạo một kế hoạch mới thay thế file
 - Baseline trước wave: commit `7f561b15`.
 - Báo cáo hiện hành:
   `anh-chup-hinh-toan-dat-chuan/coverage-report-v51.json`.
-- Prompt/schema: `lesson-summary-prompt-v54` / `lesson-summary-schema-v39`.
+- Prompt/schema: `lesson-summary-prompt-v54` / `lesson-summary-schema-v40`.
 - Compiler/local golden: `50/50` ô; semantic visual `86` fixture, `688` ảnh.
 - Gate A: 44 ví dụ lẻ, 352 ảnh, 8/8 cấu hình.
 - Gate B: 21 bài thật, 152 block, 1.216 ảnh, 8/8 cấu hình.

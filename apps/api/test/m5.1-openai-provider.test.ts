@@ -28,6 +28,7 @@ describe("OpenAiProvider", () => {
   const testConfig: AiOpenAiConfig = {
     apiKey: "test-api-key",
     requestTimeoutMs: 60_000,
+    generationRequestTimeoutMs: 600_000,
     structuredModel: "gpt-4.1-mini",
     chatModel: "gpt-4.1-mini",
     embeddingModel: "text-embedding-3-small",
@@ -208,6 +209,7 @@ describe("OpenAiProvider", () => {
           input: expect.stringContaining('<chunk id="chunk-1">'),
           max_output_tokens: 100,
         }),
+        { timeout: 600_000 },
       );
     });
 
@@ -267,6 +269,7 @@ describe("OpenAiProvider", () => {
           temperature: 0,
           text: { format: expect.any(Object) },
         }),
+        { timeout: 600_000 },
       );
     });
 
@@ -297,6 +300,7 @@ describe("OpenAiProvider", () => {
           model: "gpt-5.4",
           reasoning: { effort: "medium" },
         }),
+        { timeout: 600_000 },
       );
       expect(mockResponsesParse.mock.calls[0]?.[0]).not.toHaveProperty(
         "reasoning_effort",

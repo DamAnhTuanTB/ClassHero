@@ -659,6 +659,26 @@ Side effects:
 - Ghi audit log.
 - Giữ `ai_generation_id` hiện có để không mất provenance khi admin review/sửa
   một summary vốn được AI tạo.
+- `NEEDS_REVIEW` vẫn lưu được khi block có `reviewIssues`; issue không khóa sửa,
+  thêm, xóa hoặc sắp xếp block.
+- Khi lưu, backend kiểm lại fingerprint đúng field/hình đích. Issue đã được sửa
+  hết tự biến mất; acceptance cũ không còn hiệu lực nếu target đã thay đổi.
+- Trong `visual.spec.labels`, nhãn bị xóa field `text` hoặc có `text` chỉ gồm
+  khoảng trắng được hiểu là admin đã xóa nhãn: backend loại cả phần tử nhãn đó
+  trước khi validate và lưu. Quy tắc này không bỏ qua lỗi tọa độ, cạnh hoặc marker
+  thật còn lại trong cùng sơ đồ.
+- Các text trình bày optional khác (`point.label`, chữ của ký hiệu góc và
+  `caption`) bị xóa hoặc để trắng được chuẩn hóa thành `null`; `labelPosition`
+  bị xóa cũng được hiểu là chưa chọn vị trí. Những trường hợp này không làm hình
+  lỗi vì phần hình học vẫn dựng được.
+- `APPROVED` bị từ chối với mã `LESSON_SUMMARY_REVIEW_REQUIRED` nếu còn issue
+  chưa được sửa hoặc chấp nhận. Response `details.issues[]` trả `code`, `path`,
+  `message`, `suggestion` để admin biết cách xử lý.
+- Issue được chuẩn hóa với resolution `ACCEPT_OR_FIX | FIX_ONLY`. Hard issue như
+  `DIAGRAM_CANNOT_RENDER`/`BLOCK_CANNOT_PROCESS` luôn bị ép `accepted=false`, nên
+  payload client không thể đánh dấu chấp nhận để vượt publish guard.
+- `Xóa hình lỗi` không có endpoint riêng: frontend chỉ bỏ visual + issue trong
+  bản nháp local; request `PUT` này chỉ phát sinh khi admin bấm `Lưu nội dung`.
 
 ### `POST /admin/lessons/:lessonId/summary/generate-ai`
 
@@ -702,9 +722,12 @@ Rules:
   đa `16.000` ký tự.
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
   tiêu gần đúng và được kết hợp với `length` khi dựng user prompt.
-- `temperature` giới hạn `0..1`, `reasoningEffort` nhận `low | medium | high`,
-  `maxOutputTokens` giới hạn `8000..32000`; bỏ trống thì dùng Cài đặt AI hiện tại
-  với sàn mặc định `8000` cho Summary.
+- `temperature` giới hạn `0..1`; `reasoningEffort` nhận một trong các mức chuẩn
+  `none | minimal | low | medium | high | xhigh | max`, nhưng danh sách option
+  thực tế và validation phải lấy từ `capabilities.reasoningEffortLevels` của đúng
+  model do admin thiết lập tại màn Cài đặt AI; `maxOutputTokens` giới hạn
+  `8000..32000`. Bỏ trống thì dùng Cài đặt AI hiện tại với sàn mặc định `8000`
+  cho Summary.
 
 Response: `202 Accepted`.
 
@@ -725,14 +748,27 @@ Side effects:
 - Enqueue AI generation job.
 - Worker upsert summary với `source = AI`, `reviewStatus = NEEDS_REVIEW` và
   `aiGenerationId` để admin review trước khi student nhìn thấy.
-- Output qua được JSON Schema/Zod kỹ thuật luôn được lưu để admin sửa trực tiếp;
-  không trả panel warning kỹ thuật và không kích hoạt provider call sửa lần hai.
-  JSON hỏng, sai provider schema hoặc lỗi provider/hạ tầng vẫn làm job thất bại.
+- Worker parse bằng transport schema rồi kiểm acceptance theo từng block. Block
+  hợp lệ được giữ nguyên; block/hình chưa đạt nhưng còn render an toàn vẫn được
+  lưu kèm `reviewIssues`; chỉ phần không thể render an toàn mới thành placeholder
+  cục bộ. Summary vẫn `NEEDS_REVIEW` và các block khác vẫn hiển thị.
+- Hình còn structural-safe nhưng có lỗi semantic dùng `DIAGRAM_NEEDS_REVIEW` và
+  vẫn render; chỉ hình không tạo được spec an toàn mới dùng
+  `DIAGRAM_CANNOT_RENDER`/`FIX_ONLY`.
+- Recovery không xóa điểm, cạnh hay đường cong chỉ vì thiếu tên điểm dựng, thiếu
+  vạch chia hoặc chưa đạt một quy ước trình bày. Các phần hình học đó vẫn hiển thị
+  kèm `DIAGRAM_NEEDS_REVIEW`. Chỉ nét tham chiếu tới điểm không tồn tại bị bỏ;
+  nếu sau đó không còn nét nào có thể vẽ thì mới dùng placeholder hình lỗi.
+- Chỉ root JSON không đọc được/không xác định được ownership section-block,
+  source stale hoặc lỗi provider/hạ tầng mới làm toàn job thất bại.
+- Một thao tác tạo chỉ có một provider attempt; không tự retry, fallback hay gọi
+  AI sửa block. Admin chấp nhận/sửa issue là thao tác local và không tốn provider.
 - Contract v3 không đổi endpoint/body generation và trả
   `contentJson.type=lesson_summary_blocks`, `version=2`. Example mới chỉ lưu đề,
   lời giải, đáp án và chỉ có visual khi thật sự có `DIAGRAM_SPEC` bắt buộc
-  `toScale=true`; không có origin/sourceAssessment/candidate metadata. API/FE
-  tiếp tục đọc version 1 và dữ liệu version 2 cũ.
+  `toScale=true`; không có origin/sourceAssessment/candidate metadata. Block và
+  root có thể có `reviewIssues[]` optional. API/FE tiếp tục đọc version 1 và dữ
+  liệu version 2 cũ.
 
 ### `POST /admin/lessons/:lessonId/summary/prompt-preview`
 

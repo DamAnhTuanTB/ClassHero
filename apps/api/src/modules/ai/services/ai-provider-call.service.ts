@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { isAiReasoningEffort, type AiReasoningEffort } from "@learning-path/shared";
 import { ProviderUsageMetric, type AiGenerationType } from "@prisma/client";
 import { createHash } from "node:crypto";
 
@@ -50,6 +51,7 @@ export class AiProviderCallService {
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]!;
       const maxOutputTokens = route.maxOutputTokens ?? input.maxTokens;
+      const reasoningEffort = toAiReasoningEffort(route.reasoningEffort);
       const requestFingerprint = createHash("sha256")
         .update(`${input.systemPrompt}\n${input.userPrompt}`)
         .digest("hex")
@@ -97,6 +99,7 @@ export class AiProviderCallService {
             ...input,
             model: candidate.model,
             temperature: route.temperature ?? input.temperature,
+            reasoningEffort: reasoningEffort ?? input.reasoningEffort,
             maxTokens: maxOutputTokens,
           },
           schema,
@@ -131,6 +134,10 @@ export class AiProviderCallService {
     }
     throw lastError instanceof Error ? lastError : new Error("AI provider call failed.");
   }
+}
+
+function toAiReasoningEffort(value: string | null): AiReasoningEffort | undefined {
+  return isAiReasoningEffort(value) ? value : undefined;
 }
 
 export function isTransientProviderError(error: unknown) {

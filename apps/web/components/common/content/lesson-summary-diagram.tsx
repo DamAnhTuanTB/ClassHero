@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  lessonSummaryDiagramSpecSchema,
+  lessonSummaryDiagramSpecStructuralSchema,
   normalizeLessonSummaryDiagramSpec,
   type LessonSummaryDiagramSpec,
 } from "@learning-path/shared";
@@ -34,7 +34,7 @@ export function LessonSummaryDiagram({
   spec: unknown;
   showEditorialWarning?: boolean;
 }) {
-  const parsed = lessonSummaryDiagramSpecSchema.safeParse(spec);
+  const parsed = lessonSummaryDiagramSpecStructuralSchema.safeParse(spec);
   if (!parsed.success) {
     return (
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-3 text-sm font-semibold text-[var(--theme-warning-text)]">

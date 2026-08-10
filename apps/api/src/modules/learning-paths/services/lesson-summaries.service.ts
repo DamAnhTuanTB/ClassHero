@@ -16,7 +16,7 @@ import {
   LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
   LESSON_SUMMARY_PROMPT_VERSION,
   LESSON_SUMMARY_SCHEMA_VERSION,
-  lessonSummaryProviderOutputSchema,
+  lessonSummaryProviderTransportOutputSchema,
   type LessonSummaryJobInput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
@@ -31,6 +31,10 @@ import {
   throwLessonNotFound,
   toInputJson,
 } from "#api/modules/learning-paths/utils/lesson.helpers";
+import {
+  listUnresolvedLessonSummaryReviewIssues,
+  reconcileLessonSummaryReviewIssues,
+} from "#api/modules/learning-paths/utils/lesson-summary-review";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import { calculateProviderCost } from "#api/modules/provider-operations/utils/provider-cost-calculator";
@@ -80,7 +84,23 @@ export class LessonSummariesService {
         where: { lessonId },
         select: lessonSummarySelect,
       });
-      const contentJson = dto.contentJson as Prisma.InputJsonValue;
+      const reconciledContent = reconcileLessonSummaryReviewIssues(dto.contentJson);
+      const unresolvedIssues = listUnresolvedLessonSummaryReviewIssues(reconciledContent);
+      if (dto.reviewStatus === "APPROVED" && unresolvedIssues.length > 0) {
+        throwBadRequest(
+          "LESSON_SUMMARY_REVIEW_REQUIRED",
+          `Còn ${unresolvedIssues.length} vấn đề cần sửa hoặc chấp nhận trước khi phát hành.`,
+          {
+            issues: unresolvedIssues.slice(0, 20).map((issue) => ({
+              code: issue.code,
+              path: issue.path,
+              message: issue.message,
+              suggestion: issue.suggestion,
+            })),
+          },
+        );
+      }
+      const contentJson = reconciledContent as Prisma.InputJsonValue;
       const updated = await transaction.lessonSummary.upsert({
         where: { lessonId },
         create: {
@@ -148,6 +168,7 @@ export class LessonSummariesService {
             model: candidate.model,
           })),
           temperature: route.temperature,
+          reasoningEffort: route.reasoningEffort,
           maxOutputTokens: route.maxOutputTokens,
         },
       },
@@ -157,7 +178,9 @@ export class LessonSummariesService {
         ":",
       ),
       deduplicateActive: true,
-      maxAttempts: 3,
+      // An admin click authorizes exactly one provider request. Local recovery
+      // handles block defects; the worker must not silently spend another call.
+      maxAttempts: 1,
     });
 
     return {
@@ -229,11 +252,14 @@ export class LessonSummariesService {
         input: inputPrompt,
         text: {
           format: buildAiStructuredTextFormat(
-            lessonSummaryProviderOutputSchema,
+            lessonSummaryProviderTransportOutputSchema,
             request.outputName,
           ),
         },
         temperature: route.temperature ?? request.temperature ?? 0.2,
+        ...(route.reasoningEffort
+          ? { reasoning_effort: route.reasoningEffort }
+          : {}),
         max_output_tokens: maxOutputTokens,
       },
       context: {
@@ -320,11 +346,28 @@ export class LessonSummariesService {
       ...baseRoute,
       candidates,
       temperature: dto.temperature ?? baseRoute.temperature,
+      reasoningEffort: dto.reasoningEffort ?? baseRoute.reasoningEffort,
       maxOutputTokens: Math.max(
         dto.maxOutputTokens ?? baseRoute.maxOutputTokens ?? 0,
         LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
       ),
     };
+    if (dto.model && dto.reasoningEffort) {
+      const allowedReasoningEffortLevels = readReasoningEffortLevels(
+        candidates[0]?.capabilitiesJson,
+      );
+      if (!allowedReasoningEffortLevels.includes(dto.reasoningEffort)) {
+        throwBadRequest(
+          "AI_REASONING_EFFORT_NOT_SUPPORTED",
+          "Mức Reasoning Effort đã chọn không được cấu hình cho model này.",
+          {
+            model: dto.model,
+            reasoningEffort: dto.reasoningEffort,
+            allowedReasoningEffortLevels,
+          },
+        );
+      }
+    }
     return { baseRoute, route };
   }
 
@@ -345,6 +388,20 @@ export class LessonSummariesService {
     }
     throwBadRequest(error.code, error.message, error.details);
   }
+}
+
+function readReasoningEffortLevels(capabilities: unknown): string[] {
+  if (
+    !capabilities ||
+    typeof capabilities !== "object" ||
+    Array.isArray(capabilities)
+  ) {
+    return [];
+  }
+  const value = (capabilities as Record<string, unknown>).reasoningEffortLevels;
+  return Array.isArray(value)
+    ? value.filter((level): level is string => typeof level === "string")
+    : [];
 }
 
 function normalizeConfiguration(

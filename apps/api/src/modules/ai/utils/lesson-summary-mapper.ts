@@ -1,20 +1,27 @@
+import { createHash } from "node:crypto";
 import {
   normalizeLessonSummaryDiagramSpec,
   type LessonSummaryDiagramSpec,
 } from "@learning-path/shared";
 
 import type { RetrievedChunk } from "#api/modules/ai/types/ai-text.types";
-import { mapLessonSummaryProviderDiagramInput } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
-import type {
-  LessonSummaryMvpBlock,
-  LessonSummaryOutput,
-  LessonSummaryProviderOutput,
-  LessonSummaryWarningDetail,
+import {
+  mapLessonSummaryProviderDiagramInput,
+  type LessonSummaryProviderDiagramInput,
+} from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
+import {
+  resolveLessonSummaryReviewIssueResolution,
+  type LessonSummaryMvpBlock,
+  type LessonSummaryOutput,
+  type LessonSummaryProviderOutput,
+  type LessonSummaryWarningDetail,
 } from "#api/modules/ai/types/lesson-summary.types";
 import {
   buildLessonSummarySourceTopics,
   isLessonSummaryRealWorldCandidate,
 } from "#api/modules/ai/utils/lesson-summary-source-candidates";
+import type { LessonSummaryReviewIssueDraft } from "#api/modules/ai/utils/lesson-summary-recovery";
+import { simplifyLessonSummaryReviewCopy } from "#api/modules/ai/utils/lesson-summary-review-copy";
 
 const EXERCISE_HEADING_PATTERN =
   /^(?:ví\s*dụ|luyện\s*tập|vận\s*dụng|bài\s*tập|ứng\s*dụng\s*thực\s*tế)(?:\s|$|[:：.-])/iu;
@@ -44,11 +51,113 @@ type MapLessonSummaryProviderOutputInput = {
   lessonId: string;
   output: LessonSummaryProviderOutput;
   contextChunks: RetrievedChunk[];
+  reviewIssuesByPath?: Map<string, LessonSummaryReviewIssueDraft[]>;
+  rootReviewIssues?: LessonSummaryReviewIssueDraft[];
 };
 
 export function mapLessonSummaryProviderOutput(
   input: MapLessonSummaryProviderOutputInput,
 ): LessonSummaryOutput {
+  const runtimeReviewIssuesByPath = new Map(
+    [...(input.reviewIssuesByPath?.entries() ?? [])].map(([path, issues]) => [
+      path,
+      [...issues],
+    ]),
+  );
+  const addRuntimeReviewIssue = (
+    providerPath: string,
+    issue: LessonSummaryReviewIssueDraft,
+  ) => {
+    const current = runtimeReviewIssuesByPath.get(providerPath) ?? [];
+    if (
+      current.some(
+        (candidate) => candidate.code === issue.code && candidate.path === issue.path,
+      )
+    ) {
+      return;
+    }
+    current.push(issue);
+    runtimeReviewIssuesByPath.set(providerPath, current);
+  };
+  const addBlockProcessingIssue = (providerPath: string, error: unknown) => {
+    addRuntimeReviewIssue(providerPath, {
+      code: "BLOCK_CANNOT_PROCESS",
+      path: providerPath,
+      message: "Khối này có dữ liệu chưa thể xử lý đầy đủ.",
+      suggestion:
+        "Kiểm tra các trường của khối theo chi tiết kỹ thuật rồi sửa và lưu lại; các khối khác vẫn được giữ nguyên.",
+      technicalDetails: error instanceof Error ? error.message : String(error),
+    });
+  };
+  const safelyValidateBlock = (providerPath: string, validate: () => void) => {
+    try {
+      validate();
+    } catch (error) {
+      addBlockProcessingIssue(providerPath, error);
+    }
+  };
+  const diagramCache = new Map<string, LessonSummaryDiagramSpec | null>();
+  const resolveDiagram = (
+    diagram: LessonSummaryProviderDiagramInput | null,
+    providerPath: string,
+  ) => {
+    if (!diagram) return null;
+    if (diagramCache.has(providerPath)) return diagramCache.get(providerPath) ?? null;
+    try {
+      const spec = normalizeLessonSummaryDiagramSpec(
+        mapLessonSummaryProviderDiagramInput(diagram),
+      );
+      diagramCache.set(providerPath, spec);
+      return spec;
+    } catch (error) {
+      diagramCache.set(providerPath, null);
+      addRuntimeReviewIssue(providerPath, {
+        code: "DIAGRAM_CANNOT_RENDER",
+        path: `${providerPath}.diagramSpec`,
+        message: "Hình vẽ thiếu dữ liệu cần thiết nên chưa thể hiển thị an toàn.",
+        suggestion:
+          "Bổ sung các điểm, cạnh hoặc nhãn còn thiếu trong dữ liệu hình vẽ rồi lưu lại; nội dung chữ và các khối khác vẫn được giữ.",
+        technicalDetails: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  };
+  const attachReviewIssues = <T extends LessonSummaryMvpBlock>(
+    block: T,
+    providerPath: string,
+  ): T => {
+    const drafts = runtimeReviewIssuesByPath.get(providerPath) ?? [];
+    if (drafts.length === 0) return block;
+    return {
+      ...block,
+      reviewIssues: drafts.map((issue, issueIndex) => {
+        const fingerprint = fingerprintIssueTarget(block, issue);
+        const copy = simplifyLessonSummaryReviewCopy(issue);
+        return {
+          ...issue,
+          ...copy,
+          id: `${issue.code}-${issueIndex + 1}-${fingerprint.slice(0, 12)}`,
+          fingerprint,
+          resolution: resolveLessonSummaryReviewIssueResolution(issue.code),
+          accepted: false,
+        };
+      }),
+    };
+  };
+  const safelyMapBlock = <T extends LessonSummaryMvpBlock>(
+    providerPath: string,
+    mapBlock: () => T,
+    fallbackBlock: () => T,
+  ) => {
+    let block: T;
+    try {
+      block = mapBlock();
+    } catch (error) {
+      addBlockProcessingIssue(providerPath, error);
+      block = fallbackBlock();
+    }
+    return attachReviewIssues(block, providerPath);
+  };
   const warningDetails: LessonSummaryWarningDetail[] = [];
   const addWarning = (
     code: string,
@@ -70,7 +179,7 @@ export function mapLessonSummaryProviderOutput(
     addWarning(
       "SOURCE_TOPIC_NOT_EXTRACTED",
       "theorySections",
-      "Context không tạo được source topic chắc chắn; admin cần đối chiếu các đề mục lớn với tài liệu nguồn.",
+      "Chưa xác định chắc chắn được các chủ đề từ tài liệu nguồn; quản trị viên cần đối chiếu lại các đề mục lớn.",
     );
   }
 
@@ -81,7 +190,7 @@ export function mapLessonSummaryProviderOutput(
       addWarning(
         "SOURCE_TOPIC_UNKNOWN",
         `${sectionPath}.sourceTopicId`,
-        "sourceTopicId không có trong context.",
+        "Chủ đề nguồn của đề mục này không có trong tài liệu đã chọn.",
       );
     } else {
       const duplicatePath = usedTopics.get(section.sourceTopicId);
@@ -89,7 +198,7 @@ export function mapLessonSummaryProviderOutput(
         addWarning(
           "SOURCE_TOPIC_DUPLICATED",
           `${sectionPath}.sourceTopicId`,
-          `sourceTopicId trùng với ${duplicatePath}.`,
+          "Chủ đề nguồn của đề mục này đang bị dùng lặp ở một đề mục khác.",
         );
       } else {
         usedTopics.set(section.sourceTopicId, sectionPath);
@@ -105,42 +214,49 @@ export function mapLessonSummaryProviderOutput(
       addWarning(
         "THEORY_SECTION_USES_EXERCISE_HEADING",
         `${sectionPath}.displayHeading`,
-        "Section lý thuyết đang dùng heading bài tập.",
+        "Đề mục lý thuyết đang dùng tiêu đề của phần bài tập.",
       );
     }
     section.units.forEach((unit, unitIndex) => {
       const unitPath = `${sectionPath}.units.${unitIndex}`;
-      validateSourceIds(
-        `${unitPath}.theory.sourceChunkIds`,
-        unit.theory.sourceChunkIds,
-        chunksById,
-        addWarning,
-      );
-      validateTheoryContent(unit.theory, `${unitPath}.theory`, addWarning);
-      if (unit.theory.diagramSpec) {
-        validateDiagramReferences(
-          mapLessonSummaryProviderDiagramInput(unit.theory.diagramSpec),
-          `${unitPath}.theory.diagramSpec`,
-          addWarning,
-        );
-      }
-      validateExample(unit.illustration, `${unitPath}.illustration`, addWarning);
-
-      unit.notes.forEach((note, noteIndex) => {
-        const notePath = `${unitPath}.notes.${noteIndex}`;
+      const theoryPath = `${unitPath}.theory`;
+      const illustrationPath = `${unitPath}.illustration`;
+      safelyValidateBlock(theoryPath, () => {
         validateSourceIds(
-          `${notePath}.sourceChunkIds`,
-          note.sourceChunkIds,
+          `${theoryPath}.sourceChunkIds`,
+          unit.theory.sourceChunkIds,
           chunksById,
           addWarning,
         );
-        if (!NOTE_EXAMPLE_PATTERN.test(note.content)) {
-          addWarning(
-            "NOTE_MISSING_INLINE_EXAMPLE",
-            `${notePath}.content`,
-            "note.content phải có một ví dụ ngắn.",
-          );
+        validateTheoryContent(unit.theory, theoryPath, addWarning);
+        if (unit.theory.diagramSpec) {
+          const diagram = resolveDiagram(unit.theory.diagramSpec, theoryPath);
+          if (diagram) {
+            validateDiagramReferences(diagram, `${theoryPath}.diagramSpec`, addWarning);
+          }
         }
+      });
+      safelyValidateBlock(illustrationPath, () =>
+        validateExample(unit.illustration, illustrationPath, addWarning, resolveDiagram),
+      );
+
+      unit.notes.forEach((note, noteIndex) => {
+        const notePath = `${unitPath}.notes.${noteIndex}`;
+        safelyValidateBlock(notePath, () => {
+          validateSourceIds(
+            `${notePath}.sourceChunkIds`,
+            note.sourceChunkIds,
+            chunksById,
+            addWarning,
+          );
+          if (!NOTE_EXAMPLE_PATTERN.test(note.content)) {
+            addWarning(
+              "NOTE_MISSING_INLINE_EXAMPLE",
+              `${notePath}.content`,
+              "Nội dung ghi chú phải có một ví dụ ngắn.",
+            );
+          }
+        });
       });
     });
   });
@@ -148,24 +264,30 @@ export function mapLessonSummaryProviderOutput(
   sourceTopics
     .map((topic) => topic.id)
     .filter((topicId) => !usedTopics.has(topicId))
-    .forEach((topicId) => {
+    .forEach(() => {
       addWarning(
         "SOURCE_TOPIC_OMITTED",
         "theorySections",
-        `Output bỏ sót sourceTopicId ${topicId}.`,
+        "Nội dung tạo ra đang bỏ sót một chủ đề có trong tài liệu nguồn.",
       );
     });
 
   const application = input.output.applicationExercises;
-  validateExample(
-    application.standardExercise,
-    "applicationExercises.standardExercise",
-    addWarning,
+  safelyValidateBlock("applicationExercises.standardExercise", () =>
+    validateExample(
+      application.standardExercise,
+      "applicationExercises.standardExercise",
+      addWarning,
+      resolveDiagram,
+    ),
   );
-  validateExample(
-    application.realWorldExercise,
-    "applicationExercises.realWorldExercise",
-    addWarning,
+  safelyValidateBlock("applicationExercises.realWorldExercise", () =>
+    validateExample(
+      application.realWorldExercise,
+      "applicationExercises.realWorldExercise",
+      addWarning,
+      resolveDiagram,
+    ),
   );
 
   const mappedTheorySections = input.output.theorySections.map(
@@ -185,22 +307,46 @@ export function mapLessonSummaryProviderOutput(
           sourceHeading,
           displayHeading,
           sourceChunkIds: sectionSourceChunkIds,
-          blocks: section.units.flatMap((unit) => {
-            const theory = normalizeTheoryBlock(
-              unit.theory,
-              chunksById,
-              sectionSourceChunkIds[0],
+          blocks: section.units.flatMap((unit, unitIndex) => {
+            const unitPath = `theorySections.${sectionIndex}.units.${unitIndex}`;
+            const theoryPath = `${unitPath}.theory`;
+            const illustrationPath = `${unitPath}.illustration`;
+            const theory = safelyMapBlock(
+              theoryPath,
+              () =>
+                normalizeTheoryBlock(
+                  unit.theory,
+                  chunksById,
+                  sectionSourceChunkIds[0],
+                  resolveDiagram(unit.theory.diagramSpec, theoryPath),
+                ),
+              () => fallbackTheoryBlock(unit.theory, sectionSourceChunkIds),
             );
-            const illustration = toPersistedExample(unit.illustration);
-            const notes = unit.notes.map((note) => ({
-              ...note,
-              content: normalizeGeneratedText(note.content),
-              sourceChunkIds: safeSourceIds(
-                note.sourceChunkIds,
-                chunksById,
-                sectionSourceChunkIds[0],
-              ),
-            }));
+            const illustration = safelyMapBlock(
+              illustrationPath,
+              () =>
+                toPersistedExample(
+                  unit.illustration,
+                  resolveDiagram(unit.illustration.diagramSpec, illustrationPath),
+                ),
+              () => fallbackExampleBlock(),
+            );
+            const notes = unit.notes.map((note, noteIndex) => {
+              const notePath = `${unitPath}.notes.${noteIndex}`;
+              return safelyMapBlock(
+                notePath,
+                () => ({
+                  ...note,
+                  content: normalizeGeneratedText(note.content),
+                  sourceChunkIds: safeSourceIds(
+                    note.sourceChunkIds,
+                    chunksById,
+                    sectionSourceChunkIds[0],
+                  ),
+                }),
+                () => fallbackNoteBlock(sectionSourceChunkIds),
+              );
+            });
             return [theory, illustration, ...notes];
           }),
         },
@@ -230,8 +376,30 @@ export function mapLessonSummaryProviderOutput(
     chunksById,
     fallbackSourceChunkId,
   );
-  const persistedStandard = toPersistedExample(application.standardExercise);
-  const persistedRealWorld = toPersistedExample(application.realWorldExercise);
+  const persistedStandard = safelyMapBlock(
+    "applicationExercises.standardExercise",
+    () =>
+      toPersistedExample(
+        application.standardExercise,
+        resolveDiagram(
+          application.standardExercise.diagramSpec,
+          "applicationExercises.standardExercise",
+        ),
+      ),
+    () => fallbackExampleBlock(),
+  );
+  const persistedRealWorld = safelyMapBlock(
+    "applicationExercises.realWorldExercise",
+    () =>
+      toPersistedExample(
+        application.realWorldExercise,
+        resolveDiagram(
+          application.realWorldExercise.diagramSpec,
+          "applicationExercises.realWorldExercise",
+        ),
+      ),
+    () => fallbackExampleBlock(),
+  );
   if (
     persistedRealWorld.type === "example" &&
     !isLessonSummaryRealWorldCandidate(persistedRealWorld.problem)
@@ -253,6 +421,10 @@ export function mapLessonSummaryProviderOutput(
     );
   }
 
+  const rootReviewTarget = {
+    title: input.output.title,
+    objectives: input.output.objectives,
+  };
   return {
     lessonId: input.lessonId,
     title: input.output.title,
@@ -267,7 +439,43 @@ export function mapLessonSummaryProviderOutput(
         blocks: [persistedStandard, persistedRealWorld],
       },
     ],
+    ...(input.rootReviewIssues?.length
+      ? {
+          reviewIssues: input.rootReviewIssues.map((issue, issueIndex) => {
+            const fingerprint = fingerprintIssueTarget(rootReviewTarget, issue);
+            const copy = simplifyLessonSummaryReviewCopy(issue);
+            return {
+              ...issue,
+              ...copy,
+              id: `${issue.code}-${issueIndex + 1}-${fingerprint.slice(0, 12)}`,
+              fingerprint,
+              resolution: resolveLessonSummaryReviewIssueResolution(issue.code),
+              accepted: false,
+            };
+          }),
+        }
+      : {}),
   };
+}
+
+function fingerprintBlock(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function fingerprintIssueTarget(
+  value: Record<string, unknown>,
+  issue: LessonSummaryReviewIssueDraft,
+) {
+  if (issue.code.startsWith("DIAGRAM_")) {
+    const visual = value.visual;
+    return fingerprintBlock(
+      visual && typeof visual === "object" && "spec" in visual
+        ? (visual as { spec: unknown }).spec
+        : null,
+    );
+  }
+  const field = issue.path.split(".").at(-1);
+  return fingerprintBlock(field && field in value ? value[field] : value);
 }
 
 type AddWarning = (
@@ -290,7 +498,7 @@ function validateTheoryContent(
     addWarning(
       "THEORY_CONTAINS_EXAMPLE",
       path,
-      "Khối lý thuyết đang trộn ví dụ/bài tập/ghi chú vào field nội dung.",
+      "Khối lý thuyết đang trộn ví dụ, bài tập hoặc ghi chú vào phần nội dung.",
     );
   }
   values.forEach((value) => {
@@ -302,18 +510,26 @@ function validateTheoryContent(
       addWarning(
         "THEORY_PARAGRAPH_TOO_DENSE",
         path,
-        "Nội dung dồn nhiều ý vào một paragraph dài; phải xuống dòng hoặc dùng bullet theo từng ý.",
+        "Nội dung dồn nhiều ý vào một đoạn văn dài; cần xuống dòng hoặc dùng gạch đầu dòng cho từng ý.",
       );
     }
   });
 }
 
-function validateExample(example: ProviderExample, path: string, addWarning: AddWarning) {
+function validateExample(
+  example: ProviderExample,
+  path: string,
+  addWarning: AddWarning,
+  resolveDiagram: (
+    diagram: LessonSummaryProviderDiagramInput | null,
+    providerPath: string,
+  ) => LessonSummaryDiagramSpec | null,
+) {
   if (SOURCE_FIGURE_REFERENCE_PATTERN.test(example.problem)) {
     addWarning(
       "EXAMPLE_REFERENCES_SOURCE_FIGURE",
       `${path}.problem`,
-      "Đề bài còn tham chiếu hình của tài liệu nguồn; cần tự đủ dữ kiện hoặc có diagramSpec chính xác.",
+      "Đề bài còn tham chiếu hình của tài liệu nguồn; cần ghi đủ dữ kiện hoặc có hình minh họa chính xác.",
     );
   }
   if (
@@ -336,7 +552,7 @@ function validateExample(example: ProviderExample, path: string, addWarning: Add
     addWarning(
       "MATH_CONTROL_CHARACTER_NORMALIZED",
       path,
-      "Nội dung có ký tự điều khiển do LaTeX escape sai; backend đã chuẩn hóa và admin cần kiểm tra công thức.",
+      "Một công thức toán có ký tự bị mã hóa sai; hệ thống đã tự chuẩn hóa và quản trị viên cần kiểm tra lại công thức.",
       "INFO",
     );
   }
@@ -353,11 +569,10 @@ function validateExample(example: ProviderExample, path: string, addWarning: Add
     );
   }
   if (example.diagramSpec) {
-    validateDiagramReferences(
-      mapLessonSummaryProviderDiagramInput(example.diagramSpec),
-      `${path}.diagramSpec`,
-      addWarning,
-    );
+    const diagram = resolveDiagram(example.diagramSpec, path);
+    if (diagram) {
+      validateDiagramReferences(diagram, `${path}.diagramSpec`, addWarning);
+    }
   }
 }
 
@@ -398,7 +613,7 @@ function validateDiagramReferences(
   const pointsById = new Map(spec.points.map((point) => [point.id, point] as const));
   spec.points.forEach((point) => {
     if (pointIds.has(point.id)) {
-      addWarning("DIAGRAM_DUPLICATE_POINT_ID", path, `Point ID ${point.id} bị trùng.`);
+      addWarning("DIAGRAM_DUPLICATE_POINT_ID", path, `Tên điểm ${point.id} bị trùng.`);
     }
     pointIds.add(point.id);
     const { minX, minY, width, height } = spec.viewBox;
@@ -411,7 +626,7 @@ function validateDiagramReferences(
       addWarning(
         "DIAGRAM_POINT_OUTSIDE_VIEWBOX",
         path,
-        `Point ${point.id} nằm ngoài viewBox nên sơ đồ không thể hiển thị chính xác.`,
+        `Điểm ${point.id} nằm ngoài khung hiển thị nên hình không thể hiện chính xác.`,
       );
     }
   });
@@ -421,7 +636,7 @@ function validateDiagramReferences(
       addWarning(
         "DIAGRAM_UNKNOWN_POINT",
         path,
-        `Diagram tham chiếu point ${id} không tồn tại.`,
+        `Hình vẽ đang tham chiếu điểm ${id} chưa được khai báo.`,
       );
     }
   };
@@ -430,7 +645,7 @@ function validateDiagramReferences(
       addWarning(
         "DIAGRAM_DUPLICATE_PRIMITIVE_ID",
         path,
-        `Primitive ID ${primitive.id} bị trùng.`,
+        `Tên nét vẽ ${primitive.id} bị trùng.`,
       );
     }
     primitiveIds.add(primitive.id);
@@ -438,7 +653,7 @@ function validateDiagramReferences(
       addWarning(
         "DIAGRAM_SEGMENT_USES_POLYLINE",
         path,
-        `Primitive ${primitive.id} chỉ có hai điểm và sẽ được chuẩn hóa thành SEGMENT.`,
+        `Nét vẽ ${primitive.id} chỉ có hai điểm và sẽ được chuẩn hóa thành đoạn thẳng.`,
         "INFO",
       );
     }
@@ -476,7 +691,7 @@ function validateDiagramReferences(
           addWarning(
             "DIAGRAM_UNKNOWN_SEGMENT",
             path,
-            `Marker tham chiếu primitive ${id} không tồn tại.`,
+            `Ký hiệu hình học đang tham chiếu nét ${id} chưa được khai báo.`,
           );
           return;
         }
@@ -488,7 +703,7 @@ function validateDiagramReferences(
           addWarning(
             "DIAGRAM_MARKER_REQUIRES_SEGMENT",
             path,
-            `Marker ${marker.type} tham chiếu ${id} không phải đoạn/đường/tia.`,
+            `Ký hiệu hình học đang tham chiếu ${id}, nhưng đối tượng này không phải đoạn thẳng, đường thẳng hoặc tia.`,
           );
           return;
         }
@@ -507,7 +722,7 @@ function validateDiagramReferences(
           addWarning(
             "DIAGRAM_EQUAL_LENGTH_NOT_TO_SCALE",
             path,
-            `Marker bằng nhau tham chiếu các đoạn không cùng độ dài theo tọa độ: ${vectors.map((value) => value.id).join(", ")}.`,
+            `Ký hiệu bằng nhau đang gắn vào các đoạn có độ dài theo tọa độ chưa khớp: ${vectors.map((value) => value.id).join(", ")}.`,
           );
         }
       }
@@ -526,7 +741,7 @@ function validateDiagramReferences(
           addWarning(
             "DIAGRAM_PARALLEL_NOT_TO_SCALE",
             path,
-            "Marker song song không khớp với hướng của các đoạn theo tọa độ.",
+            "Ký hiệu song song không khớp với hướng của các đoạn theo tọa độ.",
           );
         }
       }
@@ -553,7 +768,7 @@ function validateDiagramReferences(
           addWarning(
             "DIAGRAM_RIGHT_ANGLE_NOT_TO_SCALE",
             path,
-            `Marker vuông tại ${marker.vertex} không khớp góc 90° theo tọa độ.`,
+            `Ký hiệu góc vuông tại ${marker.vertex} không khớp với góc 90° theo tọa độ.`,
           );
         }
       }
@@ -573,7 +788,7 @@ function validateSourceIds(
     addWarning(
       "SOURCE_CHUNK_OUTSIDE_CONTEXT",
       path,
-      `Chứa ID ngoài context: ${invalidIds.join(", ")}.`,
+      "Khối đang tham chiếu một phần nội dung không thuộc tài liệu đã chọn.",
     );
   }
 }
@@ -596,19 +811,18 @@ function normalizeTheoryBlock(
   block: LessonSummaryProviderOutput["theorySections"][number]["units"][number]["theory"],
   chunksById: Map<string, RetrievedChunk>,
   fallbackSourceChunkId?: string,
+  diagramSpec?: LessonSummaryDiagramSpec | null,
 ): LessonSummaryMvpBlock {
   const sourceChunkIds = safeSourceIds(
     block.sourceChunkIds,
     chunksById,
     fallbackSourceChunkId,
   );
-  const visual = block.diagramSpec
+  const visual = diagramSpec
     ? {
         visual: {
           kind: "DIAGRAM_SPEC" as const,
-          spec: normalizeLessonSummaryDiagramSpec(
-            mapLessonSummaryProviderDiagramInput(block.diagramSpec),
-          ),
+          spec: diagramSpec,
         },
       }
     : {};
@@ -640,7 +854,10 @@ function normalizeTheoryBlock(
   }
 }
 
-function toPersistedExample(example: ProviderExample): LessonSummaryMvpBlock {
+function toPersistedExample(
+  example: ProviderExample,
+  diagramSpec?: LessonSummaryDiagramSpec | null,
+): LessonSummaryMvpBlock {
   const problem = stripSourceImages(example.problem);
   return {
     type: "example",
@@ -650,16 +867,55 @@ function toPersistedExample(example: ProviderExample): LessonSummaryMvpBlock {
         : "[Cần admin bổ sung đề bài tự đủ dữ kiện, không phụ thuộc hình nguồn]",
     solution: normalizeSolution(example.solution),
     answer: normalizeGeneratedText(example.answer),
-    ...(example.diagramSpec
+    ...(diagramSpec
       ? {
           visual: {
             kind: "DIAGRAM_SPEC" as const,
-            spec: normalizeLessonSummaryDiagramSpec(
-              mapLessonSummaryProviderDiagramInput(example.diagramSpec),
-            ),
+            spec: diagramSpec,
           },
         }
       : {}),
+  };
+}
+
+function fallbackTheoryBlock(
+  block: LessonSummaryProviderOutput["theorySections"][number]["units"][number]["theory"],
+  sourceChunkIds: string[],
+): LessonSummaryMvpBlock {
+  const title = "[Cần bổ sung tiêu đề]";
+  if (block.type === "procedure") {
+    return {
+      type: "procedure",
+      title,
+      purpose: null,
+      steps: [{ order: 1, content: "[Cần bổ sung nội dung bước]" }],
+      sourceChunkIds,
+    };
+  }
+  return {
+    type: block.type,
+    title,
+    content: "[Cần bổ sung nội dung]",
+    sourceChunkIds,
+  };
+}
+
+function fallbackExampleBlock(): Extract<LessonSummaryMvpBlock, { type: "example" }> {
+  return {
+    type: "example",
+    problem: "[Cần bổ sung đề bài]",
+    solution: null,
+    answer: "[Cần bổ sung đáp án]",
+  };
+}
+
+function fallbackNoteBlock(
+  sourceChunkIds: string[],
+): Extract<LessonSummaryMvpBlock, { type: "note" }> {
+  return {
+    type: "note",
+    content: "Ví dụ: [Cần bổ sung ghi chú]",
+    sourceChunkIds,
   };
 }
 

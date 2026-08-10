@@ -19,12 +19,13 @@ import {
   LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
   lessonSummaryJobInputSchema,
   lessonSummaryOutputSchema,
-  lessonSummaryProviderOutputSchema,
+  lessonSummaryProviderTransportOutputSchema,
   type LessonSummaryOutput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validation";
 import { mapLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-summary-mapper";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
+import { recoverLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-summary-recovery";
 
 @Injectable()
 export class LessonSummaryGenerationService {
@@ -92,17 +93,24 @@ export class LessonSummaryGenerationService {
             routeSnapshot: normalizeSummaryRouteSnapshot(context.providerRouteSnapshot),
           },
           structuredInput,
-          lessonSummaryProviderOutputSchema,
+          lessonSummaryProviderTransportOutputSchema,
         )
       : await this.aiService.generateStructured(
           structuredInput,
-          lessonSummaryProviderOutputSchema,
+          lessonSummaryProviderTransportOutputSchema,
         );
+
+    const recovery = recoverLessonSummaryProviderOutput({
+      output: providerOutput.data,
+      contextChunks: sourceContext.chunks,
+    });
 
     const data = mapLessonSummaryProviderOutput({
       lessonId: context.lessonId,
-      output: providerOutput.data,
+      output: recovery.output,
       contextChunks: sourceContext.chunks,
+      reviewIssuesByPath: recovery.reviewIssuesByPath,
+      rootReviewIssues: recovery.rootReviewIssues,
     });
     return { action: "SUMMARY", output: { ...providerOutput, data } };
   }
@@ -213,8 +221,11 @@ function normalizeSummaryRouteSnapshot(
   route: AiGenerationExecutionContext["providerRouteSnapshot"],
 ) {
   if (!route) return undefined;
+  const selectedCandidate =
+    route.candidates.find((candidate) => candidate.available) ?? route.candidates[0];
   return {
     ...route,
+    candidates: selectedCandidate ? [selectedCandidate] : [],
     maxOutputTokens: Math.max(
       route.maxOutputTokens ?? 0,
       LESSON_SUMMARY_MIN_OUTPUT_TOKENS,

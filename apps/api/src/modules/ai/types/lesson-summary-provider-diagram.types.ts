@@ -2,10 +2,14 @@ import {
   lessonSummaryDiagramLabelSchema,
   lessonSummaryDiagramPointSchema,
   lessonSummaryDiagramSpecSchema,
+  lessonSummaryDiagramSpecStructuralSchema,
 } from "@learning-path/shared";
 import { z } from "zod";
 
-import { lessonSummaryDiagramIntentSchema } from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
+import {
+  lessonSummaryDiagramIntentSchema,
+  lessonSummaryDiagramIntentTransportSchema,
+} from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
 import { compileLessonSummaryDiagramIntent } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
 
 const safeId = z
@@ -25,8 +29,38 @@ const positiveMeasure = z.number().finite().positive().max(10_000);
 const lineStyleSchema = z.enum(["SOLID", "DASHED", "DOTTED"]);
 const fillStyleSchema = z.enum(["NONE", "SOFT_BLUE", "SOFT_AMBER", "SOFT_GREEN"]);
 const GEOMETRY_RELATION_TOLERANCE = 0.02;
+const providerOptionalPointLabelSchema = z.union([
+  z.literal(""),
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(8)
+    .regex(/^(?:[A-Z](?:['′″]|[0-9₀-₉]){0,3}|\$[A-Z](?:['′″]|[0-9₀-₉]){0,3}\$)$/u),
+]);
+const providerOptionalDiagramLabelTextSchema = z.union([
+  z.literal(""),
+  lessonSummaryDiagramLabelSchema.shape.text,
+]);
+const providerOptionalSafeTextSchema = z.union([
+  z.literal(""),
+  z.string().trim().min(1).max(160),
+]);
 const providerDiagramPointSchema = lessonSummaryDiagramPointSchema
   .extend({
+    label: providerOptionalPointLabelSchema.nullable(),
+    labelPosition: z
+      .enum([
+        "TOP",
+        "TOP_RIGHT",
+        "RIGHT",
+        "BOTTOM_RIGHT",
+        "BOTTOM",
+        "BOTTOM_LEFT",
+        "LEFT",
+        "TOP_LEFT",
+      ])
+      .nullable(),
     pointStyle: z
       .enum(["NONE", "FILLED", "OPEN"])
       .describe(
@@ -36,6 +70,7 @@ const providerDiagramPointSchema = lessonSummaryDiagramPointSchema
   .strict();
 const providerDiagramLabelSchema = lessonSummaryDiagramLabelSchema
   .extend({
+    text: providerOptionalDiagramLabelTextSchema,
     anchorPrimitiveId: primitiveId
       .nullable()
       .describe(
@@ -61,7 +96,7 @@ const pointListPrimitiveSchema = z
   })
   .strict();
 
-const providerDiagramSpecInputSchema = z
+export const lessonSummaryProviderDiagramSpecTransportSchema = z
   .object({
     version: z.literal(1),
     coordinateSystem: z.literal("CARTESIAN"),
@@ -227,7 +262,7 @@ const providerDiagramSpecInputSchema = z
               .object({
                 vertex: pointReference,
                 armPointIds: z.array(pointReference).length(2),
-                label: z.string().trim().min(1).max(160).nullable(),
+                label: providerOptionalSafeTextSchema.nullable(),
               })
               .strict(),
           )
@@ -235,18 +270,19 @@ const providerDiagramSpecInputSchema = z
       })
       .strict(),
     labels: z.array(providerDiagramLabelSchema).max(32),
-    caption: z.string().trim().min(1).max(160).nullable(),
+    caption: providerOptionalSafeTextSchema.nullable(),
   })
   .strict();
 
 type LessonSummaryProviderDiagramSpecInput = z.infer<
-  typeof providerDiagramSpecInputSchema
+  typeof lessonSummaryProviderDiagramSpecTransportSchema
 >;
 
 export const lessonSummaryProviderDiagramSpecSchema =
-  providerDiagramSpecInputSchema.superRefine((spec, context) => {
+  lessonSummaryProviderDiagramSpecTransportSchema.superRefine((spec, context) => {
+    let mapped;
     try {
-      mapLessonSummaryProviderDiagramSpec(spec);
+      mapped = mapLessonSummaryProviderDiagramSpec(spec);
     } catch (error) {
       if (error instanceof z.ZodError) {
         error.issues.forEach((issue) => {
@@ -265,6 +301,17 @@ export const lessonSummaryProviderDiagramSpecSchema =
       return;
     }
 
+    const semanticResult = lessonSummaryDiagramSpecSchema.safeParse(mapped);
+    if (!semanticResult.success) {
+      semanticResult.error.issues.forEach((issue) => {
+        context.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        });
+      });
+    }
+
     addProviderGeometryRelationIssues(spec, context);
   });
 
@@ -277,6 +324,13 @@ const providerDiagramIntentEnvelopeSchema = z
   })
   .strict();
 
+const providerDiagramIntentTransportEnvelopeSchema = z
+  .object({
+    kind: z.literal("INTENT"),
+    intent: lessonSummaryDiagramIntentTransportSchema,
+  })
+  .strict();
+
 const providerRawDiagramEnvelopeSchema = z
   .object({
     kind: z.literal("RAW_SPEC"),
@@ -285,6 +339,19 @@ const providerRawDiagramEnvelopeSchema = z
     ),
   })
   .strict();
+
+const providerRawDiagramTransportEnvelopeSchema = z
+  .object({
+    kind: z.literal("RAW_SPEC"),
+    spec: lessonSummaryProviderDiagramSpecTransportSchema,
+  })
+  .strict();
+
+export const lessonSummaryProviderDiagramTransportSchema = z.union([
+  providerDiagramIntentTransportEnvelopeSchema,
+  providerRawDiagramTransportEnvelopeSchema,
+  lessonSummaryProviderDiagramSpecTransportSchema,
+]);
 
 /**
  * Provider-facing diagram input. New generations should emit the semantic INTENT
@@ -333,9 +400,8 @@ function addProviderGeometryRelationIssues(
     const normalizedDot =
       denominator === 0
         ? Number.POSITIVE_INFINITY
-        : Math.abs(
-            firstVector.x * secondVector.x + firstVector.y * secondVector.y,
-          ) / denominator;
+        : Math.abs(firstVector.x * secondVector.x + firstVector.y * secondVector.y) /
+          denominator;
     if (normalizedDot <= GEOMETRY_RELATION_TOLERANCE) return;
     context.addIssue({
       code: "custom",
@@ -350,10 +416,7 @@ function addProviderGeometryRelationIssues(
     const lengths = vectors.map((vector) => vector!.length);
     const largest = Math.max(...lengths);
     const smallest = Math.min(...lengths);
-    if (
-      largest > 0 &&
-      (largest - smallest) / largest <= GEOMETRY_RELATION_TOLERANCE
-    ) {
+    if (largest > 0 && (largest - smallest) / largest <= GEOMETRY_RELATION_TOLERANCE) {
       return;
     }
     context.addIssue({
@@ -397,7 +460,7 @@ export function mapLessonSummaryProviderDiagramSpec(
   spec: LessonSummaryProviderDiagramSpecInput,
 ) {
   const repairedSpec = repairProviderNumberLineTicks(spec);
-  return lessonSummaryDiagramSpecSchema.parse({
+  return lessonSummaryDiagramSpecStructuralSchema.parse({
     version: repairedSpec.version,
     coordinateSystem: repairedSpec.coordinateSystem,
     viewBox: repairedSpec.viewBox,
@@ -608,6 +671,10 @@ function greatestCommonDivisor(left: number, right: number): number {
 
 export type LessonSummaryProviderDiagramSpec = z.infer<
   typeof lessonSummaryProviderDiagramSpecSchema
+>;
+
+export type LessonSummaryProviderDiagramTransport = z.infer<
+  typeof lessonSummaryProviderDiagramTransportSchema
 >;
 
 export type LessonSummaryProviderDiagramInput = z.infer<

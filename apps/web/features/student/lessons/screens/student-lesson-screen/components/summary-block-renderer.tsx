@@ -25,12 +25,48 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
+type ReviewIssueData = {
+  id: string;
+  code: string;
+  path: string;
+  message: string;
+  suggestion: string;
+  technicalDetails?: string | null;
+  accepted?: boolean;
+  resolution?: "ACCEPT_OR_FIX" | "FIX_ONLY";
+};
+
+const FIX_ONLY_REVIEW_CODES = new Set([
+  "BLOCK_CANNOT_PROCESS",
+  "BLOCK_SCHEMA_INVALID",
+  "DIAGRAM_CANNOT_RENDER",
+  "MISSING_REQUIRED_FIELD",
+  "MISSING_SUMMARY_TITLE",
+  "MISSING_THEORY_SECTION",
+  "MISSING_THEORY_UNIT",
+]);
+
+function resolveReviewIssueResolution(
+  issue: ReviewIssueData,
+): "ACCEPT_OR_FIX" | "FIX_ONLY" {
+  if (
+    issue.resolution === "FIX_ONLY" ||
+    FIX_ONLY_REVIEW_CODES.has(issue.code) ||
+    issue.code.endsWith("_CANNOT_RENDER") ||
+    issue.code.endsWith("_CANNOT_PROCESS")
+  ) {
+    return "FIX_ONLY";
+  }
+
+  return "ACCEPT_OR_FIX";
+}
 
 import dynamic from "next/dynamic";
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
@@ -39,6 +75,7 @@ interface SummaryBlockRendererProps {
   data: {
     title: string;
     objectives?: string[];
+    reviewIssues?: ReviewIssueData[];
     sections: {
       order: number;
       sourceHeading?: string;
@@ -228,6 +265,17 @@ export function SummaryBlockRenderer({
 
   const isTitleEditing = viewMode === "SPLIT" || editingItems.has("title");
   const isObjectivesEditing = viewMode === "SPLIT" || editingItems.has("objectives");
+  const acceptRootIssue = (issueId: string) => {
+    if (!onChange) return;
+    onChange({
+      ...data,
+      reviewIssues: data.reviewIssues?.map((issue: ReviewIssueData) =>
+        issue.id === issueId && resolveReviewIssueResolution(issue) === "ACCEPT_OR_FIX"
+          ? { ...issue, accepted: true }
+          : issue,
+      ),
+    });
+  };
 
   return (
     <div className="mt-4 space-y-8 react-json-custom-edit-wrapper">
@@ -325,6 +373,10 @@ export function SummaryBlockRenderer({
           </div>
         </div>
       )}
+
+      {showEditorialMetadata ? (
+        <ReviewIssuePanel issues={data.reviewIssues} onAccept={acceptRootIssue} />
+      ) : null}
 
       {/* Objectives */}
       {data.objectives && data.objectives.length > 0 && (
@@ -613,7 +665,7 @@ export function SummaryBlockRenderer({
                 </div>
               )}
               <div
-                className={`transition-all ${viewMode === "SPLIT" ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "flex items-start justify-between group/header gap-6"}`}
+                className={`transition-all ${viewMode === "SPLIT" ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : "group/header flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"}`}
               >
                 <h3
                   className={`group flex items-center gap-3 text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 ${viewMode !== "SPLIT" ? "flex-1" : ""}`}
@@ -630,10 +682,10 @@ export function SummaryBlockRenderer({
                 {/* Tool Bar Section */}
                 {!isReadOnly && (
                   <div
-                    className={`flex flex-col items-end gap-2 ${viewMode === "SPLIT" ? "w-full" : "flex-none opacity-0 group-hover/header:opacity-100 transition-opacity z-10"}`}
+                    className={`flex flex-col items-end gap-2 ${viewMode === "SPLIT" ? "w-full" : "z-10 w-full flex-none opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover/header:opacity-100"}`}
                   >
                     {viewMode === "UI_ONLY" && (
-                      <div className="flex justify-end gap-2 w-full relative">
+                      <div className="relative flex w-full flex-wrap justify-end gap-2">
                         {renderSectionActions()}
                       </div>
                     )}
@@ -728,6 +780,48 @@ export function SummaryBlockRenderer({
 
                 const isBlockEditing =
                   viewMode === "SPLIT" || editingItems.has(`block-${idx}-${bIdx}`);
+                const acceptBlockIssue = (issueId: string) => {
+                  if (!onChange) return;
+                  const newData = structuredClone(data);
+                  const targetBlock = newData.sections?.[idx]?.blocks?.[bIdx];
+                  if (!targetBlock) return;
+                  targetBlock.reviewIssues = targetBlock.reviewIssues?.map(
+                    (issue: ReviewIssueData) =>
+                      issue.id === issueId &&
+                      resolveReviewIssueResolution(issue) === "ACCEPT_OR_FIX"
+                        ? { ...issue, accepted: true }
+                        : issue,
+                  );
+                  onChange(newData);
+                };
+                const deleteBrokenDiagram = (issueId: string) => {
+                  if (!onChange) return;
+                  const newData = structuredClone(data);
+                  const targetBlock = newData.sections?.[idx]?.blocks?.[bIdx];
+                  if (!targetBlock) return;
+
+                  const issue = targetBlock.reviewIssues?.find(
+                    (candidate: ReviewIssueData) => candidate.id === issueId,
+                  );
+                  if (
+                    !issue ||
+                    !issue.code.startsWith("DIAGRAM_") ||
+                    resolveReviewIssueResolution(issue) !== "FIX_ONLY"
+                  ) {
+                    return;
+                  }
+
+                  delete targetBlock.visual;
+                  const remainingIssues = targetBlock.reviewIssues.filter(
+                    (candidate: ReviewIssueData) => candidate.id !== issueId,
+                  );
+                  if (remainingIssues.length > 0) {
+                    targetBlock.reviewIssues = remainingIssues;
+                  } else {
+                    delete targetBlock.reviewIssues;
+                  }
+                  onChange(newData);
+                };
 
                 const handleMoveUp = () => {
                   const newData = { ...data };
@@ -843,10 +937,19 @@ export function SummaryBlockRenderer({
                       }
                     }}
                   >
-                    <BlockItem
-                      block={blockToRender}
-                      showEditorialMetadata={showEditorialMetadata}
-                    />
+                    <div>
+                      <BlockItem
+                        block={blockToRender}
+                        showEditorialMetadata={showEditorialMetadata}
+                      />
+                      {showEditorialMetadata ? (
+                        <ReviewIssuePanel
+                          issues={block.reviewIssues}
+                          onAccept={acceptBlockIssue}
+                          onDeleteDiagram={deleteBrokenDiagram}
+                        />
+                      ) : null}
+                    </div>
                     {!isReadOnly && (
                       <div className="flex flex-col items-end gap-2 w-full h-full">
                         {/* Toolbar for UI_ONLY mode (Floating on the UI Block) */}
@@ -1057,6 +1160,115 @@ export function SummaryBlockRenderer({
                   </div>
                 );
               })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReviewIssuePanel({
+  issues,
+  onAccept,
+  onDeleteDiagram,
+}: {
+  issues?: ReviewIssueData[];
+  onAccept: (issueId: string) => void;
+  onDeleteDiagram?: (issueId: string) => void;
+}) {
+  const unresolved =
+    issues?.filter(
+      (issue) =>
+        resolveReviewIssueResolution(issue) === "FIX_ONLY" || !issue.accepted,
+    ) ?? [];
+  if (unresolved.length === 0) return null;
+  const fixOnlyCount = unresolved.filter(
+    (issue) => resolveReviewIssueResolution(issue) === "FIX_ONLY",
+  ).length;
+  const onlyContainsUnrenderableDiagrams = unresolved.every(
+    (issue) => issue.code === "DIAGRAM_CANNOT_RENDER",
+  );
+  const summary =
+    fixOnlyCount === 0
+      ? `${unresolved.length} vấn đề cần sửa hoặc chấp nhận`
+      : fixOnlyCount === unresolved.length
+        ? `${unresolved.length} vấn đề cần sửa`
+        : `${unresolved.length} vấn đề cần xử lý`;
+  return (
+    <div
+      className={
+        onlyContainsUnrenderableDiagrams
+          ? "mt-3 space-y-3 text-sm"
+          : "mt-3 space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 sm:p-4"
+      }
+    >
+      {!onlyContainsUnrenderableDiagrams ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex min-h-7 items-center rounded-full border border-amber-400 bg-amber-100 px-2.5 text-xs font-extrabold text-amber-900 dark:border-amber-600 dark:bg-amber-900/60 dark:text-amber-100">
+            Cần kiểm tra
+          </span>
+          <span className="font-bold">{summary}</span>
+        </div>
+      ) : null}
+      {unresolved.map((issue) => {
+        const isDiagram = issue.code.startsWith("DIAGRAM_");
+        const isUnrenderableDiagram = issue.code === "DIAGRAM_CANNOT_RENDER";
+        const canAccept = resolveReviewIssueResolution(issue) === "ACCEPT_OR_FIX";
+        const canDeleteBrokenDiagram =
+          isDiagram && !canAccept && Boolean(onDeleteDiagram);
+        return (
+          <div
+            key={issue.id}
+            className={
+              isUnrenderableDiagram
+                ? "rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 sm:p-4"
+                : "rounded-lg border border-amber-200 bg-white/80 p-3 dark:border-amber-800 dark:bg-slate-950/60"
+            }
+          >
+            {isUnrenderableDiagram ? (
+              <div className="mb-3 flex min-h-16 items-center justify-center gap-2 border-b border-amber-200 px-2 pb-3 text-center font-extrabold dark:border-amber-800">
+                <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span>Hình lỗi — chưa đủ dữ liệu an toàn để hiển thị</span>
+              </div>
+            ) : null}
+            <p>
+              <strong>Vấn đề:</strong> {issue.message}
+            </p>
+            <p className="mt-1">
+              <strong>Gợi ý sửa:</strong> {issue.suggestion}
+            </p>
+            {issue.technicalDetails ? (
+              <details className="mt-2">
+                <summary className="cursor-pointer font-semibold">
+                  Chi tiết kỹ thuật
+                </summary>
+                <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-2 text-xs text-slate-100">
+                  {issue.technicalDetails}
+                </pre>
+              </details>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canAccept ? (
+                <button
+                  type="button"
+                  onClick={() => onAccept(issue.id)}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-amber-500 bg-white px-3 text-sm font-extrabold text-amber-900 transition-colors hover:bg-amber-100 dark:bg-slate-900 dark:text-amber-100 dark:hover:bg-amber-950"
+                >
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  {isDiagram ? "Chấp nhận hình này" : "Chấp nhận khối này"}
+                </button>
+              ) : null}
+              {canDeleteBrokenDiagram ? (
+                <button
+                  type="button"
+                  onClick={() => onDeleteDiagram?.(issue.id)}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-500 bg-white px-3 text-sm font-extrabold text-red-700 transition-colors hover:bg-red-50 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Xóa hình lỗi
+                </button>
+              ) : null}
             </div>
           </div>
         );
@@ -1290,7 +1502,9 @@ function ExampleBlock({
         <div className="pl-4 border-l-[3px] border-blue-500/30 dark:border-blue-400/30 space-y-3 mb-3 text-sm">
           {block.solution && (
             <div>
-              <MathpixMarkdownRenderer content={formatMathematicalSolution(block.solution)} />
+              <MathpixMarkdownRenderer
+                content={formatMathematicalSolution(block.solution)}
+              />
             </div>
           )}
           {block.answer && (

@@ -17,6 +17,7 @@ export interface AiEmbeddingConfig {
 export interface AiOpenAiConfig {
   apiKey: string;
   requestTimeoutMs: number;
+  generationRequestTimeoutMs?: number;
   structuredModel: string;
   chatModel: string;
   embeddingModel: string;
@@ -42,6 +43,9 @@ export function getOpenAiConfig(
     requestTimeoutMs: configService.get("AI_PROVIDER_TIMEOUT_MS", {
       infer: true,
     }),
+    generationRequestTimeoutMs: configService.get("AI_GENERATION_TIMEOUT_MS", {
+      infer: true,
+    }),
     structuredModel: configService.get("OPENAI_STRUCTURED_MODEL", {
       infer: true,
     }),
@@ -59,9 +63,10 @@ export function getOpenAiConfig(
  * Lấy embedding config mặc định cho retrieval/worker.
  * Dùng khi cần biết model/dimensions hiện tại mà không cần API key.
  */
-export function getEmbeddingConfig(
-  configService: ConfigService<EnvConfig, true>,
-): { model: string; dimensions: number } {
+export function getEmbeddingConfig(configService: ConfigService<EnvConfig, true>): {
+  model: string;
+  dimensions: number;
+} {
   return {
     model: configService.get("OPENAI_EMBEDDING_MODEL", { infer: true }),
     dimensions: configService.get("OPENAI_EMBEDDING_DIMENSIONS", {

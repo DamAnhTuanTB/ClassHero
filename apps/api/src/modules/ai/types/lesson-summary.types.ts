@@ -1,13 +1,17 @@
 import {
+  AI_REASONING_EFFORT_LEVELS,
   LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
-  lessonSummaryDiagramVisualSchema,
+  lessonSummaryDiagramStructuralVisualSchema,
 } from "@learning-path/shared";
 import { z } from "zod";
 
-import { lessonSummaryProviderDiagramInputSchema } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
+import {
+  lessonSummaryProviderDiagramInputSchema,
+  lessonSummaryProviderDiagramTransportSchema,
+} from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v54";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v39";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v40";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -25,7 +29,7 @@ const sourceChunkIdsSchema = z.array(z.uuid()).min(1).max(20);
 
 const baseBlockSchema = z.object({
   sourceChunkIds: sourceChunkIdsSchema,
-  visual: lessonSummaryDiagramVisualSchema.optional(),
+  visual: lessonSummaryDiagramStructuralVisualSchema.optional(),
 });
 
 export const lessonSummaryExampleOriginSchema = z.enum([
@@ -94,7 +98,7 @@ const exampleBlockSchema = z
     problem: nonEmptyText(2_000),
     solution: nonEmptyText(5_000).nullable(),
     answer: nonEmptyText(2_000),
-    visual: lessonSummaryDiagramVisualSchema.optional(),
+    visual: lessonSummaryDiagramStructuralVisualSchema.optional(),
     sourceChunkIds: sourceChunkIdsSchema.optional(),
     origin: lessonSummaryExampleOriginSchema.optional(),
     sourceCandidateIds: z.array(nonEmptyText(300)).max(20).optional(),
@@ -158,26 +162,87 @@ const sectionRecapBlockSchema = baseBlockSchema
   })
   .strict();
 
+export const lessonSummaryReviewIssueResolutionSchema = z.enum([
+  "ACCEPT_OR_FIX",
+  "FIX_ONLY",
+]);
+
+export type LessonSummaryReviewIssueResolution = z.infer<
+  typeof lessonSummaryReviewIssueResolutionSchema
+>;
+
+const FIX_ONLY_LESSON_SUMMARY_ISSUE_CODES = new Set([
+  "BLOCK_CANNOT_PROCESS",
+  "BLOCK_SCHEMA_INVALID",
+  "DIAGRAM_CANNOT_RENDER",
+  "MISSING_REQUIRED_FIELD",
+  "MISSING_SUMMARY_TITLE",
+  "MISSING_THEORY_SECTION",
+  "MISSING_THEORY_UNIT",
+]);
+
+export function resolveLessonSummaryReviewIssueResolution(
+  code: string,
+): LessonSummaryReviewIssueResolution {
+  if (
+    FIX_ONLY_LESSON_SUMMARY_ISSUE_CODES.has(code) ||
+    code.endsWith("_CANNOT_RENDER") ||
+    code.endsWith("_CANNOT_PROCESS")
+  ) {
+    return "FIX_ONLY";
+  }
+  return "ACCEPT_OR_FIX";
+}
+
+export const lessonSummaryReviewIssueSchema = z
+  .object({
+    id: nonEmptyText(100),
+    code: nonEmptyText(100),
+    path: nonEmptyText(500),
+    message: nonEmptyText(1_000),
+    suggestion: nonEmptyText(1_000),
+    technicalDetails: nonEmptyText(2_000).nullable(),
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    resolution: lessonSummaryReviewIssueResolutionSchema.optional(),
+    accepted: z.boolean(),
+  })
+  .strict();
+
+const reviewIssuesShape = {
+  reviewIssues: z.array(lessonSummaryReviewIssueSchema).max(50).optional(),
+};
+
+const reviewedKnowledgeBlockSchema = knowledgeBlockSchema.extend(reviewIssuesShape);
+const reviewedPropertyBlockSchema = propertyBlockSchema.extend(reviewIssuesShape);
+const reviewedProcedureBlockSchema = procedureBlockSchema.extend(reviewIssuesShape);
+const reviewedExampleBlockSchema = exampleBlockSchema.extend(reviewIssuesShape);
+const reviewedNoteBlockSchema = noteBlockSchema.extend(reviewIssuesShape);
+const reviewedTheoremBlockSchema = theoremBlockSchema.extend(reviewIssuesShape);
+const reviewedComparisonBlockSchema = comparisonBlockSchema.extend(reviewIssuesShape);
+const reviewedDataTableBlockSchema = dataTableBlockSchema.extend(reviewIssuesShape);
+const reviewedApplicationBlockSchema = applicationBlockSchema.extend(reviewIssuesShape);
+const reviewedSectionRecapBlockSchema = sectionRecapBlockSchema.extend(reviewIssuesShape);
+
 export const lessonSummaryMvpBlockSchema = z.discriminatedUnion("type", [
-  knowledgeBlockSchema,
-  propertyBlockSchema,
-  procedureBlockSchema,
-  exampleBlockSchema,
-  noteBlockSchema,
-  theoremBlockSchema,
+  reviewedKnowledgeBlockSchema,
+  reviewedPropertyBlockSchema,
+  reviewedProcedureBlockSchema,
+  reviewedExampleBlockSchema,
+  reviewedNoteBlockSchema,
+  reviewedTheoremBlockSchema,
 ]);
 
 export const lessonSummaryExtendedBlockSchema = z.discriminatedUnion("type", [
-  knowledgeBlockSchema,
-  propertyBlockSchema,
-  procedureBlockSchema,
-  exampleBlockSchema,
-  noteBlockSchema,
-  theoremBlockSchema,
-  comparisonBlockSchema,
-  dataTableBlockSchema,
-  applicationBlockSchema,
-  sectionRecapBlockSchema,
+  reviewedKnowledgeBlockSchema,
+  reviewedPropertyBlockSchema,
+  reviewedProcedureBlockSchema,
+  reviewedExampleBlockSchema,
+  reviewedNoteBlockSchema,
+  reviewedTheoremBlockSchema,
+  reviewedComparisonBlockSchema,
+  reviewedDataTableBlockSchema,
+  reviewedApplicationBlockSchema,
+  reviewedSectionRecapBlockSchema,
 ]);
 
 export type LessonSummaryMvpBlock = z.infer<typeof lessonSummaryMvpBlockSchema>;
@@ -193,9 +258,11 @@ const theoryDiagramSpecSchema = lessonSummaryProviderDiagramInputSchema
   )
   .nullable();
 
-const lessonSummaryProviderNoteSchema = noteBlockSchema.omit({ visual: true }).strict();
+export const lessonSummaryProviderNoteSchema = noteBlockSchema
+  .omit({ visual: true })
+  .strict();
 
-const lessonSummaryTheoryBlockSchema = z.discriminatedUnion("type", [
+export const lessonSummaryTheoryBlockSchema = z.discriminatedUnion("type", [
   knowledgeBlockSchema
     .omit({ visual: true })
     .extend({ diagramSpec: theoryDiagramSpecSchema })
@@ -214,7 +281,7 @@ const lessonSummaryTheoryBlockSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
-function createLessonSummaryProviderExampleSchema(
+export function createLessonSummaryProviderExampleSchema(
   exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
 ) {
   const illustrationRequirement =
@@ -249,6 +316,131 @@ const lessonSummaryStandardExerciseSchema =
   createLessonSummaryProviderExampleSchema("STANDARD_EXERCISE");
 const lessonSummaryRealWorldExerciseSchema =
   createLessonSummaryProviderExampleSchema("REAL_WORLD_EXERCISE");
+
+const transportText = (maxLength: number) => z.string().max(maxLength);
+const transportSourceChunkIdsSchema = z.array(z.string().max(100)).max(20);
+const transportTheoryDiagramSpecSchema =
+  lessonSummaryProviderDiagramTransportSchema.nullable();
+const transportTheoryBaseShape = {
+  sourceChunkIds: transportSourceChunkIdsSchema,
+  diagramSpec: transportTheoryDiagramSpecSchema,
+};
+
+export const lessonSummaryTheoryBlockTransportSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      ...transportTheoryBaseShape,
+      type: z.literal("knowledge"),
+      title: transportText(240),
+      content: transportText(2_000),
+    })
+    .strict(),
+  z
+    .object({
+      ...transportTheoryBaseShape,
+      type: z.literal("property"),
+      title: transportText(240),
+      content: transportText(2_000),
+    })
+    .strict(),
+  z
+    .object({
+      ...transportTheoryBaseShape,
+      type: z.literal("theorem"),
+      title: transportText(240),
+      content: transportText(2_000),
+    })
+    .strict(),
+  z
+    .object({
+      ...transportTheoryBaseShape,
+      type: z.literal("procedure"),
+      title: transportText(240),
+      purpose: transportText(2_000).nullable(),
+      steps: z
+        .array(
+          z
+            .object({
+              order: z.number().int(),
+              content: transportText(2_000),
+            })
+            .strict(),
+        )
+        .max(20),
+    })
+    .strict(),
+]);
+
+export const lessonSummaryProviderNoteTransportSchema = z
+  .object({
+    type: z.literal("note"),
+    content: transportText(2_000),
+    sourceChunkIds: transportSourceChunkIdsSchema,
+  })
+  .strict();
+
+function createLessonSummaryProviderExampleTransportSchema(
+  exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+) {
+  return z
+    .object({
+      type: z.literal("example"),
+      exampleKind: z.literal(exampleKind),
+      problem: transportText(2_000),
+      solution: transportText(5_000).nullable(),
+      answer: transportText(2_000),
+      diagramSpec: lessonSummaryProviderDiagramTransportSchema.nullable(),
+    })
+    .strict();
+}
+
+export const lessonSummaryIllustrationTransportSchema =
+  createLessonSummaryProviderExampleTransportSchema("ILLUSTRATION");
+export const lessonSummaryStandardExerciseTransportSchema =
+  createLessonSummaryProviderExampleTransportSchema("STANDARD_EXERCISE");
+export const lessonSummaryRealWorldExerciseTransportSchema =
+  createLessonSummaryProviderExampleTransportSchema("REAL_WORLD_EXERCISE");
+
+/**
+ * Transport contract used for the single paid provider call. It keeps the root
+ * ownership structure strict while deferring per-block semantic checks to the
+ * recovery mapper, so one local defect cannot discard the whole lesson.
+ */
+export const lessonSummaryProviderTransportOutputSchema = z
+  .object({
+    title: transportText(240),
+    objectives: z.array(transportText(500)).max(10).nullable(),
+    theorySections: z
+      .array(
+        z
+          .object({
+            sourceTopicId: transportText(300),
+            displayHeading: transportText(240),
+            sourceChunkIds: transportSourceChunkIdsSchema,
+            units: z
+              .array(
+                z
+                  .object({
+                    theory: lessonSummaryTheoryBlockTransportSchema,
+                    illustration: lessonSummaryIllustrationTransportSchema,
+                    notes: z.array(lessonSummaryProviderNoteTransportSchema).max(5),
+                  })
+                  .strict(),
+              )
+              .max(20),
+          })
+          .strict(),
+      )
+      .max(19),
+    applicationExercises: z
+      .object({
+        displayHeading: z.literal("Bài tập vận dụng"),
+        standardExercise: lessonSummaryStandardExerciseTransportSchema,
+        realWorldExercise: lessonSummaryRealWorldExerciseTransportSchema,
+      })
+      .strict(),
+  })
+  .strict();
 
 export const lessonSummaryProviderOutputSchema = z
   .object({
@@ -298,6 +490,10 @@ export type LessonSummaryProviderOutput = z.infer<
   typeof lessonSummaryProviderOutputSchema
 >;
 
+export type LessonSummaryProviderTransportOutput = z.infer<
+  typeof lessonSummaryProviderTransportOutputSchema
+>;
+
 export const lessonSummaryWarningDetailSchema = z
   .object({
     code: nonEmptyText(100),
@@ -338,6 +534,7 @@ export const lessonSummaryOutputSchema = z
       .max(100)
       .nullable()
       .optional(),
+    reviewIssues: z.array(lessonSummaryReviewIssueSchema).max(100).optional(),
   })
   .strict();
 
@@ -358,7 +555,7 @@ export const lessonSummaryJobInputSchema = z
     userPrompt: z.string().trim().max(16_000).default(""),
     model: z.string().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),
-    reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+    reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),
     maxOutputTokens: z
       .number()
       .int()

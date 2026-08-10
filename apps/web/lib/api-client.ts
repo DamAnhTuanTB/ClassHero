@@ -7,6 +7,7 @@ export type ApiRequestOptions = {
   token?: string;
   headers?: HeadersInit;
   keepalive?: boolean;
+  timeoutMs?: number;
 };
 
 export type ApiSuccessEnvelope<
@@ -101,6 +102,38 @@ async function readJsonResponse(response: Response) {
   return response.json() as Promise<unknown>;
 }
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs?: number,
+) {
+  const normalizedTimeoutMs =
+    typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? Math.floor(timeoutMs)
+      : null;
+  if (normalizedTimeoutMs === null) {
+    return fetch(input, init);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), normalizedTimeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiRequestError({
+        statusCode: 408,
+        code: "REQUEST_TIMEOUT",
+        message: "Máy chủ phản hồi quá lâu. Vui lòng thử lại.",
+        details: { timeoutMs: normalizedTimeoutMs },
+      });
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+
 export async function apiRequest<TData>(
   path: string,
   options: ApiRequestOptions = {},
@@ -136,13 +169,17 @@ export async function apiRequestEnvelope<
         ? (options.body as BodyInit)
         : JSON.stringify(options.body);
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: requestBody,
-    cache: options.cache,
-    keepalive: options.keepalive,
-  });
+  const response = await fetchWithTimeout(
+    `${getApiBaseUrl()}${path}`,
+    {
+      method: options.method ?? "GET",
+      headers,
+      body: requestBody,
+      cache: options.cache,
+      keepalive: options.keepalive,
+    },
+    options.timeoutMs,
+  );
   const payload = await readJsonResponse(response);
 
   if (!response.ok) {

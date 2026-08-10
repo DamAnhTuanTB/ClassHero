@@ -15,6 +15,43 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - `M5.1-M5.4` đã Done: OpenAI embedding qua `AiProvider` với vector-space validation 1.536 chiều; durable embedding worker lưu lifecycle/token/latency và retry/final error; personal clone tái sử dụng vector hợp lệ rồi enqueue idempotent phần còn thiếu; retrieval pgvector + keyword chỉ dùng tài liệu active `READY` trong đúng lesson/provider/model/dimension và giữ token budget tuyệt đối. HNSW cosine index đã được phục hồi bằng migration bù; PostgreSQL isolation test và OpenAI live smoke 25 token đã pass.
 - `M9.1` đã Done: `AiProvider`/`AiService` hỗ trợ OpenAI text và strict structured output; Zod là persistence gate cuối sau JSON Schema; provider trả model/request ID/token/latency; service tạo idempotent cặp `background_jobs` + `ai_generations`; AI worker đồng bộ lifecycle/retry/hash/output log và không gọi persistence khi output invalid. PostgreSQL lifecycle và OpenAI live smoke pass (74 input + 10 output tokens ở request đo usage, 2.168 ms). Gemini vẫn là placeholder chưa bật; handler summary/quiz/flashcard/test thuộc `M9.2-M9.3`.
 - `M9.2` core đã Done: admin summary GET/PUT/generate API có RBAC/audit; request AI chỉ chọn active `READY` lesson documents có chunks, giới hạn 12.000 context tokens, lưu source hash và chống active job trùng. Worker tải lại context đúng lesson, reject source stale/output sai schema, gọi `AiService`, map structured summary sang Tiptap và upsert `source = AI`, `NEEDS_REVIEW`, `ai_generation_id`; admin vẫn sửa/duyệt cùng summary record. PostgreSQL API/worker integration và opt-in OpenAI lesson-summary live smoke đã pass; smoke dùng một chunk mẫu, không gọi embedding/OCR. Riêng delivery wave mở rộng coverage hình Toán 3-9 của `M9.2` vẫn `IN_PROGRESS`, chưa đủ điều kiện công bố 90-100%; xem mục resume trong phần 3 và `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
+- `M9.2` partial-block recovery đã hoàn tất ngày 2026-08-10 với schema
+  `lesson-summary-schema-v40`: một lỗi semantic/field/diagram cục bộ không còn
+  làm mất toàn summary. Worker dùng transport schema trong đúng một provider
+  attempt, nghiệm thu từng block, giữ hình/nội dung còn render an toàn và đính
+  `reviewIssues` có lời giải thích/gợi ý sửa. Admin vẫn sửa/lưu nháp, có thể chấp
+  nhận issue local; chỉ publish bị chặn khi còn issue chưa resolve. Golden block
+  pass đi nguyên mapper/renderer. API focused 7 file/130 test pass; Playwright
+  review và live Bài 15 `gpt-5.4` pass Chromium laptop/iPad/mobile + WebKit mobile.
+  Artifact live ở `tmp/m9-2-partial-review-live/live-bai-15.json`; ảnh đã duyệt ở
+  `anh-chup-hinh-toan-dat-chuan/co-che-review-tung-block/`. Lượt live artifact có
+  93.647 input, 92.928 cached input, 4.125 output, 97.772 total token, 43.424 ms,
+  ước tính khoảng 2.173 VNĐ; toàn lượt smoke thành công trong task khoảng
+  4,3-4,5 nghìn VNĐ. Worker phải restart sau thay đổi này.
+- Hotfix cùng ngày đã khóa thêm trường hợp `INTENT` hợp lệ về schema nhưng bộ
+  dựng hình deterministic vẫn không thể dựng (ví dụ
+  `RIGHT_TRIANGLE_CONGRUENCE` thiếu nhãn điểm). Recovery nay preflight chính bộ
+  compiler rồi materialize renderer-ready spec một lần; mapper không compile
+  lại. Mapper còn có terminal boundary cho từng theory/example/note/application:
+  mọi exception cục bộ trở thành `DIAGRAM_CANNOT_RENDER` hoặc
+  `BLOCK_CANNOT_PROCESS` tại đúng block, dùng fallback nhỏ nhất và giữ sibling.
+  Chuỗi bắt buộc chỉ gồm control character cũng được phục hồi trước persist.
+  Regression M9.2 pass 9 file/148 test, gồm worker persist thật; hai trạng thái
+  review/placeholder pass 8 Playwright case đủ laptop, iPad, Chromium mobile và
+  WebKit mobile. Không phát sinh provider call/chi phí live.
+- Corrective pass partial-block recovery đã hoàn tất ngày 2026-08-10. Compiler /
+  recovery tách `AUTO_FIXED`, `REVIEWABLE` và `UNRENDERABLE`; chỉ issue
+  `ACCEPT_OR_FIX` có nút chấp nhận. Placeholder `Hình lỗi`/hard-error là
+  `FIX_ONLY`, backend luôn ép `accepted=false` và publish guard không thể bị lách
+  bằng payload client. Nút đỏ `Xóa hình lỗi` chỉ xóa visual + issue trong bản
+  nháp local, giữ text/sibling, không confirm/API/autosave; reload trước Lưu phục
+  hồi dữ liệu server và chỉ `Lưu nội dung` mới persist. Focused API đạt 5 file/
+  125 test, integration 6/6, API typecheck đạt; Playwright review/delete 8/8 và
+  artifact live 4/4 trên laptop/iPad/Chromium mobile/WebKit mobile. Live Bài 15
+  gọi đúng một lần bằng `gpt-5.4-2026-03-05`, 0 issue, usage 93.647 input
+  (92.928 cached) + 5.371 output, chi phí ước tính khoảng 2.640 VNĐ. Ảnh đạt ở
+  `anh-chup-hinh-toan-dat-chuan/co-che-review-tung-block/`; ảnh placeholder nằm
+  riêng trong `anh-chup-hinh-toan-can-sua/co-che-hinh-loi-khong-the-ve/`.
 - `M9.3` đã Done: admin Quiz/Flashcard/Test generate API trả 202 và chống active job trùng theo lesson/type; worker hybrid-retrieve đúng lesson, reject source stale/chunk reference ngoài context/output copy chuỗi từ 12 token, validate strict đủ bốn loại câu, rồi persist atomically vào schema M6 với `source=AI`, `NEEDS_REVIEW`, explanation và `source_metadata_json`. Review set cascade tới item/explanation. PostgreSQL integration và OpenAI live matrix 13 lượt pass (Quiz/Test mixed + từng loại; Flashcard EASY/MEDIUM/HARD), không gọi OCR/PDF.
 - `M9.8` đã bổ sung cấu hình Summary theo lần chạy (phong cách, độ dài,
   trọng tâm, nhóm nội dung, câu ôn tập, yêu cầu bổ sung, model, temperature,
@@ -158,7 +195,9 @@ Thứ tự tiếp tục bắt buộc:
    render-safe và có ý nghĩa vẫn hiện; fallback chỉ thay phần hỏng nhỏ nhất.
    Hình/block còn render-safe vẫn
    hiện nguyên dạng cho admin với badge `Cần review`; admin có thể
-   `Chấp nhận hình này` sau review thủ công mà không gọi AI. Payload không
+   `Chấp nhận hình này` sau review thủ công mà không gọi AI. Placeholder
+   `Hình lỗi` và hard-error không có nút chấp nhận; chỉ sửa, xóa hoặc chủ động
+   tạo lại mới resolve. Payload không
    render-safe một phần phải cô lập đúng primitive/marker/label lỗi và vẫn vẽ
    phần còn có ý nghĩa. Chỉ khi không còn hình có ý nghĩa nào có thể render mới
    dùng placeholder `Hình lỗi`; không in raw validator JSON làm thông báo chính.
@@ -166,9 +205,15 @@ Thứ tự tiếp tục bắt buộc:
    mapper/renderer cũ và không chạy fallback; golden cache là regression gate.
    Mọi badge `Cần review` phải có một câu tiếng Việt ngắn chỉ rõ đối tượng và lý
    do cần kiểm tra; raw validator/path chỉ nằm trong `Chi tiết kỹ thuật`.
-   Mỗi issue còn có `Gợi ý sửa` deterministic từ validator code/path, không gọi
-   AI; field JSON thiếu/sai hiển thị tên tiếng Việt và key/path trong ngoặc, ví
-   dụ `Đáp án (answer)`, nhưng không tự bịa giá trị cần điền.
+   Các lỗi hình học đã biết phải map theo family và gọi đúng tên đoạn/điểm/góc,
+   ví dụ `AC` và `A′C′` lệch độ dài; dữ liệu cũ có technical details hợp lệ cũng
+   được nâng copy khi API đọc ra, không buộc admin sinh lại chỉ để hiểu cảnh báo.
+   Nếu chỉ có nhãn đẳng thức chữ thừa và marker hình học còn đúng, recovery bỏ
+   nhãn thừa mà không tạo badge oan.
+   Mỗi issue còn có `Gợi ý sửa` tất định từ mã kiểm tra nội bộ, không gọi AI và
+   không tự bịa giá trị cần điền. Hai dòng `Vấn đề`/`Gợi ý sửa` chỉ dùng tiếng
+   Việt dễ hiểu; tên trường, đường dẫn dữ liệu và thuật ngữ kỹ thuật tiếng Anh
+   chỉ nằm trong `Chi tiết kỹ thuật`. API cũng Việt hóa cảnh báo cũ khi đọc ra.
    `Cần review`/`Cần sửa` chỉ là warning, không khóa editor: admin vẫn sửa, thêm,
    xóa, sắp xếp và lưu draft bình thường; save revalidate block đã đổi để tự gỡ
    hoặc cập nhật issue, còn publish mới bị chặn khi issue chưa resolve.

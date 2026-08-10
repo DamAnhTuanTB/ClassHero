@@ -795,9 +795,12 @@ nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
   standard rồi real-world.
 - Generation mới lưu `lesson_summary_blocks.version=2`; parser/renderer
   vẫn hỗ trợ version 1, không migration phá dữ liệu cũ.
-- Không persist/hiển thị warning kỹ thuật trong summary. JSON Schema/Zod/hạ tầng
-  không hợp lệ vẫn là lỗi kỹ thuật; nội dung hợp lệ về cấu trúc được lưu để admin
-  tự review và sửa, không thêm repair/judge provider call bắt buộc.
+- Không dùng lỗi semantic cục bộ của một block/hình để loại bỏ toàn bộ summary.
+  Provider chỉ cần qua transport schema đủ để xác định section/block; backend
+  kiểm từng block bằng acceptance schema, giữ phần còn render an toàn và đính
+  kèm `reviewIssues` có lời giải thích/gợi ý sửa cho admin. Chỉ root JSON không
+  đọc được, không xác định được ownership block, source stale hoặc lỗi hạ tầng
+  mới làm toàn job thất bại. Hệ thống không tự gọi provider lần hai để repair.
 
 #### 5.1.3. Coverage hình Toán 3-9: intent và deterministic compiler
 
@@ -847,8 +850,8 @@ golden nội bộ sau source-backed re-audit và được ghi vào
 `reference-golden-manifest.json`. Semantic truth đứng trước pixel similarity;
 responsive adaptation được chấp nhận khi giữ nguyên quan hệ và có review note.
 
-Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v53` và
-schema `lesson-summary-schema-v39`. Provider ưu tiên trả `INTENT`; backend biên
+Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v54` và
+schema `lesson-summary-schema-v40`. Provider ưu tiên trả `INTENT`; backend biên
 dịch intent bằng registry deterministic cho tám family. Bộ compiler hiện có 86
 fixture trực quan local, gồm mô hình tiểu học/đo lường, trục số–tọa độ, hàm bậc
 nhất/bậc hai/tỉ lệ nghịch, bảng–biểu đồ, hình học phẳng, đồng dạng–đường tròn,
@@ -862,6 +865,82 @@ Source audit lưu một hoặc nhiều `evidencePages` cho mỗi đầu sách, v
 evidence URL phải là ảnh do reader chính thức NXBGDVN phục vụ. Tên thư mục hoặc
 commit cũ không đủ để chứng minh ảnh đạt: mọi golden cũ là candidate, được phép
 demote nếu tái kiểm tra phát hiện lỗi toán học, ký hiệu, nhãn hoặc responsive.
+
+#### 5.1.4. Phục hồi lỗi theo từng block và nghiệm thu của admin
+
+Summary generation dùng hai tầng validate:
+
+1. `transport schema` giữ root/section/block ownership và bảo đảm dữ liệu có thể
+   xử lý an toàn trong đúng một provider call;
+2. `acceptance schema` kiểm nội dung, quan hệ toán học và diagram semantics theo
+   từng block sau khi provider trả kết quả.
+
+Block đạt acceptance đi nguyên mapper/renderer hiện có. Block chưa đạt nhưng còn
+render an toàn vẫn xuất hiện trong bản nháp; marker/chi tiết không an toàn có thể
+bị bỏ riêng và block nhận `reviewIssues[]`. Chỉ khi diagram không còn đủ điểm/nét
+an toàn thì vùng hình mới dùng placeholder `Hình lỗi`; phần chữ hợp lệ của block
+vẫn giữ. Trường bắt buộc bị trống được thay bằng nội dung tạm dễ nhận biết để
+admin sửa, không làm mất các block khác.
+
+Validation phải phân biệt dữ liệu hình học với phần trình bày optional. Khi admin
+xóa hoặc để trắng `labels[].text`, cả nhãn đó được bỏ; `point.label`, chữ trên
+marker góc và `caption` được chuẩn hóa thành `null`; thiếu `labelPosition` được
+coi như chưa chọn vị trí. Đây không phải lỗi hình. Nhãn độ dài gọn nhưng chưa neo
+vào cạnh, nhãn đẳng thức dạng chữ bị thừa, nhãn trùng và tên góc lặp lại tên đỉnh
+được bỏ/chuẩn hóa riêng mà không tạo cảnh báo nếu không còn lỗi nào khác.
+
+Lỗi chất lượng trình bày có ý nghĩa sư phạm như điểm dựng đồ thị chưa có tên,
+nhãn bảng chưa căn giữa, nhãn tọa độ đặt sai, thiếu vạch chia hoặc đường cong chưa
+đủ điểm dựng chỉ tạo `DIAGRAM_NEEDS_REVIEW`; recovery phải giữ điểm, nhãn và nét
+vẽ hiện có để admin còn nhìn và sửa. Nét có tham chiếu điểm/tâm không tồn tại mới
+bị loại vì renderer không thể dựng nó. Chỉ khi sau bước này không còn tối thiểu
+hai điểm và một nét vẽ dựng được mới dùng `DIAGRAM_CANNOT_RENDER`.
+
+Copy của `reviewIssues` phải nêu trực tiếp quan hệ bị lỗi thay vì chỉ báo chung
+chung. Ví dụ, nếu marker khai báo `AC = A′C′` nhưng độ dài tính từ tọa độ khác
+nhau, thông báo chính phải gọi đúng `AC` và `A′C′` cùng gợi ý điều chỉnh tọa độ
+hoặc bỏ marker. Nhãn chữ đẳng thức thừa được loại bỏ an toàn không tạo badge
+riêng nếu tất cả marker và quan hệ hình học còn lại đều hợp lệ.
+Mapping này áp dụng cho toàn bộ family lỗi diagram đã biết: tham chiếu điểm/cạnh,
+marker bằng nhau/song song, góc vuông, trục tọa độ, điểm dựng đồ thị, bảng/biểu
+đồ, parabol, phân số, khối không gian, Venn, đồng hồ và trục số. Lỗi schema mới
+chưa có mapping vẫn phải nêu đúng phần dữ liệu bằng tiếng Việt và gợi ý thao tác
+cụ thể, không quay về một câu `Hình không hợp lệ` không chỉ rõ vị trí. Hai dòng
+`Vấn đề` và `Gợi ý sửa` không được chứa tên trường nội bộ, đường dẫn dữ liệu hoặc
+thuật ngữ tiếng Anh khó hiểu như `diagramSpec`, `segmentIds`, `marker`, `label`,
+`null`; các tên này chỉ được xuất hiện trong `Chi tiết kỹ thuật`. Tên điểm, đoạn,
+trục và ký hiệu toán học quen thuộc như `A`, `BC`, `Ox`, `Oy`, `x ≥ 0` vẫn được
+giữ để quản trị viên xác định đúng đối tượng. Quy tắc Việt hóa này cũng áp dụng
+khi API đọc cảnh báo cũ đã lưu, nên không cần sinh lại nội dung chỉ để đổi lời báo.
+
+Mọi diagram intent phải được chạy thử qua chính deterministic compiler trong
+lớp recovery, kể cả khi intent đã qua schema. Kết quả compiler hợp lệ được
+materialize một lần thành renderer-ready spec; compiler không được chạy lại ở
+mapper cuối. Mapper vẫn có boundary dự phòng theo từng block: mọi exception khi
+validate/map diagram hoặc block được đổi thành `DIAGRAM_CANNOT_RENDER` hay
+`BLOCK_CANNOT_PROCESS` tại đúng block và dùng placeholder tối thiểu. Chuỗi bắt
+buộc chỉ gồm control character cũng được coi là rỗng trước mapper để tránh qua
+transport rồi thành rỗng lúc persist.
+
+Mỗi issue có `code`, `path`, lời giải thích tiếng Việt, `suggestion`, chi tiết kỹ
+thuật thu gọn, fingerprint của đúng target, cờ `accepted` và resolution
+`ACCEPT_OR_FIX | FIX_ONLY`. Chỉ issue reviewable được chấp nhận; hard issue luôn
+unresolved dù client gửi `accepted=true`. Admin vẫn được sửa, thêm, xóa, sắp xếp
+và lưu nháp. Khi target thay đổi, backend kiểm lại và không giữ acceptance cũ.
+`APPROVED` bị chặn khi còn reviewable chưa chấp nhận hoặc bất kỳ hard issue nào;
+student vẫn chỉ nhận summary đã phát hành.
+
+Placeholder diagram `FIX_ONLY` có nút `Xóa hình lỗi` trong admin editor. Nút này
+chỉ bỏ visual và issue tương ứng khỏi state local, không gọi API/AI, không
+autosave và không confirm riêng. Reload trước khi bấm `Lưu nội dung` phục hồi dữ
+liệu server cũ; chỉ nút Lưu mới persist toàn bộ thay đổi qua upsert/audit hiện có.
+
+Mỗi lần admin bấm tạo chỉ có tối đa một provider attempt (`maxAttempts=1`) và
+route snapshot chỉ dùng candidate đã chọn; không tự fallback, retry hay repair
+block bằng provider khác. Schema provider hiện tại là
+`lesson-summary-schema-v40`; persisted wrapper vẫn là
+`lesson_summary_blocks.version=2` với `reviewIssues` optional để tương thích dữ
+liệu v1/v2 cũ.
 
 ### 5.2. Quiz generation
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const apiBaseUrl = "http://localhost:4000/api/v1";
@@ -199,7 +201,18 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(fullInputPanel).toContainText("NỘI DUNG CHUNK THỰC TẾ");
 
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
+    await dialog.getByRole("option", { name: "OpenAI · gpt-5.6-luna" }).click();
+    await dialog.getByLabel("Reasoning Effort").click();
+    await expect(dialog.getByRole("option", { name: "Thấp (Low)" })).toBeVisible();
+    await expect(
+      dialog.getByRole("option", { name: "Rất cao (Extra High)" }),
+    ).toBeVisible();
+    await expect(dialog.getByRole("option", { name: "Tối đa (Max)" })).toHaveCount(0);
+    await dialog.getByRole("option", { name: "Rất cao (Extra High)" }).click();
+
+    await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
+    await expect(dialog.getByLabel("Reasoning Effort")).toHaveCount(0);
     await dialog.getByLabel("Temperature").fill("1.5");
     await expect(dialog.getByText("Temperature phải từ 0 đến 1")).toBeVisible();
     await dialog.getByLabel("Temperature").fill("0.1");
@@ -239,6 +252,55 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expectNoFrameworkOverlay(page);
   });
 
+  test("submits xhigh for the configured model and deduplicates rapid preview clicks", async ({
+    page,
+  }) => {
+    const mock = await setupAiGenerationMock(page);
+    await page.goto(`/admin/lessons/${lessonId}`);
+
+    await generationCard(page, "Kiến thức")
+      .getByRole("button", { name: "Cấu hình" })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
+    await expect(dialog.getByLabel("System instructions")).toHaveValue(
+      "SYSTEM PROMPT THỰC TẾ",
+    );
+    await dialog.getByRole("button", { name: "Model", exact: true }).click();
+    await dialog.getByRole("option", { name: "OpenAI · gpt-5.6-luna" }).click();
+    await dialog.getByLabel("Reasoning Effort").click();
+    await dialog.getByRole("option", { name: "Rất cao (Extra High)" }).click();
+    await dialog.getByLabel("Giới hạn token đầu ra").fill("20000");
+
+    const refreshButton = dialog.getByRole("button", {
+      name: "Cập nhật dữ liệu gửi AI",
+    });
+    await refreshButton.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+    });
+    await expect.poll(() => mock.promptPreviewPayloads.length).toBe(2);
+    await dialog.getByRole("tab", { name: "Input đầy đủ" }).click();
+    await expect(dialog.getByRole("tabpanel")).toContainText(
+      '"reasoning_effort":"xhigh"',
+    );
+    await expect(dialog.getByRole("tabpanel")).not.toContainText('"temperature"');
+
+    await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
+    await expect
+      .poll(() => mock.payloads.SUMMARY)
+      .toEqual({
+        documentIds: [documentId],
+        style: "student_friendly",
+        styleInstructions: "Dễ hiểu cho học sinh khối 7.",
+        length: "standard",
+        systemInstructions: "SYSTEM PROMPT THỰC TẾ",
+        userPrompt: expect.stringContaining("USER PROMPT"),
+        model: "gpt-5.6-luna",
+        reasoningEffort: "xhigh",
+        maxOutputTokens: 20_000,
+      });
+  });
+
   test("saves a draft, publishes, withdraws, republishes and regenerates a summary", async ({
     page,
   }) => {
@@ -254,8 +316,10 @@ test.describe("M9.8 admin AI generation panel", () => {
     const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
+    await dialog.getByLabel("Yêu cầu bổ sung").fill("Chỉ dùng cho lần tạo này");
     await dialog.getByLabel("Temperature").fill("0.2");
     await dialog.getByLabel("Giới hạn token đầu ra").fill("8000");
+    await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
       .poll(() => mock.payloads.SUMMARY)
@@ -264,6 +328,7 @@ test.describe("M9.8 admin AI generation panel", () => {
         style: "student_friendly",
         styleInstructions: "Dễ hiểu cho học sinh khối 7.",
         length: "standard",
+        extraInstructions: "Chỉ dùng cho lần tạo này",
         systemInstructions: "SYSTEM PROMPT THỰC TẾ",
         userPrompt: expect.stringContaining("USER PROMPT"),
         model: "gpt-4.1-mini",
@@ -336,8 +401,195 @@ test.describe("M9.8 admin AI generation panel", () => {
       .getByRole("button", { name: "Sinh lại" })
       .click();
     await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Model", exact: true }),
+    ).toContainText("Chọn");
+    await expect(dialog.getByLabel("Temperature")).toHaveCount(0);
+    await expect(dialog.getByLabel("Giới hạn token đầu ra")).toHaveCount(0);
+    await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
+      "Dễ hiểu cho học sinh khối 7.",
+    );
+    await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveValue("");
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
+  });
+
+  test("keeps recoverable blocks visible with actionable review guidance", async ({
+    page,
+  }, testInfo) => {
+    await setupAiGenerationMock(page, {
+      initialSummaryContent: partialReviewSummaryContent(),
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    await expect(page.getByText("2 mục cần kiểm tra")).toBeVisible();
+    await expect(
+      page.locator("h3").filter({ hasText: "Cạnh huyền và một cạnh góc vuông" }).first(),
+    ).toBeVisible();
+    await expect(page.getByText("Vấn đề:").first()).toBeVisible();
+    await expect(page.getByText("Gợi ý sửa:").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Phát hành" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Chấp nhận hình này" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Chấp nhận khối này" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+
+    await page.screenshot({
+      path: `../../tmp/m9-2-partial-review-captures/${testInfo.project.name}.png`,
+      fullPage: true,
+    });
+    await page.getByTestId("admin-lesson-summary-tab").screenshot({
+      path: `../../tmp/m9-2-partial-review-captures/${testInfo.project.name}-summary.png`,
+    });
+
+    await page.getByRole("button", { name: "Chấp nhận hình này" }).click();
+    await page.getByRole("button", { name: "Chấp nhận khối này" }).click();
+    await expect(page.getByText("2 mục cần kiểm tra")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Phát hành" })).toBeEnabled();
+  });
+
+  test("shows one diagram placeholder without hiding sibling blocks", async ({
+    page,
+  }, testInfo) => {
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
+    const content = partialReviewSummaryContent();
+    const theorem = content.data.sections[0]!.blocks[0] as unknown as {
+      visual?: unknown;
+      reviewIssues: Array<{
+        code: string;
+        message: string;
+        suggestion: string;
+        technicalDetails: string;
+        accepted: boolean;
+      }>;
+    };
+    delete theorem.visual;
+    theorem.reviewIssues[0] = {
+      ...theorem.reviewIssues[0]!,
+      code: "DIAGRAM_CANNOT_RENDER",
+      message: "Hình vẽ thiếu dữ liệu cần thiết nên chưa thể hiển thị an toàn.",
+      suggestion: "Bổ sung các điểm, cạnh hoặc nhãn còn thiếu rồi lưu lại.",
+      technicalDetails: "RIGHT_TRIANGLE_CONGRUENCE requires at least 6 point labels.",
+      accepted: true,
+    };
+    const mock = await setupAiGenerationMock(page, { initialSummaryContent: content });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    if (testInfo.project.name === "webkit-mobile") {
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    }
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    await expect(
+      summaryTab.getByText("Hình lỗi — chưa đủ dữ liệu an toàn để hiển thị"),
+    ).toBeVisible();
+    await expect(summaryTab.getByText("1 vấn đề cần sửa", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      summaryTab.getByRole("button", { name: "Chấp nhận hình này" }),
+    ).toHaveCount(0);
+    await expect(summaryTab.getByRole("button", { name: "Xóa hình lỗi" })).toBeVisible();
+    await expect(
+      summaryTab.getByText("Chứng minh hai tam giác vuông bằng nhau."),
+    ).toBeVisible();
+    await expect(
+      summaryTab.getByText("Nêu tên trường hợp bằng nhau vừa dùng."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Phát hành" })).toBeDisabled();
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-2-unrenderable-block-captures/${testInfo.project.name}-placeholder.png`,
+    });
+    await summaryTab.getByRole("button", { name: "Xóa hình lỗi" }).click();
+    await expect(
+      summaryTab.getByText("Hình lỗi — chưa đủ dữ liệu an toàn để hiển thị"),
+    ).toHaveCount(0);
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await expect(
+      summaryTab.getByText("Hình lỗi — chưa đủ dữ liệu an toàn để hiển thị"),
+    ).toBeVisible();
+
+    await summaryTab.getByRole("button", { name: "Xóa hình lỗi" }).click();
+    await page.getByRole("button", { name: "Lưu nội dung" }).click();
+    await expect.poll(() => mock.summaryPutPayloads.length).toBe(1);
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await expect(
+      summaryTab.getByText("Hình lỗi — chưa đủ dữ liệu an toàn để hiển thị"),
+    ).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-2-unrenderable-block-captures/${testInfo.project.name}.png`,
+    });
+  });
+
+  test("renders the saved gpt-5.4 Bài 15 live artifact", async ({ page }, testInfo) => {
+    test.skip(process.env.RUN_M9_2_PARTIAL_RECOVERY_LIVE_VISUAL !== "1");
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
+    const artifact = JSON.parse(
+      readFileSync(
+        resolve(process.cwd(), "../../tmp/m9-2-partial-review-live/live-bai-15.json"),
+        "utf8",
+      ),
+    ) as { summary: { title: string; objectives?: string[] } };
+    await setupAiGenerationMock(page, {
+      initialSummaryContent: {
+        type: "lesson_summary_blocks",
+        version: 2,
+        data: artifact.summary,
+      },
+      lessonTitle: "Bài 15: Ba trường hợp bằng nhau của tam giác vuông",
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    if (testInfo.project.name === "webkit-mobile") {
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    }
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    await expect(summaryTab).toContainText("Ba trường hợp bằng nhau của tam giác vuông");
+    expect(artifact.summary.objectives?.length).toBeGreaterThan(0);
+    await expect(summaryTab).toContainText(artifact.summary.objectives![0]!);
+    await expect(
+      summaryTab
+        .locator(".mmd-content:visible")
+        .filter({ hasText: "Cho tam giác" })
+        .first(),
+    ).toBeVisible();
+    await expect(summaryTab.locator("figure > svg[role='img']")).toHaveCount(6);
+    await expect
+      .poll(async () => {
+        return summaryTab.locator(".mmd-content:visible").evaluateAll((nodes) => {
+          return (
+            nodes.length > 0 &&
+            nodes.every((node) => (node.textContent ?? "").trim().length > 0)
+          );
+        });
+      })
+      .toBe(true);
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-2-partial-review-live-captures/${testInfo.project.name}.png`,
+      style:
+        ".sticky { position: static !important; } .fixed, nextjs-portal { visibility: hidden !important; }",
+    });
   });
 });
 
@@ -376,14 +628,24 @@ async function seedAdminSession(page: Page) {
 
 async function setupAiGenerationMock(
   page: Page,
-  options: { runningPolls?: number } = {},
+  options: {
+    runningPolls?: number;
+    initialSummaryContent?: unknown;
+    lessonTitle?: string;
+  } = {},
 ) {
   const payloads: Partial<Record<"SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST", unknown>> =
     {};
   const promptPreviewPayloads: unknown[] = [];
+  const summaryPutPayloads: unknown[] = [];
   const jobs = new Map<
     string,
-    { polls: number; resourceId: string; type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST" }
+    {
+      inputMetaJson: Record<string, unknown>;
+      polls: number;
+      resourceId: string;
+      type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
+    }
   >();
   const sets: Record<"QUIZ" | "FLASHCARD" | "TEST", Array<Record<string, unknown>>> = {
     QUIZ: [],
@@ -401,7 +663,20 @@ async function setupAiGenerationMock(
       createdAt: string;
       updatedAt: string;
     } | null;
-  } = { summary: null };
+  } = {
+    summary: options.initialSummaryContent
+      ? {
+          id: "summary-review",
+          lessonId,
+          contentJson: options.initialSummaryContent,
+          source: "AI",
+          reviewStatus: "NEEDS_REVIEW",
+          aiGenerationId: "generation-review",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      : null,
+  };
 
   await page.route(`${apiBaseUrl}/**`, async (route) => {
     const request = route.request();
@@ -409,19 +684,34 @@ async function setupAiGenerationMock(
     const method = request.method();
 
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}`) {
-      return fulfillJson(route, 200, { data: lesson() });
+      return fulfillJson(route, 200, {
+        data: {
+          ...lesson(),
+          ...(options.lessonTitle ? { title: options.lessonTitle } : {}),
+        },
+      });
     }
     if (
       method === "GET" &&
       pathname === `/admin/lessons/${lessonId}/ai-generation-panel`
     ) {
-      return fulfillJson(route, 200, { data: panelData(jobs) });
+      const panel = panelData(jobs);
+      return fulfillJson(route, 200, {
+        data: {
+          ...panel,
+          lesson: {
+            ...panel.lesson,
+            ...(options.lessonTitle ? { title: options.lessonTitle } : {}),
+          },
+        },
+      });
     }
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}/summary`) {
       return fulfillJson(route, 200, { data: state.summary });
     }
     if (method === "PUT" && pathname === `/admin/lessons/${lessonId}/summary`) {
       const body = request.postDataJSON() as Record<string, unknown>;
+      summaryPutPayloads.push(body);
       state.summary = {
         id: "summary-ai",
         lessonId,
@@ -440,9 +730,10 @@ async function setupAiGenerationMock(
     ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       promptPreviewPayloads.push(body);
-      const systemPrompt = body.systemInstructions
-        ? `SYSTEM PROMPT THỰC TẾ\n${String(body.systemInstructions)}`
-        : "SYSTEM PROMPT THỰC TẾ";
+      const systemPrompt =
+        body.systemInstructions && body.systemInstructions !== "SYSTEM PROMPT THỰC TẾ"
+          ? `SYSTEM PROMPT THỰC TẾ\n${String(body.systemInstructions)}`
+          : "SYSTEM PROMPT THỰC TẾ";
       return fulfillJson(route, 200, {
         data: {
           promptVersion: "lesson-summary-prompt-v40",
@@ -488,6 +779,15 @@ async function setupAiGenerationMock(
             maxOutputTokens: body.maxOutputTokens ?? 8_000,
             modelOptions: [
               { provider: "OPENAI", model: "gpt-4.1-mini", available: true },
+              {
+                provider: "OPENAI",
+                model: "gpt-5.6-luna",
+                available: true,
+                capabilities: {
+                  aiConfiguration: "REASONING_EFFORT",
+                  reasoningEffortLevels: ["low", "xhigh"],
+                },
+              },
               { provider: "GEMINI", model: "gemini-2.5-flash", available: true },
             ],
           },
@@ -514,8 +814,14 @@ async function setupAiGenerationMock(
         } as const
       )[generationMatch[1] as "summary" | "quiz-sets" | "flashcard-sets" | "test-sets"];
       payloads[type] = request.postDataJSON();
+      const inputMetaJson = request.postDataJSON() as Record<string, unknown>;
       const jobId = `job-${type.toLowerCase()}`;
-      jobs.set(jobId, { polls: 0, resourceId: `${type.toLowerCase()}-ai`, type });
+      jobs.set(jobId, {
+        inputMetaJson,
+        polls: 0,
+        resourceId: `${type.toLowerCase()}-ai`,
+        type,
+      });
       return fulfillJson(route, 202, {
         data: { mode: "QUEUED", jobId, status: "QUEUED" },
       });
@@ -579,8 +885,129 @@ async function setupAiGenerationMock(
   return {
     payloads,
     promptPreviewPayloads,
+    summaryPutPayloads,
     get summary() {
       return state.summary;
+    },
+  };
+}
+
+function partialReviewSummaryContent() {
+  const fingerprint = "a".repeat(64);
+  return {
+    type: "lesson_summary_blocks",
+    version: 2,
+    data: {
+      lessonId,
+      title: "Ba trường hợp bằng nhau của tam giác vuông",
+      objectives: ["Nhận biết trường hợp cạnh huyền và cạnh góc vuông."],
+      sections: [
+        {
+          order: 1,
+          sourceHeading: "Cạnh huyền và một cạnh góc vuông",
+          displayHeading: "Cạnh huyền và một cạnh góc vuông",
+          sourceChunkIds: [documentId],
+          blocks: [
+            {
+              type: "theorem",
+              title: "Cạnh huyền và một cạnh góc vuông",
+              content:
+                "Nếu cạnh huyền và một cạnh góc vuông tương ứng bằng nhau thì hai tam giác vuông bằng nhau.",
+              sourceChunkIds: [documentId],
+              visual: {
+                kind: "DIAGRAM_SPEC",
+                spec: {
+                  version: 1,
+                  coordinateSystem: "CARTESIAN",
+                  viewBox: { minX: -1, minY: -1, width: 8, height: 6 },
+                  toScale: true,
+                  points: [
+                    {
+                      id: "A",
+                      x: 0,
+                      y: 4,
+                      label: "A",
+                      pointStyle: "NONE",
+                      labelPosition: "TOP_LEFT",
+                    },
+                    {
+                      id: "B",
+                      x: 0,
+                      y: 0,
+                      label: "B",
+                      pointStyle: "NONE",
+                      labelPosition: "BOTTOM_LEFT",
+                    },
+                    {
+                      id: "C",
+                      x: 6,
+                      y: 0,
+                      label: "C",
+                      pointStyle: "NONE",
+                      labelPosition: "BOTTOM_RIGHT",
+                    },
+                  ],
+                  primitives: [
+                    { id: "AB", type: "SEGMENT", from: "A", to: "B", style: "SOLID" },
+                    { id: "BC", type: "SEGMENT", from: "B", to: "C", style: "SOLID" },
+                    { id: "AC", type: "SEGMENT", from: "A", to: "C", style: "SOLID" },
+                  ],
+                  markers: [],
+                  labels: [],
+                  caption: "Phần hình an toàn vẫn được hiển thị để admin đánh giá.",
+                },
+              },
+              reviewIssues: [
+                {
+                  id: "diagram-review",
+                  code: "DIAGRAM_NEEDS_REVIEW",
+                  path: "theorySections.0.units.0.theory.diagramSpec",
+                  message:
+                    "Ký hiệu hai đoạn bằng nhau chưa khớp với độ dài theo tọa độ; ký hiệu sai đã được lược bỏ.",
+                  suggestion:
+                    "Kiểm tra lại hai cạnh AB, AD trong diagramSpec hoặc chọn Chấp nhận hình này nếu hình hiện tại dùng được.",
+                  technicalDetails:
+                    "markers.equalLengths.0.segmentIds: EQUAL_LENGTH segments must have coordinate lengths within 2%: AB, AD.",
+                  fingerprint,
+                  accepted: false,
+                },
+              ],
+            },
+            {
+              type: "example",
+              problem: "Chứng minh hai tam giác vuông bằng nhau.",
+              solution: "Đối chiếu cạnh huyền và cạnh góc vuông tương ứng.",
+              answer: "[Cần bổ sung đáp án]",
+              reviewIssues: [
+                {
+                  id: "answer-review",
+                  code: "CONTENT_NEEDS_REVIEW",
+                  path: "applicationExercises.standardExercise.answer",
+                  message: "Đáp án tạm thời cần được đối chiếu với tài liệu nguồn.",
+                  suggestion: "Kiểm tra đáp án, sau đó sửa hoặc chấp nhận khối này.",
+                  technicalDetails: "Review fixture for a recoverable answer.",
+                  fingerprint,
+                  accepted: false,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          order: 2,
+          sourceHeading: "Bài tập vận dụng",
+          displayHeading: "Bài tập vận dụng",
+          sourceChunkIds: [documentId],
+          blocks: [
+            {
+              type: "example",
+              problem: "Nêu tên trường hợp bằng nhau vừa dùng.",
+              solution: "Đối chiếu giả thiết.",
+              answer: "Cạnh huyền - cạnh góc vuông.",
+            },
+          ],
+        },
+      ],
     },
   };
 }
@@ -588,7 +1015,12 @@ async function setupAiGenerationMock(
 function panelData(
   jobs: Map<
     string,
-    { polls: number; resourceId: string; type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST" }
+    {
+      inputMetaJson: Record<string, unknown>;
+      polls: number;
+      resourceId: string;
+      type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
+    }
   >,
 ) {
   const latest: Record<string, unknown> = {
@@ -607,6 +1039,7 @@ function panelData(
       resourceId: succeeded ? job.resourceId : null,
       reviewStatus: succeeded ? "NEEDS_REVIEW" : null,
       error: null,
+      inputMetaJson: job.inputMetaJson,
       createdAt: new Date().toISOString(),
       startedAt: null,
       finishedAt: succeeded ? new Date().toISOString() : null,

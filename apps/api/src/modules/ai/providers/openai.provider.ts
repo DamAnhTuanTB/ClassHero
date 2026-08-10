@@ -122,21 +122,30 @@ export class OpenAiProvider implements AiProvider {
     return /^(o[1-9]|gpt-5)/u.test(model.toLowerCase());
   }
 
+  private get generationRequestOptions(): { timeout: number } {
+    return {
+      timeout: this.config.generationRequestTimeoutMs ?? this.config.requestTimeoutMs,
+    };
+  }
+
   async generateText(input: AiTextInput): Promise<AiTextOutput> {
     const startedAt = Date.now();
     const modelToUse = input.model ?? this.config.chatModel;
-    const response = await this.client.responses.create({
-      model: modelToUse,
-      instructions: input.systemPrompt,
-      input: buildAiUserPrompt(input),
-      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
-        ? {}
-        : { temperature: input.temperature }),
-      ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
-        ? { reasoning: { effort: input.reasoningEffort } }
-        : {}),
-      ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
-    });
+    const response = await this.client.responses.create(
+      {
+        model: modelToUse,
+        instructions: input.systemPrompt,
+        input: buildAiUserPrompt(input),
+        ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
+          ? {}
+          : { temperature: input.temperature }),
+        ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
+          ? { reasoning: { effort: input.reasoningEffort } }
+          : {}),
+        ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
+      },
+      this.generationRequestOptions,
+    );
     const text = response.output_text.trim();
 
     if (!text) {
@@ -160,21 +169,24 @@ export class OpenAiProvider implements AiProvider {
     assertAiOutputName(input.outputName);
     const startedAt = Date.now();
     const modelToUse = input.model ?? this.config.structuredModel;
-    const response = await this.client.responses.parse({
-      model: modelToUse,
-      instructions: input.systemPrompt,
-      input: buildAiUserPrompt(input),
-      text: {
-        format: buildAiStructuredTextFormat(schema, input.outputName),
+    const response = await this.client.responses.parse(
+      {
+        model: modelToUse,
+        instructions: input.systemPrompt,
+        input: buildAiUserPrompt(input),
+        text: {
+          format: buildAiStructuredTextFormat(schema, input.outputName),
+        },
+        ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
+          ? {}
+          : { temperature: input.temperature }),
+        ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
+          ? { reasoning: { effort: input.reasoningEffort } }
+          : {}),
+        ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
       },
-      ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
-        ? {}
-        : { temperature: input.temperature }),
-      ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
-        ? { reasoning: { effort: input.reasoningEffort } }
-        : {}),
-      ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
-    });
+      this.generationRequestOptions,
+    );
 
     if (response.output_parsed === null) {
       this.logger.error(

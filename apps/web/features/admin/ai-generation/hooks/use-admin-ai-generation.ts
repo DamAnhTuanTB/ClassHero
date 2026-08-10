@@ -11,11 +11,11 @@ import {
 } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
 import type {
   AdminAiGenerationPayload,
+  AdminLessonSummaryContent,
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
-import type { TiptapTextDocument } from "@/types/rich-text";
 
 export const adminAiGenerationQueryKeys = {
   panel: (lessonId: string) =>
@@ -91,7 +91,7 @@ export function useUpsertAdminLessonSummary(lessonId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: {
-      contentJson: TiptapTextDocument;
+      contentJson: AdminLessonSummaryContent;
       source: "ADMIN" | "AI";
       reviewStatus: AdminLessonSummaryReviewStatus;
     }) => upsertAdminLessonSummary(lessonId, data, session?.accessToken ?? ""),

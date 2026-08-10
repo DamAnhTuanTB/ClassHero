@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import {
@@ -14,6 +14,8 @@ import {
   FileStatus,
   FileVisibility,
   PrismaClient,
+  ProviderCatalogCategory,
+  ProviderCatalogStatus,
   PublishStatus,
   ReviewStatus,
   UserRole,
@@ -49,7 +51,9 @@ const ids = {
   file: randomUUID(),
   document: randomUUID(),
   chunk: randomUUID(),
+  reasoningModel: randomUUID(),
 };
+const reasoningModelKey = `m9-2-reasoning-${testRunId}`;
 const queuedJobIds = new Set<string>();
 const queueMock = {
   enqueue: vi.fn(async (jobId: string) => {
@@ -216,6 +220,182 @@ describe("M9.2 lesson summary API and worker integration", () => {
     expect(audit?.actorUserId).toBe(ids.adminUser);
   });
 
+  it("saves reviewable blocks but blocks publish until the issue is accepted", async () => {
+    const content = "Nội dung vẫn hiển thị để admin kiểm tra.";
+    const issue = {
+      id: "CONTENT_NEEDS_REVIEW-test",
+      code: "CONTENT_NEEDS_REVIEW",
+      path: "sections.0.blocks.0.content",
+      message: "Khối kiến thức cần được kiểm tra lại.",
+      suggestion: "Đối chiếu nội dung với tài liệu nguồn rồi sửa hoặc chấp nhận.",
+      technicalDetails: "Fixture kiểm thử publish guard.",
+      fingerprint: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
+      accepted: false,
+    };
+    const contentJson = {
+      type: "lesson_summary_blocks",
+      version: 2,
+      data: {
+        lessonId: ids.lesson,
+        title: "Bản nháp cần review",
+        objectives: null,
+        sections: [
+          {
+            order: 1,
+            sourceHeading: "Kiến thức",
+            displayHeading: "Kiến thức",
+            sourceChunkIds: [ids.chunk],
+            blocks: [
+              {
+                type: "knowledge",
+                title: "Nội dung chính",
+                content,
+                sourceChunkIds: [ids.chunk],
+                reviewIssues: [issue],
+              },
+            ],
+          },
+          {
+            order: 2,
+            sourceHeading: "Bài tập vận dụng",
+            displayHeading: "Bài tập vận dụng",
+            sourceChunkIds: [ids.chunk],
+            blocks: [
+              {
+                type: "example",
+                problem: "Nêu nội dung vừa học.",
+                solution: null,
+                answer: "Nội dung chính.",
+                sourceChunkIds: [ids.chunk],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    await request(httpServer)
+      .put(`/api/v1/admin/lessons/${ids.lesson}/summary`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        contentJson,
+        source: ContentSource.AI,
+        reviewStatus: ReviewStatus.NEEDS_REVIEW,
+      })
+      .expect(200);
+
+    const blocked = await request(httpServer)
+      .put(`/api/v1/admin/lessons/${ids.lesson}/summary`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        contentJson,
+        source: ContentSource.AI,
+        reviewStatus: ReviewStatus.APPROVED,
+      })
+      .expect(400);
+    expect(blocked.body.error).toMatchObject({
+      code: "LESSON_SUMMARY_REVIEW_REQUIRED",
+      details: {
+        issues: [
+          expect.objectContaining({
+            code: "CONTENT_NEEDS_REVIEW",
+            suggestion: expect.any(String),
+          }),
+        ],
+      },
+    });
+
+    contentJson.data.sections[0]!.blocks[0]!.reviewIssues[0]!.accepted = true;
+    await request(httpServer)
+      .put(`/api/v1/admin/lessons/${ids.lesson}/summary`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        contentJson,
+        source: ContentSource.AI,
+        reviewStatus: ReviewStatus.APPROVED,
+      })
+      .expect(200);
+  });
+
+  it("never accepts an unrenderable diagram issue even when the client forges accepted=true", async () => {
+    const issue = {
+      id: "DIAGRAM_CANNOT_RENDER-test",
+      code: "DIAGRAM_CANNOT_RENDER",
+      path: "sections.0.blocks.0.visual.spec",
+      message: "Dữ liệu hình vẽ chưa hợp lệ theo quy tắc vẽ.",
+      suggestion: "Sửa dữ liệu hình vẽ hoặc xóa hình lỗi khỏi khối này.",
+      technicalDetails: "Fixture kiểm thử hình không thể hiển thị.",
+      fingerprint: createHash("sha256").update(JSON.stringify(null)).digest("hex"),
+      resolution: "ACCEPT_OR_FIX",
+      accepted: true,
+    };
+    const contentJson = {
+      type: "lesson_summary_blocks",
+      version: 2,
+      data: {
+        lessonId: ids.lesson,
+        title: "Bản nháp có hình lỗi",
+        objectives: null,
+        sections: [
+          {
+            order: 1,
+            sourceHeading: "Kiến thức",
+            displayHeading: "Kiến thức",
+            sourceChunkIds: [ids.chunk],
+            blocks: [
+              {
+                type: "knowledge",
+                title: "Nội dung chính",
+                content: "Nội dung chữ vẫn sử dụng được.",
+                sourceChunkIds: [ids.chunk],
+                reviewIssues: [issue],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const saved = await request(httpServer)
+      .put(`/api/v1/admin/lessons/${ids.lesson}/summary`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        contentJson,
+        source: ContentSource.AI,
+        reviewStatus: ReviewStatus.NEEDS_REVIEW,
+      })
+      .expect(200);
+
+    expect(
+      saved.body.data.contentJson.data.sections[0].blocks[0].reviewIssues[0],
+    ).toMatchObject({
+      code: "DIAGRAM_CANNOT_RENDER",
+      resolution: "FIX_ONLY",
+      accepted: false,
+    });
+
+    const blocked = await request(httpServer)
+      .put(`/api/v1/admin/lessons/${ids.lesson}/summary`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        contentJson,
+        source: ContentSource.AI,
+        reviewStatus: ReviewStatus.APPROVED,
+      })
+      .expect(400);
+
+    expect(blocked.body.error).toMatchObject({
+      code: "LESSON_SUMMARY_REVIEW_REQUIRED",
+      details: {
+        issues: [
+          expect.objectContaining({
+            code: "DIAGRAM_CANNOT_RENDER",
+          }),
+        ],
+      },
+    });
+  });
+
   it("validates lesson-owned READY chunks before enqueue", async () => {
     const response = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lesson}/summary/generate-ai`)
@@ -244,7 +424,8 @@ describe("M9.2 lesson summary API and worker integration", () => {
         styleInstructions: "Dễ hiểu cho học sinh khối 7",
         systemInstructions: longSystemInstructions,
         userPrompt: "USER PREVIEW CUSTOM",
-        temperature: 0.1,
+        model: reasoningModelKey,
+        reasoningEffort: "xhigh",
         maxOutputTokens: 8_000,
       })
       .expect(200);
@@ -273,7 +454,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
             }),
           },
         },
-        temperature: 0.1,
+        reasoning_effort: "xhigh",
         max_output_tokens: 8_000,
       },
       context: {
@@ -284,11 +465,33 @@ describe("M9.2 lesson summary API and worker integration", () => {
         estimatedTokens: expect.any(Number),
       },
       configuration: {
-        temperature: 0.1,
+        selectedModel: reasoningModelKey,
+        resolvedModel: reasoningModelKey,
+        reasoningEffort: "xhigh",
         maxOutputTokens: 8_000,
       },
     });
     expect(queueMock.enqueue).not.toHaveBeenCalled();
+
+    const unsupported = await request(httpServer)
+      .post(`/api/v1/admin/lessons/${ids.lesson}/summary/prompt-preview`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        documentIds: [ids.document],
+        style: "academic",
+        model: reasoningModelKey,
+        reasoningEffort: "max",
+        maxOutputTokens: 8_000,
+      })
+      .expect(400);
+    expect(unsupported.body.error).toMatchObject({
+      code: "AI_REASONING_EFFORT_NOT_SUPPORTED",
+      details: {
+        model: reasoningModelKey,
+        reasoningEffort: "max",
+        allowedReasoningEffortLevels: ["low", "xhigh"],
+      },
+    });
   });
 
   it("queues once for concurrent clicks, generates from chunks, and allows a later regeneration", async () => {
@@ -329,6 +532,24 @@ describe("M9.2 lesson summary API and worker integration", () => {
     const rejectedOutput = structuredClone(generatedOutput);
     rejectedOutput.theorySections[0]!.units[0]!.theory.content +=
       " Ví dụ: 2/3 là số hữu tỉ.";
+    (
+      rejectedOutput.theorySections[0]!.units[0]!.theory as unknown as {
+        diagramSpec: unknown;
+      }
+    ).diagramSpec = {
+      kind: "INTENT",
+      intent: {
+        intentVersion: 1,
+        grade: 7,
+        difficulty: "MEDIUM",
+        caption: "Hai tam giác vuông còn thiếu một nhãn điểm.",
+        family: "PLANE_GEOMETRY",
+        archetype: "RIGHT_TRIANGLE_CONGRUENCE",
+        variant: "HYPOTENUSE_LEG",
+        pointLabels: ["A", "B", "C", "A′", "B′"],
+        measures: [],
+      },
+    };
     const aiServiceMock = {
       generateStructured: vi.fn().mockResolvedValue({
         data: rejectedOutput,
@@ -384,6 +605,10 @@ describe("M9.2 lesson summary API and worker integration", () => {
       }),
     });
     expect(JSON.stringify(summary.contentJson)).toContain("Bài tập vận dụng");
+    expect(JSON.stringify(summary.contentJson)).toContain("DIAGRAM_CANNOT_RENDER");
+    expect(JSON.stringify(summary.contentJson)).toContain(
+      "RIGHT_TRIANGLE_CONGRUENCE requires at least 6 point labels.",
+    );
     expect(JSON.stringify(summary.contentJson)).not.toContain("Cần admin kiểm tra");
     expect(JSON.stringify(summary.contentJson)).not.toContain("warningDetails");
 
@@ -491,6 +716,20 @@ async function createFixtureData(prisma: PrismaClient) {
       tokenCount: 25,
     },
   });
+  await prisma.providerCatalogItem.create({
+    data: {
+      id: ids.reasoningModel,
+      category: ProviderCatalogCategory.AI_MODEL,
+      provider: AiProviderName.OPENAI,
+      externalKey: reasoningModelKey,
+      displayName: "M9.2 reasoning model",
+      capabilitiesJson: {
+        aiConfiguration: "REASONING_EFFORT",
+        reasoningEffortLevels: ["low", "xhigh"],
+      },
+      status: ProviderCatalogStatus.ACTIVE,
+    },
+  });
 }
 
 async function cleanupFixtureData(prisma: PrismaClient) {
@@ -507,6 +746,7 @@ async function cleanupFixtureData(prisma: PrismaClient) {
   await prisma.lesson.deleteMany({ where: { id: ids.lesson } });
   await prisma.learningPath.deleteMany({ where: { id: ids.learningPath } });
   await prisma.file.deleteMany({ where: { id: ids.file } });
+  await prisma.providerCatalogItem.deleteMany({ where: { id: ids.reasoningModel } });
   await prisma.user.deleteMany({
     where: { id: { in: [ids.adminUser, ids.studentUser] } },
   });

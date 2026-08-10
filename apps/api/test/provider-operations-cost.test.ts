@@ -169,6 +169,70 @@ describe("provider operations cost accounting", () => {
     expect(aiService.generateStructured).not.toHaveBeenCalled();
     expect(usage.fail).not.toHaveBeenCalled();
   });
+
+  it("passes extended reasoning effort from the route to the provider", async () => {
+    const output = {
+      data: { title: "Summary" },
+      provider: AiProviderName.OPENAI,
+      model: "gpt-5.6",
+    };
+    const aiService = { generateStructured: vi.fn(async () => output) };
+    const usage = {
+      reserveAndStart: vi.fn(async () => ({ id: "usage-1" })),
+      succeed: vi.fn(async () => ({ costVnd: 0 })),
+      fail: vi.fn(),
+    };
+    const service = new AiProviderCallService(
+      aiService as never,
+      { resolve: vi.fn() } as never,
+      usage as never,
+      { aiGeneration: { update: vi.fn() } } as never,
+    );
+
+    await service.generateStructured(
+      {
+        feature: AiGenerationType.SUMMARY,
+        routeSnapshot: {
+          feature: AiGenerationType.SUMMARY,
+          version: 1,
+          model: "gpt-5.6",
+          temperature: null,
+          reasoningEffort: "xhigh",
+          maxOutputTokens: 8_000,
+          candidates: [
+            {
+              catalogItemId: "openai-catalog",
+              priceVersionId: "openai-price",
+              category: ProviderCatalogCategory.AI_MODEL,
+              provider: AiProviderName.OPENAI,
+              model: "gpt-5.6",
+              maxInputTokens: 32_000,
+              available: true,
+              rates: [
+                rate(ProviderUsageMetric.INPUT_TOKEN, 1_000_000, 1),
+                rate(ProviderUsageMetric.OUTPUT_TOKEN, 1_000_000, 2),
+              ],
+            },
+          ],
+          hasConfiguration: true,
+        },
+      },
+      {
+        systemPrompt: "system",
+        userPrompt: "user",
+        outputName: "summary",
+        promptVersion: "v1",
+        schemaVersion: "v1",
+      },
+      z.object({ title: z.string() }),
+    );
+
+    expect(aiService.generateStructured).toHaveBeenCalledWith(
+      expect.objectContaining({ reasoningEffort: "xhigh" }),
+      expect.anything(),
+      AiProviderName.OPENAI,
+    );
+  });
 });
 
 function rate(metric: ProviderUsageMetric, unitSize: number, unitPriceUsd: number) {

@@ -1,4 +1,7 @@
-import { LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS } from "@learning-path/shared";
+import {
+  AI_REASONING_EFFORT_LEVELS,
+  LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
+} from "@learning-path/shared";
 import { z } from "zod";
 
 const generationTypeSchema = z.enum(["SUMMARY", "QUIZ", "FLASHCARD", "TEST"]);
@@ -41,7 +44,7 @@ const optionalNumericTextSchema = (
 export const adminAiGenerationFormSchema = z
   .object({
     type: generationTypeSchema,
-    documentIds: z.array(z.string().uuid()).max(20),
+    documentIds: z.array(z.string().uuid()).max(20, "Chọn tối đa 20 tài liệu"),
     style: summaryStyleSchema,
     styleInstructions: z
       .string()
@@ -61,7 +64,7 @@ export const adminAiGenerationFormSchema = z
     userPrompt: z.string().trim().max(16_000, "User prompt tối đa 16.000 ký tự"),
     summaryModel: z.string().max(200),
     summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),
-    summaryReasoningEffort: z.string().optional(),
+    summaryReasoningEffort: z.union([z.literal(""), z.enum(AI_REASONING_EFFORT_LEVELS)]),
     summaryMaxOutputTokens: optionalNumericTextSchema("Số token đầu ra", 8_000, 32_000),
     count: numericTextSchema("Số lượng", 1, 60),
     difficulty: difficultySchema,

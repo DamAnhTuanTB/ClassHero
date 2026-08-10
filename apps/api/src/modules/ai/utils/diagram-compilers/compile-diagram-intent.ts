@@ -12,7 +12,11 @@ import { compileGraphDiagram } from "#api/modules/ai/utils/diagram-compilers/com
 import { compilePlaneGeometryDiagram } from "#api/modules/ai/utils/diagram-compilers/compile-plane-geometry-diagram";
 import { compileSchematicDiagram } from "#api/modules/ai/utils/diagram-compilers/compile-schematic-diagram";
 import { compileSpatialDiagram } from "#api/modules/ai/utils/diagram-compilers/compile-spatial-diagram";
-import { assertCompiledDiagramSemantics } from "#api/modules/ai/utils/diagram-compilers/diagram-semantic-validator";
+import {
+  assertCompiledDiagramSemantics,
+  validateCompiledDiagramSemantics,
+  type DiagramSemanticIssue,
+} from "#api/modules/ai/utils/diagram-compilers/diagram-semantic-validator";
 
 export type CompiledDiagram = {
   spec: LessonSummaryDiagramSpec;
@@ -25,11 +29,26 @@ export type CompiledDiagram = {
 };
 
 export function compileLessonSummaryDiagramIntent(input: unknown): CompiledDiagram {
+  const compiled = compileLessonSummaryDiagramIntentWithDiagnostics(input);
+  assertCompiledDiagramSemantics(compiled.intent, compiled.spec);
+  const { intent: _intent, semanticIssues: _semanticIssues, ...result } = compiled;
+  return result;
+}
+
+export type CompiledDiagramWithDiagnostics = CompiledDiagram & {
+  intent: LessonSummaryDiagramIntent;
+  semanticIssues: DiagramSemanticIssue[];
+};
+
+export function compileLessonSummaryDiagramIntentWithDiagnostics(
+  input: unknown,
+): CompiledDiagramWithDiagnostics {
   const intent = lessonSummaryDiagramIntentSchema.parse(input);
   const spec = compileByFamily(intent);
-  assertCompiledDiagramSemantics(intent, spec);
   return {
+    intent,
     spec,
+    semanticIssues: validateCompiledDiagramSemantics(intent, spec),
     diagnostics: {
       intentVersion: 1,
       compilerKey: resolveCompilerKey(intent),

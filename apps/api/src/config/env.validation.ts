@@ -70,6 +70,12 @@ const envSchema = z
       .min(1_000)
       .max(300_000)
       .default(60_000),
+    AI_GENERATION_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .max(1_800_000)
+      .default(600_000),
     AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
     AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),

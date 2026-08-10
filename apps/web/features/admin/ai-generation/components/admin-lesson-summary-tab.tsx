@@ -10,7 +10,7 @@ import {
   Code2,
   Columns,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
@@ -21,6 +21,7 @@ import {
   useUpsertAdminLessonSummary,
 } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
+  AdminLessonSummaryContent,
   AdminLessonSummaryReviewStatus,
   AdminAiPanelJob,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
@@ -30,7 +31,6 @@ import {
   createEmptyTiptapDocument,
   hasTiptapDocumentContent,
 } from "@/lib/tiptap-rich-content";
-import type { TiptapTextDocument } from "@/types/rich-text";
 import { MathToolbar } from "@/features/student/lessons/screens/student-lesson-screen/components/math-toolbar";
 import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-metadata";
 
@@ -51,12 +51,13 @@ export function AdminLessonSummaryTab({
   const panelQuery = useAdminAiGenerationPanel(lessonId);
   const summaryJob = panelQuery.data?.jobs?.SUMMARY;
   const upsertMutation = useUpsertAdminLessonSummary(lessonId);
-  const [content, setContent] = useState<TiptapTextDocument | any>(
+  const [content, setContent] = useState<AdminLessonSummaryContent>(
     createEmptyTiptapDocument(),
   );
   const [contentError, setContentError] = useState<string>();
   const [viewMode, setViewMode] = useState<ViewMode>("UI_ONLY");
   const [jsonCollapsed, setJsonCollapsed] = useState<boolean | number>(2);
+  const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
 
   useEffect(() => {
     const savedMode = localStorage.getItem("admin-lesson-summary-view-mode");
@@ -126,7 +127,7 @@ export function AdminLessonSummaryTab({
   };
 
   return (
-    <div className="space-y-5 p-4 sm:p-6">
+    <div className="space-y-5 p-4 sm:p-6" data-testid="admin-lesson-summary-tab">
       <MathToolbar />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -139,6 +140,11 @@ export function AdminLessonSummaryTab({
                 status={summary.reviewStatus}
                 job={summaryJob ?? null}
               />
+            ) : null}
+            {unresolvedReviewIssueCount > 0 ? (
+              <span className="inline-flex min-h-7 items-center rounded-full border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-2.5 text-xs font-extrabold text-[var(--theme-warning-text)]">
+                {unresolvedReviewIssueCount} mục cần kiểm tra
+              </span>
             ) : null}
           </div>
           <AiJobMetadata job={summaryJob ?? null} onEdit={onRegenerate} />
@@ -210,22 +216,33 @@ export function AdminLessonSummaryTab({
               <div className="w-full overflow-auto max-h-[800px] border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-white dark:bg-slate-950 shadow-sm">
                 <ReactJson
                   src={content}
-                  onEdit={(e) => setContent(e.updated_src)}
-                  onAdd={(e) => setContent(e.updated_src)}
-                  onDelete={(e) => setContent(e.updated_src)}
+                  onEdit={(event) =>
+                    setContent(event.updated_src as AdminLessonSummaryContent)
+                  }
+                  onAdd={(event) =>
+                    setContent(event.updated_src as AdminLessonSummaryContent)
+                  }
+                  onDelete={(event) =>
+                    setContent(event.updated_src as AdminLessonSummaryContent)
+                  }
                   theme="rjv-default"
                   style={{ backgroundColor: "transparent" }}
                   collapsed={jsonCollapsed}
                   displayDataTypes={false}
                   name={false}
                   enableClipboard={false}
-                  keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
+                  keyModifier={(event) =>
+                    event instanceof MouseEvent &&
+                    (event.detail >= 2 || event.metaKey || event.ctrlKey)
+                  }
                 />
               </div>
             </div>
           ) : (
             <SummaryBlockRenderer
-              data={content.data}
+              data={
+                content.data as ComponentProps<typeof SummaryBlockRenderer>["data"]
+              }
               displayTitle={lessonTitle}
               viewMode={viewMode === "UI_ONLY" ? "UI_ONLY" : "SPLIT"}
               showEditorialMetadata
@@ -280,8 +297,13 @@ export function AdminLessonSummaryTab({
         {summary?.reviewStatus !== "APPROVED" ? (
           <button
             type="button"
-            disabled={upsertMutation.isPending}
+            disabled={upsertMutation.isPending || unresolvedReviewIssueCount > 0}
             onClick={() => save("PUBLISH")}
+            title={
+              unresolvedReviewIssueCount > 0
+                ? "Sửa hoặc chấp nhận các vấn đề trước khi phát hành"
+                : "Phát hành tóm tắt"
+            }
             className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:opacity-60"
           >
             <Send className="h-4 w-4" aria-hidden="true" />
@@ -301,6 +323,60 @@ export function AdminLessonSummaryTab({
         ) : null}
       </div>
     </div>
+  );
+}
+
+type ReviewIssueLike = {
+  accepted?: boolean;
+  code?: string;
+  resolution?: "ACCEPT_OR_FIX" | "FIX_ONLY";
+};
+type ReviewBlockLike = { reviewIssues?: ReviewIssueLike[] };
+type ReviewSectionLike = { blocks?: ReviewBlockLike[] };
+type ReviewContentLike = {
+  type?: string;
+  data?: { reviewIssues?: ReviewIssueLike[]; sections?: ReviewSectionLike[] };
+};
+const FIX_ONLY_REVIEW_CODES = new Set([
+  "BLOCK_CANNOT_PROCESS",
+  "BLOCK_SCHEMA_INVALID",
+  "DIAGRAM_CANNOT_RENDER",
+  "MISSING_REQUIRED_FIELD",
+  "MISSING_SUMMARY_TITLE",
+  "MISSING_THEORY_SECTION",
+  "MISSING_THEORY_UNIT",
+]);
+
+function countUnresolvedReviewIssues(content: unknown) {
+  const candidate = content as ReviewContentLike;
+  if (candidate?.type !== "lesson_summary_blocks" || !candidate.data) return 0;
+  const count = (issues: ReviewIssueLike[] | undefined) =>
+    Array.isArray(issues)
+      ? issues.filter(
+          (issue) =>
+            issue &&
+            (issue.resolution === "FIX_ONLY" ||
+              (issue.code !== undefined && FIX_ONLY_REVIEW_CODES.has(issue.code)) ||
+              issue.code?.endsWith("_CANNOT_RENDER") ||
+              issue.code?.endsWith("_CANNOT_PROCESS") ||
+              issue.accepted !== true),
+        ).length
+      : 0;
+  return (
+    count(candidate.data.reviewIssues) +
+    (Array.isArray(candidate.data.sections)
+      ? candidate.data.sections.reduce(
+          (sectionTotal: number, section) =>
+            sectionTotal +
+            (Array.isArray(section?.blocks)
+              ? section.blocks.reduce(
+                  (blockTotal: number, block) => blockTotal + count(block?.reviewIssues),
+                  0,
+                )
+              : 0),
+          0,
+        )
+      : 0)
   );
 }
 

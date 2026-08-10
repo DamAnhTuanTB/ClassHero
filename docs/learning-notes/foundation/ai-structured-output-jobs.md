@@ -22,10 +22,15 @@ flowchart TD
   B --> C[Enqueue BullMQ]
   C --> D[AI worker đánh dấu RUNNING]
   D --> E[AiProvider gọi OpenAI]
-  E --> F{JSON Schema và Zod hợp lệ?}
+  E --> F{Root/transport có đọc được?}
   F -- Không --> G[Không lưu domain; đánh dấu FAILED]
-  F -- Có --> H[Handler domain map và lưu summary/quiz/...]
-  H --> I[Hai record cùng SUCCEEDED và lưu usage/hash]
+  F -- Có --> H[Validate và map từng block]
+  H --> J{Block cục bộ có lỗi?}
+  J -- Có --> K[Giữ phần an toàn + placeholder/review issue]
+  J -- Không --> L[Giữ block nguyên vẹn]
+  K --> I[Lưu draft NEEDS_REVIEW]
+  L --> I
+  I --> M[Hai record cùng SUCCEEDED và lưu usage/hash]
 ```
 
 ## Luồng kỹ thuật
@@ -86,6 +91,14 @@ test độc lập. Ví dụ provider trả `diagramSpec`, mapper đổi thành `
 render; test chỉ parse output của provider sẽ không phát hiện schema lưu trữ quên
 field `visual`. Test hồi quy đúng phải chạy đủ chuỗi provider parse → mapper →
 persisted-output parse, đặc biệt với các field chỉ xuất hiện khi bài cần hình.
+
+Schema pass cũng không chứng minh mapper sẽ chạy được. Một `diagramIntent` có thể
+đủ field nhưng compiler vẫn ném lỗi vì thiếu số nhãn cần cho đúng archetype. Vì
+vậy summary dùng hai boundary liên tiếp: recovery chạy thử chính compiler và
+materialize kết quả renderer-ready đúng một lần; mapper có boundary cuối theo
+từng block để đổi mọi exception cục bộ thành review issue + fallback nhỏ nhất.
+Không được chỉ bắt một message cụ thể: test phải phủ các family compiler khác
+nhau và cả lỗi ngoài dự kiến trong theory/example/note/application block.
 
 ## Handler summary đầu tiên
 
@@ -191,6 +204,20 @@ lên trục. Ngoài semantic, tick còn cần giới hạn chiều dài theo c�
 `SEGMENT`; nếu chỉ nhận `LINE` hoặc lấy một số tọa độ quá lớn, hình dài/hẹp sẽ
 phóng vạch nhỏ thành cột lớn trên mobile. Bảng rộng cũng cần font floor riêng,
 không thể chỉ suy cỡ chữ từ chiều ngắn viewBox vì nội dung ô sẽ trở nên khó đọc.
+
+Khi recovery bỏ một marker hình học không đạt semantic validation, hình còn lại
+có thể vẫn sạch và đẹp nhưng đã mất một giả thiết của bài. Badge review vì thế
+phải gọi đúng tên các đoạn/góc liên quan từ lỗi validator, chẳng hạn `AC` và
+`A′C′`, thay vì dùng câu chung chung. Ngược lại, một nhãn chữ đẳng thức thừa đã
+được bỏ mà marker đúng vẫn còn là sửa trình bày tất định và không cần tạo badge.
+
+Thông báo review cần tách rõ hai tầng ngôn ngữ. `Vấn đề` và `Gợi ý sửa` là phần
+cho quản trị viên nên chỉ dùng tiếng Việt dễ hiểu, có thể giữ tên điểm, cạnh và
+ký hiệu toán học quen thuộc để xác định đúng đối tượng. Tên trường, đường dẫn dữ
+liệu, mã validator và thuật ngữ như `diagramSpec`, `segmentIds`, `marker`,
+`label`, `null` chỉ thuộc `Chi tiết kỹ thuật`. Lớp chuyển đổi này phải chạy cả
+khi tạo cảnh báo mới lẫn khi đọc cảnh báo cũ, tránh buộc người dùng sinh lại nội
+dung chỉ để có lời báo dễ hiểu hơn.
 
 Điểm điều khiển đồ thị cũng cần phân loại theo mục đích. Đồ thị đường thẳng trong
 bài “vẽ đồ thị” nên hiện ít nhất hai điểm dựng để học sinh thấy thao tác xác định

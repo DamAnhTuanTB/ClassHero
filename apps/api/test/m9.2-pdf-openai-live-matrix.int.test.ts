@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { ConfigService } from "@nestjs/config";
+import { AI_REASONING_EFFORT_LEVELS } from "@learning-path/shared";
 import { config as loadEnv } from "dotenv";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -25,7 +26,7 @@ loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false });
 const runLiveTest = process.env.RUN_M9_2_PDF_LIVE_MATRIX === "1";
 const runAiAudit = process.env.M9_2_PDF_LIVE_AI_AUDIT === "1";
 const liveReasoningEffort = z
-  .enum(["low", "medium", "high"])
+  .enum(AI_REASONING_EFFORT_LEVELS)
   .parse(process.env.M9_2_PDF_LIVE_REASONING_EFFORT ?? "medium");
 const liveLength = z
   .enum(["short", "standard", "detailed"])

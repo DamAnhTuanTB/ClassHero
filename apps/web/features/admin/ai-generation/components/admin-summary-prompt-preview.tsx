@@ -1,13 +1,16 @@
 "use client";
 
-import { Check, Copy, ShieldCheck } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import type { FieldError } from "react-hook-form";
 import { toast } from "sonner";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { JsonViewer } from "@/components/common/ui/json-viewer";
 import type { AdminLessonSummaryPromptPreview } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
-import { supportsReasoningEffort, supportsTemperature } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import {
+  supportsReasoningEffort,
+  supportsTemperature,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { cn } from "@/lib/utils";
 
 type PromptTab = "system" | "user" | "input";
@@ -52,22 +55,33 @@ export function AdminSummaryPromptPreview({
   const inputWithEditedPrompt = preview.inputPrompt.startsWith(preview.userPrompt)
     ? `${userPrompt}${preview.inputPrompt.slice(preview.userPrompt.length)}`
     : preview.inputPrompt;
-  const fullInputJson = JSON.stringify(
-    {
-      ...preview.openAiRequest,
-      model: model || preview.openAiRequest.model,
-      instructions: systemInstructions,
-      input: inputWithEditedPrompt,
-      ...(reasoningEffort || preview.openAiRequest.reasoning_effort
-        ? { reasoning_effort: reasoningEffort || preview.openAiRequest.reasoning_effort }
-        : { temperature: Number(temperature || preview.openAiRequest.temperature) }),
-      max_output_tokens: Number(
-        maxOutputTokens || preview.openAiRequest.max_output_tokens,
-      ),
-    },
-    null,
-    2,
+  const {
+    reasoning_effort: previewReasoningEffort,
+    temperature: previewTemperature,
+    ...baseOpenAiRequest
+  } = preview.openAiRequest;
+  const effectiveModel = model || preview.openAiRequest.model;
+  const effectiveModelCapability = preview.configuration.modelOptions?.find(
+    (option) => option.model === effectiveModel,
+  )?.capabilities?.aiConfiguration;
+  const usesReasoningEffort = supportsReasoningEffort(
+    effectiveModel,
+    effectiveModelCapability,
   );
+  const effectiveReasoningEffort = usesReasoningEffort
+    ? reasoningEffort || previewReasoningEffort
+    : undefined;
+  const fullInputData = {
+    ...baseOpenAiRequest,
+    model: effectiveModel,
+    instructions: systemInstructions,
+    input: inputWithEditedPrompt,
+    ...(effectiveReasoningEffort
+      ? { reasoning_effort: effectiveReasoningEffort }
+      : { temperature: Number(temperature || previewTemperature) }),
+    max_output_tokens: Number(maxOutputTokens || preview.openAiRequest.max_output_tokens),
+  };
+  const fullInputJson = JSON.stringify(fullInputData, null, 2);
   const promptValue =
     activeTab === "system"
       ? systemInstructions
@@ -109,17 +123,17 @@ export function AdminSummaryPromptPreview({
           />
           {(() => {
             const resolvedModelCapabilities = preview.configuration.modelOptions?.find(
-              (o) => o.model === preview.configuration.resolvedModel
+              (o) => o.model === preview.configuration.resolvedModel,
             )?.capabilities;
-            const aiConfiguration = (resolvedModelCapabilities as any)?.aiConfiguration;
+            const aiConfiguration = resolvedModelCapabilities?.aiConfiguration;
 
             const showReasoning = supportsReasoningEffort(
               preview.configuration.resolvedModel,
-              aiConfiguration
+              aiConfiguration,
             );
             const showTemp = supportsTemperature(
               preview.configuration.resolvedModel,
-              aiConfiguration
+              aiConfiguration,
             );
 
             return (
@@ -133,7 +147,7 @@ export function AdminSummaryPromptPreview({
                 {showTemp && (
                   <PreviewDetail
                     label="Temperature"
-                    value={preview.configuration.temperature.toString()}
+                    value={temperature || preview.configuration.temperature.toString()}
                   />
                 )}
               </>
@@ -141,7 +155,9 @@ export function AdminSummaryPromptPreview({
           })()}
           <PreviewDetail
             label="Giới hạn đầu ra"
-            value={`${preview.configuration.maxOutputTokens.toLocaleString("vi-VN")} token`}
+            value={`${Number(
+              maxOutputTokens || preview.configuration.maxOutputTokens,
+            ).toLocaleString("vi-VN")} token`}
           />
           <PreviewDetail
             label="Chi phí tối đa ước tính"
@@ -246,16 +262,7 @@ export function AdminSummaryPromptPreview({
                 <JsonViewer
                   key={isJsonExpanded ? "expanded" : "collapsed"}
                   collapseAtDepth={isJsonExpanded ? 999 : 1}
-                  data={{
-                    ...preview.openAiRequest,
-                    model: model || preview.openAiRequest.model,
-                    instructions: systemInstructions,
-                    input: inputWithEditedPrompt,
-                    temperature: Number(temperature || preview.openAiRequest.temperature),
-                    max_output_tokens: Number(
-                      maxOutputTokens || preview.openAiRequest.max_output_tokens,
-                    ),
-                  }}
+                  data={fullInputData}
                 />
               </div>
             </div>

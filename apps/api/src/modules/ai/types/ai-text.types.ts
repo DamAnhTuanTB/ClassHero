@@ -8,6 +8,7 @@
  */
 
 import type { AiProviderName } from "@prisma/client";
+import type { AiReasoningEffort } from "@learning-path/shared";
 import type { ZodType } from "zod";
 
 export interface RetrievedChunk {
@@ -24,7 +25,7 @@ export interface AiTextInput {
   /** Summary uses JSON so chunk content cannot break XML-like delimiters. */
   contextSerialization?: "xml" | "json";
   temperature?: number;
-  reasoningEffort?: "low" | "medium" | "high";
+  reasoningEffort?: AiReasoningEffort;
   maxTokens?: number;
   /** Model runtime resolved by provider-operations; embedding does not use this field. */
   model?: string;
