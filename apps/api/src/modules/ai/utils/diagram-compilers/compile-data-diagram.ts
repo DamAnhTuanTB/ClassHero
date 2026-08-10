@@ -28,7 +28,10 @@ export function compileDataDiagram(intent: DataIntent): LessonSummaryDiagramSpec
 }
 
 function compilePictogram(intent: Extract<DataIntent, { archetype: "PICTOGRAM" }>) {
-  const symbolCounts = intent.values.map((value) => value / intent.valuePerSymbol);
+  const commonValueCount = Math.min(intent.categories.length, intent.values.length);
+  const categories = intent.categories.slice(0, commonValueCount);
+  const values = intent.values.slice(0, commonValueCount);
+  const symbolCounts = values.map((value) => value / intent.valuePerSymbol);
   const maximumSymbols = Math.max(...symbolCounts, 1);
   const rowGap = 1.05;
   const symbolGap = 0.62;
@@ -39,12 +42,12 @@ function compilePictogram(intent: Extract<DataIntent, { archetype: "PICTOGRAM" }
       minX: -1.4,
       minY: -1.2,
       width: maxX + 2,
-      height: Math.max(2.6, intent.categories.length * rowGap + 1.7),
+      height: Math.max(2.6, categories.length * rowGap + 1.7),
     },
     intent.caption,
   );
-  for (const [categoryIndex, category] of intent.categories.entries()) {
-    const y = (intent.categories.length - categoryIndex - 1) * rowGap + 0.35;
+  for (const [categoryIndex, category] of categories.entries()) {
+    const y = (categories.length - categoryIndex - 1) * rowGap + 0.35;
     const categoryAnchor = builder.addPoint(
       hiddenPoint(`pictogramCategory${categoryIndex}`, 1.55, y),
     );
@@ -121,11 +124,6 @@ function compileValueTable(intent: Extract<DataIntent, { archetype: "VALUE_TABLE
   const columns = hasTrailingRowsPlaceholder
     ? intent.columns.slice(0, -1)
     : intent.columns;
-  for (const [index, row] of intent.rows.entries()) {
-    if (row.length !== columns.length) {
-      throw new Error(`Table row ${index + 1} does not match the column count.`);
-    }
-  }
   const columnCount = columns.length;
   const rowCount = intent.rows.length + 1;
   const rows = [columns, ...intent.rows];
@@ -165,7 +163,7 @@ function compileValueTable(intent: Extract<DataIntent, { archetype: "VALUE_TABLE
     builder.addSegment(safeDiagramId("tableRow", row), left, right);
   }
   for (const [rowIndex, row] of rows.entries()) {
-    for (const [columnIndex, value] of row.entries()) {
+    for (const [columnIndex, value] of row.slice(0, columnCount).entries()) {
       const anchor = builder.addPoint(
         hiddenPoint(
           `tableCellR${rowIndex}C${columnIndex}`,
@@ -185,14 +183,24 @@ function compileValueTable(intent: Extract<DataIntent, { archetype: "VALUE_TABLE
 }
 
 function compileChart(intent: ChartIntent) {
-  for (const series of intent.series) {
-    if (series.values.length !== intent.categories.length) {
-      throw new Error(`${series.label} does not match the category count.`);
-    }
+  const commonValueCount = Math.min(
+    intent.categories.length,
+    ...intent.series.map((series) => series.values.length),
+  );
+  if (commonValueCount < 1) {
+    throw new Error("A chart requires at least one category with a value.");
   }
-  return intent.archetype === "PIE_CHART"
-    ? compilePieChart(intent)
-    : compileCartesianChart(intent);
+  const drawableIntent: ChartIntent = {
+    ...intent,
+    categories: intent.categories.slice(0, commonValueCount),
+    series: intent.series.map((series) => ({
+      ...series,
+      values: series.values.slice(0, commonValueCount),
+    })),
+  };
+  return drawableIntent.archetype === "PIE_CHART"
+    ? compilePieChart(drawableIntent)
+    : compileCartesianChart(drawableIntent);
 }
 
 function compileCartesianChart(intent: ChartIntent) {
@@ -365,7 +373,9 @@ function addLineChartSeries(
       });
       return pointId;
     });
-    builder.addPolyline(safeDiagramId("chartSeries", seriesIndex), pointIds);
+    if (pointIds.length >= 2) {
+      builder.addPolyline(safeDiagramId("chartSeries", seriesIndex), pointIds);
+    }
   }
 }
 

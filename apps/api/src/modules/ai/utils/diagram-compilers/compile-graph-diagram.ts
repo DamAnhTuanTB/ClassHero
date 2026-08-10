@@ -103,19 +103,17 @@ export function compileGraphDiagram(intent: GraphIntent): LessonSummaryDiagramSp
           const name = isConstruction
             ? CONSTRUCTION_POINT_NAMES[constructionNameIndex]
             : undefined;
-          if (isConstruction && !name) {
-            throw new Error("A graph can show at most 14 named construction points.");
-          }
+          const namedConstruction = isConstruction && Boolean(name);
           builder.addPoint({
             id: pointId,
             x: renderX(x),
             y: renderY(y),
-            label: name ?? null,
-            pointStyle: isConstruction ? "FILLED" : "NONE",
+            label: namedConstruction ? name! : null,
+            pointStyle: namedConstruction ? "FILLED" : "NONE",
             labelPosition: resolveGraphPointLabelPosition(x, y, originX, originY),
           });
           pointIds.push(pointId);
-          if (isConstruction) {
+          if (namedConstruction) {
             constructionPointsByCoordinate.set(coordinateKey, pointId);
             addConstructionProjections(
               builder,
@@ -155,6 +153,7 @@ export function compileGraphDiagram(intent: GraphIntent): LessonSummaryDiagramSp
         ...functionLabelAnchors,
       ],
     );
+    if (!labelPlacement) continue;
     const labelAnchor = builder.addPoint({
       id: safeDiagramId("functionLabelAnchor", functionIndex),
       x: renderX(labelPlacement.x),
@@ -193,7 +192,11 @@ export function canonicalGraphFunctions(intent: GraphIntent): GraphFunction[] {
   return intent.functions
     .map((graphFunction) => ({
       ...graphFunction,
-      constructionXs: canonicalConstructionXs(graphFunction),
+      constructionXs: canonicalConstructionXs(graphFunction).filter((x) => {
+        if (x < intent.xMin || x > intent.xMax) return false;
+        const y = evaluateFunction(graphFunction, x);
+        return y >= intent.yMin && y <= intent.yMax;
+      }),
     }))
     .sort((left, right) => {
       const kindOrder = { QUADRATIC: 0, LINEAR: 1, INVERSE: 2 } as const;
@@ -265,6 +268,7 @@ function resolveFunctionLabelPlacement(
   const selected = candidates[0];
   if (!selected) {
     const visiblePoint = findVisibleFunctionLabelPoint(graphFunction, intent);
+    if (!visiblePoint) return null;
     return {
       ...visiblePoint,
       position: resolveFunctionLabelPosition(
@@ -291,7 +295,7 @@ function findVisibleFunctionLabelPoint(
     const y = evaluateFunction(graphFunction, x);
     if (y >= intent.yMin && y <= intent.yMax) return { x: rounded(x), y: rounded(y) };
   }
-  throw new Error(`${graphFunction.id} has no visible location for its function label.`);
+  return null;
 }
 
 function resolveFunctionLabelPosition(
@@ -480,19 +484,6 @@ function validateGraphIntent(intent: GraphIntent) {
       kinds.includes("QUADRATIC"));
   if (!valid) {
     throw new Error(`${intent.archetype} received incompatible function kinds.`);
-  }
-  for (const graphFunction of intent.functions) {
-    for (const x of graphFunction.constructionXs) {
-      if (x < intent.xMin || x > intent.xMax) {
-        throw new Error(`${graphFunction.id} construction x=${x} is outside the x domain.`);
-      }
-      const y = evaluateFunction(graphFunction, x);
-      if (y < intent.yMin || y > intent.yMax) {
-        throw new Error(
-          `${graphFunction.id} construction point (${x}, ${y}) is outside the y domain.`,
-        );
-      }
-    }
   }
 }
 

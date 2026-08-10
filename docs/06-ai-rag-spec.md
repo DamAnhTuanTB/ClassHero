@@ -888,6 +888,22 @@ marker góc và `caption` được chuẩn hóa thành `null`; thiếu `labelPos
 coi như chưa chọn vị trí. Đây không phải lỗi hình. Nhãn độ dài gọn nhưng chưa neo
 vào cạnh, nhãn đẳng thức dạng chữ bị thừa, nhãn trùng và tên góc lặp lại tên đỉnh
 được bỏ/chuẩn hóa riêng mà không tạo cảnh báo nếu không còn lỗi nào khác.
+Mỗi quy tắc tự phục hồi nhãn tùy chọn phải có test hồi quy cho cả hai đường vào:
+`RAW_SPEC` do provider mô tả trực tiếp và `INTENT` sau khi compiler dựng hình;
+không được chỉ nghiệm thu một đường rồi suy ra đường còn lại cũng an toàn.
+
+Với `INTENT`, compiler phải phục hồi cục bộ trước khi quyết định hình không thể
+vẽ: rút `AB = 4 cm` còn `4 cm` khi đã neo đúng cạnh; bỏ chữ quan hệ `AB = CD`,
+tên góc lặp và nhãn bất phương trình chỉ có dấu; giảm mật độ vạch thước; giữ bảng
+thiếu ô ở trạng thái cần kiểm tra; bỏ riêng điểm tọa độ/điểm dựng nằm ngoài miền;
+bỏ riêng biên bất phương trình có vectơ pháp tuyến bằng không khi vẫn còn biên
+hợp lệ; chỉ vẽ phần nhãn–giá trị khớp nhau khi biểu đồ cột/đường/tròn hoặc
+biểu đồ tranh có phần dư; bỏ số đo khối không dương; bỏ cạnh sơ đồ tham
+chiếu nút không tồn tại hoặc tự nối; dùng hai mốc đầu–cuối khi bước chia thước
+lớn hơn toàn miền; và điền tên chuẩn còn thiếu cho template hình học đã xác định
+chắc chắn.
+Nếu compiler điền tên điểm hoặc bỏ chi tiết có ý nghĩa toán học thì phải tạo
+`DIAGRAM_NEEDS_REVIEW`; nếu chỉ bỏ chú thích trình bày thừa thì không tạo cảnh báo.
 
 Lỗi chất lượng trình bày có ý nghĩa sư phạm như điểm dựng đồ thị chưa có tên,
 nhãn bảng chưa căn giữa, nhãn tọa độ đặt sai, thiếu vạch chia hoặc đường cong chưa

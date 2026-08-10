@@ -5,7 +5,10 @@ import {
   lessonSummaryProviderDiagramInputSchema,
   mapLessonSummaryProviderDiagramInput,
 } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
-import { compileLessonSummaryDiagramIntent } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
+import {
+  compileLessonSummaryDiagramIntent,
+  compileLessonSummaryDiagramIntentWithDiagnostics,
+} from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
 
 const base = {
   intentVersion: 1 as const,
@@ -354,6 +357,30 @@ describe("M9.2 deterministic math diagram compiler", () => {
       caption: "Cạnh huyền và một cạnh góc vuông",
     });
     expect(result.spec.labels.map((label) => label.text)).toEqual(["5 cm"]);
+  });
+
+  it("omits a composite optional measure instead of rejecting two right triangles", () => {
+    const result = compileLessonSummaryDiagramIntent({
+      ...base,
+      grade: 7,
+      difficulty: "SIMPLE",
+      family: "PLANE_GEOMETRY",
+      archetype: "RIGHT_TRIANGLE_CONGRUENCE",
+      variant: "TWO_LEGS",
+      pointLabels: ["A", "B", "C", "D", "E", "F"],
+      measures: [
+        { target: "AB = DE", text: "4 cm" },
+        { target: "AC = DF", text: "3 cm" },
+      ],
+      caption: "Hai tam giác vuông có hai cạnh góc vuông tương ứng bằng nhau",
+    });
+
+    expect(result.spec.labels).toEqual([]);
+    expect(result.spec.primitives.length).toBeGreaterThan(0);
+    expect(result.spec.markers.some((marker) => marker.type === "EQUAL_LENGTH")).toBe(
+      true,
+    );
+    expect(lessonSummaryDiagramSpecSchema.safeParse(result.spec).success).toBe(true);
   });
 
   it("keeps primary-school named quadrilaterals free of inferred property markers", () => {
@@ -768,6 +795,22 @@ describe("M9.2 deterministic math diagram compiler", () => {
       }),
       expect.objectContaining({ text: "8 cm", anchorPrimitiveId: "cuboidEdgeBC" }),
     ]);
+    expect(lessonSummaryDiagramSpecSchema.safeParse(result.spec).success).toBe(true);
+  });
+
+  it("omits an unknown optional solid dimension without rejecting the solid", () => {
+    const result = compileLessonSummaryDiagramIntent({
+      ...base,
+      family: "SPATIAL_APPLIED",
+      archetype: "CUBOID",
+      variant: "RECTANGULAR_PRISM",
+      pointLabels: [],
+      dimensions: [{ target: "cạnh chưa xác định", value: 9, unit: "cm" }],
+      caption: "Hình hộp chữ nhật",
+    });
+
+    expect(result.spec.labels).toEqual([]);
+    expect(result.spec.primitives.length).toBeGreaterThan(0);
     expect(lessonSummaryDiagramSpecSchema.safeParse(result.spec).success).toBe(true);
   });
 
@@ -2185,5 +2228,406 @@ describe("M9.2 deterministic math diagram compiler", () => {
     expect(labelsByPrimitive.get("similarFD")?.text).toBe("15 cm");
     expect(labelsByPrimitive.get("similarBC")?.position).toBe("RIGHT");
     expect(distance("similarD", "similarE") / distance("similarA", "similarB")).toBeCloseTo(1.5, 6);
+  });
+
+  it("normalizes advanced-geometry assignments and omits relation prose", () => {
+    const compiled = compileLessonSummaryDiagramIntent({
+      ...base,
+      grade: 8,
+      family: "ADVANCED_GEOMETRY",
+      archetype: "THALES",
+      variant: "PARALLEL_SEGMENT",
+      pointLabels: ["A", "B", "C", "D", "E"],
+      measures: [
+        { target: "AB", text: "AB = 4 cm" },
+        { target: "DE", text: "DE = BC" },
+      ],
+    });
+
+    expect(compiled.spec.labels).toEqual([
+      expect.objectContaining({ text: "4 cm", anchorPrimitiveId: "thalesAB" }),
+    ]);
+  });
+
+  it("removes a repeated angle name without hiding the angle", () => {
+    const compiled = compileLessonSummaryDiagramIntent({
+      ...base,
+      family: "PLANE_GEOMETRY",
+      archetype: "ANGLE_RAYS",
+      variant: "ACUTE",
+      pointLabels: ["O", "A", "B"],
+      measures: [{ target: "ANGLE", text: "∠O" }],
+    });
+
+    expect(compiled.spec.markers).toContainEqual(
+      expect.objectContaining({ type: "ANGLE", label: null }),
+    );
+  });
+
+  it("omits an incomplete inequality caption but preserves the region", () => {
+    const compiled = compileLessonSummaryDiagramIntent({
+      ...base,
+      family: "NUMBER_COORDINATE",
+      archetype: "INEQUALITY_REGION",
+      xMin: -4,
+      xMax: 4,
+      yMin: -4,
+      yMax: 4,
+      tickStep: 1,
+      boundaries: [
+        { a: 1, b: 1, c: 2, operator: "LE", label: ">= 0" },
+      ],
+    });
+
+    expect(compiled.spec.labels.map((label) => label.text)).not.toContain(">= 0");
+    expect(compiled.spec.primitives.length).toBeGreaterThan(2);
+  });
+
+  it("keeps an incomplete value table drawable and reports a review diagnostic", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 6,
+      family: "DATA_STATISTICS",
+      archetype: "VALUE_TABLE",
+      columns: ["x", "y"],
+      rows: [["0"]],
+    });
+
+    expect(compiled.spec.primitives.length).toBeGreaterThan(0);
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "TABLE_CELL_LABEL_COUNT" }),
+    );
+  });
+
+  it("downsamples dense measurement scales instead of rejecting the whole ruler", () => {
+    const compiled = compileLessonSummaryDiagramIntent({
+      ...base,
+      grade: 4,
+      family: "ELEMENTARY_MODEL",
+      archetype: "MEASUREMENT_SCALE",
+      variant: "RULER",
+      min: 0,
+      max: 100,
+      step: 1,
+      value: 50,
+      unit: "cm",
+    });
+
+    expect(
+      compiled.spec.primitives.filter((primitive) =>
+        primitive.id.startsWith("rulerTick"),
+      ),
+    ).toHaveLength(16);
+    expect(compiled.spec.labels.map((label) => label.text)).toContain("50");
+  });
+
+  it("keeps a tape model when only some optional part labels are supplied", () => {
+    const compiled = compileLessonSummaryDiagramIntent({
+      ...base,
+      grade: 3,
+      family: "ELEMENTARY_MODEL",
+      archetype: "TAPE_COMPARISON",
+      bars: [
+        { label: "12 quả", parts: [4, 4, 4], partLabels: ["4 quả"] },
+      ],
+      unit: "quả",
+    });
+
+    expect(compiled.spec.primitives.length).toBeGreaterThan(0);
+    expect(compiled.spec.labels.map((label) => label.text)).toContain("4 quả");
+  });
+
+  it("omits an out-of-domain coordinate point and asks for review", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      family: "NUMBER_COORDINATE",
+      archetype: "COORDINATE_POINTS",
+      xMin: -3,
+      xMax: 3,
+      yMin: -3,
+      yMax: 3,
+      xStep: 1,
+      yStep: 1,
+      points: [
+        { id: "inside", label: "A", x: 1, y: 2, showProjections: true },
+        { id: "outside", label: "B", x: 8, y: 2, showProjections: true },
+      ],
+    });
+
+    expect(compiled.spec.points.some((point) => point.label === "A")).toBe(true);
+    expect(compiled.spec.points.some((point) => point.label === "B")).toBe(false);
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "COORDINATE_POINT_OMITTED" }),
+    );
+  });
+
+  it("omits one invalid inequality boundary while preserving valid boundaries", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      family: "NUMBER_COORDINATE",
+      archetype: "INEQUALITY_REGION",
+      xMin: -4,
+      xMax: 4,
+      yMin: -4,
+      yMax: 4,
+      tickStep: 1,
+      boundaries: [
+        { a: 1, b: 1, c: 2, operator: "LE", label: "x + y ≤ 2" },
+        { a: 0, b: 0, c: 0, operator: "GE", label: "0 ≥ 0" },
+      ],
+    });
+
+    expect(compiled.spec.primitives.some((primitive) => primitive.id === "boundary0")).toBe(
+      true,
+    );
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "INEQUALITY_BOUNDARY_OMITTED" }),
+    );
+  });
+
+  it("omits invalid graph construction points while preserving the curve", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 9,
+      family: "ALGEBRA_GRAPH",
+      archetype: "LINEAR_FUNCTION",
+      xMin: -4,
+      xMax: 4,
+      yMin: -4,
+      yMax: 4,
+      xStep: 1,
+      yStep: 1,
+      functions: [
+        {
+          kind: "LINEAR",
+          id: "f",
+          label: "y = x",
+          slope: 1,
+          intercept: 0,
+          constructionXs: [-10, 2],
+        },
+      ],
+    });
+
+    expect(compiled.spec.primitives.some((primitive) => primitive.type === "LINE")).toBe(
+      true,
+    );
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "GRAPH_CONSTRUCTION_POINT_OMITTED" }),
+    );
+  });
+
+  it("fills duplicate spatial point names with canonical names and asks for review", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 8,
+      family: "SPATIAL_APPLIED",
+      archetype: "CUBOID",
+      variant: "RECTANGULAR_PRISM",
+      pointLabels: ["A", "A"],
+      dimensions: [],
+    });
+
+    const labels = compiled.spec.points.flatMap((point) =>
+      point.label ? [point.label] : [],
+    );
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "INFERRED_POINT_LABEL" }),
+    );
+  });
+
+  it("fills a missing point name in a standard plane template and asks for review", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      family: "PLANE_GEOMETRY",
+      archetype: "TRIANGLE",
+      variant: "ACUTE",
+      pointLabels: ["A", "B"],
+      measures: [],
+    });
+
+    expect(compiled.spec.points.map((point) => point.label)).toEqual(["A", "B", "C"]);
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "INFERRED_POINT_LABEL" }),
+    );
+  });
+
+  it("fills all omitted point names in a standard plane template", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      family: "PLANE_GEOMETRY",
+      archetype: "TRIANGLE",
+      variant: "RIGHT",
+      pointLabels: [],
+      measures: [],
+    });
+
+    expect(compiled.spec.points.map((point) => point.label)).toEqual(["A", "B", "C"]);
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "INFERRED_POINT_LABEL" }),
+    );
+  });
+
+  it("fills all omitted point names in an advanced geometry template", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 8,
+      family: "ADVANCED_GEOMETRY",
+      archetype: "THALES",
+      variant: "PARALLEL_SEGMENT",
+      pointLabels: [],
+      measures: [],
+    });
+
+    expect(compiled.spec.points.flatMap((point) => (point.label ? [point.label] : []))).toEqual(
+      expect.arrayContaining(["A", "B", "C", "D", "E"]),
+    );
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "INFERRED_POINT_LABEL" }),
+    );
+  });
+
+  it("draws the matching part of a chart with unequal category and value counts", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 6,
+      family: "DATA_STATISTICS",
+      archetype: "BAR_CHART",
+      categories: ["Tổ 1", "Tổ 2", "Tổ 3"],
+      series: [{ label: "Số bạn", values: [8, 10] }],
+      yStep: 2,
+      unit: "bạn",
+    });
+
+    expect(compiled.spec.labels.map((label) => label.text)).toEqual(
+      expect.arrayContaining(["Tổ 1", "Tổ 2", "8", "10"]),
+    );
+    expect(compiled.spec.labels.map((label) => label.text)).not.toContain("Tổ 3");
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "CHART_VALUE_COUNT_RECOVERED" }),
+    );
+  });
+
+  it("draws the matching part of a pictogram with unequal category and value counts", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 4,
+      family: "DATA_STATISTICS",
+      archetype: "PICTOGRAM",
+      categories: ["Cam", "Táo", "Lê"],
+      values: [4, 6],
+      valuePerSymbol: 2,
+      symbol: "SQUARE",
+      unit: "quả",
+    });
+
+    expect(compiled.spec.labels.map((label) => label.text)).toEqual(
+      expect.arrayContaining(["Cam", "Táo"]),
+    );
+    expect(compiled.spec.labels.map((label) => label.text)).not.toContain("Lê");
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "PICTOGRAM_VALUE_COUNT_RECOVERED" }),
+    );
+  });
+
+  it("omits x = 0 as an invalid inverse-function construction point", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 7,
+      family: "ALGEBRA_GRAPH",
+      archetype: "INVERSE_FUNCTION",
+      xMin: -5,
+      xMax: 5,
+      yMin: -5,
+      yMax: 5,
+      xStep: 1,
+      yStep: 1,
+      functions: [
+        {
+          kind: "INVERSE",
+          id: "f",
+          label: "y = 4/x",
+          coefficient: 4,
+          constructionXs: [-4, -2, 0, 2, 4],
+        },
+      ],
+    });
+
+    expect(compiled.spec.primitives.some((primitive) => primitive.type === "POLYLINE")).toBe(
+      true,
+    );
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "GRAPH_CONSTRUCTION_POINT_OMITTED" }),
+    );
+  });
+
+  it("omits a non-positive optional solid dimension without hiding the solid", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 8,
+      family: "SPATIAL_APPLIED",
+      archetype: "CUBOID",
+      variant: "RECTANGULAR_PRISM",
+      pointLabels: [],
+      dimensions: [
+        { target: "chiều dài", value: 0, unit: "cm" },
+        { target: "chiều rộng", value: 5, unit: "cm" },
+      ],
+    });
+
+    expect(compiled.spec.primitives.length).toBeGreaterThan(0);
+    expect(compiled.spec.labels.map((label) => label.text)).toContain("5 cm");
+    expect(compiled.spec.labels.map((label) => label.text)).not.toContain("0 cm");
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "SPATIAL_DIMENSION_OMITTED" }),
+    );
+  });
+
+  it("uses endpoint ticks when a measurement step exceeds the whole range", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 4,
+      family: "ELEMENTARY_MODEL",
+      archetype: "MEASUREMENT_SCALE",
+      variant: "RULER",
+      min: 0,
+      max: 10,
+      step: 20,
+      value: 6,
+      unit: "cm",
+    });
+
+    expect(compiled.spec.labels.map((label) => label.text)).toEqual(
+      expect.arrayContaining(["0", "10", "6", "cm"]),
+    );
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "MEASUREMENT_STEP_RECOVERED" }),
+    );
+  });
+
+  it("omits invalid schematic edges while preserving valid nodes and edges", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      family: "SET_SCHEMATIC",
+      archetype: "FLOW",
+      nodes: [
+        { id: "start", label: "Bắt đầu", group: null },
+        { id: "finish", label: "Kết thúc", group: null },
+      ],
+      edges: [
+        { from: "start", to: "finish", label: null },
+        { from: "start", to: "missing", label: null },
+        { from: "finish", to: "finish", label: null },
+      ],
+      setLabels: [],
+    });
+
+    expect(compiled.spec.labels.map((label) => label.text)).toEqual(
+      expect.arrayContaining(["Bắt đầu", "Kết thúc"]),
+    );
+    expect(compiled.semanticIssues).toContainEqual(
+      expect.objectContaining({ code: "SCHEMATIC_EDGE_OMITTED" }),
+    );
   });
 });

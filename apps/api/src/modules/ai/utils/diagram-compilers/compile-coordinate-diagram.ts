@@ -2,6 +2,7 @@ import type { LessonSummaryDiagramSpec } from "@learning-path/shared";
 
 import type { LessonSummaryDiagramIntent } from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
 import { addCoordinateAxes } from "#api/modules/ai/utils/diagram-compilers/coordinate-axis-builder";
+import { isIncompleteInequalityLabel } from "#api/modules/ai/utils/diagram-compilers/diagram-annotation-normalizer";
 import {
   DiagramBuilder,
   formatDiagramNumber,
@@ -66,10 +67,12 @@ function compileNumberLine(
     displayOffset,
   );
 
-  for (const item of visiblePoints) {
-    assertWithin(item.value, min, max, item.id);
+  const usedLabels = new Set<string>();
+  for (const [index, item] of visiblePoints.entries()) {
+    if (item.value < min || item.value > max || usedLabels.has(item.label)) continue;
+    usedLabels.add(item.label);
     const pointId = builder.addPoint({
-      id: item.id,
+      id: safeDiagramId("numberPoint", index),
       x: item.value,
       y: 0,
       label: item.label,
@@ -147,11 +150,20 @@ function compileCoordinatePoints(
     intent.caption ?? "Mặt phẳng tọa độ Oxy",
   );
   const { originX, originY } = addCoordinateAxes(builder, intent);
+  const usedLabels = new Set<string>();
   for (const [index, item] of intent.points.entries()) {
-    assertWithin(item.x, intent.xMin, intent.xMax, `${item.id}.x`);
-    assertWithin(item.y, intent.yMin, intent.yMax, `${item.id}.y`);
+    if (
+      item.x < intent.xMin ||
+      item.x > intent.xMax ||
+      item.y < intent.yMin ||
+      item.y > intent.yMax ||
+      usedLabels.has(item.label)
+    ) {
+      continue;
+    }
+    usedLabels.add(item.label);
     const pointId = builder.addPoint({
-      id: item.id,
+      id: safeDiagramId("coordinatePoint", index),
       x: item.x,
       y: item.y,
       label: item.label,
@@ -204,10 +216,13 @@ function compileInequalityRegion(
     { x: intent.xMax, y: intent.yMax },
     { x: intent.xMin, y: intent.yMax },
   ];
-  for (const boundary of intent.boundaries) {
-    if (Math.hypot(boundary.a, boundary.b) <= 1e-9) {
-      throw new Error(`Inequality ${boundary.label} must have a non-zero normal vector.`);
-    }
+  const validBoundaries = intent.boundaries.filter(
+    (boundary) => Math.hypot(boundary.a, boundary.b) > 1e-9,
+  );
+  if (validBoundaries.length === 0) {
+    throw new Error("An inequality region requires a non-zero boundary.");
+  }
+  for (const boundary of validBoundaries) {
     polygon = clipPolygon(polygon, boundary);
   }
   if (polygon.length >= 3) {
@@ -217,7 +232,7 @@ function compileInequalityRegion(
     builder.addPolygon("solutionRegion", regionPoints, "SOFT_BLUE");
   }
 
-  for (const [index, boundary] of intent.boundaries.entries()) {
+  for (const [index, boundary] of validBoundaries.entries()) {
     const endpoints = lineRectangleIntersections(
       boundary,
       intent.xMin,
@@ -244,25 +259,27 @@ function compileInequalityRegion(
         boundary.operator === "LT" || boundary.operator === "GT" ? "DASHED" : "SOLID",
       );
     }
-    const labelPlacement = resolveBoundaryLabelPlacement(
-      boundary,
-      endpoints[0]!,
-      endpoints[1]!,
-      intent,
-    );
-    const labelAnchor = builder.addPoint(
-      point(
-        safeDiagramId("boundaryLabelAnchor", index),
-        labelPlacement.x,
-        labelPlacement.y,
-      ),
-    );
-    builder.addLabel({
-      text: boundary.label,
-      anchorPointId: labelAnchor,
-      anchorPrimitiveId: null,
-      position: labelPlacement.position,
-    });
+    if (!isIncompleteInequalityLabel(boundary.label)) {
+      const labelPlacement = resolveBoundaryLabelPlacement(
+        boundary,
+        endpoints[0]!,
+        endpoints[1]!,
+        intent,
+      );
+      const labelAnchor = builder.addPoint(
+        point(
+          safeDiagramId("boundaryLabelAnchor", index),
+          labelPlacement.x,
+          labelPlacement.y,
+        ),
+      );
+      builder.addLabel({
+        text: boundary.label,
+        anchorPointId: labelAnchor,
+        anchorPrimitiveId: null,
+        position: labelPlacement.position,
+      });
+    }
   }
   return builder.build();
 }

@@ -1,6 +1,7 @@
 import type { LessonSummaryDiagramSpec } from "@learning-path/shared";
 
 import type { LessonSummaryDiagramIntent } from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
+import { compactGeometryMeasureText } from "#api/modules/ai/utils/diagram-compilers/diagram-annotation-normalizer";
 import { DiagramBuilder } from "#api/modules/ai/utils/diagram-compilers/diagram-builder";
 
 type PlaneIntent = Extract<LessonSummaryDiagramIntent, { family: "PLANE_GEOMETRY" }>;
@@ -1236,40 +1237,21 @@ function addMeasureLabels(
   fallbackPointId: string,
 ) {
   for (const measure of intent.measures) {
-    const text = compactMeasureText(measure.target, measure.text);
+    const text = compactGeometryMeasureText(measure.target, measure.text);
     if (!text) continue;
     const segmentId = edges.get(normalizeSegmentName(measure.target));
+    // A provider may describe a shared value with a composite target such as
+    // "AB = DE". That is not the ID of one concrete segment. The equality is
+    // already represented by markers, so omit only this optional text label
+    // instead of producing an invalid diagram that hides all geometry.
+    if (!segmentId) continue;
     builder.addLabel({
       text,
       anchorPointId: fallbackPointId,
-      anchorPrimitiveId: segmentId ?? null,
+      anchorPrimitiveId: segmentId,
       position: "TOP",
     });
   }
-}
-
-function compactMeasureText(target: string, text: string) {
-  const equalityIndex = text.indexOf("=");
-  if (equalityIndex < 0) {
-    const compact = text.trim();
-    if (/^[-+]?\d+(?:[.,]\d+)?(?:\/\d+)?\s*(?:mm|cm|dm|m|km|°|%|rad)?$/iu.test(compact)) {
-      return compact;
-    }
-    return !/\s/u.test(compact) && compact.length <= 4 ? compact : null;
-  }
-  const left = text.slice(0, equalityIndex).trim();
-  const right = text.slice(equalityIndex + 1).trim();
-  const normalizedTarget = normalizeSegmentName(
-    target.replaceAll(/[^\p{L}\p{N}′']/gu, ""),
-  );
-  const normalizedLeft = normalizeSegmentName(left.replaceAll(/[^\p{L}\p{N}′']/gu, ""));
-  const isTargetAssignment =
-    normalizedTarget.length > 0 && normalizedTarget === normalizedLeft;
-  const hasNumericMeasure = /\d/u.test(right);
-  // Equality between geometric objects is already encoded by EQUAL_LENGTH or
-  // ANGLE markers. A numeric assignment such as "AB = 3 cm" is reduced to the
-  // compact textbook label "3 cm" anchored to AB.
-  return isTargetAssignment && hasNumericMeasure ? right : null;
 }
 
 function findMeasure(intent: PlaneIntent, target: string) {
@@ -1294,10 +1276,44 @@ function findMeasure(intent: PlaneIntent, target: string) {
 }
 
 function requireLabels(intent: PlaneIntent, count: number) {
-  if (intent.pointLabels.length < count) {
+  const provided = [...new Set(intent.pointLabels)];
+  const labels = provided.length >= count ? provided : canonicalPlanePointLabels(intent);
+  if (labels.length < count) {
     throw new Error(`${intent.archetype} requires at least ${count} point labels.`);
   }
-  return intent.pointLabels;
+  return labels;
+}
+
+function canonicalPlanePointLabels(intent: PlaneIntent) {
+  const preferred =
+    intent.archetype === "RIGHT_TRIANGLE_CONGRUENCE"
+      ? intent.variant === "SHARED_HYPOTENUSE_LEG"
+        ? ["A", "B", "C", "D"]
+        : intent.pointLabels.some((label) => /['′″]/u.test(label))
+          ? ["A", "B", "C", "A′", "B′", "C′"]
+          : ["A", "B", "C", "D", "E", "F"]
+      : {
+          ANGLE_RAYS: ["O", "A", "B"],
+          TRIANGLE: ["A", "B", "C", "H"],
+          QUADRILATERAL: ["A", "B", "C", "D"],
+          PARALLEL_TRANSVERSAL: ["A", "B", "C", "D", "E", "F"],
+          CIRCLE_PARTS: ["O", "A", "B"],
+          SYMMETRY: ["A", "B", "C", "A′", "B′", "C′", "O"],
+          BASIC_CONSTRUCTION: ["A", "B", "C", "D", "E", "F"],
+          REGULAR_POLYGON: ["A", "B", "C", "D", "E", "F"],
+        }[intent.archetype];
+  const uniqueProvided = [...new Set(intent.pointLabels)];
+  if (uniqueProvided.every((label) => preferred.includes(label))) {
+    return preferred;
+  }
+  const fallback = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "O"];
+  return [
+    ...uniqueProvided,
+    ...preferred.filter((label) => !uniqueProvided.includes(label)),
+    ...fallback.filter(
+      (label) => !uniqueProvided.includes(label) && !preferred.includes(label),
+    ),
+  ];
 }
 
 function normalizeSegmentName(value: string) {

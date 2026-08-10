@@ -384,6 +384,87 @@ export function describeLessonSummaryDiagramReviewIssue(
     };
   }
 
+  const inferredPoint = technicalDetails.match(
+    /INFERRED_POINT_LABEL:[^\n]*standard point name\s+([^\s.]+)/iu,
+  );
+  if (inferredPoint?.[1]) {
+    const point = formatDiagramId(inferredPoint[1]);
+    return {
+      message: `Hình vẫn vẽ được; hệ thống đã tự bổ sung tên điểm ${point} còn thiếu theo mẫu hình chuẩn.`,
+      suggestion: `Đối chiếu điểm ${point} với đề bài và đổi tên nếu cần; có thể chấp nhận nếu tên tự bổ sung đã đúng.`,
+    };
+  }
+
+  if (technicalDetails.includes("TABLE_CELL_LABEL_COUNT")) {
+    return {
+      message: "Bảng vẫn hiển thị được nhưng đang có một hoặc vài ô thiếu nội dung.",
+      suggestion: "Bổ sung giá trị cho các ô trống, hoặc xóa hàng/cột không cần thiết rồi lưu lại.",
+    };
+  }
+
+  if (technicalDetails.includes("CHART_VALUE_COUNT_RECOVERED")) {
+    return {
+      message: "Biểu đồ vẫn hiển thị được nhưng số nhãn và số giá trị chưa khớp; phần dư đã được bỏ.",
+      suggestion: "Bổ sung hoặc xóa nhãn/giá trị để mỗi nhãn có đúng một giá trị tương ứng.",
+    };
+  }
+
+  if (technicalDetails.includes("PICTOGRAM_VALUE_COUNT_RECOVERED")) {
+    return {
+      message: "Biểu đồ tranh vẫn hiển thị được nhưng số nhóm và số giá trị chưa khớp; phần dư đã được bỏ.",
+      suggestion: "Bổ sung hoặc xóa nhóm/giá trị để mỗi nhóm có đúng một giá trị tương ứng.",
+    };
+  }
+
+  if (technicalDetails.includes("SPATIAL_DIMENSION_OMITTED")) {
+    return {
+      message: "Hình khối vẫn hiển thị được; một số đo không hợp lệ đã được bỏ khỏi hình.",
+      suggestion: "Nhập lại số đo lớn hơn 0 và gắn nó vào đúng cạnh của hình khối.",
+    };
+  }
+
+  if (technicalDetails.includes("MEASUREMENT_STEP_RECOVERED")) {
+    return {
+      message: "Thước đo vẫn hiển thị được; bước chia đã cho lớn hơn toàn khoảng nên hệ thống chỉ giữ hai mốc đầu–cuối.",
+      suggestion: "Giảm bước chia để có thêm các vạch mốc nằm giữa giá trị nhỏ nhất và lớn nhất.",
+    };
+  }
+
+  if (technicalDetails.includes("SCHEMATIC_EDGE_OMITTED")) {
+    return {
+      message: "Sơ đồ vẫn hiển thị được; một đường nối có đầu mút không tồn tại hoặc tự nối vào chính nó đã được bỏ.",
+      suggestion: "Chọn lại hai nút có thật và khác nhau cho đường nối bị bỏ.",
+    };
+  }
+
+  if (technicalDetails.includes("COORDINATE_POINT_OMITTED")) {
+    return {
+      message: "Một điểm tọa độ bị trùng tên hoặc nằm ngoài miền trục nên đã được bỏ khỏi hình.",
+      suggestion: "Đổi tên điểm cho duy nhất hoặc mở rộng miền trục để điểm nằm trong khung rồi lưu lại.",
+    };
+  }
+
+  if (technicalDetails.includes("INEQUALITY_BOUNDARY_OMITTED")) {
+    return {
+      message: "Một đường biên bất phương trình không xác định nên đã được bỏ; các đường biên hợp lệ vẫn hiển thị.",
+      suggestion: "Sửa các hệ số của đường biên bị bỏ để ít nhất một hệ số của x hoặc y khác 0.",
+    };
+  }
+
+  if (technicalDetails.includes("GRAPH_CONSTRUCTION_POINT_OMITTED")) {
+    return {
+      message: "Một điểm dựng đồ thị nằm ngoài miền đang vẽ nên đã được bỏ khỏi hình.",
+      suggestion: "Chọn lại hoành độ điểm dựng hoặc mở rộng miền trục để điểm nằm trên phần đồ thị nhìn thấy được.",
+    };
+  }
+
+  if (technicalDetails.includes("GRAPH_FUNCTION_LABEL_MISSING")) {
+    return {
+      message: "Đồ thị vẫn vẽ được nhưng chưa tìm được vị trí an toàn để đặt tên hàm số.",
+      suggestion: "Mở rộng miền vẽ hoặc điều chỉnh vị trí nhãn hàm để tên nằm gần đường cong và không đè lên nét vẽ.",
+    };
+  }
+
   const duplicateValue = technicalDetails.match(DUPLICATE_VALUE_PATTERN);
   if (duplicateValue?.[1] && duplicateValue[2]) {
     const value = formatDiagramId(duplicateValue[2]);

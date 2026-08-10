@@ -64,8 +64,20 @@ export function validateCompiledDiagramSemantics(
   ) {
     requireCoordinateAxes(spec, issues);
   }
+  if (intent.family === "NUMBER_COORDINATE") {
+    validateCoordinateIntentPoints(intent, spec, issues);
+  }
   if (intent.family === "DATA_STATISTICS") {
     validateData(intent, spec, issues);
+  }
+  if (intent.family === "ELEMENTARY_MODEL") {
+    validateElementary(intent, issues);
+  }
+  if (intent.family === "SPATIAL_APPLIED") {
+    validateSpatial(intent, issues);
+  }
+  if (intent.family === "SET_SCHEMATIC") {
+    validateSchematic(intent, issues);
   }
   if (intent.family === "PLANE_GEOMETRY" || intent.family === "ADVANCED_GEOMETRY") {
     validateGeometryMarkers(spec, issues);
@@ -89,6 +101,19 @@ export function validateCompiledDiagramSemantics(
         code: "DECLARED_POINT_LABEL_MISSING",
         message: `Declared point ${expectedLabel} is missing from the compiled diagram.`,
       });
+    }
+    if (
+      intent.family === "PLANE_GEOMETRY" ||
+      intent.family === "ADVANCED_GEOMETRY" ||
+      (intent.family === "SPATIAL_APPLIED" && intent.pointLabels.length > 0)
+    ) {
+      for (const compiledLabel of pointLabels) {
+        if (intent.pointLabels.includes(compiledLabel)) continue;
+        issues.push({
+          code: "INFERRED_POINT_LABEL",
+          message: `Compiler added the standard point name ${compiledLabel} because the intent omitted it.`,
+        });
+      }
     }
   }
 
@@ -122,6 +147,31 @@ function validateGraph(
   const expectedFunctions = new Map(
     canonicalGraphFunctions(intent).map((value) => [value.id, value]),
   );
+  const visibleFunctionLabels = new Set(spec.labels.map((label) => label.text));
+  for (const graphFunction of expectedFunctions.values()) {
+    if (visibleFunctionLabels.has(graphFunction.label)) continue;
+    issues.push({
+      code: "GRAPH_FUNCTION_LABEL_MISSING",
+      message: `${graphFunction.id} is missing its visible function label.`,
+    });
+  }
+  for (const graphFunction of intent.functions) {
+    for (const x of graphFunction.constructionXs) {
+      const y = evaluateGraphFunction(graphFunction, x);
+      if (
+        x >= intent.xMin &&
+        x <= intent.xMax &&
+        y >= intent.yMin &&
+        y <= intent.yMax
+      ) {
+        continue;
+      }
+      issues.push({
+        code: "GRAPH_CONSTRUCTION_POINT_OMITTED",
+        message: `${graphFunction.id} requested an out-of-domain construction point at (${x}, ${y}).`,
+      });
+    }
+  }
   const namedConstructionPoints = spec.points.filter(
     (point) => point.pointStyle === "FILLED" && point.label,
   );
@@ -180,6 +230,43 @@ function validateGraph(
       message: `Named point ${point.label} at (${logical.x}, ${logical.y}) is neither requested nor an intersection.`,
     });
   });
+}
+
+function validateCoordinateIntentPoints(
+  intent: Extract<LessonSummaryDiagramIntent, { family: "NUMBER_COORDINATE" }>,
+  spec: LessonSummaryDiagramSpec,
+  issues: DiagramSemanticIssue[],
+) {
+  if (intent.archetype !== "NUMBER_LINE" && intent.archetype !== "COORDINATE_POINTS") {
+    if (
+      intent.archetype === "INEQUALITY_REGION" &&
+      intent.boundaries.some((boundary) => Math.hypot(boundary.a, boundary.b) <= 1e-9)
+    ) {
+      issues.push({
+        code: "INEQUALITY_BOUNDARY_OMITTED",
+        message: "A zero-length inequality boundary was omitted from the compiled region.",
+      });
+    }
+    return;
+  }
+  if (
+    intent.archetype === "NUMBER_LINE" &&
+    /\btừ\s+\d[\d\s]*?\s+đến\s+\d/iu.test(intent.caption ?? "")
+  ) {
+    return;
+  }
+  const renderedLabels = spec.points.flatMap((point) =>
+    point.label ? [point.label] : [],
+  );
+  if (
+    intent.points.some((point) => !renderedLabels.includes(point.label)) ||
+    renderedLabels.length < intent.points.length
+  ) {
+    issues.push({
+      code: "COORDINATE_POINT_OMITTED",
+      message: "At least one duplicate or out-of-domain coordinate point was omitted.",
+    });
+  }
 }
 
 function resolveGraphRenderScales(spec: LessonSummaryDiagramSpec) {
@@ -287,7 +374,8 @@ function validateData(
     }
   }
   if (intent.archetype === "PICTOGRAM") {
-    const expectedSymbols = intent.values.reduce(
+    const commonValueCount = Math.min(intent.categories.length, intent.values.length);
+    const expectedSymbols = intent.values.slice(0, commonValueCount).reduce(
       (sum, value) => sum + value / intent.valuePerSymbol,
       0,
     );
@@ -300,6 +388,70 @@ function validateData(
         message: `Expected ${expectedSymbols} pictogram symbols, received ${actualSymbols}.`,
       });
     }
+    if (intent.categories.length !== intent.values.length) {
+      issues.push({
+        code: "PICTOGRAM_VALUE_COUNT_RECOVERED",
+        message:
+          "Pictogram categories and values had different lengths; only matching entries were drawn.",
+      });
+    }
+  }
+  if (
+    (intent.archetype === "BAR_CHART" ||
+      intent.archetype === "LINE_CHART" ||
+      intent.archetype === "HISTOGRAM" ||
+      intent.archetype === "PIE_CHART") &&
+    intent.series.some((series) => series.values.length !== intent.categories.length)
+  ) {
+    issues.push({
+      code: "CHART_VALUE_COUNT_RECOVERED",
+      message: "Chart categories and values had different lengths; only matching entries were drawn.",
+    });
+  }
+}
+
+function validateSpatial(
+  intent: Extract<LessonSummaryDiagramIntent, { family: "SPATIAL_APPLIED" }>,
+  issues: DiagramSemanticIssue[],
+) {
+  if (intent.dimensions.some((dimension) => dimension.value <= 0)) {
+    issues.push({
+      code: "SPATIAL_DIMENSION_OMITTED",
+      message: "A non-positive solid dimension was omitted from the compiled diagram.",
+    });
+  }
+}
+
+function validateElementary(
+  intent: Extract<LessonSummaryDiagramIntent, { family: "ELEMENTARY_MODEL" }>,
+  issues: DiagramSemanticIssue[],
+) {
+  if (
+    intent.archetype === "MEASUREMENT_SCALE" &&
+    intent.step > intent.max - intent.min
+  ) {
+    issues.push({
+      code: "MEASUREMENT_STEP_RECOVERED",
+      message: "The requested major step exceeded the scale range; endpoint ticks were used.",
+    });
+  }
+}
+
+function validateSchematic(
+  intent: Extract<LessonSummaryDiagramIntent, { family: "SET_SCHEMATIC" }>,
+  issues: DiagramSemanticIssue[],
+) {
+  const nodeIds = new Set(intent.nodes.map((node) => node.id));
+  if (
+    intent.edges.some(
+      (edge) =>
+        edge.from === edge.to || !nodeIds.has(edge.from) || !nodeIds.has(edge.to),
+    )
+  ) {
+    issues.push({
+      code: "SCHEMATIC_EDGE_OMITTED",
+      message: "An edge with an unknown endpoint or self-loop was omitted.",
+    });
   }
 }
 

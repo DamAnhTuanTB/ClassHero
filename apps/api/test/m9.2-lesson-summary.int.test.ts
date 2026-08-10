@@ -605,9 +605,9 @@ describe("M9.2 lesson summary API and worker integration", () => {
       }),
     });
     expect(JSON.stringify(summary.contentJson)).toContain("Bài tập vận dụng");
-    expect(JSON.stringify(summary.contentJson)).toContain("DIAGRAM_CANNOT_RENDER");
+    expect(JSON.stringify(summary.contentJson)).toContain("DIAGRAM_NEEDS_REVIEW");
     expect(JSON.stringify(summary.contentJson)).toContain(
-      "RIGHT_TRIANGLE_CONGRUENCE requires at least 6 point labels.",
+      "INFERRED_POINT_LABEL",
     );
     expect(JSON.stringify(summary.contentJson)).not.toContain("Cần admin kiểm tra");
     expect(JSON.stringify(summary.contentJson)).not.toContain("warningDetails");

@@ -290,14 +290,6 @@ const graphFunctionSchema = graphFunctionTransportSchema.superRefine((fn, contex
       message: "Inverse coefficient cannot be zero.",
     });
   }
-  fn.constructionXs.forEach((value, index) => {
-    if (value !== 0) return;
-    context.addIssue({
-      code: "custom",
-      path: ["constructionXs", index],
-      message: "x cannot be zero.",
-    });
-  });
 });
 
 const algebraGraphIntentTransportSchema = z
@@ -367,14 +359,6 @@ const chartIntentTransportSchema = z
   .strict();
 
 const chartIntentSchema = chartIntentTransportSchema.superRefine((intent, context) => {
-  intent.series.forEach((series, seriesIndex) => {
-    if (series.values.length === intent.categories.length) return;
-    context.addIssue({
-      code: "custom",
-      path: ["series", seriesIndex, "values"],
-      message: "Every chart series must contain one value for each category.",
-    });
-  });
   if (intent.archetype !== "PIE_CHART") return;
   if (intent.series.length !== 1) {
     context.addIssue({
@@ -417,13 +401,6 @@ const pictogramIntentTransportSchema = z
 
 const pictogramIntentSchema = pictogramIntentTransportSchema.superRefine(
   (intent, context) => {
-    if (intent.categories.length !== intent.values.length) {
-      context.addIssue({
-        code: "custom",
-        path: ["values"],
-        message: "Pictogram values must match the category count.",
-      });
-    }
     intent.values.forEach((value, index) => {
       if (value % intent.valuePerSymbol === 0) return;
       context.addIssue({
@@ -477,7 +454,7 @@ const planeGeometryIntentSchema = z
       "HYPOTENUSE_LEG",
       "SHARED_HYPOTENUSE_LEG",
     ]),
-    pointLabels: z.array(pointLabel).min(2).max(8),
+    pointLabels: z.array(pointLabel).max(8),
     measures: z
       .array(
         z
@@ -521,7 +498,7 @@ const advancedGeometryIntentSchema = z
       "SAS_SIMILARITY",
       "SSS_SIMILARITY",
     ]),
-    pointLabels: z.array(pointLabel).min(4).max(12),
+    pointLabels: z.array(pointLabel).max(12),
     measures: z
       .array(
         z
@@ -568,7 +545,7 @@ const spatialAppliedIntentSchema = z
         z
           .object({
             target: z.string().trim().min(1).max(64),
-            value: positiveValue,
+            value: finiteValue,
             unit: shortLabel,
           })
           .strict(),

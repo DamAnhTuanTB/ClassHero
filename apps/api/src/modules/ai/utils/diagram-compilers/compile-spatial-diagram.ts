@@ -105,7 +105,7 @@ function compileNet(intent: SpatialIntent) {
     );
   });
   const firstRectangle = rectangles[0];
-  const firstDimension = intent.dimensions[0];
+  const firstDimension = intent.dimensions.find((dimension) => dimension.value > 0);
   if (firstRectangle && firstDimension) {
     const [x, y, width] = firstRectangle;
     const from = pointId(x!, y!);
@@ -449,6 +449,7 @@ function compileAppliedRightTrianglePair(intent: SpatialIntent) {
     Array<{ segmentId: string; fallbackPointId: string; text: string }>
   >();
   for (const dimension of intent.dimensions) {
+    if (dimension.value <= 0) continue;
     const segment = segments.get(normalizeTarget(dimension.target));
     if (!segment) continue;
     const text = `${dimension.value} ${dimension.unit}`;
@@ -491,12 +492,16 @@ function addDimensions(
   > = new Map(),
 ) {
   for (const dimension of intent.dimensions) {
+    if (dimension.value <= 0) continue;
     const target = normalizeTarget(dimension.target);
     const segmentId = segments.get(dimension.target.toLowerCase()) ?? segments.get(target);
+    // Unknown or composite dimension targets are optional annotations. Keep
+    // the drawable solid and omit only the annotation that cannot be anchored.
+    if (!segmentId) continue;
     builder.addLabel({
       text: `${dimension.value} ${dimension.unit}`,
       anchorPointId: fallbackPointId,
-      anchorPrimitiveId: segmentId ?? null,
+      anchorPrimitiveId: segmentId,
       position: positionByTarget.get(target) ?? "TOP",
     });
   }
@@ -510,7 +515,12 @@ function resolveLabels(provided: string[], count: number, defaults: string[]) {
   ) {
     return defaults;
   }
-  return Array.from({ length: count }, (_, index) => provided[index] ?? defaults[index]!);
+  const uniqueProvided = [...new Set(provided)];
+  const candidates = [
+    ...uniqueProvided,
+    ...defaults.filter((label) => !uniqueProvided.includes(label)),
+  ];
+  return Array.from({ length: count }, (_, index) => candidates[index] ?? defaults[index]!);
 }
 
 export function canonicalSpatialPointLabels(intent: SpatialIntent) {

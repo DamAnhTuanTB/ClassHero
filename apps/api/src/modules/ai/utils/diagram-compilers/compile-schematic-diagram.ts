@@ -14,18 +14,25 @@ type SchematicIntent = Extract<
 export function compileSchematicDiagram(
   intent: SchematicIntent,
 ): LessonSummaryDiagramSpec {
-  validateEdges(intent);
-  switch (intent.archetype) {
+  const nodeIds = new Set(intent.nodes.map((node) => node.id));
+  const drawableIntent: SchematicIntent = {
+    ...intent,
+    edges: intent.edges.filter(
+      (edge) =>
+        edge.from !== edge.to && nodeIds.has(edge.from) && nodeIds.has(edge.to),
+    ),
+  };
+  switch (drawableIntent.archetype) {
     case "VENN":
-      return compileVenn(intent);
+      return compileVenn(drawableIntent);
     case "VENN_UNIVERSE":
-      return compileVenn(intent, true);
+      return compileVenn(drawableIntent, true);
     case "TREE":
-      return compileTree(intent);
+      return compileTree(drawableIntent);
     case "FLOW":
-      return compileFlow(intent);
+      return compileFlow(drawableIntent);
     case "NETWORK":
-      return compileNetwork(intent);
+      return compileNetwork(drawableIntent);
   }
 }
 
@@ -419,16 +426,6 @@ function computeTreeLayers(intent: SchematicIntent) {
   }
   if (visited.size !== intent.nodes.length) throw new Error("A tree cannot contain cycles.");
   return layers;
-}
-
-function validateEdges(intent: SchematicIntent) {
-  const nodeIds = new Set(intent.nodes.map((node) => node.id));
-  for (const edge of intent.edges) {
-    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-      throw new Error(`Edge ${edge.from}->${edge.to} references an unknown node.`);
-    }
-    if (edge.from === edge.to) throw new Error("A schematic edge cannot be a self-loop.");
-  }
 }
 
 function hidden(id: string, x: number, y: number) {

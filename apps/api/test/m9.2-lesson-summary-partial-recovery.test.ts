@@ -115,6 +115,22 @@ function semanticallyIncompleteRightTriangleCongruenceIntent() {
   };
 }
 
+function rightTriangleCongruenceIntentWithCompositeMeasures() {
+  const diagram = incompleteRightTriangleCongruenceIntent();
+  return {
+    ...diagram,
+    intent: {
+      ...diagram.intent,
+      variant: "TWO_LEGS" as const,
+      pointLabels: ["A", "B", "C", "D", "E", "F"],
+      measures: [
+        { target: "AB = DE", text: "4 cm" },
+        { target: "AC = DF", text: "3 cm" },
+      ],
+    },
+  };
+}
+
 const compilerFailureDiagrams = [
   {
     name: "number line with a non-increasing domain",
@@ -236,6 +252,159 @@ const compilerFailureDiagrams = [
   },
 ] as const;
 
+const hardCompilerFailureDiagrams = [
+  compilerFailureDiagrams[0],
+  compilerFailureDiagrams[2],
+  compilerFailureDiagrams[5],
+] as const;
+
+const recoverableCompilerDiagrams = [
+  {
+    ...compilerFailureDiagrams[1],
+    semanticCode: null,
+  },
+  {
+    ...compilerFailureDiagrams[3],
+    semanticCode: "TABLE_CELL_LABEL_COUNT",
+  },
+  {
+    ...compilerFailureDiagrams[4],
+    semanticCode: "INFERRED_POINT_LABEL",
+  },
+  {
+    name: "chart with one unmatched category",
+    semanticCode: "CHART_VALUE_COUNT_RECOVERED",
+    diagram: {
+      kind: "INTENT" as const,
+      intent: {
+        intentVersion: 1 as const,
+        grade: 6,
+        difficulty: "SIMPLE" as const,
+        caption: "Biểu đồ có một nhãn dư.",
+        family: "DATA_STATISTICS" as const,
+        archetype: "BAR_CHART" as const,
+        categories: ["Tổ 1", "Tổ 2", "Tổ 3"],
+        series: [{ label: "Số bạn", values: [8, 10] }],
+        yStep: 2,
+        unit: "bạn",
+      },
+    },
+  },
+  {
+    name: "pictogram with one unmatched category",
+    semanticCode: "PICTOGRAM_VALUE_COUNT_RECOVERED",
+    diagram: {
+      kind: "INTENT" as const,
+      intent: {
+        intentVersion: 1 as const,
+        grade: 4,
+        difficulty: "SIMPLE" as const,
+        caption: "Biểu đồ tranh có một nhóm dư.",
+        family: "DATA_STATISTICS" as const,
+        archetype: "PICTOGRAM" as const,
+        categories: ["Cam", "Táo", "Lê"],
+        values: [4, 6],
+        valuePerSymbol: 2,
+        symbol: "SQUARE" as const,
+        unit: "quả",
+      },
+    },
+  },
+  {
+    name: "inverse graph with x zero as an optional construction point",
+    semanticCode: "GRAPH_CONSTRUCTION_POINT_OMITTED",
+    diagram: {
+      kind: "INTENT" as const,
+      intent: {
+        intentVersion: 1 as const,
+        grade: 7,
+        difficulty: "MEDIUM" as const,
+        caption: "Đồ thị hàm số tỉ lệ nghịch.",
+        family: "ALGEBRA_GRAPH" as const,
+        archetype: "INVERSE_FUNCTION" as const,
+        xMin: -5,
+        xMax: 5,
+        yMin: -5,
+        yMax: 5,
+        xStep: 1,
+        yStep: 1,
+        functions: [
+          {
+            kind: "INVERSE" as const,
+            id: "f",
+            label: "y = 4/x",
+            coefficient: 4,
+            constructionXs: [-4, -2, 0, 2, 4],
+          },
+        ],
+      },
+    },
+  },
+  {
+    name: "measurement scale with a step larger than its range",
+    semanticCode: "MEASUREMENT_STEP_RECOVERED",
+    diagram: {
+      kind: "INTENT" as const,
+      intent: {
+        intentVersion: 1 as const,
+        grade: 4,
+        difficulty: "SIMPLE" as const,
+        caption: "Thước có bước chia quá lớn.",
+        family: "ELEMENTARY_MODEL" as const,
+        archetype: "MEASUREMENT_SCALE" as const,
+        variant: "RULER" as const,
+        min: 0,
+        max: 10,
+        step: 20,
+        value: 6,
+        unit: "cm",
+      },
+    },
+  },
+  {
+    name: "flow schematic with local invalid edges",
+    semanticCode: "SCHEMATIC_EDGE_OMITTED",
+    diagram: {
+      kind: "INTENT" as const,
+      intent: {
+        intentVersion: 1 as const,
+        grade: 7,
+        difficulty: "SIMPLE" as const,
+        caption: "Sơ đồ luồng có một đường nối sai.",
+        family: "SET_SCHEMATIC" as const,
+        archetype: "FLOW" as const,
+        nodes: [
+          { id: "start", label: "Bắt đầu", group: null },
+          { id: "finish", label: "Kết thúc", group: null },
+        ],
+        edges: [
+          { from: "start", to: "finish", label: null },
+          { from: "start", to: "missing", label: null },
+        ],
+        setLabels: [],
+      },
+    },
+  },
+  {
+    name: "solid with a non-positive optional dimension",
+    semanticCode: "SPATIAL_DIMENSION_OMITTED",
+    diagram: {
+      kind: "INTENT" as const,
+      intent: {
+        intentVersion: 1 as const,
+        grade: 8,
+        difficulty: "MEDIUM" as const,
+        caption: "Hình hộp chữ nhật.",
+        family: "SPATIAL_APPLIED" as const,
+        archetype: "CUBOID" as const,
+        variant: "RECTANGULAR_PRISM" as const,
+        pointLabels: [],
+        dimensions: [{ target: "chiều dài", value: 0, unit: "cm" }],
+      },
+    },
+  },
+] as const;
+
 function providerOutput() {
   return {
     title: "Ba trường hợp bằng nhau của tam giác vuông",
@@ -349,6 +518,52 @@ describe("M9.2 partial lesson-summary recovery", () => {
     {
       detail: "spec.viewBox.width: Too small: expected number to be >0",
       message: "Dữ liệu khung hiển thị chưa hợp lệ theo quy tắc vẽ.",
+    },
+    {
+      detail:
+        "INFERRED_POINT_LABEL: Compiler added the standard point name C′ because the intent omitted it.",
+      message:
+        "Hình vẫn vẽ được; hệ thống đã tự bổ sung tên điểm C′ còn thiếu theo mẫu hình chuẩn.",
+    },
+    {
+      detail:
+        "TABLE_CELL_LABEL_COUNT: Expected 4 centered table cells, received 3.",
+      message: "Bảng vẫn hiển thị được nhưng đang có một hoặc vài ô thiếu nội dung.",
+    },
+    {
+      detail:
+        "GRAPH_CONSTRUCTION_POINT_OMITTED: f requested an out-of-domain construction point.",
+      message: "Một điểm dựng đồ thị nằm ngoài miền đang vẽ nên đã được bỏ khỏi hình.",
+    },
+    {
+      detail:
+        "CHART_VALUE_COUNT_RECOVERED: Chart categories and values had different lengths.",
+      message:
+        "Biểu đồ vẫn hiển thị được nhưng số nhãn và số giá trị chưa khớp; phần dư đã được bỏ.",
+    },
+    {
+      detail:
+        "PICTOGRAM_VALUE_COUNT_RECOVERED: Pictogram categories and values had different lengths.",
+      message:
+        "Biểu đồ tranh vẫn hiển thị được nhưng số nhóm và số giá trị chưa khớp; phần dư đã được bỏ.",
+    },
+    {
+      detail:
+        "SPATIAL_DIMENSION_OMITTED: A non-positive solid dimension was omitted.",
+      message:
+        "Hình khối vẫn hiển thị được; một số đo không hợp lệ đã được bỏ khỏi hình.",
+    },
+    {
+      detail:
+        "MEASUREMENT_STEP_RECOVERED: The requested major step exceeded the scale range.",
+      message:
+        "Thước đo vẫn hiển thị được; bước chia đã cho lớn hơn toàn khoảng nên hệ thống chỉ giữ hai mốc đầu–cuối.",
+    },
+    {
+      detail:
+        "SCHEMATIC_EDGE_OMITTED: An edge with an unknown endpoint was omitted.",
+      message:
+        "Sơ đồ vẫn hiển thị được; một đường nối có đầu mút không tồn tại hoặc tự nối vào chính nó đã được bỏ.",
     },
   ])("provides actionable copy for diagram validator family: $message", (fixture) => {
     expect(describeLessonSummaryDiagramReviewIssue(fixture.detail)?.message).toBe(
@@ -535,6 +750,25 @@ describe("M9.2 partial lesson-summary recovery", () => {
     if (theorem.visual?.kind === "DIAGRAM_SPEC") {
       expect(theorem.visual.spec.labels).toEqual([]);
       expect(theorem.visual.spec.primitives.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps an INTENT diagram when only composite optional length labels cannot be anchored", () => {
+    const value = providerOutput();
+    value.theorySections[0]!.units[0]!.theory.diagramSpec =
+      rightTriangleCongruenceIntentWithCompositeMeasures();
+    value.theorySections[0]!.units[0]!.illustration.diagramSpec = null;
+
+    const summary = recoverAndMap(value);
+    const theorem = summary.sections[0]!.blocks[0]!;
+    expect(theorem.reviewIssues).toBeUndefined();
+    expect(theorem.visual?.kind).toBe("DIAGRAM_SPEC");
+    if (theorem.visual?.kind === "DIAGRAM_SPEC") {
+      expect(theorem.visual.spec.labels).toEqual([]);
+      expect(theorem.visual.spec.primitives.length).toBeGreaterThan(0);
+      expect(
+        theorem.visual.spec.markers.some((marker) => marker.type === "EQUAL_LENGTH"),
+      ).toBe(true);
     }
   });
 
@@ -800,7 +1034,7 @@ describe("M9.2 partial lesson-summary recovery", () => {
     expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
   });
 
-  it.each(compilerFailureDiagrams)("isolates compiler failure: $name", ({ diagram }) => {
+  it.each(hardCompilerFailureDiagrams)("isolates compiler failure: $name", ({ diagram }) => {
     const value = providerOutput();
     value.theorySections[0]!.units[0]!.theory.diagramSpec = diagram;
     value.theorySections[0]!.units[0]!.illustration.diagramSpec = null;
@@ -819,6 +1053,31 @@ describe("M9.2 partial lesson-summary recovery", () => {
     expect(summary.sections.at(-1)?.blocks).toHaveLength(2);
     expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
   });
+
+  it.each(recoverableCompilerDiagrams)(
+    "keeps recoverable compiler output visible: $name",
+    ({ diagram, semanticCode }) => {
+      const value = providerOutput();
+      value.theorySections[0]!.units[0]!.theory.diagramSpec = diagram;
+      value.theorySections[0]!.units[0]!.illustration.diagramSpec = null;
+
+      const summary = recoverAndMap(value);
+      const theorem = summary.sections[0]!.blocks[0]!;
+      expect(theorem.visual?.kind).toBe("DIAGRAM_SPEC");
+      if (semanticCode) {
+        expect(theorem.reviewIssues).toEqual([
+          expect.objectContaining({
+            code: "DIAGRAM_NEEDS_REVIEW",
+            resolution: "ACCEPT_OR_FIX",
+            technicalDetails: expect.stringContaining(semanticCode),
+          }),
+        ]);
+      } else {
+        expect(theorem.reviewIssues).toBeUndefined();
+      }
+      expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
+    },
+  );
 
   it("keeps the mapper itself block-safe even when a caller skips recovery", () => {
     const value = providerOutput();
@@ -840,9 +1099,12 @@ describe("M9.2 partial lesson-summary recovery", () => {
       output: accepted,
       contextChunks,
     });
-    expect(summary.sections[0]!.blocks[0]!.visual).toBeUndefined();
+    expect(summary.sections[0]!.blocks[0]!.visual?.kind).toBe("DIAGRAM_SPEC");
     expect(summary.sections[0]!.blocks[0]!.reviewIssues).toEqual([
-      expect.objectContaining({ code: "DIAGRAM_CANNOT_RENDER" }),
+      expect.objectContaining({
+        code: "DIAGRAM_NEEDS_REVIEW",
+        technicalDetails: expect.stringContaining("INFERRED_POINT_LABEL"),
+      }),
     ]);
     expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
   });

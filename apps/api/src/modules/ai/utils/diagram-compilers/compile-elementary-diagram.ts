@@ -149,10 +149,14 @@ function compileThermometer(
 
 function measurementTickValues(min: number, max: number, step: number) {
   const count = Math.floor((max - min) / step + 1e-9) + 1;
-  if (count < 2 || count > 16) {
-    throw new Error("A measurement scale supports between 2 and 16 major ticks.");
+  if (count < 2) {
+    return [min, max];
   }
-  return Array.from({ length: count }, (_, index) => min + index * step);
+  const visibleTickCount = Math.min(count, 16);
+  const indices = Array.from({ length: visibleTickCount }, (_, index) =>
+    Math.round((index * (count - 1)) / (visibleTickCount - 1)),
+  );
+  return [...new Set(indices)].map((index) => min + index * step);
 }
 
 function scaleMeasurementValue(value: number, min: number, max: number, extent: number) {
@@ -209,11 +213,6 @@ function compileMultiplicationArray(
 function compileTapeComparison(
   intent: Extract<ElementaryIntent, { archetype: "TAPE_COMPARISON" }>,
 ) {
-  for (const bar of intent.bars) {
-    if (bar.partLabels.length !== 0 && bar.partLabels.length !== bar.parts.length) {
-      throw new Error(`${bar.label} must provide zero or one label for every part.`);
-    }
-  }
   const maximumTotal = Math.max(
     ...intent.bars.map((bar) => bar.parts.reduce((sum, value) => sum + value, 0)),
   );

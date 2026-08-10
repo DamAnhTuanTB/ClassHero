@@ -10,7 +10,7 @@ import {
   lessonSummaryDiagramIntentSchema,
   lessonSummaryDiagramIntentTransportSchema,
 } from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
-import { compileLessonSummaryDiagramIntent } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
+import { compileLessonSummaryDiagramIntentWithDiagnostics } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
 
 const safeId = z
   .string()
@@ -528,7 +528,7 @@ export function mapLessonSummaryProviderDiagramInput(
 ) {
   if ("kind" in input) {
     if (input.kind === "INTENT") {
-      return compileLessonSummaryDiagramIntent(input.intent).spec;
+      return compileLessonSummaryDiagramIntentWithDiagnostics(input.intent).spec;
     }
     return mapLessonSummaryProviderDiagramSpec(input.spec);
   }

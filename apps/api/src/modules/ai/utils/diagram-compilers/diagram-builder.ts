@@ -1,8 +1,14 @@
 import {
   lessonSummaryDiagramSpecSchema,
+  lessonSummaryDiagramSpecStructuralSchema,
   normalizeLessonSummaryDiagramSpec,
   type LessonSummaryDiagramSpec,
 } from "@learning-path/shared";
+
+import {
+  compactGeometryMeasureText,
+  isIncompleteInequalityLabel,
+} from "#api/modules/ai/utils/diagram-compilers/diagram-annotation-normalizer";
 
 type PointInput = LessonSummaryDiagramSpec["points"][number];
 type PrimitiveInput = LessonSummaryDiagramSpec["primitives"][number];
@@ -159,18 +165,84 @@ export class DiagramBuilder {
   }
 
   build(): LessonSummaryDiagramSpec {
+    const structurallyValid = lessonSummaryDiagramSpecStructuralSchema.parse({
+      version: 1,
+      coordinateSystem: "CARTESIAN",
+      viewBox: this.viewBox,
+      toScale: true,
+      points: this.points,
+      primitives: this.primitives,
+      markers: this.markers,
+      labels: this.labels,
+      caption: this.caption,
+    });
+    const primitivesById = new Map(
+      structurallyValid.primitives.map((primitive) => [primitive.id, primitive] as const),
+    );
+    const pointsById = new Map(
+      structurallyValid.points.map((point) => [point.id, point] as const),
+    );
+    const sanitizedMarkers = structurallyValid.markers.map((marker): MarkerInput => {
+      if (marker.type !== "ANGLE" || !marker.label) return marker;
+      const vertexLabel = pointsById.get(marker.vertex)?.label;
+      if (
+        vertexLabel &&
+        marker.label.replaceAll(/\s/gu, "") === `∠${vertexLabel}`
+      ) {
+        return { ...marker, label: null };
+      }
+      return marker;
+    });
+    const seenLabels = new Set<string>();
+    const sanitizedLabels = structurallyValid.labels.flatMap((label): LabelInput[] => {
+      if (!pointsById.has(label.anchorPointId)) return [];
+      const primitive = label.anchorPrimitiveId
+        ? primitivesById.get(label.anchorPrimitiveId)
+        : undefined;
+      if (label.anchorPrimitiveId && primitive?.type !== "SEGMENT") return [];
+
+      let text = label.text;
+      if (/^[A-Z](?:['′″])?[A-Z](?:['′″])?\s*=/u.test(text)) {
+        if (primitive?.type !== "SEGMENT") return [];
+        const fromLabel = pointsById.get(primitive.from)?.label;
+        const toLabel = pointsById.get(primitive.to)?.label;
+        if (!fromLabel || !toLabel) return [];
+        const compact = compactGeometryMeasureText(`${fromLabel}${toLabel}`, text);
+        if (!compact) return [];
+        text = compact;
+      }
+      if (
+        /^\d+(?:[.,]\d+)?\s*(?:mm|cm|dm|m|km)$/iu.test(text) &&
+        primitive?.type !== "SEGMENT"
+      ) {
+        return [];
+      }
+      if (
+        /^(?:tường|mặt\s*đất|thang)$/iu.test(text.trim()) &&
+        primitive?.type !== "SEGMENT"
+      ) {
+        return [];
+      }
+      if (isIncompleteInequalityLabel(text)) return [];
+
+      const normalized = {
+        ...label,
+        text,
+        anchorPrimitiveId: label.anchorPrimitiveId ?? null,
+      };
+      const key = `${normalized.anchorPointId}:${normalized.anchorPrimitiveId ?? "FREE"}:${normalized.text}`;
+      if (seenLabels.has(key)) return [];
+      seenLabels.add(key);
+      return [normalized];
+    });
+    const sanitized = {
+      ...structurallyValid,
+      markers: sanitizedMarkers,
+      labels: sanitizedLabels,
+    };
+
     return normalizeLessonSummaryDiagramSpec(
-      lessonSummaryDiagramSpecSchema.parse({
-        version: 1,
-        coordinateSystem: "CARTESIAN",
-        viewBox: this.viewBox,
-        toScale: true,
-        points: this.points,
-        primitives: this.primitives,
-        markers: this.markers,
-        labels: this.labels,
-        caption: this.caption,
-      }),
+      lessonSummaryDiagramSpecSchema.parse(sanitized),
     );
   }
 }

@@ -1,6 +1,7 @@
 import type { LessonSummaryDiagramSpec } from "@learning-path/shared";
 
 import type { LessonSummaryDiagramIntent } from "#api/modules/ai/types/lesson-summary-diagram-intent.types";
+import { compactGeometryMeasureText } from "#api/modules/ai/utils/diagram-compilers/diagram-annotation-normalizer";
 import { DiagramBuilder } from "#api/modules/ai/utils/diagram-compilers/diagram-builder";
 
 type AdvancedIntent = Extract<
@@ -881,10 +882,12 @@ function addMeasures(
   > = new Map(),
 ) {
   for (const measure of intent.measures) {
+    const text = compactGeometryMeasureText(measure.target, measure.text);
+    if (!text) continue;
     const edgeId = edges.get(normalizeTarget(measure.target));
     if (!edgeId) continue;
     builder.addLabel({
-      text: measure.text,
+      text,
       anchorPointId: fallbackPointId,
       anchorPrimitiveId: edgeId,
       position: positionByEdge.get(edgeId) ?? "TOP",
@@ -893,22 +896,27 @@ function addMeasures(
 }
 
 function requireLabels(intent: AdvancedIntent, count: number) {
-  if (intent.pointLabels.length < count) {
+  const labels = canonicalAdvancedPointLabels(intent);
+  if (labels.length < count) {
     throw new Error(`${intent.archetype}/${intent.variant} requires ${count} point labels.`);
   }
-  return canonicalAdvancedPointLabels(intent);
+  return labels;
 }
 
 export function canonicalAdvancedPointLabels(intent: AdvancedIntent) {
   const preferred = preferredAdvancedPointLabels(intent);
   if (
     preferred &&
-    preferred.length === intent.pointLabels.length &&
-    preferred.every((label) => intent.pointLabels.includes(label))
+    intent.pointLabels.every((label) => preferred.includes(label))
   ) {
     return preferred;
   }
-  return intent.pointLabels;
+  if (!preferred) return [...new Set(intent.pointLabels)];
+  const uniqueProvided = [...new Set(intent.pointLabels)];
+  return [
+    ...uniqueProvided,
+    ...preferred.filter((label) => !uniqueProvided.includes(label)),
+  ];
 }
 
 function preferredAdvancedPointLabels(intent: AdvancedIntent): string[] | null {

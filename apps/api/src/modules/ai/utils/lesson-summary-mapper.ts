@@ -5,6 +5,7 @@ import {
 } from "@learning-path/shared";
 
 import type { RetrievedChunk } from "#api/modules/ai/types/ai-text.types";
+import { compileLessonSummaryDiagramIntentWithDiagnostics } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
 import {
   mapLessonSummaryProviderDiagramInput,
   type LessonSummaryProviderDiagramInput,
@@ -21,7 +22,10 @@ import {
   isLessonSummaryRealWorldCandidate,
 } from "#api/modules/ai/utils/lesson-summary-source-candidates";
 import type { LessonSummaryReviewIssueDraft } from "#api/modules/ai/utils/lesson-summary-recovery";
-import { simplifyLessonSummaryReviewCopy } from "#api/modules/ai/utils/lesson-summary-review-copy";
+import {
+  describeLessonSummaryDiagramReviewIssue,
+  simplifyLessonSummaryReviewCopy,
+} from "#api/modules/ai/utils/lesson-summary-review-copy";
 
 const EXERCISE_HEADING_PATTERN =
   /^(?:ví\s*dụ|luyện\s*tập|vận\s*dụng|bài\s*tập|ứng\s*dụng\s*thực\s*tế)(?:\s|$|[:：.-])/iu;
@@ -104,9 +108,31 @@ export function mapLessonSummaryProviderOutput(
     if (!diagram) return null;
     if (diagramCache.has(providerPath)) return diagramCache.get(providerPath) ?? null;
     try {
+      const compiled =
+        "kind" in diagram && diagram.kind === "INTENT"
+          ? compileLessonSummaryDiagramIntentWithDiagnostics(diagram.intent)
+          : null;
       const spec = normalizeLessonSummaryDiagramSpec(
-        mapLessonSummaryProviderDiagramInput(diagram),
+        compiled?.spec ?? mapLessonSummaryProviderDiagramInput(diagram),
       );
+      if (compiled?.semanticIssues.length) {
+        const technicalDetails = compiled.semanticIssues
+          .slice(0, 12)
+          .map((issue) => `${issue.code}: ${issue.message}`)
+          .join("\n");
+        const copy = describeLessonSummaryDiagramReviewIssue(technicalDetails);
+        addRuntimeReviewIssue(providerPath, {
+          code: "DIAGRAM_NEEDS_REVIEW",
+          path: `${providerPath}.diagramSpec`,
+          message:
+            copy?.message ??
+            "Hình vẽ vẫn hiển thị được nhưng còn chi tiết cần kiểm tra lại.",
+          suggestion:
+            copy?.suggestion ??
+            "Đối chiếu các điểm và nét vẽ với đề bài; sửa hình hoặc chấp nhận nếu hình hiện tại vẫn dùng được.",
+          technicalDetails,
+        });
+      }
       diagramCache.set(providerPath, spec);
       return spec;
     } catch (error) {
