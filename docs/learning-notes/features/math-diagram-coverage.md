@@ -283,4 +283,3 @@ Khi có báo cáo coverage mới:
 ## Task liên quan
 
 - `M9.2` — Lesson summary generation và math diagram coverage.
-
