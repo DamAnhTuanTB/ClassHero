@@ -230,6 +230,12 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   repair lần hai.
 - Có fallback/error state thân thiện khi provider chậm/lỗi.
 - Ghi log usage/duration khi module AI log đã có.
+- Với Summary, log thêm `promptVersion`, `schemaVersion`, schema strategy,
+  `cachedInputTokens`, `uncachedInputTokens` và cache-hit ratio; không log raw
+  instructions, input, chunk hoặc cache key chứa dữ liệu người dùng.
+- Prompt Caching chỉ giảm phần input bị tính phí/độ trễ theo policy provider,
+  không giảm tổng token được gửi. UI và báo cáo phải tách tổng input khỏi cached
+  input để tránh hiểu sai việc tối ưu cache thành cắt dữ liệu nguồn.
 - Khi test runtime với provider trả phí, ưu tiên cache/sample trước; forced/full run phải có ước tính usage/chi phí và xác nhận rõ của owner trước khi chạy.
 
 ---

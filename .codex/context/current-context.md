@@ -98,8 +98,28 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   rate catalog gồm cached input và FX 25.000 khoảng 23.670 VNĐ, trong đó bốn call
   bổ sung khoảng 11.975 VNĐ. Artifact cặp đầu ở
   `tmp/m9-2-schema-ref-live-comparison/`, hai cặp sau ở `run-2/` và `run-3/`.
-  Local `.env` đang bật flag; restart API/worker để process đang chạy nạp giá trị
-  mới, và tắt flag để rollback khi cần.
+- Scope clarification của owner ngày 2026-08-11: khi trao đổi tối ưu cho “tính
+  năng Sinh kiến thức”, chỉ phân tích luồng Summary/M9.2; không tự mở rộng sang
+  Quiz, Flashcard hoặc Test. Mọi phương án tối ưu tiếp theo trong scope này phải
+  bảo toàn 100% độ chính xác theo chuẩn contract của owner: được phép đổi cách
+  biểu diễn nếu chứng minh tương đương cấu trúc như `$defs/$ref`, giữ nguyên tập
+  output hợp lệ và giữ cùng Zod parser, acceptance, mapper, recovery cùng
+  persisted output. Không được rút gọn hay diễn giải lại prompt/context, bỏ dữ
+  liệu nguồn hoặc thay đổi nghiệp vụ chỉ để giảm token.
+- Follow-up an toàn cho đúng scope Summary/M9.2 đã triển khai và verify ngày
+  2026-08-11 theo
+  `.codex/plans/m9-2-summary-safe-schema-cache-optimization-plan.md`. Strategy
+  `ref_v2` giữ nguyên toàn bộ prompt/chunk/metadata và cùng tập output hợp lệ,
+  Zod parser, acceptance, recovery, mapper, persisted output; schema giảm từ
+  33.320 xuống 30.394 ký tự và dereference deep-equal inline. 15 live call
+  `gpt-5.4-2026-03-05` pass: 6 nguồn nhỏ, 6 Bài 15 và 3 cache-warm; 18/18 hình
+  Bài 15 `ref_v2` có đủ hai tam giác, 0 required visual thiếu, 0 review issue.
+  Cache-warm xuyên bài đạt khoảng 95%; tổng usage 212.617 input (168.704 cached)
+  + 53.132 output, chi phí ước tính khoảng 0,95 USD / 23.700 VNĐ. Manual text và
+  ảnh raster từ renderer đạt 99/100; browser tích hợp không có phiên nên ảnh là
+  fallback SVG của component, ghi rõ tại
+  `tmp/m9-2-schema-ref-v2-visual-comparison/manual-review.md`. Local `.env` bật
+  ref v1 + ref v2 + cache key + retention 24h; restart API/worker để nạp cấu hình.
 - Micro live A/B cùng ngày đã chạy thêm ba nguồn ngắn độc lập trên
   `gpt-5.4-2026-03-05`/medium: giao hoán phép cộng lớp 3, bình phương của một tổng
   lớp 8 và tổng ba góc tam giác lớp 7. Cả 6/6 output ref/inline đều pass schema,

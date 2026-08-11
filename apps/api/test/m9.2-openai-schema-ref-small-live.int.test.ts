@@ -4,6 +4,7 @@ import { config as loadEnv } from "dotenv";
 import { describe, expect, it } from "vitest";
 
 import { OpenAiProvider } from "#api/modules/ai/providers/openai.provider";
+import type { AiStructuredSchemaReferenceStrategy } from "#api/modules/ai/types/ai-text.types";
 import {
   type LessonSummaryOutput,
   lessonSummaryOutputSchema,
@@ -23,9 +24,16 @@ loadEnv({
 });
 
 const runLiveTest = liveEnv.RUN_OPENAI_SMALL_LIVE_TESTS === "1";
+const liveRunId = normalizeRunId(
+  liveEnv.M9_2_SCHEMA_REF_SMALL_LIVE_RUN_ID ?? "historical",
+);
+const schemaReferenceStrategies = readStrategies(
+  liveEnv.M9_2_SCHEMA_REF_SMALL_LIVE_STRATEGIES ?? "ref,inline",
+);
 const artifactDirectory = resolve(
   process.cwd(),
   "../../tmp/m9-2-schema-ref-small-live-comparison",
+  liveRunId,
 );
 const smallCases = [
   {
@@ -82,7 +90,7 @@ describe.skipIf(!runLiveTest)(
         mkdirSync(caseDirectory, { recursive: true });
         const caseComparisons: SmallLiveComparison[] = [];
 
-        for (const schemaReferenceStrategy of ["ref", "inline"] as const) {
+        for (const schemaReferenceStrategy of schemaReferenceStrategies) {
           const artifactPath = resolve(
             caseDirectory,
             `${schemaReferenceStrategy}.json`,
@@ -111,6 +119,9 @@ describe.skipIf(!runLiveTest)(
               targetWordCount: null,
               extraInstructions: "",
               schemaReferenceStrategy,
+              promptCacheKeyEnabled: schemaReferenceStrategy === "ref_v2",
+              promptCacheRetention:
+                schemaReferenceStrategy === "ref_v2" ? "24h" : "in_memory",
             },
           });
           const structuredTextFormat = buildAiStructuredTextFormat(
@@ -191,26 +202,32 @@ describe.skipIf(!runLiveTest)(
           );
         }
 
+        for (const result of caseComparisons) {
+          expect(result.issueCount).toBe(0);
+          expect(result.requiredTermHits.length).toBeGreaterThan(0);
+          if (smallCase.expectsTriangleDiagrams) {
+            expect(result.diagramCount).toBeGreaterThan(0);
+            expect(result.diagramsWithoutTriangles).toBe(0);
+          }
+        }
         const refResult = caseComparisons.find(
           (comparison) => comparison.schemaReferenceStrategy === "ref",
+        );
+        const refV2Result = caseComparisons.find(
+          (comparison) => comparison.schemaReferenceStrategy === "ref_v2",
         );
         const inlineResult = caseComparisons.find(
           (comparison) => comparison.schemaReferenceStrategy === "inline",
         );
-        expect(refResult).toBeDefined();
-        expect(inlineResult).toBeDefined();
-        expect(refResult?.schemaCharacters).toBeLessThan(
-          (inlineResult?.schemaCharacters ?? 0) / 5,
-        );
-        expect(refResult?.issueCount).toBe(0);
-        expect(inlineResult?.issueCount).toBe(0);
-        expect(refResult?.requiredTermHits.length).toBeGreaterThan(0);
-        expect(inlineResult?.requiredTermHits.length).toBeGreaterThan(0);
-        if (smallCase.expectsTriangleDiagrams) {
-          expect(refResult?.diagramCount).toBeGreaterThan(0);
-          expect(inlineResult?.diagramCount).toBeGreaterThan(0);
-          expect(refResult?.diagramsWithoutTriangles).toBe(0);
-          expect(inlineResult?.diagramsWithoutTriangles).toBe(0);
+        if (refResult && inlineResult) {
+          expect(refResult.schemaCharacters).toBeLessThan(
+            inlineResult.schemaCharacters / 5,
+          );
+        }
+        if (refResult && refV2Result) {
+          expect(refV2Result.schemaCharacters).toBeLessThan(
+            refResult.schemaCharacters,
+          );
         }
 
         writeFileSync(
@@ -358,7 +375,7 @@ type DiagramSpec = Extract<
 
 type SmallLiveComparison = {
   caseId: string;
-  schemaReferenceStrategy: "inline" | "ref";
+  schemaReferenceStrategy: AiStructuredSchemaReferenceStrategy;
   schemaCharacters: number;
   provider: string;
   model: string;
@@ -379,3 +396,28 @@ type SmallLiveComparison = {
   triangleCounts: number[];
   diagramsWithoutTriangles: number;
 };
+
+function normalizeRunId(value: string) {
+  const normalized = value.trim().replace(/[^a-zA-Z0-9_-]/gu, "-");
+  if (!normalized) throw new Error("Small live run id must not be empty.");
+  return normalized;
+}
+
+function readStrategies(value: string): AiStructuredSchemaReferenceStrategy[] {
+  const allowed = new Set<AiStructuredSchemaReferenceStrategy>([
+    "inline",
+    "ref",
+    "ref_v2",
+  ]);
+  const strategies = value
+    .split(",")
+    .map((strategy) => strategy.trim())
+    .filter(
+      (strategy): strategy is AiStructuredSchemaReferenceStrategy =>
+        allowed.has(strategy as AiStructuredSchemaReferenceStrategy),
+    );
+  if (strategies.length === 0) {
+    throw new Error("At least one live schema strategy is required.");
+  }
+  return [...new Set(strategies)];
+}

@@ -811,10 +811,12 @@ Behavior:
   contract hoặc preference. Nếu field rỗng/không có, server dựng prompt mặc định
   từ cấu hình runtime hiện tại.
 - Trả thêm `openAiRequest` ở dạng JSON với các field `model`, `instructions`,
-  `input`, `text.format`, `temperature`, `max_output_tokens`; `text.format` phải
-  chứa đúng structured-output name, strict mode và JSON Schema mà provider sử
-  dụng. Đây phải là payload xem trước đầy đủ sau khi server ghép context, không
-  phải object gần giống request thật và không chứa credential.
+  `input`, `text.format`, `temperature` hoặc `reasoning`, `max_output_tokens`;
+  khi cấu hình Summary bật cache còn có `prompt_cache_key` và
+  `prompt_cache_retention`. `text.format` phải chứa đúng structured-output name,
+  strict mode và JSON Schema mà provider sử dụng. Đây phải là payload xem trước
+  đầy đủ sau khi server ghép context, không phải object gần giống request thật và
+  không chứa credential.
 - Trả số document/chunk, token ước tính, model/provider thực tế,
   temperature, giới hạn output, danh sách model khả dụng và chi phí tối đa ước
   tính theo bảng giá hiện tại.

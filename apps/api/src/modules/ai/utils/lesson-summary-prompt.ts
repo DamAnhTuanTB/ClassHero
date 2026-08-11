@@ -123,7 +123,14 @@ export function buildLessonSummaryStructuredInput(input: {
   sourceHash: string;
   chunks: NonNullable<AiStructuredInput["contextChunks"]>;
   configuration: Parameters<typeof buildLessonSummaryUserPrompt>[0]["configuration"] &
-    Partial<Pick<LessonSummaryJobInput, "schemaReferenceStrategy">>;
+    Partial<
+      Pick<
+        LessonSummaryJobInput,
+        | "schemaReferenceStrategy"
+        | "promptCacheKeyEnabled"
+        | "promptCacheRetention"
+      >
+    >;
   systemInstructions?: string;
   userPrompt?: string;
 }): AiStructuredInput {
@@ -134,6 +141,10 @@ export function buildLessonSummaryStructuredInput(input: {
   });
   const customSystemInstructions = input.systemInstructions?.trim();
   const customUserPrompt = input.userPrompt?.trim();
+
+  const promptCacheKeyEnabled = input.configuration.promptCacheKeyEnabled ?? false;
+  const promptCacheRetention =
+    input.configuration.promptCacheRetention ?? "in_memory";
 
   return {
     systemPrompt: customSystemInstructions || LESSON_SUMMARY_SYSTEM_PROMPT,
@@ -152,6 +163,15 @@ export function buildLessonSummaryStructuredInput(input: {
     promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
     schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
     schemaReferenceStrategy: input.configuration.schemaReferenceStrategy ?? "inline",
+    ...(promptCacheKeyEnabled || promptCacheRetention === "24h"
+      ? {
+          promptCache: {
+            namespace: "ls",
+            keyEnabled: promptCacheKeyEnabled,
+            retention: promptCacheRetention,
+          },
+        }
+      : {}),
   };
 }
 

@@ -853,8 +853,19 @@ describe("M9.2 lesson summary provider contract", () => {
       outputName,
       "ref",
     );
+    const referenceV2Format = buildAiStructuredTextFormat(
+      lessonSummaryProviderTransportOutputSchema,
+      outputName,
+      "ref_v2",
+    );
+    const referenceV2FormatAgain = buildAiStructuredTextFormat(
+      lessonSummaryProviderTransportOutputSchema,
+      outputName,
+      "ref_v2",
+    );
 
     expect(JSON.stringify(inlineFormat)).toBe(JSON.stringify(sdkInlineFormat));
+    expect(JSON.stringify(referenceFormat)).toHaveLength(33_320);
     expect(referenceFormat.schema).toHaveProperty("$defs");
     expect(JSON.stringify(referenceFormat)).toContain('"$ref"');
     expect(JSON.stringify(referenceFormat).length).toBeLessThan(
@@ -863,9 +874,24 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(
       normalizeExpandedJsonSchema(referenceFormat.schema),
     ).toEqual(normalizeExpandedJsonSchema(inlineFormat.schema));
+    expect(referenceV2Format.schema).toHaveProperty("$defs");
+    expect(JSON.stringify(referenceV2Format)).toContain('"$ref"');
+    expect(JSON.stringify(referenceV2Format).length).toBeLessThanOrEqual(30_600);
+    expect(JSON.stringify(referenceV2Format).length).toBeLessThan(
+      JSON.stringify(referenceFormat).length,
+    );
+    expect(JSON.stringify(referenceV2FormatAgain)).toBe(
+      JSON.stringify(referenceV2Format),
+    );
+    expect(
+      normalizeExpandedJsonSchema(referenceV2Format.schema),
+    ).toEqual(normalizeExpandedJsonSchema(inlineFormat.schema));
 
     const providerOutput = createProviderOutput();
     expect(referenceFormat.$parseRaw(JSON.stringify(providerOutput))).toEqual(
+      lessonSummaryProviderTransportOutputSchema.parse(providerOutput),
+    );
+    expect(referenceV2Format.$parseRaw(JSON.stringify(providerOutput))).toEqual(
       lessonSummaryProviderTransportOutputSchema.parse(providerOutput),
     );
   });
@@ -1289,6 +1315,53 @@ describe("M9.2 lesson summary provider contract", () => {
     ).toBeNull();
   });
 
+  it("changes only the structured schema when switching summary reference strategies", () => {
+    const chunks = [
+      {
+        id: ids.theory,
+        content: "Nội dung nguồn giữ nguyên từng byte.",
+        score: 0.875,
+        metadata: {
+          pageNumber: 7,
+          source: "SGK",
+          nullableValue: null,
+          nested: { order: 1, label: "Bài 15" },
+        },
+      },
+    ];
+    const buildRequest = (
+      schemaReferenceStrategy: "inline" | "ref" | "ref_v2",
+    ) =>
+      buildLessonSummaryStructuredInput({
+        lessonId: "lesson-1",
+        lessonTitle: "Bài 15",
+        targetGrade: 7,
+        documentIds: ["document-1"],
+        sourceHash: "source-hash",
+        chunks,
+        configuration: {
+          style: "academic",
+          styleInstructions: "Chặt chẽ",
+          length: "standard",
+          targetWordCount: null,
+          extraInstructions: "Giữ đủ hai tam giác",
+          schemaReferenceStrategy,
+        },
+      });
+    const inline = buildRequest("inline");
+    const ref = buildRequest("ref");
+    const refV2 = buildRequest("ref_v2");
+
+    for (const candidate of [ref, refV2]) {
+      expect(candidate.systemPrompt).toBe(inline.systemPrompt);
+      expect(candidate.userPrompt).toBe(inline.userPrompt);
+      expect(candidate.contextChunks).toEqual(inline.contextChunks);
+      expect(candidate.metadata).toEqual(inline.metadata);
+      expect(buildAiUserPrompt(candidate)).toBe(buildAiUserPrompt(inline));
+      expect({ ...candidate, schemaReferenceStrategy: "inline" }).toEqual(inline);
+    }
+  });
+
   it("accepts a resolved system prompt beyond the legacy 12,000-character limit", () => {
     const resolvedSystemPrompt = "S".repeat(15_501);
     const parsed = lessonSummaryJobInputSchema.parse({
@@ -1308,6 +1381,18 @@ describe("M9.2 lesson summary provider contract", () => {
         schemaReferenceStrategy: "ref",
       }).schemaReferenceStrategy,
     ).toBe("ref");
+    expect(
+      lessonSummaryJobInputSchema.parse({
+        documentIds: [ids.theory],
+        sourceHash: "a".repeat(64),
+        style: "student_friendly",
+        schemaReferenceStrategy: "ref_v2",
+      }),
+    ).toMatchObject({
+      schemaReferenceStrategy: "ref_v2",
+      promptCacheKeyEnabled: false,
+      promptCacheRetention: "in_memory",
+    });
     expect(() =>
       lessonSummaryJobInputSchema.parse({
         documentIds: [ids.theory],

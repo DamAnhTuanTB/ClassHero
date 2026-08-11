@@ -343,6 +343,54 @@ describe("OpenAiProvider", () => {
       expect(JSON.stringify(request.text.format.schema)).toContain('"$ref"');
     });
 
+    it("adds stable Summary cache routing fields without changing prompt content", async () => {
+      const sharedSchema = z.object({ label: z.string() });
+      const repeatedSchema = z.object({ first: sharedSchema, second: sharedSchema });
+      mockResponsesParse.mockResolvedValue({
+        id: "resp-cache-1",
+        model: "gpt-5.4-2026-03-05",
+        output_parsed: { first: { label: "A" }, second: { label: "B" } },
+        usage: {
+          input_tokens: 2_000,
+          output_tokens: 100,
+          total_tokens: 2_100,
+          input_tokens_details: { cached_tokens: 1_600 },
+        },
+      });
+      const input = {
+        systemPrompt: "Return structured output.",
+        userPrompt: "Return two labels.",
+        outputName: "schema_refs_cache_smoke",
+        promptVersion: "summary-v1",
+        schemaVersion: "summary-schema-v1",
+        schemaReferenceStrategy: "ref_v2" as const,
+        model: "gpt-5.4-2026-03-05",
+        promptCache: {
+          namespace: "ls",
+          keyEnabled: true,
+          retention: "24h" as const,
+        },
+      };
+
+      await provider.generateStructured(input, repeatedSchema);
+      await provider.generateStructured(input, repeatedSchema);
+
+      const firstRequest = mockResponsesParse.mock.calls[0]?.[0] as {
+        instructions: string;
+        input: string;
+        prompt_cache_key?: string;
+        prompt_cache_retention?: string;
+      };
+      const secondRequest = mockResponsesParse.mock.calls[1]?.[0] as typeof firstRequest;
+      expect(firstRequest.instructions).toBe(input.systemPrompt);
+      expect(firstRequest.input).toContain(input.userPrompt);
+      expect(firstRequest.prompt_cache_key).toMatch(
+        /^ls:[a-f0-9]{8}:[a-f0-9]{8}:[a-f0-9]{12}$/u,
+      );
+      expect(firstRequest.prompt_cache_key).toBe(secondRequest.prompt_cache_key);
+      expect(firstRequest.prompt_cache_retention).toBe("24h");
+    });
+
     it("rejects parsed data that fails local Zod validation", async () => {
       mockResponsesParse.mockResolvedValueOnce({
         id: "resp-invalid",

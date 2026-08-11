@@ -23,6 +23,11 @@ import {
 } from "#api/modules/ai/types/lesson-summary.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import {
+  supportsOpenAiReasoningEffort,
+  supportsOpenAiTemperature,
+} from "#api/modules/ai/utils/ai-openai-model-capabilities";
+import { buildOpenAiPromptCacheFields } from "#api/modules/ai/utils/ai-prompt-cache";
+import {
   buildAiStructuredTextFormat,
   estimateAiStructuredInputTokens,
 } from "#api/modules/ai/utils/ai-structured-output-format";
@@ -152,6 +157,7 @@ export class LessonSummariesService {
     const configuration = normalizeConfiguration(
       dto,
       this.resolveSchemaReferenceStrategy(),
+      this.resolvePromptCacheConfiguration(),
     );
     const { route } = await this.resolveSummaryRoute(dto);
 
@@ -206,6 +212,7 @@ export class LessonSummariesService {
     const configuration = normalizeConfiguration(
       dto,
       this.resolveSchemaReferenceStrategy(),
+      this.resolvePromptCacheConfiguration(),
     );
     const { baseRoute, route } = await this.resolveSummaryRoute(dto);
     const request = buildLessonSummaryStructuredInput({
@@ -236,6 +243,16 @@ export class LessonSummariesService {
       route.candidates.find((candidate) => candidate.available) ??
       route.candidates[0] ??
       null;
+    const resolvedModel = resolvedCandidate?.model ?? null;
+    const resolvedTemperature = route.temperature ?? request.temperature;
+    const resolvedReasoningEffort = route.reasoningEffort ?? request.reasoningEffort;
+    const promptCacheFields = resolvedModel
+      ? buildOpenAiPromptCacheFields({
+          request,
+          model: resolvedModel,
+          structuredTextFormat,
+        })
+      : {};
     const fxRate = await this.getFxRateVndPerUsd();
     const requiredCostMetrics = new Set([
       ProviderUsageMetric.INPUT_TOKEN,
@@ -269,14 +286,23 @@ export class LessonSummariesService {
       userPrompt: request.userPrompt,
       inputPrompt,
       openAiRequest: {
-        model: resolvedCandidate?.model ?? null,
+        model: resolvedModel,
         instructions: request.systemPrompt,
         input: inputPrompt,
         text: {
           format: structuredTextFormat,
         },
-        temperature: route.temperature ?? request.temperature ?? 0.2,
-        ...(route.reasoningEffort ? { reasoning_effort: route.reasoningEffort } : {}),
+        ...promptCacheFields,
+        ...(resolvedModel &&
+        resolvedTemperature !== undefined &&
+        supportsOpenAiTemperature(resolvedModel)
+          ? { temperature: resolvedTemperature }
+          : {}),
+        ...(resolvedModel &&
+        resolvedReasoningEffort &&
+        supportsOpenAiReasoningEffort(resolvedModel)
+          ? { reasoning: { effort: resolvedReasoningEffort } }
+          : {}),
         max_output_tokens: maxOutputTokens,
       },
       context: {
@@ -409,11 +435,31 @@ export class LessonSummariesService {
   }
 
   private resolveSchemaReferenceStrategy(): LessonSummaryJobInput["schemaReferenceStrategy"] {
-    return this.configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
+    const refsEnabled = this.configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
+      infer: true,
+    });
+    if (!refsEnabled) return "inline";
+    return this.configService.get("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", {
       infer: true,
     })
-      ? "ref"
-      : "inline";
+      ? "ref_v2"
+      : "ref";
+  }
+
+  private resolvePromptCacheConfiguration(): Pick<
+    LessonSummaryJobInput,
+    "promptCacheKeyEnabled" | "promptCacheRetention"
+  > {
+    return {
+      promptCacheKeyEnabled: this.configService.get(
+        "AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED",
+        { infer: true },
+      ),
+      promptCacheRetention: this.configService.get(
+        "AI_SUMMARY_PROMPT_CACHE_RETENTION",
+        { infer: true },
+      ),
+    };
   }
 }
 
@@ -430,6 +476,10 @@ function readReasoningEffortLevels(capabilities: unknown): string[] {
 function normalizeConfiguration(
   dto: GenerateLessonSummaryDto,
   schemaReferenceStrategy: LessonSummaryJobInput["schemaReferenceStrategy"],
+  promptCacheConfiguration: Pick<
+    LessonSummaryJobInput,
+    "promptCacheKeyEnabled" | "promptCacheRetention"
+  >,
 ): Omit<LessonSummaryJobInput, "documentIds" | "sourceHash" | "targetGrade"> {
   return {
     style: dto.style,
@@ -445,6 +495,7 @@ function normalizeConfiguration(
     ...(dto.temperature !== undefined ? { temperature: dto.temperature } : {}),
     ...(dto.reasoningEffort ? { reasoningEffort: dto.reasoningEffort } : {}),
     schemaReferenceStrategy,
+    ...promptCacheConfiguration,
     ...(dto.maxOutputTokens !== undefined
       ? { maxOutputTokens: dto.maxOutputTokens }
       : {}),

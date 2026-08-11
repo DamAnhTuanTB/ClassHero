@@ -4,6 +4,7 @@ import { config as loadEnv } from "dotenv";
 import { describe, expect, it } from "vitest";
 
 import { OpenAiProvider } from "#api/modules/ai/providers/openai.provider";
+import type { AiStructuredSchemaReferenceStrategy } from "#api/modules/ai/types/ai-text.types";
 import {
   type LessonSummaryOutput,
   lessonSummaryOutputSchema,
@@ -26,6 +27,9 @@ const runLiveTest = liveEnv.RUN_OPENAI_LIVE_TESTS === "1";
 const liveRunId = (liveEnv.M9_2_SCHEMA_REF_LIVE_RUN_ID ?? "run")
   .trim()
   .replace(/[^a-zA-Z0-9_-]/g, "-");
+const schemaReferenceStrategies = readStrategies(
+  liveEnv.M9_2_SCHEMA_REF_LIVE_STRATEGIES ?? "ref,inline",
+);
 const supportedTheoryCategories = new Set<TheoryCategory>([
   "TWO_LEGS",
   "HYPOTENUSE_LEG",
@@ -67,7 +71,7 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
 
     // Run the new path first. If OpenAI rejects `$defs/$ref`, the test stops
     // before spending a second call on the already-proven inline baseline.
-    for (const schemaReferenceStrategy of ["ref", "inline"] as const) {
+    for (const schemaReferenceStrategy of schemaReferenceStrategies) {
       const request = buildLessonSummaryStructuredInput({
         lessonId: "lesson-live",
         lessonTitle: "Bài 15: Ba trường hợp bằng nhau của tam giác vuông",
@@ -82,6 +86,9 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
           targetWordCount: null,
           extraInstructions: "",
           schemaReferenceStrategy,
+          promptCacheKeyEnabled: schemaReferenceStrategy === "ref_v2",
+          promptCacheRetention:
+            schemaReferenceStrategy === "ref_v2" ? "24h" : "in_memory",
         },
       });
       const structuredTextFormat = buildAiStructuredTextFormat(
@@ -168,15 +175,27 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
     const inlineResult = comparisons.find(
       (comparison) => comparison.schemaReferenceStrategy === "inline",
     );
-    expect(refResult).toBeDefined();
-    expect(inlineResult).toBeDefined();
-    expect(refResult?.schemaCharacters).toBeLessThan(
-      (inlineResult?.schemaCharacters ?? 0) / 5,
+    const refV2Result = comparisons.find(
+      (comparison) => comparison.schemaReferenceStrategy === "ref_v2",
     );
-    expect(refResult?.issueCount).toBe(inlineResult?.issueCount);
-    expect(refResult?.missingRequiredVisuals).toBe(
-      inlineResult?.missingRequiredVisuals,
-    );
+    if (refResult && inlineResult) {
+      expect(refResult.schemaCharacters).toBeLessThan(
+        inlineResult.schemaCharacters / 5,
+      );
+      expect(refResult.issueCount).toBe(inlineResult.issueCount);
+      expect(refResult.missingRequiredVisuals).toBe(
+        inlineResult.missingRequiredVisuals,
+      );
+    }
+    if (refResult && refV2Result) {
+      expect(refV2Result.schemaCharacters).toBeLessThan(
+        refResult.schemaCharacters,
+      );
+      expect(refV2Result.issueCount).toBe(refResult.issueCount);
+      expect(refV2Result.missingRequiredVisuals).toBe(
+        refResult.missingRequiredVisuals,
+      );
+    }
 
     writeFileSync(
       resolve(artifactDirectory, "comparison.json"),
@@ -336,6 +355,25 @@ type TheoryCategory =
   | "HYPOTENUSE_LEG"
   | "HYPOTENUSE_ACUTE_ANGLE"
   | "OTHER";
+
+function readStrategies(value: string): AiStructuredSchemaReferenceStrategy[] {
+  const allowed = new Set<AiStructuredSchemaReferenceStrategy>([
+    "inline",
+    "ref",
+    "ref_v2",
+  ]);
+  const strategies = value
+    .split(",")
+    .map((strategy) => strategy.trim())
+    .filter(
+      (strategy): strategy is AiStructuredSchemaReferenceStrategy =>
+        allowed.has(strategy as AiStructuredSchemaReferenceStrategy),
+    );
+  if (strategies.length === 0) {
+    throw new Error("At least one live schema strategy is required.");
+  }
+  return [...new Set(strategies)];
+}
 
 function readTheoryMetrics(output: {
   theorySections: Array<{

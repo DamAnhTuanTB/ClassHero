@@ -55,7 +55,7 @@ const ids = {
   chunk: randomUUID(),
   reasoningModel: randomUUID(),
 };
-const reasoningModelKey = `m9-2-reasoning-${testRunId}`;
+const reasoningModelKey = `gpt-5.4-test-${testRunId}`;
 const queuedJobIds = new Set<string>();
 const queueMock = {
   enqueue: vi.fn(async (jobId: string) => {
@@ -469,7 +469,9 @@ describe("M9.2 lesson summary API and worker integration", () => {
             }),
           },
         },
-        reasoning_effort: "xhigh",
+        reasoning: {
+          effort: "xhigh",
+        },
         max_output_tokens: 8_000,
       },
       context: {
@@ -514,7 +516,22 @@ describe("M9.2 lesson summary API and worker integration", () => {
     const previousValue = configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
       infer: true,
     });
+    const previousV2Value = configService.get(
+      "AI_SUMMARY_SCHEMA_REFS_V2_ENABLED",
+      { infer: true },
+    );
+    const previousCacheKeyValue = configService.get(
+      "AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED",
+      { infer: true },
+    );
+    const previousCacheRetention = configService.get(
+      "AI_SUMMARY_PROMPT_CACHE_RETENTION",
+      { infer: true },
+    );
     configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", true);
+    configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", true);
+    configService.set("AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED", true);
+    configService.set("AI_SUMMARY_PROMPT_CACHE_RETENTION", "24h");
 
     try {
       const response = await request(httpServer)
@@ -534,9 +551,28 @@ describe("M9.2 lesson summary API and worker integration", () => {
       expect(
         JSON.stringify(response.body.data.openAiRequest.text.format),
       ).toContain('"$ref"');
-      expect(response.body.data.context.schemaTokens).toBeLessThan(30_000);
+      expect(
+        JSON.stringify(response.body.data.openAiRequest.text.format),
+      ).not.toContain("__schema");
+      expect(response.body.data.context.schemaTokens).toBeLessThan(26_000);
+      expect(response.body.data.openAiRequest.prompt_cache_key).toMatch(
+        /^ls:[a-f0-9]{8}:[a-f0-9]{8}:[a-f0-9]{12}$/u,
+      );
+      expect(response.body.data.openAiRequest.prompt_cache_retention).toBe("24h");
+      expect(response.body.data.openAiRequest).not.toHaveProperty("reasoning");
+      expect(response.body.data.openAiRequest).not.toHaveProperty("reasoning_effort");
+      expect(response.body.data.openAiRequest).not.toHaveProperty("temperature");
     } finally {
       configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", previousValue);
+      configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", previousV2Value);
+      configService.set(
+        "AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED",
+        previousCacheKeyValue,
+      );
+      configService.set(
+        "AI_SUMMARY_PROMPT_CACHE_RETENTION",
+        previousCacheRetention,
+      );
     }
   });
 
@@ -669,7 +705,12 @@ describe("M9.2 lesson summary API and worker integration", () => {
     ]);
 
     const configService = app.get(ConfigService<EnvConfig, true>);
+    const previousV2Value = configService.get(
+      "AI_SUMMARY_SCHEMA_REFS_V2_ENABLED",
+      { infer: true },
+    );
     configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", true);
+    configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", false);
     const regenerated = await (async () => {
       try {
         return await request(httpServer)
@@ -679,6 +720,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
           .expect(202);
       } finally {
         configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", false);
+        configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", previousV2Value);
       }
     })();
     expect(regenerated.body.data.jobId).not.toBe(first.body.data.jobId);

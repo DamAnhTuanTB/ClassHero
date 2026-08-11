@@ -51,7 +51,16 @@ export interface AiTextOutput extends AiProviderOutputMetadata {
   text: string;
 }
 
-export type AiStructuredSchemaReferenceStrategy = "inline" | "ref";
+export type AiStructuredSchemaReferenceStrategy = "inline" | "ref" | "ref_v2";
+
+export type AiPromptCacheRetention = "in_memory" | "24h";
+
+export interface AiPromptCacheConfiguration {
+  /** Short provider-neutral namespace; no lesson, document, user, or source data. */
+  namespace: string;
+  keyEnabled: boolean;
+  retention: AiPromptCacheRetention;
+}
 
 export interface AiStructuredInput extends AiTextInput {
   outputName: string;
@@ -59,9 +68,12 @@ export interface AiStructuredInput extends AiTextInput {
   schemaVersion: string;
   /**
    * Controls JSON Schema serialization only. `inline` preserves the OpenAI SDK
-   * helper byte-for-byte; `ref` reuses repeated sub-schemas through `$defs/$ref`.
+   * helper byte-for-byte; `ref` preserves the first `$defs/$ref` serializer;
+   * `ref_v2` only compacts additional exact duplicate schema subtrees.
    */
   schemaReferenceStrategy?: AiStructuredSchemaReferenceStrategy;
+  /** Summary-only cache routing policy. It never changes prompt/context content. */
+  promptCache?: AiPromptCacheConfiguration;
 }
 
 export type AiOutputSchema<TOutput> = ZodType<TOutput>;

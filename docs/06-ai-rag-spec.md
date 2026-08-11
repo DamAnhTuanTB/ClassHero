@@ -511,15 +511,27 @@ với structured output bắt buộc có cả `text.format` gồm `type`, `name`
 và JSON Schema thực tế được tạo từ cùng Zod schema. Không được gọi một object
 thiếu provider field là “input đầy đủ”.
 
-Riêng Summary có thể bật serializer tham chiếu bằng
-`AI_SUMMARY_SCHEMA_REFS_ENABLED=true`. Serializer này chỉ thay các sub-schema
-lặp bằng `$defs/$ref`; system prompt, user prompt, context, provider transport
-schema, acceptance schema, mapper, recovery và persisted output phải giữ nguyên.
-Cờ mặc định `false` để request tiếp tục byte-equivalent với helper inline của
-OpenAI SDK. Trước khi bật live phải đạt gate local: schema sau khi dereference
-tương đương schema inline, parser Zod đọc được cached output cũ và kích thước
-schema giảm theo ngưỡng test. Tắt cờ phải rollback ngay về inline mà không cần
-sửa prompt hay chạy migration dữ liệu.
+Riêng Summary có ba strategy biểu diễn cùng một output contract:
+
+- refs off → `inline`, byte-equivalent với helper OpenAI SDK;
+- refs on và v2 off → `$ref` v1;
+- refs on và v2 on → `ref_v2`, chỉ hoist subtree deep-equal và rút gọn tên
+  `$defs`/JSON Pointer theo ánh xạ deterministic.
+
+`AI_SUMMARY_SCHEMA_REFS_ENABLED` và `AI_SUMMARY_SCHEMA_REFS_V2_ENABLED` mặc định
+`false`. Mọi strategy giữ nguyên system prompt, user prompt, toàn bộ chunk và
+metadata, provider transport schema, Zod parser, acceptance schema, recovery,
+mapper, persisted output và renderer. Schema sau dereference phải deep-equal
+inline; job cũ dùng strategy đã snapshot, không tự nâng từ v1 sang v2. Tắt cờ
+rollback ngay mà không cần migration hoặc regenerate Summary.
+
+Summary có thể bật stable `prompt_cache_key` bằng
+`AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=true`. Key chỉ hash model, version contract,
+effective system instructions và structured schema; không chứa lesson/document/
+user/chunk data và không được chèn vào prompt. Retention mặc định `in_memory`;
+chỉ gửi `prompt_cache_retention=24h` khi opt-in và model capability cho phép.
+Prompt Caching không làm giảm “Tổng input ước tính”; hiệu quả phải đo bằng
+`cachedInputTokens`, `uncachedInputTokens`, cache-hit ratio và chi phí thực tế.
 
 `targetWordCount` là số từ mục tiêu gần đúng của tổng text sư phạm học sinh nhìn
 thấy, không tính JSON key, schema metadata hoặc primitive/coordinate của diagram;

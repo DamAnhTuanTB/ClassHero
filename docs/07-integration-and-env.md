@@ -79,8 +79,13 @@ OPENAI_STRUCTURED_MODEL=gpt-4.1-mini
 OPENAI_CHAT_MODEL=gpt-4.1-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_EMBEDDING_DIMENSIONS=1536
-# false = serializer inline hiện tại; true = tái sử dụng $defs/$ref riêng cho Summary
+# Rollback độc lập cho ba strategy inline -> ref v1 -> ref v2
 AI_SUMMARY_SCHEMA_REFS_ENABLED=false
+AI_SUMMARY_SCHEMA_REFS_V2_ENABLED=false
+# Stable cache routing không thay prompt/context
+AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=false
+# in_memory | 24h; 24h chỉ được gửi khi model hỗ trợ
+AI_SUMMARY_PROMPT_CACHE_RETENTION=in_memory
 
 # Gemini
 GEMINI_API_KEY=change-me
@@ -281,6 +286,13 @@ Dùng phụ cho:
   hiện tại. Chỉ bật `true` sau khi gate local/cached đạt; khi bật, Summary tái sử
   dụng các sub-schema lặp qua `$defs/$ref` nhưng vẫn parse bằng cùng Zod schema.
   Tắt cờ là đường rollback, không cần đổi prompt hoặc persisted output.
+- `AI_SUMMARY_SCHEMA_REFS_V2_ENABLED=true` chỉ có hiệu lực khi refs v1 đã bật;
+  strategy v2 thêm hoist subtree deep-equal và tên `$defs` ngắn deterministic.
+  Không đổi prompt, chunk/metadata, tập output hợp lệ hoặc pipeline sau provider.
+- `AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=true` gửi stable `prompt_cache_key` riêng
+  cho Summary. `AI_SUMMARY_PROMPT_CACHE_RETENTION=24h` chỉ gửi extended retention
+  cho model đã whitelist capability; mặc định `in_memory` omit provider field.
+  Mọi thay đổi các cờ này cần restart API và worker.
 - Log `ai_generations`.
 - `AI_PROVIDER_TIMEOUT_MS` giới hạn các provider request ngắn như embedding.
 - `AI_GENERATION_TIMEOUT_MS` giới hạn riêng request sinh text/structured output dài;

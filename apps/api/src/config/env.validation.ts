@@ -80,6 +80,17 @@ const envSchema = z
       .enum(["true", "false"])
       .transform((value) => value === "true")
       .default(false),
+    AI_SUMMARY_SCHEMA_REFS_V2_ENABLED: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .default(false),
+    AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .default(false),
+    AI_SUMMARY_PROMPT_CACHE_RETENTION: z
+      .enum(["in_memory", "24h"])
+      .default("in_memory"),
     AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
     AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),

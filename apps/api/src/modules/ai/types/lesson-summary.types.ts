@@ -575,7 +575,9 @@ export const lessonSummaryJobInputSchema = z
     model: z.string().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),
     reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),
-    schemaReferenceStrategy: z.enum(["inline", "ref"]).default("inline"),
+    schemaReferenceStrategy: z.enum(["inline", "ref", "ref_v2"]).default("inline"),
+    promptCacheKeyEnabled: z.boolean().default(false),
+    promptCacheRetention: z.enum(["in_memory", "24h"]).default("in_memory"),
     maxOutputTokens: z
       .number()
       .int()

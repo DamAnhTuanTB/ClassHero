@@ -25,6 +25,7 @@ import type {
 } from "#api/modules/ai/types/ai-text.types";
 import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
 import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
+import { buildOpenAiPromptCacheFields } from "#api/modules/ai/utils/ai-prompt-cache";
 import {
   assertEmbeddingInput,
   assertEmbeddingOutput,
@@ -35,6 +36,10 @@ import {
   parseAiStructuredOutput,
 } from "#api/modules/ai/utils/ai-output-validation";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
+import {
+  supportsOpenAiReasoningEffort,
+  supportsOpenAiTemperature,
+} from "#api/modules/ai/utils/ai-openai-model-capabilities";
 
 export class OpenAiProvider implements AiProvider {
   readonly name = AiProviderName.OPENAI;
@@ -109,19 +114,6 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  private supportsTemperature(model: string): boolean {
-    const m = model.toLowerCase();
-    // Các model reasoning o-series (o1, o2, o3...) hoặc gpt-5.x đều không hỗ trợ temperature
-    if (/^(o[1-9]|gpt-5)/.test(m)) {
-      return false;
-    }
-    return true;
-  }
-
-  private supportsReasoningEffort(model: string): boolean {
-    return /^(o[1-9]|gpt-5)/u.test(model.toLowerCase());
-  }
-
   private get generationRequestOptions(): { timeout: number } {
     return {
       timeout: this.config.generationRequestTimeoutMs ?? this.config.requestTimeoutMs,
@@ -136,10 +128,10 @@ export class OpenAiProvider implements AiProvider {
         model: modelToUse,
         instructions: input.systemPrompt,
         input: buildAiUserPrompt(input),
-        ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
+        ...(input.temperature === undefined || !supportsOpenAiTemperature(modelToUse)
           ? {}
           : { temperature: input.temperature }),
-        ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
+        ...(input.reasoningEffort && supportsOpenAiReasoningEffort(modelToUse)
           ? { reasoning: { effort: input.reasoningEffort } }
           : {}),
         ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
@@ -169,22 +161,28 @@ export class OpenAiProvider implements AiProvider {
     assertAiOutputName(input.outputName);
     const startedAt = Date.now();
     const modelToUse = input.model ?? this.config.structuredModel;
+    const structuredTextFormat = buildAiStructuredTextFormat(
+      schema,
+      input.outputName,
+      input.schemaReferenceStrategy,
+    );
     const response = await this.client.responses.parse(
       {
         model: modelToUse,
         instructions: input.systemPrompt,
         input: buildAiUserPrompt(input),
         text: {
-          format: buildAiStructuredTextFormat(
-            schema,
-            input.outputName,
-            input.schemaReferenceStrategy,
-          ),
+          format: structuredTextFormat,
         },
-        ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
+        ...buildOpenAiPromptCacheFields({
+          request: input,
+          model: modelToUse,
+          structuredTextFormat,
+        }),
+        ...(input.temperature === undefined || !supportsOpenAiTemperature(modelToUse)
           ? {}
           : { temperature: input.temperature }),
-        ...(input.reasoningEffort && this.supportsReasoningEffort(modelToUse)
+        ...(input.reasoningEffort && supportsOpenAiReasoningEffort(modelToUse)
           ? { reasoning: { effort: input.reasoningEffort } }
           : {}),
         ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
@@ -217,12 +215,26 @@ export class OpenAiProvider implements AiProvider {
     }
 
     const data = parseAiStructuredOutput(schema, response.output_parsed);
+    const usage = toTokenUsage(response.usage);
+    if (usage?.promptTokens !== undefined) {
+      const cachedTokens = usage.cachedInputTokens ?? 0;
+      const uncachedTokens = Math.max(0, usage.promptTokens - cachedTokens);
+      const hitRatio =
+        usage.promptTokens === 0 ? 0 : cachedTokens / usage.promptTokens;
+      this.logger.debug(
+        `[PROMPT_CACHE] output=${input.outputName} model=${response.model ?? modelToUse} ` +
+          `prompt=${input.promptVersion} schema=${input.schemaVersion} ` +
+          `strategy=${input.schemaReferenceStrategy ?? "inline"} input=${usage.promptTokens} ` +
+          `cached=${cachedTokens} uncached=${uncachedTokens} ` +
+          `hitRatio=${hitRatio.toFixed(4)}`,
+      );
+    }
 
     return {
       data,
       provider: this.name,
       model: response.model ?? this.config.structuredModel,
-      usage: toTokenUsage(response.usage),
+      usage,
       providerRequestId: response.id,
       latencyMs: Date.now() - startedAt,
     };
