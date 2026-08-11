@@ -9,16 +9,19 @@ import type {
   AdminLessonSummaryReviewStatus,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
 
 export function AdminGeneratedSetReviewActions({
   lessonId,
+  pendingReviewQuestionCount = 0,
   reviewStatus,
   setId,
   source,
   type,
 }: {
   lessonId: string;
+  pendingReviewQuestionCount?: number;
   reviewStatus: string;
   setId: string;
   source: string;
@@ -42,12 +45,16 @@ export function AdminGeneratedSetReviewActions({
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Chưa cập nhật được trạng thái",
+        getUserFacingErrorMessage(
+          error,
+          "Chưa cập nhật được trạng thái. Vui lòng thử lại.",
+        ),
       );
     },
   });
 
-  if (source !== "AI") {
+  const isStandaloneAiSet = source === "AI";
+  if (!isStandaloneAiSet && pendingReviewQuestionCount === 0) {
     return null;
   }
   return (
@@ -62,13 +69,15 @@ export function AdminGeneratedSetReviewActions({
               : "border-[var(--theme-border)] bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
         )}
       >
-        {reviewStatus === "APPROVED"
-          ? "Đã duyệt"
-          : reviewStatus === "HIDDEN"
-            ? "Đã ẩn"
-            : "Cần duyệt"}
+        {pendingReviewQuestionCount > 0
+          ? `${pendingReviewQuestionCount} câu AI cần duyệt`
+          : reviewStatus === "APPROVED"
+            ? "Đã duyệt"
+            : reviewStatus === "HIDDEN"
+              ? "Đã ẩn"
+              : "Cần duyệt"}
       </span>
-      {reviewStatus !== "APPROVED" ? (
+      {reviewStatus !== "APPROVED" || pendingReviewQuestionCount > 0 ? (
         <button
           type="button"
           disabled={mutation.isPending}
@@ -83,7 +92,7 @@ export function AdminGeneratedSetReviewActions({
           Duyệt
         </button>
       ) : null}
-      {reviewStatus !== "HIDDEN" ? (
+      {isStandaloneAiSet && reviewStatus !== "HIDDEN" ? (
         <button
           type="button"
           disabled={mutation.isPending}

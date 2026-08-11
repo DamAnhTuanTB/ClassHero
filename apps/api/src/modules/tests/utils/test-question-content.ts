@@ -200,8 +200,10 @@ export async function syncExplanation(
       where: { id: input.currentExplanationId },
       data: {
         contentJson: toInputJson(input.explanationJson),
+        diagramSpecJson: Prisma.DbNull,
         source: ContentSource.ADMIN,
         reviewStatus: ReviewStatus.APPROVED,
+        staleAt: null,
       },
       select: { id: true },
     });

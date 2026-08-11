@@ -1,5 +1,9 @@
 import React from "react";
 import {
+  normalizeLessonSummaryAngleNotation,
+  normalizeLessonSummaryNoteContent,
+} from "@learning-path/shared";
+import {
   BookOpen,
   AlertCircle,
   Info,
@@ -29,6 +33,11 @@ import {
 } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
+import { LessonSummaryExampleCard } from "@/components/common/content/lesson-summary-example-content";
+import type {
+  LessonSummaryDiagramEditableTarget,
+  LessonSummaryDiagramEditor,
+} from "@/components/common/content/lesson-summary-diagram-editing";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
@@ -84,8 +93,28 @@ interface SummaryBlockRendererProps {
     }[];
   };
   displayTitle?: string;
+  diagramEditingDisabled?: boolean;
   hideTitle?: boolean;
   onChange?: (newData: any) => void;
+  onRequestDiagramDelete?: (request: {
+    blockIndex: number;
+    sectionIndex: number;
+    target: LessonSummaryDiagramEditableTarget;
+  }) => void;
+  onRequestDiagramAddEqualLength?: (request: {
+    blockIndex: number;
+    sectionIndex: number;
+    segmentIds: string[];
+  }) => boolean;
+  onRequestDiagramReset?: (request: { blockIndex: number; sectionIndex: number }) => void;
+  onRequestDiagramTextEdit?: (
+    request: {
+      blockIndex: number;
+      sectionIndex: number;
+      target: Exclude<LessonSummaryDiagramEditableTarget, { kind: "MARKER" }>;
+    },
+    nextText: string,
+  ) => boolean;
   viewMode?: "UI_ONLY" | "SPLIT";
   showEditorialMetadata?: boolean;
 }
@@ -105,8 +134,13 @@ const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> 
 export function SummaryBlockRenderer({
   data,
   displayTitle,
+  diagramEditingDisabled = false,
   hideTitle,
   onChange,
+  onRequestDiagramDelete,
+  onRequestDiagramAddEqualLength,
+  onRequestDiagramReset,
+  onRequestDiagramTextEdit,
   viewMode = "SPLIT",
   showEditorialMetadata = false,
 }: SummaryBlockRendererProps) {
@@ -210,6 +244,7 @@ export function SummaryBlockRenderer({
           problem: "Nhập đề bài tại đây...",
           solution: "Ta có: $x=2$",
           answer: "Đáp án cuối cùng...",
+          geometryStatement: null,
         };
 
       case "procedure":
@@ -393,7 +428,7 @@ export function SummaryBlockRenderer({
                 <li key={i}>
                   <MathpixMarkdownRenderer
                     className="inline [&>*]:inline"
-                    content={obj}
+                    content={normalizeLessonSummaryAngleNotation(obj)}
                   />
                 </li>
               ))}
@@ -940,6 +975,51 @@ export function SummaryBlockRenderer({
                     <div>
                       <BlockItem
                         block={blockToRender}
+                        diagramEditor={
+                          !isReadOnly &&
+                          (onRequestDiagramAddEqualLength ||
+                            onRequestDiagramDelete ||
+                            onRequestDiagramReset ||
+                            onRequestDiagramTextEdit)
+                            ? {
+                                disabled: diagramEditingDisabled,
+                                onRequestAddEqualLength: onRequestDiagramAddEqualLength
+                                  ? (segmentIds) =>
+                                      onRequestDiagramAddEqualLength({
+                                        blockIndex: bIdx,
+                                        sectionIndex: idx,
+                                        segmentIds,
+                                      })
+                                  : undefined,
+                                onRequestDelete: onRequestDiagramDelete
+                                  ? (target) =>
+                                      onRequestDiagramDelete({
+                                        blockIndex: bIdx,
+                                        sectionIndex: idx,
+                                        target,
+                                      })
+                                  : undefined,
+                                onRequestReset: onRequestDiagramReset
+                                  ? () =>
+                                      onRequestDiagramReset({
+                                        blockIndex: bIdx,
+                                        sectionIndex: idx,
+                                      })
+                                  : undefined,
+                                onRequestTextEdit: onRequestDiagramTextEdit
+                                  ? (target, nextText) =>
+                                      onRequestDiagramTextEdit(
+                                        {
+                                          blockIndex: bIdx,
+                                          sectionIndex: idx,
+                                          target,
+                                        },
+                                        nextText,
+                                      )
+                                  : undefined,
+                              }
+                            : undefined
+                        }
                         showEditorialMetadata={showEditorialMetadata}
                       />
                       {showEditorialMetadata ? (
@@ -1179,8 +1259,7 @@ function ReviewIssuePanel({
 }) {
   const unresolved =
     issues?.filter(
-      (issue) =>
-        resolveReviewIssueResolution(issue) === "FIX_ONLY" || !issue.accepted,
+      (issue) => resolveReviewIssueResolution(issue) === "FIX_ONLY" || !issue.accepted,
     ) ?? [];
   if (unresolved.length === 0) return null;
   const fixOnlyCount = unresolved.filter(
@@ -1279,23 +1358,31 @@ function ReviewIssuePanel({
 
 function BlockItem({
   block,
+  diagramEditor,
   showEditorialMetadata,
 }: {
   block: BlockData;
+  diagramEditor?: LessonSummaryDiagramEditor;
   showEditorialMetadata: boolean;
 }) {
   switch (block.type) {
     case "procedure":
-      return <StepsBlock block={block} />;
+      return <StepsBlock block={block} diagramEditor={diagramEditor} />;
     case "example":
-      return <ExampleBlock block={block} showEditorialMetadata={showEditorialMetadata} />;
+      return (
+        <ExampleBlock
+          block={block}
+          diagramEditor={diagramEditor}
+          showEditorialMetadata={showEditorialMetadata}
+        />
+      );
     case "section_recap":
       return <SectionRecapBlock block={block} />;
     case "knowledge":
     case "property":
     case "theorem":
     case "note":
-      return <CalloutBlock block={block} />;
+      return <CalloutBlock block={block} diagramEditor={diagramEditor} />;
     default:
       return (
         <div className="p-3 border border-slate-200 rounded text-sm text-slate-500 overflow-auto">
@@ -1433,7 +1520,7 @@ function BaseBlockContainer({
       </div>
       {shouldShowTitle && (
         <div className={`font-bold ${styles.text}`}>
-          <MathpixMarkdownRenderer content={block.title} />
+          <MathpixMarkdownRenderer content={normalizeBlockMath(block.title, block)} />
         </div>
       )}
       <div className="space-y-2 opacity-90 text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">
@@ -1443,16 +1530,34 @@ function BaseBlockContainer({
   );
 }
 
-function CalloutBlock({ block }: { block: BlockData }) {
+function CalloutBlock({
+  block,
+  diagramEditor,
+}: {
+  block: BlockData;
+  diagramEditor?: LessonSummaryDiagramEditor;
+}) {
+  const content =
+    block.type === "note"
+      ? normalizeLessonSummaryNoteContent(block.content ?? "")
+      : block.content;
   return (
     <BaseBlockContainer block={block}>
-      {block.content && <MathpixMarkdownRenderer content={block.content} />}
-      <TheoryBlockDiagram block={block} />
+      {content && (
+        <MathpixMarkdownRenderer content={normalizeBlockMath(content, block)} />
+      )}
+      <TheoryBlockDiagram block={block} diagramEditor={diagramEditor} />
     </BaseBlockContainer>
   );
 }
 
-function StepsBlock({ block }: { block: BlockData }) {
+function StepsBlock({
+  block,
+  diagramEditor,
+}: {
+  block: BlockData;
+  diagramEditor?: LessonSummaryDiagramEditor;
+}) {
   return (
     <BaseBlockContainer block={block}>
       <div className="space-y-1.5 mt-2.5">
@@ -1462,79 +1567,53 @@ function StepsBlock({ block }: { block: BlockData }) {
               {step.order || i + 1}
             </div>
             <div className="flex-1">
-              <MathpixMarkdownRenderer content={step.content || step.statement || ""} />
+              <MathpixMarkdownRenderer
+                content={normalizeBlockMath(step.content || step.statement || "", block)}
+              />
             </div>
           </div>
         ))}
       </div>
-      <TheoryBlockDiagram block={block} />
+      <TheoryBlockDiagram block={block} diagramEditor={diagramEditor} />
     </BaseBlockContainer>
   );
 }
 
-function TheoryBlockDiagram({ block }: { block: BlockData }) {
+function TheoryBlockDiagram({
+  block,
+  diagramEditor,
+}: {
+  block: BlockData;
+  diagramEditor?: LessonSummaryDiagramEditor;
+}) {
   return block.visual?.kind === "DIAGRAM_SPEC" ? (
-    <LessonSummaryDiagram spec={block.visual.spec} />
+    <LessonSummaryDiagram editor={diagramEditor} spec={block.visual.spec} />
   ) : null;
 }
 
 function ExampleBlock({
   block,
+  diagramEditor,
   showEditorialMetadata,
 }: {
   block: BlockData;
+  diagramEditor?: LessonSummaryDiagramEditor;
   showEditorialMetadata: boolean;
 }) {
   return (
-    <BaseBlockContainer block={block}>
-      <div className="mb-3">
-        <MathpixMarkdownRenderer content={block.problem} />
-      </div>
-
-      {block.visual?.kind === "DIAGRAM_SPEC" ? (
-        <LessonSummaryDiagram
-          spec={block.visual.spec}
-          showEditorialWarning={showEditorialMetadata}
-        />
-      ) : null}
-
-      {(block.solution || block.answer) && (
-        <div className="pl-4 border-l-[3px] border-blue-500/30 dark:border-blue-400/30 space-y-3 mb-3 text-sm">
-          {block.solution && (
-            <div>
-              <MathpixMarkdownRenderer
-                content={formatMathematicalSolution(block.solution)}
-              />
-            </div>
-          )}
-          {block.answer && (
-            <div className="mt-2">
-              <MathpixMarkdownRenderer content={`Kết luận: ${block.answer}`} />
-            </div>
-          )}
-        </div>
-      )}
-    </BaseBlockContainer>
+    <LessonSummaryExampleCard
+      block={block}
+      diagramEditor={diagramEditor}
+      displayNumber={block.displayNumber}
+      showEditorialWarning={showEditorialMetadata}
+    />
   );
 }
 
-function formatMathematicalSolution(value: string) {
-  if (
-    value.includes("\n") ||
-    !/\b(?:tam\s*giác|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b/iu.test(
-      value,
-    )
-  ) {
-    return value;
-  }
-
-  const statements = value
-    .split(/(?<=[.!?])\s+(?=[\p{L}$])/u)
-    .map((statement) => statement.trim())
-    .filter(Boolean);
-  return statements.length > 1
-    ? statements.map((statement) => `- ${statement}`).join("\n")
-    : value;
+function normalizeBlockMath(value: string, block: BlockData) {
+  const diagramSpec =
+    block.visual?.kind === "DIAGRAM_SPEC" ? block.visual.spec : undefined;
+  return normalizeLessonSummaryAngleNotation(value, diagramSpec);
 }
 
 function SectionRecapBlock({ block }: { block: BlockData }) {
@@ -1543,7 +1622,10 @@ function SectionRecapBlock({ block }: { block: BlockData }) {
       <ul className="list-disc pl-5 space-y-1">
         {block.points?.map((point: string, i: number) => (
           <li key={i}>
-            <MathpixMarkdownRenderer className="inline [&>*]:inline" content={point} />
+            <MathpixMarkdownRenderer
+              className="inline [&>*]:inline"
+              content={normalizeBlockMath(point, block)}
+            />
           </li>
         ))}
       </ul>

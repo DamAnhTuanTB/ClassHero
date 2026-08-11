@@ -1,10 +1,10 @@
-# Kế hoạch hoàn thiện Sinh Quiz bằng AI từ dữ liệu nguồn bài học
+# Kế hoạch hardening M9.3 — Sinh Quiz và lời giải Quiz/Test bằng AI
 
 Ngày lập: 2026-08-10
 
-Ngày rà soát theo toàn bộ `.codex/plans`: 2026-08-10
+Ngày rà soát theo toàn bộ `.codex/plans`: 2026-08-11
 
-Trạng thái: `Chờ owner duyệt để triển khai`
+Trạng thái: `Đã triển khai và kiểm chứng ngày 2026-08-11`
 
 Task sở hữu chính:
 
@@ -12,6 +12,9 @@ Task sở hữu chính:
 - `M9.8` — Admin AI generation panel (`UI + API`).
 - `M7.2` — Quiz attempt và submit (`UI + API`).
 - `M7.4` — Test start, submit và review (`UI + API`).
+
+Đây là kế hoạch hardening/extension cho các flow lõi M9.3, M9.8, M7.2 và M7.4
+đã `Done`; không mở lại hoặc tự đổi trạng thái roadmap của các subtask này.
 
 Phạm vi dùng lại:
 
@@ -61,8 +64,15 @@ chưa đạt acceptance validation.
 - AI sinh lời giải chi tiết cho từng câu Quiz và Test.
 - AI có thể trả semantic diagram intent cho lời giải cần hình.
 - Worker compile diagram intent thành spec an toàn và lưu cùng explanation.
-- Admin xem được hint, lời giải và hình trước khi duyệt.
+- Khi job hoàn tất, toàn bộ question record hợp lệ xuất hiện ngay trong danh sách
+  của tab Quiz ở trạng thái nháp/review; không tạo một màn staging tách biệt.
+- Admin xem hint/lời giải/hình, sửa nội dung hoặc xóa cả câu trực tiếp từ danh
+  sách Quiz trước khi duyệt.
 - Học sinh xem hint trong Quiz và xem lời giải/hình trong review Quiz/Test.
+- AI phải trả đủ số câu admin yêu cầu ở output ban đầu. Sau đó admin được quyền
+  xóa thủ công câu không phù hợp và lưu số câu còn lại trong chính `quizSet`/
+  `aiGeneration` đó; ví dụ AI tạo đủ 10, admin xóa 2 thì 8 câu còn lại vẫn được
+  lưu/duyệt mà không phát sinh lượt AI mới.
 - Test bằng mock provider; không gọi OpenAI thật trong test mặc định.
 
 ### 2.2. Không làm trong kế hoạch này
@@ -73,6 +83,8 @@ chưa đạt acceptance validation.
 - Mở rộng cùng bộ field cấu hình nâng cao sang modal Sinh Test, trừ phần nâng
   output lời giải/hình của Test để đáp ứng màn review.
 - Thay đổi generation Flashcard.
+- Sửa nghiệp vụ Flashcard; chỉ chạy regression để bảo đảm flow hiện có không bị
+  ảnh hưởng bởi phần shared được hardening.
 - Tự động gọi AI để backfill câu hỏi cũ chưa có lời giải.
 - Tự động gọi provider lần hai để repair/judge/regenerate output lỗi; lần generate
   ban đầu chỉ có đúng một provider call.
@@ -110,6 +122,7 @@ chưa đạt acceptance validation.
   - `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
   - `.codex/plans/m9-2-summary-partial-block-recovery-plan.md`.
   - `.codex/plans/m9-3-ai-quiz-generation-completion-plan.md`.
+  - `.codex/plans/m9-13-admin-safe-diagram-element-delete-plan.md`.
   - `.codex/plans/personalized-learning-path-plan.md`.
 
 `codex-execution-plan.md` chỉ dùng để kiểm thứ tự/phụ thuộc lịch sử; roadmap và
@@ -125,53 +138,53 @@ phải tiếp tục tương thích cơ chế deep-copy của learning path về 
 - Lesson content generation context/job/worker/prompt/schema/mapper.
 - Quiz/Test service, admin approval và stale explanation flow.
 - Student Quiz runner, Quiz/Test review và attempt serializer.
-- Diagram schema, compiler, mapper và renderer đang được phát triển trong M9.2.
+- Diagram schema, compiler, mapper, normalizer và renderer hiện hành của M9.2.
 - Các test hiện có của M9.3, M9.8 và M7.
 
 ### 3.3. Snapshot M9.2 dùng làm đầu vào cho M9.3
 
 Snapshot tại thời điểm rà soát, không được hard-code như trạng thái vĩnh viễn:
 
-- Authoring v3 của example block đang là nguồn chất lượng cho đề bài, solution và
-  diagram, nhưng provider contract Summary hiện vẫn tối giản dạng
-  `{ problem, solution: string, answer, diagramSpec }` và chưa có `keyIdea`.
-- Partial-block recovery đã hoàn tất ở M9.2 schema v40 theo hướng
-  `PASS | REVIEW_REQUIRED | PARTIAL_RENDER | UNRENDERABLE`: job kỹ thuật
-  `SUCCEEDED`, result có thể `SUCCEEDED_WITH_WARNINGS`, nhưng approve/publish bị
-  chặn khi còn issue chưa resolve.
+- Lõi M9.2 đã ổn theo xác nhận của owner. Baseline hiện hành là prompt
+  `lesson-summary-prompt-v57` và schema `lesson-summary-schema-v42`.
+- Source hash đã gồm `targetGrade`; prompt/mapper có cách viết theo lớp, chuẩn hóa
+  ký hiệu góc dùng chung và `geometryStatement` GT–KL cho bài chứng minh hình học
+  lớp 7–9. M9.3 phải kế thừa các rule này cho đề/lời giải Quiz/Test phù hợp.
+- Recovery hiện dùng taxonomy `VALID | AUTO_FIXED | REVIEWABLE | UNRENDERABLE`;
+  issue resolution dùng `ACCEPT_OR_FIX | FIX_ONLY`. Job kỹ thuật có thể
+  `SUCCEEDED_WITH_WARNINGS`, còn approve phụ thuộc issue blocking chưa resolve.
 - Diagram ưu tiên `diagramIntent` dạng discriminated union hẹp, sau đó compiler
-  deterministic/template registry tạo `diagramSpec`; raw `diagramSpec` chỉ là
-  fallback cho archetype chưa hỗ trợ và luôn cần review.
-- Coverage plan đang dùng mốc prompt `lesson-summary-prompt-v54` và schema/contract
-  v40; có 50/50 local compiler/golden, 39/50 live evidence, 19/50 exact-page audit,
-  chỉ 11/50 có đủ local + live + exact page, còn 11 archetype thiếu live evidence.
-  Release vẫn `IN_PROGRESS` và chưa archetype nào được coi là `SUPPORTED`.
-- Hotfix recovery đã qua 129 focused API tests, Playwright laptop/iPad/Chromium
-  mobile/WebKit mobile và Live Bài 15 bằng `gpt-5.4`; đây là bằng chứng cơ chế
-  recovery/renderer, không thay thế Live evidence riêng cho Quiz M9.3.
-- Các con số/version trên chỉ là snapshot của plan M9.2 ngày 2026-08-10. Khi bắt
-  đầu implement M9.3 phải đọc lại code, manifest, release status và worktree thật.
+  deterministic/template registry tạo `diagramSpec`; raw fallback hoặc capability
+  chưa đủ bằng chứng phải giữ ở review.
+- Lõi generation/recovery/renderer M9.2 được coi là baseline ổn để M9.3 tái sử
+  dụng. Coverage toàn bộ archetype vẫn `IN_PROGRESS`; M9.3 chỉ tiêu thụ capability
+  source-backed đã hỗ trợ và không chờ coverage toàn cục đạt 90–100%.
+- `M9.13-M9.15` là nhóm editor đã Done để admin chỉnh label/marker/caption,
+  thêm dấu bằng nhau và reset một hình. M9.3 không sao chép editor này mà dùng
+  nguyên core/editor EXAMPLE đã có, để sửa một lần áp dụng đồng thời cho Summary
+  và Quiz.
+- Khi bắt đầu implement phải đọc lại code, manifest, release status và worktree
+  thật vì version/evidence có thể tiếp tục thay đổi.
 
-Vì vậy M9.3 được phép tái sử dụng pipeline M9.2 nhưng không được suy diễn rằng mọi
-archetype hình đã production-ready hoặc dùng screenshot/fixture thay bằng bằng
-chứng nguồn chính thống.
+Vì vậy M9.3 tái sử dụng pipeline M9.2 đã ổn, đồng thời giữ capability chưa được
+chứng minh ở review thay vì suy diễn mọi archetype đều production-ready.
 
 ## 4. Hiện trạng và khoảng trống
 
-| Yêu cầu | Hiện trạng | Khoảng trống cần xử lý |
-| --- | --- | --- |
-| Gợi ý Quiz | Quiz runner đã có nút `Gợi ý`, mặc định đóng | Bảo đảm AI luôn sinh hint hợp lệ, persistence/API ổn định và có regression test |
-| Lời giải review | API đã có phần explanation text | Màn review chung chưa render explanation; API chưa trả diagram spec |
-| Hình minh họa | Sinh kiến thức có schema/compiler/renderer an toàn | Quiz/Test explanation chưa dùng pipeline này |
-| Nhãn độ khó | AI output hiện đã có difficulty | MIXED chưa kiểm soát chính xác số câu của từng mức |
-| Cấu hình model | Modal Sinh kiến thức đã có | Modal Quiz hiện chỉ có cấu hình cơ bản |
-| Chọn tài liệu | Sinh kiến thức đã hỗ trợ | Admin Quiz generation chưa nhận danh sách tài liệu được chọn |
-| Reasoning Effort | Route/model catalog đã có dữ liệu | Provider call chưa truyền đầy đủ reasoning effort xuống OpenAI |
-| Prompt preview | Sinh kiến thức đã có System/User/Input | Cần trích thành phần dùng chung và tạo preview cho Quiz |
+| Yêu cầu          | Hiện trạng                                         | Khoảng trống cần xử lý                                                          |
+| ---------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Gợi ý Quiz       | Quiz runner đã có nút `Gợi ý`, mặc định đóng       | Bảo đảm AI luôn sinh hint hợp lệ, persistence/API ổn định và có regression test |
+| Lời giải review  | API đã có phần explanation text                    | Màn review chung chưa render explanation; API chưa trả diagram spec             |
+| Hình minh họa    | Sinh kiến thức có schema/compiler/renderer an toàn | Quiz/Test explanation chưa dùng pipeline này                                    |
+| Nhãn độ khó      | AI output hiện đã có difficulty                    | MIXED chưa kiểm soát chính xác số câu của từng mức                              |
+| Cấu hình model   | Modal Sinh kiến thức đã có                         | Modal Quiz hiện chỉ có cấu hình cơ bản                                          |
+| Chọn tài liệu    | Sinh kiến thức đã hỗ trợ                           | Admin Quiz generation chưa nhận danh sách tài liệu được chọn                    |
+| Reasoning Effort | Route/model catalog đã có dữ liệu                  | Provider call chưa truyền đầy đủ reasoning effort xuống OpenAI                  |
+| Prompt preview   | Sinh kiến thức đã có System/User/Input             | Cần trích thành phần dùng chung và tạo preview cho Quiz                         |
 
 ## 5. Quyết định kỹ thuật đã chốt trong kế hoạch
 
-### 5.1. Không migration database
+### 5.1. Ưu tiên không migration, nhưng phải preflight storage
 
 Tái sử dụng các field hiện có:
 
@@ -183,34 +196,44 @@ Tái sử dụng các field hiện có:
 - `ai_explanations.content_json`.
 - `ai_explanations.diagram_spec_json`.
 - `source_metadata_json` ở question/explanation liên quan.
+- `ai_generations.input_meta_json`/`output_json` và
+  `background_jobs.result_json` cho audit generation/recovery nếu contract hiện
+  hành cho phép.
 
 Không thêm cột phân bổ độ khó vào Quiz set. Phân bổ là input của generation job;
-nhãn kết quả được lưu trên từng question.
+nhãn kết quả được lưu trên từng question. `questionCount` là số câu AI phải trả ở
+output ban đầu, không phải số câu bất biến sau kiểm duyệt. Metadata cần phân biệt
+tối thiểu `requestedCount`, `initialGeneratedCount`, `deletedCount` và
+`currentActiveCount`; ví dụ `10/10/2/8` vẫn là một generation hợp lệ.
 
-### 5.2. Tên field lời giải
+Quyết định không migration chỉ có hiệu lực sau preflight giai đoạn 0 chứng minh
+các JSON field hiện tại lưu được metadata/review issue mà không tạo question giả.
+Nếu cần formalize semantics trong database contract thì cập nhật database docs;
+chỉ đề xuất migration khi schema hiện tại thật sự không biểu diễn được dữ liệu.
 
-Không sử dụng `overview`. Contract lời giải dùng `keyIdea` theo chuẩn camelCase:
+### 5.2. Contract lời giải: dùng nguyên EXAMPLE M9.2
+
+Không tạo shape lời giải riêng như `overview`, `keyIdea`, `steps` hoặc
+`finalAnswer`. Mỗi Quiz/Test question chứa nguyên block EXAMPLE M9.2:
 
 ```json
 {
-  "solution": {
-    "keyIdea": "Ý tưởng hoặc kiến thức cốt lõi dùng để giải câu hỏi.",
-    "steps": ["Bước 1", "Bước 2"],
-    "finalAnswer": "Kết luận cuối cùng",
-    "diagram": null
+  "example": {
+    "type": "example",
+    "exampleKind": "STANDARD_EXERCISE",
+    "problem": "Đề bài tự đủ dữ kiện",
+    "solution": "Mạch lời giải đúng phong cách Sinh kiến thức",
+    "answer": "Kết luận cuối cùng",
+    "geometryStatement": null,
+    "diagramSpec": null
   }
 }
 ```
 
-Ý nghĩa:
-
-- `keyIdea`: giúp học sinh biết phương pháp/kiến thức chính trước khi đọc các
-  bước giải.
-- `steps`: các bước giải theo đúng thứ tự.
-- `finalAnswer`: kết luận cuối cùng và phải nhất quán với đáp án chấm điểm.
-- `diagram`: semantic diagram intent hoặc `null` nếu không cần hình.
-
-Frontend, backend, worker và test phải thống nhất dùng `keyIdea`.
+Frontend, backend, worker và test dùng cùng schema/recovery/mapper/renderer
+EXAMPLE. Lớp Quiz chỉ bổ sung question type, options/correct answer, hint,
+difficulty. Quiz không yêu cầu hoặc lưu sourceChunkIds ở cấp câu; tài liệu nguồn
+chỉ là context để AI tạo bài tập mới.
 
 ### 5.3. Diagram an toàn
 
@@ -221,13 +244,19 @@ Frontend, backend, worker và test phải thống nhất dùng `keyIdea`.
 - Không lưu hoặc render raw SVG/HTML/script từ provider.
 - Không dùng URL ảnh OCR mờ làm lời giải học sinh.
 
-### 5.4. Approval và stale explanation
+### 5.4. Approval, student visibility và stale explanation
 
 - Generation mới tạo dữ liệu ở trạng thái `NEEDS_REVIEW`.
-- Admin phải review/approve trước khi học sinh nhìn thấy.
+- Bộ do admin tạo phải review/approve trước khi học sinh nhìn thấy.
+- Giữ nguyên ngoại lệ M9.4 đã chốt: bộ dự phòng do học sinh yêu cầu có thể ở
+  `NEEDS_REVIEW` nhưng vẫn dùng được theo contract reserve hiện hành, chỉ khi qua
+  acceptance/safety gate và không còn blocking issue. Plan này không âm thầm đổi
+  nghiệp vụ M9.4; muốn bỏ ngoại lệ phải có quyết định sản phẩm riêng.
 - Khi admin sửa question/correct answer/hint liên quan, explanation cũ tiếp tục
   bị đánh dấu stale theo cơ chế hiện có.
 - Student API chỉ trả explanation `APPROVED` và không stale.
+- Test start/resume không trả correct answer, explanation hoặc dữ liệu có thể làm
+  lộ đáp án trước submit, kể cả explanation đã được approve.
 
 ### 5.5. Backward compatibility
 
@@ -245,7 +274,10 @@ tốt ở khối ví dụ của tính năng Sinh kiến thức.
 Phần dùng chung gồm:
 
 - Prompt rules để biên soạn một đề bài mới, tự đủ dữ kiện và bám phạm vi nguồn.
+- `targetGrade`, quy tắc chọn ngôn ngữ/cách giải đúng lớp và source-hash guard.
 - Quy tắc tạo solution đúng từng bước và nhất quán với đáp án.
+- `geometryStatement` GT–KL cho bài chứng minh lớp 7–9 và shared text normalizer
+  cho ký hiệu góc/công thức.
 - Quy tắc quyết định khi nào bài cần hình.
 - Semantic diagram intent, schema, validator, compiler, normalizer và renderer.
 - Kiểm tra bài phụ thuộc hình, dữ kiện thiếu, answer/solution inconsistency và
@@ -265,10 +297,10 @@ Source context
   -> Summary example adapter
        -> giữ contract/persistence hiện tại của khối ví dụ M9.2
   -> Quiz adapter
-       -> prompt + correct answer
+       -> question type + correct answer
        -> options/distractors theo question type
        -> hint + difficulty
-       -> solution { keyIdea, steps, finalAnswer, diagram }
+       -> giữ nguyên EXAMPLE core M9.2
 ```
 
 Mục tiêu là tái sử dụng cùng prompt fragments/helper/schema/validator/compiler ở
@@ -276,6 +308,10 @@ cấp source code, không copy-paste một bản quy tắc riêng sang Quiz. Con
 ra của Summary và Quiz có thể khác shape ở lớp adapter, nhưng cùng dùng một lõi
 authoring để các cải tiến chất lượng đề bài/solution/diagram sau này có hiệu lực
 cho cả hai flow.
+
+Việc tái sử dụng có chọn lọc: không mang rule heading/section/note chỉ dành cho
+Summary sang Assessment; chỉ chia sẻ rule thực sự chung về source, cấp lớp, đề
+bài, lời giải, ký hiệu và diagram.
 
 Không lấy nguyên nội dung example đã persist trong lesson summary để biến thành
 Quiz và không copy nguyên văn bài nguồn. Quiz tạo bài mới/biến thể mới bằng cùng
@@ -318,58 +354,63 @@ mobile/iPad/laptop, mobile là core. Việc kiểm thêm Chromium/WebKit trên m
 cross-engine của cùng một nhóm thiết bị và không làm thay đổi nguyên tắc review
 ảnh M9.2.
 
-### 5.8. Partial recovery, pass-through và approval gate
+### 5.8. Partial recovery, admin curation và approval gate
 
-M9.3 áp dụng cùng triết lý phục hồi cục bộ mới của M9.2 để không vứt bỏ toàn bộ
-output trả phí khi chỉ một câu hoặc một field bị lỗi:
+M9.3 dùng đúng taxonomy recovery hiện hành của M9.2:
 
-| Trạng thái câu | Cách xử lý | Có thể approve ngay? |
-| --- | --- | --- |
-| `PASS` | Đi qua normal mapper nguyên trạng, không sửa/normalize nội dung hợp lệ ngoài các bước deterministic đã chốt | Có, sau review nội dung bình thường |
-| `REVIEW_REQUIRED` | Vẫn render an toàn nhưng còn nghi ngờ semantic/chất lượng/nguồn; lưu issue và badge | Chỉ sau khi admin đối chiếu nguồn rồi accept hoặc sửa |
-| `PARTIAL_RENDER` | Giữ các phần an toàn, cô lập field/sub-element lỗi bằng placeholder đúng vị trí | Chỉ khi issue code được đánh dấu accept-safe và phần còn lại vẫn tự đủ/đúng nguồn; mặc định không |
-| `UNRENDERABLE` | Không có nội dung có nghĩa hoặc không thể render an toàn; giữ slot/câu placeholder cùng issue | Không đối với nội dung/hình bắt buộc; optional visual chỉ được bỏ khi câu đã tự đủ dữ kiện |
+| Trạng thái item | Cách xử lý                                                              | Chính sách issue                                                 |
+| --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `VALID`         | Đi qua normal mapper; chỉ áp dụng normalizer deterministic đã chốt      | Không tạo blocking issue                                         |
+| `AUTO_FIXED`    | Chỉ sửa lỗi hình thức bằng rule deterministic, không phát minh nội dung | Lưu audit; review nếu rule yêu cầu                               |
+| `REVIEWABLE`    | Render/lưu được nhưng còn nghi ngờ semantic, chất lượng hoặc nguồn      | `ACCEPT_OR_FIX` nếu thật sự accept-safe, nếu không là `FIX_ONLY` |
+| `UNRENDERABLE`  | Không thể tạo một question record hợp lệ/an toàn                        | Không tạo question giả; ghi set-level issue `FIX_ONLY`           |
 
 Quy tắc bắt buộc:
 
 - Chỉ phục hồi khi root/set/questions còn parse được và xác định chắc chắn lỗi
-  thuộc câu/field nào. Mọi câu `PASS` phải có pass-through invariant test để bảo
-  đảm recovery path không làm thay đổi question, answer, hint, solution hoặc
-  diagram hợp lệ.
-- Exact count và difficulty distribution là acceptance invariant của cả set. Một
-  slot thiếu/sai nhãn được ghi thành blocking issue trong draft và làm set
-  `SUCCEEDED_WITH_WARNINGS`, không nhất thiết hủy các câu hợp lệ đã sinh.
+  thuộc câu/field nào. Mọi câu `VALID` phải có pass-through invariant test để bảo
+  đảm recovery không làm thay đổi question, answer, hint, solution hoặc diagram.
+- Exact count và difficulty distribution là invariant của output AI ban đầu. Nếu
+  admin yêu cầu 10 nhưng provider chỉ trả 8 thì set có blocking issue và không
+  được coi là “admin đã xóa 2”. Các câu hợp lệ vẫn có thể được giữ trong draft để
+  admin xử lý mà không mất output trả phí.
+- Sau khi AI đã tạo đủ 10, admin có quyền xóa thủ công 2 câu không phù hợp bằng
+  flow delete/soft-delete M6 hiện có. 8 câu còn lại phải lưu được trong cùng
+  `quizSet` và cùng `aiGeneration`, không enqueue generation mới, không gọi lại
+  provider và không tạo exact-count blocking issue chỉ vì số câu hiện tại còn 8.
+  Khi save/approve, backend validate lại 8 câu đang active và cập nhật audit
+  `requested=10`, `initial=10`, `deleted=2`, `current=8`.
+- Không lưu placeholder vào `quiz_questions`: relational schema yêu cầu
+  `question_json` và `correct_answer_json` hợp lệ. Item không thể map an toàn bị
+  bỏ khỏi bảng question và được biểu diễn bằng set-level issue/job result; tuyệt
+  đối không chế dữ liệu giả để giữ đủ slot.
 - Root JSON không đọc được, không xác định được ownership, source hash stale,
   provider/DB/queue/infra error vẫn là full job failure và không overwrite artifact
   tốt trước đó.
 - Local sanitizer chỉ được loại/cô lập dữ liệu nguy hiểm; không được tự phát minh
   dữ kiện, đáp án, bước giải, nhãn difficulty hoặc hình toán học.
-- Persist recovery metadata theo cơ chế M9.2 đã chạy thật: `reviewIssues[]` đặt ở
-  đúng question/solution/diagram hoặc set metadata, gồm `id`, `code`, `path`,
-  `message`, `suggestion`, `technicalDetails`, target `fingerprint` và `accepted`.
+- Persist `reviewIssues[]` theo taxonomy M9.2, đặt đúng question/solution/diagram
+  hoặc set metadata; gồm `id`, `code`, `path`, `message`, `suggestion`,
+  `technicalDetails`, target `fingerprint`, resolution policy và acceptance audit.
 - Warning hiển thị tiếng Việt theo cấu trúc `Vấn đề:` và `Gợi ý sửa:`. Path/error
   kỹ thuật chỉ xuất hiện trong `Chi tiết kỹ thuật` đã sanitize.
-- Draft có warning vẫn mở, sửa và lưu được. CTA approve/publish bị chặn khi
-  `blockingIssueCount > 0`; student API tuyệt đối không trả các câu chưa đạt.
-- Admin có thể accept issue render-safe sau khi review nguồn mà không gọi AI.
-  Backend phải kiểm target fingerprint; nếu question/answer/solution/diagram đích
-  thay đổi thì acceptance cũ tự mất hiệu lực và validate lại khi lưu.
-- Không có issue code nào được cho phép accept nếu thiếu/sai correct answer,
-  grading, `keyIdea`, bước giải/final answer cốt lõi, difficulty distribution hoặc
-  required diagram khiến đề không tự đủ dữ kiện. Các trường hợp đó phải sửa, xóa
-  hoặc thay thế trước approve.
+- Draft có warning vẫn mở, sửa, xóa câu và lưu được. Approve/publish bị chặn khi
+  `blockingIssueCount > 0`; student API không trả item chưa đạt, trừ boundary
+  reserve M9.4 đã nêu tại mục 5.4 và vẫn phải qua safety gate.
+- Issue `ACCEPT_OR_FIX` có thể được admin accept sau review nguồn mà không gọi AI;
+  `FIX_ONLY` phải sửa, xóa item lỗi hoặc thay thế thủ công. Backend kiểm target
+  fingerprint; target đổi thì acceptance cũ mất hiệu lực và validate lại.
+- Không cho accept nếu sai/thiếu correct answer, grading, EXAMPLE
+  `problem/solution/answer`, initial distribution hoặc required diagram làm đề không
+  tự đủ dữ kiện.
 - Generation ban đầu chỉ gọi provider đúng một lần; không tự repair, judge,
   fallback model/provider hoặc retry để tìm output đẹp hơn.
-- Trước khi code, kiểm chứng các JSON field hiện có có đủ khả năng lưu
-  `reviewIssues[]`/job result. Nếu không đủ, báo owner và cập nhật database/API
-  docs; không âm thầm thêm migration. Ưu tiên `source_metadata_json`,
-  question/explanation JSON và job result hiện có để giữ quyết định “không
-  migration”; không tăng wrapper/version chỉ vì thêm metadata optional nếu
-  backward-compatible parser đã đủ.
+- Trước khi code, preflight các JSON field hiện có. Nếu không đủ, báo owner và
+  cập nhật database/API docs trước khi đề xuất thay đổi schema.
 
-Transaction vẫn nguyên tử ở cấp database: hoặc lưu trọn một draft nhất quán gồm
-câu hợp lệ + issue/placeholder cục bộ, hoặc rollback toàn transaction khi lỗi DB.
-“Nguyên tử” không còn đồng nghĩa một field lỗi làm mất toàn bộ provider output.
+Transaction vẫn nguyên tử ở cấp database: hoặc lưu trọn draft nhất quán gồm các
+question record hợp lệ và issue/audit tương ứng, hoặc rollback khi lỗi DB. Không
+dùng placeholder sai schema để đổi lấy số lượng bề ngoài.
 
 ### 5.9. Capability guard cho diagram
 
@@ -381,8 +422,8 @@ câu hợp lệ + issue/placeholder cục bộ, hoặc rollback toàn transactio
   khi schema hiện có cho phép, để screenshot/live artifact tái hiện được.
 - Difficulty của câu hỏi `EASY | MEDIUM | HARD` và độ phức tạp diagram
   `SIMPLE | MEDIUM | HARD | VERY_COMPLEX` là hai trục độc lập, không map đồng nhất.
-- Raw `diagramSpec` fallback hoặc archetype chưa đủ evidence luôn
-  `REVIEW_REQUIRED` và không được student-publish trước source-backed review.
+- Raw `diagramSpec` fallback hoặc archetype chưa đủ evidence luôn `REVIEWABLE`
+  với policy phù hợp và không được student-publish trước source-backed review.
 - `VERY_COMPLEX` đang ngoài coverage: phải rewrite câu thành tự đủ dữ kiện mà
   không phụ thuộc hình hoặc ghi unresolved/block approval; không ép compiler sinh
   một hình kém chất lượng rồi coi là đạt.
@@ -410,7 +451,9 @@ Admin mở modal Sinh Quiz bằng AI
   -> Acceptance schema + semantic validation ở cấp câu và cấp set
   -> Compile diagram intent
   -> Transaction lưu draft nhất quán + warning/blocking issues nếu có
-  -> Admin review và approve
+  -> Invalidate/refetch danh sách tab Quiz
+  -> Tất cả question record hợp lệ hiện ngay với badge AI/NEEDS_REVIEW
+  -> Admin review, sửa/xóa và approve ngay trong flow Quiz hiện có
   -> Student Quiz runner mở hint khi bấm
   -> Student Quiz/Test review hiển thị lời giải + hình
 ```
@@ -426,7 +469,12 @@ Admin mở modal Sinh Quiz bằng AI
     "medium": 8,
     "hard": 3
   },
-  "questionTypes": ["SINGLE_CHOICE", "MULTIPLE_CHOICE"],
+  "questionTypes": [
+    "MULTIPLE_CHOICE",
+    "TRUE_FALSE",
+    "MULTI_STATEMENT_TRUE_FALSE",
+    "TEXT_INPUT"
+  ],
   "documentIds": ["document-id-1", "document-id-2"],
   "model": "selected-model",
   "temperature": 0.2,
@@ -454,7 +502,7 @@ Quy tắc:
 - Model, reasoning effort và token limit phải được validate bằng model catalog,
   không tin chuỗi tùy ý từ client.
 
-## 8. Contract output đề xuất
+## 8. Contract output chốt
 
 Các field đáp án đặc thù theo loại câu tiếp tục dùng schema hiện tại. Phần chung
 của một question được nâng thành:
@@ -462,38 +510,38 @@ của một question được nâng thành:
 ```json
 {
   "difficulty": "EASY",
-  "prompt": {},
-  "answer": {},
   "hint": "Gợi ý ngắn và không tiết lộ trực tiếp đáp án.",
-  "solution": {
-    "keyIdea": "Áp dụng định luật bảo toàn năng lượng.",
-    "steps": [
-      "Viết biểu thức cơ năng tại vị trí ban đầu.",
-      "Viết biểu thức cơ năng tại vị trí cần tìm.",
-      "Cho hai biểu thức bằng nhau và giải phương trình."
-    ],
-    "finalAnswer": "Vận tốc của vật là 10 m/s.",
-    "diagram": null
-  },
-  "sourceChunkIds": ["chunk-id"]
+  "example": {
+    "type": "example",
+    "exampleKind": "STANDARD_EXERCISE",
+    "problem": "Đề bài hoàn chỉnh.",
+    "solution": "Lời giải theo mạch trình bày của M9.2.",
+    "answer": "Kết luận cuối cùng.",
+    "geometryStatement": null,
+    "diagramSpec": null
+  }
 }
 ```
 
 Quy tắc output:
 
 - `difficulty` luôn bắt buộc và chỉ nhận `EASY | MEDIUM | HARD`.
-- Quiz luôn có `hint`; Test không thêm hint nếu contract Test hiện tại không cho
-  phép gợi ý trong lúc làm bài.
-- Quiz và Test đều có `solution`.
-- `keyIdea`, ít nhất một phần tử `steps` và `finalAnswer` phải có nội dung.
-- `finalAnswer` phải khớp với correct answer/grading rule.
-- `sourceChunkIds` chỉ được trỏ tới context đã gửi provider.
-- `diagram=null` khi câu không cần hình.
+- Quiz luôn có `hint` và chỉ hiển thị khi học sinh chủ động bấm. Test có thể lưu
+  `hintJson` optional cho admin review theo schema hiện có, nhưng plan này không
+  thêm UI gợi ý trong lúc làm Test và không để hint lộ answer trước submit.
+- Quiz và Test đều có `example`; `problem`, `solution` và `answer` đi qua đúng
+  authoring/recovery/mapper của EXAMPLE M9.2.
+- Bài chứng minh hình học lớp 7–9 phải có `geometryStatement` GT–KL hợp lệ; các
+  case khác để `null`. Ký hiệu góc phải qua shared canonical normalizer M9.2.
+- `example.answer` phải khớp với correct answer/grading rule.
+- Quiz không trả hoặc lưu `sourceChunkIds`, `sources`, `sourceHash` ở cấp câu.
+- `example.diagramSpec=null` khi câu không cần hình.
 - Nếu câu bắt buộc phụ thuộc hình mà output thiếu/không hợp lệ, câu đó phải thành
-  `PARTIAL_RENDER`/`UNRENDERABLE` và chặn approve; chỉ full job fail khi root/
+  `REVIEWABLE`/`UNRENDERABLE` và chặn approve; chỉ full job fail khi root/
   ownership không còn đọc được hoặc có lỗi provider/DB/infra.
 - Contract transport cho phép giữ item lỗi có ownership; contract acceptance chỉ
-  nhận `PASS` hoặc item đã được admin sửa/accept theo đúng policy.
+  nhận `VALID`/`AUTO_FIXED` hoặc item `REVIEWABLE` đã được admin sửa/accept theo
+  đúng resolution policy.
 
 ## 9. Kế hoạch triển khai theo giai đoạn
 
@@ -501,14 +549,21 @@ Quy tắc output:
 
 - Ghi nhận `git status --short` trước khi code.
 - Không revert hoặc sửa mất các thay đổi M9.2 hiện có của owner.
-- Snapshot contract/prompt/schema version, compiler/template fingerprint,
-  archetype manifest và release status M9.2 đang thực sự có; không giả định kế
-  hoạch coverage đã hoàn tất.
+- Xác nhận baseline tối thiểu prompt `lesson-summary-prompt-v57`, schema
+  `lesson-summary-schema-v42`, `targetGrade`, `geometryStatement`, shared text
+  normalizer và taxonomy recovery hiện hành; nếu code đã tiến thêm thì dùng code
+  thật và cập nhật snapshot.
+- Snapshot compiler/template fingerprint, archetype manifest và release status;
+  không biến coverage toàn cục `IN_PROGRESS` thành blocker cho capability đã có
+  source-backed evidence.
 - Xác định contract diagram/compiler nào đủ bằng chứng để Quiz/Test tiêu thụ và
-  capability nào phải giữ `REVIEW_REQUIRED`/`NEEDS_SOURCE`.
+  capability nào phải giữ `REVIEWABLE`/`NEEDS_SOURCE`.
 - Nếu cần trung lập hóa tên module `lesson-summary-*`, chỉ extract phần generic
   sang common AI diagram layer; Summary và Assessment cùng sử dụng, không tạo
   diagram contract thứ hai.
+- Preflight relational/JSON storage: xác nhận lưu được các question hợp lệ,
+  set-level issue và audit requested/initial/deleted/current mà không tạo row giả;
+  quyết định có/không migration chỉ chốt sau bước này.
 - Không chạy OpenAI thật ở bước baseline.
 
 ### Giai đoạn 1 — Shared contract và schema
@@ -519,13 +574,16 @@ Quy tắc output:
   pipeline dùng chung thành shared example authoring core; không duplicate một
   bộ quy tắc riêng cho Quiz.
 - Giữ Summary adapter tương thích contract/persistence hiện tại để tránh làm suy
-  giảm chất lượng tính năng Sinh kiến thức đang ổn. Không ép Summary thêm
-  `keyIdea`; chỉ Quiz adapter yêu cầu/map structured solution mới.
+  giảm chất lượng tính năng Sinh kiến thức đang ổn; Quiz/Test dùng trực tiếp
+  `lessonSummaryStandardExerciseTransportSchema` thay vì thêm solution contract.
+- Kế thừa `targetGrade`, grade-aware authoring, `geometryStatement` GT–KL và
+  canonical angle/text normalizer; không kéo rule heading/note riêng của Summary.
 - Tạo Quiz adapter bổ sung question type, options/distractors, hint và difficulty
   trên kết quả problem/solution/diagram của core.
 - Nâng prompt/schema version cho Quiz/Test generation.
 - Thêm schema `difficultyCounts`.
-- Thêm structured `solution` với `keyIdea`, `steps`, `finalAnswer`, `diagram`.
+- Bọc nguyên `example` M9.2 trong mỗi question và chỉ thêm assessment metadata.
+- Thêm `geometryStatement` optional theo đúng contract chứng minh hình học.
 - Chia rõ provider input type, transport schema, acceptance schema, normalized
   domain type và persisted/recovery type.
 - Giữ parser/mapper tương thích explanation cũ.
@@ -584,8 +642,8 @@ Quy tắc output:
 
 ### Giai đoạn 4 — Worker generation và persistence
 
-- Dùng shared example authoring core làm nguồn sinh `problem`, worked solution,
-  final answer và diagram cho từng câu; không viết lại từ đầu logic sinh ba phần
+- Dùng shared example authoring core làm nguồn sinh `problem`, `solution`,
+  `answer` và diagram cho từng câu; không viết lại từ đầu logic sinh các phần
   này trong Quiz worker.
 - Nâng system instructions với invariant bắt buộc:
   - Chỉ dùng kiến thức trong nguồn bài học.
@@ -593,23 +651,29 @@ Quy tắc output:
   - Đúng question types.
   - Mỗi Quiz có hint không lộ đáp án.
   - Mỗi Quiz/Test có lời giải chi tiết.
-  - Answer, `finalAnswer` và các bước giải nhất quán.
+  - Cách viết/cách giải phù hợp `targetGrade`; bài chứng minh lớp 7–9 có GT–KL.
+  - Correct answer, `example.answer` và `example.solution` nhất quán.
   - Hình chỉ dùng semantic diagram intent.
   - Trả source chunk IDs hợp lệ.
 - Ghép presentation/extra instructions nhưng không cho chúng vô hiệu hóa
   invariant nghiệp vụ.
 - Sau provider response, validate kỹ thuật và semantic trước khi map.
 - Compile diagram intent bằng pipeline M9.2.
-- Mapper chuyển solution thành Tiptap JSON có cấu trúc:
-  - `keyIdea`.
-  - Danh sách bước giải theo thứ tự.
-  - Kết luận cuối cùng.
+- Mapper gọi trực tiếp recovery và mapper EXAMPLE M9.2; Tiptap
+  `ai_explanations.content_json` chỉ là projection tương thích cho client cũ.
+- Lưu nguyên persisted EXAMPLE trong `source_metadata_json.exampleBlock` để
+  admin/student dùng cùng renderer với Sinh kiến thức.
 - Lưu `contentJson`, `diagramSpecJson`, difficulty, source metadata,
-  `reviewIssues[]` và compiler fingerprint bằng các JSON/job-result field hiện có
-  nếu phù hợp.
-- Với root parseable, map `PASS` nguyên trạng; cô lập câu/field lỗi thành
-  `REVIEW_REQUIRED`, `PARTIAL_RENDER` hoặc `UNRENDERABLE` và tạo draft
+  `reviewIssues[]`, requested/initial count và compiler fingerprint bằng các
+  JSON/job-result field hiện có nếu phù hợp.
+- Với root parseable, map `VALID` nguyên trạng; phân loại phần còn lại thành
+  `AUTO_FIXED`, `REVIEWABLE` hoặc `UNRENDERABLE` và tạo draft
   `NEEDS_REVIEW`/`SUCCEEDED_WITH_WARNINGS` có `blockingIssueCount`.
+- Chỉ tạo `quiz_questions` cho item có `question_json` và `correct_answer_json`
+  hợp lệ; item không map được được ghi bằng set-level issue, không bằng placeholder.
+- Phân biệt provider trả thiếu so với admin xóa sau generation: trường hợp đầu tạo
+  initial-count blocking issue; trường hợp sau cập nhật audit/current count và
+  vẫn cho lưu cùng set/generation nếu các câu active còn lại hợp lệ.
 - Persistence dùng transaction nguyên tử cho toàn draft nhất quán. Lỗi DB rollback
   toàn bộ; lỗi validation cục bộ không được làm mất các câu hợp lệ.
 - Không tự gọi provider repair/judge/fallback/retry. Queue chỉ được retry tự động
@@ -617,6 +681,10 @@ Quy tắc output:
   billing còn mơ hồ, phải dừng để kiểm cache/log/budget và xin approval trước lần
   gọi mới.
 - Giữ active-job dedupe, retry/idempotency và status/error reporting hiện có.
+- Persist Quiz append vào `targetQuizSetId`; chỉ tạo `Bộ câu hỏi 1` nếu lesson
+  chưa có set. Không tạo set/tab mới theo lượt generation.
+- Lineage nằm trên từng question bằng `aiGenerationId` và
+  `generationQuestionIndex`; audit 10→8 chỉ đếm câu của đúng generation.
 - Bổ sung regression test bảo đảm việc extract/reuse core không làm thay đổi bất
   lợi output của example block M9.2.
 
@@ -650,20 +718,35 @@ Quy tắc output:
   - Input đầy đủ: derived/read-only, hiển thị request thật và có copy.
 - Submit button có pending/disabled feedback phù hợp nhưng không dùng disabled để
   che toàn bộ validation error.
+- Sau submit, modal hiển thị trạng thái enqueue/processing và có thể đóng an toàn.
+  Khi job hoàn tất, invalidate/refetch query của tab Quiz để các câu mới xuất hiện
+  ngay; refresh hoặc mở lại tab vẫn thấy cùng dữ liệu đã persist.
 - Đảm bảo modal giữa viewport, body scroll riêng, mobile/tablet/laptop và cả
   light/dark theme.
 
-### Giai đoạn 6 — Admin review AI output
+### Giai đoạn 6 — Admin review ngay trong tab Quiz
 
+- Không tạo màn staging AI riêng. Question hợp lệ được persist và hiển thị ngay
+  trong danh sách tab Quiz với badge `AI` và trạng thái `NEEDS_REVIEW`; set-level
+  warning/blocking issue cũng phải nhìn thấy từ tab này.
+- Card generation luôn giữ CTA `Tạo Quiz` sau khi thành công để mở modal sinh
+  lượt tiếp theo vào set đang chọn. Danh sách dùng thanh số câu và chỉ render một
+  câu được chọn. Với câu AI, toolbar có `Chỉ xem UI` và `Song song` UI + JSON;
+  label EXAMPLE trên card đổi thành `Lời giải`.
 - Hiển thị tổng quan `Đã tạo, có N câu cần review`, số blocking issue và CTA đi
   tới câu lỗi đầu tiên.
 - Hiển thị badge độ khó từng question.
 - Hiển thị hint của Quiz.
-- Hiển thị `keyIdea`, steps và final answer.
-- Render diagram ngay dưới lời giải khi có spec.
-- Dùng cùng renderer với Sinh kiến thức.
-- Không thêm diagram editor trong scope này.
+- Hiển thị nguyên EXAMPLE (`geometryStatement`, diagram, solution, answer) bằng
+  cùng component với Sinh kiến thức; không flatten lời giải thành một paragraph.
+- Dùng nguyên diagram editor của EXAMPLE Sinh kiến thức cho sửa chữ, xóa phần tử,
+  thêm dấu đoạn bằng nhau và khôi phục; không tạo editor riêng cho Quiz.
 - Giữ approve/reject/edit flow hiện có.
+- Cho phép admin xóa thủ công câu không phù hợp bằng flow M6 hiện có. Sau xóa,
+  lưu/refresh/reopen vẫn giữ các câu còn lại trong cùng set/generation; không gọi
+  AI lại. Case nghiệm thu bắt buộc: initial 10, xóa 2, current 8, save/approve 8.
+- Summary/count trên UI hiển thị rõ `AI đã tạo 10 · Đã loại 2 · Còn 8 câu` khi có
+  audit tương ứng, tránh hiểu nhầm provider trả thiếu.
 - Question card hiển thị `Vấn đề:`/`Gợi ý sửa:` và badge recovery; chi tiết kỹ
   thuật sanitize nằm trong vùng mở rộng riêng. Issue render-safe có action
   `Chấp nhận` local; action này không gọi provider và phải lưu audit theo flow
@@ -680,12 +763,12 @@ Quy tắc output:
 - Mở rộng Quiz/Test attempt serializer để select/return `diagramSpecJson` cùng
   explanation hợp lệ.
 - Không trả explanation chưa duyệt hoặc stale.
+- Giữ đúng visibility boundary: admin-generated set cần approve; reserve set M9.4
+  giữ ngoại lệ contract hiện hành và vẫn phải không có blocking issue.
 - Test start/resume tuyệt đối không trả correct answer/explanation trước submit.
 - Tạo shared `AssessmentExplanationPanel` trong student learning feature:
-  - `keyIdea`/ý tưởng chính.
-  - Các bước giải.
-  - Final answer.
-  - Diagram renderer.
+  - Nhận persisted EXAMPLE block.
+  - Dùng chung renderer đề/hình/GT–KL/solution/answer của M9.2.
   - Legacy explanation fallback.
 - Quiz runner:
   - Giữ nút `Gợi ý` hiện có.
@@ -697,6 +780,8 @@ Quy tắc output:
   - Không yêu cầu một lần bấm thứ hai để xem lời giải sau khi đã vào review.
   - Hình responsive, không overflow, đúng contrast light/dark.
 - Question cũ thiếu lời giải hiển thị fallback trung tính, không bịa lời giải.
+- Chạy regression Flashcard để bảo đảm shared extraction không đổi flow ngoài
+  scope; không bổ sung behavior Flashcard mới.
 
 ### Giai đoạn 8 — Docs, verification và handoff
 
@@ -786,7 +871,8 @@ Quy tắc output:
 
 - Transport schema bảo toàn root/question ownership kể cả khi một field lỗi.
 - Acceptance schema cho item và set đã đủ điều kiện approve.
-- Exact count và exact difficulty distribution là blocking acceptance invariant.
+- Exact count và exact difficulty distribution là blocking invariant của output
+  AI ban đầu; sau admin curation, acceptance dùng tập question đang active.
 - Type-specific answer validation.
 - Hint/solution completeness.
 - Answer/solution consistency.
@@ -818,12 +904,19 @@ Ba lớp phải độc lập; không xem validation frontend là security bounda
 - MIXED `5/8/3` sinh đúng chính xác từng nhãn.
 - Thiếu/thừa một slot khi root vẫn đọc được tạo draft
   `SUCCEEDED_WITH_WARNINGS`, exact-count issue và chặn approve.
+- AI trả đủ 10 rồi admin xóa thủ công 2: vẫn lưu/refresh/reopen đúng 8 câu active
+  trong cùng set/generation, không tạo job/provider call mới và không bị chặn bởi
+  initial exact-count invariant.
+- Admin yêu cầu 10 nhưng provider chỉ trả 8: vẫn là initial-count blocking issue,
+  không được ghi audit giả như admin đã xóa 2.
+- Item `UNRENDERABLE` không tạo placeholder question thiếu `question_json` hoặc
+  `correct_answer_json`; issue được lưu ở set/job metadata.
 - Sai distribution khi root vẫn đọc được tạo blocking issue dù tổng đúng.
-- Thiếu hint, `keyIdea`, steps hoặc final answer chỉ cô lập đúng field/question;
-  normalized domain object của các câu `PASS` khác phải deep-equal trước/sau
+- Thiếu hint hoặc field cốt lõi `example.problem/solution/answer` chỉ cô lập đúng field/question;
+  normalized domain object của các câu `VALID` khác phải deep-equal trước/sau
   recovery layer.
-- Final answer mâu thuẫn correct answer luôn là blocking issue; có thể render dưới
-  badge `REVIEW_REQUIRED` để admin sửa/đối chiếu, nhưng không được auto-accept hoặc
+- `example.answer` mâu thuẫn correct answer luôn là blocking issue; có thể render dưới
+  badge `REVIEWABLE`/`FIX_ONLY` để admin sửa/đối chiếu, nhưng không được auto-accept hoặc
   tự sửa đáp án.
 - Source chunk lạ thành blocking `NEEDS_SOURCE`; student không nhận item đó.
 - Diagram intent hợp lệ được compile/persist.
@@ -844,6 +937,8 @@ Ba lớp phải độc lập; không xem validation frontend là security bounda
   hiệu lực và backend tạo/gỡ issue đúng sau lần save kế tiếp.
 - Draft warning vẫn edit/save được; approve bị reject khi còn issue không
   accept-safe hoặc chưa resolve, nhưng student API không lộ draft.
+- Job hoàn tất làm query tab Quiz được refetch/invalidate; mọi question record
+  hợp lệ xuất hiện ngay với badge AI/review, không cần qua màn staging riêng.
 
 ### 12.3. Student API/UI
 
@@ -854,6 +949,8 @@ Ba lớp phải độc lập; không xem validation frontend là security bounda
 - Test chưa submit không nhận answer/explanation.
 - Diagram render đúng trong review.
 - Explanation chưa duyệt/stale không được student API trả về.
+- Admin-generated set và reserve set M9.4 đi đúng hai visibility boundary riêng;
+  reserve exception không cho phép item còn blocking issue lọt tới student.
 - Legacy explanation text vẫn hiển thị.
 - Missing explanation dùng fallback, không crash.
 - Mobile/tablet/laptop và light/dark không overflow hoặc mất contrast.
@@ -921,23 +1018,34 @@ lần gọi provider thật.
 
 ### 14.3. Kịch bản Live test tối thiểu
 
-Chạy một generation end-to-end trên một lesson nhỏ có tài liệu READY/cache hợp
-lệ và có kiến thức phù hợp để tạo ít nhất một câu cần hình. Ưu tiên lesson/
-archetype đã có exact-page reference và live evidence M9.2; không chọn capability
-đang thiếu nguồn chỉ để ép Live case PASS:
+Live Gate A chạy một Quiz generation end-to-end trên lesson nhỏ có tài liệu
+READY/cache hợp lệ và có kiến thức phù hợp để tạo ít nhất một câu cần hình. Ưu
+tiên archetype đã có exact-page reference/live evidence M9.2; không chọn
+capability đang thiếu nguồn chỉ để ép Live case PASS:
 
 ```json
 {
-  "questionCount": 3,
+  "questionCount": 4,
   "difficulty": "MIXED",
   "difficultyCounts": {
     "easy": 1,
-    "medium": 1,
+    "medium": 2,
     "hard": 1
   },
+  "questionTypes": [
+    "MULTIPLE_CHOICE",
+    "TRUE_FALSE",
+    "MULTI_STATEMENT_TRUE_FALSE",
+    "TEXT_INPUT"
+  ],
   "extraInstructions": "Tạo ít nhất một câu có lời giải cần diagram minh họa."
 }
 ```
+
+Live Gate B chạy một Test generation nhỏ qua đúng production path với 2 câu,
+trong đó có ít nhất một explanation/diagram phù hợp. Gate B chỉ cần thiết vì plan
+này thay đổi solution/review path của Test; nó là paid call riêng và phải được
+owner duyệt chi phí riêng, không được gộp ngầm vào approval của Gate A.
 
 Live flow phải đi qua đúng đường production:
 
@@ -952,7 +1060,8 @@ Admin prompt preview
   -> acceptance/semantic validation
   -> diagram compiler
   -> transaction persistence của draft nhất quán
-  -> admin review
+  -> question xuất hiện ngay trong danh sách tab Quiz
+  -> admin review/sửa/xóa/approve
   -> student Quiz review renderer
 ```
 
@@ -962,18 +1071,26 @@ diagnostic riêng đã được owner đồng ý; diagnostic đó không thay th
 ### 14.4. Tiêu chí pass Live test
 
 - Job hoàn thành qua đúng queue/worker/provider route.
-- Persist đúng ba question và đúng `1 EASY + 1 MEDIUM + 1 HARD`.
+- Gate A persist đúng 4 question ban đầu, đủ bốn canonical question type và đúng
+  `1 EASY + 2 MEDIUM + 1 HARD`.
+- Cả 4 câu xuất hiện ngay trong danh sách tab Quiz với trạng thái review đúng;
+  refresh/reopen không làm mất câu hoặc tạo duplicate.
 - Mỗi question có nhãn difficulty, đáp án hợp lệ và hint không lộ trực tiếp đáp
   án.
-- Mỗi explanation có `keyIdea`, ít nhất một bước giải và `finalAnswer` nhất quán
-  với correct answer.
+- Mỗi explanation giữ được EXAMPLE block M9.2 hoàn chỉnh và `example.answer`
+  nhất quán với correct answer.
 - Có ít nhất một question chứa diagram intent hợp lệ, compile/persist thành
   `diagramSpecJson` và render được ở admin/student review.
-- Mọi `sourceChunkIds` thuộc đúng context tài liệu đã chọn.
+- Quiz output và metadata từng câu không có `sourceChunkIds`; test grounding xác
+  nhận nội dung mới vẫn bám context và không sao chép nguyên văn.
 - Không có record mồ côi hoặc duplicate. Nếu Live output có recovery warning thì
   chứng minh các câu hợp lệ được giữ nguyên, issue được cô lập và approve bị chặn;
   tuy nhiên bộ Live dùng để nghiệm thu cuối phải được sửa/review tới khi đủ đúng
-  ba câu và phân bổ `1/1/1`.
+  4 câu ban đầu và phân bổ `1/2/1`.
+- Chạy riêng curation regression trên artifact Gate A: xóa thủ công một câu,
+  chứng minh các câu còn lại vẫn ở cùng set/generation và không gọi provider lại.
+- Gate B chứng minh Test explanation/diagram persist và chỉ xuất hiện ở review
+  sau submit; Test start/resume không lộ correct answer/explanation.
 - Artifact giữ trạng thái `NEEDS_REVIEW` cho tới khi admin chủ động duyệt.
 - Ghi nhận model/provider, số question, input/output tokens, số lần gọi, trạng
   thái cache, job/artifact ID, raw + normalized output, prompt/contract/compiler
@@ -984,8 +1101,8 @@ diagnostic riêng đã được owner đồng ý; diagnostic đó không thay th
 - Không tự động forced rerun chỉ để tìm output đẹp hơn.
 - Phân loại nguyên nhân theo taxonomy:
   `PROVIDER_CONTENT_OR_INTENT | TRANSPORT_SCHEMA | ACCEPTANCE_SCHEMA | COMPILER |
-  SEMANTIC_VALIDATOR | LABEL_LAYOUT | RENDERER | RESPONSIVE_THEME | API_UI |
-  SOURCE_REFERENCE | PROVIDER_TRANSIENT`.
+SEMANTIC_VALIDATOR | LABEL_LAYOUT | RENDERER | RESPONSIVE_THEME | API_UI |
+SOURCE_REFERENCE | PROVIDER_TRANSIENT`.
 - Ưu tiên dùng artifact/output lỗi đã có để debug và bổ sung test mock/regression.
 - Các lỗi từ `TRANSPORT_SCHEMA` trở xuống phải thử fix/reprocess từ cache trước.
   Chỉ `PROVIDER_CONTENT_OR_INTENT` hoặc provider transient mới có thể cần paid
@@ -993,7 +1110,7 @@ diagnostic riêng đã được owner đồng ý; diagnostic đó không thay th
 - Trước lần gọi paid thứ hai, báo lại nguyên nhân, thay đổi đã thực hiện, token
   budget và chi phí ước tính; chờ owner xác nhận lần nữa.
 - Nếu owner chưa duyệt Live call, báo trạng thái `Implementation/check local đã
-  xong, Live acceptance gate đang chờ duyệt chi phí`; không tuyên bố task đã
+xong, Live acceptance gate đang chờ duyệt chi phí`; không tuyên bố task đã
   nghiệm thu hoàn toàn.
 
 ### 14.6. Vòng screenshot review bắt buộc sau Live test
@@ -1039,16 +1156,19 @@ Phải chụp từ dữ liệu Quiz Live thật, không dùng mock thay thế:
 Admin:
 
 - Modal cấu hình và Input preview trước generation.
-- Job hoàn thành và Quiz set được tạo.
+- Job hoàn thành và câu hỏi được append vào Quiz set đang mở, không tạo tab mới.
+- Danh sách tab Quiz ngay sau khi job hoàn tất, gồm đủ câu mới, badge AI/review và
+  summary initial/deleted/current nếu có curation.
 - Review từng question, gồm difficulty, answer, hint, solution và diagram.
 
 Student:
 
 - Quiz runner khi hint đang đóng.
 - Quiz runner sau khi bấm mở hint.
-- Màn review của cả ba question.
+- Màn review của cả bốn question Quiz.
 - Màn Test review dùng explanation/diagram đã approve để xác nhận shared review
-  panel không chỉ đúng ở Quiz.
+  panel không chỉ đúng ở Quiz; Test start/resume được kiểm riêng để bảo đảm không
+  lộ đáp án/lời giải.
 - Ảnh riêng/crop đủ lớn cho từng solution và từng diagram, không chỉ một ảnh
   full-page quá nhỏ để đọc.
 
@@ -1160,7 +1280,7 @@ hoặc một test pass đơn thuần không đủ để kết luận.
 - Không copy nguyên văn bài nguồn, không phụ thuộc câu `xem hình bên` hoặc ảnh OCR.
 - Không thừa/thiếu dữ kiện, không mâu thuẫn giữa text và diagram.
 - Loại câu hỏi phù hợp nội dung và mục tiêu học tập.
-- Không trùng hoặc chỉ thay số máy móc giữa ba câu.
+- Không trùng hoặc chỉ thay số máy móc giữa bốn câu Quiz.
 
 #### C. Đáp án, phương án nhiễu và grading
 
@@ -1168,12 +1288,12 @@ hoặc một test pass đơn thuần không đủ để kết luận.
 - Single choice chỉ có một đáp án đúng; multiple choice có đúng tập đáp án.
 - Distractor hợp lý, phản ánh lỗi sai thường gặp nhưng không mơ hồ hoặc vô lý.
 - Không có dấu hiệu hình thức làm lộ đáp án như độ dài/cách viết khác biệt rõ.
-- Grading rule nhất quán với question type và final answer.
+- Grading rule nhất quán với question type và `example.answer`.
 
 #### D. Độ khó
 
 - Nhãn `EASY|MEDIUM|HARD` phản ánh số bước, mức suy luận và độ phức tạp thực tế.
-- Đúng phân bổ `1/1/1` của Live case.
+- Đúng phân bổ `1/2/1` của Live Quiz case.
 - Câu HARD vẫn nằm trong phạm vi nguồn/cấp học, không tạo độ khó bằng dữ kiện mơ
   hồ hoặc kiến thức ngoài bài.
 
@@ -1181,17 +1301,15 @@ hoặc một test pass đơn thuần không đủ để kết luận.
 
 - Gợi đúng kiến thức/bước khởi đầu, có ích khi học sinh bị kẹt.
 - Không nói trực tiếp đáp án hoặc thay học sinh thực hiện toàn bộ lời giải.
-- Không mâu thuẫn với `keyIdea`, steps, final answer hoặc diagram.
+- Không mâu thuẫn với `example.solution`, `example.answer` hoặc diagram.
 - UI mặc định đóng và mở đúng sau thao tác của học sinh.
 
 #### F. Solution
 
-- `keyIdea` nêu đúng phương pháp/kiến thức cốt lõi, không phải bản sao final
-  answer và không đưa phương pháp sai.
-- Từng phần tử `steps` đúng toán học, đúng thứ tự, đủ dữ kiện và không nhảy bước
-  quan trọng đối với cấp học đó.
+- `example.solution` đúng toán học, có mạch trình bày đúng khối EXAMPLE M9.2,
+  đủ dữ kiện và không nhảy bước quan trọng đối với cấp học đó.
 - Ký hiệu, đơn vị, LaTeX, thuật ngữ và phép biến đổi chính xác.
-- `finalAnswer` đúng và khớp tuyệt đối với correct answer/grading.
+- `example.answer` đúng và khớp tuyệt đối với correct answer/grading.
 - Lời giải dễ học, không dài dòng, không suy luận vòng tròn và không hallucinate
   dữ kiện không có trong đề.
 - Đối chiếu được với lời giải/phương pháp chính thống; nếu có nhiều cách giải,
@@ -1229,6 +1347,8 @@ hoặc một test pass đơn thuần không đủ để kết luận.
 #### I. End-to-end và dữ liệu lưu
 
 - Job, source hash, route snapshot, question count và difficulty counts đúng.
+- Requested/initial/deleted/current count phản ánh đúng lịch sử; admin curation
+  không bị hiểu nhầm là provider trả thiếu và không tạo generation mới.
 - Database lưu đúng hint, difficulty, explanation, diagram spec và source
   metadata.
 - Cache key, prompt/contract/compiler fingerprint và usage đủ để tái hiện output.
@@ -1253,7 +1373,7 @@ Chỉ kết thúc vòng Live screenshot review khi:
 - Không còn `BLOCKER` hoặc `MAJOR` đã biết.
 - Không còn `MINOR` đã biết trong phạm vi Live screenshot; defect nhìn thấy phải
   được sửa và chụp lại, không đóng task bằng cách ghi nhận rồi bỏ qua.
-- Cả ba question PASS toàn bộ rubric A-I.
+- Cả bốn Quiz question và hai Test question PASS toàn bộ phần rubric áp dụng.
 - Mobile PASS toàn bộ state ở light/dark và Chromium/WebKit trước; iPad và laptop
   sau đó PASS cùng flow mà không tạo regression.
 - Có đủ bằng chứng screenshot của đúng ba nhóm thiết bị mobile/iPad/laptop; không
@@ -1263,8 +1383,8 @@ Chỉ kết thúc vòng Live screenshot review khi:
 - Mỗi question/diagram có reference record hợp lệ từ nguồn chính thống.
 - Tất cả screenshot cuối nằm trong `passed`, không lẫn ảnh lỗi.
 - Regression của shared example authoring core và golden diagram M9.2 vẫn pass.
-- M9.2 Summary adapter giữ nguyên contract/output hợp lệ; Quiz adapter thêm
-  `keyIdea` mà không buộc Summary đổi schema.
+- M9.2 Summary adapter giữ nguyên contract/output hợp lệ; Quiz adapter bọc nguyên
+  EXAMPLE core và chỉ thêm assessment metadata.
 - Review record dùng đúng comparison mode/decision chuẩn M9.2; không có diagram
   được PASS bằng đánh giá riêng ngoài hệ thống đó.
 - Review report cuối liệt kê rõ nguồn, ảnh, lỗi đã sửa, vòng lặp đã chạy và lý do
@@ -1283,6 +1403,8 @@ Chỉ kết thúc vòng Live screenshot review khi:
 - `docs/implementation/M9.md`.
 - `docs/implementation/feature-coverage-matrix.md`.
 - `.codex/context/code-index.md` nếu tạo/di chuyển entrypoint quan trọng.
+- `.codex/plans/codex-execution-plan.md` để đồng bộ baseline/dependency mà không
+  thay roadmap source-of-truth.
 
 Khi triển khai phải sửa rõ mâu thuẫn hiện có trong docs M9.3 giữa câu chữ “output
 invalid không lưu/rollback toàn set” và policy partial recovery mới: DB transaction
@@ -1292,11 +1414,11 @@ transport validation, acceptance validation và student visibility boundary.
 
 Không dự kiến cập nhật:
 
-- Prisma/database docs, vì không cần migration hoặc field mới.
+- Prisma schema/migration nếu preflight chứng minh JSON field hiện có đã đủ.
+  Database docs vẫn phải cập nhật nếu cần formalize semantics audit/count.
 - Env docs, trừ khi phát hiện config provider hiện tại thiếu contract đã được
   docs quy định.
 - Changelog, vì chưa có lệnh commit.
-- Execution plan chính, trừ khi trong lúc implement phát hiện dependency mới.
 
 ## 16. Tiêu chí nghiệm thu
 
@@ -1311,53 +1433,70 @@ Task được coi là hoàn thành khi:
 4. Admin chọn đúng tài liệu nguồn và xem được prompt/input trước khi gọi AI.
 5. Admin điều khiển được model, temperature hoặc reasoning effort, max output
    tokens, cách trình bày và yêu cầu bổ sung.
-6. MIXED `5/8/3` với tổng 16 tạo đúng 16 câu và đúng từng số lượng.
+6. MIXED `5/8/3` với tổng 16 tạo đúng 16 câu ban đầu và đúng từng số lượng.
 7. Mỗi câu sinh ra có nhãn độ khó hợp lệ.
 8. Mỗi Quiz có hint, nhưng học sinh chỉ thấy khi bấm nút gợi ý.
-9. Mỗi Quiz/Test AI mới có lời giải gồm `keyIdea`, steps và final answer.
+9. Mỗi Quiz/Test AI mới có một EXAMPLE M9.2 hoàn chỉnh gồm problem, solution,
+   answer, geometryStatement và diagram khi cần.
 10. Câu cần hình có diagram được compile/render an toàn.
-11. Admin xem và duyệt được toàn bộ hint/lời giải/hình.
+11. Khi generation hoàn tất, mọi question record hợp lệ xuất hiện ngay trong
+    danh sách của Quiz set đang mở ở trạng thái review, không tạo tab mới; admin
+    xem và duyệt được toàn bộ hint/lời giải/hình mà không qua màn staging riêng.
 12. Student review Quiz/Test hiển thị lời giải của từng câu.
 13. Test không lộ answer/explanation trước submit.
-14. Explanation chưa duyệt hoặc stale không được hiển thị cho học sinh.
+14. Explanation chưa duyệt hoặc stale không được hiển thị cho học sinh theo
+    boundary admin-generated; reserve exception M9.4 vẫn qua acceptance/safety
+    gate riêng và Test không lộ lời giải trước submit.
 15. Root/provider/DB/infra failure không tạo dữ liệu mồ côi hoặc duplicate; lỗi
     cục bộ có ownership tạo draft nhất quán, giữ nguyên câu hợp lệ và chặn approve.
 16. Typecheck, focused tests, E2E, lint và build liên quan pass.
-17. Live acceptance gate chạy qua OpenAI thật và đạt toàn bộ tiêu chí mục 14.4
-    sau khi owner duyệt chi phí.
-18. Vòng screenshot review đạt exit criteria mục 14.10 trên đúng ba nhóm thiết
+17. Một lượt sinh 10 câu rồi xóa 2 giữ đúng 8 câu của lượt đó trong set hiện tại,
+    không xóa hoặc tính nhầm câu thủ công/lượt AI khác.
+18. Live Gate A Quiz và Gate B Test chạy qua OpenAI thật, đạt tiêu chí mục 14.4
+    sau khi owner duyệt chi phí riêng cho từng gate.
+19. Vòng screenshot review đạt exit criteria mục 14.10 trên đúng ba nhóm thiết
     bị mobile/iPad/laptop, trong đó mobile là core gate và đã kiểm cả
     Chromium/WebKit ở light/dark.
-19. Mỗi question/solution/diagram có reference record từ nguồn chính thống và
+20. Mỗi question/solution/diagram có reference record từ nguồn chính thống và
     không còn trạng thái `NEEDS_SOURCE`.
-20. Transport/acceptance schema, recovery states, `reviewIssues[]`, target
+21. Transport/acceptance schema, recovery states, `reviewIssues[]`, target
     fingerprint/acceptance invalidation, `blockingIssueCount`, issue copy và
     student visibility boundary có unit/integration/E2E coverage.
-21. Initial generation chỉ gọi provider một lần; cache/reprocess và paid rerun
+22. Initial generation chỉ gọi provider một lần; cache/reprocess và paid rerun
     tuân thủ M9.12 cùng approval chi phí riêng.
-22. Diagram capability guard phân biệt question difficulty với diagram complexity;
+23. Diagram capability guard phân biệt question difficulty với diagram complexity;
     raw fallback, archetype thiếu evidence và `VERY_COMPLEX` không được auto-pass.
-23. Docs contract và milestone phản ánh đúng behavior đã triển khai.
+24. AI tạo đủ 10 rồi admin xóa 2 vẫn lưu/approve được 8 câu active trong cùng
+    set/generation, không gọi lại provider; provider tự trả 8/10 vẫn bị nhận diện
+    là initial-count blocking issue.
+25. Recovery dùng đúng `VALID | AUTO_FIXED | REVIEWABLE | UNRENDERABLE` và
+    `ACCEPT_OR_FIX | FIX_ONLY`; không persist question placeholder sai schema.
+26. `targetGrade`, grade-aware solution, canonical angle notation và GT–KL cho
+    bài chứng minh lớp 7–9 được kế thừa đúng từ M9.2.
+27. Docs contract và milestone phản ánh đúng behavior đã triển khai.
 
 ## 17. Rủi ro và cách giảm thiểu
 
-### 17.1. M9.2 đang có thay đổi chưa commit
+### 17.1. Baseline M9.2 ổn nhưng worktree còn thay đổi chưa commit
 
-Diagram compiler/schema/renderer đang được owner chỉnh trong worktree. Khi triển
-khai phải đọc lại diff, không revert và tránh chỉnh chồng. Nên ổn định interface
-M9.2 trước khi extract phần dùng chung.
+Owner đã xác nhận tính năng M9.2 ổn; đây là baseline để tái sử dụng. Tuy nhiên
+worktree còn thay đổi chưa commit nên khi triển khai phải đọc lại diff, không
+revert và tránh chỉnh chồng. Coverage archetype `IN_PROGRESS` không chặn M9.3,
+nhưng capability chưa có evidence vẫn không được auto-publish.
 
 ### 17.2. Output quá lớn
 
 Nhiều câu kèm lời giải/hình có thể vượt context/output limit. Cần preview token,
 hard max tokens, compact diagram intent và lỗi rõ ràng. Nếu provider vẫn trả thiếu
 câu nhưng root đọc được, giữ câu hợp lệ trong draft warning và chặn approve thay
-vì mất toàn bộ output; bộ cuối cùng vẫn phải đủ exact count trước phát hành.
+vì mất toàn bộ output. Exact count áp dụng cho response ban đầu; sau khi AI đã trả
+đủ, admin được quyền chủ động xóa câu và phát hành số câu active còn lại.
 
 ### 17.3. Prompt admin chỉnh mâu thuẫn invariant
 
-System/User prompt cho phép chỉnh để đáp ứng nghiệp vụ, nhưng exact count,
-difficulty, schema, source scope và diagram safety vẫn được validator cưỡng chế.
+System/User prompt cho phép chỉnh để đáp ứng nghiệp vụ, nhưng initial exact count,
+initial difficulty distribution, schema, source scope và diagram safety vẫn được
+validator cưỡng chế.
 
 ### 17.4. Preview stale
 
@@ -1384,7 +1523,7 @@ quyền truy cập hợp pháp; không tải/commit bản scan lậu để hoàn
 
 M9.2 coverage hiện `IN_PROGRESS`, chưa thể coi 50 archetype là release-ready.
 M9.3 phải snapshot manifest/evidence lúc implement, chọn Live case có exact-page
-evidence và giữ raw fallback/archetype chưa đủ bằng chứng ở `REVIEW_REQUIRED`.
+evidence và giữ raw fallback/archetype chưa đủ bằng chứng ở `REVIEWABLE`.
 
 ### 17.9. Recovery làm biến đổi output hợp lệ
 
@@ -1394,12 +1533,13 @@ question và diagram; recovery chỉ được chạm đúng field đã ownership
 
 ## 18. Assumption và điểm cần giữ khi triển khai
 
-- `keyIdea` là tên field chính thức; không dùng `overview` hoặc `keyIDea`.
+- Không có field lời giải song song `overview`, `keyIdea`, `steps` hoặc
+  `finalAnswer`; nguồn sự thật là EXAMPLE M9.2.
 - Đề bài, solution và diagram của Quiz phải đi qua shared example authoring core
   được trích từ khối ví dụ M9.2; chỉ lớp Quiz-specific mới tạo distractor, hint,
   difficulty và grading shape.
-- Summary adapter giữ provider contract hiện tại; `keyIdea` là contract riêng của
-  Quiz/Test explanation adapter, không phải lý do sửa output schema M9.2 đã ổn.
+- Summary adapter giữ provider contract hiện tại; Quiz/Test dùng cùng EXAMPLE
+  transport schema và không sửa output Summary đã ổn.
 - MIXED hiện cho phép một difficulty count bằng `0`; tổng vẫn phải khớp.
 - Input tab là dữ liệu derived/read-only; System instructions và User prompt cho
   phép admin chỉnh như modal Sinh kiến thức.
@@ -1407,26 +1547,40 @@ question và diagram; recovery chỉ được chạm đúng field đã ownership
   chunk từ document không được chọn.
 - Test chỉ được nâng structured solution/diagram phục vụ review; chưa thêm bộ
   cấu hình nâng cao vào modal Sinh Test.
-- Không có migration database trong kế hoạch hiện tại.
+- Khi job AI hoàn tất, question record hợp lệ phải xuất hiện ngay trong danh sách
+  tab Quiz dưới trạng thái review; không có staging screen riêng.
+- `questionCount`/difficulty distribution là yêu cầu đối với output AI ban đầu.
+  Admin curation sau đó được phép làm số active nhỏ hơn mà vẫn lưu cùng lượt.
+- Case `10 -> admin xóa 2 -> còn 8` là behavior bắt buộc; khác hoàn toàn với
+  provider chỉ trả 8/10.
+- Ưu tiên không migration; quyết định cuối chỉ chốt sau storage preflight. Không
+  tạo placeholder question trái relational schema.
 - Nếu kiểm chứng schema cho thấy existing JSON/job result không biểu diễn được
-  recovery issue/placeholder an toàn, phải dừng và báo owner trước khi đổi DB.
+  recovery issue/audit count an toàn, phải dừng và báo owner trước khi đổi DB.
 - Một local item error không tự động làm fail toàn job: ưu tiên coherent draft
   `SUCCEEDED_WITH_WARNINGS`; full failure chỉ dùng cho root/ownership/source stale/
   provider/DB/infra như mục 5.8.
 - Không có provider call trả phí khi chưa có xác nhận riêng.
+- Live Gate A Quiz và Gate B Test là hai approval chi phí riêng.
+- Visibility của admin-generated set không được làm mất reserve exception M9.4;
+  Test start/resume vẫn không được lộ answer/explanation.
+- M9.3 dùng trực tiếp diagram editor EXAMPLE của M9.13-M9.15; không tạo editor
+  Quiz song song.
+- Flashcard ngoài scope behavior nhưng phải có regression khi shared core đổi.
 - Screenshot review bắt buộc trên mobile/iPad/laptop; mobile là core quality gate.
 - Mỗi kết luận PASS về kiến thức, solution hoặc diagram phải có reference record
   chính thống; nhận xét thị giác chủ quan không đủ để nghiệm thu.
 - Diagram review bắt buộc dùng lại evaluator/reference/golden process của M9.2;
   không được tạo evaluator Quiz riêng hoặc tiêu chí nhẹ hơn.
 
-## 19. Approval gate
+## 19. Kết quả triển khai
 
-File này là kế hoạch bổ sung cho các subtask đã có trong roadmap, không tự thay
-đổi trạng thái Done của M7/M9 và không được xem là lệnh triển khai.
+Owner đã duyệt và yêu cầu thực hiện trong phiên M9.3. Lát dọc Quiz đã
+hoàn tất theo các quyết định trong plan: append vào set đang chọn, không source
+trace cấp câu, dùng chung EXAMPLE core/diagram editor, giữ CTA `Tạo Quiz`,
+thanh số chỉ render một câu, hai mode review và label `Lời giải`.
 
-Codex chỉ bắt đầu sửa FE/BE/worker sau khi owner xác nhận rõ bằng lời như:
-
-```text
-ok, bắt đầu đi
-```
+Kiểm chứng cuối gồm focused API 119 test, root typecheck, scoped lint, production
+build, Playwright Chromium desktop và agent-browser desktop/tablet/mobile light/dark.
+Live GPT-5.4 đã pass ma trận 1/5/10 Đại số–Hình học và một lượt 10 câu
+hỗn hợp 5+5; không gọi provider trả phí thêm trong corrective UI cuối.

@@ -492,9 +492,13 @@ Phân quyền UI theo task:
 - `M9.8` chỉ sở hữu panel AI của admin trong lesson detail, không thay thế ba
   UI học sinh trên.
 - Modal tạo Summary của `M9.8` cho phép cấu hình nội dung và cấu hình kỹ thuật
-  theo lần chạy. Phần nâng cao hiển thị read-only ba lớp dữ liệu gửi AI:
-  `System instructions`, `User prompt` và `Input đầy đủ` có context; không hiển
-  thị API key/secret. Preview phải ghi rõ không gọi provider và không tốn phí.
+  theo lần chạy. Phần nâng cao cho phép admin sửa trực tiếp `System instructions`
+  và `User prompt`; nội dung khác rỗng được gửi làm toàn bộ prompt hiệu lực tương
+  ứng, không bị hệ thống bọc thêm contract hoặc preference. `Input đầy đủ` có
+  context là dữ liệu read-only để đối chiếu; không hiển thị API key/secret. Khi
+  admin không sửa một prompt, thay đổi field cấu hình phải làm prompt đó được dựng
+  lại từ dữ liệu mới trước lúc generate. Preview phải ghi rõ không gọi provider
+  và không tốn phí.
 
 ### 4.9. Notes và private comments
 
@@ -664,7 +668,26 @@ Màn chi tiết buổi học admin:
 - Course detail có nút `Nhập khoảng trang` mở modal gán trang hàng loạt cho nhiều lesson; không nhét toàn bộ form nhập range dài vào màn chính.
 - Modal tạo/sửa lesson và lesson detail là nơi gán/điều chỉnh page range tùy chọn của một lesson cụ thể để tránh thao tác vòng khi admin upload sách trước rồi mới tạo buổi học; phần nhập trang disabled tới khi source document xử lý xong và không còn page warning.
 - Là nơi admin thêm thủ công, sửa, xóa mềm, ẩn/hiện, duyệt lại quiz/flashcard/test; nội dung do AI sinh sau M9.3 cũng được quản trị tại đây.
-- Tab `Quiz` hiển thị mỗi quiz set như một tab ngang có count; chọn tab sẽ render toàn bộ câu hỏi của set ngay bên dưới. Trong set có action `Thêm câu hỏi`, sửa và xóa từng câu.
+- Tab `Quiz` hiển thị mỗi quiz set như một tab ngang có count. Trong set có thanh
+  số thứ tự câu hỏi nằm ngay trên panel nội dung; chọn số nào chỉ render câu đó
+  bên dưới, giữ điều hướng ngang gọn khi bộ có nhiều câu. Trong set vẫn có action
+  `Thêm câu hỏi`, sửa và xóa từng câu.
+- Modal `Tạo Quiz bằng AI` luôn gắn với Quiz set đang mở. Khi job hoàn tất, mọi
+  câu hợp lệ xuất hiện như card bình thường trong danh sách câu bên dưới của set
+  đó; không dùng tên bài/số lượng câu AI làm tab Quiz mới.
+- Card câu AI dùng cùng component EXAMPLE với Sinh kiến thức cho phần hình,
+  bảng GT–KL, lời giải và đáp án. Admin và student review không duy trì hai phong
+  cách trình bày khác nhau; question cũ vẫn fallback sang Tiptap/diagram cũ.
+- Trong Quiz, label của EXAMPLE hiển thị là `Lời giải` thay vì `Ví dụ`. Câu AI có
+  đúng hai chế độ review `Chỉ xem UI` và `Song song`; chế độ song song đặt card
+  UI và JSON của chính câu đang chọn cạnh nhau trên màn đủ rộng, xếp dọc trên
+  mobile. Câu thủ công không bắt buộc hiện toggle này.
+- Hình trong câu Quiz dùng nguyên diagram core/editor của EXAMPLE Sinh kiến
+  thức: sửa chữ, xóa phần tử, thêm dấu đoạn bằng nhau và khôi phục đều gọi cùng
+  utility/component; thay đổi core ở Sinh kiến thức tự áp dụng cho Quiz, không
+  tạo bản editor riêng.
+- Một set trộn câu thủ công và câu AI vẫn giữ `source=ADMIN`; UI hiển thị số câu
+  AI cần duyệt và audit của lượt gần nhất (`tạo ban đầu / đã xóa / còn lại`).
 - Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`,
   `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi
   tiết. Multiple choice dùng danh sách phương án động:
@@ -696,6 +719,30 @@ Trong lesson detail `/admin/lessons/[lessonId]`, admin có panel/nút:
 - Sửa output.
 - Summary hợp lệ kỹ thuật được hiển thị và cho sửa bình thường; không có panel mã
   warning kỹ thuật, provenance hoặc heading audit làm rối màn biên tập.
+- Block note chỉ hiển thị một nhãn do UI sở hữu. Nội dung không lặp tiền tố
+  `Chú ý`, `Lưu ý` hoặc `Nhận xét`; renderer phải chuẩn hóa cả summary cũ để tránh
+  nhãn kép mà vẫn giữ nguyên phần giải thích phía sau.
+- `M9.13-M9.15` (Done 2026-08-11): trong admin edit mode, hình `DIAGRAM_SPEC` cho
+  chọn trực tiếp tên điểm, label rời, text/cung góc, caption và marker. Target tô
+  đỏ rồi hiện popup nhỏ sát phần tử; tên điểm chỉ có sửa, label/caption có sửa và
+  xóa, marker được xóa theo cả group. Các action áp dụng ngay trong draft, không
+  confirm và không autosave.
+- Một cạnh được chọn chỉ tô đỏ. Từ hai `SEGMENT` có tên ở cả hai điểm mút mới hiện
+  popup chỉ có icon `=`; popup không hiện text đếm hoặc nút đóng. Chọn lại cạnh
+  hoặc click nền để bỏ chọn. Hit-test phải chọn đúng ID cạnh, kể cả nhiều hình có
+  cạnh tương tự nằm cạnh nhau.
+- Mỗi hình editable luôn có nút reset. Đây là action duy nhất mở confirm modal;
+  confirm phục hồi mọi chỉnh sửa của riêng hình đó trong draft phiên hiện tại.
+  Mọi action giữ nguyên vị trí cuộn.
+- Không cho xóa point, primitive, cạnh, đường, polygon, circle/arc hoặc nhãn trục
+  tự sinh. Backend kiểm lại khi `Lưu nội dung` và vẫn khóa `Phát hành` nếu phát
+  sinh review issue. Student/read-only không có selection/action; summary
+  `APPROVED` phải thu hồi trước khi chỉnh hình.
+- Example chứng minh Hình học có bảng GT–KL nằm sau hình và trước lời giải. Bảng
+  dùng một cột nhãn `GT`/`KL`, đường dọc ngăn nhãn với nội dung và đường ngang
+  ngăn hai hàng; không trình bày thành hai tiêu đề rời. Sau bảng là heading
+  `Chứng minh`, mạch suy luận và dòng `Vậy`. Dữ liệu cũ không có
+  `geometryStatement` tiếp tục dùng layout example thông thường.
 - Với Summary, `Lưu nội dung` chỉ lưu phần chỉnh sửa thành bản nháp; nếu Summary
   đang ẩn thì vẫn giữ trạng thái ẩn. Chỉ action `Phát hành` mới chuyển bản hiện
   tại thành nội dung chính thức học sinh được xem. Bản đã phát hành có action
@@ -706,8 +753,15 @@ Trong lesson detail `/admin/lessons/[lessonId]`, admin có panel/nút:
   trước, để admin chọn tài liệu và tạo một bản mới. Card Summary đã có kết quả
   cũng dùng `Sinh lại` thay cho `Mở để duyệt`.
 - Quiz/Flashcard/Test vẫn giữ review flow riêng.
+- Riêng card Quiz luôn dùng CTA `Tạo Quiz` khi không có job đang chạy, kể cả sau
+  một lượt thành công; bấm CTA luôn mở modal cấu hình để sinh thêm câu vào Quiz
+  set đang chọn. Không đổi CTA thành `Mở để duyệt` sau khi hoàn tất.
 - Form cấu hình dùng shared custom select/input/checkbox, báo lỗi realtime và
   giữ cùng button/state pattern của các màn admin khác.
+- Với modal Summary/Quiz, `Cập nhật dữ liệu gửi AI` cho phép admin chủ động xem
+  lại prompt và chi phí ước tính. Dù có bấm nút này hay không, `Bắt đầu tạo` luôn
+  tự dựng lại prompt từ toàn bộ lựa chọn mới nhất trước khi tạo job; trong lúc
+  đồng bộ, modal khóa action và hiển thị trạng thái `Đang cập nhật dữ liệu`.
 - Form Summary dùng field custom multi-select `Tài liệu dùng để tạo`, hiển thị
   toàn bộ tài liệu active của buổi học. Tài liệu chưa `READY` hoặc chưa có
   chunks vẫn hiện trong danh sách nhưng bị khóa và có lý do; mặc định chọn mọi

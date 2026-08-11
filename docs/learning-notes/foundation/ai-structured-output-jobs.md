@@ -75,6 +75,15 @@ giá trị rỗng của form ghi đè `openAiRequest.instructions`. Cách kiểm
 `instructions` trong JSON cuối. Sau đó phải kiểm thêm vòng gửi lại preview hoặc
 generate để chắc chắn prompt hiệu lực không bị builder bọc lặp.
 
+Preview cũng là derived state và có thể cũ ngay khi admin đổi style, độ dài, số
+từ, tài liệu hoặc yêu cầu bổ sung. Submit không được gửi nguyên prompt tự sinh đã
+lưu từ lần preview trước; nó phải dựng lại prompt từ snapshot form hiện tại rồi
+mới tạo job. Nếu admin đã sửa trực tiếp System/User prompt, phần sửa đó được giữ
+làm toàn bộ prompt hiệu lực tương ứng, còn prompt không sửa được thay bằng bản vừa
+dựng. UI cần theo dõi việc admin chủ động sửa từng ô thay vì suy đoán bằng cách so
+chuỗi với response preview. Nhờ vậy nút preview chỉ phục vụ kiểm tra, không trở
+thành một bước lưu ngầm dễ bị quên.
+
 Phải tách ranh giới kỹ thuật và đánh giá biên tập. JSON Schema/Zod vẫn là ranh
 giới bắt buộc vì JSON hỏng không thể persist/render an toàn. Ngược lại, các nhận
 định như theory có lẫn ví dụ, paragraph quá dài, ví dụ lệch chủ đề hay lời giải

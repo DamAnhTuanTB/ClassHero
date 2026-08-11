@@ -162,6 +162,11 @@ deterministic trong ứng dụng và không tạo thêm image-generation provide
 Generation vẫn chỉ có một structured-output call; semantic warning không kích
 hoạt repair/judge call. Renderer phải giới hạn số primitive/label và lazy-load ở
 UI khi cần để không làm tăng đáng kể initial bundle hoặc thời gian hiển thị lesson.
+Corrective `M9.16` phải bảo đảm custom preference chỉ làm tăng prompt theo đúng
+độ dài preference, không nối lại toàn bộ canonical contract. Preview và generate
+dùng cùng request fingerprint để không enqueue bằng prompt stale; fingerprint chỉ
+hash dữ liệu canonical, không log prompt/context thô. Regression phải đếm đúng một
+contract heading và so token estimate preview với request worker tương ứng.
 Lượt coverage Toán 3-9 dùng compiler/template và semantic validator deterministic
 sau structured output, không thêm AI call. Full property/golden matrix chạy ở
 test/CI theo tầng, không chạy trong request path: PR chỉ chạy smoke representative,

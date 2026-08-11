@@ -9,6 +9,7 @@ import type {
   AdminLessonSummary,
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
+  AdminQuizGenerationPayload,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 
 const LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS = 20_000;
@@ -52,6 +53,23 @@ export function previewAdminLessonSummaryPrompt(
   const { type: _type, ...body } = payload;
   return apiRequest<AdminLessonSummaryPromptPreview>(
     `/admin/lessons/${lessonId}/summary/prompt-preview`,
+    {
+      method: "POST",
+      body,
+      token,
+      timeoutMs: LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS,
+    },
+  );
+}
+
+export function previewAdminQuizPrompt(
+  lessonId: string,
+  payload: AdminQuizGenerationPayload,
+  token: string,
+) {
+  const { type: _type, ...body } = payload;
+  return apiRequest<AdminLessonSummaryPromptPreview>(
+    `/admin/lessons/${lessonId}/quiz-sets/prompt-preview`,
     {
       method: "POST",
       body,

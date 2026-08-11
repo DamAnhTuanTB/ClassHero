@@ -24,8 +24,8 @@ import {
 } from "@/features/admin/courses/admin-courses-utils";
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { useAdminCatalogOptions } from "@/features/admin/domains/hooks/use-admin-catalog-options";
-import { ApiRequestError } from "@/lib/api-client";
 import { getQueryRenderState } from "@/lib/query-render-state";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   adminSidebarCollapsedDatasetKey,
   adminSidebarCollapsedStorageKey,
@@ -438,11 +438,7 @@ export function useAdminCoursesManager(
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof ApiRequestError) {
-    return error.message;
-  }
-
-  return "Vui lòng thử lại sau ít phút.";
+  return getUserFacingErrorMessage(error, "Vui lòng thử lại sau ít phút.");
 }
 
 function parseAdminStatusFilter(value: string | null): AdminPublishStatus | "ALL" {

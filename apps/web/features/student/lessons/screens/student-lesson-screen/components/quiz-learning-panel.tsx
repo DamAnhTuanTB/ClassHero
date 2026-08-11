@@ -36,6 +36,7 @@ import {
   QuizRunnerScreen,
 } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-runner-screen";
 import { useStableLoadingVisibility } from "@/lib/use-stable-loading-visibility";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type {
   AssessmentReview,
   AttemptSummary,
@@ -305,7 +306,7 @@ export function QuizLearningPanel({
   const handleProgressSaveError = useCallback((error: unknown) => {
     if (autosaveErrorShownRef.current) return;
     autosaveErrorShownRef.current = true;
-    toast.error("Chưa đồng bộ được tiến độ Quiz", {
+    toast.error("Chưa đồng bộ được tiến độ bài luyện tập", {
       description: getErrorMessage(error),
     });
   }, []);
@@ -491,7 +492,9 @@ export function QuizLearningPanel({
       applyPreparedQuizAttempt(prepareResult.value, targetQuizSet.id);
       if (historyQuery.data) void historyQuery.refetch();
     } catch (error) {
-      toast.error("Chưa bắt đầu được Quiz", { description: getErrorMessage(error) });
+      toast.error("Chưa bắt đầu được bài luyện tập", {
+        description: getErrorMessage(error),
+      });
     } finally {
       setCurtainPhase("opening");
       await waitForCurtain(
@@ -657,7 +660,7 @@ export function QuizLearningPanel({
       if (historyQuery.data) void historyQuery.refetch();
       return true;
     } catch (error) {
-      toast.error("Chưa hoàn thành được Quiz", {
+      toast.error("Chưa hoàn thành được bài luyện tập", {
         description: getErrorMessage(error),
       });
       return false;
@@ -1229,7 +1232,7 @@ function isStoredQuizPosition(value: unknown): value is StoredQuizPosition {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Vui lòng thử lại.";
+  return getUserFacingErrorMessage(error, "Vui lòng thử lại.");
 }
 
 function formatQuizScore(accuracyPercent: number) {

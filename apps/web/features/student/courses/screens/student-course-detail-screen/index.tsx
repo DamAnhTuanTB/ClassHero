@@ -38,6 +38,7 @@ import { getStudentCourseAudienceStyle } from "@/features/student/shared/utils/s
 import { getStudentCourseAccentStyle } from "@/features/student/shared/utils/student-course-accent-palette";
 import { getStudentCourseContinueLessonCopy } from "@/features/student/shared/utils/student-course-continue-lesson";
 import { cn } from "@/lib/utils";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { AppThemeMode } from "@/lib/theme-store";
 
 export function StudentCourseDetailScreen({
@@ -447,5 +448,5 @@ export function StudentCourseDetailScreen({
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Bạn thử lại sau ít phút nhé.";
+  return getUserFacingErrorMessage(error, "Bạn thử lại sau ít phút nhé.");
 }

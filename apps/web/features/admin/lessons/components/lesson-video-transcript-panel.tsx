@@ -33,6 +33,10 @@ import {
   transcriptTimestampPattern,
   type TranscriptFormValues,
 } from "@/features/admin/lessons/schemas/lesson-video-transcript-schema";
+import {
+  getUserFacingErrorMessage,
+  sanitizeUserFacingMessage,
+} from "@/lib/user-facing-error";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { cn } from "@/lib/utils";
@@ -222,15 +226,20 @@ export function LessonVideoTranscriptPanel({
       });
       setSearchQuery("");
       if (draft.segments.length === 0) {
-        toast.warning("Không có đoạn transcript nào trong khoảng video đang phát");
+        toast.warning("Không có đoạn bản chép lời nào trong khoảng video đang phát");
       } else {
         toast.success(
-          `Đã lấy ${draft.segments.length.toLocaleString("vi-VN")} đoạn transcript (${draft.languageLabel})`,
+          `Đã lấy ${draft.segments.length.toLocaleString("vi-VN")} đoạn bản chép lời (${draft.languageLabel})`,
         );
       }
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Không thể lấy transcript từ YouTube");
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Không thể lấy bản chép lời từ YouTube. Vui lòng thử lại.",
+        ),
+      );
     },
   });
 
@@ -253,7 +262,9 @@ export function LessonVideoTranscriptPanel({
       toast.success("Đã lưu bản chép lời video");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Không thể lưu bản chép lời");
+      toast.error(
+        getUserFacingErrorMessage(error, "Không thể lưu bản chép lời. Vui lòng thử lại."),
+      );
     },
   });
 
@@ -288,7 +299,10 @@ export function LessonVideoTranscriptPanel({
     const parsedValues = transcriptFormSchema.safeParse(values);
     if (!parsedValues.success) {
       toast.error(
-        parsedValues.error.issues[0]?.message || "Dữ liệu transcript không hợp lệ",
+        sanitizeUserFacingMessage(
+          parsedValues.error.issues[0]?.message,
+          "Dữ liệu bản chép lời chưa hợp lệ. Vui lòng kiểm tra lại.",
+        ),
       );
       return;
     }
@@ -336,12 +350,12 @@ export function LessonVideoTranscriptPanel({
               <span className="mt-0.5 block text-xs text-[var(--theme-text-muted)]">
                 {fields.length > 0
                   ? `Đã lưu ${fields.length.toLocaleString("vi-VN")} đoạn`
-                  : "Chưa có transcript"}
+                  : "Chưa có bản chép lời"}
               </span>
             </span>
           </span>
           <span className="shrink-0 rounded-full bg-[var(--theme-primary)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--theme-primary)]">
-            Mở transcript
+            Mở bản chép lời
           </span>
         </button>
       </div>
@@ -381,7 +395,7 @@ export function LessonVideoTranscriptPanel({
             <p className="text-sm font-semibold text-[var(--theme-text-strong)]">
               {fields.length > 0
                 ? `${fields.length.toLocaleString("vi-VN")} đoạn theo trình tự thời gian`
-                : "Chưa có dữ liệu transcript"}
+                : "Chưa có dữ liệu bản chép lời"}
               {(isDirty || hasFetchedDraft) && fields.length > 0 && (
                 <span className="ml-2 rounded-full bg-[var(--theme-warning-bg)] px-2 py-0.5 text-[0.7rem] font-bold text-[var(--theme-warning-text)]">
                   Chưa lưu
@@ -404,7 +418,7 @@ export function LessonVideoTranscriptPanel({
                     : ""}
                 </p>
                 <p className="mt-1 text-xs text-[var(--theme-text-muted)]">
-                  Mốc transcript tính từ 0:00 của phần video sau khi cắt.
+                  Mốc bản chép lời tính từ 0:00 của phần video sau khi cắt.
                 </p>
               </>
             )}
@@ -420,7 +434,7 @@ export function LessonVideoTranscriptPanel({
             ) : (
               <Download className="h-4 w-4" aria-hidden="true" />
             )}
-            {fields.length > 0 ? "Lấy lại từ YouTube" : "Lấy transcript từ YouTube"}
+            {fields.length > 0 ? "Lấy lại từ YouTube" : "Lấy bản chép lời từ YouTube"}
           </button>
         </div>
 
@@ -428,7 +442,7 @@ export function LessonVideoTranscriptPanel({
           {fields.length > 0 && (
             <div className="border-b border-[var(--theme-border)] p-4">
               <label className="relative block">
-                <span className="sr-only">Tìm trong transcript</span>
+                <span className="sr-only">Tìm trong bản chép lời</span>
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--theme-text-muted)]"
                   aria-hidden="true"
@@ -485,8 +499,8 @@ export function LessonVideoTranscriptPanel({
                           aria-pressed={isAutoScrollEnabled}
                           aria-label={
                             isAutoScrollEnabled
-                              ? "Tắt tự động cuộn transcript theo video"
-                              : "Bật tự động cuộn transcript theo video"
+                              ? "Tắt tự động cuộn bản chép lời theo video"
+                              : "Bật tự động cuộn bản chép lời theo video"
                           }
                           title={
                             isAutoScrollEnabled

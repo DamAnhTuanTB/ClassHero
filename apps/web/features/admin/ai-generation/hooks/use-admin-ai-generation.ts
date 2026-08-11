@@ -7,6 +7,7 @@ import {
   getAdminAiJob,
   getAdminLessonSummary,
   previewAdminLessonSummaryPrompt,
+  previewAdminQuizPrompt,
   upsertAdminLessonSummary,
 } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
 import type {
@@ -14,6 +15,7 @@ import type {
   AdminLessonSummaryContent,
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
+  AdminQuizGenerationPayload,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 
@@ -73,6 +75,14 @@ export function usePreviewAdminLessonSummaryPrompt(lessonId: string) {
   return useMutation({
     mutationFn: (payload: AdminSummaryGenerationPayload) =>
       previewAdminLessonSummaryPrompt(lessonId, payload, session?.accessToken ?? ""),
+  });
+}
+
+export function usePreviewAdminQuizPrompt(lessonId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  return useMutation({
+    mutationFn: (payload: AdminQuizGenerationPayload) =>
+      previewAdminQuizPrompt(lessonId, payload, session?.accessToken ?? ""),
   });
 }
 

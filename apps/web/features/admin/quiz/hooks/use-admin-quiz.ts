@@ -11,6 +11,7 @@ import {
   updateAdminQuizSet,
   type AdminQuizQuestion,
   type AdminQuizQuestionPayload,
+  type AdminQuizQuestionUpdatePayload,
   type AdminQuizSet,
   type QuizDifficulty,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -179,7 +180,7 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
       data,
     }: {
       questionId: string;
-      data: AdminQuizQuestionPayload;
+      data: AdminQuizQuestionUpdatePayload;
     }) => {
       if (!session?.accessToken) throw new Error("No token");
       return updateAdminQuizQuestion(questionId, data, session.accessToken);

@@ -2,6 +2,7 @@ import {
   AI_REASONING_EFFORT_LEVELS,
   LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
   lessonSummaryDiagramStructuralVisualSchema,
+  lessonSummaryGeometryStatementSchema,
 } from "@learning-path/shared";
 import { z } from "zod";
 
@@ -10,8 +11,8 @@ import {
   lessonSummaryProviderDiagramTransportSchema,
 } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v54";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v40";
+export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v58";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v42";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -98,6 +99,7 @@ const exampleBlockSchema = z
     problem: nonEmptyText(2_000),
     solution: nonEmptyText(5_000).nullable(),
     answer: nonEmptyText(2_000),
+    geometryStatement: lessonSummaryGeometryStatementSchema.optional(),
     visual: lessonSummaryDiagramStructuralVisualSchema.optional(),
     sourceChunkIds: sourceChunkIdsSchema.optional(),
     origin: lessonSummaryExampleOriginSchema.optional(),
@@ -110,7 +112,7 @@ const noteBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("note"),
     content: nonEmptyText(2_000).describe(
-      "Ghi chú phải chứa một ví dụ ngắn được mở đầu bằng Ví dụ: hoặc Chẳng hạn:.",
+      "Ghi chú phải chứa một ví dụ ngắn được mở đầu bằng Ví dụ: hoặc Chẳng hạn:. Không bắt đầu content bằng Chú ý:, Lưu ý: hoặc Nhận xét: vì giao diện đã hiển thị nhãn khối.",
     ),
   })
   .strict();
@@ -297,10 +299,15 @@ export function createLessonSummaryProviderExampleSchema(
       ),
       solution: nonEmptyText(5_000)
         .describe(
-          `Lời giải đúng, gọn và theo phong cách trình bày toán học. Với chứng minh hoặc dựng hình, mỗi giả thiết, suy luận và kết quả phải nằm trên dòng Markdown riêng, ưu tiên bullet; không kể thành một đoạn văn nói liên tục. Với bài tính thuần túy, trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức.${illustrationRequirement}`,
+          `Lời giải đúng, gọn và theo phong cách trình bày toán học. Riêng chứng minh/dựng hình, viết mạch lập luận liên kết bằng Xét, Ta có, Vì... nên..., Suy ra, Do đó, Vậy; không biến toàn bộ lời giải thành danh sách bullet rời rạc. Với bài tính thuần túy, giữ cách trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức. Mọi ý a), b), c) phải bắt đầu ở dòng riêng.${illustrationRequirement}`,
         )
         .nullable(),
       answer: nonEmptyText(2_000),
+      geometryStatement: lessonSummaryGeometryStatementSchema
+        .describe(
+          "Bảng giả thiết–kết luận. Chỉ khác null cho bài Hình học lớp 7–9 yêu cầu Chứng minh/Chứng tỏ. hypotheses chỉ chứa dữ kiện có sẵn trong đề, không chứa kết quả suy ra hoặc đường phụ; conclusions ghi đúng điều phải chứng minh. Mọi bài Số học/Đại số, bài Hình học lớp nhỏ và bài Hình học không phải chứng minh chính thức phải trả null.",
+        )
+        .nullable(),
       diagramSpec: lessonSummaryProviderDiagramInputSchema
         .describe(
           "Một hình minh họa dùng chung cho toàn bộ ví dụ/bài tập. Nếu bài học thuộc Hình học thì mọi example và exercise đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, các bài yêu cầu vẽ, đọc hoặc suy luận từ đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc khác null.",
@@ -374,7 +381,9 @@ export const lessonSummaryTheoryBlockTransportSchema = z.discriminatedUnion("typ
 export const lessonSummaryProviderNoteTransportSchema = z
   .object({
     type: z.literal("note"),
-    content: transportText(2_000),
+    content: transportText(2_000).describe(
+      "Nội dung đi thẳng vào ghi chú, không mở đầu bằng Chú ý:, Lưu ý: hoặc Nhận xét:; vẫn phải có một Ví dụ: hoặc Chẳng hạn: ngắn.",
+    ),
     sourceChunkIds: transportSourceChunkIdsSchema,
   })
   .strict();
@@ -389,6 +398,14 @@ function createLessonSummaryProviderExampleTransportSchema(
       problem: transportText(2_000),
       solution: transportText(5_000).nullable(),
       answer: transportText(2_000),
+      geometryStatement: z
+        .object({
+          hypotheses: z.array(transportText(1_000)).max(20),
+          conclusions: z.array(transportText(1_000)).max(20),
+        })
+        .strict()
+        .nullable()
+        .optional(),
       diagramSpec: lessonSummaryProviderDiagramTransportSchema.nullable(),
     })
     .strict();
@@ -509,6 +526,7 @@ export type LessonSummaryWarningDetail = z.infer<typeof lessonSummaryWarningDeta
 export const lessonSummaryOutputSchema = z
   .object({
     lessonId: nonEmptyText(240),
+    targetGrade: z.number().int().min(1).max(12).nullable().optional(),
     title: nonEmptyText(240),
     objectives: z.array(nonEmptyText(500)).min(1).max(10).nullable(),
     sections: z
@@ -542,6 +560,7 @@ export const lessonSummaryJobInputSchema = z
   .object({
     documentIds: z.array(z.uuid()).min(1).max(20),
     sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+    targetGrade: z.number().int().min(1).max(12).nullable().default(null),
     style: lessonSummaryStyleSchema,
     styleInstructions: z.string().trim().max(1_000).default(""),
     length: lessonSummaryLengthSchema.default("standard"),

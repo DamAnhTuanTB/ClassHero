@@ -72,8 +72,9 @@ function compileSingleLinearConstruction(intent: PlaneIntent) {
   const lastLabel = labels[2]!;
   const caption = intent.caption ?? "";
   const isNamedRay = /thuộc\s+tia|tia\s+[A-Z][a-z](?:\s|\b)/u.test(caption);
-  const isOppositeRayPair =
-    /hai\s+tia\s+đối|là\s+hai\s+tia\s+đối|OX\s+và\s+OY/iu.test(caption);
+  const isOppositeRayPair = /hai\s+tia\s+đối|là\s+hai\s+tia\s+đối|OX\s+và\s+OY/iu.test(
+    caption,
+  );
   const isDirectionNamedLine =
     middleLabel === "O" &&
     firstLabel.toLocaleUpperCase("vi") === "X" &&
@@ -162,11 +163,11 @@ function compilePerpendicularLines(intent: PlaneIntent) {
     const [centerLabel, footLabel, radiusPointLabel] = intent.pointLabels;
     const hasCenterRadiusSemantics = Boolean(
       /tâm|bán\s*kính|đường\s*tròn/iu.test(intent.caption ?? "") ||
-        intent.measures.some(
-          (measure) =>
-            normalizeSegmentName(measure.target) ===
-            normalizeSegmentName(`${centerLabel}${radiusPointLabel}`),
-        ),
+      intent.measures.some(
+        (measure) =>
+          normalizeSegmentName(measure.target) ===
+          normalizeSegmentName(`${centerLabel}${radiusPointLabel}`),
+      ),
     );
     if (hasCenterRadiusSemantics) {
       return compileCenterRadiusLineDistance(
@@ -839,9 +840,7 @@ function explicitRightAngleIndex(
 ) {
   if (!/^\s*90(?:[.,]0+)?\s*°?\s*$/u.test(measure.text)) return -1;
   const normalizedTarget = measure.target.normalize("NFKC").trim();
-  return labels.findIndex(
-    (label) => label.normalize("NFKC").trim() === normalizedTarget,
-  );
+  return labels.findIndex((label) => label.normalize("NFKC").trim() === normalizedTarget);
 }
 
 function findQuadrilateralMidpointRelation(intent: PlaneIntent, labels: string[]) {
@@ -919,7 +918,9 @@ function compileParallelLineDistance(intent: PlaneIntent) {
   const lowerLeft = builder.addPoint(hiddenPoint("parallelDistanceLowerLeft", -3.8, 1));
   const lowerRight = builder.addPoint(hiddenPoint("parallelDistanceLowerRight", 3.8, 1));
   const upperLeft = builder.addPoint(hiddenPoint("parallelDistanceUpperLeft", -3.8, 4.6));
-  const upperRight = builder.addPoint(hiddenPoint("parallelDistanceUpperRight", 3.8, 4.6));
+  const upperRight = builder.addPoint(
+    hiddenPoint("parallelDistanceUpperRight", 3.8, 4.6),
+  );
   builder.addLine("parallelDistanceLineOne", lowerLeft, lowerRight);
   builder.addLine("parallelDistanceLineTwo", upperLeft, upperRight);
   builder.addSegment("parallelDistancePerpendicular", upper, lower);
@@ -997,10 +998,7 @@ function compileCircleParts(intent: PlaneIntent) {
         return pair.filter((label) => label !== centerLabel);
       }),
     );
-    edges.set(
-      normalizeSegmentName(`${diameterPair[0]}${diameterPair[1]}`),
-      diameterId,
-    );
+    edges.set(normalizeSegmentName(`${diameterPair[0]}${diameterPair[1]}`), diameterId);
     for (const [index, endpointLabel] of [...radiusEndpointLabels].entries()) {
       const endpointId = pointIdByLabel.get(endpointLabel);
       if (!endpointId) continue;
@@ -1135,7 +1133,12 @@ function compileArcSector(intent: PlaneIntent) {
 }
 
 function compileRightTriangleCongruence(intent: PlaneIntent) {
-  return intent.variant === "SHARED_HYPOTENUSE_LEG"
+  const uniquePointLabels = new Set(intent.pointLabels);
+  const describesSharedHypotenuse =
+    intent.variant === "SHARED_HYPOTENUSE_LEG" ||
+    (intent.variant === "HYPOTENUSE_LEG" && uniquePointLabels.size === 4);
+
+  return describesSharedHypotenuse
     ? compileSharedHypotenuseCongruence(intent)
     : compileSeparateRightTriangleCongruence(intent);
 }

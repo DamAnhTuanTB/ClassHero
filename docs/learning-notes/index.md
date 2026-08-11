@@ -27,6 +27,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Fullscreen media layout](foundation/fullscreen-media-layout.md)                         | Full-bleed mobile và fullscreen fallback không bị transform/overflow cắt      | `M7.1`, `M15.1`   | Đã cập nhật |
 | [Playwright UI checks](foundation/playwright-ui-checks.md)                               | Browser E2E, responsive screenshot và UI review local                         | `M2.4`, `M14.3`   | Đã cập nhật |
 | [Prisma database foundation](foundation/prisma-database.md)                              | Prisma, migration, pgvector, PrismaService, seed dev và foundation models     | `M1.1`-`M1.6`     | Đã cập nhật |
+| [Thông báo lỗi an toàn cho người dùng](foundation/user-facing-errors.md)                  | Chặn lỗi kỹ thuật rò vào toast/banner và ánh xạ sang câu tiếng Việt theo ngữ cảnh | Dùng chung toàn web | Đã cập nhật |
 | [UI state persistence](foundation/ui-state-persistence.md)                               | Lưu trạng thái UI local như sidebar collapse qua refresh bằng browser storage | `M3.4`, `M3.5`    | Đã cập nhật |
 
 ## Glossary

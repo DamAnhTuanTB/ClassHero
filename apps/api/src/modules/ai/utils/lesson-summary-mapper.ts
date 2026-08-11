@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import {
+  normalizeLessonSummaryAngleNotation,
   normalizeLessonSummaryDiagramSpec,
+  normalizeLessonSummaryNoteContent,
   type LessonSummaryDiagramSpec,
 } from "@learning-path/shared";
 
@@ -43,8 +45,10 @@ const SOURCE_EXERCISE_LABEL_PATTERN =
 const REDUNDANT_SOLUTION_CONCLUSION_PATTERN =
   /(?:^|\n)\s*(?:kết\s*luận|đáp\s*số)\s*:[^\n]*(?=\n|$)/giu;
 const LEADING_HEADING_NUMBER_PATTERN = /^\s*(?:§\s*)?\d+(?:[.,]\d+)*(?:\s*[:.)-])?\s+/u;
-const GEOMETRY_SOLUTION_PATTERN =
-  /\b(?:tam\s*giác|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b/iu;
+const FORMAL_PROOF_PATTERN = /\b(?:chứng\s*minh|chứng\s*tỏ)\b/iu;
+const GEOMETRY_PROBLEM_PATTERN =
+  /(?:\\triangle|△|\b(?:tam\s*giác|tứ\s*giác|hình\s+(?:vuông|chữ\s*nhật|thoi|bình\s*hành|thang|tròn)|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b)/iu;
+const BULLET_LINE_PATTERN = /^\s*[-*+]\s+/u;
 
 type ProviderExample =
   | LessonSummaryProviderOutput["theorySections"][number]["units"][number]["illustration"]
@@ -57,6 +61,7 @@ type MapLessonSummaryProviderOutputInput = {
   contextChunks: RetrievedChunk[];
   reviewIssuesByPath?: Map<string, LessonSummaryReviewIssueDraft[]>;
   rootReviewIssues?: LessonSummaryReviewIssueDraft[];
+  targetGrade?: number | null;
 };
 
 export function mapLessonSummaryProviderOutput(
@@ -92,6 +97,54 @@ export function mapLessonSummaryProviderOutput(
         "Kiểm tra các trường của khối theo chi tiết kỹ thuật rồi sửa và lưu lại; các khối khác vẫn được giữ nguyên.",
       technicalDetails: error instanceof Error ? error.message : String(error),
     });
+  };
+  const validateExamplePresentation = (
+    example: ProviderExample,
+    providerPath: string,
+  ) => {
+    const isFormalGeometryProof =
+      FORMAL_PROOF_PATTERN.test(example.problem) &&
+      (Boolean(example.diagramSpec) || GEOMETRY_PROBLEM_PATTERN.test(example.problem));
+    const requiresGeometryStatement =
+      isFormalGeometryProof &&
+      input.targetGrade !== null &&
+      input.targetGrade !== undefined &&
+      input.targetGrade >= 7 &&
+      input.targetGrade <= 9;
+    if (requiresGeometryStatement && !example.geometryStatement) {
+      addRuntimeReviewIssue(providerPath, {
+        code: "MISSING_GEOMETRY_STATEMENT",
+        path: `${providerPath}.geometryStatement`,
+        message: "Bài chứng minh hình học đang thiếu bảng giả thiết–kết luận.",
+        suggestion:
+          "Bổ sung GT chỉ gồm dữ kiện đã cho và KL đúng điều phải chứng minh rồi lưu lại.",
+        technicalDetails:
+          "Formal geometry proofs for grades 7–9 require geometryStatement.",
+      });
+    }
+    if (
+      isFormalGeometryProof &&
+      example.solution &&
+      example.solution
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean).length >= 2 &&
+      example.solution
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .every((line) => BULLET_LINE_PATTERN.test(line))
+    ) {
+      addRuntimeReviewIssue(providerPath, {
+        code: "GEOMETRY_SOLUTION_BULLET_CHECKLIST",
+        path: `${providerPath}.solution`,
+        message:
+          "Lời giải hình học đang là danh sách ý rời, chưa thể hiện mạch suy luận.",
+        suggestion:
+          "Nối các dữ kiện và suy luận bằng Xét, Ta có, Vì… nên…, Suy ra, Do đó và Vậy.",
+        technicalDetails: "Every non-empty solution line is a Markdown bullet.",
+      });
+    }
   };
   const safelyValidateBlock = (providerPath: string, validate: () => void) => {
     try {
@@ -262,9 +315,10 @@ export function mapLessonSummaryProviderOutput(
           }
         }
       });
-      safelyValidateBlock(illustrationPath, () =>
-        validateExample(unit.illustration, illustrationPath, addWarning, resolveDiagram),
-      );
+      safelyValidateBlock(illustrationPath, () => {
+        validateExamplePresentation(unit.illustration, illustrationPath);
+        validateExample(unit.illustration, illustrationPath, addWarning, resolveDiagram);
+      });
 
       unit.notes.forEach((note, noteIndex) => {
         const notePath = `${unitPath}.notes.${noteIndex}`;
@@ -299,22 +353,30 @@ export function mapLessonSummaryProviderOutput(
     });
 
   const application = input.output.applicationExercises;
-  safelyValidateBlock("applicationExercises.standardExercise", () =>
+  safelyValidateBlock("applicationExercises.standardExercise", () => {
+    validateExamplePresentation(
+      application.standardExercise,
+      "applicationExercises.standardExercise",
+    );
     validateExample(
       application.standardExercise,
       "applicationExercises.standardExercise",
       addWarning,
       resolveDiagram,
-    ),
-  );
-  safelyValidateBlock("applicationExercises.realWorldExercise", () =>
+    );
+  });
+  safelyValidateBlock("applicationExercises.realWorldExercise", () => {
+    validateExamplePresentation(
+      application.realWorldExercise,
+      "applicationExercises.realWorldExercise",
+    );
     validateExample(
       application.realWorldExercise,
       "applicationExercises.realWorldExercise",
       addWarning,
       resolveDiagram,
-    ),
-  );
+    );
+  });
 
   const mappedTheorySections = input.output.theorySections.map(
     (section, sectionIndex) => {
@@ -363,7 +425,9 @@ export function mapLessonSummaryProviderOutput(
                 notePath,
                 () => ({
                   ...note,
-                  content: normalizeGeneratedText(note.content),
+                  content: normalizeGeneratedText(
+                    normalizeLessonSummaryNoteContent(note.content),
+                  ),
                   sourceChunkIds: safeSourceIds(
                     note.sourceChunkIds,
                     chunksById,
@@ -453,6 +517,7 @@ export function mapLessonSummaryProviderOutput(
   };
   return {
     lessonId: input.lessonId,
+    ...(input.targetGrade !== undefined ? { targetGrade: input.targetGrade } : {}),
     title: input.output.title,
     objectives: input.output.objectives,
     sections: [
@@ -858,12 +923,14 @@ function normalizeTheoryBlock(
       return {
         type: block.type,
         title: block.title,
-        purpose: block.purpose ? normalizeGeneratedText(block.purpose) : null,
+        purpose: block.purpose
+          ? normalizeGeneratedText(block.purpose, diagramSpec)
+          : null,
         sourceChunkIds,
         steps: block.steps.map((step, index) => ({
           ...step,
           order: index + 1,
-          content: normalizeGeneratedText(step.content),
+          content: normalizeGeneratedText(step.content, diagramSpec),
         })),
         ...visual,
       };
@@ -873,7 +940,7 @@ function normalizeTheoryBlock(
       return {
         type: block.type,
         title: block.title,
-        content: normalizeGeneratedText(block.content),
+        content: normalizeGeneratedText(block.content, diagramSpec),
         sourceChunkIds,
         ...visual,
       };
@@ -883,16 +950,28 @@ function normalizeTheoryBlock(
 function toPersistedExample(
   example: ProviderExample,
   diagramSpec?: LessonSummaryDiagramSpec | null,
-): LessonSummaryMvpBlock {
-  const problem = stripSourceImages(example.problem);
+): Extract<LessonSummaryMvpBlock, { type: "example" }> {
+  const problem = stripSourceImages(example.problem, diagramSpec);
   return {
     type: "example",
     problem:
       problem.length >= 8
         ? problem
         : "[Cần admin bổ sung đề bài tự đủ dữ kiện, không phụ thuộc hình nguồn]",
-    solution: normalizeSolution(example.solution),
-    answer: normalizeGeneratedText(example.answer),
+    solution: normalizeSolution(example.solution, diagramSpec),
+    answer: normalizeGeneratedText(example.answer, diagramSpec),
+    ...(example.geometryStatement
+      ? {
+          geometryStatement: {
+            hypotheses: example.geometryStatement.hypotheses.map((statement) =>
+              normalizeGeneratedText(statement, diagramSpec),
+            ),
+            conclusions: example.geometryStatement.conclusions.map((statement) =>
+              normalizeGeneratedText(statement, diagramSpec),
+            ),
+          },
+        }
+      : {}),
     ...(diagramSpec
       ? {
           visual: {
@@ -902,6 +981,17 @@ function toPersistedExample(
         }
       : {}),
   };
+}
+
+export function mapLessonSummaryProviderExampleBlock(
+  example: LessonSummaryProviderOutput["applicationExercises"]["standardExercise"],
+): Extract<LessonSummaryMvpBlock, { type: "example" }> {
+  const diagramSpec = example.diagramSpec
+    ? normalizeLessonSummaryDiagramSpec(
+        mapLessonSummaryProviderDiagramInput(example.diagramSpec),
+      )
+    : null;
+  return toPersistedExample(example, diagramSpec);
 }
 
 function fallbackTheoryBlock(
@@ -945,7 +1035,7 @@ function fallbackNoteBlock(
   };
 }
 
-function stripSourceImages(value: string) {
+function stripSourceImages(value: string, diagramSpec?: LessonSummaryDiagramSpec | null) {
   return normalizeGeneratedText(
     value
       .replace(SOURCE_IMAGE_PATTERN, "")
@@ -953,29 +1043,27 @@ function stripSourceImages(value: string) {
       .replace(SOURCE_EXERCISE_LABEL_PATTERN, "")
       .replace(/\[Hình nguồn đã được lược bỏ\]/giu, "")
       .replace(/\n{3,}/gu, "\n\n"),
+    diagramSpec,
   );
 }
 
-function normalizeSolution(value: string | null) {
+function normalizeSolution(
+  value: string | null,
+  diagramSpec?: LessonSummaryDiagramSpec | null,
+) {
   if (!value) return null;
   const normalized = normalizeGeneratedText(
     value.replace(REDUNDANT_SOLUTION_CONCLUSION_PATTERN, ""),
+    diagramSpec,
   );
   if (!normalized) return null;
-  if (normalized.includes("\n") || !GEOMETRY_SOLUTION_PATTERN.test(normalized)) {
-    return normalized;
-  }
-
-  const statements = normalized
-    .split(/(?<=[.!?])\s+(?=[\p{L}$])/u)
-    .map((statement) => statement.trim())
-    .filter(Boolean);
-  return statements.length > 1
-    ? statements.map((statement) => `- ${statement}`).join("\n")
-    : normalized;
+  return normalized;
 }
 
-function normalizeGeneratedText(value: string) {
+function normalizeGeneratedText(
+  value: string,
+  diagramSpec?: LessonSummaryDiagramSpec | null,
+) {
   const repairedLatex = value
     .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
     .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
@@ -988,14 +1076,16 @@ function normalizeGeneratedText(value: string) {
       "\\",
     );
 
-  return [...repairedLatex]
+  const cleaned = [...repairedLatex]
     .map((character) => {
       const code = character.charCodeAt(0);
       if (code === 7) return "\\";
       return isUnsafeControlCode(code) ? "" : character;
     })
-    .join("")
-    .trim();
+    .join("");
+
+  const separatedSubparts = cleaned.replace(/([^\n])\s+([a-h]\)\s+)/giu, "$1\n$2");
+  return normalizeLessonSummaryAngleNotation(separatedSubparts, diagramSpec).trim();
 }
 
 function normalizeDisplayHeading(value: string) {

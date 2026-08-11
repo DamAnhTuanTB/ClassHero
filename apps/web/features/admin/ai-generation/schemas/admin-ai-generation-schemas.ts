@@ -59,9 +59,9 @@ export const adminAiGenerationFormSchema = z
       .trim()
       .max(
         LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
-        "System instructions tối đa 64.000 ký tự",
+        "Quy tắc hệ thống tối đa 64.000 ký tự",
       ),
-    userPrompt: z.string().trim().max(16_000, "User prompt tối đa 16.000 ký tự"),
+    userPrompt: z.string().trim().max(16_000, "Câu lệnh người dùng tối đa 16.000 ký tự"),
     summaryModel: z.string().max(200),
     summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),
     summaryReasoningEffort: z.union([z.literal(""), z.enum(AI_REASONING_EFFORT_LEVELS)]),
@@ -73,16 +73,22 @@ export const adminAiGenerationFormSchema = z
     easyRatio: numericTextSchema("Tỷ lệ dễ", 0, 100),
     mediumRatio: numericTextSchema("Tỷ lệ trung bình", 0, 100),
     hardRatio: numericTextSchema("Tỷ lệ khó", 0, 100),
+    easyCount: numericTextSchema("Số câu dễ", 0, 50),
+    mediumCount: numericTextSchema("Số câu trung bình", 0, 50),
+    hardCount: numericTextSchema("Số câu khó", 0, 50),
   })
   .superRefine((values, context) => {
-    if (values.type === "SUMMARY" && values.documentIds.length === 0) {
+    if (
+      (values.type === "SUMMARY" || values.type === "QUIZ") &&
+      values.documentIds.length === 0
+    ) {
       context.addIssue({
         code: "custom",
         path: ["documentIds"],
         message: "Chọn ít nhất một tài liệu",
       });
     }
-    if (values.type === "SUMMARY" && values.summaryModel) {
+    if ((values.type === "SUMMARY" || values.type === "QUIZ") && values.summaryModel) {
       if (!values.summaryMaxOutputTokens) {
         context.addIssue({
           code: "custom",
@@ -99,18 +105,22 @@ export const adminAiGenerationFormSchema = z
           message: "Chọn ít nhất một loại câu hỏi",
         });
       }
-      if (Number(values.count) < values.questionTypes.length) {
-        context.addIssue({
-          code: "custom",
-          path: ["count"],
-          message: "Số câu phải lớn hơn hoặc bằng số loại câu hỏi đã chọn",
-        });
-      }
       if (Number(values.count) > 50) {
         context.addIssue({
           code: "custom",
           path: ["count"],
           message: "Số câu tối đa là 50",
+        });
+      }
+    }
+    if (values.type === "QUIZ" && values.difficulty === "MIXED") {
+      const total =
+        Number(values.easyCount) + Number(values.mediumCount) + Number(values.hardCount);
+      if (total !== Number(values.count)) {
+        context.addIssue({
+          code: "custom",
+          path: ["hardCount"],
+          message: `Tổng Dễ, Trung bình, Khó phải bằng ${values.count} câu (hiện là ${total})`,
         });
       }
     }

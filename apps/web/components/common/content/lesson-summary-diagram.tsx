@@ -5,8 +5,30 @@ import {
   normalizeLessonSummaryDiagramSpec,
   type LessonSummaryDiagramSpec,
 } from "@learning-path/shared";
-import { TriangleAlert } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type CSSProperties,
+} from "react";
+import { LessonSummaryDiagramElementToolbar } from "@/components/common/content/lesson-summary-diagram-element-toolbar";
+import { LessonSummaryDiagramSegmentToolbar } from "@/components/common/content/lesson-summary-diagram-segment-toolbar";
+import {
+  createAngleLabelTarget,
+  createCaptionTarget,
+  createDiagramLabelTarget,
+  createMarkerTarget,
+  createPointLabelTarget,
+  describeLessonSummaryDiagramTarget,
+  isLessonSummaryDiagramTextTarget,
+  lessonSummaryDiagramTargetKey,
+  type LessonSummaryDiagramEditableTarget,
+  type LessonSummaryDiagramEditor,
+} from "@/components/common/content/lesson-summary-diagram-editing";
 
 type Point = LessonSummaryDiagramSpec["points"][number];
 type Primitive = LessonSummaryDiagramSpec["primitives"][number];
@@ -27,10 +49,16 @@ const COMPACT_MEASUREMENT_LABEL_PATTERN =
   /^(?:-?\d+(?:[.,]\d+)?\s*(?:mm|cm|dm|m|km|°)|[rh])$/iu;
 const MINIMUM_AXIS_TICK_LENGTH = 0.04;
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function LessonSummaryDiagram({
+  editor,
   spec,
   showEditorialWarning = false,
 }: {
+  editor?: LessonSummaryDiagramEditor;
   spec: unknown;
   showEditorialWarning?: boolean;
 }) {
@@ -48,15 +76,41 @@ export function LessonSummaryDiagram({
 
   return (
     <ValidatedLessonSummaryDiagram
+      editableSpec={parsed.data}
+      editor={editor}
       spec={normalizeLessonSummaryDiagramSpec(parsed.data)}
     />
   );
 }
 
-function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpec }) {
+function ValidatedLessonSummaryDiagram({
+  editableSpec,
+  editor,
+  spec,
+}: {
+  editableSpec: LessonSummaryDiagramSpec;
+  editor?: LessonSummaryDiagramEditor;
+  spec: LessonSummaryDiagramSpec;
+}) {
   const clipId = useId().replaceAll(":", "-");
+  const figureRef = useRef<HTMLElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [svgViewport, setSvgViewport] = useState({ width: 0, height: 0 });
+  const [selectedTarget, setSelectedTarget] = useState<{
+    left: number;
+    maxWidth: number;
+    side: "LEFT" | "RIGHT";
+    target: LessonSummaryDiagramEditableTarget;
+    top: number;
+  } | null>(null);
+  const [selectedSegmentIds, setSelectedSegmentIds] = useState<string[]>([]);
+  const [segmentToolbarPosition, setSegmentToolbarPosition] = useState<{
+    left: number;
+    maxWidth: number;
+    side: "LEFT" | "RIGHT";
+    top: number;
+  } | null>(null);
+  const editingEnabled = Boolean(editor && !editor.disabled);
   const arrowId = `${clipId}-arrow`;
   const points = new Map(spec.points.map((point) => [point.id, point] as const));
   const pointsByLabel = new Map(
@@ -65,6 +119,12 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
   const primitives = new Map(
     spec.primitives.map((primitive) => [primitive.id, primitive] as const),
   );
+  const equalLengthMarkedSegmentIds = new Set(
+    editableSpec.markers.flatMap((marker) =>
+      marker.type === "EQUAL_LENGTH" ? marker.segmentIds : [],
+    ),
+  );
+  const captionTarget = createCaptionTarget(editableSpec.caption);
   const { minX, minY, width, height } = spec.viewBox;
   const resolve = (id: string) => points.get(id);
   const diagramScale = Math.max(width, height);
@@ -108,6 +168,218 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
     observer.observe(svg);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    if (!editingEnabled) {
+      setSelectedTarget(null);
+      setSelectedSegmentIds([]);
+      setSegmentToolbarPosition(null);
+    }
+  }, [editingEnabled]);
+  useEffect(() => {
+    if (!selectedTarget && selectedSegmentIds.length === 0) return;
+    const clearOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setSelectedTarget(null);
+      setSelectedSegmentIds([]);
+      setSegmentToolbarPosition(null);
+    };
+    document.addEventListener("keydown", clearOnEscape);
+    return () => document.removeEventListener("keydown", clearOnEscape);
+  }, [selectedSegmentIds.length, selectedTarget]);
+
+  const selectEditableTarget = (
+    target: LessonSummaryDiagramEditableTarget,
+    event:
+      | ReactMouseEvent<SVGElement | HTMLElement>
+      | ReactKeyboardEvent<SVGElement | HTMLElement>,
+  ) => {
+    if (!editingEnabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedSegmentIds([]);
+    setSegmentToolbarPosition(null);
+    const figureBounds = figureRef.current?.getBoundingClientRect();
+    const elementBounds = event.currentTarget.getBoundingClientRect();
+    if (!figureBounds) return;
+    const isMouseEvent = "clientX" in event && event.clientX > 0;
+    const targetX = isMouseEvent
+      ? event.clientX
+      : elementBounds.left + elementBounds.width / 2;
+    const targetY = isMouseEvent
+      ? event.clientY
+      : elementBounds.top + elementBounds.height / 2;
+    const toolbarHeight = 48;
+    const estimatedExpandedToolbarWidth = target.kind === "MARKER" ? 52 : 258;
+    const gap = 8;
+    const relativeTargetX = targetX - figureBounds.left;
+    const availableRight = figureBounds.width - relativeTargetX - gap - 8;
+    const availableLeft = relativeTargetX - gap - 8;
+    const side =
+      availableRight >=
+        Math.min(estimatedExpandedToolbarWidth, figureBounds.width - 16) ||
+      availableRight >= availableLeft
+        ? "RIGHT"
+        : "LEFT";
+    const rawLeft = relativeTargetX + (side === "RIGHT" ? gap : -gap);
+    const rawTop = targetY - figureBounds.top - toolbarHeight / 2;
+    setSelectedTarget({
+      target,
+      left: clamp(rawLeft, 8, Math.max(8, figureBounds.width - 8)),
+      maxWidth: Math.max(120, figureBounds.width - 16),
+      side,
+      top: clamp(rawTop, 8, Math.max(8, figureBounds.height - toolbarHeight - 8)),
+    });
+  };
+  const toggleEqualLengthSegment = (
+    segmentId: string,
+    event: ReactMouseEvent<SVGElement> | ReactKeyboardEvent<SVGElement>,
+  ) => {
+    if (!editingEnabled || !editor?.onRequestAddEqualLength) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedTarget(null);
+    const figureBounds = figureRef.current?.getBoundingClientRect();
+    const elementBounds = event.currentTarget.getBoundingClientRect();
+    if (!figureBounds) return;
+    const isMouseEvent = "clientX" in event && event.clientX > 0;
+    const targetX = isMouseEvent
+      ? event.clientX
+      : elementBounds.left + elementBounds.width / 2;
+    const targetY = isMouseEvent
+      ? event.clientY
+      : elementBounds.top + elementBounds.height / 2;
+    const gap = 8;
+    const toolbarHeight = 48;
+    const estimatedToolbarWidth = 52;
+    const relativeTargetX = targetX - figureBounds.left;
+    const availableRight = figureBounds.width - relativeTargetX - gap - 8;
+    const availableLeft = relativeTargetX - gap - 8;
+    const side =
+      availableRight >= Math.min(estimatedToolbarWidth, figureBounds.width - 16) ||
+      availableRight >= availableLeft
+        ? "RIGHT"
+        : "LEFT";
+    const rawLeft = relativeTargetX + (side === "RIGHT" ? gap : -gap);
+    const rawTop = targetY - figureBounds.top - toolbarHeight / 2;
+    setSelectedSegmentIds((current) => {
+      const next = current.includes(segmentId)
+        ? current.filter((candidate) => candidate !== segmentId)
+        : [...current, segmentId];
+      if (next.length === 0) {
+        setSegmentToolbarPosition(null);
+      } else {
+        setSegmentToolbarPosition({
+          left: clamp(rawLeft, 8, Math.max(8, figureBounds.width - 8)),
+          maxWidth: Math.max(120, figureBounds.width - 16),
+          side,
+          top: clamp(rawTop, 8, Math.max(8, figureBounds.height - toolbarHeight - 8)),
+        });
+      }
+      return next;
+    });
+  };
+  const editableSegmentProps = (segmentId: string, segmentName: string) => ({
+    "aria-label": `Chọn đoạn ${segmentName} để đánh dấu bằng nhau`,
+    "data-diagram-segment-id": segmentId,
+    "data-diagram-segment-selectable": "true",
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: (event: ReactMouseEvent<SVGElement>) =>
+      toggleEqualLengthSegment(segmentId, event),
+    onKeyDown: (event: ReactKeyboardEvent<SVGElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        toggleEqualLengthSegment(segmentId, event);
+      }
+    },
+    style: {
+      cursor: "pointer",
+      outline: "none",
+      pointerEvents: "none",
+    } satisfies CSSProperties,
+  });
+  const handleSvgClick = (event: ReactMouseEvent<SVGSVGElement>) => {
+    if (!editingEnabled) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-diagram-edit-kind]")
+    ) {
+      return;
+    }
+    const svg = svgRef.current;
+    const matrix = svg?.getScreenCTM();
+    if (svg && matrix && editor?.onRequestAddEqualLength) {
+      const pointer = svg.createSVGPoint();
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      const diagramPointer = pointer.matrixTransform(matrix.inverse());
+      const screenScale = Math.max(
+        Math.hypot(matrix.a, matrix.b),
+        Math.hypot(matrix.c, matrix.d),
+        0.001,
+      );
+      const hitThreshold = 16 / screenScale;
+      const hitSegment = spec.primitives
+        .flatMap((primitive) => {
+          if (primitive.type !== "SEGMENT") return [];
+          const from = resolve(primitive.from);
+          const to = resolve(primitive.to);
+          if (
+            !from?.label ||
+            !to?.label ||
+            equalLengthMarkedSegmentIds.has(primitive.id)
+          ) {
+            return [];
+          }
+          return [
+            {
+              id: primitive.id,
+              distance: pointToSegmentDistance(
+                diagramPointer,
+                { x: from.x, y: toSvgY(from.y) },
+                { x: to.x, y: toSvgY(to.y) },
+              ),
+            },
+          ];
+        })
+        .filter((candidate) => candidate.distance <= hitThreshold)
+        .sort((left, right) => left.distance - right.distance)[0];
+      if (hitSegment) {
+        toggleEqualLengthSegment(hitSegment.id, event);
+        return;
+      }
+    }
+    setSelectedTarget(null);
+    setSelectedSegmentIds([]);
+    setSegmentToolbarPosition(null);
+  };
+  const editableTargetProps = (target: LessonSummaryDiagramEditableTarget) =>
+    editingEnabled
+      ? {
+          "aria-label": `Chọn ${describeLessonSummaryDiagramTarget(target)} để chỉnh`,
+          "data-diagram-edit-kind": target.kind,
+          role: "button" as const,
+          tabIndex: 0,
+          onClick: (event: ReactMouseEvent<SVGElement>) =>
+            selectEditableTarget(target, event),
+          onKeyDown: (event: ReactKeyboardEvent<SVGElement>) => {
+            if (event.key === "Enter" || event.key === " ") {
+              selectEditableTarget(target, event);
+            }
+          },
+          style: {
+            cursor: "pointer",
+            outline: "none",
+            pointerEvents: target.kind === "MARKER" ? undefined : "all",
+          } satisfies CSSProperties,
+        }
+      : {};
+  const isSelected = (target: LessonSummaryDiagramEditableTarget | null) =>
+    Boolean(
+      target &&
+      selectedTarget &&
+      lessonSummaryDiagramTargetKey(target) ===
+        lessonSummaryDiagramTargetKey(selectedTarget.target),
+    );
   const toSvgY = (value: number) =>
     renderViewBox.minY + renderViewBox.height - (value - renderViewBox.minY);
   const labelOffset = textScale * 0.035;
@@ -249,16 +521,43 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
   const occupiedTextBoxes: DiagramTextBox[] = [];
 
   return (
-    <figure className="mt-4 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3 dark:bg-slate-950 sm:p-4">
+    <figure
+      ref={figureRef}
+      className="relative mt-4 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3 focus:outline-none dark:bg-slate-950 sm:p-4"
+      data-diagram-editable={editingEnabled ? "true" : undefined}
+      style={{ overflowAnchor: "none" }}
+      tabIndex={editingEnabled ? -1 : undefined}
+    >
       <svg
         ref={svgRef}
         aria-label={spec.caption ?? "Sơ đồ minh họa cho bài toán"}
         className="mx-auto block h-auto max-h-[28rem] w-full text-slate-800 dark:text-slate-100"
         preserveAspectRatio="xMidYMid meet"
-        role="img"
+        role={editingEnabled ? "group" : "img"}
+        style={editingEnabled ? { pointerEvents: "all" } : undefined}
         viewBox={`${renderViewBox.minX} ${renderViewBox.minY} ${renderViewBox.width} ${renderViewBox.height}`}
+        onClick={
+          editingEnabled
+            ? () => {
+                setSelectedTarget(null);
+                setSelectedSegmentIds([]);
+                setSegmentToolbarPosition(null);
+              }
+            : undefined
+        }
+        onClickCapture={editingEnabled ? handleSvgClick : undefined}
       >
         <defs>
+          <style>{`
+            [data-diagram-edit-kind]:focus { outline: none; }
+            [data-diagram-segment-selectable]:focus { outline: none; }
+            [data-diagram-edit-kind]:focus-visible {
+              filter: drop-shadow(0 0 2px rgb(220 38 38 / 0.75));
+            }
+            [data-diagram-segment-selectable]:focus-visible {
+              filter: drop-shadow(0 0 2px rgb(220 38 38 / 0.75));
+            }
+          `}</style>
           <clipPath id={clipId}>
             <rect
               x={renderViewBox.minX}
@@ -347,18 +646,28 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                     Math.max(MINIMUM_AXIS_TICK_LENGTH, Math.min(width, height) * 0.02),
                   )
                 : orientedEndpoints;
-              return (
+              const isSelectableNamedSegment = Boolean(
+                editingEnabled &&
+                editor?.onRequestAddEqualLength &&
+                primitive.type === "SEGMENT" &&
+                from.label &&
+                to.label &&
+                !equalLengthMarkedSegmentIds.has(primitive.id),
+              );
+              const isSelectedSegment = selectedSegmentIds.includes(primitive.id);
+              const visibleLine = (
                 <line
-                  key={primitive.id}
                   data-diagram-axis-tick={isAxisTick ? "true" : undefined}
                   x1={endpoints.from.x}
                   y1={toSvgY(endpoints.from.y)}
                   x2={endpoints.to.x}
                   y2={toSvgY(endpoints.to.y)}
                   className={
-                    isIntervalSegment || isMeasurementReading
-                      ? "stroke-sky-600 dark:stroke-sky-300"
-                      : "stroke-current"
+                    isSelectedSegment
+                      ? "!stroke-red-600 dark:!stroke-red-400"
+                      : isIntervalSegment || isMeasurementReading
+                        ? "stroke-sky-600 dark:stroke-sky-300"
+                        : "stroke-current"
                   }
                   markerEnd={
                     primitive.type === "RAY" || isCoordinateAxis || isNumberLineAxis
@@ -367,10 +676,31 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                   }
                   strokeDasharray={dashArray(primitive.style)}
                   strokeLinecap="round"
-                  strokeWidth={isIntervalSegment || isMeasurementReading ? 3.5 : 1.75}
+                  strokeWidth={
+                    isSelectedSegment
+                      ? 3
+                      : isIntervalSegment || isMeasurementReading
+                        ? 3.5
+                        : 1.75
+                  }
                   vectorEffect="non-scaling-stroke"
                 />
               );
+              if (isSelectableNamedSegment) {
+                return (
+                  <g
+                    key={primitive.id}
+                    data-diagram-segment-selected={isSelectedSegment ? "true" : undefined}
+                    {...editableSegmentProps(
+                      primitive.id,
+                      `${from.label ?? from.id}${to.label ?? to.id}`,
+                    )}
+                  >
+                    {visibleLine}
+                  </g>
+                );
+              }
+              return <g key={primitive.id}>{visibleLine}</g>;
             }
             if (primitive.type === "POLYGON" || primitive.type === "POLYLINE") {
               const polygonPoints = primitive.pointIds
@@ -456,6 +786,11 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
           })}
 
           {spec.markers.map((marker, index) => {
+            const editableMarker = editableSpec.markers[index];
+            const markerTarget =
+              editableMarker?.type === marker.type
+                ? createMarkerTarget(editableMarker, index)
+                : null;
             if (
               isNumberLine &&
               (marker.type === "EQUAL_LENGTH" || marker.type === "PARALLEL")
@@ -478,16 +813,35 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                 ),
               );
               return (
-                <polyline
+                <g
                   key={`right-angle-${index}`}
+                  data-diagram-selected={isSelected(markerTarget) ? "true" : undefined}
                   data-diagram-marker-type="RIGHT_ANGLE"
-                  points={markerPoints
-                    .map((point) => `${point.x},${toSvgY(point.y)}`)
-                    .join(" ")}
-                  className="fill-none stroke-sky-600 dark:stroke-sky-300"
-                  strokeWidth={2}
-                  vectorEffect="non-scaling-stroke"
-                />
+                  {...(markerTarget ? editableTargetProps(markerTarget) : {})}
+                >
+                  {editingEnabled ? (
+                    <polyline
+                      aria-hidden="true"
+                      points={markerPoints
+                        .map((point) => `${point.x},${toSvgY(point.y)}`)
+                        .join(" ")}
+                      className="fill-none"
+                      opacity={0}
+                      pointerEvents="stroke"
+                      stroke="transparent"
+                      strokeWidth={16}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ) : null}
+                  <polyline
+                    points={markerPoints
+                      .map((point) => `${point.x},${toSvgY(point.y)}`)
+                      .join(" ")}
+                    className={`fill-none ${isSelected(markerTarget) ? "!stroke-red-600 dark:!stroke-red-400" : "stroke-sky-600 dark:stroke-sky-300"}`}
+                    strokeWidth={isSelected(markerTarget) ? 3 : 2}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
               );
             }
             if (marker.type === "ANGLE") {
@@ -495,6 +849,7 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
               const first = resolve(marker.armPointIds[0]!);
               const second = resolve(marker.armPointIds[1]!);
               if (!vertex || !first || !second) return null;
+              const labelFontSize = textScale * 0.034;
               const geometry = angleMarkerGeometry(
                 vertex,
                 first,
@@ -504,29 +859,61 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                   pointDistance(vertex, first) * 0.22,
                   pointDistance(vertex, second) * 0.22,
                 ),
+                marker.label,
+                labelFontSize,
               );
+              const sourceAngleMarker =
+                editableMarker?.type === "ANGLE" ? editableMarker : null;
+              const angleLabelTarget = sourceAngleMarker
+                ? createAngleLabelTarget(sourceAngleMarker, index)
+                : null;
               return (
-                <g key={`angle-${index}`} data-diagram-marker-type="ANGLE">
+                <g
+                  key={`angle-${index}`}
+                  data-diagram-selected={isSelected(markerTarget) ? "true" : undefined}
+                  data-diagram-marker-type="ANGLE"
+                  {...(markerTarget ? editableTargetProps(markerTarget) : {})}
+                >
+                  {editingEnabled ? (
+                    <polyline
+                      aria-hidden="true"
+                      points={geometry.arcPoints
+                        .map((point) => `${point.x},${toSvgY(point.y)}`)
+                        .join(" ")}
+                      className="fill-none"
+                      opacity={0}
+                      pointerEvents="stroke"
+                      stroke="transparent"
+                      strokeLinecap="round"
+                      strokeWidth={16}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ) : null}
                   <polyline
                     points={geometry.arcPoints
                       .map((point) => `${point.x},${toSvgY(point.y)}`)
                       .join(" ")}
-                    className="fill-none stroke-sky-600 dark:stroke-sky-300"
+                    className={`fill-none ${isSelected(markerTarget) ? "!stroke-red-600 dark:!stroke-red-400" : "stroke-sky-600 dark:stroke-sky-300"}`}
                     strokeLinecap="round"
-                    strokeWidth={2}
+                    strokeWidth={isSelected(markerTarget) ? 3 : 2}
                     vectorEffect="non-scaling-stroke"
                   />
                   {marker.label ? (
                     <text
+                      data-diagram-angle-label="true"
+                      data-diagram-selected={
+                        isSelected(angleLabelTarget) ? "true" : undefined
+                      }
                       x={geometry.labelPoint.x}
                       y={toSvgY(geometry.labelPoint.y)}
-                      className="fill-sky-700 stroke-white font-bold dark:fill-sky-300 dark:stroke-slate-950"
+                      className={`${isSelected(angleLabelTarget) ? "!fill-red-600 dark:!fill-red-400" : "fill-sky-700 dark:fill-sky-300"} stroke-white font-bold dark:stroke-slate-950`}
                       dominantBaseline="middle"
-                      fontSize={textScale * 0.034}
+                      fontSize={labelFontSize}
                       paintOrder="stroke"
                       strokeLinejoin="round"
                       strokeWidth={textScale * 0.0045}
                       textAnchor="middle"
+                      {...(angleLabelTarget ? editableTargetProps(angleLabelTarget) : {})}
                     >
                       {marker.label}
                     </text>
@@ -534,74 +921,132 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                 </g>
               );
             }
-            return marker.segmentIds.flatMap((segmentId, segmentIndex) => {
-              const primitive = primitives.get(segmentId);
-              if (
-                !primitive ||
-                !(
-                  primitive.type === "SEGMENT" ||
-                  primitive.type === "LINE" ||
-                  primitive.type === "RAY"
-                )
-              ) {
-                return [];
-              }
-              const from = resolve(primitive.from);
-              const to = resolve(primitive.to);
-              if (!from || !to) return [];
-              const markerSize = Math.min(
-                diagramScale * 0.035,
-                pointDistance(from, to) * 0.14,
-              );
-              const centerRatio = markerCenterRatio(from, to, spec.markers, points);
-              return [
-                <g
-                  key={`${marker.type}-${index}-${segmentIndex}`}
-                  data-diagram-marker-type={marker.type}
-                >
-                  {Array.from({ length: marker.markCount }).map((_, markIndex) =>
-                    marker.type === "PARALLEL" ? (
-                      <polyline
-                        key={markIndex}
-                        points={parallelMarkerPoints({
-                          from,
-                          to,
-                          markIndex,
-                          markCount: marker.markCount,
-                          size: markerSize,
-                          centerRatio,
-                          toSvgY,
-                        })}
-                        className="fill-none stroke-sky-600 dark:stroke-sky-300"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ) : (
-                      <line
-                        key={markIndex}
-                        {...markerLineProps({
-                          from,
-                          to,
-                          markIndex,
-                          markCount: marker.markCount,
-                          size: markerSize,
-                          centerRatio,
-                          toSvgY,
-                        })}
-                        className="stroke-sky-600 dark:stroke-sky-300"
-                        strokeWidth={2}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ),
-                  )}
-                </g>,
-              ];
-            });
+            return (
+              <g
+                key={`${marker.type}-${index}`}
+                data-diagram-selected={isSelected(markerTarget) ? "true" : undefined}
+                data-diagram-marker-type={marker.type}
+                {...(markerTarget ? editableTargetProps(markerTarget) : {})}
+              >
+                {marker.segmentIds.flatMap((segmentId, segmentIndex) => {
+                  const primitive = primitives.get(segmentId);
+                  if (
+                    !primitive ||
+                    !(
+                      primitive.type === "SEGMENT" ||
+                      primitive.type === "LINE" ||
+                      primitive.type === "RAY"
+                    )
+                  ) {
+                    return [];
+                  }
+                  const from = resolve(primitive.from);
+                  const to = resolve(primitive.to);
+                  if (!from || !to) return [];
+                  const markerSize = Math.min(
+                    diagramScale * 0.035,
+                    pointDistance(from, to) * 0.14,
+                  );
+                  const centerRatio = markerCenterRatio(from, to, spec.markers, points);
+                  return [
+                    <g key={`${marker.type}-${index}-${segmentIndex}`}>
+                      {Array.from({ length: marker.markCount }).map((_, markIndex) =>
+                        marker.type === "PARALLEL" ? (
+                          <g key={markIndex}>
+                            {editingEnabled ? (
+                              <polyline
+                                aria-hidden="true"
+                                points={parallelMarkerPoints({
+                                  from,
+                                  to,
+                                  markIndex,
+                                  markCount: marker.markCount,
+                                  size: markerSize,
+                                  centerRatio,
+                                  toSvgY,
+                                })}
+                                className="fill-none"
+                                opacity={0}
+                                pointerEvents="stroke"
+                                stroke="transparent"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={16}
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            ) : null}
+                            <polyline
+                              points={parallelMarkerPoints({
+                                from,
+                                to,
+                                markIndex,
+                                markCount: marker.markCount,
+                                size: markerSize,
+                                centerRatio,
+                                toSvgY,
+                              })}
+                              className={`fill-none ${isSelected(markerTarget) ? "!stroke-red-600 dark:!stroke-red-400" : "stroke-sky-600 dark:stroke-sky-300"}`}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={isSelected(markerTarget) ? 3 : 2}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          </g>
+                        ) : (
+                          <g key={markIndex}>
+                            {editingEnabled ? (
+                              <line
+                                aria-hidden="true"
+                                {...markerLineProps({
+                                  from,
+                                  to,
+                                  markIndex,
+                                  markCount: marker.markCount,
+                                  size: markerSize,
+                                  centerRatio,
+                                  toSvgY,
+                                })}
+                                opacity={0}
+                                pointerEvents="stroke"
+                                stroke="transparent"
+                                strokeWidth={16}
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            ) : null}
+                            <line
+                              {...markerLineProps({
+                                from,
+                                to,
+                                markIndex,
+                                markCount: marker.markCount,
+                                size: markerSize,
+                                centerRatio,
+                                toSvgY,
+                              })}
+                              className={
+                                isSelected(markerTarget)
+                                  ? "!stroke-red-600 dark:!stroke-red-400"
+                                  : "stroke-sky-600 dark:stroke-sky-300"
+                              }
+                              strokeWidth={isSelected(markerTarget) ? 3 : 2}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          </g>
+                        ),
+                      )}
+                    </g>,
+                  ];
+                })}
+              </g>
+            );
           })}
 
-          {spec.points.map((point) => {
+          {spec.points.map((point, pointIndex) => {
+            const editablePoint = editableSpec.points[pointIndex];
+            const pointLabelTarget =
+              editablePoint?.id === point.id
+                ? createPointLabelTarget(editablePoint)
+                : null;
             const coordinateLabel = coordinateLabelsByPointId.get(point.id);
             const isGraphConstructionPoint = graphConstructionPointIds.has(point.id);
             const isIntervalEndpoint =
@@ -712,17 +1157,21 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                 {visiblePointLabel ? (
                   <text
                     data-diagram-point-label-id={point.id}
+                    data-diagram-selected={
+                      isSelected(pointLabelTarget) ? "true" : undefined
+                    }
                     data-diagram-point-source-label-position={point.labelPosition ?? ""}
                     data-diagram-point-label-position={pointLabelPlacement.position}
                     x={collisionFreePointLabelAnchor.x}
                     y={toSvgY(collisionFreePointLabelAnchor.y)}
-                    className="fill-slate-900 stroke-white font-bold dark:fill-slate-100 dark:stroke-slate-950"
+                    className={`${isSelected(pointLabelTarget) ? "!fill-red-600 dark:!fill-red-400" : "fill-slate-900 dark:fill-slate-100"} stroke-white font-bold dark:stroke-slate-950`}
                     dominantBaseline="middle"
                     fontSize={pointLabelFontSize}
                     paintOrder="stroke"
                     strokeLinejoin="round"
                     strokeWidth={textScale * 0.0045}
                     textAnchor={labelTextAnchor(pointLabelPlacement.position)}
+                    {...(pointLabelTarget ? editableTargetProps(pointLabelTarget) : {})}
                   >
                     {point.label}
                   </text>
@@ -732,6 +1181,10 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
           })}
 
           {spec.labels.map((label, index) => {
+            const editableLabel = editableSpec.labels[index];
+            const labelTarget = editableLabel
+              ? createDiagramLabelTarget(editableLabel, index)
+              : null;
             const anchoredPoint = resolve(label.anchorPointId);
             if (COORDINATE_LABEL_PATTERN.test(label.text)) return null;
             const isRedundantCoordinateOriginValue = Boolean(
@@ -952,9 +1405,10 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                 data-diagram-container-label={isFixedContainerLabel ? "true" : undefined}
                 data-diagram-label-anchor-point-id={label.anchorPointId}
                 data-diagram-label-text={label.text}
+                data-diagram-selected={isSelected(labelTarget) ? "true" : undefined}
                 x={collisionFreeLabelAnchor.x}
                 y={toSvgY(collisionFreeLabelAnchor.y)}
-                className="fill-slate-700 stroke-white font-semibold dark:fill-slate-200 dark:stroke-slate-950"
+                className={`${isSelected(labelTarget) ? "!fill-red-600 dark:!fill-red-400" : "fill-slate-700 dark:fill-slate-200"} stroke-white font-semibold dark:stroke-slate-950`}
                 dominantBaseline="middle"
                 fontSize={labelFontSize}
                 paintOrder="stroke"
@@ -967,6 +1421,7 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
                       ? "middle"
                       : labelTextAnchor(effectiveLabelPosition)
                 }
+                {...(labelTarget ? editableTargetProps(labelTarget) : {})}
               >
                 {label.text}
               </text>
@@ -1004,8 +1459,102 @@ function ValidatedLessonSummaryDiagram({ spec }: { spec: LessonSummaryDiagramSpe
           ) : null}
         </g>
       </svg>
+      {editor?.onRequestReset ? (
+        <button
+          type="button"
+          aria-label="Khôi phục hình về đầu phiên chỉnh sửa"
+          className="theme-button-neutral absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-lg border border-[var(--theme-border)] bg-white/95 shadow-md backdrop-blur-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/95"
+          data-testid="diagram-reset"
+          disabled={editor.disabled}
+          title="Khôi phục hình"
+          onClick={(event) => {
+            event.stopPropagation();
+            editor.onRequestReset?.();
+          }}
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+        </button>
+      ) : null}
+      {editingEnabled && selectedTarget ? (
+        <LessonSummaryDiagramElementToolbar
+          canDelete={
+            selectedTarget.target.kind !== "POINT_LABEL" &&
+            Boolean(editor?.onRequestDelete)
+          }
+          canEdit={
+            isLessonSummaryDiagramTextTarget(selectedTarget.target) &&
+            Boolean(editor?.onRequestTextEdit)
+          }
+          description={describeLessonSummaryDiagramTarget(selectedTarget.target)}
+          initialText={
+            isLessonSummaryDiagramTextTarget(selectedTarget.target)
+              ? selectedTarget.target.displayText
+              : undefined
+          }
+          left={selectedTarget.left}
+          maxWidth={selectedTarget.maxWidth}
+          side={selectedTarget.side}
+          top={selectedTarget.top}
+          onDelete={() => {
+            figureRef.current?.focus({ preventScroll: true });
+            editor?.onRequestDelete?.(selectedTarget.target);
+            setSelectedTarget(null);
+          }}
+          onEdit={(nextText) => {
+            if (!isLessonSummaryDiagramTextTarget(selectedTarget.target)) return false;
+            figureRef.current?.focus({ preventScroll: true });
+            const edited =
+              editor?.onRequestTextEdit?.(selectedTarget.target, nextText) ?? false;
+            if (edited) setSelectedTarget(null);
+            return edited;
+          }}
+        />
+      ) : null}
+      {editingEnabled && selectedSegmentIds.length >= 2 && segmentToolbarPosition ? (
+        <LessonSummaryDiagramSegmentToolbar
+          count={selectedSegmentIds.length}
+          left={segmentToolbarPosition.left}
+          maxWidth={segmentToolbarPosition.maxWidth}
+          side={segmentToolbarPosition.side}
+          top={segmentToolbarPosition.top}
+          onCreateEqualLength={() => {
+            figureRef.current?.focus({ preventScroll: true });
+            const created =
+              editor?.onRequestAddEqualLength?.(selectedSegmentIds) ?? false;
+            if (!created) return;
+            setSelectedSegmentIds([]);
+            setSegmentToolbarPosition(null);
+          }}
+        />
+      ) : null}
       {spec.caption ? (
-        <figcaption className="mt-2 text-center text-xs font-semibold text-[var(--theme-text-muted)]">
+        <figcaption
+          aria-label={
+            captionTarget
+              ? `Chọn ${describeLessonSummaryDiagramTarget(captionTarget)} để chỉnh`
+              : undefined
+          }
+          className={`mt-2 rounded-md px-2 py-1 text-center text-xs font-semibold ${isSelected(captionTarget) ? "bg-red-50 !text-red-600 ring-1 ring-red-200 dark:bg-red-950/30 dark:!text-red-400 dark:ring-red-900" : "text-[var(--theme-text-muted)]"}`}
+          data-diagram-caption="true"
+          data-diagram-edit-kind={editingEnabled && captionTarget ? "CAPTION" : undefined}
+          data-diagram-selected={isSelected(captionTarget) ? "true" : undefined}
+          role={editingEnabled && captionTarget ? "button" : undefined}
+          tabIndex={editingEnabled && captionTarget ? 0 : undefined}
+          onClick={
+            editingEnabled && captionTarget
+              ? (event) => selectEditableTarget(captionTarget, event)
+              : undefined
+          }
+          onKeyDown={
+            editingEnabled && captionTarget
+              ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    selectEditableTarget(captionTarget, event);
+                  }
+                }
+              : undefined
+          }
+        >
           {spec.caption}
         </figcaption>
       ) : null}
@@ -1219,7 +1768,14 @@ function rightAnglePoints(vertex: Point, first: Point, second: Point, size: numb
   return [alongFirst, corner, alongSecond];
 }
 
-function angleMarkerGeometry(vertex: Point, first: Point, second: Point, radius: number) {
+function angleMarkerGeometry(
+  vertex: Point,
+  first: Point,
+  second: Point,
+  radius: number,
+  label: string | null,
+  labelFontSize: number,
+) {
   let startAngle = Math.atan2(first.y - vertex.y, first.x - vertex.x);
   let endAngle = Math.atan2(second.y - vertex.y, second.x - vertex.x);
   let delta = positiveAngleDelta(startAngle, endAngle);
@@ -1236,11 +1792,20 @@ function angleMarkerGeometry(vertex: Point, first: Point, second: Point, radius:
     };
   });
   const labelAngle = startAngle + delta / 2;
+  const labelHalfWidth = label
+    ? (labelFontSize * Math.max(1, label.length * 0.56)) / 2
+    : 0;
+  const labelHalfHeight = label ? labelFontSize * 0.5 : 0;
+  const projectedLabelHalfExtent =
+    Math.abs(Math.cos(labelAngle)) * labelHalfWidth +
+    Math.abs(Math.sin(labelAngle)) * labelHalfHeight;
+  const labelRadius =
+    radius + projectedLabelHalfExtent + (label ? labelFontSize * 0.12 : 0);
   return {
     arcPoints,
     labelPoint: {
-      x: vertex.x + Math.cos(labelAngle) * radius * 1.72,
-      y: vertex.y + Math.sin(labelAngle) * radius * 1.72,
+      x: vertex.x + Math.cos(labelAngle) * labelRadius,
+      y: vertex.y + Math.sin(labelAngle) * labelRadius,
     },
   };
 }
@@ -1586,10 +2151,10 @@ function pointLabelClearance(
 ) {
   const isCoordinateOrigin = Boolean(
     point.label?.trim().toUpperCase() === "O" &&
-      Math.abs(point.x) <= spec.viewBox.width * 0.005 &&
-      Math.abs(point.y) <= spec.viewBox.height * 0.005 &&
-      spec.primitives.some((primitive) => primitive.id === "axisX") &&
-      spec.primitives.some((primitive) => primitive.id === "axisY"),
+    Math.abs(point.x) <= spec.viewBox.width * 0.005 &&
+    Math.abs(point.y) <= spec.viewBox.height * 0.005 &&
+    spec.primitives.some((primitive) => primitive.id === "axisX") &&
+    spec.primitives.some((primitive) => primitive.id === "axisY"),
   );
   if (isCoordinateOrigin) return diagramScale * 0.05;
   if (point.pointStyle === "FILLED" && /trục\s*số/iu.test(spec.caption ?? "")) {
@@ -1698,7 +2263,7 @@ function avoidLabelStrokeCollision(
         "LEFT",
         "RIGHT",
       ]
-      : isCenteredNumber
+    : isCenteredNumber
       ? [
           "RIGHT",
           "LEFT",
@@ -2027,10 +2592,7 @@ function keepFunctionLabelClearOfVerticalProjections(input: {
   const gap = Math.max(input.diagramScale * 0.008, input.fontSize * 0.24);
   let anchor = input.anchor;
   for (const primitive of input.primitives.values()) {
-    if (
-      primitive.type !== "SEGMENT" ||
-      !primitive.id.startsWith("graphProjectionToX")
-    ) {
+    if (primitive.type !== "SEGMENT" || !primitive.id.startsWith("graphProjectionToX")) {
       continue;
     }
     const from = input.points.get(primitive.from);

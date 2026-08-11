@@ -1,4 +1,5 @@
 import { ApiRequestError } from "@/lib/api-client";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 export function getAuthErrorMessage(error: unknown, fallback: string) {
   if (!(error instanceof ApiRequestError)) {
@@ -23,6 +24,6 @@ export function getAuthErrorMessage(error: unknown, fallback: string) {
     case "VALIDATION_ERROR":
       return "Thông tin chưa hợp lệ. Vui lòng kiểm tra lại các ô nhập.";
     default:
-      return error.message || fallback;
+      return getUserFacingErrorMessage(error, fallback);
   }
 }

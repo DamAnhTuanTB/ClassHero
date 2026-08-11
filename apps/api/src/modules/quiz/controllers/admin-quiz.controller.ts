@@ -87,6 +87,15 @@ export class AdminQuizController {
     return this.generationJobs.queueQuiz(lessonId, user.id, dto);
   }
 
+  @Post("lessons/:lessonId/quiz-sets/prompt-preview")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview Quiz prompts, lesson source and estimated cost without calling AI",
+  })
+  previewPrompt(@Param("lessonId") lessonId: string, @Body() dto: GenerateQuizDto) {
+    return this.generationJobs.previewQuiz(lessonId, dto);
+  }
+
   @Post("lessons/:lessonId/quiz-sets")
   @ApiOperation({ summary: "Create a quiz set for a lesson" })
   createSet(
@@ -127,7 +136,12 @@ export class AdminQuizController {
     @Body() dto: ReviewContentSetDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.quizService.reviewQuizSet(setId, user.id, dto, getRequestContext(request));
+    return this.quizService.reviewQuizSet(
+      setId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Delete("quiz-sets/:setId")

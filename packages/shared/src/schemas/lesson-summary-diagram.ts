@@ -1313,6 +1313,54 @@ export const lessonSummaryDiagramStructuralVisualSchema = z.discriminatedUnion("
 export type LessonSummaryDiagramSpec = z.infer<typeof lessonSummaryDiagramSpecSchema>;
 export type LessonSummaryDiagramVisual = z.infer<typeof lessonSummaryDiagramVisualSchema>;
 
+const BRACED_THREE_POINT_ANGLE_PATTERN =
+  /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
+const THREE_POINT_ANGLE_PATTERN =
+  /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
+const SINGLE_POINT_ANGLE_PATTERN =
+  /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
+
+export function normalizeLessonSummaryAngleNotation(
+  value: string,
+  diagramSpec?: LessonSummaryDiagramSpec | null,
+) {
+  const withCanonicalThreePointAngles = value
+    .replace(
+      BRACED_THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    )
+    .replace(
+      THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    );
+  if (!diagramSpec) return withCanonicalThreePointAngles;
+
+  const pointsById = new Map(
+    diagramSpec.points.map((point) => [point.id, point] as const),
+  );
+  const notationByVertexLabel = new Map<string, string | null>();
+  diagramSpec.markers.forEach((marker) => {
+    if (marker.type !== "ANGLE" && marker.type !== "RIGHT_ANGLE") return;
+    const vertexLabel = pointsById.get(marker.vertex)?.label;
+    const firstArmLabel = pointsById.get(marker.armPointIds[0]!)?.label;
+    const secondArmLabel = pointsById.get(marker.armPointIds[1]!)?.label;
+    if (!vertexLabel || !firstArmLabel || !secondArmLabel) return;
+    const notation = `\\widehat{${firstArmLabel}${vertexLabel}${secondArmLabel}}`;
+    const existing = notationByVertexLabel.get(vertexLabel);
+    notationByVertexLabel.set(
+      vertexLabel,
+      existing === undefined || existing === notation ? notation : null,
+    );
+  });
+
+  return withCanonicalThreePointAngles.replace(
+    SINGLE_POINT_ANGLE_PATTERN,
+    (match, vertexLabel: string) => notationByVertexLabel.get(vertexLabel) ?? match,
+  );
+}
+
 export function normalizeLessonSummaryDiagramText(value: string) {
   return value
     .trim()

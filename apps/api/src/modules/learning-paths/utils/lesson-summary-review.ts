@@ -14,6 +14,9 @@ import {
 
 type ReviewIssue = z.infer<typeof lessonSummaryReviewIssueSchema>;
 type JsonObject = Record<string, unknown>;
+const FORMAL_PROOF_PATTERN = /\b(?:chứng\s*minh|chứng\s*tỏ)\b/iu;
+const GEOMETRY_PROBLEM_PATTERN =
+  /(?:\\triangle|△|\b(?:tam\s*giác|tứ\s*giác|hình\s+(?:vuông|chữ\s*nhật|thoi|bình\s*hành|thang|tròn)|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b)/iu;
 
 export function improveLessonSummaryReviewIssueCopy(contentJson: unknown) {
   if (!isObject(contentJson) || contentJson.type !== "lesson_summary_blocks") {
@@ -58,9 +61,10 @@ export function reconcileLessonSummaryReviewIssues(contentJson: JsonObject) {
   }
 
   const data = { ...contentJson.data };
+  const targetGrade = typeof data.targetGrade === "number" ? data.targetGrade : null;
   const sections = Array.isArray(data.sections)
     ? data.sections.map((section, sectionIndex) =>
-        reconcileSection(section, sectionIndex),
+        reconcileSection(section, sectionIndex, targetGrade),
       )
     : data.sections;
   const existingRootIssues = parseIssues(data.reviewIssues);
@@ -94,17 +98,26 @@ export function listUnresolvedLessonSummaryReviewIssues(contentJson: JsonObject)
   return issues.filter(isUnresolved);
 }
 
-function reconcileSection(value: unknown, sectionIndex: number) {
+function reconcileSection(
+  value: unknown,
+  sectionIndex: number,
+  targetGrade: number | null,
+) {
   if (!isObject(value) || !Array.isArray(value.blocks)) return value;
   return {
     ...value,
     blocks: value.blocks.map((block, blockIndex) =>
-      reconcileBlock(block, sectionIndex, blockIndex),
+      reconcileBlock(block, sectionIndex, blockIndex, targetGrade),
     ),
   };
 }
 
-function reconcileBlock(value: unknown, sectionIndex: number, blockIndex: number) {
+function reconcileBlock(
+  value: unknown,
+  sectionIndex: number,
+  blockIndex: number,
+  targetGrade: number | null,
+) {
   if (!isObject(value)) return value;
   const blockWithoutIssues = omitReviewIssues(value);
   const parsedBlock = lessonSummaryMvpBlockSchema.safeParse(blockWithoutIssues);
@@ -113,6 +126,7 @@ function reconcileBlock(value: unknown, sectionIndex: number, blockIndex: number
   const validationIssues = validateBlock(
     normalizedBlock,
     `sections.${sectionIndex}.blocks.${blockIndex}`,
+    targetGrade,
   );
   const reviewIssues = mergeIssues(existingIssues, validationIssues, normalizedBlock);
   return {
@@ -138,7 +152,7 @@ function validateRoot(data: JsonObject) {
   return issues;
 }
 
-function validateBlock(value: JsonObject, blockPath: string) {
+function validateBlock(value: JsonObject, blockPath: string, targetGrade: number | null) {
   const issues: ReviewIssue[] = [];
   const parsed = lessonSummaryMvpBlockSchema.safeParse(value);
   if (!parsed.success) {
@@ -174,7 +188,52 @@ function validateBlock(value: JsonObject, blockPath: string) {
       );
     }
   }
+  if (
+    value.type === "example" &&
+    typeof value.problem === "string" &&
+    isFormalGeometryProof(value.problem, Boolean(visual)) &&
+    targetGrade !== null &&
+    targetGrade >= 7 &&
+    targetGrade <= 9
+  ) {
+    const geometryStatement = isObject(value.geometryStatement)
+      ? value.geometryStatement
+      : null;
+    const hasHypotheses =
+      geometryStatement &&
+      Array.isArray(geometryStatement.hypotheses) &&
+      geometryStatement.hypotheses.some(
+        (statement) => typeof statement === "string" && statement.trim().length > 0,
+      );
+    const hasConclusions =
+      geometryStatement &&
+      Array.isArray(geometryStatement.conclusions) &&
+      geometryStatement.conclusions.some(
+        (statement) => typeof statement === "string" && statement.trim().length > 0,
+      );
+    if (!hasHypotheses || !hasConclusions) {
+      issues.push(
+        createIssue({
+          code: "MISSING_GEOMETRY_STATEMENT",
+          path: `${blockPath}.geometryStatement`,
+          message: "Bài chứng minh hình học đang thiếu bảng giả thiết–kết luận.",
+          suggestion:
+            "Bổ sung GT chỉ gồm dữ kiện đã cho và KL đúng điều phải chứng minh rồi lưu lại.",
+          technicalDetails:
+            "Formal geometry proofs for grades 7–9 require geometryStatement.",
+          fingerprint: fingerprint(value.geometryStatement ?? null),
+        }),
+      );
+    }
+  }
   return deduplicateIssues(issues);
+}
+
+function isFormalGeometryProof(problem: string, hasDiagram: boolean) {
+  return (
+    FORMAL_PROOF_PATTERN.test(problem) &&
+    (hasDiagram || GEOMETRY_PROBLEM_PATTERN.test(problem))
+  );
 }
 
 function mergeIssues(
@@ -270,6 +329,7 @@ function friendlyField(path: Array<PropertyKey>) {
       problem: "đề bài",
       solution: "lời giải",
       answer: "đáp án",
+      geometryStatement: "bảng giả thiết–kết luận",
       steps: "các bước thực hiện",
       sourceChunkIds: "nguồn tham chiếu",
       visual: "hình minh họa",

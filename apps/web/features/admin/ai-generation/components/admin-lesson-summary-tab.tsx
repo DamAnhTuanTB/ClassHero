@@ -14,6 +14,12 @@ import { useEffect, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
+import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import {
+  describeLessonSummaryDiagramTarget,
+  type LessonSummaryDiagramEditableTarget,
+  type LessonSummaryDiagramTextTarget,
+} from "@/components/common/content/lesson-summary-diagram-editing";
 import dynamic from "next/dynamic";
 import {
   useAdminAiGenerationPanel,
@@ -33,10 +39,39 @@ import {
 } from "@/lib/tiptap-rich-content";
 import { MathToolbar } from "@/features/student/lessons/screens/student-lesson-screen/components/math-toolbar";
 import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-metadata";
+import {
+  addEqualLengthMarkerToLessonSummaryDiagram,
+  deleteLessonSummaryDiagramTarget,
+  editLessonSummaryDiagramTargetText,
+} from "@/features/admin/ai-generation/utils/lesson-summary-diagram-edit";
+import {
+  getUserFacingErrorMessage,
+  sanitizeUserFacingMessage,
+} from "@/lib/user-facing-error";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
 type ViewMode = "UI_ONLY" | "JSON_ONLY" | "SPLIT";
+type SummaryRendererData = ComponentProps<typeof SummaryBlockRenderer>["data"];
+type DiagramDeleteRequest = {
+  blockIndex: number;
+  sectionIndex: number;
+  target: LessonSummaryDiagramEditableTarget;
+};
+type DiagramTextEditRequest = {
+  blockIndex: number;
+  sectionIndex: number;
+  target: LessonSummaryDiagramTextTarget;
+};
+type DiagramEqualLengthRequest = {
+  blockIndex: number;
+  sectionIndex: number;
+  segmentIds: string[];
+};
+type DiagramResetRequest = {
+  blockIndex: number;
+  sectionIndex: number;
+};
 
 export function AdminLessonSummaryTab({
   lessonId,
@@ -57,6 +92,8 @@ export function AdminLessonSummaryTab({
   const [contentError, setContentError] = useState<string>();
   const [viewMode, setViewMode] = useState<ViewMode>("UI_ONLY");
   const [jsonCollapsed, setJsonCollapsed] = useState<boolean | number>(2);
+  const [pendingDiagramReset, setPendingDiagramReset] =
+    useState<DiagramResetRequest | null>(null);
   const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
 
   useEffect(() => {
@@ -95,6 +132,203 @@ export function AdminLessonSummaryTab({
   }
 
   const summary = summaryQuery.data;
+  const deleteDiagramTarget = (request: DiagramDeleteRequest) => {
+    if (content.type !== "lesson_summary_blocks") return;
+    const data = content.data as SummaryRendererData;
+    const section = data.sections[request.sectionIndex];
+    const block = section?.blocks[request.blockIndex];
+    if (!section || block?.visual?.kind !== "DIAGRAM_SPEC") {
+      toast.error("Không tìm thấy hình cần chỉnh. Hãy chọn lại phần tử.");
+      return;
+    }
+
+    const result = deleteLessonSummaryDiagramTarget(block.visual.spec, request.target);
+    if (!result.success) {
+      toast.error(
+        sanitizeUserFacingMessage(
+          result.reason,
+          "Chưa thể xóa phần tử này. Vui lòng kiểm tra lại hình.",
+        ),
+      );
+      return;
+    }
+
+    const nextSections = data.sections.map((candidateSection, sectionIndex) =>
+      sectionIndex === request.sectionIndex
+        ? {
+            ...candidateSection,
+            blocks: candidateSection.blocks.map((candidateBlock, blockIndex) =>
+              blockIndex === request.blockIndex
+                ? {
+                    ...candidateBlock,
+                    visual: { ...candidateBlock.visual, spec: result.spec },
+                  }
+                : candidateBlock,
+            ),
+          }
+        : candidateSection,
+    );
+    preserveViewportAfterDiagramMutation();
+    setContent({
+      ...content,
+      data: { ...data, sections: nextSections },
+    });
+    toast.success("Đã xóa khỏi bản nháp. Bấm Lưu nội dung để ghi lại.");
+  };
+
+  const editDiagramText = (request: DiagramTextEditRequest, nextText: string) => {
+    if (content.type !== "lesson_summary_blocks") return false;
+    const data = content.data as SummaryRendererData;
+    const section = data.sections[request.sectionIndex];
+    const block = section?.blocks[request.blockIndex];
+    if (!section || block?.visual?.kind !== "DIAGRAM_SPEC") {
+      toast.error("Không tìm thấy hình cần chỉnh. Hãy chọn lại phần tử.");
+      return false;
+    }
+    const result = editLessonSummaryDiagramTargetText(
+      block.visual.spec,
+      request.target,
+      nextText,
+    );
+    if (!result.success) {
+      toast.error(
+        sanitizeUserFacingMessage(
+          result.reason,
+          "Chưa thể sửa phần tử này. Vui lòng kiểm tra lại hình.",
+        ),
+      );
+      return false;
+    }
+
+    const mayHaveExternalReference =
+      request.target.kind === "POINT_LABEL" ||
+      hasTextOutsideSelectedDiagram(
+        data,
+        request.sectionIndex,
+        request.blockIndex,
+        request.target.displayText,
+      );
+    const nextSections = data.sections.map((candidateSection, sectionIndex) =>
+      sectionIndex === request.sectionIndex
+        ? {
+            ...candidateSection,
+            blocks: candidateSection.blocks.map((candidateBlock, blockIndex) =>
+              blockIndex === request.blockIndex
+                ? {
+                    ...candidateBlock,
+                    visual: { ...candidateBlock.visual, spec: result.spec },
+                  }
+                : candidateBlock,
+            ),
+          }
+        : candidateSection,
+    );
+    preserveViewportAfterDiagramMutation();
+    setContent({ ...content, data: { ...data, sections: nextSections } });
+    if (mayHaveExternalReference) {
+      toast.warning(
+        `Đã sửa ${describeLessonSummaryDiagramTarget(request.target)} trong bản nháp. Hãy rà soát đề bài, GT–KL và lời giải còn dùng nội dung cũ.`,
+      );
+    } else {
+      toast.success("Đã sửa trong bản nháp. Bấm Lưu nội dung để ghi lại.");
+    }
+    return true;
+  };
+
+  const addEqualLengthMarker = (request: DiagramEqualLengthRequest) => {
+    if (content.type !== "lesson_summary_blocks") return false;
+    const data = content.data as SummaryRendererData;
+    const section = data.sections[request.sectionIndex];
+    const block = section?.blocks[request.blockIndex];
+    if (!section || block?.visual?.kind !== "DIAGRAM_SPEC") {
+      toast.error("Không tìm thấy hình cần chỉnh. Hãy chọn lại các đoạn.");
+      return false;
+    }
+    const result = addEqualLengthMarkerToLessonSummaryDiagram(
+      block.visual.spec,
+      request.segmentIds,
+    );
+    if (!result.success) {
+      toast.error(
+        sanitizeUserFacingMessage(
+          result.reason,
+          "Chưa thể đánh dấu các đoạn bằng nhau. Vui lòng kiểm tra lại hình.",
+        ),
+      );
+      return false;
+    }
+    const nextSections = data.sections.map((candidateSection, sectionIndex) =>
+      sectionIndex === request.sectionIndex
+        ? {
+            ...candidateSection,
+            blocks: candidateSection.blocks.map((candidateBlock, blockIndex) =>
+              blockIndex === request.blockIndex
+                ? {
+                    ...candidateBlock,
+                    visual: { ...candidateBlock.visual, spec: result.spec },
+                  }
+                : candidateBlock,
+            ),
+          }
+        : candidateSection,
+    );
+    preserveViewportAfterDiagramMutation();
+    setContent({ ...content, data: { ...data, sections: nextSections } });
+    toast.success(
+      `Đã đánh dấu ${request.segmentIds.length} đoạn bằng nhau trong bản nháp. Bấm Lưu nội dung để ghi lại.`,
+    );
+    return true;
+  };
+
+  const confirmDiagramReset = () => {
+    if (
+      !pendingDiagramReset ||
+      content.type !== "lesson_summary_blocks" ||
+      summary?.contentJson.type !== "lesson_summary_blocks"
+    ) {
+      setPendingDiagramReset(null);
+      return;
+    }
+    const data = content.data as SummaryRendererData;
+    const savedData = summary.contentJson.data as SummaryRendererData;
+    const currentBlock =
+      data.sections[pendingDiagramReset.sectionIndex]?.blocks[
+        pendingDiagramReset.blockIndex
+      ];
+    const savedBlock = findSavedDiagramBlock(
+      savedData,
+      pendingDiagramReset,
+      currentBlock,
+    );
+    if (
+      currentBlock?.visual?.kind !== "DIAGRAM_SPEC" ||
+      savedBlock?.visual?.kind !== "DIAGRAM_SPEC"
+    ) {
+      setPendingDiagramReset(null);
+      toast.error("Không tìm thấy bản hình đầu phiên để khôi phục.");
+      return;
+    }
+    const nextSections = data.sections.map((section, sectionIndex) =>
+      sectionIndex === pendingDiagramReset.sectionIndex
+        ? {
+            ...section,
+            blocks: section.blocks.map((block, blockIndex) =>
+              blockIndex === pendingDiagramReset.blockIndex
+                ? {
+                    ...block,
+                    visual: { ...block.visual, spec: savedBlock.visual.spec },
+                  }
+                : block,
+            ),
+          }
+        : section,
+    );
+    preserveViewportAfterDiagramMutation();
+    setContent({ ...content, data: { ...data, sections: nextSections } });
+    setPendingDiagramReset(null);
+    toast.success("Đã khôi phục mọi chỉnh sửa của hình trong phiên bản nháp này.");
+  };
+
   const save = async (action: "SAVE" | "PUBLISH" | "WITHDRAW") => {
     const isBlocks = content?.type === "lesson_summary_blocks";
     if (!isBlocks && !hasTiptapDocumentContent(content)) {
@@ -122,7 +356,9 @@ export function AdminLessonSummaryTab({
             : "Đã lưu nội dung chỉnh sửa",
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Chưa lưu được tóm tắt");
+      toast.error(
+        getUserFacingErrorMessage(error, "Chưa lưu được nội dung. Vui lòng thử lại."),
+      );
     }
   };
 
@@ -197,6 +433,14 @@ export function AdminLessonSummaryTab({
 
       {content?.type === "lesson_summary_blocks" ? (
         <div className="-mx-3 sm:mx-0 py-6 px-3 sm:p-8 bg-white dark:bg-slate-950 rounded-none sm:rounded-2xl shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-800/50">
+          {summary?.reviewStatus === "APPROVED" ? (
+            <div
+              className="mb-4 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-semibold text-[var(--theme-warning-text)]"
+              data-testid="diagram-edit-withdraw-required"
+            >
+              Thu hồi phát hành trước khi xóa nhãn hoặc ký hiệu trực tiếp trên hình.
+            </div>
+          ) : null}
           {viewMode === "JSON_ONLY" ? (
             <div className="flex flex-col space-y-3">
               <div className="flex items-center gap-2">
@@ -240,13 +484,24 @@ export function AdminLessonSummaryTab({
             </div>
           ) : (
             <SummaryBlockRenderer
-              data={
-                content.data as ComponentProps<typeof SummaryBlockRenderer>["data"]
-              }
+              data={content.data as ComponentProps<typeof SummaryBlockRenderer>["data"]}
               displayTitle={lessonTitle}
+              diagramEditingDisabled={upsertMutation.isPending}
               viewMode={viewMode === "UI_ONLY" ? "UI_ONLY" : "SPLIT"}
               showEditorialMetadata
               onChange={(newData) => setContent({ ...content, data: newData })}
+              onRequestDiagramDelete={
+                summary?.reviewStatus === "APPROVED" ? undefined : deleteDiagramTarget
+              }
+              onRequestDiagramAddEqualLength={
+                summary?.reviewStatus === "APPROVED" ? undefined : addEqualLengthMarker
+              }
+              onRequestDiagramReset={
+                summary?.reviewStatus === "APPROVED" ? undefined : setPendingDiagramReset
+              }
+              onRequestDiagramTextEdit={
+                summary?.reviewStatus === "APPROVED" ? undefined : editDiagramText
+              }
             />
           )}
         </div>
@@ -322,8 +577,84 @@ export function AdminLessonSummaryTab({
           </button>
         ) : null}
       </div>
+
+      <DeleteConfirmDialog
+        confirmLabel="Khôi phục hình"
+        description="Mọi chỉnh sửa của hình này trong bản nháp ở phiên hiện tại sẽ bị khôi phục. Các nội dung khác không bị thay đổi."
+        intent="RESET"
+        isConfirming={upsertMutation.isPending}
+        isOpen={Boolean(pendingDiagramReset)}
+        itemName="hình vẽ này"
+        title="Khôi phục hình"
+        onCancel={() => setPendingDiagramReset(null)}
+        onConfirm={confirmDiagramReset}
+      />
     </div>
   );
+}
+
+function hasTextOutsideSelectedDiagram(
+  data: SummaryRendererData,
+  selectedSectionIndex: number,
+  selectedBlockIndex: number,
+  text: string,
+) {
+  const searchValue = text.trim();
+  if (!searchValue) return false;
+  const contentWithoutSelectedDiagram = data.sections.map((section, sectionIndex) => ({
+    ...section,
+    blocks: section.blocks.map((block, blockIndex) =>
+      sectionIndex === selectedSectionIndex && blockIndex === selectedBlockIndex
+        ? { ...block, visual: undefined }
+        : block,
+    ),
+  }));
+  return JSON.stringify(contentWithoutSelectedDiagram).includes(searchValue);
+}
+
+function findSavedDiagramBlock(
+  savedData: SummaryRendererData,
+  request: DiagramResetRequest,
+  currentBlock: SummaryRendererData["sections"][number]["blocks"][number] | undefined,
+) {
+  const direct = savedData.sections[request.sectionIndex]?.blocks[request.blockIndex];
+  if (
+    direct?.visual?.kind === "DIAGRAM_SPEC" &&
+    diagramBlockResetSignature(direct) === diagramBlockResetSignature(currentBlock)
+  ) {
+    return direct;
+  }
+  if (!currentBlock) return undefined;
+  const signature = diagramBlockResetSignature(currentBlock);
+  const candidates = savedData.sections.flatMap((section) =>
+    section.blocks.filter(
+      (block) =>
+        block.visual?.kind === "DIAGRAM_SPEC" &&
+        diagramBlockResetSignature(block) === signature,
+    ),
+  );
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+function diagramBlockResetSignature(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const { visual: _visual, ...contentFields } = value as Record<string, unknown>;
+  return JSON.stringify(contentFields);
+}
+
+function preserveViewportAfterDiagramMutation() {
+  const left = window.scrollX;
+  const top = window.scrollY;
+  if (
+    document.activeElement instanceof HTMLElement &&
+    !document.activeElement.closest("figure[data-diagram-editable='true']")
+  ) {
+    document.activeElement.blur();
+  }
+  requestAnimationFrame(() => {
+    window.scrollTo({ behavior: "auto", left, top });
+    requestAnimationFrame(() => window.scrollTo({ behavior: "auto", left, top }));
+  });
 }
 
 type ReviewIssueLike = {

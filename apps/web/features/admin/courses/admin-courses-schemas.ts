@@ -256,7 +256,7 @@ export const lessonSchema = z.object({
   foundationDocumentOrder: z.array(z.string()).optional(),
   referenceDocuments: z
     .array(referenceDocumentSchema)
-    .max(10, "Tối đa 10 tài liệu upload")
+    .max(10, "Chỉ được tải lên tối đa 10 tài liệu")
     .superRefine((docs, ctx) => {
       const fileKeys = new Set<string>();
       const titleKeys = new Set<string>();
@@ -300,7 +300,7 @@ export function createLessonSchema(
     .extend({
       referenceDocuments: z
         .array(referenceDocumentSchema)
-        .max(10, "Tối đa 10 tài liệu upload")
+        .max(10, "Chỉ được tải lên tối đa 10 tài liệu")
         .superRefine((docs, ctx) => {
           const fileKeys = new Set<string>();
           const titleKeys = new Set<string>();

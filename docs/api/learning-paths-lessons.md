@@ -671,6 +671,13 @@ Side effects:
   `caption`) bị xóa hoặc để trắng được chuẩn hóa thành `null`; `labelPosition`
   bị xóa cũng được hiểu là chưa chọn vị trí. Những trường hợp này không làm hình
   lỗi vì phần hình học vẫn dựng được.
+- UI xóa trực tiếp label/marker không có endpoint riêng và không autosave. Lượt
+  đầu chỉ gửi lại toàn bộ `contentJson` qua PUT này sau khi admin bấm `Lưu nội
+dung`; backend không tin selection state của frontend mà reconcile lại spec.
+- Khi xóa marker `EQUAL_LENGTH`/`PARALLEL`, client phải xóa toàn bộ marker object,
+  không gửi nhóm chỉ còn một `segmentId`. Payload thủ công vi phạm cardinality,
+  làm thiếu label bắt buộc hoặc tạo lỗi semantic vẫn sinh review issue và bị
+  publish guard xử lý như mọi chỉnh sửa JSON khác.
 - `APPROVED` bị từ chối với mã `LESSON_SUMMARY_REVIEW_REQUIRED` nếu còn issue
   chưa được sửa hoặc chấp nhận. Response `details.issues[]` trả `code`, `path`,
   `message`, `suggestion` để admin biết cách xử lý.
@@ -690,7 +697,7 @@ Body:
 {
   "documentIds": ["uuid"],
   "style": "student_friendly",
-  "styleInstructions": "Dễ hiểu cho học sinh khối 7.",
+  "styleInstructions": "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
   "length": "standard",
   "targetWordCount": 350,
   "extraInstructions": "Dùng câu ngắn",
@@ -720,8 +727,14 @@ Rules:
   user prompt, không nhận raw context từ client. `systemInstructions` cho phép
   tối đa `64.000` ký tự để nhận lại prompt hiệu lực từ preview; `userPrompt` tối
   đa `16.000` ký tự.
+- Contract `M9.16` giữ `systemInstructions`/`userPrompt`: giá trị khác rỗng thay
+  thế toàn bộ prompt tương ứng và được round-trip nguyên vẹn giữa preview/generate;
+  giá trị rỗng dùng prompt mặc định từ cấu hình hiện tại. Có thể bổ sung
+  `requestFingerprint` để phát hiện preview stale mà không đổi semantics hai field
+  hoặc thêm endpoint/database migration.
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
-  tiêu gần đúng và được kết hợp với `length` khi dựng user prompt.
+  tiêu gần đúng và được kết hợp với `length` trong đúng một mục `Độ dài` khi
+  dựng user prompt; không xuất thành hai dòng chỉ dẫn rời nhau.
 - `temperature` giới hạn `0..1`; `reasoningEffort` nhận một trong các mức chuẩn
   `none | minimal | low | medium | high | xhigh | max`, nhưng danh sách option
   thực tế và validation phải lấy từ `capabilities.reasoningEffortLevels` của đúng
@@ -769,6 +782,18 @@ Side effects:
   `toScale=true`; không có origin/sourceAssessment/candidate metadata. Block và
   root có thể có `reviewIssues[]` optional. API/FE tiếp tục đọc version 1 và dữ
   liệu version 2 cũ.
+- Server tự lấy khối lớp từ `learningPath.targetAudiences` (chọn grade nhỏ nhất
+  giống panel admin), đưa vào prompt preview, worker input và `sourceHash`; client
+  không gửi `targetGrade` trong body.
+- Summary mới có thể lưu `data.targetGrade` và example Hình học có
+  `geometryStatement: { hypotheses: string[], conclusions: string[] }`. Field
+  example này optional khi đọc dữ liệu cũ. Bài Hình học lớp 7–12 yêu cầu chứng
+  minh/chứng tỏ nên có đủ GT–KL; nếu provider thiếu thì admin được sửa hoặc chấp
+  nhận cảnh báo sau khi kiểm tra.
+- `MISSING_GEOMETRY_STATEMENT` là issue `ACCEPT_OR_FIX`, không làm example lỗi:
+  đề, hình, lời giải và đáp án vẫn được giữ/render đầy đủ. GT chỉ gồm dữ kiện đề
+  cho, KL ghi đúng điều cần chứng minh. Bài Số học/Đại số và bài Hình học không
+  phải chứng minh chính thức không dùng field này.
 
 ### `POST /admin/lessons/:lessonId/summary/prompt-preview`
 
@@ -781,8 +806,10 @@ Behavior:
 - Dùng cùng context loader và prompt builder với worker để trả đúng
   `systemPrompt`, `userPrompt` và `inputPrompt` đầy đủ có context chunks.
 - `systemPrompt`/`userPrompt` trả về là prompt hiệu lực để FE hiển thị và cho
-  admin chỉnh sửa. Nếu FE gửi lại nguyên hai prompt này khi generate/preview,
-  server tái sử dụng trực tiếp và không lồng thêm một lớp base prompt.
+  admin chỉnh sửa. Khi request gửi một giá trị khác rỗng, server dùng chính xác
+  giá trị đó làm toàn bộ prompt hiệu lực tương ứng và không lồng thêm base prompt,
+  contract hoặc preference. Nếu field rỗng/không có, server dựng prompt mặc định
+  từ cấu hình runtime hiện tại.
 - Trả thêm `openAiRequest` ở dạng JSON với các field `model`, `instructions`,
   `input`, `text.format`, `temperature`, `max_output_tokens`; `text.format` phải
   chứa đúng structured-output name, strict mode và JSON Schema mà provider sử

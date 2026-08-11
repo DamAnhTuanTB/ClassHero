@@ -202,6 +202,9 @@ export class TestsService {
           select: {
             id: true,
             contentJson: true,
+            diagramSpecJson: true,
+            reviewStatus: true,
+            staleAt: true,
           },
         },
       },
@@ -286,7 +289,13 @@ export class TestsService {
         where: { id: question.id },
         include: {
           explanation: {
-            select: { id: true, contentJson: true },
+            select: {
+              id: true,
+              contentJson: true,
+              diagramSpecJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
           },
         },
       });
@@ -303,7 +312,13 @@ export class TestsService {
       where: { id: questionId, deletedAt: null },
       include: {
         explanation: {
-          select: { id: true, contentJson: true },
+          select: {
+            id: true,
+            contentJson: true,
+            diagramSpecJson: true,
+            reviewStatus: true,
+            staleAt: true,
+          },
         },
       },
     });
@@ -389,7 +404,13 @@ export class TestsService {
         data: updateData,
         include: {
           explanation: {
-            select: { id: true, contentJson: true },
+            select: {
+              id: true,
+              contentJson: true,
+              diagramSpecJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
           },
         },
       });

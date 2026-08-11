@@ -3,10 +3,13 @@
 import {
   CircleHelp,
   Clock3,
+  Columns,
   FileQuestion,
   Gauge,
+  LayoutTemplate,
   Pencil,
   Plus,
+  Save,
   Trash2,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -20,9 +23,18 @@ import {
   type Ref,
 } from "react";
 import { toast } from "sonner";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
+import {
+  isLessonSummaryExampleBlockData,
+  LessonSummaryExampleCard,
+  type LessonSummaryExampleBlockData,
+} from "@/components/common/content/lesson-summary-example-content";
+import type { LessonSummaryDiagramEditor } from "@/components/common/content/lesson-summary-diagram-editing";
+import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
 import type {
   AdminMultiStatementAnswer,
   AdminQuizInitialData,
@@ -52,6 +64,11 @@ import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizonta
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { cn } from "@/lib/utils";
 import { AdminGeneratedSetReviewActions } from "@/features/admin/ai-generation/components/admin-generated-set-review-actions";
+import {
+  addEqualLengthMarkerToLessonSummaryDiagram,
+  deleteLessonSummaryDiagramTarget,
+  editLessonSummaryDiagramTargetText,
+} from "@/features/admin/ai-generation/utils/lesson-summary-diagram-edit";
 
 const AdminAssessmentQuestionEditorDialog = dynamic(
   () =>
@@ -81,6 +98,7 @@ interface AdminAssessmentTabProps {
   assessmentKind?: "quiz" | "test";
   initialQuizData?: AdminQuizInitialData;
   lessonId: string;
+  onSelectedSetIdChange?: (setId: string | undefined) => void;
   preferredSetId?: string;
 }
 
@@ -89,10 +107,13 @@ type DeleteTarget =
   | { type: "question"; id: string; label: string }
   | null;
 
+type QuizQuestionViewMode = "UI_ONLY" | "SPLIT";
+
 export function AdminAssessmentTab({
   assessmentKind = "quiz",
   initialQuizData,
   lessonId,
+  onSelectedSetIdChange,
   preferredSetId,
 }: AdminAssessmentTabProps) {
   const isTest = assessmentKind === "test";
@@ -136,22 +157,25 @@ export function AdminAssessmentTab({
 
       preserveQuizSetPanelHeight();
       setSelectedSetId(setId);
+      onSelectedSetIdChange?.(setId);
     },
-    [preserveQuizSetPanelHeight, selectedSetId],
+    [onSelectedSetIdChange, preserveQuizSetPanelHeight, selectedSetId],
   );
 
   useEffect(() => {
     if (!quizSets?.length) {
       setSelectedSetId("");
+      onSelectedSetIdChange?.(undefined);
       return;
     }
     if (!quizSets.some((set) => set.id === selectedSetId)) {
       const firstSet = quizSets.at(0);
       if (firstSet) {
         setSelectedSetId(firstSet.id);
+        onSelectedSetIdChange?.(firstSet.id);
       }
     }
-  }, [quizSets, selectedSetId]);
+  }, [onSelectedSetIdChange, quizSets, selectedSetId]);
 
   useEffect(() => {
     if (
@@ -249,7 +273,10 @@ export function AdminAssessmentTab({
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : `Chưa lưu được ${copy.setName}`,
+        getUserFacingErrorMessage(
+          error,
+          `Chưa lưu được ${copy.setName}. Vui lòng thử lại.`,
+        ),
       );
     }
   };
@@ -388,6 +415,16 @@ export function AdminAssessmentTab({
                 setEditorQuestion(question);
                 setIsEditorOpen(true);
               }}
+              isSavingQuizExample={quizQuestionMutations.updateQuestion.isPending}
+              onSaveQuizExample={
+                isTest
+                  ? undefined
+                  : (questionId, exampleBlock) =>
+                      quizQuestionMutations.updateQuestion.mutateAsync({
+                        questionId,
+                        data: { exampleBlock },
+                      })
+              }
             />
           ) : null}
 
@@ -476,7 +513,12 @@ export function AdminAssessmentTab({
             }
             setDeleteTarget(null);
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Chưa xóa được dữ liệu");
+            toast.error(
+              getUserFacingErrorMessage(
+                error,
+                "Chưa xóa được dữ liệu. Vui lòng thử lại.",
+              ),
+            );
           }
         }}
       />
@@ -496,6 +538,8 @@ function QuizSetPanel({
   onDeleteSet,
   onEditSet,
   onEditQuestion,
+  isSavingQuizExample,
+  onSaveQuizExample,
 }: {
   assessmentKind: "quiz" | "test";
   activeSet: AdminQuizSet | AdminTestSet;
@@ -508,6 +552,11 @@ function QuizSetPanel({
   onDeleteSet: () => void;
   onEditSet: () => void;
   onEditQuestion: (question: AdminQuizQuestion | AdminTestQuestion) => void;
+  isSavingQuizExample: boolean;
+  onSaveQuizExample?: (
+    questionId: string,
+    exampleBlock: LessonSummaryExampleBlockData,
+  ) => Promise<unknown>;
 }) {
   const isTest = assessmentKind === "test";
   const quizQuestionsQuery = useAdminQuizQuestions(
@@ -519,130 +568,343 @@ function QuizSetPanel({
   const questionsQuery = isTest ? testQuestionsQuery : quizQuestionsQuery;
   const questions = questionsQuery.data;
   const queryRenderState = getQueryRenderState(questionsQuery);
-  return (
-    <section
-      ref={panelRef}
-      id={`${assessmentKind}-set-panel-${activeSet.id}`}
-      role="tabpanel"
-      className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 shadow-sm"
-      style={{ minHeight: minHeight || undefined }}
-    >
-      <div className="flex flex-col gap-4 border-b border-[var(--theme-border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
-              {activeSet.title}
-            </h4>
-            <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
-              {difficultyLabel(activeSet.difficulty)}
-            </span>
-            {isTest ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
-                <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                {formatDuration((activeSet as AdminTestSet).durationSeconds)}
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
-            {questions?.length ?? activeSet._count?.questions ?? activeSet.questionCount}{" "}
-            câu hỏi
-          </p>
-          <AdminGeneratedSetReviewActions
-            lessonId={lessonId}
-            reviewStatus={activeSet.reviewStatus}
-            setId={activeSet.id}
-            source={activeSet.source}
-            type={isTest ? "TEST" : "QUIZ"}
-          />
-        </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
-          <button
-            type="button"
-            onClick={onAddQuestion}
-            className="theme-button-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold sm:flex-none sm:px-4"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Thêm câu hỏi
-          </button>
-          <button
-            type="button"
-            onClick={onEditSet}
-            className="theme-button-primary-subtle grid h-10 w-10 place-items-center rounded-lg"
-            aria-label={`Sửa ${activeSet.title}`}
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={onDeleteSet}
-            className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg"
-            aria-label={`Xóa ${activeSet.title}`}
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+  const latestGeneration = activeSet.aiGenerations?.[0] ?? activeSet.aiGeneration;
+  const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [questionViewMode, setQuestionViewMode] =
+    useState<QuizQuestionViewMode>("UI_ONLY");
+  const selectedQuestionIndex =
+    questions?.findIndex((question) => question.id === selectedQuestionId) ?? -1;
+  const selectedQuestion =
+    selectedQuestionIndex >= 0 ? questions?.[selectedQuestionIndex] : undefined;
+  const selectedQuizQuestion = isTest
+    ? undefined
+    : (selectedQuestion as AdminQuizQuestion | undefined);
+  const isAiGeneratedQuestion = Boolean(
+    selectedQuizQuestion?.sourceMetadataJson?.aiGenerationId,
+  );
+  const questionReviewJson = useMemo(
+    () =>
+      selectedQuizQuestion
+        ? {
+            questionType: selectedQuizQuestion.questionType,
+            difficulty: selectedQuizQuestion.difficulty,
+            questionJson: selectedQuizQuestion.questionJson,
+            optionsJson: selectedQuizQuestion.optionsJson,
+            correctAnswerJson: selectedQuizQuestion.correctAnswerJson,
+            hintJson: selectedQuizQuestion.hintJson,
+            gradingConfigJson: selectedQuizQuestion.gradingConfigJson,
+            exampleBlock: selectedQuizQuestion.sourceMetadataJson?.exampleBlock ?? null,
+          }
+        : null,
+    [selectedQuizQuestion],
+  );
+  const {
+    focusItem: focusQuestionNumber,
+    scrollerRef: questionNumbersRef,
+    setItemRef: setQuestionNumberRef,
+  } = useRevealActiveHorizontalItem(selectedQuestionId);
 
-      {queryRenderState === "loading" ? (
-        <QuizLoadingState />
-      ) : queryRenderState === "error" ? (
-        <AdminDataErrorState
-          className="rounded-none border-0 shadow-none"
-          description="Vui lòng thử lại để tiếp tục quản lý câu hỏi."
-          headingLevel={4}
-          isRetrying={questionsQuery.isFetching}
-          onRetry={() => questionsQuery.refetch()}
-          title="Không tải được câu hỏi của bộ này"
-          variant="compact"
-        />
-      ) : !questions?.length ? (
-        <div className="m-5 flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] px-4 py-10 text-center">
-          <FileQuestion
-            className="h-8 w-8 text-[var(--theme-text-muted)]"
-            aria-hidden="true"
-          />
-          <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
-            Bộ này chưa có câu hỏi
-          </p>
-          <p className="mt-1 text-sm text-[var(--theme-text-muted)]">
-            Tạo câu hỏi đầu tiên với đầy đủ đáp án, gợi ý và lời giải.
-          </p>
-          <button
-            type="button"
-            onClick={onAddQuestion}
-            className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-extrabold"
+  useEffect(() => {
+    if (isTest) return;
+    setSelectedQuestionId((currentQuestionId) =>
+      questions?.some((question) => question.id === currentQuestionId)
+        ? currentQuestionId
+        : (questions?.at(0)?.id ?? ""),
+    );
+  }, [activeSet.id, isTest, questions]);
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem("admin-ai-quiz-question-view-mode");
+    if (savedMode === "UI_ONLY" || savedMode === "SPLIT") {
+      setQuestionViewMode(savedMode);
+    }
+  }, []);
+
+  const handleSetQuestionViewMode = (mode: QuizQuestionViewMode) => {
+    setQuestionViewMode(mode);
+    localStorage.setItem("admin-ai-quiz-question-view-mode", mode);
+  };
+
+  function handleQuestionNumbersKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) {
+    if (!questions?.length) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % questions.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + questions.length) % questions.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = questions.length - 1;
+    }
+    if (nextIndex === null) return;
+
+    const nextQuestion = questions[nextIndex];
+    if (!nextQuestion) return;
+    event.preventDefault();
+    setSelectedQuestionId(nextQuestion.id);
+    focusQuestionNumber(nextQuestion.id);
+  }
+
+  return (
+    <div className="space-y-3">
+      {!isTest && questions?.length && selectedQuestionIndex >= 0 ? (
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div
+            ref={questionNumbersRef}
+            role="tablist"
+            aria-label="Chọn câu hỏi Quiz"
+            className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Tạo câu hỏi đầu tiên
-          </button>
+            {questions.map((question, index) => {
+              const isSelected = question.id === selectedQuestionId;
+              return (
+                <button
+                  key={question.id}
+                  ref={(element) => setQuestionNumberRef(question.id, element)}
+                  type="button"
+                  role="tab"
+                  aria-controls={`quiz-question-${question.id}`}
+                  aria-label={`Xem câu ${index + 1}`}
+                  aria-selected={isSelected}
+                  tabIndex={isSelected ? 0 : -1}
+                  onClick={() => setSelectedQuestionId(question.id)}
+                  onKeyDown={(event) => handleQuestionNumbersKeyDown(event, index)}
+                  className={cn(
+                    "grid h-10 min-w-10 shrink-0 place-items-center rounded-lg border px-2 text-sm font-extrabold transition",
+                    isSelected
+                      ? "border-[var(--theme-primary)] bg-[var(--theme-primary)] text-white shadow-sm dark:text-[var(--theme-primary-foreground)]"
+                      : "border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text-muted)] hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)]",
+                  )}
+                >
+                  {index + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {isAiGeneratedQuestion ? (
+            <div className="flex shrink-0 items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-1 shadow-sm">
+              <button
+                type="button"
+                title="Chỉ xem UI"
+                onClick={() => handleSetQuestionViewMode("UI_ONLY")}
+                className={cn(
+                  "flex min-h-8 items-center gap-2 rounded-md px-3 text-xs font-bold transition-colors",
+                  questionViewMode === "UI_ONLY"
+                    ? "bg-white text-[var(--theme-primary)] shadow-sm dark:bg-slate-800"
+                    : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]",
+                )}
+              >
+                <LayoutTemplate className="h-4 w-4" aria-hidden="true" />
+                Chỉ xem UI
+              </button>
+              <button
+                type="button"
+                title="Xem song song"
+                onClick={() => handleSetQuestionViewMode("SPLIT")}
+                className={cn(
+                  "flex min-h-8 items-center gap-2 rounded-md px-3 text-xs font-bold transition-colors",
+                  questionViewMode === "SPLIT"
+                    ? "bg-white text-[var(--theme-primary)] shadow-sm dark:bg-slate-800"
+                    : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-strong)]",
+                )}
+              >
+                <Columns className="h-4 w-4" aria-hidden="true" />
+                Song song
+              </button>
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <div className="divide-y divide-[var(--theme-border)]">
-          {questions.map((question, index) => (
-            <QuestionCard
-              key={question.id}
-              index={index}
-              question={question}
-              onDelete={() => onDeleteQuestion(question)}
-              onEdit={() => onEditQuestion(question)}
+      ) : null}
+
+      <section
+        ref={panelRef}
+        id={`${assessmentKind}-set-panel-${activeSet.id}`}
+        role="tabpanel"
+        className="overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 shadow-sm"
+        style={{ minHeight: minHeight || undefined }}
+      >
+        <div className="flex flex-col gap-4 border-b border-[var(--theme-border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+                {activeSet.title}
+              </h4>
+              <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
+                {difficultyLabel(activeSet.difficulty)}
+              </span>
+              {isTest ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-2.5 py-1 text-xs font-extrabold text-[var(--theme-text-muted)]">
+                  <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {formatDuration((activeSet as AdminTestSet).durationSeconds)}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-sm font-medium text-[var(--theme-text-muted)]">
+              {questions?.length ??
+                activeSet._count?.questions ??
+                activeSet.questionCount}{" "}
+              câu hỏi
+            </p>
+            {!isTest && latestGeneration?.inputMetaJson?.generationAudit ? (
+              <p className="mt-1 text-xs font-bold text-[var(--theme-text-muted)]">
+                AI tạo ban đầu{" "}
+                {latestGeneration.inputMetaJson.generationAudit.initialGeneratedCount}
+                {" · "}Đã xóa{" "}
+                {latestGeneration.inputMetaJson.generationAudit.deletedCount}
+                {" · "}Còn lại{" "}
+                {latestGeneration.inputMetaJson.generationAudit.currentActiveCount}
+              </p>
+            ) : null}
+            <AdminGeneratedSetReviewActions
+              lessonId={lessonId}
+              pendingReviewQuestionCount={activeSet.pendingReviewQuestionCount}
+              reviewStatus={activeSet.reviewStatus}
+              setId={activeSet.id}
+              source={activeSet.source}
+              type={isTest ? "TEST" : "QUIZ"}
             />
-          ))}
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem] gap-2 sm:flex">
+            <button
+              type="button"
+              onClick={onAddQuestion}
+              className="theme-button-primary inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold sm:flex-none sm:px-4"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Thêm câu hỏi
+            </button>
+            <button
+              type="button"
+              onClick={onEditSet}
+              className="theme-button-primary-subtle grid h-10 w-10 place-items-center rounded-lg"
+              aria-label={`Sửa ${activeSet.title}`}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteSet}
+              className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg"
+              aria-label={`Xóa ${activeSet.title}`}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
-      )}
-    </section>
+
+        {queryRenderState === "loading" ? (
+          <QuizLoadingState />
+        ) : queryRenderState === "error" ? (
+          <AdminDataErrorState
+            className="rounded-none border-0 shadow-none"
+            description="Vui lòng thử lại để tiếp tục quản lý câu hỏi."
+            headingLevel={4}
+            isRetrying={questionsQuery.isFetching}
+            onRetry={() => questionsQuery.refetch()}
+            title="Không tải được câu hỏi của bộ này"
+            variant="compact"
+          />
+        ) : !questions?.length ? (
+          <div className="m-5 flex flex-col items-center rounded-xl border-2 border-dashed border-[var(--theme-border)] px-4 py-10 text-center">
+            <FileQuestion
+              className="h-8 w-8 text-[var(--theme-text-muted)]"
+              aria-hidden="true"
+            />
+            <p className="mt-3 text-sm font-extrabold text-[var(--theme-text-strong)]">
+              Bộ này chưa có câu hỏi
+            </p>
+            <p className="mt-1 text-sm text-[var(--theme-text-muted)]">
+              Tạo câu hỏi đầu tiên với đầy đủ đáp án, gợi ý và lời giải.
+            </p>
+            <button
+              type="button"
+              onClick={onAddQuestion}
+              className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-extrabold"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Tạo câu hỏi đầu tiên
+            </button>
+          </div>
+        ) : isTest ? (
+          <div className="divide-y divide-[var(--theme-border)]">
+            {questions.map((question, index) => (
+              <QuestionCard
+                key={question.id}
+                index={index}
+                question={question}
+                isSavingExample={isSavingQuizExample}
+                onDelete={() => onDeleteQuestion(question)}
+                onEdit={() => onEditQuestion(question)}
+                onSaveExample={onSaveQuizExample}
+              />
+            ))}
+          </div>
+        ) : selectedQuestion && selectedQuestionIndex >= 0 ? (
+          isAiGeneratedQuestion && questionViewMode === "SPLIT" ? (
+          <div className="grid gap-4 bg-[var(--theme-surface-soft)] p-3 sm:p-4 xl:grid-cols-2">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950">
+                <QuestionCard
+                  key={selectedQuestion.id}
+                  index={selectedQuestionIndex}
+                  question={selectedQuestion}
+                  isSavingExample={isSavingQuizExample}
+                  onDelete={() => onDeleteQuestion(selectedQuestion)}
+                  onEdit={() => onEditQuestion(selectedQuestion)}
+                  onSaveExample={onSaveQuizExample}
+                />
+              </div>
+              <section
+                aria-label={`JSON câu ${selectedQuestionIndex + 1}`}
+                className="min-w-0 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-slate-950 shadow-sm"
+              >
+                <div className="border-b border-slate-800 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-300">
+                  JSON câu {selectedQuestionIndex + 1}
+                </div>
+                <pre className="max-h-[52rem] overflow-auto p-4 text-xs leading-5 text-slate-100">
+                  {JSON.stringify(questionReviewJson, null, 2)}
+                </pre>
+              </section>
+            </div>
+          ) : (
+            <QuestionCard
+              key={selectedQuestion.id}
+              index={selectedQuestionIndex}
+              question={selectedQuestion}
+              isSavingExample={isSavingQuizExample}
+              onDelete={() => onDeleteQuestion(selectedQuestion)}
+              onEdit={() => onEditQuestion(selectedQuestion)}
+              onSaveExample={onSaveQuizExample}
+            />
+          )
+        ) : null}
+      </section>
+    </div>
   );
 }
 
 function QuestionCard({
   index,
+  isSavingExample,
   question,
   onDelete,
   onEdit,
+  onSaveExample,
 }: {
   index: number;
+  isSavingExample: boolean;
   question: AdminQuizQuestion | AdminTestQuestion;
   onDelete: () => void;
   onEdit: () => void;
+  onSaveExample?: (
+    questionId: string,
+    exampleBlock: LessonSummaryExampleBlockData,
+  ) => Promise<unknown>;
 }) {
   const correctAnswers = getStringAnswers(question.correctAnswerJson);
   const statementAnswerById = new Map(
@@ -653,9 +915,90 @@ function QuestionCard({
   );
   const hint = getTiptapDocumentText(question.hintJson);
   const explanation = getTiptapDocumentText(question.explanation?.contentJson);
+  const explanationDiagram = question.explanation?.diagramSpecJson;
+  const savedExampleBlock = useMemo(() => {
+    const candidate = question.sourceMetadataJson?.exampleBlock;
+    return isLessonSummaryExampleBlockData(candidate) ? candidate : null;
+  }, [question.sourceMetadataJson?.exampleBlock]);
+  const [draftExampleBlock, setDraftExampleBlock] =
+    useState<LessonSummaryExampleBlockData | null>(null);
+  const exampleBlock = draftExampleBlock ?? savedExampleBlock;
+  const hasExampleChanges =
+    draftExampleBlock !== null &&
+    JSON.stringify(draftExampleBlock) !== JSON.stringify(savedExampleBlock);
+  const diagramEditor = useMemo<LessonSummaryDiagramEditor | undefined>(() => {
+    if (
+      !onSaveExample ||
+      !exampleBlock?.visual ||
+      exampleBlock.visual.kind !== "DIAGRAM_SPEC"
+    ) {
+      return undefined;
+    }
+    const updateSpec = (spec: typeof exampleBlock.visual.spec) => {
+      setDraftExampleBlock({
+        ...exampleBlock,
+        visual: { kind: "DIAGRAM_SPEC", spec },
+      });
+    };
+    return {
+      disabled: isSavingExample,
+      onRequestAddEqualLength(segmentIds) {
+        const result = addEqualLengthMarkerToLessonSummaryDiagram(
+          exampleBlock.visual?.spec,
+          segmentIds,
+        );
+        if (!result.success) {
+          toast.error(result.reason);
+          return false;
+        }
+        updateSpec(result.spec);
+        return true;
+      },
+      onRequestDelete(target) {
+        const result = deleteLessonSummaryDiagramTarget(
+          exampleBlock.visual?.spec,
+          target,
+        );
+        if (!result.success) {
+          toast.error(result.reason);
+          return;
+        }
+        updateSpec(result.spec);
+      },
+      onRequestReset() {
+        setDraftExampleBlock(null);
+      },
+      onRequestTextEdit(target, nextText) {
+        const result = editLessonSummaryDiagramTargetText(
+          exampleBlock.visual?.spec,
+          target,
+          nextText,
+        );
+        if (!result.success) {
+          toast.error(result.reason);
+          return false;
+        }
+        updateSpec(result.spec);
+        return true;
+      },
+    };
+  }, [exampleBlock, isSavingExample, onSaveExample]);
+
+  const saveExampleChanges = async () => {
+    if (!draftExampleBlock || !onSaveExample) return;
+    try {
+      await onSaveExample(question.id, draftExampleBlock);
+      setDraftExampleBlock(null);
+      toast.success("Đã lưu hình của khối Lời giải trong câu Quiz.");
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(error, "Chưa lưu được hình. Vui lòng thử lại."),
+      );
+    }
+  };
 
   return (
-    <article className="space-y-4 p-4 sm:p-5">
+    <article id={`quiz-question-${question.id}`} className="space-y-4 p-4 sm:p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -780,34 +1123,80 @@ function QuestionCard({
           <ul className="mt-1 space-y-1 text-sm font-extrabold text-[var(--theme-success-text)]">
             {correctAnswers.map((answer, answerIndex) => (
               <li key={`${answerIndex}-${answer}`} className="break-words">
-                {answer}
+                <QuizRichContentViewer
+                  ariaLabel={`Đáp án được chấp nhận ${answerIndex + 1}`}
+                  content={{
+                    type: "doc",
+                    content: [
+                      {
+                        type: "paragraph",
+                        content: [{ type: "text", text: answer }],
+                      },
+                    ],
+                  }}
+                />
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {hint || explanation ? (
-        <div className="grid gap-3 lg:grid-cols-2">
+      {hint || explanation || explanationDiagram || exampleBlock ? (
+        <div className="space-y-3">
           {hint ? (
             <div className="rounded-lg border border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] p-3">
               <p className="flex items-center gap-2 text-xs font-extrabold text-[var(--theme-info-text)]">
                 <CircleHelp className="h-4 w-4" aria-hidden="true" />
                 Gợi ý
               </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--theme-text)]">{hint}</p>
+              <QuizRichContentViewer
+                ariaLabel="Nội dung gợi ý"
+                className="mt-1 text-sm leading-6 text-[var(--theme-text)]"
+                content={question.hintJson}
+              />
             </div>
           ) : null}
-          {explanation ? (
+          {exampleBlock ? (
+            <>
+              <LessonSummaryExampleCard
+                block={exampleBlock}
+                diagramEditor={diagramEditor}
+                label="Lời giải"
+                showEditorialWarning
+                showProblem={false}
+              />
+              {hasExampleChanges ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="theme-button-primary mt-2 inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-extrabold"
+                    disabled={isSavingExample}
+                    onClick={saveExampleChanges}
+                  >
+                    <Save className="h-4 w-4" aria-hidden="true" />
+                    {isSavingExample ? "Đang lưu hình..." : "Lưu hình"}
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : explanation ? (
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
               <p className="text-xs font-extrabold text-[var(--theme-text-muted)]">
                 Lời giải chi tiết
               </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--theme-text)]">
-                {explanation}
-              </p>
+              <div className="mt-1 text-sm leading-6 text-[var(--theme-text)]">
+                <TiptapContentView content={question.explanation?.contentJson} />
+              </div>
             </div>
           ) : null}
+        </div>
+      ) : null}
+      {!exampleBlock && explanationDiagram ? (
+        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
+          <p className="mb-2 text-xs font-extrabold text-[var(--theme-text-muted)]">
+            Hình minh họa lời giải
+          </p>
+          <LessonSummaryDiagram spec={explanationDiagram} showEditorialWarning />
         </div>
       ) : null}
     </article>

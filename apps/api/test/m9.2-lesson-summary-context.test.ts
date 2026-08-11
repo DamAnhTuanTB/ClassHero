@@ -12,7 +12,16 @@ const documentId = "00000000-0000-4000-8000-000000000002";
 function createPrismaMock(tokenCount = 20) {
   return {
     lesson: {
-      findFirst: vi.fn(async () => ({ id: lessonId, title: "Lesson" })),
+      findFirst: vi.fn(async () => ({
+        id: lessonId,
+        title: "Lesson",
+        learningPath: {
+          targetAudiences: [
+            { targetAudience: { grade: 8 } },
+            { targetAudience: { grade: 7 } },
+          ],
+        },
+      })),
     },
     lessonDocument: {
       findMany: vi.fn(async () => [
@@ -48,6 +57,7 @@ describe("M9.2 lesson summary context", () => {
     ]);
     expect(first.sourceHash).toBe(second.sourceHash);
     expect(first.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(first.targetGrade).toBe(7);
   });
 
   it("rejects a selected document that is not ready in the lesson", async () => {
@@ -58,6 +68,25 @@ describe("M9.2 lesson summary context", () => {
     await expect(service.load(lessonId, [documentId])).rejects.toMatchObject({
       code: "AI_CONTEXT_NOT_FOUND",
     } satisfies Partial<LessonSummaryContextError>);
+  });
+
+  it("changes the source hash when the target grade changes", async () => {
+    const prisma = createPrismaMock();
+    const service = new LessonSummaryContextService(prisma as unknown as PrismaService);
+    const gradeSeven = await service.load(lessonId, [documentId]);
+    prisma.lesson.findFirst.mockResolvedValueOnce({
+      id: lessonId,
+      title: "Lesson",
+      learningPath: {
+        targetAudiences: [{ targetAudience: { grade: 8 } }],
+      },
+    });
+
+    const gradeEight = await service.load(lessonId, [documentId]);
+
+    expect(gradeSeven.targetGrade).toBe(7);
+    expect(gradeEight.targetGrade).toBe(8);
+    expect(gradeEight.sourceHash).not.toBe(gradeSeven.sourceHash);
   });
 
   it("fails clearly instead of silently truncating oversized context", async () => {

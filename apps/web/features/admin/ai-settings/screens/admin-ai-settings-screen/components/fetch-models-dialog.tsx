@@ -14,6 +14,7 @@ import { FieldLabel } from "@/components/common/forms/field-label";
 import { sanitizeNumericInput } from "@/features/admin/ai-settings/screens/admin-ai-settings-screen/components/numeric-settings-field";
 import type { createProviderCatalogItem } from "@/features/admin/ai-settings/api/provider-operations-api";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 type FetchedModel = {
   provider: string;
@@ -99,7 +100,12 @@ export function FetchModelsDialog({
           }),
         });
       } catch (error) {
-        setFetchError(error instanceof Error ? error.message : "Đã có lỗi xảy ra");
+        setFetchError(
+          getUserFacingErrorMessage(
+            error,
+            "Chưa tải được danh sách mô hình. Vui lòng thử lại.",
+          ),
+        );
       } finally {
         setIsFetching(false);
       }

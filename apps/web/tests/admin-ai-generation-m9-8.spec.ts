@@ -67,12 +67,12 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeEnabled();
     await summaryDialog.getByRole("button", { name: "Hủy" }).click();
 
-    await generationCard(page, "Quiz").getByRole("button", { name: "Cấu hình" }).click();
+    await generationCard(page, "Quiz").getByRole("button", { name: "Tạo Quiz" }).click();
     const quizDialog = page.getByRole("dialog", { name: "Tạo Quiz bằng AI" });
     await quizDialog.getByLabel("Số câu hỏi").fill("2");
     await expect(
       quizDialog.getByText("Số câu phải lớn hơn hoặc bằng số loại câu hỏi đã chọn"),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await quizDialog.getByLabel("Nhiều mệnh đề Đúng / Sai").uncheck();
     await quizDialog.getByLabel("Nhập đáp án").uncheck();
     await expect(
@@ -81,15 +81,33 @@ test.describe("M9.8 admin AI generation panel", () => {
     await quizDialog.getByLabel("Mức độ").click();
     await quizDialog.getByRole("option", { name: "Khó" }).click();
     await expect(quizDialog.getByLabel("Mức độ")).toContainText("Khó");
+    await quizDialog.getByRole("button", { name: "Model", exact: true }).click();
+    await quizDialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
+    await quizDialog.getByLabel("Temperature").fill("0.1");
+    await quizDialog.getByLabel("Giới hạn token đầu ra").fill("8000");
     await quizDialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
 
     await expect
       .poll(() => mock.payloads.QUIZ)
-      .toEqual({
+      .toMatchObject({
         questionCount: 2,
         difficulty: "HARD",
         questionTypes: ["MULTIPLE_CHOICE", "TRUE_FALSE"],
+        systemInstructions: "SYSTEM PROMPT THỰC TẾ",
+        userPrompt: expect.stringContaining('"questionCount":2'),
+        model: "gpt-4.1-mini",
+        temperature: 0.1,
+        maxOutputTokens: 8_000,
       });
+    expect(mock.promptPreviewPayloads.at(-1)).toMatchObject({
+      questionCount: 2,
+      difficulty: "HARD",
+      questionTypes: ["MULTIPLE_CHOICE", "TRUE_FALSE"],
+      model: "gpt-4.1-mini",
+      temperature: 0.1,
+      maxOutputTokens: 8_000,
+    });
+    expect(mock.promptPreviewPayloads.at(-1)).not.toHaveProperty("userPrompt");
     await expect(page.getByRole("tab", { name: /Quiz AI/ })).toBeVisible();
     await expect(page.getByText("Cần duyệt", { exact: true }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -182,15 +200,15 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       dialog.getByText("Xem lại dữ liệu theo các lựa chọn hiện tại."),
     ).toBeVisible();
-    await expect(dialog.getByRole("tab", { name: "System instructions" })).toBeVisible();
-    await expect(dialog.getByLabel("System instructions")).toHaveValue(
+    await expect(dialog.getByRole("tab", { name: "Quy tắc hệ thống" })).toBeVisible();
+    await expect(dialog.getByLabel("Quy tắc hệ thống")).toHaveValue(
       "SYSTEM PROMPT THỰC TẾ",
     );
-    await dialog.getByLabel("System instructions").fill("SYSTEM CUSTOM");
+    await dialog.getByLabel("Quy tắc hệ thống").fill("SYSTEM CUSTOM");
 
-    await dialog.getByRole("tab", { name: "User prompt" }).click();
-    await dialog.getByLabel("User prompt").fill("USER CUSTOM");
-    await dialog.getByRole("tab", { name: "Input đầy đủ" }).click();
+    await dialog.getByRole("tab", { name: "Câu lệnh người dùng" }).click();
+    await dialog.getByLabel("Câu lệnh người dùng").fill("USER CUSTOM");
+    await dialog.getByRole("tab", { name: "Dữ liệu gửi đi" }).click();
     const fullInputPanel = dialog.getByRole("tabpanel");
     await fullInputPanel.getByRole("button", { name: "Xổ toàn bộ" }).click();
     await expect(fullInputPanel).toContainText('"instructions":"SYSTEM CUSTOM"');
@@ -223,14 +241,17 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByLabel("Giới hạn token đầu ra").fill("8000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect.poll(() => mock.promptPreviewPayloads.length).toBeGreaterThan(1);
-    await dialog.getByRole("tab", { name: "User prompt" }).click();
-    await expect(dialog.getByLabel("User prompt")).toHaveValue(/"targetWordCount":350/);
-    expect(mock.promptPreviewPayloads.at(-1)).not.toHaveProperty("userPrompt");
+    await dialog.getByRole("tab", { name: "Câu lệnh người dùng" }).click();
+    await expect(dialog.getByLabel("Câu lệnh người dùng")).toHaveValue("USER CUSTOM");
+    expect(mock.promptPreviewPayloads.at(-1)).toMatchObject({
+      systemInstructions: "SYSTEM CUSTOM",
+      userPrompt: "USER CUSTOM",
+    });
 
     const resolvedSystemPrompt = `SYSTEM PROMPT THỰC TẾ\n${"S".repeat(15_501)}`;
-    await dialog.getByRole("tab", { name: "System instructions" }).click();
-    await dialog.getByLabel("System instructions").fill(resolvedSystemPrompt);
-    await expect(dialog.getByText(/System instructions tối đa/u)).toHaveCount(0);
+    await dialog.getByRole("tab", { name: "Quy tắc hệ thống" }).click();
+    await dialog.getByLabel("Quy tắc hệ thống").fill(resolvedSystemPrompt);
+    await expect(dialog.getByText(/Quy tắc hệ thống tối đa/u)).toHaveCount(0);
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
       .poll(() => mock.payloads.SUMMARY)
@@ -243,7 +264,7 @@ test.describe("M9.8 admin AI generation panel", () => {
         targetWordCount: 350,
         extraInstructions: "Dùng tiêu đề ngắn",
         systemInstructions: resolvedSystemPrompt,
-        userPrompt: expect.stringContaining('"targetWordCount":350'),
+        userPrompt: "USER CUSTOM",
         model: "gpt-4.1-mini",
         temperature: 0.1,
         maxOutputTokens: 8_000,
@@ -262,7 +283,7 @@ test.describe("M9.8 admin AI generation panel", () => {
       .getByRole("button", { name: "Cấu hình" })
       .click();
     const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
-    await expect(dialog.getByLabel("System instructions")).toHaveValue(
+    await expect(dialog.getByLabel("Quy tắc hệ thống")).toHaveValue(
       "SYSTEM PROMPT THỰC TẾ",
     );
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
@@ -279,7 +300,7 @@ test.describe("M9.8 admin AI generation panel", () => {
       (button as HTMLButtonElement).click();
     });
     await expect.poll(() => mock.promptPreviewPayloads.length).toBe(2);
-    await dialog.getByRole("tab", { name: "Input đầy đủ" }).click();
+    await dialog.getByRole("tab", { name: "Dữ liệu gửi đi" }).click();
     await expect(dialog.getByRole("tabpanel")).toContainText(
       '"reasoning_effort":"xhigh"',
     );
@@ -291,7 +312,8 @@ test.describe("M9.8 admin AI generation panel", () => {
       .toEqual({
         documentIds: [documentId],
         style: "student_friendly",
-        styleInstructions: "Dễ hiểu cho học sinh khối 7.",
+        styleInstructions:
+          "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
         length: "standard",
         systemInstructions: "SYSTEM PROMPT THỰC TẾ",
         userPrompt: expect.stringContaining("USER PROMPT"),
@@ -326,7 +348,8 @@ test.describe("M9.8 admin AI generation panel", () => {
       .toEqual({
         documentIds: [documentId],
         style: "student_friendly",
-        styleInstructions: "Dễ hiểu cho học sinh khối 7.",
+        styleInstructions:
+          "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
         length: "standard",
         extraInstructions: "Chỉ dùng cho lần tạo này",
         systemInstructions: "SYSTEM PROMPT THỰC TẾ",
@@ -352,7 +375,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       page.getByText("Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ."),
     ).toBeVisible();
-    const diagram = page.getByRole("img", {
+    const diagram = page.getByRole("group", {
       name: "Tam giác ABC vuông tại A, dựng đúng tỉ lệ theo tọa độ.",
     });
     await expect(diagram).toBeVisible();
@@ -363,10 +386,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     expect((renderedViewBox?.[0] ?? 0) + (renderedViewBox?.[2] ?? 0)).toBeGreaterThan(8);
     await expect(diagram.locator("line").first()).toHaveAttribute("stroke-width", "1.75");
     await expect(diagram.locator("circle")).toHaveCount(0);
-    await expect(diagram.locator("polyline").first()).toHaveAttribute(
-      "stroke-width",
-      "2",
-    );
+    await expect(
+      diagram.locator("polyline:not([aria-hidden='true'])").first(),
+    ).toHaveAttribute("stroke-width", "2");
     await expect(diagram).toContainText("∠B");
     await expect(diagram).not.toContainText("$\\angle B$");
     const segmentLabel = diagram.getByText("AC = 7 cm");
@@ -407,7 +429,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(dialog.getByLabel("Temperature")).toHaveCount(0);
     await expect(dialog.getByLabel("Giới hạn token đầu ra")).toHaveCount(0);
     await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
-      "Dễ hiểu cho học sinh khối 7.",
+      "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
     );
     await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveValue("");
     await expectNoHorizontalOverflow(page);
@@ -417,6 +439,11 @@ test.describe("M9.8 admin AI generation panel", () => {
   test("keeps recoverable blocks visible with actionable review guidance", async ({
     page,
   }, testInfo) => {
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
     await setupAiGenerationMock(page, {
       initialSummaryContent: partialReviewSummaryContent(),
     });
@@ -429,6 +456,23 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeVisible();
     await expect(page.getByText("Vấn đề:").first()).toBeVisible();
     await expect(page.getByText("Gợi ý sửa:").first()).toBeVisible();
+    const geometryStatement = page.getByRole("table", {
+      name: "Bảng giả thiết và kết luận",
+    });
+    await expect(geometryStatement).toBeVisible();
+    await expect(geometryStatement.getByRole("rowheader", { name: "GT" })).toHaveClass(
+      /border-r-2/u,
+    );
+    await expect(geometryStatement.getByRole("rowheader", { name: "KL" })).toHaveClass(
+      /border-r-2/u,
+    );
+    await expect(geometryStatement.getByRole("row").first()).toHaveClass(/border-b-2/u);
+    await expect(page.getByText("Chứng minh", { exact: true })).toBeVisible();
+    await expect(page.getByText("Nhận xét:", { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText("Hai cạnh góc vuông tương ứng phải được đối chiếu đúng thứ tự."),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page);
     await expect(page.getByRole("button", { name: "Phát hành" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Chấp nhận hình này" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Chấp nhận khối này" })).toBeVisible();
@@ -532,6 +576,412 @@ test.describe("M9.8 admin AI generation panel", () => {
     });
   });
 
+  test("deletes only safe diagram labels and markers from the admin draft", async ({
+    page,
+  }, testInfo) => {
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: editableDiagramSummaryContent(),
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    if (testInfo.project.name === "webkit-mobile") {
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    }
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    const diagram = summaryTab.locator("figure[data-diagram-editable='true']");
+    await expect(diagram).toHaveCount(1);
+    await expect(diagram.locator("[data-diagram-edit-kind='POINT_LABEL']")).toHaveCount(
+      6,
+    );
+    await expect(diagram.locator("[data-diagram-edit-kind='ANGLE_LABEL']")).toHaveCount(
+      1,
+    );
+    await expect(diagram.locator("[data-diagram-edit-kind='MARKER']")).toHaveCount(5);
+    await expect(diagram.locator("line[data-diagram-edit-kind]")).toHaveCount(0);
+
+    const angleLabel = diagram.locator("[data-diagram-angle-label='true']");
+    await angleLabel.click();
+    const deleteButton = diagram.getByRole("button", {
+      name: "Xóa số đo góc “35°”",
+    });
+    await expect(deleteButton).toBeVisible();
+    await expect(angleLabel).toHaveAttribute("data-diagram-selected", "true");
+    await expect(diagram.getByTestId("diagram-element-toolbar")).toBeVisible();
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-13-diagram-delete-captures/${testInfo.project.name}-selected.png`,
+    });
+    const scrollBeforeDelete = await page.evaluate(() => window.scrollY);
+    await deleteButton.click();
+    await expectStablePageScroll(page, scrollBeforeDelete);
+    await expect(page.getByRole("dialog", { name: "Xóa phần tử trên hình" })).toHaveCount(
+      0,
+    );
+    await expect(diagram.locator("[data-diagram-angle-label='true']")).toHaveCount(0);
+    await expect(diagram.locator("[data-diagram-marker-type='ANGLE']")).toHaveCount(1);
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    const reloadedDiagram = summaryTab.locator("figure[data-diagram-editable='true']");
+    await expect(
+      reloadedDiagram.locator("[data-diagram-angle-label='true']"),
+    ).toHaveCount(1);
+
+    const reloadedAngleLabel = reloadedDiagram.locator(
+      "[data-diagram-angle-label='true']",
+    );
+    await reloadedAngleLabel.click();
+    await reloadedDiagram.getByRole("button", { name: "Xóa số đo góc “35°”" }).click();
+    await page.getByRole("button", { name: "Lưu nội dung" }).click();
+    await expect.poll(() => mock.summaryPutPayloads.length).toBe(1);
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await expect(summaryTab.locator("[data-diagram-angle-label='true']")).toHaveCount(0);
+
+    const equalMarker = summaryTab.locator("[data-diagram-marker-type='EQUAL_LENGTH']");
+    await equalMarker.scrollIntoViewIfNeeded();
+    if (testInfo.project.name === "webkit-mobile") {
+      await equalMarker.focus();
+      await equalMarker.press("Enter");
+    } else {
+      const equalMarkerBounds = await equalMarker
+        .locator("line:not([aria-hidden='true'])")
+        .first()
+        .boundingBox();
+      expect(equalMarkerBounds).not.toBeNull();
+      if (!equalMarkerBounds) throw new Error("Không xác định được vị trí marker");
+      const equalMarkerPoint = {
+        x: equalMarkerBounds.x + equalMarkerBounds.width / 2,
+        y: equalMarkerBounds.y + equalMarkerBounds.height / 2,
+      };
+      const equalMarkerHitTarget = await page.evaluate(({ x, y }) => {
+        const element = document.elementFromPoint(x, y);
+        return element
+          ?.closest("[data-diagram-marker-type]")
+          ?.getAttribute("data-diagram-marker-type");
+      }, equalMarkerPoint);
+      expect(equalMarkerHitTarget).toBe("EQUAL_LENGTH");
+      await page.mouse.click(equalMarkerPoint.x, equalMarkerPoint.y);
+    }
+    await expect(
+      summaryTab.getByRole("button", {
+        name: "Xóa nhóm ký hiệu đoạn thẳng bằng nhau",
+      }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(summaryTab.getByTestId("diagram-delete-target")).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+  });
+
+  test("edits point names, auxiliary labels and angle measurements in the admin draft", async ({
+    page,
+  }, testInfo) => {
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: editableDiagramSummaryContent(),
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    const diagram = summaryTab.locator("figure[data-diagram-editable='true']");
+    const pointA = diagram.locator("[data-diagram-point-label-id='A']");
+    if (testInfo.project.name === "webkit-mobile") {
+      await pointA.focus();
+      await pointA.press("Enter");
+    } else {
+      await pointA.click();
+    }
+    await expect(diagram.getByRole("button", { name: "Sửa tên điểm “A”" })).toBeVisible();
+    await expect(diagram.getByRole("button", { name: "Xóa tên điểm “A”" })).toHaveCount(
+      0,
+    );
+    await diagram.getByRole("button", { name: "Sửa tên điểm “A”" }).click();
+    const pointInput = diagram.getByRole("textbox", {
+      name: "Nội dung mới cho tên điểm “A”",
+    });
+    await expect(pointInput).toBeFocused();
+    await pointInput.fill("AB′");
+    await diagram.getByRole("button", { name: "Lưu tên điểm “A”" }).click();
+    await expect(
+      page.getByText(/Tên điểm chỉ được gồm một chữ cái in hoa/u),
+    ).toBeVisible();
+    await expect(page.getByText(/Point labels must/u)).toHaveCount(0);
+    await expect(pointInput).toBeVisible();
+    await pointInput.fill("M");
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-13-diagram-edit-captures/${testInfo.project.name}-point-input.png`,
+    });
+    const scrollBeforePointEdit = await page.evaluate(() => window.scrollY);
+    await diagram.getByRole("button", { name: "Lưu tên điểm “A”" }).click();
+    await expectStablePageScroll(page, scrollBeforePointEdit);
+    await expect(pointA).toHaveText("M");
+    await expect(page.getByText(/Hãy rà soát đề bài, GT–KL và lời giải/u)).toBeVisible();
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+
+    const lengthLabel = diagram.locator("[data-diagram-label-text='5 cm']").first();
+    if (testInfo.project.name === "webkit-mobile") {
+      await lengthLabel.focus();
+      await lengthLabel.press("Enter");
+    } else {
+      await lengthLabel.click();
+    }
+    await diagram.getByRole("button", { name: "Sửa nhãn “5 cm”" }).click();
+    const lengthInput = diagram.getByRole("textbox", {
+      name: "Nội dung mới cho nhãn “5 cm”",
+    });
+    await lengthInput.fill("6 cm");
+    await lengthInput.press("Enter");
+    await expect(diagram.locator("[data-diagram-label-text='6 cm']")).toHaveCount(1);
+
+    const angleLabel = diagram.locator("[data-diagram-angle-label='true']");
+    if (testInfo.project.name === "webkit-mobile") {
+      await angleLabel.focus();
+      await angleLabel.press("Enter");
+    } else {
+      await angleLabel.click();
+    }
+    await diagram.getByRole("button", { name: "Sửa số đo góc “35°”" }).click();
+    const angleInput = diagram.getByRole("textbox", {
+      name: "Nội dung mới cho số đo góc “35°”",
+    });
+    await angleInput.fill("40°");
+    await diagram.getByRole("button", { name: "Lưu số đo góc “35°”" }).click();
+    await expect(angleLabel).toHaveText("40°");
+    await page.getByRole("button", { name: "Lưu nội dung" }).click();
+    await expect.poll(() => mock.summaryPutPayloads.length).toBe(1);
+
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await expect(summaryTab.locator("[data-diagram-point-label-id='A']")).toHaveText("M");
+    await expect(summaryTab.locator("[data-diagram-label-text='6 cm']")).toHaveCount(1);
+    await expect(summaryTab.locator("[data-diagram-angle-label='true']")).toHaveText(
+      "40°",
+    );
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+  });
+
+  test("edits or deletes the caption directly and resets all diagram changes in the session", async ({
+    page,
+  }, testInfo) => {
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: editableDiagramSummaryContent(),
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    const diagram = summaryTab.locator("figure[data-diagram-editable='true']");
+    const originalCaption = "Hai tam giác vuông bằng nhau";
+    const caption = diagram.locator("[data-diagram-caption='true']");
+    await caption.click();
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-13-diagram-caption-captures/${testInfo.project.name}-selected.png`,
+    });
+    await diagram
+      .getByRole("button", { name: `Sửa chú thích hình “${originalCaption}”` })
+      .click();
+    const captionInput = diagram.getByRole("textbox", {
+      name: `Nội dung mới cho chú thích hình “${originalCaption}”`,
+    });
+    await captionInput.fill("Hai tam giác vuông tương ứng");
+    await captionInput.press("Enter");
+    await expect(caption).toHaveText("Hai tam giác vuông tương ứng");
+
+    await caption.click();
+    await diagram
+      .getByRole("button", {
+        name: "Xóa chú thích hình “Hai tam giác vuông tương ứng”",
+      })
+      .click();
+    await expect(diagram.locator("[data-diagram-caption='true']")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    const pointA = diagram.locator("[data-diagram-point-label-id='A']");
+    await pointA.focus();
+    await pointA.press("Enter");
+    await diagram.getByRole("button", { name: "Sửa tên điểm “A”" }).click();
+    const pointInput = diagram.getByRole("textbox", {
+      name: "Nội dung mới cho tên điểm “A”",
+    });
+    await pointInput.fill("M");
+    await pointInput.press("Enter");
+    await expect(pointA).toHaveText("M");
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+
+    const resetButton = diagram.getByRole("button", {
+      name: "Khôi phục hình về đầu phiên chỉnh sửa",
+    });
+    await resetButton.click();
+    const resetDialog = page.getByRole("dialog", { name: "Khôi phục hình" });
+    await expect(resetDialog).toContainText(
+      "Mọi chỉnh sửa của hình này trong bản nháp ở phiên hiện tại sẽ bị khôi phục",
+    );
+    await resetDialog.getByRole("button", { name: "Hủy" }).click();
+    await expect(pointA).toHaveText("M");
+    await expect(diagram.locator("[data-diagram-caption='true']")).toHaveCount(0);
+
+    await resetButton.click();
+    await expect(resetDialog).toBeVisible();
+    await page.waitForTimeout(250);
+    await page.screenshot({
+      path: `../../tmp/m9-15-diagram-reset-captures/${testInfo.project.name}-confirm.png`,
+    });
+    const scrollBeforeReset = await page.evaluate(() => window.scrollY);
+    await resetDialog.getByRole("button", { name: "Khôi phục hình" }).click();
+    await expectStablePageScroll(page, scrollBeforeReset);
+    await expect(diagram.locator("[data-diagram-point-label-id='A']")).toHaveText("A");
+    await expect(diagram.locator("[data-diagram-caption='true']")).toHaveText(
+      originalCaption,
+    );
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+  });
+
+  test("creates an equal-length marker only from multiple named-endpoint segments", async ({
+    page,
+  }, testInfo) => {
+    if (testInfo.project.name === "webkit-mobile") {
+      await page.addInitScript(() =>
+        window.localStorage.setItem("classhero-theme", "dark"),
+      );
+    }
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: editableDiagramSummaryContent(),
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    const diagram = summaryTab.locator("figure[data-diagram-editable='true']");
+    await expect(diagram.locator("[data-diagram-segment-selectable='true']")).toHaveCount(
+      4,
+    );
+    const segmentBC = diagram.locator("[data-diagram-segment-id='BC']");
+    const segmentEF = diagram.locator("[data-diagram-segment-id='EF']");
+    if (testInfo.project.name === "webkit-mobile") {
+      await segmentBC.focus();
+      await segmentBC.press("Enter");
+    } else {
+      await segmentBC.scrollIntoViewIfNeeded();
+      const segmentBCBounds = await segmentBC.locator("line").boundingBox();
+      expect(segmentBCBounds).not.toBeNull();
+      if (!segmentBCBounds) throw new Error("Không xác định được vị trí đoạn BC");
+      await page.mouse.click(
+        segmentBCBounds.x + segmentBCBounds.width / 2,
+        segmentBCBounds.y + segmentBCBounds.height / 2,
+      );
+    }
+    await expect
+      .poll(() =>
+        diagram
+          .locator("[data-diagram-segment-selected='true']")
+          .evaluateAll((segments) =>
+            segments.map((segment) => segment.getAttribute("data-diagram-segment-id")),
+          ),
+      )
+      .toEqual(["BC"]);
+    await expect(diagram.getByTestId("diagram-segment-toolbar")).toHaveCount(0);
+    if (testInfo.project.name === "webkit-mobile") {
+      await segmentEF.focus();
+      await segmentEF.press("Enter");
+    } else {
+      await segmentEF.scrollIntoViewIfNeeded();
+      const segmentEFBounds = await segmentEF.locator("line").boundingBox();
+      expect(segmentEFBounds).not.toBeNull();
+      if (!segmentEFBounds) throw new Error("Không xác định được vị trí đoạn EF");
+      await page.mouse.click(
+        segmentEFBounds.x + segmentEFBounds.width / 2,
+        segmentEFBounds.y + segmentEFBounds.height / 2,
+      );
+    }
+    await expect(segmentBC).toHaveAttribute("data-diagram-segment-selected", "true");
+    await expect(segmentEF).toHaveAttribute("data-diagram-segment-selected", "true");
+    await expect(diagram.getByText("2 đoạn đã chọn")).toHaveCount(0);
+    await expect(
+      diagram.getByRole("button", { name: "Bỏ chọn các đoạn thẳng" }),
+    ).toHaveCount(0);
+    const createEqualButton = diagram.getByRole("button", {
+      name: "Đánh dấu 2 đoạn thẳng bằng nhau",
+    });
+    await expect(createEqualButton).toBeVisible();
+    await summaryTab.screenshot({
+      path: `../../tmp/m9-14-diagram-equal-length-captures/${testInfo.project.name}-selected.png`,
+    });
+    const scrollBeforeEqualLength = await page.evaluate(() => window.scrollY);
+    await createEqualButton.click();
+    await expectStablePageScroll(page, scrollBeforeEqualLength);
+    await expect(
+      diagram.locator("[data-diagram-marker-type='EQUAL_LENGTH']"),
+    ).toHaveCount(2);
+    await expect(diagram.locator("[data-diagram-segment-selectable='true']")).toHaveCount(
+      2,
+    );
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await expect(
+      summaryTab.locator("[data-diagram-marker-type='EQUAL_LENGTH']"),
+    ).toHaveCount(1);
+    const reloadedDiagram = summaryTab.locator("figure[data-diagram-editable='true']");
+    for (const segmentId of ["BC", "EF"]) {
+      const segment = reloadedDiagram.locator(`[data-diagram-segment-id='${segmentId}']`);
+      await segment.focus();
+      await segment.press("Enter");
+    }
+    await reloadedDiagram
+      .getByRole("button", { name: "Đánh dấu 2 đoạn thẳng bằng nhau" })
+      .click();
+    await page.getByRole("button", { name: "Lưu nội dung" }).click();
+    await expect.poll(() => mock.summaryPutPayloads.length).toBe(1);
+    await page.reload();
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await expect(
+      summaryTab.locator("[data-diagram-marker-type='EQUAL_LENGTH']"),
+    ).toHaveCount(2);
+    await expectNoHorizontalOverflow(page);
+    await expectNoFrameworkOverlay(page);
+  });
+
+  test("requires withdrawal before direct diagram deletion", async ({ page }) => {
+    await setupAiGenerationMock(page, {
+      initialReviewStatus: "APPROVED",
+      initialSummaryContent: editableDiagramSummaryContent(),
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const summaryTab = page.getByTestId("admin-lesson-summary-tab");
+    await expect(summaryTab.getByTestId("diagram-edit-withdraw-required")).toBeVisible();
+    await expect(summaryTab.locator("figure[data-diagram-editable='true']")).toHaveCount(
+      0,
+    );
+    await expect(summaryTab.locator("[data-diagram-edit-kind]")).toHaveCount(0);
+    await expect(summaryTab.locator("[data-diagram-segment-selectable]")).toHaveCount(0);
+    await expect(
+      summaryTab.getByRole("button", { name: "Thu hồi phát hành" }),
+    ).toBeVisible();
+  });
+
   test("renders the saved gpt-5.4 Bài 15 live artifact", async ({ page }, testInfo) => {
     test.skip(process.env.RUN_M9_2_PARTIAL_RECOVERY_LIVE_VISUAL !== "1");
     if (testInfo.project.name === "webkit-mobile") {
@@ -569,7 +1019,7 @@ test.describe("M9.8 admin AI generation panel", () => {
         .filter({ hasText: "Cho tam giác" })
         .first(),
     ).toBeVisible();
-    await expect(summaryTab.locator("figure > svg[role='img']")).toHaveCount(6);
+    await expect(summaryTab.locator("figure > svg")).toHaveCount(6);
     await expect
       .poll(async () => {
         return summaryTab.locator(".mmd-content:visible").evaluateAll((nodes) => {
@@ -629,6 +1079,7 @@ async function seedAdminSession(page: Page) {
 async function setupAiGenerationMock(
   page: Page,
   options: {
+    initialReviewStatus?: "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "HIDDEN";
     runningPolls?: number;
     initialSummaryContent?: unknown;
     lessonTitle?: string;
@@ -670,7 +1121,7 @@ async function setupAiGenerationMock(
           lessonId,
           contentJson: options.initialSummaryContent,
           source: "AI",
-          reviewStatus: "NEEDS_REVIEW",
+          reviewStatus: options.initialReviewStatus ?? "NEEDS_REVIEW",
           aiGenerationId: "generation-review",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -726,29 +1177,28 @@ async function setupAiGenerationMock(
     }
     if (
       method === "POST" &&
-      pathname === `/admin/lessons/${lessonId}/summary/prompt-preview`
+      (pathname === `/admin/lessons/${lessonId}/summary/prompt-preview` ||
+        pathname === `/admin/lessons/${lessonId}/quiz-sets/prompt-preview`)
     ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       promptPreviewPayloads.push(body);
-      const systemPrompt =
-        body.systemInstructions && body.systemInstructions !== "SYSTEM PROMPT THỰC TẾ"
-          ? `SYSTEM PROMPT THỰC TẾ\n${String(body.systemInstructions)}`
-          : "SYSTEM PROMPT THỰC TẾ";
+      const systemPrompt = body.systemInstructions
+        ? String(body.systemInstructions)
+        : "SYSTEM PROMPT THỰC TẾ";
+      const userPrompt = body.userPrompt
+        ? String(body.userPrompt)
+        : `USER PROMPT ${JSON.stringify(body)}`;
       return fulfillJson(route, 200, {
         data: {
           promptVersion: "lesson-summary-prompt-v40",
           schemaVersion: "lesson-summary-schema-v32",
           systemPrompt,
-          userPrompt: `USER PROMPT ${JSON.stringify(body)}`,
-          inputPrompt: `USER PROMPT ${JSON.stringify(
-            body,
-          )}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
+          userPrompt,
+          inputPrompt: `${userPrompt}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
           openAiRequest: {
             model: body.model ?? "gpt-4.1-mini",
             instructions: systemPrompt,
-            input: `USER PROMPT ${JSON.stringify(
-              body,
-            )}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
+            input: `${userPrompt}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
             text: {
               format: {
                 type: "json_schema",
@@ -892,6 +1342,132 @@ async function setupAiGenerationMock(
   };
 }
 
+function editableDiagramSummaryContent() {
+  return {
+    type: "lesson_summary_blocks",
+    version: 2,
+    data: {
+      lessonId,
+      targetGrade: 7,
+      title: "Hai tam giác vuông",
+      objectives: ["Nhận biết các yếu tố tương ứng bằng nhau."],
+      sections: [
+        {
+          order: 1,
+          sourceHeading: "Hai tam giác vuông",
+          displayHeading: "Hai tam giác vuông",
+          sourceChunkIds: [documentId],
+          blocks: [
+            {
+              type: "knowledge",
+              title: "Trường hợp bằng nhau",
+              content: "Quan sát các cạnh và góc tương ứng trên hình.",
+              sourceChunkIds: [documentId],
+              visual: {
+                kind: "DIAGRAM_SPEC",
+                spec: {
+                  version: 1,
+                  coordinateSystem: "CARTESIAN",
+                  viewBox: { minX: -1, minY: -1, width: 12, height: 6 },
+                  toScale: true,
+                  points: [
+                    { id: "A", x: 0, y: 0, label: "A", pointStyle: "NONE" },
+                    { id: "B", x: 0, y: 4, label: "B", pointStyle: "NONE" },
+                    { id: "C", x: 3, y: 0, label: "C", pointStyle: "NONE" },
+                    { id: "D", x: 6, y: 0, label: "D", pointStyle: "NONE" },
+                    { id: "E", x: 6, y: 4, label: "E", pointStyle: "NONE" },
+                    { id: "F", x: 9, y: 0, label: "F", pointStyle: "NONE" },
+                  ],
+                  primitives: [
+                    {
+                      id: "AB",
+                      type: "SEGMENT",
+                      from: "A",
+                      to: "B",
+                      style: "SOLID",
+                    },
+                    {
+                      id: "BC",
+                      type: "SEGMENT",
+                      from: "B",
+                      to: "C",
+                      style: "SOLID",
+                    },
+                    {
+                      id: "CA",
+                      type: "SEGMENT",
+                      from: "C",
+                      to: "A",
+                      style: "SOLID",
+                    },
+                    {
+                      id: "DE",
+                      type: "SEGMENT",
+                      from: "D",
+                      to: "E",
+                      style: "SOLID",
+                    },
+                    {
+                      id: "EF",
+                      type: "SEGMENT",
+                      from: "E",
+                      to: "F",
+                      style: "SOLID",
+                    },
+                    {
+                      id: "FD",
+                      type: "SEGMENT",
+                      from: "F",
+                      to: "D",
+                      style: "SOLID",
+                    },
+                  ],
+                  markers: [
+                    { type: "RIGHT_ANGLE", vertex: "A", armPointIds: ["B", "C"] },
+                    { type: "RIGHT_ANGLE", vertex: "D", armPointIds: ["E", "F"] },
+                    {
+                      type: "ANGLE",
+                      vertex: "B",
+                      armPointIds: ["A", "C"],
+                      label: "35°",
+                    },
+                    {
+                      type: "EQUAL_LENGTH",
+                      segmentIds: ["AB", "DE"],
+                      markCount: 1,
+                    },
+                    {
+                      type: "PARALLEL",
+                      segmentIds: ["CA", "FD"],
+                      markCount: 1,
+                    },
+                  ],
+                  labels: [
+                    {
+                      text: "5 cm",
+                      anchorPointId: "A",
+                      anchorPrimitiveId: "AB",
+                      position: "LEFT",
+                    },
+                    {
+                      text: "5 cm",
+                      anchorPointId: "D",
+                      anchorPrimitiveId: "DE",
+                      position: "LEFT",
+                    },
+                  ],
+                  caption: "Hai tam giác vuông bằng nhau",
+                },
+              },
+            },
+          ],
+        },
+      ],
+      reviewIssues: [],
+    },
+  };
+}
+
 function partialReviewSummaryContent() {
   const fingerprint = "a".repeat(64);
   return {
@@ -899,6 +1475,7 @@ function partialReviewSummaryContent() {
     version: 2,
     data: {
       lessonId,
+      targetGrade: 7,
       title: "Ba trường hợp bằng nhau của tam giác vuông",
       objectives: ["Nhận biết trường hợp cạnh huyền và cạnh góc vuông."],
       sections: [
@@ -978,6 +1555,14 @@ function partialReviewSummaryContent() {
               problem: "Chứng minh hai tam giác vuông bằng nhau.",
               solution: "Đối chiếu cạnh huyền và cạnh góc vuông tương ứng.",
               answer: "[Cần bổ sung đáp án]",
+              geometryStatement: {
+                hypotheses: [
+                  "$\\triangle ABC$ và $\\triangle DEF$ vuông tại $A$ và $D$.",
+                  "$BC=EF$.",
+                  "$AB=DE$.",
+                ],
+                conclusions: ["$\\triangle ABC=\\triangle DEF$."],
+              },
               reviewIssues: [
                 {
                   id: "answer-review",
@@ -990,6 +1575,12 @@ function partialReviewSummaryContent() {
                   accepted: false,
                 },
               ],
+            },
+            {
+              type: "note",
+              content:
+                "Nhận xét: Hai cạnh góc vuông tương ứng phải được đối chiếu đúng thứ tự.",
+              sourceChunkIds: [documentId],
             },
           ],
         },
@@ -1267,6 +1858,17 @@ async function expectNoHorizontalOverflow(page: Page) {
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(sizes.scrollWidth).toBeLessThanOrEqual(sizes.clientWidth + 1);
+}
+
+async function expectStablePageScroll(page: Page, expectedScrollY: number) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolveFrame) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())),
+      ),
+  );
+  const actualScrollY = await page.evaluate(() => window.scrollY);
+  expect(Math.abs(actualScrollY - expectedScrollY)).toBeLessThanOrEqual(1);
 }
 
 async function expectNoFrameworkOverlay(page: Page) {

@@ -19,9 +19,26 @@ Update note 2026-07-26:
 Update note 2026-08-03:
 
 - Riêng cụm AI được đồng bộ lại theo thứ tự
-  `M9.1 -> M9.2 -> M9.3 -> M9.8 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
+  `M9.1 -> M9.2 -> M9.3 -> M9.8 -> M9.16 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
 - `M9.4` và `M9.5` là `UI + API`; `M9.8` chỉ là panel quản trị cho
   `M9.2-M9.3`, không thay thế UI học sinh.
+- `M9.13-M9.15` là chuỗi corrective Done ngày 2026-08-11: admin sửa/xóa
+  label-marker-caption, thêm dấu bằng nhau từ nhiều segment có tên và reset riêng
+  một hình trong draft; dùng PUT hiện có, phụ thuộc `M9.2/M9.8` nhưng không chặn
+  `M9.4`.
+- `M9.16` Planned ngày 2026-08-11 tại
+  `.codex/plans/m9-16-lesson-summary-prompt-contract-hardening-plan.md`: loại
+  contract lặp, giữ prompt hiệu lực do admin sửa theo cơ chế thay thế nguyên văn,
+  chống preview stale và mở learner profile/GT–KL/diagram grade tới lớp 12. Task
+  này phải xong trước `M9.4`.
+- Plan hardening M9.3 được đồng bộ ngày 2026-08-11 tại
+  `.codex/plans/m9-3-ai-quiz-generation-completion-plan.md`; các subtask lõi
+  M9.3/M9.8/M7.2/M7.4 vẫn giữ trạng thái `Done`.
+- Corrective implementation M9.3 chốt Quiz output là danh sách EXAMPLE M9.2 cộng
+  assessment metadata. Worker append vào `targetQuizSetId` đang mở, không tạo tab
+  mới; lineage/audit theo question giữ đúng case 10→8. Admin/student dùng chung
+  EXAMPLE schema/prompt/recovery/compiler/renderer/editor với Sinh kiến thức;
+  Quiz không trả hoặc lưu sourceChunkIds ở cấp câu.
 
 ## 1. Phạm vi bước này
 
@@ -154,11 +171,12 @@ dụng`, đúng hai bài lấy từ source; theory-example đi theo unit liền 
 chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn được lưu
     `NEEDS_REVIEW`; semantic/reference/presentation issues chỉ thành warning cho
     admin, không gọi model repair lần hai.
-    41.2. Contract v3 đang triển khai trên
-    `codex/m9-2-classhero-authoring-v3`: theory luôn đứng trước example,
-    heading lớn exact/OCR-repair có audit, example có provenance, không dùng
-    ảnh OCR và dùng safe `diagramSpec`; generation persist summary version 2
-    nhưng renderer tiếp tục đọc version 1.
+    41.2. Baseline chức năng M9.2 đã ổn theo xác nhận owner; snapshot hiện hành
+    dùng prompt `lesson-summary-prompt-v58`, schema
+    `lesson-summary-schema-v42`, source hash có `targetGrade`, authoring theo lớp,
+    `geometryStatement` GT–KL cho bài chứng minh lớp 7–9, chuẩn hóa ký hiệu góc và
+    recovery `VALID | AUTO_FIXED | REVIEWABLE | UNRENDERABLE` với policy
+    `ACCEPT_OR_FIX | FIX_ONLY`.
     41.3. Coverage hardening Toán 3-9 được lập kế hoạch tại
     `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`: kiểm kê 100% dạng hình,
     cam kết mức đơn giản/trung bình/khó, dùng semantic `diagramIntent` →
@@ -177,7 +195,17 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     lesson đối chiếu đúng trang/bài. Ảnh đạt chuẩn cũ chỉ được dùng làm golden sau
     khi tái kiểm chứng nguồn và vào `reference-golden-manifest.json`.
 42. `M9.3` - Admin generate quiz/flashcard/test.
+    42.1. Hardening plan mở rộng Quiz/Test solution/diagram và review tại
+    `.codex/plans/m9-3-ai-quiz-generation-completion-plan.md`: output AI phải đủ
+    initial count; sau đó admin được xóa câu và giữ số còn lại trong cùng
+    set/generation. Question hợp lệ hiện ngay ở danh sách tab Quiz dưới trạng thái
+    review; không tạo staging screen riêng. Đây không phải subtask roadmap mới.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
+    43.0.1. `M9.13` - Admin chỉnh label/marker/caption an toàn. Done 2026-08-11.
+    43.0.2. `M9.14` - Chọn nhiều segment và thêm dấu bằng nhau. Done 2026-08-11.
+    43.0.3. `M9.15` - Reset chỉnh sửa riêng một hình trong phiên. Done 2026-08-11.
+    43.0.4. `M9.16` - Harden prompt Sinh kiến thức và phạm vi lớp 3–12. Planned 2026-08-11.
+    Chi tiết tại `.codex/plans/m9-13-admin-safe-diagram-element-delete-plan.md`.
     43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
     43.2. `M4.6` - OCR accounting, retry-resume và budget guard.
     43.3. `M9.10` - Admin provider operations API.
@@ -271,15 +299,19 @@ Phụ thuộc AI/RAG:
 - `M5.4` phụ thuộc `M5.3`.
 - `M9.1` phụ thuộc `M5.1`, `M1.5`, `M4.3`.
 - `M9.2` phụ thuộc `M5.3`, `M9.1`, `M1.3`.
-- Lượt nâng cấp `M9.2` contract v3 theo
-  `.codex/plans/m9-2-classhero-authoring-v3-plan.md` đang được triển khai trên
-  `codex/m9-2-classhero-authoring-v3`, tách từ baseline v2 commit `776a69c1`;
-  không thay đổi dependency hoặc mã subtask.
+- Lõi chức năng M9.2 hiện là baseline ổn cho M9.3. Coverage diagram toàn cục tại
+  `.codex/plans/m9-2-math-diagram-coverage-90-plan.md` vẫn `IN_PROGRESS`, nhưng
+  không chặn M9.3 dùng capability source-backed đã được hỗ trợ; capability chưa
+  đủ evidence phải giữ ở review. Điều này không đổi dependency hoặc mã subtask.
 - `M9.3` phụ thuộc `M6.2` đến `M6.4`, `M5.3`, `M9.1`.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`, `M4.3`; xếp ngay sau `M9.3` để generation
   có UI quản trị kiểm thử trước khi chuyển sang student flow; đã Done
-  2026-08-03, tiếp theo là `M9.4`.
-- `M9.4` phụ thuộc `M9.3`, `M6.2` đến `M6.4`, `M7.1-M7.4`; task bao gồm nối
+  2026-08-03.
+- `M9.16` phụ thuộc `M9.2`, `M9.3`, `M9.8` và phải xong trước `M9.4`; plan chi
+  tiết tại `.codex/plans/m9-16-lesson-summary-prompt-contract-hardening-plan.md`.
+- `M9.13 -> M9.14 -> M9.15` phụ thuộc `M9.2`, `M9.8`; dùng PUT Summary/review
+  guard hiện có, không thêm dependency cho `M9.4`.
+- `M9.4` phụ thuộc `M9.3`, `M9.16`, `M6.2` đến `M6.4`, `M7.1-M7.4`; task bao gồm nối
   action request-new trên UI học sinh, không chỉ endpoint/worker.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2` đến `M6.4`, `M7.2-M7.4`; task bao
   gồm inline explanation UI và trạng thái polling/error/retry.

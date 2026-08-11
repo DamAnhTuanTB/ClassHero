@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils";
 type PromptTab = "system" | "user" | "input";
 
 const promptTabs: Array<{ value: PromptTab; label: string }> = [
-  { value: "system", label: "System instructions" },
-  { value: "user", label: "User prompt" },
-  { value: "input", label: "Input đầy đủ" },
+  { value: "system", label: "Quy tắc hệ thống" },
+  { value: "user", label: "Câu lệnh người dùng" },
+  { value: "input", label: "Dữ liệu gửi đi" },
 ];
 
 export function AdminSummaryPromptPreview({
@@ -94,9 +94,9 @@ export function AdminSummaryPromptPreview({
       await navigator.clipboard.writeText(promptValue);
       setCopiedTab(activeTab);
       window.setTimeout(() => setCopiedTab(null), 1_500);
-      toast.success("Đã sao chép prompt");
+      toast.success("Đã sao chép câu lệnh");
     } catch {
-      toast.error("Chưa thể sao chép prompt");
+      toast.error("Chưa thể sao chép câu lệnh");
     }
   }
 
@@ -106,7 +106,7 @@ export function AdminSummaryPromptPreview({
         <PreviewMetric label="Tài liệu" value={preview.context.documentCount} />
         <PreviewMetric label="Phần nội dung" value={preview.context.chunkCount} />
         <PreviewMetric
-          label="Dung lượng ước tính"
+          label="Tổng input ước tính"
           value={preview.context.estimatedTokens.toLocaleString("vi-VN")}
         />
       </div>
@@ -202,10 +202,10 @@ export function AdminSummaryPromptPreview({
           <div className="flex items-center justify-between gap-3 border-b border-[var(--theme-border)] px-3 py-2">
             <p className="text-xs font-bold text-[var(--theme-text-muted)]">
               {activeTab === "system"
-                ? "Quy tắc AI cần tuân theo"
+                ? "Một lớp quy tắc; không phải toàn bộ dữ liệu gửi AI"
                 : activeTab === "user"
                   ? "Nội dung AI sẽ thực hiện"
-                  : "Dữ liệu hoàn chỉnh trước khi tạo"}
+                  : "Yêu cầu hoàn chỉnh gồm câu lệnh, nguồn và cấu trúc đầu ra"}
             </p>
             <button
               type="button"
@@ -223,7 +223,7 @@ export function AdminSummaryPromptPreview({
           {activeTab === "system" ? (
             <TextareaField
               id="ai-summary-system-instructions"
-              label="System instructions"
+              label="Quy tắc hệ thống"
               wrapperClassName="p-3"
               className="min-h-64 font-mono text-xs leading-5"
               value={systemInstructions}
@@ -233,7 +233,7 @@ export function AdminSummaryPromptPreview({
           ) : activeTab === "user" ? (
             <TextareaField
               id="ai-summary-user-prompt"
-              label="User prompt"
+              label="Câu lệnh người dùng"
               wrapperClassName="p-3"
               className="min-h-64 font-mono text-xs leading-5"
               value={userPrompt}

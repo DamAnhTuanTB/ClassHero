@@ -142,8 +142,8 @@ function LessonVideoTranscriptRowComponent({
           type="button"
           onClick={() => onRemove(index)}
           className="theme-button-danger flex h-9 w-9 items-center justify-center rounded-lg"
-          aria-label={`Xóa đoạn transcript ${index + 1}`}
-          title="Xóa đoạn transcript"
+          aria-label={`Xóa đoạn bản chép lời ${index + 1}`}
+          title="Xóa đoạn bản chép lời"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>

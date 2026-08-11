@@ -32,6 +32,7 @@ export type ProviderCatalogItem = {
   status: "ACTIVE" | "DEPRECATED" | "DISABLED";
   deprecationNote: string | null;
   credentialConfigured: boolean;
+  createdAt: string | null;
   updatedAt: string;
   priceVersions: PriceVersion[];
 };

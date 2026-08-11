@@ -13,6 +13,7 @@ import {
   updateFlashcardProgress,
 } from "@/features/student/lessons/api/student-lessons-api";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { FlashcardResultScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-result-screen";
 import { FlashcardRunnerScreen } from "@/features/student/lessons/screens/student-lesson-screen/components/flashcard-runner-screen";
 import {
@@ -339,7 +340,7 @@ export function FlashcardLearningPanel({
       await action();
       await waitForCurtain(shouldReduceMotion ? 0 : quizTransitionTimings.holdMs);
     } catch (error) {
-      toast.error("Chưa mở được bộ Flashcard", {
+      toast.error("Chưa mở được bộ thẻ ghi nhớ", {
         description: getErrorMessage(error),
       });
     } finally {
@@ -906,7 +907,7 @@ function buildProgress(
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Vui lòng thử lại.";
+  return getUserFacingErrorMessage(error, "Vui lòng thử lại.");
 }
 
 function waitForCurtain(durationMs: number) {

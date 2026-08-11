@@ -21,6 +21,7 @@ import type {
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getQueryRenderState } from "@/lib/query-render-state";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 export const enrollmentListQueryKeys = {
   all: ["admin", "course-enrollments"] as const,
@@ -93,12 +94,14 @@ export function useEnrollmentListPanel(learningPathId: string) {
       });
     },
     onError: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : "Không thể tạo bản cá nhân.";
-      if (msg.includes("PERSONAL_LEARNING_PATH_EXISTS")) {
-        toast.error("Enrollment này đã có bản cá nhân.");
-      } else {
-        toast.error(msg);
-      }
+      const msg = getUserFacingErrorMessage(
+        error,
+        "Không thể tạo bản học cá nhân. Vui lòng thử lại.",
+        {
+          PERSONAL_LEARNING_PATH_EXISTS: "Học sinh này đã có bản học cá nhân.",
+        },
+      );
+      toast.error(msg);
     },
   });
 

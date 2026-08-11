@@ -18,6 +18,7 @@ import { updateAdminLessonVideoSettings } from "@/features/admin/courses/api/adm
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 interface LessonVideoChaptersFormProps {
   lessonId: string;
@@ -154,7 +155,12 @@ export function LessonVideoChaptersForm({
       setIsOpen(false);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Có lỗi xảy ra khi lưu");
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa lưu được mốc thời gian. Vui lòng thử lại.",
+        ),
+      );
     },
   });
 
@@ -180,12 +186,12 @@ export function LessonVideoChaptersForm({
 
   const handleScrapeChapters = async () => {
     if (!videoUrl) {
-      toast.error("Không có link video YouTube");
+      toast.error("Chưa có liên kết video YouTube");
       return;
     }
     const videoId = extractYoutubeId(videoUrl);
     if (!videoId) {
-      toast.error("Link video không hợp lệ");
+      toast.error("Liên kết video không hợp lệ");
       return;
     }
 
@@ -207,7 +213,7 @@ export function LessonVideoChaptersForm({
         setValue("chapters", mappedChapters, { shouldValidate: true, shouldDirty: true });
         toast.success(`Đã tự động lấy ${chapters.length} mốc thời gian`);
       } else {
-        toast.warning("Video này không có mốc thời gian (chapters) nào");
+        toast.warning("Video này không có mốc thời gian nào");
       }
     } catch {
       toast.error("Có lỗi xảy ra khi lấy dữ liệu tự động");

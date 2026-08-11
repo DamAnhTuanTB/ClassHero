@@ -20,7 +20,10 @@ import {
   type LessonSummaryJobInput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
-import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
+import {
+  buildAiStructuredTextFormat,
+  estimateAiStructuredInputTokens,
+} from "#api/modules/ai/utils/ai-structured-output-format";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 import { GenerateLessonSummaryDto } from "#api/modules/learning-paths/dto/generate-lesson-summary.dto";
 import { UpsertLessonSummaryDto } from "#api/modules/learning-paths/dto/upsert-lesson-summary.dto";
@@ -149,6 +152,7 @@ export class LessonSummariesService {
     const inputMeta = {
       documentIds: sourceContext.documentIds,
       sourceHash: sourceContext.sourceHash,
+      targetGrade: sourceContext.targetGrade,
       ...configuration,
     } as const;
     const job = await this.aiGenerationJobs.createAndEnqueue({
@@ -197,6 +201,7 @@ export class LessonSummariesService {
     const request = buildLessonSummaryStructuredInput({
       lessonId,
       lessonTitle: sourceContext.lessonTitle,
+      targetGrade: sourceContext.targetGrade,
       documentIds: sourceContext.documentIds,
       sourceHash: sourceContext.sourceHash,
       chunks: sourceContext.chunks,
@@ -205,10 +210,16 @@ export class LessonSummariesService {
       userPrompt: configuration.userPrompt,
     });
     const inputPrompt = buildAiUserPrompt(request);
-    const estimatedInputTokens = Math.max(
-      sourceContext.totalTokens,
-      Math.ceil((request.systemPrompt.length + inputPrompt.length) / 4),
+    const structuredTextFormat = buildAiStructuredTextFormat(
+      lessonSummaryProviderTransportOutputSchema,
+      request.outputName,
     );
+    const inputTokenEstimate = estimateAiStructuredInputTokens({
+      systemPrompt: request.systemPrompt,
+      inputPrompt,
+      structuredTextFormat,
+      minimumPromptTokens: sourceContext.totalTokens,
+    });
     const maxOutputTokens = route.maxOutputTokens ?? LESSON_SUMMARY_MAX_OUTPUT_TOKENS;
     const resolvedCandidate =
       route.candidates.find((candidate) => candidate.available) ??
@@ -229,7 +240,7 @@ export class LessonSummariesService {
       resolvedCandidate && canEstimateCost
         ? calculateProviderCost(
             {
-              promptTokens: estimatedInputTokens,
+              promptTokens: inputTokenEstimate.estimatedTokens,
               completionTokens: maxOutputTokens,
               requestCount: 1,
             },
@@ -251,21 +262,18 @@ export class LessonSummariesService {
         instructions: request.systemPrompt,
         input: inputPrompt,
         text: {
-          format: buildAiStructuredTextFormat(
-            lessonSummaryProviderTransportOutputSchema,
-            request.outputName,
-          ),
+          format: structuredTextFormat,
         },
         temperature: route.temperature ?? request.temperature ?? 0.2,
-        ...(route.reasoningEffort
-          ? { reasoning_effort: route.reasoningEffort }
-          : {}),
+        ...(route.reasoningEffort ? { reasoning_effort: route.reasoningEffort } : {}),
         max_output_tokens: maxOutputTokens,
       },
       context: {
         documentCount: sourceContext.documentIds.length,
         chunkCount: sourceContext.chunks.length,
-        estimatedTokens: estimatedInputTokens,
+        estimatedTokens: inputTokenEstimate.estimatedTokens,
+        promptTokens: inputTokenEstimate.promptTokens,
+        schemaTokens: inputTokenEstimate.schemaTokens,
         contextTokens: sourceContext.totalTokens,
         maxContextTokens: LESSON_SUMMARY_MAX_CONTEXT_TOKENS,
       },
@@ -391,11 +399,7 @@ export class LessonSummariesService {
 }
 
 function readReasoningEffortLevels(capabilities: unknown): string[] {
-  if (
-    !capabilities ||
-    typeof capabilities !== "object" ||
-    Array.isArray(capabilities)
-  ) {
+  if (!capabilities || typeof capabilities !== "object" || Array.isArray(capabilities)) {
     return [];
   }
   const value = (capabilities as Record<string, unknown>).reasoningEffortLevels;
@@ -406,7 +410,7 @@ function readReasoningEffortLevels(capabilities: unknown): string[] {
 
 function normalizeConfiguration(
   dto: GenerateLessonSummaryDto,
-): Omit<LessonSummaryJobInput, "documentIds" | "sourceHash"> {
+): Omit<LessonSummaryJobInput, "documentIds" | "sourceHash" | "targetGrade"> {
   return {
     style: dto.style,
     styleInstructions: dto.styleInstructions?.trim() ?? "",

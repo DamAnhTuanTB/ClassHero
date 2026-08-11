@@ -21,6 +21,7 @@ import {
   type QuizTransitionPhase,
   type QuizTransitionVariant,
 } from "@/features/student/lessons/utils/quiz-transition-variant";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 type StudentLearningTransitionContextValue = {
   isTransitioning: boolean;
@@ -75,7 +76,7 @@ export function StudentLearningTransitionProvider({ children }: { children: Reac
       } catch (error) {
         toast.error("Chưa mở được buổi học", {
           description:
-            error instanceof Error ? error.message : "Bạn thử lại sau ít phút nhé.",
+            getUserFacingErrorMessage(error, "Bạn thử lại sau ít phút nhé."),
         });
         setPhase("opening");
         await waitForTransition(

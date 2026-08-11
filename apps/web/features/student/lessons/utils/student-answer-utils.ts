@@ -107,6 +107,8 @@ function createFeedback(
     correctAnswerJson: question.correctAnswerJson as StudentAnswer,
     statementResults,
     explanationJson: question.explanationJson ?? null,
+    explanationDiagramSpecJson: question.explanationDiagramSpecJson ?? null,
+    explanationExampleBlock: question.explanationExampleBlock ?? null,
   };
 }
 

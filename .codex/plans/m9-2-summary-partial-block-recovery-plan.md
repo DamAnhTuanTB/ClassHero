@@ -9,7 +9,8 @@ block là phase tùy chọn, không tính vào hotfix này.
 Kết quả thực hiện:
 
 - baseline đã commit trước khi làm tại `7eef4172`;
-- transport/acceptance schema đã tách ở `lesson-summary-schema-v40`;
+- transport/acceptance schema đã tách và contract hiện tại là
+  `lesson-summary-schema-v42`;
 - generation chỉ có một provider attempt, không fallback/retry/repair tự động;
 - block hợp lệ giữ nguyên; block lỗi cục bộ vẫn lưu/render phần an toàn và có
   `reviewIssues` thân thiện cho admin;

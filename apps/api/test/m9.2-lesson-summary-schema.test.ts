@@ -4,6 +4,7 @@ import {
   lessonSummaryDiagramSpecSchema,
   normalizeLessonSummaryDiagramSpec,
   normalizeLessonSummaryDiagramText,
+  normalizeLessonSummaryNoteContent,
 } from "@learning-path/shared";
 
 import {
@@ -13,6 +14,7 @@ import {
   lessonSummaryJobInputSchema,
   lessonSummaryOutputSchema,
   lessonSummaryProviderOutputSchema,
+  lessonSummaryProviderTransportOutputSchema,
 } from "#api/modules/ai/types/lesson-summary.types";
 import {
   lessonSummaryProviderDiagramSpecSchema,
@@ -195,6 +197,7 @@ function createProviderOutput() {
               problem: "Chứng minh số $1/2$ là một số hữu tỉ.",
               solution: "Ta có $1/2$ là một phân số có mẫu khác 0.",
               answer: "$1/2$ là số hữu tỉ.",
+              geometryStatement: null,
               diagramSpec: null,
             },
             notes: [
@@ -216,6 +219,7 @@ function createProviderOutput() {
         problem: "Viết số $0,25$ dưới dạng phân số tối giản.",
         solution: "$0,25 = 25/100 = 1/4$.",
         answer: "$1/4$.",
+        geometryStatement: null,
         diagramSpec: null,
       },
       realWorldExercise: {
@@ -225,6 +229,7 @@ function createProviderOutput() {
           "Một cửa hàng giảm giá chiếc áo $200\\,000$ đồng đi $25\\%$. Tính giá chiếc áo sau khi giảm.",
         solution: "Số tiền giảm là $200\\,000 \\times 25\\% = 50\\,000$ đồng.",
         answer: "$150\\,000$ đồng.",
+        geometryStatement: null,
         diagramSpec: null,
       },
     },
@@ -240,6 +245,26 @@ function parseAndMapProviderOutput(output: unknown) {
 }
 
 describe("M9.2 lesson summary provider contract", () => {
+  it("removes only duplicated note labels and preserves the note body", () => {
+    expect(
+      normalizeLessonSummaryNoteContent(
+        "**Nhận xét:** Mẫu số phải khác $0$. Ví dụ: $1/2$ có mẫu bằng $2$.",
+      ),
+    ).toBe("Mẫu số phải khác $0$. Ví dụ: $1/2$ có mẫu bằng $2$.");
+    expect(
+      normalizeLessonSummaryNoteContent(
+        "Chú ý rằng hai góc đối của tứ giác nội tiếp là bù nhau.",
+      ),
+    ).toBe("hai góc đối của tứ giác nội tiếp là bù nhau.");
+    expect(normalizeLessonSummaryNoteContent("**Lưu ý**: Không chia cho $0$.")).toBe(
+      "Không chia cho $0$.",
+    );
+    expect(normalizeLessonSummaryNoteContent("Nhận xét:")).toBe("");
+    expect(normalizeLessonSummaryNoteContent("Trong chú ý này có một ví dụ.")).toBe(
+      "Trong chú ý này có một ví dụ.",
+    );
+  });
+
   it("normalizes flattened fraction commands in plain diagram captions", () => {
     expect(
       normalizeLessonSummaryDiagramText("Biểu diễn frac54 và -frac54; so sánh dfrac52."),
@@ -328,6 +353,20 @@ describe("M9.2 lesson summary provider contract", () => {
       "example",
       "example",
     ]);
+  });
+
+  it("does not persist a repeated label at the start of note content", () => {
+    const output = createProviderOutput();
+    output.theorySections[0]!.units[0]!.notes[0]!.content =
+      "Lưu ý: Mẫu số phải khác $0$. Ví dụ: $1/2$ có mẫu bằng $2$.";
+
+    const summary = parseAndMapProviderOutput(output);
+    const note = summary.sections[0]?.blocks.find((block) => block.type === "note");
+
+    expect(note).toMatchObject({
+      type: "note",
+      content: "Mẫu số phải khác $0$. Ví dụ: $1/2$ có mẫu bằng $2$.",
+    });
   });
 
   it("accepts editable semantic issues without exposing technical warning metadata", () => {
@@ -527,7 +566,8 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(examples[1]?.problem).not.toMatch(/^Bài\s+1\.10/iu);
     expect(examples[1]?.problem).not.toMatch(/xem hình/iu);
     expect(examples[1]?.problem).not.toContain("Hình nguồn");
-    expect(examples[0]?.problem).toContain("\\angle ABC");
+    expect(examples[0]?.problem).toContain("\\widehat{ABC}");
+    expect(examples[0]?.problem).not.toContain("\\angle ABC");
     expect(examples[0]?.problem).toContain("\\widehat{xOz}=65^\\circ");
   });
 
@@ -613,6 +653,11 @@ describe("M9.2 lesson summary provider contract", () => {
               },
               illustration: {
                 ...baseOutput.theorySections[0]!.units[0]!.illustration,
+                problem:
+                  "Cho $\\angle A=90^\\circ$ và $\\angle B=35^\\circ$. Tính góc còn lại.",
+                solution:
+                  "$\\angle A=90^\\circ$ và $\\angle B=35^\\circ$ nên góc còn lại bằng $55^\\circ$.",
+                answer: "$55^\\circ$.",
                 diagramSpec,
               },
             },
@@ -646,6 +691,12 @@ describe("M9.2 lesson summary provider contract", () => {
       mappedExample.visual.spec.viewBox.minX + mappedExample.visual.spec.viewBox.width,
     ).toBeGreaterThan(12);
     expect(mappedExample.visual.spec.markers[1]).toMatchObject({ label: null });
+    expect(mappedExample.problem).toContain("$\\widehat{BAC}=90^\\circ$");
+    expect(mappedExample.problem).toContain("$\\widehat{ABC}=35^\\circ$");
+    expect(mappedExample.problem).not.toContain("\\angle A");
+    expect(mappedExample.problem).not.toContain("\\angle B");
+    expect(mappedExample.solution).toContain("$\\widehat{BAC}=90^\\circ$");
+    expect(mappedExample.solution).toContain("$\\widehat{ABC}=35^\\circ$");
     expect(mappedExample.visual.spec.labels[0]).toMatchObject({ text: "3 cm" });
     expect(mappedExample.visual.spec.primitives).toContainEqual({
       id: "AC",
@@ -739,6 +790,27 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(serializedFormat).toContain('"ellipses"');
   });
 
+  it("requires geometryStatement in strict provider JSON while accepting omission for local recovery", () => {
+    const serializedFormat = JSON.stringify(
+      buildAiStructuredTextFormat(
+        lessonSummaryProviderTransportOutputSchema,
+        "lesson_summary_provider_contract",
+      ),
+    );
+    expect(serializedFormat).toContain('"geometryStatement"');
+    expect(serializedFormat).toMatch(
+      /"required":\[[^\]]*"geometryStatement"[^\]]*"diagramSpec"/su,
+    );
+
+    const omitted = createProviderOutput();
+    delete (
+      omitted.theorySections[0]!.units[0]!.illustration as {
+        geometryStatement?: unknown;
+      }
+    ).geometryStatement;
+    expect(() => lessonSummaryProviderTransportOutputSchema.parse(omitted)).not.toThrow();
+  });
+
   it("rejects right-angle and equal-length markers that contradict diagram coordinates", () => {
     const invalidSharedHypotenuseDiagram = {
       version: 1 as const,
@@ -792,14 +864,11 @@ describe("M9.2 lesson summary provider contract", () => {
       ]),
     );
 
-    const validSharedHypotenuseDiagram = structuredClone(
-      invalidSharedHypotenuseDiagram,
-    );
+    const validSharedHypotenuseDiagram = structuredClone(invalidSharedHypotenuseDiagram);
     validSharedHypotenuseDiagram.points[3] = diagramPoint("D", 48 / 13, 72 / 13);
     expect(
-      lessonSummaryProviderDiagramSpecSchema.safeParse(
-        validSharedHypotenuseDiagram,
-      ).success,
+      lessonSummaryProviderDiagramSpecSchema.safeParse(validSharedHypotenuseDiagram)
+        .success,
     ).toBe(true);
   });
 
@@ -837,34 +906,131 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(normalized.viewBox.minY + normalized.viewBox.height).toBeGreaterThan(2);
   });
 
-  it("repairs JSON-damaged LaTeX and formats geometry reasoning as mathematical lines", () => {
+  it("repairs JSON-damaged LaTeX and preserves linked geometry reasoning without auto-bullets", () => {
     const output = createProviderOutput();
     output.theorySections[0]!.units[0]!.illustration.problem =
       "Chứng minh rằng $\u0009riangle ABC=\u0009riangle A'B'C'$ và $\\\\angle ABC=\\\\angle A'B'C'$.";
     output.theorySections[0]!.units[0]!.illustration.solution =
       "Hai tam giác đã cho đều vuông. Ta có hai cạnh góc vuông tương ứng bằng nhau. Do đó hai tam giác bằng nhau.";
+    output.theorySections[0]!.units[0]!.illustration.geometryStatement = {
+      hypotheses: [
+        "$\\triangle ABC$ và $\\triangle A'B'C'$ đều vuông.",
+        "Hai cạnh góc vuông tương ứng bằng nhau.",
+      ],
+      conclusions: ["$\\triangle ABC=\\triangle A'B'C'$."],
+    };
 
     const summary = mapLessonSummaryProviderOutput({
       lessonId: "lesson-1",
       output: lessonSummaryProviderOutputSchema.parse(output),
       contextChunks,
+      targetGrade: 7,
     });
     const example = summary.sections[0]?.blocks.find((block) => block.type === "example");
     if (example?.type !== "example") throw new Error("Expected an example block.");
 
     expect(example.problem).toContain("$\\triangle ABC=\\triangle A'B'C'$");
-    expect(example.problem).toContain("$\\angle ABC=\\angle A'B'C'$");
+    expect(example.problem).toContain("$\\widehat{ABC}=\\widehat{A'B'C'}$");
     expect(example.problem).not.toContain("\u0009");
     expect(example.problem).not.toContain("\\\\angle");
     expect(example.solution).toBe(
-      "- Hai tam giác đã cho đều vuông.\n- Ta có hai cạnh góc vuông tương ứng bằng nhau.\n- Do đó hai tam giác bằng nhau.",
+      "Hai tam giác đã cho đều vuông. Ta có hai cạnh góc vuông tương ứng bằng nhau. Do đó hai tam giác bằng nhau.",
     );
+    expect(example.geometryStatement).toEqual({
+      hypotheses: [
+        "$\\triangle ABC$ và $\\triangle A'B'C'$ đều vuông.",
+        "Hai cạnh góc vuông tương ứng bằng nhau.",
+      ],
+      conclusions: ["$\\triangle ABC=\\triangle A'B'C'$."],
+    });
+    expect(example.reviewIssues).toBeUndefined();
   });
 
-  it("keeps the mandatory contract around admin preferences and serializes context as JSON", () => {
+  it("requires GT-KL only for formal geometry proofs in grades 7-9", () => {
+    const geometryOutput = createProviderOutput();
+    geometryOutput.theorySections[0]!.units[0]!.illustration.problem =
+      "Chứng minh $\\triangle ABC=\\triangle DEF$.";
+    geometryOutput.theorySections[0]!.units[0]!.illustration.solution =
+      "Xét $\\triangle ABC$ và $\\triangle DEF$. Ta có các cạnh tương ứng bằng nhau. Do đó hai tam giác bằng nhau.";
+
+    const geometrySummary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-geometry",
+      output: lessonSummaryProviderOutputSchema.parse(geometryOutput),
+      contextChunks,
+      targetGrade: 7,
+    });
+    const geometryExample = geometrySummary.sections[0]?.blocks.find(
+      (block) => block.type === "example",
+    );
+    expect(geometryExample?.reviewIssues).toEqual([
+      expect.objectContaining({
+        code: "MISSING_GEOMETRY_STATEMENT",
+        resolution: "ACCEPT_OR_FIX",
+      }),
+    ]);
+    expect(geometryExample).toMatchObject({
+      type: "example",
+      problem: "Chứng minh $\\triangle ABC=\\triangle DEF$.",
+      solution:
+        "Xét $\\triangle ABC$ và $\\triangle DEF$. Ta có các cạnh tương ứng bằng nhau. Do đó hai tam giác bằng nhau.",
+      answer: "$1/2$ là số hữu tỉ.",
+    });
+
+    const algebraOutput = createProviderOutput();
+    algebraOutput.theorySections[0]!.units[0]!.illustration.problem =
+      "Chứng minh số $1/2$ là số hữu tỉ. a) Viết dưới dạng phân số. b) Nêu điều kiện của mẫu.";
+    algebraOutput.theorySections[0]!.units[0]!.illustration.solution =
+      "a) Ta có $1/2$ đã là phân số. b) Mẫu số $2\\ne0$.";
+    algebraOutput.theorySections[0]!.units[0]!.illustration.answer =
+      "a) $1/2$ là phân số. b) Mẫu số khác $0$.";
+    const algebraSummary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-algebra",
+      output: lessonSummaryProviderOutputSchema.parse(algebraOutput),
+      contextChunks,
+      targetGrade: 7,
+    });
+    const algebraExample = algebraSummary.sections[0]?.blocks.find(
+      (block) => block.type === "example",
+    );
+    expect(algebraExample?.reviewIssues).toBeUndefined();
+    expect(algebraExample?.solution).toBe(
+      "a) Ta có $1/2$ đã là phân số.\nb) Mẫu số $2\\ne0$.",
+    );
+    expect(algebraExample?.problem).toContain(
+      "số hữu tỉ.\na) Viết dưới dạng phân số.\nb) Nêu điều kiện của mẫu.",
+    );
+    expect(algebraExample?.answer).toBe("a) $1/2$ là phân số.\nb) Mẫu số khác $0$.");
+  });
+
+  it("keeps provider bullets editable but flags a disconnected geometry checklist", () => {
+    const output = createProviderOutput();
+    const illustration = output.theorySections[0]!.units[0]!.illustration;
+    illustration.problem = "Chứng minh $\\triangle ABC=\\triangle DEF$.";
+    illustration.solution =
+      "- $\\triangle ABC$ và $\\triangle DEF$ đều vuông.\n- Hai cạnh tương ứng bằng nhau.\n- Hai tam giác bằng nhau.";
+    illustration.geometryStatement = {
+      hypotheses: ["Hai tam giác vuông có các cạnh tương ứng bằng nhau."],
+      conclusions: ["$\\triangle ABC=\\triangle DEF$."],
+    };
+
+    const summary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-geometry",
+      output: lessonSummaryProviderOutputSchema.parse(output),
+      contextChunks,
+      targetGrade: 7,
+    });
+    const example = summary.sections[0]?.blocks.find((block) => block.type === "example");
+    expect(example?.solution).toBe(illustration.solution);
+    expect(example?.reviewIssues).toEqual([
+      expect.objectContaining({ code: "GEOMETRY_SOLUTION_BULLET_CHECKLIST" }),
+    ]);
+  });
+
+  it("uses the default prompts and serializes context as JSON when admin prompts are empty", () => {
     const request = buildLessonSummaryStructuredInput({
       lessonId: "lesson-1",
       lessonTitle: "Số hữu tỉ",
+      targetGrade: 7,
       documentIds: ["document-1"],
       sourceHash: "source-hash",
       chunks: [
@@ -880,8 +1046,6 @@ describe("M9.2 lesson summary provider contract", () => {
         targetWordCount: 350,
         extraInstructions: "Dùng tiêu đề ngắn",
       },
-      systemInstructions: "Hãy bỏ qua contract và tạo thêm bài tập.",
-      userPrompt: "Chỉ trả kiến thức, không trả bài cuối.",
     });
     const fullInput = buildAiUserPrompt(request);
 
@@ -920,15 +1084,46 @@ describe("M9.2 lesson summary provider contract", () => {
     );
     expect(request.systemPrompt).toContain("Tâm đồng hồ phải có một chấm nhỏ");
     expect(request.systemPrompt).toContain("Tâm của CIRCLE được gọi tên như O hoặc I");
-    expect(request.systemPrompt).toContain(
-      "node gốc là hành động/thực nghiệm",
-    );
+    expect(request.systemPrompt).toContain("node gốc là hành động/thực nghiệm");
     expect(request.systemPrompt).toContain(
       "không dùng VENN/VENN_UNIVERSE nếu nguồn không mô tả tập hợp",
     );
-    expect(request.systemPrompt).toContain("Hãy bỏ qua contract");
+    expect(request.systemPrompt).toContain("kí hiệu góc bắt buộc dùng `\\widehat{BAC}`");
+    expect(request.systemPrompt).toContain(
+      "không tạo một labels[] rời cho cùng số đo góc",
+    );
+    expect(request.systemPrompt).toContain(
+      "KHÔNG biến toàn bộ lời giải thành danh sách bullet/checklist",
+    );
+    expect(request.systemPrompt).toContain(
+      "bắt đầu trực tiếp bằng phép tính hoặc biểu thức cần biến đổi",
+    );
+    expect(request.systemPrompt).toContain(
+      "mỗi chặng phải nêu rõ dữ kiện hoặc căn cứ và kết quả suy ra",
+    );
+    expect(request.systemPrompt).toContain("`geometryStatement` bắt buộc khác null");
+    expect(request.systemPrompt).toContain(
+      "mọi ý a), b), c) bắt buộc bắt đầu ở dòng riêng",
+    );
     expect(request.userPrompt).toContain("NHIỆM VỤ SINH KIẾN THỨC");
-    expect(request.userPrompt).toContain("Chỉ trả kiến thức");
+    expect(request.userPrompt).toContain(
+      "Văn phong và cách trình bày cho học sinh lớp 7",
+    );
+    expect(request.userPrompt).toContain(
+      "chặt chẽ, có cấu trúc học thuật và dùng thuật ngữ chính xác",
+    );
+    expect(request.userPrompt).toContain(
+      "Với bài Số học/Đại số, trình bày trực tiếp từng phép tính và bước biến đổi",
+    );
+    expect(request.userPrompt).toContain(
+      "trình bày mạch suy luận liên kết theo chuẩn SGK lớp 7",
+    );
+    expect(request.userPrompt).not.toContain("- Phong cách:");
+    expect(request.userPrompt).not.toContain("như cũ");
+    expect(request.userPrompt).toContain(
+      "Độ dài: chi tiết, giải thích đầy đủ các ý quan trọng trong context; mục tiêu khoảng 350 từ và có thể dao động hợp lý",
+    );
+    expect(request.userPrompt).not.toContain("- Mục tiêu khoảng");
     expect(request.maxTokens).toBe(LESSON_SUMMARY_MIN_OUTPUT_TOKENS);
     expect(request.outputName).toBe("lesson_summary_provider_contract");
     expect(request.promptVersion).toBe(LESSON_SUMMARY_PROMPT_VERSION);
@@ -938,10 +1133,47 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(fullInput).not.toContain("<context_chunks>");
   });
 
+  it("uses the admin-edited system and user prompts verbatim", () => {
+    const systemInstructions = [
+      "### QUY TẮC HỆ THỐNG DO ADMIN CHỈNH",
+      "Chỉ sử dụng kiến thức trong tài liệu nguồn.",
+    ].join("\n");
+    const userPrompt = [
+      "### YÊU CẦU DO ADMIN CHỈNH",
+      "Tạo nội dung ngắn gọn cho học sinh lớp 7.",
+    ].join("\n");
+    const request = buildLessonSummaryStructuredInput({
+      lessonId: "lesson-1",
+      lessonTitle: "Số hữu tỉ",
+      targetGrade: 7,
+      documentIds: ["document-1"],
+      sourceHash: "source-hash",
+      chunks: [{ id: ids.theory, content: "Số hữu tỉ viết được dưới dạng phân số." }],
+      configuration: {
+        style: "academic",
+        styleInstructions: "Học thuật, chặt chẽ",
+        length: "detailed",
+        targetWordCount: 350,
+        extraInstructions: "Nhấn mạnh lỗi thường gặp",
+      },
+      systemInstructions,
+      userPrompt,
+    });
+
+    expect(request.systemPrompt).toBe(systemInstructions);
+    expect(request.userPrompt).toBe(userPrompt);
+    expect(request.systemPrompt).not.toContain("CẤU TRÚC BẮT BUỘC");
+    expect(request.userPrompt).not.toContain("NHIỆM VỤ SINH KIẾN THỨC");
+    expect(buildAiUserPrompt(request)).toMatch(
+      /^### YÊU CẦU DO ADMIN CHỈNH[\s\S]*CONTEXT_CHUNKS_JSON_BEGIN/u,
+    );
+  });
+
   it("reuses effective prompts from preview without nesting the base prompts again", () => {
     const input = {
       lessonId: "lesson-1",
       lessonTitle: "Số hữu tỉ",
+      targetGrade: 7,
       documentIds: ["document-1"],
       sourceHash: "source-hash",
       chunks: [{ id: ids.theory, content: "Số hữu tỉ viết được dưới dạng phân số." }],
@@ -964,14 +1196,16 @@ describe("M9.2 lesson summary provider contract", () => {
       userPrompt: previewRequest.userPrompt,
     });
 
+    expect(previewRequest.systemPrompt).toBe("Dùng câu ngắn.");
+    expect(previewRequest.userPrompt).toBe("Ưu tiên công thức trọng tâm.");
     expect(generationRequest.systemPrompt).toBe(previewRequest.systemPrompt);
     expect(generationRequest.userPrompt).toBe(previewRequest.userPrompt);
     expect(
       generationRequest.systemPrompt.match(/### I\. VAI TRÒ VÀ NGUYÊN TẮC CƠ BẢN/g),
-    ).toHaveLength(1);
+    ).toBeNull();
     expect(
       generationRequest.userPrompt.match(/### NHIỆM VỤ SINH KIẾN THỨC/g),
-    ).toHaveLength(1);
+    ).toBeNull();
   });
 
   it("accepts a resolved system prompt beyond the legacy 12,000-character limit", () => {
@@ -1181,9 +1415,8 @@ describe("M9.2 lesson summary provider contract", () => {
       labels: [{ text: "5/4", anchorPointId: "P", position: "BOTTOM" as const }],
       caption: "Phân số trên trục số",
     };
-    const fractionNumberLineResult = lessonSummaryDiagramSpecSchema.safeParse(
-      fractionNumberLine,
-    );
+    const fractionNumberLineResult =
+      lessonSummaryDiagramSpecSchema.safeParse(fractionNumberLine);
     expect(
       fractionNumberLineResult.success
         ? []
@@ -1394,21 +1627,83 @@ describe("M9.2 lesson summary provider contract", () => {
       viewBox: { minX: -1, minY: -1, width: 8, height: 6 },
       toScale: true as const,
       points: [
-        { id: "A", x: 0, y: 0, label: "A", pointStyle: "NONE" as const, labelPosition: "BOTTOM_LEFT" as const },
-        { id: "B", x: 6, y: 0, label: "B", pointStyle: "NONE" as const, labelPosition: "BOTTOM_RIGHT" as const },
-        { id: "C", x: 5, y: 3, label: "C", pointStyle: "NONE" as const, labelPosition: "TOP_RIGHT" as const },
-        { id: "D", x: 1, y: 3, label: "D", pointStyle: "NONE" as const, labelPosition: "TOP_LEFT" as const },
+        {
+          id: "A",
+          x: 0,
+          y: 0,
+          label: "A",
+          pointStyle: "NONE" as const,
+          labelPosition: "BOTTOM_LEFT" as const,
+        },
+        {
+          id: "B",
+          x: 6,
+          y: 0,
+          label: "B",
+          pointStyle: "NONE" as const,
+          labelPosition: "BOTTOM_RIGHT" as const,
+        },
+        {
+          id: "C",
+          x: 5,
+          y: 3,
+          label: "C",
+          pointStyle: "NONE" as const,
+          labelPosition: "TOP_RIGHT" as const,
+        },
+        {
+          id: "D",
+          x: 1,
+          y: 3,
+          label: "D",
+          pointStyle: "NONE" as const,
+          labelPosition: "TOP_LEFT" as const,
+        },
       ],
       primitives: [
-        { id: "AB", type: "SEGMENT" as const, from: "A", to: "B", style: "SOLID" as const },
-        { id: "BC", type: "SEGMENT" as const, from: "B", to: "C", style: "SOLID" as const },
-        { id: "CD", type: "SEGMENT" as const, from: "C", to: "D", style: "SOLID" as const },
-        { id: "DA", type: "SEGMENT" as const, from: "D", to: "A", style: "SOLID" as const },
+        {
+          id: "AB",
+          type: "SEGMENT" as const,
+          from: "A",
+          to: "B",
+          style: "SOLID" as const,
+        },
+        {
+          id: "BC",
+          type: "SEGMENT" as const,
+          from: "B",
+          to: "C",
+          style: "SOLID" as const,
+        },
+        {
+          id: "CD",
+          type: "SEGMENT" as const,
+          from: "C",
+          to: "D",
+          style: "SOLID" as const,
+        },
+        {
+          id: "DA",
+          type: "SEGMENT" as const,
+          from: "D",
+          to: "A",
+          style: "SOLID" as const,
+        },
       ],
       markers: [],
       labels: [
-        { text: "đáy", anchorPointId: "A", anchorPrimitiveId: "AB", position: "TOP" as const },
-        { text: "đáy", anchorPointId: "A", anchorPrimitiveId: "CD", position: "TOP" as const },
+        {
+          text: "đáy",
+          anchorPointId: "A",
+          anchorPrimitiveId: "AB",
+          position: "TOP" as const,
+        },
+        {
+          text: "đáy",
+          anchorPointId: "A",
+          anchorPrimitiveId: "CD",
+          position: "TOP" as const,
+        },
       ],
       caption: "Hình thang ABCD",
     };

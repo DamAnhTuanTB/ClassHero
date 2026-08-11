@@ -1,25 +1,93 @@
+import {
+  normalizeLessonSummaryAngleNotation,
+  tokenizeMathText,
+} from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
 import type { GeneratedQuestion } from "#api/modules/ai/types/lesson-content-generation.types";
+import { mapLessonSummaryProviderExampleBlock } from "#api/modules/ai/utils/lesson-summary-mapper";
+import { recoverLessonSummaryProviderExample } from "#api/modules/ai/utils/lesson-summary-recovery";
 
 export function toTiptap(text: string) {
+  const normalizedText = normalizeLessonSummaryAngleNotation(text);
+  const content: Array<Record<string, unknown>> = [];
+  let inlineContent: Array<Record<string, unknown>> = [];
+
+  const flushParagraph = () => {
+    const paragraphContent = trimParagraphBoundaryWhitespace(inlineContent);
+    if (paragraphContent.length > 0) {
+      content.push({ type: "paragraph", content: paragraphContent });
+    }
+    inlineContent = [];
+  };
+
+  for (const token of tokenizeMathText(normalizedText)) {
+    if (token.type === "math") {
+      if (token.display) {
+        flushParagraph();
+        content.push({ type: "blockMath", attrs: { latex: token.latex } });
+      } else {
+        inlineContent.push({ type: "inlineMath", attrs: { latex: token.latex } });
+      }
+      continue;
+    }
+
+    const lines = token.value.split(/\n+/);
+    lines.forEach((line, index) => {
+      if (line) {
+        inlineContent.push({ type: "text", text: line });
+      }
+      if (index < lines.length - 1) {
+        flushParagraph();
+      }
+    });
+  }
+  flushParagraph();
+
   return {
     type: "doc",
-    content: text
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => ({ type: "paragraph", content: [{ type: "text", text: line }] })),
+    content,
   };
 }
 
+function trimParagraphBoundaryWhitespace(nodes: Array<Record<string, unknown>>) {
+  const trimmed = nodes.map((node) => ({ ...node }));
+  const firstTextIndex = trimmed.findIndex((node) => node.type === "text");
+  let lastTextIndex = -1;
+  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
+    if (trimmed[index]?.type === "text") {
+      lastTextIndex = index;
+      break;
+    }
+  }
+
+  const firstText = trimmed[firstTextIndex]?.text;
+  if (firstTextIndex >= 0 && typeof firstText === "string") {
+    trimmed[firstTextIndex]!.text = firstText.trimStart();
+  }
+  const lastText = trimmed[lastTextIndex]?.text;
+  if (lastTextIndex >= 0 && typeof lastText === "string") {
+    trimmed[lastTextIndex]!.text = lastText.trimEnd();
+  }
+
+  return trimmed.filter(
+    (node) => node.type !== "text" || (typeof node.text === "string" && node.text),
+  );
+}
+
 export function mapGeneratedQuestion(question: GeneratedQuestion) {
+  const mappedExample = mapGeneratedExample(question);
   const common = {
     questionType: question.questionType,
     difficulty: question.difficulty,
-    questionJson: toTiptap(question.prompt),
+    questionJson: toTiptap(mappedExample.block.problem),
     hintJson: "hint" in question && question.hint ? toTiptap(question.hint) : null,
-    explanationJson: toTiptap(question.explanation),
-    sourceMetadataJson: { sourceChunkIds: question.sourceChunkIds },
+    explanationJson: mappedExample.contentJson,
+    explanationDiagramSpecJson:
+      mappedExample.block.visual?.kind === "DIAGRAM_SPEC"
+        ? mappedExample.block.visual.spec
+        : null,
+    exampleBlock: mappedExample.block,
+    recoveryIssues: mappedExample.recoveryIssues,
   };
 
   switch (question.questionType) {
@@ -67,13 +135,36 @@ export function mapGeneratedQuestion(question: GeneratedQuestion) {
   }
 }
 
+function mapGeneratedExample(question: GeneratedQuestion) {
+  const sourceChunkIds = "sourceChunkIds" in question ? question.sourceChunkIds : [];
+  const recovered = recoverLessonSummaryProviderExample({
+    example: question.example,
+    sourceChunkIds,
+  });
+  const mappedBlock = mapLessonSummaryProviderExampleBlock(recovered.example);
+  const block =
+    sourceChunkIds.length > 0 ? { ...mappedBlock, sourceChunkIds } : mappedBlock;
+  return {
+    block,
+    contentJson: toTiptap(
+      [block.solution, `Đáp án: ${block.answer}`].filter(Boolean).join("\n"),
+    ),
+    recoveryIssues: recovered.reviewIssues.map((issue) => ({
+      classification: "REVIEWABLE" as const,
+      code: issue.code,
+      message: issue.message,
+      technicalDetails: issue.technicalDetails ?? undefined,
+    })),
+  };
+}
+
 export function assertGeneratedContent(input: {
-  items: Array<{ sourceChunkIds: string[]; text: string }>;
+  items: Array<{ sourceChunkIds?: string[]; text: string }>;
   allowedChunkIds: Set<string>;
   contextTexts: string[];
 }) {
   for (const item of input.items) {
-    if (item.sourceChunkIds.some((id) => !input.allowedChunkIds.has(id))) {
+    if (item.sourceChunkIds?.some((id) => !input.allowedChunkIds.has(id))) {
       throw new Error(
         "AI_SOURCE_REFERENCE_INVALID: Output references a chunk outside the retrieved lesson context.",
       );

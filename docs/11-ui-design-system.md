@@ -99,6 +99,9 @@ Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới 
 - Trong trình soạn và phần hiển thị công thức Quiz/Flashcard/Test, mọi ký tự
   chữ cái phải dùng kiểu chữ đứng, gồm ký tự chính, chỉ số trên, chỉ số dưới,
   Vector và công thức Hóa học; không dùng kiểu nghiêng mặc định của math font.
+- Quiz/Flashcard/Test không được hiện delimiter LaTeX thô như `$...$`, `\\(...\\)`
+  hoặc lệnh `\\frac`; rich-content mapper phải tạo math node và viewer phải có
+  fallback tương thích cho dữ liệu AI cũ.
 
 Scale mặc định:
 
@@ -218,6 +221,7 @@ Spacing/radius mặc định:
 - Toast/notification ngắn hạn phải dùng thư viện toast chung của web app, hiện là `sonner`; không hand-roll toast cục bộ trong từng form/page.
 - Toast phải giữ màu chủ đạo theo trạng thái trên nền/border/text, không chỉ ở icon: success dùng xanh lá, error dùng đỏ, warning dùng vàng/cam, info dùng xanh dương; icon phải có vùng/cột riêng và không được đè chữ; close button không được nổi lệch ra ngoài khối toast, không dùng biểu tượng trùng lặp với icon trạng thái và không làm toast quá thưa.
 - Toast ngắn hạn chỉ hiển thị toast mới nhất; khi có toast mới, các toast cũ phải biến mất ngay thay vì xếp chồng bên dưới.
+- Toast, banner, lỗi biểu mẫu và mô tả lỗi cho người dùng không được ghép hoặc hiển thị nguyên văn thông báo từ thư viện, schema, provider, database hay HTTP. Front-end phải đổi mã lỗi/lỗi đã biết thành câu tiếng Việt theo ngữ cảnh và dùng lời nhắc tiếng Việt an toàn cho lỗi chưa biết; tên trường, đường dẫn dữ liệu, stack trace và câu kỹ thuật tiếng Anh chỉ được giữ trong log hoặc vùng `Chi tiết kỹ thuật` dành riêng cho quản trị viên.
 - Không fetch dữ liệu rải rác trong component sâu; dùng feature hook/API client.
 - Mock data phải đặt rõ ràng, dễ xóa khi connect API.
 - Màn UI có nhiều form, list, panel, trạng thái hoặc helper phải tách theo feature: page/manager chỉ compose layout; mỗi component render JSX ở file riêng; hook xử lý orchestration/state; schema/type và mapper/formatter/helper nằm ngoài file UI; mock data nằm file riêng. Không tạo file barrel/re-export chỉ để gom import cho tiện.
@@ -463,9 +467,25 @@ Một màn hình UI chỉ xem là xong khi:
   được chấp nhận một case mới bằng cách làm giảm chất lượng case cũ; phát sinh
   clip, chồng text–nét, chồng text–text, sai marker hoặc thay đổi ngữ nghĩa ở bất
   kỳ golden nào đều là regression chặn nghiệm thu.
+- Bảng giả thiết–kết luận của chứng minh Hình học phải giữ đúng quy ước SGK: cột
+  trái chỉ có nhãn `GT`, `KL`; một đường dọc ngăn cột nhãn với nội dung và một
+  đường ngang ngăn hai hàng. Không thay bằng hai badge/heading rời. Trên mobile,
+  cột nhãn thu gọn, nội dung/KaTeX tự xuống dòng hoặc cuộn ngang cục bộ nhưng các
+  đường ngăn vẫn liên tục; màu đường và chữ phải đủ tương phản ở light/dark.
 - Text trong visual Toán không được đè lên nét hình hoặc marker. Cơ chế tránh va
   chạm phải ưu tiên vùng trống gần nhất, giữ đúng phía/ngữ nghĩa của nhãn và dùng
   khoảng dịch nhỏ có giới hạn; không được làm sạch hình bằng cách đẩy nhãn ra xa.
+- Lớp chỉnh sửa trực tiếp visual Toán chỉ tồn tại khi admin editor truyền quyền
+  edit; student/read-only không render focus target, highlight hoặc action xóa.
+  Label/marker selectable phải có hit area trong suốt đủ dùng bằng chuột/touch và
+  keyboard, nhưng không đổi nét nhìn thấy hoặc lọt vào screenshot figure chuẩn.
+- Khi chọn một marker group bằng nhau/song song, toàn bộ glyph cùng quan hệ phải
+  highlight. Icon xóa là HTML overlay destructive có `aria-label`, touch target
+  khoảng `44px`, nằm trong biên figure và mở confirm dialog trước khi thay draft.
+  Click nền hoặc `Esc` bỏ chọn. Không dùng click một lần để xóa ngay phần tử SVG.
+- Lượt chỉnh trực tiếp đầu tiên chỉ xóa label và toàn marker; không xóa
+  point/primitive/topology. Summary đã phát hành phải thu hồi trước khi chỉnh hình;
+  mọi mutation phải qua schema client và validation/publish guard của backend.
 - Vùng cấm của nhãn phải tính theo toàn bộ khung chữ, không chỉ theo điểm neo. Quy
   tắc này áp dụng cả tên điểm, phương trình đồ thị, trục, đường dóng và
   marker; ảnh chỉ được đưa vào bộ đạt chuẩn sau khi kiểm lại trên mobile thật.

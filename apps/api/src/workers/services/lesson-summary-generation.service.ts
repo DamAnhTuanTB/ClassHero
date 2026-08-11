@@ -75,6 +75,7 @@ export class LessonSummaryGenerationService {
     const structuredInput = buildLessonSummaryStructuredInput({
       lessonId: context.lessonId,
       lessonTitle: sourceContext.lessonTitle,
+      targetGrade: sourceContext.targetGrade,
       documentIds: sourceContext.documentIds,
       sourceHash: sourceContext.sourceHash,
       chunks: sourceContext.chunks,
@@ -111,6 +112,7 @@ export class LessonSummaryGenerationService {
       contextChunks: sourceContext.chunks,
       reviewIssuesByPath: recovery.reviewIssuesByPath,
       rootReviewIssues: recovery.rootReviewIssues,
+      targetGrade: sourceContext.targetGrade,
     });
     return { action: "SUMMARY", output: { ...providerOutput, data } };
   }

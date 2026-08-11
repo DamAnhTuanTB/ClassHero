@@ -14,6 +14,7 @@ import {
   flashcardSetFormSchema,
   type FlashcardSetFormValues,
 } from "@/features/admin/flashcards/schemas/flashcard-form-schemas";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 const difficultyOptions = [
   { value: "MIXED", label: "Hỗn hợp" },
@@ -63,7 +64,12 @@ export function FlashcardSetEditorDialog({
       onSaved(saved);
       onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Chưa lưu được bộ flashcard");
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa lưu được bộ thẻ ghi nhớ. Vui lòng thử lại.",
+        ),
+      );
     }
   });
 

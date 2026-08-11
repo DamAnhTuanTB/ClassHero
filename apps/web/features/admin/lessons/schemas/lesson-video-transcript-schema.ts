@@ -19,8 +19,8 @@ export const transcriptSegmentSchema = z.object({
 export const transcriptFormSchema = z.object({
   segments: z
     .array(transcriptSegmentSchema)
-    .min(1, "Cần ít nhất một đoạn transcript")
-    .max(10_000, "Transcript vượt quá 10.000 đoạn"),
+    .min(1, "Cần ít nhất một đoạn bản chép lời")
+    .max(10_000, "Bản chép lời không được vượt quá 10.000 đoạn"),
 });
 
 export type TranscriptFormValues = z.infer<typeof transcriptFormSchema>;

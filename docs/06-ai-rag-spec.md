@@ -437,12 +437,49 @@ AI generation dùng document chunks để bám đúng buổi học, nhưng khôn
 - Prompt phải yêu cầu tạo câu hỏi/thẻ mới dựa trên chuẩn kiến thức, khái niệm, kỹ năng và mức độ của lesson.
 - Không copy nguyên văn bài tập, ví dụ, câu hỏi hoặc ngữ cảnh đặc thù từ tài liệu nguồn, trừ khi admin chủ động chọn chế độ trích lại nội dung.
 - Với Toán, có thể biến đổi số liệu, ngữ cảnh, cách hỏi và mức độ nhận thức, nhưng vẫn giữ đúng kỹ năng của page range buổi học.
-- Lưu source chunk/page metadata ở mức item để truy vết nội bộ: generated item này dựa trên phần kiến thức nào, không phải để chứng minh đã copy từ trang đó.
+- Flashcard/Test có thể lưu source chunk/page metadata ở mức item để truy vết nội bộ. Quiz là bài tập mới do AI biên soạn nên không yêu cầu provider trả và không lưu `sourceChunkIds`, `sources` hoặc `sourceHash` trong từng câu; tài liệu nguồn chỉ làm context ở lúc sinh.
 - UI cho học sinh không cần hiển thị source page cho quiz/test mặc định. Source page hữu ích hơn cho admin review, debug AI generation, report sai câu và chat Q&A theo tài liệu.
 - Validation/prompt guard cần reject hoặc yêu cầu regenerate nếu output lặp lại nguyên văn câu hỏi/bài tập từ context ở mức quá giống.
 - M9.3 hiện reject khi phần nội dung chính của item chứa một chuỗi liên tiếp từ
-  12 token đã xuất hiện trong context retrieval; đồng thời mọi
-  `sourceChunkIds` phải thuộc đúng tập chunks đã đưa vào lần generate đó.
+  12 token đã xuất hiện trong context retrieval. Flashcard/Test có
+  `sourceChunkIds` thì các ID đó phải thuộc đúng tập chunks đã đưa vào lần
+  generate; Quiz không có field này.
+
+### 5.0.1. Quiz/Test là danh sách EXAMPLE của M9.2
+
+Provider contract của mỗi Quiz/Test question gồm hai lớp:
+
+```text
+M9.2 EXAMPLE core
+  problem + solution + answer + geometryStatement + diagramSpec
+Assessment metadata
+  questionType + options/correct answer + hint + difficulty
+```
+
+- System instructions của Quiz/Test nhúng trực tiếp các authoring invariants
+  EXAMPLE từ prompt M9.2; schema dùng lại
+  `lessonSummaryStandardExerciseTransportSchema`.
+- Output được recover bằng chính partial-recovery M9.2, map bằng mapper EXAMPLE
+  M9.2, compile/edit hình bằng cùng diagram core và hiển thị bằng cùng component.
+  Không có `keyIdea/steps/finalAnswer`, schema hình, editor hình hoặc renderer
+  lời giải riêng của Quiz. Sửa core EXAMPLE một lần phải áp dụng cho cả Sinh
+  kiến thức và Quiz.
+- Mọi câu Quiz hợp lệ được append vào `targetQuizSetId` đang mở. Nếu lesson chưa
+  có set, backend tạo duy nhất `Bộ câu hỏi 1`; các lượt sau không tạo tab mới.
+- Sau mỗi lượt thành công, UI vẫn cho tạo lượt Quiz tiếp theo bằng cùng modal và
+  `targetQuizSetId`. Admin review một câu tại một thời điểm qua thanh số câu;
+  câu AI hỗ trợ `Chỉ xem UI` hoặc `Song song` UI + JSON. Khối EXAMPLE vẫn giữ
+  schema/core M9.2 nhưng label ngữ cảnh trên Quiz là `Lời giải`.
+- Text LaTeX từ provider dùng `$...$`, `$$...$$`, `\\(...\\)` hoặc `\\[...\\]`
+  phải được mapper chuyển thành node Tiptap `inlineMath`/`blockMath`. Renderer có
+  fallback cùng tokenizer cho dữ liệu cũ, không được hiển thị delimiter thô.
+- Set có thể chứa câu thủ công và nhiều lượt AI. `aiGenerationId` cùng
+  `generationQuestionIndex` nằm ở metadata từng câu; `generationAudit` đếm riêng
+  `initialGeneratedCount`, `deletedCount`, `currentActiveCount` của từng lượt.
+- Curation diễn ra sau generation: provider trả thiếu 8/10 là lỗi count, nhưng
+  AI trả đủ 10 rồi admin xóa 2 là trạng thái hợp lệ 8/10 của chính lượt đó.
+- Khi admin sửa nội dung câu AI bằng editor thủ công, `exampleBlock` cũ bị bỏ để
+  UI dùng explanation Tiptap mới, tránh hiển thị snapshot EXAMPLE đã stale.
 
 ### 5.1. Summary generation
 
@@ -452,7 +489,7 @@ Input:
 {
   "documentIds": ["uuid"],
   "style": "student_friendly",
-  "styleInstructions": "Dễ hiểu cho học sinh khối 7.",
+  "styleInstructions": "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
   "length": "standard",
   "targetWordCount": 350,
   "extraInstructions": "string optional",
@@ -474,9 +511,15 @@ với structured output bắt buộc có cả `text.format` gồm `type`, `name`
 và JSON Schema thực tế được tạo từ cùng Zod schema. Không được gọi một object
 thiếu provider field là “input đầy đủ”.
 
-`targetWordCount` là số từ mục tiêu gần đúng, dùng cùng `length` để mô tả rõ
-mức độ dài mong muốn. Field này không bắt buộc, mặc định để trống; khi có giá
-trị thì prompt phải nêu rõ bản tóm tắt dài khoảng bao nhiêu từ.
+`targetWordCount` là số từ mục tiêu gần đúng của tổng text sư phạm học sinh nhìn
+thấy, không tính JSON key, schema metadata hoặc primitive/coordinate của diagram;
+dùng cùng `length` để mô tả rõ mức độ dài mong muốn. Field này không bắt buộc,
+mặc định để trống; khi có giá trị thì prompt phải nêu rõ bản tóm tắt dài khoảng
+bao nhiêu từ. Khi dựng user prompt, `length` và `targetWordCount` phải nằm trong
+đúng một mục `Độ dài`: nếu có số từ thì cho phép dao động hợp lý để giữ nội dung
+đầy đủ, dễ đọc; nếu không có thì ghi rõ không cần bám theo một số từ cố định,
+không tạo thêm dòng meta lặp lại mức độ dài đã chọn. Số từ là mục tiêu mềm; khi
+xung đột, structured contract và độ đầy đủ của kiến thức cốt lõi được ưu tiên.
 
 Provider output dùng contract lồng để khóa cặp lý thuyết–ví dụ; backend validate
 và trải phẳng sang output lưu trữ:
@@ -546,7 +589,10 @@ Output phải giữ các invariant sau:
   thành block `example` riêng.
 - `note` là ngoại lệ có chủ đích: mỗi `note.content` phải trình bày một ghi chú,
   lưu ý hoặc nhận xét từ nguồn và kèm một ví dụ ngắn ngay trong cùng `content`;
-  không tạo block `example` riêng chỉ để minh họa cho note.
+  không tạo block `example` riêng chỉ để minh họa cho note. Vì renderer đã tự
+  hiển thị nhãn của block, `note.content` không được mở đầu lại bằng `Chú ý`,
+  `Lưu ý` hoặc `Nhận xét`. Mapper phải bỏ tiền tố lặp trước khi persist; renderer
+  áp dụng cùng normalizer cho summary cũ để không cần migration hoặc sinh lại.
 - Không áp giới hạn số ý kiểu `1–3 ý/block`. Mỗi block giữ đủ các ý thuộc cùng một
   tiểu chủ đề/mục tiêu học tập; khi mục tiêu học tập thay đổi thì tách block. Nếu
   số ví dụ nguồn ít hơn số ý lý thuyết có thể tách, model chỉ gom các ý thực sự
@@ -593,15 +639,24 @@ Generation contract nên khóa cấu trúc trước khi trải phẳng sang sche
 
 Prompt/input contract:
 
-- System prompt nền và các invariant trên là bắt buộc, không được để custom system
-  prompt của admin thay thế toàn bộ. Custom instruction chỉ được nối như preference
-  bổ sung và không có quyền ghi đè invariant.
-- User prompt sinh tự động luôn được giữ lại; custom user prompt chỉ append vào
-  phần yêu cầu bổ sung thay vì thay thế task contract.
+- Khi `systemInstructions` khác rỗng, nội dung admin gửi thay thế toàn bộ System
+  prompt mặc định; backend không nối thêm preamble/invariant. Khi field rỗng,
+  backend dùng canonical System prompt mặc định.
+- Khi `userPrompt` khác rỗng, nội dung admin gửi thay thế toàn bộ User prompt mặc
+  định; backend không append task contract. Khi field rỗng, backend dựng User
+  prompt từ cấu hình runtime hiện tại.
 - Context phải được serialize bằng JSON hoặc cơ chế escaping tương đương; không
   chèn raw chunk content vào delimiter XML có thể bị đóng thẻ bởi nội dung nguồn.
 - Prompt phải phân biệt rõ `ILLUSTRATION` trong section lý thuyết với hai exercise
   của section cuối và yêu cầu self-check trước structured output.
+- Corrective `M9.16` giữ System/User prompt editable, loại mọi nhánh nhận diện
+  heading rồi bọc lại prompt. Preview và generate dùng cùng shared builder; prompt
+  chưa được admin sửa được rebuild từ field hiện tại, còn prompt đã sửa được giữ
+  nguyên. Request fingerprint có thể được bổ sung để phát hiện source/config stale
+  mà không đổi semantics thay thế nguyên văn này.
+- Mỗi canonical contract section chỉ được compose đúng một lần. Cảnh báo context
+  untrusted ở system và ngay trước JSON context là hai boundary an toàn có chủ
+  đích; không coi đây là nội dung sư phạm bị lặp.
 - Ngân sách output tối thiểu/mặc định là `8_000` token, cho phép cấu hình tới
   `32_000` token và vẫn giữ budget reservation hiện có.
 - Candidate phụ thuộc hình được gắn warning để admin đối chiếu hình với lời giải
@@ -627,14 +682,24 @@ Summary context rules:
   phải trả đúng system instructions, user prompt và input cuối cùng sau khi
   ghép context; không được tự dựng một bản mô phỏng khác với request thật.
 - FE phải nạp `systemPrompt` và `userPrompt` hiệu lực từ preview vào đúng hai tab.
-  Khi admin gửi lại nguyên prompt hiệu lực đã xem trước, shared builder phải tái
-  sử dụng trực tiếp, không bọc lặp base prompt hoặc preference lần thứ hai.
+  Nếu admin chủ động sửa một ô rồi gửi lại giá trị khác rỗng, shared builder phải
+  dùng chính xác prompt đã sửa làm toàn bộ prompt hiệu lực của lớp đó; không nối
+  thêm base prompt, contract hoặc nhãn preference ở trước/sau. Chỉ khi ô tương
+  ứng rỗng mới dựng prompt mặc định từ cấu hình form hiện tại.
+- Khi admin bấm `Bắt đầu tạo`, FE phải dựng lại prompt bằng toàn bộ giá trị form
+  hiện tại trước khi gửi request tạo job. Prompt tự sinh từ lần preview cũ không
+  được ghi đè style, độ dài, số từ, yêu cầu bổ sung, tài liệu hoặc cấu hình Quiz
+  vừa thay đổi; phần System/User prompt do admin chủ động sửa vẫn được giữ nguyên
+  làm prompt hiệu lực của lần chạy đó. Nút cập nhật dữ liệu chỉ phục vụ xem trước
+  và ước tính, không phải điều kiện để các lựa chọn mới có hiệu lực.
 - Semantic checker chỉ coi `Ví dụ:`, `Chú ý:`, `Bài tập 1.`, `Vận dụng:` và
   các nhãn cấu trúc tương đương là nội dung bị trộn vào theory. Không được chặn
   chỉ vì câu lý thuyết dùng từ thông thường như “vận dụng các tính chất” hoặc
   “khi giải bài tập”.
-- Admin được sửa System instructions và User prompt theo lần chạy; các field đều
-  có giới hạn độ dài và được đưa vào input fingerprint/job metadata. System
+- Admin được sửa System instructions và User prompt theo lần chạy. Giá trị khác
+  rỗng thay thế toàn bộ prompt mặc định cùng lớp; vì vậy admin chịu trách nhiệm
+  giữ các contract cần thiết khi sửa. Các field đều có giới hạn độ dài và được
+  đưa vào input fingerprint/job metadata. System
   instructions cho phép tối đa `64.000` ký tự vì field này còn chứa prompt hiệu
   lực do preview trả về; user prompt cho phép tối đa `16.000` ký tự. Context
   chunks vẫn do server ghép sau user prompt và được đánh dấu là dữ liệu tham
@@ -775,6 +840,15 @@ nằm tại `.codex/plans/m9-2-classhero-authoring-v3-plan.md`.
   nhãn tập hợp nằm trong miền. Nhãn cạnh tính kích thước chữ theo text scale thích
   ứng thay vì cạnh dài viewBox để hình nhiều cụm không đẩy số đo ra xa. Điểm dựng
   đồ thị chỉ hiện tên sát chấm; renderer tự thêm đường dóng nét đứt tới Ox/Oy.
+- Kí hiệu góc trong nội dung học tập dùng `\\widehat{BAC}` với đúng ba tên điểm,
+  trong đó đỉnh góc nằm ở giữa; không dùng `\\angle A`, `\\angle BAC` hoặc
+  `\\widehat A`. Mapper chuẩn hóa notation ba điểm và dùng hai cánh của marker
+  `ANGLE`/`RIGHT_ANGLE` để phục hồi notation khi provider chỉ trả tên đỉnh. Trên
+  SVG, số đo hoặc ẩn số như `35°`, `x` nằm trong `marker.label`; renderer đặt tâm
+  chữ trên tia phân giác, ngay ngoài cung góc theo kích thước thật ước lượng của
+  nhãn, không đẩy chữ sâu vào trong hình và không tạo `labels[]` rời trùng nghĩa.
+  Frontend áp dụng cùng normalizer khi đọc summary cũ để bản đã lưu cũng hiển thị
+  đúng mà không cần gọi lại provider chỉ vì đổi notation.
 - Sơ đồ thực tế/dựng hình phải giữ đúng vai trò ngữ nghĩa của từng điểm và đường:
   ví dụ chân tường/chân thang nằm trên mặt đất, điểm chạm nằm trên tường và thang
   là đoạn chéo; tâm/bán kính cung tròn phải đúng thao tác dựng. Prompt buộc model
@@ -850,8 +924,8 @@ golden nội bộ sau source-backed re-audit và được ghi vào
 `reference-golden-manifest.json`. Semantic truth đứng trước pixel similarity;
 responsive adaptation được chấp nhận khi giữ nguyên quan hệ và có review note.
 
-Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v54` và
-schema `lesson-summary-schema-v40`. Provider ưu tiên trả `INTENT`; backend biên
+Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v58` và
+schema `lesson-summary-schema-v42`. Provider ưu tiên trả `INTENT`; backend biên
 dịch intent bằng registry deterministic cho tám family. Bộ compiler hiện có 86
 fixture trực quan local, gồm mô hình tiểu học/đo lường, trục số–tọa độ, hàm bậc
 nhất/bậc hai/tỉ lệ nghịch, bảng–biểu đồ, hình học phẳng, đồng dạng–đường tròn,
@@ -928,6 +1002,11 @@ thuật ngữ tiếng Anh khó hiểu như `diagramSpec`, `segmentIds`, `marker`
 trục và ký hiệu toán học quen thuộc như `A`, `BC`, `Ox`, `Oy`, `x ≥ 0` vẫn được
 giữ để quản trị viên xác định đúng đối tượng. Quy tắc Việt hóa này cũng áp dụng
 khi API đọc cảnh báo cũ đã lưu, nên không cần sinh lại nội dung chỉ để đổi lời báo.
+Mọi toast/banner phát sinh từ generate, preview, save hoặc chỉnh trực tiếp hình
+phải đi qua lớp chuẩn hóa thông báo phía web. Không nối trực tiếp `error.message`,
+lỗi Zod/JSON Schema, lỗi provider hay `reviewIssue` kỹ thuật vào câu hiển thị;
+lỗi đã biết được ánh xạ sang hướng xử lý tiếng Việt cụ thể, còn lỗi chưa biết dùng
+lời nhắc an toàn theo đúng thao tác đang thực hiện.
 
 Mọi diagram intent phải được chạy thử qua chính deterministic compiler trong
 lớp recovery, kể cả khi intent đã qua schema. Kết quả compiler hợp lệ được
@@ -954,9 +1033,53 @@ liệu server cũ; chỉ nút Lưu mới persist toàn bộ thay đổi qua upse
 Mỗi lần admin bấm tạo chỉ có tối đa một provider attempt (`maxAttempts=1`) và
 route snapshot chỉ dùng candidate đã chọn; không tự fallback, retry hay repair
 block bằng provider khác. Schema provider hiện tại là
-`lesson-summary-schema-v40`; persisted wrapper vẫn là
+`lesson-summary-schema-v42`; persisted wrapper vẫn là
 `lesson_summary_blocks.version=2` với `reviewIssues` optional để tương thích dữ
 liệu v1/v2 cũ.
+
+Summary prompt lấy `targetGrade` từ target audience thấp nhất của learning path
+và đưa grade vào `sourceHash`, vì đổi khối lớp làm thay đổi văn phong đầu ra. Lớp
+3–4 ưu tiên quan sát/nhận biết và mẫu `Bài giải`–`Đáp số`; lớp 5–6 dùng mạch ngắn
+`Ta có`–`Do đó`–`Vậy`; lớp 7–12 bắt buộc bảng GT–KL cho bài Hình học yêu cầu
+`Chứng minh`/`Chứng tỏ`. Bài Số học/Đại số giữ cách giải trực tiếp phép tính và
+biến đổi; mọi ý `a)`, `b)`, `c)` trong đề, lời giải và đáp án phải bắt đầu ở dòng
+riêng.
+
+`targetGrade` và `styleInstructions` vẫn là hai field độc lập để giữ nguồn dữ
+liệu bắt buộc và preference của admin, nhưng user prompt phải ghép chúng thành
+đúng một mục `Văn phong và cách trình bày`. Không tạo hai dòng rời `Khối lớp mục
+tiêu` và `Phong cách`, không lặp lại khối lớp trong preset và không dùng tham
+chiếu mơ hồ như `như cũ`.
+
+Example provider luôn trả `geometryStatement`; field là `null` ngoài bài chứng
+minh Hình học lớp 7–12. Khi có dữ liệu, `hypotheses[]` chỉ chứa dữ kiện đã cho,
+không chứa kết quả suy ra hoặc đường phụ, còn `conclusions[]` ghi đúng điều cần
+chứng minh. Persisted example cho phép thiếu field để summary cũ tiếp tục đọc.
+Lời giải chứng minh dùng mạch `Xét`–`Ta có`–`Vì... nên`–`Suy ra`–`Do đó`–`Vậy`,
+không dùng danh sách bullet làm toàn bộ cấu trúc. Mapper/renderer không tự biến
+văn xuôi hình học thành bullet; output checklist mới bị gắn review issue để admin
+sửa hoặc chấp nhận sau khi kiểm tra. Thiếu GT–KL chỉ tạo
+`MISSING_GEOMETRY_STATEMENT/ACCEPT_OR_FIX`: đề, hình, lời giải và đáp án vẫn hiển
+thị đầy đủ, không bị thay bằng placeholder và không làm hỏng toàn bộ summary.
+
+Admin direct-edit của diagram là một lớp chỉnh bản nháp sau generation, không làm
+đổi prompt/schema AI và không gọi provider. Tên điểm chỉ được sửa phần hiển thị,
+giữ nguyên ID/tọa độ; label rời, text góc và caption được sửa/xóa; marker
+`ANGLE|RIGHT_ANGLE|EQUAL_LENGTH|PARALLEL` được xóa theo cả group. Sửa/xóa áp dụng
+ngay vào draft, không confirm; chỉ reset toàn bộ chỉnh sửa của một hình trong
+phiên hiện tại mới có confirm.
+
+Admin có thể chọn từ hai `SEGMENT` trở lên để thêm marker `EQUAL_LENGTH` khi mỗi
+đầu đoạn đều là point có tên. Một đoạn chỉ được tô đỏ, không hiện popup; từ hai
+đoạn mới hiện popup nhỏ chỉ có action bằng nhau. Hit-test phải định danh đúng
+segment bằng tọa độ SVG, không dùng hit-line vô hình gây chọn nhầm cạnh ở cụm hình
+kề nhau. Mọi mutation giữ vị trí cuộn và chỉ PUT khi bấm `Lưu nội dung`.
+
+Frontend bắt buộc validate structural schema và không áp dụng mutation tạo thêm
+full-schema issue; backend vẫn reconcile authoritative khi PUT summary. Không cho
+xóa point/primitive/topology và không tự chấp nhận review issue để vượt publish
+guard. Chi tiết kế hoạch ở
+`.codex/plans/m9-13-admin-safe-diagram-element-delete-plan.md`.
 
 ### 5.2. Quiz generation
 

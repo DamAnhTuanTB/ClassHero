@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   CheckCircle2,
   ChevronLeft,
   Lightbulb,
@@ -15,6 +14,7 @@ import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentQuestionCard } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-question-card";
+import { AssessmentExplanationPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-explanation-panel";
 import { QuizExitConfirmDialog } from "@/features/student/lessons/screens/student-lesson-screen/components/quiz-exit-confirm-dialog";
 import type {
   CheckedAnswer,
@@ -392,22 +392,14 @@ export function QuizRunnerScreen({
             </div>
           ) : null}
 
-          {feedback?.explanationJson ? (
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={handleToggleExplanation}
-                className="inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl bg-sky-50 px-4 text-base font-black text-sky-700 transition hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300"
-              >
-                <BookOpen className="h-5 w-5" aria-hidden="true" />
-                {isExplanationOpen ? "Ẩn lời giải chi tiết" : "Xem lời giải chi tiết"}
-              </button>
-              {isExplanationOpen ? (
-                <div className="mt-2 rounded-2xl border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-400/30 dark:bg-sky-500/10">
-                  <TiptapContentView content={feedback.explanationJson} />
-                </div>
-              ) : null}
-            </div>
+          {feedback ? (
+            <AssessmentExplanationPanel
+              content={feedback.explanationJson}
+              diagramSpec={feedback.explanationDiagramSpecJson}
+              exampleBlock={feedback.explanationExampleBlock}
+              isOpen={isExplanationOpen}
+              onToggle={handleToggleExplanation}
+            />
           ) : null}
         </div>
 

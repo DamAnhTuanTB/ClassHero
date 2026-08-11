@@ -72,6 +72,13 @@ export class RetrievalService {
       1,
       Math.trunc(input.maxContextTokens ?? RETRIEVAL_DEFAULTS.maxContextTokens),
     );
+    const documentIds = [...new Set(input.documentIds ?? [])];
+    const documentFilter =
+      documentIds.length > 0
+        ? Prisma.sql`AND chunk.document_id IN (${Prisma.join(
+            documentIds.map((documentId) => Prisma.sql`${documentId}::uuid`),
+          )})`
+        : Prisma.empty;
 
     // 1. Get embedding config (provider, model, dimensions)
     const embConfig = this.aiService.getEmbeddingConfig();
@@ -109,6 +116,7 @@ export class RetrievalService {
         AND document.lesson_id = ${input.lessonId}::uuid
         AND document.replaced_at IS NULL
         AND document.status = 'READY'::"DocumentStatus"
+        ${documentFilter}
         AND chunk.embedding IS NOT NULL
         AND chunk.embedding_provider = ${embConfig.provider}::"AiProviderName"
         AND chunk.embedding_model = ${embConfig.model}
@@ -146,6 +154,7 @@ export class RetrievalService {
             AND document.lesson_id = ${input.lessonId}::uuid
             AND document.replaced_at IS NULL
             AND document.status = 'READY'::"DocumentStatus"
+            ${documentFilter}
             AND ${orClause}
           ORDER BY chunk.document_id, chunk.chunk_index, chunk.id
           LIMIT ${topK}

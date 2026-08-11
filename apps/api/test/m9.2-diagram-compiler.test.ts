@@ -344,6 +344,46 @@ describe("M9.2 deterministic math diagram compiler", () => {
     expect(result.spec.labels).toEqual([]);
   });
 
+  it("treats a four-point hypotenuse-leg intent as two right triangles sharing one hypotenuse", () => {
+    const compiled = compileLessonSummaryDiagramIntentWithDiagnostics({
+      ...base,
+      grade: 7,
+      difficulty: "SIMPLE",
+      family: "PLANE_GEOMETRY",
+      archetype: "RIGHT_TRIANGLE_CONGRUENCE",
+      variant: "HYPOTENUSE_LEG",
+      pointLabels: ["A", "B", "C", "D"],
+      measures: [
+        { target: "AB", text: "=" },
+        { target: "AD", text: "=" },
+      ],
+      caption: "Hai tam giác vuông có chung cạnh huyền",
+    });
+
+    expect(compiled.spec.points.map((point) => point.label)).toEqual([
+      "A",
+      "B",
+      "C",
+      "D",
+    ]);
+    expect(compiled.spec.primitives.map((primitive) => primitive.id)).toEqual(
+      expect.arrayContaining([
+        "sharedAB",
+        "sharedBC",
+        "sharedAC",
+        "sharedAD",
+        "sharedDC",
+      ]),
+    );
+    expect(
+      compiled.spec.markers.filter((marker) => marker.type === "RIGHT_ANGLE"),
+    ).toHaveLength(2);
+    expect(
+      compiled.spec.markers.filter((marker) => marker.type === "EQUAL_LENGTH"),
+    ).toHaveLength(1);
+    expect(compiled.semanticIssues).toEqual([]);
+  });
+
   it("keeps only the numeric value when a segment measure repeats its name", () => {
     const result = compileLessonSummaryDiagramIntent({
       ...base,
@@ -653,7 +693,10 @@ describe("M9.2 deterministic math diagram compiler", () => {
       expect.objectContaining({ type: "RIGHT_ANGLE", vertex: "distanceFoot" }),
     );
     expect(result.spec.labels).toContainEqual(
-      expect.objectContaining({ text: "4 cm", anchorPrimitiveId: "distancePerpendicular" }),
+      expect.objectContaining({
+        text: "4 cm",
+        anchorPrimitiveId: "distancePerpendicular",
+      }),
     );
   });
 
@@ -691,7 +734,10 @@ describe("M9.2 deterministic math diagram compiler", () => {
     );
     expect(result.spec.labels).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ text: "d", anchorPrimitiveId: "distanceCirclePerpendicular" }),
+        expect.objectContaining({
+          text: "d",
+          anchorPrimitiveId: "distanceCirclePerpendicular",
+        }),
         expect.objectContaining({ text: "R", anchorPrimitiveId: "distanceCircleRadius" }),
       ]),
     );
@@ -1502,8 +1548,7 @@ describe("M9.2 deterministic math diagram compiler", () => {
       variant: "LINE_RAY_SEGMENT",
       pointLabels: ["X", "O", "Y"],
       measures: [],
-      caption:
-        "Trên đường thẳng XY, O nằm giữa X và Y nên OX và OY là hai tia đối nhau.",
+      caption: "Trên đường thẳng XY, O nằm giữa X và Y nên OX và OY là hai tia đối nhau.",
     });
 
     expect(line.spec.points.map((point) => [point.label, point.pointStyle])).toEqual([
@@ -1538,10 +1583,12 @@ describe("M9.2 deterministic math diagram compiler", () => {
         to: "linearLast",
       }),
     ]);
-    expect(oppositeRays.spec.labels.map((label) => [label.text, label.position])).toEqual([
-      ["x", "TOP"],
-      ["y", "TOP"],
-    ]);
+    expect(oppositeRays.spec.labels.map((label) => [label.text, label.position])).toEqual(
+      [
+        ["x", "TOP"],
+        ["y", "TOP"],
+      ],
+    );
   });
 
   it("canonicalizes graph function order and removes redundant linear construction points", () => {
@@ -2134,7 +2181,9 @@ describe("M9.2 deterministic math diagram compiler", () => {
       measures: [],
     });
 
-    expect(compiled.spec.primitives.filter((item) => item.type === "SEGMENT")).toHaveLength(6);
+    expect(
+      compiled.spec.primitives.filter((item) => item.type === "SEGMENT"),
+    ).toHaveLength(6);
     expect(compiled.spec.labels.map((label) => label.text)).toEqual([
       "a",
       "b",
@@ -2171,8 +2220,7 @@ describe("M9.2 deterministic math diagram compiler", () => {
     const ab = { x: b.x - a.x, y: b.y - a.y };
     const ac = { x: c.x - a.x, y: c.y - a.y };
     const cosine =
-      (ab.x * ac.x + ab.y * ac.y) /
-      (Math.hypot(ab.x, ab.y) * Math.hypot(ac.x, ac.y));
+      (ab.x * ac.x + ab.y * ac.y) / (Math.hypot(ab.x, ab.y) * Math.hypot(ac.x, ac.y));
     expect(cosine).toBeCloseTo(0.5, 6);
   });
 
@@ -2194,7 +2242,9 @@ describe("M9.2 deterministic math diagram compiler", () => {
     });
     const angles = compiled.spec.markers.filter((marker) => marker.type === "ANGLE");
 
-    expect(compiled.spec.markers.some((marker) => marker.type === "RIGHT_ANGLE")).toBe(false);
+    expect(compiled.spec.markers.some((marker) => marker.type === "RIGHT_ANGLE")).toBe(
+      false,
+    );
     expect(angles.map((angle) => angle.label)).toEqual(["80°", "70°", "80°", "70°"]);
   });
 
@@ -2227,7 +2277,9 @@ describe("M9.2 deterministic math diagram compiler", () => {
     expect(labelsByPrimitive.get("similarEF")?.text).toBe("12 cm");
     expect(labelsByPrimitive.get("similarFD")?.text).toBe("15 cm");
     expect(labelsByPrimitive.get("similarBC")?.position).toBe("RIGHT");
-    expect(distance("similarD", "similarE") / distance("similarA", "similarB")).toBeCloseTo(1.5, 6);
+    expect(
+      distance("similarD", "similarE") / distance("similarA", "similarB"),
+    ).toBeCloseTo(1.5, 6);
   });
 
   it("normalizes advanced-geometry assignments and omits relation prose", () => {
@@ -2274,9 +2326,7 @@ describe("M9.2 deterministic math diagram compiler", () => {
       yMin: -4,
       yMax: 4,
       tickStep: 1,
-      boundaries: [
-        { a: 1, b: 1, c: 2, operator: "LE", label: ">= 0" },
-      ],
+      boundaries: [{ a: 1, b: 1, c: 2, operator: "LE", label: ">= 0" }],
     });
 
     expect(compiled.spec.labels.map((label) => label.text)).not.toContain(">= 0");
@@ -2327,9 +2377,7 @@ describe("M9.2 deterministic math diagram compiler", () => {
       grade: 3,
       family: "ELEMENTARY_MODEL",
       archetype: "TAPE_COMPARISON",
-      bars: [
-        { label: "12 quả", parts: [4, 4, 4], partLabels: ["4 quả"] },
-      ],
+      bars: [{ label: "12 quả", parts: [4, 4, 4], partLabels: ["4 quả"] }],
       unit: "quả",
     });
 
@@ -2377,9 +2425,9 @@ describe("M9.2 deterministic math diagram compiler", () => {
       ],
     });
 
-    expect(compiled.spec.primitives.some((primitive) => primitive.id === "boundary0")).toBe(
-      true,
-    );
+    expect(
+      compiled.spec.primitives.some((primitive) => primitive.id === "boundary0"),
+    ).toBe(true);
     expect(compiled.semanticIssues).toContainEqual(
       expect.objectContaining({ code: "INEQUALITY_BOUNDARY_OMITTED" }),
     );
@@ -2480,9 +2528,9 @@ describe("M9.2 deterministic math diagram compiler", () => {
       measures: [],
     });
 
-    expect(compiled.spec.points.flatMap((point) => (point.label ? [point.label] : []))).toEqual(
-      expect.arrayContaining(["A", "B", "C", "D", "E"]),
-    );
+    expect(
+      compiled.spec.points.flatMap((point) => (point.label ? [point.label] : [])),
+    ).toEqual(expect.arrayContaining(["A", "B", "C", "D", "E"]));
     expect(compiled.semanticIssues).toContainEqual(
       expect.objectContaining({ code: "INFERRED_POINT_LABEL" }),
     );
@@ -2554,9 +2602,9 @@ describe("M9.2 deterministic math diagram compiler", () => {
       ],
     });
 
-    expect(compiled.spec.primitives.some((primitive) => primitive.type === "POLYLINE")).toBe(
-      true,
-    );
+    expect(
+      compiled.spec.primitives.some((primitive) => primitive.type === "POLYLINE"),
+    ).toBe(true);
     expect(compiled.semanticIssues).toContainEqual(
       expect.objectContaining({ code: "GRAPH_CONSTRUCTION_POINT_OMITTED" }),
     );

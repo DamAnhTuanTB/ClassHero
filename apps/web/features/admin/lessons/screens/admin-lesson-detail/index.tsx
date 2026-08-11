@@ -118,6 +118,9 @@ export function AdminLessonDetailManager({
   const [preferredSetIds, setPreferredSetIds] = useState<
     Partial<Record<"QUIZ" | "FLASHCARD" | "TEST", string>>
   >({});
+  const [activeQuizSetId, setActiveQuizSetId] = useState(
+    initialQuizData?.questionSetId ?? undefined,
+  );
   const [requestedGenerationType, setRequestedGenerationType] =
     useState<AdminAiGenerationType | null>(null);
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
@@ -606,6 +609,7 @@ export function AdminLessonDetailManager({
 
               <AdminAiGenerationPanel
                 lessonId={lessonId}
+                quizTargetSetId={activeQuizSetId}
                 requestedGenerationType={requestedGenerationType}
                 onOpenResult={handleOpenAiResult}
                 onRequestedGenerationHandled={handleRequestedGenerationHandled}
@@ -639,6 +643,7 @@ export function AdminLessonDetailManager({
                     <AdminQuizTab
                       initialQuizData={initialQuizData}
                       lessonId={lessonId}
+                      onSelectedSetIdChange={setActiveQuizSetId}
                       preferredSetId={preferredSetIds.QUIZ}
                     />
                   </div>

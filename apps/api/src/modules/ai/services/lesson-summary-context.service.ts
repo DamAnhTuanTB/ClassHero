@@ -23,6 +23,7 @@ export class LessonSummaryContextError extends Error {
 export interface LessonSummaryContext {
   lessonId: string;
   lessonTitle: string;
+  targetGrade: number | null;
   documentIds: string[];
   sourceHash: string;
   totalTokens: number;
@@ -41,7 +42,17 @@ export class LessonSummaryContextService {
         deletedAt: null,
         learningPath: { deletedAt: null },
       },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        learningPath: {
+          select: {
+            targetAudiences: {
+              select: { targetAudience: { select: { grade: true } } },
+            },
+          },
+        },
+      },
     });
     if (!lesson) {
       throw new LessonSummaryContextError("LESSON_NOT_FOUND", "Không tìm thấy buổi học");
@@ -116,8 +127,14 @@ export class LessonSummaryContextService {
       );
     }
 
-    const sourceHash = hashAiValue(
-      documents.map((document) => ({
+    const targetGrade =
+      lesson.learningPath.targetAudiences
+        .map(({ targetAudience }) => targetAudience.grade)
+        .filter((grade): grade is number => grade !== null)
+        .sort((left, right) => left - right)[0] ?? null;
+    const sourceHash = hashAiValue({
+      targetGrade,
+      documents: documents.map((document) => ({
         id: document.id,
         contentHash: document.contentHash,
         chunks: document.chunks.map((chunk) => ({
@@ -126,11 +143,12 @@ export class LessonSummaryContextService {
           tokenCount: chunk.tokenCount,
         })),
       })),
-    );
+    });
 
     return {
       lessonId: lesson.id,
       lessonTitle: lesson.title,
+      targetGrade,
       documentIds: documents.map((document) => document.id),
       sourceHash,
       totalTokens,

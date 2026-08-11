@@ -3,6 +3,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import type { getRequestContext } from "#api/common/api/request-context";
 import {
+  AiGenerationStatus,
   AiExplanationTargetType,
   ContentSource,
   Difficulty,
@@ -22,6 +23,10 @@ import {
   textInputGradingSchema,
 } from "#api/modules/quiz/types/quiz.types";
 import { getTiptapText } from "#api/common/validation/rich-text-content";
+import {
+  lessonSummaryMvpBlockSchema,
+  type LessonSummaryMvpBlock,
+} from "#api/modules/ai/types/lesson-summary.types";
 
 type RequestContext = ReturnType<typeof getRequestContext>;
 
@@ -43,10 +48,13 @@ export class QuizService {
   // --- Quiz Set ---
 
   async listQuizSetsByLesson(lessonId: string) {
-    return this.prisma.quizSet.findMany({
+    const sets = await this.prisma.quizSet.findMany({
       where: { lessonId, deletedAt: null },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
+        aiGeneration: {
+          select: { id: true, inputMetaJson: true },
+        },
         _count: {
           select: {
             questions: {
@@ -56,6 +64,44 @@ export class QuizService {
         },
       },
     });
+    if (sets.length === 0) return [];
+    const setIds = sets.map((set) => set.id);
+    const [pendingGroups, aiGenerations] = await Promise.all([
+      this.prisma.quizQuestion.groupBy({
+        by: ["quizSetId"],
+        where: {
+          quizSetId: { in: setIds },
+          deletedAt: null,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.aiGeneration.findMany({
+        where: {
+          type: "QUIZ",
+          status: AiGenerationStatus.SUCCEEDED,
+          targetType: "QUIZ_SET",
+          targetId: { in: setIds },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, targetId: true, inputMetaJson: true, createdAt: true },
+      }),
+    ]);
+    const pendingBySetId = new Map(
+      pendingGroups.map((group) => [group.quizSetId, group._count._all]),
+    );
+    const generationsBySetId = new Map<string, typeof aiGenerations>();
+    aiGenerations.forEach((generation) => {
+      if (!generation.targetId) return;
+      const current = generationsBySetId.get(generation.targetId) ?? [];
+      current.push(generation);
+      generationsBySetId.set(generation.targetId, current);
+    });
+    return sets.map((set) => ({
+      ...set,
+      pendingReviewQuestionCount: pendingBySetId.get(set.id) ?? 0,
+      aiGenerations: generationsBySetId.get(set.id) ?? [],
+    }));
   }
 
   async createQuizSet(
@@ -192,6 +238,9 @@ export class QuizService {
           select: {
             id: true,
             contentJson: true,
+            diagramSpecJson: true,
+            reviewStatus: true,
+            staleAt: true,
           },
         },
       },
@@ -258,7 +307,13 @@ export class QuizService {
         where: { id: question.id },
         include: {
           explanation: {
-            select: { id: true, contentJson: true },
+            select: {
+              id: true,
+              contentJson: true,
+              diagramSpecJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
           },
         },
       });
@@ -275,7 +330,13 @@ export class QuizService {
       where: { id: questionId, deletedAt: null },
       include: {
         explanation: {
-          select: { id: true, contentJson: true },
+          select: {
+            id: true,
+            contentJson: true,
+            diagramSpecJson: true,
+            reviewStatus: true,
+            staleAt: true,
+          },
         },
       },
     });
@@ -298,6 +359,18 @@ export class QuizService {
         dto.explanationJson ?? toOptionalJsonRecord(question.explanation?.contentJson),
     };
     validateQuestionContent(mergedContent);
+    let exampleBlock: Extract<LessonSummaryMvpBlock, { type: "example" }> | null = null;
+    if (dto.exampleBlock) {
+      const parsedExampleBlock = lessonSummaryMvpBlockSchema.safeParse(dto.exampleBlock);
+      if (!parsedExampleBlock.success || parsedExampleBlock.data.type !== "example") {
+        throw badRequestException(
+          "QUIZ_EXAMPLE_BLOCK_INVALID",
+          "Khối Ví dụ của câu Quiz không đúng cấu trúc dùng chung với Sinh kiến thức",
+          parsedExampleBlock.success ? undefined : parsedExampleBlock.error.flatten(),
+        );
+      }
+      exampleBlock = parsedExampleBlock.data;
+    }
 
     const updateData: Prisma.QuizQuestionUpdateInput = {};
     if (dto.questionType) updateData.questionType = dto.questionType;
@@ -324,8 +397,29 @@ export class QuizService {
     if (mergedContent.questionType !== QuestionType.TEXT_INPUT) {
       updateData.gradingConfigJson = Prisma.DbNull;
     }
+    if (exampleBlock) {
+      updateData.sourceMetadataJson = toInputJson(
+        replaceStructuredExample(question.sourceMetadataJson, exampleBlock),
+      );
+    } else if (changesExplanationContext(dto) || dto.explanationJson !== undefined) {
+      updateData.sourceMetadataJson = toInputJson(
+        removeStructuredExample(question.sourceMetadataJson),
+      );
+    }
 
     return this.prisma.$transaction(async (transaction) => {
+      if (exampleBlock && question.explanationId) {
+        await transaction.aiExplanation.update({
+          where: { id: question.explanationId },
+          data: {
+            diagramSpecJson:
+              exampleBlock.visual?.kind === "DIAGRAM_SPEC"
+                ? toInputJson(exampleBlock.visual.spec)
+                : Prisma.DbNull,
+            staleAt: null,
+          },
+        });
+      }
       if (
         dto.explanationJson === undefined &&
         question.explanationId &&
@@ -354,34 +448,188 @@ export class QuizService {
         data: updateData,
         include: {
           explanation: {
-            select: { id: true, contentJson: true },
+            select: {
+              id: true,
+              contentJson: true,
+              diagramSpecJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
           },
         },
       });
     });
   }
 
-  async deleteQuestion(questionId: string, _userId: string, _context: RequestContext) {
+  async deleteQuestion(questionId: string, userId: string, context: RequestContext) {
     const question = await this.prisma.quizQuestion.findUnique({
       where: { id: questionId, deletedAt: null },
+      include: {
+        quizSet: {
+          select: { id: true, aiGenerationId: true, questionCount: true },
+        },
+        explanation: { select: { aiGenerationId: true } },
+      },
     });
     if (!question) {
       throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
     }
 
-    await this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       await transaction.quizQuestion.update({
         where: { id: questionId },
         data: { deletedAt: new Date() },
       });
+      const currentActiveCount = await transaction.quizQuestion.count({
+        where: { quizSetId: question.quizSetId, deletedAt: null },
+      });
       await transaction.quizSet.update({
         where: { id: question.quizSetId },
-        data: { questionCount: { decrement: 1 } },
+        data: { questionCount: currentActiveCount, updatedById: userId },
       });
+      const aiGenerationId =
+        question.explanation?.aiGenerationId ?? question.quizSet.aiGenerationId;
+      const generationActiveCount = aiGenerationId
+        ? await transaction.quizQuestion.count({
+            where: {
+              quizSetId: question.quizSetId,
+              deletedAt: null,
+              explanation: { aiGenerationId },
+            },
+          })
+        : currentActiveCount;
+      const generationAudit = await updateGenerationCurationMetadata(
+        transaction,
+        aiGenerationId,
+        {
+          currentActiveCount: generationActiveCount,
+          deletedCountIncrement: 1,
+          removedQuestionIndex: readGenerationQuestionIndex(
+            question.sourceMetadataJson,
+            question.sortOrder,
+          ),
+        },
+      );
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "QUIZ_QUESTION_DELETED",
+          entityType: "QuizQuestion",
+          entityId: questionId,
+          before: toInputJson({
+            quizSetId: question.quizSetId,
+            sortOrder: question.sortOrder,
+          }),
+          after: toInputJson({ deletedAt: true, currentActiveCount }),
+          metadata: toInputJson({
+            aiGenerationId,
+            generationAudit,
+          }),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return { currentActiveCount, generationAudit };
     });
 
-    return { success: true };
+    return { success: true, ...result };
   }
+}
+
+async function updateGenerationCurationMetadata(
+  transaction: Prisma.TransactionClient,
+  aiGenerationId: string | null,
+  update: {
+    currentActiveCount: number;
+    deletedCountIncrement?: number;
+    removedQuestionIndex?: number;
+  },
+) {
+  if (!aiGenerationId) return null;
+  const generation = await transaction.aiGeneration.findUnique({
+    where: { id: aiGenerationId },
+    select: { inputMetaJson: true },
+  });
+  if (!generation) return null;
+  const inputMeta = toRecordOrEmpty(generation.inputMetaJson);
+  const currentAudit = toRecordOrEmpty(inputMeta.generationAudit);
+  const initialGeneratedCount = readNumber(
+    currentAudit.initialGeneratedCount,
+    readNumber(inputMeta.questionCount, update.currentActiveCount),
+  );
+  const generationAudit = {
+    requestedCount: readNumber(
+      currentAudit.requestedCount,
+      readNumber(inputMeta.questionCount, initialGeneratedCount),
+    ),
+    initialGeneratedCount,
+    currentActiveCount: update.currentActiveCount,
+    deletedCount:
+      readNumber(currentAudit.deletedCount, 0) + (update.deletedCountIncrement ?? 0),
+  };
+  const generationIssues = Array.isArray(inputMeta.generationIssues)
+    ? inputMeta.generationIssues.filter((issue) => {
+        if (
+          update.removedQuestionIndex === undefined ||
+          !issue ||
+          typeof issue !== "object" ||
+          Array.isArray(issue)
+        ) {
+          return true;
+        }
+        return (
+          (issue as Record<string, unknown>).questionIndex !== update.removedQuestionIndex
+        );
+      })
+    : [];
+  await transaction.aiGeneration.update({
+    where: { id: aiGenerationId },
+    data: {
+      inputMetaJson: toInputJson({
+        ...inputMeta,
+        generationAudit,
+        generationIssues,
+      }),
+    },
+  });
+  return generationAudit;
+}
+
+function toRecordOrEmpty(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readNumber(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readGenerationQuestionIndex(value: unknown, fallback: number) {
+  return readNumber(toRecordOrEmpty(value).generationQuestionIndex, fallback);
+}
+
+function removeStructuredExample(value: unknown) {
+  const metadata = toRecordOrEmpty(value);
+  const { exampleBlock: _exampleBlock, ...rest } = metadata;
+  return rest;
+}
+
+function replaceStructuredExample(
+  value: unknown,
+  exampleBlock: Extract<LessonSummaryMvpBlock, { type: "example" }>,
+) {
+  const metadata = toRecordOrEmpty(value);
+  const {
+    exampleBlock: _oldExampleBlock,
+    sourceChunkIds: _sourceChunkIds,
+    sourceHash: _sourceHash,
+    sources: _sources,
+    ...rest
+  } = metadata;
+  const { sourceChunkIds: _exampleSourceChunkIds, ...exampleWithoutSourceTrace } =
+    exampleBlock;
+  return { ...rest, exampleBlock: exampleWithoutSourceTrace };
 }
 
 function validateQuestionContent(dto: QuizQuestionContentDto) {
@@ -565,8 +813,10 @@ async function syncExplanation(
       where: { id: input.currentExplanationId },
       data: {
         contentJson: toInputJson(input.explanationJson),
+        diagramSpecJson: Prisma.DbNull,
         source: ContentSource.ADMIN,
         reviewStatus: ReviewStatus.APPROVED,
+        staleAt: null,
       },
       select: { id: true },
     });

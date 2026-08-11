@@ -24,6 +24,7 @@ import {
 import { useAdminQuizQuestionMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import type { AdminTestQuestion } from "@/features/admin/tests/api/admin-tests-api";
 import { useAdminTestQuestionMutations } from "@/features/admin/tests/hooks/use-admin-tests";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   createEmptyTiptapDocument,
   getTiptapDocumentText,
@@ -246,7 +247,12 @@ export function AdminAssessmentQuestionEditorDialog({
       }
       onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Chưa lưu được câu hỏi");
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa lưu được câu hỏi. Vui lòng thử lại.",
+        ),
+      );
     }
   });
 

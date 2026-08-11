@@ -10,6 +10,7 @@ import type {
   TiptapJsonNode,
   TiptapTextDocument,
 } from "@/types/rich-text";
+import { tokenizeMathText } from "@learning-path/shared";
 import { cn } from "@/lib/utils";
 
 export function TiptapContentView({
@@ -43,7 +44,7 @@ function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
   ));
 
   if (node.type === "text") {
-    return applyMarks(node.text ?? "", node.marks);
+    return renderTextWithFallbackMath(node.text ?? "", node.marks);
   }
   if (node.type === "paragraph") {
     return (
@@ -129,6 +130,22 @@ function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
   }
 
   return <>{children}</>;
+}
+
+function renderTextWithFallbackMath(text: string, marks: TiptapJsonMark[] | undefined) {
+  return tokenizeMathText(text).map((token, index) =>
+    token.type === "text" ? (
+      <span key={`text-${index}`}>{applyMarks(token.value, marks)}</span>
+    ) : (
+      <span
+        key={`math-${index}`}
+        className={token.display ? "my-3 block overflow-x-auto py-1" : ""}
+        dangerouslySetInnerHTML={{
+          __html: renderMath(token.latex, token.display),
+        }}
+      />
+    ),
+  );
 }
 
 function applyMarks(text: string, marks: TiptapJsonMark[] | undefined): ReactNode {

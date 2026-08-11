@@ -41,6 +41,12 @@ export class GenerateLessonSummaryDto {
   @IsIn(["student_friendly", "concise", "academic"])
   style!: "student_friendly" | "concise" | "academic";
 
+  @ApiPropertyOptional({ maxLength: 2_000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_000)
+  extraInstructions?: string;
+
   @ApiPropertyOptional({
     maxLength: 1_000,
     description: "Cách trình bày do admin nhập tự do",
@@ -65,12 +71,6 @@ export class GenerateLessonSummaryDto {
   @Min(50)
   @Max(5_000)
   targetWordCount?: number;
-
-  @ApiPropertyOptional({ maxLength: 2_000 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(2_000)
-  extraInstructions?: string;
 
   @ApiPropertyOptional({
     maxLength: LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,

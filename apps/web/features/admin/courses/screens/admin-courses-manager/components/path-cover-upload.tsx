@@ -3,6 +3,7 @@
 import { ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FieldLabel } from "@/components/common/forms/field-label";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 const maxImageSizeBytes = 5 * 1024 * 1024;
 
@@ -139,9 +140,10 @@ export function PathCoverUpload({
               } catch (error) {
                 setLocalPreviewUrl("");
                 setLocalError(
-                  error instanceof Error
-                    ? error.message
-                    : "Không upload được ảnh. Vui lòng thử lại.",
+                  getUserFacingErrorMessage(
+                    error,
+                    "Chưa tải được ảnh lên. Vui lòng thử lại.",
+                  ),
                 );
                 event.currentTarget.value = "";
               } finally {

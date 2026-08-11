@@ -31,12 +31,14 @@ const studentTestQuestionSelect = {
   optionsJson: true,
   correctAnswerJson: true,
   gradingConfigJson: true,
+  sourceMetadataJson: true,
   points: true,
   difficulty: true,
   sortOrder: true,
   explanation: {
     select: {
       contentJson: true,
+      diagramSpecJson: true,
       reviewStatus: true,
       staleAt: true,
     },
@@ -423,9 +425,7 @@ export class StudentTestAttemptsService {
         },
       });
 
-      const completionMinScore = Number(
-        submittedAttempt.lesson.completionMinScore,
-      );
+      const completionMinScore = Number(submittedAttempt.lesson.completionMinScore);
       if (Number(submittedAttempt.score) >= completionMinScore) {
         await this.applyPassingResult(transaction, {
           attemptId: submittedAttempt.id,
@@ -561,6 +561,10 @@ export class StudentTestAttemptsService {
           pointsAwarded: Number(answer.pointsAwarded ?? 0),
           statementResults: grade.statementResults,
           explanationJson: serializeApprovedExplanation(answer.question),
+          explanationDiagramSpecJson: serializeApprovedExplanationDiagram(
+            answer.question,
+          ),
+          explanationExampleBlock: serializeApprovedExplanationExample(answer.question),
         };
       }),
     };
@@ -591,8 +595,7 @@ export class StudentTestAttemptsService {
       },
     });
     const currentBestScore =
-      currentProgress?.bestScore === null ||
-      currentProgress?.bestScore === undefined
+      currentProgress?.bestScore === null || currentProgress?.bestScore === undefined
         ? null
         : Number(currentProgress.bestScore);
     const isBetter = isCandidateBetter(
@@ -719,6 +722,28 @@ function serializeApprovedExplanation(question: StudentTestQuestionRecord) {
   return question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
     question.explanation.staleAt === null
     ? question.explanation.contentJson
+    : null;
+}
+
+function serializeApprovedExplanationDiagram(question: StudentTestQuestionRecord) {
+  return question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
+    question.explanation.staleAt === null
+    ? question.explanation.diagramSpecJson
+    : null;
+}
+
+function serializeApprovedExplanationExample(question: StudentTestQuestionRecord) {
+  if (
+    question.explanation?.reviewStatus !== ReviewStatus.APPROVED ||
+    question.explanation.staleAt !== null
+  ) {
+    return null;
+  }
+  const metadata = question.sourceMetadataJson;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const exampleBlock = metadata.exampleBlock;
+  return exampleBlock && typeof exampleBlock === "object" && !Array.isArray(exampleBlock)
+    ? exampleBlock
     : null;
 }
 

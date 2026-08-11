@@ -53,8 +53,11 @@ Body:
 
 ```json
 {
+  "targetQuizSetId": "uuid",
+  "documentIds": ["uuid"],
   "questionCount": 10,
-  "difficulty": "MEDIUM",
+  "difficulty": "MIXED",
+  "difficultyCounts": { "easy": 3, "medium": 4, "hard": 3 },
   "questionTypes": [
     "MULTIPLE_CHOICE",
     "TRUE_FALSE",
@@ -71,8 +74,20 @@ Side effects:
 - Tạo `background_jobs` queue `AI_GENERATION`.
 - Tạo `ai_generations` type `QUIZ`.
 - Enqueue AI job.
-- Worker lưu set/item vào cùng schema CRUD quản trị với `source=AI`,
-  `reviewStatus=NEEDS_REVIEW`; mỗi item có `sourceMetadataJson` cho admin.
+- `targetQuizSetId` phải thuộc đúng lesson. Nếu không gửi, backend dùng set đầu
+  tiên; nếu lesson chưa có set thì tạo duy nhất `Bộ câu hỏi 1`.
+- Worker append item vào set đích, không tạo Quiz set/tab mới. Câu AI có
+  `reviewStatus=NEEDS_REVIEW`; set thủ công hiện có không bị đổi thành `source=AI`.
+- Mỗi question là EXAMPLE core M9.2 cộng metadata chấm bài. `sourceMetadataJson`
+  chỉ lưu `aiGenerationId`, `generationQuestionIndex` và `exampleBlock`; Quiz
+  không lưu `sourceChunkIds`, `sources` hoặc `sourceHash` ở cấp câu vì nguồn chỉ
+  là context để AI biên soạn bài tập mới. `ai_explanations` giữ projection
+  Tiptap/diagram tương thích.
+- `GET /admin/lessons/:lessonId/quiz-sets` trả thêm
+  `pendingReviewQuestionCount` và `aiGenerations[]` theo set để UI duyệt/audit
+  nhiều lượt sinh trong cùng một bộ.
+- Xóa câu AI cập nhật `generationAudit` của đúng `aiGenerationId`. Xóa 2 trong
+  lượt 10 làm audit lượt đó còn 8, không tính câu thủ công/lượt AI khác.
 
 #### `PATCH /admin/quiz-sets/:quizSetId`
 
@@ -258,6 +273,10 @@ Role: `ADMIN`.
 Behavior:
 
 - Cập nhật câu hỏi với cùng contract nội dung như create; cho phép đổi loại câu hỏi và xóa gợi ý/lời giải bằng `null`.
+- Riêng câu AI có thể gửi `exampleBlock` theo đúng schema EXAMPLE M9.2 để lưu
+  chỉnh sửa hình từ editor dùng chung. Server đồng bộ `exampleBlock.visual.spec`
+  sang `ai_explanations.diagram_spec_json` và tiếp tục loại mọi source trace cấp
+  câu khỏi metadata.
 - Khi gửi `explanationJson`, service tạo mới hoặc cập nhật `ai_explanations` nguồn `ADMIN`; nội dung rỗng/`null` gỡ lời giải khỏi câu hỏi.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation liên quan stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - Ghi audit log.

@@ -49,6 +49,7 @@ import {
 } from "@/lib/sidebar-collapse-state";
 import { useThemeStore } from "@/lib/theme-store";
 import { usePersistentBooleanState } from "@/lib/use-persistent-boolean-state";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
 
 type TabKey = "models" | "usage" | "catalog";
@@ -218,9 +219,13 @@ export function AdminAiSettingsScreen() {
       await refreshAll();
       toast.success("Đã xoá mô hình");
     },
-    onError: (err: any) => {
-      const message = err?.message || "Chưa thể xoá mô hình. Vui lòng thử lại.";
-      toast.error(message);
+    onError: (error: unknown) => {
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa thể xoá mô hình. Vui lòng thử lại.",
+        ),
+      );
     }
   });
 

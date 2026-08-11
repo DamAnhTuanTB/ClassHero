@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDefined,
   IsEnum,
+  IsObject,
   IsOptional,
   IsString,
   MinLength,
@@ -71,4 +72,12 @@ export class QuizQuestionContentDto {
   explanationJson?: Record<string, unknown> | null;
 }
 
-export class UpdateQuizQuestionContentDto extends PartialType(QuizQuestionContentDto) {}
+export class UpdateQuizQuestionContentDto extends PartialType(QuizQuestionContentDto) {
+  @ApiPropertyOptional({
+    description:
+      "Khối EXAMPLE dùng chung với Sinh kiến thức; chỉ dùng khi chỉnh trực tiếp nội dung/hình của câu AI",
+  })
+  @IsOptional()
+  @IsObject()
+  exampleBlock?: Record<string, unknown>;
+}

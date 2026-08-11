@@ -36,6 +36,11 @@ export type LessonSummaryProviderRecovery = {
   rootReviewIssues: LessonSummaryReviewIssueDraft[];
 };
 
+export type LessonSummaryRecoveredExample = {
+  example: LessonSummaryProviderOutput["applicationExercises"]["standardExercise"];
+  reviewIssues: LessonSummaryReviewIssueDraft[];
+};
+
 type MutableReviewIssues = Map<string, LessonSummaryReviewIssueDraft[]>;
 
 export function recoverLessonSummaryProviderOutput(input: {
@@ -261,6 +266,7 @@ export function recoverLessonSummaryProviderOutput(input: {
           illustrationPath,
           recoverDiagram,
           text,
+          addIssue,
         ),
         notes: unit.notes.map((note, noteIndex) => {
           const notePath = `${unitPath}.notes.${noteIndex}`;
@@ -365,17 +371,73 @@ export function recoverLessonSummaryProviderOutput(input: {
         standardPath,
         recoverDiagram,
         text,
+        addIssue,
       ),
       realWorldExercise: recoverExample(
         input.output.applicationExercises.realWorldExercise,
         realWorldPath,
         recoverDiagram,
         text,
+        addIssue,
       ),
     },
   } as LessonSummaryProviderOutput;
 
   return { output, reviewIssuesByPath: issuesByPath, rootReviewIssues };
+}
+
+/**
+ * Reuses the exact M9.2 EXAMPLE recovery pipeline for Quiz/Test items without
+ * maintaining a second diagram/text repair implementation.
+ */
+export function recoverLessonSummaryProviderExample(input: {
+  example: LessonSummaryProviderTransportOutput["applicationExercises"]["standardExercise"];
+  sourceChunkIds: string[];
+}): LessonSummaryRecoveredExample {
+  const sourceChunkIds = [...new Set(input.sourceChunkIds)].slice(0, 20);
+  const recovered = recoverLessonSummaryProviderOutput({
+    output: {
+      title: "Assessment examples",
+      objectives: null,
+      theorySections: [
+        {
+          sourceTopicId: "assessment-example",
+          displayHeading: "Assessment examples",
+          sourceChunkIds,
+          units: [
+            {
+              theory: {
+                type: "knowledge",
+                title: "Assessment context",
+                content: "Assessment context",
+                sourceChunkIds,
+                diagramSpec: null,
+              },
+              illustration: {
+                ...input.example,
+                exampleKind: "ILLUSTRATION",
+              },
+              notes: [],
+            },
+          ],
+        },
+      ],
+      applicationExercises: {
+        displayHeading: "Bài tập vận dụng",
+        standardExercise: input.example,
+        realWorldExercise: {
+          ...input.example,
+          exampleKind: "REAL_WORLD_EXERCISE",
+        },
+      },
+    },
+    contextChunks: sourceChunkIds.map((id) => ({ id, content: "" })),
+  });
+  return {
+    example: recovered.output.applicationExercises.standardExercise,
+    reviewIssues:
+      recovered.reviewIssuesByPath.get("applicationExercises.standardExercise") ?? [],
+  };
 }
 
 function removeRejectedProviderDiagramParts(
@@ -394,22 +456,22 @@ function removeRejectedProviderDiagramParts(
     labels: new Set<number>(),
   };
   error.issues.forEach((issue) => {
-    (
-      ["rightAngles", "equalLengths", "parallels", "angles", "labels"] as const
-    ).forEach((category) => {
-      const categoryIndex = issue.path.indexOf(category);
-      const markerIndex = issue.path[categoryIndex + 1];
-      if (categoryIndex >= 0 && typeof markerIndex === "number") {
-        if (category === "angles" && issue.path.includes("label")) {
-          rejected.angleLabels.add(markerIndex);
-          return;
+    (["rightAngles", "equalLengths", "parallels", "angles", "labels"] as const).forEach(
+      (category) => {
+        const categoryIndex = issue.path.indexOf(category);
+        const markerIndex = issue.path[categoryIndex + 1];
+        if (categoryIndex >= 0 && typeof markerIndex === "number") {
+          if (category === "angles" && issue.path.includes("label")) {
+            rejected.angleLabels.add(markerIndex);
+            return;
+          }
+          if (category === "labels" && !shouldDiscardDiagramLabelIssue(issue)) {
+            return;
+          }
+          rejected[category].add(markerIndex);
         }
-        if (category === "labels" && !shouldDiscardDiagramLabelIssue(issue)) {
-          return;
-        }
-        rejected[category].add(markerIndex);
-      }
-    });
+      },
+    );
   });
   const sanitized = {
     ...raw,
@@ -450,7 +512,34 @@ function recoverExample(
     fieldPath: string,
     fieldLabel: string,
   ) => string,
+  addIssue: (path: string, issue: LessonSummaryReviewIssueDraft) => void,
 ) {
+  const geometryStatement = example.geometryStatement
+    ? {
+        hypotheses: example.geometryStatement.hypotheses
+          .map((statement) => statement.trim())
+          .filter(Boolean),
+        conclusions: example.geometryStatement.conclusions
+          .map((statement) => statement.trim())
+          .filter(Boolean),
+      }
+    : null;
+  const recoveredGeometryStatement =
+    geometryStatement &&
+    geometryStatement.hypotheses.length > 0 &&
+    geometryStatement.conclusions.length > 0
+      ? geometryStatement
+      : null;
+  if (example.geometryStatement && !recoveredGeometryStatement) {
+    addIssue(path, {
+      code: "MISSING_GEOMETRY_STATEMENT",
+      path: `${path}.geometryStatement`,
+      message: "Bảng giả thiết–kết luận đang thiếu một trong hai phần GT hoặc KL.",
+      suggestion: "Bổ sung đầy đủ giả thiết và kết luận rồi lưu lại.",
+      technicalDetails:
+        "geometryStatement must contain at least one hypothesis and one conclusion.",
+    });
+  }
   return {
     ...example,
     problem: text(
@@ -468,6 +557,7 @@ function recoverExample(
       `${path}.answer`,
       "đáp án",
     ),
+    geometryStatement: recoveredGeometryStatement,
     diagramSpec: recoverDiagram(example.diagramSpec, path),
   };
 }
@@ -487,6 +577,7 @@ function createFallbackUnit(sourceChunkIds: string[]) {
       problem: "[Cần bổ sung đề bài]",
       solution: null,
       answer: "[Cần bổ sung đáp án]",
+      geometryStatement: null,
       diagramSpec: null,
     },
     notes: [],
@@ -505,8 +596,7 @@ function sanitizeMappedDiagram(spec: LessonSummaryDiagramSpec): LessonSummaryDia
         primitive.type === "RAY"
       ) {
         return (
-          primitive.from !== primitive.to &&
-          hasAllPoints([primitive.from, primitive.to])
+          primitive.from !== primitive.to && hasAllPoints([primitive.from, primitive.to])
         );
       }
       if (primitive.type === "POLYGON" || primitive.type === "POLYLINE") {
@@ -516,9 +606,7 @@ function sanitizeMappedDiagram(spec: LessonSummaryDiagramSpec): LessonSummaryDia
     }),
     markers: spec.markers.map((marker) => {
       if (marker.type !== "ANGLE" || !marker.label) return marker;
-      const vertexLabel = spec.points.find(
-        (point) => point.id === marker.vertex,
-      )?.label;
+      const vertexLabel = spec.points.find((point) => point.id === marker.vertex)?.label;
       return vertexLabel && marker.label.replaceAll(" ", "") === `∠${vertexLabel}`
         ? { ...marker, label: null }
         : marker;
@@ -651,9 +739,7 @@ function formatZodIssues(error: z.ZodError) {
     .join("\n");
 }
 
-function formatCompiledSemanticIssues(
-  issues: Array<{ code: string; message: string }>,
-) {
+function formatCompiledSemanticIssues(issues: Array<{ code: string; message: string }>) {
   if (issues.length === 0) return null;
   return issues
     .slice(0, 12)

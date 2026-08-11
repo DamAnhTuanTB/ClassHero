@@ -30,6 +30,10 @@ export interface AdminQuizQuestionPayload {
   explanationJson?: TiptapTextDocument | null;
 }
 
+export type AdminQuizQuestionUpdatePayload = Partial<AdminQuizQuestionPayload> & {
+  exampleBlock?: unknown;
+};
+
 export interface AdminQuizSet {
   id: string;
   lessonId: string;
@@ -42,6 +46,33 @@ export interface AdminQuizSet {
   _count?: {
     questions: number;
   };
+  pendingReviewQuestionCount?: number;
+  aiGenerations?: Array<{
+    id: string;
+    createdAt: string;
+    inputMetaJson: AdminQuizSet["aiGeneration"] extends infer T
+      ? T extends { inputMetaJson: infer M }
+        ? M
+        : never
+      : never;
+  }>;
+  aiGeneration?: {
+    id: string;
+    inputMetaJson: {
+      generationAudit?: {
+        requestedCount: number;
+        initialGeneratedCount: number;
+        deletedCount: number;
+        currentActiveCount: number;
+      };
+      generationIssues?: Array<{
+        code: string;
+        message: string;
+        blocking?: boolean;
+      }>;
+      [key: string]: unknown;
+    } | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +94,15 @@ export interface AdminQuizQuestion {
   explanation: {
     id: string;
     contentJson: TiptapTextDocument;
+    diagramSpecJson: unknown | null;
+    reviewStatus: string;
+    staleAt: string | null;
+  } | null;
+  sourceMetadataJson: {
+    aiGenerationId?: string;
+    generationQuestionIndex?: number;
+    exampleBlock?: unknown;
+    [key: string]: unknown;
   } | null;
   reviewStatus: string;
 }
@@ -144,7 +184,7 @@ export async function createAdminQuizQuestion(
 
 export async function updateAdminQuizQuestion(
   questionId: string,
-  data: AdminQuizQuestionPayload,
+  data: AdminQuizQuestionUpdatePayload,
   token: string,
 ) {
   return apiRequest<AdminQuizQuestion>(`/admin/quiz-questions/${questionId}`, {

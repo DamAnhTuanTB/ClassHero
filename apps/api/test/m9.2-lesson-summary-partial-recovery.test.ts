@@ -430,6 +430,14 @@ function providerOutput() {
               problem: "Chứng minh hai tam giác vuông bằng nhau.",
               solution: "Áp dụng trường hợp cạnh huyền - cạnh góc vuông.",
               answer: "Hai tam giác bằng nhau.",
+              geometryStatement: {
+                hypotheses: [
+                  "$\\triangle ABC$ và $\\triangle DEF$ vuông tại $A$ và $D$.",
+                  "$BC=EF$.",
+                  "$AB=DE$.",
+                ],
+                conclusions: ["$\\triangle ABC=\\triangle DEF$."],
+              },
               diagramSpec: invalidRelationDiagram(),
             },
             notes: [],
@@ -445,6 +453,7 @@ function providerOutput() {
         problem: "Nêu trường hợp bằng nhau đã dùng.",
         solution: "Đối chiếu cạnh huyền và cạnh góc vuông.",
         answer: "Cạnh huyền - cạnh góc vuông.",
+        geometryStatement: null,
         diagramSpec: null,
       },
       realWorldExercise: {
@@ -453,13 +462,14 @@ function providerOutput() {
         problem: "Hai khung đỡ vuông có các cạnh tương ứng bằng nhau. So sánh chúng.",
         solution: "Mô hình hóa thành hai tam giác vuông.",
         answer: "Hai khung đỡ bằng nhau.",
+        geometryStatement: null,
         diagramSpec: null,
       },
     },
   };
 }
 
-function recoverAndMap(value = providerOutput()) {
+function recoverAndMap(value = providerOutput(), targetGrade?: number | null) {
   const transport = lessonSummaryProviderTransportOutputSchema.parse(value);
   const recovery = recoverLessonSummaryProviderOutput({
     output: transport,
@@ -471,10 +481,44 @@ function recoverAndMap(value = providerOutput()) {
     contextChunks,
     reviewIssuesByPath: recovery.reviewIssuesByPath,
     rootReviewIssues: recovery.rootReviewIssues,
+    targetGrade,
   });
 }
 
 describe("M9.2 partial lesson-summary recovery", () => {
+  it("keeps the complete example visible when a formal proof lacks GT-KL", () => {
+    const output = providerOutput();
+    output.applicationExercises.standardExercise.problem =
+      "Chứng minh $\\triangle ABC=\\triangle DEF$.";
+    output.applicationExercises.standardExercise.solution =
+      "Xét $\\triangle ABC$ và $\\triangle DEF$. Vì các cạnh tương ứng bằng nhau nên hai tam giác bằng nhau.";
+    output.applicationExercises.standardExercise.answer =
+      "$\\triangle ABC=\\triangle DEF$.";
+    delete (
+      output.applicationExercises.standardExercise as {
+        geometryStatement?: unknown;
+      }
+    ).geometryStatement;
+
+    const summary = recoverAndMap(output, 7);
+    const example = summary.sections.at(-1)?.blocks[0];
+
+    expect(example).toMatchObject({
+      type: "example",
+      problem: "Chứng minh $\\triangle ABC=\\triangle DEF$.",
+      solution:
+        "Xét $\\triangle ABC$ và $\\triangle DEF$. Vì các cạnh tương ứng bằng nhau nên hai tam giác bằng nhau.",
+      answer: "$\\triangle ABC=\\triangle DEF$.",
+      reviewIssues: [
+        expect.objectContaining({
+          code: "MISSING_GEOMETRY_STATEMENT",
+          resolution: "ACCEPT_OR_FIX",
+        }),
+      ],
+    });
+    expect(example).not.toHaveProperty("geometryStatement");
+  });
+
   it("names the exact equal-length relation that needs review", () => {
     expect(
       describeLessonSummaryDiagramReviewIssue(

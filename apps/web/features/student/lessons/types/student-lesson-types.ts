@@ -56,6 +56,8 @@ export type StudentAssessmentQuestion = {
     exactMatch?: boolean;
   } | null;
   explanationJson?: TiptapTextDocument | null;
+  explanationDiagramSpecJson?: unknown | null;
+  explanationExampleBlock?: unknown | null;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   sortOrder: number;
   questionNumber?: number;
@@ -142,6 +144,8 @@ export type CheckedAnswer = {
   correctAnswerJson: StudentAnswer;
   statementResults: StatementResult[] | null;
   explanationJson: TiptapTextDocument | null;
+  explanationDiagramSpecJson: unknown | null;
+  explanationExampleBlock: unknown | null;
 };
 
 export type ResumableQuizAttempt = QuizAttempt & {

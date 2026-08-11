@@ -59,6 +59,7 @@ import {
   isStudentAnswerComplete,
 } from "@/features/student/lessons/utils/student-answer-utils";
 import { cn } from "@/lib/utils";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 function syncTestResultUrl(attemptId: string, testSetId: string) {
   // Logic removed at user's request: do not sync result surface to URL
@@ -743,7 +744,7 @@ function formatDateTime(value: string | null) {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Vui lòng thử lại.";
+  return getUserFacingErrorMessage(error, "Vui lòng thử lại.");
 }
 
 function formatTestScore(score: number) {

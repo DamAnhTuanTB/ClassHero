@@ -4,6 +4,7 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import {
   AiProviderName,
+  ContentSource,
   Difficulty,
   DocumentStatus,
   FileProvider,
@@ -28,6 +29,7 @@ import { createValidationException } from "#api/common/validation/validation-err
 import type { AiService } from "#api/modules/ai/services/ai.service";
 import type { LessonContentGenerationContextService } from "#api/modules/ai/services/lesson-content-generation-context.service";
 import type { AiGenerationExecutionContext } from "#api/modules/ai/types/ai-generation.types";
+import { compileLessonSummaryDiagramIntent } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
 import { AuthTokenService } from "#api/modules/auth/services/auth-token.service";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
@@ -45,16 +47,25 @@ const ids = {
   document: randomUUID(),
   processingDocument: randomUUID(),
   chunk: randomUUID(),
+  quizSet: randomUUID(),
+  manualQuestion: randomUUID(),
 };
 const queueMock = { enqueue: vi.fn(async (jobId: string) => ({ jobId })) };
 const sourceText =
   "Số hữu tỉ biểu diễn được dưới dạng phân số với mẫu khác không. Phép cộng số hữu tỉ cần quy đồng mẫu số trước khi cộng tử số.";
 const commonQuestion = {
   difficulty: Difficulty.MEDIUM,
-  prompt: "Hãy vận dụng kiến thức đã học để giải quyết yêu cầu mới sau đây.",
   hint: "Xác định quy tắc phù hợp trước khi trả lời.",
-  explanation: "Áp dụng đúng định nghĩa và quy tắc trong buổi học sẽ thu được đáp án.",
-  sourceChunkIds: [ids.chunk],
+  example: {
+    type: "example" as const,
+    exampleKind: "STANDARD_EXERCISE" as const,
+    problem: "Hãy vận dụng kiến thức đã học để giải quyết yêu cầu mới sau đây.",
+    solution:
+      "Áp dụng đúng định nghĩa và quy tắc của buổi học.\nThực hiện rồi đối chiếu kết quả.",
+    answer: "Kết quả phù hợp.",
+    geometryStatement: null,
+    diagramSpec: null,
+  },
 };
 const allQuestions = [
   {
@@ -211,10 +222,11 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
     await request(server)
       .post(`/api/v1/admin/lessons/${ids.lesson}/quiz-sets/generate-ai`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ questionCount: 1, difficulty: Difficulty.MEDIUM })
+      .send({ questionCount: 1, difficulty: Difficulty.MIXED })
       .expect(400);
 
     const quizJob = await enqueue("quiz-sets", {
+      targetQuizSetId: ids.quizSet,
       questionCount: 4,
       difficulty: Difficulty.MEDIUM,
       questionTypes: Object.values(QuestionType),
@@ -245,7 +257,13 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
           }),
         ),
       },
-      generated_test: { title: "Test AI", questions: allQuestions },
+      generated_test: {
+        title: "Test AI",
+        questions: allQuestions.map(({ hint: _hint, ...question }) => ({
+          ...question,
+          sourceChunkIds: [ids.chunk],
+        })),
+      },
     };
     const aiService = {
       generateStructured: vi.fn(async (input: { outputName: keyof typeof outputs }) => ({
@@ -291,23 +309,72 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
       await worker.persist(context, prepared);
     }
 
-    const quiz = await prisma.quizSet.findFirstOrThrow({
-      where: { lessonId: ids.lesson, source: "AI" },
+    const quiz = await prisma.quizSet.findUniqueOrThrow({
+      where: { id: ids.quizSet },
       include: { questions: { include: { explanation: true } } },
     });
-    expect(new Set(quiz.questions.map((question) => question.questionType))).toEqual(
-      new Set(Object.values(QuestionType)),
+    const generatedQuizQuestions = quiz.questions.filter(
+      (question) => question.id !== ids.manualQuestion,
     );
+    expect(quiz.source).toBe("ADMIN");
+    expect(quiz.questions).toHaveLength(5);
     expect(
-      quiz.questions.every(
+      new Set(generatedQuizQuestions.map((question) => question.questionType)),
+    ).toEqual(new Set(Object.values(QuestionType)));
+    expect(
+      generatedQuizQuestions.every(
         (question) =>
           question.reviewStatus === ReviewStatus.NEEDS_REVIEW &&
           question.explanation?.reviewStatus === ReviewStatus.NEEDS_REVIEW,
       ),
     ).toBe(true);
-    expect(quiz.questions[0]?.sourceMetadataJson).toMatchObject({
-      sourceChunkIds: [ids.chunk],
+    const firstQuizMetadata = generatedQuizQuestions[0]?.sourceMetadataJson as Record<
+      string,
+      unknown
+    >;
+    expect(firstQuizMetadata).toMatchObject({
+      exampleBlock: expect.objectContaining({ type: "example" }),
     });
+    expect(firstQuizMetadata).not.toHaveProperty("sourceChunkIds");
+    expect(firstQuizMetadata).not.toHaveProperty("sources");
+    expect(firstQuizMetadata).not.toHaveProperty("sourceHash");
+
+    const compiledDiagram = compileLessonSummaryDiagramIntent({
+      intentVersion: 1,
+      grade: 7,
+      difficulty: "SIMPLE",
+      caption: "Hình Quiz đã chỉnh bằng ExampleCore",
+      family: "PLANE_GEOMETRY",
+      archetype: "RIGHT_TRIANGLE_CONGRUENCE",
+      variant: "SHARED_HYPOTENUSE_LEG",
+      pointLabels: ["A", "B", "C", "D"],
+      measures: [],
+    });
+    const updatedQuizQuestion = await request(server)
+      .patch(`/api/v1/admin/quiz-questions/${generatedQuizQuestions[0]!.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        exampleBlock: {
+          ...(firstQuizMetadata.exampleBlock as Record<string, unknown>),
+          visual: { kind: "DIAGRAM_SPEC", spec: compiledDiagram.spec },
+        },
+      })
+      .expect(200);
+    expect(updatedQuizQuestion.body.data.sourceMetadataJson).toMatchObject({
+      exampleBlock: {
+        type: "example",
+        visual: {
+          kind: "DIAGRAM_SPEC",
+          spec: { caption: "Hình Quiz đã chỉnh bằng ExampleCore" },
+        },
+      },
+    });
+    expect(updatedQuizQuestion.body.data.explanation.diagramSpecJson).toMatchObject({
+      caption: "Hình Quiz đã chỉnh bằng ExampleCore",
+    });
+    expect(updatedQuizQuestion.body.data.sourceMetadataJson).not.toHaveProperty(
+      "sourceChunkIds",
+    );
 
     const flashcards = await prisma.flashcardSet.findFirstOrThrow({
       where: { lessonId: ids.lesson, source: "AI" },
@@ -333,7 +400,7 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
       await prisma.quizQuestion.count({
         where: { quizSetId: quiz.id, reviewStatus: ReviewStatus.APPROVED },
       }),
-    ).toBe(4);
+    ).toBe(5);
     expect(
       await prisma.flashcard.count({
         where: { flashcardSetId: flashcards.id, reviewStatus: ReviewStatus.APPROVED },
@@ -344,6 +411,30 @@ describe("M9.3 API, PostgreSQL persistence and review integration", () => {
         where: { testSetId: test.id, reviewStatus: ReviewStatus.APPROVED },
       }),
     ).toBe(4);
+
+    for (const question of generatedQuizQuestions.slice(0, 2)) {
+      await request(server)
+        .delete(`/api/v1/admin/quiz-questions/${question.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+    }
+    const quizGenerationId = generatedQuizQuestions[2]?.explanation?.aiGenerationId;
+    if (!quizGenerationId) throw new Error("Generated Quiz question is missing lineage");
+    const quizGeneration = await prisma.aiGeneration.findUniqueOrThrow({
+      where: { id: quizGenerationId },
+    });
+    expect(quizGeneration.inputMetaJson).toMatchObject({
+      generationAudit: {
+        initialGeneratedCount: 4,
+        deletedCount: 2,
+        currentActiveCount: 2,
+      },
+    });
+    expect(
+      await prisma.quizQuestion.count({
+        where: { quizSetId: quiz.id, deletedAt: null },
+      }),
+    ).toBe(3);
   });
 
   it("returns one recoverable latest job per generation type", async () => {
@@ -463,6 +554,37 @@ async function createFixture(prisma: PrismaClient) {
       status: PublishStatus.DRAFT,
       createdById: ids.admin,
       updatedById: ids.admin,
+    },
+  });
+  await prisma.quizSet.create({
+    data: {
+      id: ids.quizSet,
+      lessonId: ids.lesson,
+      title: "Bộ câu hỏi 1",
+      difficulty: Difficulty.MIXED,
+      source: ContentSource.ADMIN,
+      reviewStatus: ReviewStatus.APPROVED,
+      questionCount: 1,
+      createdById: ids.admin,
+      updatedById: ids.admin,
+    },
+  });
+  await prisma.quizQuestion.create({
+    data: {
+      id: ids.manualQuestion,
+      quizSetId: ids.quizSet,
+      lessonId: ids.lesson,
+      questionType: QuestionType.TRUE_FALSE,
+      questionJson: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "Câu thủ công" }] },
+        ],
+      },
+      correctAnswerJson: true,
+      difficulty: Difficulty.EASY,
+      reviewStatus: ReviewStatus.APPROVED,
+      sortOrder: 0,
     },
   });
   await prisma.sourceDocument.create({

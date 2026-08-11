@@ -28,6 +28,10 @@ import type {
   AdminAiGenerationType,
   AdminAiPanelJob,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import {
+  getUserFacingErrorMessage,
+  sanitizeUserFacingMessage,
+} from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
 
 const AiGenerationConfigDialog = dynamic(
@@ -67,11 +71,13 @@ const cards = [
 
 export function AdminAiGenerationPanel({
   lessonId,
+  quizTargetSetId,
   onOpenResult,
   onRequestedGenerationHandled,
   requestedGenerationType,
 }: {
   lessonId: string;
+  quizTargetSetId?: string;
   onOpenResult: (type: AdminAiGenerationType, resourceId: string | null) => void;
   onRequestedGenerationHandled: () => void;
   requestedGenerationType: AdminAiGenerationType | null;
@@ -137,7 +143,12 @@ export function AdminAiGenerationPanel({
       {panel.readiness.reason ? (
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-3 text-sm font-semibold text-[var(--theme-warning-text)]">
           <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{panel.readiness.reason}</span>
+          <span>
+            {sanitizeUserFacingMessage(
+              panel.readiness.reason,
+              "Chưa đủ dữ liệu để tạo nội dung. Hãy kiểm tra lại tài liệu của buổi học.",
+            )}
+          </span>
         </div>
       ) : null}
 
@@ -183,19 +194,21 @@ export function AdminAiGenerationPanel({
           isOpen
           isSubmitting={generateMutation.isPending}
           lessonId={lessonId}
+          quizTargetSetId={quizTargetSetId}
           targetGrade={panel.lesson.targetGrade}
           type={dialogType}
           onClose={() => !generateMutation.isPending && setDialogType(null)}
           onSubmit={async (payload) => {
             try {
               await generateMutation.mutateAsync(payload);
-              toast.success("Đã đưa yêu cầu vào hàng đợi AI");
+              toast.success("Hệ thống đã tiếp nhận yêu cầu tạo nội dung");
               setDialogType(null);
             } catch (error) {
               toast.error(
-                error instanceof Error
-                  ? error.message
-                  : "Chưa thể bắt đầu tạo nội dung AI",
+                getUserFacingErrorMessage(
+                  error,
+                  "Chưa thể bắt đầu tạo nội dung. Vui lòng thử lại.",
+                ),
               );
             }
           }}
@@ -244,20 +257,27 @@ function GenerationCard({
       </div>
       <h3 className="mt-3 font-extrabold text-[var(--theme-text-strong)]">{label}</h3>
       <p className="mt-1 flex-1 text-sm font-medium leading-5 text-[var(--theme-text-muted)]">
-        {job?.status === "FAILED" && job.error ? job.error : description}
+        {job?.status === "FAILED" && job.error
+          ? sanitizeUserFacingMessage(
+              job.error,
+              "Chưa tạo được nội dung. Bạn có thể thử lại.",
+            )
+          : description}
       </p>
       {job?.status === "SUCCEEDED" ? (
         <button
           type="button"
-          onClick={type === "SUMMARY" ? onGenerate : onOpen}
+          onClick={type === "SUMMARY" || type === "QUIZ" ? onGenerate : onOpen}
           className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
         >
           {type === "SUMMARY" ? (
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          ) : type === "QUIZ" ? (
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
           ) : (
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           )}
-          {type === "SUMMARY" ? "Sinh lại" : "Mở để duyệt"}
+          {type === "SUMMARY" ? "Sinh lại" : type === "QUIZ" ? "Tạo Quiz" : "Mở để duyệt"}
         </button>
       ) : (
         <button
@@ -277,6 +297,8 @@ function GenerationCard({
             <JobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
           ) : job?.status === "FAILED" ? (
             "Thử lại"
+          ) : type === "QUIZ" ? (
+            "Tạo Quiz"
           ) : (
             "Cấu hình"
           )}
@@ -329,7 +351,12 @@ function AdminAiJobWatcher({
       );
       onCompleted(type, job.resourceId);
     } else {
-      toast.error(job.error || "AI chưa tạo được nội dung. Bạn có thể thử lại.");
+      toast.error(
+        sanitizeUserFacingMessage(
+          job.error,
+          "Chưa tạo được nội dung. Bạn có thể thử lại.",
+        ),
+      );
     }
   }, [jobQuery.data, lessonId, onCompleted, queryClient, type]);
 
@@ -346,7 +373,7 @@ function ReadinessBadge({
   const label = ready
     ? "Sẵn sàng tạo"
     : summaryReady
-      ? "Đang chờ embedding"
+      ? "Đang xử lý tài liệu"
       : "Chưa đủ dữ liệu";
   return (
     <span
@@ -455,5 +482,10 @@ export function JobTimer({
     return () => clearInterval(interval);
   }, [createdAt]);
 
-  return <>{prefix}{elapsed}s{suffix}</>;
+  return (
+    <>
+      {prefix}
+      {elapsed}s{suffix}
+    </>
+  );
 }

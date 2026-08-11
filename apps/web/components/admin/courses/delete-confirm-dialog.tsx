@@ -1,11 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Loader2, RotateCcw, Trash2, X } from "lucide-react";
 
 export function DeleteConfirmDialog({
   confirmLabel = "Xóa",
   description,
+  intent = "DELETE",
   isConfirming = false,
   isOpen,
   itemName,
@@ -15,6 +16,7 @@ export function DeleteConfirmDialog({
 }: {
   confirmLabel?: string;
   description?: string;
+  intent?: "DELETE" | "RESET";
   isConfirming?: boolean;
   isOpen: boolean;
   itemName: string;
@@ -23,6 +25,7 @@ export function DeleteConfirmDialog({
   onConfirm: () => void;
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const isResetIntent = intent === "RESET";
 
   return (
     <AnimatePresence>
@@ -68,8 +71,14 @@ export function DeleteConfirmDialog({
             </div>
 
             <div className="theme-dialog-header flex min-h-[4.5rem] shrink-0 items-center gap-3 p-4 pr-16">
-              <span className="theme-button-danger-subtle grid h-10 w-10 shrink-0 place-items-center rounded-lg">
-                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              <span
+                className={`${isResetIntent ? "theme-button-primary-subtle" : "theme-button-danger-subtle"} grid h-10 w-10 shrink-0 place-items-center rounded-lg`}
+              >
+                {isResetIntent ? (
+                  <RotateCcw className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                )}
               </span>
               <div className="min-w-0">
                 <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
@@ -97,12 +106,16 @@ export function DeleteConfirmDialog({
                 type="button"
                 onClick={onConfirm}
                 disabled={isConfirming}
-                className="theme-button-danger inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-center text-sm font-extrabold transition sm:w-auto"
+                className={`${isResetIntent ? "theme-button-primary" : "theme-button-danger"} inline-flex min-h-11 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-center text-sm font-extrabold transition sm:w-auto`}
               >
                 {isConfirming ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  isResetIntent ? (
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  )
                 )}
                 {isConfirming ? "Đang xử lý" : confirmLabel}
               </button>

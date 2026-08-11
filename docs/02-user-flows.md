@@ -311,12 +311,26 @@ Các bước chung:
 1. Admin mở buổi học.
 2. Chọn loại nội dung cần tạo bằng AI.
 3. Nhập tham số như số lượng, độ khó, loại câu hỏi, thời gian làm bài nếu có.
+   Với Quiz, bộ đang mở được gửi làm `targetQuizSetId`; admin có thể chọn 1, 5,
+   10 hoặc số câu khác và chọn đúng tài liệu nguồn của buổi học.
 4. Backend tạo BullMQ job.
 5. Worker lấy context đúng `lesson_id`.
 6. Worker gọi AI qua `AiProvider`.
 7. Worker validate output bằng schema.
-8. Worker lưu kết quả vào bảng tương ứng.
-9. Admin xem, sửa, thêm, xóa và duyệt/publish.
+8. Với Quiz, mỗi câu output là một block `EXAMPLE` dùng chung lõi M9.2, bọc thêm
+   metadata chấm bài. Worker append các câu vào bộ Quiz đang mở và danh sách câu
+   bên dưới; không tạo một bộ/tab mới cho từng lượt AI. Flashcard/Test vẫn lưu
+   theo set tương ứng của chúng.
+9. Sau khi một lượt Quiz hoàn tất, card AI vẫn giữ CTA `Tạo Quiz`; bấm lại mở
+   modal cấu hình để append thêm một lượt câu mới vào bộ đang chọn. Trong tab
+   Quiz, admin chọn câu bằng thanh số thứ tự và chỉ câu đang chọn được render
+   bên dưới. Câu AI có hai chế độ `Chỉ xem UI` và `Song song` (UI + JSON) theo
+   cùng pattern review của Sinh kiến thức; nhãn khối EXAMPLE trong ngữ cảnh Quiz
+   hiển thị là `Lời giải`.
+10. Admin xem, sửa, thêm, xóa và duyệt/publish. Với hình JSON trong Summary,
+   admin chọn trực tiếp tên/label/caption/marker hoặc nhiều đoạn có tên ở hai đầu.
+   Sửa, xóa và thêm dấu bằng nhau áp dụng ngay trong draft; chỉ reset một hình mới
+   có confirm và chỉ nút `Lưu nội dung` mới persist.
 
 Acceptance Criteria:
 
@@ -324,6 +338,25 @@ Acceptance Criteria:
 - Output không đúng schema thì không lưu dữ liệu lỗi.
 - Nội dung có `source = AI` và `review_status` phù hợp.
 - Có log AI generation.
+- Mỗi lượt Quiz giữ lineage riêng. Ví dụ AI sinh 10 câu rồi admin xóa 2 câu thì
+  audit của chính lượt đó còn 8, trong khi các câu thủ công và lượt AI khác trong
+  cùng bộ vẫn được giữ nguyên.
+- Đề, hình, bảng GT–KL, lời giải và đáp án của Quiz dùng cùng schema, recovery,
+  normalizer và component hiển thị với block `EXAMPLE` của Sinh kiến thức.
+- Tên điểm chỉ sửa text hiển thị, không xóa hoặc đổi ID/tọa độ; `labels[]`, text
+  góc và caption được sửa/xóa; marker góc/góc vuông/bằng nhau/song song được xóa
+  theo group; không cho xóa point/primitive/topology hình.
+- Một dấu bằng nhau/song song đại diện cả marker group: chọn một glyph phải
+  highlight và xóa cả quan hệ, không để lại nhóm chỉ có một segment.
+- Summary đã phát hành phải được thu hồi trước khi xóa label/marker. Student và
+  mọi renderer read-only không có edit affordance.
+- Frontend validate bản nháp sau mutation; backend vẫn reconcile schema/review
+  issue khi lưu và chặn phát hành nếu còn issue chưa xử lý.
+- Một đoạn được chọn chỉ tô đỏ, không hiện popup. Từ hai đoạn `SEGMENT` có tên ở
+  cả hai đầu mới hiện popup chỉ có action tạo `EQUAL_LENGTH`; click đúng `BC` phải
+  chọn đúng `BC`, không được tô cạnh có hình dạng/vị trí tương tự ở cụm khác.
+- Mọi action giữ vị trí cuộn. Nút reset trên từng hình có confirm và chỉ phục hồi
+  mọi chỉnh sửa của hình đó trong phiên draft hiện tại, không đổi nội dung khác.
 
 ### 7.1. Admin cấu hình model và theo dõi chi phí AI/OCR
 

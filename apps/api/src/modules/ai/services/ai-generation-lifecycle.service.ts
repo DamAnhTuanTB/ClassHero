@@ -150,6 +150,8 @@ export class AiGenerationLifecycleService {
           retryCount: Math.max(context.attempt - 1, 0),
           outputHash: hashAiValue(prepared.output.data),
           outputJson: toJobJson(prepared.output.data),
+          targetType: persisted.resourceType,
+          targetId: persisted.resourceId,
           errorMessage: null,
           finishedAt,
         },
@@ -182,9 +184,7 @@ export class AiGenerationLifecycleService {
       this.prisma.aiGeneration.update({
         where: { id: context.aiGenerationId },
         data: {
-          status: isFinalAttempt
-            ? AiGenerationStatus.FAILED
-            : AiGenerationStatus.QUEUED,
+          status: isFinalAttempt ? AiGenerationStatus.FAILED : AiGenerationStatus.QUEUED,
           retryCount: Math.max(context.attempt - 1, 0),
           errorMessage: message,
           finishedAt,

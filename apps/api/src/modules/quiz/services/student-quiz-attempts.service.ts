@@ -29,11 +29,13 @@ const studentQuizQuestionSelect = {
   correctAnswerJson: true,
   hintJson: true,
   gradingConfigJson: true,
+  sourceMetadataJson: true,
   difficulty: true,
   sortOrder: true,
   explanation: {
     select: {
       contentJson: true,
+      diagramSpecJson: true,
       reviewStatus: true,
       staleAt: true,
     },
@@ -1150,6 +1152,16 @@ function serializeRunnerQuestion(
       question.explanation.staleAt === null
         ? question.explanation.contentJson
         : null,
+    explanationDiagramSpecJson:
+      question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
+      question.explanation.staleAt === null
+        ? question.explanation.diagramSpecJson
+        : null,
+    explanationExampleBlock:
+      question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
+      question.explanation.staleAt === null
+        ? readExampleBlock(question.sourceMetadataJson)
+        : null,
     difficulty: question.difficulty,
     sortOrder: question.sortOrder,
     questionNumber,
@@ -1185,7 +1197,25 @@ function serializeCheckedAnswer(
       question.explanation.staleAt === null
         ? question.explanation.contentJson
         : null,
+    explanationDiagramSpecJson:
+      question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
+      question.explanation.staleAt === null
+        ? question.explanation.diagramSpecJson
+        : null,
+    explanationExampleBlock:
+      question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
+      question.explanation.staleAt === null
+        ? readExampleBlock(question.sourceMetadataJson)
+        : null,
   };
+}
+
+function readExampleBlock(value: Prisma.JsonValue | null): Prisma.JsonValue | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const exampleBlock = value.exampleBlock;
+  return exampleBlock && typeof exampleBlock === "object" && !Array.isArray(exampleBlock)
+    ? exampleBlock
+    : null;
 }
 
 function toJsonValue(value: unknown): Prisma.JsonValue {

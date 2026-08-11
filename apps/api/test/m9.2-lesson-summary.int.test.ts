@@ -103,6 +103,7 @@ const generatedOutput = {
             problem: "Chứng minh số $1/2$ là một số hữu tỉ.",
             solution: "Ta có mẫu số 2 khác 0.",
             answer: "$1/2$ là số hữu tỉ.",
+            geometryStatement: null,
             diagramSpec: null,
           },
           notes: [
@@ -124,6 +125,7 @@ const generatedOutput = {
       problem: "Viết số $0,25$ dưới dạng phân số tối giản.",
       solution: "$0,25 = 1/4$.",
       answer: "$1/4$.",
+      geometryStatement: null,
       diagramSpec: null,
     },
     realWorldExercise: {
@@ -132,6 +134,7 @@ const generatedOutput = {
       problem: "Một chiếc áo giá 200 000 đồng được giảm 25%. Tính giá sau khi giảm.",
       solution: "Số tiền giảm là 50 000 đồng.",
       answer: "150 000 đồng.",
+      geometryStatement: null,
       diagramSpec: null,
     },
   },
@@ -433,12 +436,12 @@ describe("M9.2 lesson summary API and worker integration", () => {
     expect(response.body.data).toMatchObject({
       promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
       schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
-      systemPrompt: expect.stringContaining(longSystemInstructions),
-      userPrompt: expect.stringContaining("USER PREVIEW CUSTOM"),
+      systemPrompt: longSystemInstructions,
+      userPrompt: "USER PREVIEW CUSTOM",
       inputPrompt: expect.stringContaining("Số hữu tỉ viết được"),
       openAiRequest: {
         model: expect.any(String),
-        instructions: expect.stringContaining("CẤU TRÚC BẮT BUỘC"),
+        instructions: longSystemInstructions,
         input: expect.stringContaining("USER PREVIEW CUSTOM"),
         text: {
           format: {
@@ -606,9 +609,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
     });
     expect(JSON.stringify(summary.contentJson)).toContain("Bài tập vận dụng");
     expect(JSON.stringify(summary.contentJson)).toContain("DIAGRAM_NEEDS_REVIEW");
-    expect(JSON.stringify(summary.contentJson)).toContain(
-      "INFERRED_POINT_LABEL",
-    );
+    expect(JSON.stringify(summary.contentJson)).toContain("INFERRED_POINT_LABEL");
     expect(JSON.stringify(summary.contentJson)).not.toContain("Cần admin kiểm tra");
     expect(JSON.stringify(summary.contentJson)).not.toContain("warningDetails");
 

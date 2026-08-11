@@ -30,6 +30,7 @@ import type { AdminLessonDocumentApi } from "@/features/admin/courses/types/admi
 import { useAuthGuard } from "@/features/auth/session/use-auth-guard";
 import { ApiRequestError } from "@/lib/api-client";
 import { getQueryRenderState } from "@/lib/query-render-state";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   adminSidebarCollapsedDatasetKey,
   adminSidebarCollapsedStorageKey,
@@ -659,9 +660,5 @@ function normalizeLessonTitleForComparison(title: string) {
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof ApiRequestError) {
-    return error.message;
-  }
-
-  return "Vui lòng thử lại sau ít phút.";
+  return getUserFacingErrorMessage(error, "Vui lòng thử lại sau ít phút.");
 }

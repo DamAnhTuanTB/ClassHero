@@ -111,14 +111,28 @@ export type AdminSummaryGenerationPayload = {
   maxOutputTokens?: number;
 };
 
+export type AdminQuizGenerationPayload = {
+  type: "QUIZ";
+  targetQuizSetId?: string;
+  documentIds: string[];
+  questionCount: number;
+  difficulty: AdminAiDifficulty;
+  difficultyCounts?: { easy: number; medium: number; hard: number };
+  questionTypes: AdminAiQuestionType[];
+  style: AdminSummaryStyle;
+  styleInstructions?: string;
+  extraInstructions?: string;
+  systemInstructions?: string;
+  userPrompt?: string;
+  model?: string;
+  temperature?: number;
+  reasoningEffort?: AiReasoningEffort;
+  maxOutputTokens?: number;
+};
+
 export type AdminAiGenerationPayload =
   | AdminSummaryGenerationPayload
-  | {
-      type: "QUIZ";
-      questionCount: number;
-      difficulty: AdminAiDifficulty;
-      questionTypes: AdminAiQuestionType[];
-    }
+  | AdminQuizGenerationPayload
   | {
       type: "FLASHCARD";
       cardCount: number;
@@ -153,10 +167,13 @@ export interface AdminLessonSummaryPromptPreview {
     documentCount: number;
     chunkCount: number;
     estimatedTokens: number;
+    promptTokens?: number;
+    schemaTokens?: number;
     contextTokens: number;
     maxContextTokens: number;
   };
   configuration: {
+    targetQuizSet?: { id: string; title: string } | null;
     selectedModel: string | null;
     isDefaultConfigured: boolean;
     resolvedProvider: string | null;

@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-08-10
+Last updated: 2026-08-11
 
 File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên làm việc nhanh hơn. Nó không thay thế `AGENTS.md` hoặc docs gốc trong `docs/`.
 
@@ -15,8 +15,8 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - `M5.1-M5.4` đã Done: OpenAI embedding qua `AiProvider` với vector-space validation 1.536 chiều; durable embedding worker lưu lifecycle/token/latency và retry/final error; personal clone tái sử dụng vector hợp lệ rồi enqueue idempotent phần còn thiếu; retrieval pgvector + keyword chỉ dùng tài liệu active `READY` trong đúng lesson/provider/model/dimension và giữ token budget tuyệt đối. HNSW cosine index đã được phục hồi bằng migration bù; PostgreSQL isolation test và OpenAI live smoke 25 token đã pass.
 - `M9.1` đã Done: `AiProvider`/`AiService` hỗ trợ OpenAI text và strict structured output; Zod là persistence gate cuối sau JSON Schema; provider trả model/request ID/token/latency; service tạo idempotent cặp `background_jobs` + `ai_generations`; AI worker đồng bộ lifecycle/retry/hash/output log và không gọi persistence khi output invalid. PostgreSQL lifecycle và OpenAI live smoke pass (74 input + 10 output tokens ở request đo usage, 2.168 ms). Gemini vẫn là placeholder chưa bật; handler summary/quiz/flashcard/test thuộc `M9.2-M9.3`.
 - `M9.2` core đã Done: admin summary GET/PUT/generate API có RBAC/audit; request AI chỉ chọn active `READY` lesson documents có chunks, giới hạn 12.000 context tokens, lưu source hash và chống active job trùng. Worker tải lại context đúng lesson, reject source stale/output sai schema, gọi `AiService`, map structured summary sang Tiptap và upsert `source = AI`, `NEEDS_REVIEW`, `ai_generation_id`; admin vẫn sửa/duyệt cùng summary record. PostgreSQL API/worker integration và opt-in OpenAI lesson-summary live smoke đã pass; smoke dùng một chunk mẫu, không gọi embedding/OCR. Riêng delivery wave mở rộng coverage hình Toán 3-9 của `M9.2` vẫn `IN_PROGRESS`, chưa đủ điều kiện công bố 90-100%; xem mục resume trong phần 3 và `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
-- `M9.2` partial-block recovery đã hoàn tất ngày 2026-08-10 với schema
-  `lesson-summary-schema-v40`: một lỗi semantic/field/diagram cục bộ không còn
+- `M9.2` partial-block recovery đã hoàn tất ngày 2026-08-10; contract hiện tại là
+  `lesson-summary-schema-v42`: một lỗi semantic/field/diagram cục bộ không còn
   làm mất toàn summary. Worker dùng transport schema trong đúng một provider
   attempt, nghiệm thu từng block, giữ hình/nội dung còn render an toàn và đính
   `reviewIssues` có lời giải thích/gợi ý sửa. Admin vẫn sửa/lưu nháp, có thể chấp
@@ -52,7 +52,64 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   (92.928 cached) + 5.371 output, chi phí ước tính khoảng 2.640 VNĐ. Ảnh đạt ở
   `anh-chup-hinh-toan-dat-chuan/co-che-review-tung-block/`; ảnh placeholder nằm
   riêng trong `anh-chup-hinh-toan-can-sua/co-che-hinh-loi-khong-the-ve/`.
-- `M9.3` đã Done: admin Quiz/Flashcard/Test generate API trả 202 và chống active job trùng theo lesson/type; worker hybrid-retrieve đúng lesson, reject source stale/chunk reference ngoài context/output copy chuỗi từ 12 token, validate strict đủ bốn loại câu, rồi persist atomically vào schema M6 với `source=AI`, `NEEDS_REVIEW`, explanation và `source_metadata_json`. Review set cascade tới item/explanation. PostgreSQL integration và OpenAI live matrix 13 lượt pass (Quiz/Test mixed + từng loại; Flashcard EASY/MEDIUM/HARD), không gọi OCR/PDF.
+- Feedback Bài 15 ngày 2026-08-10 đã nâng prompt Summary lên
+  `lesson-summary-prompt-v56`: notation góc trong text dùng `\\widehat{BAC}` với
+  đỉnh ở giữa; mapper còn canonicalize `\\angle` và suy ra ba điểm từ marker khi
+  provider chỉ ghi tên đỉnh. Renderer angle label đặt `x`/số đo ngay ngoài cung
+  theo kích thước nhãn, thay cho khoảng cách bán kính cố định quá xa; frontend
+  cũng normalize summary cũ khi render để không cần gọi lại provider.
+- Corrective pass văn phong Summary dùng schema v41: context lấy grade thấp nhất
+  của learning path và khóa vào source hash. Chứng minh Hình học lớp 7–9 có
+  `geometryStatement` để render bảng GT–KL với đường ngăn dọc/ngang đúng SGK;
+  solution dùng mạch `Xét/Ta có/Vì... nên/Suy ra/Do đó/Vậy` và không bị mapper
+  hay frontend tự đổi thành bullet. Số học/Đại số giữ cách giải cũ; mọi ý a), b),
+  c) vẫn bắt buộc ở dòng riêng. Thiếu GT–KL chỉ là issue `ACCEPT_OR_FIX`, không
+  ẩn/placeholder example; dữ liệu lesson summary version 1/2 cũ tiếp tục đọc.
+- Feedback khối note ngày 2026-08-11 nâng contract hiện tại lên prompt
+  `lesson-summary-prompt-v57` / schema `lesson-summary-schema-v42`: provider bị
+  cấm lặp `Chú ý`, `Lưu ý`, `Nhận xét` ở đầu `note.content`; mapper dùng shared
+  normalizer trước khi persist, còn renderer dùng cùng normalizer để tương thích
+  summary cũ mà không cần migration hoặc gọi lại provider.
+- Owner xác nhận ngày 2026-08-11 hệ thống bao phủ học sinh lớp 3–12, gồm cả THPT.
+  Prompt Summary/GT–KL và `diagramIntent.grade` hiện mới phủ đến lớp 9 là gap cần
+  corrective pass; mọi thay đổi tiếp theo không được coi lớp 10–12 là ngoài scope.
+- Corrective plan `M9.16` đã được lập tại
+  `.codex/plans/m9-16-lesson-summary-prompt-contract-hardening-plan.md`: canonical
+  contract chỉ compose một lần, admin gửi preference thay vì resolved prompt,
+  preview/generate khóa request fingerprint và learner profile/GT–KL/diagram
+  grade phủ lớp 3–12. Đây là task AI kế tiếp trước `M9.4`.
+- `M9.13-M9.15` đã Done ngày 2026-08-11 cho admin chỉnh trực tiếp hình JSON trong
+  draft: tên điểm edit-only; label/góc/caption edit-delete; marker xóa theo group;
+  chọn từ hai segment có tên ở hai đầu để thêm `EQUAL_LENGTH`; reset riêng một
+  hình về đầu phiên. Một segment chỉ tô đỏ, popup hai segment chỉ có icon `=`,
+  hit-test theo tọa độ SVG để không chọn nhầm cạnh, mọi action giữ scroll. Chỉ
+  reset có confirm; `Lưu nội dung` mới PUT, backend guard giữ nguyên và không gọi
+  provider. Plan chi tiết ở
+  `.codex/plans/m9-13-admin-safe-diagram-element-delete-plan.md`.
+- Corrective ngày 2026-08-11 đã thêm ranh giới thông báo lỗi dùng chung ở web:
+  toast/banner/form không còn đưa nguyên văn lỗi Zod, provider hoặc câu kỹ thuật
+  tiếng Anh ra giao diện. Lỗi chỉnh hình được ánh xạ riêng theo tên điểm, marker,
+  cạnh và đồng hồ; lỗi chưa biết dùng câu tiếng Việt theo đúng ngữ cảnh thao tác.
+- `M9.3` đã Done và được corrective ngày 2026-08-11: admin Quiz/Flashcard/Test
+  generate API trả 202 và chống active job trùng theo lesson/type; worker
+  hybrid-retrieve đúng lesson, reject source stale/chunk reference ngoài
+  context/output copy chuỗi từ 12 token và validate strict đủ bốn loại câu. Mỗi
+  Quiz/Test question dùng nguyên EXAMPLE core M9.2 cộng assessment metadata.
+  Quiz append vào set đang mở (`targetQuizSetId`), không tạo tab mới; mỗi câu lưu
+  generation lineage + `exampleBlock`, audit giữ đúng 10→xóa 2→8 mà không tính
+  câu thủ công/lượt khác. Quiz không trả/lưu sourceChunkIds ở cấp câu vì là bài
+  tập mới bám context. Admin/student dùng cùng EXAMPLE card; admin Quiz dùng cùng
+  diagram editor với Sinh kiến thức. Contract/prompt nâng `v4`. Live GPT-5.4 đã
+  pass ma trận 1/5/10 cho Đại số và Hình học; một lượt live bổ sung cũng pass 10
+  câu hỗn hợp 5 Đại số + 5 Hình học, có ba diagram persist không issue và không
+  source trace cấp câu. Compiler tự nhận shared-hypotenuse từ intent 4 điểm và
+  không còn dựng thêm E/F. UI corrective đã giữ CTA `Tạo Quiz` sau success,
+  thêm thanh số chỉ render một câu, hai mode `Chỉ xem UI`/`Song song` cho
+  câu AI và label ngữ cảnh `Lời giải`; Summary vẫn là `Ví dụ`. Mapper và
+  renderer dùng chung tokenizer cho `$...$`, `$$...$$`, `\\(...\\)`, `\\[...\\]`
+  nên không còn lộ delimiter LaTeX ở đề/đáp án/gợi ý cũ. Agent-browser
+  đã verify desktop/mobile light/dark, công thức, hình học, split JSON và modal
+  tạo thêm; artifact nằm trong `.codex/artifacts/m9-3-quiz-visual/`.
 - `M9.8` đã bổ sung cấu hình Summary theo lần chạy (phong cách, độ dài,
   trọng tâm, nhóm nội dung, câu ôn tập, yêu cầu bổ sung, model, temperature,
   output token) và endpoint preview dùng chung prompt builder với worker. Admin
@@ -244,9 +301,10 @@ token reserve, upper bound và số đã dùng; trần đề xuất cho phần c
 Core student learning `M7.1-M7.5` đã xong. Theo quyết định owner ngày
 2026-08-03, toàn bộ cụm `M15 Smart video learning` được hoãn lại và không đề
 xuất làm task kế tiếp cho đến khi owner mở lại. `M9.1-M9.3` và `M9.8` đã Done;
-thứ tự AI tiếp theo được chốt là `M9.4 -> M9.5 -> M9.6 -> M9.7`. `M9.8` đã
+thứ tự AI tiếp theo được chốt là `M9.16 -> M9.4 -> M9.5 -> M9.6 -> M9.7`. `M9.8` đã
 bổ sung panel admin bốn loại nội dung, polling/recovery, editor/review và live
-matrix 8 ca. `M9.4` là task kế tiếp. `M9.4` và
+matrix 8 ca. `M9.16` là task kế tiếp để harden prompt/preview/grade 3–12 trước
+student flow. `M9.4` và
 `M9.5` đổi sang `UI + API`, phải hoàn tất đường bấm kiểm thử cho học sinh trong
 cùng task; `M9.8` không thay thế UI học sinh. `M15.2` vẫn chờ nền notes `M7.6`
 khi milestone M15 được mở lại.
@@ -258,7 +316,7 @@ Admin lesson detail `/admin/lessons/[lessonId]` hiện đã là workspace thật
 M4.5 UI adjustment ngày 2026-07-19: course detail là nơi upload source PDF dài và xem status tài liệu theo buổi ở dạng gọn; thao tác nhập/chỉnh page range hàng loạt phải nằm trong modal `Nhập khoảng trang`, không nhét toàn bộ form dài vào màn detail course. Modal tạo/sửa lesson vẫn có section gán page range tùy chọn + preview source document cho một buổi học cụ thể nếu course đã có source document, để admin upload sách trước rồi tạo lesson sau mà không phải thao tác vòng; nếu admin chỉ tạo metadata thì bỏ trống range. Phần nhập trang trong modal lesson và modal nhập nhanh phải disabled tới khi source document đã xử lý xong, đủ page records, mọi page sẵn sàng và không còn warning số trang in cần xác nhận.
 
 ```txt
-/task-full plan M9.4
+/task-full M9.16
 ```
 
 `M3.5` student course browsing đã nối API thật dựa trên API `M3.3`, nhưng theo quyết định owner ngày 2026-07-13 thì pass này chỉ làm student course browsing trước. Tạm chưa làm public landing page hoàn chỉnh, public course list và public course detail trong pass này; public/SEO surface sẽ quay lại sau. Theo điều chỉnh ngày 2026-07-14, student course browsing tách thành hai màn riêng, không lồng route explore trong `courses`; feature code cũng mirror route này: `features/student/courses` cho `/student/courses`, `features/student/explore` cho `/student/explore`. Shared component student nằm ở `apps/web/components/student`, còn shared API/hooks/data/types/utils không render JSX vẫn ở `features/student/shared`: `/student/courses` là `Khóa học của tôi`, chỉ hiển thị các khóa học/lộ trình học sinh đã mua/đang có enrollment; `/student/explore` là `Danh sách khóa học`, hiển thị tất cả lộ trình published. Màn tất cả lộ trình có filter theo lớp và môn; mặc định lớp chọn theo lớp của học sinh, môn học chọn `Tất cả`. Bộ lọc Explore dùng select `Khối lớp` và `Môn học` cùng một hàng; `Khối lớp` có option `Tất cả` ở đầu và đủ lớp 3 đến lớp 12; search có nút tròn icon `X` là một cột riêng nằm ngoài cạnh phải ô tìm kiếm, không overlay/absolute vào input. Khi `X` chưa xuất hiện thì input full width; khi vùng search focus hoặc đang có từ khóa, input thu ngắn bằng animation và icon `X` trượt vào/fade-in; sau khi bấm `X` để xóa, icon phải biến mất và input trở lại full width. Không hiển thị nút filter cạnh search hoặc sort `Mới nhất` phụ ở màn mobile này. Select filter phải tránh lỗi bấm lại trigger khi đang mở làm dropdown tắt rồi bật lại ngay. Trên card khóa học Explore, badge trạng thái như `Đang học`, `Có học thử`, `Chưa mua` phải nằm sát mép phải của vùng nội dung/card, không đứng ngay sau nhãn lớp. Ảnh khóa học trong card Explore phải luôn là hình vuông và chiếm khoảng 40% chiều ngang khối card mẹ, dùng gap nhỏ để ảnh cao gần tới hàng số chương/số buổi nhưng vẫn giữ đủ không gian nội dung; không kéo dọc làm mất tỉ lệ. Tạm thời mobile student layout thống nhất: header compact/sticky, chỉ gồm logo + text `ClassHero` ở trái, icon thông báo + icon Chat AI dạng Messenger-style không có nền sát mép phải; không đặt tiêu đề trang trong mobile header. Khi người dùng cuộn xuống, header trượt ẩn lên trên; chỉ cần cuộn nhẹ lên trên một chút thì header phải xuất hiện lại ngay và sticky top, đồng thời luôn hiện khi ở gần đầu trang. Với mobile thật, header hide/show phải dựa trên scroll position thật (`scrollY`/document scroll) và ngưỡng delta, không dùng `touchmove`/`pointermove` để suy hướng cuộn vì các event này có thể chạy trước scroll và làm sai delta giữa responsive emulator và điện thoại. Badge số thông báo phải nhỏ, bám mép trên bên phải của chính icon chuông và không che mất icon; icon Chat AI cần có nhãn `AI` dạng pill nhỏ có nền ở góc trên bên phải chính icon tin nhắn, không đẩy lệch xa và không che nét icon Messenger. Hai icon thông báo và tin nhắn trong header phải dùng cùng khung/kích thước để mép dưới thẳng hàng; các icon header và icon bottom menu phải dùng cùng size 28px. Nhãn môn học và tên lớp trong card khóa học phải luôn cùng một hàng, không để lớp rớt xuống dòng riêng. Content màn `Khóa học của tôi` bắt đầu bằng avatar học sinh + tên + lời chào; bottom nav gồm icon kèm text dưới icon theo thứ tự `Trang chủ`, `Khám phá`, `Học tập`, `Sự kiện`, `Trang cá nhân`, `Menu`; mục `Sự kiện` dùng cho tin tức, sự kiện và lịch livestream. Label bottom nav luôn ở một dòng, không xuống dòng và không được truncate/cắt chữ; nếu label dài như `Trang cá nhân` thì phải tinh chỉnh grid/icon/font/padding để vẫn đủ chỗ. Active bottom nav không dùng nền xanh; chỉ đổi màu icon/text và hiển thị một thanh chữ nhật phía trên item active, sát mép trên và phủ đúng chiều rộng một item, tương đương 1/6 chiều dài thanh menu. Student scope gồm danh sách/chi tiết lộ trình, trạng thái enrollment/trial nếu API trả, và CTA vào học/học thử/mua lộ trình; payment thật vẫn nối ở `M8.4`. Quyết định owner ngày 2026-07-17 cho M4: flow chính là tạo lesson metadata trước, upload một source PDF/tài liệu dài ở cấp lộ trình, worker dùng paid OCR-first bằng Mathpix hoặc import artifact cache theo `content_hash`, admin gán page range cho từng lesson, rồi worker chunk theo `lesson_id`; mỗi lesson có action upload/thay thế tài liệu gốc riêng, còn upload lẻ bổ sung là `SUPPLEMENT`. `M4.2` đã làm source document + page range + primary/original document replace + supplemental document API/schema; `M4.3` đã nối BullMQ worker foundation; `M4.4` đã làm paid OCR artifact import + chunk theo mapping/primary replacement/supplement; `M4.5` đã làm UI upload source document, gán trang, upload/thay thế tài liệu gốc và upload bổ sung theo lesson. Admin course code hiện tách theo screen tại `apps/web/features/admin/courses/screens/<screen>/index.tsx`; component local của từng màn nằm trong `screens/<screen>/components`, còn component dùng chung role admin nằm ở `apps/web/components/admin/courses`. Form controls dùng shared primitives từ `apps/web/components/common/forms`; các task UI sau phải kiểm tra shared/approved patterns trước khi tạo control/hook/client mới.

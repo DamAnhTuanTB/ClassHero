@@ -21,6 +21,7 @@ import { FlashcardSetTabs } from "@/features/admin/flashcards/screens/admin-flas
 import { getQueryRenderState } from "@/lib/query-render-state";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 const FlashcardSetEditorDialog = dynamic(() =>
   import("@/features/admin/flashcards/screens/admin-flashcards-tab/components/flashcard-set-editor-dialog").then(
@@ -240,7 +241,12 @@ export function AdminFlashcardsTab({
             }
             setDeleteTarget(null);
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Chưa xóa được dữ liệu");
+            toast.error(
+              getUserFacingErrorMessage(
+                error,
+                "Chưa xóa được dữ liệu. Vui lòng thử lại.",
+              ),
+            );
           }
         }}
       />

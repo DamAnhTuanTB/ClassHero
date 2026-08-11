@@ -38,7 +38,7 @@ import type {
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
-import { ApiRequestError } from "@/lib/api-client";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { computeAutofillRanges } from "@/features/admin/courses/utils/autofill-page-ranges";
 
 const EMPTY_SOURCE_DOCUMENTS: AdminSourceDocumentApi[] = [];
@@ -297,7 +297,7 @@ export function useAdminCourseDocumentsManager(
       await invalidateDocumentQueries();
     },
     onError: (error) => {
-      toast.error("Chưa upload được tài liệu nguồn", {
+      toast.error("Chưa tải được tài liệu nguồn lên", {
         description: getErrorMessage(error),
       });
     },
@@ -486,7 +486,7 @@ export function useAdminCourseDocumentsManager(
       );
     },
     onError: (error) => {
-      toast.error("Chưa upload được tài liệu", {
+      toast.error("Chưa tải được tài liệu lên", {
         description: getErrorMessage(error),
       });
     },
@@ -611,7 +611,7 @@ export function useAdminCourseDocumentsManager(
     setRangeSubmitAttempted(true);
 
     if (!selectedSourceDocument) {
-      toast.warning("Hãy upload tài liệu nguồn trước");
+      toast.warning("Hãy tải tài liệu nguồn lên trước");
       return;
     }
 
@@ -740,13 +740,5 @@ export function useAdminCourseDocumentsManager(
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof ApiRequestError) {
-    return error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Vui lòng thử lại sau ít phút.";
+  return getUserFacingErrorMessage(error, "Vui lòng thử lại sau ít phút.");
 }

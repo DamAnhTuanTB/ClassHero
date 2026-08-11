@@ -11,6 +11,9 @@ export interface RetrievalInput {
   /** Lesson hiện tại — chỉ lấy chunks trong lesson này */
   lessonId: string;
 
+  /** Giới hạn thêm vào đúng các lesson_documents admin đã chọn. */
+  documentIds?: string[];
+
   /** Câu hỏi/query của user hoặc prompt */
   query: string;
 

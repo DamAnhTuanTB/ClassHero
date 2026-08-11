@@ -29,6 +29,7 @@ MVP tập trung vào việc giúp:
 ### Trong scope
 
 - Chỉ làm các môn: Toán, Lý, Hóa.
+- Đối tượng học sinh trong MVP bao phủ từ lớp 3 đến lớp 12, gồm Tiểu học, THCS và THPT.
 - Có các role: Admin, Student, Parent.
 - Có lộ trình học theo môn và khối lớp.
 - Mỗi lộ trình có nhiều buổi học; mỗi buổi có thể thuộc một chương hoặc không thuộc chương nào.

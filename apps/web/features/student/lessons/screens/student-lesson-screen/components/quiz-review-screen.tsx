@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
 import { useDocumentScrollLock } from "@/features/student/lessons/hooks/use-document-scroll-lock";
 import { AssessmentQuestionCard } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-question-card";
+import { AssessmentExplanationPanel } from "@/features/student/lessons/screens/student-lesson-screen/components/assessment-explanation-panel";
 import type {
   AssessmentReview,
   StudentAssessmentQuestion,
@@ -185,6 +186,11 @@ export function QuizReviewScreen({
                 feedback={question}
                 onChange={() => undefined}
                 readOnly
+              />
+              <AssessmentExplanationPanel
+                content={question.explanationJson}
+                diagramSpec={question.explanationDiagramSpecJson}
+                exampleBlock={question.explanationExampleBlock}
               />
             </div>
           ) : (

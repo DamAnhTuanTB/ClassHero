@@ -22,6 +22,7 @@ import {
   createEmptyTiptapDocument,
   hasTiptapDocumentContent,
 } from "@/lib/tiptap-rich-content";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 const difficultyOptions = [
   { value: "EASY", label: "Dễ" },
@@ -84,7 +85,12 @@ export function FlashcardEditorDialog({
       }
       onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Chưa lưu được flashcard");
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa lưu được thẻ ghi nhớ. Vui lòng thử lại.",
+        ),
+      );
     }
   });
 

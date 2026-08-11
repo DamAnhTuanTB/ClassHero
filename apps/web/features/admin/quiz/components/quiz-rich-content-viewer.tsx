@@ -3,6 +3,7 @@
 import katex from "katex";
 import "katex/contrib/mhchem";
 import "katex/dist/katex.min.css";
+import { tokenizeMathText } from "@learning-path/shared";
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import type {
   TiptapJsonMark,
@@ -57,7 +58,7 @@ function renderRichContentNode(node: TiptapJsonNode): ReactNode {
 
   switch (node.type) {
     case "text":
-      return renderTextMarks(node.text ?? "", node.marks);
+      return renderTextWithFallbackMath(node.text ?? "", node.marks);
     case "paragraph":
       return (
         <p data-indent={readIndent(node.attrs?.indent)} style={readBlockStyle(node)}>
@@ -110,6 +111,22 @@ function renderRichContentNode(node: TiptapJsonNode): ReactNode {
     default:
       return children;
   }
+}
+
+function renderTextWithFallbackMath(text: string, marks: TiptapJsonMark[] | undefined) {
+  return tokenizeMathText(text).map((token, index) => (
+    <Fragment key={`${token.type}-${index}`}>
+      {token.type === "text"
+        ? renderTextMarks(token.value, marks)
+        : renderFormula(
+            {
+              type: token.display ? "blockMath" : "inlineMath",
+              attrs: { latex: token.latex },
+            },
+            token.display,
+          )}
+    </Fragment>
+  ));
 }
 
 function renderTextMarks(text: string, marks: TiptapJsonMark[] | undefined) {
