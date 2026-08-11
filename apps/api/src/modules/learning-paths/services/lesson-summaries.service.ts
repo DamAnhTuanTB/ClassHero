@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { AiGenerationType, Prisma, ProviderUsageMetric } from "@prisma/client";
 import type { ProviderRouteCandidate } from "#api/modules/provider-operations/types/provider-operations.types";
 
 import { throwBadRequest, throwNotFound } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import type { EnvConfig } from "#api/config/env.validation";
 import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-job.service";
 import {
   LessonSummaryContextError,
@@ -52,6 +54,8 @@ export class LessonSummariesService {
     private readonly summaryContext: LessonSummaryContextService,
     @Inject(AiModelRoutingService)
     private readonly modelRouting: AiModelRoutingService,
+    @Inject(ConfigService)
+    private readonly configService: ConfigService<EnvConfig, true>,
   ) {}
 
   async getForAdmin(lessonId: string) {
@@ -145,7 +149,10 @@ export class LessonSummariesService {
 
   async generate(lessonId: string, actorUserId: string, dto: GenerateLessonSummaryDto) {
     const sourceContext = await this.loadSourceContext(lessonId, dto.documentIds);
-    const configuration = normalizeConfiguration(dto);
+    const configuration = normalizeConfiguration(
+      dto,
+      this.resolveSchemaReferenceStrategy(),
+    );
     const { route } = await this.resolveSummaryRoute(dto);
 
     const requestId = randomUUID();
@@ -196,7 +203,10 @@ export class LessonSummariesService {
 
   async previewPrompt(lessonId: string, dto: GenerateLessonSummaryDto) {
     const sourceContext = await this.loadSourceContext(lessonId, dto.documentIds);
-    const configuration = normalizeConfiguration(dto);
+    const configuration = normalizeConfiguration(
+      dto,
+      this.resolveSchemaReferenceStrategy(),
+    );
     const { baseRoute, route } = await this.resolveSummaryRoute(dto);
     const request = buildLessonSummaryStructuredInput({
       lessonId,
@@ -213,6 +223,7 @@ export class LessonSummariesService {
     const structuredTextFormat = buildAiStructuredTextFormat(
       lessonSummaryProviderTransportOutputSchema,
       request.outputName,
+      request.schemaReferenceStrategy,
     );
     const inputTokenEstimate = estimateAiStructuredInputTokens({
       systemPrompt: request.systemPrompt,
@@ -396,6 +407,14 @@ export class LessonSummariesService {
     }
     throwBadRequest(error.code, error.message, error.details);
   }
+
+  private resolveSchemaReferenceStrategy(): LessonSummaryJobInput["schemaReferenceStrategy"] {
+    return this.configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
+      infer: true,
+    })
+      ? "ref"
+      : "inline";
+  }
 }
 
 function readReasoningEffortLevels(capabilities: unknown): string[] {
@@ -410,6 +429,7 @@ function readReasoningEffortLevels(capabilities: unknown): string[] {
 
 function normalizeConfiguration(
   dto: GenerateLessonSummaryDto,
+  schemaReferenceStrategy: LessonSummaryJobInput["schemaReferenceStrategy"],
 ): Omit<LessonSummaryJobInput, "documentIds" | "sourceHash" | "targetGrade"> {
   return {
     style: dto.style,
@@ -424,6 +444,7 @@ function normalizeConfiguration(
     ...(dto.model ? { model: dto.model } : {}),
     ...(dto.temperature !== undefined ? { temperature: dto.temperature } : {}),
     ...(dto.reasoningEffort ? { reasoningEffort: dto.reasoningEffort } : {}),
+    schemaReferenceStrategy,
     ...(dto.maxOutputTokens !== undefined
       ? { maxOutputTokens: dto.maxOutputTokens }
       : {}),

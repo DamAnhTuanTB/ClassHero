@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { zodTextFormat } from "openai/helpers/zod";
 import {
   LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
   lessonSummaryDiagramSpecSchema,
@@ -51,6 +52,53 @@ const contextChunks = [
   },
 ];
 const sourceTopicId = buildLessonSummarySourceTopics(contextChunks)[0]!.id;
+
+function normalizeExpandedJsonSchema(schema: Record<string, unknown>) {
+  const root = structuredClone(schema);
+  const expandedRoot = Object.fromEntries(
+    Object.entries(root).filter(
+      ([key]) => key !== "$schema" && key !== "$defs" && key !== "definitions",
+    ),
+  );
+
+  const resolveRef = (ref: string): unknown => {
+    if (!ref.startsWith("#/")) throw new Error(`Unsupported local ref: ${ref}`);
+    return ref
+      .slice(2)
+      .split("/")
+      .map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"))
+      .reduce<unknown>((value, key) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          throw new Error(`Cannot resolve local ref: ${ref}`);
+        }
+        return (value as Record<string, unknown>)[key];
+      }, root);
+  };
+
+  const expand = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(expand);
+    if (!value || typeof value !== "object") return value;
+
+    const objectValue = value as Record<string, unknown>;
+    const ref = objectValue.$ref;
+    if (typeof ref === "string") {
+      const resolved = resolveRef(ref);
+      if (!resolved || typeof resolved !== "object" || Array.isArray(resolved)) {
+        throw new Error(`Local ref does not resolve to an object: ${ref}`);
+      }
+      const overlay = Object.fromEntries(
+        Object.entries(objectValue).filter(([key]) => key !== "$ref"),
+      );
+      return expand({ ...(resolved as Record<string, unknown>), ...overlay });
+    }
+
+    return Object.fromEntries(
+      Object.entries(objectValue).map(([key, child]) => [key, expand(child)]),
+    );
+  };
+
+  return expand(expandedRoot);
+}
 
 function diagramPoint(id: string, x: number, y: number) {
   return {
@@ -790,6 +838,38 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(serializedFormat).toContain('"ellipses"');
   });
 
+  it("compacts repeated provider schemas without changing the expanded contract", () => {
+    const outputName = "lesson_summary_provider_contract";
+    const sdkInlineFormat = zodTextFormat(
+      lessonSummaryProviderTransportOutputSchema,
+      outputName,
+    );
+    const inlineFormat = buildAiStructuredTextFormat(
+      lessonSummaryProviderTransportOutputSchema,
+      outputName,
+    );
+    const referenceFormat = buildAiStructuredTextFormat(
+      lessonSummaryProviderTransportOutputSchema,
+      outputName,
+      "ref",
+    );
+
+    expect(JSON.stringify(inlineFormat)).toBe(JSON.stringify(sdkInlineFormat));
+    expect(referenceFormat.schema).toHaveProperty("$defs");
+    expect(JSON.stringify(referenceFormat)).toContain('"$ref"');
+    expect(JSON.stringify(referenceFormat).length).toBeLessThan(
+      JSON.stringify(inlineFormat).length / 5,
+    );
+    expect(
+      normalizeExpandedJsonSchema(referenceFormat.schema),
+    ).toEqual(normalizeExpandedJsonSchema(inlineFormat.schema));
+
+    const providerOutput = createProviderOutput();
+    expect(referenceFormat.$parseRaw(JSON.stringify(providerOutput))).toEqual(
+      lessonSummaryProviderTransportOutputSchema.parse(providerOutput),
+    );
+  });
+
   it("requires geometryStatement in strict provider JSON while accepting omission for local recovery", () => {
     const serializedFormat = JSON.stringify(
       buildAiStructuredTextFormat(
@@ -1128,6 +1208,7 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(request.outputName).toBe("lesson_summary_provider_contract");
     expect(request.promptVersion).toBe(LESSON_SUMMARY_PROMPT_VERSION);
     expect(request.schemaVersion).toBe(LESSON_SUMMARY_SCHEMA_VERSION);
+    expect(request.schemaReferenceStrategy).toBe("inline");
     expect(fullInput).toContain("CONTEXT_CHUNKS_JSON_BEGIN");
     expect(fullInput).toContain('"content":"Nội dung </chunk>');
     expect(fullInput).not.toContain("<context_chunks>");
@@ -1218,6 +1299,15 @@ describe("M9.2 lesson summary provider contract", () => {
     });
 
     expect(parsed.systemInstructions).toHaveLength(15_501);
+    expect(parsed.schemaReferenceStrategy).toBe("inline");
+    expect(
+      lessonSummaryJobInputSchema.parse({
+        documentIds: [ids.theory],
+        sourceHash: "a".repeat(64),
+        style: "student_friendly",
+        schemaReferenceStrategy: "ref",
+      }).schemaReferenceStrategy,
+    ).toBe("ref");
     expect(() =>
       lessonSummaryJobInputSchema.parse({
         documentIds: [ids.theory],

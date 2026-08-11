@@ -78,6 +78,41 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   contract chỉ compose một lần, admin gửi preference thay vì resolved prompt,
   preview/generate khóa request fingerprint và learner profile/GT–KL/diagram
   grade phủ lớp 3–12. Đây là task AI kế tiếp trước `M9.4`.
+- Corrective schema compaction của `M9.16` đã có local gate và rollback flag
+  `AI_SUMMARY_SCHEMA_REFS_ENABLED` mặc định `false`. Đường `inline` vẫn dùng nguyên
+  helper OpenAI SDK; đường `ref` chỉ tuần tự hóa các sub-schema lặp thành
+  `$defs/$ref`, giữ cùng Zod parser/transport/acceptance/mapper/recovery. Contract
+  Summary giảm từ khoảng 329.547 xuống 33.295 ký tự (23 definitions, 213 refs),
+  schema sau dereference deep-equal inline và focused 228 test pass. Ba cặp live
+  A/B Bài 15 ngày 2026-08-11 bằng cùng `gpt-5.4-2026-03-05`/medium đã pass
+  contract cho cả 6/6 output: 0 review issue, 0 hình bắt buộc bị thiếu và 38/38
+  diagram đều có đúng hai tam giác; riêng ví dụ nguồn đều giữ đủ hai tam giác
+  `ABC`/`ADC`, cạnh chung `AC`, góc vuông B/D và dấu `AB = AD`. Ref ổn định ở
+  14.757 input token/lượt, inline ở 93.552 token/lượt, giảm 84,2%; latency trung
+  bình gần ngang nhau (64,1 giây so với 64,2 giây). Hai cặp bổ sung đều cho cùng
+  đúng hai trường hợp kiến thức từ nguồn ở cả ref/inline; cặp đầu ref từng thêm
+  trường hợp “cạnh huyền và một góc nhọn” trong khi inline chỉ có hai trường hợp.
+  Vì vậy technical/structural/diagram equivalence đã có bằng chứng lặp lại, nhưng
+  không khẳng định text hay pedagogical content luôn giống hệt do model
+  nondeterministic. Tổng 6 request dùng 41.069 output token; chi phí ước tính theo
+  rate catalog gồm cached input và FX 25.000 khoảng 23.670 VNĐ, trong đó bốn call
+  bổ sung khoảng 11.975 VNĐ. Artifact cặp đầu ở
+  `tmp/m9-2-schema-ref-live-comparison/`, hai cặp sau ở `run-2/` và `run-3/`.
+  Local `.env` đang bật flag; restart API/worker để process đang chạy nạp giá trị
+  mới, và tắt flag để rollback khi cần.
+- Micro live A/B cùng ngày đã chạy thêm ba nguồn ngắn độc lập trên
+  `gpt-5.4-2026-03-05`/medium: giao hoán phép cộng lớp 3, bình phương của một tổng
+  lớp 8 và tổng ba góc tam giác lớp 7. Cả 6/6 output ref/inline đều pass schema,
+  0 issue, đúng 1 theory unit + 4 persisted block, không thêm các chủ đề ngoài
+  nguồn đã đặt sentinel; mọi phép tính/ví dụ sinh ra đều đúng khi review thủ
+  công. Case Hình học cho 4/4 diagram ở mỗi strategy, mỗi diagram có đúng một
+  tam giác. Ref dùng tổng 43.209 input token so với inline 279.594 (giảm 84,5%),
+  latency trung bình 24,7 giây so với 27,5 giây; tổng chi phí 6 call khoảng 7.979
+  VNĐ theo cached-input rate/FX catalog. Phát hiện chung không liên quan `$ref`:
+  cả ref và inline đều vẽ đúng khung tam giác nhưng không ghi số đo góc 50°/60°
+  lên hình (`markers=[]`, `labels=[]`), nên current review gate chưa bắt được thiếu
+  annotation dữ kiện. Artifact ở
+  `tmp/m9-2-schema-ref-small-live-comparison/`.
 - `M9.13-M9.15` đã Done ngày 2026-08-11 cho admin chỉnh trực tiếp hình JSON trong
   draft: tên điểm edit-only; label/góc/caption edit-delete; marker xóa theo group;
   chọn từ hai segment có tên ở hai đầu để thêm `EQUAL_LENGTH`; reset riêng một

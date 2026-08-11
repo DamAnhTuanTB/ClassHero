@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { createHash, randomUUID } from "node:crypto";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import {
   AiGenerationStatus,
@@ -26,6 +27,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { AppModule } from "#api/app.module";
 import { ApiResponseInterceptor } from "#api/common/api/api-response.interceptor";
+import type { EnvConfig } from "#api/config/env.validation";
 import { HttpExceptionFilter } from "#api/common/errors/http-exception.filter";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { createValidationException } from "#api/common/validation/validation-error";
@@ -146,6 +148,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
   let adminToken: string;
   let studentToken: string;
   let httpServer: Parameters<typeof request>[0];
+  let initialSchemaRefsEnabled: boolean;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -169,6 +172,12 @@ describe("M9.2 lesson summary API and worker integration", () => {
 
     httpServer = app.getHttpServer();
     prisma = app.get(PrismaService);
+    const configService = app.get(ConfigService<EnvConfig, true>);
+    initialSchemaRefsEnabled = configService.get(
+      "AI_SUMMARY_SCHEMA_REFS_ENABLED",
+      { infer: true },
+    );
+    configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", false);
     await createFixtureData(prisma);
 
     const authTokens = app.get(AuthTokenService, { strict: false });
@@ -183,6 +192,9 @@ describe("M9.2 lesson summary API and worker integration", () => {
   });
 
   afterAll(async () => {
+    app
+      .get(ConfigService<EnvConfig, true>)
+      .set("AI_SUMMARY_SCHEMA_REFS_ENABLED", initialSchemaRefsEnabled);
     await cleanupFixtureData(prisma);
     await app.close();
   });
@@ -497,6 +509,37 @@ describe("M9.2 lesson summary API and worker integration", () => {
     });
   });
 
+  it("uses reusable schema references only when the rollback flag is enabled", async () => {
+    const configService = app.get(ConfigService<EnvConfig, true>);
+    const previousValue = configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
+      infer: true,
+    });
+    configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", true);
+
+    try {
+      const response = await request(httpServer)
+        .post(`/api/v1/admin/lessons/${ids.lesson}/summary/prompt-preview`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          documentIds: [ids.document],
+          style: "academic",
+          model: reasoningModelKey,
+          maxOutputTokens: 8_000,
+        })
+        .expect(200);
+
+      expect(response.body.data.openAiRequest.text.format.schema).toMatchObject({
+        $defs: expect.any(Object),
+      });
+      expect(
+        JSON.stringify(response.body.data.openAiRequest.text.format),
+      ).toContain('"$ref"');
+      expect(response.body.data.context.schemaTokens).toBeLessThan(30_000);
+    } finally {
+      configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", previousValue);
+    }
+  });
+
   it("queues once for concurrent clicks, generates from chunks, and allows a later regeneration", async () => {
     const first = await request(httpServer)
       .post(`/api/v1/admin/lessons/${ids.lesson}/summary/generate-ai`)
@@ -531,6 +574,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
     const generation = durable.aiGenerations[0];
     expect(generation?.type).toBe(AiGenerationType.SUMMARY);
     expect(durable.inputMeta).not.toHaveProperty("chunks");
+    expect(durable.inputMeta).toHaveProperty("schemaReferenceStrategy", "inline");
 
     const rejectedOutput = structuredClone(generatedOutput);
     rejectedOutput.theorySections[0]!.units[0]!.theory.content +=
@@ -624,13 +668,25 @@ describe("M9.2 lesson summary API and worker integration", () => {
       }),
     ]);
 
-    const regenerated = await request(httpServer)
-      .post(`/api/v1/admin/lessons/${ids.lesson}/summary/generate-ai`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ documentIds: [ids.document], style: "student_friendly" })
-      .expect(202);
+    const configService = app.get(ConfigService<EnvConfig, true>);
+    configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", true);
+    const regenerated = await (async () => {
+      try {
+        return await request(httpServer)
+          .post(`/api/v1/admin/lessons/${ids.lesson}/summary/generate-ai`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ documentIds: [ids.document], style: "student_friendly" })
+          .expect(202);
+      } finally {
+        configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", false);
+      }
+    })();
     expect(regenerated.body.data.jobId).not.toBe(first.body.data.jobId);
     expect(queueMock.enqueue).toHaveBeenCalledTimes(2);
+    const regeneratedJob = await prisma.backgroundJob.findUniqueOrThrow({
+      where: { id: regenerated.body.data.jobId },
+    });
+    expect(regeneratedJob.inputMeta).toHaveProperty("schemaReferenceStrategy", "ref");
   });
 });
 

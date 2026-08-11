@@ -76,6 +76,10 @@ const envSchema = z
       .min(60_000)
       .max(1_800_000)
       .default(600_000),
+    AI_SUMMARY_SCHEMA_REFS_ENABLED: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .default(false),
     AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
     AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),

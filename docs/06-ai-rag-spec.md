@@ -511,6 +511,16 @@ với structured output bắt buộc có cả `text.format` gồm `type`, `name`
 và JSON Schema thực tế được tạo từ cùng Zod schema. Không được gọi một object
 thiếu provider field là “input đầy đủ”.
 
+Riêng Summary có thể bật serializer tham chiếu bằng
+`AI_SUMMARY_SCHEMA_REFS_ENABLED=true`. Serializer này chỉ thay các sub-schema
+lặp bằng `$defs/$ref`; system prompt, user prompt, context, provider transport
+schema, acceptance schema, mapper, recovery và persisted output phải giữ nguyên.
+Cờ mặc định `false` để request tiếp tục byte-equivalent với helper inline của
+OpenAI SDK. Trước khi bật live phải đạt gate local: schema sau khi dereference
+tương đương schema inline, parser Zod đọc được cached output cũ và kích thước
+schema giảm theo ngưỡng test. Tắt cờ phải rollback ngay về inline mà không cần
+sửa prompt hay chạy migration dữ liệu.
+
 `targetWordCount` là số từ mục tiêu gần đúng của tổng text sư phạm học sinh nhìn
 thấy, không tính JSON key, schema metadata hoặc primitive/coordinate của diagram;
 dùng cùng `length` để mô tả rõ mức độ dài mong muốn. Field này không bắt buộc,

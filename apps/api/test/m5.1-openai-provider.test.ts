@@ -308,6 +308,41 @@ describe("OpenAiProvider", () => {
       expect(mockResponsesParse.mock.calls[0]?.[0]).not.toHaveProperty("temperature");
     });
 
+    it("passes reusable schema references to the Responses API when requested", async () => {
+      const sharedSchema = z.object({ label: z.string() });
+      const repeatedSchema = z.object({
+        first: sharedSchema,
+        second: sharedSchema,
+      });
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-schema-refs-1",
+        model: "gpt-5.4",
+        output_parsed: {
+          first: { label: "A" },
+          second: { label: "B" },
+        },
+        usage: null,
+      });
+
+      await provider.generateStructured(
+        {
+          systemPrompt: "Return structured output.",
+          userPrompt: "Return two labels.",
+          outputName: "schema_refs_smoke",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+          schemaReferenceStrategy: "ref",
+        },
+        repeatedSchema,
+      );
+
+      const request = mockResponsesParse.mock.calls[0]?.[0] as {
+        text: { format: { schema: Record<string, unknown> } };
+      };
+      expect(request.text.format.schema).toHaveProperty("$defs");
+      expect(JSON.stringify(request.text.format.schema)).toContain('"$ref"');
+    });
+
     it("rejects parsed data that fails local Zod validation", async () => {
       mockResponsesParse.mockResolvedValueOnce({
         id: "resp-invalid",

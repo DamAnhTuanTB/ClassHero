@@ -1,12 +1,56 @@
 import { zodTextFormat } from "openai/helpers/zod";
+import {
+  makeParseableTextFormat,
+  type AutoParseableTextFormat,
+} from "openai/lib/parser";
+import { toStrictJsonSchema } from "openai/lib/transform";
+import { z } from "zod";
 
-import type { AiOutputSchema } from "#api/modules/ai/types/ai-text.types";
+import type {
+  AiOutputSchema,
+  AiStructuredSchemaReferenceStrategy,
+} from "#api/modules/ai/types/ai-text.types";
 
 export function buildAiStructuredTextFormat<TOutput>(
   schema: AiOutputSchema<TOutput>,
   outputName: string,
-) {
-  return zodTextFormat(schema, outputName);
+  referenceStrategy: AiStructuredSchemaReferenceStrategy = "inline",
+): AutoParseableTextFormat<TOutput> {
+  if (referenceStrategy === "inline") {
+    return zodTextFormat(schema, outputName);
+  }
+
+  const jsonSchema = toStrictJsonSchema(
+    z.toJSONSchema(schema, {
+      reused: "ref",
+      override: ({ zodSchema, jsonSchema: generatedSchema }) => {
+        const definition = zodSchema._zod.def;
+        if (
+          definition.type === "union" &&
+          "discriminator" in definition &&
+          Array.isArray(generatedSchema.oneOf)
+        ) {
+          if (generatedSchema.anyOf !== undefined) {
+            throw new Error(
+              "Zod discriminated union generated both anyOf and oneOf.",
+            );
+          }
+          generatedSchema.anyOf = generatedSchema.oneOf;
+          delete generatedSchema.oneOf;
+        }
+      },
+    }) as Parameters<typeof toStrictJsonSchema>[0],
+  );
+
+  return makeParseableTextFormat<TOutput>(
+    {
+      type: "json_schema",
+      name: outputName,
+      strict: true,
+      schema: jsonSchema as unknown as Record<string, unknown>,
+    },
+    (content) => schema.parse(JSON.parse(content)),
+  );
 }
 
 export function estimateAiStructuredInputTokens(input: {

@@ -575,6 +575,7 @@ export const lessonSummaryJobInputSchema = z
     model: z.string().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),
     reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),
+    schemaReferenceStrategy: z.enum(["inline", "ref"]).default("inline"),
     maxOutputTokens: z
       .number()
       .int()

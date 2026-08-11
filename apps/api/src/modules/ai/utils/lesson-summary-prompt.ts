@@ -122,7 +122,8 @@ export function buildLessonSummaryStructuredInput(input: {
   documentIds: string[];
   sourceHash: string;
   chunks: NonNullable<AiStructuredInput["contextChunks"]>;
-  configuration: Parameters<typeof buildLessonSummaryUserPrompt>[0]["configuration"];
+  configuration: Parameters<typeof buildLessonSummaryUserPrompt>[0]["configuration"] &
+    Partial<Pick<LessonSummaryJobInput, "schemaReferenceStrategy">>;
   systemInstructions?: string;
   userPrompt?: string;
 }): AiStructuredInput {
@@ -150,6 +151,7 @@ export function buildLessonSummaryStructuredInput(input: {
     outputName: "lesson_summary_provider_contract",
     promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
     schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
+    schemaReferenceStrategy: input.configuration.schemaReferenceStrategy ?? "inline",
   };
 }
 

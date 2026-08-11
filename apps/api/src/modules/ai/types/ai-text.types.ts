@@ -51,10 +51,17 @@ export interface AiTextOutput extends AiProviderOutputMetadata {
   text: string;
 }
 
+export type AiStructuredSchemaReferenceStrategy = "inline" | "ref";
+
 export interface AiStructuredInput extends AiTextInput {
   outputName: string;
   promptVersion: string;
   schemaVersion: string;
+  /**
+   * Controls JSON Schema serialization only. `inline` preserves the OpenAI SDK
+   * helper byte-for-byte; `ref` reuses repeated sub-schemas through `$defs/$ref`.
+   */
+  schemaReferenceStrategy?: AiStructuredSchemaReferenceStrategy;
 }
 
 export type AiOutputSchema<TOutput> = ZodType<TOutput>;

@@ -389,11 +389,17 @@ gọi OpenAI/Gemini/Mathpix trong test mặc định.
 
 ## 8. Tiêu chí Done
 
-- [ ] Schema compaction được triển khai độc lập, có feature flag rollback; không
+- [x] Schema compaction được triển khai độc lập, có feature flag rollback; không
       đổi transport/acceptance/persisted output contract.
-- [ ] Compact schema sau expand deep-equal inline schema; cached regression cho
-      cùng parse/recovery/mapper/compiler result và preview/worker cùng schema hash.
-- [ ] Token schema giảm theo budget đã đo mà không dùng live provider làm vòng
+- [ ] Compact schema sau expand deep-equal inline schema và cached output parse
+      bằng cùng Zod contract; ba cặp live A/B đã pass technical/structural/visual
+      gate (6/6 output, 38/38 hình có đủ hai tam giác), nhưng còn cần full-source
+      pedagogical review trước khi rollout rộng vì một trong ba lượt ref từng
+      thêm một unit ngoài hai trường hợp được sample source mô tả rõ. Ba cặp
+      micro-source bổ sung cũng pass 6/6 và tương đương về theory scope/block/
+      diagram topology; cả hai strategy cùng để thiếu annotation số đo góc trong
+      case tam giác, đây là gap review/diagram contract chung chứ không phải ref.
+- [x] Token schema giảm theo budget đã đo mà không dùng live provider làm vòng
       debug; live canary chỉ chạy khi owner duyệt riêng.
 - [ ] Prompt mặc định có đúng một hard contract; prompt custom khác rỗng được dùng
       nguyên vẹn và không bị bọc thêm.

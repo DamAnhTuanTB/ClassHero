@@ -175,7 +175,11 @@ export class OpenAiProvider implements AiProvider {
         instructions: input.systemPrompt,
         input: buildAiUserPrompt(input),
         text: {
-          format: buildAiStructuredTextFormat(schema, input.outputName),
+          format: buildAiStructuredTextFormat(
+            schema,
+            input.outputName,
+            input.schemaReferenceStrategy,
+          ),
         },
         ...(input.temperature === undefined || !this.supportsTemperature(modelToUse)
           ? {}
@@ -189,6 +193,10 @@ export class OpenAiProvider implements AiProvider {
     );
 
     if (response.output_parsed === null) {
+      const responseDiagnostics = response as typeof response & {
+        finish_reason?: unknown;
+        refusal?: unknown;
+      };
       this.logger.error(
         `OpenAI Structured Generation Failed: ${JSON.stringify(
           {
@@ -196,8 +204,8 @@ export class OpenAiProvider implements AiProvider {
             model: response.model,
             usage: response.usage,
             id: response.id,
-            finish_reason: (response as any).finish_reason,
-            refusal: (response as any).refusal,
+            finish_reason: responseDiagnostics.finish_reason,
+            refusal: responseDiagnostics.refusal,
           },
           null,
           2,
