@@ -64,17 +64,22 @@ export function isLessonSummaryExampleBlockData(
 }
 
 export function LessonSummaryExampleContent({
+  answerLabel = "Đáp án",
   block,
   diagramEditor,
   showEditorialWarning = false,
   showProblem = true,
 }: {
+  answerLabel?: string;
   block: LessonSummaryExampleBlockData;
   diagramEditor?: LessonSummaryDiagramEditor;
   showEditorialWarning?: boolean;
   showProblem?: boolean;
 }) {
   const geometryStatement = readGeometryStatement(block);
+  const normalizedAnswer = block.answer ? normalizeBlockMath(block.answer, block) : "";
+  const shouldStackAnswerLabel =
+    answerLabel === "Kết luận" && hasMultipleAnswerSubparts(normalizedAnswer);
   return (
     <div className="space-y-3">
       {showProblem ? (
@@ -99,21 +104,28 @@ export function LessonSummaryExampleContent({
         <div className="mb-3 space-y-3 border-l-[3px] border-blue-500/30 pl-4 text-sm dark:border-blue-400/30">
           {block.solution ? (
             <div>
-              {geometryStatement ? (
-                <div className="mb-1.5 font-bold text-slate-900 dark:text-slate-100">
-                  Chứng minh
-                </div>
-              ) : null}
+              <div className="mb-1.5 font-bold text-slate-900 dark:text-slate-100">
+                Lời giải
+              </div>
               <MathpixMarkdownRenderer
-                content={normalizeBlockMath(block.solution, block)}
+                content={normalizeSolutionForDisplay(block.solution, block)}
               />
             </div>
           ) : null}
           {block.answer ? (
             <div className="mt-2">
-              <MathpixMarkdownRenderer
-                content={`${geometryStatement ? "Vậy " : "Đáp án: "}${normalizeBlockMath(block.answer, block)}`}
-              />
+              {shouldStackAnswerLabel ? (
+                <>
+                  <div className="mb-1.5 font-bold text-slate-900 dark:text-slate-100">
+                    {answerLabel}:
+                  </div>
+                  <MathpixMarkdownRenderer content={normalizedAnswer} />
+                </>
+              ) : (
+                <MathpixMarkdownRenderer
+                  content={`${answerLabel}: ${normalizedAnswer}`}
+                />
+              )}
             </div>
           ) : null}
         </div>
@@ -127,6 +139,7 @@ export function LessonSummaryExampleContent({
  * must render this component instead of recreating a similar-looking card.
  */
 export function LessonSummaryExampleCard({
+  answerLabel,
   block,
   diagramEditor,
   displayNumber,
@@ -134,6 +147,7 @@ export function LessonSummaryExampleCard({
   showEditorialWarning = false,
   showProblem = true,
 }: {
+  answerLabel?: string;
   block: LessonSummaryExampleBlockData;
   diagramEditor?: LessonSummaryDiagramEditor;
   displayNumber?: number | string | null;
@@ -149,6 +163,7 @@ export function LessonSummaryExampleCard({
       </div>
       <div className="space-y-2 text-[15px] leading-relaxed text-slate-800 opacity-90 dark:text-slate-200">
         <LessonSummaryExampleContent
+          answerLabel={answerLabel}
           block={block}
           diagramEditor={diagramEditor}
           showEditorialWarning={showEditorialWarning}
@@ -161,6 +176,31 @@ export function LessonSummaryExampleCard({
 
 function normalizeBlockMath(value: string, block: LessonSummaryExampleBlockData) {
   return normalizeLessonSummaryAngleNotation(value, block.visual?.spec);
+}
+
+function hasMultipleAnswerSubparts(value: string) {
+  const subparts = new Set(
+    [...value.matchAll(/(?:^|\n)\s*([a-h])\)\s+/giu)].map((match) =>
+      match[1]!.toLocaleLowerCase("vi"),
+    ),
+  );
+  return subparts.size >= 2;
+}
+
+function normalizeSolutionForDisplay(
+  value: string,
+  block: LessonSummaryExampleBlockData,
+) {
+  return normalizeBlockMath(value, block)
+    .split("\n")
+    .filter(
+      (line) =>
+        !/^\s*(?:#{1,6}\s*)?(?:\*\*|__)?(?:Lời giải|Chứng minh)\s*:?(?:\*\*|__)?\s*$/iu.test(
+          line,
+        ),
+    )
+    .join("\n")
+    .trim();
 }
 
 function readGeometryStatement(block: LessonSummaryExampleBlockData) {

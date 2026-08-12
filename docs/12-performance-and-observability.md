@@ -176,6 +176,14 @@ trước khi đưa vào renderer production.
 Các family compiler được phát triển đồng thời trong một delivery wave nhưng chỉ
 rollout production một lần sau global release gate; việc gom phạm vi triển khai
 không được làm tăng số provider call hoặc đưa full coverage suite vào request path.
+Mọi bước normalize/materialize làm hai dạng input cùng trở thành một output phải
+giữ provenance có cấu trúc thay vì chỉ lưu payload cuối. Riêng hình lesson summary,
+renderer-ready `DIAGRAM_SPEC` phải mang `diagramSpecOrigin = PROVIDER_RAW_SPEC |
+COMPILED_INTENT | LEGACY_UNKNOWN`; tuyến compiler giữ thêm compiler key/version.
+Dashboard và báo cáo live phải tách số lượng, tỷ lệ schema pass, semantic pass,
+manual visual pass, `reviewIssues` và lỗi renderer theo origin/model/compiler.
+Không suy ngược origin từ ID điểm hoặc primitive vì compiler có thể thay đổi cách
+đặt tên và raw spec của provider có thể trùng cùng hình dạng.
 Live matrix M9.2 có hard cap kế hoạch 320.000 VNĐ: 65 request chính và tối đa 15
 retry có điều kiện trên `gpt-5.4`; 21 request là full lesson phân đều ba mức khó
 cho từng lớp 3-9. Mỗi output phải cache trước visual review để
@@ -230,6 +238,11 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   repair lần hai.
 - Có fallback/error state thân thiện khi provider chậm/lỗi.
 - Ghi log usage/duration khi module AI log đã có.
+- Structured response incomplete/refusal phải log mã lỗi ổn định, `status`,
+  `incomplete_details.reason`, request ID, model, latency và usage; chỉ log độ dài
+  partial output, không log raw prompt/chunk/output. Response đã có usage phải được
+  tính chi phí dù generation không persist được; response đã về nhưng thiếu usage
+  giữ reservation `UNCERTAIN` thay vì giải phóng như một lỗi trước-provider.
 - Với Summary, log thêm `promptVersion`, `schemaVersion`, schema strategy,
   `cachedInputTokens`, `uncachedInputTokens` và cache-hit ratio; không log raw
   instructions, input, chunk hoặc cache key chứa dữ liệu người dùng.
@@ -248,7 +261,8 @@ Khi hạ tầng logging/monitoring được triển khai, cần có:
 - Error rate theo endpoint/job/provider.
 - Slow query hoặc query duration cho flow nhạy cảm.
 - Job duration, retry count, failed reason.
-- AI provider latency, token/usage nếu có.
+- AI provider latency, request ID, response status, incomplete/refusal reason và
+  token/usage kể cả khi structured output không dùng được.
 - Payment webhook verify/idempotency logs.
 - Basic health check cho API/worker/Redis.
 

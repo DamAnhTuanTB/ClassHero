@@ -1602,6 +1602,7 @@ function ExampleBlock({
 }) {
   return (
     <LessonSummaryExampleCard
+      answerLabel="Kết luận"
       block={block}
       diagramEditor={diagramEditor}
       displayNumber={block.displayNumber}

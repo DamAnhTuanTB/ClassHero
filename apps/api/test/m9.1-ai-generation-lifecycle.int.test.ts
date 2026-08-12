@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
 import { AiGenerationLifecycleService } from "#api/modules/ai/services/ai-generation-lifecycle.service";
+import { AiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 
 describe("M9.1 AI generation PostgreSQL lifecycle", () => {
   let prisma: PrismaService;
@@ -131,5 +132,79 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
       outputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       outputJson: { status: "ok" },
     });
+  });
+
+  it("keeps provider metadata when a completed call has unusable output", async () => {
+    const job = await prisma.backgroundJob.create({
+      data: {
+        queue: BackgroundJobQueue.AI_GENERATION,
+        status: BackgroundJobStatus.QUEUED,
+        maxAttempts: 1,
+      },
+      select: { id: true },
+    });
+    const generation = await prisma.aiGeneration.create({
+      data: {
+        type: AiGenerationType.SUMMARY,
+        status: AiGenerationStatus.QUEUED,
+        backgroundJobId: job.id,
+      },
+      select: { id: true },
+    });
+
+    try {
+      const context = {
+        backgroundJobId: job.id,
+        aiGenerationId: generation.id,
+        type: AiGenerationType.SUMMARY,
+        ownerUserId: null,
+        lessonId: null,
+        targetType: null,
+        targetId: null,
+        inputMeta: null,
+        attempt: 1,
+        maxAttempts: 1,
+      };
+      await lifecycle.markRunning(context, "bullmq-incomplete");
+      await lifecycle.markFailed(
+        context,
+        new AiProviderOutputError(
+          "OPENAI_INCOMPLETE_MAX_OUTPUT_TOKENS",
+          "OpenAI đã dừng vì chạm giới hạn token đầu ra.",
+          {
+            provider: AiProviderName.OPENAI,
+            model: "gpt-5.1-2025-11-13",
+            providerRequestId: "resp-incomplete",
+            responseStatus: "incomplete",
+            incompleteReason: "max_output_tokens",
+            hasRefusal: false,
+            latencyMs: 2_000,
+            usage: {
+              promptTokens: 100,
+              completionTokens: 16_000,
+              totalTokens: 16_100,
+            },
+          },
+        ),
+        true,
+      );
+
+      const failed = await prisma.aiGeneration.findUniqueOrThrow({
+        where: { id: generation.id },
+      });
+      expect(failed).toMatchObject({
+        status: AiGenerationStatus.FAILED,
+        provider: AiProviderName.OPENAI,
+        model: "gpt-5.1-2025-11-13",
+        providerRequestId: "resp-incomplete",
+        promptTokens: 100,
+        completionTokens: 16_000,
+        totalTokens: 16_100,
+        latencyMs: 2_000,
+      });
+    } finally {
+      await prisma.aiGeneration.deleteMany({ where: { id: generation.id } });
+      await prisma.backgroundJob.deleteMany({ where: { id: job.id } });
+    }
   });
 });

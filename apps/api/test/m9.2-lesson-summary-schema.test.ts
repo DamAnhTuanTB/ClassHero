@@ -417,6 +417,56 @@ describe("M9.2 lesson summary provider contract", () => {
     });
   });
 
+  it("accepts notes without examples and self-contained note examples", () => {
+    const contents = [
+      "Không được chia cho $0$.",
+      "Khi rút gọn phân số, cần kiểm tra mẫu khác $0$. Ví dụ: $2/4=1/2$.",
+    ];
+
+    contents.forEach((content) => {
+      const output = createProviderOutput();
+      output.theorySections[0]!.units[0]!.notes[0]!.content = content;
+
+      const summary = parseAndMapProviderOutput(output);
+      const note = summary.sections[0]?.blocks.find((block) => block.type === "note");
+
+      expect(note).toMatchObject({ type: "note", content });
+      expect(note).not.toHaveProperty("reviewIssues");
+    });
+  });
+
+  it.each([
+    "Ví dụ: trong Hình 4.47, hai tam giác vuông biểu diễn hai con dốc.",
+    "Quan sát hình bên để nhận biết hai cạnh bằng nhau.",
+    "![Hình minh họa](https://example.com/source-figure.png)",
+    "Xem thêm tại https://example.com/source-figure.",
+  ])(
+    "keeps a note that references an unavailable visual and marks only that block for review: %s",
+    (content) => {
+      const output = createProviderOutput();
+      output.theorySections[0]!.units[0]!.notes[0]!.content = content;
+
+      const summary = parseAndMapProviderOutput(output);
+      const blocks = summary.sections[0]?.blocks ?? [];
+      const note = blocks.find((block) => block.type === "note");
+
+      expect(blocks.map((block) => block.type)).toEqual(["knowledge", "example", "note"]);
+      expect(note).toMatchObject({
+        type: "note",
+        content,
+        reviewIssues: [
+          {
+            code: "NOTE_REFERENCES_UNAVAILABLE_VISUAL",
+            path: "theorySections.0.units.0.notes.0.content",
+            resolution: "ACCEPT_OR_FIX",
+            accepted: false,
+          },
+        ],
+      });
+      expect(summary).not.toHaveProperty("warningDetails");
+    },
+  );
+
   it("accepts editable semantic issues without exposing technical warning metadata", () => {
     const output = createProviderOutput();
     output.theorySections[0]!.units[0]!.theory.content += "\nVí dụ: 2/3 là số hữu tỉ.";
@@ -443,14 +493,14 @@ describe("M9.2 lesson summary provider contract", () => {
       ),
     ).not.toThrow();
 
-    const missingNoteExample = createProviderOutput();
-    missingNoteExample.theorySections[0]!.units[0]!.notes[0]!.content =
+    const noteWithoutExample = createProviderOutput();
+    noteWithoutExample.theorySections[0]!.units[0]!.notes[0]!.content =
       "Mẫu số phải khác 0.";
     expect(() =>
       lessonSummaryOutputSchema.parse(
         mapLessonSummaryProviderOutput({
           lessonId: "lesson-1",
-          output: lessonSummaryProviderOutputSchema.parse(missingNoteExample),
+          output: lessonSummaryProviderOutputSchema.parse(noteWithoutExample),
           contextChunks,
         }),
       ),
@@ -865,27 +915,27 @@ describe("M9.2 lesson summary provider contract", () => {
     );
 
     expect(JSON.stringify(inlineFormat)).toBe(JSON.stringify(sdkInlineFormat));
-    expect(JSON.stringify(referenceFormat)).toHaveLength(33_320);
+    expect(JSON.stringify(referenceFormat)).toHaveLength(34_057);
     expect(referenceFormat.schema).toHaveProperty("$defs");
     expect(JSON.stringify(referenceFormat)).toContain('"$ref"');
     expect(JSON.stringify(referenceFormat).length).toBeLessThan(
       JSON.stringify(inlineFormat).length / 5,
     );
-    expect(
-      normalizeExpandedJsonSchema(referenceFormat.schema),
-    ).toEqual(normalizeExpandedJsonSchema(inlineFormat.schema));
+    expect(normalizeExpandedJsonSchema(referenceFormat.schema)).toEqual(
+      normalizeExpandedJsonSchema(inlineFormat.schema),
+    );
     expect(referenceV2Format.schema).toHaveProperty("$defs");
     expect(JSON.stringify(referenceV2Format)).toContain('"$ref"');
-    expect(JSON.stringify(referenceV2Format).length).toBeLessThanOrEqual(30_600);
+    expect(JSON.stringify(referenceV2Format).length).toBeLessThanOrEqual(31_000);
     expect(JSON.stringify(referenceV2Format).length).toBeLessThan(
       JSON.stringify(referenceFormat).length,
     );
     expect(JSON.stringify(referenceV2FormatAgain)).toBe(
       JSON.stringify(referenceV2Format),
     );
-    expect(
-      normalizeExpandedJsonSchema(referenceV2Format.schema),
-    ).toEqual(normalizeExpandedJsonSchema(inlineFormat.schema));
+    expect(normalizeExpandedJsonSchema(referenceV2Format.schema)).toEqual(
+      normalizeExpandedJsonSchema(inlineFormat.schema),
+    );
 
     const providerOutput = createProviderOutput();
     expect(referenceFormat.$parseRaw(JSON.stringify(providerOutput))).toEqual(
@@ -906,6 +956,13 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(serializedFormat).toContain('"geometryStatement"');
     expect(serializedFormat).toMatch(
       /"required":\[[^\]]*"geometryStatement"[^\]]*"diagramSpec"/su,
+    );
+    expect(serializedFormat).toContain("GT–KL chỉ nằm trong geometryStatement");
+    expect(serializedFormat).toContain(
+      "Nơi duy nhất chứa bảng GT–KL; không chép lại vào solution",
+    );
+    expect(serializedFormat).toContain(
+      "không nhắc Hình x.y, hình bên, ảnh, URL hoặc nội dung phụ thuộc hình nguồn",
     );
 
     const omitted = createProviderOutput();
@@ -1190,6 +1247,20 @@ describe("M9.2 lesson summary provider contract", () => {
     );
     expect(request.systemPrompt).toContain("Tâm đồng hồ phải có một chấm nhỏ");
     expect(request.systemPrompt).toContain("Tâm của CIRCLE được gọi tên như O hoặc I");
+    expect(request.systemPrompt).toContain(
+      "Chỉ dùng `{ kind: INTENT, intent: ... }` khi một family/archetype trong schema biểu diễn ĐẦY ĐỦ",
+    );
+    expect(request.systemPrompt).toContain(
+      "Không chọn family/archetype gần nhất nếu phải bỏ bớt",
+    );
+    expect(request.systemPrompt).toContain("nếu không thì phải dùng RAW_SPEC");
+    expect(request.systemPrompt).toContain(
+      "BẮT BUỘC dùng INTENT `ADVANCED_GEOMETRY` + `CIRCLE_RELATIONS` + `CYCLIC_QUADRILATERAL`",
+    );
+    expect(request.systemPrompt).toContain(
+      "Chỉ dùng RAW_SPEC cho tứ giác nội tiếp khi hình còn bắt buộc có đường chéo",
+    );
+    expect(request.systemPrompt).not.toContain("LUÔN ưu tiên envelope");
     expect(request.systemPrompt).toContain("node gốc là hành động/thực nghiệm");
     expect(request.systemPrompt).toContain(
       "không dùng VENN/VENN_UNIVERSE nếu nguồn không mô tả tập hợp",
@@ -1209,6 +1280,21 @@ describe("M9.2 lesson summary provider contract", () => {
     );
     expect(request.systemPrompt).toContain("`geometryStatement` bắt buộc khác null");
     expect(request.systemPrompt).toContain(
+      "`geometryStatement` bắt buộc khác null và là nơi duy nhất chứa bảng GT–KL",
+    );
+    expect(request.systemPrompt).toContain(
+      "Tuyệt đối không chép `Bảng GT–KL`, `GT:` hoặc `KL:` vào solution",
+    );
+    expect(request.systemPrompt).toContain(
+      "không có dòng tiêu đề `Lời giải:`/`Chứng minh:`",
+    );
+    expect(request.systemPrompt).toContain(
+      "Ví dụ trong note là tùy chọn; nếu có phải tự đủ dữ kiện",
+    );
+    expect(request.systemPrompt).toContain(
+      "Nếu ý ghi chú chỉ hiểu được khi xem hình nguồn thì không tạo note đó",
+    );
+    expect(request.systemPrompt).toContain(
       "mọi ý a), b), c) bắt buộc bắt đầu ở dòng riêng",
     );
     expect(request.userPrompt).toContain("NHIỆM VỤ SINH KIẾN THỨC");
@@ -1222,7 +1308,10 @@ describe("M9.2 lesson summary provider contract", () => {
       "Với bài Số học/Đại số, trình bày trực tiếp từng phép tính và bước biến đổi",
     );
     expect(request.userPrompt).toContain(
-      "trình bày mạch suy luận liên kết theo chuẩn SGK lớp 7",
+      "điền bảng GT–KL duy nhất vào geometryStatement",
+    );
+    expect(request.userPrompt).toContain(
+      "solution chỉ trình bày mạch suy luận liên kết theo chuẩn SGK lớp 7, không chép lại GT–KL",
     );
     expect(request.userPrompt).not.toContain("- Phong cách:");
     expect(request.userPrompt).not.toContain("như cũ");
@@ -1310,9 +1399,7 @@ describe("M9.2 lesson summary provider contract", () => {
     expect(
       generationRequest.systemPrompt.match(/### I\. VAI TRÒ VÀ NGUYÊN TẮC CƠ BẢN/g),
     ).toBeNull();
-    expect(
-      generationRequest.userPrompt.match(/### NHIỆM VỤ SINH KIẾN THỨC/g),
-    ).toBeNull();
+    expect(generationRequest.userPrompt.match(/### NHIỆM VỤ SINH KIẾN THỨC/g)).toBeNull();
   });
 
   it("changes only the structured schema when switching summary reference strategies", () => {
@@ -1329,9 +1416,7 @@ describe("M9.2 lesson summary provider contract", () => {
         },
       },
     ];
-    const buildRequest = (
-      schemaReferenceStrategy: "inline" | "ref" | "ref_v2",
-    ) =>
+    const buildRequest = (schemaReferenceStrategy: "inline" | "ref" | "ref_v2") =>
       buildLessonSummaryStructuredInput({
         lessonId: "lesson-1",
         lessonTitle: "Bài 15",

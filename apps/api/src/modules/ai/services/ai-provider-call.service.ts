@@ -10,6 +10,7 @@ import type {
   AiStructuredInput,
   AiStructuredOutput,
 } from "#api/modules/ai/types/ai-text.types";
+import { isAiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
@@ -124,7 +125,19 @@ export class AiProviderCallService {
         }
         return output;
       } catch (error) {
-        await this.usage.fail(usageEvent.id, error);
+        const recorded = await this.usage.fail(usageEvent.id, error, {
+          rates: candidate.rates,
+        });
+        if (
+          context.aiGenerationId &&
+          isAiProviderOutputError(error) &&
+          recorded.costMeasured
+        ) {
+          await this.prisma.aiGeneration.update({
+            where: { id: context.aiGenerationId },
+            data: { estimatedCostVnd: recorded.costVnd },
+          });
+        }
         lastError = error;
         const hasFallback = index < candidates.length - 1;
         if (!hasFallback || !isTransientProviderError(error)) {

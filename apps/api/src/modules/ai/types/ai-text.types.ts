@@ -36,6 +36,7 @@ export interface AiTokenUsage {
   promptTokens?: number;
   cachedInputTokens?: number;
   completionTokens?: number;
+  reasoningTokens?: number;
   totalTokens?: number;
 }
 

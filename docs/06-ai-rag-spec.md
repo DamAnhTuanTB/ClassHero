@@ -79,7 +79,9 @@ interface AiStructuredOutput<TOutput> {
   model: string;
   usage?: {
     promptTokens?: number;
+    cachedInputTokens?: number;
     completionTokens?: number;
+    reasoningTokens?: number;
     totalTokens?: number;
   };
   providerRequestId?: string;
@@ -161,6 +163,13 @@ Mục đích:
 - Budget mặc định cảnh báo mềm ở 70/90/100%; hard stop chỉ có hiệu lực khi admin chủ động bật.
 - Từ `M9.12`, hard stop dùng reservation nguyên tử trước paid call. Gateway khóa và kiểm tra đồng thời ngân sách `ALL` + `AI/OCR`, giữ worst-case cost rồi mới gọi provider; thiếu dữ liệu để ước lượng thì fail-closed.
 - Budget error và estimate-unavailable là lỗi nghiệp vụ không fallback, không retry. Timeout có khả năng đã bill giữ reservation ở trạng thái `UNCERTAIN` cho tới khi reconciliation xác nhận.
+- Response structured đã về nhưng `status=incomplete`, có refusal hoặc không có
+  `output_parsed` vẫn là một provider attempt có thể đã phát sinh chi phí. Provider
+  phải đọc `status`, `incomplete_details.reason` và refusal trong output item; lưu
+  request ID, model, latency, token usage và mã lỗi ổn định. Khi usage đo được,
+  `provider_usage_events` giữ `FAILED` nhưng ghi đủ token/chi phí và reservation
+  chuyển `SETTLED`; nếu response có thật nhưng thiếu usage thì reservation giữ
+  `UNCERTAIN`. Không log raw prompt, chunks hoặc partial output.
 - Cache hit không phát sinh paid call nên không cần reservation và vẫn ghi nhận chi phí tiết kiệm như hiện tại.
 
 ---
@@ -513,17 +522,18 @@ thiếu provider field là “input đầy đủ”.
 
 Riêng Summary có ba strategy biểu diễn cùng một output contract:
 
-- refs off → `inline`, byte-equivalent với helper OpenAI SDK;
-- refs on và v2 off → `$ref` v1;
-- refs on và v2 on → `ref_v2`, chỉ hoist subtree deep-equal và rút gọn tên
+- `inline`: schema mở rộng hoàn toàn, byte-equivalent với helper OpenAI SDK;
+- `ref`: `$defs/$ref` v1;
+- `ref_v2`: strategy mặc định, chỉ hoist subtree deep-equal và rút gọn tên
   `$defs`/JSON Pointer theo ánh xạ deterministic.
 
-`AI_SUMMARY_SCHEMA_REFS_ENABLED` và `AI_SUMMARY_SCHEMA_REFS_V2_ENABLED` mặc định
-`false`. Mọi strategy giữ nguyên system prompt, user prompt, toàn bộ chunk và
+`AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY` nhận `inline | ref | ref_v2` và mặc định
+`ref_v2`; đổi về `ref` hoặc `inline` là đường rollback một bước. Mọi strategy giữ
+nguyên system prompt, user prompt, toàn bộ chunk và
 metadata, provider transport schema, Zod parser, acceptance schema, recovery,
 mapper, persisted output và renderer. Schema sau dereference phải deep-equal
-inline; job cũ dùng strategy đã snapshot, không tự nâng từ v1 sang v2. Tắt cờ
-rollback ngay mà không cần migration hoặc regenerate Summary.
+inline; job cũ dùng strategy đã snapshot, không tự nâng từ v1 sang v2. Đổi
+strategy không cần migration hoặc regenerate Summary.
 
 Summary có thể bật stable `prompt_cache_key` bằng
 `AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=true`. Key chỉ hash model, version contract,
@@ -609,12 +619,13 @@ Output phải giữ các invariant sau:
   giải, phép tính minh họa hoặc đoạn mở đầu bằng các nhãn như `Ví dụ`, `Chẳng hạn`,
   `Luyện tập`, `Vận dụng`, `Bài tập` vào field lý thuyết; nội dung đó phải được bóc
   thành block `example` riêng.
-- `note` là ngoại lệ có chủ đích: mỗi `note.content` phải trình bày một ghi chú,
-  lưu ý hoặc nhận xét từ nguồn và kèm một ví dụ ngắn ngay trong cùng `content`;
-  không tạo block `example` riêng chỉ để minh họa cho note. Vì renderer đã tự
-  hiển thị nhãn của block, `note.content` không được mở đầu lại bằng `Chú ý`,
-  `Lưu ý` hoặc `Nhận xét`. Mapper phải bỏ tiền tố lặp trước khi persist; renderer
-  áp dụng cùng normalizer cho summary cũ để không cần migration hoặc sinh lại.
+- `note` chỉ dùng khi nguồn thật sự có một ghi chú, lưu ý hoặc nhận xét. Ví dụ
+  trong `note.content` là tùy chọn; nếu có thì phải tự đủ dữ kiện, không tham chiếu
+  `Hình x.y`, hình bên, ảnh, URL hoặc chi tiết chỉ hiểu được khi xem hình nguồn.
+  Không tạo block `example` riêng chỉ để minh họa cho note. Vì renderer đã tự hiển
+  thị nhãn của block, `note.content` không được mở đầu lại bằng `Chú ý`, `Lưu ý`
+  hoặc `Nhận xét`. Mapper bỏ tiền tố lặp trước khi persist; renderer áp dụng cùng
+  normalizer cho summary cũ để không cần migration hoặc sinh lại.
 - Không áp giới hạn số ý kiểu `1–3 ý/block`. Mỗi block giữ đủ các ý thuộc cùng một
   tiểu chủ đề/mục tiêu học tập; khi mục tiêu học tập thay đổi thì tách block. Nếu
   số ví dụ nguồn ít hơn số ý lý thuyết có thể tách, model chỉ gom các ý thực sự
@@ -907,13 +918,26 @@ quan thành `family + archetype + semanticVariant + difficulty`; chỉ
 được liệt kê riêng thay vì âm thầm bỏ qua. Mục tiêu supported coverage là `>=95%`,
 ngưỡng tối thiểu `90%`, stretch goal `98-100%`.
 
-Với các archetype đã hỗ trợ, provider không tự phát minh raw tọa độ làm nguồn sự
-thật chính. Provider trả `diagramIntent` hẹp gồm entity, vai trò, dữ kiện, quan hệ
-và annotation; backend chọn compiler/template versioned để tính tọa độ, miền nhìn,
-tick, điểm dựng và primitive. Semantic validator kiểm quan hệ theo family, sau đó
-label/layout solver đặt text ở vùng trống gần anchor trước khi adapter sinh
-`diagramSpec` v2 cho safe renderer hiện có. Raw `diagramSpec` chỉ là fallback có
-kiểm soát cho family chưa được compiler hỗ trợ và vẫn bắt buộc `NEEDS_REVIEW`.
+Provider là lớp phải quyết định đường output `INTENT` hay `RAW_SPEC` ngay trong
+cùng một response. Với archetype mà capability manifest của compiler biểu diễn
+đủ toàn bộ thực thể, vai trò, dữ kiện, quan hệ và annotation của bài, provider trả
+`diagramIntent`; backend chọn compiler/template versioned để tính tọa độ, miền
+nhìn, tick, điểm dựng và primitive. Nếu intent contract không biểu diễn được dù
+chỉ một điểm, đoạn nối hoặc quan hệ bắt buộc của đề, provider phải chọn raw
+`diagramSpec` thay vì giản lược bài về một archetype gần đúng. Prompt/schema phải
+cung cấp capability manifest versioned đủ rõ để provider thực hiện lựa chọn này.
+Semantic validator kiểm quan hệ theo family, sau đó label/layout solver đặt text
+ở vùng trống gần anchor trước khi adapter sinh `diagramSpec` v2 cho safe renderer.
+Raw `diagramSpec` là fallback có kiểm soát và vẫn bắt buộc `NEEDS_REVIEW`.
+
+Backend là final gate, không phải lớp chọn thay provider sau khi response đã về.
+Backend phải đối chiếu INTENT với compiler capability và các thực thể/quan hệ bắt
+buộc có thể xác định từ đề. Nếu không chứng minh được coverage đầy đủ, backend
+không được compile một template giản lược rồi coi hình là hợp lệ, cũng không được
+tự bịa RAW_SPEC từ intent thiếu dữ kiện. Khi không có raw fallback trong cùng
+response và không gọi provider lần hai, block phải nhận review issue/placeholder
+phù hợp. Muốn đổi sang RAW_SPEC hoàn chỉnh phải để provider chọn đúng ngay từ lần
+gọi đầu hoặc thực hiện một provider call mới theo chính sách retry riêng.
 
 Compiler và validator phải chạy deterministic, không tạo provider call thứ hai.
 Coverage được nghiệm thu bằng unit/property test và golden render trên Chromium
@@ -946,15 +970,24 @@ golden nội bộ sau source-backed re-audit và được ghi vào
 `reference-golden-manifest.json`. Semantic truth đứng trước pixel similarity;
 responsive adaptation được chấp nhận khi giữ nguyên quan hệ và có review note.
 
-Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v58` và
-schema `lesson-summary-schema-v42`. Provider ưu tiên trả `INTENT`; backend biên
-dịch intent bằng registry deterministic cho tám family. Bộ compiler hiện có 86
+Contract đang triển khai cho wave này là prompt `lesson-summary-prompt-v62` và
+schema `lesson-summary-schema-v45`. Provider chỉ trả `INTENT` khi archetype biểu
+diễn đầy đủ hình, nếu không phải trả `RAW_SPEC`; backend biên dịch intent bằng
+registry deterministic cho tám family. Bộ compiler hiện có 86
 fixture trực quan local, gồm mô hình tiểu học/đo lường, trục số–tọa độ, hàm bậc
 nhất/bậc hai/tỉ lệ nghịch, bảng–biểu đồ, hình học phẳng, đồng dạng–đường tròn,
 hình không gian–hình khai triển và Venn/tree/flow/network. Các con số này chỉ là
 tiến độ triển khai, không đồng nghĩa coverage đạt chuẩn: inventory 50 ô vẫn giữ
 `IN_PROGRESS`, không ô nào được chuyển `SUPPORTED` trước khi có source-page audit,
 semantic invariant, golden bốn viewport và live gate tương ứng.
+
+Capability định tuyến được công bố theo phạm vi hẹp, không chỉ theo tên
+archetype. `CIRCLE_RELATIONS/CYCLIC_QUADRILATERAL` được coi là đầy đủ đúng cho
+hình cơ bản gồm đường tròn tâm O, bốn đỉnh A/B/C/D trên đường tròn và bốn cạnh
+AB/BC/CD/DA. Provider phải dùng INTENT cho đúng trường hợp đó; nếu hình còn cần
+đường chéo, bán kính, góc/số đo, tiếp tuyến, điểm hoặc đường phụ thì dùng RAW_SPEC
+trừ khi capability version hiện hành khai báo hỗ trợ rõ ràng. Không được lược bỏ
+chi tiết để đổi đường output.
 
 Source audit lưu một hoặc nhiều `evidencePages` cho mỗi đầu sách, vì các nhóm chủ
 đề của cùng tập có thể nằm trên nhiều trang mục lục hoặc trang bài khác nhau. Mỗi
@@ -1039,6 +1072,18 @@ validate/map diagram hoặc block được đổi thành `DIAGRAM_CANNOT_RENDER`
 buộc chỉ gồm control character cũng được coi là rỗng trước mapper để tránh qua
 transport rồi thành rỗng lúc persist.
 
+Việc materialize không được xóa nguồn gốc của hình. Mỗi `visual` đã chuẩn hóa
+thành `DIAGRAM_SPEC` phải persist `diagramSpecOrigin` với một trong ba giá trị:
+`PROVIDER_RAW_SPEC` khi provider trả tọa độ/spec trực tiếp,
+`COMPILED_INTENT` khi backend biên dịch từ intent, và `LEGACY_UNKNOWN` chỉ dành
+cho dữ liệu cũ không còn đủ bằng chứng để phân loại. Với `COMPILED_INTENT`, hệ
+thống đồng thời phải giữ `compilerKey`/version trong metadata chẩn đoán. Provenance
+này phải đi xuyên suốt recovery → mapper → persisted output → API/admin preview;
+renderer có thể bỏ qua nhưng không được làm mất. Không được suy đoán nguồn gốc
+từ tên ID điểm, cấu trúc primitive hay hình đã render. Mọi thống kê chất lượng
+hình phải nhóm riêng theo `diagramSpecOrigin`, compiler và model; bản ghi
+`LEGACY_UNKNOWN` không được gộp vào một trong hai tuyến để tạo tỷ lệ giả.
+
 Mỗi issue có `code`, `path`, lời giải thích tiếng Việt, `suggestion`, chi tiết kỹ
 thuật thu gọn, fingerprint của đúng target, cờ `accepted` và resolution
 `ACCEPT_OR_FIX | FIX_ONLY`. Chỉ issue reviewable được chấp nhận; hard issue luôn
@@ -1046,6 +1091,13 @@ unresolved dù client gửi `accepted=true`. Admin vẫn được sửa, thêm, 
 và lưu nháp. Khi target thay đổi, backend kiểm lại và không giữ acceptance cũ.
 `APPROVED` bị chặn khi còn reviewable chưa chấp nhận hoặc bất kỳ hard issue nào;
 student vẫn chỉ nhận summary đã phát hành.
+
+Riêng `note.content` còn tham chiếu hình nguồn không được xóa hoặc làm fail cả
+generation. Mapper giữ nguyên note và sibling blocks, rồi gắn
+`NOTE_REFERENCES_UNAVAILABLE_VISUAL` với resolution `ACCEPT_OR_FIX` đúng tại note
+đó để admin thấy mục cần kiểm tra, sửa hoặc chấp nhận. Note không có ví dụ và note
+có ví dụ tự đủ dữ kiện đều hợp lệ, không sinh issue. Guard này không gọi lại
+provider và không tạo thêm chi phí.
 
 Placeholder diagram `FIX_ONLY` có nút `Xóa hình lỗi` trong admin editor. Nút này
 chỉ bỏ visual và issue tương ứng khỏi state local, không gọi API/AI, không
@@ -1055,7 +1107,7 @@ liệu server cũ; chỉ nút Lưu mới persist toàn bộ thay đổi qua upse
 Mỗi lần admin bấm tạo chỉ có tối đa một provider attempt (`maxAttempts=1`) và
 route snapshot chỉ dùng candidate đã chọn; không tự fallback, retry hay repair
 block bằng provider khác. Schema provider hiện tại là
-`lesson-summary-schema-v42`; persisted wrapper vẫn là
+`lesson-summary-schema-v45`; persisted wrapper vẫn là
 `lesson_summary_blocks.version=2` với `reviewIssues` optional để tương thích dữ
 liệu v1/v2 cũ.
 
@@ -1076,8 +1128,11 @@ chiếu mơ hồ như `như cũ`.
 Example provider luôn trả `geometryStatement`; field là `null` ngoài bài chứng
 minh Hình học lớp 7–12. Khi có dữ liệu, `hypotheses[]` chỉ chứa dữ kiện đã cho,
 không chứa kết quả suy ra hoặc đường phụ, còn `conclusions[]` ghi đúng điều cần
-chứng minh. Persisted example cho phép thiếu field để summary cũ tiếp tục đọc.
-Lời giải chứng minh dùng mạch `Xét`–`Ta có`–`Vì... nên`–`Suy ra`–`Do đó`–`Vậy`,
+chứng minh. Đây là nơi duy nhất chứa bảng GT–KL; `solution` không được chép lại
+`Bảng GT–KL`, `GT:` hoặc `KL:`. Persisted example cho phép thiếu field để summary
+cũ tiếp tục đọc. Lời giải chứng minh chỉ chứa thân lời giải, không chứa tiêu đề
+`Lời giải`/`Chứng minh`, và dùng mạch
+`Xét`–`Ta có`–`Vì... nên`–`Suy ra`–`Do đó`–`Vậy`,
 không dùng danh sách bullet làm toàn bộ cấu trúc. Mapper/renderer không tự biến
 văn xuôi hình học thành bullet; output checklist mới bị gắn review issue để admin
 sửa hoặc chấp nhận sau khi kiểm tra. Thiếu GT–KL chỉ tạo
@@ -1603,6 +1658,12 @@ Zod. Refusal, output rỗng hoặc schema-invalid là lỗi không recoverable t
 foundation để không vừa lưu dữ liệu sai vừa retry tốn phí; lỗi timeout/network
 tạm thời vẫn đi qua retry BullMQ.
 
+Với OpenAI Responses API, `output_parsed=null` không được gom vào một câu lỗi
+chung. `incomplete_details.reason=max_output_tokens` phải hiển thị hướng dẫn tăng
+giới hạn hoặc giảm mức suy luận; `content_filter`, refusal và missing structured
+output có mã riêng. Dù job `FAILED`, metadata của provider response vẫn phải được
+ghi vào `ai_generations` và `provider_usage_events`; domain content cũ giữ nguyên.
+
 ### 10.5. Retry
 
 - Retry lỗi network/provider tạm thời.
@@ -1652,6 +1713,8 @@ Không gọi AI blocking trong request-new.
 Để kiểm soát chi phí AI:
 
 - Lưu token usage nếu provider trả về.
+- Kể cả provider response không dùng được, nếu đã có usage thì vẫn ghi input,
+  cached input, output/reasoning, request ID, latency và quyết toán chi phí thật.
 - Lưu estimated cost nếu có cấu hình giá.
 - Có env monthly budget soft limit.
 - Có rate limit theo user/action cho student request-new và chat.

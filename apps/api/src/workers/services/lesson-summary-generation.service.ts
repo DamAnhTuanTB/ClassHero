@@ -111,6 +111,7 @@ export class LessonSummaryGenerationService {
       output: recovery.output,
       contextChunks: sourceContext.chunks,
       reviewIssuesByPath: recovery.reviewIssuesByPath,
+      diagramProvenanceByPath: recovery.diagramProvenanceByPath,
       rootReviewIssues: recovery.rootReviewIssues,
       targetGrade: sourceContext.targetGrade,
     });

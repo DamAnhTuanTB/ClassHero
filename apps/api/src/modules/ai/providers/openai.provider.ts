@@ -20,6 +20,7 @@ import type {
   AiStructuredInput,
   AiStructuredOutput,
   AiOutputSchema,
+  AiTokenUsage,
   AiTextInput,
   AiTextOutput,
 } from "#api/modules/ai/types/ai-text.types";
@@ -31,7 +32,7 @@ import {
   assertEmbeddingOutput,
 } from "#api/modules/ai/utils/embedding-validation";
 import {
-  AiOutputValidationError,
+  AiProviderOutputError,
   assertAiOutputName,
   parseAiStructuredOutput,
 } from "#api/modules/ai/utils/ai-output-validation";
@@ -191,27 +192,36 @@ export class OpenAiProvider implements AiProvider {
     );
 
     if (response.output_parsed === null) {
-      const responseDiagnostics = response as typeof response & {
-        finish_reason?: unknown;
-        refusal?: unknown;
-      };
+      const latencyMs = Date.now() - startedAt;
+      const failure = buildOpenAiStructuredOutputError({
+        responseStatus: response.status ?? null,
+        incompleteReason: response.incomplete_details?.reason ?? null,
+        hasRefusal: hasOpenAiRefusal(response.output),
+        providerRequestId: response.id,
+        model: response.model ?? modelToUse,
+        usage: toTokenUsage(response.usage),
+        latencyMs,
+        maxOutputTokens: response.max_output_tokens ?? input.maxTokens,
+      });
       this.logger.error(
         `OpenAI Structured Generation Failed: ${JSON.stringify(
           {
-            output_text: response.output_text,
-            model: response.model,
-            usage: response.usage,
-            id: response.id,
-            finish_reason: responseDiagnostics.finish_reason,
-            refusal: responseDiagnostics.refusal,
+            code: failure.code,
+            responseStatus: failure.details.responseStatus,
+            incompleteReason: failure.details.incompleteReason,
+            hasRefusal: failure.details.hasRefusal,
+            outputTextLength: response.output_text.length,
+            maxOutputTokens: failure.details.maxOutputTokens,
+            model: failure.details.model,
+            usage: failure.details.usage,
+            providerRequestId: failure.details.providerRequestId,
+            latencyMs,
           },
           null,
           2,
         )}`,
       );
-      throw new AiOutputValidationError(
-        "OpenAI did not return a parsed structured output. The response may have been refused or incomplete.",
-      );
+      throw failure;
     }
 
     const data = parseAiStructuredOutput(schema, response.output_parsed);
@@ -248,10 +258,11 @@ function toTokenUsage(
         output_tokens: number;
         total_tokens: number;
         input_tokens_details?: { cached_tokens?: number } | null;
+        output_tokens_details?: { reasoning_tokens?: number } | null;
       }
     | null
     | undefined,
-) {
+): AiTokenUsage | undefined {
   if (!usage) {
     return undefined;
   }
@@ -260,6 +271,82 @@ function toTokenUsage(
     promptTokens: usage.input_tokens,
     cachedInputTokens: usage.input_tokens_details?.cached_tokens,
     completionTokens: usage.output_tokens,
+    reasoningTokens: usage.output_tokens_details?.reasoning_tokens,
     totalTokens: usage.total_tokens,
   };
+}
+
+export function buildOpenAiStructuredOutputError(input: {
+  responseStatus: string | null;
+  incompleteReason: string | null;
+  hasRefusal: boolean;
+  providerRequestId?: string;
+  model: string;
+  usage?: AiTokenUsage;
+  latencyMs?: number;
+  maxOutputTokens?: number;
+}) {
+  const details = {
+    provider: AiProviderName.OPENAI,
+    model: input.model,
+    ...(input.providerRequestId
+      ? { providerRequestId: input.providerRequestId }
+      : {}),
+    ...(input.usage ? { usage: input.usage } : {}),
+    ...(input.latencyMs === undefined ? {} : { latencyMs: input.latencyMs }),
+    responseStatus: input.responseStatus,
+    incompleteReason: input.incompleteReason,
+    hasRefusal: input.hasRefusal,
+    ...(input.maxOutputTokens === undefined
+      ? {}
+      : { maxOutputTokens: input.maxOutputTokens }),
+  };
+
+  if (input.incompleteReason === "max_output_tokens") {
+    const limitText = input.maxOutputTokens
+      ? ` ${input.maxOutputTokens.toLocaleString("vi-VN")}`
+      : "";
+    return new AiProviderOutputError(
+      "OPENAI_INCOMPLETE_MAX_OUTPUT_TOKENS",
+      `OpenAI đã dừng trước khi hoàn thành dữ liệu vì chạm giới hạn${limitText} token đầu ra; giới hạn này bao gồm cả token suy luận. Hãy tăng giới hạn token hoặc giảm mức suy luận rồi tạo lại.`,
+      details,
+    );
+  }
+  if (input.incompleteReason === "content_filter") {
+    return new AiProviderOutputError(
+      "OPENAI_INCOMPLETE_CONTENT_FILTER",
+      "OpenAI đã dừng phản hồi do bộ lọc an toàn. Hãy kiểm tra nội dung nguồn và yêu cầu bổ sung rồi tạo lại.",
+      details,
+    );
+  }
+  if (input.hasRefusal) {
+    return new AiProviderOutputError(
+      "OPENAI_REFUSED",
+      "OpenAI đã từ chối tạo nội dung cho yêu cầu này. Hãy kiểm tra nội dung nguồn và yêu cầu bổ sung rồi tạo lại.",
+      details,
+    );
+  }
+  return new AiProviderOutputError(
+    "OPENAI_STRUCTURED_OUTPUT_MISSING",
+    "OpenAI không trả về dữ liệu có cấu trúc hoàn chỉnh. Hãy kiểm tra cấu hình rồi tạo lại.",
+    details,
+  );
+}
+
+function hasOpenAiRefusal(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.some((item) => {
+    if (!item || typeof item !== "object" || !("content" in item)) return false;
+    const content = (item as { content?: unknown }).content;
+    return (
+      Array.isArray(content) &&
+      content.some(
+        (part) =>
+          part !== null &&
+          typeof part === "object" &&
+          "type" in part &&
+          (part as { type?: unknown }).type === "refusal",
+      )
+    );
+  });
 }

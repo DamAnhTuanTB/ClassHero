@@ -40,6 +40,19 @@ Nếu provider refusal, trả rỗng hoặc Zod reject, lời gọi đầu ném 
 `persist()` không thể chạy. Lỗi schema là non-retryable để tránh tạo nhiều lần
 tốn phí; timeout/network còn lượt sẽ đưa trạng thái về `QUEUED` cho BullMQ.
 
+`output_parsed=null` chưa nói được nguyên nhân. Với OpenAI Responses API, worker
+phải đọc thêm `response.status`, `incomplete_details.reason` và content kiểu
+`refusal`. Trường hợp thường gặp là `max_output_tokens`: giới hạn này bao gồm cả
+token suy luận lẫn JSON nhìn thấy, nên reasoning cao có thể dùng hết ngân sách
+trước khi JSON hoàn chỉnh. Partial JSON không được cố lưu hoặc tự nối bằng một paid
+call khác.
+
+Một generation thất bại không đồng nghĩa provider chưa tính tiền. Nếu response
+incomplete đã mang usage, hệ thống ghi request ID, model, token, latency và chi phí
+vào usage event, đồng thời quyết toán reservation. Nếu response đã về nhưng usage
+không rõ, reservation giữ `UNCERTAIN`; chỉ lỗi chắc chắn xảy ra trước provider mới
+được release. `ai_generations` vẫn `FAILED` và dữ liệu domain cũ không bị ghi đè.
+
 OpenAI SDK không tự retry bên trong provider. Nhờ vậy một BullMQ attempt tương
 ứng với một provider request, log retry và chi phí dễ hiểu hơn.
 
@@ -95,11 +108,37 @@ trí. Chẳng hạn “vận dụng” có thể là nhãn `Vận dụng 1.` nh�
 lệ trong câu “vận dụng các tính chất”. Dù chỉ là warning, giảm false positive vẫn
 giúp admin tập trung vào vấn đề thật.
 
+Với nội dung AI còn đọc được nhưng phụ thuộc tài nguyên không được render, không
+nên âm thầm xóa block. Ví dụ một note nhắc `Hình 4.47` trong khi note không có hình
+kèm theo phải được giữ nguyên và nhận review issue ở đúng block. Job vẫn thành
+công, sibling không bị ảnh hưởng, admin nhìn thấy nguyên văn để sửa hoặc chấp nhận;
+prompt/schema đồng thời phải giảm xác suất provider tiếp tục tạo lỗi. Đây là lỗi
+ngữ nghĩa reviewable, khác với lỗi schema làm dữ liệu không thể xử lý.
+
 Provider output và dữ liệu sau mapper là hai contract khác nhau nên phải được
 test độc lập. Ví dụ provider trả `diagramSpec`, mapper đổi thành `visual` để UI
 render; test chỉ parse output của provider sẽ không phát hiện schema lưu trữ quên
 field `visual`. Test hồi quy đúng phải chạy đủ chuỗi provider parse → mapper →
 persisted-output parse, đặc biệt với các field chỉ xuất hiện khi bài cần hình.
+
+Chuẩn hóa về cùng một shape không có nghĩa hai đường tạo dữ liệu là tương đương
+về quan sát. Nếu provider raw spec và intent qua compiler đều bị ghi đè thành một
+`DIAGRAM_SPEC` không provenance, hệ thống sẽ không còn đo được lỗi thuộc provider
+hay compiler. Vì vậy mọi phép materialize phải giữ discriminator bền vững, chẳng
+hạn `diagramSpecOrigin`, và metadata compiler nếu có. Đây là dữ liệu lineage,
+không phải nội dung sư phạm; renderer được phép không hiển thị nhưng mapper,
+persist/API và công cụ admin không được xóa. Thiếu lineage từ đầu khiến thống kê
+lịch sử phải suy đoán và không thể đưa ra tỷ lệ đáng tin cậy cho dữ liệu đã mất dấu.
+
+Trong contract có hai nhánh `INTENT | RAW_SPEC`, provider phải chọn nhánh ngay lúc
+sinh output vì chỉ provider còn đủ ngữ cảnh để mô tả một raw spec hoàn chỉnh.
+Compiler chỉ materialize INTENT đã đủ nghĩa; nó không thể tự chuyển một intent
+thiếu điểm/quan hệ thành RAW_SPEC mà không bịa dữ liệu. Backend vẫn phải kiểm tra
+capability và từ chối hạ intent phức tạp xuống template đơn giản, nhưng đây là
+final gate chứ không phải quyết định routing thay provider. Vì vậy capability
+manifest/version phải xuất hiện rõ trong prompt/schema, và INTENT không đủ
+coverage phải thành review issue hoặc cần một provider call mới — không được
+âm thầm render hình thiếu rồi báo thành công.
 
 Schema pass cũng không chứng minh mapper sẽ chạy được. Một `diagramIntent` có thể
 đủ field nhưng compiler vẫn ném lỗi vì thiếu số nhãn cần cho đúng archetype. Vì

@@ -2,6 +2,7 @@ import {
   lessonSummaryDiagramSpecSchema,
   lessonSummaryDiagramSpecStructuralSchema,
   type LessonSummaryDiagramSpec,
+  type LessonSummaryDiagramSpecOrigin,
 } from "@learning-path/shared";
 import { z } from "zod";
 
@@ -33,7 +34,14 @@ export type LessonSummaryReviewIssueDraft = {
 export type LessonSummaryProviderRecovery = {
   output: LessonSummaryProviderOutput;
   reviewIssuesByPath: Map<string, LessonSummaryReviewIssueDraft[]>;
+  diagramProvenanceByPath: Map<string, LessonSummaryDiagramProvenance>;
   rootReviewIssues: LessonSummaryReviewIssueDraft[];
+};
+
+export type LessonSummaryDiagramProvenance = {
+  diagramSpecOrigin: LessonSummaryDiagramSpecOrigin;
+  compilerKey: string | null;
+  intentVersion: number | null;
 };
 
 export type LessonSummaryRecoveredExample = {
@@ -48,6 +56,7 @@ export function recoverLessonSummaryProviderOutput(input: {
   contextChunks: RetrievedChunk[];
 }): LessonSummaryProviderRecovery {
   const issuesByPath: MutableReviewIssues = new Map();
+  const diagramProvenanceByPath = new Map<string, LessonSummaryDiagramProvenance>();
   const rootReviewIssues: LessonSummaryReviewIssueDraft[] = [];
   const validChunkIds = new Set(input.contextChunks.map((chunk) => chunk.id));
   const fallbackChunkId = input.contextChunks[0]?.id;
@@ -104,14 +113,25 @@ export function recoverLessonSummaryProviderOutput(input: {
         // block-local renderer defect cannot escape later and fail the whole job.
         let mapped: LessonSummaryDiagramSpec;
         let semanticDetails: string | null = null;
+        let provenance: LessonSummaryDiagramProvenance;
         if ("kind" in accepted.data && accepted.data.kind === "INTENT") {
           const compiled = compileLessonSummaryDiagramIntentWithDiagnostics(
             accepted.data.intent,
           );
           mapped = compiled.spec;
           semanticDetails = formatCompiledSemanticIssues(compiled.semanticIssues);
+          provenance = {
+            diagramSpecOrigin: "COMPILED_INTENT",
+            compilerKey: compiled.diagnostics.compilerKey,
+            intentVersion: compiled.diagnostics.intentVersion,
+          };
         } else {
           mapped = mapLessonSummaryProviderDiagramInput(accepted.data);
+          provenance = {
+            diagramSpecOrigin: "PROVIDER_RAW_SPEC",
+            compilerKey: null,
+            intentVersion: null,
+          };
         }
         const structurallySafe = lessonSummaryDiagramSpecStructuralSchema.parse(mapped);
         if (semanticDetails) {
@@ -130,6 +150,7 @@ export function recoverLessonSummaryProviderOutput(input: {
         }
         // Persist a renderer-ready RAW_SPEC so downstream code never needs to
         // invoke the intent compiler for this block a second time.
+        diagramProvenanceByPath.set(blockPath, provenance);
         return toProviderRawDiagram(structurallySafe);
       } catch (error) {
         addIssue(blockPath, {
@@ -183,6 +204,11 @@ export function recoverLessonSummaryProviderOutput(input: {
           technicalDetails,
         });
       }
+      diagramProvenanceByPath.set(blockPath, {
+        diagramSpecOrigin: "PROVIDER_RAW_SPEC",
+        compilerKey: null,
+        intentVersion: null,
+      });
       return toProviderRawDiagram(structurallySafe.data);
     } catch (error) {
       addIssue(blockPath, {
@@ -383,7 +409,12 @@ export function recoverLessonSummaryProviderOutput(input: {
     },
   } as LessonSummaryProviderOutput;
 
-  return { output, reviewIssuesByPath: issuesByPath, rootReviewIssues };
+  return {
+    output,
+    reviewIssuesByPath: issuesByPath,
+    diagramProvenanceByPath,
+    rootReviewIssues,
+  };
 }
 
 /**

@@ -30,10 +30,7 @@ const liveRunId = (liveEnv.M9_2_SCHEMA_REF_LIVE_RUN_ID ?? "run")
 const schemaReferenceStrategies = readStrategies(
   liveEnv.M9_2_SCHEMA_REF_LIVE_STRATEGIES ?? "ref,inline",
 );
-const supportedTheoryCategories = new Set<TheoryCategory>([
-  "TWO_LEGS",
-  "HYPOTENUSE_LEG",
-]);
+const supportedTheoryCategories = new Set<TheoryCategory>(["TWO_LEGS", "HYPOTENUSE_LEG"]);
 const chunks = [
   {
     id: "11111111-1111-4111-8111-111111111111",
@@ -113,6 +110,7 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
         output: recovery.output,
         contextChunks: chunks,
         reviewIssuesByPath: recovery.reviewIssuesByPath,
+        diagramProvenanceByPath: recovery.diagramProvenanceByPath,
         rootReviewIssues: recovery.rootReviewIssues,
         targetGrade: 7,
       });
@@ -166,7 +164,9 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
         )}\n`,
         "utf8",
       );
-      console.info(`[M9.2 LIVE ${schemaReferenceStrategy}] ${JSON.stringify(comparison)}`);
+      console.info(
+        `[M9.2 LIVE ${schemaReferenceStrategy}] ${JSON.stringify(comparison)}`,
+      );
     }
 
     const refResult = comparisons.find(
@@ -179,22 +179,14 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI lesson summary live smoke", () => {
       (comparison) => comparison.schemaReferenceStrategy === "ref_v2",
     );
     if (refResult && inlineResult) {
-      expect(refResult.schemaCharacters).toBeLessThan(
-        inlineResult.schemaCharacters / 5,
-      );
+      expect(refResult.schemaCharacters).toBeLessThan(inlineResult.schemaCharacters / 5);
       expect(refResult.issueCount).toBe(inlineResult.issueCount);
-      expect(refResult.missingRequiredVisuals).toBe(
-        inlineResult.missingRequiredVisuals,
-      );
+      expect(refResult.missingRequiredVisuals).toBe(inlineResult.missingRequiredVisuals);
     }
     if (refResult && refV2Result) {
-      expect(refV2Result.schemaCharacters).toBeLessThan(
-        refResult.schemaCharacters,
-      );
+      expect(refV2Result.schemaCharacters).toBeLessThan(refResult.schemaCharacters);
       expect(refV2Result.issueCount).toBe(refResult.issueCount);
-      expect(refV2Result.missingRequiredVisuals).toBe(
-        refResult.missingRequiredVisuals,
-      );
+      expect(refV2Result.missingRequiredVisuals).toBe(refResult.missingRequiredVisuals);
     }
 
     writeFileSync(
@@ -224,9 +216,8 @@ function readVisualMetrics(summary: LessonSummaryOutput) {
     blockCount: visualBlocks.length,
     diagramCount: visualBlocks.filter((block) => block.visual != null).length,
     requiredVisualCount: requiredVisualBlocks.length,
-    missingRequiredVisuals: requiredVisualBlocks.filter(
-      (block) => block.visual == null,
-    ).length,
+    missingRequiredVisuals: requiredVisualBlocks.filter((block) => block.visual == null)
+      .length,
   };
 }
 
@@ -244,8 +235,7 @@ function readTriangleDiagramMetrics(summary: LessonSummaryOutput) {
 
   return {
     diagramsWithTwoTriangles,
-    diagramsMissingSecondTriangle:
-      diagramSpecs.length - diagramsWithTwoTriangles,
+    diagramsMissingSecondTriangle: diagramSpecs.length - diagramsWithTwoTriangles,
     exactSourceExampleDiagram:
       sourceExample?.visual?.kind === "DIAGRAM_SPEC" &&
       isExactSourceExampleDiagram(sourceExample.visual.spec),
@@ -287,9 +277,7 @@ function countTriangles(spec: DiagramSpec) {
 }
 
 function isExactSourceExampleDiagram(spec: DiagramSpec) {
-  const pointLabelsById = new Map(
-    spec.points.map((point) => [point.id, point.label]),
-  );
+  const pointLabelsById = new Map(spec.points.map((point) => [point.id, point.label]));
   const segmentKeysById = new Map<string, string>();
   const segmentKeys = new Set(
     spec.primitives.flatMap((primitive) => {
@@ -350,11 +338,7 @@ type DiagramSpec = Extract<
   { kind: "DIAGRAM_SPEC" }
 >["spec"];
 
-type TheoryCategory =
-  | "TWO_LEGS"
-  | "HYPOTENUSE_LEG"
-  | "HYPOTENUSE_ACUTE_ANGLE"
-  | "OTHER";
+type TheoryCategory = "TWO_LEGS" | "HYPOTENUSE_LEG" | "HYPOTENUSE_ACUTE_ANGLE" | "OTHER";
 
 function readStrategies(value: string): AiStructuredSchemaReferenceStrategy[] {
   const allowed = new Set<AiStructuredSchemaReferenceStrategy>([
@@ -365,9 +349,8 @@ function readStrategies(value: string): AiStructuredSchemaReferenceStrategy[] {
   const strategies = value
     .split(",")
     .map((strategy) => strategy.trim())
-    .filter(
-      (strategy): strategy is AiStructuredSchemaReferenceStrategy =>
-        allowed.has(strategy as AiStructuredSchemaReferenceStrategy),
+    .filter((strategy): strategy is AiStructuredSchemaReferenceStrategy =>
+      allowed.has(strategy as AiStructuredSchemaReferenceStrategy),
     );
   if (strategies.length === 0) {
     throw new Error("At least one live schema strategy is required.");

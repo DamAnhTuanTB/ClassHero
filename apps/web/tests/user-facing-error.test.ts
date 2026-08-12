@@ -15,6 +15,12 @@ test("giữ thông báo tiếng Việt dễ hiểu", () => {
   );
 });
 
+test("giữ hướng dẫn xử lý khi OpenAI chạm giới hạn đầu ra", () => {
+  const message =
+    "OpenAI đã dừng trước khi hoàn thành dữ liệu vì chạm giới hạn 16.000 token đầu ra; giới hạn này bao gồm cả token suy luận. Hãy tăng giới hạn token hoặc giảm mức suy luận rồi tạo lại.";
+  assert.equal(sanitizeUserFacingMessage(message), message);
+});
+
 test("loại phần mô tả kiểm tra cấu trúc bằng tiếng Anh", () => {
   assert.equal(
     sanitizeUserFacingMessage(

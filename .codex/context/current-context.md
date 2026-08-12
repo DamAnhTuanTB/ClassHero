@@ -16,7 +16,7 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
 - `M9.1` đã Done: `AiProvider`/`AiService` hỗ trợ OpenAI text và strict structured output; Zod là persistence gate cuối sau JSON Schema; provider trả model/request ID/token/latency; service tạo idempotent cặp `background_jobs` + `ai_generations`; AI worker đồng bộ lifecycle/retry/hash/output log và không gọi persistence khi output invalid. PostgreSQL lifecycle và OpenAI live smoke pass (74 input + 10 output tokens ở request đo usage, 2.168 ms). Gemini vẫn là placeholder chưa bật; handler summary/quiz/flashcard/test thuộc `M9.2-M9.3`.
 - `M9.2` core đã Done: admin summary GET/PUT/generate API có RBAC/audit; request AI chỉ chọn active `READY` lesson documents có chunks, giới hạn 12.000 context tokens, lưu source hash và chống active job trùng. Worker tải lại context đúng lesson, reject source stale/output sai schema, gọi `AiService`, map structured summary sang Tiptap và upsert `source = AI`, `NEEDS_REVIEW`, `ai_generation_id`; admin vẫn sửa/duyệt cùng summary record. PostgreSQL API/worker integration và opt-in OpenAI lesson-summary live smoke đã pass; smoke dùng một chunk mẫu, không gọi embedding/OCR. Riêng delivery wave mở rộng coverage hình Toán 3-9 của `M9.2` vẫn `IN_PROGRESS`, chưa đủ điều kiện công bố 90-100%; xem mục resume trong phần 3 và `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`.
 - `M9.2` partial-block recovery đã hoàn tất ngày 2026-08-10; contract hiện tại là
-  `lesson-summary-schema-v42`: một lỗi semantic/field/diagram cục bộ không còn
+  `lesson-summary-schema-v44`: một lỗi semantic/field/diagram cục bộ không còn
   làm mất toàn summary. Worker dùng transport schema trong đúng một provider
   attempt, nghiệm thu từng block, giữ hình/nội dung còn render an toàn và đính
   `reviewIssues` có lời giải thích/gợi ý sửa. Admin vẫn sửa/lưu nháp, có thể chấp
@@ -70,6 +70,16 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   cấm lặp `Chú ý`, `Lưu ý`, `Nhận xét` ở đầu `note.content`; mapper dùng shared
   normalizer trước khi persist, còn renderer dùng cùng normalizer để tương thích
   summary cũ mà không cần migration hoặc gọi lại provider.
+- Corrective contract v59/v43 khóa `geometryStatement` sở hữu duy nhất bảng GT–KL;
+  `solution` chỉ chứa thân lời giải và không được chép lại bảng hoặc nhãn tiêu đề.
+  Thay đổi khóa ở system prompt, chỉ dẫn theo lớp và mô tả structured field;
+  không thêm bộ lọc GT–KL tương thích ngược trong renderer theo quyết định owner.
+- Corrective contract hiện tại v60/v44 bỏ yêu cầu mọi note phải có ví dụ. Note chỉ
+  lấy ý Chú ý/Lưu ý/Nhận xét có trong nguồn; ví dụ tùy chọn phải tự đủ dữ kiện.
+  Note còn nhắc Hình x.y/hình bên, nhúng ảnh hoặc URL được giữ nguyên và nhận
+  `NOTE_REFERENCES_UNAVAILABLE_VISUAL/ACCEPT_OR_FIX` ở đúng block để admin review;
+  sibling và toàn job vẫn thành công, không có provider retry. Schema `ref_v2` dài
+  30.981 ký tự, vẫn dưới budget 31.000.
 - Owner xác nhận ngày 2026-08-11 hệ thống bao phủ học sinh lớp 3–12, gồm cả THPT.
   Prompt Summary/GT–KL và `diagramIntent.grade` hiện mới phủ đến lớp 9 là gap cần
   corrective pass; mọi thay đổi tiếp theo không được coi lớp 10–12 là ngoài scope.
@@ -78,8 +88,8 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   contract chỉ compose một lần, admin gửi preference thay vì resolved prompt,
   preview/generate khóa request fingerprint và learner profile/GT–KL/diagram
   grade phủ lớp 3–12. Đây là task AI kế tiếp trước `M9.4`.
-- Corrective schema compaction của `M9.16` đã có local gate và rollback flag
-  `AI_SUMMARY_SCHEMA_REFS_ENABLED` mặc định `false`. Đường `inline` vẫn dùng nguyên
+- Corrective schema compaction của `M9.16` đã có local gate và strategy env
+  `AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY=ref_v2`. Đường `inline` vẫn dùng nguyên
   helper OpenAI SDK; đường `ref` chỉ tuần tự hóa các sub-schema lặp thành
   `$defs/$ref`, giữ cùng Zod parser/transport/acceptance/mapper/recovery. Contract
   Summary giảm từ khoảng 329.547 xuống 33.295 ký tự (23 definitions, 213 refs),
@@ -115,11 +125,11 @@ File này ghi trạng thái ngắn của repo để Codex bắt đầu phiên l�
   `gpt-5.4-2026-03-05` pass: 6 nguồn nhỏ, 6 Bài 15 và 3 cache-warm; 18/18 hình
   Bài 15 `ref_v2` có đủ hai tam giác, 0 required visual thiếu, 0 review issue.
   Cache-warm xuyên bài đạt khoảng 95%; tổng usage 212.617 input (168.704 cached)
-  + 53.132 output, chi phí ước tính khoảng 0,95 USD / 23.700 VNĐ. Manual text và
-  ảnh raster từ renderer đạt 99/100; browser tích hợp không có phiên nên ảnh là
-  fallback SVG của component, ghi rõ tại
-  `tmp/m9-2-schema-ref-v2-visual-comparison/manual-review.md`. Local `.env` bật
-  ref v1 + ref v2 + cache key + retention 24h; restart API/worker để nạp cấu hình.
+  - 53.132 output, chi phí ước tính khoảng 0,95 USD / 23.700 VNĐ. Manual text và
+    ảnh raster từ renderer đạt 99/100; browser tích hợp không có phiên nên ảnh là
+    fallback SVG của component, ghi rõ tại
+    `tmp/m9-2-schema-ref-v2-visual-comparison/manual-review.md`. Local `.env` chọn
+    `ref_v2`, bật cache key + retention 24h; restart API/worker để nạp cấu hình.
 - Micro live A/B cùng ngày đã chạy thêm ba nguồn ngắn độc lập trên
   `gpt-5.4-2026-03-05`/medium: giao hoán phép cộng lớp 3, bình phương của một tổng
   lớp 8 và tổng ba góc tam giác lớp 7. Cả 6/6 output ref/inline đều pass schema,

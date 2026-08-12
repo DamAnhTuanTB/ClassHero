@@ -15,6 +15,7 @@ import type {
   AiGenerationPreparedOutput,
 } from "#api/modules/ai/types/ai-generation.types";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import { isAiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import { toJobJson } from "#api/jobs/job-json";
 import type { BackgroundJobBullmqResult } from "#api/jobs/background-job-queues";
 
@@ -168,6 +169,8 @@ export class AiGenerationLifecycleService {
   ): Promise<void> {
     const message = getSafeAiErrorMessage(error);
     const finishedAt = isFinalAttempt ? new Date() : null;
+    const providerFailure = isAiProviderOutputError(error) ? error.details : null;
+    const usage = providerFailure?.usage;
 
     await this.prisma.$transaction([
       this.prisma.backgroundJob.update({
@@ -187,6 +190,17 @@ export class AiGenerationLifecycleService {
           status: isFinalAttempt ? AiGenerationStatus.FAILED : AiGenerationStatus.QUEUED,
           retryCount: Math.max(context.attempt - 1, 0),
           errorMessage: message,
+          ...(providerFailure
+            ? {
+                provider: providerFailure.provider,
+                model: providerFailure.model,
+                providerRequestId: providerFailure.providerRequestId,
+                promptTokens: usage?.promptTokens,
+                completionTokens: usage?.completionTokens,
+                totalTokens: usage?.totalTokens,
+                latencyMs: providerFailure.latencyMs,
+              }
+            : {}),
           finishedAt,
         },
       }),

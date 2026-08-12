@@ -172,11 +172,12 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     `NEEDS_REVIEW`; semantic/reference/presentation issues chỉ thành warning cho
     admin, không gọi model repair lần hai.
     41.2. Baseline chức năng M9.2 đã ổn theo xác nhận owner; snapshot hiện hành
-    dùng prompt `lesson-summary-prompt-v58`, schema
-    `lesson-summary-schema-v42`, source hash có `targetGrade`, authoring theo lớp,
+    dùng prompt `lesson-summary-prompt-v60`, schema
+    `lesson-summary-schema-v44`, source hash có `targetGrade`, authoring theo lớp,
     `geometryStatement` GT–KL cho bài chứng minh lớp 7–9, chuẩn hóa ký hiệu góc và
     recovery `VALID | AUTO_FIXED | REVIEWABLE | UNRENDERABLE` với policy
-    `ACCEPT_OR_FIX | FIX_ONLY`.
+    `ACCEPT_OR_FIX | FIX_ONLY`. Note không còn bị ép phải có ví dụ; note tham chiếu
+    hình/ảnh/URL nguồn được giữ nguyên và gắn review issue riêng cho admin.
     41.3. Coverage hardening Toán 3-9 được lập kế hoạch tại
     `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`: kiểm kê 100% dạng hình,
     cam kết mức đơn giản/trung bình/khó, dùng semantic `diagramIntent` →

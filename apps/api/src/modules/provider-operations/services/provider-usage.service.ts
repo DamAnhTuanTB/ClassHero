@@ -10,6 +10,10 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import {
+  isAiProviderOutputError,
+  type AiProviderOutputFailureDetails,
+} from "#api/modules/ai/utils/ai-output-validation";
 import type {
   PriceRateSnapshot,
   ProviderUsageAmounts,
@@ -44,6 +48,10 @@ type FinishUsageInput = ProviderUsageAmounts & {
   rawUsage?: unknown;
   rates?: PriceRateSnapshot[];
   savedCost?: boolean;
+};
+
+type FailUsageInput = {
+  rates?: PriceRateSnapshot[];
 };
 
 export type ProviderReservationInput = {
@@ -174,23 +182,77 @@ export class ProviderUsageService {
     });
   }
 
-  async fail(eventId: string, error: unknown) {
+  async fail(eventId: string, error: unknown, input: FailUsageInput = {}) {
     const event = await this.prisma.providerUsageEvent.findUniqueOrThrow({
       where: { id: eventId },
-      select: { budgetReservation: { select: { id: true, status: true } } },
+      select: {
+        fxRateVndPerUsd: true,
+        budgetReservation: {
+          select: { id: true, reservedVnd: true, status: true },
+        },
+      },
     });
     const finishedAt = new Date();
-    const reservationStatus = isBillingUncertain(error)
-      ? ProviderBudgetReservationStatus.UNCERTAIN
-      : ProviderBudgetReservationStatus.RELEASED;
+    const providerFailure = isAiProviderOutputError(error) ? error.details : null;
+    const measuredUsage = providerFailure?.usage;
+    const measuredCost =
+      measuredUsage && (input.rates?.length ?? 0) > 0
+        ? calculateProviderCost(
+            { ...measuredUsage, requestCount: 1 },
+            input.rates ?? [],
+            event.fxRateVndPerUsd.toNumber(),
+          )
+        : null;
+    const reservationStatus = measuredCost
+      ? ProviderBudgetReservationStatus.SETTLED
+      : providerFailure || isBillingUncertain(error)
+        ? ProviderBudgetReservationStatus.UNCERTAIN
+        : ProviderBudgetReservationStatus.RELEASED;
+    const settledVnd = measuredCost?.costVnd ?? 0;
+    if (
+      measuredCost &&
+      event.budgetReservation &&
+      settledVnd > event.budgetReservation.reservedVnd
+    ) {
+      this.logger.error(
+        `Failed provider usage ${eventId} settled at ${settledVnd} VND above reservation ${event.budgetReservation.reservedVnd} VND.`,
+      );
+    }
     return this.prisma.$transaction(async (transaction) => {
       const updated = await transaction.providerUsageEvent.update({
         where: { id: eventId },
         data: {
           status: ProviderUsageStatus.FAILED,
           errorCode: getSafeErrorCode(error),
+          ...(providerFailure?.providerRequestId
+            ? { providerRequestId: providerFailure.providerRequestId }
+            : {}),
+          ...(measuredUsage
+            ? {
+                promptTokens: Math.max(0, measuredUsage.promptTokens ?? 0),
+                cachedInputTokens: Math.max(
+                  0,
+                  measuredUsage.cachedInputTokens ?? 0,
+                ),
+                completionTokens: Math.max(
+                  0,
+                  measuredUsage.completionTokens ?? 0,
+                ),
+                totalTokens: Math.max(0, measuredUsage.totalTokens ?? 0),
+                requestCount: 1,
+                estimatedCostUsd: measuredCost?.costUsd ?? 0,
+                costVnd: settledVnd,
+              }
+            : {}),
+          ...(providerFailure
+            ? { rawUsageJson: toProviderFailureJson(providerFailure) }
+            : {}),
+          ...(providerFailure?.latencyMs === undefined
+            ? {}
+            : { latencyMs: providerFailure.latencyMs }),
           finishedAt,
         },
+        select: { id: true, costVnd: true, estimatedCostUsd: true },
       });
       if (
         event.budgetReservation &&
@@ -201,13 +263,15 @@ export class ProviderUsageService {
           data: {
             status: reservationStatus,
             heartbeatAt: finishedAt,
-            ...(reservationStatus === ProviderBudgetReservationStatus.RELEASED
-              ? { settledAt: finishedAt }
-              : {}),
+            ...(reservationStatus === ProviderBudgetReservationStatus.SETTLED
+              ? { settledVnd, settledAt: finishedAt }
+              : reservationStatus === ProviderBudgetReservationStatus.RELEASED
+                ? { settledAt: finishedAt }
+                : {}),
           },
         });
       }
-      return updated;
+      return { ...updated, costMeasured: measuredCost !== null };
     });
   }
 
@@ -463,8 +527,28 @@ export class ProviderUsageService {
 }
 
 function getSafeErrorCode(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code.replace(/[^A-Za-z0-9_:-]/g, "_").slice(0, 160);
+  }
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/[^A-Za-z0-9_:-]/g, "_").slice(0, 160);
+}
+
+function toProviderFailureJson(details: AiProviderOutputFailureDetails) {
+  return JSON.parse(
+    JSON.stringify({
+      responseStatus: details.responseStatus,
+      incompleteReason: details.incompleteReason,
+      hasRefusal: details.hasRefusal,
+      maxOutputTokens: details.maxOutputTokens,
+      reasoningTokens: details.usage?.reasoningTokens,
+    }),
+  ) as Prisma.InputJsonValue;
 }
 
 function getBudgetScopes(category: ProviderCatalogCategory): ProviderBudgetScope[] {

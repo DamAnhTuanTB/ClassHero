@@ -91,10 +91,7 @@ describe.skipIf(!runLiveTest)(
         const caseComparisons: SmallLiveComparison[] = [];
 
         for (const schemaReferenceStrategy of schemaReferenceStrategies) {
-          const artifactPath = resolve(
-            caseDirectory,
-            `${schemaReferenceStrategy}.json`,
-          );
+          const artifactPath = resolve(caseDirectory, `${schemaReferenceStrategy}.json`);
           const cachedComparison = readCachedComparison(artifactPath);
           if (cachedComparison) {
             caseComparisons.push(cachedComparison);
@@ -146,6 +143,7 @@ describe.skipIf(!runLiveTest)(
             output: recovery.output,
             contextChunks: chunks,
             reviewIssuesByPath: recovery.reviewIssuesByPath,
+            diagramProvenanceByPath: recovery.diagramProvenanceByPath,
             rootReviewIssues: recovery.rootReviewIssues,
             targetGrade: smallCase.targetGrade,
           });
@@ -225,9 +223,7 @@ describe.skipIf(!runLiveTest)(
           );
         }
         if (refResult && refV2Result) {
-          expect(refV2Result.schemaCharacters).toBeLessThan(
-            refResult.schemaCharacters,
-          );
+          expect(refV2Result.schemaCharacters).toBeLessThan(refResult.schemaCharacters);
         }
 
         writeFileSync(
@@ -304,8 +300,7 @@ function countReviewIssues(summary: LessonSummaryOutput) {
     (total, section) =>
       total +
       section.blocks.reduce(
-        (blockTotal, block) =>
-          blockTotal + (block.reviewIssues?.length ?? 0),
+        (blockTotal, block) => blockTotal + (block.reviewIssues?.length ?? 0),
         0,
       ),
     summary.reviewIssues?.length ?? 0,
@@ -412,9 +407,8 @@ function readStrategies(value: string): AiStructuredSchemaReferenceStrategy[] {
   const strategies = value
     .split(",")
     .map((strategy) => strategy.trim())
-    .filter(
-      (strategy): strategy is AiStructuredSchemaReferenceStrategy =>
-        allowed.has(strategy as AiStructuredSchemaReferenceStrategy),
+    .filter((strategy): strategy is AiStructuredSchemaReferenceStrategy =>
+      allowed.has(strategy as AiStructuredSchemaReferenceStrategy),
     );
   if (strategies.length === 0) {
     throw new Error("At least one live schema strategy is required.");

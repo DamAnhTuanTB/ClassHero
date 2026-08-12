@@ -11,8 +11,8 @@ import {
   lessonSummaryProviderDiagramTransportSchema,
 } from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v58";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v42";
+export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v62";
+export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v45";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -112,7 +112,7 @@ const noteBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("note"),
     content: nonEmptyText(2_000).describe(
-      "Ghi chú phải chứa một ví dụ ngắn được mở đầu bằng Ví dụ: hoặc Chẳng hạn:. Không bắt đầu content bằng Chú ý:, Lưu ý: hoặc Nhận xét: vì giao diện đã hiển thị nhãn khối.",
+      "Chỉ dùng cho ý Chú ý, Lưu ý hoặc Nhận xét có trong nguồn. Không bắt đầu content bằng Chú ý:, Lưu ý: hoặc Nhận xét: vì giao diện đã hiển thị nhãn khối. Ví dụ là tùy chọn; nếu có phải tự đủ dữ kiện và không phụ thuộc hình/ảnh/URL của tài liệu nguồn.",
     ),
   })
   .strict();
@@ -283,6 +283,13 @@ export const lessonSummaryTheoryBlockSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 
+const LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION =
+  "Chỉ chứa thân lời giải; không chứa tiêu đề Lời giải/Chứng minh hoặc Bảng GT–KL/GT:/KL:. GT–KL chỉ nằm trong geometryStatement.";
+const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Riêng chứng minh/dựng hình, viết mạch lập luận liên kết bằng Xét, Ta có, Vì... nên..., Suy ra, Do đó, Vậy; không biến toàn bộ lời giải thành danh sách bullet rời rạc. Với bài tính thuần túy, giữ cách trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức. Mọi ý a), b), c) phải bắt đầu ở dòng riêng.`;
+const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION =
+  "Nơi duy nhất chứa bảng GT–KL; không chép lại vào solution.";
+const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION} Chỉ khác null cho bài Hình học lớp 7–9 yêu cầu Chứng minh/Chứng tỏ. hypotheses chỉ chứa dữ kiện có sẵn trong đề, không chứa kết quả suy ra hoặc đường phụ; conclusions ghi đúng điều phải chứng minh. Mọi bài Số học/Đại số, bài Hình học lớp nhỏ và bài Hình học không phải chứng minh chính thức phải trả null.`;
+
 export function createLessonSummaryProviderExampleSchema(
   exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
 ) {
@@ -299,14 +306,12 @@ export function createLessonSummaryProviderExampleSchema(
       ),
       solution: nonEmptyText(5_000)
         .describe(
-          `Lời giải đúng, gọn và theo phong cách trình bày toán học. Riêng chứng minh/dựng hình, viết mạch lập luận liên kết bằng Xét, Ta có, Vì... nên..., Suy ra, Do đó, Vậy; không biến toàn bộ lời giải thành danh sách bullet rời rạc. Với bài tính thuần túy, giữ cách trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức. Mọi ý a), b), c) phải bắt đầu ở dòng riêng.${illustrationRequirement}`,
+          `${LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION}${illustrationRequirement}`,
         )
         .nullable(),
       answer: nonEmptyText(2_000),
       geometryStatement: lessonSummaryGeometryStatementSchema
-        .describe(
-          "Bảng giả thiết–kết luận. Chỉ khác null cho bài Hình học lớp 7–9 yêu cầu Chứng minh/Chứng tỏ. hypotheses chỉ chứa dữ kiện có sẵn trong đề, không chứa kết quả suy ra hoặc đường phụ; conclusions ghi đúng điều phải chứng minh. Mọi bài Số học/Đại số, bài Hình học lớp nhỏ và bài Hình học không phải chứng minh chính thức phải trả null.",
-        )
+        .describe(LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION)
         .nullable(),
       diagramSpec: lessonSummaryProviderDiagramInputSchema
         .describe(
@@ -382,7 +387,7 @@ export const lessonSummaryProviderNoteTransportSchema = z
   .object({
     type: z.literal("note"),
     content: transportText(2_000).describe(
-      "Nội dung đi thẳng vào ghi chú, không mở đầu bằng Chú ý:, Lưu ý: hoặc Nhận xét:; vẫn phải có một Ví dụ: hoặc Chẳng hạn: ngắn.",
+      "Chỉ ghi ý Chú ý/Lưu ý/Nhận xét có trong nguồn và đi thẳng vào nội dung, không lặp nhãn. Ví dụ là tùy chọn nhưng phải tự đủ dữ kiện; không nhắc Hình x.y, hình bên, ảnh, URL hoặc nội dung phụ thuộc hình nguồn.",
     ),
     sourceChunkIds: transportSourceChunkIdsSchema,
   })
@@ -396,7 +401,9 @@ function createLessonSummaryProviderExampleTransportSchema(
       type: z.literal("example"),
       exampleKind: z.literal(exampleKind),
       problem: transportText(2_000),
-      solution: transportText(5_000).nullable(),
+      solution: transportText(5_000)
+        .describe(LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION)
+        .nullable(),
       answer: transportText(2_000),
       geometryStatement: z
         .object({
@@ -404,6 +411,7 @@ function createLessonSummaryProviderExampleTransportSchema(
           conclusions: z.array(transportText(1_000)).max(20),
         })
         .strict()
+        .describe(LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION)
         .nullable()
         .optional(),
       diagramSpec: lessonSummaryProviderDiagramTransportSchema.nullable(),

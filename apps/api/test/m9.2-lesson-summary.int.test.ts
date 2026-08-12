@@ -148,7 +148,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
   let adminToken: string;
   let studentToken: string;
   let httpServer: Parameters<typeof request>[0];
-  let initialSchemaRefsEnabled: boolean;
+  let initialSchemaReferenceStrategy: EnvConfig["AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY"];
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -173,11 +173,11 @@ describe("M9.2 lesson summary API and worker integration", () => {
     httpServer = app.getHttpServer();
     prisma = app.get(PrismaService);
     const configService = app.get(ConfigService<EnvConfig, true>);
-    initialSchemaRefsEnabled = configService.get(
-      "AI_SUMMARY_SCHEMA_REFS_ENABLED",
+    initialSchemaReferenceStrategy = configService.get(
+      "AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY",
       { infer: true },
     );
-    configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", false);
+    configService.set("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", "inline");
     await createFixtureData(prisma);
 
     const authTokens = app.get(AuthTokenService, { strict: false });
@@ -194,7 +194,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
   afterAll(async () => {
     app
       .get(ConfigService<EnvConfig, true>)
-      .set("AI_SUMMARY_SCHEMA_REFS_ENABLED", initialSchemaRefsEnabled);
+      .set("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", initialSchemaReferenceStrategy);
     await cleanupFixtureData(prisma);
     await app.close();
   });
@@ -511,15 +511,11 @@ describe("M9.2 lesson summary API and worker integration", () => {
     });
   });
 
-  it("uses reusable schema references only when the rollback flag is enabled", async () => {
+  it("uses the configured schema reference strategy", async () => {
     const configService = app.get(ConfigService<EnvConfig, true>);
-    const previousValue = configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
+    const previousStrategy = configService.get("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", {
       infer: true,
     });
-    const previousV2Value = configService.get(
-      "AI_SUMMARY_SCHEMA_REFS_V2_ENABLED",
-      { infer: true },
-    );
     const previousCacheKeyValue = configService.get(
       "AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED",
       { infer: true },
@@ -528,8 +524,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
       "AI_SUMMARY_PROMPT_CACHE_RETENTION",
       { infer: true },
     );
-    configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", true);
-    configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", true);
+    configService.set("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", "ref_v2");
     configService.set("AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED", true);
     configService.set("AI_SUMMARY_PROMPT_CACHE_RETENTION", "24h");
 
@@ -548,12 +543,12 @@ describe("M9.2 lesson summary API and worker integration", () => {
       expect(response.body.data.openAiRequest.text.format.schema).toMatchObject({
         $defs: expect.any(Object),
       });
-      expect(
-        JSON.stringify(response.body.data.openAiRequest.text.format),
-      ).toContain('"$ref"');
-      expect(
-        JSON.stringify(response.body.data.openAiRequest.text.format),
-      ).not.toContain("__schema");
+      expect(JSON.stringify(response.body.data.openAiRequest.text.format)).toContain(
+        '"$ref"',
+      );
+      expect(JSON.stringify(response.body.data.openAiRequest.text.format)).not.toContain(
+        "__schema",
+      );
       expect(response.body.data.context.schemaTokens).toBeLessThan(26_000);
       expect(response.body.data.openAiRequest.prompt_cache_key).toMatch(
         /^ls:[a-f0-9]{8}:[a-f0-9]{8}:[a-f0-9]{12}$/u,
@@ -563,16 +558,9 @@ describe("M9.2 lesson summary API and worker integration", () => {
       expect(response.body.data.openAiRequest).not.toHaveProperty("reasoning_effort");
       expect(response.body.data.openAiRequest).not.toHaveProperty("temperature");
     } finally {
-      configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", previousValue);
-      configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", previousV2Value);
-      configService.set(
-        "AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED",
-        previousCacheKeyValue,
-      );
-      configService.set(
-        "AI_SUMMARY_PROMPT_CACHE_RETENTION",
-        previousCacheRetention,
-      );
+      configService.set("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", previousStrategy);
+      configService.set("AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED", previousCacheKeyValue);
+      configService.set("AI_SUMMARY_PROMPT_CACHE_RETENTION", previousCacheRetention);
     }
   });
 
@@ -705,12 +693,10 @@ describe("M9.2 lesson summary API and worker integration", () => {
     ]);
 
     const configService = app.get(ConfigService<EnvConfig, true>);
-    const previousV2Value = configService.get(
-      "AI_SUMMARY_SCHEMA_REFS_V2_ENABLED",
-      { infer: true },
-    );
-    configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", true);
-    configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", false);
+    const previousStrategy = configService.get("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", {
+      infer: true,
+    });
+    configService.set("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", "ref");
     const regenerated = await (async () => {
       try {
         return await request(httpServer)
@@ -719,8 +705,7 @@ describe("M9.2 lesson summary API and worker integration", () => {
           .send({ documentIds: [ids.document], style: "student_friendly" })
           .expect(202);
       } finally {
-        configService.set("AI_SUMMARY_SCHEMA_REFS_ENABLED", false);
-        configService.set("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", previousV2Value);
+        configService.set("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", previousStrategy);
       }
     })();
     expect(regenerated.body.data.jobId).not.toBe(first.body.data.jobId);

@@ -89,14 +89,14 @@ chữ làm tiêu chí, vì generation vốn không deterministic.
 
 Đo và lưu fixture từ commit `9eb8e105`:
 
-| Baseline | Giá trị đã đo |
-| --- | ---: |
-| Schema inline | khoảng `329.547` ký tự |
-| `$ref` v1 hiện tại | khoảng `33.295` ký tự |
-| Số `$defs` v1 | `23` |
-| Số `$ref` v1 | `213` |
+| Baseline                        |              Giá trị đã đo |
+| ------------------------------- | -------------------------: |
+| Schema inline                   |     khoảng `329.547` ký tự |
+| `$ref` v1 hiện tại              |      khoảng `33.295` ký tự |
+| Số `$defs` v1                   |                       `23` |
+| Số `$ref` v1                    |                      `213` |
 | Input OpenAI live với `$ref` v1 | khoảng `14,4k–14,8k` token |
-| Input OpenAI live với inline | khoảng `93,2k–93,6k` token |
+| Input OpenAI live với inline    | khoảng `93,2k–93,6k` token |
 
 Fixture baseline cần gồm:
 
@@ -167,7 +167,8 @@ Kết hợp hoist subtree và short deterministic names dự kiến:
 - giảm thêm khoảng `2.822` ký tự (`8,48%`) so với `$ref` v1;
 - vẫn tương đương hoàn toàn với inline sau dereference.
 
-Budget gate ban đầu: `ref_v2 <= 30.600` ký tự với contract hiện tại. Khi contract
+Budget gate hiện tại: `ref_v2 <= 31.000` ký tự; schema v44 đạt 30.981 ký tự sau
+thay đổi note contract và ownership GT–KL. Khi contract
 version đổi hợp lệ trong tương lai, test dùng tỷ lệ so với v1 cùng version thay vì
 giữ số tuyệt đối cũ.
 
@@ -234,22 +235,21 @@ Lưu ý UI/đo lường: “Tổng input ước tính” vẫn là tổng token 
 không giảm nhờ Prompt Caching. Cache chỉ làm một phần input trở thành cached input;
 cần nhìn `cachedInputTokens`/`uncachedInputTokens` và chi phí thực tế để đánh giá.
 
-## 5. Feature flags và rollback
+## 5. Cấu hình strategy và rollback
 
-Các lớp phải điều khiển độc lập:
+Schema strategy và các lớp cache được điều khiển độc lập:
 
 ```env
-AI_SUMMARY_SCHEMA_REFS_ENABLED=false
-AI_SUMMARY_SCHEMA_REFS_V2_ENABLED=false
+AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY=ref_v2
 AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=false
 AI_SUMMARY_PROMPT_CACHE_RETENTION=in_memory
 ```
 
 Resolution:
 
-- refs off → `inline`;
-- refs on, refs v2 off → `ref` v1;
-- refs on, refs v2 on → `ref_v2`;
+- strategy `inline` → schema mở rộng hoàn toàn;
+- strategy `ref` → `$defs/$ref` v1;
+- strategy `ref_v2` → serializer compact hiện hành và là mặc định;
 - cache key off → không gửi `prompt_cache_key`;
 - retention mặc định → omit hoặc dùng behavior mặc định của provider;
 - `24h` chỉ được gửi khi capability gate pass.
@@ -287,7 +287,7 @@ Gate:
 
 ### Pha 2 — Preview/worker parity và cờ rollout schema
 
-1. Nối `AI_SUMMARY_SCHEMA_REFS_V2_ENABLED` vào resolver Summary.
+1. Nối `AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY` vào resolver Summary.
 2. Snapshot strategy vào job input.
 3. Preview và worker dùng cùng formatter/schema hash.
 4. So request field-by-field với whitelist diff tại mục 2.2.
@@ -369,24 +369,24 @@ Pha này không gọi OpenAI nhưng tạo baseline định lượng thực sự 
 
 #### 6.3. Bộ case cố định
 
-| ID | Khối/lĩnh vực | Mục đích kiểm tra | Hard visual gate |
-| --- | --- | --- | --- |
-| `S1` | Lớp 3, tính chất giao hoán | Bám đúng một khái niệm, không bịa kiến thức lân cận, văn phong tiểu học | Không tự tạo hình |
-| `S2` | Lớp 8, bình phương một tổng | Công thức, biến đổi và lời giải Đại số | Không tự tạo hình |
-| `S3` | Lớp 7, tổng ba góc tam giác | Kiến thức Hình học và một tam giác đúng cạnh/đỉnh | Mọi hình có đúng tam giác cần thiết |
-| `F1` | Bài 15, hai tam giác vuông | Đủ hai trường hợp bằng nhau, hai tam giác, góc vuông và cạnh bằng nhau | Không hình nào thiếu tam giác thứ hai; source example đúng topology |
+| ID   | Khối/lĩnh vực               | Mục đích kiểm tra                                                       | Hard visual gate                                                    |
+| ---- | --------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `S1` | Lớp 3, tính chất giao hoán  | Bám đúng một khái niệm, không bịa kiến thức lân cận, văn phong tiểu học | Không tự tạo hình                                                   |
+| `S2` | Lớp 8, bình phương một tổng | Công thức, biến đổi và lời giải Đại số                                  | Không tự tạo hình                                                   |
+| `S3` | Lớp 7, tổng ba góc tam giác | Kiến thức Hình học và một tam giác đúng cạnh/đỉnh                       | Mọi hình có đúng tam giác cần thiết                                 |
+| `F1` | Bài 15, hai tam giác vuông  | Đủ hai trường hợp bằng nhau, hai tam giác, góc vuông và cạnh bằng nhau  | Không hình nào thiếu tam giác thứ hai; source example đúng topology |
 
 Mỗi case dùng nguyên source, metadata, prompt, model, reasoning và output budget
 đã khóa. Model phải pin `gpt-5.4-2026-03-05`, không dùng alias trôi theo thời gian.
 
 #### 6.4. Ma trận paid calls theo tầng
 
-| Tầng | Control/Treatment | Số call mới | Điều kiện đi tiếp |
-| --- | --- | ---: | --- |
-| `L0` | Chấm lại H0/H1 từ artifact | `0` | Baseline parse được và manifest/hash đầy đủ |
-| `L1` | S1–S3: mỗi case một `C1 ref v1` + một `T1 ref v2` | `6` | 6/6 đạt hard gates, không có material quality loss |
-| `L2` | F1: ba cặp C1/T1, đảo thứ tự gọi theo từng cặp | `6` | 3/3 T1 đủ hai tam giác và đạt non-inferiority |
-| `L3` | Một request nhỏ ref v2 lặp ba lần với cùng cache key | `3` | Có cache read đo được; cả 3 output vẫn đạt quality gate |
+| Tầng | Control/Treatment                                    | Số call mới | Điều kiện đi tiếp                                       |
+| ---- | ---------------------------------------------------- | ----------: | ------------------------------------------------------- |
+| `L0` | Chấm lại H0/H1 từ artifact                           |         `0` | Baseline parse được và manifest/hash đầy đủ             |
+| `L1` | S1–S3: mỗi case một `C1 ref v1` + một `T1 ref v2`    |         `6` | 6/6 đạt hard gates, không có material quality loss      |
+| `L2` | F1: ba cặp C1/T1, đảo thứ tự gọi theo từng cặp       |         `6` | 3/3 T1 đủ hai tam giác và đạt non-inferiority           |
+| `L3` | Một request nhỏ ref v2 lặp ba lần với cùng cache key |         `3` | Có cache read đo được; cả 3 output vẫn đạt quality gate |
 
 Tổng tối đa ban đầu: `15` paid calls. Chạy tuần tự theo tầng và dừng ngay khi một
 hard gate fail. Không tự chạy lại request timeout/5xx; trường hợp hạ tầng được ghi
@@ -457,14 +457,14 @@ usage và tên file; reviewer chỉ thấy source và output đã render.
 
 Rubric 100 điểm:
 
-| Nhóm | Điểm | Nội dung |
-| --- | ---: | --- |
-| Bám nguồn, không tự bịa | 25 | Đúng phạm vi, đủ ý nguồn, không thêm định lí/phương pháp ngoài nguồn |
-| Đúng toán học | 20 | Công thức, suy luận, lời giải, đáp số/kết luận |
-| Đầy đủ và cân đối | 15 | Không thiếu trường hợp, ví dụ, hai bài cuối hoặc ý nhỏ của đề |
-| Cấu trúc contract | 10 | Theory–example, section, heading và thứ tự hợp lý |
-| Văn phong đúng khối lớp | 10 | Dễ hiểu/chặt chẽ đúng grade và loại bài |
-| Hình vẽ | 20 | Đủ số hình/thành phần, đúng topology, marker, nhãn và quan hệ |
+| Nhóm                    | Điểm | Nội dung                                                             |
+| ----------------------- | ---: | -------------------------------------------------------------------- |
+| Bám nguồn, không tự bịa |   25 | Đúng phạm vi, đủ ý nguồn, không thêm định lí/phương pháp ngoài nguồn |
+| Đúng toán học           |   20 | Công thức, suy luận, lời giải, đáp số/kết luận                       |
+| Đầy đủ và cân đối       |   15 | Không thiếu trường hợp, ví dụ, hai bài cuối hoặc ý nhỏ của đề        |
+| Cấu trúc contract       |   10 | Theory–example, section, heading và thứ tự hợp lý                    |
+| Văn phong đúng khối lớp |   10 | Dễ hiểu/chặt chẽ đúng grade và loại bài                              |
+| Hình vẽ                 |   20 | Đủ số hình/thành phần, đúng topology, marker, nhãn và quan hệ        |
 
 Case không cần hình được chuẩn hóa điểm trên 80 điểm còn lại; không cộng 20 điểm
 hình một cách tự động. Ít nhất hai lượt review độc lập (owner và người thực hiện
@@ -551,7 +551,7 @@ Không bật ref v2, cache key và 24h retention trong cùng một lần rollout
 - Serialize ở process/test run khác nhau vẫn byte-identical.
 - Ref v2 không làm mất description/required/nullability/union branch.
 - Inline và ref v1 không đổi byte so với commit baseline.
-- Ref v2 đạt `<= 30.600` ký tự với contract hiện tại.
+- Ref v2 đạt `<= 31.000` ký tự với contract hiện tại.
 
 ### Context/request preservation
 
@@ -678,7 +678,7 @@ có chỉ để phục vụ test harness.
 - [ ] L1/L2 đạt hard gates và non-inferiority threshold với C1/H0/H1.
 - [ ] Blind review xác nhận không giảm độ đúng toán, đủ nội dung hoặc hình vẽ.
 - [ ] L3 ghi nhận cache hit và cache-warm output vẫn đạt cùng quality gate.
-- [ ] Có thể rollback riêng `ref_v2`, cache key và retention mà không migration hoặc
+- [ ] Có thể rollback schema strategy, cache key và retention mà không migration hoặc
       regenerate dữ liệu.
 
 ## 11. Ngoài phạm vi

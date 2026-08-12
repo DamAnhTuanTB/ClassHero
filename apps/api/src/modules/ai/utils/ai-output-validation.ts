@@ -1,14 +1,57 @@
+import type { AiProviderName } from "@prisma/client";
 import type { ZodError } from "zod";
 
-import type { AiOutputSchema } from "#api/modules/ai/types/ai-text.types";
+import type {
+  AiOutputSchema,
+  AiTokenUsage,
+} from "#api/modules/ai/types/ai-text.types";
+
+export type AiProviderOutputErrorCode =
+  | "OPENAI_INCOMPLETE_MAX_OUTPUT_TOKENS"
+  | "OPENAI_INCOMPLETE_CONTENT_FILTER"
+  | "OPENAI_REFUSED"
+  | "OPENAI_STRUCTURED_OUTPUT_MISSING";
+
+export type AiProviderOutputFailureDetails = {
+  provider: AiProviderName;
+  model: string;
+  providerRequestId?: string;
+  usage?: AiTokenUsage;
+  latencyMs?: number;
+  responseStatus: string | null;
+  incompleteReason: string | null;
+  hasRefusal: boolean;
+  maxOutputTokens?: number;
+};
 
 export class AiOutputValidationError extends Error {
-  readonly code = "AI_OUTPUT_INVALID";
+  readonly code: string;
 
-  constructor(message: string, options?: { cause?: unknown }) {
+  constructor(
+    message: string,
+    options?: { cause?: unknown; code?: string },
+  ) {
     super(message, options);
     this.name = "AiOutputValidationError";
+    this.code = options?.code ?? "AI_OUTPUT_INVALID";
   }
+}
+
+export class AiProviderOutputError extends AiOutputValidationError {
+  constructor(
+    code: AiProviderOutputErrorCode,
+    message: string,
+    readonly details: AiProviderOutputFailureDetails,
+  ) {
+    super(message, { code });
+    this.name = "AiProviderOutputError";
+  }
+}
+
+export function isAiProviderOutputError(
+  error: unknown,
+): error is AiProviderOutputError {
+  return error instanceof AiProviderOutputError;
 }
 
 export function parseAiStructuredOutput<TOutput>(

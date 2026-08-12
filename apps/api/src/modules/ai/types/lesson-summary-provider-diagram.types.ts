@@ -319,7 +319,7 @@ const providerDiagramIntentEnvelopeSchema = z
   .object({
     kind: z.literal("INTENT"),
     intent: lessonSummaryDiagramIntentSchema.describe(
-      "Mô tả ngữ nghĩa của hình. Backend chịu trách nhiệm dựng tọa độ, vạch chia, điểm phụ, marker và bố trí nhãn theo quy chuẩn.",
+      "Chỉ chọn INTENT khi family/archetype này biểu diễn đầy đủ mọi điểm, đoạn/nét và quan hệ bắt buộc của nội dung. Backend chịu trách nhiệm dựng tọa độ, vạch chia, điểm phụ kỹ thuật, marker và bố trí nhãn; backend không tự bổ sung thực thể toán học đã bị bỏ khỏi intent.",
     ),
   })
   .strict();
@@ -335,7 +335,7 @@ const providerRawDiagramEnvelopeSchema = z
   .object({
     kind: z.literal("RAW_SPEC"),
     spec: lessonSummaryProviderDiagramSpecSchema.describe(
-      "Chỉ dùng khi hình thật sự không thuộc bất kỳ family/archetype INTENT nào đang hỗ trợ.",
+      "Bắt buộc dùng khi không có family/archetype INTENT nào biểu diễn đầy đủ mọi điểm, đoạn/nét hoặc quan hệ bắt buộc; không giản lược nội dung để ép vào INTENT gần nhất.",
     ),
   })
   .strict();
@@ -354,9 +354,10 @@ export const lessonSummaryProviderDiagramTransportSchema = z.union([
 ]);
 
 /**
- * Provider-facing diagram input. New generations should emit the semantic INTENT
- * envelope. RAW_SPEC and the legacy unwrapped raw shape remain accepted so cached
- * responses and existing drafts can still be parsed and repaired.
+ * Provider-facing diagram input. New generations choose INTENT only when its
+ * semantic contract is complete for the requested visual; otherwise they choose
+ * RAW_SPEC. The legacy unwrapped raw shape remains accepted so cached responses
+ * and existing drafts can still be parsed and repaired.
  */
 export const lessonSummaryProviderDiagramInputSchema = z
   .union([
@@ -365,7 +366,7 @@ export const lessonSummaryProviderDiagramInputSchema = z
     lessonSummaryProviderDiagramSpecSchema,
   ])
   .describe(
-    "Ưu tiên { kind: 'INTENT', intent: ... } để backend dựng hình chuẩn. RAW_SPEC chỉ là đường lùi cho hình chưa có archetype; dạng raw không bọc chỉ được giữ để tương thích dữ liệu cũ.",
+    "Chọn INTENT khi một archetype biểu diễn đầy đủ toàn bộ nội dung hình; nếu phải bỏ bất kỳ điểm, đoạn hoặc quan hệ bắt buộc nào thì chọn RAW_SPEC. Không chọn archetype gần nhất bằng cách giản lược đề. Dạng raw không bọc chỉ được giữ để tương thích dữ liệu cũ.",
   );
 
 function addProviderGeometryRelationIssues(

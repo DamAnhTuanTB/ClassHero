@@ -435,15 +435,9 @@ export class LessonSummariesService {
   }
 
   private resolveSchemaReferenceStrategy(): LessonSummaryJobInput["schemaReferenceStrategy"] {
-    const refsEnabled = this.configService.get("AI_SUMMARY_SCHEMA_REFS_ENABLED", {
+    return this.configService.get("AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY", {
       infer: true,
     });
-    if (!refsEnabled) return "inline";
-    return this.configService.get("AI_SUMMARY_SCHEMA_REFS_V2_ENABLED", {
-      infer: true,
-    })
-      ? "ref_v2"
-      : "ref";
   }
 
   private resolvePromptCacheConfiguration(): Pick<
@@ -455,10 +449,9 @@ export class LessonSummariesService {
         "AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED",
         { infer: true },
       ),
-      promptCacheRetention: this.configService.get(
-        "AI_SUMMARY_PROMPT_CACHE_RETENTION",
-        { infer: true },
-      ),
+      promptCacheRetention: this.configService.get("AI_SUMMARY_PROMPT_CACHE_RETENTION", {
+        infer: true,
+      }),
     };
   }
 }

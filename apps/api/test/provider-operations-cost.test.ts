@@ -11,6 +11,7 @@ import {
   AiProviderCallService,
   isTransientProviderError,
 } from "#api/modules/ai/services/ai-provider-call.service";
+import { AiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import {
   ProviderBudgetError,
   providerBudgetErrorCodes,
@@ -232,6 +233,167 @@ describe("provider operations cost accounting", () => {
       expect.anything(),
       AiProviderName.OPENAI,
     );
+  });
+
+  it("settles and assigns measured cost when a structured response is incomplete", async () => {
+    const providerError = new AiProviderOutputError(
+      "OPENAI_INCOMPLETE_MAX_OUTPUT_TOKENS",
+      "OpenAI đã dừng vì chạm giới hạn token đầu ra.",
+      {
+        provider: AiProviderName.OPENAI,
+        model: "gpt-5.1",
+        providerRequestId: "resp-incomplete",
+        responseStatus: "incomplete",
+        incompleteReason: "max_output_tokens",
+        hasRefusal: false,
+        maxOutputTokens: 16_000,
+        latencyMs: 2_000,
+        usage: {
+          promptTokens: 100,
+          completionTokens: 16_000,
+          totalTokens: 16_100,
+        },
+      },
+    );
+    const aiService = {
+      generateStructured: vi.fn(async () => Promise.reject(providerError)),
+    };
+    const rates = [
+      rate(ProviderUsageMetric.INPUT_TOKEN, 1_000_000, 1),
+      rate(ProviderUsageMetric.OUTPUT_TOKEN, 1_000_000, 2),
+    ];
+    const usage = {
+      reserveAndStart: vi.fn(async () => ({ id: "usage-incomplete" })),
+      succeed: vi.fn(),
+      fail: vi.fn(async () => ({ costVnd: 815, costMeasured: true })),
+    };
+    const update = vi.fn();
+    const service = new AiProviderCallService(
+      aiService as never,
+      { resolve: vi.fn() } as never,
+      usage as never,
+      { aiGeneration: { update } } as never,
+    );
+
+    await expect(
+      service.generateStructured(
+        {
+          feature: AiGenerationType.SUMMARY,
+          aiGenerationId: "generation-incomplete",
+          backgroundJobId: "job-incomplete",
+          routeSnapshot: {
+            feature: AiGenerationType.SUMMARY,
+            version: 1,
+            model: "gpt-5.1",
+            temperature: null,
+            reasoningEffort: "medium",
+            maxOutputTokens: 16_000,
+            candidates: [
+              {
+                catalogItemId: "openai-catalog",
+                priceVersionId: "openai-price",
+                category: ProviderCatalogCategory.AI_MODEL,
+                provider: AiProviderName.OPENAI,
+                model: "gpt-5.1",
+                maxInputTokens: 32_000,
+                available: true,
+                rates,
+              },
+            ],
+            hasConfiguration: true,
+          },
+        },
+        {
+          systemPrompt: "system",
+          userPrompt: "user",
+          outputName: "summary",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+        },
+        z.object({ title: z.string() }),
+      ),
+    ).rejects.toBe(providerError);
+    expect(usage.fail).toHaveBeenCalledWith(
+      "usage-incomplete",
+      providerError,
+      { rates },
+    );
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "generation-incomplete" },
+      data: { estimatedCostVnd: 815 },
+    });
+    expect(usage.succeed).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite generation cost when failed response usage is unknown", async () => {
+    const providerError = new AiProviderOutputError(
+      "OPENAI_STRUCTURED_OUTPUT_MISSING",
+      "OpenAI không trả về dữ liệu có cấu trúc hoàn chỉnh.",
+      {
+        provider: AiProviderName.OPENAI,
+        model: "gpt-5.1",
+        providerRequestId: "resp-missing-usage",
+        responseStatus: "completed",
+        incompleteReason: null,
+        hasRefusal: false,
+      },
+    );
+    const usage = {
+      reserveAndStart: vi.fn(async () => ({ id: "usage-missing" })),
+      succeed: vi.fn(),
+      fail: vi.fn(async () => ({ costVnd: 0, costMeasured: false })),
+    };
+    const update = vi.fn();
+    const service = new AiProviderCallService(
+      {
+        generateStructured: vi.fn(async () => Promise.reject(providerError)),
+      } as never,
+      { resolve: vi.fn() } as never,
+      usage as never,
+      { aiGeneration: { update } } as never,
+    );
+
+    await expect(
+      service.generateStructured(
+        {
+          feature: AiGenerationType.SUMMARY,
+          aiGenerationId: "generation-missing",
+          routeSnapshot: {
+            feature: AiGenerationType.SUMMARY,
+            version: 1,
+            model: "gpt-5.1",
+            temperature: null,
+            reasoningEffort: "medium",
+            maxOutputTokens: 16_000,
+            candidates: [
+              {
+                catalogItemId: "openai-catalog",
+                priceVersionId: "openai-price",
+                category: ProviderCatalogCategory.AI_MODEL,
+                provider: AiProviderName.OPENAI,
+                model: "gpt-5.1",
+                maxInputTokens: 32_000,
+                available: true,
+                rates: [
+                  rate(ProviderUsageMetric.INPUT_TOKEN, 1_000_000, 1),
+                  rate(ProviderUsageMetric.OUTPUT_TOKEN, 1_000_000, 2),
+                ],
+              },
+            ],
+            hasConfiguration: true,
+          },
+        },
+        {
+          systemPrompt: "system",
+          userPrompt: "user",
+          outputName: "summary",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+        },
+        z.object({ title: z.string() }),
+      ),
+    ).rejects.toBe(providerError);
+    expect(update).not.toHaveBeenCalled();
   });
 });
 

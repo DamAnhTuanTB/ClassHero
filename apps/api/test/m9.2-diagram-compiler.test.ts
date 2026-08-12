@@ -1752,6 +1752,35 @@ describe("M9.2 deterministic math diagram compiler", () => {
     );
   });
 
+  it("fully compiles the basic cyclic-quadrilateral capability advertised to the provider", () => {
+    const diagram = compileLessonSummaryDiagramIntent({
+      ...base,
+      grade: 9,
+      difficulty: "HARD",
+      family: "ADVANCED_GEOMETRY",
+      archetype: "CIRCLE_RELATIONS",
+      variant: "CYCLIC_QUADRILATERAL",
+      pointLabels: ["O", "A", "B", "C", "D"],
+      measures: [],
+    });
+
+    expect(diagram.diagnostics.compilerKey).toBe("geometry.circle-relations.v1");
+    expect(diagram.spec.points).toHaveLength(5);
+    expect(diagram.spec.points).toContainEqual(
+      expect.objectContaining({ id: "cyclicO", label: "O", pointStyle: "FILLED" }),
+    );
+    expect(diagram.spec.primitives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "cyclicCircle", type: "CIRCLE" }),
+        expect.objectContaining({ id: "cyclicSide0", type: "SEGMENT" }),
+        expect.objectContaining({ id: "cyclicSide1", type: "SEGMENT" }),
+        expect.objectContaining({ id: "cyclicSide2", type: "SEGMENT" }),
+        expect.objectContaining({ id: "cyclicSide3", type: "SEGMENT" }),
+      ]),
+    );
+    expect(diagram.spec.primitives).toHaveLength(5);
+  });
+
   it("draws both tangents from an external point with equal-length markers", () => {
     const diagram = compileLessonSummaryDiagramIntent({
       ...base,

@@ -2,17 +2,20 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import {
+  AiProviderName,
   Prisma,
   ProviderBillingMode,
   ProviderBudgetReservationStatus,
   ProviderBudgetScope,
   ProviderCatalogCategory,
   ProviderUsageMetric,
+  ProviderUsageStatus,
 } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
+import { AiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 import { isProviderBudgetError } from "#api/modules/provider-operations/utils/provider-budget-error";
 
@@ -199,6 +202,98 @@ describe("M9.12 atomic provider budget reservation", () => {
         where: { idempotencyKey: `${provider}:released` },
       }),
     ).toMatchObject({ status: ProviderBudgetReservationStatus.RELEASED });
+  });
+
+  it("settles measured cost and diagnostics for an incomplete provider response", async () => {
+    await allowAnother(100);
+    const failed = await reserve("settled-incomplete");
+    await usage.fail(
+      failed.id,
+      new AiProviderOutputError(
+        "OPENAI_INCOMPLETE_MAX_OUTPUT_TOKENS",
+        "OpenAI đã dừng vì chạm giới hạn token đầu ra.",
+        {
+          provider: AiProviderName.OPENAI,
+          model: "gpt-5.1",
+          providerRequestId: "resp-incomplete",
+          responseStatus: "incomplete",
+          incompleteReason: "max_output_tokens",
+          hasRefusal: false,
+          maxOutputTokens: 16_000,
+          latencyMs: 2_000,
+          usage: {
+            promptTokens: 100,
+            cachedInputTokens: 40,
+            completionTokens: 16_000,
+            reasoningTokens: 12_500,
+            totalTokens: 16_100,
+          },
+        },
+      ),
+      { rates: requestRates() },
+    );
+
+    const usageEvent = await prisma.providerUsageEvent.findUniqueOrThrow({
+      where: { id: failed.id },
+    });
+    expect(usageEvent).toMatchObject({
+      status: ProviderUsageStatus.FAILED,
+      providerRequestId: "resp-incomplete",
+      promptTokens: 100,
+      cachedInputTokens: 40,
+      completionTokens: 16_000,
+      totalTokens: 16_100,
+      errorCode: "OPENAI_INCOMPLETE_MAX_OUTPUT_TOKENS",
+      latencyMs: 2_000,
+      costVnd: 100,
+      rawUsageJson: {
+        responseStatus: "incomplete",
+        incompleteReason: "max_output_tokens",
+        hasRefusal: false,
+        maxOutputTokens: 16_000,
+        reasoningTokens: 12_500,
+      },
+    });
+    expect(
+      await prisma.providerBudgetReservation.findUniqueOrThrow({
+        where: { idempotencyKey: `${provider}:settled-incomplete` },
+      }),
+    ).toMatchObject({
+      status: ProviderBudgetReservationStatus.SETTLED,
+      settledVnd: 100,
+    });
+  });
+
+  it("keeps the reservation uncertain when a provider response has no usage", async () => {
+    await allowAnother(100);
+    const failed = await reserve("uncertain-missing-usage");
+    await usage.fail(
+      failed.id,
+      new AiProviderOutputError(
+        "OPENAI_STRUCTURED_OUTPUT_MISSING",
+        "OpenAI không trả về dữ liệu có cấu trúc hoàn chỉnh.",
+        {
+          provider: AiProviderName.OPENAI,
+          model: "gpt-5.1",
+          providerRequestId: "resp-missing-usage",
+          responseStatus: "completed",
+          incompleteReason: null,
+          hasRefusal: false,
+          latencyMs: 1_000,
+        },
+      ),
+      { rates: requestRates() },
+    );
+
+    expect(
+      await prisma.providerBudgetReservation.findUniqueOrThrow({
+        where: { idempotencyKey: `${provider}:uncertain-missing-usage` },
+      }),
+    ).toMatchObject({
+      status: ProviderBudgetReservationStatus.UNCERTAIN,
+      settledVnd: 0,
+      settledAt: null,
+    });
   });
 
   it("keeps an ambiguous timeout reserved and fails closed without a price", async () => {

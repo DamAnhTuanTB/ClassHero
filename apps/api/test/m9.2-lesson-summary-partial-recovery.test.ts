@@ -480,12 +480,78 @@ function recoverAndMap(value = providerOutput(), targetGrade?: number | null) {
     output: recovery.output,
     contextChunks,
     reviewIssuesByPath: recovery.reviewIssuesByPath,
+    diagramProvenanceByPath: recovery.diagramProvenanceByPath,
     rootReviewIssues: recovery.rootReviewIssues,
     targetGrade,
   });
 }
 
 describe("M9.2 partial lesson-summary recovery", () => {
+  it("preserves whether a renderer-ready diagram came from INTENT or RAW_SPEC", () => {
+    const intentOutput = providerOutput();
+    intentOutput.applicationExercises.standardExercise.diagramSpec = {
+      kind: "INTENT",
+      intent: {
+        intentVersion: 1,
+        grade: 7,
+        difficulty: "MEDIUM",
+        caption: "Hình chữ nhật ABCD",
+        family: "PLANE_GEOMETRY",
+        archetype: "QUADRILATERAL",
+        variant: "RECTANGLE",
+        pointLabels: ["A", "B", "C", "D"],
+        measures: [],
+      },
+    };
+
+    const intentTransport =
+      lessonSummaryProviderTransportOutputSchema.parse(intentOutput);
+    const intentRecovery = recoverLessonSummaryProviderOutput({
+      output: intentTransport,
+      contextChunks,
+    });
+    const intentSummary = mapLessonSummaryProviderOutput({
+      lessonId: "lesson-15",
+      output: intentRecovery.output,
+      contextChunks,
+      reviewIssuesByPath: intentRecovery.reviewIssuesByPath,
+      diagramProvenanceByPath: intentRecovery.diagramProvenanceByPath,
+      rootReviewIssues: intentRecovery.rootReviewIssues,
+      targetGrade: 7,
+    });
+    const intentExample = intentSummary.sections.at(-1)?.blocks[0];
+
+    expect(
+      intentRecovery.diagramProvenanceByPath.get("applicationExercises.standardExercise"),
+    ).toEqual({
+      diagramSpecOrigin: "COMPILED_INTENT",
+      compilerKey: "geometry.quadrilateral.v1",
+      intentVersion: 1,
+    });
+    expect(intentExample).toHaveProperty("visual.diagramSpecOrigin", "COMPILED_INTENT");
+    expect(intentExample).toHaveProperty(
+      "visual.compilerKey",
+      "geometry.quadrilateral.v1",
+    );
+
+    const rawOutput = providerOutput();
+    rawOutput.applicationExercises.standardExercise.diagramSpec =
+      invalidRelationDiagram();
+    const rawTransport = lessonSummaryProviderTransportOutputSchema.parse(rawOutput);
+    const rawRecovery = recoverLessonSummaryProviderOutput({
+      output: rawTransport,
+      contextChunks,
+    });
+
+    expect(
+      rawRecovery.diagramProvenanceByPath.get("applicationExercises.standardExercise"),
+    ).toEqual({
+      diagramSpecOrigin: "PROVIDER_RAW_SPEC",
+      compilerKey: null,
+      intentVersion: null,
+    });
+  });
+
   it("keeps the complete example visible when a formal proof lacks GT-KL", () => {
     const output = providerOutput();
     output.applicationExercises.standardExercise.problem =
@@ -570,8 +636,7 @@ describe("M9.2 partial lesson-summary recovery", () => {
         "Hình vẫn vẽ được; hệ thống đã tự bổ sung tên điểm C′ còn thiếu theo mẫu hình chuẩn.",
     },
     {
-      detail:
-        "TABLE_CELL_LABEL_COUNT: Expected 4 centered table cells, received 3.",
+      detail: "TABLE_CELL_LABEL_COUNT: Expected 4 centered table cells, received 3.",
       message: "Bảng vẫn hiển thị được nhưng đang có một hoặc vài ô thiếu nội dung.",
     },
     {
@@ -592,8 +657,7 @@ describe("M9.2 partial lesson-summary recovery", () => {
         "Biểu đồ tranh vẫn hiển thị được nhưng số nhóm và số giá trị chưa khớp; phần dư đã được bỏ.",
     },
     {
-      detail:
-        "SPATIAL_DIMENSION_OMITTED: A non-positive solid dimension was omitted.",
+      detail: "SPATIAL_DIMENSION_OMITTED: A non-positive solid dimension was omitted.",
       message:
         "Hình khối vẫn hiển thị được; một số đo không hợp lệ đã được bỏ khỏi hình.",
     },
@@ -604,8 +668,7 @@ describe("M9.2 partial lesson-summary recovery", () => {
         "Thước đo vẫn hiển thị được; bước chia đã cho lớn hơn toàn khoảng nên hệ thống chỉ giữ hai mốc đầu–cuối.",
     },
     {
-      detail:
-        "SCHEMATIC_EDGE_OMITTED: An edge with an unknown endpoint was omitted.",
+      detail: "SCHEMATIC_EDGE_OMITTED: An edge with an unknown endpoint was omitted.",
       message:
         "Sơ đồ vẫn hiển thị được; một đường nối có đầu mút không tồn tại hoặc tự nối vào chính nó đã được bỏ.",
     },
@@ -1078,25 +1141,28 @@ describe("M9.2 partial lesson-summary recovery", () => {
     expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
   });
 
-  it.each(hardCompilerFailureDiagrams)("isolates compiler failure: $name", ({ diagram }) => {
-    const value = providerOutput();
-    value.theorySections[0]!.units[0]!.theory.diagramSpec = diagram;
-    value.theorySections[0]!.units[0]!.illustration.diagramSpec = null;
+  it.each(hardCompilerFailureDiagrams)(
+    "isolates compiler failure: $name",
+    ({ diagram }) => {
+      const value = providerOutput();
+      value.theorySections[0]!.units[0]!.theory.diagramSpec = diagram;
+      value.theorySections[0]!.units[0]!.illustration.diagramSpec = null;
 
-    const summary = recoverAndMap(value);
-    const theorem = summary.sections[0]!.blocks[0]!;
-    expect(theorem.visual).toBeUndefined();
-    expect(theorem.reviewIssues).toEqual([
-      expect.objectContaining({
-        code: "DIAGRAM_CANNOT_RENDER",
-        resolution: "FIX_ONLY",
-        accepted: false,
-      }),
-    ]);
-    expect(summary.sections[0]!.blocks[1]!.type).toBe("example");
-    expect(summary.sections.at(-1)?.blocks).toHaveLength(2);
-    expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
-  });
+      const summary = recoverAndMap(value);
+      const theorem = summary.sections[0]!.blocks[0]!;
+      expect(theorem.visual).toBeUndefined();
+      expect(theorem.reviewIssues).toEqual([
+        expect.objectContaining({
+          code: "DIAGRAM_CANNOT_RENDER",
+          resolution: "FIX_ONLY",
+          accepted: false,
+        }),
+      ]);
+      expect(summary.sections[0]!.blocks[1]!.type).toBe("example");
+      expect(summary.sections.at(-1)?.blocks).toHaveLength(2);
+      expect(() => lessonSummaryOutputSchema.parse(summary)).not.toThrow();
+    },
+  );
 
   it.each(recoverableCompilerDiagrams)(
     "keeps recoverable compiler output visible: $name",

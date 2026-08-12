@@ -23,7 +23,10 @@ import {
   buildLessonSummarySourceTopics,
   isLessonSummaryRealWorldCandidate,
 } from "#api/modules/ai/utils/lesson-summary-source-candidates";
-import type { LessonSummaryReviewIssueDraft } from "#api/modules/ai/utils/lesson-summary-recovery";
+import type {
+  LessonSummaryDiagramProvenance,
+  LessonSummaryReviewIssueDraft,
+} from "#api/modules/ai/utils/lesson-summary-recovery";
 import {
   describeLessonSummaryDiagramReviewIssue,
   simplifyLessonSummaryReviewCopy,
@@ -33,9 +36,17 @@ const EXERCISE_HEADING_PATTERN =
   /^(?:ví\s*dụ|luyện\s*tập|vận\s*dụng|bài\s*tập|ứng\s*dụng\s*thực\s*tế)(?:\s|$|[:：.-])/iu;
 const FORBIDDEN_THEORY_LABEL_PATTERN =
   /(?:(?:ví\s*dụ|chẳng\s*hạn|chú\s*ý|lưu\s*ý|nhận\s*xét)(?:\s+\d+)?\s*[:：]|(?:^|\n)\s*(?:[-*+]\s*)?(?:\*\*|__)?(?:luyện\s*tập|vận\s*dụng|bài\s*tập)(?:\s+\d+)?\s*(?:[:：.-]|$))/imu;
-const NOTE_EXAMPLE_PATTERN = /(?:ví\s*dụ|chẳng\s*hạn)\s*[:：]?/iu;
 const SOURCE_IMAGE_PATTERN =
   /!\[[^\]]*\]\([^)]*\)|<img\b[^>]*>|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|\\begin\{figure\}[\s\S]*?\\end\{figure\}/giu;
+const NOTE_NUMBERED_SOURCE_VISUAL_PATTERN =
+  /\b(?:hình|hình\s*vẽ|sơ\s*đồ)\s+\d+(?:[.,]\d+)*(?:[a-z])?\b/iu;
+const NOTE_DEICTIC_SOURCE_VISUAL_PATTERN =
+  /\b(?:trong|ở|theo)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)\s+(?:\d+(?:[.,]\d+)*(?:[a-z])?|bên|dưới|trên|sau|kèm\s*theo|sau\s*đây)\b/iu;
+const NOTE_VISUAL_INSTRUCTION_PATTERN =
+  /\b(?:xem|quan\s*sát|dựa\s*vào)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)\b/iu;
+const NOTE_EMBEDDED_VISUAL_PATTERN =
+  /!\[[^\]]*\]\([^)]*\)|<img\b[^>]*>|<svg\b[^>]*>|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|\\begin\{figure\}/iu;
+const NOTE_EXTERNAL_URL_PATTERN = /(?:https?:\/\/|www\.)\S+/iu;
 const SOURCE_FIGURE_REFERENCE_PATTERN =
   /\b(?:xem|quan\s*sát|dựa\s*vào)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)(?:\s+(?:bên|dưới|trên|sau|kèm\s*theo|sau\s*đây))?\b/iu;
 const PARENTHESIZED_SOURCE_FIGURE_REFERENCE_PATTERN =
@@ -60,6 +71,7 @@ type MapLessonSummaryProviderOutputInput = {
   output: LessonSummaryProviderOutput;
   contextChunks: RetrievedChunk[];
   reviewIssuesByPath?: Map<string, LessonSummaryReviewIssueDraft[]>;
+  diagramProvenanceByPath?: Map<string, LessonSummaryDiagramProvenance>;
   rootReviewIssues?: LessonSummaryReviewIssueDraft[];
   targetGrade?: number | null;
 };
@@ -201,6 +213,10 @@ export function mapLessonSummaryProviderOutput(
       return null;
     }
   };
+  const resolveDiagramProvenance = (
+    _diagram: LessonSummaryProviderDiagramInput | null,
+    providerPath: string,
+  ) => input.diagramProvenanceByPath?.get(providerPath) ?? null;
   const attachReviewIssues = <T extends LessonSummaryMvpBlock>(
     block: T,
     providerPath: string,
@@ -329,12 +345,17 @@ export function mapLessonSummaryProviderOutput(
             chunksById,
             addWarning,
           );
-          if (!NOTE_EXAMPLE_PATTERN.test(note.content)) {
-            addWarning(
-              "NOTE_MISSING_INLINE_EXAMPLE",
-              `${notePath}.content`,
-              "Nội dung ghi chú phải có một ví dụ ngắn.",
-            );
+          if (referencesUnavailableNoteVisual(note.content)) {
+            addRuntimeReviewIssue(notePath, {
+              code: "NOTE_REFERENCES_UNAVAILABLE_VISUAL",
+              path: `${notePath}.content`,
+              message:
+                "Ghi chú đang tham chiếu hình, ảnh hoặc đường dẫn không được hiển thị kèm theo.",
+              suggestion:
+                "Viết lại ghi chú thành nội dung tự đủ dữ kiện, hoặc xóa phần tham chiếu hình nếu không cần thiết.",
+              technicalDetails:
+                "Detected a source figure, embedded visual, or external URL in note.content.",
+            });
           }
         });
       });
@@ -407,6 +428,7 @@ export function mapLessonSummaryProviderOutput(
                   chunksById,
                   sectionSourceChunkIds[0],
                   resolveDiagram(unit.theory.diagramSpec, theoryPath),
+                  resolveDiagramProvenance(unit.theory.diagramSpec, theoryPath),
                 ),
               () => fallbackTheoryBlock(unit.theory, sectionSourceChunkIds),
             );
@@ -416,6 +438,10 @@ export function mapLessonSummaryProviderOutput(
                 toPersistedExample(
                   unit.illustration,
                   resolveDiagram(unit.illustration.diagramSpec, illustrationPath),
+                  resolveDiagramProvenance(
+                    unit.illustration.diagramSpec,
+                    illustrationPath,
+                  ),
                 ),
               () => fallbackExampleBlock(),
             );
@@ -475,6 +501,10 @@ export function mapLessonSummaryProviderOutput(
           application.standardExercise.diagramSpec,
           "applicationExercises.standardExercise",
         ),
+        resolveDiagramProvenance(
+          application.standardExercise.diagramSpec,
+          "applicationExercises.standardExercise",
+        ),
       ),
     () => fallbackExampleBlock(),
   );
@@ -484,6 +514,10 @@ export function mapLessonSummaryProviderOutput(
       toPersistedExample(
         application.realWorldExercise,
         resolveDiagram(
+          application.realWorldExercise.diagramSpec,
+          "applicationExercises.realWorldExercise",
+        ),
+        resolveDiagramProvenance(
           application.realWorldExercise.diagramSpec,
           "applicationExercises.realWorldExercise",
         ),
@@ -903,6 +937,7 @@ function normalizeTheoryBlock(
   chunksById: Map<string, RetrievedChunk>,
   fallbackSourceChunkId?: string,
   diagramSpec?: LessonSummaryDiagramSpec | null,
+  diagramProvenance?: LessonSummaryDiagramProvenance | null,
 ): LessonSummaryMvpBlock {
   const sourceChunkIds = safeSourceIds(
     block.sourceChunkIds,
@@ -914,6 +949,7 @@ function normalizeTheoryBlock(
         visual: {
           kind: "DIAGRAM_SPEC" as const,
           spec: diagramSpec,
+          ...(diagramProvenance ?? {}),
         },
       }
     : {};
@@ -950,6 +986,7 @@ function normalizeTheoryBlock(
 function toPersistedExample(
   example: ProviderExample,
   diagramSpec?: LessonSummaryDiagramSpec | null,
+  diagramProvenance?: LessonSummaryDiagramProvenance | null,
 ): Extract<LessonSummaryMvpBlock, { type: "example" }> {
   const problem = stripSourceImages(example.problem, diagramSpec);
   return {
@@ -977,6 +1014,7 @@ function toPersistedExample(
           visual: {
             kind: "DIAGRAM_SPEC" as const,
             spec: diagramSpec,
+            ...(diagramProvenance ?? {}),
           },
         }
       : {}),
@@ -1030,9 +1068,19 @@ function fallbackNoteBlock(
 ): Extract<LessonSummaryMvpBlock, { type: "note" }> {
   return {
     type: "note",
-    content: "Ví dụ: [Cần bổ sung ghi chú]",
+    content: "[Cần bổ sung ghi chú]",
     sourceChunkIds,
   };
+}
+
+function referencesUnavailableNoteVisual(value: string) {
+  return (
+    NOTE_NUMBERED_SOURCE_VISUAL_PATTERN.test(value) ||
+    NOTE_DEICTIC_SOURCE_VISUAL_PATTERN.test(value) ||
+    NOTE_VISUAL_INSTRUCTION_PATTERN.test(value) ||
+    NOTE_EMBEDDED_VISUAL_PATTERN.test(value) ||
+    NOTE_EXTERNAL_URL_PATTERN.test(value)
+  );
 }
 
 function stripSourceImages(value: string, diagramSpec?: LessonSummaryDiagramSpec | null) {

@@ -46,7 +46,8 @@ const safePointLabel = z
   );
 
 function normalizeBlankOptionalText(value: unknown) {
-  return value === undefined || value === null ||
+  return value === undefined ||
+    value === null ||
     (typeof value === "string" && value.trim().length === 0)
     ? null
     : value;
@@ -1290,12 +1291,31 @@ export const lessonSummaryDiagramSpecSchema =
     }
   });
 
+export const lessonSummaryDiagramSpecOriginSchema = z.enum([
+  "PROVIDER_RAW_SPEC",
+  "COMPILED_INTENT",
+  "LEGACY_UNKNOWN",
+]);
+
+const lessonSummaryDiagramProvenanceShape = {
+  diagramSpecOrigin: lessonSummaryDiagramSpecOriginSchema.optional(),
+  compilerKey: z
+    .string()
+    .trim()
+    .regex(/^[a-z]+(?:[.-][a-z]+)*\.v\d+$/u)
+    .max(120)
+    .nullable()
+    .optional(),
+  intentVersion: z.number().int().positive().nullable().optional(),
+};
+
 export const lessonSummaryDiagramVisualSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("NONE") }).strict(),
   z
     .object({
       kind: z.literal("DIAGRAM_SPEC"),
       spec: lessonSummaryDiagramSpecSchema,
+      ...lessonSummaryDiagramProvenanceShape,
     })
     .strict(),
 ]);
@@ -1306,12 +1326,16 @@ export const lessonSummaryDiagramStructuralVisualSchema = z.discriminatedUnion("
     .object({
       kind: z.literal("DIAGRAM_SPEC"),
       spec: lessonSummaryDiagramSpecStructuralSchema,
+      ...lessonSummaryDiagramProvenanceShape,
     })
     .strict(),
 ]);
 
 export type LessonSummaryDiagramSpec = z.infer<typeof lessonSummaryDiagramSpecSchema>;
 export type LessonSummaryDiagramVisual = z.infer<typeof lessonSummaryDiagramVisualSchema>;
+export type LessonSummaryDiagramSpecOrigin = z.infer<
+  typeof lessonSummaryDiagramSpecOriginSchema
+>;
 
 const BRACED_THREE_POINT_ANGLE_PATTERN =
   /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
