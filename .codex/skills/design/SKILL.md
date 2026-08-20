@@ -124,7 +124,7 @@ For `/design <viewport> M4.5`, design the admin lesson document upload/status fl
 Required context:
 
 - `docs/implementation/M4.md`
-- `docs/ui-references/approved-patterns.md#admin-lesson-document-upload---2026-07-17`
+- `docs/ui-references/approved-patterns.md#admin-lesson-document-upload---updated-2026-07-23`
 - `docs/ui-references/code-patterns/uploads.md`
 - Existing admin course list/detail screenshots from `docs/final-screen-ui/<viewport>/admin/courses/`
 - Existing admin course code under `apps/web/features/admin/courses/`

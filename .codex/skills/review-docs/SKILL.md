@@ -35,9 +35,24 @@ Use this skill to audit Codex guidance files. Stay docs/skills/prompts focused u
    - stale UI code-pattern routing after pattern docs are split across `docs/ui-references/code-patterns/`;
    - stale current context, code index, feature coverage, dependency graph, or decision log references;
    - overly long repeated rules that should live in `AGENTS.md` or README instead.
+   - context/index files that have become history logs instead of routing aids.
 4. If the user asks to fix, or the issue is an obvious docs-only correction, patch the relevant docs.
 5. Do not update changelog in this workflow. Changelog is written only during `/commit` for the commit being created.
 6. Run lightweight checks such as `rg` for stale references, `pnpm format:check`, and `git diff --check` when relevant.
+
+## Brevity Guard
+
+- Index files should route to the source of truth, not repeat its detailed contract.
+- Keep `.codex/context/current-context.md` to the active direction, current
+  subtask/status, latest relevant checks, blockers and links. Target roughly
+  `<= 150` lines; move historical audits to ADRs, plans or artifacts.
+- Keep `.codex/context/code-index.md` as path plus one concise ownership note;
+  do not turn each row into a feature changelog.
+- Keep implementation order in `docs/09-implementation-plan.md`, dependency
+  detail in `docs/implementation/dependency-graph.md`, and layer coverage in
+  `docs/implementation/feature-coverage-matrix.md`.
+- Do not shorten by deleting unique product, API, database, security or AI
+  invariants. Remove repetition only after confirming the canonical copy remains.
 
 ## Completion Notification
 

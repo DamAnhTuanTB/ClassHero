@@ -1,0 +1,1 @@
+- 2026-08-20: Rút gọn README và current context thành các điểm vào vận hành ngắn gọn, bổ sung guard chống tài liệu Codex phình thành lịch sử lặp lại, đồng thời sửa liên kết pattern UI và thêm hướng dẫn lưu final-screen artifact.
