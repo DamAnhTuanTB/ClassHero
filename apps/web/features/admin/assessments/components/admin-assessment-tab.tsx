@@ -27,13 +27,11 @@ import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
-import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
 import {
   isLessonSummaryExampleBlockData,
   LessonSummaryExampleCard,
   type LessonSummaryExampleBlockData,
 } from "@/components/common/content/lesson-summary-example-content";
-import type { LessonSummaryDiagramEditor } from "@/components/common/content/lesson-summary-diagram-editing";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
 import type {
   AdminMultiStatementAnswer,
@@ -64,11 +62,6 @@ import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizonta
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
 import { cn } from "@/lib/utils";
 import { AdminGeneratedSetReviewActions } from "@/features/admin/ai-generation/components/admin-generated-set-review-actions";
-import {
-  addEqualLengthMarkerToLessonSummaryDiagram,
-  deleteLessonSummaryDiagramTarget,
-  editLessonSummaryDiagramTargetText,
-} from "@/features/admin/ai-generation/utils/lesson-summary-diagram-edit";
 
 const AdminAssessmentQuestionEditorDialog = dynamic(
   () =>
@@ -847,7 +840,7 @@ function QuizSetPanel({
           </div>
         ) : selectedQuestion && selectedQuestionIndex >= 0 ? (
           isAiGeneratedQuestion && questionViewMode === "SPLIT" ? (
-          <div className="grid gap-4 bg-[var(--theme-surface-soft)] p-3 sm:p-4 xl:grid-cols-2">
+            <div className="grid gap-4 bg-[var(--theme-surface-soft)] p-3 sm:p-4 xl:grid-cols-2">
               <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950">
                 <QuestionCard
                   key={selectedQuestion.id}
@@ -915,7 +908,6 @@ function QuestionCard({
   );
   const hint = getTiptapDocumentText(question.hintJson);
   const explanation = getTiptapDocumentText(question.explanation?.contentJson);
-  const explanationDiagram = question.explanation?.diagramSpecJson;
   const savedExampleBlock = useMemo(() => {
     const candidate = question.sourceMetadataJson?.exampleBlock;
     return isLessonSummaryExampleBlockData(candidate) ? candidate : null;
@@ -926,63 +918,6 @@ function QuestionCard({
   const hasExampleChanges =
     draftExampleBlock !== null &&
     JSON.stringify(draftExampleBlock) !== JSON.stringify(savedExampleBlock);
-  const diagramEditor = useMemo<LessonSummaryDiagramEditor | undefined>(() => {
-    if (
-      !onSaveExample ||
-      !exampleBlock?.visual ||
-      exampleBlock.visual.kind !== "DIAGRAM_SPEC"
-    ) {
-      return undefined;
-    }
-    const updateSpec = (spec: typeof exampleBlock.visual.spec) => {
-      setDraftExampleBlock({
-        ...exampleBlock,
-        visual: { kind: "DIAGRAM_SPEC", spec },
-      });
-    };
-    return {
-      disabled: isSavingExample,
-      onRequestAddEqualLength(segmentIds) {
-        const result = addEqualLengthMarkerToLessonSummaryDiagram(
-          exampleBlock.visual?.spec,
-          segmentIds,
-        );
-        if (!result.success) {
-          toast.error(result.reason);
-          return false;
-        }
-        updateSpec(result.spec);
-        return true;
-      },
-      onRequestDelete(target) {
-        const result = deleteLessonSummaryDiagramTarget(
-          exampleBlock.visual?.spec,
-          target,
-        );
-        if (!result.success) {
-          toast.error(result.reason);
-          return;
-        }
-        updateSpec(result.spec);
-      },
-      onRequestReset() {
-        setDraftExampleBlock(null);
-      },
-      onRequestTextEdit(target, nextText) {
-        const result = editLessonSummaryDiagramTargetText(
-          exampleBlock.visual?.spec,
-          target,
-          nextText,
-        );
-        if (!result.success) {
-          toast.error(result.reason);
-          return false;
-        }
-        updateSpec(result.spec);
-        return true;
-      },
-    };
-  }, [exampleBlock, isSavingExample, onSaveExample]);
 
   const saveExampleChanges = async () => {
     if (!draftExampleBlock || !onSaveExample) return;
@@ -1141,7 +1076,7 @@ function QuestionCard({
         </div>
       )}
 
-      {hint || explanation || explanationDiagram || exampleBlock ? (
+      {hint || explanation || exampleBlock ? (
         <div className="space-y-3">
           {hint ? (
             <div className="rounded-lg border border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] p-3">
@@ -1160,7 +1095,6 @@ function QuestionCard({
             <>
               <LessonSummaryExampleCard
                 block={exampleBlock}
-                diagramEditor={diagramEditor}
                 label="Lời giải"
                 showEditorialWarning
                 showProblem={false}
@@ -1189,14 +1123,6 @@ function QuestionCard({
               </div>
             </div>
           ) : null}
-        </div>
-      ) : null}
-      {!exampleBlock && explanationDiagram ? (
-        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-          <p className="mb-2 text-xs font-extrabold text-[var(--theme-text-muted)]">
-            Hình minh họa lời giải
-          </p>
-          <LessonSummaryDiagram spec={explanationDiagram} showEditorialWarning />
         </div>
       ) : null}
     </article>

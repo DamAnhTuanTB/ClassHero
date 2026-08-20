@@ -21,6 +21,12 @@ export interface RetrievedChunk {
 export interface AiTextInput {
   systemPrompt: string;
   userPrompt: string;
+  /** Ordered file inputs placed before manifest/user text in one user message. */
+  inputFiles?: AiInputFile[];
+  /** Ordered provider-neutral text items placed after files and before userPrompt. */
+  inputTextItems?: AiInputTextItem[];
+  /** Optional visual references. Text remains the primary input. */
+  inputImages?: AiInputImage[];
   contextChunks?: RetrievedChunk[];
   /** Summary uses JSON so chunk content cannot break XML-like delimiters. */
   contextSerialization?: "xml" | "json";
@@ -30,6 +36,25 @@ export interface AiTextInput {
   /** Model runtime resolved by provider-operations; embedding does not use this field. */
   model?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface AiInputFile {
+  filename: string;
+  mimeType: "application/pdf" | "application/json";
+  detail?: "low" | "high" | "auto";
+  fileId?: string;
+  fileData?: string;
+  fileUrl?: string;
+}
+
+export interface AiInputTextItem {
+  id: "user_prompt" | "source_packet_manifest";
+  text: string;
+}
+
+export interface AiInputImage {
+  imageUrl: string;
+  detail?: "low" | "high" | "auto" | "original";
 }
 
 export interface AiTokenUsage {
@@ -44,8 +69,15 @@ export interface AiProviderOutputMetadata {
   provider: AiProviderName;
   model: string;
   usage?: AiTokenUsage;
+  /** Exact provider usage object before normalization; kept for audit only. */
+  providerUsageRaw?: unknown;
   providerRequestId?: string;
   latencyMs?: number;
+  inputFileOperations?: Array<{
+    providerFileId: string;
+    uploadLatencyMs: number;
+    cleanupStatus: "not_owned" | "deleted" | "failed";
+  }>;
 }
 
 export interface AiTextOutput extends AiProviderOutputMetadata {

@@ -9,6 +9,7 @@ import type {
   AdminSourceDocumentApi,
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
+import { useAdminFileAccessUrl } from "@/features/admin/courses/hooks/use-admin-file-access-url";
 
 export function SourceDocumentRangePreview({
   expanded,
@@ -23,9 +24,13 @@ export function SourceDocumentRangePreview({
   warning?: string | null;
   onExpandedChange?: (expanded: boolean) => void;
 }) {
-  const [internalExpanded, setInternalExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(true);
   const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
   const isExpanded = expanded ?? internalExpanded;
+  const pdfAccessUrlQuery = useAdminFileAccessUrl(
+    sourceDocument?.file.id ?? null,
+    isExpanded && previewMode === "pdf",
+  );
 
   const toggleExpanded = () => {
     const nextExpanded = !isExpanded;
@@ -86,7 +91,11 @@ export function SourceDocumentRangePreview({
         <div className="mt-3 max-h-[32rem] overflow-y-auto rounded-md border border-[var(--theme-border)] bg-[var(--theme-surface)] p-3">
           {pages.map((page, pageIndex) => {
             const printed = getPrintedPageView(page);
-            const content = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+            const content =
+              page.orderedContent ??
+              page.mathpixMarkdown ??
+              page.fullText ??
+              page.textPreview;
             return (
               <div
                 key={page.id}
@@ -102,16 +111,19 @@ export function SourceDocumentRangePreview({
                 </p>
                 {previewMode === "ocr" ? (
                   content ? (
-                    <MathpixMarkdownRenderer content={content} />
+                    <MathpixMarkdownRenderer
+                      className="mmd-content--ocr-document"
+                      content={content}
+                    />
                   ) : (
                     <p className="italic text-[var(--theme-text-muted)]">
                       Không có nội dung OCR.
                     </p>
                   )
-                ) : sourceDocument?.file.publicUrl ? (
+                ) : sourceDocument?.file.id ? (
                   <div className="flex justify-center overflow-x-auto rounded-md bg-[var(--theme-surface-soft)] text-center">
                     <PdfPagePreview
-                      pdfUrl={sourceDocument.file.publicUrl}
+                      pdfUrl={pdfAccessUrlQuery.data?.url ?? null}
                       pageNumber={page.pageNumber}
                       width={650}
                     />

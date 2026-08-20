@@ -269,6 +269,9 @@ function createProcessorPrismaMock() {
       findUnique: vi.fn(async () => ({ metadataJson: {} })),
       updateMany: vi.fn(async () => ({ count: 0 })),
     },
+    documentOcrArtifact: {
+      upsert: vi.fn(async () => ({ id: "ocr-artifact-1" })),
+    },
   } as unknown as PrismaService & {
     backgroundJob: {
       findUnique: ReturnType<typeof vi.fn>;

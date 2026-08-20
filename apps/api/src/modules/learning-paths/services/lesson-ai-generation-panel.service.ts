@@ -4,6 +4,8 @@ import { AiGenerationType, AiProviderName, DocumentStatus, Prisma } from "@prism
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { AiService } from "#api/modules/ai/services/ai.service";
 import { throwLessonNotFound } from "#api/modules/learning-paths/utils/lesson.helpers";
+import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
+import { supportsHighDetailPdfInput } from "#api/modules/provider-operations/utils/ai-model-capabilities";
 
 const PANEL_GENERATION_TYPES = [
   AiGenerationType.SUMMARY,
@@ -13,6 +15,7 @@ const PANEL_GENERATION_TYPES = [
 ] as const;
 
 const panelGenerationSelect = {
+  id: true,
   type: true,
   status: true,
   errorMessage: true,
@@ -23,6 +26,7 @@ const panelGenerationSelect = {
   latencyMs: true,
   estimatedCostVnd: true,
   inputMetaJson: true,
+  providerUsageEvents: { select: { costVnd: true } },
   backgroundJob: {
     select: {
       id: true,
@@ -51,10 +55,12 @@ export class LessonAiGenerationPanelService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AiService) private readonly aiService: AiService,
+    @Inject(AiModelRoutingService)
+    private readonly modelRouting: AiModelRoutingService,
   ) {}
 
   async getForAdmin(lessonId: string) {
-    const [lesson, ...generations] = await Promise.all([
+    const [lesson, summaryRoute, activeModels, ...generations] = await Promise.all([
       this.prisma.lesson.findFirst({
         where: {
           id: lessonId,
@@ -83,12 +89,26 @@ export class LessonAiGenerationPanelService {
               embeddingProvider: true,
               embeddingModel: true,
               embeddingDimensions: true,
-              file: { select: { originalName: true } },
+              activeOcrArtifactId: true,
+              sourceDocumentId: true,
+              file: {
+                select: {
+                  originalName: true,
+                  mimeType: true,
+                  checksum: true,
+                  status: true,
+                },
+              },
               pageRange: { select: { pageStart: true, pageEnd: true } },
+              sourceDocument: {
+                select: { status: true, activeOcrArtifactId: true },
+              },
             },
           },
         },
       }),
+      this.modelRouting.resolve(AiGenerationType.SUMMARY),
+      this.modelRouting.getAllActiveModels(),
       ...PANEL_GENERATION_TYPES.map((type) =>
         this.prisma.aiGeneration.findFirst({
           where: { lessonId, type },
@@ -102,19 +122,52 @@ export class LessonAiGenerationPanelService {
       throwLessonNotFound();
     }
 
+    const pageRangeEndpoints = lesson.documents.flatMap((document) => {
+      if (!document.pageRange || !document.sourceDocumentId) return [];
+      const { pageStart, pageEnd } = document.pageRange;
+      const { sourceDocumentId } = document;
+      return pageStart === pageEnd
+        ? [{ sourceDocumentId, pageNumber: pageStart }]
+        : [
+            { sourceDocumentId, pageNumber: pageStart },
+            { sourceDocumentId, pageNumber: pageEnd },
+          ];
+    });
+    const sourcePages =
+      pageRangeEndpoints.length === 0
+        ? []
+        : await this.prisma.sourceDocumentPage.findMany({
+            where: { OR: pageRangeEndpoints },
+            select: { sourceDocumentId: true, pageNumber: true, metadataJson: true },
+          });
+    const printedPageNumberBySourcePage = new Map(
+      sourcePages.map((page) => [
+        `${page.sourceDocumentId}:${page.pageNumber}`,
+        readPrintedPageNumber(page.metadataJson),
+      ]),
+    );
+
     const embeddingConfig = this.aiService.getEmbeddingConfig();
     const documents = lesson.documents.map((document) => {
+      const packetUnavailableReason = getPacketDocumentUnavailableReason(document);
       const canUseForSummary =
-        document.status === DocumentStatus.READY && document.chunkCount > 0;
+        document.status === DocumentStatus.READY &&
+        document.chunkCount > 0 &&
+        packetUnavailableReason === null;
       return {
         id: document.id,
         title: document.title?.trim() || document.file.originalName,
         kind: document.kind,
         status: document.status,
         chunkCount: document.chunkCount,
-        pageRange: document.pageRange,
+        pageRange: formatPrintedPageRange(
+          document.pageRange,
+          document.sourceDocumentId,
+          printedPageNumberBySourcePage,
+        ),
         canUseForSummary,
-        unavailableReason: getSummaryDocumentUnavailableReason(document),
+        unavailableReason:
+          getSummaryDocumentUnavailableReason(document) ?? packetUnavailableReason,
         embeddingReady:
           document.embeddingProvider === AiProviderName.OPENAI &&
           document.embeddingModel === embeddingConfig.model &&
@@ -129,6 +182,13 @@ export class LessonAiGenerationPanelService {
     for (const generation of generations) {
       if (generation) latestByType.set(generation.type, generation);
     }
+
+    const summaryCandidates = summaryRoute.candidates.filter(supportsHighDetailPdfInput);
+    const resolvedSummaryCandidate =
+      summaryCandidates.find((candidate) => candidate.available) ??
+      summaryCandidates[0] ??
+      null;
+    const summaryModelOptions = activeModels.filter(supportsHighDetailPdfInput);
 
     return {
       lesson: {
@@ -154,6 +214,20 @@ export class LessonAiGenerationPanelService {
         }),
       },
       documents,
+      summaryConfiguration: {
+        isDefaultConfigured: summaryRoute.hasConfiguration,
+        resolvedProvider: resolvedSummaryCandidate?.provider ?? null,
+        resolvedModel: resolvedSummaryCandidate?.model ?? null,
+        temperature: summaryRoute.temperature,
+        reasoningEffort: summaryRoute.reasoningEffort,
+        maxOutputTokens: summaryRoute.maxOutputTokens,
+        modelOptions: summaryModelOptions.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
       jobs: Object.fromEntries(
         PANEL_GENERATION_TYPES.map((type) => [
           type,
@@ -162,6 +236,38 @@ export class LessonAiGenerationPanelService {
       ),
     };
   }
+}
+
+function formatPrintedPageRange(
+  pageRange: { pageStart: number; pageEnd: number } | null,
+  sourceDocumentId: string | null,
+  printedPageNumberBySourcePage: Map<string, number | null>,
+) {
+  if (!pageRange) return null;
+
+  const getDisplayedPage = (pageNumber: number) =>
+    (sourceDocumentId
+      ? printedPageNumberBySourcePage.get(`${sourceDocumentId}:${pageNumber}`)
+      : null) ?? pageNumber;
+
+  return {
+    pageStart: getDisplayedPage(pageRange.pageStart),
+    pageEnd: getDisplayedPage(pageRange.pageEnd),
+  };
+}
+
+function readPrintedPageNumber(metadataJson: Prisma.JsonValue | null) {
+  if (!metadataJson || typeof metadataJson !== "object" || Array.isArray(metadataJson)) {
+    return null;
+  }
+
+  const printedPage = (metadataJson as Record<string, unknown>).printedPage;
+  if (!printedPage || typeof printedPage !== "object" || Array.isArray(printedPage)) {
+    return null;
+  }
+
+  const value = (printedPage as Record<string, unknown>).printedPageNumber;
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function getSummaryDocumentUnavailableReason(document: {
@@ -183,6 +289,37 @@ function getSummaryDocumentUnavailableReason(document: {
   return null;
 }
 
+function getPacketDocumentUnavailableReason(document: {
+  activeOcrArtifactId: string | null;
+  sourceDocumentId: string | null;
+  pageRange: { pageStart: number; pageEnd: number } | null;
+  file: {
+    mimeType: string;
+    checksum: string | null;
+    status: string;
+  };
+  sourceDocument: {
+    status: DocumentStatus;
+    activeOcrArtifactId: string | null;
+  } | null;
+}) {
+  if (document.file.mimeType !== "application/pdf") return "Chỉ hỗ trợ file PDF";
+  if (document.file.status === "DELETED" || !document.file.checksum) {
+    return "File PDF không còn khả dụng";
+  }
+  const activeOcrArtifactId =
+    document.activeOcrArtifactId ?? document.sourceDocument?.activeOcrArtifactId ?? null;
+  if (!activeOcrArtifactId) return "Chưa có dữ liệu OCR";
+
+  const hasSourceDocument = document.sourceDocumentId !== null;
+  const hasPageRange = document.pageRange !== null;
+  if (hasSourceDocument !== hasPageRange) return "Liên kết khoảng trang chưa hoàn chỉnh";
+  if (hasSourceDocument && document.sourceDocument?.status !== DocumentStatus.READY) {
+    return "Tài liệu nguồn chưa sẵn sàng";
+  }
+  return null;
+}
+
 function serializeLatestGeneration(
   type: (typeof PANEL_GENERATION_TYPES)[number],
   generation: PanelGenerationRecord | undefined,
@@ -191,7 +328,12 @@ function serializeLatestGeneration(
     return null;
   }
   const job = generation.backgroundJob;
+  const recordedCostVnd = generation.providerUsageEvents.reduce(
+    (total, event) => total + event.costVnd,
+    0,
+  );
   return {
+    aiGenerationId: generation.id,
     type,
     jobId: job?.id ?? null,
     status: job?.status ?? generation.status,
@@ -205,7 +347,11 @@ function serializeLatestGeneration(
     updatedAt: job?.updatedAt ?? generation.finishedAt ?? generation.createdAt,
     model: generation.model,
     latencyMs: generation.latencyMs,
-    estimatedCostVnd: generation.estimatedCostVnd,
+    estimatedCostVnd:
+      generation.providerUsageEvents.length > 0
+        ? recordedCostVnd
+        : generation.estimatedCostVnd,
+    usageEventCount: generation.providerUsageEvents.length,
     inputMetaJson: generation.inputMetaJson,
   };
 }

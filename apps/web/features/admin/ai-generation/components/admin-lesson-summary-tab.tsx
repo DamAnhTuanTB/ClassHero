@@ -3,33 +3,41 @@
 import {
   EyeOff,
   Loader2,
+  Pencil,
   RefreshCw,
   Save,
   Send,
+  Sparkles,
+  Trash2,
   LayoutTemplate,
   Code2,
   Columns,
 } from "lucide-react";
-import { useEffect, useState, type ComponentProps } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import { toast } from "sonner";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
-import {
-  describeLessonSummaryDiagramTarget,
-  type LessonSummaryDiagramEditableTarget,
-  type LessonSummaryDiagramTextTarget,
-} from "@/components/common/content/lesson-summary-diagram-editing";
 import dynamic from "next/dynamic";
 import {
   useAdminAiGenerationPanel,
   useAdminLessonSummary,
+  useAdminStemFigures,
+  useDeleteAdminLessonSummary,
   useUpsertAdminLessonSummary,
 } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
   AdminLessonSummaryContent,
   AdminLessonSummaryReviewStatus,
   AdminAiPanelJob,
+  AdminStemFigure,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import { QuizRichContentEditor } from "@/features/admin/quiz/components/quiz-rich-content-editor";
 import { SummaryBlockRenderer } from "@/features/student/lessons/screens/student-lesson-screen/components/summary-block-renderer";
@@ -39,39 +47,25 @@ import {
 } from "@/lib/tiptap-rich-content";
 import { MathToolbar } from "@/features/student/lessons/screens/student-lesson-screen/components/math-toolbar";
 import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-metadata";
+import { AdminStemFigureStatusSummary } from "@/features/admin/ai-generation/components/admin-stem-figure-status-summary";
+import { AdminStemFigureInline } from "@/features/admin/ai-generation/components/admin-stem-figures-panel";
+import { AdminBlockImageActions } from "@/features/admin/ai-generation/components/admin-block-image-actions";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import type { StemFigureVisual } from "@/components/common/content/stem-figure";
 import {
-  addEqualLengthMarkerToLessonSummaryDiagram,
-  deleteLessonSummaryDiagramTarget,
-  editLessonSummaryDiagramTargetText,
-} from "@/features/admin/ai-generation/utils/lesson-summary-diagram-edit";
+  canReconcileStemFigureSnapshot,
+  syncStemFigureReferencesInContent,
+} from "@/features/admin/ai-generation/utils/lesson-summary-stem-figure-sync";
 import {
-  getUserFacingErrorMessage,
-  sanitizeUserFacingMessage,
-} from "@/lib/user-facing-error";
+  applyPhaseOneLayoutOperation,
+  applyPhaseOneBlockPreview,
+  applyPhaseOneBlocksPreview,
+  type LessonSummaryPhaseOneLayoutOperation,
+} from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
 type ViewMode = "UI_ONLY" | "JSON_ONLY" | "SPLIT";
-type SummaryRendererData = ComponentProps<typeof SummaryBlockRenderer>["data"];
-type DiagramDeleteRequest = {
-  blockIndex: number;
-  sectionIndex: number;
-  target: LessonSummaryDiagramEditableTarget;
-};
-type DiagramTextEditRequest = {
-  blockIndex: number;
-  sectionIndex: number;
-  target: LessonSummaryDiagramTextTarget;
-};
-type DiagramEqualLengthRequest = {
-  blockIndex: number;
-  sectionIndex: number;
-  segmentIds: string[];
-};
-type DiagramResetRequest = {
-  blockIndex: number;
-  sectionIndex: number;
-};
 
 export function AdminLessonSummaryTab({
   lessonId,
@@ -83,18 +77,111 @@ export function AdminLessonSummaryTab({
   onRegenerate: () => void;
 }) {
   const summaryQuery = useAdminLessonSummary(lessonId);
-  const panelQuery = useAdminAiGenerationPanel(lessonId);
+  const figuresQuery = useAdminStemFigures(lessonId);
+  const hasActiveStemFigures = (figuresQuery.data ?? []).some((figure) =>
+    ["QUEUED", "RENDERING", "REPAIRING"].includes(figure.status),
+  );
+  const panelQuery = useAdminAiGenerationPanel(lessonId, {
+    pollUsage: hasActiveStemFigures,
+  });
+  const wasProcessingStemFigures = useRef(false);
   const summaryJob = panelQuery.data?.jobs?.SUMMARY;
+  const isSummaryPhaseOneActive =
+    summaryJob?.status === "QUEUED" || summaryJob?.status === "RUNNING";
   const upsertMutation = useUpsertAdminLessonSummary(lessonId);
+  const deleteMutation = useDeleteAdminLessonSummary(lessonId);
   const [content, setContent] = useState<AdminLessonSummaryContent>(
     createEmptyTiptapDocument(),
   );
+  const [phaseOneBlockJsonByPath, setPhaseOneBlockJsonByPath] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [phaseOneLayoutOperations, setPhaseOneLayoutOperations] = useState<
+    LessonSummaryPhaseOneLayoutOperation[]
+  >([]);
   const [contentError, setContentError] = useState<string>();
   const [viewMode, setViewMode] = useState<ViewMode>("UI_ONLY");
   const [jsonCollapsed, setJsonCollapsed] = useState<boolean | number>(2);
-  const [pendingDiagramReset, setPendingDiagramReset] =
-    useState<DiagramResetRequest | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
+  const stemFigureVisuals = useMemo(
+    () =>
+      new Map<string, StemFigureVisual>(
+        (figuresQuery.data ?? []).map((figure) => [
+          figure.id,
+          {
+            kind: "TEX_FIGURE",
+            figureId: figure.id,
+            ...(figure.figureOrigin ? { figureOrigin: figure.figureOrigin } : {}),
+            status: figure.status,
+            altText: figure.altText,
+            caption: figure.caption,
+            previewSvg: figure.previewSvg ?? undefined,
+            assetUrl: figure.assetUrl,
+          },
+        ]),
+      ),
+    [figuresQuery.data],
+  );
+  const stemFiguresById = useMemo(
+    () =>
+      new Map<string, AdminStemFigure>(
+        (figuresQuery.data ?? []).map((figure) => [figure.id, figure]),
+      ),
+    [figuresQuery.data],
+  );
+  const jsonViewContent = useMemo(
+    () => addStemFigureSourceReferencesForJsonView(content, figuresQuery.data ?? []),
+    [content, figuresQuery.data],
+  );
+  const updateContentFromJsonView = useCallback(
+    (value: AdminLessonSummaryContent) =>
+      setContent(removeStemFigureSourceReferencesFromJsonView(value)),
+    [],
+  );
+  const renderStemFigure = useCallback(
+    (visual: StemFigureVisual) => {
+      const figure = stemFiguresById.get(visual.figureId);
+      return figure ? (
+        <AdminStemFigureInline
+          figure={figure}
+          lessonId={lessonId}
+          modelConfiguration={panelQuery.data?.summaryConfiguration}
+        />
+      ) : null;
+    },
+    [lessonId, panelQuery.data?.summaryConfiguration, stemFiguresById],
+  );
+  const stemFiguresByBlockPath = useMemo(() => {
+    const groups = new Map<string, AdminStemFigure[]>();
+    for (const figure of figuresQuery.data ?? []) {
+      const current = groups.get(figure.blockPath) ?? [];
+      current.push(figure);
+      groups.set(
+        figure.blockPath,
+        current.sort((left, right) => left.figureIndex - right.figureIndex),
+      );
+    }
+    return groups;
+  }, [figuresQuery.data]);
+  const renderBlockImageActions = useCallback(
+    ({ blockPath }: { blockPath: string }) => (
+      <AdminBlockImageActions
+        blockPath={blockPath}
+        figures={stemFiguresByBlockPath.get(blockPath) ?? []}
+        lessonId={lessonId}
+      />
+    ),
+    [lessonId, stemFiguresByBlockPath],
+  );
+
+  useEffect(() => {
+    if (wasProcessingStemFigures.current && !hasActiveStemFigures) {
+      void panelQuery.refetch();
+    }
+    wasProcessingStemFigures.current = hasActiveStemFigures;
+  }, [hasActiveStemFigures, panelQuery]);
 
   useEffect(() => {
     const savedMode = localStorage.getItem("admin-lesson-summary-view-mode");
@@ -107,13 +194,56 @@ export function AdminLessonSummaryTab({
     setViewMode(mode);
     localStorage.setItem("admin-lesson-summary-view-mode", mode);
   };
+  const updateAllPhaseOneBlocks = (blocks: Record<string, unknown>) => {
+    setPhaseOneBlockJsonByPath(blocks);
+    setContent((current) => applyPhaseOneBlocksPreview(current, blocks));
+  };
+  const applyLayoutOperation = useCallback(
+    (operation: LessonSummaryPhaseOneLayoutOperation) => {
+      setPhaseOneBlockJsonByPath((current) =>
+        current ? applyPhaseOneLayoutOperation(current, operation) : current,
+      );
+      setPhaseOneLayoutOperations((current) => [...current, operation]);
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (summaryQuery.data?.contentJson) {
-      setContent(summaryQuery.data.contentJson);
-      setContentError(undefined);
-    }
+    setContent(summaryQuery.data?.contentJson ?? createEmptyTiptapDocument());
+    setPhaseOneBlockJsonByPath(
+      summaryQuery.data?.phaseOneBlockJsonByPath
+        ? structuredClone(summaryQuery.data.phaseOneBlockJsonByPath)
+        : null,
+    );
+    setPhaseOneLayoutOperations([]);
+    setContentError(undefined);
   }, [summaryQuery.data]);
+
+  const referencedStemFigureIds = useMemo(
+    () => collectReferencedStemFigureIds(content),
+    [content],
+  );
+  useEffect(() => {
+    const figures = figuresQuery.data ?? [];
+    const summary = summaryQuery.data;
+    if (
+      !summary ||
+      !canReconcileStemFigureSnapshot({
+        figures,
+        isFetching: figuresQuery.isFetching,
+        isSuccess: figuresQuery.isSuccess,
+        summaryAiGenerationId: summary.aiGenerationId,
+      })
+    ) {
+      return;
+    }
+    setContent((current) => syncStemFigureReferencesInContent(current, figures));
+  }, [
+    figuresQuery.data,
+    figuresQuery.isFetching,
+    figuresQuery.isSuccess,
+    summaryQuery.data,
+  ]);
 
   if (summaryQuery.isPending) {
     return <SummarySkeleton />;
@@ -132,206 +262,26 @@ export function AdminLessonSummaryTab({
   }
 
   const summary = summaryQuery.data;
-  const deleteDiagramTarget = (request: DiagramDeleteRequest) => {
-    if (content.type !== "lesson_summary_blocks") return;
-    const data = content.data as SummaryRendererData;
-    const section = data.sections[request.sectionIndex];
-    const block = section?.blocks[request.blockIndex];
-    if (!section || block?.visual?.kind !== "DIAGRAM_SPEC") {
-      toast.error("Không tìm thấy hình cần chỉnh. Hãy chọn lại phần tử.");
-      return;
-    }
-
-    const result = deleteLessonSummaryDiagramTarget(block.visual.spec, request.target);
-    if (!result.success) {
-      toast.error(
-        sanitizeUserFacingMessage(
-          result.reason,
-          "Chưa thể xóa phần tử này. Vui lòng kiểm tra lại hình.",
-        ),
-      );
-      return;
-    }
-
-    const nextSections = data.sections.map((candidateSection, sectionIndex) =>
-      sectionIndex === request.sectionIndex
-        ? {
-            ...candidateSection,
-            blocks: candidateSection.blocks.map((candidateBlock, blockIndex) =>
-              blockIndex === request.blockIndex
-                ? {
-                    ...candidateBlock,
-                    visual: { ...candidateBlock.visual, spec: result.spec },
-                  }
-                : candidateBlock,
-            ),
-          }
-        : candidateSection,
-    );
-    preserveViewportAfterDiagramMutation();
-    setContent({
-      ...content,
-      data: { ...data, sections: nextSections },
-    });
-    toast.success("Đã xóa khỏi bản nháp. Bấm Lưu nội dung để ghi lại.");
-  };
-
-  const editDiagramText = (request: DiagramTextEditRequest, nextText: string) => {
-    if (content.type !== "lesson_summary_blocks") return false;
-    const data = content.data as SummaryRendererData;
-    const section = data.sections[request.sectionIndex];
-    const block = section?.blocks[request.blockIndex];
-    if (!section || block?.visual?.kind !== "DIAGRAM_SPEC") {
-      toast.error("Không tìm thấy hình cần chỉnh. Hãy chọn lại phần tử.");
-      return false;
-    }
-    const result = editLessonSummaryDiagramTargetText(
-      block.visual.spec,
-      request.target,
-      nextText,
-    );
-    if (!result.success) {
-      toast.error(
-        sanitizeUserFacingMessage(
-          result.reason,
-          "Chưa thể sửa phần tử này. Vui lòng kiểm tra lại hình.",
-        ),
-      );
-      return false;
-    }
-
-    const mayHaveExternalReference =
-      request.target.kind === "POINT_LABEL" ||
-      hasTextOutsideSelectedDiagram(
-        data,
-        request.sectionIndex,
-        request.blockIndex,
-        request.target.displayText,
-      );
-    const nextSections = data.sections.map((candidateSection, sectionIndex) =>
-      sectionIndex === request.sectionIndex
-        ? {
-            ...candidateSection,
-            blocks: candidateSection.blocks.map((candidateBlock, blockIndex) =>
-              blockIndex === request.blockIndex
-                ? {
-                    ...candidateBlock,
-                    visual: { ...candidateBlock.visual, spec: result.spec },
-                  }
-                : candidateBlock,
-            ),
-          }
-        : candidateSection,
-    );
-    preserveViewportAfterDiagramMutation();
-    setContent({ ...content, data: { ...data, sections: nextSections } });
-    if (mayHaveExternalReference) {
-      toast.warning(
-        `Đã sửa ${describeLessonSummaryDiagramTarget(request.target)} trong bản nháp. Hãy rà soát đề bài, GT–KL và lời giải còn dùng nội dung cũ.`,
-      );
-    } else {
-      toast.success("Đã sửa trong bản nháp. Bấm Lưu nội dung để ghi lại.");
-    }
-    return true;
-  };
-
-  const addEqualLengthMarker = (request: DiagramEqualLengthRequest) => {
-    if (content.type !== "lesson_summary_blocks") return false;
-    const data = content.data as SummaryRendererData;
-    const section = data.sections[request.sectionIndex];
-    const block = section?.blocks[request.blockIndex];
-    if (!section || block?.visual?.kind !== "DIAGRAM_SPEC") {
-      toast.error("Không tìm thấy hình cần chỉnh. Hãy chọn lại các đoạn.");
-      return false;
-    }
-    const result = addEqualLengthMarkerToLessonSummaryDiagram(
-      block.visual.spec,
-      request.segmentIds,
-    );
-    if (!result.success) {
-      toast.error(
-        sanitizeUserFacingMessage(
-          result.reason,
-          "Chưa thể đánh dấu các đoạn bằng nhau. Vui lòng kiểm tra lại hình.",
-        ),
-      );
-      return false;
-    }
-    const nextSections = data.sections.map((candidateSection, sectionIndex) =>
-      sectionIndex === request.sectionIndex
-        ? {
-            ...candidateSection,
-            blocks: candidateSection.blocks.map((candidateBlock, blockIndex) =>
-              blockIndex === request.blockIndex
-                ? {
-                    ...candidateBlock,
-                    visual: { ...candidateBlock.visual, spec: result.spec },
-                  }
-                : candidateBlock,
-            ),
-          }
-        : candidateSection,
-    );
-    preserveViewportAfterDiagramMutation();
-    setContent({ ...content, data: { ...data, sections: nextSections } });
-    toast.success(
-      `Đã đánh dấu ${request.segmentIds.length} đoạn bằng nhau trong bản nháp. Bấm Lưu nội dung để ghi lại.`,
-    );
-    return true;
-  };
-
-  const confirmDiagramReset = () => {
-    if (
-      !pendingDiagramReset ||
-      content.type !== "lesson_summary_blocks" ||
-      summary?.contentJson.type !== "lesson_summary_blocks"
-    ) {
-      setPendingDiagramReset(null);
-      return;
-    }
-    const data = content.data as SummaryRendererData;
-    const savedData = summary.contentJson.data as SummaryRendererData;
-    const currentBlock =
-      data.sections[pendingDiagramReset.sectionIndex]?.blocks[
-        pendingDiagramReset.blockIndex
-      ];
-    const savedBlock = findSavedDiagramBlock(
-      savedData,
-      pendingDiagramReset,
-      currentBlock,
-    );
-    if (
-      currentBlock?.visual?.kind !== "DIAGRAM_SPEC" ||
-      savedBlock?.visual?.kind !== "DIAGRAM_SPEC"
-    ) {
-      setPendingDiagramReset(null);
-      toast.error("Không tìm thấy bản hình đầu phiên để khôi phục.");
-      return;
-    }
-    const nextSections = data.sections.map((section, sectionIndex) =>
-      sectionIndex === pendingDiagramReset.sectionIndex
-        ? {
-            ...section,
-            blocks: section.blocks.map((block, blockIndex) =>
-              blockIndex === pendingDiagramReset.blockIndex
-                ? {
-                    ...block,
-                    visual: { ...block.visual, spec: savedBlock.visual.spec },
-                  }
-                : block,
-            ),
-          }
-        : section,
-    );
-    preserveViewportAfterDiagramMutation();
-    setContent({ ...content, data: { ...data, sections: nextSections } });
-    setPendingDiagramReset(null);
-    toast.success("Đã khôi phục mọi chỉnh sửa của hình trong phiên bản nháp này.");
-  };
-
+  const stemFigureBlockers = (figuresQuery.data ?? []).filter(
+    (figure) => referencedStemFigureIds.has(figure.id) && !figure.hasCurrentAsset,
+  );
+  const figureActionsBlocked = figuresQuery.isPending || stemFigureBlockers.length > 0;
+  const figureBlockerTitle = figuresQuery.isPending
+    ? "Đang kiểm tra trạng thái hình STEM."
+    : stemFigureBlockers.length > 0
+      ? `Cần xử lý hình tại: ${stemFigureBlockers.map((figure) => figure.blockPath).join(", ")}`
+      : undefined;
   const save = async (action: "SAVE" | "PUBLISH" | "WITHDRAW") => {
+    if (action !== "WITHDRAW" && figureActionsBlocked) {
+      toast.error(figureBlockerTitle ?? "Còn hình STEM chưa có asset hợp lệ.");
+      return;
+    }
     const isBlocks = content?.type === "lesson_summary_blocks";
-    if (!isBlocks && !hasTiptapDocumentContent(content)) {
+    if (action !== "WITHDRAW" && isBlocks && !phaseOneBlockJsonByPath) {
+      toast.error("Bản này chưa có raw Phase 1 để chỉnh sửa. Hãy sinh lại kiến thức.");
+      return;
+    }
+    if (action !== "WITHDRAW" && !isBlocks && !hasTiptapDocumentContent(content)) {
       setContentError("Nhập nội dung Kiến thức trước khi lưu");
       return;
     }
@@ -343,11 +293,26 @@ export function AdminLessonSummaryTab({
           ? "APPROVED"
           : summary?.reviewStatus || "DRAFT";
     try {
-      await upsertMutation.mutateAsync({
-        contentJson: content,
-        source: summary?.source ?? "ADMIN",
-        reviewStatus,
-      });
+      await upsertMutation.mutateAsync(
+        action === "WITHDRAW" && summary
+          ? {
+              contentJson: summary.contentJson,
+              source: summary.source,
+              reviewStatus,
+            }
+          : content?.type === "lesson_summary_blocks"
+            ? {
+                phaseOneBlockJsonByPath: phaseOneBlockJsonByPath!,
+                phaseOneLayoutOperations,
+                source: summary?.source ?? "AI",
+                reviewStatus,
+              }
+            : {
+                contentJson: content,
+                source: summary?.source ?? "ADMIN",
+                reviewStatus,
+              },
+      );
       toast.success(
         action === "WITHDRAW"
           ? "Đã thu hồi phát hành tóm tắt"
@@ -359,6 +324,17 @@ export function AdminLessonSummaryTab({
       toast.error(
         getUserFacingErrorMessage(error, "Chưa lưu được nội dung. Vui lòng thử lại."),
       );
+    }
+  };
+
+  const deleteSummary = async () => {
+    try {
+      await deleteMutation.mutateAsync();
+      setContent(createEmptyTiptapDocument());
+      setIsDeleteConfirmOpen(false);
+      toast.success("Đã xóa toàn bộ kiến thức đã sinh.");
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, "Chưa xóa được kiến thức đã sinh."));
     }
   };
 
@@ -382,65 +358,91 @@ export function AdminLessonSummaryTab({
                 {unresolvedReviewIssueCount} mục cần kiểm tra
               </span>
             ) : null}
+            {summary && !isSummaryPhaseOneActive && figuresQuery.isSuccess ? (
+              <AdminStemFigureStatusSummary
+                figures={figuresQuery.data ?? []}
+                lessonId={lessonId}
+                modelConfiguration={panelQuery.data?.summaryConfiguration}
+              />
+            ) : null}
           </div>
-          <AiJobMetadata job={summaryJob ?? null} onEdit={onRegenerate} />
+          {summary ? <AiJobMetadata job={summaryJob ?? null} /> : null}
         </div>
 
-        {content?.type === "lesson_summary_blocks" && (
-          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
-            <button
-              type="button"
-              onClick={() => handleSetViewMode("UI_ONLY")}
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
-                viewMode === "UI_ONLY"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-              title="Chỉ xem UI"
-            >
-              <LayoutTemplate className="h-4 w-4" />
-              <span className="hidden lg:inline">Chỉ xem UI</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetViewMode("JSON_ONLY")}
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
-                viewMode === "JSON_ONLY"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-              title="Chỉ xem JSON"
-            >
-              <Code2 className="h-4 w-4" />
-              <span className="hidden lg:inline">Chỉ xem JSON</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetViewMode("SPLIT")}
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
-                viewMode === "SPLIT"
-                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-              title="Xem song song"
-            >
-              <Columns className="h-4 w-4" />
-              <span className="hidden lg:inline">Song song</span>
-            </button>
-          </div>
-        )}
+        <div className="flex flex-col items-end gap-2">
+          {summary ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Sửa
+              </button>
+              <button
+                type="button"
+                disabled={deleteMutation.isPending}
+                onClick={() => setIsDeleteConfirmOpen(true)}
+                className="theme-button-danger-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold disabled:opacity-60"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                )}
+                Xóa
+              </button>
+            </div>
+          ) : null}
+          {content?.type === "lesson_summary_blocks" ? (
+            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => handleSetViewMode("UI_ONLY")}
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
+                  viewMode === "UI_ONLY"
+                    ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+                title="Chỉ xem UI"
+              >
+                <LayoutTemplate className="h-4 w-4" />
+                <span className="hidden lg:inline">Chỉ xem UI</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetViewMode("JSON_ONLY")}
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
+                  viewMode === "JSON_ONLY"
+                    ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+                title="Chỉ xem JSON"
+              >
+                <Code2 className="h-4 w-4" />
+                <span className="hidden lg:inline">Chỉ xem JSON</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetViewMode("SPLIT")}
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
+                  viewMode === "SPLIT"
+                    ? "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-400"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+                title="Xem song song"
+              >
+                <Columns className="h-4 w-4" />
+                <span className="hidden lg:inline">Song song</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {content?.type === "lesson_summary_blocks" ? (
         <div className="-mx-3 sm:mx-0 py-6 px-3 sm:p-8 bg-white dark:bg-slate-950 rounded-none sm:rounded-2xl shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-800/50">
-          {summary?.reviewStatus === "APPROVED" ? (
-            <div
-              className="mb-4 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] px-3 py-2 text-sm font-semibold text-[var(--theme-warning-text)]"
-              data-testid="diagram-edit-withdraw-required"
-            >
-              Thu hồi phát hành trước khi xóa nhãn hoặc ký hiệu trực tiếp trên hình.
-            </div>
-          ) : null}
           {viewMode === "JSON_ONLY" ? (
             <div className="flex flex-col space-y-3">
               <div className="flex items-center gap-2">
@@ -458,49 +460,69 @@ export function AdminLessonSummaryTab({
                 </button>
               </div>
               <div className="w-full overflow-auto max-h-[800px] border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-white dark:bg-slate-950 shadow-sm">
-                <ReactJson
-                  src={content}
-                  onEdit={(event) =>
-                    setContent(event.updated_src as AdminLessonSummaryContent)
-                  }
-                  onAdd={(event) =>
-                    setContent(event.updated_src as AdminLessonSummaryContent)
-                  }
-                  onDelete={(event) =>
-                    setContent(event.updated_src as AdminLessonSummaryContent)
-                  }
-                  theme="rjv-default"
-                  style={{ backgroundColor: "transparent" }}
-                  collapsed={jsonCollapsed}
-                  displayDataTypes={false}
-                  name={false}
-                  enableClipboard={false}
-                  keyModifier={(event) =>
-                    event instanceof MouseEvent &&
-                    (event.detail >= 2 || event.metaKey || event.ctrlKey)
-                  }
-                />
+                {phaseOneBlockJsonByPath ? (
+                  <ReactJson
+                    src={phaseOneBlockJsonByPath}
+                    onEdit={(event) =>
+                      updateAllPhaseOneBlocks(
+                        event.updated_src as Record<string, unknown>,
+                      )
+                    }
+                    onAdd={(event) =>
+                      updateAllPhaseOneBlocks(
+                        event.updated_src as Record<string, unknown>,
+                      )
+                    }
+                    onDelete={(event) =>
+                      updateAllPhaseOneBlocks(
+                        event.updated_src as Record<string, unknown>,
+                      )
+                    }
+                    theme="rjv-default"
+                    style={{ backgroundColor: "transparent" }}
+                    collapsed={jsonCollapsed}
+                    displayDataTypes={false}
+                    name={false}
+                    enableClipboard={false}
+                    keyModifier={(event) =>
+                      event instanceof MouseEvent &&
+                      (event.detail >= 2 || event.metaKey || event.ctrlKey)
+                    }
+                  />
+                ) : (
+                  <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    Bản này chưa có raw Phase 1. Hãy sinh lại kiến thức để chỉnh sửa JSON
+                    gốc.
+                  </p>
+                )}
               </div>
             </div>
           ) : (
             <SummaryBlockRenderer
-              data={content.data as ComponentProps<typeof SummaryBlockRenderer>["data"]}
+              data={
+                (viewMode === "SPLIT" && jsonViewContent.type === "lesson_summary_blocks"
+                  ? jsonViewContent.data
+                  : content.data) as ComponentProps<typeof SummaryBlockRenderer>["data"]
+              }
               displayTitle={lessonTitle}
-              diagramEditingDisabled={upsertMutation.isPending}
               viewMode={viewMode === "UI_ONLY" ? "UI_ONLY" : "SPLIT"}
               showEditorialMetadata
-              onChange={(newData) => setContent({ ...content, data: newData })}
-              onRequestDiagramDelete={
-                summary?.reviewStatus === "APPROVED" ? undefined : deleteDiagramTarget
-              }
-              onRequestDiagramAddEqualLength={
-                summary?.reviewStatus === "APPROVED" ? undefined : addEqualLengthMarker
-              }
-              onRequestDiagramReset={
-                summary?.reviewStatus === "APPROVED" ? undefined : setPendingDiagramReset
-              }
-              onRequestDiagramTextEdit={
-                summary?.reviewStatus === "APPROVED" ? undefined : editDiagramText
+              showTableOfContents
+              renderStemFigure={renderStemFigure}
+              renderBlockImageActions={renderBlockImageActions}
+              phaseOneBlockJsonByPath={phaseOneBlockJsonByPath}
+              onPhaseOneBlockJsonChange={(blockPath, value) => {
+                setPhaseOneBlockJsonByPath((current) =>
+                  current ? { ...current, [blockPath]: value } : current,
+                );
+                setContent((current) =>
+                  applyPhaseOneBlockPreview(current, blockPath, value),
+                );
+              }}
+              onPhaseOneLayoutOperation={applyLayoutOperation}
+              stemFigureVisuals={stemFigureVisuals}
+              onChange={(newData) =>
+                updateContentFromJsonView({ ...content, data: newData })
               }
             />
           )}
@@ -533,13 +555,18 @@ export function AdminLessonSummaryTab({
           onClick={onRegenerate}
           className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:opacity-60"
         >
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          {summary ? "Sinh lại" : "Sinh Kiến thức"}
+          {summary ? (
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          )}
+          {summary ? "Tạo mới" : "Tạo Kiến thức"}
         </button>
         <button
           type="button"
-          disabled={upsertMutation.isPending}
+          disabled={upsertMutation.isPending || figureActionsBlocked}
           onClick={() => save("SAVE")}
+          title={figureBlockerTitle}
           className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
         >
           {upsertMutation.isPending ? (
@@ -552,13 +579,9 @@ export function AdminLessonSummaryTab({
         {summary?.reviewStatus !== "APPROVED" ? (
           <button
             type="button"
-            disabled={upsertMutation.isPending || unresolvedReviewIssueCount > 0}
+            disabled={upsertMutation.isPending || figureActionsBlocked}
             onClick={() => save("PUBLISH")}
-            title={
-              unresolvedReviewIssueCount > 0
-                ? "Sửa hoặc chấp nhận các vấn đề trước khi phát hành"
-                : "Phát hành tóm tắt"
-            }
+            title={figureBlockerTitle ?? "Phát hành tóm tắt"}
             className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:opacity-60"
           >
             <Send className="h-4 w-4" aria-hidden="true" />
@@ -577,84 +600,95 @@ export function AdminLessonSummaryTab({
           </button>
         ) : null}
       </div>
-
       <DeleteConfirmDialog
-        confirmLabel="Khôi phục hình"
-        description="Mọi chỉnh sửa của hình này trong bản nháp ở phiên hiện tại sẽ bị khôi phục. Các nội dung khác không bị thay đổi."
-        intent="RESET"
-        isConfirming={upsertMutation.isPending}
-        isOpen={Boolean(pendingDiagramReset)}
-        itemName="hình vẽ này"
-        title="Khôi phục hình"
-        onCancel={() => setPendingDiagramReset(null)}
-        onConfirm={confirmDiagramReset}
+        confirmLabel="Xóa vĩnh viễn"
+        description="Thao tác này xóa vĩnh viễn toàn bộ kiến thức đã sinh của buổi học, gồm cả các hình STEM liên quan. Không thể khôi phục."
+        isConfirming={deleteMutation.isPending}
+        isOpen={isDeleteConfirmOpen}
+        itemName="kiến thức đã sinh"
+        title="Xóa toàn bộ kiến thức đã sinh?"
+        onCancel={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={deleteSummary}
       />
     </div>
   );
 }
 
-function hasTextOutsideSelectedDiagram(
-  data: SummaryRendererData,
-  selectedSectionIndex: number,
-  selectedBlockIndex: number,
-  text: string,
-) {
-  const searchValue = text.trim();
-  if (!searchValue) return false;
-  const contentWithoutSelectedDiagram = data.sections.map((section, sectionIndex) => ({
-    ...section,
-    blocks: section.blocks.map((block, blockIndex) =>
-      sectionIndex === selectedSectionIndex && blockIndex === selectedBlockIndex
-        ? { ...block, visual: undefined }
-        : block,
-    ),
-  }));
-  return JSON.stringify(contentWithoutSelectedDiagram).includes(searchValue);
-}
+function collectReferencedStemFigureIds(value: unknown) {
+  const ids = new Set<string>();
+  visit(value);
+  return ids;
 
-function findSavedDiagramBlock(
-  savedData: SummaryRendererData,
-  request: DiagramResetRequest,
-  currentBlock: SummaryRendererData["sections"][number]["blocks"][number] | undefined,
-) {
-  const direct = savedData.sections[request.sectionIndex]?.blocks[request.blockIndex];
-  if (
-    direct?.visual?.kind === "DIAGRAM_SPEC" &&
-    diagramBlockResetSignature(direct) === diagramBlockResetSignature(currentBlock)
-  ) {
-    return direct;
+  function visit(node: unknown): void {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    const record = node as Record<string, unknown>;
+    if (record.kind === "TEX_FIGURE" && typeof record.figureId === "string") {
+      ids.add(record.figureId);
+    }
+    Object.values(record).forEach(visit);
   }
-  if (!currentBlock) return undefined;
-  const signature = diagramBlockResetSignature(currentBlock);
-  const candidates = savedData.sections.flatMap((section) =>
-    section.blocks.filter(
-      (block) =>
-        block.visual?.kind === "DIAGRAM_SPEC" &&
-        diagramBlockResetSignature(block) === signature,
-    ),
-  );
-  return candidates.length === 1 ? candidates[0] : undefined;
 }
 
-function diagramBlockResetSignature(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const { visual: _visual, ...contentFields } = value as Record<string, unknown>;
-  return JSON.stringify(contentFields);
-}
-
-function preserveViewportAfterDiagramMutation() {
-  const left = window.scrollX;
-  const top = window.scrollY;
-  if (
-    document.activeElement instanceof HTMLElement &&
-    !document.activeElement.closest("figure[data-diagram-editable='true']")
-  ) {
-    document.activeElement.blur();
+function addStemFigureSourceReferencesForJsonView(
+  value: AdminLessonSummaryContent,
+  figures: AdminStemFigure[],
+) {
+  if (value.type !== "lesson_summary_blocks") return value;
+  const copy = structuredClone(value);
+  const data = copy.data as {
+    sections?: Array<{ blocks?: Array<Record<string, unknown>> }>;
+  };
+  for (const figure of figures) {
+    const sourceReferences = readStemFigureSourceReferences(figure.planJson);
+    if (!sourceReferences) continue;
+    const match = figure.blockPath.match(/^sections\.(\d+)\.blocks\.(\d+)$/u);
+    const block = match
+      ? data.sections?.[Number(match[1])]?.blocks?.[Number(match[2])]
+      : null;
+    if (!block || !Array.isArray(block.figures)) continue;
+    const reference = block.figures.find(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        (item as Record<string, unknown>).kind === "TEX_FIGURE" &&
+        (item as Record<string, unknown>).figureId === figure.id,
+    );
+    if (!reference || typeof reference !== "object" || Array.isArray(reference)) {
+      continue;
+    }
+    (reference as Record<string, unknown>).sourceReferences = sourceReferences;
   }
-  requestAnimationFrame(() => {
-    window.scrollTo({ behavior: "auto", left, top });
-    requestAnimationFrame(() => window.scrollTo({ behavior: "auto", left, top }));
-  });
+  return copy;
+}
+
+function removeStemFigureSourceReferencesFromJsonView(value: AdminLessonSummaryContent) {
+  const copy = structuredClone(value);
+  visit(copy);
+  return copy;
+
+  function visit(node: unknown): void {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    const record = node as Record<string, unknown>;
+    if (record.kind === "TEX_FIGURE") {
+      delete record.sourceReferences;
+    }
+    Object.values(record).forEach(visit);
+  }
+}
+
+function readStemFigureSourceReferences(value: unknown): unknown[] | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const sourceReferences = (value as Record<string, unknown>).sourceReferences;
+  return Array.isArray(sourceReferences) ? structuredClone(sourceReferences) : undefined;
 }
 
 type ReviewIssueLike = {
@@ -672,6 +706,7 @@ const FIX_ONLY_REVIEW_CODES = new Set([
   "BLOCK_CANNOT_PROCESS",
   "BLOCK_SCHEMA_INVALID",
   "DIAGRAM_CANNOT_RENDER",
+  "MISSING_REQUIRED_FIGURE",
   "MISSING_REQUIRED_FIELD",
   "MISSING_SUMMARY_TITLE",
   "MISSING_THEORY_SECTION",

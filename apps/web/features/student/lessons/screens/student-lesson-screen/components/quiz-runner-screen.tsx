@@ -395,7 +395,6 @@ export function QuizRunnerScreen({
           {feedback ? (
             <AssessmentExplanationPanel
               content={feedback.explanationJson}
-              diagramSpec={feedback.explanationDiagramSpecJson}
               exampleBlock={feedback.explanationExampleBlock}
               isOpen={isExplanationOpen}
               onToggle={handleToggleExplanation}

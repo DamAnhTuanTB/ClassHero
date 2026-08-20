@@ -74,9 +74,15 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                   allowEmpty
                   value={configuration.primaryCatalogItemId ?? ""}
                   models={data.models}
-                  onChange={(value) =>
-                    update(configuration.feature, { primaryCatalogItemId: value || null })
-                  }
+                  onChange={(value) => {
+                    const updateData: any = { primaryCatalogItemId: value || null };
+                    if (!value) {
+                      updateData.temperature = null;
+                      updateData.reasoningEffort = null;
+                      updateData.maxOutputTokens = null;
+                    }
+                    update(configuration.feature, updateData);
+                  }}
                 />
                 
                 {(() => {
@@ -119,8 +125,13 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                               <SelectItem value="__default__">
                                 Mặc định của model
                               </SelectItem>
-                              {(() => {
-                                const levels = (primaryModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                {(() => {
+                                  const baseLevels = (primaryModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                  const levelsSet = new Set(baseLevels || []);
+                                  if (configuration.reasoningEffort && configuration.reasoningEffort !== "__default__") {
+                                    levelsSet.add(configuration.reasoningEffort);
+                                  }
+                                  const levels = Array.from(levelsSet);
                                 const labels: Record<string, string> = {
                                   minimal: "Tối thiểu (Minimal)",
                                   low: "Thấp (Low)",
@@ -189,11 +200,15 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                     models={data.models.filter(
                       (model) => model.id !== configuration.primaryCatalogItemId,
                     )}
-                    onChange={(value) =>
-                      update(configuration.feature, {
-                        fallbackCatalogItemId: value || null,
-                      })
-                    }
+                    onChange={(value) => {
+                      const updateData: any = { fallbackCatalogItemId: value || null };
+                      if (!value) {
+                        updateData.fallbackTemperature = null;
+                        updateData.fallbackReasoningEffort = null;
+                        updateData.fallbackMaxOutputTokens = null;
+                      }
+                      update(configuration.feature, updateData);
+                    }}
                   />
 
                   {(() => {
@@ -237,7 +252,12 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                                   Mặc định của model
                                 </SelectItem>
                                 {(() => {
-                                  const levels = (fallbackModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                  const baseLevels = (fallbackModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                  const levelsSet = new Set(baseLevels || []);
+                                  if (configuration.fallbackReasoningEffort && configuration.fallbackReasoningEffort !== "__default__") {
+                                    levelsSet.add(configuration.fallbackReasoningEffort);
+                                  }
+                                  const levels = Array.from(levelsSet);
                                   const labels: Record<string, string> = {
                                     minimal: "Tối thiểu (Minimal)",
                                     low: "Thấp (Low)",

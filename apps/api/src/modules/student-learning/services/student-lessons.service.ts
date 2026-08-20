@@ -44,12 +44,18 @@ export class StudentLessonsService {
       throwLessonNotFound();
     }
 
-    const [fileAccessUrls, navigation] = await Promise.all([
+    const [fileAccessUrls, stemFigureAssetUrls, navigation] = await Promise.all([
       this.resolveFileAccessUrls(record),
+      this.resolveStemFigureAssetUrls(record.summary),
       this.getLessonNavigation(record.learningPathId, lessonId),
     ]);
     return {
-      ...serializeStudentLessonContent(record, access, fileAccessUrls),
+      ...serializeStudentLessonContent(
+        record,
+        access,
+        fileAccessUrls,
+        stemFigureAssetUrls,
+      ),
       navigation,
     };
   }
@@ -65,7 +71,8 @@ export class StudentLessonsService {
       select: studentLessonSummarySelect,
     });
 
-    return serializeStudentLessonSummary(record);
+    const stemFigureAssetUrls = await this.resolveStemFigureAssetUrls(record);
+    return serializeStudentLessonSummary(record, stemFigureAssetUrls);
   }
 
   async listQuizSets(lessonId: string, studentUserId: string) {
@@ -189,11 +196,10 @@ export class StudentLessonsService {
         orderIndex: lesson.orderIndex,
         lesson,
       })),
-    ]
-      .sort(
-        (left, right) =>
-          left.orderIndex - right.orderIndex || left.type.localeCompare(right.type),
-      );
+    ].sort(
+      (left, right) =>
+        left.orderIndex - right.orderIndex || left.type.localeCompare(right.type),
+    );
     const lessons: Array<{
       id: string;
       title: string;
@@ -250,6 +256,24 @@ export class StudentLessonsService {
       ),
     );
 
+    return new Map(entries);
+  }
+
+  private async resolveStemFigureAssetUrls(
+    summary: StudentLessonContentRecord["summary"],
+  ) {
+    if (!summary) return new Map<string, string | null>();
+    const entries = await Promise.all(
+      summary.stemFigures.map(
+        async (figure) =>
+          [
+            figure.id,
+            await this.filesService.resolveAccessUrl(
+              figure.currentRevision?.deliveryFile,
+            ),
+          ] as const,
+      ),
+    );
     return new Map(entries);
   }
 }

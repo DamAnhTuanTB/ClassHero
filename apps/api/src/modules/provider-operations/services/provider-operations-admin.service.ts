@@ -21,9 +21,9 @@ import type {
   ProviderUsageEventsQueryDto,
   ProviderUsageQueryDto,
 } from "#api/modules/provider-operations/dto/provider-operations-query.dto";
-import { 
+import {
   CreateProviderCatalogItemDto,
-  AiConfigurationFeature
+  AiConfigurationFeature,
 } from "#api/modules/provider-operations/dto/create-provider-catalog-item.dto";
 import type { UpdateProviderCatalogItemDto } from "#api/modules/provider-operations/dto/update-provider-catalog-item.dto";
 import { ProviderUsageGranularity } from "#api/modules/provider-operations/dto/provider-operations-query.dto";
@@ -132,19 +132,24 @@ export class ProviderOperationsAdminService {
       },
     });
     if (existing) {
-      throwConflict("PROVIDER_CATALOG_ITEM_EXISTS", "Model này đã tồn tại trong hệ thống.");
+      throwConflict(
+        "PROVIDER_CATALOG_ITEM_EXISTS",
+        "Model này đã tồn tại trong hệ thống.",
+      );
     }
-    
+
     // Add default capabilities based on category
-    const defaultCapabilities = dto.category === ProviderCatalogCategory.AI_MODEL 
-      ? [...MANAGED_AI_FEATURES] 
-      : [];
-      
+    const defaultCapabilities =
+      dto.category === ProviderCatalogCategory.AI_MODEL ? [...MANAGED_AI_FEATURES] : [];
+
     // Include the aiConfiguration if provided
     let capabilitiesJson: Record<string, any> = { features: defaultCapabilities };
     if (dto.aiConfiguration) {
       capabilitiesJson.aiConfiguration = dto.aiConfiguration;
-      if (dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT && dto.reasoningEffortLevels?.length) {
+      if (
+        dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT &&
+        dto.reasoningEffortLevels?.length
+      ) {
         capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
       }
     }
@@ -157,14 +162,14 @@ export class ProviderOperationsAdminService {
         displayName: dto.displayName,
         createdAt: dto.createdAt ? new Date(dto.createdAt) : undefined,
         capabilitiesJson,
-          priceVersions: dto.initialPrice
-            ? {
-                create: {
-                  billingMode: dto.initialPrice.billingMode,
-                  sourceUrl: dto.initialPrice.sourceUrl,
-                  effectiveFrom: new Date(),
-                  createdByUserId: actorUserId,
-                  rates: {
+        priceVersions: dto.initialPrice
+          ? {
+              create: {
+                billingMode: dto.initialPrice.billingMode,
+                sourceUrl: dto.initialPrice.sourceUrl,
+                effectiveFrom: new Date(),
+                createdByUserId: actorUserId,
+                rates: {
                   create: dto.initialPrice.rates.map((rate) => ({
                     metric: rate.metric,
                     unitSize: rate.unitSize,
@@ -192,21 +197,28 @@ export class ProviderOperationsAdminService {
     return item;
   }
 
-  async updateCatalogItem(id: string, actorUserId: string, dto: UpdateProviderCatalogItemDto) {
+  async updateCatalogItem(
+    id: string,
+    actorUserId: string,
+    dto: UpdateProviderCatalogItemDto,
+  ) {
     const item = await this.prisma.providerCatalogItem.findUnique({
       where: { id },
     });
     if (!item) {
       throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model.");
     }
-    
+
     let capabilitiesJson = item.capabilitiesJson as Record<string, any> | null;
     if (dto.aiConfiguration) {
-      if (!capabilitiesJson || typeof capabilitiesJson !== 'object') {
+      if (!capabilitiesJson || typeof capabilitiesJson !== "object") {
         capabilitiesJson = {};
       }
       capabilitiesJson.aiConfiguration = dto.aiConfiguration;
-      if (dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT && dto.reasoningEffortLevels) {
+      if (
+        dto.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT &&
+        dto.reasoningEffortLevels
+      ) {
         capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
       } else {
         delete capabilitiesJson.reasoningEffortLevels;
@@ -214,12 +226,16 @@ export class ProviderOperationsAdminService {
     } else if (dto.aiConfiguration === null && capabilitiesJson) {
       delete capabilitiesJson.aiConfiguration;
       delete capabilitiesJson.reasoningEffortLevels;
-    } else if (dto.reasoningEffortLevels !== undefined && capabilitiesJson && capabilitiesJson.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT) {
-       if (dto.reasoningEffortLevels === null) {
-         delete capabilitiesJson.reasoningEffortLevels;
-       } else {
-         capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
-       }
+    } else if (
+      dto.reasoningEffortLevels !== undefined &&
+      capabilitiesJson &&
+      capabilitiesJson.aiConfiguration === AiConfigurationFeature.REASONING_EFFORT
+    ) {
+      if (dto.reasoningEffortLevels === null) {
+        delete capabilitiesJson.reasoningEffortLevels;
+      } else {
+        capabilitiesJson.reasoningEffortLevels = dto.reasoningEffortLevels;
+      }
     }
 
     const updated = await this.prisma.providerCatalogItem.update({
@@ -229,7 +245,12 @@ export class ProviderOperationsAdminService {
         ...(dto.externalKey ? { externalKey: dto.externalKey } : {}),
         ...(dto.status ? { status: dto.status } : {}),
         ...(dto.createdAt ? { createdAt: new Date(dto.createdAt) } : {}),
-        ...((dto.aiConfiguration !== undefined || dto.reasoningEffortLevels !== undefined) ? { capabilitiesJson: (capabilitiesJson ?? Prisma.DbNull) as import("@prisma/client").Prisma.InputJsonValue } : {}),
+        ...(dto.aiConfiguration !== undefined || dto.reasoningEffortLevels !== undefined
+          ? {
+              capabilitiesJson: (capabilitiesJson ??
+                Prisma.DbNull) as import("@prisma/client").Prisma.InputJsonValue,
+            }
+          : {}),
       },
     });
 
@@ -259,7 +280,7 @@ export class ProviderOperationsAdminService {
     if (!item) {
       throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model.");
     }
-    
+
     // Constraints for usage and routing removed to allow forced deletion
 
     await this.prisma.$transaction(async (transaction) => {
@@ -285,7 +306,7 @@ export class ProviderOperationsAdminService {
       await transaction.providerPriceVersion.deleteMany({
         where: { catalogItemId: id },
       });
-      
+
       // Delete the catalog item
       await transaction.providerCatalogItem.delete({
         where: { id },
@@ -712,14 +733,40 @@ export class ProviderOperationsAdminService {
     actorUserId: string,
     dto: CreatePriceVersionDto,
   ) {
+    const effectiveFrom = new Date();
     const item = await this.prisma.providerCatalogItem.findUnique({
       where: { id: catalogItemId },
-      select: { id: true },
+      select: {
+        id: true,
+        priceVersions: {
+          where: {
+            effectiveFrom: { lte: effectiveFrom },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gt: effectiveFrom } }],
+          },
+          orderBy: { effectiveFrom: "desc" },
+          take: 1,
+          select: {
+            rates: {
+              select: {
+                metric: true,
+                tierFrom: true,
+                tierTo: true,
+                conditionsJson: true,
+              },
+            },
+          },
+        },
+      },
     });
     if (!item) {
       throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model/provider.");
     }
-    const effectiveFrom = new Date();
+    const previousConditions = new Map(
+      (item.priceVersions[0]?.rates ?? []).map((rate) => [
+        priceRateKey(rate),
+        rate.conditionsJson,
+      ]),
+    );
     const created = await this.prisma.$transaction(async (transaction) => {
       await transaction.providerPriceVersion.updateMany({
         where: {
@@ -737,13 +784,19 @@ export class ProviderOperationsAdminService {
           effectiveFrom,
           createdByUserId: actorUserId,
           rates: {
-            create: dto.rates.map((rate) => ({
-              metric: rate.metric,
-              unitSize: rate.unitSize,
-              unitPriceUsd: rate.unitPriceUsd,
-              tierFrom: rate.tierFrom,
-              tierTo: rate.tierTo,
-            })),
+            create: dto.rates.map((rate) => {
+              const conditionsJson = previousConditions.get(priceRateKey(rate));
+              return {
+                metric: rate.metric,
+                unitSize: rate.unitSize,
+                unitPriceUsd: rate.unitPriceUsd,
+                tierFrom: rate.tierFrom,
+                tierTo: rate.tierTo,
+                ...(conditionsJson == null
+                  ? {}
+                  : { conditionsJson: conditionsJson as Prisma.InputJsonValue }),
+              };
+            }),
           },
         },
         include: { rates: true },
@@ -852,37 +905,96 @@ export class ProviderOperationsAdminService {
   async events(query: ProviderUsageEventsQueryDto) {
     const { from, to } = resolveDateRange(query);
     const where = {
-      ...buildUsageWhere(query, from, to),
+      ...buildUsageWhere(query, from, to, !query.aiGenerationId),
+      ...(query.aiGenerationId ? { aiGenerationId: query.aiGenerationId } : {}),
       ...(query.status ? { status: query.status } : {}),
     };
-    const [items, total] = await Promise.all([
+    const [items, total, summary] = await Promise.all([
       this.prisma.providerUsageEvent.findMany({
         where,
         include: {
           catalogItem: { select: { displayName: true, externalKey: true } },
           priceVersion: { include: { rates: true } },
+          backgroundJob: { select: { queue: true, resourceType: true } },
+          aiGeneration: {
+            select: {
+              id: true,
+              type: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),
       this.prisma.providerUsageEvent.count({ where }),
+      this.prisma.providerUsageEvent.aggregate({
+        where,
+        _sum: { costVnd: true },
+      }),
     ]);
+    const generationIds = [
+      ...new Set(
+        items
+          .map((item) => item.aiGeneration?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const generationTotals =
+      generationIds.length > 0
+        ? await this.prisma.providerUsageEvent.groupBy({
+            by: ["aiGenerationId"],
+            where: { aiGenerationId: { in: generationIds } },
+            _sum: { costVnd: true },
+            _count: { _all: true },
+          })
+        : [];
+    const generationTotalById = new Map(
+      generationTotals.flatMap((item) =>
+        item.aiGenerationId
+          ? [
+              [
+                item.aiGenerationId,
+                {
+                  totalCostVnd: item._sum.costVnd ?? 0,
+                  usageEventCount: item._count._all,
+                },
+              ] as const,
+            ]
+          : [],
+      ),
+    );
     return {
       items: items.map((item) => ({
         ...item,
-        priceVersion: item.priceVersion ? {
-          ...item.priceVersion,
-          rates: item.priceVersion.rates.map(r => ({
-            ...r,
-            unitSize: r.unitSize.toNumber(),
-            unitPriceUsd: r.unitPriceUsd.toNumber(),
-          }))
-        } : null,
+        priceVersion: item.priceVersion
+          ? {
+              ...item.priceVersion,
+              rates: item.priceVersion.rates.map((r) => ({
+                ...r,
+                unitSize: r.unitSize.toNumber(),
+                unitPriceUsd: r.unitPriceUsd.toNumber(),
+              })),
+            }
+          : null,
         estimatedCostUsd: item.estimatedCostUsd.toNumber(),
         fxRateVndPerUsd: item.fxRateVndPerUsd.toNumber(),
         estimatedSavedCostUsd: item.estimatedSavedCostUsd.toNumber(),
+        aiGeneration: item.aiGeneration
+          ? {
+              id: item.aiGeneration.id,
+              type: item.aiGeneration.type,
+              ...(generationTotalById.get(item.aiGeneration.id) ?? {
+                totalCostVnd: 0,
+                usageEventCount: 0,
+              }),
+            }
+          : null,
       })),
+      summary: {
+        totalCostVnd: summary._sum.costVnd ?? 0,
+        totalCalls: total,
+      },
       pagination: {
         page: query.page,
         pageSize: query.pageSize,
@@ -959,7 +1071,8 @@ export class ProviderOperationsAdminService {
   async fetchExternalModels(provider: "OPENAI" | "GEMINI") {
     if (provider === "OPENAI") {
       const apiKey = this.configService.get("OPENAI_API_KEY", { infer: true });
-      if (!apiKey) throwBadRequest("OPENAI_KEY_NOT_FOUND", "Chưa cấu hình OpenAI API Key");
+      if (!apiKey)
+        throwBadRequest("OPENAI_KEY_NOT_FOUND", "Chưa cấu hình OpenAI API Key");
       try {
         const response = await fetch("https://api.openai.com/v1/models", {
           headers: { Authorization: `Bearer ${apiKey}` },
@@ -967,9 +1080,16 @@ export class ProviderOperationsAdminService {
         if (!response.ok) throw new Error("OpenAI request failed");
         const data = await response.json();
         const models = (data.data as Array<{ id: string; created: number }>)
-          .filter(model => /^gpt-\d+/.test(model.id) && !/-\d{4}/.test(model.id) && model.created >= 1735689600 && !model.id.includes("codex") && !/(-search|-vision|-audio|-transcribe|-tts)/.test(model.id))
+          .filter(
+            (model) =>
+              /^gpt-\d+/.test(model.id) &&
+              !/-\d{4}/.test(model.id) &&
+              model.created >= 1735689600 &&
+              !model.id.includes("codex") &&
+              !/(-search|-vision|-audio|-transcribe|-tts)/.test(model.id),
+          )
           .sort((a, b) => b.created - a.created)
-          .map(model => ({
+          .map((model) => ({
             provider: "OPENAI",
             externalKey: model.id,
             displayName: model.id,
@@ -981,14 +1101,17 @@ export class ProviderOperationsAdminService {
       }
     } else if (provider === "GEMINI") {
       const apiKey = this.configService.get("GEMINI_API_KEY", { infer: true });
-      if (!apiKey) throwBadRequest("GEMINI_KEY_NOT_FOUND", "Chưa cấu hình Gemini API Key");
+      if (!apiKey)
+        throwBadRequest("GEMINI_KEY_NOT_FOUND", "Chưa cấu hình Gemini API Key");
       try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+        );
         if (!response.ok) throw new Error("Gemini request failed");
         const data = await response.json();
-        const models = (data.models as Array<{ name: string, displayName: string }>)
-          .filter(model => model.name.startsWith("models/gemini-"))
-          .map(model => ({
+        const models = (data.models as Array<{ name: string; displayName: string }>)
+          .filter((model) => model.name.startsWith("models/gemini-"))
+          .map((model) => ({
             provider: "GEMINI",
             externalKey: model.name.replace("models/", ""),
             displayName: model.displayName || model.name.replace("models/", ""),
@@ -1028,6 +1151,14 @@ export class ProviderOperationsAdminService {
     }
     return results;
   }
+}
+
+function priceRateKey(rate: {
+  metric: import("@prisma/client").ProviderUsageMetric;
+  tierFrom?: number | null;
+  tierTo?: number | null;
+}) {
+  return `${rate.metric}:${rate.tierFrom ?? "none"}:${rate.tierTo ?? "none"}`;
 }
 
 function serializePriceVersion(version: {
@@ -1070,7 +1201,7 @@ function hasCapability(value: Prisma.JsonValue | null, feature: AiGenerationType
   if (Array.isArray(value)) {
     return value.includes(feature);
   }
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
     const features = (value as any).features;
     return Array.isArray(features) && features.includes(feature);
   }
@@ -1112,10 +1243,15 @@ function resolveDateRange(query: ProviderUsageQueryDto) {
   return { from, to };
 }
 
-function buildUsageWhere(query: ProviderUsageQueryDto, from: Date, to: Date) {
+function buildUsageWhere(
+  query: ProviderUsageQueryDto,
+  from: Date,
+  to: Date,
+  includeDateRange = true,
+) {
   const feature = parseFeature(query.feature);
   return {
-    createdAt: { gte: from, lte: to },
+    ...(includeDateRange ? { createdAt: { gte: from, lte: to } } : {}),
     ...(query.category ? { category: query.category } : {}),
     ...(query.provider ? { provider: query.provider.toUpperCase() } : {}),
     ...(feature ? { feature } : {}),

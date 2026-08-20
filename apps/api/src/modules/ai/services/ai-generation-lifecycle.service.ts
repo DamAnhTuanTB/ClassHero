@@ -124,6 +124,7 @@ export class AiGenerationLifecycleService {
       ...(persisted.result === undefined ? {} : { details: persisted.result }),
     };
     const usage = prepared.output.usage;
+    const recordedOutput = prepared.recordedOutput ?? prepared.output.data;
 
     await this.prisma.$transaction([
       this.prisma.backgroundJob.update({
@@ -149,8 +150,8 @@ export class AiGenerationLifecycleService {
           totalTokens: usage?.totalTokens,
           latencyMs: prepared.output.latencyMs,
           retryCount: Math.max(context.attempt - 1, 0),
-          outputHash: hashAiValue(prepared.output.data),
-          outputJson: toJobJson(prepared.output.data),
+          outputHash: hashAiValue(recordedOutput),
+          outputJson: toJobJson(recordedOutput),
           targetType: persisted.resourceType,
           targetId: persisted.resourceId,
           errorMessage: null,

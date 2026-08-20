@@ -119,7 +119,7 @@ export function SourceDocumentAssignmentsDialog({
               >
                 <div className="border-b border-[var(--theme-border)] bg-[var(--theme-surface-soft)] px-3 py-3 sm:px-4">
                   <p className="text-xs font-extrabold uppercase tracking-wide text-[var(--theme-text-muted)]">
-                    Chương {assignment.chapterOrder}: {assignment.chapterTitle}
+                    {assignment.chapterTitle}
                   </p>
                   <h3 className="mt-1 text-base font-extrabold text-[var(--theme-text-strong)]">
                     {assignment.lessonTitle}

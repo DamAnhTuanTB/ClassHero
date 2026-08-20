@@ -47,6 +47,7 @@ API_URL=http://localhost:4000/api/v1
 API_PORT=4000
 
 # Database - local Postgres + pgvector
+POSTGRES_HOST_PORT=5432
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/learning_path_dev?schema=public
 DIRECT_URL=postgresql://postgres:postgres@localhost:5432/learning_path_dev?schema=public
 
@@ -60,9 +61,12 @@ JWT_REFRESH_EXPIRES_IN=30d
 REDIS_URL=redis://localhost:6379
 WORKER_CONCURRENCY_AI=2
 WORKER_CONCURRENCY_DOCUMENT=1
+WORKER_CONCURRENCY_DIAGRAM=1
 WORKER_CONCURRENCY_NOTIFICATION=3
 
 # File storage - local/dev mặc định dùng MinIO, staging/production dùng Cloudflare R2
+MINIO_API_HOST_PORT=9000
+MINIO_CONSOLE_HOST_PORT=9001
 FILE_STORAGE_PROVIDER=minio_local
 S3_ENDPOINT=http://localhost:9000
 S3_REGION=auto
@@ -111,6 +115,22 @@ AI_GENERATION_TIMEOUT_MS=600000
 AI_MONTHLY_BUDGET_VND=1500000
 AI_STUDENT_CHAT_DAILY_LIMIT=20
 AI_STUDENT_GENERATE_DAILY_LIMIT=5
+
+# Searchable PDF equivalence + temporary Summary packet
+SEARCHABLE_PDF_VALIDATION_TTL_SECONDS=3600
+SEARCHABLE_PDF_ROLLBACK_TTL_SECONDS=86400
+AI_SUMMARY_PACKET_MAX_MB=45
+AI_SUMMARY_PACKET_MAX_PAGES=120
+
+# Isolated TeX Live renderer (worker-only internal service)
+TEX_RENDERER_URL=http://localhost:8080
+TEX_RENDERER_TOKEN=local-tex-renderer-token
+TEX_RENDER_REQUEST_TIMEOUT_MS=30000
+TEX_RENDER_MAX_AI_REPAIRS=2
+TEX_RENDER_MAX_SOURCE_BYTES=40000
+TEX_RENDER_MAX_SVG_BYTES=2000000
+TEX_RENDER_MAX_SVG_NODES=20000
+TEX_RENDER_MAX_PATH_CHARACTERS=1500000
 
 # payOS
 PAYOS_CLIENT_ID=change-me
@@ -185,6 +205,11 @@ Username: postgres
 Password: postgres
 ```
 
+Nếu cổng host `5432` đang được một dự án khác sử dụng, đặt
+`POSTGRES_HOST_PORT` sang cổng còn trống (ví dụ `5433`) và dùng cùng cổng đó
+trong `DATABASE_URL`/`DIRECT_URL` của API chạy trên host. Cổng bên trong Compose
+vẫn là `postgres:5432`.
+
 Khi API chạy trong Docker Compose, `DATABASE_URL` phải dùng host service `postgres` thay vì `localhost`:
 
 ```bash
@@ -252,6 +277,10 @@ Provider rules:
 
 - `FILE_STORAGE_PROVIDER=minio_local`: chỉ dùng local/dev, trỏ tới MinIO bằng `S3_ENDPOINT=http://localhost:9000`, `S3_FORCE_PATH_STYLE=true`.
 - `FILE_STORAGE_PROVIDER=cloudflare_r2`: dùng staging/production, trỏ tới endpoint S3-compatible của Cloudflare R2 như `https://<account_id>.r2.cloudflarestorage.com`, không chạy MinIO trên VPS production.
+- Nếu host port `9000`/`9001` đang được dự án khác sử dụng, đặt
+  `MINIO_API_HOST_PORT`/`MINIO_CONSOLE_HOST_PORT` sang cổng còn trống và cập nhật
+  `S3_ENDPOINT` của API chạy trên host theo `MINIO_API_HOST_PORT`. API/worker
+  trong Compose vẫn dùng endpoint nội bộ `http://minio:9000`.
 - Code upload/download phải đi qua một service/adapter chung; module domain không gọi trực tiếp SDK R2/MinIO.
 - Signed URL TTL dùng `FILE_SIGNED_URL_TTL_SECONDS`; backend vẫn kiểm tra quyền trước khi trả URL.
 - Bucket local/dev có thể tạo tự động khi khởi động Docker/dev script, nhưng production bucket phải tạo và phân quyền thủ công trên Cloudflare.
@@ -423,6 +452,14 @@ payment-postprocess
 ```
 
 Concurrency cấu hình bằng env.
+
+`diagram-rendering` hiện chỉ nhận `stem_figures` của Summary. Worker gọi
+`TEX_RENDERER_URL` qua private Docker network với bearer token; renderer không
+publish port ra host/Internet trong Compose. Chỉ `TEX_COMPILE_FAILED` có batch
+compiler đầy đủ mới được bounded OpenAI repair. Mỗi repair gửi toàn bộ lỗi và raw
+log của lượt compile đó. Source policy, validator, provider, timeout, network,
+storage và lỗi hạ tầng không tự retry; các thao tác retry thủ công vẫn theo
+lifecycle hình hiện có.
 
 ---
 

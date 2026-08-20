@@ -51,7 +51,7 @@ flowchart LR
 
 - `apps/web/lib/user-facing-error.ts`
 - `apps/web/tests/user-facing-error.test.ts`
-- `apps/web/features/admin/ai-generation/utils/lesson-summary-diagram-edit.ts`
+- `apps/web/features/admin/ai-generation/components/admin-stem-figures-panel.tsx`
 
 ## Khi nào cần nhớ lại?
 
@@ -61,4 +61,4 @@ trả chuỗi động ra giao diện.
 ## Task liên quan
 
 - Corrective thông báo UI ngày 2026-08-11
-- `M9.8`, `M9.13-M9.15`
+- `M9.2`, `M9.8`

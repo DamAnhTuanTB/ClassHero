@@ -91,6 +91,12 @@
   border: 1px solid var(--theme-border);
 }
 
+.mmd-content.mmd-content--ocr-document img {
+  width: auto;
+  max-height: 16rem;
+  object-fit: contain;
+}
+
 .mmd-content h1,
 .mmd-content h2,
 .mmd-content h3,

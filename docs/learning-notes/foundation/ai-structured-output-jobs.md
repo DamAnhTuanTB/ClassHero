@@ -1,308 +1,229 @@
-# AI structured output và durable jobs
+# AI structured output, TeX figure và durable jobs
 
 ## Chủ đề này dùng để làm gì?
 
-Nền M9.1 giúp các tính năng tạo summary, quiz, flashcard, test và lời giải gọi
-model theo một đường thống nhất. Mục tiêu quan trọng nhất không phải chỉ nhận
-được JSON, mà là không cho dữ liệu AI sai shape đi vào database.
+Ghi lại ranh giới giữa một lần OpenAI tạo Summary, các job render TeX chạy lâu và
+artifact SVG được promote sau khi compile + validator thành công.
 
-## Cách nó hoạt động trong repo
+## Luồng hiện tại
 
-- `AiService` là cửa gọi chung; code domain không gọi OpenAI SDK trực tiếp.
-- OpenAI nhận JSON Schema được sinh từ Zod để tạo structured output.
-- Backend parse lại kết quả bằng Zod trước khi worker được phép lưu domain.
-- Mỗi AI job có một `background_jobs` cho UI/vận hành và một `ai_generations`
-  cho model, token, latency, version, hash và lỗi.
-
-## Sơ đồ luồng dễ hiểu
-
-```mermaid
-flowchart TD
-  A[API tạo yêu cầu AI] --> B[Transaction tạo background job và AI log]
-  B --> C[Enqueue BullMQ]
-  C --> D[AI worker đánh dấu RUNNING]
-  D --> E[AiProvider gọi OpenAI]
-  E --> F{Root/transport có đọc được?}
-  F -- Không --> G[Không lưu domain; đánh dấu FAILED]
-  F -- Có --> H[Validate và map từng block]
-  H --> J{Block cục bộ có lỗi?}
-  J -- Có --> K[Giữ phần an toàn + placeholder/review issue]
-  J -- Không --> L[Giữ block nguyên vẹn]
-  K --> I[Lưu draft NEEDS_REVIEW]
-  L --> I
-  I --> M[Hai record cùng SUCCEEDED và lưu usage/hash]
+```txt
+POST generate Summary
+  -> background_jobs(AI_GENERATION) + ai_generations
+  -> provider strict structured output
+  -> Zod persistence gate
+  -> lesson_summaries content version 3
+  -> stem_figures + background_jobs(DIAGRAM_RENDERING)
+  -> source policy
+  -> isolated TeX Live/LuaLaTeX + dvisvgm
+  -> local SVG validator/sanitizer
+  -> atomic promote R2
 ```
 
-## Luồng kỹ thuật
+API trả `background_jobs.id` làm `jobId`. Database là nguồn trạng thái durable;
+BullMQ chỉ vận chuyển công việc. UI poll job/figure và có thể phục hồi sau reload.
 
-`AiGenerationProcessor` cố ý chia thành `generate()` rồi mới `persist()`.
-Nếu provider refusal, trả rỗng hoặc Zod reject, lời gọi đầu ném lỗi và bước
-`persist()` không thể chạy. Lỗi schema là non-retryable để tránh tạo nhiều lần
-tốn phí; timeout/network còn lượt sẽ đưa trạng thái về `QUEUED` cho BullMQ.
+Khi một Summary sinh ra nhiều figure, mapper gán vị trí theo thứ tự nội dung và
+worker có thể enqueue đồng thời bằng `Promise.all`; thứ tự hoàn tất vì vậy không
+phải contract. API/UI phải sắp xếp theo vị trí số
+`section -> block -> figureIndex` để thứ tự hiển thị vẫn ổn định. Khi parent
+Summary job terminal, frontend phải invalidate cả Summary lẫn danh sách figure
+con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figure cũ cho
+đến lần reload trang.
 
-`output_parsed=null` chưa nói được nguyên nhân. Với OpenAI Responses API, worker
-phải đọc thêm `response.status`, `incomplete_details.reason` và content kiểu
-`refusal`. Trường hợp thường gặp là `max_output_tokens`: giới hạn này bao gồm cả
-token suy luận lẫn JSON nhìn thấy, nên reasoning cao có thể dùng hết ngân sách
-trước khi JSON hoàn chỉnh. Partial JSON không được cố lưu hoặc tự nối bằng một paid
-call khác.
+## Structured output boundary
 
-Một generation thất bại không đồng nghĩa provider chưa tính tiền. Nếu response
-incomplete đã mang usage, hệ thống ghi request ID, model, token, latency và chi phí
-vào usage event, đồng thời quyết toán reservation. Nếu response đã về nhưng usage
-không rõ, reservation giữ `UNCERTAIN`; chỉ lỗi chắc chắn xảy ra trước provider mới
-được release. `ai_generations` vẫn `FAILED` và dữ liệu domain cũ không bị ghi đè.
+- Provider schema giúp ép shape nhưng Zod vẫn là gate cuối trước khi persist.
+- Khi một quyết định AI làm đổi loại input của paid call sau đó, provenance phải
+  là field có invariant chứ không chỉ được suy từ metadata khác. Với Summary
+  figure, `TEXTBOOK_SOURCE` bắt buộc có `sourceReferences`, còn
+  `GENERATED_FROM_BRIEF` bắt buộc reference rỗng. Resolver, generation brief và
+  provider boundary cùng chặn ảnh cho nhánh dựng mới; vì vậy một asset stale
+  không thể biến thành OCR crop/PDF fallback gửi sang lượt TikZ.
+- JSON Schema gửi provider chỉ dùng tập cú pháp Structured Outputs hỗ trợ. Quy
+  tắc cần regex JavaScript nâng cao như lookaround phải để ở Zod gate phía
+  backend; nếu đưa thẳng vào `pattern`, provider có thể từ chối toàn bộ request
+  trước khi model bắt đầu sinh nội dung.
+- Prompt/schema/model/config/source hash phải được snapshot để worker không dùng
+  dữ liệu stale.
+- Summary figure draft chỉ chứa source LaTeX, alt text và caption. AI không trả raw
+  SVG, URL hoặc geometry JSON.
+- Figure decision dùng hai tầng: subject profile quy định mức tối thiểu bắt buộc,
+  còn AI chủ động bổ sung hình ngoài danh sách khi hình cần cho việc hiểu đúng.
+  Danh sách hệ thống là mức sàn, không phải whitelist hay danh sách đóng.
+- Sau Zod, semantic coverage gate chặn output thiếu figure thuộc mức sàn trước
+  mapper/persistence. Figure AI tự thêm được giữ nguyên. Gate chỉ kiểm coverage,
+  không dùng Vision, không chọn package và không gọi thêm provider.
+- Mapper lưu `TEX_FIGURE` reference trong content và source/state ở bảng riêng.
+- Schema nhận output mới và schema đọc dữ liệu vận hành đã lưu không nên bị buộc
+  chung một cách máy móc. Với figure, caption/alt text là metadata của revision;
+  render-plan chỉ gồm ngữ nghĩa cần resolve crop và dựng hình. Vì vậy một rule
+  caption mới có thể từ chối output mới nhưng không được vô tình khóa nút sinh
+  lại của một render-plan vẫn đủ dữ liệu hình học.
+- Giai đoạn hiện tại chỉ Summary có figure; Quiz/Test/Flashcard/Explanation/Chat
+  giữ text-only.
 
-OpenAI SDK không tự retry bên trong provider. Nhờ vậy một BullMQ attempt tương
-ứng với một provider request, log retry và chi phí dễ hiểu hơn.
+### Chuẩn hóa trình bày output AI ở front-end
 
-Từ M9.9, job còn chụp route snapshot lúc enqueue. OpenAI/Gemini model được
-resolve theo feature; fallback chỉ chạy cho lỗi provider tạm thời. Mỗi attempt
-có `provider_usage_events` riêng với cached/input/output token, price version,
-tỷ giá và VND. Vì vậy `ai_generations` là summary theo generation, còn usage
-event là sổ chi tiết dùng cho accounting/audit.
+Heuristic trình bày không được chạy mù trên toàn bộ Markdown. Khi FE cần tách các
+ý `a)`, `b)` do provider trả cùng dòng, phải che vùng LaTeX và code trước, chỉ sửa
+khoảng trắng ở plain text, yêu cầu có cặp marker tuần tự và giữ phép biến đổi
+idempotent. Regression matrix phải có cả happy path lẫn counterexample: marker
+thường/in đậm/viết hoa, khoảng trắng Unicode, newline sẵn có, bullet Markdown,
+inline/display math, môi trường LaTeX, inline/fenced code, ký hiệu hàm `f(a)`,
+marker đơn và thứ tự marker không hợp lệ. Mục tiêu là sửa layout mà không đổi ký
+tự kiến thức ngoài whitespace.
 
-## Kỹ thuật chính
+### Shared schema phải đúng ở cả source và runtime build
 
-- Strict structured output: JSON Schema hướng model sinh đúng cấu trúc.
-- Runtime validation: Zod là ranh giới tin cậy cuối cùng của ứng dụng.
-- Durable lifecycle: trạng thái nằm trong Postgres, Redis chỉ làm hàng đợi.
-- Idempotency: cùng key trả lại job hiện có thay vì gọi AI lần nữa.
-- Active-job dedupe: M9.2 khóa theo lesson trong transaction, nên hai lần bấm
-  gần nhau dùng cùng một summary job; job terminal vẫn cho phép regenerate.
-- Deterministic hashing: object key được chuẩn hóa trước khi SHA-256 để cùng
-  input/output luôn có cùng hash bất kể thứ tự key.
-- Source freshness: API hash danh sách lesson chunks, worker tải lại và so hash
-  trước khi gọi provider để không tóm tắt tài liệu đã bị thay đổi giữa chừng.
-- Prompt preview round-trip: FE phải lấy `systemPrompt` và `userPrompt` hiệu lực
-  từ response preview để hiển thị, không dùng giá trị form rỗng ghi đè request
-  đã dựng. Nếu admin gửi lại nguyên prompt đã xem trước, shared builder nhận
-  diện và tái sử dụng trực tiếp để base prompt không bị lồng thêm lần nữa.
+`@learning-path/shared` export runtime từ `dist/index.js`, không đọc trực tiếp
+`src`. Vì vậy, chỉ sửa Zod schema trong `packages/shared/src` mà không build lại
+có thể tạo ra tình huống TypeScript/source đã có field mới nhưng API đang chạy
+vẫn báo `Unrecognized key` theo JavaScript cũ.
 
-## Luồng lỗi thường gặp
+Luồng dev hiện tại ngăn lỗi này bằng ba lớp:
 
-Một response preview có thể hoàn toàn đúng nhưng tab System vẫn trống nếu UI
-chỉ lưu `userPrompt` vào form. Tình huống này còn làm JSON “Input đầy đủ” sai vì
-giá trị rỗng của form ghi đè `openAiRequest.instructions`. Cách kiểm tra đúng là
-đối chiếu cùng lúc ba nơi: `systemPrompt` trong response, textarea trên FE và
-`instructions` trong JSON cuối. Sau đó phải kiểm thêm vòng gửi lại preview hoặc
-generate để chắc chắn prompt hiệu lực không bị builder bọc lặp.
+```txt
+pnpm dev
+  -> Turbo build package phụ thuộc trước
+  -> shared tsc --watch cập nhật dist
+  -> API watcher thấy shared/dist thay đổi và restart runtime
+```
 
-Preview cũng là derived state và có thể cũ ngay khi admin đổi style, độ dài, số
-từ, tài liệu hoặc yêu cầu bổ sung. Submit không được gửi nguyên prompt tự sinh đã
-lưu từ lần preview trước; nó phải dựng lại prompt từ snapshot form hiện tại rồi
-mới tạo job. Nếu admin đã sửa trực tiếp System/User prompt, phần sửa đó được giữ
-làm toàn bộ prompt hiệu lực tương ứng, còn prompt không sửa được thay bằng bản vừa
-dựng. UI cần theo dõi việc admin chủ động sửa từng ô thay vì suy đoán bằng cách so
-chuỗi với response preview. Nhờ vậy nút preview chỉ phục vụ kiểm tra, không trở
-thành một bước lưu ngầm dễ bị quên.
+Review issue do validator nội bộ sinh ra cũng phải được reconcile lại theo
+schema hiện hành khi đọc/lưu Summary. Nếu validator mới đã chấp nhận block,
+cảnh báo schema cũ phải bị loại bỏ; không giữ nó chỉ vì fingerprint nội
+dung chưa đổi.
 
-Phải tách ranh giới kỹ thuật và đánh giá biên tập. JSON Schema/Zod vẫn là ranh
-giới bắt buộc vì JSON hỏng không thể persist/render an toàn. Ngược lại, các nhận
-định như theory có lẫn ví dụ, paragraph quá dài, ví dụ lệch chủ đề hay lời giải
-chưa hay đều có false positive; chúng chỉ nên thành warning trên bản nháp
-`NEEDS_REVIEW`, không reject job và không tự gọi model lần hai tốn phí.
+## Retry đúng loại lỗi
 
-Semantic checker vẫn nên nhận diện nhãn theo cấu trúc thay vì cấm từ khóa mọi vị
-trí. Chẳng hạn “vận dụng” có thể là nhãn `Vận dụng 1.` nhưng cũng là động từ hợp
-lệ trong câu “vận dụng các tính chất”. Dù chỉ là warning, giảm false positive vẫn
-giúp admin tập trung vào vấn đề thật.
+Có hai lớp retry độc lập:
 
-Với nội dung AI còn đọc được nhưng phụ thuộc tài nguyên không được render, không
-nên âm thầm xóa block. Ví dụ một note nhắc `Hình 4.47` trong khi note không có hình
-kèm theo phải được giữ nguyên và nhận review issue ở đúng block. Job vẫn thành
-công, sibling không bị ảnh hưởng, admin nhìn thấy nguyên văn để sửa hoặc chấp nhận;
-prompt/schema đồng thời phải giảm xác suất provider tiếp tục tạo lỗi. Đây là lỗi
-ngữ nghĩa reviewable, khác với lỗi schema làm dữ liệu không thể xử lý.
+1. Chỉ `TEX_COMPILE_FAILED` có diagnostic batch đầy đủ mới được tự gọi OpenAI
+   repair, tối đa `maxRepairAttempts`. Request repair phải chứa toàn bộ structured
+   compiler errors và raw compiler log của đúng lượt compile đó.
+2. Source policy, semantic/SVG validator, provider, budget, timeout, network,
+   storage và lỗi hạ tầng đều terminal đối với automatic retry. Admin vẫn có thể
+   chủ động retry hạ tầng, sửa source, xóa, thay ảnh hoặc tạo revision mới qua
+   lifecycle cũ.
 
-Provider output và dữ liệu sau mapper là hai contract khác nhau nên phải được
-test độc lập. Ví dụ provider trả `diagramSpec`, mapper đổi thành `visual` để UI
-render; test chỉ parse output của provider sẽ không phát hiện schema lưu trữ quên
-field `visual`. Test hồi quy đúng phải chạy đủ chuỗi provider parse → mapper →
-persisted-output parse, đặc biệt với các field chỉ xuất hiện khi bài cần hình.
+Mỗi attempt lưu kind, source version/hash, compile log rút gọn, error
+category/code, validator issues và duration. Hết repair budget là terminal, không
+tạo vòng lặp.
 
-Chuẩn hóa về cùng một shape không có nghĩa hai đường tạo dữ liệu là tương đương
-về quan sát. Nếu provider raw spec và intent qua compiler đều bị ghi đè thành một
-`DIAGRAM_SPEC` không provenance, hệ thống sẽ không còn đo được lỗi thuộc provider
-hay compiler. Vì vậy mọi phép materialize phải giữ discriminator bền vững, chẳng
-hạn `diagramSpecOrigin`, và metadata compiler nếu có. Đây là dữ liệu lineage,
-không phải nội dung sư phạm; renderer được phép không hiển thị nhưng mapper,
-persist/API và công cụ admin không được xóa. Thiếu lineage từ đầu khiến thống kê
-lịch sử phải suy đoán và không thể đưa ra tỷ lệ đáng tin cậy cho dữ liệu đã mất dấu.
+## Security boundary
 
-Trong contract có hai nhánh `INTENT | RAW_SPEC`, provider phải chọn nhánh ngay lúc
-sinh output vì chỉ provider còn đủ ngữ cảnh để mô tả một raw spec hoàn chỉnh.
-Compiler chỉ materialize INTENT đã đủ nghĩa; nó không thể tự chuyển một intent
-thiếu điểm/quan hệ thành RAW_SPEC mà không bịa dữ liệu. Backend vẫn phải kiểm tra
-capability và từ chối hạ intent phức tạp xuống template đơn giản, nhưng đây là
-final gate chứ không phải quyết định routing thay provider. Vì vậy capability
-manifest/version phải xuất hiện rõ trong prompt/schema, và INTENT không đủ
-coverage phải thành review issue hoặc cần một provider call mới — không được
-âm thầm render hình thiếu rồi báo thành công.
+TeX do AI tạo là untrusted code:
 
-Schema pass cũng không chứng minh mapper sẽ chạy được. Một `diagramIntent` có thể
-đủ field nhưng compiler vẫn ném lỗi vì thiếu số nhãn cần cho đúng archetype. Vì
-vậy summary dùng hai boundary liên tiếp: recovery chạy thử chính compiler và
-materialize kết quả renderer-ready đúng một lần; mapper có boundary cuối theo
-từng block để đổi mọi exception cục bộ thành review issue + fallback nhỏ nhất.
-Không được chỉ bắt một message cụ thể: test phải phủ các family compiler khác
-nhau và cả lỗi ngoài dự kiến trong theory/example/note/application block.
+- Compile trong container riêng, non-root, network internal-only, read-only +
+  tmpfs, không mount dữ liệu ứng dụng.
+- Tắt shell escape, giới hạn CPU/RAM/PID/timeout/source/output.
+- Source policy chặn shell, external I/O/network, direct Lua và PDF object.
+- Package cài cố định trong image; không cài động.
+- SVG validator dùng allowlist, chặn script/event/foreignObject/external reference
+  và giới hạn viewBox/node/path/bytes.
+- Chỉ sanitized SVG hợp lệ mới thành preview.
 
-## Handler summary đầu tiên
+## Admin review và storage
 
-M9.2 là handler domain đầu tiên dùng nền M9.1. API chỉ nhận
-`lesson_documents.id`, kiểm document active/`READY`/có chunks rồi lưu metadata
-nhỏ vào job. Worker tải chunks theo đúng lesson, giới hạn context, gọi strict
-schema, map sang block contract theo kiểu best-effort reference, gắn semantic warning rồi upsert một
-`lesson_summaries` ở trạng thái `NEEDS_REVIEW`. Raw PDF và raw prompt không được
-lưu trong durable job.
+Validator chỉ kết luận an toàn/kỹ thuật, không kết luận hình đúng sư phạm. Không có
+AI Vision. Worker promote asset hợp lệ atomically; admin kiểm bố cục/nội dung và
+có thể sửa source, compile draft local rồi apply revision đã qua validator. Draft
+preview nằm trong database; student chỉ nhận delivery asset của current revision
+`SUCCEEDED`.
 
-Contract v3 giữ heading/theory bám nguồn nhưng cố ý làm output biên tập đơn giản:
-model chủ động sửa lỗi OCR/chính tả của heading, còn example không mang
-`origin`, candidate ID hay `sourceAssessment`. Backend coi topic/candidate
-classification là dữ liệu hỗ trợ input, không phải metadata phải trả lại. Hình minh họa dùng shared
-`DIAGRAM_SPEC` đã validate và renderer SVG kiểm soát; không persist URL ảnh
-OCR, raw SVG hoặc câu kiểu `xem hình bên`. Contract buộc `toScale=true`; mapper
-kiểm point/viewBox, còn provider Zod gate đối chiếu marker vuông góc, song song,
-bằng độ dài với tọa độ trong sai số `2%`. Các quan hệ marker này là invariant kỹ
-thuật: nếu mâu thuẫn thì output bị reject trước persist, thay vì hạ thành warning
-và render một tam giác suy biến. Trước khi lưu, mapper còn mở rộng viewBox thiếu biên và đổi LaTeX
-trong nhãn SVG thành text thuần; renderer lặp lại bước auto-fit cho summary cũ.
-Nội dung toán cũng phải sửa các control character do JSON hiểu nhầm, chẳng hạn
-`\t` trong `\triangle`, trước khi đưa cho trình render công thức. Nếu không cần
-hình thì block không lưu field visual.
+Một source TikZ biên dịch được vẫn có thể sai chất lượng. Khi đã gửi ảnh sách giáo
+khoa, prompt nên coi ảnh là chuẩn trực quan thay vì chồng thêm nhiều công thức
+đặt nhãn, góc, anchor hoặc khoảng cách. Các quy tắc vá lẻ dễ cạnh tranh với ảnh
+nguồn và khiến model tối ưu theo câu chữ thay vì tái tạo hình. Prompt chung chỉ
+cần khóa thứ tự ưu tiên, cấm thiếu/thừa nét, yêu cầu nhãn gần đúng đối tượng mà
+không chạm nét và yêu cầu source biên dịch được; lỗi cụ thể được giữ làm regression
+fixture, không nối tiếp thành một đoạn chỉ dẫn mới.
 
-Một `diagramSpec` parse được chưa có nghĩa là hình đúng. Schema chỉ nhìn thấy ID,
-tọa độ và reference; nó không tự hiểu `H` là chân tường hay `B` là điểm thang chạm
-tường. Vì vậy diagram cần ba hàng rào riêng: schema chặn cấu trúc mơ hồ như ID/nhãn
-trùng hoặc point label ghép; mapper chuẩn hóa primitive suy biến; prompt bắt model
-đối chiếu vai trò từng điểm với đề. Renderer cũng phải dùng hình học thật của
-marker/segment để đặt cung góc và text, không tin một tọa độ nhãn cố định từ model.
+Prompt provider không phải nơi lưu audit metadata. Chỉ gửi dữ liệu và ràng buộc
+mà model có thể dùng để quyết định output; prompt/schema version, tên manifest,
+object key, provenance và lifecycle vẫn được snapshot ở backend để tái hiện và
+điều tra. Nếu một invariant đã suy ra được từ payload, ví dụ số panel từ chính
+mảng ảnh, không gửi thêm nhiều field diễn đạt lại cùng một ý. Preview dành cho
+admin phải mô phỏng đúng request provider thực nhận và chỉ che phần binary/secret,
+không bọc thêm metadata khiến người xem hiểu nhầm là đã gửi lên model.
 
-Trước khi sinh realtime cả bài Hình học, chạy smoke test tiết kiệm bằng đúng một
-provider request chỉ trả hai example + `diagramSpec`, không retry và có output cap.
-Nếu model lặp primitive đến hết token thì dừng, không tăng token hoặc chạy cả bài.
-`superRefine` của Zod chỉ kiểm được sau khi JSON đã hoàn chỉnh; nó không nhất thiết
-biến thành ràng buộc mà provider tuân thủ trong JSON Schema, nên phải giới hạn độ
-phức tạp output ngay trong JSON Schema. Với `diagramSpec`, không nên gửi một mảng
-union `anyOf` cho mọi primitive: model có thể chọn nhánh CIRCLE/POLYGON hợp schema
-nhưng sai ý. Tách thành các mảng giới hạn nhỏ như `segments`, `arcs`, `circles`,
-`rightAngles`, `equalLengths`, rồi flatten về persisted union sau khi nhận output,
-giúp provider thấy rõ số cạnh và loại hình phải sinh mà không đổi format lưu cũ.
-Semantic audit vẫn phải kiểm tọa độ thật: marker bằng nhau không đủ nếu hai đoạn
-lệch độ dài; cung có đúng bán kính cũng chưa đủ nếu endpoint không chạm điểm cần dựng.
+Source vẽ và metadata trình bày phải có dirty state riêng. Thay đổi source làm
+draft đã compile trở nên stale và bắt buộc compile lại; thay đổi alt text/caption
+không làm SVG stale, không được xóa preview hoặc bắt compile lại. Khi chỉ sửa
+metadata, apply cập nhật current revision và Summary reference trong cùng
+transaction, không upload lại asset. Khi đã có draft hợp lệ, apply dùng metadata
+mới nhất cùng revision đã compile.
 
-Visual audit phải chụp chính component thật, không chỉ kiểm JSON/SVG node. Với
-`vector-effect="non-scaling-stroke"`, `strokeWidth` là độ dày hiển thị nên phải
-dùng giá trị pixel ổn định như `1.75–2`, không dùng `viewBox * 0.008` vì hình rộng
-có thể chỉ còn nét dưới một pixel. Dấu góc vuông, cung góc và tick cạnh bằng nhau
-nên lấy theo `min(tỉ lệ viewBox, tỉ lệ chiều dài hai arm/cạnh)` để tránh marker
-phình to khi một diagram chứa nhiều hình tách rời.
+Ảnh tham chiếu sách giáo khoa là provenance bất biến của logical figure, không
+phải dữ liệu tạm của riêng revision AI. Revision tạo bằng mã code hoặc upload phải
+kế thừa snapshot/hash này. Khi đọc dữ liệu cũ bị thiếu snapshot ở revision hiện
+hành, API có thể phục hồi từ revision lịch sử gần nhất có snapshot; cả response
+admin và mutation dùng crop phải resolve cùng một nguồn để tránh UI bật nút nhưng
+backend lại từ chối.
 
-Point trong structured diagram không đồng nghĩa với một chấm phải nhìn thấy. Nó
-có thể chỉ là nút điều khiển để dựng polyline, ô bảng, cột biểu đồ hoặc neo text.
-Nếu renderer vẽ mọi point, hình học sẽ thành sơ đồ nhiều nút đen và đồ thị cong
-sẽ lộ toàn bộ điểm lấy mẫu. Contract nên có quyết định `pointStyle` rõ ràng, mặc
-định `NONE` cho đỉnh hình học thường/điểm điều khiển; `FILLED`/`OPEN` chỉ dành cho
-điểm độc lập hoặc đầu mút đóng/mở có ý nghĩa. Tâm đường tròn có tên là ngoại lệ:
-nếu không có dấu tâm nhỏ thì chữ `O`/`I` không đủ chỉ ra tọa độ chính xác, nên
-renderer cần nhận diện quan hệ `CIRCLE.center` và phục hồi marker cho dữ liệu cũ.
-Nhãn đỉnh nên đặt sát giao của các cạnh; khoảng cách quá lớn làm người học khó
-ghép tên với đúng đỉnh.
+Figure hiện light-only. UI dark đặt figure trên surface sáng, không tự đảo màu.
 
-Điểm dựng của đồ thị là lớp semantic riêng: chấm phải đủ tương phản và phải được
-chọn theo quy tắc của đồ thị, không tùy ý. Parabol dùng đỉnh cùng các cặp đối xứng
-đúng hàm; đường thẳng dùng hai điểm phân biệt dễ đọc. Mỗi điểm dựng có tên duy nhất
-(giữ tên nguồn trước, rồi dùng tên phụ chưa trùng), nhưng trên hình chỉ hiện tên
-ngắn; tọa độ được đọc qua đường dóng nét đứt và nhãn trục. Nhãn số/tên điểm phải
-tìm vùng trống trong một bán kính nhỏ quanh mục tiêu; đổi
-hướng trước khi tăng khoảng cách và đặt trần dịch chuyển để chữ không trôi xa vạch.
+### Structural edit phải đồng bộ ba lớp dữ liệu
 
-Schema pass cũng không thay thế visual pass. Trước khi chấp nhận một lô diagram,
-render đúng component của app ở cả theme cần kiểm, chụp riêng từng figure rồi xem
-bằng mắt. Kiểm ít nhất: nhãn có đè/cách xa đối tượng không; outline text SVG có
-phình theo viewBox không; trục có mũi tên dương, `O`, tick và đơn vị không; đường
-cong có liên tục/đúng miền không; bảng có căn giữa không; ký hiệu độ dài/góc có
-gọn và đúng quy ước SGK không. Tách ảnh đạt và ảnh lỗi thành hai thư mục độc lập
-để một ảnh chưa duyệt không bị hiểu nhầm là mẫu chuẩn.
+Summary AI có ba biểu diễn liên quan nhưng khác vai trò: preview đã map để render,
+raw block Phase 1 để admin sửa, và provider output gốc để strict-validate lại khi
+Lưu. Vì vậy xóa một block chỉ khỏi preview là chưa đủ; lần Lưu kế tiếp sẽ map raw
+cũ và làm block xuất hiện lại. Tương tự, gộp section mà không đánh lại raw
+`blockPath` sẽ khiến khung JSON ở vị trí mới báo nhầm là thiếu raw Phase 1.
 
-Visual pass cũng chưa đủ nếu chỉ đo bounding box. Hình có thể sạch va chạm nhưng
-vẫn dạy sai: nhãn 25 nằm trong phần bằng 15 của sơ đồ thanh; lục giác đều bị gọi
-là có hai trục đối xứng; hai góc đối của tứ giác nội tiếp bị gọi là cùng chắn một
-cung. Vì vậy fixture hồi quy phải khóa cả `problem`/`caption` lẫn primitive và
-marker. Khi chụp locator, cần ẩn mọi node không phải target hoặc ancestor/descendant
-của target; chỉ ẩn `fixed`/`sticky` không đủ để ngăn control tuyệt đối lọt vào mép
-ảnh trên mobile.
+```mermaid
+flowchart LR
+  A[Admin xóa block hoặc heading] --> B[Cập nhật preview]
+  A --> C[Đánh lại raw block path]
+  A --> D[Ghi layout operation có thứ tự]
+  B --> E[PUT phase-one-blocks]
+  C --> E
+  D --> E
+  E --> F[Strict-validate provider output gốc]
+  F --> G[Replay delete/merge lên content và snapshot]
+  G --> H[Đổi figure blockPath hoặc soft-delete]
+  H --> I[Persist cùng transaction]
+```
 
-Tránh chồng chữ không nên sửa bằng offset cố định theo tám hướng cho mọi loại
-nhãn. Nhãn điểm cần chọn vùng clearance lớn nhất trong bán kính nhỏ quanh đỉnh;
-nhãn độ dài/r/h cần lấy pháp tuyến của segment neo; nhãn miền tròn nên dịch vào
-phía trong miền; marker song song cần tìm vị trí trên đoạn đủ xa vertex của cung
-góc. Các offset đều phải có trần theo diagram scale để text vẫn sát đối tượng.
+Layout operation là overlay biên tập, không sửa méo provider schema. Backend giữ
+provider output hợp lệ để audit/validate, rồi replay `DELETE_BLOCK` hoặc
+`MERGE_SECTION` sau mapper. Operation phải được lưu cùng snapshot để các lần sửa
+sau tiếp tục nhìn đúng layout hiện tại. Figure của block chỉ đổi vị trí giữ nguyên
+revision/asset; figure thuộc block bị xóa dùng soft-delete để không còn reference
+active nhưng vẫn giữ khả năng điều tra dữ liệu.
 
-Một semantic repair có thể an toàn hơn retry provider nếu dữ kiện đã đủ và phép
-sửa là tất định. Với trục số, khi model đã cho trục ngang, O và ít nhất hai nhãn
-số đúng một ánh xạ tuyến tính, adapter có thể suy ra hoành độ các tick theo mẫu
-số và thêm segment ngắn. Không repair nếu thiếu ánh xạ, slope không dương, vượt
-giới hạn primitive/point hoặc O không cùng mốc 0; các trường hợp đó phải fail.
-Các segment tick chỉ mang nghĩa phân độ: nếu provider đưa chúng vào
-`EQUAL_LENGTH`/`PARALLEL`, renderer phải bỏ marker đó thay vì vẽ thêm nét màu đè
-lên trục. Ngoài semantic, tick còn cần giới hạn chiều dài theo cạnh ngắn viewBox
-(mục tiêu khoảng 2%, không quá 3%) và nhận diện cả trục biểu đồ dựng bằng
-`SEGMENT`; nếu chỉ nhận `LINE` hoặc lấy một số tọa độ quá lớn, hình dài/hẹp sẽ
-phóng vạch nhỏ thành cột lớn trên mobile. Bảng rộng cũng cần font floor riêng,
-không thể chỉ suy cỡ chữ từ chiều ngắn viewBox vì nội dung ô sẽ trở nên khó đọc.
+## Coverage lớp 3–12
 
-Khi recovery bỏ một marker hình học không đạt semantic validation, hình còn lại
-có thể vẫn sạch và đẹp nhưng đã mất một giả thiết của bài. Badge review vì thế
-phải gọi đúng tên các đoạn/góc liên quan từ lỗi validator, chẳng hạn `AC` và
-`A′C′`, thay vì dùng câu chung chung. Ngược lại, một nhãn chữ đẳng thức thừa đã
-được bỏ mà marker đúng vẫn còn là sửa trình bày tất định và không cần tạo badge.
+Prompt và test phải coi lớp 3–12 là phạm vi bắt buộc. Package smoke trong Docker
+cần bao phủ tối thiểu TikZ core/tiểu học, `tkz-euclide`, `pgfplots`,
+`tkz-tab`, `tikz-3dplot`, `circuitikz`, `chemfig` và `mhchem` theo đúng
+package thật đã cài trong image. Quang học dùng TikZ core; không quảng bá
+`tkz-elements`/`tikz-optics` khi image chưa có.
 
-Thông báo review cần tách rõ hai tầng ngôn ngữ. `Vấn đề` và `Gợi ý sửa` là phần
-cho quản trị viên nên chỉ dùng tiếng Việt dễ hiểu, có thể giữ tên điểm, cạnh và
-ký hiệu toán học quen thuộc để xác định đúng đối tượng. Tên trường, đường dẫn dữ
-liệu, mã validator và thuật ngữ như `diagramSpec`, `segmentIds`, `marker`,
-`label`, `null` chỉ thuộc `Chi tiết kỹ thuật`. Lớp chuyển đổi này phải chạy cả
-khi tạo cảnh báo mới lẫn khi đọc cảnh báo cũ, tránh buộc người dùng sinh lại nội
-dung chỉ để có lời báo dễ hiểu hơn.
-
-Điểm điều khiển đồ thị cũng cần phân loại theo mục đích. Đồ thị đường thẳng trong
-bài “vẽ đồ thị” nên hiện ít nhất hai điểm dựng để học sinh thấy thao tác xác định
-đường; điểm chỉ dùng lấy mẫu đường cong vẫn phải ẩn. Tương tự, marker song song
-không phải trang trí bắt buộc: chỉ sinh khi nguồn thực sự yêu cầu đánh dấu, tránh
-dấu hình mũi tên cạnh tranh với ngữ nghĩa hướng của tia/trục.
-
-Khoảng cách nhãn cạnh phải dùng cùng text scale thích ứng với renderer. Dùng cạnh
-dài nhất của viewBox để ước lượng khung chữ sẽ đẩy `3 cm`, `4 cm`, `r`, `h` quá xa
-trong hình rộng hoặc hình chứa nhiều cụm dù chữ thực tế đã được co nhỏ.
-
-Một lỗi renderer khó thấy là dùng `strokeWidth` text theo đơn vị tuyệt đối trong
-viewBox trong khi hình co giãn. Outline vài đơn vị có thể trở thành mảng trắng/đen
-che cả nhãn và cạnh. Độ dày outline phải tỉ lệ theo `diagramScale` hoặc được kiểm
-soát bằng một cơ chế pixel ổn định, sau đó xác nhận lại trên screenshot thật.
+Local fixtures không gọi provider. Live OpenAI test luôn opt-in, báo số request và
+ước tính chi phí trước khi chạy.
 
 ## File quan trọng
 
-- `apps/api/src/modules/ai/providers/openai.provider.ts`
-- `apps/api/src/modules/ai/services/ai-generation-job.service.ts`
-- `apps/api/src/modules/ai/services/ai-generation-lifecycle.service.ts`
-- `apps/api/src/modules/ai/services/ai-provider-call.service.ts`
-- `apps/api/src/modules/provider-operations/`
-- `apps/api/src/workers/processors/ai-generation.processor.ts`
-- `apps/api/src/workers/services/ai-generation-worker.service.ts`
-- `apps/api/src/modules/ai/services/lesson-summary-context.service.ts`
+- `apps/api/src/modules/ai/types/lesson-summary.types.ts`
+- `apps/api/src/modules/ai/utils/lesson-summary-prompt.ts`
 - `apps/api/src/workers/services/lesson-summary-generation.service.ts`
+- `apps/api/src/modules/stem-figures/`
+- `apps/api/src/workers/processors/stem-figure-rendering.processor.ts`
+- `apps/api/tex-renderer/server.mjs`
+- `apps/api/Dockerfile.tex-renderer`
+- `packages/shared/src/schemas/stem-figure.ts`
+- `packages/shared/package.json`
+- `apps/api/scripts/dev-with-metadata.mjs`
+- `apps/api/src/modules/learning-paths/utils/lesson-summary-review.ts`
+- `apps/api/src/modules/ai/utils/lesson-summary-phase-one-editor.ts`
 - `apps/api/src/modules/learning-paths/services/lesson-summaries.service.ts`
+- `apps/web/features/admin/ai-generation/utils/lesson-summary-phase-one-preview.ts`
+- `apps/web/components/common/content/lesson-summary-example-content-normalizer.ts`
+- `apps/web/tests/lesson-summary-example-content-normalizer.spec.ts`
 
 ## Khi nào cần nhớ lại?
 
-Khi thêm một generation type mới, handler chỉ nên chuẩn bị prompt/schema trong
-`generate`, rồi lưu dữ liệu domain trong `persist`. Không đảo thứ tự và không
-gọi provider trực tiếp từ controller/service domain.
-
-## Task liên quan
-
-- `M9.1`
-- `M9.2`
-- Nền cho `M9.3-M9.7` và phần AI của `M15`
+Khi sửa Summary schema/prompt, worker retry, TeX sandbox, validator, admin review,
+figure coverage gate, R2 publishing, student serializer hoặc provider cost guard.

@@ -37,6 +37,16 @@ export function formatCacheStatus(value: string | null) {
   return value.toUpperCase() === "HIT" ? "Đã dùng kết quả có sẵn" : "Xử lý mới";
 }
 
+export function formatUsagePurpose(event: UsageEvent) {
+  if (event.backgroundJob?.resourceType === "STEM_FIGURE") {
+    return "Tạo hình minh họa";
+  }
+  if (event.feature) {
+    return aiFeatureLabels[event.feature];
+  }
+  return event.category === "OCR_SERVICE" ? "Xử lý tài liệu" : "Gọi mô hình AI";
+}
+
 export function formatVnd(value: number) {
   const amount = new Intl.NumberFormat("vi-VN", {
     maximumFractionDigits: 0,

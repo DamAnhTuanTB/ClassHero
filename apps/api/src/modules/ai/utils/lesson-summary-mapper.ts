@@ -1,1151 +1,369 @@
 import { createHash } from "node:crypto";
 import {
   normalizeLessonSummaryAngleNotation,
-  normalizeLessonSummaryDiagramSpec,
   normalizeLessonSummaryNoteContent,
-  type LessonSummaryDiagramSpec,
 } from "@learning-path/shared";
 
-import type { RetrievedChunk } from "#api/modules/ai/types/ai-text.types";
-import { compileLessonSummaryDiagramIntentWithDiagnostics } from "#api/modules/ai/utils/diagram-compilers/compile-diagram-intent";
 import {
-  mapLessonSummaryProviderDiagramInput,
-  type LessonSummaryProviderDiagramInput,
-} from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
-import {
+  lessonSummaryOutputSchema,
   resolveLessonSummaryReviewIssueResolution,
+  type LessonSummaryProviderExampleBlock,
+  type LessonSummaryProviderTheoryBlock,
   type LessonSummaryMvpBlock,
   type LessonSummaryOutput,
-  type LessonSummaryProviderOutput,
-  type LessonSummaryWarningDetail,
+  type LessonSummaryProviderTransportOutput,
+  type StemFigurePlanDraft,
+  type StemFigureProviderPlanDraft,
 } from "#api/modules/ai/types/lesson-summary.types";
-import {
-  buildLessonSummarySourceTopics,
-  isLessonSummaryRealWorldCandidate,
-} from "#api/modules/ai/utils/lesson-summary-source-candidates";
-import type {
-  LessonSummaryDiagramProvenance,
-  LessonSummaryReviewIssueDraft,
-} from "#api/modules/ai/utils/lesson-summary-recovery";
-import {
-  describeLessonSummaryDiagramReviewIssue,
-  simplifyLessonSummaryReviewCopy,
-} from "#api/modules/ai/utils/lesson-summary-review-copy";
+import type { LessonSummarySubjectKey } from "#api/modules/ai/types/lesson-summary-subject.types";
+import type { MissingRequiredFigure } from "#api/modules/ai/utils/lesson-summary-figure-requirement";
 
-const EXERCISE_HEADING_PATTERN =
-  /^(?:ví\s*dụ|luyện\s*tập|vận\s*dụng|bài\s*tập|ứng\s*dụng\s*thực\s*tế)(?:\s|$|[:：.-])/iu;
-const FORBIDDEN_THEORY_LABEL_PATTERN =
-  /(?:(?:ví\s*dụ|chẳng\s*hạn|chú\s*ý|lưu\s*ý|nhận\s*xét)(?:\s+\d+)?\s*[:：]|(?:^|\n)\s*(?:[-*+]\s*)?(?:\*\*|__)?(?:luyện\s*tập|vận\s*dụng|bài\s*tập)(?:\s+\d+)?\s*(?:[:：.-]|$))/imu;
-const SOURCE_IMAGE_PATTERN =
-  /!\[[^\]]*\]\([^)]*\)|<img\b[^>]*>|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|\\begin\{figure\}[\s\S]*?\\end\{figure\}/giu;
-const NOTE_NUMBERED_SOURCE_VISUAL_PATTERN =
-  /\b(?:hình|hình\s*vẽ|sơ\s*đồ)\s+\d+(?:[.,]\d+)*(?:[a-z])?\b/iu;
-const NOTE_DEICTIC_SOURCE_VISUAL_PATTERN =
-  /\b(?:trong|ở|theo)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)\s+(?:\d+(?:[.,]\d+)*(?:[a-z])?|bên|dưới|trên|sau|kèm\s*theo|sau\s*đây)\b/iu;
-const NOTE_VISUAL_INSTRUCTION_PATTERN =
-  /\b(?:xem|quan\s*sát|dựa\s*vào)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)\b/iu;
-const NOTE_EMBEDDED_VISUAL_PATTERN =
-  /!\[[^\]]*\]\([^)]*\)|<img\b[^>]*>|<svg\b[^>]*>|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|\\begin\{figure\}/iu;
-const NOTE_EXTERNAL_URL_PATTERN = /(?:https?:\/\/|www\.)\S+/iu;
-const SOURCE_FIGURE_REFERENCE_PATTERN =
-  /\b(?:xem|quan\s*sát|dựa\s*vào)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)(?:\s+(?:bên|dưới|trên|sau|kèm\s*theo|sau\s*đây))?\b/iu;
-const PARENTHESIZED_SOURCE_FIGURE_REFERENCE_PATTERN =
-  /\s*\((?:xem|quan\s*sát|dựa\s*vào)\s+(?:hình|hình\s*vẽ|sơ\s*đồ)[^)]*\)/giu;
-const SOURCE_EXERCISE_LABEL_PATTERN =
-  /^\s*(?:(?:bài|ví\s*dụ|luyện\s*tập|vận\s*dụng|thực\s*hành)\s*\d+(?:[.,]\d+)*(?:\s*[:.])?\s*)/iu;
-const REDUNDANT_SOLUTION_CONCLUSION_PATTERN =
-  /(?:^|\n)\s*(?:kết\s*luận|đáp\s*số)\s*:[^\n]*(?=\n|$)/giu;
-const LEADING_HEADING_NUMBER_PATTERN = /^\s*(?:§\s*)?\d+(?:[.,]\d+)*(?:\s*[:.)-])?\s+/u;
-const FORMAL_PROOF_PATTERN = /\b(?:chứng\s*minh|chứng\s*tỏ)\b/iu;
-const GEOMETRY_PROBLEM_PATTERN =
-  /(?:\\triangle|△|\b(?:tam\s*giác|tứ\s*giác|hình\s+(?:vuông|chữ\s*nhật|thoi|bình\s*hành|thang|tròn)|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b)/iu;
-const BULLET_LINE_PATTERN = /^\s*[-*+]\s+/u;
-
-type ProviderExample =
-  | LessonSummaryProviderOutput["theorySections"][number]["units"][number]["illustration"]
-  | LessonSummaryProviderOutput["applicationExercises"]["standardExercise"]
-  | LessonSummaryProviderOutput["applicationExercises"]["realWorldExercise"];
-
-type MapLessonSummaryProviderOutputInput = {
-  lessonId: string;
-  output: LessonSummaryProviderOutput;
-  contextChunks: RetrievedChunk[];
-  reviewIssuesByPath?: Map<string, LessonSummaryReviewIssueDraft[]>;
-  diagramProvenanceByPath?: Map<string, LessonSummaryDiagramProvenance>;
-  rootReviewIssues?: LessonSummaryReviewIssueDraft[];
-  targetGrade?: number | null;
+export type LessonSummaryFigureDraft = {
+  blockPath: string;
+  figureIndex: number;
+  draft: StemFigurePlanDraft;
 };
 
-export function mapLessonSummaryProviderOutput(
-  input: MapLessonSummaryProviderOutputInput,
-): LessonSummaryOutput {
-  const runtimeReviewIssuesByPath = new Map(
-    [...(input.reviewIssuesByPath?.entries() ?? [])].map(([path, issues]) => [
-      path,
-      [...issues],
+export type MappedLessonSummaryOutput = {
+  content: LessonSummaryOutput;
+  figures: LessonSummaryFigureDraft[];
+  phaseOneBlocks: Record<string, unknown>;
+  phaseOneProviderPaths: Record<string, string>;
+};
+
+export function mapLessonSummaryProviderOutput(input: {
+  lessonId: string;
+  output: LessonSummaryProviderTransportOutput;
+  packetPageCount: number;
+  targetGrade?: number | null;
+  subjectKey?: LessonSummarySubjectKey;
+  missingRequiredFigures?: MissingRequiredFigure[];
+}): MappedLessonSummaryOutput {
+  const figures: LessonSummaryFigureDraft[] = [];
+  const phaseOneBlocks: Record<string, unknown> = {};
+  const phaseOneProviderPaths: Record<string, string> = {};
+  const sections: LessonSummaryOutput["sections"] = [];
+  const missingFiguresByProviderBlockPath = new Map(
+    (input.missingRequiredFigures ?? []).map((issue) => [
+      issue.path.replace(/\.figures$/u, ""),
+      issue,
     ]),
   );
-  const addRuntimeReviewIssue = (
-    providerPath: string,
-    issue: LessonSummaryReviewIssueDraft,
-  ) => {
-    const current = runtimeReviewIssuesByPath.get(providerPath) ?? [];
-    if (
-      current.some(
-        (candidate) => candidate.code === issue.code && candidate.path === issue.path,
-      )
-    ) {
-      return;
-    }
-    current.push(issue);
-    runtimeReviewIssuesByPath.set(providerPath, current);
-  };
-  const addBlockProcessingIssue = (providerPath: string, error: unknown) => {
-    addRuntimeReviewIssue(providerPath, {
-      code: "BLOCK_CANNOT_PROCESS",
-      path: providerPath,
-      message: "Khối này có dữ liệu chưa thể xử lý đầy đủ.",
-      suggestion:
-        "Kiểm tra các trường của khối theo chi tiết kỹ thuật rồi sửa và lưu lại; các khối khác vẫn được giữ nguyên.",
-      technicalDetails: error instanceof Error ? error.message : String(error),
-    });
-  };
-  const validateExamplePresentation = (
-    example: ProviderExample,
-    providerPath: string,
-  ) => {
-    const isFormalGeometryProof =
-      FORMAL_PROOF_PATTERN.test(example.problem) &&
-      (Boolean(example.diagramSpec) || GEOMETRY_PROBLEM_PATTERN.test(example.problem));
-    const requiresGeometryStatement =
-      isFormalGeometryProof &&
-      input.targetGrade !== null &&
-      input.targetGrade !== undefined &&
-      input.targetGrade >= 7 &&
-      input.targetGrade <= 9;
-    if (requiresGeometryStatement && !example.geometryStatement) {
-      addRuntimeReviewIssue(providerPath, {
-        code: "MISSING_GEOMETRY_STATEMENT",
-        path: `${providerPath}.geometryStatement`,
-        message: "Bài chứng minh hình học đang thiếu bảng giả thiết–kết luận.",
-        suggestion:
-          "Bổ sung GT chỉ gồm dữ kiện đã cho và KL đúng điều phải chứng minh rồi lưu lại.",
-        technicalDetails:
-          "Formal geometry proofs for grades 7–9 require geometryStatement.",
-      });
-    }
-    if (
-      isFormalGeometryProof &&
-      example.solution &&
-      example.solution
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean).length >= 2 &&
-      example.solution
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .every((line) => BULLET_LINE_PATTERN.test(line))
-    ) {
-      addRuntimeReviewIssue(providerPath, {
-        code: "GEOMETRY_SOLUTION_BULLET_CHECKLIST",
-        path: `${providerPath}.solution`,
-        message:
-          "Lời giải hình học đang là danh sách ý rời, chưa thể hiện mạch suy luận.",
-        suggestion:
-          "Nối các dữ kiện và suy luận bằng Xét, Ta có, Vì… nên…, Suy ra, Do đó và Vậy.",
-        technicalDetails: "Every non-empty solution line is a Markdown bullet.",
-      });
-    }
-  };
-  const safelyValidateBlock = (providerPath: string, validate: () => void) => {
-    try {
-      validate();
-    } catch (error) {
-      addBlockProcessingIssue(providerPath, error);
-    }
-  };
-  const diagramCache = new Map<string, LessonSummaryDiagramSpec | null>();
-  const resolveDiagram = (
-    diagram: LessonSummaryProviderDiagramInput | null,
-    providerPath: string,
-  ) => {
-    if (!diagram) return null;
-    if (diagramCache.has(providerPath)) return diagramCache.get(providerPath) ?? null;
-    try {
-      const compiled =
-        "kind" in diagram && diagram.kind === "INTENT"
-          ? compileLessonSummaryDiagramIntentWithDiagnostics(diagram.intent)
-          : null;
-      const spec = normalizeLessonSummaryDiagramSpec(
-        compiled?.spec ?? mapLessonSummaryProviderDiagramInput(diagram),
-      );
-      if (compiled?.semanticIssues.length) {
-        const technicalDetails = compiled.semanticIssues
-          .slice(0, 12)
-          .map((issue) => `${issue.code}: ${issue.message}`)
-          .join("\n");
-        const copy = describeLessonSummaryDiagramReviewIssue(technicalDetails);
-        addRuntimeReviewIssue(providerPath, {
-          code: "DIAGRAM_NEEDS_REVIEW",
-          path: `${providerPath}.diagramSpec`,
-          message:
-            copy?.message ??
-            "Hình vẽ vẫn hiển thị được nhưng còn chi tiết cần kiểm tra lại.",
-          suggestion:
-            copy?.suggestion ??
-            "Đối chiếu các điểm và nét vẽ với đề bài; sửa hình hoặc chấp nhận nếu hình hiện tại vẫn dùng được.",
-          technicalDetails,
-        });
-      }
-      diagramCache.set(providerPath, spec);
-      return spec;
-    } catch (error) {
-      diagramCache.set(providerPath, null);
-      addRuntimeReviewIssue(providerPath, {
-        code: "DIAGRAM_CANNOT_RENDER",
-        path: `${providerPath}.diagramSpec`,
-        message: "Hình vẽ thiếu dữ liệu cần thiết nên chưa thể hiển thị an toàn.",
-        suggestion:
-          "Bổ sung các điểm, cạnh hoặc nhãn còn thiếu trong dữ liệu hình vẽ rồi lưu lại; nội dung chữ và các khối khác vẫn được giữ.",
-        technicalDetails: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }
-  };
-  const resolveDiagramProvenance = (
-    _diagram: LessonSummaryProviderDiagramInput | null,
-    providerPath: string,
-  ) => input.diagramProvenanceByPath?.get(providerPath) ?? null;
-  const attachReviewIssues = <T extends LessonSummaryMvpBlock>(
-    block: T,
-    providerPath: string,
-  ): T => {
-    const drafts = runtimeReviewIssuesByPath.get(providerPath) ?? [];
-    if (drafts.length === 0) return block;
+
+  const attachMissingFigureIssue = <TBlock extends LessonSummaryMvpBlock>(
+    block: TBlock,
+    providerBlockPath: string,
+    outputBlockPath: string,
+  ): TBlock => {
+    const requirement = missingFiguresByProviderBlockPath.get(providerBlockPath);
+    if (!requirement) return block;
+    const code = "MISSING_REQUIRED_FIGURE";
+    const path = `${outputBlockPath}.figures`;
+    const issueFingerprint = fingerprint(null);
     return {
       ...block,
-      reviewIssues: drafts.map((issue, issueIndex) => {
-        const fingerprint = fingerprintIssueTarget(block, issue);
-        const copy = simplifyLessonSummaryReviewCopy(issue);
-        return {
-          ...issue,
-          ...copy,
-          id: `${issue.code}-${issueIndex + 1}-${fingerprint.slice(0, 12)}`,
-          fingerprint,
-          resolution: resolveLessonSummaryReviewIssueResolution(issue.code),
+      reviewIssues: [
+        ...(block.reviewIssues ?? []),
+        {
+          id: `${code}-${fingerprint(`${path}:${requirement.reason}`).slice(0, 12)}`,
+          code,
+          path,
+          message: "Phần này bắt buộc cần hình minh họa nhưng AI chưa tạo hình.",
+          suggestion:
+            "Bổ sung hình phù hợp hoặc sinh lại nội dung; phần chữ và các phần khác vẫn được giữ nguyên.",
+          technicalDetails: `${requirement.reason} Provider path: ${requirement.path}`,
+          fingerprint: issueFingerprint,
+          resolution: resolveLessonSummaryReviewIssueResolution(code),
           accepted: false,
-        };
-      }),
+        },
+      ],
     };
   };
-  const safelyMapBlock = <T extends LessonSummaryMvpBlock>(
-    providerPath: string,
-    mapBlock: () => T,
-    fallbackBlock: () => T,
-  ) => {
-    let block: T;
-    try {
-      block = mapBlock();
-    } catch (error) {
-      addBlockProcessingIssue(providerPath, error);
-      block = fallbackBlock();
-    }
-    return attachReviewIssues(block, providerPath);
-  };
-  const warningDetails: LessonSummaryWarningDetail[] = [];
-  const addWarning = (
-    code: string,
-    path: string,
-    message: string,
-    severity: LessonSummaryWarningDetail["severity"] = "WARNING",
-  ) => {
-    warningDetails.push({ code, path, message, severity });
-  };
-  const chunksById = new Map(
-    input.contextChunks.map((chunk) => [chunk.id, chunk] as const),
-  );
-  const sourceTopics = buildLessonSummarySourceTopics(input.contextChunks);
-  const topicsById = new Map(sourceTopics.map((topic) => [topic.id, topic] as const));
-  const fallbackSourceChunkId = input.contextChunks[0]?.id;
-  const usedTopics = new Map<string, string>();
 
-  if (sourceTopics.length === 0) {
-    addWarning(
-      "SOURCE_TOPIC_NOT_EXTRACTED",
-      "theorySections",
-      "Chưa xác định chắc chắn được các chủ đề từ tài liệu nguồn; quản trị viên cần đối chiếu lại các đề mục lớn.",
-    );
-  }
-
-  input.output.theorySections.forEach((section, sectionIndex) => {
-    const sectionPath = `theorySections.${sectionIndex}`;
-    const sourceTopic = topicsById.get(section.sourceTopicId);
-    if (!sourceTopic) {
-      addWarning(
-        "SOURCE_TOPIC_UNKNOWN",
-        `${sectionPath}.sourceTopicId`,
-        "Chủ đề nguồn của đề mục này không có trong tài liệu đã chọn.",
-      );
-    } else {
-      const duplicatePath = usedTopics.get(section.sourceTopicId);
-      if (duplicatePath) {
-        addWarning(
-          "SOURCE_TOPIC_DUPLICATED",
-          `${sectionPath}.sourceTopicId`,
-          "Chủ đề nguồn của đề mục này đang bị dùng lặp ở một đề mục khác.",
-        );
-      } else {
-        usedTopics.set(section.sourceTopicId, sectionPath);
-      }
-    }
-    validateSourceIds(
-      `${sectionPath}.sourceChunkIds`,
-      section.sourceChunkIds,
-      chunksById,
-      addWarning,
-    );
-    if (EXERCISE_HEADING_PATTERN.test(section.displayHeading)) {
-      addWarning(
-        "THEORY_SECTION_USES_EXERCISE_HEADING",
-        `${sectionPath}.displayHeading`,
-        "Đề mục lý thuyết đang dùng tiêu đề của phần bài tập.",
-      );
-    }
-    section.units.forEach((unit, unitIndex) => {
-      const unitPath = `${sectionPath}.units.${unitIndex}`;
-      const theoryPath = `${unitPath}.theory`;
-      const illustrationPath = `${unitPath}.illustration`;
-      safelyValidateBlock(theoryPath, () => {
-        validateSourceIds(
-          `${theoryPath}.sourceChunkIds`,
-          unit.theory.sourceChunkIds,
-          chunksById,
-          addWarning,
-        );
-        validateTheoryContent(unit.theory, theoryPath, addWarning);
-        if (unit.theory.diagramSpec) {
-          const diagram = resolveDiagram(unit.theory.diagramSpec, theoryPath);
-          if (diagram) {
-            validateDiagramReferences(diagram, `${theoryPath}.diagramSpec`, addWarning);
-          }
-        }
-      });
-      safelyValidateBlock(illustrationPath, () => {
-        validateExamplePresentation(unit.illustration, illustrationPath);
-        validateExample(unit.illustration, illustrationPath, addWarning, resolveDiagram);
-      });
-
-      unit.notes.forEach((note, noteIndex) => {
-        const notePath = `${unitPath}.notes.${noteIndex}`;
-        safelyValidateBlock(notePath, () => {
-          validateSourceIds(
-            `${notePath}.sourceChunkIds`,
-            note.sourceChunkIds,
-            chunksById,
-            addWarning,
-          );
-          if (referencesUnavailableNoteVisual(note.content)) {
-            addRuntimeReviewIssue(notePath, {
-              code: "NOTE_REFERENCES_UNAVAILABLE_VISUAL",
-              path: `${notePath}.content`,
-              message:
-                "Ghi chú đang tham chiếu hình, ảnh hoặc đường dẫn không được hiển thị kèm theo.",
-              suggestion:
-                "Viết lại ghi chú thành nội dung tự đủ dữ kiện, hoặc xóa phần tham chiếu hình nếu không cần thiết.",
-              technicalDetails:
-                "Detected a source figure, embedded visual, or external URL in note.content.",
-            });
-          }
+  for (const [
+    sourceSectionIndex,
+    sourceSection,
+  ] of input.output.theorySections.entries()) {
+    validateSourceEvidence(sourceSection.sourceEvidence, input.packetPageCount);
+    const blocks: LessonSummaryMvpBlock[] = [];
+    for (const [itemIndex, item] of sourceSection.items.entries()) {
+      if (item.itemType === "NOTE") {
+        validateSourcePageNumbers(item.note.sourcePageNumbers, input.packetPageCount);
+        const notePath = `sections.${sections.length}.blocks.${blocks.length}`;
+        phaseOneBlocks[notePath] = structuredClone(item.note);
+        phaseOneProviderPaths[notePath] =
+          `theorySections.${sourceSectionIndex}.items.${itemIndex}.note`;
+        blocks.push({
+          type: "note",
+          content: normalizeLessonSummaryNoteContent(item.note.content),
+          sourcePageNumbers: item.note.sourcePageNumbers,
+          figures: [],
         });
-      });
+        continue;
+      }
+
+      validateSourcePageNumbers(item.theory.sourcePageNumbers, input.packetPageCount);
+      const theoryPath = `sections.${sections.length}.blocks.${blocks.length}`;
+      phaseOneBlocks[theoryPath] = structuredClone(item.theory);
+      phaseOneProviderPaths[theoryPath] =
+        `theorySections.${sourceSectionIndex}.items.${itemIndex}.theory`;
+      const theory = attachMissingFigureIssue(
+        mapTheoryBlock(item.theory),
+        `theorySections.${sourceSectionIndex}.items.${itemIndex}.theory`,
+        theoryPath,
+      );
+      blocks.push(theory);
+      addFigures(figures, theoryPath, item.theory.figures, input.packetPageCount);
+
+      validateExampleProvenance(item.example, input.packetPageCount);
+      const examplePath = `sections.${sections.length}.blocks.${blocks.length}`;
+      phaseOneBlocks[examplePath] = structuredClone(item.example);
+      phaseOneProviderPaths[examplePath] =
+        `theorySections.${sourceSectionIndex}.items.${itemIndex}.example`;
+      blocks.push(
+        attachMissingFigureIssue(
+          mapLessonSummaryProviderExampleBlock(
+            item.example,
+            input.subjectKey,
+            input.targetGrade,
+          ),
+          `theorySections.${sourceSectionIndex}.items.${itemIndex}.example`,
+          examplePath,
+        ),
+      );
+      addFigures(figures, examplePath, item.example.figures, input.packetPageCount);
+    }
+    if (blocks.length === 0) continue;
+    const heading = requireText(sourceSection.displayHeading, "displayHeading");
+    sections.push({
+      order: sections.length + 1,
+      displayHeading: stripLeadingHeadingNumber(heading),
+      sourceEvidence: sourceSection.sourceEvidence,
+      blocks,
     });
-  });
+  }
 
-  sourceTopics
-    .map((topic) => topic.id)
-    .filter((topicId) => !usedTopics.has(topicId))
-    .forEach(() => {
-      addWarning(
-        "SOURCE_TOPIC_OMITTED",
-        "theorySections",
-        "Nội dung tạo ra đang bỏ sót một chủ đề có trong tài liệu nguồn.",
-      );
-    });
-
-  const application = input.output.applicationExercises;
-  safelyValidateBlock("applicationExercises.standardExercise", () => {
-    validateExamplePresentation(
-      application.standardExercise,
+  const applicationBlocks: LessonSummaryMvpBlock[] = [];
+  const standardPath = `sections.${sections.length}.blocks.0`;
+  phaseOneBlocks[standardPath] = structuredClone(
+    input.output.applicationExercises.standardExercise,
+  );
+  phaseOneProviderPaths[standardPath] = "applicationExercises.standardExercise";
+  validateExampleProvenance(
+    input.output.applicationExercises.standardExercise,
+    input.packetPageCount,
+  );
+  applicationBlocks.push(
+    attachMissingFigureIssue(
+      mapLessonSummaryProviderExampleBlock(
+        input.output.applicationExercises.standardExercise,
+        input.subjectKey,
+        input.targetGrade,
+      ),
       "applicationExercises.standardExercise",
-    );
-    validateExample(
-      application.standardExercise,
-      "applicationExercises.standardExercise",
-      addWarning,
-      resolveDiagram,
-    );
-  });
-  safelyValidateBlock("applicationExercises.realWorldExercise", () => {
-    validateExamplePresentation(
-      application.realWorldExercise,
-      "applicationExercises.realWorldExercise",
-    );
-    validateExample(
-      application.realWorldExercise,
-      "applicationExercises.realWorldExercise",
-      addWarning,
-      resolveDiagram,
-    );
-  });
-
-  const mappedTheorySections = input.output.theorySections.map(
-    (section, sectionIndex) => {
-      const topic = topicsById.get(section.sourceTopicId);
-      const sourceHeading = topic?.sourceHeadingRaw ?? section.displayHeading;
-      const displayHeading = normalizeDisplayHeading(section.displayHeading);
-      const sectionSourceChunkIds = safeSourceIds(
-        [topic?.sourceChunkId, ...section.sourceChunkIds],
-        chunksById,
-        fallbackSourceChunkId,
-      );
-      return {
-        sourceTopicId: section.sourceTopicId,
-        section: {
-          order: sectionIndex + 1,
-          sourceHeading,
-          displayHeading,
-          sourceChunkIds: sectionSourceChunkIds,
-          blocks: section.units.flatMap((unit, unitIndex) => {
-            const unitPath = `theorySections.${sectionIndex}.units.${unitIndex}`;
-            const theoryPath = `${unitPath}.theory`;
-            const illustrationPath = `${unitPath}.illustration`;
-            const theory = safelyMapBlock(
-              theoryPath,
-              () =>
-                normalizeTheoryBlock(
-                  unit.theory,
-                  chunksById,
-                  sectionSourceChunkIds[0],
-                  resolveDiagram(unit.theory.diagramSpec, theoryPath),
-                  resolveDiagramProvenance(unit.theory.diagramSpec, theoryPath),
-                ),
-              () => fallbackTheoryBlock(unit.theory, sectionSourceChunkIds),
-            );
-            const illustration = safelyMapBlock(
-              illustrationPath,
-              () =>
-                toPersistedExample(
-                  unit.illustration,
-                  resolveDiagram(unit.illustration.diagramSpec, illustrationPath),
-                  resolveDiagramProvenance(
-                    unit.illustration.diagramSpec,
-                    illustrationPath,
-                  ),
-                ),
-              () => fallbackExampleBlock(),
-            );
-            const notes = unit.notes.map((note, noteIndex) => {
-              const notePath = `${unitPath}.notes.${noteIndex}`;
-              return safelyMapBlock(
-                notePath,
-                () => ({
-                  ...note,
-                  content: normalizeGeneratedText(
-                    normalizeLessonSummaryNoteContent(note.content),
-                  ),
-                  sourceChunkIds: safeSourceIds(
-                    note.sourceChunkIds,
-                    chunksById,
-                    sectionSourceChunkIds[0],
-                  ),
-                }),
-                () => fallbackNoteBlock(sectionSourceChunkIds),
-              );
-            });
-            return [theory, illustration, ...notes];
-          }),
-        },
-      };
-    },
-  );
-  const theorySections: LessonSummaryOutput["sections"] = [];
-  const theorySectionIndexByTopicId = new Map<string, number>();
-  mappedTheorySections.forEach(({ sourceTopicId, section }) => {
-    const existingIndex = theorySectionIndexByTopicId.get(sourceTopicId);
-    if (existingIndex === undefined) {
-      theorySectionIndexByTopicId.set(sourceTopicId, theorySections.length);
-      theorySections.push(section);
-      return;
-    }
-    const existing = theorySections[existingIndex];
-    if (!existing) return;
-    // A source topic is one major section. Keep the first complete occurrence so
-    // a duplicated provider section cannot repeat all theory/example pairs in UI.
-  });
-  theorySections.forEach((section, index) => {
-    section.order = index + 1;
-  });
-
-  const applicationSourceChunkIds = safeSourceIds(
-    [fallbackSourceChunkId],
-    chunksById,
-    fallbackSourceChunkId,
-  );
-  const persistedStandard = safelyMapBlock(
-    "applicationExercises.standardExercise",
-    () =>
-      toPersistedExample(
-        application.standardExercise,
-        resolveDiagram(
-          application.standardExercise.diagramSpec,
-          "applicationExercises.standardExercise",
-        ),
-        resolveDiagramProvenance(
-          application.standardExercise.diagramSpec,
-          "applicationExercises.standardExercise",
-        ),
-      ),
-    () => fallbackExampleBlock(),
-  );
-  const persistedRealWorld = safelyMapBlock(
-    "applicationExercises.realWorldExercise",
-    () =>
-      toPersistedExample(
-        application.realWorldExercise,
-        resolveDiagram(
-          application.realWorldExercise.diagramSpec,
-          "applicationExercises.realWorldExercise",
-        ),
-        resolveDiagramProvenance(
-          application.realWorldExercise.diagramSpec,
-          "applicationExercises.realWorldExercise",
-        ),
-      ),
-    () => fallbackExampleBlock(),
-  );
-  if (
-    persistedRealWorld.type === "example" &&
-    !isLessonSummaryRealWorldCandidate(persistedRealWorld.problem)
-  ) {
-    addWarning(
-      "REAL_WORLD_CONTEXT_UNCLEAR",
-      "applicationExercises.realWorldExercise.problem",
-      "Bài cuối chưa thể hiện rõ ngữ cảnh đời sống hoặc dữ liệu thực tế.",
-    );
-  }
-  if (
-    persistedStandard.type === "example" &&
-    isLessonSummaryRealWorldCandidate(persistedStandard.problem)
-  ) {
-    addWarning(
-      "STANDARD_EXERCISE_LOOKS_REAL_WORLD",
-      "applicationExercises.standardExercise.problem",
-      "Bài tập thông thường đang có dấu hiệu là bài toán thực tế.",
-    );
-  }
-
-  const rootReviewTarget = {
-    title: input.output.title,
-    objectives: input.output.objectives,
-  };
-  return {
-    lessonId: input.lessonId,
-    ...(input.targetGrade !== undefined ? { targetGrade: input.targetGrade } : {}),
-    title: input.output.title,
-    objectives: input.output.objectives,
-    sections: [
-      ...theorySections,
-      {
-        order: theorySections.length + 1,
-        sourceHeading: "Bài tập vận dụng",
-        displayHeading: "Bài tập vận dụng",
-        sourceChunkIds: applicationSourceChunkIds,
-        blocks: [persistedStandard, persistedRealWorld],
-      },
-    ],
-    ...(input.rootReviewIssues?.length
-      ? {
-          reviewIssues: input.rootReviewIssues.map((issue, issueIndex) => {
-            const fingerprint = fingerprintIssueTarget(rootReviewTarget, issue);
-            const copy = simplifyLessonSummaryReviewCopy(issue);
-            return {
-              ...issue,
-              ...copy,
-              id: `${issue.code}-${issueIndex + 1}-${fingerprint.slice(0, 12)}`,
-              fingerprint,
-              resolution: resolveLessonSummaryReviewIssueResolution(issue.code),
-              accepted: false,
-            };
-          }),
-        }
-      : {}),
-  };
-}
-
-function fingerprintBlock(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
-}
-
-function fingerprintIssueTarget(
-  value: Record<string, unknown>,
-  issue: LessonSummaryReviewIssueDraft,
-) {
-  if (issue.code.startsWith("DIAGRAM_")) {
-    const visual = value.visual;
-    return fingerprintBlock(
-      visual && typeof visual === "object" && "spec" in visual
-        ? (visual as { spec: unknown }).spec
-        : null,
-    );
-  }
-  const field = issue.path.split(".").at(-1);
-  return fingerprintBlock(field && field in value ? value[field] : value);
-}
-
-type AddWarning = (
-  code: string,
-  path: string,
-  message: string,
-  severity?: LessonSummaryWarningDetail["severity"],
-) => void;
-
-function validateTheoryContent(
-  block: LessonSummaryProviderOutput["theorySections"][number]["units"][number]["theory"],
-  path: string,
-  addWarning: AddWarning,
-) {
-  const values =
-    block.type === "procedure"
-      ? [block.purpose ?? "", ...block.steps.map((step) => step.content)]
-      : [block.content];
-  if (values.some((value) => FORBIDDEN_THEORY_LABEL_PATTERN.test(value))) {
-    addWarning(
-      "THEORY_CONTAINS_EXAMPLE",
-      path,
-      "Khối lý thuyết đang trộn ví dụ, bài tập hoặc ghi chú vào phần nội dung.",
-    );
-  }
-  values.forEach((value) => {
-    const sentenceCount = value
-      .split(/[.!?](?=\s|$)/u)
-      .map((sentence) => sentence.trim())
-      .filter(Boolean).length;
-    if (value.length >= 240 && sentenceCount >= 3 && !value.includes("\n")) {
-      addWarning(
-        "THEORY_PARAGRAPH_TOO_DENSE",
-        path,
-        "Nội dung dồn nhiều ý vào một đoạn văn dài; cần xuống dòng hoặc dùng gạch đầu dòng cho từng ý.",
-      );
-    }
-  });
-}
-
-function validateExample(
-  example: ProviderExample,
-  path: string,
-  addWarning: AddWarning,
-  resolveDiagram: (
-    diagram: LessonSummaryProviderDiagramInput | null,
-    providerPath: string,
-  ) => LessonSummaryDiagramSpec | null,
-) {
-  if (SOURCE_FIGURE_REFERENCE_PATTERN.test(example.problem)) {
-    addWarning(
-      "EXAMPLE_REFERENCES_SOURCE_FIGURE",
-      `${path}.problem`,
-      "Đề bài còn tham chiếu hình của tài liệu nguồn; cần ghi đủ dữ kiện hoặc có hình minh họa chính xác.",
-    );
-  }
-  if (
-    /^(?:thực hiện|sử dụng|dựa vào|quan sát|làm theo|tính theo|kết quả tùy|theo yêu cầu|nếu (?:hình|ta có))/iu.test(
-      example.answer.trim(),
-    )
-  ) {
-    addWarning(
-      "ANSWER_NOT_CONCRETE",
-      `${path}.answer`,
-      "Đáp án còn chung chung, chưa nêu kết quả cụ thể của đề.",
-    );
-  }
-  const solution = example.solution ?? "";
-  if (
-    hasUnsafeControlCharacters(example.answer) ||
-    hasUnsafeControlCharacters(solution) ||
-    hasUnsafeControlCharacters(example.problem)
-  ) {
-    addWarning(
-      "MATH_CONTROL_CHARACTER_NORMALIZED",
-      path,
-      "Một công thức toán có ký tự bị mã hóa sai; hệ thống đã tự chuẩn hóa và quản trị viên cần kiểm tra lại công thức.",
-      "INFO",
-    );
-  }
-  validateExampleSubparts(example.problem, solution, example.answer, path, addWarning);
-  const solutionSentenceCount = solution
-    .split(/[.!?](?=\s|$)/u)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean).length;
-  if (solution.length >= 240 && solutionSentenceCount >= 3 && !solution.includes("\n")) {
-    addWarning(
-      "SOLUTION_PARAGRAPH_TOO_DENSE",
-      `${path}.solution`,
-      "Lời giải nên ngắt dòng theo từng bước lập luận.",
-    );
-  }
-  if (example.diagramSpec) {
-    const diagram = resolveDiagram(example.diagramSpec, path);
-    if (diagram) {
-      validateDiagramReferences(diagram, `${path}.diagramSpec`, addWarning);
-    }
-  }
-}
-
-function validateExampleSubparts(
-  problem: string,
-  solution: string,
-  answer: string,
-  path: string,
-  addWarning: AddWarning,
-) {
-  const subparts = [
-    ...new Set(
-      [...problem.matchAll(/(?:^|\n|\s)([a-h])\)\s/giu)].map((match) =>
-        match[1]!.toLocaleLowerCase("vi"),
-      ),
+      standardPath,
     ),
-  ];
-  if (subparts.length < 2) return;
-  const response = `${solution}\n${answer}`;
-  const missing = subparts.filter(
-    (subpart) => !new RegExp(`(?:^|\\n|\\s|;)${subpart}\\)`, "iu").test(response),
   );
-  if (missing.length > 0) {
-    addWarning(
-      "EXAMPLE_SUBPARTS_INCOMPLETE",
-      path,
-      `Lời giải/đáp án chưa thể hiện đủ các ý: ${missing.map((value) => `${value})`).join(", ")}.`,
-    );
-  }
-}
-
-function validateDiagramReferences(
-  spec: LessonSummaryDiagramSpec,
-  path: string,
-  addWarning: AddWarning,
-) {
-  const pointIds = new Set<string>();
-  const pointsById = new Map(spec.points.map((point) => [point.id, point] as const));
-  spec.points.forEach((point) => {
-    if (pointIds.has(point.id)) {
-      addWarning("DIAGRAM_DUPLICATE_POINT_ID", path, `Tên điểm ${point.id} bị trùng.`);
-    }
-    pointIds.add(point.id);
-    const { minX, minY, width, height } = spec.viewBox;
-    if (
-      point.x < minX ||
-      point.x > minX + width ||
-      point.y < minY ||
-      point.y > minY + height
-    ) {
-      addWarning(
-        "DIAGRAM_POINT_OUTSIDE_VIEWBOX",
-        path,
-        `Điểm ${point.id} nằm ngoài khung hiển thị nên hình không thể hiện chính xác.`,
-      );
-    }
-  });
-  const primitiveIds = new Set<string>();
-  const requirePoint = (id: string) => {
-    if (!pointIds.has(id)) {
-      addWarning(
-        "DIAGRAM_UNKNOWN_POINT",
-        path,
-        `Hình vẽ đang tham chiếu điểm ${id} chưa được khai báo.`,
-      );
-    }
-  };
-  spec.primitives.forEach((primitive) => {
-    if (primitiveIds.has(primitive.id)) {
-      addWarning(
-        "DIAGRAM_DUPLICATE_PRIMITIVE_ID",
-        path,
-        `Tên nét vẽ ${primitive.id} bị trùng.`,
-      );
-    }
-    primitiveIds.add(primitive.id);
-    if (primitive.type === "POLYLINE" && primitive.pointIds.length === 2) {
-      addWarning(
-        "DIAGRAM_SEGMENT_USES_POLYLINE",
-        path,
-        `Nét vẽ ${primitive.id} chỉ có hai điểm và sẽ được chuẩn hóa thành đoạn thẳng.`,
-        "INFO",
-      );
-    }
-    if (
-      primitive.type === "CIRCLE" &&
-      primitive.radius < Math.max(spec.viewBox.width, spec.viewBox.height, 1) * 0.005 &&
-      spec.primitives.length > 1
-    ) {
-      addWarning(
-        "DIAGRAM_DEGENERATE_CIRCLE_REMOVED",
-        path,
-        `Đường tròn ${primitive.id} quá nhỏ so với hình và sẽ bị loại khi chuẩn hóa.`,
-        "INFO",
-      );
-    }
-    if (
-      primitive.type === "SEGMENT" ||
-      primitive.type === "LINE" ||
-      primitive.type === "RAY"
-    ) {
-      requirePoint(primitive.from);
-      requirePoint(primitive.to);
-    } else if (primitive.type === "POLYGON" || primitive.type === "POLYLINE") {
-      primitive.pointIds.forEach(requirePoint);
-    } else {
-      requirePoint(primitive.center);
-    }
-  });
-  spec.markers.forEach((marker) => {
-    if (marker.type === "EQUAL_LENGTH" || marker.type === "PARALLEL") {
-      const vectors: Array<{ id: string; dx: number; dy: number; length: number }> = [];
-      marker.segmentIds.forEach((id) => {
-        const primitive = spec.primitives.find((value) => value.id === id);
-        if (!primitiveIds.has(id) || !primitive) {
-          addWarning(
-            "DIAGRAM_UNKNOWN_SEGMENT",
-            path,
-            `Ký hiệu hình học đang tham chiếu nét ${id} chưa được khai báo.`,
-          );
-          return;
-        }
-        if (
-          primitive.type !== "SEGMENT" &&
-          primitive.type !== "LINE" &&
-          primitive.type !== "RAY"
-        ) {
-          addWarning(
-            "DIAGRAM_MARKER_REQUIRES_SEGMENT",
-            path,
-            `Ký hiệu hình học đang tham chiếu ${id}, nhưng đối tượng này không phải đoạn thẳng, đường thẳng hoặc tia.`,
-          );
-          return;
-        }
-        const from = pointsById.get(primitive.from);
-        const to = pointsById.get(primitive.to);
-        if (!from || !to) return;
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        vectors.push({ id, dx, dy, length: Math.hypot(dx, dy) });
-      });
-      if (marker.type === "EQUAL_LENGTH" && vectors.length >= 2) {
-        const lengths = vectors.map((vector) => vector.length);
-        const largest = Math.max(...lengths);
-        const smallest = Math.min(...lengths);
-        if (largest === 0 || (largest - smallest) / largest > 0.02) {
-          addWarning(
-            "DIAGRAM_EQUAL_LENGTH_NOT_TO_SCALE",
-            path,
-            `Ký hiệu bằng nhau đang gắn vào các đoạn có độ dài theo tọa độ chưa khớp: ${vectors.map((value) => value.id).join(", ")}.`,
-          );
-        }
-      }
-      if (marker.type === "PARALLEL" && vectors.length >= 2) {
-        const [first, ...rest] = vectors;
-        if (
-          first &&
-          rest.some((vector) => {
-            const denominator = first.length * vector.length;
-            return (
-              denominator === 0 ||
-              Math.abs(first.dx * vector.dy - first.dy * vector.dx) / denominator > 0.02
-            );
-          })
-        ) {
-          addWarning(
-            "DIAGRAM_PARALLEL_NOT_TO_SCALE",
-            path,
-            "Ký hiệu song song không khớp với hướng của các đoạn theo tọa độ.",
-          );
-        }
-      }
-      return;
-    }
-    requirePoint(marker.vertex);
-    marker.armPointIds.forEach(requirePoint);
-    if (marker.type === "RIGHT_ANGLE") {
-      const vertex = pointsById.get(marker.vertex);
-      const first = pointsById.get(marker.armPointIds[0]!);
-      const second = pointsById.get(marker.armPointIds[1]!);
-      if (vertex && first && second) {
-        const firstVector = { x: first.x - vertex.x, y: first.y - vertex.y };
-        const secondVector = { x: second.x - vertex.x, y: second.y - vertex.y };
-        const denominator =
-          Math.hypot(firstVector.x, firstVector.y) *
-          Math.hypot(secondVector.x, secondVector.y);
-        const normalizedDot =
-          denominator === 0
-            ? 1
-            : Math.abs(firstVector.x * secondVector.x + firstVector.y * secondVector.y) /
-              denominator;
-        if (normalizedDot > 0.02) {
-          addWarning(
-            "DIAGRAM_RIGHT_ANGLE_NOT_TO_SCALE",
-            path,
-            `Ký hiệu góc vuông tại ${marker.vertex} không khớp với góc 90° theo tọa độ.`,
-          );
-        }
-      }
-    }
-  });
-  spec.labels.forEach((label) => requirePoint(label.anchorPointId));
-}
-
-function validateSourceIds(
-  path: string,
-  sourceChunkIds: string[],
-  chunksById: Map<string, RetrievedChunk>,
-  addWarning: AddWarning,
-) {
-  const invalidIds = sourceChunkIds.filter((id) => !chunksById.has(id));
-  if (invalidIds.length > 0) {
-    addWarning(
-      "SOURCE_CHUNK_OUTSIDE_CONTEXT",
-      path,
-      "Khối đang tham chiếu một phần nội dung không thuộc tài liệu đã chọn.",
-    );
-  }
-}
-
-function uniqueSourceIds(values: Array<string | undefined>) {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))];
-}
-
-function safeSourceIds(
-  values: Array<string | undefined>,
-  chunksById: Map<string, RetrievedChunk>,
-  fallbackSourceChunkId?: string,
-) {
-  const validIds = uniqueSourceIds(values).filter((value) => chunksById.has(value));
-  if (validIds.length > 0) return validIds.slice(0, 20);
-  return fallbackSourceChunkId ? [fallbackSourceChunkId] : [];
-}
-
-function normalizeTheoryBlock(
-  block: LessonSummaryProviderOutput["theorySections"][number]["units"][number]["theory"],
-  chunksById: Map<string, RetrievedChunk>,
-  fallbackSourceChunkId?: string,
-  diagramSpec?: LessonSummaryDiagramSpec | null,
-  diagramProvenance?: LessonSummaryDiagramProvenance | null,
-): LessonSummaryMvpBlock {
-  const sourceChunkIds = safeSourceIds(
-    block.sourceChunkIds,
-    chunksById,
-    fallbackSourceChunkId,
+  addFigures(
+    figures,
+    standardPath,
+    input.output.applicationExercises.standardExercise.figures,
+    input.packetPageCount,
   );
-  const visual = diagramSpec
-    ? {
-        visual: {
-          kind: "DIAGRAM_SPEC" as const,
-          spec: diagramSpec,
-          ...(diagramProvenance ?? {}),
-        },
-      }
-    : {};
+  const realWorldPath = `sections.${sections.length}.blocks.1`;
+  phaseOneBlocks[realWorldPath] = structuredClone(
+    input.output.applicationExercises.realWorldExercise,
+  );
+  phaseOneProviderPaths[realWorldPath] = "applicationExercises.realWorldExercise";
+  validateExampleProvenance(
+    input.output.applicationExercises.realWorldExercise,
+    input.packetPageCount,
+  );
+  applicationBlocks.push(
+    attachMissingFigureIssue(
+      mapLessonSummaryProviderExampleBlock(
+        input.output.applicationExercises.realWorldExercise,
+        input.subjectKey,
+        input.targetGrade,
+      ),
+      "applicationExercises.realWorldExercise",
+      realWorldPath,
+    ),
+  );
+  addFigures(
+    figures,
+    realWorldPath,
+    input.output.applicationExercises.realWorldExercise.figures,
+    input.packetPageCount,
+  );
+  sections.push({
+    order: sections.length + 1,
+    displayHeading: "Bài tập vận dụng",
+    sourceEvidence: input.output.theorySections.at(-1)?.sourceEvidence ?? {
+      kind: "CONTENT",
+      text: "Bài tập vận dụng tổng hợp từ nội dung trong PDF packet.",
+      packetPageNumbers: [input.packetPageCount],
+    },
+    blocks: applicationBlocks,
+  });
 
-  switch (block.type) {
-    case "procedure":
-      return {
-        type: block.type,
-        title: block.title,
-        purpose: block.purpose
-          ? normalizeGeneratedText(block.purpose, diagramSpec)
-          : null,
-        sourceChunkIds,
-        steps: block.steps.map((step, index) => ({
-          ...step,
-          order: index + 1,
-          content: normalizeGeneratedText(step.content, diagramSpec),
-        })),
-        ...visual,
-      };
-    case "knowledge":
-    case "property":
-    case "theorem":
-      return {
-        type: block.type,
-        title: block.title,
-        content: normalizeGeneratedText(block.content, diagramSpec),
-        sourceChunkIds,
-        ...visual,
-      };
-  }
-}
-
-function toPersistedExample(
-  example: ProviderExample,
-  diagramSpec?: LessonSummaryDiagramSpec | null,
-  diagramProvenance?: LessonSummaryDiagramProvenance | null,
-): Extract<LessonSummaryMvpBlock, { type: "example" }> {
-  const problem = stripSourceImages(example.problem, diagramSpec);
-  return {
-    type: "example",
-    problem:
-      problem.length >= 8
-        ? problem
-        : "[Cần admin bổ sung đề bài tự đủ dữ kiện, không phụ thuộc hình nguồn]",
-    solution: normalizeSolution(example.solution, diagramSpec),
-    answer: normalizeGeneratedText(example.answer, diagramSpec),
-    ...(example.geometryStatement
-      ? {
-          geometryStatement: {
-            hypotheses: example.geometryStatement.hypotheses.map((statement) =>
-              normalizeGeneratedText(statement, diagramSpec),
-            ),
-            conclusions: example.geometryStatement.conclusions.map((statement) =>
-              normalizeGeneratedText(statement, diagramSpec),
-            ),
-          },
-        }
-      : {}),
-    ...(diagramSpec
-      ? {
-          visual: {
-            kind: "DIAGRAM_SPEC" as const,
-            spec: diagramSpec,
-            ...(diagramProvenance ?? {}),
-          },
-        }
-      : {}),
-  };
+  const content = lessonSummaryOutputSchema.parse({
+    lessonId: input.lessonId,
+    targetGrade: input.targetGrade ?? null,
+    title: requireText(input.output.title, "title"),
+    objectives:
+      input.output.objectives && input.output.objectives.length > 0
+        ? input.output.objectives.map((value) => requireText(value, "objective"))
+        : null,
+    sections,
+    warnings: null,
+    warningDetails: null,
+  });
+  return { content, figures, phaseOneBlocks, phaseOneProviderPaths };
 }
 
 export function mapLessonSummaryProviderExampleBlock(
-  example: LessonSummaryProviderOutput["applicationExercises"]["standardExercise"],
-): Extract<LessonSummaryMvpBlock, { type: "example" }> {
-  const diagramSpec = example.diagramSpec
-    ? normalizeLessonSummaryDiagramSpec(
-        mapLessonSummaryProviderDiagramInput(example.diagramSpec),
-      )
-    : null;
-  return toPersistedExample(example, diagramSpec);
-}
-
-function fallbackTheoryBlock(
-  block: LessonSummaryProviderOutput["theorySections"][number]["units"][number]["theory"],
-  sourceChunkIds: string[],
-): LessonSummaryMvpBlock {
-  const title = "[Cần bổ sung tiêu đề]";
-  if (block.type === "procedure") {
-    return {
-      type: "procedure",
-      title,
-      purpose: null,
-      steps: [{ order: 1, content: "[Cần bổ sung nội dung bước]" }],
-      sourceChunkIds,
-    };
-  }
-  return {
-    type: block.type,
-    title,
-    content: "[Cần bổ sung nội dung]",
-    sourceChunkIds,
-  };
-}
-
-function fallbackExampleBlock(): Extract<LessonSummaryMvpBlock, { type: "example" }> {
+  example: LessonSummaryProviderExampleBlock,
+  subjectKey: LessonSummarySubjectKey = "MATH",
+  targetGrade: number | null = null,
+): LessonSummaryMvpBlock & { type: "example" } {
+  const solution = requireText(normalizeSolution(example.solution), "solution");
   return {
     type: "example",
-    problem: "[Cần bổ sung đề bài]",
-    solution: null,
-    answer: "[Cần bổ sung đáp án]",
+    problem: normalizeMathText(requireText(example.problem, "problem")),
+    solution,
+    answer: normalizeMathText(requireText(example.answer, "answer")),
+    figures: [],
+    sourcePageNumbers: example.sourcePageNumbers,
+    isGeometry:
+      subjectKey === "MATH" && "isGeometry" in example ? example.isGeometry : undefined,
+    geometryStatement:
+      subjectKey === "MATH" &&
+      targetGrade !== null &&
+      targetGrade >= 7 &&
+      targetGrade <= 9 &&
+      "isGeometry" in example &&
+      example.isGeometry &&
+      "geometryStatement" in example
+        ? normalizeGeometryStatement(example.geometryStatement)
+        : undefined,
+    origin: example.origin,
   };
 }
 
-function fallbackNoteBlock(
-  sourceChunkIds: string[],
-): Extract<LessonSummaryMvpBlock, { type: "note" }> {
+function mapTheoryBlock(block: LessonSummaryProviderTheoryBlock): LessonSummaryMvpBlock {
   return {
-    type: "note",
-    content: "[Cần bổ sung ghi chú]",
-    sourceChunkIds,
+    type: block.type,
+    title: requireText(block.title, "theory.title"),
+    content: requireText(block.content, `${block.type}.content`),
+    sourcePageNumbers: block.sourcePageNumbers,
+    figures: [],
   };
 }
 
-function referencesUnavailableNoteVisual(value: string) {
-  return (
-    NOTE_NUMBERED_SOURCE_VISUAL_PATTERN.test(value) ||
-    NOTE_DEICTIC_SOURCE_VISUAL_PATTERN.test(value) ||
-    NOTE_VISUAL_INSTRUCTION_PATTERN.test(value) ||
-    NOTE_EMBEDDED_VISUAL_PATTERN.test(value) ||
-    NOTE_EXTERNAL_URL_PATTERN.test(value)
-  );
-}
-
-function stripSourceImages(value: string, diagramSpec?: LessonSummaryDiagramSpec | null) {
-  return normalizeGeneratedText(
-    value
-      .replace(SOURCE_IMAGE_PATTERN, "")
-      .replace(PARENTHESIZED_SOURCE_FIGURE_REFERENCE_PATTERN, "")
-      .replace(SOURCE_EXERCISE_LABEL_PATTERN, "")
-      .replace(/\[Hình nguồn đã được lược bỏ\]/giu, "")
-      .replace(/\n{3,}/gu, "\n\n"),
-    diagramSpec,
-  );
-}
-
-function normalizeSolution(
-  value: string | null,
-  diagramSpec?: LessonSummaryDiagramSpec | null,
+function addFigures(
+  figures: LessonSummaryFigureDraft[],
+  blockPath: string,
+  blockFigures: StemFigureProviderPlanDraft[],
+  packetPageCount: number,
 ) {
-  if (!value) return null;
-  const normalized = normalizeGeneratedText(
-    value.replace(REDUNDANT_SOLUTION_CONCLUSION_PATTERN, ""),
-    diagramSpec,
-  );
-  if (!normalized) return null;
+  for (const [figureIndex, figure] of blockFigures.entries()) {
+    for (const reference of figure.sourceReferences) {
+      if (
+        reference.packetPageNumber < 1 ||
+        reference.packetPageNumber > packetPageCount
+      ) {
+        throw new Error(`LESSON_SUMMARY_FIGURE_REFERENCE_OUT_OF_RANGE:${blockPath}`);
+      }
+    }
+    figures.push({
+      blockPath,
+      figureIndex,
+      draft: {
+        ...figure,
+        figurePlanContractVersion: 3,
+        localId: `F${String(figures.length + 1).padStart(3, "0")}`,
+      },
+    });
+  }
+}
+
+function validateExampleProvenance(
+  example: LessonSummaryProviderExampleBlock,
+  packetPageCount: number,
+) {
+  validateSourcePageNumbers(example.sourcePageNumbers, packetPageCount);
+  if (example.origin === "AI_AUTHORED" && example.sourcePageNumbers.length > 0) {
+    throw new Error("LESSON_SUMMARY_AI_AUTHORED_EXAMPLE_HAS_SOURCE_PAGE");
+  }
+  if (example.origin !== "AI_AUTHORED" && example.sourcePageNumbers.length === 0) {
+    throw new Error("LESSON_SUMMARY_SOURCE_EXAMPLE_MISSING_SOURCE_PAGE");
+  }
+}
+
+function validateSourcePageNumbers(pageNumbers: number[], packetPageCount: number) {
+  if (pageNumbers.some((pageNumber) => pageNumber < 1 || pageNumber > packetPageCount)) {
+    throw new Error("LESSON_SUMMARY_BLOCK_SOURCE_PAGE_OUT_OF_RANGE");
+  }
+}
+
+function validateSourceEvidence(
+  evidence: { packetPageNumbers: number[] },
+  packetPageCount: number,
+) {
+  if (
+    evidence.packetPageNumbers.some(
+      (pageNumber) => pageNumber < 1 || pageNumber > packetPageCount,
+    )
+  ) {
+    throw new Error("LESSON_SUMMARY_SOURCE_EVIDENCE_OUT_OF_RANGE");
+  }
+}
+
+function normalizeGeometryStatement(
+  value:
+    | {
+        hypotheses: string[];
+        conclusions: string[];
+      }
+    | null
+    | undefined,
+) {
+  if (!value) return undefined;
+  const hypotheses = value.hypotheses.map(normalizeMathText).filter(Boolean);
+  const conclusions = value.conclusions.map(normalizeMathText).filter(Boolean);
+  return hypotheses.length > 0 && conclusions.length > 0
+    ? { hypotheses, conclusions }
+    : undefined;
+}
+
+function normalizeSolution(value: string) {
+  return normalizeMathText(value)
+    .split("\n")
+    .filter(
+      (line) =>
+        !/^\s*(?:#{1,6}\s*)?(?:\*\*|__)?(?:Lời giải|Chứng minh)\s*:?(?:\*\*|__)?\s*$/iu.test(
+          line,
+        ),
+    )
+    .join("\n")
+    .trim();
+}
+
+function normalizeMathText(value: string) {
+  return normalizeLessonSummaryAngleNotation(value).trim();
+}
+
+function requireText(value: string, field: string) {
+  const normalized = value.trim();
+  if (!normalized) throw new Error(`LESSON_SUMMARY_EMPTY_FIELD: ${field}`);
   return normalized;
 }
 
-function normalizeGeneratedText(
-  value: string,
-  diagramSpec?: LessonSummaryDiagramSpec | null,
-) {
-  const repairedLatex = value
-    .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
-    .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
-    .replaceAll(`${String.fromCharCode(8)}eta`, "\\beta")
-    .replaceAll(`${String.fromCharCode(13)}ight`, "\\right")
-    .replaceAll(`${String.fromCharCode(28)}hat{`, "\\widehat{")
-    .replaceAll(`${String.fromCharCode(27)}0`, "\\circ")
-    .replace(
-      /\\{2,}(?=(?:angle|triangle|frac|dfrac|sqrt|cdot|times|left|right|mathrm|text|circ|widehat|overline|perp|parallel|cong|neq|ne|le|ge)\b)/gu,
-      "\\",
-    );
-
-  const cleaned = [...repairedLatex]
-    .map((character) => {
-      const code = character.charCodeAt(0);
-      if (code === 7) return "\\";
-      return isUnsafeControlCode(code) ? "" : character;
-    })
-    .join("");
-
-  const separatedSubparts = cleaned.replace(/([^\n])\s+([a-h]\)\s+)/giu, "$1\n$2");
-  return normalizeLessonSummaryAngleNotation(separatedSubparts, diagramSpec).trim();
+function stripLeadingHeadingNumber(value: string) {
+  return value.replace(/^\s*(?:§\s*)?\d+(?:[.,]\d+)*(?:\s*[:.)-])?\s+/u, "").trim();
 }
 
-function normalizeDisplayHeading(value: string) {
-  return normalizeGeneratedText(value).replace(LEADING_HEADING_NUMBER_PATTERN, "");
-}
-
-function hasUnsafeControlCharacters(value: string) {
-  return [...value].some((character) => isUnsafeControlCode(character.charCodeAt(0)));
-}
-
-function isUnsafeControlCode(code: number) {
-  return (
-    (code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31)
-  );
+function fingerprint(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }

@@ -25,6 +25,8 @@ import { RolesGuard } from "#api/common/auth/roles.guard";
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
 import { ConfirmPrintedPageDto } from "#api/modules/learning-paths/dto/confirm-printed-page.dto";
+import { PromoteSearchablePdfDto } from "#api/modules/learning-paths/dto/promote-searchable-pdf.dto";
+import { ValidateSearchablePdfDto } from "#api/modules/learning-paths/dto/validate-searchable-pdf.dto";
 import { SourceDocumentsService } from "#api/modules/learning-paths/services/source-documents.service";
 
 @ApiTags("admin-source-documents")
@@ -80,6 +82,45 @@ export class AdminSourceDocumentsController {
   @ApiOperation({ summary: "Check source document OCR cache status" })
   getCacheStatus(@Param("sourceDocumentId") sourceDocumentId: string) {
     return this.sourceDocumentsService.getCacheStatus(sourceDocumentId);
+  }
+
+  @Post("admin/source-documents/:sourceDocumentId/searchable-pdf/validate")
+  @ApiOperation({ summary: "Validate a searchable PDF against the canonical scan" })
+  validateSearchablePdf(
+    @Param("sourceDocumentId") sourceDocumentId: string,
+    @Body() dto: ValidateSearchablePdfDto,
+  ) {
+    return this.sourceDocumentsService.validateSearchablePdf(sourceDocumentId, dto);
+  }
+
+  @Get(
+    "admin/source-documents/:sourceDocumentId/searchable-pdf/validation/:validationId",
+  )
+  @ApiOperation({ summary: "Get a searchable PDF equivalence report" })
+  getSearchablePdfValidation(
+    @Param("sourceDocumentId") sourceDocumentId: string,
+    @Param("validationId") validationId: string,
+  ) {
+    return this.sourceDocumentsService.getSearchablePdfValidation(
+      sourceDocumentId,
+      validationId,
+    );
+  }
+
+  @Post("admin/source-documents/:sourceDocumentId/searchable-pdf/promote")
+  @ApiOperation({ summary: "Promote a validated searchable PDF atomically" })
+  promoteSearchablePdf(
+    @Param("sourceDocumentId") sourceDocumentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: PromoteSearchablePdfDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.sourceDocumentsService.promoteSearchablePdf(
+      sourceDocumentId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Delete("admin/source-documents/:sourceDocumentId")

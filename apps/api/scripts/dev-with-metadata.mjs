@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 const rootDir = process.cwd();
 const distMain = join(rootDir, "dist/main.js");
+const sharedDistDir = join(rootDir, "../../packages/shared/dist");
 
 let apiProcess;
 let restartTimer;
@@ -40,8 +41,13 @@ tscProcess.on("exit", (code, signal) => {
   process.exit(code ?? (signal ? 1 : 0));
 });
 
-if (existsSync(join(rootDir, "dist"))) {
-  watch(join(rootDir, "dist"), { recursive: true }, (_event, filename) => {
+watchJavaScriptDirectory(join(rootDir, "dist"));
+watchJavaScriptDirectory(sharedDistDir);
+
+function watchJavaScriptDirectory(directory) {
+  if (!existsSync(directory)) return;
+
+  watch(directory, { recursive: true }, (_event, filename) => {
     if (filename?.endsWith(".js")) {
       scheduleRestart();
     }

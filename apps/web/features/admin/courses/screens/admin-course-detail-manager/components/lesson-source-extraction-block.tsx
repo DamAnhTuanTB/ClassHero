@@ -34,7 +34,7 @@ export function LessonSourceExtractionBlock({
   sourcePagesByDocumentId: Record<string, AdminSourceDocumentPageApi[]>;
   onRemove: () => void;
 }) {
-  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(true);
   const sourceDocumentId =
     form.watch(`sourceDocumentExtractions.${index}.sourceDocumentId`) ?? "";
   const pageStart = form.watch(`sourceDocumentExtractions.${index}.pageStart`) ?? "";

@@ -238,7 +238,6 @@ export class QuizService {
           select: {
             id: true,
             contentJson: true,
-            diagramSpecJson: true,
             reviewStatus: true,
             staleAt: true,
           },
@@ -310,7 +309,6 @@ export class QuizService {
             select: {
               id: true,
               contentJson: true,
-              diagramSpecJson: true,
               reviewStatus: true,
               staleAt: true,
             },
@@ -333,7 +331,6 @@ export class QuizService {
           select: {
             id: true,
             contentJson: true,
-            diagramSpecJson: true,
             reviewStatus: true,
             staleAt: true,
           },
@@ -411,13 +408,7 @@ export class QuizService {
       if (exampleBlock && question.explanationId) {
         await transaction.aiExplanation.update({
           where: { id: question.explanationId },
-          data: {
-            diagramSpecJson:
-              exampleBlock.visual?.kind === "DIAGRAM_SPEC"
-                ? toInputJson(exampleBlock.visual.spec)
-                : Prisma.DbNull,
-            staleAt: null,
-          },
+          data: { staleAt: null },
         });
       }
       if (
@@ -451,7 +442,6 @@ export class QuizService {
             select: {
               id: true,
               contentJson: true,
-              diagramSpecJson: true,
               reviewStatus: true,
               staleAt: true,
             },
@@ -627,9 +617,7 @@ function replaceStructuredExample(
     sources: _sources,
     ...rest
   } = metadata;
-  const { sourceChunkIds: _exampleSourceChunkIds, ...exampleWithoutSourceTrace } =
-    exampleBlock;
-  return { ...rest, exampleBlock: exampleWithoutSourceTrace };
+  return { ...rest, exampleBlock };
 }
 
 function validateQuestionContent(dto: QuizQuestionContentDto) {
@@ -813,7 +801,6 @@ async function syncExplanation(
       where: { id: input.currentExplanationId },
       data: {
         contentJson: toInputJson(input.explanationJson),
-        diagramSpecJson: Prisma.DbNull,
         source: ContentSource.ADMIN,
         reviewStatus: ReviewStatus.APPROVED,
         staleAt: null,

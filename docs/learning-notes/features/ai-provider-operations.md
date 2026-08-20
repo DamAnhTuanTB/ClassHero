@@ -29,6 +29,10 @@ flowchart TD
 - `AiGenerationJobService` chụp route snapshot lúc enqueue. `AiProviderCallService` gọi provider, fallback có kiểm soát và ghi usage event.
 - OCR cache hit ghi saving; cache miss lưu `pdfId` ngay. Retry đọc lại ID này để tiếp tục thay vì submit file lần nữa.
 - Mỗi usage event giữ price version và tỷ giá lúc gọi, nên đổi bảng giá mới không làm lịch sử thay đổi.
+- Một lần sinh nội dung có thể tạo nhiều usage event, ví dụ một lượt sinh kiến thức
+  và nhiều lượt tạo hình minh họa. Màn chi tiết bài hiển thị tổng của cả lần sinh;
+  bảng provider vẫn giữ từng lượt gọi để audit, đồng thời hiện tổng lần sinh làm
+  mốc đối chiếu. Không đặt cùng nhãn “chi phí” cho hai phạm vi khác nhau.
 
 ## File quan trọng
 
@@ -44,6 +48,11 @@ flowchart TD
 - Cost lịch sử phải snapshot, không tính lại bằng bảng giá hiện tại.
 - Fallback không dùng cho output sai schema vì gọi thêm model vừa tốn tiền vừa che lỗi nghiệp vụ.
 - Idempotency của paid OCR cần lưu provider request ID ngay sau submit.
+- Khi hiển thị cost phải luôn ghi rõ phạm vi: `chi phí lượt gọi` hay `tổng lần sinh`;
+  formatter giống nhau không thể sửa được lỗi ngữ nghĩa do aggregate khác nhau.
+- Usage chuẩn hóa phục vụ tính phí và provider usage nguyên bản phục vụ audit là
+  hai lớp dữ liệu khác nhau. Metadata upload/xóa file của backend phải nằm ở nhánh
+  riêng; nếu trộn vào provider usage thì UI không được gọi object đó là `raw usage`.
 
 ## Task liên quan
 

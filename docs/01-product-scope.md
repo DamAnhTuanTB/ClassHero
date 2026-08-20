@@ -45,6 +45,8 @@ MVP tập trung vào việc giúp:
 - Có nhiều bộ quiz/flashcard/bài thi trong một buổi học.
 - Có kho bộ dự phòng do AI tạo.
 - Có AI tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải chi tiết và chat theo buổi học.
+- Khi sinh tóm tắt, admin có thể chọn dùng trực tiếp crop ảnh gốc sách giáo khoa
+  đã trích xuất thay vì gọi AI vẽ lại hình.
 - Có học video thông minh theo `M15`: lưu khoảng đã xem/tiếp tục học, ghi chú theo timestamp, checkpoint, hỏi AI theo đoạn, tìm trong video, chapter mastery và đề xuất ôn tập. Đây là scope mở rộng được ưu tiên sau khi luồng lesson/quiz/test phía học sinh hoàn tất.
 - Có report lỗi ở cấp item lẻ.
 - Có quản lý nội dung AI chưa duyệt.
@@ -85,6 +87,11 @@ Admin có quyền:
 - Upload tài liệu/PDF/ảnh.
 - Tạo hoặc chỉnh sửa tóm tắt bài học.
 - Dùng AI tạo tóm tắt bài học.
+- Chọn theo từng lượt sinh tóm tắt giữa luồng AI vẽ lại hình mặc định và luồng
+  tự điền crop ảnh gốc sách giáo khoa, không gọi AI tạo hình ở giai đoạn sau.
+- Quản lý từng hình STEM trong tóm tắt: xem lỗi, xóa, tải ảnh thay thế, sinh lại
+  bằng AI, xem SVG preview và tự sửa LaTeX figure snippet khi cần. Không có
+  editor click-to-source/SyncTeX trên PDF hoặc preview trong phạm vi hiện tại.
 - Tạo, sửa, xóa quiz.
 - Dùng AI tạo quiz.
 - Tạo, sửa, xóa flashcard.

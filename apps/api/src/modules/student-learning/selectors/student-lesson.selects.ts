@@ -17,6 +17,33 @@ export const studentLessonSummarySelect = {
   reviewStatus: true,
   updatedAt: true,
   deletedAt: true,
+  stemFigures: {
+    where: {
+      deletedAt: null,
+      currentRevision: {
+        is: {
+          status: "SUCCEEDED",
+          deliveryFileId: { not: null },
+        },
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      currentRevision: {
+        select: {
+          altText: true,
+          caption: true,
+          deliveryFile: {
+            select: {
+              objectKey: true,
+              publicUrl: true,
+            },
+          },
+        },
+      },
+    },
+  },
 } satisfies Prisma.LessonSummarySelect;
 
 const approvedQuizQuestionWhere = {

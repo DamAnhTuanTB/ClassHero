@@ -2,7 +2,8 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function EditorDialogShell({
@@ -21,6 +22,9 @@ export function EditorDialogShell({
   panelClassName?: string;
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => setIsMounted(true), []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -31,7 +35,11 @@ export function EditorDialogShell({
     document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const codeCompletionIsOpen =
+        Boolean(target?.closest(".cm-editor")) &&
+        Boolean(document.querySelector(".cm-tooltip-autocomplete"));
+      if (event.key === "Escape" && !event.defaultPrevented && !codeCompletionIsOpen) {
         onClose();
       }
     }
@@ -44,11 +52,13 @@ export function EditorDialogShell({
     };
   }, [isOpen, onClose]);
 
-  return (
+  if (!isMounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen ? (
         <motion.div
-          className="theme-dialog-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden px-4 py-4 backdrop-blur-sm sm:py-6"
+          className="theme-dialog-overlay fixed inset-0 z-[80] flex items-center justify-center overflow-hidden px-4 py-4 backdrop-blur-sm sm:py-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -94,6 +104,7 @@ export function EditorDialogShell({
           </motion.div>
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

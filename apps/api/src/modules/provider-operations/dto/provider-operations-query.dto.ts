@@ -1,5 +1,14 @@
 import { Transform, Type } from "class-transformer";
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from "class-validator";
 import { ProviderCatalogCategory, ProviderUsageStatus } from "@prisma/client";
 
 export enum ProviderUsageGranularity {
@@ -35,6 +44,10 @@ export class ProviderUsageQueryDto {
 }
 
 export class ProviderUsageEventsQueryDto extends ProviderUsageQueryDto {
+  @IsOptional()
+  @IsUUID()
+  aiGenerationId?: string;
+
   @IsOptional()
   @IsEnum(ProviderUsageStatus)
   status?: ProviderUsageStatus;

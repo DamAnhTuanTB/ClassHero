@@ -157,42 +157,57 @@ Tác vụ nên dùng worker/job:
 - Email/Zalo notification.
 - Ảnh minh họa/render nặng nếu có.
 
-Riêng lesson-summary contract v3 của `M9.2`, `diagramSpec` được render
-deterministic trong ứng dụng và không tạo thêm image-generation provider call.
-Generation vẫn chỉ có một structured-output call; semantic warning không kích
-hoạt repair/judge call. Renderer phải giới hạn số primitive/label và lazy-load ở
-UI khi cần để không làm tăng đáng kể initial bundle hoặc thời gian hiển thị lesson.
-Corrective `M9.16` phải bảo đảm custom preference chỉ làm tăng prompt theo đúng
-độ dài preference, không nối lại toàn bộ canonical contract. Preview và generate
-dùng cùng request fingerprint để không enqueue bằng prompt stale; fingerprint chỉ
-hash dữ liệu canonical, không log prompt/context thô. Regression phải đếm đúng một
-contract heading và so token estimate preview với request worker tương ứng.
-Lượt coverage Toán 3-9 dùng compiler/template và semantic validator deterministic
-sau structured output, không thêm AI call. Full property/golden matrix chạy ở
-test/CI theo tầng, không chạy trong request path: PR chỉ chạy smoke representative,
-còn full 250-400 ô × viewport/theme chạy theo workflow đầy đủ. Nếu thêm thư viện
-hình học/layout, phải benchmark server runtime, client bundle và khả năng tree-shake
-trước khi đưa vào renderer production.
-Các family compiler được phát triển đồng thời trong một delivery wave nhưng chỉ
-rollout production một lần sau global release gate; việc gom phạm vi triển khai
-không được làm tăng số provider call hoặc đưa full coverage suite vào request path.
-Mọi bước normalize/materialize làm hai dạng input cùng trở thành một output phải
-giữ provenance có cấu trúc thay vì chỉ lưu payload cuối. Riêng hình lesson summary,
-renderer-ready `DIAGRAM_SPEC` phải mang `diagramSpecOrigin = PROVIDER_RAW_SPEC |
-COMPILED_INTENT | LEGACY_UNKNOWN`; tuyến compiler giữ thêm compiler key/version.
-Dashboard và báo cáo live phải tách số lượng, tỷ lệ schema pass, semantic pass,
-manual visual pass, `reviewIssues` và lỗi renderer theo origin/model/compiler.
-Không suy ngược origin từ ID điểm hoặc primitive vì compiler có thể thay đổi cách
-đặt tên và raw spec của provider có thể trùng cùng hình dạng.
-Live matrix M9.2 có hard cap kế hoạch 320.000 VNĐ: 65 request chính và tối đa 15
-retry có điều kiện trên `gpt-5.4`; 21 request là full lesson phân đều ba mức khó
-cho từng lớp 3-9. Mỗi output phải cache trước visual review để
-mọi lượt sửa compiler/renderer/layout chỉ re-render và chụp lại local, không tạo
-paid call mới. Queue paid phải dừng khi phát hiện lỗi hệ thống lặp lại hoặc khi
-reservation chạm cap; chỉ `PROVIDER_INTENT` mới được tiêu retry pool.
-Paid queue phải hoàn tất Gate A `44` ví dụ lẻ (cap 125.000 VNĐ) và sửa hết lỗi
-hệ thống trước khi enqueue Gate B `21` full lesson (phần cap còn lại tối đa
-195.000 VNĐ). Không chạy song song hai gate vì sẽ nhân lỗi và lãng phí ngân sách.
+Riêng Summary có `TEX_FIGURE`, generation và render là các bước tách biệt.
+Structured-output call của Summary chỉ sinh nội dung + figure plan. Mỗi figure
+dùng một structured-output call chuyên vẽ, lưu raw core fragment rồi enqueue một
+`DIAGRAM_RENDERING` job. Worker figure mặc định concurrency 1 để TeX Live không
+tranh CPU/RAM trên VPS nhỏ. Các figure của cùng một Summary được enqueue đồng thời
+bằng `Promise.all` để không kéo dài bước persist; thứ tự hoàn tất không phải
+contract. API/UI luôn sắp xếp danh sách theo vị trí số
+`section -> block -> figureIndex` để thứ tự hiển thị ổn định. UI dùng một query
+figure duy nhất, invalidate ngay khi job Summary terminal và poll 1,5 giây khi
+còn figure active để đồng bộ ảnh/counter.
+
+Ngoại lệ M9.17: khi job snapshot `useTextbookSourceImages=true`, Phase 1 vẫn chạy
+như cũ nhưng worker chỉ copy/normalize crop OCR hợp lệ sang delivery asset và
+không enqueue `DIAGRAM_RENDERING`. Metrics phải ghi riêng mode, số crop tự điền,
+số figure cần xem lại, số figure do AI đề xuất bị bỏ qua và xác nhận
+`phase_two_enqueued_count=0`, `phase_two_provider_call_count=0`. UI không cần
+poll figure rendering nếu sau bước import không còn figure active.
+
+Performance và cost rules:
+
+- Source policy/compile/validator chạy local; chỉ lỗi source mới gọi OpenAI repair.
+- Output token của Summary scale theo `targetWordCount` và có hard cap; route
+  figure có output budget riêng. Không dùng một max-token cố định cho cả bài ngắn
+  lẫn bài chi tiết dài.
+- Provider output deterministic-invalid hoặc incomplete trước khi có source kết
+  thúc paid attempt với error code ổn định; BullMQ không gọi lại y hệt request đó.
+- Theo dõi riêng `provider_output_pass`, `source_policy_pass`, `compiler_invoked`,
+  `first_compile_pass`, `first_pass_succeeded`, `repair_count` và
+  prompt/toolbox/compiler-profile version. `first_compile_pass` tính trên lần
+  LuaLaTeX đầu của raw figure snippet trong compiler envelope chuẩn;
+  `first_pass_succeeded` chỉ true khi raw snippet qua policy, compile và validator.
+  Không thêm dependency vào source để làm đẹp chỉ số. Trường
+  `local_dependency_recovery` cũ có thể giữ trong schema lịch sử nhưng flow mới
+  không phát sinh hoặc dùng nó để sửa package/library declaration.
+- Mỗi figure mặc định tối đa 2 lượt repair; lỗi renderer/container dùng BullMQ
+  retry riêng và không gọi AI.
+- Compile + validator pass mới upload/promote delivery SVG lên R2. Candidate
+  `NEEDS_REVIEW/FAILED` giữ private artifacts và không ghi đè current asset.
+- Student không compile hoặc poll job, chỉ tải current SVG/raster đã promote từ R2.
+- Cache/idempotency dùng `sourceHash + sourceVersion`; source không đổi không
+  được tạo lại cùng job đang active.
+- Giới hạn mặc định: source 40 KB, SVG 2 MB, 20.000 node, 1,5 triệu ký tự path,
+  compile timeout 20 giây và request timeout 30 giây.
+- Metrics/log cần tách `SOURCE`, `VALIDATION`, `INFRASTRUCTURE`,
+  `ADMIN_REVIEW`; theo dõi compile latency, repair count, queue wait, tỷ lệ
+  `SUCCEEDED/NEEDS_REVIEW/FAILED` và bytes/nodes output.
+- Figure light-only; dark UI dùng surface sáng nên không tăng gấp đôi compile,
+  storage hoặc visual-review matrix.
+- Coverage/test representative phải trải lớp 3–12 và các package đã công bố,
+  nhưng mặc định dùng fixture local. Live OpenAI test luôn opt-in và phải tuân
+  cost guard.
 
 Provider operations rules:
 
@@ -226,6 +241,12 @@ Rules:
 
 ## 7. AI/RAG performance
 
+Corrective M9.2 đã triển khai: figure plan v3 bỏ `visualIntent`, giảm
+một phần text input Stage 1/Stage 2 và dùng projection block cố định. Observability
+phải tách metrics theo source/no-source/admin-delta, theo dõi ambiguity gate trước
+paid call và xác nhận không còn active job v1/v2 sau cutover. Không triển khai
+rolling API/worker khác version; worker phải được restart sau release.
+
 AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 
 - Không gọi AI đồng bộ cho tác vụ generate nặng nếu có thể dùng job.
@@ -249,6 +270,20 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 - Prompt Caching chỉ giảm phần input bị tính phí/độ trễ theo policy provider,
   không giảm tổng token được gửi. UI và báo cáo phải tách tổng input khỏi cached
   input để tránh hiểu sai việc tối ưu cache thành cắt dữ liệu nguồn.
+- Stage 2 tạo STEM figure chỉ gửi semantic brief tối thiểu và đúng danh sách ảnh
+  vision thực tế. Mỗi source reference có nhãn gửi tối đa bốn crop khớp chính xác
+  khác object key để giữ đủ panel; số panel trong brief phải bằng số ảnh thực tế
+  và mỗi ảnh ánh xạ một panel riêng. Nhãn mơ hồ chỉ chọn một crop. Ảnh nguyên trang
+  PDF chỉ giữ làm fallback khi block không có nhãn hình cụ thể hoặc không resolve
+  được crop đáng tin cậy. Không lặp provenance trang/object key/hash trong prompt.
+- Preview request tạo lại STEM figure chỉ chạy theo thao tác `Xem dữ liệu` hoặc
+  `Cập nhật dữ liệu`; đổi nguồn ảnh phải invalidate preview phía client thay vì
+  âm thầm giữ request cũ. Preview chỉ resolve route/schema và ước tính token/chi
+  phí, không gọi provider trả phí.
+- Lesson detail chỉ polling tổng usage khi figure phase 2 còn hoạt động; khi phase
+  chuyển sang terminal phải refetch một lần để chốt số tiền. Modal chi tiết usage
+  chỉ polling khi đang mở, query theo `aiGenerationId`, phân trang và dùng aggregate
+  server-side thay vì tải toàn bộ event về client để cộng.
 - Khi test runtime với provider trả phí, ưu tiên cache/sample trước; forced/full run phải có ước tính usage/chi phí và xác nhận rõ của owner trước khi chạy.
 
 ---

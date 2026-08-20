@@ -156,17 +156,14 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 47     | `M5.3`  | RetrievalService vector search theo lesson                                 |
 | 48     | `M5.4`  | Hybrid search cho công thức/ký hiệu                                        |
 | 49     | `M9.1`  | AiModule structured output foundation                                      |
-| 50     | `M9.2`  | Admin generate lesson summary                                              |
+| 50     | `M9.2`  | Admin generate Summary từ searchable PDF + multimodal TeX/TikZ lớp 3–12 |
 | 51     | `M9.3`  | Admin generate quiz/flashcard/test                                         |
 | 52     | `M9.8`  | Admin AI generation panel UI — Done 2026-08-03                             |
 | 52.1   | `M9.9`  | Provider catalog, AI routing, Gemini fallback và usage accounting          |
 | 52.2   | `M9.10` | Admin provider operations API                                              |
 | 52.3   | `M9.11` | Admin Cài đặt AI/OCR UI                                                    |
 | 52.4   | `M9.12` | Hard-stop ngân sách tuyệt đối bằng reservation                             |
-| 52.5   | `M9.13` | Admin chỉnh label/marker/caption an toàn trong hình JSON — Done 2026-08-11 |
-| 52.6   | `M9.14` | Admin chọn nhiều đoạn và đánh dấu bằng nhau — Done 2026-08-11              |
-| 52.7   | `M9.15` | Khôi phục chỉnh sửa một hình trong phiên draft — Done 2026-08-11       |
-| 52.8   | `M9.16` | Harden prompt Sinh kiến thức và phạm vi lớp 3–12 — Planned 2026-08-11  |
+| 52.5   | `M9.17` | Summary tùy chọn dùng trực tiếp ảnh gốc SGK, bỏ qua Phase 2                |
 | 53     | `M9.4`  | Student request-new reserve-first UI + API                              |
 | 54     | `M9.5`  | AI explanation cache inline UI + API                                       |
 | 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                              |
@@ -283,10 +280,9 @@ Ghi chú:
 - `M9.8` phụ thuộc `M9.2`, `M9.3`; job status UI phụ thuộc `M4.3`. Task này
   được xếp ngay sau `M9.3` để admin có UI kiểm thử generation trước khi làm
   luồng học sinh; đã Done ngày 2026-08-03.
-- `M9.16` phụ thuộc `M9.2`, `M9.3`, `M9.8`; corrective prompt/preview/grade
-  3–12 này phải hoàn tất trước `M9.4` để student flow không tái sử dụng contract
-  đang lặp hoặc bỏ sót THPT.
-- `M9.4` phụ thuộc `M9.3`, `M9.16`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
+- `M9.2` hiện gồm pipeline TeX/TikZ Summary lớp 3–12, phụ thuộc Redis/BullMQ,
+  isolated TeX renderer, file/R2 và admin panel `M9.8`. Quiz/Test chưa dùng figure.
+- `M9.4` phụ thuộc `M9.2`, `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
   nối luôn các action request-new hiện có trên UI học sinh.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline
   explanation UI trong cùng task.
@@ -297,10 +293,9 @@ Ghi chú:
 - `M9.10` phụ thuộc `M9.9`, cung cấp RBAC API cho cấu hình, giá, budget, thống kê và audit.
 - `M9.11` phụ thuộc `M9.10` và admin shell; nối route `/admin/ai-settings` với dữ liệu thật.
 - `M9.12` phụ thuộc `M9.9-M9.11` và `M4.6`; harden toàn bộ paid-call gateway bằng reservation nguyên tử, fail-closed, lỗi không retry và UI số dư ngân sách.
-- `M9.13-M9.15` phụ thuộc renderer/schema Summary `M9.2` và admin editor/lưu nháp
-  `M9.8`; dùng lại PUT summary và backend review reconciliation hiện có. Chuỗi
-  corrective là `M9.13 -> M9.14 -> M9.15`, không thêm endpoint/database/worker
-  và không chặn dependency của `M9.4`.
+- `M9.17` phụ thuộc `M9.2`, `M9.8` và OCR image manifest của `M4.4`; tái sử dụng
+  resolver + pipeline `use-source-crop`, giữ Phase 1 nguyên trạng và thêm nhánh
+  không enqueue/call Phase 2 khi admin chọn dùng ảnh gốc SGK.
 
 ### Smart video learning
 

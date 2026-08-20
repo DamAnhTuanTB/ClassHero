@@ -17,6 +17,7 @@ import type {
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import type { EnvConfig } from "#api/config/env.validation";
+import { extractChunkPdfPageRange } from "#api/modules/ai/utils/chunk-page-range";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
 import {
   MathpixOcrService,
@@ -356,6 +357,7 @@ export class DocumentProcessingProcessor {
       ownerId: sourceDocId,
       sourceDocumentId: sourceDocId,
     });
+    await this.persistOcrArtifact("SOURCE_DOCUMENT", sourceDocId, ocr);
 
     await this.prisma.sourceDocument.update({
       where: { id: sourceDocId },
@@ -733,6 +735,7 @@ export class DocumentProcessingProcessor {
       ocr,
       ownerId: lessonDoc.id,
     });
+    await this.persistOcrArtifact("LESSON_DOCUMENT", lessonDoc.id, ocr);
 
     const fullText = ocr.pages
       .map((page) => this.buildOcrPageTextBlock(page))
@@ -1380,6 +1383,79 @@ export class DocumentProcessingProcessor {
     };
   }
 
+  private async persistOcrArtifact(
+    ownerType: "SOURCE_DOCUMENT" | "LESSON_DOCUMENT",
+    ownerId: string,
+    ocr: OcrProcessingResult,
+  ) {
+    const ownerField =
+      ownerType === "SOURCE_DOCUMENT"
+        ? { sourceDocumentId: ownerId }
+        : { lessonDocumentId: ownerId };
+    const uniqueWhere =
+      ownerType === "SOURCE_DOCUMENT"
+        ? {
+            sourceDocumentId_provider_optionsHash_sourceContentHash: {
+              sourceDocumentId: ownerId,
+              provider: ocr.provider,
+              optionsHash: ocr.descriptor.optionsHash,
+              sourceContentHash: ocr.contentHash,
+            },
+          }
+        : {
+            lessonDocumentId_provider_optionsHash_sourceContentHash: {
+              lessonDocumentId: ownerId,
+              provider: ocr.provider,
+              optionsHash: ocr.descriptor.optionsHash,
+              sourceContentHash: ocr.contentHash,
+            },
+          };
+    const artifact = await this.prisma.documentOcrArtifact.upsert({
+      where: uniqueWhere,
+      create: {
+        ...ownerField,
+        provider: ocr.provider,
+        providerDocumentId: ocr.bundlePdfId,
+        sourceContentHash: ocr.contentHash,
+        modelVersion: ocr.descriptor.modelVersion,
+        optionsHash: ocr.descriptor.optionsHash,
+        pageCount: ocr.pageCount,
+        artifactBaseKey: ocr.descriptor.baseKey,
+        manifestObjectKey: ocr.artifactKeys.manifestJson,
+        pagesObjectKey: ocr.normalizedPagesKey,
+        imageManifestObjectKey: ocr.artifactKeys.imageManifestJson,
+        artifactAuditObjectKey: ocr.artifactKeys.artifactAuditJson,
+        status: DocumentStatus.READY,
+        metadataJson: this.toJson({
+          cacheHit: ocr.cacheHit,
+          processingTimeMs: ocr.processingTimeMs,
+        }),
+      },
+      update: {
+        providerDocumentId: ocr.bundlePdfId,
+        pageCount: ocr.pageCount,
+        artifactBaseKey: ocr.descriptor.baseKey,
+        manifestObjectKey: ocr.artifactKeys.manifestJson,
+        pagesObjectKey: ocr.normalizedPagesKey,
+        imageManifestObjectKey: ocr.artifactKeys.imageManifestJson,
+        artifactAuditObjectKey: ocr.artifactKeys.artifactAuditJson,
+        status: DocumentStatus.READY,
+      },
+      select: { id: true },
+    });
+    if (ownerType === "SOURCE_DOCUMENT") {
+      await this.prisma.sourceDocument.update({
+        where: { id: ownerId },
+        data: { activeOcrArtifactId: artifact.id },
+      });
+      return;
+    }
+    await this.prisma.lessonDocument.update({
+      where: { id: ownerId },
+      data: { activeOcrArtifactId: artifact.id },
+    });
+  }
+
   private buildPageArtifactRefs(ocr: OcrProcessingResult, pageNumber: number) {
     return {
       pageNumber,
@@ -1638,21 +1714,31 @@ export class DocumentProcessingProcessor {
     }
 
     await this.prisma.documentChunk.createMany({
-      data: chunks.map((chunk) => ({
-        documentId,
-        lessonId,
-        chunkIndex: chunk.chunkIndex,
-        content: chunk.content,
-        contentHash: chunk.contentHash,
-        tokenCount: chunk.tokenCount,
-        metadataJson: this.toJson({
-          ...metadata,
+      data: chunks.map((chunk) => {
+        const chunkPageRange = extractChunkPdfPageRange(chunk.content);
+
+        return {
+          documentId,
+          lessonId,
           chunkIndex: chunk.chunkIndex,
-          chunkContentHash: chunk.contentHash,
+          content: chunk.content,
+          contentHash: chunk.contentHash,
           tokenCount: chunk.tokenCount,
-          embeddingStatus: "pending",
-        }),
-      })),
+          metadataJson: this.toJson({
+            ...metadata,
+            ...(chunkPageRange
+              ? {
+                  chunkPageStart: chunkPageRange.pageStart,
+                  chunkPageEnd: chunkPageRange.pageEnd,
+                }
+              : {}),
+            chunkIndex: chunk.chunkIndex,
+            chunkContentHash: chunk.contentHash,
+            tokenCount: chunk.tokenCount,
+            embeddingStatus: "pending",
+          }),
+        };
+      }),
     });
   }
 

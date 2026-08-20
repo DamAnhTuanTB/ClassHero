@@ -46,6 +46,7 @@ const fileSelect = {
 export type FileAccessRecord = {
   objectKey: string;
   publicUrl: string | null;
+  visibility?: FileVisibility;
 };
 
 @Injectable()
@@ -141,7 +142,7 @@ export class FilesService {
       return null;
     }
 
-    if (file.publicUrl) {
+    if (file.visibility === FileVisibility.PUBLIC && file.publicUrl) {
       return file.publicUrl;
     }
 

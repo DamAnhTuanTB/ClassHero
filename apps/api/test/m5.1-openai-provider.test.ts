@@ -10,10 +10,18 @@ import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
 const mockEmbeddingsCreate = vi.fn();
 const mockResponsesCreate = vi.fn();
 const mockResponsesParse = vi.fn();
+const mockFilesCreate = vi.fn();
+const mockFilesDelete = vi.fn();
+const mockToFile = vi.fn(async (value: Buffer, filename: string) => ({
+  value,
+  filename,
+}));
 vi.mock("openai", () => {
   return {
+    toFile: mockToFile,
     default: class MockOpenAI {
       embeddings = { create: mockEmbeddingsCreate };
+      files = { create: mockFilesCreate, delete: mockFilesDelete };
       responses = {
         create: mockResponsesCreate,
         parse: mockResponsesParse,
@@ -201,6 +209,11 @@ describe("OpenAiProvider", () => {
           completionTokens: 5,
           totalTokens: 17,
         },
+        providerUsageRaw: {
+          input_tokens: 12,
+          output_tokens: 5,
+          total_tokens: 17,
+        },
       });
       expect(mockResponsesCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -271,6 +284,171 @@ describe("OpenAiProvider", () => {
         }),
         { timeout: 600_000 },
       );
+    });
+
+    it("sends optional reference images in the same structured user request", async () => {
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-structured-image-1",
+        model: "gpt-5.4",
+        output_parsed: { status: "ok", value: 2 },
+        usage: {
+          input_tokens: 1_579,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens: 1_930,
+          output_tokens_details: { reasoning_tokens: 1_258 },
+          total_tokens: 3_509,
+        },
+      });
+
+      const imageResult = await provider.generateStructured(
+        {
+          systemPrompt: "Draw from the local brief.",
+          userPrompt: "Return the figure source.",
+          inputImages: [
+            {
+              imageUrl: "data:image/png;base64,aW1hZ2U=",
+              detail: "high",
+            },
+          ],
+          outputName: "stem_figure_with_reference",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+          model: "gpt-5.4",
+        },
+        schema,
+      );
+
+      expect(mockResponsesParse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: [
+            {
+              role: "user",
+              content: [
+                expect.objectContaining({
+                  type: "input_text",
+                  text: expect.stringContaining("Return the figure source."),
+                }),
+                {
+                  type: "input_image",
+                  image_url: "data:image/png;base64,aW1hZ2U=",
+                  detail: "high",
+                },
+              ],
+            },
+          ],
+        }),
+        { timeout: 600_000 },
+      );
+      expect(imageResult.providerUsageRaw).toEqual({
+        input_tokens: 1_579,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens: 1_930,
+        output_tokens_details: { reasoning_tokens: 1_258 },
+        total_tokens: 3_509,
+      });
+    });
+
+    it("uploads a PDF, orders file before manifest/prompt, requests high detail, and deletes it", async () => {
+      mockFilesCreate.mockResolvedValueOnce({ id: "file-packet-1" });
+      mockFilesDelete.mockResolvedValueOnce({ deleted: true });
+      mockResponsesParse.mockResolvedValueOnce({
+        id: "resp-pdf-1",
+        model: "gpt-5.6-terra",
+        output_parsed: { status: "ok", value: 2 },
+        usage: {
+          input_tokens: 1_579,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens: 1_930,
+          output_tokens_details: { reasoning_tokens: 1_258 },
+          total_tokens: 3_509,
+        },
+      });
+
+      const result = await provider.generateStructured(
+        {
+          systemPrompt: "Read the lesson packet.",
+          userPrompt: "Generate the complete lesson.",
+          inputFiles: [
+            {
+              filename: "lesson-source.pdf",
+              mimeType: "application/pdf",
+              fileData: `data:application/pdf;base64,${Buffer.from("pdf").toString("base64")}`,
+              detail: "high",
+            },
+          ],
+          inputTextItems: [{ id: "manifest", text: '{"pages":[1,2]}' }],
+          outputName: "lesson_from_pdf",
+          promptVersion: "pdf-v1",
+          schemaVersion: "pdf-v1",
+          model: "gpt-5.6-terra",
+        },
+        schema,
+      );
+
+      expect(mockFilesCreate).toHaveBeenCalledWith({
+        file: expect.objectContaining({ filename: "lesson-source.pdf" }),
+        purpose: "user_data",
+      });
+      expect(mockResponsesParse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: [
+            {
+              role: "user",
+              content: [
+                { type: "input_file", file_id: "file-packet-1", detail: "high" },
+                { type: "input_text", text: '{"pages":[1,2]}' },
+                expect.objectContaining({
+                  type: "input_text",
+                  text: expect.stringContaining("Generate the complete lesson."),
+                }),
+              ],
+            },
+          ],
+        }),
+        { timeout: 600_000 },
+      );
+      expect(mockFilesDelete).toHaveBeenCalledWith("file-packet-1");
+      expect(result.inputFileOperations).toEqual([
+        expect.objectContaining({
+          providerFileId: "file-packet-1",
+          cleanupStatus: "deleted",
+        }),
+      ]);
+      expect(result.providerUsageRaw).toEqual({
+        input_tokens: 1_579,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens: 1_930,
+        output_tokens_details: { reasoning_tokens: 1_258 },
+        total_tokens: 3_509,
+      });
+    });
+
+    it("deletes an owned PDF even when the provider request fails", async () => {
+      mockFilesCreate.mockResolvedValueOnce({ id: "file-packet-failed" });
+      mockFilesDelete.mockResolvedValueOnce({ deleted: true });
+      mockResponsesParse.mockRejectedValueOnce(new Error("provider unavailable"));
+
+      await expect(
+        provider.generateStructured(
+          {
+            systemPrompt: "Read packet.",
+            userPrompt: "Generate.",
+            inputFiles: [
+              {
+                filename: "lesson-source.pdf",
+                mimeType: "application/pdf",
+                fileData: Buffer.from("pdf").toString("base64"),
+                detail: "high",
+              },
+            ],
+            outputName: "lesson_from_pdf",
+            promptVersion: "pdf-v1",
+            schemaVersion: "pdf-v1",
+          },
+          schema,
+        ),
+      ).rejects.toThrow("provider unavailable");
+      expect(mockFilesDelete).toHaveBeenCalledWith("file-packet-failed");
     });
 
     it("uses the Responses API reasoning object for supported models", async () => {
@@ -432,7 +610,7 @@ describe("OpenAiProvider", () => {
           },
           schema,
         ),
-      ).rejects.toThrow("did not return a parsed structured output");
+      ).rejects.toThrow("OpenAI không trả về dữ liệu có cấu trúc hoàn chỉnh");
     });
   });
 });

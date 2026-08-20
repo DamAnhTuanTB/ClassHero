@@ -5,6 +5,7 @@ import {
   CheckCircle,
   Eye,
   ExternalLink,
+  FileSearch,
   FileText,
   Loader2,
   RefreshCw,
@@ -30,12 +31,14 @@ import { SourceDocumentAssignmentsDialog } from "@/features/admin/courses/screen
 import { SourceDocumentPagesDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-pages-dialog";
 import { SourceDocumentUploadDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/source-document-upload-dialog";
 import { RetrySourceDocumentConfirmDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/retry-source-document-confirm-dialog";
+import { SearchablePdfPromoteDialog } from "@/features/admin/courses/screens/admin-course-detail-manager/components/searchable-pdf-promote-dialog";
 
 export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) {
   const manager = useAdminCourseDocumentsManager(path);
   const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
   const [isDeleteSourceConfirmOpen, setIsDeleteSourceConfirmOpen] = useState(false);
   const [isRetrySourceConfirmOpen, setIsRetrySourceConfirmOpen] = useState(false);
+  const [isSearchablePdfOpen, setIsSearchablePdfOpen] = useState(false);
   const sourceDocument = manager.selectedSourceDocument;
   const isSourceProcessing =
     sourceDocument?.status === "PROCESSING" ||
@@ -253,6 +256,16 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
 
                 <button
                   type="button"
+                  disabled={isSourceProcessing}
+                  onClick={() => setIsSearchablePdfOpen(true)}
+                  className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FileSearch className="h-4 w-4" aria-hidden="true" />
+                  PDF searchable
+                </button>
+
+                <button
+                  type="button"
                   disabled={isSourceProcessing || manager.isRetryingSourceDocument}
                   onClick={() => setIsRetrySourceConfirmOpen(true)}
                   className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
@@ -375,6 +388,12 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
         sourceDocumentId={sourceDocument?.id ?? null}
         onCancel={() => setIsRetrySourceConfirmOpen(false)}
         onConfirm={(forceNewOcr) => void handleRetrySourceDocument(forceNewOcr)}
+      />
+      <SearchablePdfPromoteDialog
+        isOpen={isSearchablePdfOpen}
+        sourceDocumentId={sourceDocument?.id ?? null}
+        onClose={() => setIsSearchablePdfOpen(false)}
+        onPromoted={manager.actions.reloadDocuments}
       />
     </section>
   );

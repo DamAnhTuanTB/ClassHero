@@ -37,7 +37,9 @@ Rules:
 - `provider` ghi backend storage thật đã lưu file; không dùng để cấp quyền.
 - File permission phải kiểm tra theo `purpose`, `uploaded_by_id` và entity đang tham chiếu file.
 - Không được chỉ dựa vào `file_id` để cấp signed URL.
-- Client không được upload trực tiếp `AI_DIAGRAM`; chỉ backend/worker tạo sau khi validate `diagram_spec_json`.
+- Generic client upload không nhận `AI_DIAGRAM`. Backend tạo SVG Summary sau
+  compile + validator hoặc nhận JPEG/PNG/WebP qua endpoint admin thay thế figure
+  chuyên biệt, rồi tự tạo file purpose `AI_DIAGRAM`.
 
 ### 4.2. `source_documents`
 
@@ -46,7 +48,8 @@ Tài liệu nguồn dài ở cấp lộ trình/course, ví dụ một file sách
 ```txt
 id uuid pk
 learning_path_id uuid fk learning_paths.id
-file_id uuid fk files.id
+file_id uuid fk files.id -- canonical PDF hiện hành
+active_ocr_artifact_id uuid? fk document_ocr_artifacts.id
 title string?
 status DocumentStatus default UPLOADED
 page_count int?
@@ -74,6 +77,25 @@ Rules:
 - Source document là nguồn paid OCR artifact/page-level content, visual refs và mapping sang lesson.
 - File gốc vẫn phải được giữ trong object storage để học sinh xem tài liệu chuẩn và để backend render/crop page image fallback khi visual Q&A cần.
 - Nếu source document thay đổi, OCR artifact, page text, lesson mappings, chunks, embedding và explanation liên quan có thể stale.
+- Đổi canonical scan sang searchable PDF chỉ được thực hiện qua một
+  `searchable_pdf_validations` đã pass/warning được admin chấp nhận; promote giữ
+  `active_ocr_artifact_id`, page mapping, chunks và lineage provider hiện có.
+
+### 4.2.1. `document_ocr_artifacts`
+
+Lưu identity/lineage có cấu trúc cho artifact OCR của source hoặc lesson document:
+provider, provider document id, source hash, model/options hash, page count, base
+key, manifest/pages/image-manifest/audit object keys, status và metadata. Mỗi
+source/lesson document có con trỏ `active_ocr_artifact_id`; unique theo owner +
+provider + options hash + source hash để forced retry không gọi lại paid OCR khi
+artifact hợp lệ đã tồn tại.
+
+### 4.2.2. `searchable_pdf_validations`
+
+Lưu original/candidate file, hai checksum, status, equivalence report, contact
+sheet, TTL và thời điểm promote. Report kiểm page count/geometry, searchable text
+coverage, render similarity và toàn bộ crop usable. Candidate hết TTL không được
+promote; `WARNING` chỉ promote khi admin gửi cờ chấp nhận rõ.
 
 ### 4.3. `source_document_pages`
 

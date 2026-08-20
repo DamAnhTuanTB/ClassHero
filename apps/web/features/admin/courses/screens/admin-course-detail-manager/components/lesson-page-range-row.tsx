@@ -29,6 +29,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import { PdfPagePreview } from "@/components/shared/pdf-page-preview";
+import { useAdminFileAccessUrl } from "@/features/admin/courses/hooks/use-admin-file-access-url";
 
 export function LessonPageRangeRow({
   documents,
@@ -80,8 +81,12 @@ export function LessonPageRangeRow({
     (d) => d.type === "SUPPLEMENT" || !d.type,
   );
   const newHomeworks = allNewSupplements.filter((d) => d.type === "HOMEWORK");
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [previewMode, setPreviewMode] = useState<"ocr" | "pdf">("pdf");
+  const pdfAccessUrlQuery = useAdminFileAccessUrl(
+    sourceDocument?.file.id ?? null,
+    isExpanded && previewMode === "pdf",
+  );
   const pdfPageStart = getPdfPageFromPrintedPage(draft.pageStart, pages);
   const pdfPageEnd = getPdfPageFromPrintedPage(draft.pageEnd, pages);
   const previewPage =
@@ -97,10 +102,13 @@ export function LessonPageRangeRow({
         ? [previewPage]
         : [];
   const fullText = previewPages
-    .map((page) => page.mathpixMarkdown ?? page.fullText ?? page.textPreview)
+    .map(
+      (page) =>
+        page.orderedContent ?? page.mathpixMarkdown ?? page.fullText ?? page.textPreview,
+    )
     .filter(Boolean)
     .join("\n\n");
-  const hasMultiplePages = previewPages.length > 1 || (fullText && fullText.length > 200);
+  const hasMultiplePages = previewPages.length > 1 || fullText.length > 200;
 
   const hasPageError = issues.some(
     (issue) =>
@@ -273,7 +281,10 @@ export function LessonPageRangeRow({
                 <div className="flex flex-col gap-4">
                   {previewPages.map((page, index) => {
                     const text =
-                      page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+                      page.orderedContent ??
+                      page.mathpixMarkdown ??
+                      page.fullText ??
+                      page.textPreview;
                     const printed = getPrintedPageView(page);
                     return (
                       <div
@@ -292,7 +303,10 @@ export function LessonPageRangeRow({
                         </div>
                         {previewMode === "ocr" ? (
                           text ? (
-                            <MathpixMarkdownRenderer content={text} />
+                            <MathpixMarkdownRenderer
+                              className="mmd-content--ocr-document"
+                              content={text}
+                            />
                           ) : (
                             <p className="italic text-[var(--theme-text-muted)]">
                               Không có nội dung
@@ -300,10 +314,10 @@ export function LessonPageRangeRow({
                           )
                         ) : (
                           <div className="flex justify-center border border-[var(--theme-border)] rounded-md overflow-x-auto overflow-y-hidden bg-[var(--theme-surface-soft)] text-center">
-                            {sourceDocument?.file?.publicUrl ? (
+                            {sourceDocument?.file?.id ? (
                               <div className="inline-block align-top">
                                 <PdfPagePreview
-                                  pdfUrl={sourceDocument.file.publicUrl}
+                                  pdfUrl={pdfAccessUrlQuery.data?.url ?? null}
                                   pageNumber={page.pageNumber}
                                   width={650}
                                 />

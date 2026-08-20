@@ -94,7 +94,6 @@ export interface AdminQuizQuestion {
   explanation: {
     id: string;
     contentJson: TiptapTextDocument;
-    diagramSpecJson: unknown | null;
     reviewStatus: string;
     staleAt: string | null;
   } | null;

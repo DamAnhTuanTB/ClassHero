@@ -1,8 +1,5 @@
 import { zodTextFormat } from "openai/helpers/zod";
-import {
-  makeParseableTextFormat,
-  type AutoParseableTextFormat,
-} from "openai/lib/parser";
+import { makeParseableTextFormat, type AutoParseableTextFormat } from "openai/lib/parser";
 import { toStrictJsonSchema } from "openai/lib/transform";
 import { z } from "zod";
 
@@ -18,7 +15,10 @@ type JsonSlot = {
   replace: (value: JsonObject) => void;
 };
 
-const compactFormatCache = new WeakMap<object, Map<string, AutoParseableTextFormat<unknown>>>();
+const compactFormatCache = new WeakMap<
+  object,
+  Map<string, AutoParseableTextFormat<unknown>>
+>();
 
 export function buildAiStructuredTextFormat<TOutput>(
   schema: AiOutputSchema<TOutput>,
@@ -61,9 +61,7 @@ function buildReferenceTextFormat<TOutput>(
           Array.isArray(jsonSchema.oneOf)
         ) {
           if (jsonSchema.anyOf !== undefined) {
-            throw new Error(
-              "Zod discriminated union generated both anyOf and oneOf.",
-            );
+            throw new Error("Zod discriminated union generated both anyOf and oneOf.");
           }
           jsonSchema.anyOf = jsonSchema.oneOf;
           delete jsonSchema.oneOf;
@@ -92,7 +90,7 @@ function compactAndRenameExactSchemaReferences(schema: JsonObject): JsonObject {
   const definitions = readDefinitions(compacted);
   const slots = collectExactReusableSchemaSlots(compacted);
 
-  hoistExactSlots(definitions, "__compact_geometry_statement", slots.geometry, 3);
+  hoistExactSlots(definitions, "__compact_geometry_statement", slots.geometry, [3, 6]);
   hoistExactSlots(definitions, "__compact_marker_group", slots.markerGroups, 2);
   hoistExactSlots(definitions, "__compact_measure", slots.measures, 2);
 
@@ -117,7 +115,12 @@ function collectExactReusableSchemaSlots(schema: JsonObject) {
     if (!isJsonObject(properties)) return;
 
     const geometryStatement = properties.geometryStatement;
-    if (isJsonObject(geometryStatement)) {
+    if (
+      isJsonObject(geometryStatement) &&
+      isJsonObject(geometryStatement.properties) &&
+      "hypotheses" in geometryStatement.properties &&
+      "conclusions" in geometryStatement.properties
+    ) {
       geometry.push({
         path: `${path}/properties/geometryStatement`,
         value: geometryStatement,
@@ -191,12 +194,13 @@ function hoistExactSlots(
   definitions: JsonObject,
   definitionName: string,
   slots: JsonSlot[],
-  expectedCount: number,
+  expectedCount: number | readonly number[],
 ) {
   if (slots.length === 0) return;
-  if (slots.length !== expectedCount) {
+  const expectedCounts = Array.isArray(expectedCount) ? expectedCount : [expectedCount];
+  if (!expectedCounts.includes(slots.length)) {
     throw new Error(
-      `Expected ${expectedCount} exact schema slots for ${definitionName}, found ${slots.length}.`,
+      `Expected ${expectedCounts.join(" or ")} exact schema slots for ${definitionName}, found ${slots.length}.`,
     );
   }
   const canonical = stableJson(slots[0]!.value);
@@ -225,6 +229,7 @@ function renameDefinitionsDeterministically(schema: JsonObject): JsonObject {
     renamedDefinitions[nameMap.get(oldName)!] = definition;
   }
   schema.$defs = renamedDefinitions;
+  const renamedNames = new Set(nameMap.values());
 
   walkJson(schema, "", (object) => {
     if (typeof object.$ref !== "string") return;
@@ -235,6 +240,10 @@ function renameDefinitionsDeterministically(schema: JsonObject): JsonObject {
     const oldName = decodeJsonPointerSegment(match[1]!);
     const newName = nameMap.get(oldName);
     if (!newName) {
+      // structuredClone preserves shared object identity. A reused $ref object
+      // can therefore be visited through two schema paths after its first path
+      // has already rewritten the name to the compact form.
+      if (renamedNames.has(oldName)) return;
       throw new Error(`Unresolved $defs reference in ref_v2: ${object.$ref}`);
     }
     object.$ref = `#/$defs/${encodeJsonPointerSegment(newName)}${match[2] ?? ""}`;
@@ -321,17 +330,24 @@ export function estimateAiStructuredInputTokens(input: {
   inputPrompt: string;
   structuredTextFormat: unknown;
   minimumPromptTokens?: number;
+  additionalInputTokens?: number;
 }) {
-  const promptTokens = Math.max(
-    input.minimumPromptTokens ?? 0,
+  const textPromptTokens = Math.max(
+    1,
     Math.ceil((input.systemPrompt.length + input.inputPrompt.length) / 4),
   );
+  const promptTokens =
+    Math.max(input.minimumPromptTokens ?? 0, textPromptTokens) +
+    (input.additionalInputTokens ?? 0);
   const schemaTokens = Math.ceil(
     // JSON Schema is punctuation- and identifier-heavy. Live Responses usage for
     // this contract is about 1.2 characters/token, unlike prose at about 4.
     JSON.stringify(input.structuredTextFormat).length / 1.2,
   );
   return {
+    textPromptTokens,
+    textInputTokens: textPromptTokens + schemaTokens,
+    additionalInputTokens: input.additionalInputTokens ?? 0,
     promptTokens,
     schemaTokens,
     estimatedTokens: promptTokens + schemaTokens,

@@ -40,6 +40,7 @@ export interface AiGenerationExecutionContext {
 export interface AiGenerationPreparedOutput<TOutput = unknown> {
   action: string;
   output: AiStructuredOutput<TOutput>;
+  recordedOutput?: unknown;
   contextMetadata?: unknown;
 }
 

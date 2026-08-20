@@ -4,8 +4,6 @@ import {
 } from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
 import type { GeneratedQuestion } from "#api/modules/ai/types/lesson-content-generation.types";
-import { mapLessonSummaryProviderExampleBlock } from "#api/modules/ai/utils/lesson-summary-mapper";
-import { recoverLessonSummaryProviderExample } from "#api/modules/ai/utils/lesson-summary-recovery";
 
 export function toTiptap(text: string) {
   const normalizedText = normalizeLessonSummaryAngleNotation(text);
@@ -82,10 +80,6 @@ export function mapGeneratedQuestion(question: GeneratedQuestion) {
     questionJson: toTiptap(mappedExample.block.problem),
     hintJson: "hint" in question && question.hint ? toTiptap(question.hint) : null,
     explanationJson: mappedExample.contentJson,
-    explanationDiagramSpecJson:
-      mappedExample.block.visual?.kind === "DIAGRAM_SPEC"
-        ? mappedExample.block.visual.spec
-        : null,
     exampleBlock: mappedExample.block,
     recoveryIssues: mappedExample.recoveryIssues,
   };
@@ -137,11 +131,19 @@ export function mapGeneratedQuestion(question: GeneratedQuestion) {
 
 function mapGeneratedExample(question: GeneratedQuestion) {
   const sourceChunkIds = "sourceChunkIds" in question ? question.sourceChunkIds : [];
-  const recovered = recoverLessonSummaryProviderExample({
-    example: question.example,
-    sourceChunkIds,
-  });
-  const mappedBlock = mapLessonSummaryProviderExampleBlock(recovered.example);
+  const mappedBlock = {
+    type: "example" as const,
+    problem: normalizeLessonSummaryAngleNotation(question.example.problem),
+    solution: question.example.solution
+      ? normalizeLessonSummaryAngleNotation(question.example.solution)
+      : null,
+    answer: normalizeLessonSummaryAngleNotation(question.example.answer),
+    geometryStatement:
+      "geometryStatement" in question.example
+        ? (question.example.geometryStatement ?? undefined)
+        : undefined,
+    origin: "AI_AUTHORED" as const,
+  };
   const block =
     sourceChunkIds.length > 0 ? { ...mappedBlock, sourceChunkIds } : mappedBlock;
   return {
@@ -149,12 +151,12 @@ function mapGeneratedExample(question: GeneratedQuestion) {
     contentJson: toTiptap(
       [block.solution, `Đáp án: ${block.answer}`].filter(Boolean).join("\n"),
     ),
-    recoveryIssues: recovered.reviewIssues.map((issue) => ({
-      classification: "REVIEWABLE" as const,
-      code: issue.code,
-      message: issue.message,
-      technicalDetails: issue.technicalDetails ?? undefined,
-    })),
+    recoveryIssues: [] as Array<{
+      classification: "REVIEWABLE";
+      code: string;
+      message: string;
+      technicalDetails?: string;
+    }>,
   };
 }
 

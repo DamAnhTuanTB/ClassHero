@@ -228,6 +228,20 @@ describe("M9.12 atomic provider budget reservation", () => {
             reasoningTokens: 12_500,
             totalTokens: 16_100,
           },
+          providerUsageRaw: {
+            input_tokens: 100,
+            input_tokens_details: { cached_tokens: 40 },
+            output_tokens: 16_000,
+            output_tokens_details: { reasoning_tokens: 12_500 },
+            total_tokens: 16_100,
+          },
+          inputFileOperations: [
+            {
+              providerFileId: "file-incomplete",
+              uploadLatencyMs: 25,
+              cleanupStatus: "deleted",
+            },
+          ],
         },
       ),
       { rates: requestRates() },
@@ -247,11 +261,27 @@ describe("M9.12 atomic provider budget reservation", () => {
       latencyMs: 2_000,
       costVnd: 100,
       rawUsageJson: {
-        responseStatus: "incomplete",
-        incompleteReason: "max_output_tokens",
-        hasRefusal: false,
-        maxOutputTokens: 16_000,
-        reasoningTokens: 12_500,
+        providerUsage: {
+          input_tokens: 100,
+          input_tokens_details: { cached_tokens: 40 },
+          output_tokens: 16_000,
+          output_tokens_details: { reasoning_tokens: 12_500 },
+          total_tokens: 16_100,
+        },
+        fileOperations: [
+          {
+            providerFileId: "file-incomplete",
+            uploadLatencyMs: 25,
+            cleanupStatus: "deleted",
+          },
+        ],
+        failure: {
+          responseStatus: "incomplete",
+          incompleteReason: "max_output_tokens",
+          hasRefusal: false,
+          maxOutputTokens: 16_000,
+          reasoningTokens: 12_500,
+        },
       },
     });
     expect(

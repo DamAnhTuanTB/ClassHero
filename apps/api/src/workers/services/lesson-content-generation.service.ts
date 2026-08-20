@@ -26,9 +26,9 @@ import type {
 } from "#api/modules/ai/types/ai-generation.types";
 import {
   flashcardGenerationJobInputSchema,
+  getGeneratedQuizOutputSchema,
+  getGeneratedTestOutputSchema,
   generatedFlashcardOutputSchema,
-  generatedQuizOutputSchema,
-  generatedTestOutputSchema,
   LESSON_CONTENT_MAX_OUTPUT_TOKENS,
   LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
@@ -45,9 +45,9 @@ import {
 } from "#api/modules/ai/utils/lesson-content-generation-mapper";
 import {
   buildFlashcardPrompt,
+  buildLessonContentSystemPrompt,
   buildQuizStructuredInput,
   buildTestPrompt,
-  LESSON_CONTENT_SYSTEM_PROMPT,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 
 @Injectable()
@@ -118,13 +118,14 @@ export class LessonContentGenerationService {
       })),
       configuration: input,
     });
+    const providerSchema = getGeneratedQuizOutputSchema(source.subject.key);
     const output = this.providerCall
       ? await this.providerCall.generateStructured(
           providerContext(context),
           request,
-          generatedQuizOutputSchema,
+          providerSchema,
         )
-      : await this.aiService.generateStructured(request, generatedQuizOutputSchema);
+      : await this.aiService.generateStructured(request, providerSchema);
     const validation = validateQuestionOutput({
       questions: output.data.questions,
       requestedCount: input.questionCount,
@@ -162,7 +163,11 @@ export class LessonContentGenerationService {
     );
     const request = structuredInput(
       source,
-      buildFlashcardPrompt({ lessonTitle: source.lessonTitle, ...input }),
+      buildFlashcardPrompt({
+        lessonTitle: source.lessonTitle,
+        ...input,
+        subject: source.subject,
+      }),
       "generated_flashcards",
     );
     const output = this.providerCall
@@ -205,16 +210,21 @@ export class LessonContentGenerationService {
     );
     const request = structuredInput(
       source,
-      buildTestPrompt({ lessonTitle: source.lessonTitle, ...input }),
+      buildTestPrompt({
+        lessonTitle: source.lessonTitle,
+        ...input,
+        subject: source.subject,
+      }),
       "generated_test",
     );
+    const providerSchema = getGeneratedTestOutputSchema(source.subject.key);
     const output = this.providerCall
       ? await this.providerCall.generateStructured(
           providerContext(context),
           request,
-          generatedTestOutputSchema,
+          providerSchema,
         )
-      : await this.aiService.generateStructured(request, generatedTestOutputSchema);
+      : await this.aiService.generateStructured(request, providerSchema);
     assertQuestionOutput(
       output.data.questions,
       input.questionCount,
@@ -252,7 +262,7 @@ export class LessonContentGenerationService {
   ) {
     const input = parseJobInput(quizGenerationJobInputSchema, context.inputMeta, "quiz");
     const output = parseAiStructuredOutput(
-      generatedQuizOutputSchema,
+      getGeneratedQuizOutputSchema(input.subjectKey),
       prepared.output.data,
     );
     return this.prisma.$transaction(async (tx) => {
@@ -412,7 +422,7 @@ export class LessonContentGenerationService {
   ) {
     const input = parseJobInput(testGenerationJobInputSchema, context.inputMeta, "test");
     const output = parseAiStructuredOutput(
-      generatedTestOutputSchema,
+      getGeneratedTestOutputSchema(input.subjectKey),
       prepared.output.data,
     );
     return this.prisma.$transaction(async (tx) => {
@@ -477,7 +487,7 @@ function structuredInput(
   outputName: string,
 ) {
   return {
-    systemPrompt: LESSON_CONTENT_SYSTEM_PROMPT,
+    systemPrompt: buildLessonContentSystemPrompt(source.subject),
     userPrompt,
     contextChunks: source.chunks.map((chunk) => ({
       id: chunk.chunkId,
@@ -493,6 +503,7 @@ function structuredInput(
     maxTokens: LESSON_CONTENT_MAX_OUTPUT_TOKENS,
     metadata: {
       lessonId: source.lessonId,
+      subject: source.subject,
       documentIds: source.documentIds,
       sourceHash: source.sourceHash,
     },
@@ -606,7 +617,6 @@ async function createGeneratedQuestion(
       targetId: id,
       lessonId: context.lessonId!,
       contentJson: json(mapped.explanationJson),
-      diagramSpecJson: nullableJson(mapped.explanationDiagramSpecJson),
       source: ContentSource.AI,
       reviewStatus: ReviewStatus.NEEDS_REVIEW,
       aiGenerationId: context.aiGenerationId,

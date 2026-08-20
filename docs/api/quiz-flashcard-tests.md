@@ -273,10 +273,8 @@ Role: `ADMIN`.
 Behavior:
 
 - Cập nhật câu hỏi với cùng contract nội dung như create; cho phép đổi loại câu hỏi và xóa gợi ý/lời giải bằng `null`.
-- Riêng câu AI có thể gửi `exampleBlock` theo đúng schema EXAMPLE M9.2 để lưu
-  chỉnh sửa hình từ editor dùng chung. Server đồng bộ `exampleBlock.visual.spec`
-  sang `ai_explanations.diagram_spec_json` và tiếp tục loại mọi source trace cấp
-  câu khỏi metadata.
+- Quiz/Test hiện text-only. Endpoint không nhận `exampleBlock`, TeX/TikZ, SVG
+  hoặc metadata figure; source trace cấp câu vẫn bị loại theo contract M9.3.
 - Khi gửi `explanationJson`, service tạo mới hoặc cập nhật `ai_explanations` nguồn `ADMIN`; nội dung rỗng/`null` gỡ lời giải khỏi câu hỏi.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation liên quan stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - Ghi audit log.

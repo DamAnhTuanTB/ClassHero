@@ -64,11 +64,13 @@ export class GeminiProvider implements AiProvider {
       system_instruction: { parts: [{ text: input.systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: buildAiUserPrompt(input) }] }],
       generationConfig: {
-        ...(input.temperature === undefined || !this.supportsTemperature(model) ? {} : { temperature: input.temperature }),
-        ...(input.reasoningEffort ? { thinkingConfig: { thinkingLevel: input.reasoningEffort.toUpperCase() } } : {}),
-        ...(input.maxTokens === undefined
+        ...(input.temperature === undefined || !this.supportsTemperature(model)
           ? {}
-          : { maxOutputTokens: input.maxTokens }),
+          : { temperature: input.temperature }),
+        ...(input.reasoningEffort
+          ? { thinkingConfig: { thinkingLevel: input.reasoningEffort.toUpperCase() } }
+          : {}),
+        ...(input.maxTokens === undefined ? {} : { maxOutputTokens: input.maxTokens }),
       },
     });
     const text = readGeminiText(response);
@@ -78,6 +80,7 @@ export class GeminiProvider implements AiProvider {
       model: response.modelVersion ?? model,
       providerRequestId: response.responseId,
       usage: toGeminiUsage(response),
+      providerUsageRaw: response.usageMetadata,
       latencyMs: Date.now() - startedAt,
     };
   }
@@ -94,11 +97,13 @@ export class GeminiProvider implements AiProvider {
       generationConfig: {
         responseMimeType: "application/json",
         responseJsonSchema: z.toJSONSchema(schema),
-        ...(input.temperature === undefined || !this.supportsTemperature(model) ? {} : { temperature: input.temperature }),
-        ...(input.reasoningEffort ? { thinkingConfig: { thinkingLevel: input.reasoningEffort.toUpperCase() } } : {}),
-        ...(input.maxTokens === undefined
+        ...(input.temperature === undefined || !this.supportsTemperature(model)
           ? {}
-          : { maxOutputTokens: input.maxTokens }),
+          : { temperature: input.temperature }),
+        ...(input.reasoningEffort
+          ? { thinkingConfig: { thinkingLevel: input.reasoningEffort.toUpperCase() } }
+          : {}),
+        ...(input.maxTokens === undefined ? {} : { maxOutputTokens: input.maxTokens }),
       },
     });
     const raw = readGeminiText(response);
@@ -114,13 +119,17 @@ export class GeminiProvider implements AiProvider {
       model: response.modelVersion ?? model,
       providerRequestId: response.responseId,
       usage: toGeminiUsage(response),
+      providerUsageRaw: response.usageMetadata,
       latencyMs: Date.now() - startedAt,
     };
   }
 
   private async generate(model: string, body: unknown): Promise<GeminiResponse> {
     const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), this.config.requestTimeoutMs);
+    const timeout = setTimeout(
+      () => abortController.abort(),
+      this.config.requestTimeoutMs,
+    );
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(this.config.apiKey)}`,

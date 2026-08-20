@@ -336,7 +336,9 @@ Worker jobs:
 - AI tạo flashcard.
 - AI tạo bài kiểm tra.
 - AI tạo lời giải.
-- Render ảnh minh họa từ `diagram_spec_json`.
+- Compile LaTeX figure snippet của Summary trong compiler envelope chuẩn thành
+  SVG, validate/sanitize và lưu asset thành công; figure lỗi giữ placeholder để
+  admin xử lý.
 - Gửi thông báo.
 - Gửi email/Zalo.
 - Xử lý hậu kỳ payment.
@@ -346,6 +348,7 @@ ASSUMPTION: Concurrency ban đầu:
 - PDF processing: 1-2.
 - Embedding: 1-2.
 - AI generation: 1-3.
+- TeX figure rendering: 1 trên VPS ban đầu.
 - Notification/email/Zalo: 3-5.
 
 Cần cấu hình bằng env, không hard-code cố định.
@@ -410,6 +413,25 @@ Student asks question in lesson
 
 AI không được lấy context từ lesson khác.
 Chapter chỉ là metadata tổng quan để nhóm lesson; document processing và RAG không chạy ở cấp chapter trong MVP.
+
+Pipeline hình của Summary:
+
+```txt
+OpenAI structured output Summary + figure plan; lượt chuyên vẽ trả core fragment
+  -> stem_figures + DIAGRAM_RENDERING
+  -> backend ghép compiler envelope/toolbox theo subject profile
+  -> TeX Live sandbox riêng (LuaLaTeX + dvisvgm)
+  -> source error: bounded OpenAI repair
+  -> SVG validator/sanitizer local
+  -> Cloudflare R2 + SUCCEEDED
+  -> admin xóa / upload thay thế / sinh lại / sửa source + draft SVG preview
+```
+
+Renderer không chạy trong API/worker container chính, không có network và chỉ
+tạo figure light. Phạm vi hình bắt buộc là lớp 3–12 nhưng giai đoạn đầu chỉ nối
+vào Summary; Quiz/Test/Flashcard/Explanation/Chat giữ text-only. Không AI Vision.
+AI/admin chỉ cung cấp fragment có một root drawing environment; renderer là nơi
+duy nhất thêm document wrapper, package và library theo ADR-0015.
 
 ---
 

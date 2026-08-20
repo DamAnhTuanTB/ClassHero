@@ -2,6 +2,7 @@ import type { AiProviderName } from "@prisma/client";
 import type { ZodError } from "zod";
 
 import type {
+  AiProviderOutputMetadata,
   AiOutputSchema,
   AiTokenUsage,
 } from "#api/modules/ai/types/ai-text.types";
@@ -17,6 +18,8 @@ export type AiProviderOutputFailureDetails = {
   model: string;
   providerRequestId?: string;
   usage?: AiTokenUsage;
+  providerUsageRaw?: unknown;
+  inputFileOperations?: AiProviderOutputMetadata["inputFileOperations"];
   latencyMs?: number;
   responseStatus: string | null;
   incompleteReason: string | null;
@@ -27,10 +30,7 @@ export type AiProviderOutputFailureDetails = {
 export class AiOutputValidationError extends Error {
   readonly code: string;
 
-  constructor(
-    message: string,
-    options?: { cause?: unknown; code?: string },
-  ) {
+  constructor(message: string, options?: { cause?: unknown; code?: string }) {
     super(message, options);
     this.name = "AiOutputValidationError";
     this.code = options?.code ?? "AI_OUTPUT_INVALID";
@@ -48,9 +48,7 @@ export class AiProviderOutputError extends AiOutputValidationError {
   }
 }
 
-export function isAiProviderOutputError(
-  error: unknown,
-): error is AiProviderOutputError {
+export function isAiProviderOutputError(error: unknown): error is AiProviderOutputError {
   return error instanceof AiProviderOutputError;
 }
 

@@ -411,9 +411,7 @@ export class PersonalLearningPathClonerService {
         id: getMappedId(lessonIdMap, lesson.id),
         sourceLessonId: lesson.id,
         learningPathId: personalLearningPathId,
-        chapterId: lesson.chapterId
-          ? getMappedId(chapterIdMap, lesson.chapterId)
-          : null,
+        chapterId: lesson.chapterId ? getMappedId(chapterIdMap, lesson.chapterId) : null,
         orderIndex: lesson.orderIndex,
         title: lesson.title,
         shortDescription: lesson.shortDescription,
@@ -809,7 +807,6 @@ function buildExplanationClone({
   source: {
     targetType: Prisma.AiExplanationCreateManyInput["targetType"];
     contentJson: Prisma.JsonValue;
-    diagramSpecJson: Prisma.JsonValue | null;
     imageFileId: string | null;
     source: Prisma.AiExplanationCreateManyInput["source"];
     reviewStatus: Prisma.AiExplanationCreateManyInput["reviewStatus"];
@@ -830,7 +827,6 @@ function buildExplanationClone({
       targetId,
       lessonId,
       contentJson: requiredJson(source.contentJson),
-      diagramSpecJson: nullableJson(source.diagramSpecJson),
       imageFileId: source.imageFileId,
       source: source.source,
       reviewStatus: source.reviewStatus,

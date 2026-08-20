@@ -71,19 +71,20 @@ M14 testing/hardening/deploy
 - `M7.1` lesson page skeleton cần `M6.5` để đọc lesson content.
 - `M8.4` payment UI cần `M8.2` và `M8.3`; notification thật có thể chờ `M10.1`.
 - Thứ tự triển khai cụm AI là
-  `M9.1 -> M9.2 -> M9.3 -> M9.8 -> M9.16 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
+  `M9.1 -> M9.2 (Summary + TeX/TikZ) -> M9.8 -> M9.17 -> M9.4 -> M9.5 -> M9.6 -> M9.7`.
 - Provider operations là lát dọc độc lập:
   `M9.9 -> M4.6 -> M9.10 -> M9.11 -> M9.12`; dùng nền `M9.1`, `M4.4` và admin shell. `M9.12` là bước hardening cuối, phải hoàn tất trước khi coi hard-stop là giới hạn tuyệt đối trong production.
   `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI và đã Done
   ngày 2026-08-03; mã task không đổi để giữ ổn định lịch sử tham chiếu.
-- `M9.16` phụ thuộc `M9.2`, `M9.3`, `M9.8` và là prerequisite mới của `M9.4`:
-  harden prompt contract/preview fingerprint, đồng bộ EXAMPLE và mở learner
-  profile/GT–KL/diagram grade tới lớp 12 trước khi student flow dùng lại lõi AI.
+- `M9.2` hiện bao gồm searchable-PDF packet, exact request draft, multimodal
+  reference và TeX/TikZ Summary lớp 3–12. Nó phụ thuộc `M4.1` storage, `M4.3`
+  BullMQ, `M4.4` OCR artifact/page mapping, `M9.1` provider foundation và admin
+  panel `M9.8`; Summary mới không còn phụ thuộc retrieval chunks `M5.3`.
+- `M9.17` phụ thuộc `M9.2`, panel `M9.8` và image manifest `M4.4`; chỉ thêm
+  execution mode dùng crop SGK trực tiếp, không thay output Phase 1 hoặc chặn
+  các student flow `M9.4-M9.7`.
 - `M9.4` và `M9.5` là `UI + API`: mỗi task phải kết thúc bằng flow học sinh bấm
   kiểm thử được, không tách UI sang `M9.8` hoặc một task chưa xác định.
-- `M9.13 -> M9.14 -> M9.15` là chuỗi corrective độc lập cho admin Summary editor,
-  phụ thuộc `M9.2` + `M9.8`, dùng schema/PUT/review guard hiện có và không phải
-  prerequisite của student flow `M9.4-M9.7`.
 - `M9.6` AI chat chỉ nên hoàn thiện sau `M4.4`, `M5.2`, `M5.3`, `M9.1` và đi
   sau `M9.5` để nhận context từ `Chat thêm với AI`; `M9.7` đi sau `M9.6`.
 - `M13.5` admin dashboard có thể dùng placeholder cho metric chưa có API, nhưng phải ghi rõ.

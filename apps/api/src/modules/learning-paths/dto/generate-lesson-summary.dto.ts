@@ -9,6 +9,7 @@ import {
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -17,12 +18,33 @@ import {
   IsUUID,
   Max,
   MaxLength,
+  Matches,
   Min,
 } from "class-validator";
 
 import { LESSON_SUMMARY_MIN_OUTPUT_TOKENS } from "#api/modules/ai/types/lesson-summary.types";
 
 export class GenerateLessonSummaryDto {
+  @ApiPropertyOptional({ description: "Immutable request draft returned by preview" })
+  @IsOptional()
+  @IsUUID()
+  requestDraftId?: string;
+
+  @ApiPropertyOptional({ description: "SHA-256 request hash returned by preview" })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  requestHash?: string;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      "Sau Phase 1, dùng crop ảnh SGK đã phân giải và không xếp hàng Phase 2 tạo hình",
+  })
+  @IsOptional()
+  @IsBoolean()
+  useTextbookSourceImages?: boolean;
+
   @ApiProperty({
     type: [String],
     description: "Danh sách lesson_documents.id thuộc đúng buổi học",

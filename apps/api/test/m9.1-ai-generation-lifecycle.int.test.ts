@@ -21,9 +21,7 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
   let aiGenerationId: string;
 
   beforeAll(async () => {
-    prisma = new PrismaService(
-      new ConfigService() as ConfigService<EnvConfig, true>,
-    );
+    prisma = new PrismaService(new ConfigService() as ConfigService<EnvConfig, true>);
     await prisma.$connect();
     const backgroundJob = await prisma.backgroundJob.create({
       data: {
@@ -90,8 +88,9 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
       context,
       {
         action: "M9_1_LIFECYCLE_TEST",
+        recordedOutput: { status: "provider-raw" },
         output: {
-          data: { status: "ok" },
+          data: { status: "mapped" },
           provider: AiProviderName.OPENAI,
           model: "gpt-4.1-mini",
           providerRequestId: "test-request",
@@ -130,7 +129,7 @@ describe("M9.1 AI generation PostgreSQL lifecycle", () => {
       model: "gpt-4.1-mini",
       totalTokens: 14,
       outputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-      outputJson: { status: "ok" },
+      outputJson: { status: "provider-raw" },
     });
   });
 

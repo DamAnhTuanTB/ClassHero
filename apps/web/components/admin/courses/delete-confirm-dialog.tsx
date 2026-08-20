@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, Loader2, RotateCcw, Trash2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 
 export function DeleteConfirmDialog({
   confirmLabel = "Xóa",
@@ -26,12 +28,17 @@ export function DeleteConfirmDialog({
 }) {
   const shouldReduceMotion = useReducedMotion();
   const isResetIntent = intent === "RESET";
+  const [isMounted, setIsMounted] = useState(false);
 
-  return (
+  useEffect(() => setIsMounted(true), []);
+
+  if (!isMounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen ? (
         <motion.div
-          className="theme-dialog-overlay fixed inset-0 z-[60] flex items-center justify-center px-4 py-6 backdrop-blur-sm"
+          className="theme-dialog-overlay fixed inset-0 z-[90] flex items-center justify-center px-4 py-6 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -123,6 +130,7 @@ export function DeleteConfirmDialog({
           </motion.section>
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

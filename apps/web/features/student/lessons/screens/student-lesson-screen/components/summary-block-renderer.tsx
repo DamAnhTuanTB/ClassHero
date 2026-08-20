@@ -18,10 +18,8 @@ import {
   MessageSquareQuote,
   AlertOctagon,
   Sigma,
-  ListOrdered,
   FileBadge,
   PlayCircle,
-  Flag,
   GripVertical,
   Copy,
   Trash2,
@@ -32,12 +30,19 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
-import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
-import { LessonSummaryExampleCard } from "@/components/common/content/lesson-summary-example-content";
-import type {
-  LessonSummaryDiagramEditableTarget,
-  LessonSummaryDiagramEditor,
-} from "@/components/common/content/lesson-summary-diagram-editing";
+import {
+  StemFigure,
+  type StemFigureVisual,
+} from "@/components/common/content/stem-figure";
+import {
+  LessonSummaryExampleCard,
+  type LessonSummaryFigureRenderer,
+} from "@/components/common/content/lesson-summary-example-content";
+import {
+  getLessonSummarySectionAnchorId,
+  LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID,
+  LessonSummaryTableOfContents,
+} from "@/components/common/content/lesson-summary-table-of-contents";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
@@ -56,6 +61,7 @@ const FIX_ONLY_REVIEW_CODES = new Set([
   "BLOCK_CANNOT_PROCESS",
   "BLOCK_SCHEMA_INVALID",
   "DIAGRAM_CANNOT_RENDER",
+  "MISSING_REQUIRED_FIGURE",
   "MISSING_REQUIRED_FIELD",
   "MISSING_SUMMARY_TITLE",
   "MISSING_THEORY_SECTION",
@@ -93,30 +99,24 @@ interface SummaryBlockRendererProps {
     }[];
   };
   displayTitle?: string;
-  diagramEditingDisabled?: boolean;
   hideTitle?: boolean;
   onChange?: (newData: any) => void;
-  onRequestDiagramDelete?: (request: {
-    blockIndex: number;
-    sectionIndex: number;
-    target: LessonSummaryDiagramEditableTarget;
-  }) => void;
-  onRequestDiagramAddEqualLength?: (request: {
-    blockIndex: number;
-    sectionIndex: number;
-    segmentIds: string[];
-  }) => boolean;
-  onRequestDiagramReset?: (request: { blockIndex: number; sectionIndex: number }) => void;
-  onRequestDiagramTextEdit?: (
-    request: {
-      blockIndex: number;
-      sectionIndex: number;
-      target: Exclude<LessonSummaryDiagramEditableTarget, { kind: "MARKER" }>;
-    },
-    nextText: string,
-  ) => boolean;
   viewMode?: "UI_ONLY" | "SPLIT";
   showEditorialMetadata?: boolean;
+  stemFigureVisuals?: ReadonlyMap<string, StemFigureVisual>;
+  renderStemFigure?: LessonSummaryFigureRenderer;
+  renderBlockImageActions?: (input: {
+    blockPath: string;
+    block: BlockData;
+  }) => React.ReactNode;
+  phaseOneBlockJsonByPath?: Readonly<Record<string, unknown>> | null;
+  onPhaseOneBlockJsonChange?: (blockPath: string, value: unknown) => void;
+  onPhaseOneLayoutOperation?: (
+    operation:
+      | { type: "MERGE_SECTION"; sectionIndex: number }
+      | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number },
+  ) => void;
+  showTableOfContents?: boolean;
 }
 
 const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -125,24 +125,23 @@ const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> 
   theorem: { label: "Định lí", color: "green", icon: GraduationCap },
   note: { label: "Chú ý", color: "rose", icon: AlertCircle },
 
-  procedure: { label: "Phương pháp giải", color: "cyan", icon: ListOrdered },
-
   example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
-  section_recap: { label: "Tổng kết", color: "orange", icon: Flag },
 };
 
 export function SummaryBlockRenderer({
   data,
   displayTitle,
-  diagramEditingDisabled = false,
   hideTitle,
   onChange,
-  onRequestDiagramDelete,
-  onRequestDiagramAddEqualLength,
-  onRequestDiagramReset,
-  onRequestDiagramTextEdit,
   viewMode = "SPLIT",
   showEditorialMetadata = false,
+  renderBlockImageActions,
+  phaseOneBlockJsonByPath,
+  onPhaseOneBlockJsonChange,
+  onPhaseOneLayoutOperation,
+  showTableOfContents = false,
+  stemFigureVisuals,
+  renderStemFigure,
 }: SummaryBlockRendererProps) {
   const isReadOnly = !onChange;
   const [draggedItem, setDraggedItem] = React.useState<{
@@ -236,8 +235,6 @@ export function SummaryBlockRenderer({
   const getBlockDefaultData = (type: string) => {
     const base = { type, title: "Tiêu đề khối mới" };
     switch (type) {
-      case "section_recap":
-        return { type, title: "Tổng kết mới", points: ["Điểm tổng kết mới"] };
       case "example":
         return {
           ...base,
@@ -245,12 +242,6 @@ export function SummaryBlockRenderer({
           solution: "Ta có: $x=2$",
           answer: "Đáp án cuối cùng...",
           geometryStatement: null,
-        };
-
-      case "procedure":
-        return {
-          ...base,
-          steps: [{ content: "Nội dung bước 1..." }],
         };
 
       default:
@@ -317,33 +308,43 @@ export function SummaryBlockRenderer({
       {/* Title */}
       {!hideTitle && (
         <div className="relative group/title">
-          {!isReadOnly && viewMode === "SPLIT" && (
-            <div className="flex justify-end mb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const newData = { ...data };
-                  if (!newData.sections) newData.sections = [];
-                  newData.sections.push({
-                    order: newData.sections.length + 1,
-                    displayHeading: "Đề mục mới",
-                    blocks: [],
-                  });
-                  onChange(newData);
+          {(showTableOfContents || (!isReadOnly && viewMode === "SPLIT")) && (
+            <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
+              {showTableOfContents ? (
+                <LessonSummaryTableOfContents
+                  hasObjectives={Boolean(data.objectives?.length)}
+                  sections={data.sections ?? []}
+                />
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              {!isReadOnly && viewMode === "SPLIT" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newData = { ...data };
+                    if (!newData.sections) newData.sections = [];
+                    newData.sections.push({
+                      order: newData.sections.length + 1,
+                      displayHeading: "Đề mục mới",
+                      blocks: [],
+                    });
+                    onChange(newData);
 
-                  const newSectionIdx = newData.sections.length - 1;
-                  setTimeout(() => {
-                    const el = document.getElementById(`section-${newSectionIdx}`);
-                    if (el) {
-                      el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }, 100);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md font-medium text-sm transition-colors border border-blue-200 dark:border-blue-800 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Thêm đề mục lớn
-              </button>
+                    const newSectionIdx = newData.sections.length - 1;
+                    setTimeout(() => {
+                      const el = document.getElementById(`section-${newSectionIdx}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }, 100);
+                  }}
+                  className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md font-medium text-sm transition-colors border border-blue-200 dark:border-blue-800 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Thêm đề mục lớn
+                </button>
+              ) : null}
             </div>
           )}
           <div
@@ -353,12 +354,12 @@ export function SummaryBlockRenderer({
                 : "flex justify-between items-start gap-4"
             }
           >
-            <div className="text-2xl sm:text-3xl font-black mb-6 tracking-tight text-slate-800 dark:text-slate-100 pr-10 flex-1">
+            <div className="mb-6 min-w-0 flex-1 pr-0 text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100 sm:pr-10 sm:text-3xl">
               {displayTitle || data.title}
             </div>
 
             {!isReadOnly && viewMode === "UI_ONLY" && (
-              <div className="flex justify-end opacity-0 group-hover/title:opacity-100 transition-opacity">
+              <div className="absolute right-0 top-0 hidden justify-end opacity-0 transition-opacity group-hover/title:opacity-100 sm:flex">
                 <button
                   type="button"
                   onClick={() => {
@@ -416,7 +417,8 @@ export function SummaryBlockRenderer({
       {/* Objectives */}
       {data.objectives && data.objectives.length > 0 && (
         <div
-          className={`relative group/obj ${isObjectivesEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}`}
+          id={LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID}
+          className={`relative scroll-mt-24 group/obj ${isObjectivesEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}`}
         >
           <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 relative">
             <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
@@ -622,8 +624,8 @@ export function SummaryBlockRenderer({
         return (
           <div
             key={idx}
-            id={`section-${idx}`}
-            className={`space-y-4 transition-all rounded-2xl ${
+            id={getLessonSummarySectionAnchorId(idx)}
+            className={`scroll-mt-24 space-y-4 transition-all rounded-2xl ${
               draggedSection === idx
                 ? "opacity-50 ring-2 ring-blue-500 ring-offset-4 ring-offset-white dark:ring-offset-slate-900"
                 : ""
@@ -758,6 +760,10 @@ export function SummaryBlockRenderer({
                                 newData.sections.forEach((s, i) => {
                                   s.order = i + 1;
                                 });
+                                onPhaseOneLayoutOperation?.({
+                                  type: "MERGE_SECTION",
+                                  sectionIndex: idx,
+                                });
                                 onChange?.(newData);
                               }
                             }}
@@ -801,6 +807,12 @@ export function SummaryBlockRenderer({
 
             <div className="space-y-4">
               {section.blocks?.map((block, bIdx) => {
+                const blockPath = `sections.${idx}.blocks.${bIdx}`;
+                const phaseOneBlockJson = phaseOneBlockJsonByPath?.[blockPath];
+                const hasPhaseOneBlockJson =
+                  typeof phaseOneBlockJson === "object" &&
+                  phaseOneBlockJson !== null &&
+                  !Array.isArray(phaseOneBlockJson);
                 runningCounts[block.type] = (runningCounts[block.type] || 0) + 1;
 
                 // Only assign a number for "example" blocks, if there is more than 1 in the lesson
@@ -810,7 +822,15 @@ export function SummaryBlockRenderer({
                     : undefined;
 
                 // Override the AI's displayNumber (if any) with the mathematically correct one
-                const blockToRender = { ...block, displayNumber: computedDisplayNumber };
+                const blockToRender = {
+                  ...block,
+                  displayNumber: computedDisplayNumber,
+                  figures: Array.isArray(block.figures)
+                    ? block.figures.map((visual: unknown) =>
+                        resolveStemFigureVisual(visual, stemFigureVisuals),
+                      )
+                    : [],
+                };
                 const blockColorClass = getBlockDragColor(blockToRender.type);
 
                 const isBlockEditing =
@@ -975,51 +995,7 @@ export function SummaryBlockRenderer({
                     <div>
                       <BlockItem
                         block={blockToRender}
-                        diagramEditor={
-                          !isReadOnly &&
-                          (onRequestDiagramAddEqualLength ||
-                            onRequestDiagramDelete ||
-                            onRequestDiagramReset ||
-                            onRequestDiagramTextEdit)
-                            ? {
-                                disabled: diagramEditingDisabled,
-                                onRequestAddEqualLength: onRequestDiagramAddEqualLength
-                                  ? (segmentIds) =>
-                                      onRequestDiagramAddEqualLength({
-                                        blockIndex: bIdx,
-                                        sectionIndex: idx,
-                                        segmentIds,
-                                      })
-                                  : undefined,
-                                onRequestDelete: onRequestDiagramDelete
-                                  ? (target) =>
-                                      onRequestDiagramDelete({
-                                        blockIndex: bIdx,
-                                        sectionIndex: idx,
-                                        target,
-                                      })
-                                  : undefined,
-                                onRequestReset: onRequestDiagramReset
-                                  ? () =>
-                                      onRequestDiagramReset({
-                                        blockIndex: bIdx,
-                                        sectionIndex: idx,
-                                      })
-                                  : undefined,
-                                onRequestTextEdit: onRequestDiagramTextEdit
-                                  ? (target, nextText) =>
-                                      onRequestDiagramTextEdit(
-                                        {
-                                          blockIndex: bIdx,
-                                          sectionIndex: idx,
-                                          target,
-                                        },
-                                        nextText,
-                                      )
-                                  : undefined,
-                              }
-                            : undefined
-                        }
+                        renderStemFigure={renderStemFigure}
                         showEditorialMetadata={showEditorialMetadata}
                       />
                       {showEditorialMetadata ? (
@@ -1034,7 +1010,11 @@ export function SummaryBlockRenderer({
                       <div className="flex flex-col items-end gap-2 w-full h-full">
                         {/* Toolbar for UI_ONLY mode (Floating on the UI Block) */}
                         {!isBlockEditing && (
-                          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/block:opacity-100 transition-opacity z-10 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5">
+                          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 opacity-100 shadow-sm transition-opacity focus-within:opacity-100 dark:border-slate-700 dark:bg-slate-800/90 sm:opacity-0 sm:group-hover/block:opacity-100">
+                            {renderBlockImageActions?.({
+                              blockPath,
+                              block: blockToRender,
+                            })}
                             {viewMode === "UI_ONLY" && (
                               <button
                                 type="button"
@@ -1093,6 +1073,11 @@ export function SummaryBlockRenderer({
                                   const blocks = [...newData.sections[idx].blocks];
                                   blocks.splice(bIdx, 1);
                                   newData.sections[idx].blocks = blocks;
+                                  onPhaseOneLayoutOperation?.({
+                                    type: "DELETE_BLOCK",
+                                    sectionIndex: idx,
+                                    blockIndex: bIdx,
+                                  });
                                   onChange(newData);
                                 }
                               }}
@@ -1179,6 +1164,11 @@ export function SummaryBlockRenderer({
                                     const blocks = [...newData.sections[idx].blocks];
                                     blocks.splice(bIdx, 1);
                                     newData.sections[idx].blocks = blocks;
+                                    onPhaseOneLayoutOperation?.({
+                                      type: "DELETE_BLOCK",
+                                      sectionIndex: idx,
+                                      blockIndex: bIdx,
+                                    });
                                     onChange(newData);
                                   }
                                 }}
@@ -1201,38 +1191,42 @@ export function SummaryBlockRenderer({
                                 <GripVertical className="w-3.5 h-3.5" />
                               </div>
                             </div>
-                            <ReactJson
-                              src={block}
-                              onEdit={(e) => {
-                                const newData = { ...data };
-                                const targetSection = newData.sections?.[idx];
-                                if (targetSection && targetSection.blocks)
-                                  targetSection.blocks[bIdx] = e.updated_src;
-                                onChange?.(newData);
-                              }}
-                              onAdd={(e) => {
-                                const newData = { ...data };
-                                const targetSection = newData.sections?.[idx];
-                                if (targetSection && targetSection.blocks)
-                                  targetSection.blocks[bIdx] = e.updated_src;
-                                onChange?.(newData);
-                              }}
-                              onDelete={(e) => {
-                                const newData = { ...data };
-                                const targetSection = newData.sections?.[idx];
-                                if (targetSection && targetSection.blocks)
-                                  targetSection.blocks[bIdx] = e.updated_src;
-                                onChange?.(newData);
-                              }}
-                              theme="rjv-default"
-                              style={{ backgroundColor: "transparent" }}
-                              displayDataTypes={false}
-                              name={false}
-                              enableClipboard={false}
-                              keyModifier={(e: any) =>
-                                e.detail >= 2 || e.metaKey || e.ctrlKey
-                              }
-                            />
+                            {hasPhaseOneBlockJson ? (
+                              <ReactJson
+                                src={phaseOneBlockJson as object}
+                                onEdit={(event) =>
+                                  onPhaseOneBlockJsonChange?.(
+                                    blockPath,
+                                    event.updated_src,
+                                  )
+                                }
+                                onAdd={(event) =>
+                                  onPhaseOneBlockJsonChange?.(
+                                    blockPath,
+                                    event.updated_src,
+                                  )
+                                }
+                                onDelete={(event) =>
+                                  onPhaseOneBlockJsonChange?.(
+                                    blockPath,
+                                    event.updated_src,
+                                  )
+                                }
+                                theme="rjv-default"
+                                style={{ backgroundColor: "transparent" }}
+                                displayDataTypes={false}
+                                name={false}
+                                enableClipboard={false}
+                                keyModifier={(e: any) =>
+                                  e.detail >= 2 || e.metaKey || e.ctrlKey
+                                }
+                              />
+                            ) : (
+                              <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                                Bản này chưa có raw Phase 1. Hãy sinh lại kiến thức để
+                                chỉnh sửa JSON gốc.
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1358,31 +1352,27 @@ function ReviewIssuePanel({
 
 function BlockItem({
   block,
-  diagramEditor,
+  renderStemFigure,
   showEditorialMetadata,
 }: {
   block: BlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
+  renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
 }) {
   switch (block.type) {
-    case "procedure":
-      return <StepsBlock block={block} diagramEditor={diagramEditor} />;
     case "example":
       return (
         <ExampleBlock
           block={block}
-          diagramEditor={diagramEditor}
+          renderStemFigure={renderStemFigure}
           showEditorialMetadata={showEditorialMetadata}
         />
       );
-    case "section_recap":
-      return <SectionRecapBlock block={block} />;
     case "knowledge":
     case "property":
     case "theorem":
     case "note":
-      return <CalloutBlock block={block} diagramEditor={diagramEditor} />;
+      return <CalloutBlock block={block} renderStemFigure={renderStemFigure} />;
     default:
       return (
         <div className="p-3 border border-slate-200 rounded text-sm text-slate-500 overflow-auto">
@@ -1391,6 +1381,22 @@ function BlockItem({
         </div>
       );
   }
+}
+
+function resolveStemFigureVisual(
+  visual: unknown,
+  stemFigureVisuals: ReadonlyMap<string, StemFigureVisual> | undefined,
+) {
+  if (
+    !visual ||
+    typeof visual !== "object" ||
+    Array.isArray(visual) ||
+    (visual as { kind?: unknown }).kind !== "TEX_FIGURE" ||
+    typeof (visual as { figureId?: unknown }).figureId !== "string"
+  ) {
+    return visual;
+  }
+  return stemFigureVisuals?.get((visual as { figureId: string }).figureId) ?? visual;
 }
 
 const COLOR_STYLES: Record<string, any> = {
@@ -1532,10 +1538,10 @@ function BaseBlockContainer({
 
 function CalloutBlock({
   block,
-  diagramEditor,
+  renderStemFigure,
 }: {
   block: BlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
+  renderStemFigure?: LessonSummaryFigureRenderer;
 }) {
   const content =
     block.type === "note"
@@ -1546,90 +1552,49 @@ function CalloutBlock({
       {content && (
         <MathpixMarkdownRenderer content={normalizeBlockMath(content, block)} />
       )}
-      <TheoryBlockDiagram block={block} diagramEditor={diagramEditor} />
-    </BaseBlockContainer>
-  );
-}
-
-function StepsBlock({
-  block,
-  diagramEditor,
-}: {
-  block: BlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
-}) {
-  return (
-    <BaseBlockContainer block={block}>
-      <div className="space-y-1.5 mt-2.5">
-        {block.steps?.map((step: any, i: number) => (
-          <div key={i} className="flex gap-3">
-            <div className="flex-none w-6 h-6 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-xs font-bold">
-              {step.order || i + 1}
-            </div>
-            <div className="flex-1">
-              <MathpixMarkdownRenderer
-                content={normalizeBlockMath(step.content || step.statement || "", block)}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <TheoryBlockDiagram block={block} diagramEditor={diagramEditor} />
+      <TheoryBlockDiagram block={block} renderStemFigure={renderStemFigure} />
     </BaseBlockContainer>
   );
 }
 
 function TheoryBlockDiagram({
   block,
-  diagramEditor,
+  renderStemFigure,
 }: {
   block: BlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
+  renderStemFigure?: LessonSummaryFigureRenderer;
 }) {
-  return block.visual?.kind === "DIAGRAM_SPEC" ? (
-    <LessonSummaryDiagram editor={diagramEditor} spec={block.visual.spec} />
-  ) : null;
+  return Array.isArray(block.figures)
+    ? block.figures.map((visual: StemFigureVisual) =>
+        visual.kind === "TEX_FIGURE" ? (
+          <div key={visual.figureId}>
+            {renderStemFigure ? renderStemFigure(visual) : <StemFigure visual={visual} />}
+          </div>
+        ) : null,
+      )
+    : null;
 }
 
 function ExampleBlock({
   block,
-  diagramEditor,
+  renderStemFigure,
   showEditorialMetadata,
 }: {
   block: BlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
+  renderStemFigure?: LessonSummaryFigureRenderer;
   showEditorialMetadata: boolean;
 }) {
   return (
     <LessonSummaryExampleCard
       answerLabel="Kết luận"
       block={block}
-      diagramEditor={diagramEditor}
       displayNumber={block.displayNumber}
+      renderFigure={renderStemFigure}
       showEditorialWarning={showEditorialMetadata}
     />
   );
 }
 
 function normalizeBlockMath(value: string, block: BlockData) {
-  const diagramSpec =
-    block.visual?.kind === "DIAGRAM_SPEC" ? block.visual.spec : undefined;
-  return normalizeLessonSummaryAngleNotation(value, diagramSpec);
-}
-
-function SectionRecapBlock({ block }: { block: BlockData }) {
-  return (
-    <BaseBlockContainer block={block}>
-      <ul className="list-disc pl-5 space-y-1">
-        {block.points?.map((point: string, i: number) => (
-          <li key={i}>
-            <MathpixMarkdownRenderer
-              className="inline [&>*]:inline"
-              content={normalizeBlockMath(point, block)}
-            />
-          </li>
-        ))}
-      </ul>
-    </BaseBlockContainer>
-  );
+  return normalizeLessonSummaryAngleNotation(value);
 }

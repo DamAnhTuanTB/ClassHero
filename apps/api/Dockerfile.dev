@@ -13,4 +13,6 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+RUN pnpm --filter @learning-path/api db:generate
+
 EXPOSE 4000

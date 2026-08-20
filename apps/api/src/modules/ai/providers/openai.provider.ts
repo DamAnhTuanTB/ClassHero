@@ -9,7 +9,7 @@
 
 import { Logger } from "@nestjs/common";
 import { AiProviderName } from "@prisma/client";
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 
 import type {
   AiEmbeddingInput,
@@ -17,16 +17,17 @@ import type {
 } from "#api/modules/ai/types/ai-embedding.types";
 import type { AiProvider } from "#api/modules/ai/types/ai-provider.interface";
 import type {
+  AiInputFile,
+  AiOutputSchema,
+  AiProviderOutputMetadata,
   AiStructuredInput,
   AiStructuredOutput,
-  AiOutputSchema,
-  AiTokenUsage,
   AiTextInput,
   AiTextOutput,
+  AiTokenUsage,
 } from "#api/modules/ai/types/ai-text.types";
 import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
 import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
-import { buildOpenAiPromptCacheFields } from "#api/modules/ai/utils/ai-prompt-cache";
 import {
   assertEmbeddingInput,
   assertEmbeddingOutput,
@@ -36,11 +37,15 @@ import {
   assertAiOutputName,
   parseAiStructuredOutput,
 } from "#api/modules/ai/utils/ai-output-validation";
-import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import {
   supportsOpenAiReasoningEffort,
   supportsOpenAiTemperature,
 } from "#api/modules/ai/utils/ai-openai-model-capabilities";
+import {
+  buildOpenAiResponseInput,
+  buildOpenAiStructuredResponseRequest,
+  type OpenAiPreparedInputFile,
+} from "#api/modules/ai/utils/openai-response-request";
 
 export class OpenAiProvider implements AiProvider {
   readonly name = AiProviderName.OPENAI;
@@ -124,35 +129,44 @@ export class OpenAiProvider implements AiProvider {
   async generateText(input: AiTextInput): Promise<AiTextOutput> {
     const startedAt = Date.now();
     const modelToUse = input.model ?? this.config.chatModel;
-    const response = await this.client.responses.create(
-      {
-        model: modelToUse,
-        instructions: input.systemPrompt,
-        input: buildAiUserPrompt(input),
-        ...(input.temperature === undefined || !supportsOpenAiTemperature(modelToUse)
-          ? {}
-          : { temperature: input.temperature }),
-        ...(input.reasoningEffort && supportsOpenAiReasoningEffort(modelToUse)
-          ? { reasoning: { effort: input.reasoningEffort } }
-          : {}),
-        ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
-      },
-      this.generationRequestOptions,
-    );
-    const text = response.output_text.trim();
+    const preparedInput = await this.prepareResponseInput(input);
+    try {
+      const response = await this.client.responses.create(
+        {
+          model: modelToUse,
+          instructions: input.systemPrompt,
+          input: preparedInput.input,
+          ...(input.temperature === undefined || !supportsOpenAiTemperature(modelToUse)
+            ? {}
+            : { temperature: input.temperature }),
+          ...(input.reasoningEffort && supportsOpenAiReasoningEffort(modelToUse)
+            ? { reasoning: { effort: input.reasoningEffort } }
+            : {}),
+          ...(input.maxTokens === undefined
+            ? {}
+            : { max_output_tokens: input.maxTokens }),
+        },
+        this.generationRequestOptions,
+      );
+      const text = response.output_text.trim();
 
-    if (!text) {
-      throw new Error("OpenAI returned an empty text response.");
+      if (!text) {
+        throw new Error("OpenAI returned an empty text response.");
+      }
+
+      return {
+        text,
+        provider: this.name,
+        model: response.model ?? this.config.chatModel,
+        usage: toTokenUsage(response.usage),
+        providerUsageRaw: response.usage,
+        providerRequestId: response.id,
+        latencyMs: Date.now() - startedAt,
+        inputFileOperations: preparedInput.operations,
+      };
+    } finally {
+      await preparedInput.cleanup();
     }
-
-    return {
-      text,
-      provider: this.name,
-      model: response.model ?? this.config.chatModel,
-      usage: toTokenUsage(response.usage),
-      providerRequestId: response.id,
-      latencyMs: Date.now() - startedAt,
-    };
   }
 
   async generateStructured<TOutput>(
@@ -167,88 +181,167 @@ export class OpenAiProvider implements AiProvider {
       input.outputName,
       input.schemaReferenceStrategy,
     );
-    const response = await this.client.responses.parse(
-      {
-        model: modelToUse,
-        instructions: input.systemPrompt,
-        input: buildAiUserPrompt(input),
-        text: {
-          format: structuredTextFormat,
-        },
-        ...buildOpenAiPromptCacheFields({
+    const preparedInput = await this.prepareResponseInput(input);
+    try {
+      const response = await this.client.responses.parse(
+        buildOpenAiStructuredResponseRequest({
           request: input,
           model: modelToUse,
           structuredTextFormat,
+          responseInput: preparedInput.input,
         }),
-        ...(input.temperature === undefined || !supportsOpenAiTemperature(modelToUse)
-          ? {}
-          : { temperature: input.temperature }),
-        ...(input.reasoningEffort && supportsOpenAiReasoningEffort(modelToUse)
-          ? { reasoning: { effort: input.reasoningEffort } }
-          : {}),
-        ...(input.maxTokens === undefined ? {} : { max_output_tokens: input.maxTokens }),
-      },
-      this.generationRequestOptions,
-    );
+        this.generationRequestOptions,
+      );
 
-    if (response.output_parsed === null) {
-      const latencyMs = Date.now() - startedAt;
-      const failure = buildOpenAiStructuredOutputError({
-        responseStatus: response.status ?? null,
-        incompleteReason: response.incomplete_details?.reason ?? null,
-        hasRefusal: hasOpenAiRefusal(response.output),
+      if (response.output_parsed === null) {
+        const latencyMs = Date.now() - startedAt;
+        const failure = buildOpenAiStructuredOutputError({
+          responseStatus: response.status ?? null,
+          incompleteReason: response.incomplete_details?.reason ?? null,
+          hasRefusal: hasOpenAiRefusal(response.output),
+          providerRequestId: response.id,
+          model: response.model ?? modelToUse,
+          usage: toTokenUsage(response.usage),
+          providerUsageRaw: response.usage,
+          latencyMs,
+          maxOutputTokens: response.max_output_tokens ?? input.maxTokens,
+          inputFileOperations: preparedInput.operations,
+        });
+        this.logger.error(
+          `OpenAI Structured Generation Failed: ${JSON.stringify(
+            {
+              code: failure.code,
+              responseStatus: failure.details.responseStatus,
+              incompleteReason: failure.details.incompleteReason,
+              hasRefusal: failure.details.hasRefusal,
+              outputTextLength: response.output_text?.length ?? 0,
+              maxOutputTokens: failure.details.maxOutputTokens,
+              model: failure.details.model,
+              usage: failure.details.usage,
+              providerRequestId: failure.details.providerRequestId,
+              latencyMs,
+            },
+            null,
+            2,
+          )}`,
+        );
+        throw failure;
+      }
+
+      const data = parseAiStructuredOutput(schema, response.output_parsed);
+      const usage = toTokenUsage(response.usage);
+      if (usage?.promptTokens !== undefined) {
+        const cachedTokens = usage.cachedInputTokens ?? 0;
+        const uncachedTokens = Math.max(0, usage.promptTokens - cachedTokens);
+        const hitRatio = usage.promptTokens === 0 ? 0 : cachedTokens / usage.promptTokens;
+        this.logger.debug(
+          `[PROMPT_CACHE] output=${input.outputName} model=${response.model ?? modelToUse} ` +
+            `prompt=${input.promptVersion} schema=${input.schemaVersion} ` +
+            `strategy=${input.schemaReferenceStrategy ?? "inline"} input=${usage.promptTokens} ` +
+            `cached=${cachedTokens} uncached=${uncachedTokens} ` +
+            `hitRatio=${hitRatio.toFixed(4)}`,
+        );
+      }
+
+      return {
+        data,
+        provider: this.name,
+        model: response.model ?? this.config.structuredModel,
+        usage,
+        providerUsageRaw: response.usage,
         providerRequestId: response.id,
-        model: response.model ?? modelToUse,
-        usage: toTokenUsage(response.usage),
-        latencyMs,
-        maxOutputTokens: response.max_output_tokens ?? input.maxTokens,
-      });
-      this.logger.error(
-        `OpenAI Structured Generation Failed: ${JSON.stringify(
-          {
-            code: failure.code,
-            responseStatus: failure.details.responseStatus,
-            incompleteReason: failure.details.incompleteReason,
-            hasRefusal: failure.details.hasRefusal,
-            outputTextLength: response.output_text.length,
-            maxOutputTokens: failure.details.maxOutputTokens,
-            model: failure.details.model,
-            usage: failure.details.usage,
-            providerRequestId: failure.details.providerRequestId,
-            latencyMs,
-          },
-          null,
-          2,
-        )}`,
-      );
-      throw failure;
+        latencyMs: Date.now() - startedAt,
+        inputFileOperations: preparedInput.operations,
+      };
+    } finally {
+      await preparedInput.cleanup();
     }
+  }
 
-    const data = parseAiStructuredOutput(schema, response.output_parsed);
-    const usage = toTokenUsage(response.usage);
-    if (usage?.promptTokens !== undefined) {
-      const cachedTokens = usage.cachedInputTokens ?? 0;
-      const uncachedTokens = Math.max(0, usage.promptTokens - cachedTokens);
-      const hitRatio =
-        usage.promptTokens === 0 ? 0 : cachedTokens / usage.promptTokens;
-      this.logger.debug(
-        `[PROMPT_CACHE] output=${input.outputName} model=${response.model ?? modelToUse} ` +
-          `prompt=${input.promptVersion} schema=${input.schemaVersion} ` +
-          `strategy=${input.schemaReferenceStrategy ?? "inline"} input=${usage.promptTokens} ` +
-          `cached=${cachedTokens} uncached=${uncachedTokens} ` +
-          `hitRatio=${hitRatio.toFixed(4)}`,
-      );
+  private async prepareResponseInput(input: AiTextInput) {
+    assertInputFiles(input.inputFiles ?? []);
+    const operations: NonNullable<AiTextOutput["inputFileOperations"]> = [];
+    const ownedFileIds: string[] = [];
+    const files: OpenAiPreparedInputFile[] = [];
+    for (const file of input.inputFiles ?? []) {
+      if (file.fileData) {
+        const startedAt = Date.now();
+        const uploaded = await this.client.files.create({
+          file: await toFile(decodeFileData(file.fileData), file.filename, {
+            type: file.mimeType,
+          }),
+          purpose: "user_data",
+        });
+        ownedFileIds.push(uploaded.id);
+        operations.push({
+          providerFileId: uploaded.id,
+          uploadLatencyMs: Date.now() - startedAt,
+          cleanupStatus: "failed",
+        });
+        files.push({
+          type: "input_file",
+          file_id: uploaded.id,
+          detail: file.detail,
+        });
+      } else if (file.fileId) {
+        operations.push({
+          providerFileId: file.fileId,
+          uploadLatencyMs: 0,
+          cleanupStatus: "not_owned",
+        });
+        files.push({
+          type: "input_file",
+          file_id: file.fileId,
+          detail: file.detail,
+        });
+      } else {
+        files.push({
+          type: "input_file",
+          file_url: file.fileUrl!,
+          detail: file.detail,
+        });
+      }
     }
-
+    const responseInput = buildOpenAiResponseInput(input, files);
     return {
-      data,
-      provider: this.name,
-      model: response.model ?? this.config.structuredModel,
-      usage,
-      providerRequestId: response.id,
-      latencyMs: Date.now() - startedAt,
+      input: responseInput,
+      operations,
+      cleanup: async () => {
+        await Promise.all(
+          ownedFileIds.map(async (fileId) => {
+            const operation = operations.find((item) => item.providerFileId === fileId);
+            try {
+              await this.client.files.delete(fileId);
+              if (operation) operation.cleanupStatus = "deleted";
+            } catch (error) {
+              this.logger.warn(
+                `OpenAI temporary file cleanup failed for ${fileId}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            }
+          }),
+        );
+      },
     };
   }
+}
+
+function assertInputFiles(files: AiInputFile[]) {
+  for (const file of files) {
+    const variants = [file.fileId, file.fileData, file.fileUrl].filter(Boolean);
+    if (variants.length !== 1) {
+      throw new Error(
+        `AI input file ${file.filename} must define exactly one of fileId, fileData, or fileUrl.`,
+      );
+    }
+    if (file.mimeType === "application/pdf" && file.detail === undefined) {
+      throw new Error(`PDF input file ${file.filename} must set detail explicitly.`);
+    }
+  }
+}
+
+function decodeFileData(value: string) {
+  const dataUrl = value.match(/^data:[^;]+;base64,(.+)$/su);
+  return Buffer.from(dataUrl?.[1] ?? value, "base64");
 }
 
 function toTokenUsage(
@@ -283,16 +376,22 @@ export function buildOpenAiStructuredOutputError(input: {
   providerRequestId?: string;
   model: string;
   usage?: AiTokenUsage;
+  providerUsageRaw?: unknown;
+  inputFileOperations?: AiProviderOutputMetadata["inputFileOperations"];
   latencyMs?: number;
   maxOutputTokens?: number;
 }) {
   const details = {
     provider: AiProviderName.OPENAI,
     model: input.model,
-    ...(input.providerRequestId
-      ? { providerRequestId: input.providerRequestId }
-      : {}),
+    ...(input.providerRequestId ? { providerRequestId: input.providerRequestId } : {}),
     ...(input.usage ? { usage: input.usage } : {}),
+    ...(input.providerUsageRaw === undefined
+      ? {}
+      : { providerUsageRaw: input.providerUsageRaw }),
+    ...(input.inputFileOperations
+      ? { inputFileOperations: input.inputFileOperations }
+      : {}),
     ...(input.latencyMs === undefined ? {} : { latencyMs: input.latencyMs }),
     responseStatus: input.responseStatus,
     incompleteReason: input.incompleteReason,

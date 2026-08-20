@@ -194,6 +194,7 @@ export function AdminAiGenerationPanel({
           isOpen
           isSubmitting={generateMutation.isPending}
           lessonId={lessonId}
+          initialModelConfiguration={panel.summaryConfiguration}
           quizTargetSetId={quizTargetSetId}
           targetGrade={panel.lesson.targetGrade}
           type={dialogType}
@@ -239,6 +240,8 @@ function GenerationCard({
   onGenerate: () => void;
   onOpen: () => void;
 }) {
+  const hasCurrentSummary = type !== "SUMMARY" || job?.reviewStatus !== null;
+  const hasSucceededContent = job?.status === "SUCCEEDED" && hasCurrentSummary;
   const status = getJobStatus(job, isReady, type);
   return (
     <article className="flex min-h-56 flex-col rounded-xl border border-[var(--theme-border)] bg-white dark:bg-slate-950 p-4 shadow-sm">
@@ -264,20 +267,20 @@ function GenerationCard({
             )
           : description}
       </p>
-      {job?.status === "SUCCEEDED" ? (
+      {hasSucceededContent ? (
         <button
           type="button"
           onClick={type === "SUMMARY" || type === "QUIZ" ? onGenerate : onOpen}
           className="theme-button-primary-subtle mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
         >
           {type === "SUMMARY" ? (
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
           ) : type === "QUIZ" ? (
             <Sparkles className="h-4 w-4" aria-hidden="true" />
           ) : (
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           )}
-          {type === "SUMMARY" ? "Sinh lại" : type === "QUIZ" ? "Tạo Quiz" : "Mở để duyệt"}
+          {type === "SUMMARY" ? "Tạo mới" : type === "QUIZ" ? "Tạo Quiz" : "Mở để duyệt"}
         </button>
       ) : (
         <button
@@ -299,6 +302,8 @@ function GenerationCard({
             "Thử lại"
           ) : type === "QUIZ" ? (
             "Tạo Quiz"
+          ) : type === "SUMMARY" ? (
+            "Tạo mới"
           ) : (
             "Cấu hình"
           )}
@@ -338,6 +343,9 @@ function AdminAiJobWatcher({
       }),
       queryClient.invalidateQueries({
         queryKey: adminAiGenerationQueryKeys.summary(lessonId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: adminAiGenerationQueryKeys.stemFigures(lessonId),
       }),
       queryClient.invalidateQueries({ queryKey: ["admin", "quiz"] }),
       queryClient.invalidateQueries({ queryKey: ["admin", "flashcards"] }),
@@ -417,6 +425,13 @@ function getJobStatus(
   }
   if (job.status === "SUCCEEDED") {
     if (type === "SUMMARY") {
+      if (job.reviewStatus === null) {
+        return {
+          label: "Chưa tạo",
+          className:
+            "border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text-muted)]",
+        };
+      }
       const isInUse = job.reviewStatus === "APPROVED";
       const isHidden = job.reviewStatus === "HIDDEN";
       return {

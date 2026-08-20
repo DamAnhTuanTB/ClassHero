@@ -40,6 +40,74 @@ Update note 2026-08-03:
   EXAMPLE schema/prompt/recovery/compiler/renderer/editor với Sinh kiến thức;
   Quiz không trả hoặc lưu sourceChunkIds ở cấp câu.
 
+Update note 2026-08-12:
+
+- Owner thay hướng M9.2 trên nhánh `codex/m9-texlive-tikz`: loại runtime/schema/
+  test renderer JSON cũ và thay bằng OpenAI sinh source TeX/TikZ → TeX Live
+  sandbox → SVG validator local → R2. Figure pass cả compiler và validator tự
+  `SUCCEEDED`, không có bước approve bắt buộc. Nhánh cũ giữ nguyên hệ thống cũ
+  tại commit đã chốt.
+- Phạm vi hiện tại chỉ có figure cho Lesson Summary/Sinh kiến thức; Quiz,
+  Flashcard, Test, Explanation và Chat giữ text-only.
+- Hình light-only, Stage 2 nhận ảnh tham chiếu đã resolve nhưng không có Vision
+  hậu kiểm tự động, hỗ trợ lớp 3–12. Mỗi compiler attempt gom toàn
+  bộ lỗi đã phát hiện thành một diagnostic batch; mỗi auto/manual repair gửi
+  source + cả batch trong một OpenAI request, không gửi riêng từng lỗi. Automatic
+  AI repair tối đa 2 lượt và chỉ dành cho compiler failure; validator failure
+  chuyển `NEEDS_REVIEW`; source policy/provider/timeout/network/storage/hạ tầng
+  không tự retry và giữ trạng thái tương ứng để admin xử lý thủ công.
+- Mọi request OpenAI lấy môn từ `learning_path.domain`, ghép lõi trung tính với
+  đúng một profile `MATH|PHYSICS|CHEMISTRY|GENERAL`; snapshot môn nằm trong job/
+  figure. Theo ADR-0015, source policy đích reject mọi compiler declaration và
+  root environment không thuộc profile; backend tự nạp package/library đúng môn.
+- Coverage hình dùng hai tầng: subject profile ép mức tối thiểu đã biết và AI vẫn
+  phải chủ động trả thêm figure khi nội dung ngoài danh sách cần hình. Thiếu hình
+  được lưu cùng Summary và gắn warning đúng block, không fail toàn generation và
+  không chặn Lưu/Phát hành. Chỉ kế thừa rule coverage, không đưa `diagramSpec`/
+  renderer JSON cũ sang nhánh này.
+- Các mục M9.13–M9.16/coverage diagram JSON dưới đây chỉ là snapshot lịch sử của
+  nhánh cũ, không còn là dependency hoặc task hiện hành trên nhánh TeX/TikZ.
+- Kế hoạch lifecycle figure hiện dùng source editor + preview SVG. Phần editor
+  PDF/SyncTeX đã bị owner loại khỏi phạm vi; ADR-0015 là contract hiện hành.
+
+Update note 2026-08-13:
+
+- Corrective M9.2 tiếp theo được lập tại
+  `.codex/plans/m9-2-raw-source-context-and-figure-prompt-hardening-plan.md`.
+- Provider Summary chỉ nhận OCR `content` nguyên chunk + metadata khách quan;
+  không nhận source topic/candidate/hint do backend suy luận và không chia thêm
+  source block. Output dùng source evidence (`HEADING` hoặc `CONTENT`) + chunk IDs
+  để backend hậu kiểm mà không ép tài liệu phi cấu trúc phải có heading giả.
+- Prompt bỏ dependency metadata cũ, compact figure rules và loại global
+  `ALL_REQUIRED` suy từ title/OCR khỏi provider path. Đây vẫn là M9.2, chưa tạo
+  task code mới và chưa triển khai production.
+
+Update note 2026-08-17:
+
+- Owner khôi phục invariant trình bày ý con cho Summary: trong mọi `problem`,
+  `solution`, `answer`, mỗi nhãn `a)`, `b)`, `c)` hoặc nhãn chữ cái tương đương
+  phải bắt đầu ở dòng riêng; không được dồn hai ý con trên cùng dòng.
+- Đây vẫn là corrective của `M9.2`, áp dụng cho mọi loại example và subject
+  profile. Bước implementation phải đồng bộ system prompt, description của cả ba
+  field provider-facing và focused test; không thêm task code hay dependency mới.
+
+Update note 2026-08-19:
+
+- Owner chốt hard cutover M9.2 xóa hoàn toàn `visualIntent`, không legacy reader,
+  dual contract hoặc fallback. Contract đích duy nhất là figure plan v3.
+- Stage 2 có ảnh dùng ảnh + source target + projection block; không ảnh dùng
+  projection block. Example không gửi solution/answer/conclusions.
+- Implementation và migration một chiều đã hoàn tất ở source; deploy cần chạy
+  migration, cập nhật API/web/worker atomically và restart worker. Kế hoạch chi tiết tại
+  `.codex/plans/m9-2-remove-visual-intent-hard-cutover-plan.md`.
+- Owner bổ sung `M9.17` Implemented: modal Sinh kiến thức có checkbox dùng trực tiếp
+  crop ảnh gốc SGK. Phase 1 giữ nguyên; mode bật promote toàn bộ OCR crop
+  thuộc tập khớp chắc chắn thành các figure cùng block và tuyệt đối không
+  enqueue/call Phase 2. Candidate mơ hồ, thiếu crop hoặc full-page fallback cần
+  admin review; figure `GENERATED_FROM_BRIEF` bị bỏ
+  qua. `M9.17` phụ thuộc `M9.2`, `M9.8`, `M4.4` và dùng mã mới vì `M9.13-M9.16`
+  đã thuộc lịch sử renderer JSON cũ.
+
 ## 1. Phạm vi bước này
 
 Subtask hiện tại: `M0.P` - đọc tài liệu và tạo execution plan.
@@ -178,23 +246,26 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     recovery `VALID | AUTO_FIXED | REVIEWABLE | UNRENDERABLE` với policy
     `ACCEPT_OR_FIX | FIX_ONLY`. Note không còn bị ép phải có ví dụ; note tham chiếu
     hình/ảnh/URL nguồn được giữ nguyên và gắn review issue riêng cho admin.
-    41.3. Coverage hardening Toán 3-9 được lập kế hoạch tại
-    `.codex/plans/m9-2-math-diagram-coverage-90-plan.md`: kiểm kê 100% dạng hình,
-    cam kết mức đơn giản/trung bình/khó, dùng semantic `diagramIntent` →
-    deterministic compiler/validator/layout → `diagramSpec` v2. Ngưỡng coverage
-    tối thiểu 90%, mục tiêu >=95%, không lấy số screenshot làm mẫu số. Owner chốt
-    triển khai toàn bộ scope trong một delivery wave M9.2 với các workstream đồng
-    thời và một release gate chung, không tách thành các lần release theo family.
-    Live matrix dự kiến 65 request chính + tối đa 15 retry `gpt-5.4`, hard cap
-    320.000 VNĐ. Trong đó có 21 full lesson: lớp 3-9 × ba mức khó; mỗi output bắt
-    buộc chụp 4 viewport × 2 theme, full lesson chụp từng block hình, tự review và
-    sửa bằng cache trước khi cân nhắc paid retry.
-    Paid test chạy Gate A 44 ví dụ lẻ trước (cap 125.000 VNĐ); chỉ khi toàn bộ
-    semantic/visual/regression pass mới chạy Gate B 21 full lesson (phần cap còn
-    lại tối đa 195.000 VNĐ).
-    Mỗi screenshot PASS phải có reference ID SGK/SBT/SGV/tài liệu NXBGDVN; full
-    lesson đối chiếu đúng trang/bài. Ảnh đạt chuẩn cũ chỉ được dùng làm golden sau
-    khi tái kiểm chứng nguồn và vào `reference-golden-manifest.json`.
+    41.3. Nhánh hiện tại dùng TeX/TikZ cho Summary theo update note 2026-08-12;
+    coverage cũ Toán 3–9/diagram compiler không áp dụng. Coverage mới trải lớp
+    3–12 và package theo môn, dùng fixture/compile local mặc định; live provider
+    luôn opt-in theo cost guard.
+    41.4. Owner chốt ADR-0015 ngày 2026-08-13: lượt chuyên vẽ chỉ trả LaTeX
+    figure snippet gồm optional local header trong toolbox allowlist rồi đúng một
+    drawing root. Backend sở hữu document wrapper/package/compiler preamble và
+    phạm vi toolbox. Không có compatibility path cho standalone source cũ.
+    Implementation đã hoàn tất trong M9.2: shared schema/prompt/policy/
+    renderer/editor cùng dùng snippet-only contract; không có compatibility path
+    cho standalone source cũ, PDF/SyncTeX edit-session hay route approval cũ.
+    41.5. Corrective M9.2 theo quyết định owner ngày 2026-08-17: trong modal
+    `Tạo mới bằng AI`, ảnh tham chiếu và `adminInstructions` là hai authority duy
+    nhất, ngang hàng theo phạm vi. Ảnh khóa baseline, field khóa delta; mọi phần
+    ảnh ngoài delta phải được giữ nguyên; block sở hữu chỉ dùng kiểm chứng phần
+    ảnh không quyết định. Đã sửa prompt Stage 2, serializer, parity preview/create, bảo toàn
+    baseline + delta qua compiler repair và thêm regression/counterexample cho
+    cả ba mode. Field rỗng/blank bị loại khỏi provider JSON và prompt mặc định.
+    Stage 2 chỉ gửi projection của đúng block sở hữu figure; không suy
+    hoặc gửi block lý thuyết đứng trước dưới field `pairedTheory`.
 42. `M9.3` - Admin generate quiz/flashcard/test.
     42.1. Hardening plan mở rộng Quiz/Test solution/diagram và review tại
     `.codex/plans/m9-3-ai-quiz-generation-completion-plan.md`: output AI phải đủ
@@ -202,11 +273,8 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     set/generation. Question hợp lệ hiện ngay ở danh sách tab Quiz dưới trạng thái
     review; không tạo staging screen riêng. Đây không phải subtask roadmap mới.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
-    43.0.1. `M9.13` - Admin chỉnh label/marker/caption an toàn. Done 2026-08-11.
-    43.0.2. `M9.14` - Chọn nhiều segment và thêm dấu bằng nhau. Done 2026-08-11.
-    43.0.3. `M9.15` - Reset chỉnh sửa riêng một hình trong phiên. Done 2026-08-11.
-    43.0.4. `M9.16` - Harden prompt Sinh kiến thức và phạm vi lớp 3–12. Planned 2026-08-11.
-    Chi tiết tại `.codex/plans/m9-13-admin-safe-diagram-element-delete-plan.md`.
+    43.0.1. M9.13–M9.16 là lịch sử của nhánh renderer JSON cũ, không chạy trên
+    nhánh TeX/TikZ.
     43.1. `M9.9` - Provider catalog, AI routing, Gemini fallback và usage accounting.
     43.2. `M4.6` - OCR accounting, retry-resume và budget guard.
     43.3. `M9.10` - Admin provider operations API.
@@ -300,19 +368,13 @@ Phụ thuộc AI/RAG:
 - `M5.4` phụ thuộc `M5.3`.
 - `M9.1` phụ thuộc `M5.1`, `M1.5`, `M4.3`.
 - `M9.2` phụ thuộc `M5.3`, `M9.1`, `M1.3`.
-- Lõi chức năng M9.2 hiện là baseline ổn cho M9.3. Coverage diagram toàn cục tại
-  `.codex/plans/m9-2-math-diagram-coverage-90-plan.md` vẫn `IN_PROGRESS`, nhưng
-  không chặn M9.3 dùng capability source-backed đã được hỗ trợ; capability chưa
-  đủ evidence phải giữ ở review. Điều này không đổi dependency hoặc mã subtask.
+- M9.2 TeX/TikZ chỉ nối figure vào Summary; M9.3 giữ text-only và không phụ thuộc
+  capability figure hiện tại.
 - `M9.3` phụ thuộc `M6.2` đến `M6.4`, `M5.3`, `M9.1`.
 - `M9.8` phụ thuộc `M9.2`, `M9.3`, `M4.3`; xếp ngay sau `M9.3` để generation
   có UI quản trị kiểm thử trước khi chuyển sang student flow; đã Done
   2026-08-03.
-- `M9.16` phụ thuộc `M9.2`, `M9.3`, `M9.8` và phải xong trước `M9.4`; plan chi
-  tiết tại `.codex/plans/m9-16-lesson-summary-prompt-contract-hardening-plan.md`.
-- `M9.13 -> M9.14 -> M9.15` phụ thuộc `M9.2`, `M9.8`; dùng PUT Summary/review
-  guard hiện có, không thêm dependency cho `M9.4`.
-- `M9.4` phụ thuộc `M9.3`, `M9.16`, `M6.2` đến `M6.4`, `M7.1-M7.4`; task bao gồm nối
+- `M9.4` phụ thuộc `M9.3`, `M6.2` đến `M6.4`, `M7.1-M7.4`; task bao gồm nối
   action request-new trên UI học sinh, không chỉ endpoint/worker.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2` đến `M6.4`, `M7.2-M7.4`; task bao
   gồm inline explanation UI và trạng thái polling/error/retry.

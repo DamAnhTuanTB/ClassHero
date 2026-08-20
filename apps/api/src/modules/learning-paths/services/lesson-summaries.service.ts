@@ -1,38 +1,54 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { AiGenerationType, Prisma, ProviderUsageMetric } from "@prisma/client";
+import { isAiReasoningEffort } from "@learning-path/shared";
+import {
+  AiGenerationType,
+  Prisma,
+  ProviderUsageMetric,
+  StemFigureRevisionStatus,
+} from "@prisma/client";
 import type { ProviderRouteCandidate } from "#api/modules/provider-operations/types/provider-operations.types";
 
 import { throwBadRequest, throwNotFound } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
 import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-job.service";
+import { LessonSourcePacketService } from "#api/modules/ai/services/lesson-source-packet.service";
+import { LessonSourcePacketError } from "#api/modules/ai/services/lesson-source-packet.service";
 import {
   LessonSummaryContextError,
   LessonSummaryContextService,
 } from "#api/modules/ai/services/lesson-summary-context.service";
 import {
-  LESSON_SUMMARY_MAX_CONTEXT_TOKENS,
   LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
-  LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
   LESSON_SUMMARY_PROMPT_VERSION,
   LESSON_SUMMARY_SCHEMA_VERSION,
-  lessonSummaryProviderTransportOutputSchema,
+  getLessonSummaryProviderTransportOutputSchema,
+  resolveLessonSummaryOutputTokenFloor,
+  stemFigureRenderPlanSchema,
   type LessonSummaryJobInput,
 } from "#api/modules/ai/types/lesson-summary.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
-import {
-  supportsOpenAiReasoningEffort,
-  supportsOpenAiTemperature,
-} from "#api/modules/ai/utils/ai-openai-model-capabilities";
-import { buildOpenAiPromptCacheFields } from "#api/modules/ai/utils/ai-prompt-cache";
+import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import {
   buildAiStructuredTextFormat,
   estimateAiStructuredInputTokens,
 } from "#api/modules/ai/utils/ai-structured-output-format";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
+import {
+  applyLessonSummaryPhaseOneBlockEdits,
+  prepareLessonSummaryPhaseOneLayoutEdits,
+  readLessonSummaryPhaseOneSnapshot,
+} from "#api/modules/ai/utils/lesson-summary-phase-one-editor";
+import {
+  buildOpenAiResponseInput,
+  buildOpenAiStructuredResponseRequest,
+  OPENAI_PREVIEW_BINARY_DATA,
+  OPENAI_PREVIEW_FILE_ID,
+} from "#api/modules/ai/utils/openai-response-request";
 import { GenerateLessonSummaryDto } from "#api/modules/learning-paths/dto/generate-lesson-summary.dto";
+import { UpdateLessonSummaryPhaseOneBlocksDto } from "#api/modules/learning-paths/dto/update-lesson-summary-phase-one-blocks.dto";
 import { UpsertLessonSummaryDto } from "#api/modules/learning-paths/dto/upsert-lesson-summary.dto";
 import { lessonSummarySelect } from "#api/modules/learning-paths/selectors/lesson-summary.selects";
 import { serializeLessonSummary } from "#api/modules/learning-paths/serializers/lesson-summary.serializers";
@@ -41,12 +57,10 @@ import {
   throwLessonNotFound,
   toInputJson,
 } from "#api/modules/learning-paths/utils/lesson.helpers";
-import {
-  listUnresolvedLessonSummaryReviewIssues,
-  reconcileLessonSummaryReviewIssues,
-} from "#api/modules/learning-paths/utils/lesson-summary-review";
+import { reconcileLessonSummaryReviewIssues } from "#api/modules/learning-paths/utils/lesson-summary-review";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import { supportsHighDetailPdfInput } from "#api/modules/provider-operations/utils/ai-model-capabilities";
 import { calculateProviderCost } from "#api/modules/provider-operations/utils/provider-cost-calculator";
 
 @Injectable()
@@ -61,16 +75,28 @@ export class LessonSummariesService {
     private readonly modelRouting: AiModelRoutingService,
     @Inject(ConfigService)
     private readonly configService: ConfigService<EnvConfig, true>,
+    @Inject(LessonSourcePacketService)
+    private readonly packets: LessonSourcePacketService,
   ) {}
 
   async getForAdmin(lessonId: string) {
     await this.assertLessonExists(lessonId);
     const summary = await this.prisma.lessonSummary.findUnique({
       where: { lessonId },
-      select: lessonSummarySelect,
+      select: {
+        ...lessonSummarySelect,
+        aiGeneration: { select: { outputJson: true } },
+      },
     });
 
-    return summary && !summary.deletedAt ? serializeLessonSummary(summary) : null;
+    return summary && !summary.deletedAt
+      ? {
+          ...serializeLessonSummary(summary),
+          phaseOneBlockJsonByPath: readPhaseOneBlockJsonByPath(
+            summary.aiGeneration?.outputJson,
+          ),
+        }
+      : null;
   }
 
   async upsertForAdmin(
@@ -97,20 +123,29 @@ export class LessonSummariesService {
         select: lessonSummarySelect,
       });
       const reconciledContent = reconcileLessonSummaryReviewIssues(dto.contentJson);
-      const unresolvedIssues = listUnresolvedLessonSummaryReviewIssues(reconciledContent);
-      if (dto.reviewStatus === "APPROVED" && unresolvedIssues.length > 0) {
-        throwBadRequest(
-          "LESSON_SUMMARY_REVIEW_REQUIRED",
-          `Còn ${unresolvedIssues.length} vấn đề cần sửa hoặc chấp nhận trước khi phát hành.`,
-          {
-            issues: unresolvedIssues.slice(0, 20).map((issue) => ({
-              code: issue.code,
-              path: issue.path,
-              message: issue.message,
-              suggestion: issue.suggestion,
-            })),
-          },
-        );
+      const referencedFigureIds = collectStemFigureIds(reconciledContent);
+      if (referencedFigureIds.length > 0) {
+        const figures = before
+          ? await transaction.stemFigure.findMany({
+              where: {
+                id: { in: referencedFigureIds },
+                lessonId,
+                lessonSummaryId: before.id,
+                deletedAt: null,
+              },
+              select: {
+                id: true,
+                currentRevision: {
+                  select: { status: true, deliveryFileId: true },
+                },
+              },
+            })
+          : [];
+        assertLessonSummaryStemFigureReferences({
+          referencedFigureIds,
+          figures,
+          requireReadyAsset: dto.reviewStatus === "APPROVED",
+        });
       }
       const contentJson = reconciledContent as Prisma.InputJsonValue;
       const updated = await transaction.lessonSummary.upsert({
@@ -152,20 +187,362 @@ export class LessonSummariesService {
     return serializeLessonSummary(summary);
   }
 
+  async updatePhaseOneBlocksForAdmin(
+    lessonId: string,
+    actorUserId: string,
+    dto: UpdateLessonSummaryPhaseOneBlocksDto,
+    context: RequestContext = {},
+  ) {
+    await this.prisma.$transaction(async (transaction) => {
+      const summary = await transaction.lessonSummary.findFirst({
+        where: {
+          lessonId,
+          deletedAt: null,
+          lesson: { deletedAt: null, learningPath: { deletedAt: null } },
+        },
+        select: {
+          ...lessonSummarySelect,
+          aiGeneration: { select: { id: true, outputJson: true } },
+          stemFigures: {
+            where: { deletedAt: null },
+            orderBy: [{ blockPath: "asc" }, { figureIndex: "asc" }],
+            select: {
+              id: true,
+              blockPath: true,
+              figureIndex: true,
+              localPlanId: true,
+              planJson: true,
+              status: true,
+              currentRevision: {
+                select: {
+                  id: true,
+                  status: true,
+                  deliveryFileId: true,
+                  altText: true,
+                  caption: true,
+                },
+              },
+              pendingRevision: {
+                select: { id: true, altText: true, caption: true },
+              },
+            },
+          },
+        },
+      });
+      if (!summary) throwLessonNotFound();
+
+      const snapshot = readLessonSummaryPhaseOneSnapshot(
+        summary.aiGeneration?.outputJson,
+      );
+      if (!snapshot || !summary.aiGeneration) {
+        throwBadRequest(
+          "LESSON_SUMMARY_PHASE_ONE_RAW_UNAVAILABLE",
+          "Bản kiến thức này chưa có raw Phase 1 có thể chỉnh sửa. Hãy sinh lại kiến thức.",
+        );
+      }
+      const layoutOperations = (dto.phaseOneLayoutOperations ?? []).map((operation) => {
+        if (operation.type === "MERGE_SECTION") {
+          return {
+            type: operation.type,
+            sectionIndex: operation.sectionIndex,
+          } as const;
+        }
+        if (operation.blockIndex === undefined) {
+          throwBadRequest(
+            "LESSON_SUMMARY_PHASE_ONE_LAYOUT_INVALID",
+            "Thao tác xóa block thiếu vị trí block.",
+          );
+        }
+        return {
+          type: operation.type,
+          sectionIndex: operation.sectionIndex,
+          blockIndex: operation.blockIndex,
+        } as const;
+      });
+      const prepared = prepareLessonSummaryPhaseOneLayoutEdits(
+        snapshot,
+        layoutOperations,
+      );
+      if (!prepared.success) {
+        throwBadRequest(prepared.code, prepared.message, prepared.details);
+      }
+      assertRawFigureCountsUnchanged(
+        prepared.snapshot.blocks,
+        dto.phaseOneBlockJsonByPath,
+      );
+      const applied = applyLessonSummaryPhaseOneBlockEdits({
+        lessonId,
+        snapshot: prepared.snapshot,
+        blocks: dto.phaseOneBlockJsonByPath,
+      });
+      if (!applied.success) {
+        throwBadRequest(applied.code, applied.message, applied.details);
+      }
+
+      const relocatedFigures = summary.stemFigures.flatMap((figure) => {
+        const nextPath = prepared.blockPathChanges.get(figure.blockPath);
+        return nextPath === null
+          ? []
+          : [{ ...figure, blockPath: nextPath ?? figure.blockPath }];
+      });
+      const deletedFigures = summary.stemFigures.filter(
+        (figure) => prepared.blockPathChanges.get(figure.blockPath) === null,
+      );
+      const movedFigures = relocatedFigures.filter((figure) => {
+        const original = summary.stemFigures.find((item) => item.id === figure.id);
+        return original?.blockPath !== figure.blockPath;
+      });
+
+      const plannedFigures = new Map(
+        applied.mapped.figures.map((figure) => [
+          stemFigurePositionKey(figure.blockPath, figure.figureIndex),
+          figure.draft,
+        ]),
+      );
+      const activeFigures = new Map(
+        relocatedFigures.map((figure) => [
+          stemFigurePositionKey(figure.blockPath, figure.figureIndex),
+          figure,
+        ]),
+      );
+      const missingFigurePositions = [...plannedFigures.keys()].filter(
+        (position) => !activeFigures.has(position),
+      );
+      if (missingFigurePositions.length > 0) {
+        throwBadRequest(
+          "LESSON_SUMMARY_PHASE_ONE_FIGURE_MISSING",
+          "Một số figure trong raw không còn khớp dữ liệu hiện tại. Hãy tải lại trang.",
+          { positions: missingFigurePositions },
+        );
+      }
+
+      const content = structuredClone(applied.mapped.content);
+      for (const figure of [...movedFigures, ...deletedFigures]) {
+        await transaction.stemFigure.update({
+          where: { id: figure.id },
+          data: { blockPath: `layout-operation-${figure.id}` },
+        });
+      }
+      for (const figure of movedFigures) {
+        await transaction.stemFigure.update({
+          where: { id: figure.id },
+          data: { blockPath: figure.blockPath },
+        });
+      }
+      if (deletedFigures.length > 0) {
+        await transaction.stemFigure.updateMany({
+          where: { id: { in: deletedFigures.map((figure) => figure.id) } },
+          data: { deletedAt: new Date() },
+        });
+      }
+
+      for (const figure of relocatedFigures) {
+        const position = stemFigurePositionKey(figure.blockPath, figure.figureIndex);
+        const planned = plannedFigures.get(position);
+        const currentPlan = isRecord(figure.planJson) ? figure.planJson : {};
+        const plan = planned ? { ...planned, localId: figure.localPlanId } : currentPlan;
+        const metadataRevision = figure.currentRevision ?? figure.pendingRevision;
+        const altText = planned?.altText ?? metadataRevision?.altText ?? "Hình minh họa";
+        const caption = planned?.caption ?? metadataRevision?.caption ?? null;
+        const parsedPlan = stemFigureRenderPlanSchema.safeParse(plan);
+        if (!parsedPlan.success) {
+          throwBadRequest(
+            "LESSON_SUMMARY_FIGURE_PLAN_INVALID",
+            "Figure plan không còn đúng contract v3. Hãy sinh lại nội dung.",
+          );
+        }
+        const figureOrigin = parsedPlan.data.figureOrigin;
+        attachPhaseOneFigureReference(content, {
+          blockPath: figure.blockPath,
+          figureIndex: figure.figureIndex,
+          figureId: figure.id,
+          figureOrigin,
+          altText,
+          caption,
+          status: figure.status,
+        });
+
+        if (!planned) continue;
+        await transaction.stemFigure.update({
+          where: { id: figure.id },
+          data: { planJson: plan as Prisma.InputJsonValue },
+        });
+        if (metadataRevision) {
+          await transaction.stemFigureRevision.update({
+            where: { id: metadataRevision.id },
+            data: { altText, caption },
+          });
+        }
+      }
+
+      const reconciledContent = reconcileLessonSummaryReviewIssues({
+        type: "lesson_summary_blocks",
+        version: 3,
+        data: content,
+      });
+      const referencedFigureIds = collectStemFigureIds(reconciledContent);
+      assertLessonSummaryStemFigureReferences({
+        referencedFigureIds,
+        figures: relocatedFigures.map((figure) => ({
+          id: figure.id,
+          currentRevision: figure.currentRevision
+            ? {
+                status: figure.currentRevision.status,
+                deliveryFileId: figure.currentRevision.deliveryFileId,
+              }
+            : null,
+        })),
+        requireReadyAsset: dto.reviewStatus === "APPROVED",
+      });
+
+      const updated = await transaction.lessonSummary.update({
+        where: { id: summary.id },
+        data: {
+          contentJson: reconciledContent as Prisma.InputJsonValue,
+          source: dto.source,
+          reviewStatus: dto.reviewStatus,
+          updatedById: actorUserId,
+        },
+        select: lessonSummarySelect,
+      });
+      await transaction.aiGeneration.update({
+        where: { id: summary.aiGeneration.id },
+        data: {
+          outputJson: applied.snapshot as unknown as Prisma.InputJsonValue,
+          outputHash: hashAiValue(applied.snapshot),
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorUserId,
+          action: "LESSON_SUMMARY_PHASE_ONE_RAW_UPDATED",
+          entityType: "LessonSummary",
+          entityId: summary.id,
+          before: toInputJson(serializeLessonSummary(summary)),
+          after: toInputJson(serializeLessonSummary(updated)),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+          metadata: toInputJson({
+            providerCalled: false,
+            figureJobsEnqueued: 0,
+            layoutOperations,
+          }),
+        },
+      });
+    });
+
+    return this.getForAdmin(lessonId);
+  }
+
+  async deleteForAdmin(
+    lessonId: string,
+    actorUserId: string,
+    context: RequestContext = {},
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      const lesson = await transaction.lesson.findFirst({
+        where: {
+          id: lessonId,
+          deletedAt: null,
+          learningPath: { deletedAt: null },
+        },
+        select: { id: true },
+      });
+      if (!lesson) {
+        throwLessonNotFound();
+      }
+
+      const summary = await transaction.lessonSummary.findUnique({
+        where: { lessonId },
+        select: lessonSummarySelect,
+      });
+      if (!summary) {
+        return { deleted: false };
+      }
+
+      await transaction.lessonSummary.delete({ where: { id: summary.id } });
+      await transaction.auditLog.create({
+        data: {
+          actorUserId,
+          action: "LESSON_SUMMARY_DELETED",
+          entityType: "LessonSummary",
+          entityId: summary.id,
+          before: toInputJson(serializeLessonSummary(summary)),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+
+      return { deleted: true };
+    });
+  }
+
   async generate(lessonId: string, actorUserId: string, dto: GenerateLessonSummaryDto) {
-    const sourceContext = await this.loadSourceContext(lessonId, dto.documentIds);
+    if (!dto.requestDraftId || !dto.requestHash) {
+      throwBadRequest(
+        "AI_REQUEST_DRAFT_REQUIRED",
+        "Hãy tạo lại bản xem trước request trước khi bắt đầu.",
+      );
+    }
+    const draft = await this.prisma.lessonSummaryRequestDraft.findFirst({
+      where: { id: dto.requestDraftId, lessonId },
+    });
+    if (!draft || draft.expiresAt.getTime() <= Date.now() || draft.consumedAt) {
+      throwBadRequest(
+        "AI_INPUT_SNAPSHOT_STALE",
+        "Bản xem trước đã hết hạn hoặc đã được sử dụng.",
+      );
+    }
+    if (draft.requestHash !== dto.requestHash) {
+      throwBadRequest(
+        "AI_INPUT_SNAPSHOT_STALE",
+        "Prompt hiện tại không còn khớp bản xem trước.",
+      );
+    }
+    const sourceSnapshot = readJsonRecord(draft.sourceSnapshotJson);
     const configuration = normalizeConfiguration(
       dto,
       this.resolveSchemaReferenceStrategy(),
       this.resolvePromptCacheConfiguration(),
     );
-    const { route } = await this.resolveSummaryRoute(dto);
+    if (
+      hashAiValue(configuration) !==
+      hashAiValue(readJsonRecord(sourceSnapshot.generationConfiguration))
+    ) {
+      throwBadRequest(
+        "AI_INPUT_SNAPSHOT_STALE",
+        "Cấu hình sinh hiện tại không còn khớp bản xem trước.",
+      );
+    }
+    const documentIds = readStringArray(sourceSnapshot.documentIds);
+    const currentSourceHash = await this.packets.computeCurrentSourceHash(
+      lessonId,
+      documentIds,
+    );
+    if (
+      currentSourceHash !== readRequiredString(sourceSnapshot.sourceHash, "sourceHash")
+    ) {
+      throwBadRequest(
+        "AI_INPUT_SNAPSHOT_STALE",
+        "Nguồn PDF hoặc khoảng trang đã thay đổi; hãy preview lại.",
+      );
+    }
+    const route = readJsonRecord(
+      readJsonRecord(draft.modelConfigJson).routeSnapshot,
+    ) as unknown as AiFeatureRoute;
 
     const requestId = randomUUID();
     const inputMeta = {
-      documentIds: sourceContext.documentIds,
-      sourceHash: sourceContext.sourceHash,
-      targetGrade: sourceContext.targetGrade,
+      requestDraftId: draft.id,
+      requestHash: draft.requestHash,
+      packetHash: draft.packetHash,
+      manifestHash: draft.manifestHash,
+      documentIds,
+      sourceHash: currentSourceHash,
+      targetGrade: readNumber(sourceSnapshot.targetGrade),
+      subjectKey: readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
+      subjectName: readRequiredString(sourceSnapshot.subjectName, "subjectName"),
+      subjectSlug: readRequiredString(sourceSnapshot.subjectSlug, "subjectSlug"),
       ...configuration,
     } as const;
     const job = await this.aiGenerationJobs.createAndEnqueue({
@@ -191,13 +568,15 @@ export class LessonSummariesService {
       },
       inputMeta,
       routeSnapshot: route,
-      idempotencyKey: ["ai-summary", lessonId, sourceContext.sourceHash, requestId].join(
-        ":",
-      ),
+      idempotencyKey: ["ai-summary", lessonId, currentSourceHash, requestId].join(":"),
       deduplicateActive: true,
       // An admin click authorizes exactly one provider request. Local recovery
       // handles block defects; the worker must not silently spend another call.
       maxAttempts: 1,
+    });
+    await this.prisma.lessonSummaryRequestDraft.update({
+      where: { id: draft.id },
+      data: { consumedAt: new Date() },
     });
 
     return {
@@ -207,8 +586,14 @@ export class LessonSummariesService {
     };
   }
 
-  async previewPrompt(lessonId: string, dto: GenerateLessonSummaryDto) {
-    const sourceContext = await this.loadSourceContext(lessonId, dto.documentIds);
+  async previewPrompt(
+    lessonId: string,
+    actorUserId: string,
+    dto: GenerateLessonSummaryDto,
+  ) {
+    await this.cleanupRequestDraftPackets(lessonId, actorUserId);
+    const sourceContext = await this.loadPacketSourceContext(lessonId, dto.documentIds);
+    if (!sourceContext.packet) throw new Error("Missing lesson source packet.");
     const configuration = normalizeConfiguration(
       dto,
       this.resolveSchemaReferenceStrategy(),
@@ -219,24 +604,35 @@ export class LessonSummariesService {
       lessonId,
       lessonTitle: sourceContext.lessonTitle,
       targetGrade: sourceContext.targetGrade,
+      subject: sourceContext.subject,
       documentIds: sourceContext.documentIds,
       sourceHash: sourceContext.sourceHash,
-      chunks: sourceContext.chunks,
+      packet: {
+        filename: sourceContext.packet.filename,
+        bytes: sourceContext.packet.bytes,
+        modelManifest: sourceContext.packet.modelManifest,
+      },
       configuration,
       systemInstructions: configuration.systemInstructions,
       userPrompt: configuration.userPrompt,
     });
     const inputPrompt = buildAiUserPrompt(request);
     const structuredTextFormat = buildAiStructuredTextFormat(
-      lessonSummaryProviderTransportOutputSchema,
+      getLessonSummaryProviderTransportOutputSchema(
+        sourceContext.subject.key,
+        "CONTEXTUAL",
+        sourceContext.targetGrade,
+      ),
       request.outputName,
       request.schemaReferenceStrategy,
     );
+    const pdfInputTokens = Math.max(1, sourceContext.packet.manifest.pageCount * 1_000);
+    const sourceManifestText = JSON.stringify(sourceContext.packet.modelManifest);
     const inputTokenEstimate = estimateAiStructuredInputTokens({
       systemPrompt: request.systemPrompt,
-      inputPrompt,
+      inputPrompt: `${inputPrompt}\n${sourceManifestText}`,
       structuredTextFormat,
-      minimumPromptTokens: sourceContext.totalTokens,
+      additionalInputTokens: pdfInputTokens,
     });
     const maxOutputTokens = route.maxOutputTokens ?? LESSON_SUMMARY_MAX_OUTPUT_TOKENS;
     const resolvedCandidate =
@@ -245,14 +641,10 @@ export class LessonSummariesService {
       null;
     const resolvedModel = resolvedCandidate?.model ?? null;
     const resolvedTemperature = route.temperature ?? request.temperature;
-    const resolvedReasoningEffort = route.reasoningEffort ?? request.reasoningEffort;
-    const promptCacheFields = resolvedModel
-      ? buildOpenAiPromptCacheFields({
-          request,
-          model: resolvedModel,
-          structuredTextFormat,
-        })
-      : {};
+    const configuredReasoningEffort = route.reasoningEffort ?? request.reasoningEffort;
+    const resolvedReasoningEffort = isAiReasoningEffort(configuredReasoningEffort)
+      ? configuredReasoningEffort
+      : undefined;
     const fxRate = await this.getFxRateVndPerUsd();
     const requiredCostMetrics = new Set([
       ProviderUsageMetric.INPUT_TOKEN,
@@ -264,6 +656,30 @@ export class LessonSummariesService {
     const canEstimateCost = [...requiredCostMetrics].every((metric) =>
       pricedMetrics.has(metric),
     );
+    const estimatedInputCost =
+      resolvedCandidate && canEstimateCost
+        ? calculateProviderCost(
+            {
+              promptTokens: inputTokenEstimate.estimatedTokens,
+              completionTokens: 0,
+              requestCount: 1,
+            },
+            resolvedCandidate.rates,
+            fxRate,
+          )
+        : null;
+    const estimatedOutputCost =
+      resolvedCandidate && canEstimateCost
+        ? calculateProviderCost(
+            {
+              promptTokens: 0,
+              completionTokens: maxOutputTokens,
+              requestCount: 0,
+            },
+            resolvedCandidate.rates,
+            fxRate,
+          )
+        : null;
     const estimatedCost =
       resolvedCandidate && canEstimateCost
         ? calculateProviderCost(
@@ -277,42 +693,145 @@ export class LessonSummariesService {
           )
         : null;
 
-    const allActiveModels = await this.modelRouting.getAllActiveModels();
+    const allActiveModels = (await this.modelRouting.getAllActiveModels()).filter(
+      supportsHighDetailPdfInput,
+    );
+    const schemaJson = structuredTextFormat.schema;
+    const schemaHash = hashAiValue(schemaJson);
+    const requestHash = hashAiValue({
+      packetHash: sourceContext.packet.packetHash,
+      manifestHash: sourceContext.packet.manifestHash,
+      systemPrompt: request.systemPrompt,
+      userPrompt: request.userPrompt,
+      schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
+      schemaHash,
+      model: resolvedModel,
+      temperature: resolvedTemperature,
+      reasoningEffort: resolvedReasoningEffort,
+      maxOutputTokens,
+      detail: "high",
+    });
+    const expiresAt = new Date(
+      Date.now() +
+        this.configService.get("AI_SUMMARY_REQUEST_DRAFT_TTL_SECONDS", {
+          infer: true,
+        }) *
+          1_000,
+    );
+    const draft = await this.prisma.lessonSummaryRequestDraft.create({
+      data: {
+        lessonId,
+        createdById: actorUserId,
+        requestHash,
+        packetHash: sourceContext.packet.packetHash,
+        manifestHash: sourceContext.packet.manifestHash,
+        packetObjectKey: sourceContext.packet.objectKey,
+        packetFilename: sourceContext.packet.filename,
+        packetSizeBytes: BigInt(sourceContext.packet.bytes.length),
+        packetPageCount: sourceContext.packet.manifest.pageCount,
+        systemInstructions: request.systemPrompt,
+        userPrompt: request.userPrompt,
+        schemaName: request.outputName,
+        schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
+        schemaHash,
+        schemaJson: schemaJson as unknown as Prisma.InputJsonValue,
+        manifestJson: sourceContext.packet.manifest as unknown as Prisma.InputJsonValue,
+        sourceSnapshotJson: {
+          ...sourceContext.packet.sourceSnapshot,
+          documentIds: sourceContext.documentIds,
+          sourceHash: sourceContext.sourceHash,
+          lessonTitle: sourceContext.lessonTitle,
+          targetGrade: sourceContext.targetGrade,
+          subjectKey: sourceContext.subject.key,
+          subjectName: sourceContext.subject.name,
+          subjectSlug: sourceContext.subject.slug,
+          generationConfiguration: configuration,
+        } as Prisma.InputJsonValue,
+        modelConfigJson: {
+          resolvedProvider: resolvedCandidate?.provider ?? null,
+          resolvedModel,
+          temperature: resolvedTemperature,
+          reasoningEffort: resolvedReasoningEffort,
+          maxOutputTokens,
+          pdfDetail: "high",
+          routeSnapshot: route,
+        } as unknown as Prisma.InputJsonValue,
+        costEstimateJson: estimatedCost
+          ? ({
+              inputUpperBoundUsd: estimatedInputCost?.costUsd ?? null,
+              inputUpperBoundVnd: estimatedInputCost?.costVnd ?? null,
+              outputUpperBoundUsd: estimatedOutputCost?.costUsd ?? null,
+              outputUpperBoundVnd: estimatedOutputCost?.costVnd ?? null,
+              upperBoundUsd: estimatedCost.costUsd,
+              upperBoundVnd: estimatedCost.costVnd,
+              fxRateVndPerUsd: fxRate,
+            } as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        expiresAt,
+      },
+    });
 
     return {
+      requestDraftId: draft.id,
+      requestHash,
+      expiresAt,
       promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
       schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
       systemPrompt: request.systemPrompt,
       userPrompt: request.userPrompt,
       inputPrompt,
-      openAiRequest: {
-        model: resolvedModel,
-        instructions: request.systemPrompt,
-        input: inputPrompt,
-        text: {
-          format: structuredTextFormat,
-        },
-        ...promptCacheFields,
-        ...(resolvedModel &&
-        resolvedTemperature !== undefined &&
-        supportsOpenAiTemperature(resolvedModel)
-          ? { temperature: resolvedTemperature }
-          : {}),
-        ...(resolvedModel &&
-        resolvedReasoningEffort &&
-        supportsOpenAiReasoningEffort(resolvedModel)
-          ? { reasoning: { effort: resolvedReasoningEffort } }
-          : {}),
-        max_output_tokens: maxOutputTokens,
+      openAiFileUploadRequest: {
+        purpose: "user_data" as const,
+        file: `<File name="${sourceContext.packet.filename}" type="application/pdf" size=${sourceContext.packet.bytes.length}; ${OPENAI_PREVIEW_BINARY_DATA}>`,
       },
+      openAiRequest: buildOpenAiStructuredResponseRequest({
+        request: {
+          ...request,
+          model: resolvedModel ?? undefined,
+          temperature: resolvedTemperature,
+          reasoningEffort: resolvedReasoningEffort,
+          maxTokens: maxOutputTokens,
+        },
+        model: resolvedModel,
+        structuredTextFormat,
+        responseInput: buildOpenAiResponseInput(request, [
+          {
+            type: "input_file",
+            file_id: OPENAI_PREVIEW_FILE_ID,
+            detail: "high",
+          },
+        ]),
+      }),
       context: {
+        lessonTitle: sourceContext.lessonTitle,
         documentCount: sourceContext.documentIds.length,
-        chunkCount: sourceContext.chunks.length,
+        packet: {
+          filename: sourceContext.packet.filename,
+          sizeBytes: sourceContext.packet.bytes.length,
+          pageCount: sourceContext.packet.manifest.pageCount,
+          packetHash: sourceContext.packet.packetHash,
+          manifestHash: sourceContext.packet.manifestHash,
+          detail: "high",
+          manifest: sourceContext.packet.manifest,
+        },
+        chunkCount: 0,
         estimatedTokens: inputTokenEstimate.estimatedTokens,
+        textInputTokens: inputTokenEstimate.textInputTokens,
+        pdfInputTokens,
         promptTokens: inputTokenEstimate.promptTokens,
         schemaTokens: inputTokenEstimate.schemaTokens,
-        contextTokens: sourceContext.totalTokens,
-        maxContextTokens: LESSON_SUMMARY_MAX_CONTEXT_TOKENS,
+        contextTokens: 0,
+        maxContextTokens: null,
+        chunks: [],
+        tokenBreakdown: {
+          systemInstructionsTokens: estimateTextTokens(request.systemPrompt),
+          userPromptTokens: estimateTextTokens(request.userPrompt),
+          contextTokens: 0,
+          schemaTokens: inputTokenEstimate.schemaTokens,
+          textInputTokens: inputTokenEstimate.textInputTokens,
+          pdfInputTokens,
+          estimatedTokens: inputTokenEstimate.estimatedTokens,
+        },
       },
       configuration: {
         selectedModel: dto.model ?? null,
@@ -332,12 +851,20 @@ export class LessonSummariesService {
       estimatedCost: estimatedCost
         ? {
             available: true,
+            inputUpperBoundUsd: estimatedInputCost?.costUsd ?? null,
+            inputUpperBoundVnd: estimatedInputCost?.costVnd ?? null,
+            outputUpperBoundUsd: estimatedOutputCost?.costUsd ?? null,
+            outputUpperBoundVnd: estimatedOutputCost?.costVnd ?? null,
             upperBoundUsd: estimatedCost.costUsd,
             upperBoundVnd: estimatedCost.costVnd,
             fxRateVndPerUsd: fxRate,
           }
         : {
             available: false,
+            inputUpperBoundUsd: null,
+            inputUpperBoundVnd: null,
+            outputUpperBoundUsd: null,
+            outputUpperBoundVnd: null,
             upperBoundUsd: null,
             upperBoundVnd: null,
             fxRateVndPerUsd: fxRate,
@@ -359,6 +886,26 @@ export class LessonSummariesService {
     }
   }
 
+  private async cleanupRequestDraftPackets(lessonId: string, actorUserId: string) {
+    const drafts = await this.prisma.lessonSummaryRequestDraft.findMany({
+      where: {
+        consumedAt: null,
+        OR: [{ expiresAt: { lte: new Date() } }, { lessonId, createdById: actorUserId }],
+      },
+      select: { id: true, packetObjectKey: true },
+      take: 50,
+    });
+    if (drafts.length === 0) return;
+    await Promise.all(
+      drafts.map((draft) =>
+        this.packets.cleanup(draft.packetObjectKey).catch(() => undefined),
+      ),
+    );
+    await this.prisma.lessonSummaryRequestDraft.deleteMany({
+      where: { id: { in: drafts.map((draft) => draft.id) } },
+    });
+  }
+
   private async loadSourceContext(lessonId: string, documentIds: string[]) {
     try {
       return await this.summaryContext.load(lessonId, documentIds);
@@ -367,9 +914,29 @@ export class LessonSummariesService {
     }
   }
 
+  private async loadPacketSourceContext(lessonId: string, documentIds: string[]) {
+    try {
+      return await this.summaryContext.loadPacket(lessonId, documentIds);
+    } catch (error) {
+      if (error instanceof LessonSourcePacketError) {
+        if (error.code === "LESSON_NOT_FOUND") {
+          throwNotFound("NOT_FOUND", error.message, error.details);
+        }
+        throwBadRequest(error.code, error.message, error.details);
+      }
+      this.rethrowContextError(error);
+    }
+  }
+
   private async resolveSummaryRoute(dto: GenerateLessonSummaryDto) {
     const baseRoute = await this.modelRouting.resolve(AiGenerationType.SUMMARY);
-    let candidates = baseRoute.candidates;
+    let candidates = baseRoute.candidates.filter(supportsHighDetailPdfInput);
+    if (!dto.model && candidates.length === 0) {
+      throwBadRequest(
+        "AI_PDF_MODEL_NOT_AVAILABLE",
+        "Chưa có model OpenAI hỗ trợ PDF detail=high cho chức năng tóm tắt.",
+      );
+    }
     if (dto.model) {
       let selectedCandidate: ProviderRouteCandidate | null | undefined = candidates.find(
         (candidate) => candidate.model === dto.model && candidate.available,
@@ -377,7 +944,11 @@ export class LessonSummariesService {
       if (!selectedCandidate) {
         selectedCandidate = await this.modelRouting.resolveCandidateByModel(dto.model);
       }
-      if (!selectedCandidate || !selectedCandidate.available) {
+      if (
+        !selectedCandidate ||
+        !selectedCandidate.available ||
+        !supportsHighDetailPdfInput(selectedCandidate)
+      ) {
         throwBadRequest(
           "AI_MODEL_NOT_AVAILABLE",
           "Model đã chọn không còn khả dụng cho chức năng tóm tắt.",
@@ -394,7 +965,10 @@ export class LessonSummariesService {
       reasoningEffort: dto.reasoningEffort ?? baseRoute.reasoningEffort,
       maxOutputTokens: Math.max(
         dto.maxOutputTokens ?? baseRoute.maxOutputTokens ?? 0,
-        LESSON_SUMMARY_MIN_OUTPUT_TOKENS,
+        resolveLessonSummaryOutputTokenFloor({
+          length: dto.length ?? "standard",
+          targetWordCount: dto.targetWordCount ?? null,
+        }),
       ),
     };
     if (dto.model && dto.reasoningEffort) {
@@ -456,6 +1030,175 @@ export class LessonSummariesService {
   }
 }
 
+function estimateTextTokens(value: string) {
+  return Math.max(1, Math.ceil(value.length / 4));
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function readRequiredString(value: unknown, field: string) {
+  const result = readString(value);
+  if (result === null) {
+    throwBadRequest("AI_INPUT_SNAPSHOT_INVALID", `Snapshot thiếu trường ${field}.`);
+  }
+  return result;
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function readJsonRecord(value: Prisma.JsonValue | null | undefined) {
+  return isRecord(value) ? value : {};
+}
+
+function readNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function collectStemFigureIds(contentJson: Record<string, unknown>) {
+  const data = isRecord(contentJson.data) ? contentJson.data : null;
+  const sections = data && Array.isArray(data.sections) ? data.sections : [];
+  const ids = new Set<string>();
+  for (const section of sections) {
+    if (!isRecord(section) || !Array.isArray(section.blocks)) continue;
+    for (const block of section.blocks) {
+      if (!isRecord(block) || !Array.isArray(block.figures)) continue;
+      for (const figure of block.figures) {
+        if (
+          isRecord(figure) &&
+          figure.kind === "TEX_FIGURE" &&
+          typeof figure.figureId === "string"
+        ) {
+          ids.add(figure.figureId);
+        }
+      }
+    }
+  }
+  return [...ids];
+}
+
+export function assertLessonSummaryStemFigureReferences(input: {
+  referencedFigureIds: string[];
+  figures: Array<{
+    id: string;
+    currentRevision: {
+      status: StemFigureRevisionStatus;
+      deliveryFileId: string | null;
+    } | null;
+  }>;
+  requireReadyAsset: boolean;
+}) {
+  const figuresById = new Map(input.figures.map((figure) => [figure.id, figure]));
+  const invalidFigureIds = input.referencedFigureIds.filter(
+    (figureId) => !figuresById.has(figureId),
+  );
+  if (invalidFigureIds.length > 0) {
+    throwBadRequest(
+      "LESSON_SUMMARY_STEM_FIGURES_INVALID_REFERENCE",
+      "Nội dung chứa hình không còn thuộc bản kiến thức hiện tại. Hãy tải lại trang trước khi lưu.",
+      { figureIds: invalidFigureIds.slice(0, 20) },
+    );
+  }
+  if (!input.requireReadyAsset) return;
+
+  const blockedFigureIds = input.referencedFigureIds.filter((figureId) => {
+    const figure = figuresById.get(figureId)!;
+    return (
+      figure.currentRevision?.status !== StemFigureRevisionStatus.SUCCEEDED ||
+      !figure.currentRevision.deliveryFileId
+    );
+  });
+  if (blockedFigureIds.length > 0) {
+    throwBadRequest(
+      "LESSON_SUMMARY_STEM_FIGURES_UNRESOLVED",
+      `Còn ${blockedFigureIds.length} hình chưa có asset hợp lệ để phát hành.`,
+      { figureIds: blockedFigureIds.slice(0, 20) },
+    );
+  }
+}
+
+function assertRawFigureCountsUnchanged(
+  previousBlocks: Record<string, unknown>,
+  nextBlocks: Record<string, unknown>,
+) {
+  const changedPaths = Object.keys(previousBlocks).filter(
+    (blockPath) =>
+      readRawFigureCount(previousBlocks[blockPath]) !==
+      readRawFigureCount(nextBlocks[blockPath]),
+  );
+  if (changedPaths.length > 0) {
+    throwBadRequest(
+      "LESSON_SUMMARY_PHASE_ONE_FIGURE_COUNT_CHANGED",
+      "Không thêm hoặc xóa figure trực tiếp trong raw JSON. Hãy dùng menu ảnh của block.",
+      { blockPaths: changedPaths },
+    );
+  }
+}
+
+function readRawFigureCount(value: unknown) {
+  return isRecord(value) && Array.isArray(value.figures) ? value.figures.length : 0;
+}
+
+function stemFigurePositionKey(blockPath: string, figureIndex: number) {
+  return `${blockPath}:${figureIndex}`;
+}
+
+function attachPhaseOneFigureReference(
+  content: {
+    sections: Array<{ blocks: Array<Record<string, unknown>> }>;
+  },
+  input: {
+    blockPath: string;
+    figureIndex: number;
+    figureId: string;
+    figureOrigin: "TEXTBOOK_SOURCE" | "GENERATED_FROM_BRIEF";
+    altText: string;
+    caption: string | null;
+    status: string;
+  },
+) {
+  const match = input.blockPath.match(/^sections\.(\d+)\.blocks\.(\d+)$/u);
+  const block = match
+    ? content.sections[Number(match[1])]?.blocks[Number(match[2])]
+    : undefined;
+  if (!block) {
+    throwBadRequest(
+      "LESSON_SUMMARY_PHASE_ONE_BLOCK_PATH_INVALID",
+      `Không tìm thấy block ${input.blockPath} sau khi map raw JSON.`,
+    );
+  }
+  const figures = Array.isArray(block.figures) ? [...block.figures] : [];
+  figures[input.figureIndex] = {
+    kind: "TEX_FIGURE",
+    figureId: input.figureId,
+    figureOrigin: input.figureOrigin,
+    altText: input.altText,
+    caption: input.caption,
+    status: input.status,
+  };
+  block.figures = figures;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readPhaseOneBlockJsonByPath(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) return null;
+  if (
+    value.type !== "lesson_summary_phase_one_blocks" ||
+    (value.version !== 1 && value.version !== 2)
+  ) {
+    return null;
+  }
+  return isRecord(value.blocks) ? value.blocks : null;
+}
+
 function readReasoningEffortLevels(capabilities: unknown): string[] {
   if (!capabilities || typeof capabilities !== "object" || Array.isArray(capabilities)) {
     return [];
@@ -473,16 +1216,29 @@ function normalizeConfiguration(
     LessonSummaryJobInput,
     "promptCacheKeyEnabled" | "promptCacheRetention"
   >,
-): Omit<LessonSummaryJobInput, "documentIds" | "sourceHash" | "targetGrade"> {
+): Omit<
+  LessonSummaryJobInput,
+  | "documentIds"
+  | "sourceHash"
+  | "targetGrade"
+  | "subjectKey"
+  | "subjectName"
+  | "subjectSlug"
+  | "requestDraftId"
+  | "requestHash"
+  | "packetHash"
+  | "manifestHash"
+> {
   return {
+    useTextbookSourceImages: dto.useTextbookSourceImages ?? false,
     style: dto.style,
     styleInstructions: dto.styleInstructions?.trim() ?? "",
     length: dto.length ?? "standard",
     targetWordCount: dto.targetWordCount ?? null,
 
     extraInstructions: dto.extraInstructions?.trim() ?? "",
-    systemInstructions: dto.systemInstructions?.trim() ?? "",
-    userPrompt: dto.userPrompt?.trim() ?? "",
+    systemInstructions: dto.systemInstructions ?? "",
+    userPrompt: dto.userPrompt ?? "",
 
     ...(dto.model ? { model: dto.model } : {}),
     ...(dto.temperature !== undefined ? { temperature: dto.temperature } : {}),

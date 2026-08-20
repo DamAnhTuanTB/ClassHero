@@ -13,6 +13,7 @@ export function serializeStudentLessonContent(
   record: StudentLessonContentRecord,
   access: StudentLessonAccessContext,
   fileAccessUrls: StudentFileAccessUrls,
+  stemFigureAssetUrls: ReadonlyMap<string, string | null> = new Map(),
 ) {
   const canStartTest = canStudentStartTest(record.examOpenAt, access);
 
@@ -64,7 +65,7 @@ export function serializeStudentLessonContent(
       sortOrder: document.sortOrder,
       title: document.title,
     })),
-    summary: serializeStudentLessonSummary(record.summary),
+    summary: serializeStudentLessonSummary(record.summary, stemFigureAssetUrls),
     quizSets: record.quizSets.map(({ _count, ...set }) => ({
       ...set,
       questionCount: _count.questions,
@@ -81,7 +82,10 @@ export function serializeStudentLessonContent(
   };
 }
 
-export function serializeStudentLessonSummary(record: StudentLessonSummaryRecord | null) {
+export function serializeStudentLessonSummary(
+  record: StudentLessonSummaryRecord | null,
+  stemFigureAssetUrls: ReadonlyMap<string, string | null> = new Map(),
+) {
   if (!record || record.deletedAt || record.reviewStatus !== ReviewStatus.APPROVED) {
     return null;
   }
@@ -89,10 +93,79 @@ export function serializeStudentLessonSummary(record: StudentLessonSummaryRecord
   return {
     id: record.id,
     lessonId: record.lessonId,
-    contentJson: record.contentJson,
+    contentJson: hydrateStemFigureReferences(
+      record.contentJson,
+      new Map(
+        record.stemFigures.map((figure) => [
+          figure.id,
+          {
+            status: "SUCCEEDED" as const,
+            altText: figure.currentRevision?.altText ?? "Hình minh họa STEM",
+            caption: figure.currentRevision?.caption ?? null,
+            assetUrl: stemFigureAssetUrls.get(figure.id) ?? null,
+          },
+        ]),
+      ),
+    ),
     source: record.source,
     updatedAt: record.updatedAt,
   };
+}
+
+function hydrateStemFigureReferences(
+  contentJson: unknown,
+  figures: ReadonlyMap<
+    string,
+    {
+      status: "SUCCEEDED";
+      altText: string;
+      caption: string | null;
+      assetUrl: string | null;
+    }
+  >,
+) {
+  if (!isRecord(contentJson) || !isRecord(contentJson.data)) return contentJson;
+  const sections = contentJson.data.sections;
+  if (!Array.isArray(sections)) return contentJson;
+  return {
+    ...contentJson,
+    data: {
+      ...contentJson.data,
+      sections: sections.map((section) => {
+        if (!isRecord(section) || !Array.isArray(section.blocks)) return section;
+        return {
+          ...section,
+          blocks: section.blocks.map((block) => {
+            if (!isRecord(block) || !isRecord(block.visual)) return block;
+            if (
+              block.visual.kind !== "TEX_FIGURE" ||
+              typeof block.visual.figureId !== "string"
+            ) {
+              return block;
+            }
+            const figure = figures.get(block.visual.figureId);
+            return figure
+              ? {
+                  ...block,
+                  visual: {
+                    kind: "TEX_FIGURE",
+                    figureId: block.visual.figureId,
+                    status: figure.status,
+                    altText: figure.altText,
+                    caption: figure.caption,
+                    assetUrl: figure.assetUrl,
+                  },
+                }
+              : block;
+          }),
+        };
+      }),
+    },
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function serializeStudentQuizSet(record: StudentQuizSetRecord) {

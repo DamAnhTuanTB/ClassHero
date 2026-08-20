@@ -31,6 +31,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { adminCourseDocumentQueryKeys } from "@/features/admin/courses/hooks/use-admin-course-documents-manager";
 import { toast } from "sonner";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
+import { useAdminFileAccessUrl } from "@/features/admin/courses/hooks/use-admin-file-access-url";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 type ViewMode = "html" | "pages";
@@ -48,14 +49,17 @@ export function SourceDocumentPagesDialog({
   sourceDocument: AdminSourceDocumentApi | null;
   onClose: () => void;
 }) {
-  const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("html");
   const [filterMode, setFilterMode] = useState<"all" | "warnings">("all");
   const [searchPrintedPage, setSearchPrintedPage] = useState("");
   const debouncedSearchPrintedPage = useDebouncedValue(searchPrintedPage);
   const [visibleCount, setVisibleCount] = useState(10);
+  const pdfAccessUrlQuery = useAdminFileAccessUrl(
+    sourceDocument?.file.id ?? null,
+    isOpen && viewMode === "pages" && showPdfPreview,
+  );
+  const pdfUrl = pdfAccessUrlQuery.data?.url ?? null;
 
   const filteredPages = pages.filter((page) => {
     if (filterMode === "warnings" && !getPrintedPageView(page).warning) {
@@ -79,18 +83,11 @@ export function SourceDocumentPagesDialog({
 
   useEffect(() => {
     if (isOpen) {
-      if (sourceDocument?.file?.publicUrl) {
-        setPdfUrl(sourceDocument.file.publicUrl);
-      } else {
-        setPdfUrl(null);
-      }
       // Reset view state when opening
       setShowPdfPreview(initialFilter === "warnings");
       setViewMode(initialFilter === "warnings" ? "pages" : "html");
       setFilterMode(initialFilter ?? "all");
       setSearchPrintedPage("");
-    } else {
-      setPdfUrl(null);
     }
   }, [isOpen, sourceDocument, initialFilter]);
 
@@ -301,7 +298,11 @@ function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }
       <div className="w-full max-w-3xl bg-white border border-[var(--theme-border)] rounded-md shadow-sm p-3 sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4">
           {pages.map((page, index) => {
-            const text = page.mathpixMarkdown ?? page.fullText ?? page.textPreview;
+            const text =
+              page.orderedContent ??
+              page.mathpixMarkdown ??
+              page.fullText ??
+              page.textPreview;
             const printed = getPrintedPageView(page);
             return (
               <div
@@ -317,7 +318,10 @@ function OcrRenderedPagesView({ pages }: { pages: AdminSourceDocumentPageApi[] }
                     : ""}
                 </div>
                 {text ? (
-                  <MathpixMarkdownRenderer content={text} />
+                  <MathpixMarkdownRenderer
+                    className="mmd-content--ocr-document"
+                    content={text}
+                  />
                 ) : (
                   <p className="italic text-[var(--theme-text-muted)]">
                     Không có nội dung
@@ -344,8 +348,8 @@ function PageDetailRow({
   const printedPage = getPrintedPageView(page);
   const hasWarning = Boolean(printedPage.warning);
   const hasError = page.status === "FAILED";
-  // Prefer mathpixMarkdown (rich: images, tables, math) over plain text
-  const richContent = page.mathpixMarkdown;
+  // orderedContent keeps Mathpix text/figure order and refreshes private image URLs.
+  const richContent = page.orderedContent ?? page.mathpixMarkdown;
   const plainText = page.fullText ?? page.textPreview;
   const text = richContent ?? plainText;
   const isLongText = (text?.length ?? 0) > 200;
@@ -463,7 +467,10 @@ function PageDetailRow({
                     : ""
                 }`}
               >
-                <MathpixMarkdownRenderer content={text} />
+                <MathpixMarkdownRenderer
+                  className="mmd-content--ocr-document"
+                  content={text}
+                />
                 {!isExpanded && isLongText && (
                   <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent" />
                 )}

@@ -304,6 +304,12 @@ Acceptance Criteria:
 
 ## 7. Admin dùng AI tạo tóm tắt/quiz/flashcard/bài kiểm tra
 
+Quyết định flow M9.2 đã triển khai ngày 2026-08-19: khi dựng
+hình Summary, hệ thống không còn nhận/sửa/hiển thị `visualIntent`. Có ảnh nguồn
+thì OpenAI nhận ảnh + target + nội dung block tối thiểu; không ảnh thì nhận nội
+dung block. Yêu cầu admin chỉ là delta trên ảnh baseline. Payload/job cũ không
+được tiếp tục qua cutover v3.
+
 Actor: Admin.
 
 Các bước chung:
@@ -327,36 +333,99 @@ Các bước chung:
    bên dưới. Câu AI có hai chế độ `Chỉ xem UI` và `Song song` (UI + JSON) theo
    cùng pattern review của Sinh kiến thức; nhãn khối EXAMPLE trong ngữ cảnh Quiz
    hiển thị là `Lời giải`.
-10. Admin xem, sửa, thêm, xóa và duyệt/publish. Với hình JSON trong Summary,
-   admin chọn trực tiếp tên/label/caption/marker hoặc nhiều đoạn có tên ở hai đầu.
-   Sửa, xóa và thêm dấu bằng nhau áp dụng ngay trong draft; chỉ reset một hình mới
-   có confirm và chỉ nút `Lưu nội dung` mới persist.
+10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
+    `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
+    trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
+    Stage 1 bắt buộc tạo brief; backend không suy hình bằng tiêu đề/từ khóa.
+    Example Hình học lớp 7–9 bắt buộc có bảng GT–KL; lớp 10–12 không có bảng này.
+11. Trong modal `Sinh kiến thức`, checkbox `Dùng ảnh gốc sách giáo khoa` mặc
+    định tắt. Khi bật, Stage 1 vẫn đi qua nguyên entrypoint, packet, prompt,
+    provider schema, validation và mapper hiện tại, không thêm nhánh theo
+    checkbox; chỉ sau khi output đã validate/map thành công backend mới đọc cờ
+    hậu xử lý và tự promote toàn bộ crop OCR thuộc tập khớp chắc chắn của figure
+    `TEXTBOOK_SOURCE` thành ảnh raster chính thức và không enqueue/call Stage 2
+    cho bất kỳ figure nào. Figure `GENERATED_FROM_BRIEF` được bỏ qua vì không có
+    ảnh SGK; nhiều panel chắc chắn được gắn thành nhiều ảnh cùng block theo
+    thứ tự resolver. Figure nguồn thiếu crop, có nhiều candidate mơ hồ hoặc chỉ resolve được
+    ảnh toàn trang chuyển `NEEDS_REVIEW` để admin chọn/thay/xóa thủ công; hệ thống
+    không tự chọn một crop mơ hồ và không dùng cả trang PDF làm ảnh bài học.
+12. Ở chế độ mặc định, mỗi figure chạy render riêng. Compile + validator thành
+    công thì figure tự
+    chuyển `SUCCEEDED` và dùng asset R2, không có bước approve riêng. Retry cạn
+    thì vị trí đó hiện placeholder `FAILED` kèm lỗi.
+    JSON của `TEX_FIGURE` phải cho admin biết provenance qua `figureOrigin`:
+    `TEXTBOOK_SOURCE` khi Stage 1 liên kết hình SGK và
+    `GENERATED_FROM_BRIEF` khi không có hình nguồn, AI đề xuất vẽ thêm. AI phải
+    khai field này trong structured output và backend reject nếu origin mâu thuẫn
+    với `sourceReferences`. Với `GENERATED_FROM_BRIEF`, Stage 2 luôn chạy không
+    ảnh (`mode=NONE`), không được gửi crop hoặc PDF fallback. Ở chế độ `Song song`
+    và `Chỉ xem JSON`, admin còn thấy nguyên `sourceReferences` Phase 1 của từng
+    figure; mảng rỗng xác nhận hình do AI đề xuất vẽ mới, mảng có phần tử chỉ ra
+    đúng trang/nhãn/phạm vi hình SGK.
+13. Mọi block có menu ảnh dùng chung gồm `Tạo mới bằng AI`, `Tạo mới bằng mã
+code`, `Tải ảnh lên`, `Xem hình gốc`; nếu block có nhiều figure thì admin phải
+    chọn đúng figure trước khi thao tác. Mọi figure có các action tương ứng cùng
+    `Xóa`; chỉ figure có source `AI_TEX` mới bật `Chỉnh sửa bằng mã code`, còn ảnh
+    upload/ảnh sách dạng raster phải disable action sửa mã.
+    Modal tạo hình AI có nút `Xem dữ liệu`, hiển thị cùng cây JSON của modal Tạo
+    kiến thức và phản ánh request OpenAI đầy đủ theo lựa chọn/field hiện tại. Nếu
+    admin nhập `Yêu cầu cho hình mới`, request phải phản ánh đúng cách làm đã
+    chọn. `Tạo mới lại` gửi ảnh gốc sách giáo khoa và projection block như Stage 2,
+    không gửi code hiện tại. `Sửa ảnh hiện tại` gửi ảnh gốc sách giáo khoa làm
+    hình đích, code TikZ hiện tại làm code cần sửa và yêu cầu admin; provider sửa
+    tối thiểu trên code, giữ nguyên phần không liên quan và không gửi ảnh render
+    hiện tại. Mọi phần ảnh ngoài delta phải được giữ nguyên; block sở hữu chỉ dùng
+    kiểm chứng phần ảnh không quyết định. Nếu field rỗng,
+    request provider không chứa key hoặc câu prompt nói về yêu cầu bổ sung.
+14. Nút `Lưu`/`Phát hành` chỉ bị chặn khi còn placeholder figure `FAILED` đang
+    hoạt động hoặc initial figure còn render. Admin phải xóa, thay thế hoặc làm
+    figure đó thành công; cảnh báo thiếu hình không phải blocker.
 
 Acceptance Criteria:
 
 - Không gửi toàn bộ PDF nếu đã có chunk/embedding.
-- Output không đúng schema thì không lưu dữ liệu lỗi.
+- Output không đúng schema cấu trúc thì không lưu dữ liệu lỗi. Không có semantic
+  figure gate dựa tiêu đề/từ khóa; quan hệ hình nguồn–block và figure brief được
+  khóa ngay trong prompt/structured output của Stage 1.
 - Nội dung có `source = AI` và `review_status` phù hợp.
 - Có log AI generation.
 - Mỗi lượt Quiz giữ lineage riêng. Ví dụ AI sinh 10 câu rồi admin xóa 2 câu thì
   audit của chính lượt đó còn 8, trong khi các câu thủ công và lượt AI khác trong
   cùng bộ vẫn được giữ nguyên.
-- Đề, hình, bảng GT–KL, lời giải và đáp án của Quiz dùng cùng schema, recovery,
-  normalizer và component hiển thị với block `EXAMPLE` của Sinh kiến thức.
-- Tên điểm chỉ sửa text hiển thị, không xóa hoặc đổi ID/tọa độ; `labels[]`, text
-  góc và caption được sửa/xóa; marker góc/góc vuông/bằng nhau/song song được xóa
-  theo group; không cho xóa point/primitive/topology hình.
-- Một dấu bằng nhau/song song đại diện cả marker group: chọn một glyph phải
-  highlight và xóa cả quan hệ, không để lại nhóm chỉ có một segment.
-- Summary đã phát hành phải được thu hồi trước khi xóa label/marker. Student và
-  mọi renderer read-only không có edit affordance.
-- Frontend validate bản nháp sau mutation; backend vẫn reconcile schema/review
-  issue khi lưu và chặn phát hành nếu còn issue chưa xử lý.
-- Một đoạn được chọn chỉ tô đỏ, không hiện popup. Từ hai đoạn `SEGMENT` có tên ở
-  cả hai đầu mới hiện popup chỉ có action tạo `EQUAL_LENGTH`; click đúng `BC` phải
-  chọn đúng `BC`, không được tô cạnh có hình dạng/vị trí tương tự ở cụm khác.
-- Mọi action giữ vị trí cuộn. Nút reset trên từng hình có confirm và chỉ phục hồi
-  mọi chỉnh sửa của hình đó trong phiên draft hiện tại, không đổi nội dung khác.
+- Quiz/Flashcard/Test giữ text-only trong giai đoạn TeX/TikZ Summary đầu tiên.
+- Figure thành công không cần `NEEDS_REVIEW`/`APPROVED`; validator kỹ thuật là
+  điều kiện thành công, còn admin chủ động sửa/thay/sinh lại nếu hình chưa đẹp.
+- Checkbox dùng ảnh gốc phải được snapshot vào request draft/job. Bật checkbox
+  không được làm thay đổi packet, prompt, provider schema, validation, mapper
+  hoặc provider input Phase 1; usage của lượt sinh chỉ có Phase 1 và bằng `0`
+  paid call Phase 2. Crop tự điền phải đi qua cùng
+  validation MIME/kích thước, chuẩn hóa WebP, R2 và revision audit với action
+  `Dùng hình này`; không tham chiếu trực tiếp object OCR tạm thời khi delivery.
+- Mọi action giữ vị trí cuộn. Xóa figure xóa reference khỏi Summary và soft-delete
+  metadata; cleanup object storage chạy tách biệt, không xóa nhầm asset đang dùng.
+- Block đã xóa figure hoặc chưa từng có figure vẫn mở được luồng AI/code/upload.
+  Logical draft được phục hồi/tạo từ đúng block context nhưng không gắn reference
+  vào Summary cho tới khi asset mới thành công; vì vậy không hiện placeholder
+  `Đang chờ` sau thao tác xóa hoặc khi admin hủy modal.
+- Sinh lại figure đang `SUCCEEDED` không làm mất asset cũ: chỉ hoán đổi nguyên tử
+  khi candidate mới compile + validate thành công. Candidate lỗi giữ nguyên hình
+  cũ và hiển thị lỗi action.
+- Ảnh thay thế nhận JPEG/PNG/WebP, qua validation type/size và gắn vào đúng figure;
+  ảnh upload không có source TikZ để mở editor.
+- Modal tạo mới bằng AI có mục `1. Cách tạo hình` với hai lựa chọn loại trừ nhau:
+  `Tạo mới lại` và `Sửa ảnh hiện tại`. Cách sửa chỉ bật khi có cả ảnh gốc sách
+  giáo khoa và revision `AI_TEX` hiện tại; nếu thiếu ảnh sách thì hệ thống tạo từ
+  block brief theo mode `NONE`. Cả hai lựa chọn có ảnh đều gửi ảnh sách đúng một
+  lần; chỉ cách sửa gửi thêm code TikZ hiện tại.
+- Ảnh tham chiếu và `Yêu cầu cho hình mới` là hai authority duy nhất, ngang hàng
+  theo phạm vi trong dữ liệu động của lượt tạo lại. Hệ thống phải giữ nguyên
+  baseline ngoài phạm vi delta, đồng thời không được hạ delta admin thành
+  preference hoặc âm thầm ưu tiên block sở hữu. Field rỗng/blank phải
+  biến mất hoàn toàn khỏi provider JSON và prompt mặc định. Chỉ safety, contract
+  output/TeX và tính đúng nội tại được phép đứng cao hơn hai authority này.
+- Figure `AI_TEX` mở source editor và preview SVG song song. Admin sửa source,
+  compile draft local rồi chỉ apply revision đã qua validator; không có click
+  preview để định vị source, PDF/SyncTeX hay chỉnh vector trực tiếp.
 
 ### 7.1. Admin cấu hình model và theo dõi chi phí AI/OCR
 

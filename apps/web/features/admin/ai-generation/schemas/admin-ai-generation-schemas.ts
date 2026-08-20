@@ -45,6 +45,7 @@ export const adminAiGenerationFormSchema = z
   .object({
     type: generationTypeSchema,
     documentIds: z.array(z.string().uuid()).max(20, "Chọn tối đa 20 tài liệu"),
+    useTextbookSourceImages: z.boolean(),
     style: summaryStyleSchema,
     styleInstructions: z
       .string()
@@ -56,12 +57,11 @@ export const adminAiGenerationFormSchema = z
     extraInstructions: z.string().trim().max(2_000, "Yêu cầu bổ sung tối đa 2.000 ký tự"),
     systemInstructions: z
       .string()
-      .trim()
       .max(
         LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
         "Quy tắc hệ thống tối đa 64.000 ký tự",
       ),
-    userPrompt: z.string().trim().max(16_000, "Câu lệnh người dùng tối đa 16.000 ký tự"),
+    userPrompt: z.string().max(16_000, "Câu lệnh người dùng tối đa 16.000 ký tự"),
     summaryModel: z.string().max(200),
     summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),
     summaryReasoningEffort: z.union([z.literal(""), z.enum(AI_REASONING_EFFORT_LEVELS)]),

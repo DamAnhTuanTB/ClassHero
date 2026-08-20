@@ -230,14 +230,8 @@ export class ProviderUsageService {
           ...(measuredUsage
             ? {
                 promptTokens: Math.max(0, measuredUsage.promptTokens ?? 0),
-                cachedInputTokens: Math.max(
-                  0,
-                  measuredUsage.cachedInputTokens ?? 0,
-                ),
-                completionTokens: Math.max(
-                  0,
-                  measuredUsage.completionTokens ?? 0,
-                ),
+                cachedInputTokens: Math.max(0, measuredUsage.cachedInputTokens ?? 0),
+                completionTokens: Math.max(0, measuredUsage.completionTokens ?? 0),
                 totalTokens: Math.max(0, measuredUsage.totalTokens ?? 0),
                 requestCount: 1,
                 estimatedCostUsd: measuredCost?.costUsd ?? 0,
@@ -542,11 +536,15 @@ function getSafeErrorCode(error: unknown) {
 function toProviderFailureJson(details: AiProviderOutputFailureDetails) {
   return JSON.parse(
     JSON.stringify({
-      responseStatus: details.responseStatus,
-      incompleteReason: details.incompleteReason,
-      hasRefusal: details.hasRefusal,
-      maxOutputTokens: details.maxOutputTokens,
-      reasoningTokens: details.usage?.reasoningTokens,
+      providerUsage: details.providerUsageRaw ?? null,
+      fileOperations: details.inputFileOperations ?? [],
+      failure: {
+        responseStatus: details.responseStatus,
+        incompleteReason: details.incompleteReason,
+        hasRefusal: details.hasRefusal,
+        maxOutputTokens: details.maxOutputTokens,
+        reasoningTokens: details.usage?.reasoningTokens,
+      },
     }),
   ) as Prisma.InputJsonValue;
 }

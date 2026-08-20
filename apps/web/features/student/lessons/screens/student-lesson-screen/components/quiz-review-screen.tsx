@@ -189,7 +189,6 @@ export function QuizReviewScreen({
               />
               <AssessmentExplanationPanel
                 content={question.explanationJson}
-                diagramSpec={question.explanationDiagramSpecJson}
                 exampleBlock={question.explanationExampleBlock}
               />
             </div>

@@ -42,7 +42,29 @@ export interface AdminAiPanelDocument {
   unavailableReason: string | null;
 }
 
+export interface AdminAiModelConfiguration {
+  isDefaultConfigured: boolean;
+  resolvedProvider: string | null;
+  resolvedModel: string | null;
+  temperature: number | null;
+  reasoningEffort: string | null;
+  maxOutputTokens: number | null;
+  modelOptions: Array<{
+    provider: string;
+    model: string;
+    available: boolean;
+    capabilities?: {
+      aiConfiguration?: AdminAiConfigurationCapability;
+      reasoningEffortLevels?: string[];
+      pdfInput?: boolean;
+      pdfDetailLevels?: string[];
+      [key: string]: unknown;
+    };
+  }>;
+}
+
 export interface AdminAiPanelJob {
+  aiGenerationId: string;
   type: AdminAiGenerationType;
   jobId: string | null;
   status: AdminAiJobStatus;
@@ -57,6 +79,7 @@ export interface AdminAiPanelJob {
   model?: string | null;
   latencyMs?: number | null;
   estimatedCostVnd?: number | null;
+  usageEventCount?: number;
   inputMetaJson?: {
     temperature?: number;
     reasoningEffort?: string;
@@ -74,6 +97,7 @@ export interface AdminAiGenerationPanelData {
     reason: string | null;
   };
   documents: AdminAiPanelDocument[];
+  summaryConfiguration: AdminAiModelConfiguration;
   jobs: Record<AdminAiGenerationType, AdminAiPanelJob | null>;
 }
 
@@ -98,6 +122,7 @@ export interface AdminAiQueuedJob {
 export type AdminSummaryGenerationPayload = {
   type: "SUMMARY";
   documentIds: string[];
+  useTextbookSourceImages?: boolean;
   style: AdminSummaryStyle;
   styleInstructions?: string;
   length: AdminSummaryLength;
@@ -109,6 +134,8 @@ export type AdminSummaryGenerationPayload = {
   temperature?: number;
   reasoningEffort?: AiReasoningEffort;
   maxOutputTokens?: number;
+  requestDraftId?: string;
+  requestHash?: string;
 };
 
 export type AdminQuizGenerationPayload = {
@@ -147,53 +174,99 @@ export type AdminAiGenerationPayload =
     };
 
 export interface AdminLessonSummaryPromptPreview {
+  requestDraftId?: string;
+  requestHash?: string;
+  expiresAt?: string;
   promptVersion: string;
   schemaVersion: string;
   systemPrompt: string;
   userPrompt: string;
   inputPrompt: string;
+  openAiFileUploadRequest?: {
+    purpose: "user_data";
+    file: string;
+  };
   openAiRequest: {
     model: string | null;
     instructions: string;
-    input: string;
+    input: unknown;
     text: {
       format: Record<string, unknown>;
     };
-    temperature: number;
-    reasoning_effort?: string;
+    temperature?: number;
+    reasoning?: { effort: string };
     max_output_tokens: number;
+    prompt_cache_key?: string;
+    prompt_cache_retention?: "24h";
   };
   context: {
+    lessonTitle: string;
     documentCount: number;
     chunkCount: number;
     estimatedTokens: number;
+    textInputTokens: number;
+    pdfInputTokens: number;
     promptTokens?: number;
     schemaTokens?: number;
     contextTokens: number;
-    maxContextTokens: number;
+    maxContextTokens: number | null;
+    packet?: {
+      filename: string;
+      sizeBytes: number;
+      pageCount: number;
+      packetHash: string;
+      manifestHash: string;
+      detail: "high";
+      manifest: {
+        version: 1;
+        lessonId: string;
+        packetHash: string;
+        pageCount: number;
+        pages: Array<{
+          packetPageNumber: number;
+          sourceKey: string;
+          lessonDocumentId: string;
+          sourceDocumentId: string | null;
+          sourceFileId: string;
+          sourcePdfPageNumber: number;
+          printedPageLabel: string | null;
+          pageRangeId: string | null;
+          documentTitle: string;
+          segmentOrder: number;
+        }>;
+      };
+    };
+    chunks?: Array<{
+      id: string;
+      documentId: string;
+      documentTitle: string;
+      chunkIndex: number;
+      tokenCount: number;
+      pageRange: { pageStart: number; pageEnd: number } | null;
+      content: string;
+    }>;
+    tokenBreakdown?: {
+      systemInstructionsTokens: number;
+      userPromptTokens: number;
+      contextTokens: number;
+      schemaTokens: number;
+      textInputTokens: number;
+      pdfInputTokens: number;
+      estimatedTokens: number;
+    };
   };
-  configuration: {
+  configuration: AdminAiModelConfiguration & {
     targetQuizSet?: { id: string; title: string } | null;
     selectedModel: string | null;
-    isDefaultConfigured: boolean;
-    resolvedProvider: string | null;
-    resolvedModel: string | null;
     temperature: number;
-    reasoningEffort: string | null;
     maxOutputTokens: number;
-    modelOptions: Array<{
-      provider: string;
-      model: string;
-      available: boolean;
-      capabilities?: {
-        aiConfiguration?: AdminAiConfigurationCapability;
-        reasoningEffortLevels?: string[];
-        [key: string]: unknown;
-      };
-    }>;
   };
   estimatedCost: {
     available: boolean;
+    inputUpperBoundUsd: number | null;
+    inputUpperBoundVnd: number | null;
+    outputUpperBoundUsd: number | null;
+    outputUpperBoundVnd: number | null;
     upperBoundUsd: number | null;
     upperBoundVnd: number | null;
     fxRateVndPerUsd: number;
@@ -216,9 +289,206 @@ export interface AdminLessonSummary {
   id: string;
   lessonId: string;
   contentJson: AdminLessonSummaryContent;
+  phaseOneBlockJsonByPath?: Record<string, unknown> | null;
   source: "ADMIN" | "AI";
   reviewStatus: AdminLessonSummaryReviewStatus;
   aiGenerationId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AdminStemFigureStatus =
+  "QUEUED" | "RENDERING" | "REPAIRING" | "SUCCEEDED" | "NEEDS_REVIEW" | "FAILED";
+
+export interface AdminStemFigureDiagnosticBatch {
+  attemptId: string;
+  sourceVersion: number;
+  sourceHash: string;
+  category: "COMPILER" | "SOURCE_POLICY" | "VALIDATOR" | "INFRASTRUCTURE";
+  issues: Array<{
+    code: string;
+    severity: "ERROR" | "WARNING";
+    message: string;
+    file: string | null;
+    line: number | null;
+    column: number | null;
+    element: string | null;
+    path: string | null;
+  }>;
+  rawLogExcerpt: string;
+  collectionComplete: boolean;
+  batchHash: string;
+  createdAt: string;
+}
+
+export interface AdminStemFigureProviderRequestSnapshotCollection {
+  version: 1;
+  calls: Array<{
+    version: 1;
+    idempotencyKey: string;
+    callKind: "CREATE_NEW" | "COMPILER_REPAIR" | "VALIDATOR_REPAIR";
+    repairKind: "AUTO_COMPILER" | "MANUAL_COMPILER" | "MANUAL_VALIDATOR" | null;
+    callSequence: number;
+    createdAt: string;
+    request: {
+      provider: string;
+      model: string;
+      catalogItemId: string | null;
+      category: string;
+      temperature: number | null;
+      reasoningEffort: string | null;
+      maxOutputTokens: number | null;
+      outputName: string;
+      promptVersion: string;
+      schemaVersion: string;
+      schemaReferenceStrategy?: string;
+      systemPrompt: string;
+      userPrompt: string;
+      inputTextItems?: unknown[];
+      inputFiles: unknown[];
+      inputImages: Array<{
+        order: number;
+        detail: string | null;
+        mimeType: string | null;
+        byteLength: number | null;
+        sha256: string;
+      }>;
+      textFormat: Record<string, unknown>;
+      promptCache?: unknown;
+    };
+    generationBrief: Record<string, unknown> | null;
+    referenceImages: Array<{
+      order: number;
+      objectKey: string;
+      mimeType: string;
+      label: string;
+      packetPageNumber: number;
+      source: "OCR_CROP" | "PDF_PAGE";
+      detail: "low" | "high" | "auto" | "original";
+      byteLength: number | null;
+      sha256: string;
+      accessUrl: string | null;
+    }>;
+    latexSource: string | null;
+    diagnosticBatch: AdminStemFigureDiagnosticBatch | null;
+  }>;
+}
+
+export interface AdminStemFigure {
+  id: string;
+  lessonId: string;
+  lessonSummaryId: string | null;
+  aiGenerationId: string | null;
+  blockPath: string;
+  figureIndex: number;
+  localPlanId: string;
+  planJson: unknown;
+  figureOrigin: "TEXTBOOK_SOURCE" | "GENERATED_FROM_BRIEF" | null;
+  subject: {
+    key: "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL";
+    name: string;
+    slug: string;
+  };
+  status: AdminStemFigureStatus;
+  theme: "LIGHT";
+  currentRevisionId: string | null;
+  pendingRevisionId: string | null;
+  hasCurrentAsset: boolean;
+  sourceKind: "AI_TEX" | "ADMIN_UPLOAD";
+  currentAssetKind: "AI_TEX" | "ADMIN_UPLOAD" | "TEXTBOOK_SOURCE" | null;
+  latexSource: string | null;
+  sourceHash: string;
+  sourceVersion: number;
+  altText: string;
+  caption: string | null;
+  previewSvg: string | null;
+  assetUrl: string | null;
+  rendererVersion: string | null;
+  validatorVersion: string | null;
+  repairCount: number;
+  maxRepairAttempts: number;
+  lastErrorCategory: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  diagnosticBatch: AdminStemFigureDiagnosticBatch | null;
+  retryUsesAi: boolean;
+  retryIssueCount: number;
+  latestAttemptId: string | null;
+  providerRequestSnapshots: AdminStemFigureProviderRequestSnapshotCollection | null;
+  sourceReferenceSnapshotHash: string | null;
+  sourceReferenceImages: AdminStemFigureSourceReferenceImage[];
+  updatedAt: string;
+}
+
+export interface AdminStemFigureSourceReferenceImage {
+  index: number;
+  objectKey: string;
+  mimeType: string;
+  label: string;
+  packetPageNumber: number;
+  source: "OCR_CROP" | "PDF_PAGE";
+  canUseAsFigure: boolean;
+  accessUrl: string | null;
+}
+
+export type AdminStemFigureReferenceImageMode =
+  "SOURCE_CROP_ONLY" | "CURRENT_ONLY" | "NONE";
+
+export interface AdminStemFigureCreateAiInput {
+  figure: AdminStemFigure;
+  referenceImageMode: AdminStemFigureReferenceImageMode;
+  adminInstructions: string | null;
+  model?: string | null;
+  temperature?: number | null;
+  reasoningEffort?: AiReasoningEffort | null;
+  systemPrompt?: string | null;
+  userPrompt?: string | null;
+}
+
+export interface AdminStemFigureCreateAiPreview {
+  referenceImageMode: AdminStemFigureReferenceImageMode;
+  adminInstructions: string | null;
+  generationBrief: Record<string, unknown>;
+  providerInput: Record<string, unknown>;
+  systemPrompt: string;
+  userPrompt: string;
+  configuration: {
+    resolvedProvider: string | null;
+    resolvedModel: string | null;
+    temperature: number | null;
+    reasoningEffort: string | null;
+    maxOutputTokens: number;
+  };
+  context: {
+    textInputTokens: number;
+    imageInputTokens: number;
+    estimatedTokens: number;
+  };
+  estimatedCost: {
+    available: boolean;
+    inputUpperBoundUsd: number | null;
+    inputUpperBoundVnd: number | null;
+    outputUpperBoundUsd: number | null;
+    outputUpperBoundVnd: number | null;
+    upperBoundUsd: number | null;
+    upperBoundVnd: number | null;
+    fxRateVndPerUsd: number;
+  };
+  referenceImages: Array<{
+    order: number;
+    objectKey: string;
+    mimeType: string;
+    label: string;
+    packetPageNumber: number | null;
+    source: "OCR_CROP" | "PDF_PAGE" | "CURRENT_FIGURE";
+    accessUrl: string | null;
+  }>;
+}
+
+export interface AdminStemFigureCompileResult {
+  revisionId: string;
+  status: "DRAFT_READY" | "NEEDS_REVIEW" | "FAILED";
+  sourceVersion?: number;
+  previewSvg?: string;
+  diagnosticBatch?: AdminStemFigureDiagnosticBatch;
 }

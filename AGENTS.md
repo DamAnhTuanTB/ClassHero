@@ -52,6 +52,13 @@ Nếu cần định tuyến nhanh bộ tài liệu, đọc `docs/00-docs-map.md`
 - Không hard-code secret, token, API key, webhook key hoặc config production.
 - Không revert/sửa thay đổi không liên quan của user.
 - Không dùng prompt ngắn của owner làm lý do để bỏ qua docs liên quan.
+- Mọi prompt, heuristic, validator, semantic gate, policy và kỹ thuật sửa lỗi AI
+  phải được thiết kế từ invariant tổng quát, dùng lại được giữa nhiều bài, lớp và
+  dữ liệu tương đương. Cấm hard-code tên bài, mã lesson/figure, số liệu hoặc hình
+  cụ thể chỉ để làm một case đang lỗi vượt qua. Một lỗi đơn lẻ chỉ được dùng làm
+  regression fixture; bản sửa phải nêu được quy tắc tổng quát và có counterexample
+  chứng minh không làm hỏng trường hợp hợp lệ khác. Ngoại lệ theo tài liệu cụ thể
+  chỉ được thêm khi đó là product contract do owner chốt và phải ghi rõ trong docs.
 - Nếu thiếu thông tin để code an toàn, hỏi lại hoặc ghi rõ `TODO`/`ASSUMPTION`.
 - Nếu phát hiện mâu thuẫn lớn giữa docs, báo owner hoặc ghi rõ quyết định tạm thời; không âm thầm tự quyết.
 - Không cập nhật changelog trong task thường. Changelog chỉ được ghi khi owner yêu cầu commit và commit thật sự được thực hiện.

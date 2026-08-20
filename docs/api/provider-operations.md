@@ -2,18 +2,23 @@
 
 Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `/api/v1` và dùng envelope chung.
 
-| Method | Path | Mục đích |
-| --- | --- | --- |
-| `GET` | `/admin/provider-operations/overview` | KPI chi phí tháng, cache saving, reliability và budget |
-| `GET` | `/admin/provider-operations/catalog` | Catalog AI/OCR, credential status và price versions |
-| `POST` | `/admin/provider-operations/catalog/:id/price-versions` | Thêm giá có ngày hiệu lực và nguồn chính thức |
-| `GET/PUT` | `/admin/provider-operations/ai-configurations` | Đọc/lưu model chính, fallback, temperature, token limit |
-| `GET/PUT` | `/admin/provider-operations/ocr-settings` | Trạng thái OCR/cache và thiết lập tỷ giá/price freshness |
-| `GET/PUT` | `/admin/provider-operations/budgets` | Ngân sách `ALL/AI/OCR`, warning thresholds, hard stop |
-| `GET` | `/admin/provider-operations/usage/timeline` | Timeline `DAY/WEEK/MONTH`, tối đa 366 ngày |
-| `GET` | `/admin/provider-operations/usage/breakdown` | Breakdown theo provider/model/feature |
-| `GET` | `/admin/provider-operations/usage/events` | Event list phân trang và filter |
-| `GET` | `/admin/provider-operations/audit-history` | Lịch sử đổi model/giá/budget/accounting |
+| Method    | Path                                                    | Mục đích                                                 |
+| --------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| `GET`     | `/admin/provider-operations/overview`                   | KPI chi phí tháng, cache saving, reliability và budget   |
+| `GET`     | `/admin/provider-operations/catalog`                    | Catalog AI/OCR, credential status và price versions      |
+| `POST`    | `/admin/provider-operations/catalog/:id/price-versions` | Thêm giá có ngày hiệu lực và nguồn chính thức            |
+| `GET/PUT` | `/admin/provider-operations/ai-configurations`          | Đọc/lưu model chính, fallback, temperature, token limit  |
+| `GET/PUT` | `/admin/provider-operations/ocr-settings`               | Trạng thái OCR/cache và thiết lập tỷ giá/price freshness |
+| `GET/PUT` | `/admin/provider-operations/budgets`                    | Ngân sách `ALL/AI/OCR`, warning thresholds, hard stop    |
+| `GET`     | `/admin/provider-operations/usage/timeline`             | Timeline `DAY/WEEK/MONTH`, tối đa 366 ngày               |
+| `GET`     | `/admin/provider-operations/usage/breakdown`            | Breakdown theo provider/model/feature                    |
+| `GET`     | `/admin/provider-operations/usage/events`               | Event list phân trang và filter                          |
+| `GET`     | `/admin/provider-operations/audit-history`              | Lịch sử đổi model/giá/budget/accounting                  |
+
+`POST /admin/provider-operations/catalog/:id/price-versions` chỉ thay dữ liệu giá
+do admin gửi và tự kế thừa điều kiện kỹ thuật của rate tương ứng từ phiên bản đang
+hiệu lực. Vì vậy cập nhật đơn giá không được xóa `maxInputTokens` hoặc metadata
+routing/budget khác.
 
 ## Concurrency và validation
 
@@ -23,6 +28,22 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 - Price version chỉ thêm mới. Backend đóng khoảng hiệu lực cũ thay vì overwrite.
 - Timeline dùng múi giờ `Asia/Ho_Chi_Minh`, tuần bắt đầu thứ Hai.
 - Response chỉ có boolean `credentialConfigured`, tuyệt đối không trả secret/key.
+- Mỗi item của `GET /usage/events` là một lượt gọi provider riêng và trả thêm
+  `backgroundJob` để UI nêu đúng mục đích gọi. Nếu lượt gọi thuộc một lần sinh AI,
+  `aiGeneration` trả `totalCostVnd` và `usageEventCount` để phân biệt chi phí của
+  riêng lượt gọi với tổng chi phí của toàn lần sinh. Hai giá trị tổng này phải
+  được aggregate từ `provider_usage_events`, không đọc snapshot tổng đã cũ trên
+  `ai_generations`.
+- `GET /usage/events` trả thêm `summary.totalCostVnd` và `summary.totalCalls` cho
+  toàn bộ tập kết quả đã lọc, độc lập với trang hiện tại. Filter UUID
+  `aiGenerationId` trả toàn bộ lượt gọi thuộc đúng lần sinh và không áp dụng cửa
+  sổ 30 ngày mặc định, để admin vẫn tra cứu được lịch sử cũ từ lesson detail.
+- Với usage event AI mới, `rawUsageJson` là audit envelope gồm
+  `providerUsage` giữ nguyên object usage do provider trả và `fileOperations`
+  chứa metadata upload/xóa file tạm của backend. Các cột `promptTokens`,
+  `cachedInputTokens`, `completionTokens` và `totalTokens` vẫn là dữ liệu đã
+  chuẩn hóa dùng để tính phí. Record lịch sử dạng phẳng vẫn được API trả nguyên
+  để bảo toàn khả năng đọc dữ liệu cũ.
 
 ## Hard-stop tuyệt đối (`M9.12`)
 

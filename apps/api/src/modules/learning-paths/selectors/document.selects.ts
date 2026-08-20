@@ -40,6 +40,7 @@ export const sourceDocumentSelect = {
   status: true,
   pageCount: true,
   contentHash: true,
+  activeOcrArtifactId: true,
   processingJobId: true,
   processingJob: {
     select: documentJobSelect,
@@ -110,6 +111,7 @@ export const lessonDocumentSelect = {
   extractedText: true,
   extractError: true,
   contentHash: true,
+  activeOcrArtifactId: true,
   chunkCount: true,
   processingJobId: true,
   processingJob: {

@@ -36,7 +36,6 @@ Cached response:
     "explanation": {
       "id": "uuid",
       "contentJson": {},
-      "diagramSpecJson": null,
       "imageFileId": null
     }
   }

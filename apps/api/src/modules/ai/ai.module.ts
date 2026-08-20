@@ -31,12 +31,14 @@ import {
 } from "#api/modules/ai/types/ai-provider.interface";
 import { getOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
+import { FilesModule } from "#api/modules/files/files.module";
+import { LessonSourcePacketService } from "#api/modules/ai/services/lesson-source-packet.service";
 
 const logger = new Logger("AiModule");
 
 @Global()
 @Module({
-  imports: [JobsModule],
+  imports: [FilesModule, JobsModule],
   providers: [
     {
       provide: AI_PROVIDER_REGISTRY,
@@ -93,6 +95,7 @@ const logger = new Logger("AiModule");
     LessonSummaryContextService,
     LessonContentGenerationContextService,
     LessonContentGenerationJobService,
+    LessonSourcePacketService,
   ],
   exports: [
     AiService,
@@ -103,6 +106,7 @@ const logger = new Logger("AiModule");
     LessonSummaryContextService,
     LessonContentGenerationContextService,
     LessonContentGenerationJobService,
+    LessonSourcePacketService,
     AI_PROVIDER_REGISTRY,
   ],
 })

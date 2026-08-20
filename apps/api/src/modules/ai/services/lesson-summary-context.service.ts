@@ -2,12 +2,25 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DocumentStatus } from "@prisma/client";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
+import { LessonSourcePacketService } from "#api/modules/ai/services/lesson-source-packet.service";
 import type { AiTextInput } from "#api/modules/ai/types/ai-text.types";
+import type { LessonSummarySubjectSnapshot } from "#api/modules/ai/types/lesson-summary-subject.types";
 import { LESSON_SUMMARY_MAX_CONTEXT_TOKENS } from "#api/modules/ai/types/lesson-summary.types";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import {
+  extractChunkPdfPageRange,
+  readStoredChunkPageRange,
+} from "#api/modules/ai/utils/chunk-page-range";
+import { resolveLessonSummarySubject } from "#api/modules/ai/utils/lesson-summary-subject";
 
 export type LessonSummaryContextErrorCode =
-  "LESSON_NOT_FOUND" | "AI_CONTEXT_NOT_FOUND" | "AI_CONTEXT_TOO_LARGE";
+  | "LESSON_NOT_FOUND"
+  | "AI_CONTEXT_NOT_FOUND"
+  | "AI_CONTEXT_TOO_LARGE"
+  | "AI_PDF_SOURCE_NOT_READY"
+  | "AI_PDF_SOURCE_EMPTY"
+  | "AI_PDF_PACKET_TOO_LARGE"
+  | "AI_PDF_PACKET_TOO_MANY_PAGES";
 
 export class LessonSummaryContextError extends Error {
   constructor(
@@ -24,15 +37,34 @@ export interface LessonSummaryContext {
   lessonId: string;
   lessonTitle: string;
   targetGrade: number | null;
+  subject: LessonSummarySubjectSnapshot;
   documentIds: string[];
   sourceHash: string;
   totalTokens: number;
   chunks: NonNullable<AiTextInput["contextChunks"]>;
+  packet?: Awaited<ReturnType<LessonSourcePacketService["build"]>>;
 }
 
 @Injectable()
 export class LessonSummaryContextService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(LessonSourcePacketService)
+    private readonly packets: LessonSourcePacketService,
+  ) {}
+
+  async loadPacket(lessonId: string, documentIds: string[]) {
+    const base = await this.loadLessonIdentity(lessonId);
+    const packet = await this.packets.build(lessonId, documentIds);
+    return {
+      ...base,
+      documentIds: [...new Set(documentIds)],
+      sourceHash: packet.sourceHash,
+      totalTokens: 0,
+      chunks: [],
+      packet,
+    } satisfies LessonSummaryContext;
+  }
 
   async load(lessonId: string, documentIds: string[]): Promise<LessonSummaryContext> {
     const uniqueDocumentIds = [...new Set(documentIds)];
@@ -47,6 +79,7 @@ export class LessonSummaryContextService {
         title: true,
         learningPath: {
           select: {
+            domain: { select: { name: true, slug: true } },
             targetAudiences: {
               select: { targetAudience: { select: { grade: true } } },
             },
@@ -68,7 +101,9 @@ export class LessonSummaryContextService {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
       select: {
         id: true,
+        title: true,
         contentHash: true,
+        file: { select: { originalName: true } },
         chunks: {
           orderBy: [{ chunkIndex: "asc" }, { id: "asc" }],
           select: {
@@ -77,6 +112,7 @@ export class LessonSummaryContextService {
             contentHash: true,
             tokenCount: true,
             chunkIndex: true,
+            metadataJson: true,
           },
         },
       },
@@ -100,7 +136,12 @@ export class LessonSummaryContextService {
         content: chunk.content,
         metadata: {
           documentId: document.id,
+          documentTitle: document.title?.trim() || document.file.originalName,
+          pageRange:
+            readStoredChunkPageRange(chunk.metadataJson) ??
+            extractChunkPdfPageRange(chunk.content),
           chunkIndex: chunk.chunkIndex,
+          tokenCount: chunk.tokenCount ?? Math.max(1, Math.ceil(chunk.content.length / 4)),
         },
       })),
     );
@@ -132,8 +173,13 @@ export class LessonSummaryContextService {
         .map(({ targetAudience }) => targetAudience.grade)
         .filter((grade): grade is number => grade !== null)
         .sort((left, right) => left - right)[0] ?? null;
+    const subject = resolveLessonSummarySubject({
+      domainName: lesson.learningPath.domain.name,
+      domainSlug: lesson.learningPath.domain.slug,
+    });
     const sourceHash = hashAiValue({
       targetGrade,
+      subject,
       documents: documents.map((document) => ({
         id: document.id,
         contentHash: document.contentHash,
@@ -149,10 +195,50 @@ export class LessonSummaryContextService {
       lessonId: lesson.id,
       lessonTitle: lesson.title,
       targetGrade,
+      subject,
       documentIds: documents.map((document) => document.id),
       sourceHash,
       totalTokens,
       chunks,
+    };
+  }
+
+  async loadLessonIdentity(lessonId: string) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+        deletedAt: null,
+        learningPath: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        title: true,
+        learningPath: {
+          select: {
+            domain: { select: { name: true, slug: true } },
+            targetAudiences: {
+              select: { targetAudience: { select: { grade: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!lesson) {
+      throw new LessonSummaryContextError("LESSON_NOT_FOUND", "Không tìm thấy buổi học");
+    }
+    const targetGrade =
+      lesson.learningPath.targetAudiences
+        .map(({ targetAudience }) => targetAudience.grade)
+        .filter((grade): grade is number => grade !== null)
+        .sort((left, right) => left - right)[0] ?? null;
+    return {
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      targetGrade,
+      subject: resolveLessonSummarySubject({
+        domainName: lesson.learningPath.domain.name,
+        domainSlug: lesson.learningPath.domain.slug,
+      }),
     };
   }
 }

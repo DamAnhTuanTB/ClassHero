@@ -1,0 +1,438 @@
+"use client";
+
+import { Code2, FileImage, LoaderCircle, Play, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+
+import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import {
+  useApplyAdminStemFigureDraft,
+  useCompileAdminStemFigureDraft,
+} from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
+import { StemFigureCompileErrorPanel } from "@/features/admin/ai-generation/components/stem-figure-compile-error-panel";
+import { StemFigureCodeEditor } from "@/features/admin/ai-generation/components/stem-figure-code-editor";
+import type {
+  AdminStemFigure,
+  AdminStemFigureCompileResult,
+  AdminStemFigureDiagnosticBatch,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+
+export function AdminStemFigureEditorDialog({
+  figure,
+  isOpen,
+  lessonId,
+  onClose,
+  mode = "edit",
+}: {
+  figure: AdminStemFigure;
+  isOpen: boolean;
+  lessonId: string;
+  onClose: () => void;
+  mode?: "edit" | "create";
+}) {
+  const compileMutation = useCompileAdminStemFigureDraft(lessonId);
+  const applyMutation = useApplyAdminStemFigureDraft(lessonId);
+  const [result, setResult] = useState<AdminStemFigureCompileResult | null>(null);
+  const [source, setSource] = useState(
+    mode === "create" ? createStarterSource() : (figure.latexSource ?? ""),
+  );
+  const [altText, setAltText] = useState(figure.altText);
+  const [caption, setCaption] = useState(figure.caption ?? "");
+  const [focusLine, setFocusLine] = useState<number | null>(null);
+  const [requestIssues, setRequestIssues] = useState<StemFigureCompileIssue[]>([]);
+  const openSessionKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      openSessionKeyRef.current = null;
+      return;
+    }
+    const openSessionKey = `${mode}:${figure.id}`;
+    if (openSessionKeyRef.current === openSessionKey) return;
+    openSessionKeyRef.current = openSessionKey;
+    setSource(mode === "create" ? createStarterSource() : (figure.latexSource ?? ""));
+    setAltText(figure.altText);
+    setCaption(figure.caption ?? "");
+    setFocusLine(null);
+    setRequestIssues([]);
+    setResult(null);
+  }, [figure.altText, figure.caption, figure.id, figure.latexSource, isOpen, mode]);
+
+  const originalSource = mode === "create" ? "" : (figure.latexSource ?? "");
+  const sourceChanged = source !== originalSource;
+  const metadataChanged =
+    altText !== figure.altText || caption !== (figure.caption ?? "");
+  const previewSvg = result?.previewSvg ?? (!sourceChanged ? figure.previewSvg : null);
+  const previewUrl = previewSvg
+    ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(previewSvg)}`
+    : !sourceChanged
+      ? figure.assetUrl
+      : null;
+  const pending = compileMutation.isPending || applyMutation.isPending;
+  const compileIssues = result?.diagnosticBatch?.issues ?? requestIssues;
+  const hasDraftErrors =
+    (Boolean(result && result.status !== "DRAFT_READY") || requestIssues.length > 0) &&
+    compileIssues.length > 0;
+
+  function requestClose() {
+    closeNow();
+  }
+
+  function closeNow() {
+    compileMutation.reset();
+    applyMutation.reset();
+    setFocusLine(null);
+    setRequestIssues([]);
+    setResult(null);
+    onClose();
+  }
+
+  function invalidateCompiledDraft() {
+    setFocusLine(null);
+    setRequestIssues([]);
+    setResult(null);
+  }
+
+  async function compileDraft() {
+    if (!source.trim() || !altText.trim()) {
+      toast.error("Mã hình và mô tả thay thế không được để trống.");
+      return null;
+    }
+    setFocusLine(null);
+    setRequestIssues([]);
+    try {
+      const compiled = await compileMutation.mutateAsync({
+        figureId: figure.id,
+        baseRevisionId: figure.currentRevisionId,
+        sourceVersion: result?.sourceVersion ?? figure.sourceVersion,
+        latexSource: source,
+        altText,
+        caption: caption.trim() || null,
+      });
+      setResult(compiled);
+      if (compiled.status === "DRAFT_READY") {
+        toast.success("Biên dịch hình thành công.");
+      } else {
+        toast.warning("Mã hình chưa hợp lệ. Hãy xem các lỗi bên dưới và chỉnh lại.");
+      }
+      return compiled;
+    } catch (error) {
+      setRequestIssues(getDraftCompileIssues(error));
+      toast.error("Biên dịch hình chưa thành công. Xem chi tiết ở khung bên phải.");
+      return null;
+    }
+  }
+
+  async function apply() {
+    const normalizedAltText = altText.trim();
+    const normalizedCaption = caption.trim() || null;
+    if (!normalizedAltText) {
+      toast.error("Mô tả hình không được để trống.");
+      return;
+    }
+    if (!sourceChanged && !result && figure.currentRevisionId) {
+      if (!metadataChanged) {
+        closeNow();
+        return;
+      }
+      try {
+        await applyMutation.mutateAsync({
+          figureId: figure.id,
+          baseRevisionId: figure.currentRevisionId,
+          revisionId: figure.currentRevisionId,
+          sourceVersion: figure.sourceVersion,
+          altText: normalizedAltText,
+          caption: normalizedCaption,
+        });
+        toast.success("Đã cập nhật thông tin hình.");
+        closeNow();
+      } catch (error) {
+        toast.error(
+          getUserFacingErrorMessage(error, "Chưa cập nhật được thông tin hình."),
+        );
+      }
+      return;
+    }
+    const draft = result ?? (await compileDraft());
+    if (!isApplicableDraft(draft)) {
+      if (draft) {
+        toast.error("Hình chưa biên dịch thành công nên chưa thể áp dụng.");
+      }
+      return;
+    }
+    try {
+      await applyMutation.mutateAsync({
+        figureId: figure.id,
+        baseRevisionId: figure.currentRevisionId,
+        revisionId: draft.revisionId,
+        sourceVersion: draft.sourceVersion,
+        altText: normalizedAltText,
+        caption: normalizedCaption,
+      });
+      toast.success("Đã áp dụng hình mới.");
+      closeNow();
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, "Chưa áp dụng được bản sửa."));
+    }
+  }
+
+  return (
+    <>
+      <EditorDialogShell
+        ariaLabel="Chỉnh sửa hình"
+        isOpen={isOpen}
+        onClose={requestClose}
+        panelClassName="h-[calc(100dvh-2rem)] max-w-[96rem]"
+      >
+        <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-4 pr-20 sm:px-5">
+          <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
+            {mode === "create" ? "Tạo mới hình bằng mã code" : "Chỉnh sửa hình"}
+          </h2>
+        </header>
+
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(22rem,1fr)_minmax(18rem,0.8fr)] overflow-hidden xl:grid-cols-2 xl:grid-rows-1">
+          <section className="flex min-h-0 flex-col border-b border-[var(--theme-border)] xl:border-b-0 xl:border-r">
+            <div className="flex items-center border-b border-[var(--theme-border)] px-4 py-2">
+              <h3 className="flex items-center gap-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
+                <Code2 className="h-4 w-4" aria-hidden="true" /> Mã vẽ hình
+              </h3>
+            </div>
+            <StemFigureCodeEditor
+              focusLine={focusLine}
+              issues={compileIssues}
+              value={source}
+              onChange={(value) => {
+                setSource(value);
+                invalidateCompiledDraft();
+              }}
+            />
+            <div className="flex flex-col gap-3 border-t border-[var(--theme-border)] p-3">
+              <label className="text-xs font-bold text-[var(--theme-text)]">
+                Mô tả hình
+                <textarea
+                  className="mt-1 min-h-20 w-full resize-y rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-2 text-sm"
+                  rows={3}
+                  value={altText}
+                  onChange={(event) => setAltText(event.target.value)}
+                />
+              </label>
+              <label className="text-xs font-bold text-[var(--theme-text)]">
+                Chú thích
+                <input
+                  className="mt-1 min-h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 text-sm"
+                  value={caption}
+                  onChange={(event) => setCaption(event.target.value)}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="flex min-h-0 flex-col bg-[var(--theme-surface-soft)]">
+            <div className="flex items-center border-b border-[var(--theme-border)] px-4 py-2">
+              <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                Xem trước hình
+              </h3>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-white">
+              {compileMutation.isPending ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="grid min-h-full flex-1 place-items-center bg-white p-6 text-center text-slate-700"
+                >
+                  <div>
+                    <LoaderCircle
+                      className="mx-auto h-9 w-9 animate-spin text-sky-600"
+                      aria-hidden="true"
+                    />
+                    <p className="mt-3 text-sm font-extrabold">Đang biên dịch…</p>
+                  </div>
+                </div>
+              ) : hasDraftErrors ? (
+                <StemFigureCompileErrorPanel
+                  issues={compileIssues}
+                  onSelectIssue={(issue) => setFocusLine(issue.line)}
+                />
+              ) : previewUrl ? (
+                <div className="grid min-h-full flex-1 place-items-center bg-white p-5">
+                  <img
+                    alt={altText}
+                    className="max-h-[65dvh] max-w-full object-contain"
+                    src={previewUrl}
+                  />
+                </div>
+              ) : (
+                <div className="grid min-h-full flex-1 place-items-center bg-white p-6 text-center text-slate-700">
+                  <div>
+                    <FileImage
+                      className="mx-auto h-8 w-8 text-amber-500"
+                      aria-hidden="true"
+                    />
+                    <p className="mt-2 text-sm font-bold">Chưa có bản xem trước</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Bấm Biên dịch để xem hình sau khi chỉnh sửa.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <footer className="theme-dialog-footer flex shrink-0 flex-wrap items-center justify-end gap-2 p-3 sm:p-4">
+          <button
+            type="button"
+            className="theme-button-neutral min-h-11 rounded-lg px-4 text-sm font-extrabold"
+            onClick={requestClose}
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            className="theme-button-primary-subtle inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-extrabold"
+            disabled={pending}
+            onClick={compileDraft}
+          >
+            <Play className="h-4 w-4" aria-hidden="true" /> Biên dịch
+          </button>
+          <button
+            type="button"
+            className="theme-button-primary inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-extrabold"
+            disabled={pending}
+            onClick={apply}
+          >
+            <Save className="h-4 w-4" aria-hidden="true" /> Áp dụng
+          </button>
+        </footer>
+      </EditorDialogShell>
+    </>
+  );
+}
+
+function isApplicableDraft(
+  draft: AdminStemFigureCompileResult | null,
+): draft is AdminStemFigureCompileResult & {
+  sourceVersion: number;
+  previewSvg: string;
+} {
+  return (
+    draft?.status === "DRAFT_READY" &&
+    typeof draft.sourceVersion === "number" &&
+    Boolean(draft.previewSvg)
+  );
+}
+
+type StemFigureCompileIssue = AdminStemFigureDiagnosticBatch["issues"][number];
+
+function getDraftCompileIssues(error: unknown): StemFigureCompileIssue[] {
+  const fallbackIssue = createDraftCompileIssue({
+    code: readStringField(error, "code") ?? "COMPILE_FAILED",
+    message: getDraftCompileErrorMessage(error),
+  });
+  if (!isRecord(error)) return [fallbackIssue];
+
+  if (isRecord(error.details) && Array.isArray(error.details.issues)) {
+    const issues = error.details.issues
+      .map((issue) => normalizeDraftCompileIssue(issue))
+      .filter((issue): issue is StemFigureCompileIssue => issue !== null);
+    return issues.length > 0 ? issues : [fallbackIssue];
+  }
+
+  if (Array.isArray(error.details)) {
+    const issues = error.details.flatMap((detail) => {
+      if (!isRecord(detail) || !Array.isArray(detail.messages)) return [];
+      return detail.messages
+        .filter((message): message is string => typeof message === "string")
+        .map((message) => createDraftCompileIssue({ code: "VALIDATION_ERROR", message }));
+    });
+    return issues.length > 0 ? issues : [fallbackIssue];
+  }
+
+  return [fallbackIssue];
+}
+
+function normalizeDraftCompileIssue(value: unknown): StemFigureCompileIssue | null {
+  if (!isRecord(value) || typeof value.message !== "string") return null;
+  return createDraftCompileIssue({
+    code: typeof value.code === "string" ? value.code : "COMPILE_FAILED",
+    column: readNumberField(value, "column"),
+    line: readNumberField(value, "line"),
+    message: value.message,
+    severity: value.severity === "WARNING" ? "WARNING" : "ERROR",
+  });
+}
+
+function createDraftCompileIssue({
+  code,
+  column = null,
+  line = null,
+  message,
+  severity = "ERROR",
+}: {
+  code: string;
+  column?: number | null;
+  line?: number | null;
+  message: string;
+  severity?: "ERROR" | "WARNING";
+}): StemFigureCompileIssue {
+  return {
+    code,
+    column,
+    element: null,
+    file: null,
+    line,
+    message,
+    path: null,
+    severity,
+  };
+}
+
+function readStringField(value: unknown, field: string) {
+  return isRecord(value) && typeof value[field] === "string" ? value[field] : null;
+}
+
+function readNumberField(value: Record<string, unknown>, field: string) {
+  return typeof value[field] === "number" ? value[field] : null;
+}
+
+function getDraftCompileErrorMessage(error: unknown) {
+  if (!isRecord(error) || error.code !== "VALIDATION_ERROR") {
+    return getUserFacingErrorMessage(error, "Biên dịch hình chưa thành công.");
+  }
+
+  const fields = Array.isArray(error.details)
+    ? error.details
+        .map((detail) =>
+          isRecord(detail) && typeof detail.field === "string" ? detail.field : null,
+        )
+        .filter((field): field is string => field !== null)
+    : [];
+  const labels = [
+    ...new Set(fields.map((field) => DRAFT_VALIDATION_FIELD_LABELS[field])),
+  ].filter((label): label is string => Boolean(label));
+
+  return labels.length > 0
+    ? `Không thể biên dịch: hãy kiểm tra ${labels.join(", ")}.`
+    : "Không thể biên dịch vì dữ liệu hình chưa hợp lệ. Hãy tải lại trang rồi thử lại.";
+}
+
+const DRAFT_VALIDATION_FIELD_LABELS: Record<string, string> = {
+  baseRevisionId: "phiên bản hình",
+  sourceVersion: "phiên bản source",
+  latexSource: "mã hình",
+  altText: "mô tả hình",
+  caption: "chú thích",
+};
+
+function createStarterSource() {
+  return [
+    "\\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]",
+    "  % Viết mã vẽ hình tại đây",
+    "\\end{tikzpicture}",
+  ].join("\n");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

@@ -10,9 +10,14 @@ import type {
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
   AdminQuizGenerationPayload,
+  AdminStemFigure,
+  AdminStemFigureCreateAiInput,
+  AdminStemFigureCreateAiPreview,
+  AdminStemFigureCompileResult,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import type { LessonSummaryPhaseOneLayoutOperation } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 
-const LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS = 20_000;
+const LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS = 120_000;
 
 export function getAdminAiGenerationPanel(lessonId: string, token: string) {
   return apiRequest<AdminAiGenerationPanelData>(
@@ -100,6 +105,221 @@ export function upsertAdminLessonSummary(
     body: data,
     token,
   });
+}
+
+export function updateAdminLessonSummaryPhaseOneBlocks(
+  lessonId: string,
+  data: {
+    phaseOneBlockJsonByPath: Record<string, unknown>;
+    phaseOneLayoutOperations?: LessonSummaryPhaseOneLayoutOperation[];
+    source: "ADMIN" | "AI";
+    reviewStatus: AdminLessonSummaryReviewStatus;
+  },
+  token: string,
+) {
+  return apiRequest<AdminLessonSummary>(
+    `/admin/lessons/${lessonId}/summary/phase-one-blocks`,
+    {
+      method: "PUT",
+      body: data,
+      token,
+    },
+  );
+}
+
+export function deleteAdminLessonSummary(lessonId: string, token: string) {
+  return apiRequest<{ deleted: boolean }>(`/admin/lessons/${lessonId}/summary`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function getAdminStemFigures(lessonId: string, token: string) {
+  return apiRequest<AdminStemFigure[]>(`/admin/lessons/${lessonId}/stem-figures`, {
+    method: "GET",
+    token,
+  });
+}
+
+export function ensureAdminStemFigureForBlock(
+  lessonId: string,
+  blockPath: string,
+  token: string,
+) {
+  return apiRequest<AdminStemFigure>(
+    `/admin/lessons/${lessonId}/stem-figures/blocks/ensure`,
+    { method: "POST", body: { blockPath }, token },
+  );
+}
+
+export function retryAdminStemFigure(
+  lessonId: string,
+  figure: AdminStemFigure,
+  token: string,
+) {
+  return apiRequest<{
+    jobId: string;
+    status: string;
+    retryUsesAi: boolean;
+    issueCount: number;
+    estimatedMaxCostVnd?: number | null;
+  }>(`/admin/lessons/${lessonId}/stem-figures/${figure.id}/retry`, {
+    method: "POST",
+    body: stemFigureMutationGuard(figure, true),
+    token,
+  });
+}
+
+export function deleteAdminStemFigure(
+  lessonId: string,
+  figure: AdminStemFigure,
+  token: string,
+) {
+  return apiRequest<{ deleted: boolean; figureId: string }>(
+    `/admin/lessons/${lessonId}/stem-figures/${figure.id}`,
+    { method: "DELETE", body: stemFigureMutationGuard(figure), token },
+  );
+}
+
+export function createNewAdminStemFigure(
+  lessonId: string,
+  input: AdminStemFigureCreateAiInput,
+  token: string,
+) {
+  return apiRequest<{
+    jobId: string;
+    status: string;
+    estimatedMaxCostVnd: number | null;
+  }>(`/admin/lessons/${lessonId}/stem-figures/${input.figure.id}/create-new-ai`, {
+    method: "POST",
+    body: {
+      ...stemFigureMutationGuard(input.figure),
+      referenceImageMode: input.referenceImageMode,
+      adminInstructions: input.adminInstructions,
+      model: input.model,
+      temperature: input.temperature,
+      reasoningEffort: input.reasoningEffort,
+      systemPrompt: input.systemPrompt,
+      userPrompt: input.userPrompt,
+    },
+    token,
+  });
+}
+
+export function previewCreateNewAdminStemFigure(
+  lessonId: string,
+  input: AdminStemFigureCreateAiInput,
+  token: string,
+) {
+  return apiRequest<AdminStemFigureCreateAiPreview>(
+    `/admin/lessons/${lessonId}/stem-figures/${input.figure.id}/create-new-ai/preview`,
+    {
+      method: "POST",
+      body: {
+        ...stemFigureMutationGuard(input.figure),
+        referenceImageMode: input.referenceImageMode,
+        adminInstructions: input.adminInstructions,
+        model: input.model,
+        temperature: input.temperature,
+        reasoningEffort: input.reasoningEffort,
+        systemPrompt: input.systemPrompt,
+        userPrompt: input.userPrompt,
+      },
+      token,
+    },
+  );
+}
+
+export function replaceAdminStemFigure(
+  lessonId: string,
+  figure: AdminStemFigure,
+  file: File,
+  token: string,
+) {
+  const body = new FormData();
+  body.set("file", file);
+  const guard = stemFigureMutationGuard(figure);
+  if (guard.baseCurrentRevisionId) {
+    body.set("baseCurrentRevisionId", guard.baseCurrentRevisionId);
+  }
+  if (guard.basePendingRevisionId) {
+    body.set("basePendingRevisionId", guard.basePendingRevisionId);
+  }
+  body.set("baseSourceVersion", String(guard.baseSourceVersion));
+  return apiRequest<AdminStemFigure>(
+    `/admin/lessons/${lessonId}/stem-figures/${figure.id}/replace-upload`,
+    { method: "POST", body, token },
+  );
+}
+
+export function promoteAdminStemFigureSourceCrop(
+  lessonId: string,
+  figure: AdminStemFigure,
+  sourceObjectKey: string,
+  token: string,
+) {
+  return apiRequest<AdminStemFigure>(
+    `/admin/lessons/${lessonId}/stem-figures/${figure.id}/use-source-crop`,
+    {
+      method: "POST",
+      body: {
+        ...stemFigureMutationGuard(figure),
+        sourceSnapshotHash: figure.sourceReferenceSnapshotHash,
+        sourceObjectKey,
+      },
+      token,
+    },
+  );
+}
+
+function stemFigureMutationGuard(figure: AdminStemFigure, includeDiagnostic = false) {
+  return {
+    baseCurrentRevisionId: figure.currentRevisionId,
+    basePendingRevisionId: figure.pendingRevisionId,
+    baseSourceVersion: figure.sourceVersion,
+    ...(includeDiagnostic
+      ? {
+          latestAttemptId: figure.latestAttemptId,
+          diagnosticBatchHash: figure.diagnosticBatch?.batchHash ?? null,
+        }
+      : {}),
+  };
+}
+
+export function compileAdminStemFigureDraft(
+  lessonId: string,
+  figureId: string,
+  body: {
+    baseRevisionId: string | null;
+    sourceVersion: number;
+    latexSource: string;
+    altText: string;
+    caption: string | null;
+  },
+  token: string,
+) {
+  return apiRequest<AdminStemFigureCompileResult>(
+    `/admin/lessons/${lessonId}/stem-figures/${figureId}/drafts/compile`,
+    { method: "POST", body, token },
+  );
+}
+
+export function applyAdminStemFigureDraft(
+  lessonId: string,
+  figureId: string,
+  body: {
+    baseRevisionId: string | null;
+    revisionId: string;
+    sourceVersion: number;
+    altText: string;
+    caption: string | null;
+  },
+  token: string,
+) {
+  return apiRequest<{ status: "SUCCEEDED"; revisionId: string }>(
+    `/admin/lessons/${lessonId}/stem-figures/${figureId}/drafts/apply`,
+    { method: "POST", body, token },
+  );
 }
 
 export function reviewAdminGeneratedSet(

@@ -69,6 +69,21 @@ flowchart TD
 - Bọc đọc/ghi storage trong `try/catch` để app không vỡ nếu browser chặn storage.
 - Đặt hook generic trong `apps/web/lib` vì admin và student cùng dùng.
 - Không dùng API/database cho trạng thái nhỏ chưa cần đồng bộ nhiều thiết bị.
+- Local draft trong form/modal/code editor phải sống ổn định suốt một phiên mở.
+  Không để `refetchOnWindowFocus` thay dữ liệu nguồn rồi chạy lại effect khởi tạo
+  draft khi người dùng chỉ chuyển tab trình duyệt. Job nền vẫn có thể poll riêng;
+  khi quay lại tab, polling tiếp tục nhưng không được ghi đè nội dung đang sửa.
+- Với dữ liệu cha/con bị thay trọn bộ sau background job, không merge snapshot
+  con đang cache vào bản cha mới chỉ vì hai request được invalidate song song.
+  Chỉ reconcile khi query con đã refetch xong và cùng generation/version với bản
+  cha; reconcile phải loại identity không còn trên server thay vì chỉ append item
+  mới. API lưu vẫn cần chặn reference orphan để cache race không thể biến thành
+  dữ liệu bẩn lâu dài.
+- Không nối trực tiếp từng lần gõ hoặc đổi lựa chọn local với API preview nếu
+  người dùng đã có action `Xem dữ liệu`. Form cập nhật local ngay; action xem mới
+  dựng payload chính xác qua API. Pending preview không được thay một khối nội
+  dung ổn định bằng loading có chiều cao khác, vì modal sẽ nhảy/nháy dù không hề
+  remount.
 
 ## File quan trọng
 
@@ -79,6 +94,7 @@ apps/web/lib/sidebar-collapse-state.ts
 apps/web/app/layout.tsx
 apps/web/features/admin/courses/hooks/use-admin-courses-manager.ts
 apps/web/features/admin/courses/hooks/use-admin-course-detail-manager.ts
+apps/web/features/admin/ai-generation/components/admin-stem-figure-create-ai-dialog.tsx
 apps/web/components/student/layout/student-shell.tsx
 ```
 

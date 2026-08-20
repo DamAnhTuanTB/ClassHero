@@ -22,6 +22,9 @@ import { AiGenerationWorkerService } from "#api/workers/services/ai-generation-w
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
 import { ProviderOperationsModule } from "#api/modules/provider-operations/provider-operations.module";
+import { StemFiguresModule } from "#api/modules/stem-figures/stem-figures.module";
+import { StemFigureRenderingProcessor } from "#api/workers/processors/stem-figure-rendering.processor";
+import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-figure-rendering-worker.service";
 
 @Module({
   imports: [
@@ -34,6 +37,7 @@ import { ProviderOperationsModule } from "#api/modules/provider-operations/provi
     ProviderOperationsModule,
     AiModule,
     FilesModule,
+    StemFiguresModule,
   ],
   providers: [
     DocumentProcessingProcessor,
@@ -53,6 +57,8 @@ import { ProviderOperationsModule } from "#api/modules/provider-operations/provi
     AiGenerationWorkerService,
     LessonSummaryGenerationService,
     LessonContentGenerationService,
+    StemFigureRenderingProcessor,
+    StemFigureRenderingWorkerService,
   ],
 })
 export class WorkerModule {}

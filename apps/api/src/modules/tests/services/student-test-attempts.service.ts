@@ -38,7 +38,6 @@ const studentTestQuestionSelect = {
   explanation: {
     select: {
       contentJson: true,
-      diagramSpecJson: true,
       reviewStatus: true,
       staleAt: true,
     },
@@ -561,9 +560,6 @@ export class StudentTestAttemptsService {
           pointsAwarded: Number(answer.pointsAwarded ?? 0),
           statementResults: grade.statementResults,
           explanationJson: serializeApprovedExplanation(answer.question),
-          explanationDiagramSpecJson: serializeApprovedExplanationDiagram(
-            answer.question,
-          ),
           explanationExampleBlock: serializeApprovedExplanationExample(answer.question),
         };
       }),
@@ -722,13 +718,6 @@ function serializeApprovedExplanation(question: StudentTestQuestionRecord) {
   return question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
     question.explanation.staleAt === null
     ? question.explanation.contentJson
-    : null;
-}
-
-function serializeApprovedExplanationDiagram(question: StudentTestQuestionRecord) {
-  return question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
-    question.explanation.staleAt === null
-    ? question.explanation.diagramSpecJson
     : null;
 }
 

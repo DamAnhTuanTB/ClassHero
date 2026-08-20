@@ -35,7 +35,6 @@ const studentQuizQuestionSelect = {
   explanation: {
     select: {
       contentJson: true,
-      diagramSpecJson: true,
       reviewStatus: true,
       staleAt: true,
     },
@@ -1152,11 +1151,6 @@ function serializeRunnerQuestion(
       question.explanation.staleAt === null
         ? question.explanation.contentJson
         : null,
-    explanationDiagramSpecJson:
-      question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
-      question.explanation.staleAt === null
-        ? question.explanation.diagramSpecJson
-        : null,
     explanationExampleBlock:
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
       question.explanation.staleAt === null
@@ -1196,11 +1190,6 @@ function serializeCheckedAnswer(
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
       question.explanation.staleAt === null
         ? question.explanation.contentJson
-        : null,
-    explanationDiagramSpecJson:
-      question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
-      question.explanation.staleAt === null
-        ? question.explanation.diagramSpecJson
         : null,
     explanationExampleBlock:
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&

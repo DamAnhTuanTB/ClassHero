@@ -1,10 +1,14 @@
 node_modules
+**/node_modules
 apps/*/node_modules
 packages/*/node_modules
 .next
+**/.next
 apps/web/.next
 .turbo
+**/.turbo
 dist
+**/dist
 build
 coverage
 *.tsbuildinfo
@@ -14,4 +18,6 @@ coverage
 !apps/api/.env.example
 !apps/web/.env.example
 .git
+**/.git
+.codex
 .DS_Store

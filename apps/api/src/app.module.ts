@@ -15,6 +15,7 @@ import { PaymentsModule } from "#api/modules/payments/payments.module";
 import { QuizModule } from "#api/modules/quiz/quiz.module";
 import { ProviderOperationsModule } from "#api/modules/provider-operations/provider-operations.module";
 import { StudentLearningModule } from "#api/modules/student-learning/student-learning.module";
+import { StemFiguresModule } from "#api/modules/stem-figures/stem-figures.module";
 import { TestsModule } from "#api/modules/tests/tests.module";
 
 @Module({
@@ -36,6 +37,7 @@ import { TestsModule } from "#api/modules/tests/tests.module";
     ProviderOperationsModule,
     QuizModule,
     StudentLearningModule,
+    StemFiguresModule,
     TestsModule,
   ],
   controllers: [AppController],

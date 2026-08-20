@@ -176,6 +176,11 @@ test.describe("Admin Cài đặt AI", () => {
         page.getByRole("img", { name: "Biểu đồ chi phí sử dụng" }),
       ).toBeVisible();
       await expect(page.getByText("GPT-4.1 mini").last()).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Tất cả lượt gọi provider" }),
+      ).toBeVisible();
+      await expect(page.getByText("Tạo hình minh họa · Thành công")).toBeVisible();
+      await expect(page.getByText("Tổng 7 lượt: 8.614 VNĐ")).toBeVisible();
 
       await page.getByRole("tab", { name: "Bảng giá" }).click();
       await expect(
@@ -411,6 +416,16 @@ async function setupProviderOperationsMock(page: Page) {
               estimatedSavedCostVnd: 0,
               latencyMs: 850,
               createdAt: now,
+              backgroundJob: {
+                queue: "DIAGRAM_RENDERING",
+                resourceType: "STEM_FIGURE",
+              },
+              aiGeneration: {
+                id: "generation-1",
+                type: "SUMMARY",
+                totalCostVnd: 8_614,
+                usageEventCount: 7,
+              },
               catalogItem: {
                 displayName: model.displayName,
                 externalKey: model.externalKey,

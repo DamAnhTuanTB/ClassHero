@@ -1,0 +1,34 @@
+FROM node:24-bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    dvisvgm \
+    fonts-lmodern \
+    fonts-noto-core \
+    fonts-noto-mono \
+    lmodern \
+    texlive-fonts-recommended \
+    texlive-lang-other \
+    texlive-latex-extra \
+    texlive-luatex \
+    texlive-pictures \
+    texlive-science \
+  && rm -rf /var/lib/apt/lists/*
+
+# chemfig delegates key parsing to simplekv.tex, shipped separately by Debian.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends texlive-plain-generic \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srv/tex-renderer
+COPY apps/api/tex-renderer/server.mjs ./server.mjs
+COPY apps/api/tex-renderer/smoke-test.mjs ./smoke-test.mjs
+COPY apps/api/tex-renderer/tex-source-policy.mjs ./tex-source-policy.mjs
+COPY packages/shared/src/constants/stem-figure-toolbox-manifest.json ./stem-figure-toolbox-manifest.json
+
+USER node
+EXPOSE 8080
+
+CMD ["node", "server.mjs"]

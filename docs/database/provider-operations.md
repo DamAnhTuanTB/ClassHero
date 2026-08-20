@@ -16,9 +16,20 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 
 - Tiền VND dùng integer; USD/tỷ giá dùng Decimal chỉ ở lớp accounting.
 - Usage event lưu cả price version, tỷ giá, raw unit, USD và VND tại thời điểm gọi; không tính ngược bằng bảng giá mới.
+- `provider_usage_events` là nguồn chuẩn khi hiển thị tổng số lượt gọi và tổng
+  chi phí của một lần sinh. `ai_generations.estimated_cost_vnd` chỉ là projection
+  denormalized để truy vấn nhanh/giữ tương thích; UI/API phải aggregate hoặc đối
+  chiếu event khi cần số tiền chính xác sau các lượt gọi phase sau.
 - AI token tách input, cached input và output. OCR lưu pages; cache hit có `cost_vnd=0` và `estimated_saved_cost_vnd`.
+- `raw_usage_json` của lượt AI mới tách `providerUsage` nguyên bản khỏi
+  `fileOperations` do backend ghi. Không trộn metadata xử lý file vào object usage
+  của provider; các cột token chuẩn hóa mới là nguồn tính phí và aggregate.
 - Index chính theo `created_at`, category/provider/model/feature/status để phục vụ dashboard.
 - Cấu hình và giá thay đổi phải ghi `audit_logs`; API không trả API key.
+- Khi tạo price version mới, các điều kiện kỹ thuật không thuộc đơn giá trên rate
+  tương ứng (ví dụ `maxInputTokens`, service/context tier) phải được kế thừa từ
+  price version đang hiệu lực; thao tác chỉ cập nhật giá không được làm model mất
+  readiness hoặc khiến budget guard fail-closed ngoài ý muốn.
 - Catalog AI mặc định chỉ seed model text/structured-output ổn định dùng được cho `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST`. Model preview, audio, image và deprecated không xuất hiện trong ô chọn.
 - Catalog hiện gồm các họ OpenAI GPT-5.6/GPT-5.4/GPT-4.1 và Gemini 3.6/3.5/3.1/2.5; bảng giá seed lấy từ trang giá chính thức của từng provider và vẫn phải tạo price version mới khi provider đổi giá.
 

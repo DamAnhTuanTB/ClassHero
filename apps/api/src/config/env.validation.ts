@@ -22,6 +22,7 @@ const envSchema = z
     REDIS_URL: z.string().min(1),
     WORKER_CONCURRENCY_AI: z.coerce.number().int().positive().default(2),
     WORKER_CONCURRENCY_DOCUMENT: z.coerce.number().int().positive().default(1),
+    WORKER_CONCURRENCY_DIAGRAM: z.coerce.number().int().positive().default(1),
     WORKER_CONCURRENCY_NOTIFICATION: z.coerce.number().int().positive().default(3),
     CORS_ORIGINS: z.string().min(1).default("http://localhost:3000"),
     LOG_LEVEL: z.enum(["error", "warn", "log", "debug", "verbose"]).default("debug"),
@@ -37,6 +38,31 @@ const envSchema = z
     FILE_PUBLIC_BASE_URL: z.string().url().optional().or(z.literal("")),
     FILE_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(900),
     MAX_PDF_UPLOAD_MB: z.coerce.number().positive().default(50),
+    SEARCHABLE_PDF_VALIDATION_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(300)
+      .max(86_400)
+      .default(3_600),
+    SEARCHABLE_PDF_ROLLBACK_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(3_600)
+      .max(604_800)
+      .default(86_400),
+    AI_SUMMARY_PACKET_MAX_MB: z.coerce.number().positive().max(49).default(45),
+    AI_SUMMARY_PACKET_MAX_PAGES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(1_000)
+      .default(120),
+    AI_SUMMARY_REQUEST_DRAFT_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(300)
+      .max(86_400)
+      .default(3_600),
     MAX_IMAGE_UPLOAD_MB: z.coerce.number().positive().default(10),
     MAX_AVATAR_UPLOAD_MB: z.coerce.number().positive().default(5),
     OCR_PROVIDER: z.enum(["mathpix"]).default("mathpix"),
@@ -87,6 +113,47 @@ const envSchema = z
     AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
     AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // Isolated TeX Live renderer
+    TEX_RENDERER_URL: z.string().url().default("http://localhost:8080"),
+    TEX_RENDERER_TOKEN: z.string().min(16).default("local-tex-renderer-token"),
+    TEX_RENDER_REQUEST_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(120_000)
+      .default(30_000),
+    TEX_RENDER_MAX_AI_REPAIRS: z.coerce.number().int().min(0).max(5).default(2),
+    TEX_RENDER_MAX_SOURCE_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(200_000)
+      .default(40_000),
+    TEX_RENDER_MAX_SVG_BYTES: z.coerce
+      .number()
+      .int()
+      .min(10_000)
+      .max(10_000_000)
+      .default(2_000_000),
+    TEX_RENDER_MAX_SVG_NODES: z.coerce
+      .number()
+      .int()
+      .min(100)
+      .max(100_000)
+      .default(20_000),
+    TEX_RENDER_MAX_PATH_CHARACTERS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(10_000_000)
+      .default(1_500_000),
+    TEX_REPAIR_MAX_INPUT_CHARACTERS: z.coerce
+      .number()
+      .int()
+      .min(10_000)
+      .max(1_000_000)
+      .default(250_000),
 
     // payOS
     PAYOS_CLIENT_ID: z.string().min(1).optional(),
@@ -144,6 +211,17 @@ const envSchema = z
         message:
           `OPENAI_EMBEDDING_DIMENSIONS must be ${EMBEDDING_VECTOR_DIMENSIONS} ` +
           "to match document_chunks.embedding vector(1536). Create a database migration before changing dimensions.",
+      });
+    }
+
+    if (
+      env.NODE_ENV === "production" &&
+      env.TEX_RENDERER_TOKEN.startsWith("local-tex-renderer-token")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["TEX_RENDERER_TOKEN"],
+        message: "TEX_RENDERER_TOKEN must be changed in production.",
       });
     }
   });

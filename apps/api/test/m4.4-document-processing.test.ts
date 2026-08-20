@@ -888,6 +888,9 @@ function createSourceChunkingPrismaMock() {
       update: vi.fn(async (input: unknown) => input),
       findUnique: vi.fn(async () => ({ metadataJson: {} })),
     },
+    documentOcrArtifact: {
+      upsert: vi.fn(async () => ({ id: "ocr-artifact-1" })),
+    },
     sourceDocumentPage: {
       findMany: vi.fn(async () => [
         createSourcePage(2, "Nội dung trang 2"),
@@ -960,6 +963,9 @@ function createDirectDocumentPrismaMock() {
       })),
       update: vi.fn(async (input: unknown) => input),
       findUnique: vi.fn(async () => ({ metadataJson: {} })),
+    },
+    documentOcrArtifact: {
+      upsert: vi.fn(async () => ({ id: "ocr-artifact-1" })),
     },
     documentChunk: {
       deleteMany: vi.fn(async () => ({ count: 0 })),

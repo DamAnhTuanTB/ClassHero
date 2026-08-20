@@ -94,11 +94,23 @@ export const getUsageTimeline = (
 export const getUsageBreakdown = (token: string) =>
   apiRequest<UsageBreakdownItem[]>(`${basePath}/usage/breakdown`, { token });
 
-export const getUsageEvents = (token: string, page = 1) =>
-  apiRequest<UsageEventsResponse>(
-    `${basePath}/usage/events?page=${page}&pageSize=20`,
+export const getUsageEvents = (
+  token: string,
+  page = 1,
+  options?: { aiGenerationId?: string; pageSize?: number },
+) => {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    pageSize: String(options?.pageSize ?? 20),
+  });
+  if (options?.aiGenerationId) {
+    searchParams.set("aiGenerationId", options.aiGenerationId);
+  }
+  return apiRequest<UsageEventsResponse>(
+    `${basePath}/usage/events?${searchParams.toString()}`,
     { token },
   );
+};
 
 export const getProviderAuditHistory = (token: string) =>
   apiRequest<AuditItem[]>(`${basePath}/audit-history?limit=20`, { token });

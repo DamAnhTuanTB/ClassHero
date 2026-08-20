@@ -47,6 +47,12 @@ flowchart TD
 - Lesson document APIs nằm trong controller `admin-lesson-documents`.
 - Job status nằm trong `JobsModule` qua `GET /jobs/:jobId`.
 - Từ `M4.3`, document services vẫn tạo durable row trong DB trước, rồi gọi `BackgroundJobQueueService` sau transaction để enqueue BullMQ. Cách này giữ DB là nguồn trạng thái bền vững, còn Redis/BullMQ là kênh thực thi.
+- Preview không đọc thẳng `files.public_url` khi file có `visibility = PRIVATE`.
+  UI lấy signed URL ngắn hạn qua Files API. Với OCR, danh sách trang trả
+  `orderedContent`: luồng Mathpix theo từng trang vốn đã chứa text/table/figure/
+  caption đúng thứ tự provider. Backend ánh xạ URL ảnh cũ trong chính luồng này
+  sang signed URL của `ocrImages[]`; UI render nguyên luồng, không nối gallery ảnh
+  vào đầu hoặc cuối trang.
 
 ## Database
 
@@ -72,6 +78,11 @@ Worker `M4.4` hiện làm các việc chính:
 - Normalize artifact thành page text/Markdown/confidence/layout refs/quality flags để DB và RAG dùng được mà không phụ thuộc raw provider shape.
 - Copy ảnh/crop provider trả trong `.mmd.zip` về object storage nội bộ dưới `document-images/...`.
 - Tạo `document_chunks` không embedding; worker `M5.x` tiếp tục tạo embedding và lưu pgvector.
+- Mỗi chunk mới lưu riêng `chunkPageStart`/`chunkPageEnd` từ các nhãn `PDF page` trong
+  OCR text. UI review/generation phải đọc phạm vi này ở cấp chunk, không được dùng
+  `lesson_document_page_range` của cả tài liệu cho mọi chunk. Với chunk cũ chưa có
+  hai field này, preview suy ra lại từ nhãn `PDF page` trong nội dung để không hiển
+  thị sai cùng một khoảng trang cho tất cả đoạn.
 - Nếu job fail hết retry, cập nhật document/page sang `FAILED` và ghi lỗi rõ cho UI.
 
 ## File quan trọng
@@ -83,6 +94,7 @@ Worker `M4.4` hiện làm các việc chính:
 - `apps/api/src/modules/jobs/services/jobs.service.ts`
 - `apps/api/src/jobs/background-job-queues.ts`
 - `apps/api/src/workers/processors/document-processing.processor.ts`
+- `apps/api/src/modules/ai/utils/chunk-page-range.ts`
 - `apps/api/src/workers/services/mathpix-ocr.service.ts`
 - `apps/api/src/workers/services/ocr-artifact-cache.service.ts`
 - `apps/api/src/workers/services/image-extraction.service.ts`
@@ -97,8 +109,25 @@ Worker `M4.4` hiện làm các việc chính:
 - OCR artifact là tài sản lâu dài của hệ thống: cần giữ plain text, Markdown/MMD, LaTeX, layout/bbox/region, confidence và visual refs nếu provider trả để dùng lại cho Q&A, quiz, flashcard, bài thi, search và visual Q&A.
 - `artifact-audit.json` không thay thế artifact gốc; nó là bảng kiểm chất lượng để các bước sau quyết định dùng crop, dùng whole-page fallback hay báo admin cần kiểm tra.
 - File PDF gốc vẫn được giữ để học sinh xem đúng tài liệu và để backend render/crop page image fallback khi visual refs của provider chưa đủ.
+- `publicUrl` chỉ là địa chỉ public thật khi file được đánh dấu `PUBLIC`. Một file
+  private có URL nền lưu trong metadata vẫn cần signed URL; nếu UI dùng URL nền
+  trực tiếp, text JSON có thể hiện bình thường trong khi PDF/ảnh đồng loạt lỗi
+  `403`.
+- Mathpix `.mmd` toàn tài liệu có thể không có page break, nhưng `lines.json` vẫn
+  trả các line theo từng trang và `text_display` của line `conversion_output`
+  chứa figure/image directive tại đúng vị trí đọc. Page normalizer phải giữ luồng
+  đó; preview dùng `orderedContent` để thay URL ảnh chứ không tự sắp lại text và
+  `providerImages` bằng bbox/order metadata. `ocrImages[]` chỉ là metadata/fallback
+  cho consumer chuyên biệt, không phải nguồn dựng thứ tự hiển thị chính.
 - Retrieval/RAG sau này phải filter theo `lesson_id`, nên chunk cuối cùng luôn gắn với lesson.
+- Page range của lesson document xác định phạm vi được đưa vào bài học; page range
+  của chunk mới là bằng chứng truy vết của riêng đoạn đó. Hai cấp metadata này không
+  được thay thế cho nhau trong màn review/debug AI.
 - `kind` mô tả vai trò retrieval, còn `source_document_id`/metadata mô tả nguồn tạo. Vì vậy page range và file upload trực tiếp đều có thể là `PRIMARY_FROM_SOURCE`.
+- Khi UI cần phân biệt ảnh gốc SGK với ảnh admin upload, serializer phải đọc
+  provenance ngữ nghĩa như `textbookSourceObjectKey`; không chỉ so tên action đã
+  tạo file. Crop do admin chọn thủ công và crop do luồng sinh Summary tự động
+  promote đều là `TEXTBOOK_SOURCE`, dù `uploadSource` của hai đường đi khác nhau.
 - Form lesson giữ một thứ tự UI riêng cho page range và các file nền tảng. Thứ tự này chỉ phục vụ trải nghiệm thêm/xóa trong modal; payload API vẫn tách page range và danh sách upload theo đúng contract.
 - Tài liệu nền tảng và tài liệu bổ sung là hai luồng khác nhau; thêm hoặc xóa tài liệu nền tảng không được xóa supplemental/homework.
 - `background_jobs.id` là `jobId` cho UI poll và cũng được dùng làm BullMQ `jobId` để enqueue idempotent hơn.

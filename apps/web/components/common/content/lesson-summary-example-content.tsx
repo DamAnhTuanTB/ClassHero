@@ -2,14 +2,16 @@
 
 import {
   normalizeLessonSummaryAngleNotation,
-  lessonSummaryDiagramSpecSchema,
   lessonSummaryGeometryStatementSchema,
-  type LessonSummaryDiagramSpec,
   type LessonSummaryGeometryStatement,
 } from "@learning-path/shared";
 import { PlayCircle } from "lucide-react";
-import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
-import type { LessonSummaryDiagramEditor } from "@/components/common/content/lesson-summary-diagram-editing";
+import type { ReactNode } from "react";
+import {
+  StemFigure,
+  type StemFigureVisual,
+} from "@/components/common/content/stem-figure";
+import { normalizeInlineSubpartBreaks } from "@/components/common/content/lesson-summary-example-content-normalizer";
 import { LessonSummaryGeometryStatementTable } from "@/components/common/content/lesson-summary-geometry-statement";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
@@ -19,11 +21,10 @@ export interface LessonSummaryExampleBlockData {
   solution: string | null;
   answer: string;
   geometryStatement?: LessonSummaryGeometryStatement;
-  visual?: {
-    kind: "DIAGRAM_SPEC";
-    spec: LessonSummaryDiagramSpec;
-  };
+  figures?: StemFigureVisual[];
 }
+
+export type LessonSummaryFigureRenderer = (visual: StemFigureVisual) => ReactNode;
 
 export function isLessonSummaryExampleBlockData(
   value: unknown,
@@ -44,20 +45,19 @@ export function isLessonSummaryExampleBlockData(
   ) {
     return false;
   }
-  if (block.visual !== undefined) {
-    if (
-      !block.visual ||
-      typeof block.visual !== "object" ||
-      Array.isArray(block.visual)
-    ) {
-      return false;
-    }
-    const visual = block.visual as Record<string, unknown>;
-    if (
-      visual.kind !== "DIAGRAM_SPEC" ||
-      !lessonSummaryDiagramSpecSchema.safeParse(visual.spec).success
-    ) {
-      return false;
+  if (block.figures !== undefined) {
+    if (!Array.isArray(block.figures)) return false;
+    for (const value of block.figures) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+      const visual = value as Record<string, unknown>;
+      if (
+        visual.kind !== "TEX_FIGURE" ||
+        typeof visual.figureId !== "string" ||
+        typeof visual.altText !== "string" ||
+        (visual.caption !== null && typeof visual.caption !== "string")
+      ) {
+        return false;
+      }
     }
   }
   return true;
@@ -66,20 +66,19 @@ export function isLessonSummaryExampleBlockData(
 export function LessonSummaryExampleContent({
   answerLabel = "Đáp án",
   block,
-  diagramEditor,
   showEditorialWarning = false,
   showProblem = true,
+  renderFigure,
 }: {
   answerLabel?: string;
   block: LessonSummaryExampleBlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
   showEditorialWarning?: boolean;
   showProblem?: boolean;
+  renderFigure?: LessonSummaryFigureRenderer;
 }) {
   const geometryStatement = readGeometryStatement(block);
   const normalizedAnswer = block.answer ? normalizeBlockMath(block.answer, block) : "";
-  const shouldStackAnswerLabel =
-    answerLabel === "Kết luận" && hasMultipleAnswerSubparts(normalizedAnswer);
+  const shouldStackAnswerLabel = answerLabel === "Kết luận";
   return (
     <div className="space-y-3">
       {showProblem ? (
@@ -88,13 +87,17 @@ export function LessonSummaryExampleContent({
         </div>
       ) : null}
 
-      {block.visual?.kind === "DIAGRAM_SPEC" ? (
-        <LessonSummaryDiagram
-          editor={diagramEditor}
-          spec={block.visual.spec}
-          showEditorialWarning={showEditorialWarning}
-        />
-      ) : null}
+      {block.figures?.map((visual) =>
+        visual.kind === "TEX_FIGURE" ? (
+          <div key={visual.figureId}>
+            {renderFigure ? (
+              renderFigure(visual)
+            ) : (
+              <StemFigure visual={visual} showStatus={showEditorialWarning} />
+            )}
+          </div>
+        ) : null,
+      )}
 
       {geometryStatement ? (
         <LessonSummaryGeometryStatementTable statement={geometryStatement} />
@@ -104,7 +107,7 @@ export function LessonSummaryExampleContent({
         <div className="mb-3 space-y-3 border-l-[3px] border-blue-500/30 pl-4 text-sm dark:border-blue-400/30">
           {block.solution ? (
             <div>
-              <div className="mb-1.5 font-bold text-slate-900 dark:text-slate-100">
+              <div className="mb-1.5 text-center font-bold text-slate-900 dark:text-slate-100">
                 Lời giải
               </div>
               <MathpixMarkdownRenderer
@@ -116,7 +119,7 @@ export function LessonSummaryExampleContent({
             <div className="mt-2">
               {shouldStackAnswerLabel ? (
                 <>
-                  <div className="mb-1.5 font-bold text-slate-900 dark:text-slate-100">
+                  <div className="mb-1.5 block whitespace-nowrap font-bold text-slate-900 dark:text-slate-100">
                     {answerLabel}:
                   </div>
                   <MathpixMarkdownRenderer content={normalizedAnswer} />
@@ -141,19 +144,19 @@ export function LessonSummaryExampleContent({
 export function LessonSummaryExampleCard({
   answerLabel,
   block,
-  diagramEditor,
   displayNumber,
   label = "Ví dụ",
   showEditorialWarning = false,
   showProblem = true,
+  renderFigure,
 }: {
   answerLabel?: string;
   block: LessonSummaryExampleBlockData;
-  diagramEditor?: LessonSummaryDiagramEditor;
   displayNumber?: number | string | null;
   label?: string;
   showEditorialWarning?: boolean;
   showProblem?: boolean;
+  renderFigure?: LessonSummaryFigureRenderer;
 }) {
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900/50 dark:bg-blue-900/10 sm:p-5">
@@ -165,26 +168,17 @@ export function LessonSummaryExampleCard({
         <LessonSummaryExampleContent
           answerLabel={answerLabel}
           block={block}
-          diagramEditor={diagramEditor}
           showEditorialWarning={showEditorialWarning}
           showProblem={showProblem}
+          renderFigure={renderFigure}
         />
       </div>
     </div>
   );
 }
 
-function normalizeBlockMath(value: string, block: LessonSummaryExampleBlockData) {
-  return normalizeLessonSummaryAngleNotation(value, block.visual?.spec);
-}
-
-function hasMultipleAnswerSubparts(value: string) {
-  const subparts = new Set(
-    [...value.matchAll(/(?:^|\n)\s*([a-h])\)\s+/giu)].map((match) =>
-      match[1]!.toLocaleLowerCase("vi"),
-    ),
-  );
-  return subparts.size >= 2;
+function normalizeBlockMath(value: string, _block: LessonSummaryExampleBlockData) {
+  return normalizeInlineSubpartBreaks(normalizeLessonSummaryAngleNotation(value));
 }
 
 function normalizeSolutionForDisplay(

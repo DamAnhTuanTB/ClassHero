@@ -21,6 +21,7 @@ coverage/
 .codex/screenshots/
 .codex/playwright-results/
 .codex/playwright-report/
+.codex/artifacts/
 
 # Logs
 *.log

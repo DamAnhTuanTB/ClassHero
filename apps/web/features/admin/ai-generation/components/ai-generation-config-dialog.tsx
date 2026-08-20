@@ -24,6 +24,7 @@ import type {
   AdminAiGenerationPayload,
   AdminAiGenerationType,
   AdminAiConfigurationCapability,
+  AdminAiModelConfiguration,
   AdminAiPanelDocument,
   AdminAiQuestionType,
   AdminSummaryGenerationPayload,
@@ -67,6 +68,7 @@ export function AiGenerationConfigDialog({
   isOpen,
   isSubmitting,
   lessonId,
+  initialModelConfiguration,
   quizTargetSetId,
   targetGrade,
   type,
@@ -77,6 +79,7 @@ export function AiGenerationConfigDialog({
   isOpen: boolean;
   isSubmitting: boolean;
   lessonId: string;
+  initialModelConfiguration?: AdminAiModelConfiguration;
   quizTargetSetId?: string;
   targetGrade: number | null;
   type: AdminAiGenerationType;
@@ -96,6 +99,7 @@ export function AiGenerationConfigDialog({
   const [summaryPreviewData, setSummaryPreviewData] =
     useState<AdminLessonSummaryPromptPreview | null>(null);
   const [isPreviewRequestPending, setIsPreviewRequestPending] = useState(false);
+  const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
   const [isPreparingSubmission, setIsPreparingSubmission] = useState(false);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const hasInitializedRef = useRef(false);
@@ -128,6 +132,7 @@ export function AiGenerationConfigDialog({
     hasAdminEditedUserPromptRef.current = false;
     form.reset(values);
     resetPreview();
+    setPreviewErrorMessage(null);
     setSummaryPreviewTab("system");
     setSummaryPreviewData(null);
     if ((type === "SUMMARY" || type === "QUIZ") && values.documentIds.length > 0) {
@@ -137,12 +142,16 @@ export function AiGenerationConfigDialog({
         .then((data) => {
           if (requestSequence !== previewRequestSequenceRef.current) return;
           setSummaryPreviewData(data);
-          form.setValue("systemInstructions", data.systemPrompt, {
-            shouldValidate: true,
-          });
-          form.setValue("userPrompt", data.userPrompt, {
-            shouldValidate: true,
-          });
+          if (!hasAdminEditedSystemPromptRef.current) {
+            form.setValue("systemInstructions", data.systemPrompt, {
+              shouldValidate: true,
+            });
+          }
+          if (!hasAdminEditedUserPromptRef.current) {
+            form.setValue("userPrompt", data.userPrompt, {
+              shouldValidate: true,
+            });
+          }
           if (
             data.configuration.isDefaultConfigured &&
             !form.getValues("summaryModel") &&
@@ -172,8 +181,14 @@ export function AiGenerationConfigDialog({
             }
           }
         })
-        .catch(() => {
-          // Mutation state renders the recoverable preview error in the dialog.
+        .catch((error: unknown) => {
+          if (requestSequence !== previewRequestSequenceRef.current) return;
+          setPreviewErrorMessage(
+            getUserFacingErrorMessage(
+              error,
+              "Chưa thể chuẩn bị dữ liệu tạo nội dung. Vui lòng thử lại.",
+            ),
+          );
         })
         .finally(() => {
           if (requestSequence === previewRequestSequenceRef.current) {
@@ -186,6 +201,7 @@ export function AiGenerationConfigDialog({
     documents,
     form,
     isOpen,
+    initialModelConfiguration,
     previewPrompt,
     quizTargetSetId,
     resetPreview,
@@ -213,7 +229,9 @@ export function AiGenerationConfigDialog({
 
   const selectedModelId = form.watch("summaryModel");
   const previewConfiguration = summaryPreviewData?.configuration;
-  const selectedModelInfo = previewConfiguration?.modelOptions?.find(
+  const modelConfiguration =
+    previewConfiguration ?? (type === "SUMMARY" ? initialModelConfiguration : undefined);
+  const selectedModelInfo = modelConfiguration?.modelOptions?.find(
     (opt) => opt.model === selectedModelId,
   );
   const aiConfigurationCapability = selectedModelInfo?.capabilities?.aiConfiguration;
@@ -258,17 +276,22 @@ export function AiGenerationConfigDialog({
 
   async function refreshSummaryPreview() {
     if (previewRequestInFlightRef.current || isDialogBusy) return;
+    if (!validateModelSelection()) return;
     previewRequestInFlightRef.current = true;
     setIsPreviewRequestPending(true);
+    setPreviewErrorMessage(null);
     const requestSequence = ++previewRequestSequenceRef.current;
     try {
       const previewFields: Array<keyof AdminAiGenerationFormValues> = [
         "documentIds",
+        "useTextbookSourceImages",
         "styleInstructions",
         "summaryLength",
         "summaryTargetWordCount",
         "extraInstructions",
         "systemInstructions",
+        "userPrompt",
+        "summaryModel",
         "summaryTemperature",
         "summaryReasoningEffort",
         "summaryMaxOutputTokens",
@@ -302,14 +325,18 @@ export function AiGenerationConfigDialog({
       );
       if (requestSequence !== previewRequestSequenceRef.current) return;
       setSummaryPreviewData(preview);
-      form.setValue("systemInstructions", preview.systemPrompt, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-      form.setValue("userPrompt", preview.userPrompt, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+      if (!hasAdminEditedSystemPromptRef.current) {
+        form.setValue("systemInstructions", preview.systemPrompt, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+      if (!hasAdminEditedUserPromptRef.current) {
+        form.setValue("userPrompt", preview.userPrompt, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
       setTimeout(() => {
         if (scrollViewportRef.current) {
           scrollViewportRef.current.scrollTo({
@@ -318,14 +345,36 @@ export function AiGenerationConfigDialog({
           });
         }
       }, 50);
-    } catch {
-      // React Query exposes the error state directly in the dialog.
+    } catch (error) {
+      if (requestSequence !== previewRequestSequenceRef.current) return;
+      setPreviewErrorMessage(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa thể chuẩn bị dữ liệu tạo nội dung. Vui lòng thử lại.",
+        ),
+      );
     } finally {
       if (requestSequence === previewRequestSequenceRef.current) {
         previewRequestInFlightRef.current = false;
         setIsPreviewRequestPending(false);
       }
     }
+  }
+
+  function validateModelSelection() {
+    if (
+      (type === "SUMMARY" || type === "QUIZ") &&
+      !form.getValues("summaryModel") &&
+      !modelConfiguration?.isDefaultConfigured
+    ) {
+      form.setError("summaryModel", { message: "Vui lòng chọn model" });
+      window.requestAnimationFrame(() => {
+        document.getElementById("ai-summary-model")?.focus();
+      });
+      return false;
+    }
+    form.clearErrors("summaryModel");
+    return true;
   }
 
   return (
@@ -348,11 +397,9 @@ export function AiGenerationConfigDialog({
           if (
             (type === "SUMMARY" || type === "QUIZ") &&
             !values.summaryModel &&
-            !previewConfiguration?.isDefaultConfigured
+            !modelConfiguration?.isDefaultConfigured
           ) {
-            form.setError("summaryModel", {
-              message: "Vui lòng chọn model",
-            });
+            validateModelSelection();
             return;
           }
           if (
@@ -369,14 +416,17 @@ export function AiGenerationConfigDialog({
           submitRequestInFlightRef.current = true;
           try {
             let submissionValues = values;
+            let currentPreviewForSubmission: AdminLessonSummaryPromptPreview | null =
+              null;
             if (type === "SUMMARY" || type === "QUIZ") {
               setIsPreparingSubmission(true);
-              const hasCustomSystemInstructions =
-                hasAdminEditedSystemPromptRef.current;
+              setPreviewErrorMessage(null);
+              const promptsAreVerbatim = type === "SUMMARY";
+              const hasCustomSystemInstructions = hasAdminEditedSystemPromptRef.current;
               const hasCustomUserPrompt = hasAdminEditedUserPromptRef.current;
               const promptPreviewValues = preparePromptPreviewValues(values, {
-                preserveSystemPrompt: hasCustomSystemInstructions,
-                preserveUserPrompt: hasCustomUserPrompt,
+                preserveSystemPrompt: promptsAreVerbatim || hasCustomSystemInstructions,
+                preserveUserPrompt: promptsAreVerbatim || hasCustomUserPrompt,
               });
 
               let currentPreview: AdminLessonSummaryPromptPreview;
@@ -387,43 +437,60 @@ export function AiGenerationConfigDialog({
                     quizTargetSetId,
                   }),
                 );
-              } catch {
-                // Mutation state renders the recoverable preparation error in the dialog.
+              } catch (error) {
+                setPreviewErrorMessage(
+                  getUserFacingErrorMessage(
+                    error,
+                    "Chưa thể chuẩn bị dữ liệu tạo nội dung. Vui lòng thử lại.",
+                  ),
+                );
                 return;
               }
 
               setSummaryPreviewData(currentPreview);
+              currentPreviewForSubmission = currentPreview;
               submissionValues = {
                 ...values,
-                systemInstructions: hasCustomSystemInstructions
+                systemInstructions: promptsAreVerbatim
                   ? values.systemInstructions
-                  : currentPreview.systemPrompt,
-                userPrompt: hasCustomUserPrompt
+                  : hasCustomSystemInstructions
+                    ? values.systemInstructions
+                    : currentPreview.systemPrompt,
+                userPrompt: promptsAreVerbatim
                   ? values.userPrompt
-                  : currentPreview.userPrompt,
+                  : hasCustomUserPrompt
+                    ? values.userPrompt
+                    : currentPreview.userPrompt,
               };
-              if (!hasCustomSystemInstructions) {
+              if (!promptsAreVerbatim && !hasCustomSystemInstructions) {
                 form.setValue("systemInstructions", currentPreview.systemPrompt, {
                   shouldValidate: true,
                 });
               }
-              if (!hasCustomUserPrompt) {
+              if (!promptsAreVerbatim && !hasCustomUserPrompt) {
                 form.setValue("userPrompt", currentPreview.userPrompt, {
                   shouldValidate: true,
                 });
               }
             }
+            const payload = toPayload(submissionValues, {
+              aiConfigurationCapability,
+              quizTargetSetId,
+            });
             await onSubmit(
-              toPayload(submissionValues, {
-                aiConfigurationCapability,
-                quizTargetSetId,
-              }),
+              payload.type === "SUMMARY" && currentPreviewForSubmission
+                ? {
+                    ...payload,
+                    requestDraftId: currentPreviewForSubmission.requestDraftId,
+                    requestHash: currentPreviewForSubmission.requestHash,
+                  }
+                : payload,
             );
           } finally {
             setIsPreparingSubmission(false);
             submitRequestInFlightRef.current = false;
           }
-        })}
+        }, validateModelSelection)}
       >
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center px-5 pr-16">
           <h2 className="text-lg font-extrabold text-[var(--theme-text-strong)]">
@@ -449,6 +516,27 @@ export function AiGenerationConfigDialog({
                   })
                 }
               />
+
+              {type === "SUMMARY" ? (
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-muted)]">
+                  <CheckboxField
+                    id="ai-summary-use-textbook-source-images"
+                    label="Dùng ảnh gốc sách giáo khoa"
+                    checked={form.watch("useTextbookSourceImages")}
+                    onChange={(event) =>
+                      form.setValue(
+                        "useTextbookSourceImages",
+                        event.currentTarget.checked,
+                        {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        },
+                      )
+                    }
+                  />
+                </div>
+              ) : null}
 
               {type === "QUIZ" ? (
                 <>
@@ -662,10 +750,10 @@ export function AiGenerationConfigDialog({
                   label="Model"
                   value={form.watch("summaryModel")}
                   options={[
-                    ...(previewConfiguration?.isDefaultConfigured
+                    ...(modelConfiguration?.isDefaultConfigured
                       ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
                       : []),
-                    ...(previewConfiguration?.modelOptions ?? []).map((option) => ({
+                    ...(modelConfiguration?.modelOptions ?? []).map((option) => ({
                       value: option.model,
                       label: `${formatProviderLabel(option.provider)} · ${option.model}${
                         option.available ? "" : " · Chưa khả dụng"
@@ -681,7 +769,12 @@ export function AiGenerationConfigDialog({
                       shouldTouch: true,
                       shouldValidate: true,
                     });
-                    const nextModel = previewConfiguration?.modelOptions.find(
+                    if (value || modelConfiguration?.isDefaultConfigured) {
+                      form.clearErrors("summaryModel");
+                    } else {
+                      form.setError("summaryModel", { message: "Vui lòng chọn model" });
+                    }
+                    const nextModel = modelConfiguration?.modelOptions.find(
                       (option) => option.model === value,
                     );
                     const nextCapability = nextModel?.capabilities?.aiConfiguration;
@@ -794,12 +887,12 @@ export function AiGenerationConfigDialog({
                 </button>
               </div>
 
-              {previewMutation.isError ? (
-                <div className="rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-3 text-sm font-semibold text-[var(--theme-error-text)]">
-                  {getUserFacingErrorMessage(
-                    previewMutation.error,
-                    "Chưa thể chuẩn bị dữ liệu tạo nội dung. Vui lòng thử lại.",
-                  )}
+              {previewErrorMessage ? (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-[var(--theme-error-border)] bg-[var(--theme-error-bg)] p-3 text-sm font-semibold text-[var(--theme-error-text)]"
+                >
+                  {previewErrorMessage}
                 </div>
               ) : null}
               {isPreviewRequestPending && !summaryPreviewData ? (
@@ -817,6 +910,7 @@ export function AiGenerationConfigDialog({
                 >
                   <AdminSummaryPromptPreview
                     preview={summaryPreviewData}
+                    promptsAreVerbatim={type === "SUMMARY"}
                     systemInstructions={form.watch("systemInstructions")}
                     userPrompt={form.watch("userPrompt")}
                     model={form.watch("summaryModel")}
@@ -1014,6 +1108,7 @@ function getDefaultValues(
       .slice(0, 20)
       .map((document) => document.id),
     style: "student_friendly",
+    useTextbookSourceImages: false,
     styleInstructions: getPresentationPreset("student_friendly", targetGrade),
     summaryLength: "standard",
     summaryTargetWordCount: "",
@@ -1158,11 +1253,12 @@ function toSummaryPayload(
 ): AdminSummaryGenerationPayload {
   const extraInstructions = values.extraInstructions.trim();
   const styleInstructions = values.styleInstructions.trim();
-  const systemInstructions = values.systemInstructions.trim();
-  const userPrompt = values.userPrompt.trim();
+  const systemInstructions = values.systemInstructions;
+  const userPrompt = values.userPrompt;
   return {
     type: "SUMMARY",
     documentIds: values.documentIds,
+    ...(values.useTextbookSourceImages ? { useTextbookSourceImages: true } : {}),
     style: values.style,
     ...(styleInstructions ? { styleInstructions } : {}),
     length: values.summaryLength,
@@ -1170,8 +1266,8 @@ function toSummaryPayload(
       ? { targetWordCount: Number(values.summaryTargetWordCount) }
       : {}),
     ...(extraInstructions ? { extraInstructions } : {}),
-    ...(systemInstructions ? { systemInstructions } : {}),
-    ...(userPrompt ? { userPrompt } : {}),
+    ...(systemInstructions.trim() ? { systemInstructions } : {}),
+    ...(userPrompt.trim() ? { userPrompt } : {}),
     ...(values.summaryModel ? { model: values.summaryModel } : {}),
     ...(values.summaryModel &&
     values.summaryTemperature &&

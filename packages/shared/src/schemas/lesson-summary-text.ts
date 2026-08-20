@@ -50,3 +50,29 @@ export function tokenizeMathText(value: string): MathTextToken[] {
 
   return tokens.length > 0 ? tokens : [{ type: "text", value }];
 }
+
+const BRACED_THREE_POINT_ANGLE_PATTERN =
+  /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
+const THREE_POINT_ANGLE_PATTERN =
+  /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
+
+/**
+ * Normalize three-point angle notation without depending on a renderer-specific
+ * geometry model. TeX figures own their labels and geometry independently.
+ */
+export function normalizeLessonSummaryAngleNotation(
+  value: string,
+  _legacyDiagramSpec?: unknown,
+) {
+  return value
+    .replace(
+      BRACED_THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    )
+    .replace(
+      THREE_POINT_ANGLE_PATTERN,
+      (_, first: string, vertex: string, second: string) =>
+        `\\widehat{${first}${vertex}${second}}`,
+    );
+}

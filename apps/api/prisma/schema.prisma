@@ -120,6 +120,15 @@ enum DocumentStatus {
   FAILED
 }
 
+enum SearchablePdfValidationStatus {
+  PENDING
+  PASSED
+  WARNING
+  FAILED
+  EXPIRED
+  PROMOTED
+}
+
 enum LessonDocumentKind {
   PRIMARY_FROM_SOURCE
   SUPPLEMENT
@@ -273,6 +282,61 @@ enum BackgroundJobStatus {
   CANCELLED
 }
 
+enum StemFigureStatus {
+  QUEUED
+  RENDERING
+  REPAIRING
+  SUCCEEDED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum StemFigureTheme {
+  LIGHT
+}
+
+enum StemFigureAttemptKind {
+  INITIAL
+  AI_REPAIR
+  INFRA_RETRY
+  ADMIN_EDIT
+  ADMIN_REGENERATE
+  ADMIN_UPLOAD
+  MANUAL_COMPILER_REPAIR
+  MANUAL_VALIDATOR_REPAIR
+  COMPILE_PREVIEW
+}
+
+enum StemFigureAttemptStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum StemFigureRevisionStatus {
+  QUEUED
+  RENDERING
+  REPAIRING
+  DRAFT_READY
+  SUCCEEDED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum StemFigureSourceKind {
+  AI_TEX
+  ADMIN_UPLOAD
+}
+
+enum StemFigureRevisionOrigin {
+  INITIAL_AI
+  AUTO_REPAIR
+  ADMIN_EDIT
+  ADMIN_REGENERATE
+  ADMIN_UPLOAD
+  MANUAL_REPAIR
+}
+
 enum ProviderCatalogCategory {
   AI_MODEL
   OCR_SERVICE
@@ -359,6 +423,8 @@ model User {
   updatedLessons              Lesson[]                  @relation("LessonUpdatedBy")
   createdLessonSummaries      LessonSummary[]           @relation("LessonSummaryCreatedBy")
   updatedLessonSummaries      LessonSummary[]           @relation("LessonSummaryUpdatedBy")
+  createdStemFigures          StemFigure[]              @relation("StemFigureCreatedBy")
+  createdStemFigureRevisions  StemFigureRevision[]      @relation("StemFigureRevisionCreatedBy")
   enrollmentsAsStudent        Enrollment[]              @relation("EnrollmentStudent")
   enrollmentsPaid             Enrollment[]              @relation("EnrollmentPaidBy")
   lessonProgress              LessonProgress[]          @relation("LessonProgressStudent")
@@ -465,32 +531,35 @@ model PasswordResetToken {
 }
 
 model File {
-  id                     String               @id @default(uuid()) @db.Uuid
-  provider               FileProvider         @default(CLOUDFLARE_R2)
-  purpose                FilePurpose
-  bucket                 String
-  objectKey              String               @unique @map("object_key")
-  originalName           String               @map("original_name")
-  mimeType               String               @map("mime_type")
-  sizeBytes              BigInt               @map("size_bytes")
-  visibility             FileVisibility       @default(PRIVATE)
-  status                 FileStatus           @default(UPLOADED)
-  uploadedById           String?              @map("uploaded_by_id") @db.Uuid
-  uploadedBy             User?                @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
-  avatarUsers            User[]               @relation("UserAvatar")
-  thumbnailLearningPaths LearningPath[]       @relation("LearningPathThumbnail")
-  sourceDocuments        SourceDocument[]     @relation("SourceDocumentFile")
-  sourcePageThumbnails   SourceDocumentPage[] @relation("SourceDocumentPageThumbnail")
-  lessonMaterials        LessonMaterial[]     @relation("LessonMaterialFile")
-  lessonDocuments        LessonDocument[]     @relation("LessonDocumentFile")
-  aiExplanationImages    AiExplanation[]      @relation("AiExplanationImageFile")
-  newsItemCovers         NewsItem[]           @relation("NewsItemCoverFile")
-  publicUrl              String?              @map("public_url")
-  checksum               String?
-  metadataJson           Json?                @map("metadata_json")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-  deletedAt              DateTime?            @map("deleted_at")
+  id                      String                    @id @default(uuid()) @db.Uuid
+  provider                FileProvider              @default(CLOUDFLARE_R2)
+  purpose                 FilePurpose
+  bucket                  String
+  objectKey               String                    @unique @map("object_key")
+  originalName            String                    @map("original_name")
+  mimeType                String                    @map("mime_type")
+  sizeBytes               BigInt                    @map("size_bytes")
+  visibility              FileVisibility            @default(PRIVATE)
+  status                  FileStatus                @default(UPLOADED)
+  uploadedById            String?                   @map("uploaded_by_id") @db.Uuid
+  uploadedBy              User?                     @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  avatarUsers             User[]                    @relation("UserAvatar")
+  thumbnailLearningPaths  LearningPath[]            @relation("LearningPathThumbnail")
+  sourceDocuments         SourceDocument[]          @relation("SourceDocumentFile")
+  searchablePdfOriginals  SearchablePdfValidation[] @relation("SearchablePdfValidationOriginalFile")
+  searchablePdfCandidates SearchablePdfValidation[] @relation("SearchablePdfValidationCandidateFile")
+  sourcePageThumbnails    SourceDocumentPage[]      @relation("SourceDocumentPageThumbnail")
+  lessonMaterials         LessonMaterial[]          @relation("LessonMaterialFile")
+  lessonDocuments         LessonDocument[]          @relation("LessonDocumentFile")
+  aiExplanationImages     AiExplanation[]           @relation("AiExplanationImageFile")
+  stemFigureDeliveries    StemFigureRevision[]      @relation("StemFigureRevisionDeliveryFile")
+  newsItemCovers          NewsItem[]                @relation("NewsItemCoverFile")
+  publicUrl               String?                   @map("public_url")
+  checksum                String?
+  metadataJson            Json?                     @map("metadata_json")
+  createdAt               DateTime                  @default(now()) @map("created_at")
+  updatedAt               DateTime                  @updatedAt @map("updated_at")
+  deletedAt               DateTime?                 @map("deleted_at")
 
   @@index([purpose, status])
   @@index([uploadedById])
@@ -513,6 +582,7 @@ model BackgroundJob {
   aiGenerations              AiGeneration[]              @relation("AiGenerationBackgroundJob")
   providerUsageEvents        ProviderUsageEvent[]        @relation("ProviderUsageBackgroundJob")
   providerBudgetReservations ProviderBudgetReservation[] @relation("ProviderBudgetReservationBackgroundJob")
+  stemFigureRenderAttempts   StemFigureRenderAttempt[]   @relation("StemFigureRenderAttemptJob")
   resourceType               String?                     @map("resource_type")
   resourceId                 String?                     @map("resource_id") @db.Uuid
   inputMeta                  Json?                       @map("input_meta_json")
@@ -653,34 +723,34 @@ model LearningPathChapter {
 }
 
 model Lesson {
-  id                     String                    @id @default(uuid()) @db.Uuid
-  sourceLessonId         String?                   @map("source_lesson_id") @db.Uuid
-  sourceLesson           Lesson?                   @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
-  personalizedCopies     Lesson[]                  @relation("PersonalLearningPathLessonSource")
-  learningPathId         String                    @map("learning_path_id") @db.Uuid
-  learningPath           LearningPath              @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  chapterId              String?                   @map("chapter_id") @db.Uuid
-  chapter                LearningPathChapter?      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  orderIndex             Int                       @map("order_index")
+  id                     String                      @id @default(uuid()) @db.Uuid
+  sourceLessonId         String?                     @map("source_lesson_id") @db.Uuid
+  sourceLesson           Lesson?                     @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
+  personalizedCopies     Lesson[]                    @relation("PersonalLearningPathLessonSource")
+  learningPathId         String                      @map("learning_path_id") @db.Uuid
+  learningPath           LearningPath                @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  chapterId              String?                     @map("chapter_id") @db.Uuid
+  chapter                LearningPathChapter?        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  orderIndex             Int                         @map("order_index")
   title                  String
-  shortDescription       String?                   @map("short_description")
-  lessonType             LessonType                @default(BASIC) @map("lesson_type")
-  liveUrl                String?                   @map("live_url")
-  prepMaterialJson       Json?                     @map("prep_material_json")
-  scheduledAt            DateTime?                 @map("scheduled_at")
-  examOpenAt             DateTime?                 @map("exam_open_at")
-  videoUrl               String?                   @map("video_url")
-  customVideoSettings    Json?                     @map("custom_video_settings")
-  completionMinScore     Decimal                   @default(7) @map("completion_min_score") @db.Decimal(5, 2)
-  trialEnabled           Boolean                   @default(false) @map("trial_enabled")
-  status                 PublishStatus             @default(DRAFT)
-  createdById            String?                   @map("created_by_id") @db.Uuid
-  createdBy              User?                     @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById            String?                   @map("updated_by_id") @db.Uuid
-  updatedBy              User?                     @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt              DateTime                  @default(now()) @map("created_at")
-  updatedAt              DateTime                  @updatedAt @map("updated_at")
-  deletedAt              DateTime?                 @map("deleted_at")
+  shortDescription       String?                     @map("short_description")
+  lessonType             LessonType                  @default(BASIC) @map("lesson_type")
+  liveUrl                String?                     @map("live_url")
+  prepMaterialJson       Json?                       @map("prep_material_json")
+  scheduledAt            DateTime?                   @map("scheduled_at")
+  examOpenAt             DateTime?                   @map("exam_open_at")
+  videoUrl               String?                     @map("video_url")
+  customVideoSettings    Json?                       @map("custom_video_settings")
+  completionMinScore     Decimal                     @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  trialEnabled           Boolean                     @default(false) @map("trial_enabled")
+  status                 PublishStatus               @default(DRAFT)
+  createdById            String?                     @map("created_by_id") @db.Uuid
+  createdBy              User?                       @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById            String?                     @map("updated_by_id") @db.Uuid
+  updatedBy              User?                       @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt              DateTime                    @default(now()) @map("created_at")
+  updatedAt              DateTime                    @updatedAt @map("updated_at")
+  deletedAt              DateTime?                   @map("deleted_at")
   materials              LessonMaterial[]
   documents              LessonDocument[]
   documentPageRanges     LessonDocumentPageRange[]
@@ -700,10 +770,12 @@ model Lesson {
   studentNotes           StudentNote[]
   videoComments          LessonVideoComment[]
   favorites              Favorite[]
-  backgroundJobs         BackgroundJob[]           @relation("BackgroundJobLesson")
+  backgroundJobs         BackgroundJob[]             @relation("BackgroundJobLesson")
   reports                Report[]
-  aiGenerations          AiGeneration[]            @relation("AiGenerationLesson")
+  aiGenerations          AiGeneration[]              @relation("AiGenerationLesson")
   aiExplanations         AiExplanation[]
+  stemFigures            StemFigure[]
+  summaryRequestDrafts   LessonSummaryRequestDraft[]
   aiChatSessions         AiChatSession[]
   xpEvents               XpEvent[]
 
@@ -759,6 +831,10 @@ model SourceDocument {
   pages                      SourceDocumentPage[]
   pageRanges                 LessonDocumentPageRange[]
   lessonDocuments            LessonDocument[]            @relation("LessonDocumentSourceDocument")
+  ocrArtifacts               DocumentOcrArtifact[]       @relation("SourceDocumentOcrArtifacts")
+  activeOcrArtifactId        String?                     @unique @map("active_ocr_artifact_id") @db.Uuid
+  activeOcrArtifact          DocumentOcrArtifact?        @relation("SourceDocumentActiveOcrArtifact", fields: [activeOcrArtifactId], references: [id], onDelete: SetNull)
+  searchablePdfValidations   SearchablePdfValidation[]
   providerUsageEvents        ProviderUsageEvent[]        @relation("ProviderUsageSourceDocument")
   providerBudgetReservations ProviderBudgetReservation[] @relation("ProviderBudgetReservationSourceDocument")
 
@@ -844,6 +920,9 @@ model LessonDocument {
   updatedAt           DateTime                 @updatedAt @map("updated_at")
   replacedAt          DateTime?                @map("replaced_at")
   chunks              DocumentChunk[]
+  ocrArtifacts        DocumentOcrArtifact[]    @relation("LessonDocumentOcrArtifacts")
+  activeOcrArtifactId String?                  @map("active_ocr_artifact_id") @db.Uuid
+  activeOcrArtifact   DocumentOcrArtifact?     @relation("LessonDocumentActiveOcrArtifact", fields: [activeOcrArtifactId], references: [id], onDelete: SetNull)
 
   @@index([lessonId])
   @@index([lessonId, kind])
@@ -856,6 +935,93 @@ model LessonDocument {
   @@index([processingJobId])
   @@index([replacedAt])
   @@map("lesson_documents")
+}
+
+model DocumentOcrArtifact {
+  id                       String           @id @default(uuid()) @db.Uuid
+  sourceDocumentId         String?          @map("source_document_id") @db.Uuid
+  sourceDocument           SourceDocument?  @relation("SourceDocumentOcrArtifacts", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  activeForSourceDocument  SourceDocument?  @relation("SourceDocumentActiveOcrArtifact")
+  lessonDocumentId         String?          @map("lesson_document_id") @db.Uuid
+  lessonDocument           LessonDocument?  @relation("LessonDocumentOcrArtifacts", fields: [lessonDocumentId], references: [id], onDelete: Cascade)
+  activeForLessonDocuments LessonDocument[] @relation("LessonDocumentActiveOcrArtifact")
+  provider                 String           @db.VarChar(40)
+  providerDocumentId       String?          @map("provider_document_id")
+  sourceContentHash        String           @map("source_content_hash")
+  modelVersion             String           @map("model_version")
+  optionsHash              String           @map("options_hash")
+  pageCount                Int              @map("page_count")
+  artifactBaseKey          String           @map("artifact_base_key")
+  manifestObjectKey        String           @map("manifest_object_key")
+  pagesObjectKey           String           @map("pages_object_key")
+  imageManifestObjectKey   String           @map("image_manifest_object_key")
+  artifactAuditObjectKey   String?          @map("artifact_audit_object_key")
+  status                   DocumentStatus   @default(READY)
+  metadataJson             Json?            @map("metadata_json")
+  createdAt                DateTime         @default(now()) @map("created_at")
+  updatedAt                DateTime         @updatedAt @map("updated_at")
+
+  @@unique([sourceDocumentId, provider, optionsHash, sourceContentHash])
+  @@unique([lessonDocumentId, provider, optionsHash, sourceContentHash])
+  @@index([sourceDocumentId, status])
+  @@index([lessonDocumentId, status])
+  @@index([sourceContentHash])
+  @@map("document_ocr_artifacts")
+}
+
+model SearchablePdfValidation {
+  id                    String                        @id @default(uuid()) @db.Uuid
+  sourceDocumentId      String                        @map("source_document_id") @db.Uuid
+  sourceDocument        SourceDocument                @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  originalFileId        String                        @map("original_file_id") @db.Uuid
+  originalFile          File                          @relation("SearchablePdfValidationOriginalFile", fields: [originalFileId], references: [id], onDelete: Restrict)
+  candidateFileId       String                        @map("candidate_file_id") @db.Uuid
+  candidateFile         File                          @relation("SearchablePdfValidationCandidateFile", fields: [candidateFileId], references: [id], onDelete: Restrict)
+  originalChecksum      String                        @map("original_checksum")
+  candidateChecksum     String                        @map("candidate_checksum")
+  status                SearchablePdfValidationStatus @default(PENDING)
+  reportJson            Json?                         @map("report_json")
+  contactSheetObjectKey String?                       @map("contact_sheet_object_key")
+  expiresAt             DateTime                      @map("expires_at")
+  promotedAt            DateTime?                     @map("promoted_at")
+  createdAt             DateTime                      @default(now()) @map("created_at")
+  updatedAt             DateTime                      @updatedAt @map("updated_at")
+
+  @@index([sourceDocumentId, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@map("searchable_pdf_validations")
+}
+
+model LessonSummaryRequestDraft {
+  id                 String    @id @default(uuid()) @db.Uuid
+  lessonId           String    @map("lesson_id") @db.Uuid
+  lesson             Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  createdById        String?   @map("created_by_id") @db.Uuid
+  requestHash        String    @map("request_hash")
+  packetHash         String    @map("packet_hash")
+  manifestHash       String    @map("manifest_hash")
+  packetObjectKey    String    @map("packet_object_key")
+  packetFilename     String    @map("packet_filename")
+  packetSizeBytes    BigInt    @map("packet_size_bytes")
+  packetPageCount    Int       @map("packet_page_count")
+  systemInstructions String    @map("system_instructions") @db.Text
+  userPrompt         String    @map("user_prompt") @db.Text
+  schemaName         String    @map("schema_name")
+  schemaVersion      String    @map("schema_version")
+  schemaHash         String    @map("schema_hash")
+  schemaJson         Json      @map("schema_json")
+  manifestJson       Json      @map("manifest_json")
+  sourceSnapshotJson Json      @map("source_snapshot_json")
+  modelConfigJson    Json      @map("model_config_json")
+  costEstimateJson   Json?     @map("cost_estimate_json")
+  expiresAt          DateTime  @map("expires_at")
+  consumedAt         DateTime? @map("consumed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([lessonId, createdAt(sort: Desc)])
+  @@index([requestHash])
+  @@index([expiresAt])
+  @@map("lesson_summary_request_drafts")
 }
 
 model DocumentChunk {
@@ -898,11 +1064,127 @@ model LessonSummary {
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   deletedAt      DateTime?     @map("deleted_at")
+  stemFigures    StemFigure[]
 
   @@index([aiGenerationId])
   @@index([createdById])
   @@index([updatedById])
   @@map("lesson_summaries")
+}
+
+model StemFigure {
+  id                String                    @id @default(uuid()) @db.Uuid
+  lessonId          String                    @map("lesson_id") @db.Uuid
+  lesson            Lesson                    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonSummaryId   String?                   @map("lesson_summary_id") @db.Uuid
+  lessonSummary     LessonSummary?            @relation(fields: [lessonSummaryId], references: [id], onDelete: Cascade)
+  aiGenerationId    String?                   @map("ai_generation_id") @db.Uuid
+  aiGeneration      AiGeneration?             @relation("StemFigureAiGeneration", fields: [aiGenerationId], references: [id], onDelete: SetNull)
+  blockPath         String                    @map("block_path")
+  figureIndex       Int                       @default(0) @map("figure_index")
+  localPlanId       String                    @default("F01") @map("local_plan_id")
+  planJson          Json?                     @map("plan_json")
+  subjectKey        String                    @map("subject_key") @db.VarChar(24)
+  subjectName       String                    @map("subject_name") @db.VarChar(120)
+  subjectSlug       String                    @map("subject_slug") @db.VarChar(140)
+  status            StemFigureStatus          @default(QUEUED)
+  theme             StemFigureTheme           @default(LIGHT)
+  lastErrorCategory String?                   @map("last_error_category")
+  lastErrorCode     String?                   @map("last_error_code")
+  lastErrorMessage  String?                   @map("last_error_message") @db.Text
+  createdById       String?                   @map("created_by_id") @db.Uuid
+  createdBy         User?                     @relation("StemFigureCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  currentRevisionId String?                   @unique @map("current_revision_id") @db.Uuid
+  currentRevision   StemFigureRevision?       @relation("StemFigureCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  pendingRevisionId String?                   @unique @map("pending_revision_id") @db.Uuid
+  pendingRevision   StemFigureRevision?       @relation("StemFigurePendingRevision", fields: [pendingRevisionId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+  deletedAt         DateTime?                 @map("deleted_at")
+  attempts          StemFigureRenderAttempt[]
+  revisions         StemFigureRevision[]      @relation("StemFigureRevisions")
+
+  @@unique([lessonSummaryId, blockPath, figureIndex])
+  @@index([lessonId, status])
+  @@index([lessonId, deletedAt, status])
+  @@index([lessonSummaryId, blockPath])
+  @@index([subjectKey])
+  @@index([aiGenerationId])
+  @@map("stem_figures")
+}
+
+model StemFigureRevision {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  stemFigureId          String                    @map("stem_figure_id") @db.Uuid
+  stemFigure            StemFigure                @relation("StemFigureRevisions", fields: [stemFigureId], references: [id], onDelete: Cascade)
+  sourceKind            StemFigureSourceKind      @default(AI_TEX) @map("source_kind")
+  origin                StemFigureRevisionOrigin
+  status                StemFigureRevisionStatus  @default(QUEUED)
+  latexSource           String?                   @map("latex_source") @db.Text
+  sourceHash            String?                   @map("source_hash")
+  referenceSnapshotJson Json?                     @map("reference_snapshot_json")
+  referenceSnapshotHash String?                   @map("reference_snapshot_hash")
+  generationBriefHash   String?                   @map("generation_brief_hash")
+  providerRequestSnapshotsJson Json?              @map("provider_request_snapshots_json")
+  sourceVersion         Int                       @map("source_version")
+  altText               String                    @map("alt_text")
+  caption               String?
+  previewSvg            String?                   @map("preview_svg") @db.Text
+  deliveryFileId        String?                   @map("delivery_file_id") @db.Uuid
+  deliveryFile          File?                     @relation("StemFigureRevisionDeliveryFile", fields: [deliveryFileId], references: [id], onDelete: SetNull)
+  sanitizedSvgHash      String?                   @map("sanitized_svg_hash")
+  rendererVersion       String?                   @map("renderer_version")
+  validatorVersion      String?                   @map("validator_version")
+  repairCount           Int                       @default(0) @map("repair_count")
+  maxRepairAttempts     Int                       @default(2) @map("max_repair_attempts")
+  lastErrorCategory     String?                   @map("last_error_category")
+  lastErrorCode         String?                   @map("last_error_code")
+  lastErrorMessage      String?                   @map("last_error_message") @db.Text
+  createdById           String?                   @map("created_by_id") @db.Uuid
+  createdBy             User?                     @relation("StemFigureRevisionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  finishedAt            DateTime?                 @map("finished_at")
+  currentForFigure      StemFigure?               @relation("StemFigureCurrentRevision")
+  pendingForFigure      StemFigure?               @relation("StemFigurePendingRevision")
+  attempts              StemFigureRenderAttempt[]
+
+  @@unique([stemFigureId, sourceVersion])
+  @@index([stemFigureId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([deliveryFileId])
+  @@map("stem_figure_revisions")
+}
+
+model StemFigureRenderAttempt {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  stemFigureId        String                  @map("stem_figure_id") @db.Uuid
+  stemFigure          StemFigure              @relation(fields: [stemFigureId], references: [id], onDelete: Cascade)
+  revisionId          String                  @map("revision_id") @db.Uuid
+  revision            StemFigureRevision      @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  backgroundJobId     String?                 @map("background_job_id") @db.Uuid
+  backgroundJob       BackgroundJob?          @relation("StemFigureRenderAttemptJob", fields: [backgroundJobId], references: [id], onDelete: SetNull)
+  attemptNumber       Int                     @map("attempt_number")
+  sourceVersion       Int                     @map("source_version")
+  kind                StemFigureAttemptKind
+  status              StemFigureAttemptStatus @default(RUNNING)
+  sourceHash          String                  @map("source_hash")
+  compileLog          String?                 @map("compile_log") @db.Text
+  errorCategory       String?                 @map("error_category")
+  errorCode           String?                 @map("error_code")
+  validatorIssues     Json?                   @map("validator_issues_json")
+  diagnosticBatch     Json?                   @map("diagnostic_batch_json")
+  diagnosticBatchHash String?                 @map("diagnostic_batch_hash")
+  collectionComplete  Boolean                 @default(true) @map("collection_complete")
+  durationMs          Int?                    @map("duration_ms")
+  startedAt           DateTime                @default(now()) @map("started_at")
+  finishedAt          DateTime?               @map("finished_at")
+  createdAt           DateTime                @default(now()) @map("created_at")
+
+  @@unique([stemFigureId, attemptNumber])
+  @@index([backgroundJobId])
+  @@index([revisionId, createdAt])
+  @@index([stemFigureId, status])
+  @@map("stem_figure_render_attempts")
 }
 
 model Enrollment {
@@ -1545,6 +1827,7 @@ model AiGeneration {
   summaries                  ConversationSummary[]
   providerUsageEvents        ProviderUsageEvent[]        @relation("ProviderUsageAiGeneration")
   providerBudgetReservations ProviderBudgetReservation[] @relation("ProviderBudgetReservationAiGeneration")
+  stemFigures                StemFigure[]                @relation("StemFigureAiGeneration")
 
   @@index([lessonId, type, status])
   @@index([backgroundJobId])
@@ -1619,19 +1902,19 @@ model AiFeatureModelConfig {
   primaryCatalogItem    ProviderCatalogItem  @relation("AiFeaturePrimaryCatalogItem", fields: [primaryCatalogItemId], references: [id], onDelete: Restrict)
   fallbackCatalogItemId String?              @map("fallback_catalog_item_id") @db.Uuid
   fallbackCatalogItem   ProviderCatalogItem? @relation("AiFeatureFallbackCatalogItem", fields: [fallbackCatalogItemId], references: [id], onDelete: SetNull)
-  
-  temperature             Decimal?             @db.Decimal(4, 3)
-  reasoningEffort         String?              @map("reasoning_effort")
-  maxOutputTokens         Int?                 @map("max_output_tokens")
-  
-  fallbackTemperature     Decimal?             @map("fallback_temperature") @db.Decimal(4, 3)
-  fallbackReasoningEffort String?              @map("fallback_reasoning_effort")
-  fallbackMaxOutputTokens Int?                 @map("fallback_max_output_tokens")
-  
-  version               Int                  @default(1)
-  updatedByUserId       String?              @map("updated_by_user_id") @db.Uuid
-  createdAt             DateTime             @default(now()) @map("created_at")
-  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  temperature     Decimal? @db.Decimal(4, 3)
+  reasoningEffort String?  @map("reasoning_effort")
+  maxOutputTokens Int?     @map("max_output_tokens")
+
+  fallbackTemperature     Decimal? @map("fallback_temperature") @db.Decimal(4, 3)
+  fallbackReasoningEffort String?  @map("fallback_reasoning_effort")
+  fallbackMaxOutputTokens Int?     @map("fallback_max_output_tokens")
+
+  version         Int      @default(1)
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([primaryCatalogItemId])
   @@index([fallbackCatalogItemId])
@@ -1753,7 +2036,6 @@ model AiExplanation {
   lessonId          String                  @map("lesson_id") @db.Uuid
   lesson            Lesson                  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   contentJson       Json                    @map("content_json")
-  diagramSpecJson   Json?                   @map("diagram_spec_json")
   imageFileId       String?                 @map("image_file_id") @db.Uuid
   imageFile         File?                   @relation("AiExplanationImageFile", fields: [imageFileId], references: [id], onDelete: SetNull)
   source            ContentSource           @default(AI)

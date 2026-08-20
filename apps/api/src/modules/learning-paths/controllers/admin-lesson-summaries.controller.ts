@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -24,6 +25,7 @@ import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
 import { GenerateLessonSummaryDto } from "#api/modules/learning-paths/dto/generate-lesson-summary.dto";
+import { UpdateLessonSummaryPhaseOneBlocksDto } from "#api/modules/learning-paths/dto/update-lesson-summary-phase-one-blocks.dto";
 import { UpsertLessonSummaryDto } from "#api/modules/learning-paths/dto/upsert-lesson-summary.dto";
 import { LessonSummariesService } from "#api/modules/learning-paths/services/lesson-summaries.service";
 
@@ -44,6 +46,22 @@ export class AdminLessonSummariesController {
     return this.lessonSummariesService.getForAdmin(lessonId);
   }
 
+  @Put("phase-one-blocks")
+  @ApiOperation({ summary: "Validate and save editable Phase 1 block JSON" })
+  updatePhaseOneBlocks(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateLessonSummaryPhaseOneBlocksDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.lessonSummariesService.updatePhaseOneBlocksForAdmin(
+      lessonId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
+  }
+
   @Put()
   @ApiOperation({ summary: "Create or update one lesson summary" })
   upsert(
@@ -56,6 +74,20 @@ export class AdminLessonSummariesController {
       lessonId,
       user.id,
       dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Delete()
+  @ApiOperation({ summary: "Permanently delete the current lesson summary" })
+  remove(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.lessonSummariesService.deleteForAdmin(
+      lessonId,
+      user.id,
       getRequestContext(request),
     );
   }
@@ -78,8 +110,9 @@ export class AdminLessonSummariesController {
   })
   previewPrompt(
     @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: GenerateLessonSummaryDto,
   ) {
-    return this.lessonSummariesService.previewPrompt(lessonId, dto);
+    return this.lessonSummariesService.previewPrompt(lessonId, user.id, dto);
   }
 }

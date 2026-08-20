@@ -3,8 +3,7 @@ export type AdminDocumentStatus = "UPLOADED" | "PROCESSING" | "READY" | "FAILED"
 export type AdminBackgroundJobStatus =
   "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
-export type AdminLessonDocumentKind =
-  "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
+export type AdminLessonDocumentKind = "PRIMARY_FROM_SOURCE" | "SUPPLEMENT" | "HOMEWORK";
 
 export type AdminDocumentFileApi = {
   id: string;
@@ -52,12 +51,7 @@ export type AdminSourceDocumentApi = {
   updatedAt: string;
   deletedAt: string | null;
   readiness?: {
-    status:
-      | "READY"
-      | "NEEDS_CONFIRMATION"
-      | "PROCESSING"
-      | "FAILED"
-      | "NOT_READY";
+    status: "READY" | "NEEDS_CONFIRMATION" | "PROCESSING" | "FAILED" | "NOT_READY";
     isEligibleForExtraction: boolean;
     warningPageCount: number;
     readyPageCount: number;
@@ -77,10 +71,44 @@ export type AdminSourceDocumentPageApi = {
   textPreview: string | null;
   fullText: string | null;
   mathpixMarkdown: string | null;
+  orderedContent?: string | null;
+  ocrImages?: AdminSourceDocumentPageOcrImageApi[];
   extractError: string | null;
   metadataJson: unknown;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AdminSourceDocumentPageOcrImageApi = {
+  caption: string | null;
+  imageId: string;
+  kind: string | null;
+  mimeType: string | null;
+  orderInPage: number;
+  url: string;
+};
+
+export type AdminSearchablePdfValidationStatus =
+  "PENDING" | "PASSED" | "WARNING" | "FAILED" | "PROMOTED" | "EXPIRED";
+
+export type AdminSearchablePdfValidationApi = {
+  id: string;
+  status: AdminSearchablePdfValidationStatus;
+  expiresAt: string;
+  promotedAt?: string | null;
+  contactSheetUrl: string | null;
+  report: {
+    version: 1;
+    pageCount: number;
+    geometryEquivalent: boolean;
+    layoutEquivalent: boolean;
+    searchablePageCount: number;
+    searchablePageRatio: number;
+    emptyTextPageNumbers: number[];
+    cropAudit: { checked: number; passed: number; failedImageIds: string[] };
+    hardFailures: string[];
+    warnings: string[];
+  };
 };
 
 export type AdminLessonDocumentPageRangeApi = {

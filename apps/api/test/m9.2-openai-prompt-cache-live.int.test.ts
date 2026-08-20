@@ -24,8 +24,7 @@ const cases = [
     id: "grade-3-commutative",
     grade: 3,
     title: "Tính chất giao hoán của phép cộng",
-    content:
-      "Khi đổi chỗ các số hạng trong một tổng thì tổng không thay đổi: $a+b=b+a$.",
+    content: "Khi đổi chỗ các số hạng trong một tổng thì tổng không thay đổi: $a+b=b+a$.",
   },
   {
     id: "grade-8-square-sum",
@@ -73,6 +72,7 @@ describe.skipIf(!runLiveTest)("M9.2 OpenAI prompt cache live", () => {
         lessonId: `lesson-${liveCase.id}`,
         lessonTitle: liveCase.title,
         targetGrade: liveCase.grade,
+        subject: { key: "MATH", name: "Toán", slug: "toan" },
         documentIds: [`document-${liveCase.id}`],
         sourceHash: `source-${liveCase.id}`,
         chunks,

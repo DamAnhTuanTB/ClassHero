@@ -1,22 +1,36 @@
 import {
   AI_REASONING_EFFORT_LEVELS,
   LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS,
-  lessonSummaryDiagramStructuralVisualSchema,
   lessonSummaryGeometryStatementSchema,
+  stemFigureVisualSchema,
 } from "@learning-path/shared";
 import { z } from "zod";
 
-import {
-  lessonSummaryProviderDiagramInputSchema,
-  lessonSummaryProviderDiagramTransportSchema,
-} from "#api/modules/ai/types/lesson-summary-provider-diagram.types";
+import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
-export const LESSON_SUMMARY_PROMPT_VERSION = "lesson-summary-prompt-v62";
-export const LESSON_SUMMARY_SCHEMA_VERSION = "lesson-summary-schema-v45";
+export const LESSON_SUMMARY_PROMPT_VERSION =
+  "lesson-summary-pdf-packet-five-block-prompt-v18-schema-alignment";
+export const LESSON_SUMMARY_SCHEMA_VERSION =
+  "lesson-summary-pdf-packet-five-block-schema-v17-conditional-invariants";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
+
+export function resolveLessonSummaryOutputTokenFloor(input: {
+  length: z.infer<typeof lessonSummaryLengthSchema>;
+  targetWordCount: number | null;
+}) {
+  const lengthFloor = input.length === "detailed" ? 12_000 : 8_000;
+  const requestedContentFloor = input.targetWordCount
+    ? Math.ceil(input.targetWordCount * 3) + 4_000
+    : 0;
+
+  return Math.min(
+    LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS,
+    Math.max(LESSON_SUMMARY_MIN_OUTPUT_TOKENS, lengthFloor, requestedContentFloor),
+  );
+}
 
 export const lessonSummaryStyleSchema = z.enum([
   "student_friendly",
@@ -26,11 +40,13 @@ export const lessonSummaryStyleSchema = z.enum([
 export const lessonSummaryLengthSchema = z.enum(["short", "standard", "detailed"]);
 
 const nonEmptyText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
-const sourceChunkIdsSchema = z.array(z.uuid()).min(1).max(20);
-
+const LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION =
+  "Không coi ngắt dòng do dàn trang là ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện, dấu câu dẫn và cấu trúc công thức theo chức năng trong nguồn; chọn inline hay display theo vai trò và độ phức tạp, không theo vị trí xuống dòng trong ảnh PDF.";
+export const LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
+  "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
 const baseBlockSchema = z.object({
-  sourceChunkIds: sourceChunkIdsSchema,
-  visual: lessonSummaryDiagramStructuralVisualSchema.optional(),
+  figures: z.array(stemFigureVisualSchema).max(3).default([]),
+  sourcePageNumbers: z.array(z.number().int().positive()).max(20).optional(),
 });
 
 export const lessonSummaryExampleOriginSchema = z.enum([
@@ -54,8 +70,8 @@ const knowledgeBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("knowledge"),
     title: nonEmptyText(240),
-    content: nonEmptyText(2_000).describe(
-      "Chỉ trình bày lý thuyết; không chứa ví dụ/bài tập. Nếu có nhiều ý, mỗi ý phải thành một dòng/đoạn hoặc bullet riêng, không dồn thành paragraph dài.",
+    content: nonEmptyText(6_000).describe(
+      `Chỉ trình bày lý thuyết; không chứa ví dụ/bài tập. Bao gồm định nghĩa, công thức, tiêu chuẩn, quy tắc, phương pháp và trình tự không được nguồn/câu dẫn thông báo rõ là định lí hay tính chất. Bảo toàn ký hiệu tương đương, hệ điều kiện, dấu ngoặc nhóm, bullet và dấu câu dẫn của nguồn; không văn xuôi hóa công thức. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`,
     ),
   })
   .strict();
@@ -64,54 +80,30 @@ const propertyBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("property"),
     title: nonEmptyText(240),
-    content: nonEmptyText(2_000).describe(
-      "Chỉ trình bày tính chất; không chứa ví dụ/bài tập. Nếu có nhiều ý, mỗi ý phải thành một dòng/đoạn hoặc bullet riêng, không dồn thành paragraph dài.",
+    content: nonEmptyText(6_000).describe(
+      `Chỉ dùng cho phát biểu được nhãn, câu dẫn hoặc ngữ nghĩa xung quanh thông báo rõ là một tính chất; không chứa ví dụ/bài tập. Một bảng tiêu chuẩn, quy tắc, phương pháp hoặc chuỗi tương đương không tự trở thành property chỉ vì nó gồm nhiều mệnh đề chuyên môn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`,
     ),
-  })
-  .strict();
-
-const procedureBlockSchema = baseBlockSchema
-  .extend({
-    type: z.literal("procedure"),
-    title: nonEmptyText(240),
-    purpose: nonEmptyText(2_000)
-      .describe("Chỉ nêu mục đích; không chứa ví dụ hoặc đề bài.")
-      .nullable(),
-    steps: z
-      .array(
-        z
-          .object({
-            order: z.number().int().positive(),
-            content: nonEmptyText(2_000).describe(
-              "Chỉ nêu thao tác; không chứa ví dụ, chẳng hạn hoặc đề bài.",
-            ),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(20),
   })
   .strict();
 
 const exampleBlockSchema = z
   .object({
     type: z.literal("example"),
-    problem: nonEmptyText(2_000),
-    solution: nonEmptyText(5_000).nullable(),
-    answer: nonEmptyText(2_000),
+    problem: nonEmptyText(4_000),
+    solution: nonEmptyText(10_000),
+    answer: nonEmptyText(3_000),
+    isGeometry: z.boolean().optional(),
     geometryStatement: lessonSummaryGeometryStatementSchema.optional(),
-    visual: lessonSummaryDiagramStructuralVisualSchema.optional(),
-    sourceChunkIds: sourceChunkIdsSchema.optional(),
+    figures: z.array(stemFigureVisualSchema).max(3).default([]),
     origin: lessonSummaryExampleOriginSchema.optional(),
-    sourceCandidateIds: z.array(nonEmptyText(300)).max(20).optional(),
-    sourceAssessment: lessonSummarySourceAssessmentSchema.optional(),
+    sourcePageNumbers: z.array(z.number().int().positive()).max(20).optional(),
   })
   .strict();
 
 const noteBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("note"),
-    content: nonEmptyText(2_000).describe(
+    content: nonEmptyText(3_000).describe(
       "Chỉ dùng cho ý Chú ý, Lưu ý hoặc Nhận xét có trong nguồn. Không bắt đầu content bằng Chú ý:, Lưu ý: hoặc Nhận xét: vì giao diện đã hiển thị nhãn khối. Ví dụ là tùy chọn; nếu có phải tự đủ dữ kiện và không phụ thuộc hình/ảnh/URL của tài liệu nguồn.",
     ),
   })
@@ -121,46 +113,9 @@ const theoremBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("theorem"),
     title: nonEmptyText(240),
-    content: nonEmptyText(2_000).describe(
-      "Chỉ trình bày định lí; không chứa ví dụ/bài tập. Nếu có nhiều ý, mỗi ý phải thành một dòng/đoạn hoặc bullet riêng, không dồn thành paragraph dài.",
+    content: nonEmptyText(6_000).describe(
+      `Chỉ dùng cho phát biểu được nhãn hoặc câu dẫn bên ngoài phát biểu thông báo rõ là một định lí; không chứa ví dụ/bài tập. Điều kiện tương đương, tiêu chuẩn hay công thức quan trọng không tự trở thành theorem chỉ vì nội dung chuyên môn của nó. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`,
     ),
-  })
-  .strict();
-
-const comparisonBlockSchema = baseBlockSchema
-  .extend({
-    type: z.literal("comparison"),
-    title: nonEmptyText(240),
-    columns: z.array(nonEmptyText(240)).min(1),
-    rows: z.array(z.array(z.string().trim().max(2_000))).min(1),
-  })
-  .strict();
-
-const dataTableBlockSchema = baseBlockSchema
-  .extend({
-    type: z.literal("data_table"),
-    title: nonEmptyText(240),
-    columns: z.array(nonEmptyText(240)).min(1),
-    rows: z.array(z.array(z.string().trim().max(2_000))).min(1),
-    note: z.string().nullable(),
-  })
-  .strict();
-
-const applicationBlockSchema = baseBlockSchema
-  .extend({
-    type: z.literal("application"),
-    title: nonEmptyText(240),
-    context: nonEmptyText(2_000),
-    knowledgeUsed: z.array(nonEmptyText(240)).nullable(),
-    content: nonEmptyText(2_000),
-  })
-  .strict();
-
-const sectionRecapBlockSchema = baseBlockSchema
-  .extend({
-    type: z.literal("section_recap"),
-    title: nonEmptyText(240),
-    points: z.array(nonEmptyText(2_000)).min(1),
   })
   .strict();
 
@@ -177,10 +132,12 @@ const FIX_ONLY_LESSON_SUMMARY_ISSUE_CODES = new Set([
   "BLOCK_CANNOT_PROCESS",
   "BLOCK_SCHEMA_INVALID",
   "DIAGRAM_CANNOT_RENDER",
+  "MISSING_REQUIRED_FIGURE",
   "MISSING_REQUIRED_FIELD",
   "MISSING_SUMMARY_TITLE",
   "MISSING_THEORY_SECTION",
   "MISSING_THEORY_UNIT",
+  "MALFORMED_LATEX",
 ]);
 
 export function resolveLessonSummaryReviewIssueResolution(
@@ -216,207 +173,356 @@ const reviewIssuesShape = {
 
 const reviewedKnowledgeBlockSchema = knowledgeBlockSchema.extend(reviewIssuesShape);
 const reviewedPropertyBlockSchema = propertyBlockSchema.extend(reviewIssuesShape);
-const reviewedProcedureBlockSchema = procedureBlockSchema.extend(reviewIssuesShape);
 const reviewedExampleBlockSchema = exampleBlockSchema.extend(reviewIssuesShape);
 const reviewedNoteBlockSchema = noteBlockSchema.extend(reviewIssuesShape);
 const reviewedTheoremBlockSchema = theoremBlockSchema.extend(reviewIssuesShape);
-const reviewedComparisonBlockSchema = comparisonBlockSchema.extend(reviewIssuesShape);
-const reviewedDataTableBlockSchema = dataTableBlockSchema.extend(reviewIssuesShape);
-const reviewedApplicationBlockSchema = applicationBlockSchema.extend(reviewIssuesShape);
-const reviewedSectionRecapBlockSchema = sectionRecapBlockSchema.extend(reviewIssuesShape);
 
 export const lessonSummaryMvpBlockSchema = z.discriminatedUnion("type", [
   reviewedKnowledgeBlockSchema,
   reviewedPropertyBlockSchema,
-  reviewedProcedureBlockSchema,
   reviewedExampleBlockSchema,
   reviewedNoteBlockSchema,
   reviewedTheoremBlockSchema,
-]);
-
-export const lessonSummaryExtendedBlockSchema = z.discriminatedUnion("type", [
-  reviewedKnowledgeBlockSchema,
-  reviewedPropertyBlockSchema,
-  reviewedProcedureBlockSchema,
-  reviewedExampleBlockSchema,
-  reviewedNoteBlockSchema,
-  reviewedTheoremBlockSchema,
-  reviewedComparisonBlockSchema,
-  reviewedDataTableBlockSchema,
-  reviewedApplicationBlockSchema,
-  reviewedSectionRecapBlockSchema,
 ]);
 
 export type LessonSummaryMvpBlock = z.infer<typeof lessonSummaryMvpBlockSchema>;
-export type LessonSummaryExtendedBlock = z.infer<typeof lessonSummaryExtendedBlockSchema>;
-
-/**
- * Provider-only contract. Its shape makes every theory/example pair and the final
- * two application exercises required by JSON Schema before semantic review.
- */
-const theoryDiagramSpecSchema = lessonSummaryProviderDiagramInputSchema
-  .describe(
-    "Nếu bài học thuộc Hình học thì mọi theory block đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, diagramSpec vẫn bắt buộc khi nội dung cần hình để hiểu đúng; các khối về đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ không được trả null.",
-  )
-  .nullable();
-
-export const lessonSummaryProviderNoteSchema = noteBlockSchema
-  .omit({ visual: true })
-  .strict();
-
-export const lessonSummaryTheoryBlockSchema = z.discriminatedUnion("type", [
-  knowledgeBlockSchema
-    .omit({ visual: true })
-    .extend({ diagramSpec: theoryDiagramSpecSchema })
-    .strict(),
-  propertyBlockSchema
-    .omit({ visual: true })
-    .extend({ diagramSpec: theoryDiagramSpecSchema })
-    .strict(),
-  procedureBlockSchema
-    .omit({ visual: true })
-    .extend({ diagramSpec: theoryDiagramSpecSchema })
-    .strict(),
-  theoremBlockSchema
-    .omit({ visual: true })
-    .extend({ diagramSpec: theoryDiagramSpecSchema })
-    .strict(),
-]);
 
 const LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION =
-  "Chỉ chứa thân lời giải; không chứa tiêu đề Lời giải/Chứng minh hoặc Bảng GT–KL/GT:/KL:. GT–KL chỉ nằm trong geometryStatement.";
-const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Riêng chứng minh/dựng hình, viết mạch lập luận liên kết bằng Xét, Ta có, Vì... nên..., Suy ra, Do đó, Vậy; không biến toàn bộ lời giải thành danh sách bullet rời rạc. Với bài tính thuần túy, giữ cách trình bày trực tiếp từng ý và chuỗi biến đổi, không chèn tiêu đề thao tác như Nhóm các số hạng thuận tiện, Đổi về phân số hoặc Áp dụng công thức. Mọi ý a), b), c) phải bắt đầu ở dòng riêng.`;
+  "Chỉ chứa thân lời giải; không chứa tiêu đề do UI sở hữu và không lặp lại dữ liệu đã tách sang geometryStatement.";
+const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Tuân theo cách lập luận của hồ sơ môn học trong system prompt, giữ đúng thứ tự suy luận và không biến toàn bộ lời giải thành checklist rời rạc. Bảo toàn ký hiệu tương đương và hệ ngoặc nhóm có ý nghĩa. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION} ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`;
 const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION =
-  "Nơi duy nhất chứa bảng GT–KL; không chép lại vào solution.";
-const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION} Chỉ khác null cho bài Hình học lớp 7–9 yêu cầu Chứng minh/Chứng tỏ. hypotheses chỉ chứa dữ kiện có sẵn trong đề, không chứa kết quả suy ra hoặc đường phụ; conclusions ghi đúng điều phải chứng minh. Mọi bài Số học/Đại số, bài Hình học lớp nhỏ và bài Hình học không phải chứng minh chính thức phải trả null.`;
+  "Bắt buộc khác null cho bài Hình học lớp 7–9 và phải chứa bảng Giả thiết–Kết luận; Hình học lớp 10–12 và nội dung không phải Hình học phải trả null. Khi có giá trị, không chép lại bảng này vào solution.";
+const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION} hypotheses chỉ chứa dữ kiện có sẵn trong đề và conclusions ghi đúng điều cần kết luận.`;
 
-export function createLessonSummaryProviderExampleSchema(
-  exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
-) {
-  const illustrationRequirement =
-    exampleKind === "ILLUSTRATION"
-      ? " Đây là illustration: đề phải kiểm tra đúng kiến thức trong theory cùng unit; lời giải phải gọi tên và trực tiếp áp dụng chính quy tắc/tính chất đó. Nếu phải dùng một quy tắc khác làm lập luận chính thì đổi đề."
-      : "";
-  return z
-    .object({
-      type: z.literal("example"),
-      exampleKind: z.literal(exampleKind),
-      problem: nonEmptyText(2_000).describe(
-        `Chỉ ghi đề bài hoàn chỉnh cuối cùng; không kể quá trình sửa đề hoặc nói kí hiệu nào sai. Không có nhãn hoặc số thứ tự từ tài liệu nguồn như Bài 1.11., Ví dụ 2, Luyện tập 3 hay Vận dụng 1; không có câu xem hình bên. Nếu đề hoặc lời giải cần hình để hiểu đúng thì diagramSpec bắt buộc phải khác null.${illustrationRequirement}`,
-      ),
-      solution: nonEmptyText(5_000)
-        .describe(
-          `${LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION}${illustrationRequirement}`,
-        )
-        .nullable(),
-      answer: nonEmptyText(2_000),
-      geometryStatement: lessonSummaryGeometryStatementSchema
-        .describe(LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION)
-        .nullable(),
-      diagramSpec: lessonSummaryProviderDiagramInputSchema
-        .describe(
-          "Một hình minh họa dùng chung cho toàn bộ ví dụ/bài tập. Nếu bài học thuộc Hình học thì mọi example và exercise đều bắt buộc có diagramSpec khác null. Với bài không thuộc Hình học, các bài yêu cầu vẽ, đọc hoặc suy luận từ đồ thị, trục số, mặt phẳng tọa độ, bảng, biểu đồ hoặc sơ đồ cũng bắt buộc khác null.",
-        )
-        .nullable(),
-    })
-    .strict();
-}
-
-const lessonSummaryIllustrationSchema =
-  createLessonSummaryProviderExampleSchema("ILLUSTRATION");
-const lessonSummaryStandardExerciseSchema =
-  createLessonSummaryProviderExampleSchema("STANDARD_EXERCISE");
-const lessonSummaryRealWorldExerciseSchema =
-  createLessonSummaryProviderExampleSchema("REAL_WORLD_EXERCISE");
-
-const transportText = (maxLength: number) => z.string().max(maxLength);
-const transportSourceChunkIdsSchema = z.array(z.string().max(100)).max(20);
-const transportTheoryDiagramSpecSchema =
-  lessonSummaryProviderDiagramTransportSchema.nullable();
-const transportTheoryBaseShape = {
-  sourceChunkIds: transportSourceChunkIdsSchema,
-  diagramSpec: transportTheoryDiagramSpecSchema,
-};
-
-export const lessonSummaryTheoryBlockTransportSchema = z.discriminatedUnion("type", [
+const transportText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
+// Keep lookaround out of the provider-facing JSON Schema. OpenAI Structured
+// Outputs does not support it, while Zod can still enforce it after parsing.
+const SOURCE_FIGURE_LABEL_ONLY_PATTERN =
+  /^\s*(?:(?:hình|figure|fig\.?)\s*)?[A-Za-z]?\d+(?:\s*[.-]\s*\d+)*(?:\s*[a-z])?\s*$/iu;
+const semanticFigureCaptionSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(500)
+  .nullable()
+  .superRefine((caption, context) => {
+    if (caption !== null && SOURCE_FIGURE_LABEL_ONLY_PATTERN.test(caption)) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Caption phải mô tả nội dung hoặc ý nghĩa của hình, không được chỉ là mã hình nguồn.",
+      });
+    }
+  })
+  .describe(
+    "Chú thích ngắn có ý nghĩa sư phạm, mô tả đối tượng, quan hệ hoặc thông điệp chính mà người học nhìn thấy. Đây không phải mã tra cứu crop: không được chỉ chép mã hình nguồn hoặc số thứ tự. Mã hình SGK phải nằm ở sourceReferences.figureLabel. Nếu không có chú thích hữu ích ngoài ngữ cảnh block thì trả null.",
+  );
+const providerSourcePageNumbersSchema = z.array(z.number().int().positive()).max(20);
+const providerTheorySourcePageNumbersSchema = providerSourcePageNumbersSchema
+  .min(1)
+  .describe("Các trang packet chứa trực tiếp nội dung của block lý thuyết.");
+const providerNoteSourcePageNumbersSchema = providerSourcePageNumbersSchema
+  .min(1)
+  .describe("Các trang packet chứa trực tiếp nội dung của block ghi chú.");
+const providerSourcedExamplePageNumbersSchema = providerSourcePageNumbersSchema
+  .min(1)
+  .describe("SOURCE_EXACT/SOURCE_ADAPTED bắt buộc có ít nhất một trang nguồn.");
+const providerAiAuthoredExamplePageNumbersSchema = providerSourcePageNumbersSchema
+  .max(0)
+  .describe("AI_AUTHORED bắt buộc có sourcePageNumbers là mảng rỗng.");
+export const sourceEvidenceSchema = z
+  .object({
+    kind: z.enum(["HEADING", "CONTENT"]),
+    text: z.string().trim().min(1).max(800),
+    packetPageNumbers: z.array(z.number().int().positive()).min(1).max(20),
+  })
+  .strict();
+export const stemFigureSourceTargetSchema = z.discriminatedUnion("scope", [
   z
     .object({
-      ...transportTheoryBaseShape,
-      type: z.literal("knowledge"),
-      title: transportText(240),
-      content: transportText(2_000),
+      scope: z.literal("WHOLE_FIGURE"),
+      locator: z.null(),
     })
     .strict(),
   z
     .object({
-      ...transportTheoryBaseShape,
-      type: z.literal("property"),
-      title: transportText(240),
-      content: transportText(2_000),
-    })
-    .strict(),
-  z
-    .object({
-      ...transportTheoryBaseShape,
-      type: z.literal("theorem"),
-      title: transportText(240),
-      content: transportText(2_000),
-    })
-    .strict(),
-  z
-    .object({
-      ...transportTheoryBaseShape,
-      type: z.literal("procedure"),
-      title: transportText(240),
-      purpose: transportText(2_000).nullable(),
-      steps: z
-        .array(
-          z
-            .object({
-              order: z.number().int(),
-              content: transportText(2_000),
-            })
-            .strict(),
-        )
-        .max(20),
+      scope: z.literal("SUBFIGURE"),
+      locator: z.string().trim().min(1).max(300),
     })
     .strict(),
 ]);
+
+export type StemFigureSourceTarget = z.infer<typeof stemFigureSourceTargetSchema>;
+
+const stemFigureSourceReferenceSchema = z
+  .object({
+    packetPageNumber: z.number().int().positive(),
+    printedPageLabel: z.string().trim().max(80).nullable(),
+    figureLabel: z.string().trim().max(160).nullable(),
+    sourceTarget: stemFigureSourceTargetSchema.describe(
+      "Phạm vi cần lấy trong hình nguồn. WHOLE_FIGURE dùng toàn bộ hình mang figureLabel; SUBFIGURE dùng đúng hình con được locator định vị. Đây chỉ là locator nguồn, không chứa hướng dẫn vẽ.",
+    ),
+  })
+  .strict();
+
+const stemFigureProviderDisplayShape = {
+  altText: z.string().trim().min(1).max(500),
+  caption: semanticFigureCaptionSchema,
+};
+const stemFigureTextbookProviderPlanSchema = z
+  .object({
+    figureOrigin: z
+      .literal("TEXTBOOK_SOURCE")
+      .describe("Hình trực quan có thật trong PDF và bắt buộc có sourceReferences."),
+    sourceReferences: z.array(stemFigureSourceReferenceSchema).min(1).max(5),
+    ...stemFigureProviderDisplayShape,
+  })
+  .strict();
+const stemFigureGeneratedProviderPlanSchema = z
+  .object({
+    figureOrigin: z
+      .literal("GENERATED_FROM_BRIEF")
+      .describe(
+        "Hình mới do AI đề xuất; đây chỉ là nhãn provenance, không yêu cầu hoặc cho phép thêm field brief.",
+      ),
+    sourceReferences: z.array(stemFigureSourceReferenceSchema).max(0),
+    ...stemFigureProviderDisplayShape,
+  })
+  .strict();
+export const stemFigureProviderPlanDraftSchema = z.discriminatedUnion("figureOrigin", [
+  stemFigureTextbookProviderPlanSchema,
+  stemFigureGeneratedProviderPlanSchema,
+]);
+const stemFigurePlanIdentityShape = {
+  figurePlanContractVersion: z.literal(3),
+  localId: z
+    .string()
+    .trim()
+    .regex(/^F\d{3}$/u),
+};
+export const stemFigurePlanDraftSchema = z.discriminatedUnion("figureOrigin", [
+  stemFigureTextbookProviderPlanSchema.extend(stemFigurePlanIdentityShape).strict(),
+  stemFigureGeneratedProviderPlanSchema.extend(stemFigurePlanIdentityShape).strict(),
+]);
+/**
+ * Only the semantic fields required to resolve references and render a figure.
+ * Display metadata such as caption/alt text has its own revision lifecycle and
+ * must not make an otherwise valid render plan unreadable after those display
+ * rules evolve.
+ */
+const stemFigureRenderDisplayShape = {
+  altText: z.string().nullable().optional(),
+  caption: z.string().nullable().optional(),
+};
+export const stemFigureRenderPlanSchema = z.discriminatedUnion("figureOrigin", [
+  z
+    .object({
+      figureOrigin: z.literal("TEXTBOOK_SOURCE"),
+      sourceReferences: z.array(stemFigureSourceReferenceSchema).min(1).max(5),
+      ...stemFigurePlanIdentityShape,
+      ...stemFigureRenderDisplayShape,
+    })
+    .strict(),
+  z
+    .object({
+      figureOrigin: z.literal("GENERATED_FROM_BRIEF"),
+      sourceReferences: z.array(stemFigureSourceReferenceSchema).max(0),
+      ...stemFigurePlanIdentityShape,
+      ...stemFigureRenderDisplayShape,
+    })
+    .strict(),
+]);
+const transportFiguresSchema = z
+  .array(stemFigureProviderPlanDraftSchema)
+  .max(1)
+  .describe(
+    "Figure plan của riêng block. Bắt buộc có ít nhất một phần tử nếu bất kỳ hình ở trước hoặc sau trong nguồn trực tiếp minh họa, giải thích hay cung cấp dữ kiện cho block; chỉ để mảng rỗng sau khi đã đối chiếu inventory toàn bộ hình nguồn và xác nhận không có hình liên quan trực tiếp, hoặc hình bổ sung không có giá trị sư phạm.",
+  );
+
+export type LessonSummaryFigureRequirement = "CONTEXTUAL" | "ALL_REQUIRED";
+
+function createLessonSummaryTheoryBlockTransportSchema(
+  figureSchema: typeof transportFiguresSchema,
+) {
+  const baseShape = {
+    sourcePageNumbers: providerNoteSourcePageNumbersSchema,
+    figures: figureSchema,
+  };
+  return z.discriminatedUnion("type", [
+    z
+      .object({
+        ...baseShape,
+        type: z.literal("knowledge"),
+        title: transportText(240),
+        content: transportText(6_000).describe(
+          `Nội dung kiến thức/định nghĩa/tiêu chuẩn/quy tắc/phương pháp đầy đủ theo nguồn khi không có semantic cue rõ cho định lí/tính chất. Bảo toàn ký hiệu tương đương, hệ ngoặc nhóm, bullet, dấu câu dẫn và bố cục công thức có ý nghĩa; không văn xuôi hóa. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
+        ),
+      })
+      .strict(),
+    z
+      .object({
+        ...baseShape,
+        type: z.literal("property"),
+        title: transportText(240),
+        content: transportText(6_000).describe(
+          `Phát biểu được nhãn/câu dẫn/ngữ nghĩa xung quanh thông báo rõ là tính chất, đầy đủ theo nguồn. Không dùng property chỉ vì nội dung là bảng tiêu chuẩn, quy tắc, phương pháp hoặc chuỗi tương đương. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
+        ),
+      })
+      .strict(),
+    z
+      .object({
+        ...baseShape,
+        type: z.literal("theorem"),
+        title: transportText(240),
+        content: transportText(6_000).describe(
+          `Phát biểu được nhãn hoặc câu dẫn bên ngoài phát biểu thông báo rõ là định lí, đầy đủ theo nguồn. Điều kiện tương đương, tiêu chuẩn hay công thức quan trọng không tự trở thành theorem chỉ vì nội dung chuyên môn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
+        ),
+      })
+      .strict(),
+  ]);
+}
+
+export const lessonSummaryTheoryBlockTransportSchema =
+  createLessonSummaryTheoryBlockTransportSchema(transportFiguresSchema);
 
 export const lessonSummaryProviderNoteTransportSchema = z
   .object({
     type: z.literal("note"),
-    content: transportText(2_000).describe(
-      "Chỉ ghi ý Chú ý/Lưu ý/Nhận xét có trong nguồn và đi thẳng vào nội dung, không lặp nhãn. Ví dụ là tùy chọn nhưng phải tự đủ dữ kiện; không nhắc Hình x.y, hình bên, ảnh, URL hoặc nội dung phụ thuộc hình nguồn.",
+    content: transportText(3_000).describe(
+      "Ý Chú ý/Nhận xét/Lưu ý bổ trợ đúng phần kiến thức liên quan; đi thẳng vào nội dung và không lặp nhãn loại block. Khi nguồn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn có cùng chức năng thì bắt buộc biểu diễn bằng NOTE này, không gộp vào theory.",
     ),
-    sourceChunkIds: transportSourceChunkIdsSchema,
+    sourcePageNumbers: providerTheorySourcePageNumbersSchema,
   })
   .strict();
 
+const providerGeometryStatementSchema = z
+  .object({
+    hypotheses: z.array(transportText(1_000)).min(1).max(20),
+    conclusions: z.array(transportText(1_000)).min(1).max(20),
+  })
+  .strict()
+  .describe(LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION);
+
+const providerSourcedExampleProvenanceShape = {
+  origin: z.enum(["SOURCE_EXACT", "SOURCE_ADAPTED"]),
+  sourcePageNumbers: providerSourcedExamplePageNumbersSchema,
+};
+const providerAiAuthoredExampleProvenanceShape = {
+  origin: z.literal("AI_AUTHORED"),
+  sourcePageNumbers: providerAiAuthoredExamplePageNumbersSchema,
+};
+
 function createLessonSummaryProviderExampleTransportSchema(
   exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+  figureSchema: typeof transportFiguresSchema = transportFiguresSchema,
+  targetGrade: number | null = null,
 ) {
-  return z
-    .object({
-      type: z.literal("example"),
-      exampleKind: z.literal(exampleKind),
-      problem: transportText(2_000),
-      solution: transportText(5_000)
-        .describe(LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION)
-        .nullable(),
-      answer: transportText(2_000),
+  const baseShape = {
+    type: z.literal("example"),
+    exampleKind: z.literal(exampleKind),
+    problem: transportText(4_000).describe(
+      `Đề ví dụ minh họa trực tiếp và đủ phạm vi của theory cùng UNIT. Nếu theory có nhiều trường hợp hoặc nhiều cách làm độc lập, dùng bài nhiều ý bao phủ chúng hoặc tách theory thành các UNIT nhỏ hơn; không chỉ minh họa một nhánh rồi bỏ các nhánh còn lại. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    solution: transportText(10_000).describe(
+      LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION,
+    ),
+    answer: transportText(3_000).describe(
+      `Đáp án hoặc kết quả cuối của bài. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    figures: figureSchema,
+  };
+  if (targetGrade !== null && (targetGrade < 7 || targetGrade > 9)) {
+    const geometryShape = {
+      isGeometry: z.boolean(),
       geometryStatement: z
+        .null()
+        .describe("Bắt buộc null với lớp 10–12 và mọi lớp ngoài phạm vi 7–9."),
+    };
+    return z.union([
+      z
         .object({
-          hypotheses: z.array(transportText(1_000)).max(20),
-          conclusions: z.array(transportText(1_000)).max(20),
+          ...baseShape,
+          ...providerSourcedExampleProvenanceShape,
+          ...geometryShape,
         })
-        .strict()
-        .describe(LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION)
-        .nullable()
-        .optional(),
-      diagramSpec: lessonSummaryProviderDiagramTransportSchema.nullable(),
-    })
-    .strict();
+        .strict(),
+      z
+        .object({
+          ...baseShape,
+          ...providerAiAuthoredExampleProvenanceShape,
+          ...geometryShape,
+        })
+        .strict(),
+    ]);
+  }
+  return z.union([
+    z
+      .object({
+        ...baseShape,
+        ...providerSourcedExampleProvenanceShape,
+        isGeometry: z.literal(true),
+        geometryStatement: providerGeometryStatementSchema,
+      })
+      .strict(),
+    z
+      .object({
+        ...baseShape,
+        ...providerSourcedExampleProvenanceShape,
+        isGeometry: z.literal(false),
+        geometryStatement: z.null(),
+      })
+      .strict(),
+    z
+      .object({
+        ...baseShape,
+        ...providerAiAuthoredExampleProvenanceShape,
+        isGeometry: z.literal(true),
+        geometryStatement: providerGeometryStatementSchema,
+      })
+      .strict(),
+    z
+      .object({
+        ...baseShape,
+        ...providerAiAuthoredExampleProvenanceShape,
+        isGeometry: z.literal(false),
+        geometryStatement: z.null(),
+      })
+      .strict(),
+  ]);
+}
+
+function createLessonSummaryProviderNonMathExampleTransportSchema(
+  exampleKind: "ILLUSTRATION" | "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE",
+  figureSchema: typeof transportFiguresSchema = transportFiguresSchema,
+) {
+  const baseShape = {
+    type: z.literal("example"),
+    exampleKind: z.literal(exampleKind),
+    problem: transportText(4_000).describe(
+      `Đề ví dụ/bài tập đầy đủ dữ kiện và yêu cầu. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    solution: transportText(10_000).describe(
+      `Lời giải đầy đủ theo phong cách sách giáo khoa; chỉ chứa thân lời giải, không chứa tiêu đề do UI sở hữu và không lặp lại answer. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    answer: transportText(3_000).describe(
+      `Đáp án hoặc kết quả cuối của bài. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    figures: figureSchema,
+  };
+  return z.union([
+    z
+      .object({
+        ...baseShape,
+        ...providerSourcedExampleProvenanceShape,
+      })
+      .strict(),
+    z
+      .object({
+        ...baseShape,
+        ...providerAiAuthoredExampleProvenanceShape,
+      })
+      .strict(),
+  ]);
 }
 
 export const lessonSummaryIllustrationTransportSchema =
@@ -425,77 +531,107 @@ export const lessonSummaryStandardExerciseTransportSchema =
   createLessonSummaryProviderExampleTransportSchema("STANDARD_EXERCISE");
 export const lessonSummaryRealWorldExerciseTransportSchema =
   createLessonSummaryProviderExampleTransportSchema("REAL_WORLD_EXERCISE");
+const lessonSummaryNonMathIllustrationTransportSchema =
+  createLessonSummaryProviderNonMathExampleTransportSchema("ILLUSTRATION");
+const lessonSummaryNonMathStandardExerciseTransportSchema =
+  createLessonSummaryProviderNonMathExampleTransportSchema("STANDARD_EXERCISE");
+const lessonSummaryNonMathRealWorldExerciseTransportSchema =
+  createLessonSummaryProviderNonMathExampleTransportSchema("REAL_WORLD_EXERCISE");
+
+const lessonSummaryNonMathSectionItemSchema = z.discriminatedUnion("itemType", [
+  z
+    .object({
+      itemType: z.literal("UNIT"),
+      theory: lessonSummaryTheoryBlockTransportSchema,
+      example: lessonSummaryNonMathIllustrationTransportSchema,
+    })
+    .strict(),
+  z
+    .object({
+      itemType: z.literal("NOTE"),
+      note: lessonSummaryProviderNoteTransportSchema,
+    })
+    .strict(),
+]);
 
 /**
  * Transport contract used for the single paid provider call. It keeps the root
  * ownership structure strict while deferring per-block semantic checks to the
  * recovery mapper, so one local defect cannot discard the whole lesson.
  */
-export const lessonSummaryProviderTransportOutputSchema = z
-  .object({
-    title: transportText(240),
-    objectives: z.array(transportText(500)).max(10).nullable(),
-    theorySections: z
-      .array(
-        z
-          .object({
-            sourceTopicId: transportText(300),
-            displayHeading: transportText(240),
-            sourceChunkIds: transportSourceChunkIdsSchema,
-            units: z
-              .array(
-                z
-                  .object({
-                    theory: lessonSummaryTheoryBlockTransportSchema,
-                    illustration: lessonSummaryIllustrationTransportSchema,
-                    notes: z.array(lessonSummaryProviderNoteTransportSchema).max(5),
-                  })
-                  .strict(),
-              )
-              .max(20),
-          })
-          .strict(),
-      )
-      .max(19),
-    applicationExercises: z
+function createLessonSummaryProviderTransportOutputBaseSchema(
+  targetGrade: number | null = null,
+) {
+  const illustrationSchema = createLessonSummaryProviderExampleTransportSchema(
+    "ILLUSTRATION",
+    transportFiguresSchema,
+    targetGrade,
+  );
+  const standardExerciseSchema = createLessonSummaryProviderExampleTransportSchema(
+    "STANDARD_EXERCISE",
+    transportFiguresSchema,
+    targetGrade,
+  );
+  const realWorldExerciseSchema = createLessonSummaryProviderExampleTransportSchema(
+    "REAL_WORLD_EXERCISE",
+    transportFiguresSchema,
+    targetGrade,
+  );
+  const sectionItemSchema = z.discriminatedUnion("itemType", [
+    z
       .object({
-        displayHeading: z.literal("Bài tập vận dụng"),
-        standardExercise: lessonSummaryStandardExerciseTransportSchema,
-        realWorldExercise: lessonSummaryRealWorldExerciseTransportSchema,
+        itemType: z.literal("UNIT"),
+        theory: lessonSummaryTheoryBlockTransportSchema,
+        example: illustrationSchema,
       })
       .strict(),
-  })
-  .strict();
+    z
+      .object({
+        itemType: z.literal("NOTE"),
+        note: lessonSummaryProviderNoteTransportSchema,
+      })
+      .strict(),
+  ]);
+  return z
+    .object({
+      title: transportText(240),
+      objectives: z.array(transportText(500)).min(1).max(10).nullable(),
+      theorySections: z
+        .array(
+          z
+            .object({
+              displayHeading: transportText(240),
+              sourceEvidence: sourceEvidenceSchema,
+              items: z.array(sectionItemSchema).min(1).max(60),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(19),
+      applicationExercises: z
+        .object({
+          standardExercise: standardExerciseSchema,
+          realWorldExercise: realWorldExerciseSchema,
+        })
+        .strict(),
+    })
+    .strict();
+}
 
-export const lessonSummaryProviderOutputSchema = z
+const lessonSummaryProviderTransportOutputBaseSchema =
+  createLessonSummaryProviderTransportOutputBaseSchema();
+
+const lessonSummaryProviderNonMathTransportOutputSchema = z
   .object({
-    title: nonEmptyText(240),
-    objectives: z.array(nonEmptyText(500)).min(1).max(10).nullable(),
+    title: transportText(240),
+    objectives: z.array(transportText(500)).min(1).max(10).nullable(),
     theorySections: z
       .array(
         z
           .object({
-            sourceTopicId: nonEmptyText(300).describe(
-              "ID của đề mục gốc trong metadata.sourceTopics.",
-            ),
-            displayHeading: nonEmptyText(240).describe(
-              "Phần chữ của đề mục gốc sau khi AI chủ động sửa lỗi OCR/chính tả; bỏ số thứ tự đầu heading vì UI tự hiển thị số; không đổi ý nghĩa hay tự tạo đề mục mới.",
-            ),
-            sourceChunkIds: sourceChunkIdsSchema,
-            units: z
-              .array(
-                z
-                  .object({
-                    theory: lessonSummaryTheoryBlockSchema,
-                    illustration: lessonSummaryIllustrationSchema.describe(
-                      "Ví dụ phải minh họa trực tiếp đúng theory trong cùng unit. Lời giải phải gọi tên và áp dụng chính quy tắc/tính chất của theory đó; ví dụ không hợp lệ nếu lập luận chính dùng kiến thức của unit khác.",
-                    ),
-                    notes: z.array(lessonSummaryProviderNoteSchema).max(5),
-                  })
-                  .strict(),
-              )
-              .min(1)
-              .max(20),
+            displayHeading: transportText(240),
+            sourceEvidence: sourceEvidenceSchema,
+            items: z.array(lessonSummaryNonMathSectionItemSchema).min(1).max(60),
           })
           .strict(),
       )
@@ -503,21 +639,57 @@ export const lessonSummaryProviderOutputSchema = z
       .max(19),
     applicationExercises: z
       .object({
-        displayHeading: z.literal("Bài tập vận dụng"),
-        standardExercise: lessonSummaryStandardExerciseSchema,
-        realWorldExercise: lessonSummaryRealWorldExerciseSchema,
+        standardExercise: lessonSummaryNonMathStandardExerciseTransportSchema,
+        realWorldExercise: lessonSummaryNonMathRealWorldExerciseTransportSchema,
       })
       .strict(),
   })
   .strict();
 
-export type LessonSummaryProviderOutput = z.infer<
-  typeof lessonSummaryProviderOutputSchema
+const LESSON_SUMMARY_PROVIDER_SCHEMAS = {
+  MATH: lessonSummaryProviderTransportOutputBaseSchema,
+  PHYSICS: lessonSummaryProviderNonMathTransportOutputSchema,
+  CHEMISTRY: lessonSummaryProviderNonMathTransportOutputSchema,
+  GENERAL: lessonSummaryProviderNonMathTransportOutputSchema,
+} as const;
+
+/**
+ * Select the provider schema by subject. Subject-specific fields stay in the
+ * matching schema instead of leaking into requests for another course domain.
+ */
+export function getLessonSummaryProviderTransportOutputSchema(
+  subjectKey: "MATH" | "PHYSICS" | "CHEMISTRY" | "GENERAL",
+  _figureRequirement: LessonSummaryFigureRequirement = "CONTEXTUAL",
+  targetGrade: number | null = null,
+) {
+  return subjectKey === "MATH"
+    ? createLessonSummaryProviderTransportOutputBaseSchema(targetGrade)
+    : LESSON_SUMMARY_PROVIDER_SCHEMAS[subjectKey];
+}
+
+export const lessonSummaryProviderTransportOutputSchema =
+  lessonSummaryProviderTransportOutputBaseSchema;
+
+export type LessonSummaryProviderTransportOutput =
+  | z.infer<typeof lessonSummaryProviderTransportOutputBaseSchema>
+  | z.infer<typeof lessonSummaryProviderNonMathTransportOutputSchema>;
+
+export type StemFigurePlanDraft = z.infer<typeof stemFigurePlanDraftSchema>;
+export type StemFigureRenderPlan = z.infer<typeof stemFigureRenderPlanSchema>;
+export type StemFigureProviderPlanDraft = z.infer<
+  typeof stemFigureProviderPlanDraftSchema
 >;
 
-export type LessonSummaryProviderTransportOutput = z.infer<
-  typeof lessonSummaryProviderTransportOutputSchema
+export type LessonSummaryProviderTheoryBlock = z.infer<
+  typeof lessonSummaryTheoryBlockTransportSchema
 >;
+export type LessonSummaryProviderExampleBlock =
+  | z.infer<typeof lessonSummaryIllustrationTransportSchema>
+  | z.infer<typeof lessonSummaryStandardExerciseTransportSchema>
+  | z.infer<typeof lessonSummaryRealWorldExerciseTransportSchema>
+  | z.infer<typeof lessonSummaryNonMathIllustrationTransportSchema>
+  | z.infer<typeof lessonSummaryNonMathStandardExerciseTransportSchema>
+  | z.infer<typeof lessonSummaryNonMathRealWorldExerciseTransportSchema>;
 
 export const lessonSummaryWarningDetailSchema = z
   .object({
@@ -542,12 +714,8 @@ export const lessonSummaryOutputSchema = z
         z
           .object({
             order: z.number().int().positive(),
-            sourceHeading: nonEmptyText(500),
             displayHeading: nonEmptyText(240),
-            headingDecision: z.enum(["EXACT", "OCR_REPAIRED"]).optional(),
-            headingRepairReason: nonEmptyText(1_000).nullable().optional(),
-            sourceAssessment: lessonSummarySourceAssessmentSchema.optional(),
-            sourceChunkIds: sourceChunkIdsSchema,
+            sourceEvidence: sourceEvidenceSchema,
             blocks: z.array(lessonSummaryMvpBlockSchema).min(1),
           })
           .strict(),
@@ -568,7 +736,15 @@ export const lessonSummaryJobInputSchema = z
   .object({
     documentIds: z.array(z.uuid()).min(1).max(20),
     sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+    requestDraftId: z.uuid(),
+    requestHash: z.string().regex(/^[a-f0-9]{64}$/),
+    packetHash: z.string().regex(/^[a-f0-9]{64}$/),
+    manifestHash: z.string().regex(/^[a-f0-9]{64}$/),
+    useTextbookSourceImages: z.boolean().default(false),
     targetGrade: z.number().int().min(1).max(12).nullable().default(null),
+    subjectKey: lessonSummarySubjectKeySchema,
+    subjectName: z.string().trim().min(1).max(120),
+    subjectSlug: z.string().trim().min(1).max(140),
     style: lessonSummaryStyleSchema,
     styleInstructions: z.string().trim().max(1_000).default(""),
     length: lessonSummaryLengthSchema.default("standard"),
@@ -576,10 +752,9 @@ export const lessonSummaryJobInputSchema = z
     extraInstructions: z.string().trim().max(2_000).default(""),
     systemInstructions: z
       .string()
-      .trim()
       .max(LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS)
       .default(""),
-    userPrompt: z.string().trim().max(16_000).default(""),
+    userPrompt: z.string().max(16_000).default(""),
     model: z.string().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),
     reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),

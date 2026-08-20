@@ -176,6 +176,27 @@ describe("provider operations cost accounting", () => {
       data: { title: "Summary" },
       provider: AiProviderName.OPENAI,
       model: "gpt-5.6",
+      usage: {
+        promptTokens: 1_579,
+        cachedInputTokens: 0,
+        completionTokens: 1_930,
+        reasoningTokens: 1_258,
+        totalTokens: 3_509,
+      },
+      providerUsageRaw: {
+        input_tokens: 1_579,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens: 1_930,
+        output_tokens_details: { reasoning_tokens: 1_258 },
+        total_tokens: 3_509,
+      },
+      inputFileOperations: [
+        {
+          providerFileId: "file-packet-1",
+          uploadLatencyMs: 25,
+          cleanupStatus: "deleted" as const,
+        },
+      ],
     };
     const aiService = { generateStructured: vi.fn(async () => output) };
     const usage = {
@@ -189,6 +210,7 @@ describe("provider operations cost accounting", () => {
       usage as never,
       { aiGeneration: { update: vi.fn() } } as never,
     );
+    const onResolvedRequest = vi.fn(async () => undefined);
 
     await service.generateStructured(
       {
@@ -217,6 +239,7 @@ describe("provider operations cost accounting", () => {
           ],
           hasConfiguration: true,
         },
+        onResolvedRequest,
       },
       {
         systemPrompt: "system",
@@ -233,6 +256,129 @@ describe("provider operations cost accounting", () => {
       expect.anything(),
       AiProviderName.OPENAI,
     );
+    expect(onResolvedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: AiProviderName.OPENAI,
+        model: "gpt-5.6",
+        reasoningEffort: "xhigh",
+        maxOutputTokens: 8_000,
+        promptVersion: "v1",
+        schemaVersion: "v1",
+        textFormat: expect.objectContaining({ type: "json_schema" }),
+      }),
+    );
+    expect(usage.succeed).toHaveBeenCalledWith(
+      "usage-1",
+      expect.objectContaining({
+        promptTokens: 1_579,
+        completionTokens: 1_930,
+        totalTokens: 3_509,
+        rawUsage: {
+          providerUsage: {
+            input_tokens: 1_579,
+            input_tokens_details: { cached_tokens: 0 },
+            output_tokens: 1_930,
+            output_tokens_details: { reasoning_tokens: 1_258 },
+            total_tokens: 3_509,
+          },
+          fileOperations: [
+            {
+              providerFileId: "file-packet-1",
+              uploadLatencyMs: 25,
+              cleanupStatus: "deleted",
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("aggregates every paid figure call into the parent generation cost", async () => {
+    const candidate = {
+      catalogItemId: "openai-catalog",
+      priceVersionId: "openai-price",
+      category: ProviderCatalogCategory.AI_MODEL,
+      provider: AiProviderName.OPENAI,
+      model: "gpt-5.4",
+      maxInputTokens: 32_000,
+      available: true,
+      rates: [
+        rate(ProviderUsageMetric.INPUT_TOKEN, 1_000_000, 1),
+        rate(ProviderUsageMetric.OUTPUT_TOKEN, 1_000_000, 2),
+      ],
+    };
+    const route = {
+      feature: AiGenerationType.SUMMARY,
+      version: 1,
+      model: "gpt-5.4",
+      temperature: null,
+      reasoningEffort: "medium",
+      maxOutputTokens: 6_000,
+      candidates: [candidate],
+      hasConfiguration: true,
+    };
+    const aiService = {
+      generateStructured: vi.fn(async () => ({
+        data: { title: "Figure" },
+        provider: AiProviderName.OPENAI,
+        model: "gpt-5.4",
+      })),
+    };
+    const usage = {
+      reserveAndStart: vi
+        .fn()
+        .mockResolvedValueOnce({ id: "usage-figure-1" })
+        .mockResolvedValueOnce({ id: "usage-figure-2" }),
+      succeed: vi
+        .fn()
+        .mockResolvedValueOnce({ costVnd: 400 })
+        .mockResolvedValueOnce({ costVnd: 600 }),
+      fail: vi.fn(),
+    };
+    const aggregate = vi
+      .fn()
+      .mockResolvedValueOnce({ _sum: { costVnd: 400 } })
+      .mockResolvedValueOnce({ _sum: { costVnd: 1_000 } });
+    const update = vi.fn();
+    const service = new AiProviderCallService(
+      aiService as never,
+      { resolve: vi.fn() } as never,
+      usage as never,
+      {
+        providerUsageEvent: { aggregate },
+        aiGeneration: { update },
+      } as never,
+    );
+
+    for (const figureId of ["figure-1", "figure-2"]) {
+      await service.generateStructured(
+        {
+          feature: AiGenerationType.SUMMARY,
+          aiGenerationId: "generation-with-two-figures",
+          backgroundJobId: `job-${figureId}`,
+          routeSnapshot: route,
+          idempotencyKey: `stem-figure-create-new:${figureId}`,
+        },
+        {
+          systemPrompt: "Draw one figure.",
+          userPrompt: figureId,
+          outputName: "new_stem_figure",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+        },
+        z.object({ title: z.string() }),
+      );
+    }
+
+    expect(aggregate).toHaveBeenCalledTimes(2);
+    expect(update).toHaveBeenNthCalledWith(1, {
+      where: { id: "generation-with-two-figures" },
+      data: { estimatedCostVnd: 400 },
+    });
+    expect(update).toHaveBeenNthCalledWith(2, {
+      where: { id: "generation-with-two-figures" },
+      data: { estimatedCostVnd: 1_000 },
+    });
   });
 
   it("settles and assigns measured cost when a structured response is incomplete", async () => {
@@ -313,11 +459,7 @@ describe("provider operations cost accounting", () => {
         z.object({ title: z.string() }),
       ),
     ).rejects.toBe(providerError);
-    expect(usage.fail).toHaveBeenCalledWith(
-      "usage-incomplete",
-      providerError,
-      { rates },
-    );
+    expect(usage.fail).toHaveBeenCalledWith("usage-incomplete", providerError, { rates });
     expect(update).toHaveBeenCalledWith({
       where: { id: "generation-incomplete" },
       data: { estimatedCostVnd: 815 },
@@ -394,6 +536,70 @@ describe("provider operations cost accounting", () => {
       ),
     ).rejects.toBe(providerError);
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it("disables provider fallback for the compiler-only figure retry contract", async () => {
+    const transient = Object.assign(new Error("provider unavailable"), { status: 503 });
+    const aiService = {
+      generateStructured: vi.fn(async () => Promise.reject(transient)),
+    };
+    const usage = {
+      reserveAndStart: vi.fn(async () => ({ id: "usage-no-fallback" })),
+      succeed: vi.fn(),
+      fail: vi.fn(async () => ({ costVnd: 0, costMeasured: false })),
+    };
+    const candidate = (provider: AiProviderName) => ({
+      catalogItemId: `${provider}-catalog`,
+      priceVersionId: `${provider}-price`,
+      category: ProviderCatalogCategory.AI_MODEL,
+      provider,
+      model: `${provider}-model`,
+      maxInputTokens: 32_000,
+      available: true,
+      rates: [
+        rate(ProviderUsageMetric.INPUT_TOKEN, 1_000_000, 1),
+        rate(ProviderUsageMetric.OUTPUT_TOKEN, 1_000_000, 2),
+      ],
+    });
+    const service = new AiProviderCallService(
+      aiService as never,
+      { resolve: vi.fn() } as never,
+      usage as never,
+      { aiGeneration: { update: vi.fn() } } as never,
+    );
+
+    await expect(
+      service.generateStructured(
+        {
+          feature: AiGenerationType.SUMMARY,
+          allowProviderFallback: false,
+          routeSnapshot: {
+            feature: AiGenerationType.SUMMARY,
+            version: 1,
+            model: "OPENAI-model",
+            temperature: null,
+            reasoningEffort: "medium",
+            maxOutputTokens: 8_000,
+            candidates: [
+              candidate(AiProviderName.OPENAI),
+              candidate(AiProviderName.GEMINI),
+            ],
+            hasConfiguration: true,
+          },
+        },
+        {
+          systemPrompt: "system",
+          userPrompt: "user",
+          outputName: "figure",
+          promptVersion: "v1",
+          schemaVersion: "v1",
+        },
+        z.object({ title: z.string() }),
+      ),
+    ).rejects.toBe(transient);
+    expect(aiService.generateStructured).toHaveBeenCalledOnce();
+    expect(usage.reserveAndStart).toHaveBeenCalledOnce();
+    expect(usage.fail).toHaveBeenCalledOnce();
   });
 });
 

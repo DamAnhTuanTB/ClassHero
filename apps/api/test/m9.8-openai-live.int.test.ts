@@ -11,13 +11,13 @@ import {
   LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
 } from "#api/modules/ai/types/lesson-content-generation.types";
-import { lessonSummaryProviderOutputSchema } from "#api/modules/ai/types/lesson-summary.types";
+import { lessonSummaryProviderTransportOutputSchema } from "#api/modules/ai/types/lesson-summary.types";
 import { mapLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-summary-mapper";
 import {
   buildFlashcardPrompt,
+  buildLessonContentSystemPrompt,
   buildQuizPrompt,
   buildTestPrompt,
-  LESSON_CONTENT_SYSTEM_PROMPT,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
@@ -39,6 +39,7 @@ const contextChunks = [
       "Bài 1. Viết số 0,25 dưới dạng phân số. Bài 2. Một chiếc áo giá 200 000 đồng được giảm 25%. Tính giá chiếc áo sau khi giảm.",
   },
 ];
+const mathSubject = { key: "MATH" as const, name: "Toán", slug: "toan" };
 
 describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
   it("covers summary, every question form, difficulty and test ratio in eight paid calls", async () => {
@@ -59,6 +60,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
       buildLessonSummaryStructuredInput({
         lessonId: "lesson-m9-8-live",
         lessonTitle: "Số hữu tỉ",
+        subject: { key: "MATH", name: "Toán", slug: "toan" },
         documentIds: ["document-m9-8-live"],
         sourceHash: "m9-8-live-source",
         chunks: contextChunks,
@@ -70,7 +72,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
           extraInstructions: "",
         },
       }),
-      lessonSummaryProviderOutputSchema,
+      lessonSummaryProviderTransportOutputSchema,
     );
     const persistedSummary = mapLessonSummaryProviderOutput({
       lessonId: "lesson-m9-8-live",
@@ -97,12 +99,13 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     ]) {
       const output = await provider.generateStructured(
         {
-          systemPrompt: LESSON_CONTENT_SYSTEM_PROMPT,
+          systemPrompt: buildLessonContentSystemPrompt(mathSubject),
           userPrompt: buildQuizPrompt({
             lessonTitle: "Số hữu tỉ",
             questionCount: quizCase.count,
             difficulty: quizCase.difficulty,
             questionTypes: quizCase.types,
+            subject: mathSubject,
           }),
           contextChunks,
           outputName: quizCase.label.replaceAll("-", "_"),
@@ -127,11 +130,12 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     for (const difficulty of [Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD]) {
       const output = await provider.generateStructured(
         {
-          systemPrompt: LESSON_CONTENT_SYSTEM_PROMPT,
+          systemPrompt: buildLessonContentSystemPrompt(mathSubject),
           userPrompt: buildFlashcardPrompt({
             lessonTitle: "Số hữu tỉ",
             cardCount: 2,
             difficulty,
+            subject: mathSubject,
           }),
           contextChunks,
           outputName: `m9_8_flashcard_${difficulty.toLowerCase()}`,
@@ -171,13 +175,14 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     ]) {
       const output = await provider.generateStructured(
         {
-          systemPrompt: LESSON_CONTENT_SYSTEM_PROMPT,
+          systemPrompt: buildLessonContentSystemPrompt(mathSubject),
           userPrompt: buildTestPrompt({
             lessonTitle: "Số hữu tỉ",
             questionCount: testCase.count,
             durationSeconds: 1_200,
             difficultyRatio: testCase.ratio,
             questionTypes: testCase.types,
+            subject: mathSubject,
           }),
           contextChunks,
           outputName: testCase.label.replaceAll("-", "_"),

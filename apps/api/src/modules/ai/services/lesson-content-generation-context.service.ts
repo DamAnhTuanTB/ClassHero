@@ -5,6 +5,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { RetrievalService } from "#api/modules/ai/services/retrieval.service";
 import { LESSON_CONTENT_MAX_CONTEXT_TOKENS } from "#api/modules/ai/types/lesson-content-generation.types";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import { resolveCourseSubject } from "#api/modules/ai/utils/lesson-summary-subject";
 
 export type LessonContentContextErrorCode =
   "LESSON_NOT_FOUND" | "AI_CONTEXT_NOT_FOUND" | "AI_SOURCE_CONTEXT_STALE";
@@ -35,6 +36,7 @@ export class LessonContentGenerationContextService {
         title: true,
         learningPath: {
           select: {
+            domain: { select: { name: true, slug: true } },
             targetAudiences: {
               select: { targetAudience: { select: { grade: true } } },
             },
@@ -86,6 +88,10 @@ export class LessonContentGenerationContextService {
         .map(({ targetAudience }) => targetAudience.grade)
         .filter((grade): grade is number => grade !== null)
         .sort((left, right) => left - right)[0] ?? null;
+    const subject = resolveCourseSubject({
+      domainName: lesson.learningPath.domain.name,
+      domainSlug: lesson.learningPath.domain.slug,
+    });
     const chunks = documents
       .flatMap((document) =>
         document.chunks.map((chunk) => ({
@@ -129,9 +135,11 @@ export class LessonContentGenerationContextService {
       lessonId: lesson.id,
       lessonTitle: lesson.title,
       targetGrade,
+      subject,
       documentIds: documents.map((document) => document.id),
       sourceHash: hashAiValue({
         targetGrade,
+        subject,
         documents: documents.map((document) => ({
           id: document.id,
           contentHash: document.contentHash,

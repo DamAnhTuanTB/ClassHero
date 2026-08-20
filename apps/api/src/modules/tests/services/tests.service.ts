@@ -202,7 +202,6 @@ export class TestsService {
           select: {
             id: true,
             contentJson: true,
-            diagramSpecJson: true,
             reviewStatus: true,
             staleAt: true,
           },
@@ -292,7 +291,6 @@ export class TestsService {
             select: {
               id: true,
               contentJson: true,
-              diagramSpecJson: true,
               reviewStatus: true,
               staleAt: true,
             },
@@ -315,7 +313,6 @@ export class TestsService {
           select: {
             id: true,
             contentJson: true,
-            diagramSpecJson: true,
             reviewStatus: true,
             staleAt: true,
           },
@@ -407,7 +404,6 @@ export class TestsService {
             select: {
               id: true,
               contentJson: true,
-              diagramSpecJson: true,
               reviewStatus: true,
               staleAt: true,
             },

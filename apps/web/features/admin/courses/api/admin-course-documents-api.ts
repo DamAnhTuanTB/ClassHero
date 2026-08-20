@@ -5,6 +5,7 @@ import type {
   AdminLessonPageRangeInput,
   AdminPageRangeSaveResponseApi,
   AdminSignedUrlApi,
+  AdminSearchablePdfValidationApi,
   AdminSourceDocumentApi,
   AdminSourceDocumentPageApi,
 } from "@/features/admin/courses/types/admin-course-document-types";
@@ -61,6 +62,29 @@ export function requestAdminSourceDocumentProcessing(
       token,
       body: { forceNewOcr },
     },
+  );
+}
+
+export function validateAdminSourceDocumentSearchablePdf(
+  sourceDocumentId: string,
+  candidateFileId: string,
+  token: string,
+) {
+  return apiRequest<AdminSearchablePdfValidationApi>(
+    `/admin/source-documents/${sourceDocumentId}/searchable-pdf/validate`,
+    { method: "POST", body: { candidateFileId }, token, timeoutMs: 300_000 },
+  );
+}
+
+export function promoteAdminSourceDocumentSearchablePdf(
+  sourceDocumentId: string,
+  validationId: string,
+  acceptWarnings: boolean,
+  token: string,
+) {
+  return apiRequest<AdminSourceDocumentApi>(
+    `/admin/source-documents/${sourceDocumentId}/searchable-pdf/promote`,
+    { method: "POST", body: { validationId, acceptWarnings }, token },
   );
 }
 

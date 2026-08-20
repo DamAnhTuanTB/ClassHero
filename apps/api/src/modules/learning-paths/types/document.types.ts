@@ -80,6 +80,7 @@ export type SourceDocumentResponse = {
   status: DocumentStatus;
   pageCount: number | null;
   contentHash: string | null;
+  activeOcrArtifactId: string | null;
   processingJobId: string | null;
   processingJob: DocumentJobResponse | null;
   processedAt: Date | null;
@@ -155,6 +156,7 @@ export type LessonDocumentResponse = {
   status: DocumentStatus;
   extractError: string | null;
   contentHash: string | null;
+  activeOcrArtifactId: string | null;
   chunkCount: number;
   processingJobId: string | null;
   processingJob: DocumentJobResponse | null;

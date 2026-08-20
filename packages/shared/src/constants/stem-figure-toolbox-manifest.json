@@ -1,0 +1,150 @@
+{
+  "version": "stem-figure-subject-profile-v2",
+  "subjects": {
+    "MATH": {
+      "rootEnvironments": ["tikzpicture"],
+      "headerCommands": [
+        "usetikzlibrary",
+        "usepgfplotslibrary",
+        "tikzset",
+        "pgfplotsset",
+        "tdplotsetmaincoords"
+      ],
+      "packages": [
+        { "name": "fontspec" },
+        { "name": "amsmath" },
+        { "name": "amssymb" },
+        { "name": "tikz" },
+        { "name": "tkz-euclide" },
+        { "name": "tkz-tab" },
+        { "name": "pgfplots" },
+        { "name": "tikz-3dplot" }
+      ],
+      "tikzLibraries": [
+        "3d",
+        "angles",
+        "arrows.meta",
+        "backgrounds",
+        "calc",
+        "decorations.markings",
+        "decorations.pathreplacing",
+        "fit",
+        "intersections",
+        "math",
+        "matrix",
+        "patterns",
+        "positioning",
+        "quotes",
+        "shapes.geometric",
+        "through"
+      ],
+      "pgfplotsLibraries": ["fillbetween"],
+      "compilerDeclarations": [
+        "\\setmainfont{Noto Sans}",
+        "\\pgfplotsset{compat=1.18}"
+      ]
+    },
+    "PHYSICS": {
+      "rootEnvironments": ["tikzpicture", "circuitikz"],
+      "headerCommands": [
+        "usetikzlibrary",
+        "usepgfplotslibrary",
+        "tikzset",
+        "pgfplotsset"
+      ],
+      "packages": [
+        { "name": "fontspec" },
+        { "name": "amsmath" },
+        { "name": "amssymb" },
+        { "name": "tikz" },
+        { "name": "pgfplots" },
+        { "name": "circuitikz" }
+      ],
+      "tikzLibraries": [
+        "3d",
+        "angles",
+        "arrows.meta",
+        "backgrounds",
+        "calc",
+        "decorations.markings",
+        "decorations.pathreplacing",
+        "fit",
+        "intersections",
+        "matrix",
+        "patterns",
+        "positioning",
+        "quotes",
+        "shapes.geometric"
+      ],
+      "pgfplotsLibraries": ["fillbetween"],
+      "compilerDeclarations": [
+        "\\setmainfont{Noto Sans}",
+        "\\pgfplotsset{compat=1.18}"
+      ]
+    },
+    "CHEMISTRY": {
+      "rootEnvironments": ["tikzpicture"],
+      "headerCommands": [
+        "usetikzlibrary",
+        "usepgfplotslibrary",
+        "tikzset",
+        "pgfplotsset"
+      ],
+      "packages": [
+        { "name": "fontspec" },
+        { "name": "amsmath" },
+        { "name": "amssymb" },
+        { "name": "tikz" },
+        { "name": "pgfplots" },
+        { "name": "chemfig" },
+        { "name": "mhchem", "options": "version=4" }
+      ],
+      "tikzLibraries": [
+        "angles",
+        "arrows.meta",
+        "backgrounds",
+        "calc",
+        "decorations.markings",
+        "fit",
+        "intersections",
+        "matrix",
+        "patterns",
+        "positioning",
+        "quotes",
+        "shapes.geometric"
+      ],
+      "pgfplotsLibraries": ["fillbetween"],
+      "compilerDeclarations": [
+        "\\setmainfont{Noto Sans}",
+        "\\pgfplotsset{compat=1.18}"
+      ]
+    },
+    "GENERAL": {
+      "rootEnvironments": ["tikzpicture"],
+      "headerCommands": ["usetikzlibrary", "tikzset"],
+      "packages": [
+        { "name": "fontspec" },
+        { "name": "amsmath" },
+        { "name": "amssymb" },
+        { "name": "tikz" }
+      ],
+      "tikzLibraries": [
+        "angles",
+        "arrows.meta",
+        "backgrounds",
+        "calc",
+        "decorations.markings",
+        "decorations.pathreplacing",
+        "fit",
+        "intersections",
+        "matrix",
+        "patterns",
+        "positioning",
+        "quotes",
+        "shapes.geometric"
+      ],
+      "pgfplotsLibraries": [],
+      "compilerDeclarations": ["\\setmainfont{Noto Sans}"]
+    }
+  }
+}

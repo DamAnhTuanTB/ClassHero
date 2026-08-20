@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import * as yauzl from "yauzl";
 import type { Entry as YauzlEntry } from "yauzl";
@@ -9,6 +10,7 @@ import {
   FileStatus,
   LessonDocumentKind,
   Prisma,
+  SearchablePdfValidationStatus,
 } from "@prisma/client";
 import {
   throwBadRequest,
@@ -23,6 +25,8 @@ import { OcrArtifactCacheService } from "#api/workers/services/ocr-artifact-cach
 import { CreateSourceDocumentDto } from "#api/modules/learning-paths/dto/create-source-document.dto";
 import { UpdateLessonPageRangesDto } from "#api/modules/learning-paths/dto/update-lesson-page-ranges.dto";
 import { ConfirmPrintedPageDto } from "#api/modules/learning-paths/dto/confirm-printed-page.dto";
+import { PromoteSearchablePdfDto } from "#api/modules/learning-paths/dto/promote-searchable-pdf.dto";
+import { ValidateSearchablePdfDto } from "#api/modules/learning-paths/dto/validate-searchable-pdf.dto";
 import type { LessonSourceDocumentExtractionDto } from "#api/modules/learning-paths/dto/create-lesson.dto";
 import {
   lessonDocumentPageRangeSelect,
@@ -41,6 +45,11 @@ import type {
   PageRangeSaveResponse,
 } from "#api/modules/learning-paths/types/document.types";
 import type { RequestContext } from "#api/modules/learning-paths/types/lesson.types";
+import { SearchablePdfEquivalenceService } from "#api/modules/learning-paths/services/searchable-pdf-equivalence.service";
+import {
+  readOcrPreviewImageReferences,
+  rewriteOcrPreviewImageUrls,
+} from "#api/modules/learning-paths/utils/ocr-preview.helpers";
 import {
   assertNoDuplicateLessonRanges,
   assertNoOverlappingSourceExtractions,
@@ -69,7 +78,315 @@ export class SourceDocumentsService {
     private readonly cacheService: OcrArtifactCacheService,
     @Inject(ConfigService)
     private readonly configService: ConfigService,
+    @Inject(SearchablePdfEquivalenceService)
+    private readonly searchablePdfEquivalence: SearchablePdfEquivalenceService,
   ) {}
+
+  async validateSearchablePdf(sourceDocumentId: string, dto: ValidateSearchablePdfDto) {
+    await this.cleanupExpiredSearchablePdfArtifacts();
+    const sourceDocument = await this.prisma.sourceDocument.findFirst({
+      where: { id: sourceDocumentId, deletedAt: null },
+      select: {
+        id: true,
+        fileId: true,
+        file: {
+          select: {
+            id: true,
+            objectKey: true,
+            checksum: true,
+            mimeType: true,
+          },
+        },
+        activeOcrArtifact: {
+          select: { imageManifestObjectKey: true },
+        },
+      },
+    });
+    if (!sourceDocument) throwSourceDocumentNotFound();
+    const candidate = await this.prisma.file.findFirst({
+      where: {
+        id: dto.candidateFileId,
+        deletedAt: null,
+        purpose: FilePurpose.LESSON_DOCUMENT,
+        mimeType: "application/pdf",
+        status: { in: [FileStatus.UPLOADED, FileStatus.READY] },
+      },
+      select: { id: true, objectKey: true, checksum: true, mimeType: true },
+    });
+    if (!candidate?.checksum || !sourceDocument.file.checksum) {
+      throwBadRequest(
+        "SEARCHABLE_PDF_FILE_INVALID",
+        "PDF gốc và PDF searchable phải có checksum hợp lệ.",
+      );
+    }
+    if (candidate.id === sourceDocument.fileId) {
+      throwBadRequest(
+        "SEARCHABLE_PDF_FILE_INVALID",
+        "Hãy chọn một file searchable mới để đối chiếu.",
+      );
+    }
+
+    const [originalBuffer, candidateBuffer] = await Promise.all([
+      this.storage.downloadObject(sourceDocument.file.objectKey),
+      this.storage.downloadObject(candidate.objectKey),
+    ]);
+    let result;
+    try {
+      result = await this.searchablePdfEquivalence.validate({
+        original: originalBuffer,
+        candidate: candidateBuffer,
+        imageManifestObjectKey: sourceDocument.activeOcrArtifact?.imageManifestObjectKey,
+      });
+    } catch (error) {
+      throwBadRequest(
+        "SEARCHABLE_PDF_UNREADABLE",
+        "Không thể đọc hoặc đối chiếu PDF searchable.",
+        { reason: error instanceof Error ? error.message : String(error) },
+      );
+    }
+    const id = randomUUID();
+    const contactSheetObjectKey = `searchable-pdf-validations/${sourceDocument.id}/${id}/contact-sheet.png`;
+    await this.storage.uploadBuffer(
+      contactSheetObjectKey,
+      result.contactSheet,
+      "image/png",
+    );
+    const status =
+      result.report.hardFailures.length > 0
+        ? SearchablePdfValidationStatus.FAILED
+        : result.report.warnings.length > 0
+          ? SearchablePdfValidationStatus.WARNING
+          : SearchablePdfValidationStatus.PASSED;
+    const validation = await this.prisma.searchablePdfValidation.create({
+      data: {
+        id,
+        sourceDocumentId: sourceDocument.id,
+        originalFileId: sourceDocument.file.id,
+        candidateFileId: candidate.id,
+        originalChecksum: sourceDocument.file.checksum,
+        candidateChecksum: candidate.checksum,
+        status,
+        reportJson: result.report as unknown as Prisma.InputJsonValue,
+        contactSheetObjectKey,
+        expiresAt: new Date(
+          Date.now() +
+            Number(
+              this.configService.get("SEARCHABLE_PDF_VALIDATION_TTL_SECONDS", {
+                infer: true,
+              }) ?? 3_600,
+            ) *
+              1_000,
+        ),
+      },
+    });
+    return {
+      id: validation.id,
+      status: validation.status,
+      expiresAt: validation.expiresAt,
+      report: result.report,
+      contactSheetUrl: await this.storage.createSignedGetUrl(contactSheetObjectKey),
+    };
+  }
+
+  async getSearchablePdfValidation(sourceDocumentId: string, validationId: string) {
+    const validation = await this.prisma.searchablePdfValidation.findFirst({
+      where: { id: validationId, sourceDocumentId },
+    });
+    if (!validation) {
+      throwNotFound(
+        "SEARCHABLE_PDF_VALIDATION_NOT_FOUND",
+        "Không tìm thấy báo cáo đối chiếu PDF.",
+      );
+    }
+    const expired = validation.expiresAt.getTime() <= Date.now();
+    if (
+      expired &&
+      validation.status !== SearchablePdfValidationStatus.PROMOTED &&
+      validation.status !== SearchablePdfValidationStatus.EXPIRED
+    ) {
+      await this.prisma.searchablePdfValidation.update({
+        where: { id: validation.id },
+        data: { status: SearchablePdfValidationStatus.EXPIRED },
+      });
+    }
+    return {
+      id: validation.id,
+      status: expired ? SearchablePdfValidationStatus.EXPIRED : validation.status,
+      expiresAt: validation.expiresAt,
+      promotedAt: validation.promotedAt,
+      report: validation.reportJson,
+      contactSheetUrl: validation.contactSheetObjectKey
+        ? await this.storage.createSignedGetUrl(validation.contactSheetObjectKey)
+        : null,
+    };
+  }
+
+  async promoteSearchablePdf(
+    sourceDocumentId: string,
+    actorUserId: string,
+    dto: PromoteSearchablePdfDto,
+    context: RequestContext = {},
+  ) {
+    const promoted = await this.prisma.$transaction(async (tx) => {
+      const validation = await tx.searchablePdfValidation.findFirst({
+        where: { id: dto.validationId, sourceDocumentId },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          originalFileId: true,
+          candidateFileId: true,
+          originalChecksum: true,
+          candidateChecksum: true,
+          reportJson: true,
+          sourceDocument: {
+            select: {
+              id: true,
+              fileId: true,
+              contentHash: true,
+              metadataJson: true,
+              file: { select: { checksum: true } },
+              pages: { select: { id: true, metadataJson: true } },
+            },
+          },
+        },
+      });
+      if (!validation) {
+        throwNotFound(
+          "SEARCHABLE_PDF_VALIDATION_NOT_FOUND",
+          "Không tìm thấy báo cáo đối chiếu PDF.",
+        );
+      }
+      if (validation.expiresAt.getTime() <= Date.now()) {
+        throwConflict(
+          "SEARCHABLE_PDF_VALIDATION_EXPIRED",
+          "Báo cáo đã hết hạn; hãy chạy đối chiếu lại.",
+        );
+      }
+      const allowed =
+        validation.status === SearchablePdfValidationStatus.PASSED ||
+        (validation.status === SearchablePdfValidationStatus.WARNING &&
+          dto.acceptWarnings === true);
+      if (!allowed) {
+        throwConflict(
+          "SEARCHABLE_PDF_VALIDATION_NOT_APPROVED",
+          "PDF chưa đạt điều kiện promote hoặc warning chưa được xác nhận.",
+          { status: validation.status },
+        );
+      }
+      if (
+        validation.sourceDocument.fileId !== validation.originalFileId ||
+        validation.sourceDocument.file.checksum !== validation.originalChecksum
+      ) {
+        throwConflict(
+          "SEARCHABLE_PDF_VALIDATION_STALE",
+          "PDF canonical đã thay đổi sau khi đối chiếu.",
+        );
+      }
+      const candidate = await tx.file.findFirst({
+        where: { id: validation.candidateFileId, deletedAt: null },
+        select: { id: true, checksum: true, objectKey: true, metadataJson: true },
+      });
+      if (!candidate || candidate.checksum !== validation.candidateChecksum) {
+        throwConflict(
+          "SEARCHABLE_PDF_VALIDATION_STALE",
+          "PDF searchable đã thay đổi sau khi đối chiếu.",
+        );
+      }
+
+      const updated = await tx.sourceDocument.update({
+        where: { id: validation.sourceDocument.id },
+        data: {
+          fileId: candidate.id,
+          contentHash: validation.candidateChecksum,
+          metadataJson: toDocumentInputJson({
+            ...asRecord(validation.sourceDocument.metadataJson),
+            searchablePdf: {
+              validationId: validation.id,
+              promotedAt: new Date().toISOString(),
+              originalFileId: validation.originalFileId,
+              canonicalFileId: candidate.id,
+              report: validation.reportJson,
+            },
+          }),
+        },
+        select: sourceDocumentSelect,
+      });
+      await tx.lessonDocument.updateMany({
+        where: { sourceDocumentId, replacedAt: null },
+        data: { fileId: candidate.id, contentHash: validation.candidateChecksum },
+      });
+      for (const page of validation.sourceDocument.pages) {
+        const metadata = asRecord(page.metadataJson);
+        const visual = asRecord(metadata.visual);
+        await tx.sourceDocumentPage.update({
+          where: { id: page.id },
+          data: {
+            metadataJson: toDocumentInputJson({
+              ...metadata,
+              visual: {
+                ...visual,
+                sourceFileId: candidate.id,
+                sourceObjectKey: candidate.objectKey,
+              },
+            }),
+          },
+        });
+      }
+      await tx.file.update({
+        where: { id: candidate.id },
+        data: { status: FileStatus.READY },
+      });
+      await tx.file.update({
+        where: { id: validation.originalFileId },
+        data: {
+          metadataJson: toDocumentInputJson({
+            quarantine: {
+              reason: "searchable_pdf_promoted",
+              replacedByFileId: candidate.id,
+              recoverableUntil: new Date(
+                Date.now() +
+                  Number(
+                    this.configService.get("SEARCHABLE_PDF_ROLLBACK_TTL_SECONDS", {
+                      infer: true,
+                    }) ?? 86_400,
+                  ) *
+                    1_000,
+              ).toISOString(),
+            },
+          }),
+        },
+      });
+      await tx.searchablePdfValidation.update({
+        where: { id: validation.id },
+        data: {
+          status: SearchablePdfValidationStatus.PROMOTED,
+          promotedAt: new Date(),
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorUserId,
+          action: "SOURCE_DOCUMENT_SEARCHABLE_PDF_PROMOTED",
+          entityType: "SourceDocument",
+          entityId: sourceDocumentId,
+          before: toDocumentInputJson({
+            fileId: validation.originalFileId,
+            contentHash: validation.originalChecksum,
+          }),
+          after: toDocumentInputJson({
+            fileId: candidate.id,
+            contentHash: validation.candidateChecksum,
+            activeOcrArtifactPreserved: true,
+          }),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return updated;
+    });
+    return serializeSourceDocument(promoted);
+  }
 
   async createForLearningPath(
     learningPathId: string,
@@ -175,10 +492,7 @@ export class SourceDocumentsService {
             },
           })
         : [];
-    const pagesBySourceDocumentId = new Map<
-      string,
-      Array<(typeof pages)[number]>
-    >();
+    const pagesBySourceDocumentId = new Map<string, Array<(typeof pages)[number]>>();
     for (const page of pages) {
       const sourcePages = pagesBySourceDocumentId.get(page.sourceDocumentId) ?? [];
       sourcePages.push(page);
@@ -295,8 +609,6 @@ export class SourceDocumentsService {
     context: RequestContext = {},
   ) {
     try {
-      let contentHashToClear: string | null = null;
-
       await this.prisma.$transaction(async (tx) => {
         const sourceDocument = await tx.sourceDocument.findFirst({
           where: {
@@ -349,23 +661,7 @@ export class SourceDocumentsService {
             userAgent: context.userAgent,
           },
         });
-
-        contentHashToClear = sourceDocument.contentHash;
       });
-
-      if (contentHashToClear) {
-        const provider =
-          this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
-        const descriptor = this.cacheService.createDescriptor(
-          contentHashToClear,
-          provider,
-        );
-        await this.cacheService.invalidateCache(descriptor).catch((err) => {
-          this.logger.warn(
-            `Failed to invalidate cache for ${contentHashToClear}: ${err.message}`,
-          );
-        });
-      }
 
       return { success: true };
     } catch (error) {
@@ -376,19 +672,28 @@ export class SourceDocumentsService {
   async getCacheStatus(sourceDocumentId: string) {
     try {
       const sourceDocument = await this.findActiveSourceDocument(sourceDocumentId);
-      if (!sourceDocument.contentHash) {
+      if (!sourceDocument.activeOcrArtifactId) {
         return { hasCache: false };
       }
-
-      const provider =
-        this.configService.get("OCR_PROVIDER", { infer: true }) ?? "mathpix";
-      const descriptor = this.cacheService.createDescriptor(
-        sourceDocument.contentHash,
-        provider,
-      );
-      const hasCache = await this.cacheService.hasArtifact(descriptor);
-
-      return { hasCache };
+      const artifact = await this.prisma.documentOcrArtifact.findFirst({
+        where: {
+          id: sourceDocument.activeOcrArtifactId,
+          status: DocumentStatus.READY,
+        },
+        select: {
+          id: true,
+          manifestObjectKey: true,
+          sourceContentHash: true,
+        },
+      });
+      const hasCache = artifact
+        ? await this.storage.headObject(artifact.manifestObjectKey)
+        : false;
+      return {
+        hasCache,
+        artifactId: artifact?.id ?? null,
+        sourceContentHash: artifact?.sourceContentHash ?? null,
+      };
     } catch (error) {
       handleDocumentPrismaError(error);
     }
@@ -407,7 +712,32 @@ export class SourceDocumentsService {
       },
     });
 
-    return pages.map(serializeSourceDocumentPage);
+    return Promise.all(
+      pages.map(async (page) => {
+        const ocrImageReferences = readOcrPreviewImageReferences(
+          page.metadataJson,
+          sourceDocumentId,
+        );
+        const signedOcrImages = await Promise.all(
+          ocrImageReferences.map(async ({ objectKey, ...image }) => ({
+            ...image,
+            objectKey,
+            url: await this.storage.createSignedGetUrl(objectKey),
+          })),
+        );
+        const serializedPage = serializeSourceDocumentPage(page);
+        const orderedContent = rewriteOcrPreviewImageUrls(
+          serializedPage.mathpixMarkdown ?? serializedPage.fullText,
+          signedOcrImages,
+        );
+
+        return {
+          ...serializedPage,
+          orderedContent,
+          ocrImages: signedOcrImages.map(({ objectKey: _objectKey, ...image }) => image),
+        };
+      }),
+    );
   }
 
   async updateLessonPageRanges(
@@ -573,10 +903,7 @@ export class SourceDocumentsService {
       .filter((id): id is string => Boolean(id));
 
     if (new Set(extractionIds).size !== extractionIds.length) {
-      throwBadRequest(
-        "VALIDATION_ERROR",
-        "Danh sách trích xuất chứa mã bị lặp",
-      );
+      throwBadRequest("VALIDATION_ERROR", "Danh sách trích xuất chứa mã bị lặp");
     }
 
     for (const extraction of extractions) {
@@ -661,9 +988,7 @@ export class SourceDocumentsService {
       select: lessonDocumentPageRangeSelect,
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
-    const existingRangeById = new Map(
-      existingRanges.map((range) => [range.id, range]),
-    );
+    const existingRangeById = new Map(existingRanges.map((range) => [range.id, range]));
 
     for (const extractionId of extractionIds) {
       if (!existingRangeById.has(extractionId)) {
@@ -677,9 +1002,7 @@ export class SourceDocumentsService {
 
     const now = new Date();
     const requestedIds = new Set(extractionIds);
-    const removedRanges = existingRanges.filter(
-      (range) => !requestedIds.has(range.id),
-    );
+    const removedRanges = existingRanges.filter((range) => !requestedIds.has(range.id));
 
     for (const range of removedRanges) {
       await tx.lessonDocument.updateMany({
@@ -928,7 +1251,7 @@ export class SourceDocumentsService {
     await tx.lessonDocumentPageRange.deleteMany({
       where: { lessonId },
     });
-    
+
     return null;
   }
 
@@ -1092,6 +1415,7 @@ export class SourceDocumentsService {
         title,
         status: DocumentStatus.PROCESSING,
         contentHash: sourceDocument.contentHash,
+        activeOcrArtifactId: sourceDocument.activeOcrArtifactId,
         metadataJson,
       },
       select: lessonDocumentSelect,
@@ -1164,26 +1488,25 @@ export class SourceDocumentsService {
    * Returns the full HTML string for rendering in the frontend.
    */
   async getOcrHtml(sourceDocumentId: string): Promise<{ html: string }> {
-    // Find a page with artifacts metadata to get the htmlZip key
-    const page = await this.prisma.sourceDocumentPage.findFirst({
-      where: {
-        sourceDocumentId,
-        metadataJson: { not: Prisma.DbNull },
+    const sourceDocument = await this.prisma.sourceDocument.findFirst({
+      where: { id: sourceDocumentId, deletedAt: null },
+      select: {
+        activeOcrArtifact: { select: { manifestObjectKey: true } },
       },
-      select: { metadataJson: true },
-      orderBy: { pageNumber: "asc" },
     });
-
-    if (!page?.metadataJson) {
+    if (!sourceDocument?.activeOcrArtifact) {
       throwNotFound(
         "OCR_ARTIFACTS_NOT_FOUND",
         "OCR artifacts not found for this document",
       );
     }
-
-    const metadata = page.metadataJson as Record<string, unknown>;
-    const artifacts = metadata.artifacts as Record<string, unknown> | undefined;
-    const htmlZipKey = artifacts?.htmlZip as string | undefined;
+    const manifestBuffer = await this.storage.downloadObject(
+      sourceDocument.activeOcrArtifact.manifestObjectKey,
+    );
+    const manifest = JSON.parse(manifestBuffer.toString("utf8")) as {
+      artifactKeys?: { htmlZip?: string };
+    };
+    const htmlZipKey = manifest.artifactKeys?.htmlZip;
 
     if (!htmlZipKey) {
       throwNotFound(
@@ -1350,6 +1673,42 @@ export class SourceDocumentsService {
 
     return serializeSourceDocumentPage(updatedPageRow);
   }
+
+  private async cleanupExpiredSearchablePdfArtifacts() {
+    const rollbackTtlSeconds = Number(
+      this.configService.get("SEARCHABLE_PDF_ROLLBACK_TTL_SECONDS", {
+        infer: true,
+      }) ?? 86_400,
+    );
+    const cutoff = new Date(Date.now() - rollbackTtlSeconds * 1_000);
+    const expired = await this.prisma.searchablePdfValidation.findMany({
+      where: {
+        status: SearchablePdfValidationStatus.PROMOTED,
+        promotedAt: { lt: cutoff },
+        originalFile: { deletedAt: null },
+      },
+      select: {
+        originalFileId: true,
+        originalFile: { select: { objectKey: true } },
+      },
+      take: 20,
+    });
+    for (const item of expired) {
+      const activeReferences = await this.prisma.sourceDocument.count({
+        where: { fileId: item.originalFileId, deletedAt: null },
+      });
+      if (activeReferences > 0) continue;
+      await this.storage.deleteObject(item.originalFile.objectKey).catch((error) => {
+        this.logger.warn(
+          `Searchable PDF rollback cleanup failed for ${item.originalFileId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+      await this.prisma.file.update({
+        where: { id: item.originalFileId },
+        data: { status: FileStatus.DELETED, deletedAt: new Date() },
+      });
+    }
+  }
 }
 
 function mergeDocumentMetadata(
@@ -1365,4 +1724,10 @@ function mergeDocumentMetadata(
   }
 
   return toDocumentInputJson(patch)!;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }

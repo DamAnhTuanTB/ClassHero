@@ -43,7 +43,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | --- | --- |
 | Envelope, pagination, status, error code, security rule | `docs/api/conventions-errors-security.md` |
 | Register, login, refresh, logout, forgot/reset, current user/profile | `docs/api/auth-profile.md` |
-| Public/admin learning path, chapter, lesson, summary, file/material | `docs/api/learning-paths-lessons.md` |
+| Public/admin learning path, chapter, lesson, Summary, STEM figure review, file/material | `docs/api/learning-paths-lessons.md` |
 | Student lesson content, notes, comments, favorites | `docs/api/student-learning.md` |
 | Quiz, flashcard, test, attempts | `docs/api/quiz-flashcard-tests.md` |
 | AI explanation, chat, generated content | `docs/api/ai-chat.md` |
@@ -68,7 +68,7 @@ Nếu chỉ làm `/task-ui` mock data, dùng API docs để hiểu data shape, k
 | `M6.x` | `quiz-flashcard-tests`, `conventions-errors-security` |
 | `M7.x` | `student-learning`, `quiz-flashcard-tests`, `conventions-errors-security` |
 | `M8.x` | `payment-discount`, `conventions-errors-security` |
-| `M9.x` | `ai-chat`, `provider-operations`, `jobs`, `conventions-errors-security` |
+| `M9.x` | `learning-paths-lessons`, `ai-chat`, `provider-operations`, `jobs`, `conventions-errors-security` |
 | `M10.x` | `notification`, `jobs`, `conventions-errors-security` |
 | `M11.x` | `parent`, `payment-discount`, `conventions-errors-security` |
 | `M12.x` | `report-news`, `conventions-errors-security` |

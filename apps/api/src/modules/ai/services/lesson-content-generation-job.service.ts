@@ -18,7 +18,7 @@ import {
 import {
   LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
-  generatedQuizOutputSchema,
+  getGeneratedQuizOutputSchema,
 } from "#api/modules/ai/types/lesson-content-generation.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import {
@@ -86,6 +86,9 @@ export class LessonContentGenerationJobService {
         difficultyCounts,
         questionTypes,
         targetGrade: snapshot.targetGrade,
+        subjectKey: snapshot.subject.key,
+        subjectName: snapshot.subject.name,
+        subjectSlug: snapshot.subject.slug,
         style: input.style ?? "student_friendly",
         styleInstructions: input.styleInstructions?.trim() ?? "",
         extraInstructions: input.extraInstructions?.trim() ?? "",
@@ -117,6 +120,9 @@ export class LessonContentGenerationJobService {
       documentIds: snapshot.documentIds,
       sourceHash: snapshot.sourceHash,
       targetGrade: snapshot.targetGrade,
+      subjectKey: snapshot.subject.key,
+      subjectName: snapshot.subject.name,
+      subjectSlug: snapshot.subject.slug,
       questionCount: input.questionCount,
       difficulty: input.difficulty,
       difficultyCounts,
@@ -142,7 +148,7 @@ export class LessonContentGenerationJobService {
     });
     const inputPrompt = buildAiUserPrompt(request);
     const structuredTextFormat = buildAiStructuredTextFormat(
-      generatedQuizOutputSchema,
+      getGeneratedQuizOutputSchema(snapshot.subject.key),
       request.outputName,
     );
     const candidate =
@@ -163,6 +169,30 @@ export class LessonContentGenerationJobService {
       availableMetrics.has(metric),
     );
     const fxRate = await this.getFxRateVndPerUsd();
+    const estimatedInputCost =
+      candidate && canEstimate
+        ? calculateProviderCost(
+            {
+              promptTokens: inputTokenEstimate.estimatedTokens,
+              completionTokens: 0,
+              requestCount: 1,
+            },
+            candidate.rates,
+            fxRate,
+          )
+        : null;
+    const estimatedOutputCost =
+      candidate && canEstimate
+        ? calculateProviderCost(
+            {
+              promptTokens: 0,
+              completionTokens: maxOutputTokens,
+              requestCount: 0,
+            },
+            candidate.rates,
+            fxRate,
+          )
+        : null;
     const estimatedCost =
       candidate && canEstimate
         ? calculateProviderCost(
@@ -197,6 +227,8 @@ export class LessonContentGenerationJobService {
         documentCount: snapshot.documentIds.length,
         chunkCount: snapshot.chunks.length,
         estimatedTokens: inputTokenEstimate.estimatedTokens,
+        textInputTokens: inputTokenEstimate.textInputTokens,
+        pdfInputTokens: 0,
         promptTokens: inputTokenEstimate.promptTokens,
         schemaTokens: inputTokenEstimate.schemaTokens,
         contextTokens: snapshot.totalTokens,
@@ -221,12 +253,20 @@ export class LessonContentGenerationJobService {
       estimatedCost: estimatedCost
         ? {
             available: true,
+            inputUpperBoundUsd: estimatedInputCost?.costUsd ?? null,
+            inputUpperBoundVnd: estimatedInputCost?.costVnd ?? null,
+            outputUpperBoundUsd: estimatedOutputCost?.costUsd ?? null,
+            outputUpperBoundVnd: estimatedOutputCost?.costVnd ?? null,
             upperBoundUsd: estimatedCost.costUsd,
             upperBoundVnd: estimatedCost.costVnd,
             fxRateVndPerUsd: fxRate,
           }
         : {
             available: false,
+            inputUpperBoundUsd: null,
+            inputUpperBoundVnd: null,
+            outputUpperBoundUsd: null,
+            outputUpperBoundVnd: null,
             upperBoundUsd: null,
             upperBoundVnd: null,
             fxRateVndPerUsd: fxRate,
@@ -288,6 +328,9 @@ export class LessonContentGenerationJobService {
       documentIds: snapshot.documentIds,
       sourceHash: snapshot.sourceHash,
       targetGrade: snapshot.targetGrade,
+      subjectKey: snapshot.subject.key,
+      subjectName: snapshot.subject.name,
+      subjectSlug: snapshot.subject.slug,
     };
     const job = await this.jobs.createAndEnqueue({
       type,

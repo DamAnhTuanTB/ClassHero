@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -35,8 +35,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -104,6 +104,8 @@ services:
       S3_FORCE_PATH_STYLE: "true"
       FILE_PUBLIC_BASE_URL:
       FILE_SIGNED_URL_TTL_SECONDS: 900
+      TEX_RENDERER_URL: http://tex-renderer:8080
+      TEX_RENDERER_TOKEN: local-tex-renderer-token
     volumes:
       - .:/app
       - /app/node_modules
@@ -117,6 +119,54 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      tex-renderer:
+        condition: service_healthy
+    networks:
+      - default
+      - tex_internal
+
+  tex-renderer:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.tex-renderer
+    container_name: learning-path-tex-renderer
+    environment:
+      TEX_RENDERER_PORT: 8080
+      TEX_RENDERER_TOKEN: local-tex-renderer-token
+      TEX_RENDER_TIMEOUT_MS: 20000
+      TEX_RENDER_MAX_SOURCE_BYTES: 40000
+      TEX_RENDER_MAX_SVG_BYTES: 2000000
+      TEX_RENDERER_VERSION: texlive-debian-v3-snippet
+    expose:
+      - "8080"
+    ports:
+      # Host-only access keeps the renderer private while allowing the local
+      # `pnpm dev` worker to use the same isolated service as Docker workers.
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.0
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - default
+      - tex_internal
 
   web:
     build:
@@ -142,3 +192,7 @@ services:
 volumes:
   postgres_data:
   minio_data:
+
+networks:
+  tex_internal:
+    internal: true

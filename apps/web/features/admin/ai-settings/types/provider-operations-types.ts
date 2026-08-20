@@ -167,6 +167,16 @@ export type UsageEvent = {
   latencyMs: number | null;
   createdAt: string;
   catalogItem: { displayName: string; externalKey: string } | null;
+  backgroundJob: {
+    queue: string;
+    resourceType: string | null;
+  } | null;
+  aiGeneration: {
+    id: string;
+    type: AiFeature;
+    totalCostVnd: number | null;
+    usageEventCount: number;
+  } | null;
   priceVersion?: {
     rates: Array<{
       metric: "INPUT_TOKEN" | "CACHED_INPUT_TOKEN" | "OUTPUT_TOKEN" | "PAGE" | "REQUEST";
@@ -174,11 +184,12 @@ export type UsageEvent = {
       unitPriceUsd: number;
     }>;
   } | null;
-  rawUsageJson?: any;
+  rawUsageJson?: unknown;
 };
 
 export type UsageEventsResponse = {
   items: UsageEvent[];
+  summary: { totalCostVnd: number; totalCalls: number };
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
 

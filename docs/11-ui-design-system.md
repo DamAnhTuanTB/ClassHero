@@ -316,6 +316,7 @@ Frontend rules:
 
 - Dùng TanStack Query cho server state, cache, refetch, mutation và invalidate; không tự fetch rải rác trong component sâu.
 - Dữ liệu TanStack Query dùng để render phải được đọc trực tiếp từ query/cache; không copy `query.data` sang local state rồi đồng bộ bằng `useEffect`, vì render thành công và effect lệch nhau một frame có thể làm UI nháy empty/error trước khi dữ liệu xuất hiện. Chỉ giữ local draft khi người dùng thật sự chỉnh sửa độc lập với server state.
+- Màn biên tập, modal hoặc code editor đang giữ local draft không được tự nạp lại dữ liệu chỉ vì người dùng chuyển sang tab trình duyệt khác rồi quay lại. Query cấp dữ liệu cho phiên biên tập phải tắt `refetchOnWindowFocus` hoặc merge an toàn mà không reset draft; trạng thái job cần realtime vẫn dùng polling/invalidation riêng và tiếp tục cập nhật sau khi tab hoạt động lại.
 - Initial fetch hoặc auth hydration phải hiện skeleton ngay và giữ skeleton khi query đang retry/refetch mà chưa có dữ liệu. Error toàn màn chỉ được hiện khi request đã dừng và vẫn thất bại; background refetch đã có dữ liệu phải giữ nội dung cũ.
 - Với action có độ trễ như submit quiz, lưu note, favorite, thanh toán, gửi chat AI: hiển thị pending/disabled state ngay khi người dùng thao tác.
 - Dùng optimistic UI chỉ khi rollback an toàn và không ảnh hưởng nghiệp vụ nhạy cảm; không optimistic cho payment, auth hoặc dữ liệu cần xác nhận server nghiêm ngặt.

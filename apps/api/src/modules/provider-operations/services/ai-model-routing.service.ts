@@ -37,10 +37,10 @@ export class AiModelRoutingService {
       where: { feature },
       include: {
         primaryCatalogItem: {
-          include: { priceVersions: priceVersionInclude },
+          include: { priceVersions: priceVersionInclude() },
         },
         fallbackCatalogItem: {
-          include: { priceVersions: priceVersionInclude },
+          include: { priceVersions: priceVersionInclude() },
         },
       },
     });
@@ -74,7 +74,7 @@ export class AiModelRoutingService {
         status: ProviderCatalogStatus.ACTIVE,
         category: ProviderCatalogCategory.AI_MODEL,
       },
-      include: { priceVersions: priceVersionInclude },
+      include: { priceVersions: priceVersionInclude() },
     });
 
     // Sort by provider and then by release date (effectiveFrom desc)
@@ -100,7 +100,7 @@ export class AiModelRoutingService {
         status: ProviderCatalogStatus.ACTIVE,
         category: ProviderCatalogCategory.AI_MODEL,
       },
-      include: { priceVersions: priceVersionInclude },
+      include: { priceVersions: priceVersionInclude() },
     });
     if (!item) {
       return null;
@@ -193,15 +193,18 @@ export class AiModelRoutingService {
   }
 }
 
-const priceVersionInclude = {
-  where: {
-    effectiveFrom: { lte: new Date() },
-    OR: [{ effectiveTo: null }, { effectiveTo: { gt: new Date() } }],
-  },
-  orderBy: { effectiveFrom: "desc" as const },
-  take: 1,
-  include: { rates: true },
-};
+function priceVersionInclude() {
+  const now = new Date();
+  return {
+    where: {
+      effectiveFrom: { lte: now },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+    },
+    orderBy: { effectiveFrom: "desc" as const },
+    take: 1,
+    include: { rates: true },
+  };
+}
 
 function parseAiProvider(provider: string): AiProviderName {
   if (provider === AiProviderName.OPENAI || provider === AiProviderName.GEMINI) {

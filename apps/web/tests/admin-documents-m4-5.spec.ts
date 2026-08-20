@@ -141,7 +141,9 @@ test.describe("M4.5 admin lesson documents", () => {
     await expect(assignmentsDialog.getByText("Buổi học 2: Lũy thừa")).toBeVisible();
     await expect(assignmentsDialog.getByText("Trang 1–4")).toBeVisible();
     await assignmentsDialog.getByRole("button", { name: "Nội dung OCR" }).first().click();
-    await assignmentsDialog.getByRole("button", { name: "Mở rộng" }).first().click();
+    await expect(
+      assignmentsDialog.getByRole("button", { name: "Thu gọn" }).first(),
+    ).toBeVisible();
     await expect(
       assignmentsDialog.getByText("Nội dung trang 1 của sách Toán 7."),
     ).toBeVisible();
@@ -505,9 +507,7 @@ async function seedAdminSession(page: Page) {
     sub: "admin-user",
   });
 
-  await page.route("**/api/auth/session", (route) =>
-    route.fulfill({ status: 204 }),
-  );
+  await page.route("**/api/auth/session", (route) => route.fulfill({ status: 204 }));
   await page.addInitScript(
     (session) => {
       window.localStorage.setItem("classhero.auth.session", JSON.stringify(session));

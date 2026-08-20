@@ -2,7 +2,6 @@
 
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
-import { LessonSummaryDiagram } from "@/components/common/content/lesson-summary-diagram";
 import {
   isLessonSummaryExampleBlockData,
   LessonSummaryExampleCard,
@@ -12,13 +11,11 @@ import type { TiptapTextDocument } from "@/types/rich-text";
 
 export function AssessmentExplanationPanel({
   content,
-  diagramSpec,
   exampleBlock,
   isOpen: controlledIsOpen,
   onToggle,
 }: {
   content: TiptapTextDocument | null | undefined;
-  diagramSpec?: unknown | null;
   exampleBlock?: unknown | null;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -28,7 +25,7 @@ export function AssessmentExplanationPanel({
     () => (isLessonSummaryExampleBlockData(exampleBlock) ? exampleBlock : null),
     [exampleBlock],
   );
-  if (!content && !diagramSpec && !structuredExample) return null;
+  if (!content && !structuredExample) return null;
   const isOpen = controlledIsOpen ?? internalIsOpen;
 
   function handleToggle() {
@@ -61,10 +58,7 @@ export function AssessmentExplanationPanel({
           </div>
         ) : (
           <div className="mt-2 rounded-2xl border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-400/30 dark:bg-sky-500/10">
-            <>
-              {content ? <TiptapContentView content={content} /> : null}
-              {diagramSpec ? <LessonSummaryDiagram spec={diagramSpec} /> : null}
-            </>
+            <>{content ? <TiptapContentView content={content} /> : null}</>
           </div>
         )
       ) : null}

@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { lessonSummaryDiagramSpecSchema } from "@learning-path/shared";
 import { z } from "zod";
 
 import {
@@ -7,16 +6,19 @@ import {
   lessonSummaryReviewIssueSchema,
   resolveLessonSummaryReviewIssueResolution,
 } from "#api/modules/ai/types/lesson-summary.types";
-import {
-  describeLessonSummaryDiagramReviewIssue,
-  simplifyLessonSummaryReviewCopy,
-} from "#api/modules/ai/utils/lesson-summary-review-copy";
+import { simplifyLessonSummaryReviewCopy } from "#api/modules/ai/utils/lesson-summary-review-copy";
 
 type ReviewIssue = z.infer<typeof lessonSummaryReviewIssueSchema>;
 type JsonObject = Record<string, unknown>;
 const FORMAL_PROOF_PATTERN = /\b(?:chứng\s*minh|chứng\s*tỏ)\b/iu;
 const GEOMETRY_PROBLEM_PATTERN =
   /(?:\\triangle|△|\b(?:tam\s*giác|tứ\s*giác|hình\s+(?:vuông|chữ\s*nhật|thoi|bình\s*hành|thang|tròn)|góc|cạnh|đoạn\s*thẳng|đường\s*thẳng|tia|trung\s*điểm|vuông|song\s*song|đường\s*tròn|cung\s*tròn)\b)/iu;
+const RECONCILED_VALIDATION_ISSUE_CODES = new Set([
+  "MISSING_SUMMARY_TITLE",
+  "BLOCK_SCHEMA_INVALID",
+  "MALFORMED_LATEX",
+  "MISSING_GEOMETRY_STATEMENT",
+]);
 
 export function improveLessonSummaryReviewIssueCopy(contentJson: unknown) {
   if (!isObject(contentJson) || contentJson.type !== "lesson_summary_blocks") {
@@ -168,30 +170,26 @@ function validateBlock(value: JsonObject, blockPath: string, targetGrade: number
     );
   }
 
-  const visual = isObject(value.visual) ? value.visual : null;
-  if (visual?.kind === "DIAGRAM_SPEC") {
-    const diagram = lessonSummaryDiagramSpecSchema.safeParse(visual.spec);
-    if (!diagram.success) {
-      const technicalDetails = formatZodIssues(diagram.error);
-      const copy = describeLessonSummaryDiagramReviewIssue(technicalDetails);
-      issues.push(
-        createIssue({
-          code: "DIAGRAM_NEEDS_REVIEW",
-          path: `${blockPath}.visual.spec`,
-          message: copy?.message ?? "Hình vẽ còn chi tiết chưa khớp quy tắc toán học.",
-          suggestion:
-            copy?.suggestion ??
-            "Sửa các điểm, cạnh hoặc ký hiệu nêu trong chi tiết kỹ thuật; nếu hình hiện tại vẫn dùng được, chọn Chấp nhận hình này.",
-          technicalDetails,
-          fingerprint: fingerprint(visual.spec),
-        }),
-      );
-    }
+  for (const candidate of latexTextCandidates(value)) {
+    if (!hasMalformedLatex(candidate.value)) continue;
+    issues.push(
+      createIssue({
+        code: "MALFORMED_LATEX",
+        path: `${blockPath}.${candidate.path}`,
+        message: "Công thức LaTeX đang thiếu hoặc thừa dấu phân cách hay dấu ngoặc.",
+        suggestion: "Sửa lại công thức để các dấu `$`, `{` và `}` cân bằng rồi lưu lại.",
+        technicalDetails: `Unbalanced LaTeX delimiters in ${candidate.path}.`,
+        fingerprint: fingerprint(candidate.value),
+      }),
+    );
   }
+
+  const visual = Array.isArray(value.figures) ? value.figures[0] ?? null : null;
   if (
     value.type === "example" &&
     typeof value.problem === "string" &&
-    isFormalGeometryProof(value.problem, Boolean(visual)) &&
+    (value.isGeometry === true ||
+      isFormalGeometryProof(value.problem, Boolean(visual))) &&
     targetGrade !== null &&
     targetGrade >= 7 &&
     targetGrade <= 9
@@ -229,6 +227,47 @@ function validateBlock(value: JsonObject, blockPath: string, targetGrade: number
   return deduplicateIssues(issues);
 }
 
+function latexTextCandidates(value: JsonObject) {
+  const candidates: Array<{ path: string; value: string }> = [];
+  for (const field of ["title", "content", "problem", "solution", "answer"]) {
+    const candidate = value[field];
+    if (typeof candidate === "string") candidates.push({ path: field, value: candidate });
+  }
+  return candidates;
+}
+
+function hasMalformedLatex(value: string) {
+  const dollarIndexes: number[] = [];
+  let braceDepth = 0;
+  let containsLatex = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === "$" && !isEscaped(value, index)) {
+      dollarIndexes.push(index);
+      containsLatex = true;
+      continue;
+    }
+    if ((character === "{" || character === "}") && !isEscaped(value, index)) {
+      containsLatex = true;
+      if (character === "{") braceDepth += 1;
+      else if (braceDepth === 0) return true;
+      else braceDepth -= 1;
+    }
+  }
+
+  if (!containsLatex) return false;
+  return dollarIndexes.length % 2 !== 0 || braceDepth !== 0;
+}
+
+function isEscaped(value: string, index: number) {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
+}
+
 function isFormalGeometryProof(problem: string, hasDiagram: boolean) {
   return (
     FORMAL_PROOF_PATTERN.test(problem) &&
@@ -241,8 +280,14 @@ function mergeIssues(
   validation: ReviewIssue[],
   currentValue: JsonObject,
 ) {
+  const activeValidationIssueKeys = new Set(
+    validation.map((issue) => `${issue.code}:${issue.path}`),
+  );
   const unchanged = existing.filter(
-    (issue) => issue.fingerprint === fingerprintIssueTarget(currentValue, issue),
+    (issue) =>
+      issue.fingerprint === fingerprintIssueTarget(currentValue, issue) &&
+      (!RECONCILED_VALIDATION_ISSUE_CODES.has(issue.code) ||
+        activeValidationIssueKeys.has(`${issue.code}:${issue.path}`)),
   );
   const merged = [...unchanged];
   validation.forEach((issue) => {
@@ -259,9 +304,8 @@ function mergeIssues(
 }
 
 function fingerprintIssueTarget(value: JsonObject, issue: ReviewIssue) {
-  if (issue.code.startsWith("DIAGRAM_")) {
-    const visual = isObject(value.visual) ? value.visual : null;
-    return fingerprint(visual?.spec ?? null);
+  if (issue.code === "MISSING_REQUIRED_FIGURE") {
+    return fingerprint(value.figures ?? []);
   }
   const field = issue.path.split(".").at(-1);
   return fingerprint(field && field in value ? value[field] : value);
@@ -276,15 +320,10 @@ function improveIssues(value: unknown[]) {
   return value.map((candidate) => {
     const parsed = lessonSummaryReviewIssueSchema.safeParse(candidate);
     if (!parsed.success) return candidate;
-    const diagramCopy = parsed.data.code.startsWith("DIAGRAM_")
-      ? describeLessonSummaryDiagramReviewIssue(parsed.data.technicalDetails ?? null)
-      : null;
-    const copy = simplifyLessonSummaryReviewCopy(
-      diagramCopy ?? {
-        message: parsed.data.message,
-        suggestion: parsed.data.suggestion,
-      },
-    );
+    const copy = simplifyLessonSummaryReviewCopy({
+      message: parsed.data.message,
+      suggestion: parsed.data.suggestion,
+    });
     return { ...normalizeIssueResolution(parsed.data), ...copy };
   });
 }

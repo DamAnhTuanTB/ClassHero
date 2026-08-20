@@ -630,6 +630,12 @@ Behavior:
 
 ## 9. Lesson summary API
 
+> **Breaking API đã triển khai (2026-08-19):** M9.2 figure plan v3 đã xóa
+> `visualIntent` khỏi mọi request/response/raw Phase 1/provider preview.
+> Payload còn key này bị strict validation reject. Không có endpoint hoặc
+> serializer đọc contract cũ. Preview/create/worker dùng chung block projection
+> theo `.codex/plans/m9-2-remove-visual-intent-hard-cutover-plan.md`.
+
 ### `GET /admin/lessons/:lessonId/summary`
 
 Role: `ADMIN`.
@@ -638,6 +644,14 @@ Behavior:
 
 - Trả summary hiện tại hoặc `data: null` nếu lesson chưa có summary.
 - Không trả summary đã xóa mềm.
+- Trả `phaseOneBlockJsonByPath` cho Summary AI sinh bằng contract mới. Mỗi key là
+  block path `sections.{sectionIndex}.blocks.{blockIndex}` và value là nguyên
+  object structured output mà provider trả ở Phase 1 cho đúng block đó, trước
+  mapper và trước khi backend gắn ID/trạng thái hình. Lượt sinh cũ chưa có
+  snapshot editable theo block trả `null`.
+- Với mỗi `contentJson.data.sections[].blocks[].figures[]` có
+  `kind=TEX_FIGURE`, response gồm `figureId`, `figureOrigin`, `status`, `altText`
+  và `caption`. Render plan chuẩn vẫn nằm trong bản ghi STEM figure tương ứng.
 
 ### `PUT /admin/lessons/:lessonId/summary`
 
@@ -655,37 +669,75 @@ Body:
 
 Side effects:
 
-- Upsert `lesson_summaries`.
-- Ghi audit log.
-- Giữ `ai_generation_id` hiện có để không mất provenance khi admin review/sửa
-  một summary vốn được AI tạo.
-- `NEEDS_REVIEW` vẫn lưu được khi block có `reviewIssues`; issue không khóa sửa,
-  thêm, xóa hoặc sắp xếp block.
-- Khi lưu, backend kiểm lại fingerprint đúng field/hình đích. Issue đã được sửa
-  hết tự biến mất; acceptance cũ không còn hiệu lực nếu target đã thay đổi.
-- Trong `visual.spec.labels`, nhãn bị xóa field `text` hoặc có `text` chỉ gồm
-  khoảng trắng được hiểu là admin đã xóa nhãn: backend loại cả phần tử nhãn đó
-  trước khi validate và lưu. Quy tắc này không bỏ qua lỗi tọa độ, cạnh hoặc marker
-  thật còn lại trong cùng sơ đồ.
-- Các text trình bày optional khác (`point.label`, chữ của ký hiệu góc và
-  `caption`) bị xóa hoặc để trắng được chuẩn hóa thành `null`; `labelPosition`
-  bị xóa cũng được hiểu là chưa chọn vị trí. Những trường hợp này không làm hình
-  lỗi vì phần hình học vẫn dựng được.
-- UI xóa trực tiếp label/marker không có endpoint riêng và không autosave. Lượt
-  đầu chỉ gửi lại toàn bộ `contentJson` qua PUT này sau khi admin bấm `Lưu nội
-dung`; backend không tin selection state của frontend mà reconcile lại spec.
-- Khi xóa marker `EQUAL_LENGTH`/`PARALLEL`, client phải xóa toàn bộ marker object,
-  không gửi nhóm chỉ còn một `segmentId`. Payload thủ công vi phạm cardinality,
-  làm thiếu label bắt buộc hoặc tạo lỗi semantic vẫn sinh review issue và bị
-  publish guard xử lý như mọi chỉnh sửa JSON khác.
-- `APPROVED` bị từ chối với mã `LESSON_SUMMARY_REVIEW_REQUIRED` nếu còn issue
-  chưa được sửa hoặc chấp nhận. Response `details.issues[]` trả `code`, `path`,
-  `message`, `suggestion` để admin biết cách xử lý.
-- Issue được chuẩn hóa với resolution `ACCEPT_OR_FIX | FIX_ONLY`. Hard issue như
-  `DIAGRAM_CANNOT_RENDER`/`BLOCK_CANNOT_PROCESS` luôn bị ép `accepted=false`, nên
-  payload client không thể đánh dấu chấp nhận để vượt publish guard.
-- `Xóa hình lỗi` không có endpoint riêng: frontend chỉ bỏ visual + issue trong
-  bản nháp local; request `PUT` này chỉ phát sinh khi admin bấm `Lưu nội dung`.
+- Upsert `lesson_summaries` và ghi audit log.
+- Giữ `ai_generation_id` khi admin sửa content để không mất provenance.
+- Ở mọi trạng thái lưu, mỗi `TEX_FIGURE.figureId` phải còn là figure active thuộc
+  đúng Summary hiện tại. Reference từ bản sinh cũ hoặc figure đã xóa bị reject với
+  `LESSON_SUMMARY_STEM_FIGURES_INVALID_REFERENCE`; frontend phải refetch và
+  reconcile theo đúng `aiGenerationId` trước khi lưu.
+- Khi `reviewStatus=APPROVED`, backend thu thập mọi reference
+  `visual.kind=TEX_FIGURE`. Tất cả figure phải thuộc đúng lesson, có
+  current revision `SUCCEEDED` kèm delivery asset; nếu không, trả
+  `LESSON_SUMMARY_STEM_FIGURES_UNRESOLVED`.
+- Source TeX và preview SVG không được gửi trong `contentJson`; chúng được quản
+  lý qua STEM figure API riêng.
+
+### `PUT /admin/lessons/:lessonId/summary/phase-one-blocks`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{
+  "phaseOneBlockJsonByPath": {
+    "sections.0.blocks.0": {}
+  },
+  "phaseOneLayoutOperations": [
+    { "type": "DELETE_BLOCK", "sectionIndex": 0, "blockIndex": 1 },
+    { "type": "MERGE_SECTION", "sectionIndex": 1 }
+  ],
+  "source": "ADMIN",
+  "reviewStatus": "NEEDS_REVIEW"
+}
+```
+
+Behavior:
+
+- Mặc định chỉ nhận đúng tập block path của snapshot Phase 1 đã lưu. Khi admin
+  xóa block hoặc xóa heading để gộp section, frontend gửi thêm
+  `phaseOneLayoutOperations` theo đúng thứ tự thao tác; backend áp dụng các thao
+  tác này lên snapshot trước rồi mới đối chiếu tập path đã được đánh lại.
+- `DELETE_BLOCK` xóa đúng block và kéo các block phía sau lên; `MERGE_SECTION`
+  chỉ hợp lệ với section không phải đầu tiên, nối toàn bộ block vào section ngay
+  trước rồi đánh lại section/block path. Lịch sử layout được lưu cùng snapshot
+  để lần Lưu/tải lại sau không dựng lại block hoặc section đã xóa.
+- Ghép từng object đã sửa về đúng vị trí trong provider output gốc, validate lại
+  bằng strict schema tương ứng với môn và lớp rồi mới map/upsert Summary.
+- Cho sửa text, `altText`, `caption` và provenance hợp lệ của figure đã tồn tại.
+  Không cho thêm/xóa phần tử `figures[]` qua raw;
+  thao tác thay đổi số figure phải đi qua STEM figure API/menu ảnh.
+- Giữ nguyên figure ID, revision và asset hiện tại. Endpoint không gọi AI
+  provider, không enqueue Stage 2/diagram rendering và không tự tạo ảnh mới.
+- Figure thuộc block bị xóa được soft-delete; figure thuộc block chỉ đổi vị trí
+  được cập nhật `blockPath` trong cùng transaction và giữ nguyên revision/asset.
+- Chỉ được frontend gọi khi admin bấm `Lưu` hoặc `Phát hành`; thay đổi realtime
+  trong preview trước đó chỉ là state cục bộ chưa persist.
+- Lượt sinh cũ không có snapshot version 2 trả lỗi
+  `LESSON_SUMMARY_PHASE_ONE_RAW_UNAVAILABLE`; admin cần sinh lại Summary để có
+  raw editable đầy đủ.
+
+### `DELETE /admin/lessons/:lessonId/summary`
+
+Role: `ADMIN`.
+
+Behavior:
+
+- Xóa cứng summary hiện tại của lesson.
+- Cascade xóa các bản ghi STEM figure, revision và render attempt thuộc summary;
+  file asset đã upload không bị API này tự xóa khỏi storage.
+- Ghi audit log `LESSON_SUMMARY_DELETED` với snapshot nội dung trước khi xóa.
+- Trả `{ "deleted": true }`; nếu lesson không có summary thì trả `{ "deleted": false }`.
 
 ### `POST /admin/lessons/:lessonId/summary/generate-ai`
 
@@ -706,7 +758,8 @@ Body:
   "model": "gpt-4.1-mini",
   "temperature": 0.2,
   "reasoningEffort": "medium",
-  "maxOutputTokens": 8000
+  "maxOutputTokens": 8000,
+  "useTextbookSourceImages": false
 }
 ```
 
@@ -714,7 +767,15 @@ Rules:
 
 - `documentIds` là `lesson_documents.id`, bắt buộc unique và thuộc đúng
   `lessonId` trên URL.
-- Mọi document phải active, `READY` và có chunks; API không nhận raw PDF/text.
+- Mọi document phải active, `READY`, trỏ tới canonical PDF searchable đã pass
+  readiness và có page range hợp lệ; API không nhận raw PDF/text từ client.
+- `requestDraftId` và `requestHash` từ prompt-preview là bắt buộc ở generate.
+  Draft phải chưa hết hạn/chưa consume và còn khớp source + generation config.
+- `useTextbookSourceImages` là boolean optional, mặc định `false`, và phải là một
+  phần của request draft/hash/job snapshot. Field này chỉ điều khiển hậu xử lý
+  figure sau khi Phase 1 đã validate/map thành công; service Phase 1 không được
+  branch theo field này. Không được nối field vào PDF packet, manifest,
+  system/user prompt, provider JSON Schema/request, validation hoặc mapper Phase 1.
 - Nếu cùng lesson đang có job summary `QUEUED`/`RUNNING`, API trả lại `jobId`
   đó thay vì enqueue provider call thứ hai.
 - Sau khi job terminal `SUCCEEDED`/`FAILED`, admin có thể yêu cầu regenerate.
@@ -723,15 +784,15 @@ Rules:
   `model` chỉ được chọn trong route `SUMMARY` đang khả dụng.
 - `styleInstructions` là nội dung trình bày tự do. `systemInstructions` và
   `userPrompt` cho phép admin
-  sửa prompt của lần chạy, nhưng context chunks vẫn do server tải và ghép sau
-  user prompt, không nhận raw context từ client. `systemInstructions` cho phép
+  sửa prompt của lần chạy, nhưng PDF packet + manifest vẫn do server dựng và
+  snapshot trong request draft, không nhận raw context từ client. `systemInstructions` cho phép
   tối đa `64.000` ký tự để nhận lại prompt hiệu lực từ preview; `userPrompt` tối
   đa `16.000` ký tự.
-- Contract `M9.16` giữ `systemInstructions`/`userPrompt`: giá trị khác rỗng thay
-  thế toàn bộ prompt tương ứng và được round-trip nguyên vẹn giữa preview/generate;
-  giá trị rỗng dùng prompt mặc định từ cấu hình hiện tại. Có thể bổ sung
-  `requestFingerprint` để phát hiện preview stale mà không đổi semantics hai field
-  hoặc thêm endpoint/database migration.
+- Contract Summary giữ `systemInstructions`/`userPrompt` là phần prompt admin có
+  thể thay thế và round-trip giữa preview/generate. Modal luôn điền prompt mặc
+  định đầy đủ để admin xem trước. Khi admin sửa, toàn bộ nội dung hiện có trong
+  từng ô được gửi nguyên văn; server không cắt, khôi phục hoặc nối thêm subject
+  profile, yêu cầu hình hay một prompt ẩn nào khác. UI không cho gửi hai ô rỗng.
 - `targetWordCount` không bắt buộc, giới hạn `50..5000`, biểu thị số từ mục
   tiêu gần đúng và được kết hợp với `length` trong đúng một mục `Độ dài` khi
   dựng user prompt; không xuất thành hai dòng chỉ dẫn rời nhau.
@@ -756,73 +817,252 @@ Response: `202 Accepted`.
 
 Side effects:
 
-- Tạo `background_jobs` queue `AI_GENERATION`.
-- Tạo `ai_generations` type `SUMMARY`.
-- Enqueue AI generation job.
-- Worker upsert summary với `source = AI`, `reviewStatus = NEEDS_REVIEW` và
-  `aiGenerationId` để admin review trước khi student nhìn thấy.
-- Worker parse bằng transport schema rồi kiểm acceptance theo từng block. Block
-  hợp lệ được giữ nguyên; block/hình chưa đạt nhưng còn render an toàn vẫn được
-  lưu kèm `reviewIssues`; chỉ phần không thể render an toàn mới thành placeholder
-  cục bộ. Summary vẫn `NEEDS_REVIEW` và các block khác vẫn hiển thị.
-- Hình còn structural-safe nhưng có lỗi semantic dùng `DIAGRAM_NEEDS_REVIEW` và
-  vẫn render; chỉ hình không tạo được spec an toàn mới dùng
-  `DIAGRAM_CANNOT_RENDER`/`FIX_ONLY`.
-- Recovery không xóa điểm, cạnh hay đường cong chỉ vì thiếu tên điểm dựng, thiếu
-  vạch chia hoặc chưa đạt một quy ước trình bày. Các phần hình học đó vẫn hiển thị
-  kèm `DIAGRAM_NEEDS_REVIEW`. Chỉ nét tham chiếu tới điểm không tồn tại bị bỏ;
-  nếu sau đó không còn nét nào có thể vẽ thì mới dùng placeholder hình lỗi.
-- Chỉ root JSON không đọc được/không xác định được ownership section-block,
-  source stale hoặc lỗi provider/hạ tầng mới làm toàn job thất bại.
-- Một thao tác tạo chỉ có một provider attempt; không tự retry, fallback hay gọi
-  AI sửa block. Admin chấp nhận/sửa issue là thao tác local và không tốn provider.
-- Contract v3 không đổi endpoint/body generation và trả
-  `contentJson.type=lesson_summary_blocks`, `version=2`. Example mới chỉ lưu đề,
-  lời giải, đáp án và chỉ có visual khi thật sự có `DIAGRAM_SPEC` bắt buộc
-  `toScale=true`; không có origin/sourceAssessment/candidate metadata. Block và
-  root có thể có `reviewIssues[]` optional. API/FE tiếp tục đọc version 1 và dữ
-  liệu version 2 cũ.
-- Server tự lấy khối lớp từ `learningPath.targetAudiences` (chọn grade nhỏ nhất
-  giống panel admin), đưa vào prompt preview, worker input và `sourceHash`; client
-  không gửi `targetGrade` trong body.
-- Summary mới có thể lưu `data.targetGrade` và example Hình học có
-  `geometryStatement: { hypotheses: string[], conclusions: string[] }`. Field
-  example này optional khi đọc dữ liệu cũ. Bài Hình học lớp 7–12 yêu cầu chứng
-  minh/chứng tỏ nên có đủ GT–KL; nếu provider thiếu thì admin được sửa hoặc chấp
-  nhận cảnh báo sau khi kiểm tra.
-- `MISSING_GEOMETRY_STATEMENT` là issue `ACCEPT_OR_FIX`, không làm example lỗi:
-  đề, hình, lời giải và đáp án vẫn được giữ/render đầy đủ. GT chỉ gồm dữ kiện đề
-  cho, KL ghi đúng điều cần chứng minh. Bài Số học/Đại số và bài Hình học không
-  phải chứng minh chính thức không dùng field này.
+- Tạo `background_jobs` queue `AI_GENERATION` và `ai_generations` type
+  `SUMMARY`.
+- Worker validate structured output năm block. Mỗi section gồm `UNIT` (theory +
+  example bắt buộc) hoặc `NOTE`; theory/note/example có provenance trang nguồn,
+  example có origin và solution bắt buộc. Provider không được sinh `procedure`.
+- Example Toán có `isGeometry`; schema theo lớp bắt buộc GT–KL cho Hình học lớp
+  7–9 và bắt buộc `geometryStatement=null` cho lớp 10–12/các nội dung không phải
+  Hình học.
+- Figure coverage dựa quan hệ hình nguồn ở phía trước/phía sau block trong PDF,
+  không dựa title/keyword và không có semantic coverage gate backend. Provider
+  trả semantic brief; backend cấp ID deterministic và resolve ảnh tham chiếu.
+- Sau khi validate/map, worker upsert Summary
+  `source=AI/reviewStatus=NEEDS_REVIEW` với content contract version 3.
+- Khi sinh lại, worker xóa cứng toàn bộ STEM figure, revision và render attempt
+  thuộc bản Summary trước rồi mới tạo figure của bản mới; bản content cũ bị thay
+  thế trong cùng transaction, vì vậy chỉ còn bản sinh mới nhất.
+- Khi `useTextbookSourceImages=false`, mỗi provider `figure` tạo một
+  `stem_figures` row và một `DIAGRAM_RENDERING` job; content block chỉ giữ
+  reference `TEX_FIGURE` như luồng mặc định hiện tại.
+- Khi `useTextbookSourceImages=true`, worker tuyệt đối không enqueue
+  `DIAGRAM_RENDERING` và không gọi provider Phase 2. Với figure
+  `TEXTBOOK_SOURCE`, toàn bộ asset `OCR_CROP` usable thuộc tập khớp chắc chắn
+  được tách thành các figure cùng block theo thứ tự resolver, tải, kiểm
+  MIME/kích thước, chuẩn hóa WebP, copy sang file delivery riêng và tạo current
+  revision `SUCCEEDED` theo cùng invariant của `use-source-crop`. Không dùng trực
+  tiếp object OCR làm delivery. Nếu không có crop, có nhiều candidate mơ hồ hoặc
+  chỉ có `PDF_PAGE`, figure giữ `NEEDS_REVIEW`, không tự lấy candidate đầu tiên.
+  Figure `GENERATED_FROM_BRIEF` không được materialize thành active reference vì
+  chế độ này chỉ dùng hình thật có trong SGK; raw Phase 1 vẫn giữ nguyên để audit.
+- Kết quả job ở chế độ ảnh gốc trả các counter
+  `sourceFigureImportedCount`, `sourceFigureNeedsReviewCount`,
+  `generatedFigureSkippedCount` và `phaseTwoEnqueuedCount=0` để UI giải thích
+  đầy đủ, không coi Summary thành công là mọi ảnh đã tự điền thành công.
+- Render worker kiểm core fragment, ghép compiler envelope/toolbox theo
+  `subjectKey`, rồi chạy LuaLaTeX -> dvisvgm -> SVG validator.
+- Chỉ lỗi compiler `TEX_COMPILE_FAILED` có diagnostic batch đầy đủ mới tự gọi
+  OpenAI repair tối đa theo `maxRepairAttempts`; request repair phải gửi toàn bộ
+  structured errors và raw compiler log của đúng lượt đó. Source policy,
+  validator, provider, timeout, network, storage và lỗi hạ tầng không tự retry.
+- SVG hợp lệ được sanitize rồi promote atomically lên R2; source editor có đường
+  draft compile/apply riêng để admin kiểm tra preview trước khi thay asset hiện hành.
+- Server lấy target grade từ learning path và prompt bắt buộc hỗ trợ lớp 3–12.
+- Server lấy môn từ `learning_path.domain`, snapshot `subjectKey`/`subjectName`/
+  `subjectSlug` vào job/figure và chỉ ghép profile đúng môn. Toán, Vật lý và Hóa
+  học không nhận chéo rule/toolbox; AI không được tự khai package/library.
+- Figure luôn `theme=LIGHT`; không tạo dark variant.
+- Quiz/Flashcard/Test/Explanation/Chat không dùng pipeline figure trong task này.
 
 ### `POST /admin/lessons/:lessonId/summary/prompt-preview`
 
 Role: `ADMIN`.
 
-Body giống endpoint `generate-ai` ở trên.
+Body dùng cùng cấu hình nội dung/source như endpoint `generate-ai`; response trả
+thêm `requestDraftId` và `requestHash`. Generate bắt buộc gửi lại đúng hai giá trị
+này, không tự dựng một request khác ở thời điểm enqueue.
 
 Behavior:
 
-- Dùng cùng context loader và prompt builder với worker để trả đúng
-  `systemPrompt`, `userPrompt` và `inputPrompt` đầy đủ có context chunks.
-- `systemPrompt`/`userPrompt` trả về là prompt hiệu lực để FE hiển thị và cho
-  admin chỉnh sửa. Khi request gửi một giá trị khác rỗng, server dùng chính xác
-  giá trị đó làm toàn bộ prompt hiệu lực tương ứng và không lồng thêm base prompt,
-  contract hoặc preference. Nếu field rỗng/không có, server dựng prompt mặc định
-  từ cấu hình runtime hiện tại.
-- Trả thêm `openAiRequest` ở dạng JSON với các field `model`, `instructions`,
-  `input`, `text.format`, `temperature` hoặc `reasoning`, `max_output_tokens`;
+- Dùng cùng packet builder, schema và prompt builder với worker để trả đúng
+  `systemPrompt`, `userPrompt`, PDF packet, manifest và cấu hình model.
+- `useTextbookSourceImages` không đổi provider input Phase 1. Preview vẫn phải
+  snapshot field này và trả breakdown cho biết Phase 2 dự kiến bằng `0` khi bật;
+  request OpenAI Phase 1 hiển thị phải giống hệt khi field này tắt nếu các cấu
+  hình nội dung khác không đổi. Có thể hiển thị mode hậu xử lý ngoài provider
+  request, nhưng không được serialize field vào Files API hoặc Responses API.
+- `systemPrompt`/`userPrompt` trả về là prompt hiệu lực để FE xem. Khi request gửi
+  giá trị khác rỗng, server dùng nguyên văn giá trị đó làm toàn bộ prompt tương
+  ứng. Nếu field rỗng/không có, server mới dựng prompt mặc định đầy đủ. Preview
+  và worker dùng chung builder; không có bước nối prompt sau preview.
+- Trả thêm `openAiFileUploadRequest` là biểu diễn tuần tự hóa của multipart
+  request lên Files API (`purpose=user_data` và File gồm tên, MIME type, số byte;
+  binary được thay bằng placeholder) cùng `openAiRequest` là body Responses API
+  với đúng các field `model`, `instructions`, `input` gồm `input_file`
+  `detail=high` + manifest text, `text.format`, `temperature` hoặc `reasoning`,
+  `max_output_tokens`;
   khi cấu hình Summary bật cache còn có `prompt_cache_key` và
   `prompt_cache_retention`. `text.format` phải chứa đúng structured-output name,
   strict mode và JSON Schema mà provider sử dụng. Đây phải là payload xem trước
   đầy đủ sau khi server ghép context, không phải object gần giống request thật và
-  không chứa credential.
-- Trả số document/chunk, token ước tính, model/provider thực tế,
-  temperature, giới hạn output, danh sách model khả dụng và chi phí tối đa ước
-  tính theo bảng giá hiện tại.
+  không chứa credential. Vì endpoint preview không gọi provider, `file_id` dùng
+  placeholder mô tả ID do Files API trả ở runtime. Các field nội bộ/UI như
+  `packetHash`, `inputTextItems.id` và filename không được giả lập trong body
+  Responses API; chúng chỉ nằm ở context audit hoặc request upload tương ứng.
+- Trả số document/page, byte/hash packet, model/provider thực tế, temperature,
+  giới hạn output và danh sách model khả dụng. Token input được tách thành
+  `textInputTokens`, `pdfInputTokens` và `estimatedTokens` (tổng hai phần); PDF
+  chỉ là estimate trước khi gọi provider, không phải usage đã thanh toán.
+- `estimatedCost` tách `inputUpperBoundUsd/Vnd`,
+  `outputUpperBoundUsd/Vnd` và `upperBoundUsd/Vnd` tổng. Input dùng tổng token
+  text + PDF ước tính; output dùng `maxOutputTokens`, nên nhãn UI phải nói rõ
+  output và tổng là mức tối đa.
+- `context` trả `lessonTitle`, ordered packet page mapping và model manifest để UI
+  gắn từng trang về đúng document/range/page nguồn; Summary request không còn gửi
+  OCR chunks/sourceTopics/sourceCandidates.
+- `context.tokenBreakdown` tách phần text thành quy tắc hệ thống, câu lệnh người
+  dùng, nội dung/context text, manifest/text kỹ thuật và JSON Schema; đồng thời
+  trả riêng PDF và tổng input. Các số là estimate phục vụ review/cost, không phải
+  usage provider đã thanh toán.
 - Chỉ dựng dữ liệu xem trước trong API; không tạo job, không gọi OpenAI/Gemini,
   không ghi usage và không phát sinh chi phí provider.
 - Không trả API key, secret hoặc credential provider.
+
+### Searchable PDF validation/promote API
+
+Role: `ADMIN`.
+
+- `POST /admin/source-documents/:id/searchable-pdf/validate`: nhận
+  `candidateFileId`, chạy equivalence toàn tài liệu và lưu report/contact sheet có
+  TTL; không gọi paid OCR.
+- `GET /admin/source-documents/:id/searchable-pdf/validation/:validationId`: trả
+  status, metrics, warnings/failures và signed contact-sheet URL.
+- `POST /admin/source-documents/:id/searchable-pdf/promote`: nhận validation id và
+  optional `acceptWarnings`; atomically đổi canonical file khi checksum/source
+  vẫn fresh, giữ active OCR artifact/page/chunk lineage.
+
+### STEM figure review API
+
+Role cho toàn bộ endpoint: `ADMIN`.
+
+- `GET /admin/lessons/:lessonId/stem-figures`: danh sách figure, source, trạng
+  thái, preview/asset URL và lỗi gần nhất của lesson. Mỗi item trả
+  `figureOrigin=TEXTBOOK_SOURCE | GENERATED_FROM_BRIEF` từ render plan v3 đã
+  qua Zod. Dữ liệu plan thiếu/không đọc được trả `null`.
+  `planJson` vẫn chứa nguyên `sourceReferences` Phase 1 để JSON review admin có
+  thể chiếu đúng trang, nhãn hình và `sourceTarget` mà không sao chép provenance
+  này vào `lesson_summaries.content_json`.
+- `GET /admin/lessons/:lessonId/stem-figures/:figureId`: chi tiết một figure.
+- `POST /admin/lessons/:lessonId/stem-figures/blocks/ensure`: nhận `blockPath`,
+  trả logical figure đang hoạt động hoặc phục hồi/tạo một draft figure chưa gắn
+  vào Summary. Endpoint dùng chung cho menu ảnh cấp block; draft chỉ được gắn
+  vào block sau khi upload/apply/render thành công nên không tạo placeholder chờ.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/drafts/compile`: nhận
+  `baseRevisionId`, `sourceVersion`, `latexSource`, `altText`, optional `caption`;
+  compile local không gọi AI và trả revision `DRAFT_READY` kèm `previewSvg` đã
+  sanitize, hoặc một diagnostic batch nếu compile/validator không đạt.
+- `latexSource` của draft chỉ nhận LaTeX figure snippet gồm optional local
+  header allowlist (`\usetikzlibrary`, `\usepgfplotslibrary`, `\tikzset`,
+  `\pgfplotsset` không đổi `compat`, `\tdplotsetmaincoords`) rồi đúng một
+  `tikzpicture`, hoặc một `circuitikz` với profile Vật lý. Library phải thuộc
+  versioned toolbox manifest của môn; cấm `documentclass`, `usepackage`, font,
+  document wrapper và compiler preamble. Source phải pass policy trước khi tạo
+  revision/compile. Standalone source cũ bị reject; không có compatibility path.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/drafts/apply`: nhận
+  `baseRevisionId`, `revisionId`, `sourceVersion`, `altText`, optional `caption`.
+  Nếu `revisionId` là revision hiện hành, endpoint chỉ cập nhật metadata và
+  Summary reference mà không biên dịch hoặc upload lại ảnh. Nếu là revision
+  `DRAFT_READY`, endpoint promote atomically revision còn khớp current revision
+  và áp dụng metadata mới nhất do admin nhập.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/retry`: force enqueue
+  lại từ diagnostic batch mới nhất, trả `202`.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/create-new-ai/preview`:
+  nhận mutation guard, `referenceImageMode`, optional `adminInstructions`,
+  `model`, `temperature`, `reasoningEffort`, `systemPrompt`, `userPrompt`; dựng
+  đúng generation brief, signed preview của các ảnh và toàn bộ request OpenAI sẽ
+  gửi ở Stage 2 nhưng không tạo revision, không enqueue và không gọi provider.
+  `model` phải thuộc catalog còn khả dụng; `temperature`/`reasoningEffort` chỉ
+  hợp lệ theo capability của model đã chọn. Response trả riêng `systemPrompt`,
+  `userPrompt`, cấu hình đã resolve, token text/ảnh ước tính và chi phí input,
+  output, tổng tối đa bên cạnh `providerInput`.
+  `providerInput` phải gồm provider/model đã resolve, system instructions, user
+  input, ảnh theo đúng thứ tự (phần byte nhị phân được ẩn khi hiển thị),
+  `text.format`/JSON Schema, reasoning hoặc temperature và giới hạn output token.
+  Khi `adminInstructions` có nội dung, provider request phải thể hiện ảnh và
+  field này là hai nguồn thẩm quyền duy nhất, ngang hàng theo phạm vi: ảnh khóa
+  baseline, field khóa đúng phần sửa đổi/bổ sung. Request phải áp dụng delta và
+  giữ nguyên mọi phần ảnh ngoài delta; block sở hữu không được ghi đè nguồn nào.
+  Yêu cầu mơ hồ không cho phép thiết kế lại toàn hình. Safety,
+  structured-output schema, TeX allowlist/compile contract và tính đúng nội tại
+  vẫn là invariant không thể ghi đè. Khi field rỗng hoặc chỉ có khoảng trắng,
+  serializer phải bỏ key và system/user prompt mặc định không được nhắc tới yêu
+  cầu sửa đổi/bổ sung. Preview không được mô tả field như preference phụ.
+  JSON chuyên vẽ chỉ giữ grade và projection của đúng block sở hữu hình; không
+  ghép theory đứng trước. Với example,
+  projection chỉ giữ `problem`, `isGeometry` và hypotheses GT–KL khi có; không
+  gửi `solution`, `answer` hoặc conclusions. Không gửi lesson title hoặc section
+  heading. Chỉ khi thực sự có
+  ảnh mới gửi `reference: { mode, images }`; khi không ảnh, gửi
+  `reference: { mode: "NONE" }` và bỏ `images` thay vì gửi mảng rỗng. Không có
+  checklist semantic song song. `SOURCE_CROP_ONLY` thêm `sourceTarget` cạnh
+  từng ảnh; `CURRENT_ONLY` cũng gửi target của ảnh sách và thêm
+  `currentLatexSource`, còn `NONE` không gửi locator SGK. Preview không lặp source
+  reference, số trang, object key, hash, lifecycle metadata hoặc
+  precedence. Preview chỉ được gọi khi admin bấm
+  `Xem dữ liệu`, không tự refetch khi đổi lựa chọn ảnh hay nhập yêu cầu.
+  UI không dựng thêm một khối `adminInstructions` ngoài request: giá trị này chỉ
+  xuất hiện đúng vị trí đã được serialize trong user prompt. `providerInput` và
+  provider thật dùng chung serializer; binary ảnh là ngoại lệ duy nhất được thay
+  bằng placeholder ở preview.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/create-new-ai`: nhận cùng
+  payload preview rồi tạo revision AI mới. `referenceImageMode` là một trong
+  `SOURCE_CROP_ONLY`, `CURRENT_ONLY`, `NONE`; mỗi request gửi tối đa một nhóm ảnh
+  sách giáo khoa. `SOURCE_CROP_ONLY` không gửi code revision hiện tại;
+  `CURRENT_ONLY` gửi thêm source TeX/TikZ của current revision và không gửi
+  delivery asset hiện hành. `NONE` chỉ dùng khi khối không có ảnh phù hợp và
+  không hiển thị như một lựa chọn ảnh thứ ba. Backend tự resolve crop nguồn mới
+  nhất và tự lấy current source, không tin object key hoặc code do client gửi.
+  Route model và hai prompt đã chỉnh được snapshot vào durable job; worker phải
+  dùng đúng snapshot đó nên request tạo thật không được tự quay lại cấu hình hoặc
+  prompt mặc định khác với lần admin đã xem.
+  Compiler repair sau lượt tạo chỉ được sửa lỗi source kỹ thuật và phải bảo toàn
+  cả baseline ảnh lẫn delta `adminInstructions`; không được hoàn tác delta hoặc
+  thiết kế lại phần ảnh không được nhắc.
+  Khi field rỗng, request repair cũng không được thêm câu nói về yêu cầu admin.
+  Mỗi source reference có nhãn gửi tối đa bốn OCR crop khớp chính xác khác object
+  key để bảo toàn figure nhiều panel; provider brief phải khai báo `panelCount`
+  đúng bằng số ảnh và invariant một ảnh/một panel. Nhãn mơ hồ chỉ chọn một crop tốt nhất.
+  Reference không có nhãn hình cụ thể, hoặc nhãn không khớp crop đáng tin cậy,
+  phải resolve ảnh nguyên trang PDF làm fallback; metadata trang chỉ dùng nội bộ
+  và không gửi lặp trong provider-facing JSON.
+  Full-page fallback chỉ hợp lệ khi figure có `sourceReferences` từ Stage 1.
+  Resolver chỉ dùng `sourceReferences.figureLabel` và `sourceTarget.locator` để
+  rank crop hoặc định vị hình con.
+  `blocks/ensure` cho figure do admin thêm vào block chưa từng có hình phải tạo
+  `sourceReferences=[]`, không suy reference từ trang nội dung của block/section.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/use-source-crop`: nhận
+  mutation guard, `sourceSnapshotHash` và `sourceObjectKey`; chỉ chấp nhận đúng
+  asset `OCR_CROP` thuộc immutable reference snapshot đã resolve cho logical
+  figure (head hoặc fallback lịch sử với dữ liệu cũ). Backend tải, kiểm
+  MIME/kích thước, chuẩn hóa WebP, lưu file `AI_DIAGRAM` riêng và atomically tạo
+  revision `ADMIN_UPLOAD` thành công. Endpoint không gọi provider, không tự retry
+  và không cho dùng ảnh toàn trang fallback như một crop.
+
+Admin figure response có `sourceReferenceSnapshotHash` và
+`sourceReferenceImages[]` kèm signed preview URL, nhãn/trang/vai trò/nguồn và
+`canUseAsFigure`. Object key do client gửi không được tin cậy độc lập; API luôn
+đối chiếu lại với snapshot và revision guard để chặn stale/wrong-crop selection.
+Revision mã code/upload mới phải kế thừa immutable snapshot. Với dữ liệu cũ có
+head revision thiếu snapshot, response admin và mutation `use-source-crop` cùng
+resolve revision lịch sử gần nhất có snapshot để UI không hiển thị khác với
+validation backend.
+Request trace được lưu ngay khi provider request đã resolve, trước bước reserve
+ngân sách, nên lần tạo gần nhất vẫn có thể được mở lại để Edit kể cả khi request
+bị budget gate chặn trước lúc gửi provider.
+
+Source editor chỉ nhận preview SVG. Không có PDF response/artifact, SyncTeX,
+edit-session hoặc API locate-source.
+
+Mỗi `TEX_FIGURE` trong Summary content JSON mới phải có `figureOrigin`:
+`TEXTBOOK_SOURCE` khi Stage 1 xác nhận PDF có hình và trỏ ít nhất một
+`sourceReferences`, hoặc `GENERATED_FROM_BRIEF` khi figure được dựng mới từ
+semantic brief và `sourceReferences=[]`. Provider Stage 1 bắt buộc trả field này,
+backend validate quan hệ giữa hai field và client không được tự khai/chỉnh nó.
+Reader vẫn chấp nhận Summary/plan cũ chưa có field, còn API/UI admin suy fallback
+từ `planJson.sourceReferences` khi cần để JSON cũ cũng đọc được provenance.
+
+Không endpoint nào trả source/preview cho student.
 
 ### `GET /student/lessons/:lessonId/summary`
 
@@ -831,7 +1071,9 @@ Role: `STUDENT`.
 Behavior:
 
 - Kiểm tra enrollment hoặc trial.
-- Trả summary đã được phép xem.
+- Trả Summary đã được phép xem. Mỗi `TEX_FIGURE` chỉ được hydrate khi figure
+  có current revision `SUCCEEDED` kèm delivery asset; response có `assetUrl`,
+  alt/caption và không có source/preview.
 
 ---
 
@@ -867,7 +1109,8 @@ PARENT:
 
 AI_DIAGRAM:
 - Không cho client upload trực tiếp.
-- Chỉ backend/worker tạo sau khi validate diagram_spec_json.
+- Chỉ backend tạo sau khi SVG Summary qua validator local hoặc ảnh thay thế do
+  admin upload qua endpoint figure chuyên biệt.
 ```
 
 Behavior:
@@ -944,7 +1187,9 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả danh sách page records: `pageNumber`, `printedPage` (`pdfPageNumber`, `printedPageNumber`, `printedPageLabel`, `source`, `confidence`, `warning`), `status`, `textSource`, `ocrProvider`, `artifactKey` hoặc artifact status nếu có, `qualityScore`, `thumbnailFileId`, `hasVisualAssets`/`visualAssetCount` nếu có, `imageManifestKey`/visual refs, `artifactAuditKey`/audit status nếu có, và text preview ngắn.
+- Trả danh sách page records: `pageNumber`, `printedPage` (`pdfPageNumber`, `printedPageNumber`, `printedPageLabel`, `source`, `confidence`, `warning`), `status`, `textSource`, `ocrProvider`, `artifactKey` hoặc artifact status nếu có, `qualityScore`, `thumbnailFileId`, `hasVisualAssets`/`visualAssetCount` nếu có, `imageManifestKey`/visual refs, `artifactAuditKey`/audit status nếu có, text preview ngắn, `orderedContent` và `ocrImages[]`.
+- `orderedContent` giữ nguyên luồng text/table/figure/caption theo thứ tự Mathpix trả về cho từng trang. Backend chỉ thay URL ảnh provider/public cũ bên trong luồng bằng signed URL ngắn hạn của object nội bộ; không được tách ảnh ra rồi nối gallery ở cuối trang.
+- `ocrImages[]` là metadata ảnh đã sắp theo thứ tự trên trang để debug/consumer chuyên biệt. Mỗi ảnh trả `imageId`, caption/kind/mime type và signed `url`; API chỉ ký object key thuộc đúng source document đang được admin truy cập. UI preview chính phải render `orderedContent`, không dùng `ocrImages[]` để tự suy đoán vị trí ảnh.
 - Nếu `printedPage.warning` là `missing` hoặc `ambiguous`, UI M4.5 nên cho admin thấy trạng thái cần kiểm tra/xác nhận thay vì âm thầm coi `pageNumber` là số trang in.
 - `textSource` production mặc định là `paid_ocr` khi OCR paid đã bật; `text_layer`/`free_ocr` chỉ dùng cho fallback local hoặc vận hành có kiểm soát.
 
@@ -1061,12 +1306,22 @@ Behavior:
   lesson document active, cùng job mới nhất của `SUMMARY`, `QUIZ`, `FLASHCARD`,
   `TEST`. Mỗi document có `status`, `chunkCount`, `canUseForSummary` và
   `unavailableReason`. Document được tạo từ khối trích xuất có thêm `pageRange`
-  dạng `{ pageStart, pageEnd }`; document upload trực tiếp trả `pageRange = null`.
+  dạng `{ pageStart, pageEnd }` theo số trang in đã xác nhận; nếu metadata trang
+  in chưa có thì từng đầu mút fallback về số trang PDF. Document upload trực tiếp
+  trả `pageRange = null`.
   UI vẫn hiển thị tài liệu chưa sẵn sàng nhưng không cho chọn để tạo Summary.
 - `lesson.targetGrade` trả khối lớp ưu tiên của learning path (hoặc `null`) để UI
   dựng mặc định cách trình bày theo đúng đối tượng khóa học.
+- `summaryConfiguration` trả cấu hình mặc định và danh sách model Summary hỗ trợ
+  PDF `detail=high` độc lập với endpoint prompt-preview. Vì vậy lỗi dựng packet
+  hoặc preview không được làm dropdown model biến mất.
+- `canUseForSummary` dùng cùng điều kiện packet với endpoint prompt-preview:
+  tài liệu trích xuất phải có đủ source document và page range; PDF nền tảng tải
+  trực tiếp không có hai liên kết này vẫn hợp lệ và dùng toàn bộ các trang.
 - Mỗi job chỉ trả trạng thái durable, `jobId`, resource đích, review status,
-  lỗi và timestamps để UI khôi phục/polling sau reload.
+  lỗi, timestamps và metadata accounting tối thiểu để UI khôi phục/polling sau
+  reload. `estimatedCostVnd` là tổng chi phí đã ghi nhận của toàn lần sinh;
+  `usageEventCount` là số lượt gọi provider cấu thành tổng đó, không phải số job.
 - Không trả chunk text, prompt, `inputMeta`, structured output hay provider
   payload. Student/Parent không được truy cập endpoint.
 
@@ -1098,13 +1353,5 @@ Role: `ADMIN`.
 Body:
 
 ```json
-{
-  "type": "RICH_TEXT",
-  "title": "Phiếu chuẩn bị",
-  "contentJson": {},
-  "fileId": null,
-  "url": null
-}
-```
 
----
+```
