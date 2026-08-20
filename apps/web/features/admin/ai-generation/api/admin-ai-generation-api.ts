@@ -259,6 +259,7 @@ export function promoteAdminStemFigureSourceCrop(
   lessonId: string,
   figure: AdminStemFigure,
   sourceObjectKey: string,
+  enhance: boolean,
   token: string,
 ) {
   return apiRequest<AdminStemFigure>(
@@ -269,6 +270,7 @@ export function promoteAdminStemFigureSourceCrop(
         ...stemFigureMutationGuard(figure),
         sourceSnapshotHash: figure.sourceReferenceSnapshotHash,
         sourceObjectKey,
+        enhance,
       },
       token,
     },

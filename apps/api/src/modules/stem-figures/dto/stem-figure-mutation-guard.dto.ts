@@ -5,6 +5,7 @@ import {
 } from "@learning-path/shared";
 import { Type } from "class-transformer";
 import {
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -125,4 +126,11 @@ export class UseStemFigureSourceCropDto extends StemFigureMutationGuardDto {
   @IsNotEmpty()
   @MaxLength(1_024)
   sourceObjectKey!: string;
+
+  @ApiProperty({
+    description: "Run the local textbook raster enhancement before promotion",
+    default: false,
+  })
+  @IsBoolean()
+  enhance!: boolean;
 }

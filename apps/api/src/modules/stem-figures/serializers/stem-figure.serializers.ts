@@ -76,6 +76,7 @@ export async function serializeStemFigure(
     hasCurrentAsset: Boolean(assetUrl),
     sourceKind: current?.sourceKind ?? working.sourceKind,
     currentAssetKind: resolveStemFigureCurrentAssetKind(current),
+    currentRevisionOrigin: current?.origin ?? null,
     ...(includeSource ? { latexSource: working.latexSource } : {}),
     sourceHash: working.sourceHash,
     sourceVersion: working.sourceVersion,

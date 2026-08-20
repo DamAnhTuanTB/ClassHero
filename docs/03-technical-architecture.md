@@ -343,12 +343,12 @@ Worker jobs:
 - Gửi email/Zalo.
 - Xử lý hậu kỳ payment.
 
-ASSUMPTION: Concurrency ban đầu:
+Concurrency mặc định hiện tại:
 
 - PDF processing: 1-2.
-- Embedding: 1-2.
-- AI generation: 1-3.
-- TeX figure rendering: 1 trên VPS ban đầu.
+- Embedding: 4.
+- AI generation: 4.
+- TeX figure rendering: 3 trên mỗi worker process.
 - Notification/email/Zalo: 3-5.
 
 Cần cấu hình bằng env, không hard-code cố định.

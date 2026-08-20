@@ -383,6 +383,12 @@ code`, `Tải ảnh lên`, `Xem hình gốc`; nếu block có nhiều figure th�
     hiện tại. Mọi phần ảnh ngoài delta phải được giữ nguyên; block sở hữu chỉ dùng
     kiểm chứng phần ảnh không quyết định. Nếu field rỗng,
     request provider không chứa key hoặc câu prompt nói về yêu cầu bổ sung.
+    Khi mở `Xem hình trong sách giáo khoa`, chọn một `OCR_CROP`, tùy chọn
+    checkbox `Làm nét ảnh` rồi bấm `Áp dụng`. Checkbox mặc định tắt; khi
+    tắt backend promote crop đã chuẩn hóa mà không chạy preset làm nét. Khi bật,
+    backend chạy `TEXTBOOK_RASTER_CLEANUP_V2`, tạo delivery WebP lossless rồi mới
+    promote revision. UI hiển thị `Đang áp dụng...` hoặc `Đang làm nét...`
+    theo lựa chọn; lỗi giữ nguyên current revision và không gọi provider trả phí.
 14. Nút `Lưu`/`Phát hành` chỉ bị chặn khi còn placeholder figure `FAILED` đang
     hoạt động hoặc initial figure còn render. Admin phải xóa, thay thế hoặc làm
     figure đó thành công; cảnh báo thiếu hình không phải blocker.
@@ -429,11 +435,16 @@ Acceptance Criteria:
   hoặc provider input Phase 1; usage của lượt sinh chỉ có Phase 1 và bằng `0`
   paid call Phase 2. Crop tự điền phải đi qua cùng
   validation MIME/kích thước, chuẩn hóa WebP, R2 và revision audit với action
-  `Dùng hình này`; không tham chiếu trực tiếp object OCR tạm thời khi delivery.
+  `Áp dụng` crop thủ công; không tham chiếu trực tiếp object OCR tạm thời khi
+  delivery.
 - Checkbox tự động làm nét phải được snapshot cùng request draft/job, chỉ hợp lệ
   khi `useTextbookSourceImages=true`, áp dụng cho toàn bộ crop tự promote và ghi
   metadata pipeline vào delivery. Crop làm nét lỗi phải giữ `NEEDS_REVIEW`, không
   âm thầm lưu bản chưa làm nét trái lựa chọn của admin.
+- Action chọn crop thủ công gửi cờ `enhance` riêng, mặc định `false` và
+  không phụ thuộc checkbox cấp lượt sinh. Chỉ nhánh `enhance=true` ghi
+  metadata pipeline/operation làm nét; lỗi validation/xử lý không được thay
+  current revision.
 - Mọi action giữ vị trí cuộn. Xóa figure xóa reference khỏi Summary và soft-delete
   metadata; cleanup object storage chạy tách biệt, không xóa nhầm asset đang dùng.
 - Block đã xóa figure hoặc chưa từng có figure vẫn mở được luồng AI/code/upload.

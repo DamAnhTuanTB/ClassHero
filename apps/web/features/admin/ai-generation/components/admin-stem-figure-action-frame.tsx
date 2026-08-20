@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, WandSparkles } from "lucide-react";
+import { BookOpen, Bot, Trash2, WandSparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -78,6 +78,9 @@ export function AdminStemFigureActionFrame({
   const [showSourceCrop, setShowSourceCrop] = useState(false);
   const [showRasterEditor, setShowRasterEditor] = useState(false);
   const hasTextbookImage = figure.sourceReferenceImages.length > 0;
+  const isNotebookOrigin = figure.currentAssetKind === "TEXTBOOK_SOURCE";
+  const originLabel = isNotebookOrigin ? "Notebook" : "AI";
+  const OriginIcon = isNotebookOrigin ? BookOpen : Bot;
   const canEditRaster =
     figure.status === "SUCCEEDED" &&
     figure.currentAssetKind === "TEXTBOOK_SOURCE" &&
@@ -112,10 +115,18 @@ export function AdminStemFigureActionFrame({
             figure={figure}
             isUsing={useSourceCropMutation.isPending}
             onClose={() => setShowSourceCrop(false)}
-            onUse={async (sourceObjectKey) => {
+            onUse={async (sourceObjectKey, enhance) => {
               try {
-                await useSourceCropMutation.mutateAsync({ figure, sourceObjectKey });
-                toast.success("Đã dùng crop sách giáo khoa làm hình chính thức.");
+                await useSourceCropMutation.mutateAsync({
+                  figure,
+                  sourceObjectKey,
+                  enhance,
+                });
+                toast.success(
+                  enhance
+                    ? "Đã làm nét và dùng crop sách giáo khoa làm hình chính thức."
+                    : "Đã dùng crop sách giáo khoa làm hình chính thức.",
+                );
                 setShowSourceCrop(false);
               } catch (error) {
                 toast.error(
@@ -129,38 +140,64 @@ export function AdminStemFigureActionFrame({
 
       <div className="relative isolate flex-1 [&>:first-child]:pt-16">
         {children}
-        {contextActions || hasTextbookImage || canEditRaster ? (
-          <div className="absolute right-14 top-3 z-30 flex items-center gap-2 sm:right-16 sm:top-4">
-            {contextActions}
-            {canEditRaster ? (
-              <span className="group relative">
-                <button
-                  aria-label="Chỉnh sửa ảnh"
-                  className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
-                  onClick={() => setShowRasterEditor(true)}
-                  type="button"
-                >
-                  <WandSparkles className="h-4 w-4" aria-hidden="true" />
-                </button>
-                <span className="pointer-events-none absolute right-0 top-11 z-40 whitespace-nowrap rounded-md bg-slate-950 px-2 py-1 text-xs font-bold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                  Chỉnh sửa ảnh
-                </span>
-              </span>
-            ) : null}
-            {hasTextbookImage ? (
+        {figure.hasCurrentAsset ? (
+          <span
+            aria-label={`Nguồn gốc ảnh: ${originLabel}`}
+            className={`absolute left-3 top-3 z-30 inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-xs shadow-sm sm:left-4 sm:top-4 ${
+              isNotebookOrigin
+                ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-200"
+                : "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/70 dark:text-violet-200"
+            }`}
+            title={
+              isNotebookOrigin
+                ? "Ảnh có nguồn gốc từ sách giáo khoa"
+                : "Ảnh có nguồn gốc từ AI hoặc nguồn khác"
+            }
+          >
+            <OriginIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="font-extrabold">{originLabel}</span>
+          </span>
+        ) : null}
+        <div className="absolute right-14 top-3 z-30 flex items-center gap-2 sm:right-16 sm:top-4">
+          {contextActions}
+          {canEditRaster ? (
+            <span className="group relative">
               <button
-                aria-label="Xem hình trong sách giáo khoa"
-                aria-pressed={showSourceCrop}
+                aria-label="Chỉnh sửa ảnh"
                 className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
-                onClick={() => setShowSourceCrop((isVisible) => !isVisible)}
-                title="Xem hình trong sách giáo khoa"
+                onClick={() => setShowRasterEditor(true)}
                 type="button"
               >
-                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                <WandSparkles className="h-4 w-4" aria-hidden="true" />
               </button>
-            ) : null}
-          </div>
-        ) : null}
+              <span className="pointer-events-none absolute right-0 top-11 z-40 whitespace-nowrap rounded-md bg-slate-950 px-2 py-1 text-xs font-bold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                Chỉnh sửa ảnh
+              </span>
+            </span>
+          ) : null}
+          {hasTextbookImage ? (
+            <button
+              aria-label="Xem hình trong sách giáo khoa"
+              aria-pressed={showSourceCrop}
+              className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
+              onClick={() => setShowSourceCrop((isVisible) => !isVisible)}
+              title="Xem hình trong sách giáo khoa"
+              type="button"
+            >
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
+          <button
+            aria-label="Xóa hình"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
+            disabled={deleteMutation.isPending}
+            onClick={() => setIsDeleting(true)}
+            title="Xóa hình"
+            type="button"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
         <AdminStemFigureActionsMenu
           canEditCode={figure.sourceKind === "AI_TEX"}
           canRetryInfrastructure={
@@ -172,7 +209,6 @@ export function AdminStemFigureActionFrame({
           isRetrying={retryMutation.isPending}
           onCreateWithAi={() => setShowCreateAi(true)}
           onCreateWithCode={() => setIsCreatingCode(true)}
-          onDelete={() => setIsDeleting(true)}
           onEditCode={() => setIsEditing(true)}
           onReplaceImage={() => inputRef.current?.click()}
           onRetryInfrastructure={() =>
@@ -249,7 +285,7 @@ export function AdminStemFigureActionFrame({
         />
       ) : null}
       <DeleteConfirmDialog
-        description={`Xóa hình tại ${figure.blockPath}. Phần kiến thức bằng chữ vẫn được giữ lại.`}
+        description="Bạn muốn xóa hình."
         isConfirming={deleteMutation.isPending}
         isOpen={isDeleting}
         itemName={figure.caption ?? figure.blockPath}

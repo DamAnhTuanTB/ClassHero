@@ -3,6 +3,7 @@
 import { BookOpen, Check, ImageIcon, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { AdminStemFigureReferenceImagePreview } from "@/features/admin/ai-generation/components/admin-stem-figure-reference-image-preview";
 import type {
   AdminStemFigure,
@@ -18,13 +19,14 @@ export function AdminStemFigureSourceCropPanel({
   figure: AdminStemFigure;
   isUsing: boolean;
   onClose: () => void;
-  onUse: (sourceObjectKey: string) => Promise<void>;
+  onUse: (sourceObjectKey: string, enhance: boolean) => Promise<void>;
 }) {
   const usableImages = useMemo(
     () => figure.sourceReferenceImages.filter((image) => image.canUseAsFigure),
     [figure.sourceReferenceImages],
   );
   const [selectedObjectKey, setSelectedObjectKey] = useState<string | null>(null);
+  const [enhance, setEnhance] = useState(false);
 
   useEffect(() => {
     setSelectedObjectKey(usableImages[0]?.objectKey ?? null);
@@ -92,6 +94,17 @@ export function AdminStemFigureSourceCropPanel({
             khoa.
           </p>
         ) : null}
+        {usableImages.length > 0 ? (
+          <CheckboxField
+            checked={enhance}
+            disabled={isUsing || isBusy}
+            id={`stem-figure-source-crop-enhance-${figure.id}`}
+            label="Làm nét ảnh"
+            labelClassName="bg-[var(--theme-surface-muted)]"
+            onChange={(event) => setEnhance(event.currentTarget.checked)}
+            wrapperClassName="ml-auto mt-4 w-full max-w-sm"
+          />
+        ) : null}
       </div>
 
       <footer className="theme-dialog-footer flex shrink-0 flex-wrap justify-end gap-2 px-4 py-3 sm:px-6">
@@ -107,7 +120,7 @@ export function AdminStemFigureSourceCropPanel({
           className="theme-button-primary inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60"
           disabled={!canUse}
           onClick={() => {
-            if (selectedObjectKey) void onUse(selectedObjectKey);
+            if (selectedObjectKey) void onUse(selectedObjectKey, enhance);
           }}
           type="button"
         >
@@ -116,7 +129,7 @@ export function AdminStemFigureSourceCropPanel({
           ) : (
             <Check className="h-4 w-4" aria-hidden="true" />
           )}
-          Dùng hình này
+          {isUsing ? (enhance ? "Đang làm nét..." : "Đang áp dụng...") : "Áp dụng"}
         </button>
       </footer>
     </section>

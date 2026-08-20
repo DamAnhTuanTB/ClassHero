@@ -43,9 +43,22 @@ import {
   LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID,
   LessonSummaryTableOfContents,
 } from "@/components/common/content/lesson-summary-table-of-contents";
+import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
+type PendingDeleteTarget =
+  | {
+      kind: "SECTION";
+      itemName: string;
+      sectionIndex: number;
+    }
+  | {
+      kind: "BLOCK";
+      blockIndex: number;
+      itemName: string;
+      sectionIndex: number;
+    };
 type ReviewIssueData = {
   id: string;
   code: string;
@@ -118,6 +131,7 @@ interface SummaryBlockRendererProps {
   onPhaseOneLayoutOperation?: (
     operation:
       | { type: "MERGE_SECTION"; sectionIndex: number }
+      | { type: "DELETE_SECTION"; sectionIndex: number }
       | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number },
   ) => void;
   showTableOfContents?: boolean;
@@ -161,6 +175,8 @@ export function SummaryBlockRenderer({
   const [dragOverSection, setDragOverSection] = React.useState<number | null>(null);
   const [activeDropdown, setActiveDropdown] = React.useState<number | null>(null);
   const [editingItems, setEditingItems] = React.useState<Set<string>>(new Set());
+  const [pendingDeleteTarget, setPendingDeleteTarget] =
+    React.useState<PendingDeleteTarget | null>(null);
 
   // Auto-scroll logic during drag
   React.useEffect(() => {
@@ -308,6 +324,46 @@ export function SummaryBlockRenderer({
     });
   };
 
+  const confirmPendingDelete = () => {
+    if (!pendingDeleteTarget || !onChange) return;
+
+    if (pendingDeleteTarget.kind === "SECTION") {
+      const sections = [...(data.sections ?? [])];
+      sections.splice(pendingDeleteTarget.sectionIndex, 1);
+      onPhaseOneLayoutOperation?.({
+        type: "DELETE_SECTION",
+        sectionIndex: pendingDeleteTarget.sectionIndex,
+      });
+      onChange({
+        ...data,
+        sections: sections.map((section, index) => ({
+          ...section,
+          order: index + 1,
+        })),
+      });
+      setPendingDeleteTarget(null);
+      return;
+    }
+
+    const sections = [...(data.sections ?? [])];
+    const section = sections[pendingDeleteTarget.sectionIndex];
+    if (!section) {
+      setPendingDeleteTarget(null);
+      return;
+    }
+
+    const blocks = [...(section.blocks ?? [])];
+    blocks.splice(pendingDeleteTarget.blockIndex, 1);
+    sections[pendingDeleteTarget.sectionIndex] = { ...section, blocks };
+    onPhaseOneLayoutOperation?.({
+      type: "DELETE_BLOCK",
+      sectionIndex: pendingDeleteTarget.sectionIndex,
+      blockIndex: pendingDeleteTarget.blockIndex,
+    });
+    onChange({ ...data, sections });
+    setPendingDeleteTarget(null);
+  };
+
   return (
     <div className="mt-4 space-y-8 react-json-custom-edit-wrapper">
       {/* Title */}
@@ -317,6 +373,7 @@ export function SummaryBlockRenderer({
             <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
               {showTableOfContents ? (
                 <LessonSummaryTableOfContents
+                  desktopBorderless
                   hasObjectives={Boolean(data.objectives?.length)}
                   sections={data.sections ?? []}
                 />
@@ -421,66 +478,77 @@ export function SummaryBlockRenderer({
 
       {/* Objectives */}
       {data.objectives && data.objectives.length > 0 && (
-        <div
-          id={LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID}
-          className={`relative scroll-mt-24 group/obj ${isObjectivesEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}`}
-        >
-          <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 relative">
-            <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              Mục tiêu học tập
-            </h3>
-            <ul className="list-disc pl-5 space-y-1 text-slate-700 dark:text-slate-300">
-              {data.objectives.map((obj, i) => (
-                <li key={i}>
-                  <MathpixMarkdownRenderer
-                    className="inline [&>*]:inline"
-                    content={normalizeLessonSummaryAngleNotation(obj)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className={showTableOfContents && hideTitle ? "space-y-3" : undefined}>
+          {showTableOfContents && hideTitle ? (
+            <LessonSummaryTableOfContents
+              accentTrigger
+              desktopBorderless
+              hasObjectives
+              sections={data.sections ?? []}
+            />
+          ) : null}
 
-          {!isReadOnly && viewMode === "UI_ONLY" && (
-            <button
-              type="button"
-              onClick={() => toggleEdit("objectives")}
-              className="absolute top-2 right-2 p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors opacity-0 group-hover/obj:opacity-100 z-10"
-              title="Chỉnh sửa Mục tiêu"
-            >
-              <PenTool className="w-4 h-4" />
-            </button>
-          )}
-
-          {!isReadOnly && isObjectivesEditing && (
-            <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto max-h-[300px]">
-              {viewMode === "UI_ONLY" && (
-                <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
-                  <button
-                    type="button"
-                    onClick={() => toggleEdit("objectives")}
-                    title="Đóng chế độ chỉnh sửa"
-                    className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-              <ReactJson
-                src={data.objectives}
-                onEdit={(e) => onChange({ ...data, objectives: e.updated_src })}
-                onAdd={(e) => onChange({ ...data, objectives: e.updated_src })}
-                onDelete={(e) => onChange({ ...data, objectives: e.updated_src })}
-                theme="rjv-default"
-                style={{ backgroundColor: "transparent" }}
-                displayDataTypes={false}
-                name="objectives"
-                enableClipboard={false}
-                keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
-              />
+          <div
+            id={LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID}
+            className={`relative scroll-mt-24 group/obj ${isObjectivesEditing ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}`}
+          >
+            <div className="rounded-xl bg-blue-50 p-3 sm:p-5 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 relative">
+              <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Mục tiêu học tập
+              </h3>
+              <ul className="list-disc pl-5 space-y-1 text-slate-700 dark:text-slate-300">
+                {data.objectives.map((obj, i) => (
+                  <li key={i}>
+                    <MathpixMarkdownRenderer
+                      className="inline [&>*]:inline"
+                      content={normalizeLessonSummaryAngleNotation(obj)}
+                    />
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
+
+            {!isReadOnly && viewMode === "UI_ONLY" && (
+              <button
+                type="button"
+                onClick={() => toggleEdit("objectives")}
+                className="absolute top-2 right-2 p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors opacity-0 group-hover/obj:opacity-100 z-10"
+                title="Chỉnh sửa Mục tiêu"
+              >
+                <PenTool className="w-4 h-4" />
+              </button>
+            )}
+
+            {!isReadOnly && isObjectivesEditing && (
+              <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto max-h-[300px]">
+                {viewMode === "UI_ONLY" && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                    <button
+                      type="button"
+                      onClick={() => toggleEdit("objectives")}
+                      title="Đóng chế độ chỉnh sửa"
+                      className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <ReactJson
+                  src={data.objectives}
+                  onEdit={(e) => onChange({ ...data, objectives: e.updated_src })}
+                  onAdd={(e) => onChange({ ...data, objectives: e.updated_src })}
+                  onDelete={(e) => onChange({ ...data, objectives: e.updated_src })}
+                  theme="rjv-default"
+                  style={{ backgroundColor: "transparent" }}
+                  displayDataTypes={false}
+                  name="objectives"
+                  enableClipboard={false}
+                  keyModifier={(e: any) => e.detail >= 2 || e.metaKey || e.ctrlKey}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -555,22 +623,13 @@ export function SummaryBlockRenderer({
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Bạn có chắc chắn muốn xóa toàn bộ đề mục này và các khối bên trong?",
-                  )
-                ) {
-                  const newData = { ...data };
-                  if (newData.sections) {
-                    newData.sections.splice(idx, 1);
-                    newData.sections.forEach((s, i) => {
-                      s.order = i + 1;
-                    });
-                    onChange?.(newData);
-                  }
-                }
-              }}
+              onClick={() =>
+                setPendingDeleteTarget({
+                  kind: "SECTION",
+                  itemName: section.displayHeading || `Đề mục ${idx + 1}`,
+                  sectionIndex: idx,
+                })
+              }
               className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors flex items-center justify-center"
               title="Xóa toàn bộ đề mục"
             >
@@ -997,12 +1056,22 @@ export function SummaryBlockRenderer({
                       }
                     }}
                   >
-                    <div>
+                    <div className="relative">
                       <BlockItem
                         block={blockToRender}
                         renderStemFigure={renderStemFigure}
                         showEditorialMetadata={showEditorialMetadata}
                       />
+                      {!isReadOnly &&
+                      (viewMode === "SPLIT" || isBlockEditing) &&
+                      renderBlockSourceAction ? (
+                        <div className="absolute right-2 top-2 z-10 flex items-center rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+                          {renderBlockSourceAction({
+                            blockPath,
+                            block: blockToRender,
+                          })}
+                        </div>
+                      ) : null}
                       {showEditorialMetadata ? (
                         <ReviewIssuePanel
                           issues={block.reviewIssues}
@@ -1076,20 +1145,16 @@ export function SummaryBlockRenderer({
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                const newData = { ...data };
-                                if (newData.sections?.[idx]?.blocks) {
-                                  const blocks = [...newData.sections[idx].blocks];
-                                  blocks.splice(bIdx, 1);
-                                  newData.sections[idx].blocks = blocks;
-                                  onPhaseOneLayoutOperation?.({
-                                    type: "DELETE_BLOCK",
-                                    sectionIndex: idx,
-                                    blockIndex: bIdx,
-                                  });
-                                  onChange(newData);
-                                }
-                              }}
+                              onClick={() =>
+                                setPendingDeleteTarget({
+                                  kind: "BLOCK",
+                                  blockIndex: bIdx,
+                                  itemName:
+                                    BLOCK_CONFIG[blockToRender.type]?.label ??
+                                    "Khối nội dung",
+                                  sectionIndex: idx,
+                                })
+                              }
                               title="Xóa khối này"
                               className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
                             >
@@ -1167,20 +1232,16 @@ export function SummaryBlockRenderer({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const newData = { ...data };
-                                  if (newData.sections?.[idx]?.blocks) {
-                                    const blocks = [...newData.sections[idx].blocks];
-                                    blocks.splice(bIdx, 1);
-                                    newData.sections[idx].blocks = blocks;
-                                    onPhaseOneLayoutOperation?.({
-                                      type: "DELETE_BLOCK",
-                                      sectionIndex: idx,
-                                      blockIndex: bIdx,
-                                    });
-                                    onChange(newData);
-                                  }
-                                }}
+                                onClick={() =>
+                                  setPendingDeleteTarget({
+                                    kind: "BLOCK",
+                                    blockIndex: bIdx,
+                                    itemName:
+                                      BLOCK_CONFIG[blockToRender.type]?.label ??
+                                      "Khối nội dung",
+                                    sectionIndex: idx,
+                                  })
+                                }
                                 title="Xóa khối này"
                                 className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
                               >
@@ -1247,6 +1308,23 @@ export function SummaryBlockRenderer({
           </div>
         );
       })}
+      <DeleteConfirmDialog
+        confirmLabel={
+          pendingDeleteTarget?.kind === "SECTION" ? "Xóa section" : "Xóa khối"
+        }
+        description={
+          pendingDeleteTarget?.kind === "SECTION"
+            ? `Section “${pendingDeleteTarget.itemName}” và toàn bộ nội dung bên trong sẽ bị xóa. Hành động này không thể hoàn tác.`
+            : pendingDeleteTarget
+              ? `Khối “${pendingDeleteTarget.itemName}” sẽ bị xóa khỏi đề mục. Hành động này không thể hoàn tác.`
+              : undefined
+        }
+        isOpen={pendingDeleteTarget !== null}
+        itemName={pendingDeleteTarget?.itemName ?? ""}
+        onCancel={() => setPendingDeleteTarget(null)}
+        onConfirm={confirmPendingDelete}
+        title={pendingDeleteTarget?.kind === "SECTION" ? "Xóa section" : "Xóa khối?"}
+      />
     </div>
   );
 }

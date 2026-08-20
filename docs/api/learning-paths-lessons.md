@@ -700,6 +700,7 @@ Body:
   },
   "phaseOneLayoutOperations": [
     { "type": "DELETE_BLOCK", "sectionIndex": 0, "blockIndex": 1 },
+    { "type": "DELETE_SECTION", "sectionIndex": 2 },
     { "type": "MERGE_SECTION", "sectionIndex": 1 }
   ],
   "source": "ADMIN",
@@ -710,13 +711,15 @@ Body:
 Behavior:
 
 - Mặc định chỉ nhận đúng tập block path của snapshot Phase 1 đã lưu. Khi admin
-  xóa block hoặc xóa heading để gộp section, frontend gửi thêm
+  xóa block, xóa section hoặc xóa heading để gộp section, frontend gửi thêm
   `phaseOneLayoutOperations` theo đúng thứ tự thao tác; backend áp dụng các thao
   tác này lên snapshot trước rồi mới đối chiếu tập path đã được đánh lại.
-- `DELETE_BLOCK` xóa đúng block và kéo các block phía sau lên; `MERGE_SECTION`
-  chỉ hợp lệ với section không phải đầu tiên, nối toàn bộ block vào section ngay
-  trước rồi đánh lại section/block path. Lịch sử layout được lưu cùng snapshot
-  để lần Lưu/tải lại sau không dựng lại block hoặc section đã xóa.
+- `DELETE_BLOCK` xóa đúng block và kéo các block phía sau lên;
+  `DELETE_SECTION` xóa section cùng toàn bộ block bên trong rồi kéo các section
+  phía sau lên; `MERGE_SECTION` chỉ hợp lệ với section không phải đầu tiên, nối
+  toàn bộ block vào section ngay trước rồi đánh lại section/block path. Lịch sử
+  layout được lưu cùng snapshot để lần Lưu/tải lại sau không dựng lại block hoặc
+  section đã xóa.
 - Ghép từng object đã sửa về đúng vị trí trong provider output gốc, validate lại
   bằng strict schema tương ứng với môn và lớp rồi mới map/upsert Summary.
 - Cho sửa text, `caption` và provenance hợp lệ của figure đã tồn tại; raw Phase 1
@@ -959,6 +962,10 @@ Role cho toàn bộ endpoint: `ADMIN`.
   thái, preview/asset URL và lỗi gần nhất của lesson. Mỗi item trả
   `figureOrigin=TEXTBOOK_SOURCE | GENERATED_FROM_BRIEF` từ render plan v3 đã
   qua Zod. Dữ liệu plan thiếu/không đọc được trả `null`.
+  Response admin còn trả `currentRevisionOrigin=INITIAL_AI | AUTO_REPAIR |
+ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
+  revision đang sở hữu asset hiển thị; client dùng provenance này thay vì suy từ
+  `AI_TEX` để phân biệt hình AI ban đầu với hình admin đã tạo/sửa/thay.
   `planJson` vẫn chứa nguyên `sourceReferences` Phase 1 để JSON review admin có
   thể chiếu đúng trang, nhãn hình và `sourceTarget` mà không sao chép provenance
   này vào `lesson_summaries.content_json`.
@@ -1051,12 +1058,16 @@ Role cho toàn bộ endpoint: `ADMIN`.
   `blocks/ensure` cho figure do admin thêm vào block chưa từng có hình phải tạo
   `sourceReferences=[]`, không suy reference từ trang nội dung của block/section.
 - `POST /admin/lessons/:lessonId/stem-figures/:figureId/use-source-crop`: nhận
-  mutation guard, `sourceSnapshotHash` và `sourceObjectKey`; chỉ chấp nhận đúng
+  mutation guard, `sourceSnapshotHash`, `sourceObjectKey` và boolean `enhance`; chỉ
+  chấp nhận đúng
   asset `OCR_CROP` thuộc immutable reference snapshot đã resolve cho logical
   figure (head hoặc fallback lịch sử với dữ liệu cũ). Backend tải, kiểm
-  MIME/kích thước, chuẩn hóa WebP, lưu file `AI_DIAGRAM` riêng và atomically tạo
-  revision `ADMIN_UPLOAD` thành công. Endpoint không gọi provider, không tự retry
-  và không cho dùng ảnh toàn trang fallback như một crop.
+  MIME/kích thước. `enhance=false` promote crop qua luồng chuẩn hóa raster hiện
+  có; `enhance=true` chạy thêm preset local `TEXTBOOK_RASTER_CLEANUP_V2`, encode
+  WebP lossless và ghi metadata `ENHANCE` trước khi promote. Cả hai nhánh lưu file
+  `AI_DIAGRAM` riêng và atomically tạo revision `ADMIN_UPLOAD` thành công. Nếu
+  validate/xử lý/upload lỗi, current revision không đổi. Endpoint không gọi
+  provider, không tự retry và không cho dùng ảnh toàn trang fallback như một crop.
 - `POST /admin/lessons/:lessonId/stem-figures/:figureId/raster-edits/preview`:
   nhận multipart gồm `baseCurrentRevisionId`, `baseSourceVersion`, JSON operation
   `{ enhance, removeSimpleDetails, pipelineVersion }` và optional PNG mask khi
@@ -1082,7 +1093,8 @@ Role cho toàn bộ endpoint: `ADMIN`.
 
 `pipelineVersion` hiện hành là `TEXTBOOK_RASTER_CLEANUP_V2`. Preset enhance v2
 giữ denoise/contrast/sharpen của v1 và thêm saturation `1.06` để màu đậm hơn nhẹ,
-không hạ brightness toàn ảnh. Chính xác một operation phải bật; mask bắt buộc khi
+không hạ brightness toàn ảnh.
+Chính xác một operation phải bật; mask bắt buộc khi
 `removeSimpleDetails=true` và bị cấm khi false. Client
 không được gửi object key, signed URL hay source bytes làm authority. Service
 giới hạn vùng xóa nhỏ trên nền gần đồng nhất và trả error code ổn định

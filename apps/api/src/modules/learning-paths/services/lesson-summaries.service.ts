@@ -253,7 +253,7 @@ export class LessonSummariesService {
         );
       }
       const layoutOperations = (dto.phaseOneLayoutOperations ?? []).map((operation) => {
-        if (operation.type === "MERGE_SECTION") {
+        if (operation.type !== "DELETE_BLOCK") {
           return {
             type: operation.type,
             sectionIndex: operation.sectionIndex,

@@ -103,6 +103,13 @@ Admin có quyền:
 - Quản lý từng hình STEM trong tóm tắt: xem lỗi, xóa, tải ảnh thay thế, sinh lại
   bằng AI, xem SVG preview và tự sửa LaTeX figure snippet khi cần. Không có
   editor click-to-source/SyncTeX trên PDF hoặc preview trong phạm vi hiện tại.
+- Trong khung ảnh SGK của một figure, checkbox `Làm nét ảnh` mặc định
+  tắt. Admin bấm `Áp dụng` để promote crop; chỉ khi checkbox được bật hệ
+  thống mới chạy preset làm nét local trước khi promote. Cả hai nhánh đều
+  không phát sinh provider trả phí.
+- Có thể thay hàng loạt các hình còn tồn tại từ lượt AI sinh Summary ban đầu bằng
+  crop SGK đã làm nét. Action không tạo lại hình đã xóa và không thay hình admin
+  đã tạo mới bằng AI, tạo bằng mã code, tải lên/thay thủ công hoặc ảnh SGK đã dùng.
 - Với figure raster `TEXTBOOK_SOURCE` đã thành công, mở editor từ icon cây đũa,
   chọn đúng một trong hai công cụ làm nét hoặc xóa vùng thừa đơn giản. Làm nét tự
   giảm nhiễu, làm rõ nét và tăng độ đậm màu nhẹ mà không đổi hue chủ ý; kết quả

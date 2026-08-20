@@ -14,9 +14,9 @@ import {
 } from "class-validator";
 
 export class LessonSummaryPhaseOneLayoutOperationDto {
-  @ApiProperty({ enum: ["MERGE_SECTION", "DELETE_BLOCK"] })
-  @IsIn(["MERGE_SECTION", "DELETE_BLOCK"])
-  type!: "MERGE_SECTION" | "DELETE_BLOCK";
+  @ApiProperty({ enum: ["MERGE_SECTION", "DELETE_SECTION", "DELETE_BLOCK"] })
+  @IsIn(["MERGE_SECTION", "DELETE_SECTION", "DELETE_BLOCK"])
+  type!: "MERGE_SECTION" | "DELETE_SECTION" | "DELETE_BLOCK";
 
   @ApiProperty({ example: 1 })
   @IsInt()

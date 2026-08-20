@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookImage,
   EyeOff,
   Eye,
   Loader2,
@@ -65,8 +66,19 @@ import {
   type LessonSummaryPhaseOneLayoutOperation,
 } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 import { toAdminLessonSummaryBlockElementId } from "@/features/admin/ai-generation/utils/admin-lesson-summary-block";
+import {
+  createTextbookImageBulkReplacePlan,
+  useAdminReplaceAllTextbookImages,
+} from "@/features/admin/ai-generation/hooks/use-admin-replace-all-textbook-images";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
+const ReplaceAllTextbookImagesDialog = dynamic(
+  () =>
+    import("@/features/admin/ai-generation/components/admin-replace-all-textbook-images-dialog").then(
+      (module) => module.AdminReplaceAllTextbookImagesDialog,
+    ),
+  { ssr: false },
+);
 
 type ViewMode = "UI_ONLY" | "JSON_ONLY" | "SPLIT";
 
@@ -95,6 +107,7 @@ export function AdminLessonSummaryTab({
     summaryJob?.status === "QUEUED" || summaryJob?.status === "RUNNING";
   const upsertMutation = useUpsertAdminLessonSummary(lessonId);
   const deleteMutation = useDeleteAdminLessonSummary(lessonId);
+  const replaceAllTextbookImagesMutation = useAdminReplaceAllTextbookImages(lessonId);
   const [content, setContent] = useState<AdminLessonSummaryContent>(
     createEmptyTiptapDocument(),
   );
@@ -109,10 +122,17 @@ export function AdminLessonSummaryTab({
   const [viewMode, setViewMode] = useState<ViewMode>("UI_ONLY");
   const [jsonCollapsed, setJsonCollapsed] = useState<boolean | number>(2);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isReplaceAllImagesConfirmOpen, setIsReplaceAllImagesConfirmOpen] =
+    useState(false);
+  const [replaceAllImagesCompletedCount, setReplaceAllImagesCompletedCount] = useState(0);
   const [selectedSourcePageNumbers, setSelectedSourcePageNumbers] = useState<
     number[] | null
   >(null);
   const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
+  const textbookImageBulkReplacePlan = useMemo(
+    () => createTextbookImageBulkReplacePlan(figuresQuery.data ?? []),
+    [figuresQuery.data],
+  );
   const stemFigureVisuals = useMemo(
     () =>
       new Map<string, StemFigureVisual>(
@@ -387,6 +407,34 @@ export function AdminLessonSummaryTab({
     }
   };
 
+  const replaceAllImagesWithEnhancedTextbookSources = async () => {
+    setReplaceAllImagesCompletedCount(0);
+    try {
+      const result = await replaceAllTextbookImagesMutation.mutateAsync({
+        items: textbookImageBulkReplacePlan.eligibleItems,
+        onProgress: setReplaceAllImagesCompletedCount,
+      });
+      setIsReplaceAllImagesConfirmOpen(false);
+
+      if (result.failedCount > 0) {
+        toast.warning(
+          `Đã thay và làm nét ${result.succeededCount} hình AI ban đầu; ${result.failedCount} hình chưa hoàn tất.`,
+        );
+        return;
+      }
+      toast.success(
+        `Đã thay và làm nét ${result.succeededCount} hình AI ban đầu bằng ảnh gốc SGK.`,
+      );
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          "Chưa hoàn tất thay ảnh gốc sách giáo khoa. Vui lòng thử lại.",
+        ),
+      );
+    }
+  };
+
   return (
     <div className="space-y-5 p-4 sm:p-6" data-testid="admin-lesson-summary-tab">
       <MathToolbar />
@@ -423,6 +471,34 @@ export function AdminLessonSummaryTab({
         <div className="flex flex-col items-end gap-2">
           {summary ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <span className="group relative">
+                <button
+                  aria-label="Thay các hình từ lượt AI sinh ban đầu còn lại bằng hình gốc sách giáo khoa đã làm nét"
+                  className="theme-button-primary-subtle relative grid min-h-10 min-w-10 place-items-center rounded-lg px-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={
+                    replaceAllTextbookImagesMutation.isPending ||
+                    !figuresQuery.isSuccess ||
+                    textbookImageBulkReplacePlan.initialAiImageCount === 0
+                  }
+                  onClick={() => setIsReplaceAllImagesConfirmOpen(true)}
+                  type="button"
+                >
+                  {replaceAllTextbookImagesMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <>
+                      <BookImage className="h-5 w-5" aria-hidden="true" />
+                      <Sparkles
+                        className="absolute right-0.5 top-0.5 h-3 w-3"
+                        aria-hidden="true"
+                      />
+                    </>
+                  )}
+                </button>
+                <span className="pointer-events-none absolute right-0 top-12 z-40 w-max max-w-72 rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-bold leading-5 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  Thay các hình AI ban đầu còn lại bằng ảnh gốc SGK đã làm nét
+                </span>
+              </span>
               <button
                 type="button"
                 onClick={onEdit}
@@ -661,6 +737,14 @@ export function AdminLessonSummaryTab({
         title="Xóa toàn bộ kiến thức đã sinh?"
         onCancel={() => setIsDeleteConfirmOpen(false)}
         onConfirm={deleteSummary}
+      />
+      <ReplaceAllTextbookImagesDialog
+        completedCount={replaceAllImagesCompletedCount}
+        isOpen={isReplaceAllImagesConfirmOpen}
+        isPending={replaceAllTextbookImagesMutation.isPending}
+        onCancel={() => setIsReplaceAllImagesConfirmOpen(false)}
+        onConfirm={() => void replaceAllImagesWithEnhancedTextbookSources()}
+        plan={textbookImageBulkReplacePlan}
       />
       {selectedSourcePageNumbers ? (
         <AdminSummarySourcePagesDialog

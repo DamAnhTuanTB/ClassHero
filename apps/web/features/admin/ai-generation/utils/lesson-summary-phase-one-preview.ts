@@ -4,6 +4,7 @@ const THEORY_TYPES = new Set(["knowledge", "property", "theorem"]);
 
 export type LessonSummaryPhaseOneLayoutOperation =
   | { type: "MERGE_SECTION"; sectionIndex: number }
+  | { type: "DELETE_SECTION"; sectionIndex: number }
   | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number };
 
 export function applyPhaseOneLayoutOperation(
@@ -42,6 +43,29 @@ export function applyPhaseOneLayoutOperation(
               position.blockIndex > operation.blockIndex
                 ? position.blockIndex - 1
                 : position.blockIndex,
+          },
+        ];
+      }),
+    );
+  }
+
+  if (operation.type === "DELETE_SECTION") {
+    const hasTargetSection = parsedEntries.some(
+      (entry) => entry.position?.sectionIndex === operation.sectionIndex,
+    );
+    if (!hasTargetSection) return blocks;
+    return rebuildBlockRecord(
+      parsedEntries.flatMap((entry) => {
+        const position = entry.position!;
+        if (position.sectionIndex === operation.sectionIndex) return [];
+        return [
+          {
+            value: entry.value,
+            sectionIndex:
+              position.sectionIndex > operation.sectionIndex
+                ? position.sectionIndex - 1
+                : position.sectionIndex,
+            blockIndex: position.blockIndex,
           },
         ];
       }),

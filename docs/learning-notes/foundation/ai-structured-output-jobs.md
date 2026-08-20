@@ -63,6 +63,31 @@ con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figu
 - Giai đoạn hiện tại chỉ Summary có figure; Quiz/Test/Flashcard/Explanation/Chat
   giữ text-only.
 
+### Provider chọn sai trang nhưng đúng nhãn hình
+
+`figureLabel` formal và trang provider trả không có cùng độ tin cậy. Model có
+thể đọc đúng `Hình 4.16` nhưng gán nó sang trang kế tiếp. Backend vì
+vậy không được chỉ kiểm nhãn trong trang model chọn rồi fallback nguyên
+trang đó.
+
+```mermaid
+flowchart TD
+  A[Provider trả figureLabel và packet page] --> B{Trang đó có exact label?}
+  B -- Có --> C[Giữ trang và lấy printed label từ manifest]
+  B -- Không --> D[Tìm exact label trên các trang thuộc packet]
+  D --> E{Bao nhiêu trang khớp?}
+  E -- Một --> F[Canonicalize trang và dùng crop hoặc fallback đúng trang]
+  E -- Nhiều --> G[Đánh ambiguous, không chọn bừa]
+  E -- Không có --> H[Giữ fallback cũ, không semantic guess]
+```
+
+Exact lookup chỉ chạy trên cặp document/PDF page thực sự có trong
+packet. OCR image manifest có thể chứa cả cuốn sách, nên bỏ giới hạn
+này sẽ làm resolver lấy hình ngoài lesson. Raw provider output vẫn được
+giữ cho audit; chỉ render plan và immutable reference snapshot dùng vị trí
+canonical. Cách tách raw/effective này cho phép vừa debug được model, vừa
+không truyền lỗi trang sang Stage 2 hoặc M9.17.
+
 ### Chuẩn hóa trình bày output AI ở front-end
 
 Heuristic trình bày không được chạy mù trên toàn bộ Markdown. Khi FE cần tách các
@@ -174,7 +199,7 @@ cũ và làm block xuất hiện lại. Tương tự, gộp section mà không �
 
 ```mermaid
 flowchart LR
-  A[Admin xóa block hoặc heading] --> B[Cập nhật preview]
+  A[Admin xóa block, section hoặc heading] --> B[Cập nhật preview]
   A --> C[Đánh lại raw block path]
   A --> D[Ghi layout operation có thứ tự]
   B --> E[PUT phase-one-blocks]
@@ -187,8 +212,8 @@ flowchart LR
 ```
 
 Layout operation là overlay biên tập, không sửa méo provider schema. Backend giữ
-provider output hợp lệ để audit/validate, rồi replay `DELETE_BLOCK` hoặc
-`MERGE_SECTION` sau mapper. Operation phải được lưu cùng snapshot để các lần sửa
+provider output hợp lệ để audit/validate, rồi replay `DELETE_BLOCK`,
+`DELETE_SECTION` hoặc `MERGE_SECTION` sau mapper. Operation phải được lưu cùng snapshot để các lần sửa
 sau tiếp tục nhìn đúng layout hiện tại. Figure của block chỉ đổi vị trí giữ nguyên
 revision/asset; figure thuộc block bị xóa dùng soft-delete để không còn reference
 active nhưng vẫn giữ khả năng điều tra dữ liệu.
@@ -210,6 +235,8 @@ Local fixtures không gọi provider. Live OpenAI test luôn opt-in, báo số r
 - `apps/api/src/modules/ai/utils/lesson-summary-prompt.ts`
 - `apps/api/src/workers/services/lesson-summary-generation.service.ts`
 - `apps/api/src/modules/stem-figures/`
+- `apps/api/src/modules/stem-figures/services/figure-reference-resolver.service.ts`
+- `apps/api/src/modules/stem-figures/utils/figure-label-identity.ts`
 - `apps/api/src/workers/processors/stem-figure-rendering.processor.ts`
 - `apps/api/tex-renderer/server.mjs`
 - `apps/api/Dockerfile.tex-renderer`

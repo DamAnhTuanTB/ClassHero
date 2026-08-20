@@ -812,6 +812,7 @@ export class StemFiguresService {
       sourceObjectKey: asset.objectKey,
       referenceSnapshot: snapshot,
       referenceSnapshotHash: sourceReference.hash,
+      autoEnhance: dto.enhance,
     });
   }
 

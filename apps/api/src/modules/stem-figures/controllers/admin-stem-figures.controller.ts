@@ -135,7 +135,7 @@ export class AdminStemFiguresController {
 
   @Post(":figureId/use-source-crop")
   @ApiOperation({
-    summary: "Promote one immutable textbook OCR crop as the official figure",
+    summary: "Optionally enhance and promote one textbook OCR crop",
   })
   useSourceCrop(
     @Param("lessonId") lessonId: string,

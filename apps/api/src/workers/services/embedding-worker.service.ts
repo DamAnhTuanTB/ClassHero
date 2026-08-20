@@ -2,7 +2,7 @@
  * EmbeddingWorkerService — BullMQ worker cho EMBEDDING queue.
  *
  * Pattern giống DocumentProcessingWorkerService.
- * Concurrency dùng WORKER_CONCURRENCY_AI (default 2).
+ * Concurrency dùng chung WORKER_CONCURRENCY_AI với AI generation (default 4).
  */
 
 import {

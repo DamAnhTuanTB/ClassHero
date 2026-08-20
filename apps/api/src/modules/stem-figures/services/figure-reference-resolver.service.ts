@@ -9,6 +9,11 @@ import type {
   StemFigureRenderPlan,
   StemFigureSourceTarget,
 } from "#api/modules/ai/types/lesson-summary.types";
+import {
+  extractFigureIdentities,
+  extractFigureIdentity,
+  normalizeFigureLabelText,
+} from "#api/modules/stem-figures/utils/figure-label-identity";
 
 export type FigureReferenceAsset = {
   objectKey: string;
@@ -26,12 +31,18 @@ export type FigureReferenceSnapshot = {
   assets: FigureReferenceAsset[];
   references: Array<{
     planReference: StemFigureRenderPlan["sourceReferences"][number];
+    requestedPlanReference?: StemFigureRenderPlan["sourceReferences"][number];
     sourcePdfPageNumber: number | null;
     sourceDocumentId: string | null;
     lessonDocumentId: string | null;
     candidateImageIds: string[];
     warnings: string[];
   }>;
+};
+
+export type ReconciledFigureReference<TPlan extends StemFigureRenderPlan> = {
+  plan: TPlan;
+  snapshot: FigureReferenceSnapshot;
 };
 
 @Injectable()
@@ -45,28 +56,34 @@ export class FigureReferenceResolverService {
     manifest: LessonSourcePacketManifest;
     plan: StemFigureRenderPlan;
   }): Promise<FigureReferenceSnapshot> {
-    if (input.plan.figureOrigin === "GENERATED_FROM_BRIEF") {
-      return {
-        version: 1,
-        localPlanId: input.plan.localId,
-        status: "not_found",
-        assets: [],
-        references: [],
-      };
+    const [result] = await this.resolveMany({
+      manifest: input.manifest,
+      plans: [input.plan],
+    });
+    if (!result) {
+      throw new Error("Figure reference resolution returned no result.");
+    }
+    return result.snapshot;
+  }
+
+  async resolveMany<TPlan extends StemFigureRenderPlan>(input: {
+    manifest: LessonSourcePacketManifest;
+    plans: TPlan[];
+  }): Promise<Array<ReconciledFigureReference<TPlan>>> {
+    if (input.plans.length === 0) return [];
+
+    const hasTextbookReferences = input.plans.some(
+      (plan) => plan.figureOrigin === "TEXTBOOK_SOURCE",
+    );
+    if (!hasTextbookReferences) {
+      return input.plans.map((plan) => ({
+        plan,
+        snapshot: emptyReferenceSnapshot(plan.localId),
+      }));
     }
 
-    const manifestPages = new Map(
-      input.manifest.pages.map((page) => [page.packetPageNumber, page] as const),
-    );
     const lessonDocumentIds = [
-      ...new Set(
-        input.plan.sourceReferences
-          .map(
-            (reference) =>
-              manifestPages.get(reference.packetPageNumber)?.lessonDocumentId,
-          )
-          .filter((value): value is string => Boolean(value)),
-      ),
+      ...new Set(input.manifest.pages.map((page) => page.lessonDocumentId)),
     ];
     const documents = await this.prisma.lessonDocument.findMany({
       where: { id: { in: lessonDocumentIds } },
@@ -87,120 +104,247 @@ export class FigureReferenceResolverService {
     });
     const documentsById = new Map(documents.map((document) => [document.id, document]));
     const imageManifestCache = new Map<string, Promise<OcrImageManifestShape>>();
-    const pdfCache = new Map<string, Promise<Buffer>>();
-    const assets: FigureReferenceAsset[] = [];
-    const references: FigureReferenceSnapshot["references"] = [];
-    let sawAmbiguous = false;
-    let sawFallback = false;
-
-    for (const reference of input.plan.sourceReferences) {
-      const page = manifestPages.get(reference.packetPageNumber);
-      const document = page ? documentsById.get(page.lessonDocumentId) : null;
-      const warnings: string[] = [];
-      const artifact =
-        document?.activeOcrArtifact ??
-        document?.sourceDocument?.activeOcrArtifact ??
-        null;
-      let selected: OcrImageShape[] = [];
-      if (page && artifact?.imageManifestObjectKey) {
+    const imagesByDocumentId = new Map<string, OcrImageShape[]>();
+    await Promise.all(
+      documents.map(async (document) => {
+        const artifact =
+          document.activeOcrArtifact ??
+          document.sourceDocument?.activeOcrArtifact ??
+          null;
+        if (!artifact?.imageManifestObjectKey) {
+          imagesByDocumentId.set(document.id, []);
+          return;
+        }
         const manifestPromise =
           imageManifestCache.get(artifact.imageManifestObjectKey) ??
           this.loadImageManifest(artifact.imageManifestObjectKey);
         imageManifestCache.set(artifact.imageManifestObjectKey, manifestPromise);
-        const imageManifest = await manifestPromise;
-        const selection = selectReferenceImages({
-          images: imageManifest.images,
-          pageNumber: page.sourcePdfPageNumber,
-          figureLabel: reference.figureLabel,
-          query: [
-            reference.figureLabel,
-            "sourceTarget" in reference ? reference.sourceTarget.locator : null,
-          ]
-            .filter(Boolean)
-            .join(" "),
-        });
-        selected = selection.images;
-        warnings.push(...selection.warnings);
-        if (selection.ambiguous) {
-          sawAmbiguous = true;
+        imagesByDocumentId.set(document.id, (await manifestPromise).images);
+      }),
+    );
+
+    type DocumentRecord = (typeof documents)[number];
+    type PacketPageContext = {
+      page: LessonSourcePacketManifest["pages"][number];
+      document: DocumentRecord | null;
+      images: OcrImageShape[];
+    };
+    type PacketExactLocation = {
+      context: PacketPageContext;
+      evidence: OcrImageShape[];
+    };
+
+    const pageContexts = input.manifest.pages.map(
+      (page): PacketPageContext => ({
+        page,
+        document: documentsById.get(page.lessonDocumentId) ?? null,
+        images: imagesByDocumentId.get(page.lessonDocumentId) ?? [],
+      }),
+    );
+    const pageContextsByPacketNumber = new Map(
+      pageContexts.map((context) => [context.page.packetPageNumber, context] as const),
+    );
+    const exactLocationsByIdentity = new Map<
+      string,
+      Map<number, PacketExactLocation>
+    >();
+    for (const context of pageContexts) {
+      for (const image of context.images) {
+        if (image.pageNumber !== context.page.sourcePdfPageNumber) continue;
+        for (const identity of extractFigureIdentities(image.captionCandidate ?? "")) {
+          const locations =
+            exactLocationsByIdentity.get(identity) ??
+            new Map<number, PacketExactLocation>();
+          const location = locations.get(context.page.packetPageNumber) ?? {
+            context,
+            evidence: [],
+          };
+          location.evidence.push(image);
+          locations.set(context.page.packetPageNumber, location);
+          exactLocationsByIdentity.set(identity, locations);
         }
+      }
+    }
+
+    const pdfCache = new Map<string, Promise<Buffer>>();
+    const results: Array<ReconciledFigureReference<TPlan>> = [];
+
+    for (const plan of input.plans) {
+      if (plan.figureOrigin === "GENERATED_FROM_BRIEF") {
+        results.push({ plan, snapshot: emptyReferenceSnapshot(plan.localId) });
+        continue;
       }
 
-      if (page && document && selected.length === 0) {
-        warnings.push("no_usable_ocr_crop");
-        if (!canUsePageFallback(reference)) {
-          warnings.push("ambiguous_page_fallback_target");
+      const assets: FigureReferenceAsset[] = [];
+      const references: FigureReferenceSnapshot["references"] = [];
+      const effectiveReferences: typeof plan.sourceReferences = [];
+      let sawAmbiguous = false;
+      let sawFallback = false;
+
+      for (const reference of plan.sourceReferences) {
+        const requestedContext = pageContextsByPacketNumber.get(
+          reference.packetPageNumber,
+        );
+        const requestedIdentity = extractFigureIdentity(reference.figureLabel ?? "");
+        const exactLocations = requestedIdentity
+          ? [...(exactLocationsByIdentity.get(requestedIdentity)?.values() ?? [])]
+          : [];
+        const requestedExactLocation = exactLocations.find(
+          (location) =>
+            location.context.page.packetPageNumber === reference.packetPageNumber,
+        );
+        const warnings: string[] = [];
+        let effectiveContext = requestedContext;
+        let globalMatchAmbiguous = false;
+
+        if (!requestedExactLocation && exactLocations.length === 1) {
+          effectiveContext = exactLocations[0]!.context;
+          warnings.push("figure_label_exact_match_relocated");
+        } else if (!requestedExactLocation && exactLocations.length > 1) {
+          globalMatchAmbiguous = true;
           sawAmbiguous = true;
-          references.push({
-            planReference: reference,
-            sourcePdfPageNumber: page.sourcePdfPageNumber,
-            sourceDocumentId: page.sourceDocumentId,
-            lessonDocumentId: page.lessonDocumentId,
-            candidateImageIds: [],
-            warnings,
-          });
-          continue;
+          warnings.push("figure_label_exact_match_multiple_pages");
         }
-        const fallback = await this.ensurePageFallback({
-          file: document.file,
-          pageNumber: page.sourcePdfPageNumber,
-          pdfCache,
-        });
-        if (fallback) {
-          sawFallback = true;
-          assets.push({
-            ...fallback,
-            label: reference.figureLabel ?? `Trang ${reference.packetPageNumber}`,
-            packetPageNumber: reference.packetPageNumber,
-            source: "PDF_PAGE",
-            sourceTarget: "sourceTarget" in reference ? reference.sourceTarget : null,
+
+        const effectiveReference: typeof reference =
+          effectiveContext && !globalMatchAmbiguous
+            ? {
+                ...reference,
+                packetPageNumber: effectiveContext.page.packetPageNumber,
+                printedPageLabel:
+                  effectiveContext.page.printedPageLabel ??
+                  reference.printedPageLabel,
+              }
+            : reference;
+        if (
+          effectiveContext &&
+          !globalMatchAmbiguous &&
+          effectiveContext.page.printedPageLabel === null &&
+          reference.printedPageLabel !== null
+        ) {
+          warnings.push("printed_page_label_manifest_missing");
+        } else if (
+          effectiveContext &&
+          !globalMatchAmbiguous &&
+          effectiveContext.page.printedPageLabel !== null &&
+          effectiveContext.page.printedPageLabel !== reference.printedPageLabel
+        ) {
+          warnings.push("printed_page_label_canonicalized");
+        }
+        effectiveReferences.push(effectiveReference);
+
+        const page = effectiveContext?.page;
+        const document = effectiveContext?.document;
+        let selected: OcrImageShape[] = [];
+        if (effectiveContext && page && document) {
+          const selection = selectReferenceImages({
+            images: effectiveContext.images,
+            pageNumber: page.sourcePdfPageNumber,
+            figureLabel: effectiveReference.figureLabel,
+            query: [
+              effectiveReference.figureLabel,
+              effectiveReference.sourceTarget.locator,
+            ]
+              .filter(Boolean)
+              .join(" "),
           });
+          selected = selection.images;
+          warnings.push(...selection.warnings);
+          if (selection.ambiguous) sawAmbiguous = true;
+        }
+
+        if (page && document && selected.length === 0) {
+          warnings.push("no_usable_ocr_crop");
+          if (!canUsePageFallback(effectiveReference)) {
+            warnings.push("ambiguous_page_fallback_target");
+            sawAmbiguous = true;
+            references.push({
+              planReference: effectiveReference,
+              ...(hasReferenceLocationChanged(reference, effectiveReference)
+                ? { requestedPlanReference: reference }
+                : {}),
+              sourcePdfPageNumber: page.sourcePdfPageNumber,
+              sourceDocumentId: page.sourceDocumentId,
+              lessonDocumentId: page.lessonDocumentId,
+              candidateImageIds: [],
+              warnings: [...new Set(warnings)],
+            });
+            continue;
+          }
+          const fallback = await this.ensurePageFallback({
+            file: document.file,
+            pageNumber: page.sourcePdfPageNumber,
+            pdfCache,
+          });
+          if (fallback) {
+            sawFallback = true;
+            assets.push({
+              ...fallback,
+              label:
+                effectiveReference.figureLabel ??
+                `Trang ${effectiveReference.packetPageNumber}`,
+              packetPageNumber: effectiveReference.packetPageNumber,
+              source: "PDF_PAGE",
+              sourceTarget: effectiveReference.sourceTarget,
+            });
+          } else {
+            warnings.push("page_render_failed");
+          }
         } else {
-          warnings.push("page_render_failed");
+          for (const candidate of selected) {
+            assets.push({
+              // Mathpix already extracted the labeled artwork. Preserve that
+              // immutable crop instead of rebuilding a much larger region from
+              // the PDF page and diluting the visual reference with prose,
+              // captions, or page furniture.
+              objectKey: candidate.objectKey,
+              mimeType: candidate.mimeType,
+              label:
+                effectiveReference.figureLabel ??
+                candidate.captionCandidate ??
+                `Trang ${effectiveReference.packetPageNumber}`,
+              packetPageNumber: effectiveReference.packetPageNumber,
+              source: "OCR_CROP",
+              sourceTarget: effectiveReference.sourceTarget,
+            });
+          }
         }
-      } else {
-        for (const candidate of selected) {
-          assets.push({
-            // Mathpix already extracted the labeled artwork. Preserve that
-            // immutable crop instead of rebuilding a much larger region from
-            // the PDF page and diluting the visual reference with prose,
-            // captions, or page furniture.
-            objectKey: candidate.objectKey,
-            mimeType: candidate.mimeType,
-            label:
-              reference.figureLabel ??
-              candidate.captionCandidate ??
-              `Trang ${reference.packetPageNumber}`,
-            packetPageNumber: reference.packetPageNumber,
-            source: "OCR_CROP",
-            sourceTarget: "sourceTarget" in reference ? reference.sourceTarget : null,
-          });
-        }
+        references.push({
+          planReference: effectiveReference,
+          ...(hasReferenceLocationChanged(reference, effectiveReference)
+            ? { requestedPlanReference: reference }
+            : {}),
+          sourcePdfPageNumber: page?.sourcePdfPageNumber ?? null,
+          sourceDocumentId: page?.sourceDocumentId ?? null,
+          lessonDocumentId: page?.lessonDocumentId ?? null,
+          candidateImageIds: selected.map((candidate) => candidate.imageId),
+          warnings: [...new Set(warnings)],
+        });
       }
-      references.push({
-        planReference: reference,
-        sourcePdfPageNumber: page?.sourcePdfPageNumber ?? null,
-        sourceDocumentId: page?.sourceDocumentId ?? null,
-        lessonDocumentId: page?.lessonDocumentId ?? null,
-        candidateImageIds: selected.map((candidate) => candidate.imageId),
-        warnings,
+
+      const effectivePlan = {
+        ...plan,
+        sourceReferences: effectiveReferences,
+      } as TPlan;
+      results.push({
+        plan: effectivePlan,
+        snapshot: {
+          version: 1,
+          localPlanId: plan.localId,
+          status: sawAmbiguous
+            ? "ambiguous"
+            : assets.length === 0
+              ? "not_found"
+              : sawFallback
+                ? "page_fallback"
+                : "resolved",
+          assets: deduplicateAssets(assets),
+          references,
+        },
       });
     }
 
-    return {
-      version: 1,
-      localPlanId: input.plan.localId,
-      status:
-        assets.length === 0
-          ? "not_found"
-          : sawAmbiguous
-            ? "ambiguous"
-            : sawFallback
-              ? "page_fallback"
-              : "resolved",
-      assets: deduplicateAssets(assets),
-      references,
-    };
+    return results;
   }
 
   private async loadImageManifest(objectKey: string) {
@@ -313,7 +457,7 @@ export function selectReferenceImages(input: {
   query: string;
 }) {
   const pageImages = input.images.filter(
-    (image) => image.pageNumber === input.pageNumber && image.isUsableForAi,
+    (image) => image.pageNumber === input.pageNumber,
   );
   const requestedIdentity = extractFigureIdentity(input.figureLabel ?? "");
 
@@ -322,8 +466,16 @@ export function selectReferenceImages(input: {
       extractFigureIdentities(image.captionCandidate ?? "").includes(requestedIdentity),
     );
     if (exactMatches.length > 0) {
+      const usableExactMatches = exactMatches.filter((image) => image.isUsableForAi);
+      if (usableExactMatches.length === 0) {
+        return {
+          images: [],
+          ambiguous: false,
+          warnings: ["figure_label_exact_match_unusable"],
+        };
+      }
       const rankedExactMatches = rankImages({
-        images: exactMatches,
+        images: usableExactMatches,
         pageNumber: input.pageNumber,
         query: input.query,
       });
@@ -353,7 +505,8 @@ export function selectReferenceImages(input: {
     };
   }
 
-  const normalizedLabel = normalize(input.figureLabel ?? "").trim();
+  const usablePageImages = pageImages.filter((image) => image.isUsableForAi);
+  const normalizedLabel = normalizeFigureLabelText(input.figureLabel ?? "").trim();
   if (!normalizedLabel) {
     return {
       images: [],
@@ -363,8 +516,8 @@ export function selectReferenceImages(input: {
   }
 
   if (normalizedLabel) {
-    const captionMatches = pageImages.filter((image) => {
-      const caption = normalize(image.captionCandidate ?? "").trim();
+    const captionMatches = usablePageImages.filter((image) => {
+      const caption = normalizeFigureLabelText(image.captionCandidate ?? "").trim();
       return (
         Boolean(caption) &&
         (caption === normalizedLabel ||
@@ -389,7 +542,7 @@ export function selectReferenceImages(input: {
     }
   }
 
-  const ranked = rankImages(input);
+  const ranked = rankImages({ ...input, images: usablePageImages });
   const ambiguous = ranked.length > 1 && ranked[0]!.score < ranked[1]!.score + 8;
   return {
     images: ranked.slice(0, 1),
@@ -412,13 +565,13 @@ function rankImages(input: {
   pageNumber: number;
   query: string;
 }) {
-  const terms = normalize(input.query)
+  const terms = normalizeFigureLabelText(input.query)
     .split(/[^a-z0-9]+/u)
     .filter((term) => term.length > 1);
   return input.images
     .filter((image) => image.pageNumber === input.pageNumber)
     .map((image) => {
-      const haystack = normalize(
+      const haystack = normalizeFigureLabelText(
         `${image.captionCandidate ?? ""} ${image.nearbyText ?? ""}`,
       );
       return {
@@ -433,32 +586,28 @@ function rankImages(input: {
     .sort((left, right) => right.score - left.score);
 }
 
-function extractFigureIdentity(value: string) {
-  return extractFigureIdentities(value)[0] ?? null;
-}
-
-function extractFigureIdentities(value: string) {
-  const normalized = normalize(value);
-  const identities = new Set<string>();
-  const pattern =
-    /\b(?:hinh|figure|fig)\s*[:.#-]?\s*([0-9]+(?:\s*[.-]\s*[0-9]+)*(?:\s*[a-z])?)/gu;
-  for (const match of normalized.matchAll(pattern)) {
-    const identity = match[1]?.replace(/\s+/gu, "").replace(/-/gu, ".");
-    if (identity) identities.add(identity);
-  }
-  return [...identities];
-}
-
 function deduplicateAssets(assets: FigureReferenceAsset[]) {
   return [...new Map(assets.map((asset) => [asset.objectKey, asset])).values()];
 }
 
-function normalize(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/gu, "")
-    .replace(/đ/gu, "d")
-    .toLowerCase();
+function emptyReferenceSnapshot(localPlanId: string): FigureReferenceSnapshot {
+  return {
+    version: 1,
+    localPlanId,
+    status: "not_found",
+    assets: [],
+    references: [],
+  };
+}
+
+function hasReferenceLocationChanged(
+  requested: StemFigureRenderPlan["sourceReferences"][number],
+  effective: StemFigureRenderPlan["sourceReferences"][number],
+) {
+  return (
+    requested.packetPageNumber !== effective.packetPageNumber ||
+    requested.printedPageLabel !== effective.printedPageLabel
+  );
 }
 
 function cloneBytes(value: Buffer) {

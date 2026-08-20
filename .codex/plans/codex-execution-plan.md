@@ -297,6 +297,14 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     cả ba mode. Field rỗng/blank bị loại khỏi provider JSON và prompt mặc định.
     Stage 2 chỉ gửi projection của đúng block sở hữu figure; không suy
     hoặc gửi block lý thuyết đứng trước dưới field `pairedTheory`.
+    41.6. Corrective M9.2 implemented ngày 2026-08-20 theo
+    `.codex/plans/m9-2-exact-figure-label-packet-reconciliation-plan.md`:
+    backend tìm exact normalized `figureLabel` trên toàn bộ trang thuộc
+    packet, chỉ canonicalize packet/printed page khi có một vị trí duy nhất,
+    giữ raw provider output cho audit và không fuzzy-match/chọn bừa. Resolver
+    batch tải mỗi OCR manifest một lần; ca live Hình 4.16 đã inspect-only
+    resolve về packet 2/trang in 20/PDF page 21 bằng OCR crop cache, không gọi
+    provider trả phí.
 42. `M9.3` - Admin generate quiz/flashcard/test.
     42.1. Hardening plan mở rộng Quiz/Test solution/diagram và review tại
     `.codex/plans/m9-3-ai-quiz-generation-completion-plan.md`: output AI phải đủ

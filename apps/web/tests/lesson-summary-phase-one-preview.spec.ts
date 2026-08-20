@@ -42,6 +42,23 @@ test("xóa heading thì gộp raw block vào section trước và đánh lại m
   });
 });
 
+test("xóa section khỏi raw và kéo các section phía sau lên", () => {
+  const result = applyPhaseOneLayoutOperation(
+    {
+      "sections.0.blocks.0": { title: "A" },
+      "sections.1.blocks.0": { title: "B" },
+      "sections.1.blocks.1": { title: "C" },
+      "sections.2.blocks.0": { title: "D" },
+    },
+    { type: "DELETE_SECTION", sectionIndex: 1 },
+  );
+
+  expect(result).toEqual({
+    "sections.0.blocks.0": { title: "A" },
+    "sections.1.blocks.0": { title: "D" },
+  });
+});
+
 test("cập nhật preview lý thuyết từ raw mà không mutate content đã lưu", () => {
   const content = createContent();
   const result = applyPhaseOneBlockPreview(content, "sections.0.blocks.0", {

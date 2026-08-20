@@ -234,15 +234,23 @@ export class LessonSummaryGenerationService {
     const textbookSourceImageOptions = readTextbookSourceImageOptions(context.inputMeta);
     const { useTextbookSourceImages, autoEnhanceTextbookSourceImages } =
       textbookSourceImageOptions;
-    const resolvedFigureDrafts = await Promise.all(
-      figureDrafts.map(async (item) => ({
+    const referenceResolutions = await this.figureReferences.resolveMany({
+      manifest: packetManifest,
+      plans: figureDrafts.map((item) => item.draft),
+    });
+    const resolvedFigureDrafts = figureDrafts.map((item, index) => {
+      const resolution = referenceResolutions[index];
+      if (!resolution) {
+        throw new UnrecoverableError(
+          "STEM_FIGURE_REFERENCE_RESOLUTION_MISSING: Kết quả phân giải hình không đầy đủ.",
+        );
+      }
+      return {
         ...item,
-        referenceSnapshot: await this.figureReferences.resolve({
-          manifest: packetManifest,
-          plan: item.draft,
-        }),
-      })),
-    );
+        draft: resolution.plan,
+        referenceSnapshot: resolution.snapshot,
+      };
+    });
     const figuresToPersist = buildFiguresToPersist(
       resolvedFigureDrafts,
       useTextbookSourceImages,

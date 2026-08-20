@@ -176,11 +176,15 @@ Spacing/radius mặc định:
   tool `Làm nét ảnh`, `Xóa chi tiết thừa`. Mask dùng màu tương phản bán trong
   suốt, cỡ cọ nhỏ/vừa/lớn, undo/redo, xóa mask, zoom/pan và Pointer Events cho
   mouse/touch/pen. Hai tool loại trừ nhau; làm nét tự preview khi chọn, xóa tự
-  preview sau mỗi stroke/undo/redo và không có nút preview riêng. Phải có
+  cập nhật và hiển thị `Sau chỉnh sửa` sau mỗi stroke/undo/redo, trong khi canvas
+  và con trỏ cọ vẫn active ngay trên ảnh kết quả để tô liên tiếp. Lớp nét đỏ hiển
+  thị phải mất sau mỗi preview dù chi tiết có xóa được hay không; mask tích lũy
+  cho apply phải tách khỏi canvas hiển thị. Không có nút preview riêng. Phải có
   before/after, cảnh báo giới hạn nền phẳng và khóa `Áp dụng` khi auto-preview
   hiện tại chưa sẵn sàng hoặc đã stale. `Áp dụng` chỉ commit tool đang chọn và
-  giữ modal mở; sau thành công reset tool/preview/mask, cập nhật ảnh hiện hành và
-  mở lại cả hai tool để admin tiếp tục. Khi đã có lượt được commit, action thoát
+  giữ modal mở; sau thành công reset preview/mask và cập nhật ảnh hiện hành. Làm
+  nét trở về trạng thái chưa chọn tool; xóa giữ cọ active để admin tô liên tiếp
+  mà không phải chọn lại công cụ. Khi đã có lượt được commit, action thoát
   dùng nhãn `Đóng` thay vì `Hủy` vì đóng modal không hoàn tác revision đã lưu.
 - Toolbar ngữ cảnh có nhiều lệnh ngắn như chỉnh bảng phải dùng icon, chia nhóm
   theo chức năng và có tooltip tùy biến xuất hiện ngay khi hover/focus cùng

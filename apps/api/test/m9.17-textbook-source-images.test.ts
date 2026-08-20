@@ -205,6 +205,53 @@ describe("M9.17 textbook source image mode", () => {
     expect(result.every((item) => item.referenceSnapshot.assets.length === 1)).toBe(true);
   });
 
+  it("materializes the canonical page returned by exact-label reconciliation", () => {
+    const canonicalPlan = plan();
+    canonicalPlan.sourceReferences[0] = {
+      ...canonicalPlan.sourceReferences[0]!,
+      packetPageNumber: 2,
+      printedPageLabel: "20",
+    };
+    const canonicalSnapshot: FigureReferenceSnapshot = {
+      version: 1,
+      localPlanId: "F001",
+      status: "resolved",
+      assets: [
+        {
+          objectKey: "ocr/page-21-figure-4-16.png",
+          mimeType: "image/png",
+          label: "Hình 4.16",
+          packetPageNumber: 2,
+          source: "OCR_CROP",
+          sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
+        },
+      ],
+      references: [],
+    };
+
+    const result = buildFiguresToPersist(
+      [
+        {
+          blockPath: "sections.0.blocks.0",
+          figureIndex: 0,
+          draft: canonicalPlan,
+          referenceSnapshot: canonicalSnapshot,
+        },
+      ],
+      true,
+    );
+
+    expect(result[0]?.mode).toBe("SOURCE_CROP");
+    expect(result[0]?.draft.sourceReferences[0]).toMatchObject({
+      packetPageNumber: 2,
+      printedPageLabel: "20",
+    });
+    expect(result[0]?.sourceAsset).toMatchObject({
+      packetPageNumber: 2,
+      objectKey: "ocr/page-21-figure-4-16.png",
+    });
+  });
+
   it("keeps ambiguous crop candidates for review and never selects the first", () => {
     const result = buildFiguresToPersist(
       [

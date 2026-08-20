@@ -10,6 +10,7 @@ import {
 
 export type LessonSummaryPhaseOneLayoutOperation =
   | { type: "MERGE_SECTION"; sectionIndex: number }
+  | { type: "DELETE_SECTION"; sectionIndex: number }
   | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number };
 
 export type LessonSummaryPhaseOneSnapshot = {
@@ -227,6 +228,12 @@ function applyLayoutOperationsToMappedOutput(
       const section = current.content.sections[operation.sectionIndex];
       if (!section?.blocks[operation.blockIndex]) return null;
       section.blocks.splice(operation.blockIndex, 1);
+    } else if (operation.type === "DELETE_SECTION") {
+      if (!current.content.sections[operation.sectionIndex]) return null;
+      current.content.sections.splice(operation.sectionIndex, 1);
+      current.content.sections.forEach((item, index) => {
+        item.order = index + 1;
+      });
     } else {
       if (operation.sectionIndex < 1) return null;
       const section = current.content.sections[operation.sectionIndex];
@@ -294,6 +301,29 @@ function applyLayoutOperationToRecord<T>(
     );
   }
 
+  if (operation.type === "DELETE_SECTION") {
+    const hasTargetSection = entries.some(
+      (entry) => entry.position?.sectionIndex === operation.sectionIndex,
+    );
+    if (!hasTargetSection) return null;
+    return rebuildBlockRecord(
+      entries.flatMap((entry) => {
+        const position = entry.position!;
+        if (position.sectionIndex === operation.sectionIndex) return [];
+        return [
+          {
+            value: entry.value,
+            sectionIndex:
+              position.sectionIndex > operation.sectionIndex
+                ? position.sectionIndex - 1
+                : position.sectionIndex,
+            blockIndex: position.blockIndex,
+          },
+        ];
+      }),
+    );
+  }
+
   if (operation.sectionIndex < 1) return null;
   const previousBlockCount = entries.filter(
     (entry) => entry.position?.sectionIndex === operation.sectionIndex - 1,
@@ -353,6 +383,7 @@ function isLayoutOperation(
     return false;
   }
   if (value.type === "MERGE_SECTION") return sectionIndex >= 1;
+  if (value.type === "DELETE_SECTION") return sectionIndex >= 0;
   return (
     value.type === "DELETE_BLOCK" &&
     sectionIndex >= 0 &&

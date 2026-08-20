@@ -1,21 +1,12 @@
 "use client";
 
-import {
-  Bot,
-  Code2,
-  EllipsisVertical,
-  ImageUp,
-  Loader2,
-  RotateCcw,
-  Trash2,
-} from "lucide-react";
+import { Bot, Code2, EllipsisVertical, ImageUp, Loader2, RotateCcw } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type MenuAction = {
   destructive?: boolean;
   disabled?: boolean;
-  disabledReason?: string;
   icon: typeof Code2;
   label: string;
   onSelect: () => void;
@@ -28,7 +19,6 @@ export function AdminStemFigureActionsMenu({
   isReplacing,
   isRetrying,
   onCreateWithAi,
-  onDelete,
   onEditCode,
   onCreateWithCode,
   onReplaceImage,
@@ -39,7 +29,6 @@ export function AdminStemFigureActionsMenu({
   isReplacing: boolean;
   isRetrying: boolean;
   onCreateWithAi: () => void;
-  onDelete: () => void;
   onEditCode: () => void;
   onCreateWithCode: () => void;
   onReplaceImage: () => void;
@@ -113,13 +102,15 @@ export function AdminStemFigureActionsMenu({
   }, [isOpen, updateMenuPosition]);
 
   const actions: MenuAction[] = [
-    {
-      disabled: !canEditCode,
-      disabledReason: "Ảnh này không có mã TeX/TikZ để chỉnh sửa.",
-      icon: Code2,
-      label: "Chỉnh sửa bằng mã code",
-      onSelect: onEditCode,
-    },
+    ...(canEditCode
+      ? [
+          {
+            icon: Code2,
+            label: "Chỉnh sửa bằng mã code",
+            onSelect: onEditCode,
+          } satisfies MenuAction,
+        ]
+      : []),
     {
       icon: Code2,
       label: "Tạo mới bằng mã code",
@@ -187,16 +178,6 @@ export function AdminStemFigureActionsMenu({
                   onClose={() => setIsOpen(false)}
                 />
               ))}
-              <div className="my-1 border-t border-[var(--theme-border)]" />
-              <MenuItem
-                action={{
-                  destructive: true,
-                  icon: Trash2,
-                  label: "Xóa",
-                  onSelect: onDelete,
-                }}
-                onClose={() => setIsOpen(false)}
-              />
             </div>,
             document.body,
           )
@@ -215,7 +196,6 @@ function MenuItem({ action, onClose }: { action: MenuAction; onClose: () => void
           : "text-[var(--theme-text-strong)] hover:bg-[var(--theme-surface-soft)] focus-visible:bg-[var(--theme-surface-soft)]"
       } focus-visible:outline-none`}
       disabled={action.disabled}
-      title={action.disabled ? action.disabledReason : undefined}
       onClick={() => {
         onClose();
         action.onSelect();

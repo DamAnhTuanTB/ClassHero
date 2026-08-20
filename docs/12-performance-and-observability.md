@@ -157,13 +157,22 @@ Tác vụ nên dùng worker/job:
 - Email/Zalo notification.
 - Ảnh minh họa/render nặng nếu có.
 
+AI generation và embedding hiện dùng chung `WORKER_CONCURRENCY_AI=4`: mỗi
+worker process có thể xử lý tối đa bốn job của queue AI generation và đồng thời
+bốn job của queue embedding. Khi chạy nhiều worker process, concurrency hiệu
+dụng tăng theo số instance; cần theo dõi provider rate limit, chi phí, CPU/RAM,
+database connection và tỷ lệ retry trước khi scale thêm.
+
 Riêng Summary có `TEX_FIGURE`, generation và render là các bước tách biệt.
 Structured-output call của Summary chỉ sinh nội dung + figure plan. Mỗi figure
 dùng một structured-output call chuyên vẽ, lưu raw core fragment rồi enqueue một
-`DIAGRAM_RENDERING` job. Worker figure mặc định concurrency 1 để TeX Live không
-tranh CPU/RAM trên VPS nhỏ. Các figure của cùng một Summary được enqueue đồng thời
-bằng `Promise.all` để không kéo dài bước persist; thứ tự hoàn tất không phải
-contract. API/UI luôn sắp xếp danh sách theo vị trí số
+`DIAGRAM_RENDERING` job. Worker figure mặc định concurrency 3 để xử lý tối đa ba
+hình đồng thời trong mỗi worker process. Chỉ chạy một worker process ở local;
+nếu scale nhiều instance thì concurrency hiệu dụng tăng theo số instance và phải
+theo dõi CPU/RAM, compile latency, timeout cùng tỷ lệ repair để hạ mức khi quá
+tải. Các figure của cùng một Summary được enqueue đồng thời bằng `Promise.all` để
+không kéo dài bước persist; thứ tự hoàn tất không phải contract. API/UI luôn sắp
+xếp danh sách theo vị trí số
 `section -> block -> figureIndex` để thứ tự hiển thị ổn định. UI dùng một query
 figure duy nhất, invalidate ngay khi job Summary terminal và poll 1,5 giây khi
 còn figure active để đồng bộ ảnh/counter.
@@ -294,6 +303,11 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   versioned; ảnh vượt cap bị từ chối thân thiện thay vì giữ request lâu hoặc âm
   thầm giảm độ phân giải. Apply nối tiếp trong cùng modal dùng thẳng figure trả về
   để cập nhật ảnh và mutation guard; không chờ đóng/mở lại editor để lấy revision.
+- `use-source-crop` chỉ chạy preset làm nét local đồng bộ khi request có
+  `enhance=true`; nhánh `false` bỏ qua preset để promote crop đã chuẩn hóa.
+  Nhánh làm nét phải dùng chung pixel/byte cap và không fallback sang crop thô
+  khi xử lý lỗi. UI hiển thị pending ngay trong CTA và current asset chỉ đổi
+  sau response thành công.
 - Ghi `raster_edit_preview_duration_ms`, `raster_edit_apply_duration_ms`, loại
   operation, số pixel nguồn, output bytes, mask coverage, background variance và
   rejection reason. Không log raw image, mask, signed URL hay object key. M9.18

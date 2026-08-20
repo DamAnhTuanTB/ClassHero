@@ -410,6 +410,14 @@ export interface AdminStemFigure {
   hasCurrentAsset: boolean;
   sourceKind: "AI_TEX" | "ADMIN_UPLOAD";
   currentAssetKind: "AI_TEX" | "ADMIN_UPLOAD" | "TEXTBOOK_SOURCE" | null;
+  currentRevisionOrigin:
+    | "INITIAL_AI"
+    | "AUTO_REPAIR"
+    | "ADMIN_EDIT"
+    | "ADMIN_REGENERATE"
+    | "ADMIN_UPLOAD"
+    | "MANUAL_REPAIR"
+    | null;
   latexSource: string | null;
   sourceHash: string;
   sourceVersion: number;

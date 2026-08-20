@@ -136,27 +136,30 @@ function hydrateStemFigureReferences(
         return {
           ...section,
           blocks: section.blocks.map((block) => {
-            if (!isRecord(block) || !isRecord(block.visual)) return block;
-            if (
-              block.visual.kind !== "TEX_FIGURE" ||
-              typeof block.visual.figureId !== "string"
-            ) {
-              return block;
-            }
-            const figure = figures.get(block.visual.figureId);
-            return figure
-              ? {
-                  ...block,
-                  visual: {
-                    kind: "TEX_FIGURE",
-                    figureId: block.visual.figureId,
-                    status: figure.status,
-                    altText: figure.altText,
-                    caption: figure.caption,
-                    assetUrl: figure.assetUrl,
-                  },
+            if (!isRecord(block) || !Array.isArray(block.figures)) return block;
+            return {
+              ...block,
+              figures: block.figures.map((visual) => {
+                if (
+                  !isRecord(visual) ||
+                  visual.kind !== "TEX_FIGURE" ||
+                  typeof visual.figureId !== "string"
+                ) {
+                  return visual;
                 }
-              : block;
+                const figure = figures.get(visual.figureId);
+                return figure
+                  ? {
+                      kind: "TEX_FIGURE",
+                      figureId: visual.figureId,
+                      status: figure.status,
+                      altText: figure.altText,
+                      caption: figure.caption,
+                      assetUrl: figure.assetUrl,
+                    }
+                  : visual;
+              }),
+            };
           }),
         };
       }),

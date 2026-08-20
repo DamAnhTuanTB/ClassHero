@@ -95,6 +95,7 @@ describe("M9.2 logical figure revision lifecycle", () => {
         currentRevisionId,
         currentRevision: revision({
           id: currentRevisionId,
+          origin: "INITIAL_AI",
           status: "SUCCEEDED",
           sourceVersion: 1,
           latexSource: "current source",
@@ -141,6 +142,7 @@ describe("M9.2 logical figure revision lifecycle", () => {
     expect(result).toMatchObject({
       status: "FAILED",
       hasCurrentAsset: true,
+      currentRevisionOrigin: "INITIAL_AI",
       assetUrl: "https://assets.test/current.svg",
       latexSource: "failed candidate source",
       sourceVersion: 2,
@@ -1249,7 +1251,7 @@ describe("M9.2 logical figure revision lifecycle", () => {
     expect(storage.uploadBuffer).not.toHaveBeenCalled();
   });
 
-  it("promotes an OCR crop from history when the code revision omitted its snapshot", async () => {
+  it("optionally enhances an OCR crop from history when the code revision omitted its snapshot", async () => {
     const sourceObjectKey = "document-images/page-050/figure-5-32.jpg";
     const snapshot = {
       version: 1,
@@ -1341,6 +1343,33 @@ describe("M9.2 logical figure revision lifecycle", () => {
         baseSourceVersion: 1,
         sourceSnapshotHash: "snapshot-hash",
         sourceObjectKey,
+        enhance: false,
+      },
+    );
+
+    expect(transaction.file.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.not.objectContaining({
+            rasterCleanupPipelineVersion: expect.anything(),
+            rasterCleanupOperations: expect.anything(),
+            automaticEnhancement: expect.anything(),
+          }),
+        }),
+      }),
+    );
+
+    await service.useSourceCrop(
+      "00000000-0000-4000-8000-000000000034",
+      figureId,
+      "00000000-0000-4000-8000-000000000035",
+      {
+        baseCurrentRevisionId: currentRevisionId,
+        basePendingRevisionId: null,
+        baseSourceVersion: 1,
+        sourceSnapshotHash: "snapshot-hash",
+        sourceObjectKey,
+        enhance: true,
       },
     );
 
@@ -1351,6 +1380,9 @@ describe("M9.2 logical figure revision lifecycle", () => {
           metadataJson: expect.objectContaining({
             uploadSource: "stem-figure.use-source-crop",
             textbookSourceObjectKey: sourceObjectKey,
+            rasterCleanupPipelineVersion: "TEXTBOOK_RASTER_CLEANUP_V2",
+            rasterCleanupOperations: ["ENHANCE"],
+            automaticEnhancement: true,
           }),
         }),
       }),
@@ -1417,18 +1449,22 @@ describe("M9.2 logical figure revision lifecycle", () => {
         lessonId: "lesson-id",
         contentJson: {
           type: "lesson_summary_blocks",
+          version: 3,
           data: {
             sections: [
               {
                 blocks: [
                   {
                     type: "knowledge",
-                    visual: {
-                      kind: "TEX_FIGURE",
-                      figureId,
-                      latexSource: "must not leak",
-                      previewSvg: "must not leak",
-                    },
+                    figures: [
+                      {
+                        kind: "TEX_FIGURE",
+                        figureId,
+                        figureOrigin: "TEXTBOOK_SOURCE",
+                        latexSource: "must not leak",
+                        previewSvg: "must not leak",
+                      },
+                    ],
                   },
                 ],
               },
@@ -1454,6 +1490,30 @@ describe("M9.2 logical figure revision lifecycle", () => {
       new Map([[figureId, "https://assets.test/current.svg"]]),
     );
 
+    expect(result).toMatchObject({
+      contentJson: {
+        data: {
+          sections: [
+            {
+              blocks: [
+                {
+                  figures: [
+                    {
+                      kind: "TEX_FIGURE",
+                      figureId,
+                      status: "SUCCEEDED",
+                      altText: "Hình hiện hành",
+                      caption: "Caption hiện hành",
+                      assetUrl: "https://assets.test/current.svg",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
     const serialized = JSON.stringify(result);
     expect(serialized).toContain("https://assets.test/current.svg");
     expect(serialized).not.toContain("latexSource");
@@ -1465,6 +1525,7 @@ function revision(
   overrides: Partial<{
     id: string;
     status: string;
+    origin: string;
     sourceVersion: number;
     latexSource: string;
     sourceHash: string | null;
@@ -1479,7 +1540,7 @@ function revision(
   return {
     id: overrides.id ?? pendingRevisionId,
     sourceKind: "AI_TEX",
-    origin: "ADMIN_EDIT",
+    origin: overrides.origin ?? "ADMIN_EDIT",
     status: overrides.status ?? "FAILED",
     latexSource: overrides.latexSource === undefined ? "source" : overrides.latexSource,
     sourceHash:

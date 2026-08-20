@@ -472,6 +472,23 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(selection.warnings).toContain("figure_label_not_matched_using_page_fallback");
   });
 
+  it("does not confuse a parent figure identity with a labelled subfigure", () => {
+    const selection = selectReferenceImages({
+      images: [
+        referenceImage({
+          imageId: "subfigure-4-16-a",
+          captionCandidate: "Hình 4.16a",
+        }),
+      ],
+      pageNumber: 43,
+      figureLabel: "Hình 4.16",
+      query: "Hình 4.16",
+    });
+
+    expect(selection.images).toEqual([]);
+    expect(selection.warnings).toContain("figure_label_not_matched_using_page_fallback");
+  });
+
   it("requests the full PDF page when the block has no concrete figure label", () => {
     const selection = selectReferenceImages({
       images: [
@@ -579,6 +596,246 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(downloadObject).toHaveBeenCalledWith("ocr/image-manifest.json");
     expect(headObject).not.toHaveBeenCalled();
     expect(uploadObject).not.toHaveBeenCalled();
+  });
+
+  it("relocates an exact figure label to its unique canonical packet page", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "lesson-document-1",
+        file: {
+          id: "source-file-1",
+          objectKey: "documents/source.pdf",
+          checksum: "source-checksum",
+        },
+        activeOcrArtifact: {
+          id: "ocr-artifact-1",
+          imageManifestObjectKey: "ocr/image-manifest.json",
+        },
+        sourceDocument: null,
+      },
+    ]);
+    const downloadObject = vi.fn().mockResolvedValue(
+      Buffer.from(
+        JSON.stringify({
+          images: [
+            {
+              imageId: "figure-4-16",
+              pageNumber: 21,
+              objectKey: "document-images/page-21/figure-4-16.jpg",
+              mimeType: "image/jpeg",
+              captionCandidate: "Hinh 4.16",
+              nearbyText: "Miền phẳng giới hạn bởi hai đồ thị",
+              isUsableForAi: true,
+            },
+            {
+              imageId: "figure-4-17",
+              pageNumber: 22,
+              objectKey: "document-images/page-22/figure-4-17.jpg",
+              mimeType: "image/jpeg",
+              captionCandidate: "Hình 4.17",
+              nearbyText: "Hai parabol",
+              isUsableForAi: true,
+            },
+          ],
+        }),
+      ),
+    );
+    const headObject = vi.fn();
+    const resolver = new FigureReferenceResolverService(
+      { lessonDocument: { findMany } } as never,
+      { downloadObject, headObject, uploadObject: vi.fn() } as never,
+    );
+    const manifest = {
+      version: 1 as const,
+      lessonId,
+      packetHash: "packet-hash",
+      pageCount: 3,
+      pages: [
+        packetManifestPage(1, 20, "19"),
+        packetManifestPage(2, 21, "20"),
+        packetManifestPage(3, 22, "21"),
+      ],
+    };
+    const requestedPlan = stemFigureRenderPlanSchema.parse({
+      figurePlanContractVersion: 3,
+      figureOrigin: "TEXTBOOK_SOURCE",
+      localId: "F001",
+      sourceReferences: [
+        {
+          packetPageNumber: 3,
+          printedPageLabel: "21",
+          figureLabel: "Hình 4.16",
+          sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
+        },
+      ],
+    });
+    const corroboratedPlan = stemFigureRenderPlanSchema.parse({
+      figurePlanContractVersion: 3,
+      figureOrigin: "TEXTBOOK_SOURCE",
+      localId: "F002",
+      sourceReferences: [
+        {
+          packetPageNumber: 3,
+          printedPageLabel: "wrong-provider-label",
+          figureLabel: "Hình 4.17",
+          sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
+        },
+      ],
+    });
+
+    const [relocated, corroborated] = await resolver.resolveMany({
+      manifest,
+      plans: [requestedPlan, corroboratedPlan],
+    });
+
+    expect(relocated?.plan.sourceReferences[0]).toMatchObject({
+      packetPageNumber: 2,
+      printedPageLabel: "20",
+      figureLabel: "Hình 4.16",
+    });
+    expect(relocated?.snapshot).toMatchObject({
+      status: "resolved",
+      assets: [
+        {
+          objectKey: "document-images/page-21/figure-4-16.jpg",
+          packetPageNumber: 2,
+          source: "OCR_CROP",
+        },
+      ],
+      references: [
+        {
+          sourcePdfPageNumber: 21,
+          requestedPlanReference: {
+            packetPageNumber: 3,
+            printedPageLabel: "21",
+          },
+          warnings: [
+            "figure_label_exact_match_relocated",
+            "printed_page_label_canonicalized",
+          ],
+        },
+      ],
+    });
+    expect(corroborated?.plan.sourceReferences[0]).toMatchObject({
+      packetPageNumber: 3,
+      printedPageLabel: "21",
+    });
+    expect(corroborated?.snapshot.references[0]?.warnings).toContain(
+      "printed_page_label_canonicalized",
+    );
+    expect(downloadObject).toHaveBeenCalledOnce();
+    expect(headObject).not.toHaveBeenCalled();
+  });
+
+  it("keeps duplicate exact-label pages ambiguous instead of choosing one", async () => {
+    const resolver = packetResolverWithImages([
+      referenceImage({
+        imageId: "figure-copy-page-21",
+        pageNumber: 21,
+        captionCandidate: "Hình 4.16",
+      }),
+      referenceImage({
+        imageId: "figure-copy-page-22",
+        pageNumber: 22,
+        captionCandidate: "Hình 4.16",
+      }),
+    ]);
+    const requestedPlan = stemFigureRenderPlanSchema.parse({
+      figurePlanContractVersion: 3,
+      figureOrigin: "TEXTBOOK_SOURCE",
+      localId: "F001",
+      sourceReferences: [
+        {
+          packetPageNumber: 1,
+          printedPageLabel: "19",
+          figureLabel: "Hình 4.16",
+          sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
+        },
+      ],
+    });
+
+    const [result] = await resolver.resolveMany({
+      manifest: {
+        version: 1,
+        lessonId,
+        packetHash: "packet-hash",
+        pageCount: 3,
+        pages: [
+          packetManifestPage(1, 20, "19"),
+          packetManifestPage(2, 21, "20"),
+          packetManifestPage(3, 22, "21"),
+        ],
+      },
+      plans: [requestedPlan],
+    });
+
+    expect(result?.plan).toEqual(requestedPlan);
+    expect(result?.snapshot.status).toBe("ambiguous");
+    expect(result?.snapshot.assets).toEqual([
+      expect.objectContaining({ packetPageNumber: 1, source: "PDF_PAGE" }),
+    ]);
+    expect(result?.snapshot.references[0]?.warnings).toContain(
+      "figure_label_exact_match_multiple_pages",
+    );
+  });
+
+  it("falls back to the relocated canonical page when the exact crop is unusable", async () => {
+    const resolver = packetResolverWithImages([
+      referenceImage({
+        imageId: "unusable-figure-4-16",
+        pageNumber: 21,
+        captionCandidate: "Hình 4.16",
+        isUsableForAi: false,
+      }),
+    ]);
+    const requestedPlan = stemFigureRenderPlanSchema.parse({
+      figurePlanContractVersion: 3,
+      figureOrigin: "TEXTBOOK_SOURCE",
+      localId: "F001",
+      sourceReferences: [
+        {
+          packetPageNumber: 3,
+          printedPageLabel: "21",
+          figureLabel: "Hình 4.16",
+          sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
+        },
+      ],
+    });
+
+    const [result] = await resolver.resolveMany({
+      manifest: {
+        version: 1,
+        lessonId,
+        packetHash: "packet-hash",
+        pageCount: 3,
+        pages: [
+          packetManifestPage(1, 20, "19"),
+          packetManifestPage(2, 21, "20"),
+          packetManifestPage(3, 22, "21"),
+        ],
+      },
+      plans: [requestedPlan],
+    });
+
+    expect(result?.plan.sourceReferences[0]).toMatchObject({
+      packetPageNumber: 2,
+      printedPageLabel: "20",
+    });
+    expect(result?.snapshot.status).toBe("page_fallback");
+    expect(result?.snapshot.assets).toEqual([
+      expect.objectContaining({
+        objectKey: "derived/lesson-summary-reference-pages/source-checksum/page-21.png",
+        packetPageNumber: 2,
+        source: "PDF_PAGE",
+      }),
+    ]);
+    expect(result?.snapshot.references[0]?.warnings).toEqual(
+      expect.arrayContaining([
+        "figure_label_exact_match_relocated",
+        "figure_label_exact_match_unusable",
+        "no_usable_ocr_crop",
+      ]),
+    );
   });
 
   it("preserves complementary exact-label crops from an immutable historical snapshot", () => {
@@ -934,6 +1191,81 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       problem: "Đề bài ban đầu.",
     });
     expect(result.mapped.figures[0]?.blockPath).toBe("sections.0.blocks.0");
+  });
+
+  it("persists a deleted section instead of rebuilding it from raw Phase 1", () => {
+    const output = buildMathProviderOutput({
+      title: "Phương trình đường thẳng",
+      displayHeading: "Vectơ chỉ phương",
+      theoryContent: "Nội dung ban đầu.",
+      illustrationProblem: "Đề bài ban đầu.",
+      illustrationFigure: { caption: null },
+    });
+    const mapped = mapLessonSummaryProviderOutput({
+      lessonId,
+      output,
+      packetPageCount: 1,
+      targetGrade: 12,
+      subjectKey: "MATH",
+    });
+    const prepared = prepareLessonSummaryPhaseOneLayoutEdits(
+      {
+        type: "lesson_summary_phase_one_blocks",
+        version: 2,
+        providerOutput: output,
+        blocks: mapped.phaseOneBlocks,
+        providerPaths: mapped.phaseOneProviderPaths,
+        subjectKey: "MATH",
+        targetGrade: 12,
+        packetPageCount: 1,
+      },
+      [{ type: "DELETE_SECTION", sectionIndex: 0 }],
+    );
+
+    expect(prepared.success).toBe(true);
+    if (!prepared.success) throw new Error(prepared.message);
+    const deletedSectionPaths = Object.keys(mapped.phaseOneBlocks).filter((path) =>
+      path.startsWith("sections.0."),
+    );
+    const followingSectionPaths = Object.keys(mapped.phaseOneBlocks).filter((path) =>
+      path.startsWith("sections.1."),
+    );
+    expect(deletedSectionPaths).not.toHaveLength(0);
+    expect(
+      deletedSectionPaths.every((path) => prepared.blockPathChanges.get(path) === null),
+    ).toBe(true);
+    expect(
+      followingSectionPaths.every(
+        (path) =>
+          prepared.blockPathChanges.get(path) ===
+          path.replace("sections.1.", "sections.0."),
+      ),
+    ).toBe(true);
+    expect(Object.keys(prepared.snapshot.blocks)).toHaveLength(
+      Object.keys(mapped.phaseOneBlocks).length - deletedSectionPaths.length,
+    );
+
+    const result = applyLessonSummaryPhaseOneBlockEdits({
+      lessonId,
+      blocks: prepared.snapshot.blocks,
+      snapshot: prepared.snapshot,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error(result.message);
+    expect(result.mapped.content.sections).toHaveLength(
+      mapped.content.sections.length - 1,
+    );
+    expect(result.mapped.content.sections.map((section) => section.title)).toEqual(
+      mapped.content.sections.slice(1).map((section) => section.title),
+    );
+    expect(result.mapped.content.sections.map((section) => section.order)).toEqual(
+      mapped.content.sections.slice(1).map((_, index) => index + 1),
+    );
+    expect(
+      result.mapped.figures.every((figure) =>
+        Object.keys(prepared.snapshot.blocks).includes(figure.blockPath),
+      ),
+    ).toBe(true);
   });
 
   it("persists heading deletion as a section merge", () => {
@@ -3853,6 +4185,51 @@ function createConfig() {
         TEX_REPAIR_MAX_INPUT_CHARACTERS: 80_000,
       })[key],
   } as ConfigService<EnvConfig, true>;
+}
+
+function packetManifestPage(
+  packetPageNumber: number,
+  sourcePdfPageNumber: number,
+  printedPageLabel: string,
+) {
+  return {
+    packetPageNumber,
+    sourceKey: "source-1",
+    lessonDocumentId: "lesson-document-1",
+    sourceDocumentId: "source-document-1",
+    sourceFileId: "source-file-1",
+    sourcePdfPageNumber,
+    printedPageLabel,
+    pageRangeId: null,
+    documentTitle: "Toán 12",
+    segmentOrder: 0,
+  };
+}
+
+function packetResolverWithImages(images: OcrImageShape[]) {
+  const findMany = vi.fn().mockResolvedValue([
+    {
+      id: "lesson-document-1",
+      file: {
+        id: "source-file-1",
+        objectKey: "documents/source.pdf",
+        checksum: "source-checksum",
+      },
+      activeOcrArtifact: {
+        id: "ocr-artifact-1",
+        imageManifestObjectKey: "ocr/image-manifest.json",
+      },
+      sourceDocument: null,
+    },
+  ]);
+  return new FigureReferenceResolverService(
+    { lessonDocument: { findMany } } as never,
+    {
+      downloadObject: vi.fn().mockResolvedValue(Buffer.from(JSON.stringify({ images }))),
+      headObject: vi.fn().mockResolvedValue(true),
+      uploadObject: vi.fn(),
+    } as never,
+  );
 }
 
 function referenceImage(

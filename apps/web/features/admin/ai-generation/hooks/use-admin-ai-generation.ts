@@ -205,11 +205,16 @@ export function useAdminStemFigureSourceCrop(lessonId: string) {
   const session = useAuthSessionStore((state) => state.session);
   const invalidate = useInvalidateStemFigures(lessonId);
   return useMutation({
-    mutationFn: (input: { figure: AdminStemFigure; sourceObjectKey: string }) =>
+    mutationFn: (input: {
+      figure: AdminStemFigure;
+      sourceObjectKey: string;
+      enhance: boolean;
+    }) =>
       promoteAdminStemFigureSourceCrop(
         lessonId,
         input.figure,
         input.sourceObjectKey,
+        input.enhance,
         session?.accessToken ?? "",
       ),
     onSuccess: invalidate,

@@ -612,8 +612,9 @@ Contract provider:
   qua raw bị reject và phải dùng menu ảnh chuyên dụng. Với UNIT, block lý thuyết
   nhận object `theory` và block ví dụ nhận object `example`; note và hai bài vận
   dụng nhận đúng object tương ứng của chúng.
-- Xóa block hoặc xóa heading để gộp section là editorial layout operation tách
-  khỏi provider schema: frontend phải đồng thời đánh lại raw block path và gửi
+- Xóa block, xóa toàn bộ section hoặc xóa heading để gộp section là editorial
+  layout operation tách khỏi provider schema: frontend phải đồng thời đánh lại
+  raw block path và gửi
   danh sách thao tác có thứ tự. Backend vẫn strict-validate provider output gốc,
   sau đó replay layout operation lên content/raw snapshot trước khi persist để
   block đã xóa không xuất hiện lại khi Lưu/tải lại. Figure của block bị xóa dùng
@@ -640,6 +641,16 @@ Contract provider:
   lấy. Khi không có ảnh nguồn, Stage 2 suy hình trực tiếp từ projection của
   đúng block sở hữu hình; không ghép block lý thuyết đứng trước và không
   tách thêm checklist hình học trùng nghĩa.
+- Trang do provider trả trong `sourceReferences` là requested location, không
+  phải canonical authority. Sau Zod, backend dùng exact normalized
+  `figureLabel` để đối chiếu OCR image inventory trên toàn bộ các trang
+  thuộc packet. Exact label ở duy nhất một packet page được phép sửa
+  `packetPageNumber` và lấy `printedPageLabel` từ packet manifest; cùng label
+  ở nhiều page phải `ambiguous`, không chọn bừa. OCR evidence có label
+  exact nhưng crop không usable vẫn được dùng để định vị canonical
+  page, sau đó fallback nguyên đúng trang đó. Raw provider output không
+  bị rewrite; render plan persist và reference snapshot dùng reference đã
+  canonicalize.
 - Figure profile hiện tại là light-only.
 
 Sau mapper, review validator vẫn kiểm dấu `$` và ngoặc `{}` của mọi trường text
@@ -742,6 +753,13 @@ encode WebP lossless trước khi promote. Nếu một crop không thể xử l�
 cap/validation thì figure đó giữ `NEEDS_REVIEW`; không fallback âm thầm sang crop
 chưa làm nét.
 
+Action hậu kiểm thủ công có checkbox `Làm nét ảnh` và gửi cờ
+`enhance` riêng, không dùng cờ cấp lượt sinh. Mặc định `false` promote
+`OCR_CROP` qua luồng chuẩn hóa raster hiện có. Khi `true`, backend chạy cùng
+preset `TEXTBOOK_RASTER_CLEANUP_V2` và encode WebP lossless trước khi promote.
+Cả hai nhánh đều là xử lý local không gọi AI/provider; lỗi giữ nguyên
+current revision.
+
 M9.18 bổ sung editor hậu xử lý raster cục bộ cho delivery asset
 `TEXTBOOK_SOURCE` đã `SUCCEEDED`. Tính năng này không thuộc AI generation: không
 gọi provider, không dùng semantic object detection/inpainting và không tạo usage
@@ -782,8 +800,9 @@ tách thành nhiều panel bổ sung nhau; snapshot vẫn giữ cảnh báo ambi
 không được tự gộp chúng. Crop Mathpix đã khớp nhãn là artifact nguồn bất
 biến và được gửi nguyên trạng; backend không render lại một crop rộng hơn
 từ trang PDF, vì thao tác đó làm loãng artwork bằng văn bản, caption và
-thành phần trang không thuộc hình.
-Với nhãn chỉ khớp mơ hồ, resolver chọn một crop tốt nhất.
+thành phần trang không thuộc hình. Formal figure identity không được
+semantic-rank sang nhãn lân cận; ranking mơ hồ chỉ còn áp dụng cho label
+không có formal identity và không được dùng để canonicalize trang.
 Nếu block không có nhãn hình cụ thể, hoặc nhãn cụ thể không khớp crop đáng tin
 cậy, resolver phải giữ ảnh render nguyên trang PDF làm fallback để AI còn đủ ngữ
 cảnh trang; đây là ngoại lệ có chủ đích, không được thay bằng crop đoán theo nearby
