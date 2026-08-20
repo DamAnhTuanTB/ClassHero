@@ -134,20 +134,15 @@ export class FigureReferenceResolverService {
       evidence: OcrImageShape[];
     };
 
-    const pageContexts = input.manifest.pages.map(
-      (page): PacketPageContext => ({
-        page,
-        document: documentsById.get(page.lessonDocumentId) ?? null,
-        images: imagesByDocumentId.get(page.lessonDocumentId) ?? [],
-      }),
-    );
+    const pageContexts = input.manifest.pages.map((page): PacketPageContext => ({
+      page,
+      document: documentsById.get(page.lessonDocumentId) ?? null,
+      images: imagesByDocumentId.get(page.lessonDocumentId) ?? [],
+    }));
     const pageContextsByPacketNumber = new Map(
       pageContexts.map((context) => [context.page.packetPageNumber, context] as const),
     );
-    const exactLocationsByIdentity = new Map<
-      string,
-      Map<number, PacketExactLocation>
-    >();
+    const exactLocationsByIdentity = new Map<string, Map<number, PacketExactLocation>>();
     for (const context of pageContexts) {
       for (const image of context.images) {
         if (image.pageNumber !== context.page.sourcePdfPageNumber) continue;
@@ -212,8 +207,7 @@ export class FigureReferenceResolverService {
                 ...reference,
                 packetPageNumber: effectiveContext.page.packetPageNumber,
                 printedPageLabel:
-                  effectiveContext.page.printedPageLabel ??
-                  reference.printedPageLabel,
+                  effectiveContext.page.printedPageLabel ?? reference.printedPageLabel,
               }
             : reference;
         if (
@@ -551,9 +545,7 @@ export function selectReferenceImages(input: {
   };
 }
 
-function canUsePageFallback(
-  reference: StemFigureRenderPlan["sourceReferences"][number],
-) {
+function canUsePageFallback(reference: StemFigureRenderPlan["sourceReferences"][number]) {
   if (reference.sourceTarget.scope === "SUBFIGURE") {
     return Boolean(reference.sourceTarget.locator?.trim());
   }

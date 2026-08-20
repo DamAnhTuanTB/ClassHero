@@ -28,14 +28,10 @@ const REMOVE_ON_COMPLETE_SECONDS = 7 * 24 * 60 * 60;
 const REMOVE_ON_FAIL_SECONDS = 30 * 24 * 60 * 60;
 
 @Injectable()
-export class EmbeddingWorkerService
-  implements OnModuleInit, OnModuleDestroy
-{
+export class EmbeddingWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EmbeddingWorkerService.name);
-  private worker: Worker<
-    BackgroundJobBullmqData,
-    BackgroundJobBullmqResult
-  > | null = null;
+  private worker: Worker<BackgroundJobBullmqData, BackgroundJobBullmqResult> | null =
+    null;
 
   constructor(
     @Inject(ConfigService)
@@ -50,29 +46,28 @@ export class EmbeddingWorkerService
       infer: true,
     });
 
-    this.worker = new Worker<
-      BackgroundJobBullmqData,
-      BackgroundJobBullmqResult
-    >(queueName, (job) => this.processor.process(job), {
-      connection: parseRedisConnection(
-        this.configService.get("REDIS_URL", { infer: true }),
-      ),
-      concurrency,
-      name: "embedding-worker",
-      removeOnComplete: {
-        age: REMOVE_ON_COMPLETE_SECONDS,
-        count: 1_000,
+    this.worker = new Worker<BackgroundJobBullmqData, BackgroundJobBullmqResult>(
+      queueName,
+      (job) => this.processor.process(job),
+      {
+        connection: parseRedisConnection(
+          this.configService.get("REDIS_URL", { infer: true }),
+        ),
+        concurrency,
+        name: "embedding-worker",
+        removeOnComplete: {
+          age: REMOVE_ON_COMPLETE_SECONDS,
+          count: 1_000,
+        },
+        removeOnFail: {
+          age: REMOVE_ON_FAIL_SECONDS,
+          count: 5_000,
+        },
       },
-      removeOnFail: {
-        age: REMOVE_ON_FAIL_SECONDS,
-        count: 5_000,
-      },
-    });
+    );
 
     this.worker.on("failed", (job, err) => {
-      this.logger.error(
-        `Embedding job ${job?.id ?? "unknown"} failed: ${err.message}`,
-      );
+      this.logger.error(`Embedding job ${job?.id ?? "unknown"} failed: ${err.message}`);
     });
 
     this.worker.on("completed", (job) => {

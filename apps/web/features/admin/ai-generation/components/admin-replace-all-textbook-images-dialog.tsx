@@ -93,10 +93,10 @@ export function AdminReplaceAllTextbookImagesDialog({
               >
                 <p>
                   <strong>{eligibleCount} hình từ lượt AI sinh ban đầu</strong> sẽ được
-                  thay bằng crop gốc sách giáo khoa, sau đó tự động giảm nhiễu và làm
-                  nét bằng xử lý local. Ảnh admin tạo mới bằng AI, tạo bằng mã code,
-                  tải lên và ảnh SGK hiện có đều được giữ nguyên. Thao tác này không
-                  gọi AI trả phí.
+                  thay bằng crop gốc sách giáo khoa, sau đó tự động giảm nhiễu và làm nét
+                  bằng xử lý local. Ảnh admin tạo mới bằng AI, tạo bằng mã code, tải lên
+                  và ảnh SGK hiện có đều được giữ nguyên. Thao tác này không gọi AI trả
+                  phí.
                 </p>
                 {skippedCount > 0 ? (
                   <p className="rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-3 text-[var(--theme-warning-text)]">
