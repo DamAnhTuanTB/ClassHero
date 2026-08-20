@@ -45,7 +45,10 @@ import {
 import { useAdminLessonContentPrefetch } from "@/features/admin/lessons/hooks/use-admin-lesson-content-prefetch";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
 import { getQueryRenderState } from "@/lib/query-render-state";
-import type { AdminAiGenerationType } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import type {
+  AdminAiGenerationDialogRequest,
+  AdminAiGenerationType,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 
 const LessonDetailEditorDialog = dynamic(() =>
   import("@/features/admin/lessons/components/lesson-detail-editor-dialog").then(
@@ -121,8 +124,8 @@ export function AdminLessonDetailManager({
   const [activeQuizSetId, setActiveQuizSetId] = useState(
     initialQuizData?.questionSetId ?? undefined,
   );
-  const [requestedGenerationType, setRequestedGenerationType] =
-    useState<AdminAiGenerationType | null>(null);
+  const [requestedGeneration, setRequestedGeneration] =
+    useState<AdminAiGenerationDialogRequest | null>(null);
   const lessonContentPanelId = `admin-lesson-tab-panel-${lessonId}`;
   const [tabPanelMinHeight, setTabPanelMinHeight] = useState(400);
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
@@ -263,7 +266,7 @@ export function AdminLessonDetailManager({
   );
 
   const handleRequestedGenerationHandled = useCallback(
-    () => setRequestedGenerationType(null),
+    () => setRequestedGeneration(null),
     [],
   );
 
@@ -610,7 +613,7 @@ export function AdminLessonDetailManager({
               <AdminAiGenerationPanel
                 lessonId={lessonId}
                 quizTargetSetId={activeQuizSetId}
-                requestedGenerationType={requestedGenerationType}
+                requestedGeneration={requestedGeneration}
                 onOpenResult={handleOpenAiResult}
                 onRequestedGenerationHandled={handleRequestedGenerationHandled}
               />
@@ -671,8 +674,11 @@ export function AdminLessonDetailManager({
                   <AdminLessonSummaryTab
                     lessonId={lessonId}
                     lessonTitle={lesson?.title}
+                    onEdit={() => {
+                      setRequestedGeneration({ type: "SUMMARY", mode: "EDIT" });
+                    }}
                     onRegenerate={() => {
-                      setRequestedGenerationType("SUMMARY");
+                      setRequestedGeneration({ type: "SUMMARY", mode: "CREATE" });
                     }}
                   />
                 )}

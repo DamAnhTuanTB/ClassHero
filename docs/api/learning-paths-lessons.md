@@ -649,6 +649,11 @@ Behavior:
   object structured output mà provider trả ở Phase 1 cho đúng block đó, trước
   mapper và trước khi backend gắn ID/trạng thái hình. Lượt sinh cũ chưa có
   snapshot editable theo block trả `null`.
+- Trả `sourcePages[]` cho Summary AI gồm ánh xạ provenance
+  `packetPageNumber -> sourceFileId + sourcePdfPageNumber`, kèm tên tài liệu và
+  nhãn trang in nếu có. Admin UI dùng ánh xạ này để mở đúng PDF gốc tại các
+  `sourcePageNumbers` của từng block; signed URL vẫn lấy qua file API chỉ khi
+  modal mở. Summary thủ công hoặc lượt cũ không còn manifest trả mảng rỗng.
 - Với mỗi `contentJson.data.sections[].blocks[].figures[]` có
   `kind=TEX_FIGURE`, response gồm `figureId`, `figureOrigin`, `status`, `altText`
   và `caption`. Render plan chuẩn vẫn nằm trong bản ghi STEM figure tương ứng.
@@ -714,7 +719,8 @@ Behavior:
   để lần Lưu/tải lại sau không dựng lại block hoặc section đã xóa.
 - Ghép từng object đã sửa về đúng vị trí trong provider output gốc, validate lại
   bằng strict schema tương ứng với môn và lớp rồi mới map/upsert Summary.
-- Cho sửa text, `altText`, `caption` và provenance hợp lệ của figure đã tồn tại.
+- Cho sửa text, `caption` và provenance hợp lệ của figure đã tồn tại; raw Phase 1
+  không có `altText`.
   Không cho thêm/xóa phần tử `figures[]` qua raw;
   thao tác thay đổi số figure phải đi qua STEM figure API/menu ảnh.
 - Giữ nguyên figure ID, revision và asset hiện tại. Endpoint không gọi AI
@@ -759,7 +765,8 @@ Body:
   "temperature": 0.2,
   "reasoningEffort": "medium",
   "maxOutputTokens": 8000,
-  "useTextbookSourceImages": false
+  "useTextbookSourceImages": false,
+  "autoEnhanceTextbookSourceImages": false
 }
 ```
 
@@ -776,6 +783,10 @@ Rules:
   figure sau khi Phase 1 đã validate/map thành công; service Phase 1 không được
   branch theo field này. Không được nối field vào PDF packet, manifest,
   system/user prompt, provider JSON Schema/request, validation hoặc mapper Phase 1.
+- `autoEnhanceTextbookSourceImages` là boolean optional, mặc định `false`, chỉ có
+  hiệu lực khi `useTextbookSourceImages=true` và cũng thuộc request
+  draft/hash/job snapshot. Backend chuẩn hóa cờ này về `false` nếu cờ cha tắt;
+  field không được đi vào PDF packet, prompt, provider schema/request hay mapper.
 - Nếu cùng lesson đang có job summary `QUEUED`/`RUNNING`, API trả lại `jobId`
   đó thay vì enqueue provider call thứ hai.
 - Sau khi job terminal `SUCCEEDED`/`FAILED`, admin có thể yêu cầu regenerate.
@@ -846,6 +857,11 @@ Side effects:
   chỉ có `PDF_PAGE`, figure giữ `NEEDS_REVIEW`, không tự lấy candidate đầu tiên.
   Figure `GENERATED_FROM_BRIEF` không được materialize thành active reference vì
   chế độ này chỉ dùng hình thật có trong SGK; raw Phase 1 vẫn giữ nguyên để audit.
+- Khi `autoEnhanceTextbookSourceImages=true`, từng crop chắc chắn phải chạy
+  `TEXTBOOK_RASTER_CLEANUP_V2` trước khi upload delivery và được encode WebP
+  lossless. Metadata file ghi pipeline/operation; crop xử lý lỗi chuyển
+  `NEEDS_REVIEW`, không fallback sang bản chưa làm nét. Job result trả thêm
+  `sourceFigureEnhancedCount`.
 - Kết quả job ở chế độ ảnh gốc trả các counter
   `sourceFigureImportedCount`, `sourceFigureNeedsReviewCount`,
   `generatedFigureSkippedCount` và `phaseTwoEnqueuedCount=0` để UI giải thích
@@ -882,6 +898,9 @@ Behavior:
   request OpenAI Phase 1 hiển thị phải giống hệt khi field này tắt nếu các cấu
   hình nội dung khác không đổi. Có thể hiển thị mode hậu xử lý ngoài provider
   request, nhưng không được serialize field vào Files API hoặc Responses API.
+- `autoEnhanceTextbookSourceImages` có cùng nguyên tắc snapshot và provider
+  isolation; bật/tắt cờ này không được làm thay đổi `openAiFileUploadRequest`,
+  `openAiRequest`, system prompt hoặc user prompt.
 - `systemPrompt`/`userPrompt` trả về là prompt hiệu lực để FE xem. Khi request gửi
   giá trị khác rỗng, server dùng nguyên văn giá trị đó làm toàn bộ prompt tương
   ứng. Nếu field rỗng/không có, server mới dựng prompt mặc định đầy đủ. Preview
@@ -1038,6 +1057,41 @@ Role cho toàn bộ endpoint: `ADMIN`.
   MIME/kích thước, chuẩn hóa WebP, lưu file `AI_DIAGRAM` riêng và atomically tạo
   revision `ADMIN_UPLOAD` thành công. Endpoint không gọi provider, không tự retry
   và không cho dùng ảnh toàn trang fallback như một crop.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/raster-edits/preview`:
+  nhận multipart gồm `baseCurrentRevisionId`, `baseSourceVersion`, JSON operation
+  `{ enhance, removeSimpleDetails, pipelineVersion }` và optional PNG mask khi
+  bật xóa. Backend tự resolve delivery asset hiện hành, chỉ nhận asset
+  `TEXTBOOK_SOURCE`/`SUCCEEDED`, xử lý bản preview có cạnh dài tối đa `1600px` và
+  trả `previewDataUrl`, kích thước, warnings, mask coverage/background variance.
+  Endpoint không tạo File/revision, không ghi R2 và không gọi provider.
+- `POST /admin/lessons/:lessonId/stem-figures/:figureId/raster-edits/apply`:
+  nhận cùng mutation guard/operation/mask. Backend kiểm MIME, decoded dimensions,
+  pixel/byte cap, mask dimensions/coverage/components và độ đồng nhất vòng nền
+  quanh vùng tô; scale mask về kích thước gốc bằng nearest-neighbor. Request chỉ
+  được bật đúng một operation. Output WebP lossless tạo File/revision mới rồi chỉ
+  promote khi toàn bộ validation/storage thành công; request kế tiếp luôn resolve
+  delivery asset của current revision mới này làm input.
+  Mask chạm mép được xem là mask đã clip theo biên ảnh và không bị từ chối chỉ vì
+  chạm cạnh; service lấy mẫu nền từ phần vòng còn nằm trong ảnh. Vùng trong ảnh
+  vẫn phải qua coverage/bounding-box cap, minimum background samples và variance
+  gate như mọi mask khác.
+  Request stale, nền phức tạp, mask quá lớn hoặc output lỗi giữ nguyên current
+  revision. Response trả figure/revision hiện hành mới và audit id; client có thể
+  giữ modal mở và dùng chính figure response làm guard/input cho request preview
+  hoặc apply kế tiếp mà không cần đóng rồi mở lại editor.
+
+`pipelineVersion` hiện hành là `TEXTBOOK_RASTER_CLEANUP_V2`. Preset enhance v2
+giữ denoise/contrast/sharpen của v1 và thêm saturation `1.06` để màu đậm hơn nhẹ,
+không hạ brightness toàn ảnh. Chính xác một operation phải bật; mask bắt buộc khi
+`removeSimpleDetails=true` và bị cấm khi false. Client
+không được gửi object key, signed URL hay source bytes làm authority. Service
+giới hạn vùng xóa nhỏ trên nền gần đồng nhất và trả error code ổn định
+`STEM_FIGURE_RASTER_EDIT_UNSUPPORTED`, `STEM_FIGURE_RASTER_MASK_INVALID`,
+`STEM_FIGURE_RASTER_BACKGROUND_COMPLEX` hoặc conflict stale revision; không
+content-aware inpainting, không phục hồi đường/texture và không rasterize
+`AI_TEX`. Apply ghi audit `STEM_FIGURE_RASTER_EDIT_APPLIED` nhưng không lưu mask
+thô; metadata output giữ revision nguồn, pipeline, operation summary và
+provenance `TEXTBOOK_SOURCE`.
 
 Admin figure response có `sourceReferenceSnapshotHash` và
 `sourceReferenceImages[]` kèm signed preview URL, nhãn/trang/vai trò/nguồn và

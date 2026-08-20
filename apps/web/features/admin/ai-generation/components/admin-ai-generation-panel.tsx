@@ -25,6 +25,7 @@ import {
   useGenerateAdminLessonContent,
 } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import type {
+  AdminAiGenerationDialogRequest,
   AdminAiGenerationType,
   AdminAiPanelJob,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
@@ -74,25 +75,26 @@ export function AdminAiGenerationPanel({
   quizTargetSetId,
   onOpenResult,
   onRequestedGenerationHandled,
-  requestedGenerationType,
+  requestedGeneration,
 }: {
   lessonId: string;
   quizTargetSetId?: string;
   onOpenResult: (type: AdminAiGenerationType, resourceId: string | null) => void;
   onRequestedGenerationHandled: () => void;
-  requestedGenerationType: AdminAiGenerationType | null;
+  requestedGeneration: AdminAiGenerationDialogRequest | null;
 }) {
   const panelQuery = useAdminAiGenerationPanel(lessonId);
   const generateMutation = useGenerateAdminLessonContent(lessonId);
-  const [dialogType, setDialogType] = useState<AdminAiGenerationType | null>(null);
+  const [dialogRequest, setDialogRequest] =
+    useState<AdminAiGenerationDialogRequest | null>(null);
 
   useEffect(() => {
-    if (!requestedGenerationType) {
+    if (!requestedGeneration) {
       return;
     }
-    setDialogType(requestedGenerationType);
+    setDialogRequest(requestedGeneration);
     onRequestedGenerationHandled();
-  }, [onRequestedGenerationHandled, requestedGenerationType]);
+  }, [onRequestedGenerationHandled, requestedGeneration]);
 
   if (panelQuery.isPending) {
     return <PanelSkeleton />;
@@ -167,7 +169,7 @@ export function AdminAiGenerationPanel({
               isActive={isActive}
               isReady={isReady}
               job={job}
-              onGenerate={() => setDialogType(card.type)}
+              onGenerate={() => setDialogRequest({ type: card.type, mode: "CREATE" })}
               onOpen={() => onOpenResult(card.type, job?.resourceId ?? null)}
             />
           );
@@ -187,23 +189,28 @@ export function AdminAiGenerationPanel({
         ) : null;
       })}
 
-      {dialogType ? (
+      {dialogRequest ? (
         <AiGenerationConfigDialog
-          key={dialogType}
+          key={`${dialogRequest.type}-${dialogRequest.mode}`}
           documents={panel.documents}
+          initialGenerationConfiguration={
+            dialogRequest.mode === "EDIT"
+              ? panel.jobs[dialogRequest.type]?.inputMetaJson
+              : null
+          }
           isOpen
           isSubmitting={generateMutation.isPending}
           lessonId={lessonId}
           initialModelConfiguration={panel.summaryConfiguration}
           quizTargetSetId={quizTargetSetId}
           targetGrade={panel.lesson.targetGrade}
-          type={dialogType}
-          onClose={() => !generateMutation.isPending && setDialogType(null)}
+          type={dialogRequest.type}
+          onClose={() => !generateMutation.isPending && setDialogRequest(null)}
           onSubmit={async (payload) => {
             try {
               await generateMutation.mutateAsync(payload);
               toast.success("Hệ thống đã tiếp nhận yêu cầu tạo nội dung");
-              setDialogType(null);
+              setDialogRequest(null);
             } catch (error) {
               toast.error(
                 getUserFacingErrorMessage(

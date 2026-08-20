@@ -367,6 +367,7 @@ export class ProviderOperationsAdminService {
           fallbackCatalogItemId: config?.fallbackCatalogItemId ?? null,
           temperature: config?.temperature?.toNumber() ?? null,
           reasoningEffort: config?.reasoningEffort ?? null,
+          maxInputTokens: config?.maxInputTokens ?? null,
           maxOutputTokens: config?.maxOutputTokens ?? null,
           fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
           fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
@@ -413,6 +414,16 @@ export class ProviderOperationsAdminService {
           throwBadRequest(
             "AI_CONFIGURATION_FALLBACK_DUPLICATE",
             "Model dự phòng phải khác model chính.",
+            { feature: item.feature },
+          );
+        }
+        if (
+          item.primaryCatalogItemId &&
+          (!item.maxInputTokens || !item.maxOutputTokens)
+        ) {
+          throwBadRequest(
+            "AI_CONFIGURATION_TOKEN_LIMIT_REQUIRED",
+            "Vui lòng cấu hình giới hạn token đầu vào và đầu ra cho tính năng.",
             { feature: item.feature },
           );
         }
@@ -476,6 +487,7 @@ export class ProviderOperationsAdminService {
             fallbackCatalogItemId: item.fallbackCatalogItemId ?? null,
             temperature: item.temperature,
             reasoningEffort: item.reasoningEffort ?? null,
+            maxInputTokens: item.maxInputTokens,
             maxOutputTokens: item.maxOutputTokens,
             fallbackTemperature: item.fallbackTemperature,
             fallbackReasoningEffort: item.fallbackReasoningEffort ?? null,
@@ -488,6 +500,7 @@ export class ProviderOperationsAdminService {
             fallbackCatalogItemId: item.fallbackCatalogItemId ?? null,
             temperature: item.temperature,
             reasoningEffort: item.reasoningEffort ?? null,
+            maxInputTokens: item.maxInputTokens,
             maxOutputTokens: item.maxOutputTokens,
             fallbackTemperature: item.fallbackTemperature,
             fallbackReasoningEffort: item.fallbackReasoningEffort ?? null,

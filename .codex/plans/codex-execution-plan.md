@@ -107,6 +107,37 @@ Update note 2026-08-19:
   admin review; figure `GENERATED_FROM_BRIEF` bị bỏ
   qua. `M9.17` phụ thuộc `M9.2`, `M9.8`, `M4.4` và dùng mã mới vì `M9.13-M9.16`
   đã thuộc lịch sử renderer JSON cũ.
+- Owner mở rộng `M9.17` ngày 2026-08-20: khi dùng ảnh gốc SGK, modal có checkbox
+  phụ `Tự động làm nét ảnh`. Cờ được snapshot vào draft/job, tái sử dụng pipeline
+  `TEXTBOOK_RASTER_CLEANUP_V2` cho mọi crop auto-promote và không đổi provider
+  Phase 1 hoặc chi phí AI.
+
+Update note 2026-08-20:
+
+- Owner yêu cầu lên kế hoạch `M9.18`: icon cây đũa trên raster SGK mở modal làm
+  nét và tô mask xóa chi tiết đơn giản. Hướng chốt cho plan là Canvas/Pointer
+  Events ở web + Sharp versioned ở API, không AI inpainting/provider/worker.
+- Preview không ghi dữ liệu; apply dùng stale guard, tạo immutable revision/file
+  WebP lossless rồi promote atomically. Phạm vi chỉ current asset
+  `TEXTBOOK_SOURCE` đã `SUCCEEDED`; chi tiết tại
+  `.codex/plans/m9-18-stem-figure-raster-cleanup-editor-plan.md`.
+- M9.18 đã triển khai end-to-end ngày 2026-08-20 bằng Canvas/Pointer Events ở web
+  và Sharp local ở API. Không thêm package, migration, worker hay paid provider;
+  preview read-only, apply lưu revision/file/audit mới và giữ provenance SGK.
+- Owner cập nhật UX M9.18 cùng ngày: mỗi lượt chỉ dùng đúng một tool; làm nét tự
+  preview khi chọn, xóa tự preview sau stroke/undo/redo, không còn nút preview.
+  Output vừa apply là current input của lần sửa tiếp theo. Preset làm nét dùng
+  median denoise 3x3 + tăng tương phản tuyến tính có giới hạn + sharpen cân bằng,
+  có regression nền mờ/điểm nhiễu/nét liền/màu ký hiệu, sharpness và visual
+  comparison trên 6 crop Mathpix gốc 5.23-5.32. Mask xóa vượt mép được clip theo
+  biên raster; phần trong ảnh vẫn xử lý nếu vượt qua các safety gate còn lại. Mỗi
+  apply giữ modal mở, reset thao tác tạm và dùng revision vừa promote làm input
+  để admin nối tiếp làm nét/xóa trong cùng phiên. Preset v2 giữ độ nét hiện tại
+  và thêm saturation `1.06`; đã so sánh bằng mắt trên sáu crop Mathpix gốc.
+- Owner chốt lại M9.19: bỏ toàn bộ giới hạn kỹ thuật/trần token khỏi `Quản lý
+model`. `maxInputTokens` cùng `maxOutputTokens` thuộc cấu hình từng feature tại
+  `Admin -> Cài đặt AI -> Thiết lập mặc định`; route snapshot/reservation dùng
+  feature config, catalog chỉ quản lý metadata và giá.
 
 ## 1. Phạm vi bước này
 

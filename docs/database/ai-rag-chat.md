@@ -162,6 +162,21 @@ tham chiếu đã resolve, không được thay bằng generic brief. Chỉ
 `TEX_COMPILE_FAILED` có diagnostic batch đầy đủ được auto repair; mọi category
 khác không auto retry.
 
+M9.18 không thêm bảng/cột hoặc lưu mask thô. Apply raster edit tạo revision
+`ADMIN_UPLOAD` và delivery `File` mới; metadata file giữ
+`uploadSource=stem-figure.raster-edit`, `derivedFromRevisionId`, version pipeline,
+danh sách operation, mask coverage và tiếp tục giữ `textbookSourceObjectKey` để
+provenance/current asset kind vẫn là `TEXTBOOK_SOURCE`. Revision hiện hành chỉ
+được đổi sau khi output đã validate; revision trước tiếp tục là lịch sử bất biến.
+Mỗi raster edit kế tiếp derive từ current revision vừa promote, không đọc lại crop
+OCR ban đầu, nên chuỗi chỉnh sửa vẫn truy vết được qua `derivedFromRevisionId`.
+
+M9.17 snapshot thêm boolean `autoEnhanceTextbookSourceImages` trong
+`lesson_summary_request_drafts.source_snapshot_json.generationConfiguration` và
+`ai_generations.input_meta_json`. Field mặc định `false`, chỉ hiệu lực cùng
+`useTextbookSourceImages=true` và không cần cột/migration riêng. Delivery crop đã
+tự làm nét ghi pipeline/operation trong `files.metadata_json`.
+
 ### 11.5. `lesson_summary_request_drafts`
 
 Snapshot immutable của exact request sau prompt preview: lesson/user, request và

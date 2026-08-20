@@ -64,3 +64,4 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0016-searchable-pdf-multimodal-summary.md`  | Accepted   | Summary dùng searchable PDF packet bất biến; Stage 2 nhận ảnh tham chiếu và chỉ auto-repair compiler failure |
 | `ADR-0017-source-neutral-figure-intent.md`       | Superseded | Từng tách semantic intent khỏi source target; đã được ADR-0018 thay thế                                      |
 | `ADR-0018-remove-visual-intent-hard-cutover.md`  | Accepted   | Xóa visual intent; Stage 2 dùng ảnh + block projection và runtime chỉ nhận figure plan v3                    |
+| `ADR-0019-local-stem-figure-raster-cleanup.md`   | Accepted   | Chỉnh nhẹ raster SGK bằng Canvas + Sharp, revision lossless; không AI inpainting                             |

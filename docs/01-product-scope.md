@@ -45,8 +45,15 @@ MVP tập trung vào việc giúp:
 - Có nhiều bộ quiz/flashcard/bài thi trong một buổi học.
 - Có kho bộ dự phòng do AI tạo.
 - Có AI tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải chi tiết và chat theo buổi học.
+- Admin quản lý giới hạn token đầu vào và đầu ra theo từng tính năng trong tab
+  `Thiết lập mặc định` của màn Cài đặt AI; không yêu cầu admin nhập giới hạn kỹ
+  thuật của provider ở catalog model.
 - Khi sinh tóm tắt, admin có thể chọn dùng trực tiếp crop ảnh gốc sách giáo khoa
   đã trích xuất thay vì gọi AI vẽ lại hình.
+- Admin có thể chỉnh nhẹ ảnh raster sách giáo khoa đã dùng trong tóm tắt bằng
+  preset làm nét/giảm nhiễu và cọ tô vùng xóa chi tiết đơn giản trên nền phẳng.
+  Đây là xử lý ảnh local có preview, không phải AI inpainting hay phục dựng nội
+  dung đã mất.
 - Có học video thông minh theo `M15`: lưu khoảng đã xem/tiếp tục học, ghi chú theo timestamp, checkpoint, hỏi AI theo đoạn, tìm trong video, chapter mastery và đề xuất ôn tập. Đây là scope mở rộng được ưu tiên sau khi luồng lesson/quiz/test phía học sinh hoàn tất.
 - Có report lỗi ở cấp item lẻ.
 - Có quản lý nội dung AI chưa duyệt.
@@ -89,9 +96,22 @@ Admin có quyền:
 - Dùng AI tạo tóm tắt bài học.
 - Chọn theo từng lượt sinh tóm tắt giữa luồng AI vẽ lại hình mặc định và luồng
   tự điền crop ảnh gốc sách giáo khoa, không gọi AI tạo hình ở giai đoạn sau.
+- Khi dùng crop ảnh gốc sách giáo khoa, có thể bật thêm `Tự động làm nét ảnh` để
+  mọi crop được giảm nhiễu/làm nét và tăng độ đậm màu nhẹ bằng pipeline local
+  trước khi lưu delivery; lựa chọn này không xuất hiện và không có hiệu lực ở
+  luồng AI vẽ lại mặc định.
 - Quản lý từng hình STEM trong tóm tắt: xem lỗi, xóa, tải ảnh thay thế, sinh lại
   bằng AI, xem SVG preview và tự sửa LaTeX figure snippet khi cần. Không có
   editor click-to-source/SyncTeX trên PDF hoặc preview trong phạm vi hiện tại.
+- Với figure raster `TEXTBOOK_SOURCE` đã thành công, mở editor từ icon cây đũa,
+  chọn đúng một trong hai công cụ làm nét hoặc xóa vùng thừa đơn giản. Làm nét tự
+  giảm nhiễu, làm rõ nét và tăng độ đậm màu nhẹ mà không đổi hue chủ ý; kết quả
+  cập nhật ngay khi chọn. Xóa tự cập nhật sau mỗi nét tô. `Áp dụng` chỉ
+  chốt thao tác đang chọn và giữ modal mở để admin chọn công cụ tiếp theo. Mỗi
+  lần áp dụng tạo revision/file delivery mới và audit; output thành công lập tức
+  trở thành input của lượt chỉnh kế tiếp trong cùng modal, còn ảnh hiện hành
+  không đổi nếu xử lý thất bại. Nét tô vượt mép được clip theo biên ảnh và phần
+  mask hợp lệ bên trong vẫn được xử lý.
 - Tạo, sửa, xóa quiz.
 - Dùng AI tạo quiz.
 - Tạo, sửa, xóa flashcard.

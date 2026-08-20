@@ -16,6 +16,7 @@ import type { EnvConfig } from "#api/config/env.validation";
 import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-job.service";
 import { LessonSourcePacketService } from "#api/modules/ai/services/lesson-source-packet.service";
 import { LessonSourcePacketError } from "#api/modules/ai/services/lesson-source-packet.service";
+import { lessonSourcePacketManifestSchema } from "#api/modules/ai/schemas/lesson-source-packet.schema";
 import {
   LessonSummaryContextError,
   LessonSummaryContextService,
@@ -85,18 +86,29 @@ export class LessonSummariesService {
       where: { lessonId },
       select: {
         ...lessonSummarySelect,
-        aiGeneration: { select: { outputJson: true } },
+        aiGeneration: { select: { inputMetaJson: true, outputJson: true } },
       },
     });
 
-    return summary && !summary.deletedAt
-      ? {
-          ...serializeLessonSummary(summary),
-          phaseOneBlockJsonByPath: readPhaseOneBlockJsonByPath(
-            summary.aiGeneration?.outputJson,
-          ),
-        }
+    if (!summary || summary.deletedAt) return null;
+
+    const requestDraftId = readString(
+      readJsonRecord(summary.aiGeneration?.inputMetaJson).requestDraftId,
+    );
+    const requestDraft = requestDraftId
+      ? await this.prisma.lessonSummaryRequestDraft.findFirst({
+          where: { id: requestDraftId, lessonId },
+          select: { manifestJson: true },
+        })
       : null;
+
+    return {
+      ...serializeLessonSummary(summary),
+      phaseOneBlockJsonByPath: readPhaseOneBlockJsonByPath(
+        summary.aiGeneration?.outputJson,
+      ),
+      sourcePages: readAdminLessonSummarySourcePages(requestDraft?.manifestJson),
+    };
   }
 
   async upsertForAdmin(
@@ -960,6 +972,7 @@ export class LessonSummariesService {
 
     const route: AiFeatureRoute = {
       ...baseRoute,
+      model: candidates[0]?.model ?? baseRoute.model,
       candidates,
       temperature: dto.temperature ?? baseRoute.temperature,
       reasoningEffort: dto.reasoningEffort ?? baseRoute.reasoningEffort,
@@ -1054,6 +1067,21 @@ function readStringArray(value: unknown) {
 
 function readJsonRecord(value: Prisma.JsonValue | null | undefined) {
   return isRecord(value) ? value : {};
+}
+
+export function readAdminLessonSummarySourcePages(
+  value: Prisma.JsonValue | null | undefined,
+) {
+  const manifest = lessonSourcePacketManifestSchema.safeParse(value);
+  if (!manifest.success) return [];
+
+  return manifest.data.pages.map((page) => ({
+    packetPageNumber: page.packetPageNumber,
+    sourceFileId: page.sourceFileId,
+    sourcePdfPageNumber: page.sourcePdfPageNumber,
+    printedPageLabel: page.printedPageLabel,
+    documentTitle: page.documentTitle,
+  }));
 }
 
 function readNumber(value: unknown) {
@@ -1231,6 +1259,9 @@ function normalizeConfiguration(
 > {
   return {
     useTextbookSourceImages: dto.useTextbookSourceImages ?? false,
+    autoEnhanceTextbookSourceImages:
+      dto.useTextbookSourceImages === true &&
+      dto.autoEnhanceTextbookSourceImages === true,
     style: dto.style,
     styleInstructions: dto.styleInstructions?.trim() ?? "",
     length: dto.length ?? "standard",

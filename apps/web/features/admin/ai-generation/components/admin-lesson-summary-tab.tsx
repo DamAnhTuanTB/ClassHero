@@ -2,6 +2,7 @@
 
 import {
   EyeOff,
+  Eye,
   Loader2,
   Pencil,
   RefreshCw,
@@ -50,6 +51,7 @@ import { AiJobMetadata } from "@/features/admin/ai-generation/components/ai-job-
 import { AdminStemFigureStatusSummary } from "@/features/admin/ai-generation/components/admin-stem-figure-status-summary";
 import { AdminStemFigureInline } from "@/features/admin/ai-generation/components/admin-stem-figures-panel";
 import { AdminBlockImageActions } from "@/features/admin/ai-generation/components/admin-block-image-actions";
+import { AdminSummarySourcePagesDialog } from "@/features/admin/ai-generation/components/admin-summary-source-pages-dialog";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import type { StemFigureVisual } from "@/components/common/content/stem-figure";
 import {
@@ -62,6 +64,7 @@ import {
   applyPhaseOneBlocksPreview,
   type LessonSummaryPhaseOneLayoutOperation,
 } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
+import { toAdminLessonSummaryBlockElementId } from "@/features/admin/ai-generation/utils/admin-lesson-summary-block";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
@@ -70,10 +73,12 @@ type ViewMode = "UI_ONLY" | "JSON_ONLY" | "SPLIT";
 export function AdminLessonSummaryTab({
   lessonId,
   lessonTitle,
+  onEdit,
   onRegenerate,
 }: {
   lessonId: string;
   lessonTitle?: string;
+  onEdit: () => void;
   onRegenerate: () => void;
 }) {
   const summaryQuery = useAdminLessonSummary(lessonId);
@@ -104,6 +109,9 @@ export function AdminLessonSummaryTab({
   const [viewMode, setViewMode] = useState<ViewMode>("UI_ONLY");
   const [jsonCollapsed, setJsonCollapsed] = useState<boolean | number>(2);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [selectedSourcePageNumbers, setSelectedSourcePageNumbers] = useState<
+    number[] | null
+  >(null);
   const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
   const stemFigureVisuals = useMemo(
     () =>
@@ -175,6 +183,29 @@ export function AdminLessonSummaryTab({
     ),
     [lessonId, stemFiguresByBlockPath],
   );
+  const renderBlockSourceAction = useCallback(
+    ({ block }: { block: unknown }) => {
+      const sourcePageNumbers = readBlockSourcePageNumbers(block);
+      const hasSourcePages = sourcePageNumbers.length > 0;
+      return (
+        <button
+          aria-label="Xem PDF nguồn của khối"
+          className="grid h-7 w-7 place-items-center rounded text-slate-500 transition hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-400 dark:hover:bg-sky-950/50 dark:hover:text-sky-300"
+          disabled={!hasSourcePages}
+          onClick={() => setSelectedSourcePageNumbers(sourcePageNumbers)}
+          title={
+            hasSourcePages
+              ? "Xem PDF nguồn của khối"
+              : "Khối này không có trang nguồn PDF"
+          }
+          type="button"
+        >
+          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     if (wasProcessingStemFigures.current && !hasActiveStemFigures) {
@@ -194,6 +225,24 @@ export function AdminLessonSummaryTab({
     setViewMode(mode);
     localStorage.setItem("admin-lesson-summary-view-mode", mode);
   };
+  const handleNavigateToBlock = useCallback(
+    (blockPath: string) => {
+      const elementId = toAdminLessonSummaryBlockElementId(blockPath);
+      if (!elementId) return;
+
+      if (viewMode === "JSON_ONLY") {
+        setViewMode("UI_ONLY");
+        localStorage.setItem("admin-lesson-summary-view-mode", "UI_ONLY");
+      }
+      window.setTimeout(() => {
+        document.getElementById(elementId)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 240);
+    },
+    [viewMode],
+  );
   const updateAllPhaseOneBlocks = (blocks: Record<string, unknown>) => {
     setPhaseOneBlockJsonByPath(blocks);
     setContent((current) => applyPhaseOneBlocksPreview(current, blocks));
@@ -360,9 +409,11 @@ export function AdminLessonSummaryTab({
             ) : null}
             {summary && !isSummaryPhaseOneActive && figuresQuery.isSuccess ? (
               <AdminStemFigureStatusSummary
+                content={content}
                 figures={figuresQuery.data ?? []}
                 lessonId={lessonId}
                 modelConfiguration={panelQuery.data?.summaryConfiguration}
+                onNavigateToBlock={handleNavigateToBlock}
               />
             ) : null}
           </div>
@@ -374,7 +425,7 @@ export function AdminLessonSummaryTab({
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={onRegenerate}
+                onClick={onEdit}
                 className="theme-button-primary-subtle inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold"
               >
                 <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -510,6 +561,7 @@ export function AdminLessonSummaryTab({
               showTableOfContents
               renderStemFigure={renderStemFigure}
               renderBlockImageActions={renderBlockImageActions}
+              renderBlockSourceAction={renderBlockSourceAction}
               phaseOneBlockJsonByPath={phaseOneBlockJsonByPath}
               onPhaseOneBlockJsonChange={(blockPath, value) => {
                 setPhaseOneBlockJsonByPath((current) =>
@@ -610,7 +662,25 @@ export function AdminLessonSummaryTab({
         onCancel={() => setIsDeleteConfirmOpen(false)}
         onConfirm={deleteSummary}
       />
+      {selectedSourcePageNumbers ? (
+        <AdminSummarySourcePagesDialog
+          isOpen
+          sourcePageNumbers={selectedSourcePageNumbers}
+          sourcePages={summary?.sourcePages ?? []}
+          onClose={() => setSelectedSourcePageNumbers(null)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function readBlockSourcePageNumbers(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const sourcePageNumbers = (value as Record<string, unknown>).sourcePageNumbers;
+  if (!Array.isArray(sourcePageNumbers)) return [];
+  return [...new Set(sourcePageNumbers)].filter(
+    (pageNumber): pageNumber is number =>
+      typeof pageNumber === "number" && Number.isInteger(pageNumber) && pageNumber > 0,
   );
 }
 

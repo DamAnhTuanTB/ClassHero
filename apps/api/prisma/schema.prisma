@@ -1905,6 +1905,7 @@ model AiFeatureModelConfig {
 
   temperature     Decimal? @db.Decimal(4, 3)
   reasoningEffort String?  @map("reasoning_effort")
+  maxInputTokens  Int?     @map("max_input_tokens")
   maxOutputTokens Int?     @map("max_output_tokens")
 
   fallbackTemperature     Decimal? @map("fallback_temperature") @db.Decimal(4, 3)

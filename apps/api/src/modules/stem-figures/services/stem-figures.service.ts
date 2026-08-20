@@ -37,6 +37,7 @@ import {
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 import { lessonSourcePacketManifestSchema } from "#api/modules/ai/schemas/lesson-source-packet.schema";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import { buildLessonSummaryFigureAltText } from "#api/modules/ai/utils/lesson-summary-figure-alt-text";
 import {
   FigureReferenceResolverService,
   hashFigureReferenceSnapshot,
@@ -58,6 +59,11 @@ import {
 import { resolveCourseSubject } from "#api/modules/ai/utils/lesson-summary-subject";
 import { ensureStemFigureSummaryReference } from "#api/modules/stem-figures/utils/stem-figure-summary-reference";
 import { compareStemFigurePositions } from "#api/modules/stem-figures/utils/stem-figure-position";
+import {
+  applyConservativeRasterEnhancement,
+  STEM_FIGURE_RASTER_EDIT_MAX_PIXELS,
+  STEM_FIGURE_RASTER_EDIT_PIPELINE_VERSION,
+} from "#api/modules/stem-figures/utils/stem-figure-raster-edit";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type {
   AiFeatureRoute,
@@ -178,7 +184,13 @@ export class StemFiguresService {
       }).catch(() => emptyFigureReferenceSnapshot(draftPlan.localId)));
     const sourceVersion = deleted ? await this.nextSourceVersion(deleted.id) : 1;
     const latexSource = createStarterFigureSource();
-    const altText = previousRevision?.altText ?? buildBlockAltText(blockContext);
+    const altText =
+      previousRevision?.altText ??
+      buildLessonSummaryFigureAltText({
+        caption: null,
+        block: blockContext.block,
+        sectionHeading: blockContext.sectionHeading,
+      });
     const caption = previousRevision?.caption ?? null;
     const subject = resolveCourseSubject({
       domainName: summary.lesson.learningPath.domain.name,
@@ -810,6 +822,7 @@ export class StemFiguresService {
     assetObjectKey: string;
     referenceSnapshot: FigureReferenceSnapshot;
     referenceSnapshotHash: string;
+    autoEnhance: boolean;
   }) {
     const figure = await this.requireFigure(input.lessonId, input.figureId);
     const metadataRevision = figure.pendingRevision ?? figure.currentRevision;
@@ -849,6 +862,7 @@ export class StemFiguresService {
       sourceObjectKey: asset.objectKey,
       referenceSnapshot: input.referenceSnapshot,
       referenceSnapshotHash: input.referenceSnapshotHash,
+      autoEnhance: input.autoEnhance,
     });
   }
 
@@ -867,6 +881,7 @@ export class StemFiguresService {
     sourceObjectKey?: string;
     referenceSnapshot?: FigureReferenceSnapshot | null;
     referenceSnapshotHash?: string | null;
+    autoEnhance?: boolean;
   }) {
     const maxBytes = Math.floor(
       this.config.get("MAX_IMAGE_UPLOAD_MB", { infer: true }) * 1024 * 1024,
@@ -895,7 +910,8 @@ export class StemFiguresService {
       !["jpeg", "png", "webp"].includes(metadata.format ?? "") ||
       metadata.width > 12_000 ||
       metadata.height > 12_000 ||
-      metadata.width * metadata.height > 40_000_000
+      metadata.width * metadata.height >
+        (input.autoEnhance ? STEM_FIGURE_RASTER_EDIT_MAX_PIXELS : 40_000_000)
     ) {
       throwBadRequest(
         "STEM_FIGURE_UPLOAD_INVALID",
@@ -926,9 +942,12 @@ export class StemFiguresService {
             snapshot: input.referenceSnapshot,
             hash: input.referenceSnapshotHash ?? null,
           };
-    const normalized = await sharp(input.bytes, { failOn: "error" })
-      .rotate()
-      .webp({ quality: 92 })
+    let rasterPipeline = sharp(input.bytes, { failOn: "error" }).rotate();
+    if (input.autoEnhance) {
+      rasterPipeline = applyConservativeRasterEnhancement(rasterPipeline);
+    }
+    const normalized = await rasterPipeline
+      .webp(input.autoEnhance ? { lossless: true, effort: 4 } : { quality: 92 })
       .toBuffer();
     const checksum = createHash("sha256").update(normalized).digest("hex");
     const sourceVersion = await this.nextSourceVersion(input.figure.id);
@@ -960,6 +979,14 @@ export class StemFiguresService {
               originalName: input.originalName,
               ...(input.sourceObjectKey
                 ? { textbookSourceObjectKey: input.sourceObjectKey }
+                : {}),
+              ...(input.autoEnhance
+                ? {
+                    rasterCleanupPipelineVersion:
+                      STEM_FIGURE_RASTER_EDIT_PIPELINE_VERSION,
+                    rasterCleanupOperations: ["ENHANCE"],
+                    automaticEnhancement: true,
+                  }
                 : {}),
               width: metadata.width,
               height: metadata.height,
@@ -1233,16 +1260,6 @@ function buildBlockFigurePlan(
     // sourceReferences. An admin-authored figure starts without visual evidence.
     sourceReferences: [],
   };
-}
-
-function buildBlockAltText(context: BlockFigureContext) {
-  const title =
-    typeof context.block.title === "string"
-      ? context.block.title
-      : typeof context.block.problem === "string"
-        ? context.block.problem
-        : context.sectionHeading;
-  return `Hình minh họa cho ${title}`.replaceAll(/\s+/gu, " ").trim().slice(0, 500);
 }
 
 function createStarterFigureSource() {

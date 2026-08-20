@@ -41,6 +41,7 @@ export const updateAiConfigurations = (
         fallbackCatalogItemId: configuration.fallbackCatalogItemId,
         temperature: configuration.temperature,
         reasoningEffort: configuration.reasoningEffort,
+        maxInputTokens: configuration.maxInputTokens,
         maxOutputTokens: configuration.maxOutputTokens,
         expectedVersion: configuration.version,
       })),

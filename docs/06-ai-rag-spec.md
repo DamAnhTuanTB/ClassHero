@@ -188,6 +188,10 @@ Mục đích:
 - Ô chọn chỉ lấy model text/structured-output `ACTIVE` trong catalog và nhóm theo provider; preview/audio/image/deprecated không được seed vào luồng sinh nội dung học tập.
 - Budget mặc định cảnh báo mềm ở 70/90/100%; hard stop chỉ có hiệu lực khi admin chủ động bật.
 - Từ `M9.12`, hard stop dùng reservation nguyên tử trước paid call. Gateway khóa và kiểm tra đồng thời ngân sách `ALL` + `AI/OCR`, giữ worst-case cost rồi mới gọi provider; thiếu dữ liệu để ước lượng thì fail-closed.
+- Với AI, worst-case input/output lấy từ `ai_feature_model_configs` của đúng
+  feature. Admin chỉnh hai giới hạn trong `Thiết lập mặc định`; catalog model
+  không yêu cầu giới hạn kỹ thuật. `conditions_json.maxInputTokens` trên rate chỉ
+  là fallback cho route snapshot/job cũ trong giai đoạn chuyển đổi.
 - Budget error và estimate-unavailable là lỗi nghiệp vụ không fallback, không retry. Timeout có khả năng đã bill giữ reservation ở trạng thái `UNCERTAIN` cho tới khi reconciliation xác nhận.
 - Response structured đã về nhưng `status=incomplete`, có refusal hoặc không có
   `output_parsed` vẫn là một provider attempt có thể đã phát sinh chi phí. Provider
@@ -572,8 +576,11 @@ Contract provider:
   lớp 10–12, `isGeometry=true` nhưng `geometryStatement=null`; nội dung không
   phải Hình học dùng `isGeometry=false` và cũng bắt buộc null.
 - Mỗi theory/example có `figures[]`, tối đa một logical figure cho mỗi block.
-  Figure ở lượt Summary chỉ chứa `figureOrigin`, `sourceReferences`, `altText` và
-  `caption`; không chứa ID do model cấp, LaTeX/TikZ, raw SVG, `diagramSpec`, tọa
+  Figure trong structured output Phase 1 chỉ chứa `figureOrigin`,
+  `sourceReferences` và `caption`; JSON Schema gửi provider không có `altText`.
+  Backend tự tạo `altText` accessibility từ caption hoặc ngữ cảnh block sau khi
+  validate output; Phase 2 cũng không nhận hoặc trả field này. Figure không chứa
+  ID do model cấp, LaTeX/TikZ, raw SVG, `diagramSpec`, tọa
   độ JSON hoặc URL asset. Backend cấp `localId` deterministic. Source LaTeX/TikZ
   chỉ được sinh ở paid call chuyên vẽ của từng figure. Không có `kind` hoặc
   `figureKind`: ảnh nguồn và block content đã là dữ liệu quyết định, còn backend
@@ -670,7 +677,8 @@ Khi sinh lại một figure đã lưu, backend phải strict-parse render-plan g
 `figureOrigin`, `sourceReferences`, `localId` và contract version. Writer chỉ
 persist `figurePlanContractVersion=3`; reader reject plan v1/v2, source target
 thiếu và field ngoài schema.
-caption/alt text được lấy từ revision head. Quy tắc hiển thị caption thay đổi
+caption/alt text được lấy từ revision head; alt text ban đầu do backend tạo,
+không phải provider. Modal sửa mã không hiển thị field nhập alt text. Quy tắc hiển thị caption thay đổi
 không được làm render-plan hợp lệ trở thành không thể đọc hoặc chặn resolve crop.
 Local ID bắt buộc dạng canonical ba chữ số `F001`–`F999` ở cả persistence và
 runtime.
@@ -724,6 +732,26 @@ admin chọn crop/thay/xóa. Figure `GENERATED_FROM_BRIEF` không materialize th
 active reference vì không có ảnh sách; raw Phase 1 vẫn giữ nguyên cho audit và
 admin có thể chủ động tạo ảnh sau từ menu block. Mặc định `false` tiếp tục redraw
 toàn bộ figure qua Stage 2 như contract hiện hành.
+
+M9.17 dùng thêm cờ phụ `autoEnhanceTextbookSourceImages`, mặc định `false` và chỉ
+có hiệu lực khi `useTextbookSourceImages=true`. Cờ này cùng thuộc request
+draft/hash/job snapshot nhưng bị loại khỏi mọi input provider Phase 1. Với mỗi
+`OCR_CROP` chắc chắn, orchestration tái sử dụng preset local versioned của M9.18:
+median denoise, bounded linear contrast, saturation nhẹ `1.06` và sharpen, sau đó
+encode WebP lossless trước khi promote. Nếu một crop không thể xử lý đúng
+cap/validation thì figure đó giữ `NEEDS_REVIEW`; không fallback âm thầm sang crop
+chưa làm nét.
+
+M9.18 bổ sung editor hậu xử lý raster cục bộ cho delivery asset
+`TEXTBOOK_SOURCE` đã `SUCCEEDED`. Tính năng này không thuộc AI generation: không
+gọi provider, không dùng semantic object detection/inpainting và không tạo usage
+AI. Client chỉ tạo mask thao tác; backend tự resolve revision hiện hành rồi chạy
+đúng một operation Sharp có version: xóa vùng nhỏ trên nền gần đồng nhất hoặc
+preset làm nét bảo thủ. Apply phải tạo
+delivery file/revision bất biến mới, giữ source snapshot và provenance SGK; chỉ
+promote atomically khi validation thành công. Revision vừa promote là input duy
+nhất của lần chỉnh tiếp theo. Làm nét chỉ cải thiện độ rõ cảm
+nhận từ pixel hiện có, không được mô tả là khôi phục chi tiết mà ảnh nguồn chưa có.
 
 Trong figure plan, `sourceReferences.figureLabel` là mã định danh đúng như SGK
 để resolver tìm crop. `caption` là chú thích hiển thị cho người học nên phải mô

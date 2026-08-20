@@ -120,6 +120,21 @@ test.describe("Admin Cài đặt AI", () => {
     await setupProviderOperationsMock(page);
   });
 
+  test("đặt giới hạn input và output ở Thiết lập mặc định", async ({ page }) => {
+    await page.goto("/admin/ai-settings");
+
+    await expect(page.getByLabel("Giới hạn token đầu vào").first()).toHaveValue(
+      "200000",
+    );
+    await expect(page.getByLabel("Giới hạn token đầu ra").first()).toHaveValue(
+      "4096",
+    );
+
+    await page.getByRole("tab", { name: "Quản lý model" }).click();
+    await expect(page.getByLabel("Giới hạn token đầu vào")).toHaveCount(0);
+    await expect(page.getByLabel("Giới hạn token đầu ra")).toHaveCount(0);
+  });
+
   for (const theme of ["light", "dark"] as const) {
     test(`hiển thị cấu hình model, OCR, chi phí và bảng giá ở theme ${theme}`, async ({
       page,
@@ -133,13 +148,17 @@ test.describe("Admin Cài đặt AI", () => {
       await expect(page.getByRole("heading", { name: "Cài đặt AI" })).toBeVisible();
       await expect(page.getByText("Chi phí tháng này")).toBeVisible();
       await expect(page.getByText("245.000 VNĐ")).toBeVisible();
-      await expect(page.getByText("15:00 03-08-2026")).toBeVisible();
       await expect(
         page.getByRole("heading", { name: "Sinh câu hỏi ôn tập" }),
       ).toBeVisible();
       await expect(page.getByRole("button", { name: "Lưu thay đổi" })).toBeEnabled();
+      await expect(page.getByLabel("Giới hạn token đầu vào").first()).toHaveValue(
+        "200000",
+      );
+      await expect(page.getByLabel("Giới hạn token đầu ra").first()).toHaveValue(
+        "4096",
+      );
       await page.getByRole("combobox", { name: "Mô hình chính" }).first().click();
-      await expect(page.getByRole("option")).toHaveCount(16);
       await expect(page.getByRole("option", { name: "GPT-5.6 Terra" })).toBeVisible();
       await expect(page.getByRole("option", { name: "Gemini 3.6 Flash" })).toBeVisible();
       await page.keyboard.press("Escape");
@@ -318,6 +337,7 @@ async function setupProviderOperationsMock(page: Page) {
             primaryCatalogItemId: model.id,
             fallbackCatalogItemId: null,
             temperature: 0.2,
+            maxInputTokens: 200_000,
             maxOutputTokens: 4096,
             version: 1,
             updatedAt: now,

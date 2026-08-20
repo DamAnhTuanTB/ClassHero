@@ -592,7 +592,7 @@ function CatalogItemDialog({
                 {...form.register("externalKey")}
               />
             </div>
-            
+
             {!isOcr && (
               <div className="space-y-3">
                 <label className="text-sm font-extrabold text-[var(--theme-text-strong)]">

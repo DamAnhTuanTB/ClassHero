@@ -53,6 +53,7 @@ export type AiFeatureConfiguration = {
   fallbackCatalogItemId: string | null;
   temperature: number | null;
   reasoningEffort: string | null;
+  maxInputTokens: number | null;
   maxOutputTokens: number | null;
   fallbackTemperature: number | null;
   fallbackReasoningEffort: string | null;

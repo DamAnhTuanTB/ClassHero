@@ -47,7 +47,7 @@ Nếu task không đổi database, chỉ cần đọc file chi tiết liên quan
 | Enrollment, progress, trial lesson | `docs/database/progress-enrollment.md` |
 | Quiz, flashcard, test, attempts | `docs/database/quiz-flashcard-tests.md` |
 | Background jobs, queue/job status | `docs/database/background-jobs.md` |
-| AI logs, explanation cache, Summary STEM figure, chat, RAG | `docs/database/ai-rag-chat.md` |
+| AI logs, explanation cache, Summary STEM figure/revision/raster edit, chat, RAG | `docs/database/ai-rag-chat.md` |
 | AI/OCR provider catalog, bảng giá, routing, usage, budget | `docs/database/provider-operations.md` |
 | Payment, payOS, discount, webhook logs | `docs/database/payment-discount.md` |
 | Notification, report, moderation, news/events/livestream | `docs/database/notification-report-news.md` |

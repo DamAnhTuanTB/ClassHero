@@ -6,7 +6,9 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
 
 - `provider_catalog_items`: catalog model AI/dịch vụ OCR, capability, trạng thái và tên env credential để kiểm tra readiness.
 - `provider_price_versions` + `provider_price_rates`: bảng giá USD có thời điểm hiệu lực. Giá cũ không bị sửa để usage lịch sử giữ nguyên snapshot.
-- `ai_feature_model_configs`: model chính/dự phòng, temperature và max output token cho `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST`; `version` dùng optimistic concurrency.
+- `ai_feature_model_configs`: model chính/dự phòng, temperature, max input token
+  và max output token cho `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST`; `version` dùng
+  optimistic concurrency.
 - `provider_usage_events`: một record bất biến cho mỗi provider attempt hoặc OCR cache hit; liên kết được với `ai_generations`, `background_jobs`, `source_documents`.
 - `provider_budget_policies`: ngân sách tháng `ALL`, `AI`, `OCR`; mặc định cảnh báo mềm, `hard_stop=false`.
 - `provider_budget_reservations` (`M9.12`): giữ chỗ chi phí trước paid call, có `idempotency_key` unique, period theo múi giờ kế toán, category, số tiền giữ/quyết toán, trạng thái `RESERVED/SETTLED/RELEASED/UNCERTAIN`, expiry/heartbeat và liên kết usage/job/generation/document.
@@ -26,10 +28,11 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
   của provider; các cột token chuẩn hóa mới là nguồn tính phí và aggregate.
 - Index chính theo `created_at`, category/provider/model/feature/status để phục vụ dashboard.
 - Cấu hình và giá thay đổi phải ghi `audit_logs`; API không trả API key.
-- Khi tạo price version mới, các điều kiện kỹ thuật không thuộc đơn giá trên rate
-  tương ứng (ví dụ `maxInputTokens`, service/context tier) phải được kế thừa từ
-  price version đang hiệu lực; thao tác chỉ cập nhật giá không được làm model mất
-  readiness hoặc khiến budget guard fail-closed ngoài ý muốn.
+- `ai_feature_model_configs.max_input_tokens` là nguồn chuẩn cho reservation AI;
+  admin quản lý cùng `max_output_tokens` theo từng tính năng. Catalog model và
+  price version không sở hữu cấu hình này; metadata
+  `provider_price_rates.conditions_json.maxInputTokens` chỉ còn để đọc route
+  snapshot/job cũ trong giai đoạn tương thích.
 - Catalog AI mặc định chỉ seed model text/structured-output ổn định dùng được cho `SUMMARY`, `QUIZ`, `FLASHCARD`, `TEST`. Model preview, audio, image và deprecated không xuất hiện trong ô chọn.
 - Catalog hiện gồm các họ OpenAI GPT-5.6/GPT-5.4/GPT-4.1 và Gemini 3.6/3.5/3.1/2.5; bảng giá seed lấy từ trang giá chính thức của từng provider và vẫn phải tạo price version mới khi provider đổi giá.
 

@@ -37,7 +37,6 @@ export function AdminStemFigureEditorDialog({
   const [source, setSource] = useState(
     mode === "create" ? createStarterSource() : (figure.latexSource ?? ""),
   );
-  const [altText, setAltText] = useState(figure.altText);
   const [caption, setCaption] = useState(figure.caption ?? "");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [requestIssues, setRequestIssues] = useState<StemFigureCompileIssue[]>([]);
@@ -52,17 +51,15 @@ export function AdminStemFigureEditorDialog({
     if (openSessionKeyRef.current === openSessionKey) return;
     openSessionKeyRef.current = openSessionKey;
     setSource(mode === "create" ? createStarterSource() : (figure.latexSource ?? ""));
-    setAltText(figure.altText);
     setCaption(figure.caption ?? "");
     setFocusLine(null);
     setRequestIssues([]);
     setResult(null);
-  }, [figure.altText, figure.caption, figure.id, figure.latexSource, isOpen, mode]);
+  }, [figure.caption, figure.id, figure.latexSource, isOpen, mode]);
 
   const originalSource = mode === "create" ? "" : (figure.latexSource ?? "");
   const sourceChanged = source !== originalSource;
-  const metadataChanged =
-    altText !== figure.altText || caption !== (figure.caption ?? "");
+  const metadataChanged = caption !== (figure.caption ?? "");
   const previewSvg = result?.previewSvg ?? (!sourceChanged ? figure.previewSvg : null);
   const previewUrl = previewSvg
     ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(previewSvg)}`
@@ -95,8 +92,8 @@ export function AdminStemFigureEditorDialog({
   }
 
   async function compileDraft() {
-    if (!source.trim() || !altText.trim()) {
-      toast.error("Mã hình và mô tả thay thế không được để trống.");
+    if (!source.trim()) {
+      toast.error("Mã hình không được để trống.");
       return null;
     }
     setFocusLine(null);
@@ -107,7 +104,7 @@ export function AdminStemFigureEditorDialog({
         baseRevisionId: figure.currentRevisionId,
         sourceVersion: result?.sourceVersion ?? figure.sourceVersion,
         latexSource: source,
-        altText,
+        altText: figure.altText,
         caption: caption.trim() || null,
       });
       setResult(compiled);
@@ -125,12 +122,7 @@ export function AdminStemFigureEditorDialog({
   }
 
   async function apply() {
-    const normalizedAltText = altText.trim();
     const normalizedCaption = caption.trim() || null;
-    if (!normalizedAltText) {
-      toast.error("Mô tả hình không được để trống.");
-      return;
-    }
     if (!sourceChanged && !result && figure.currentRevisionId) {
       if (!metadataChanged) {
         closeNow();
@@ -142,7 +134,7 @@ export function AdminStemFigureEditorDialog({
           baseRevisionId: figure.currentRevisionId,
           revisionId: figure.currentRevisionId,
           sourceVersion: figure.sourceVersion,
-          altText: normalizedAltText,
+          altText: figure.altText,
           caption: normalizedCaption,
         });
         toast.success("Đã cập nhật thông tin hình.");
@@ -167,7 +159,7 @@ export function AdminStemFigureEditorDialog({
         baseRevisionId: figure.currentRevisionId,
         revisionId: draft.revisionId,
         sourceVersion: draft.sourceVersion,
-        altText: normalizedAltText,
+        altText: figure.altText,
         caption: normalizedCaption,
       });
       toast.success("Đã áp dụng hình mới.");
@@ -209,15 +201,6 @@ export function AdminStemFigureEditorDialog({
             />
             <div className="flex flex-col gap-3 border-t border-[var(--theme-border)] p-3">
               <label className="text-xs font-bold text-[var(--theme-text)]">
-                Mô tả hình
-                <textarea
-                  className="mt-1 min-h-20 w-full resize-y rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-2 text-sm"
-                  rows={3}
-                  value={altText}
-                  onChange={(event) => setAltText(event.target.value)}
-                />
-              </label>
-              <label className="text-xs font-bold text-[var(--theme-text)]">
                 Chú thích
                 <input
                   className="mt-1 min-h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 text-sm"
@@ -257,7 +240,7 @@ export function AdminStemFigureEditorDialog({
               ) : previewUrl ? (
                 <div className="grid min-h-full flex-1 place-items-center bg-white p-5">
                   <img
-                    alt={altText}
+                    alt={caption.trim() || figure.altText}
                     className="max-h-[65dvh] max-w-full object-contain"
                     src={previewUrl}
                   />
@@ -421,7 +404,6 @@ const DRAFT_VALIDATION_FIELD_LABELS: Record<string, string> = {
   baseRevisionId: "phiên bản hình",
   sourceVersion: "phiên bản source",
   latexSource: "mã hình",
-  altText: "mô tả hình",
   caption: "chú thích",
 };
 

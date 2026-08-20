@@ -33,7 +33,9 @@ import {
   StemFigureMutationGuardDto,
   UseStemFigureSourceCropDto,
 } from "#api/modules/stem-figures/dto/stem-figure-mutation-guard.dto";
+import { StemFigureRasterEditDto } from "#api/modules/stem-figures/dto/stem-figure-raster-edit.dto";
 import { StemFigureDraftService } from "#api/modules/stem-figures/services/stem-figure-draft.service";
+import { StemFigureRasterEditService } from "#api/modules/stem-figures/services/stem-figure-raster-edit.service";
 import { StemFiguresService } from "#api/modules/stem-figures/services/stem-figures.service";
 
 @ApiTags("admin-stem-figures")
@@ -47,6 +49,8 @@ export class AdminStemFiguresController {
     private readonly figures: StemFiguresService,
     @Inject(StemFigureDraftService)
     private readonly drafts: StemFigureDraftService,
+    @Inject(StemFigureRasterEditService)
+    private readonly rasterEdits: StemFigureRasterEditService,
   ) {}
 
   @Post("blocks/ensure")
@@ -140,6 +144,37 @@ export class AdminStemFiguresController {
     @Body() dto: UseStemFigureSourceCropDto,
   ) {
     return this.figures.useSourceCrop(lessonId, figureId, user.id, dto);
+  }
+
+  @Post(":figureId/raster-edits/preview")
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(
+    FileInterceptor("mask", { limits: { fileSize: 8 * 1024 * 1024, files: 1 } }),
+  )
+  @ApiOperation({ summary: "Preview a local textbook raster cleanup" })
+  previewRasterEdit(
+    @Param("lessonId") lessonId: string,
+    @Param("figureId") figureId: string,
+    @UploadedFile() mask: UploadedFileBuffer | undefined,
+    @Body() dto: StemFigureRasterEditDto,
+  ) {
+    return this.rasterEdits.preview(lessonId, figureId, dto, mask);
+  }
+
+  @Post(":figureId/raster-edits/apply")
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(
+    FileInterceptor("mask", { limits: { fileSize: 8 * 1024 * 1024, files: 1 } }),
+  )
+  @ApiOperation({ summary: "Apply a local textbook raster cleanup as a new revision" })
+  applyRasterEdit(
+    @Param("lessonId") lessonId: string,
+    @Param("figureId") figureId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() mask: UploadedFileBuffer | undefined,
+    @Body() dto: StemFigureRasterEditDto,
+  ) {
+    return this.rasterEdits.apply(lessonId, figureId, user.id, dto, mask);
   }
 
   @Post(":figureId/drafts/compile")

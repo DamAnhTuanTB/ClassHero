@@ -62,6 +62,7 @@ export class AiModelRoutingService {
       model: configuration.primaryCatalogItem.externalKey,
       temperature: configuration.temperature?.toNumber() ?? null,
       reasoningEffort: configuration.reasoningEffort ?? null,
+      maxInputTokens: configuration.maxInputTokens,
       maxOutputTokens: configuration.maxOutputTokens,
       candidates,
       hasConfiguration: true,
@@ -145,13 +146,14 @@ export class AiModelRoutingService {
   }): ProviderRouteCandidate {
     const price = item.priceVersions[0];
     const provider = parseAiProvider(item.provider);
+    const maxInputTokens = readMaxInputTokens(price?.rates ?? []);
     return {
       catalogItemId: item.id,
       priceVersionId: price?.id ?? null,
       category: item.category,
       provider,
       model: item.externalKey,
-      maxInputTokens: readMaxInputTokens(price?.rates ?? []),
+      maxInputTokens,
       available:
         item.status === ProviderCatalogStatus.ACTIVE &&
         this.isCredentialConfigured(item.provider),
@@ -175,6 +177,7 @@ export class AiModelRoutingService {
       model: "default-model",
       temperature: null,
       reasoningEffort: null,
+      maxInputTokens: null,
       maxOutputTokens: null,
       candidates: [
         {

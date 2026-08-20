@@ -13,7 +13,10 @@ const HASH = "a".repeat(64);
 const DOCUMENT_ID = "10000000-0000-4000-8000-000000000001";
 const DRAFT_ID = "10000000-0000-4000-8000-000000000002";
 
-function jobInput(useTextbookSourceImages?: boolean) {
+function jobInput(
+  useTextbookSourceImages?: boolean,
+  autoEnhanceTextbookSourceImages?: boolean,
+) {
   return lessonSummaryJobInputSchema.parse({
     documentIds: [DOCUMENT_ID],
     sourceHash: HASH,
@@ -22,6 +25,9 @@ function jobInput(useTextbookSourceImages?: boolean) {
     packetHash: HASH,
     manifestHash: HASH,
     ...(useTextbookSourceImages === undefined ? {} : { useTextbookSourceImages }),
+    ...(autoEnhanceTextbookSourceImages === undefined
+      ? {}
+      : { autoEnhanceTextbookSourceImages }),
     targetGrade: 8,
     subjectKey: "MATH",
     subjectName: "Toán",
@@ -121,6 +127,12 @@ describe("M9.17 textbook source image mode", () => {
 
   it("defaults the durable job flag to false", () => {
     expect(jobInput().useTextbookSourceImages).toBe(false);
+    expect(jobInput().autoEnhanceTextbookSourceImages).toBe(false);
+  });
+
+  it("only accepts automatic enhancement together with textbook source mode", () => {
+    expect(jobInput(true, true).autoEnhanceTextbookSourceImages).toBe(true);
+    expect(() => jobInput(false, true)).toThrowError(/Chỉ có thể tự động làm nét/u);
   });
 
   it("does not change any Phase 1 structured input field", () => {
@@ -158,8 +170,13 @@ describe("M9.17 textbook source image mode", () => {
       ...base,
       configuration: jobInput(true),
     });
+    const checkedAndEnhanced = buildLessonSummaryStructuredInput({
+      ...base,
+      configuration: jobInput(true, true),
+    });
 
     expect(checked).toEqual(unchecked);
+    expect(checkedAndEnhanced).toEqual(unchecked);
   });
 
   it("materializes every confidently resolved crop in stable order", () => {

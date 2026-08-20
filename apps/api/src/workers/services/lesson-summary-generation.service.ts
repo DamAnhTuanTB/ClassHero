@@ -231,7 +231,9 @@ export class LessonSummaryGenerationService {
     const targetGrade = readTargetGrade(prepared.contextMetadata);
     const routeSnapshot = readFigureRouteSnapshot(prepared.contextMetadata);
     const packetManifest = readPacketManifestFromMetadata(prepared.contextMetadata);
-    const useTextbookSourceImages = readUseTextbookSourceImages(context.inputMeta);
+    const textbookSourceImageOptions = readTextbookSourceImageOptions(context.inputMeta);
+    const { useTextbookSourceImages, autoEnhanceTextbookSourceImages } =
+      textbookSourceImageOptions;
     const resolvedFigureDrafts = await Promise.all(
       figureDrafts.map(async (item) => ({
         ...item,
@@ -420,6 +422,7 @@ export class LessonSummaryGenerationService {
             assetObjectKey: figure.sourceAsset.objectKey,
             referenceSnapshot: figure.referenceSnapshot,
             referenceSnapshotHash: figure.referenceSnapshotHash,
+            autoEnhance: autoEnhanceTextbookSourceImages,
           });
           importedSourceFigureIds.add(figure.id);
         } catch (error) {
@@ -473,13 +476,18 @@ export class LessonSummaryGenerationService {
       resourceType: "LESSON_SUMMARY",
       resourceId: summary.persisted.id,
       message: useTextbookSourceImages
-        ? "Đã tạo tóm tắt và xử lý ảnh gốc sách giáo khoa."
+        ? autoEnhanceTextbookSourceImages
+          ? "Đã tạo tóm tắt, tự động làm nét và xử lý ảnh gốc sách giáo khoa."
+          : "Đã tạo tóm tắt và xử lý ảnh gốc sách giáo khoa."
         : "Đã tạo tóm tắt buổi học bằng AI.",
       result: {
         lessonId: summary.persisted.lessonId,
         reviewStatus: summary.persisted.reviewStatus,
         stemFigureCount: summary.createdFigures.length,
         sourceFigureImportedCount: importedSourceFigureIds.size,
+        sourceFigureEnhancedCount: autoEnhanceTextbookSourceImages
+          ? importedSourceFigureIds.size
+          : 0,
         sourceFigureNeedsReviewCount,
         generatedFigureSkippedCount: useTextbookSourceImages
           ? figureDrafts.filter(
@@ -600,9 +608,19 @@ function allocateStemFigureLocalId(used: Set<string>) {
   throw new UnrecoverableError("STEM_FIGURE_LOCAL_ID_EXHAUSTED");
 }
 
-function readUseTextbookSourceImages(value: unknown) {
+function readTextbookSourceImageOptions(value: unknown) {
   const parsed = lessonSummaryJobInputSchema.safeParse(omitProviderRouteSnapshot(value));
-  return parsed.success ? parsed.data.useTextbookSourceImages : false;
+  if (!parsed.success) {
+    return {
+      useTextbookSourceImages: false,
+      autoEnhanceTextbookSourceImages: false,
+    };
+  }
+  return {
+    useTextbookSourceImages: parsed.data.useTextbookSourceImages,
+    autoEnhanceTextbookSourceImages:
+      parsed.data.useTextbookSourceImages && parsed.data.autoEnhanceTextbookSourceImages,
+  };
 }
 
 function readTargetGrade(value: unknown) {

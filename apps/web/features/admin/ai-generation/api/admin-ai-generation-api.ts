@@ -14,6 +14,9 @@ import type {
   AdminStemFigureCreateAiInput,
   AdminStemFigureCreateAiPreview,
   AdminStemFigureCompileResult,
+  AdminStemFigureRasterEditApplyResult,
+  AdminStemFigureRasterEditInput,
+  AdminStemFigureRasterEditPreview,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import type { LessonSummaryPhaseOneLayoutOperation } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 
@@ -270,6 +273,53 @@ export function promoteAdminStemFigureSourceCrop(
       token,
     },
   );
+}
+
+export function previewAdminStemFigureRasterEdit(
+  lessonId: string,
+  input: AdminStemFigureRasterEditInput,
+  token: string,
+) {
+  return apiRequest<AdminStemFigureRasterEditPreview>(
+    `/admin/lessons/${lessonId}/stem-figures/${input.figure.id}/raster-edits/preview`,
+    {
+      method: "POST",
+      body: stemFigureRasterEditFormData(input),
+      token,
+      timeoutMs: 30_000,
+    },
+  );
+}
+
+export function applyAdminStemFigureRasterEdit(
+  lessonId: string,
+  input: AdminStemFigureRasterEditInput,
+  token: string,
+) {
+  return apiRequest<AdminStemFigureRasterEditApplyResult>(
+    `/admin/lessons/${lessonId}/stem-figures/${input.figure.id}/raster-edits/apply`,
+    {
+      method: "POST",
+      body: stemFigureRasterEditFormData(input),
+      token,
+      timeoutMs: 30_000,
+    },
+  );
+}
+
+function stemFigureRasterEditFormData(input: AdminStemFigureRasterEditInput) {
+  const body = new FormData();
+  const guard = stemFigureMutationGuard(input.figure);
+  if (guard.baseCurrentRevisionId) {
+    body.set("baseCurrentRevisionId", guard.baseCurrentRevisionId);
+  }
+  if (guard.basePendingRevisionId) {
+    body.set("basePendingRevisionId", guard.basePendingRevisionId);
+  }
+  body.set("baseSourceVersion", String(guard.baseSourceVersion));
+  body.set("operations", JSON.stringify(input.operations));
+  if (input.mask) body.set("mask", input.mask, "mask.png");
+  return body;
 }
 
 function stemFigureMutationGuard(figure: AdminStemFigure, includeDiagnostic = false) {

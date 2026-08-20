@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Clock3, ImageIcon } from "lucide-react";
+import { AlertTriangle, Clock3, LoaderCircle } from "lucide-react";
 import { tokenizeMathText } from "@learning-path/shared";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -18,7 +18,6 @@ export type StemFigureVisual = {
 
 export function StemFigure({
   visual,
-  showStatus = false,
   displaySize = "default",
 }: {
   visual: StemFigureVisual;
@@ -37,6 +36,11 @@ export function StemFigure({
               className={`h-7 w-7 ${failed ? "text-rose-500" : "text-amber-500"}`}
               aria-hidden="true"
             />
+          ) : visual.status === "RENDERING" ? (
+            <LoaderCircle
+              className="h-7 w-7 animate-spin text-sky-500 motion-reduce:animate-none"
+              aria-hidden="true"
+            />
           ) : (
             <Clock3 className="h-7 w-7 text-amber-500" aria-hidden="true" />
           )}
@@ -45,13 +49,14 @@ export function StemFigure({
               ? "Hình cần được sửa và render lại"
               : needsReview
                 ? "Hình cần được kiểm tra trước khi sử dụng"
-                : "Hình đang được xử lý"}
+                : visual.status === "RENDERING"
+                  ? "Hình đang được render"
+                  : visual.status === "REPAIRING"
+                    ? "AI đang sửa hình"
+                    : visual.status === "QUEUED"
+                      ? "Hình đang chờ xử lý"
+                      : "Hình đang được xử lý"}
           </p>
-          {showStatus ? (
-            <p className="text-xs text-slate-500">
-              Trạng thái: {statusLabel(visual.status, visual.lastErrorCategory)}
-            </p>
-          ) : null}
         </div>
       </figure>
     );
@@ -74,13 +79,6 @@ export function StemFigure({
         <figcaption className="mt-3 text-center text-sm font-medium leading-6 text-slate-600">
           <StemFigureMathText value={visual.caption} />
         </figcaption>
-      ) : null}
-      {showStatus && visual.status !== "SUCCEEDED" ? (
-        <div className="mt-3 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
-          <ImageIcon className="h-4 w-4" aria-hidden="true" />
-          {visual.assetUrl ? "Ảnh hiện hành" : "Bản xem trước"} ·{" "}
-          {statusLabel(visual.status, visual.lastErrorCategory)}
-        </div>
       ) : null}
     </figure>
   );
@@ -116,32 +114,4 @@ function renderMath(latex: string, displayMode: boolean) {
 
 function toSvgDataUrl(svg: string | undefined) {
   return svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null;
-}
-
-function statusLabel(
-  status: StemFigureVisual["status"],
-  lastErrorCategory?: string | null,
-) {
-  if (status === "FAILED") {
-    return (
-      {
-        BUDGET: "Bị chặn do ngân sách",
-        COMPILER: "Biên dịch lỗi",
-        PROVIDER_OUTPUT: "AI chưa trả được mã hình",
-        INFRASTRUCTURE: "Lỗi hạ tầng",
-        SOURCE_POLICY: "Mã hình không hợp lệ",
-        VALIDATOR: "Hình cần xem lại",
-      }[lastErrorCategory ?? ""] ?? "Tạo hình thất bại"
-    );
-  }
-  return (
-    {
-      QUEUED: "Đang chờ",
-      RENDERING: "Đang render",
-      REPAIRING: "AI đang sửa mã",
-      NEEDS_REVIEW: "Cần xem lại",
-      SUCCEEDED: "Sẵn sàng",
-      FAILED: "Tạo hình thất bại",
-    }[status ?? "QUEUED"] ?? "Đang xử lý"
-  );
 }

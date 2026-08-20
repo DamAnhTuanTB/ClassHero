@@ -305,14 +305,25 @@ test.describe("M9.8 admin AI generation panel", () => {
       .click();
     const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     const sourceImageCheckbox = dialog.getByLabel("Dùng ảnh gốc sách giáo khoa");
+    const autoEnhanceCheckbox = dialog.getByLabel("Tự động làm nét ảnh");
     await expect(sourceImageCheckbox).not.toBeChecked();
+    await expect(autoEnhanceCheckbox).toHaveCount(0);
 
     await sourceImageCheckbox.check();
+    await expect(autoEnhanceCheckbox).toBeVisible();
+    await expect(autoEnhanceCheckbox).not.toBeChecked();
+    await autoEnhanceCheckbox.check();
+    await sourceImageCheckbox.uncheck();
+    await expect(autoEnhanceCheckbox).toHaveCount(0);
+    await sourceImageCheckbox.check();
+    await expect(autoEnhanceCheckbox).not.toBeChecked();
+    await autoEnhanceCheckbox.check();
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect
       .poll(() => mock.promptPreviewPayloads.at(-1))
       .toMatchObject({
         useTextbookSourceImages: true,
+        autoEnhanceTextbookSourceImages: true,
       });
 
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
@@ -320,6 +331,7 @@ test.describe("M9.8 admin AI generation panel", () => {
       .poll(() => mock.payloads.SUMMARY)
       .toMatchObject({
         useTextbookSourceImages: true,
+        autoEnhanceTextbookSourceImages: true,
       });
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
@@ -495,6 +507,63 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expectNoFrameworkOverlay(page);
   });
 
+  test("prefills the previous summary generation configuration only when editing", async ({
+    page,
+  }) => {
+    const previousConfiguration = {
+      documentIds: [documentId, supplementalDocumentId],
+      useTextbookSourceImages: true,
+      autoEnhanceTextbookSourceImages: true,
+      style: "concise",
+      styleInstructions: "Trình bày theo từng bước ngắn gọn.",
+      length: "detailed",
+      targetWordCount: 1_250,
+      extraInstructions: "Giữ lại các lưu ý của lần tạo trước.",
+      systemInstructions: "SYSTEM CỦA LẦN TẠO TRƯỚC",
+      userPrompt: "USER CỦA LẦN TẠO TRƯỚC",
+      model: "gpt-4.1-mini",
+      temperature: 0.35,
+      maxOutputTokens: 12_000,
+    };
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent(),
+      initialSummaryGenerationInput: previousConfiguration,
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+    await page.getByRole("button", { name: "Sửa", exact: true }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
+    await expect(dialog.getByLabel("Tài liệu dùng để tạo", { exact: true })).toContainText(
+      "Giáo trình Toán 7 (trang 5–9), Tài liệu tham khảo",
+    );
+    await expect(dialog.getByLabel("Dùng ảnh gốc sách giáo khoa")).toBeChecked();
+    await expect(dialog.getByLabel("Tự động làm nét ảnh")).toBeChecked();
+    await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
+      "Trình bày theo từng bước ngắn gọn.",
+    );
+    await expect(dialog.getByLabel("Độ dài Kiến thức")).toContainText("Chi tiết");
+    await expect(dialog.getByLabel("Số lượng từ")).toHaveValue("1250");
+    await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveValue(
+      "Giữ lại các lưu ý của lần tạo trước.",
+    );
+    await expect(dialog.getByRole("button", { name: "Model", exact: true })).toContainText(
+      "OpenAI · gpt-4.1-mini",
+    );
+    await expect(dialog.getByLabel("Temperature")).toHaveValue("0.35");
+    await expect(dialog.getByLabel("Giới hạn token đầu ra")).toHaveValue("12000");
+    await expect.poll(() => mock.promptPreviewPayloads.at(-1)).toMatchObject({
+      ...previousConfiguration,
+    });
+
+    await dialog.getByRole("button", { name: "Hủy" }).click();
+    await generationCard(page, "Kiến thức")
+      .getByRole("button", { name: "Tạo mới", exact: true })
+      .click();
+    await expect(dialog.getByLabel("Dùng ảnh gốc sách giáo khoa")).not.toBeChecked();
+    await expect(dialog.getByLabel("Yêu cầu bổ sung")).toHaveValue("");
+  });
+
   test("keeps the current LIGHT asset, exposes stable actions, and unblocks after delete", async ({
     page,
   }, testInfo) => {
@@ -557,6 +626,18 @@ test.describe("M9.8 admin AI generation panel", () => {
     const overviewCard = figureStatusDetails.locator(
       '[data-admin-stem-figure-overview="figure-with-current"]',
     );
+    await overviewCard
+      .getByRole("button", { name: "Xem chi tiết khối chứa Ảnh 1" })
+      .click();
+    const blockDetailsDialog = page.getByRole("dialog", {
+      name: "Chi tiết khối chứa hình",
+    });
+    await expect(blockDetailsDialog).toContainText("Tam giác");
+    await expect(blockDetailsDialog).toContainText(
+      "Quan sát các đỉnh và cạnh của tam giác.",
+    );
+    await blockDetailsDialog.getByRole("button", { name: "Đóng" }).click();
+    await expect(blockDetailsDialog).toHaveCount(0);
     await overviewCard.getByRole("button", { name: "Mở menu thao tác hình" }).click();
     for (const action of [
       "Chỉnh sửa bằng mã code",
@@ -585,10 +666,9 @@ test.describe("M9.8 admin AI generation panel", () => {
       .getByRole("button", { name: "Xem hình trong sách giáo khoa" })
       .click();
     await expect(overviewCard.getByText("Xem hình trong sách giáo khoa")).toHaveCount(0);
-    await figureStatusDetails
-      .locator("footer")
-      .getByRole("button", { name: "Đóng" })
-      .click();
+    await overviewCard.getByRole("button", { name: "Đi đến khối chứa Ảnh 1" }).click();
+    await expect(figureStatusDetails).toHaveCount(0);
+    await expect(page.locator("#block-0-0")).toBeInViewport();
     await expect(page.getByAltText("Hình tam giác ABC")).toBeVisible();
     for (const figure of figures) {
       const card = page.locator(`[data-admin-stem-figure="${String(figure.id)}"]`);
@@ -752,14 +832,10 @@ test.describe("M9.8 admin AI generation panel", () => {
     await reopenedEditor.getByRole("button", { name: "Biên dịch" }).click();
     await expect(reopenedEditor.getByRole("button", { name: "Áp dụng" })).toBeEnabled();
     expect(mock.figureActions.compilePayloads[0]).not.toHaveProperty("figureId");
-    await expect(reopenedEditor.getByAltText("Hình tam giác ABC")).toBeVisible();
-    await expect(reopenedEditor.getByLabel("Mô tả hình")).toHaveJSProperty(
-      "tagName",
-      "TEXTAREA",
-    );
-    await reopenedEditor.getByLabel("Mô tả hình").fill("Mô tả hình mới");
+    await expect(reopenedEditor.getByAltText("Tam giác ABC")).toBeVisible();
+    await expect(reopenedEditor.getByLabel("Mô tả hình")).toHaveCount(0);
     await reopenedEditor.getByLabel("Chú thích").fill("Chú thích mới");
-    await expect(reopenedEditor.getByAltText("Mô tả hình mới")).toBeVisible();
+    await expect(reopenedEditor.getByAltText("Chú thích mới")).toBeVisible();
     expect(mock.figureActions.compilePayloads).toHaveLength(1);
     await page.screenshot({
       path: `../../.codex/artifacts/m9-2-stem-figure-lifecycle/admin-editor-light-${testInfo.project.name}.png`,
@@ -769,7 +845,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect.poll(() => mock.figureActions.applies).toBe(1);
     expect(mock.figureActions.applyPayloads[0]).not.toHaveProperty("figureId");
     expect(mock.figureActions.applyPayloads[0]).toMatchObject({
-      altText: "Mô tả hình mới",
+      altText: "Hình tam giác ABC",
       caption: "Chú thích mới",
     });
     await expect(reopenedEditor).toHaveCount(0);
@@ -796,7 +872,6 @@ test.describe("M9.8 admin AI generation panel", () => {
     await card.getByRole("button", { name: "Mở menu thao tác hình" }).click();
     await page.getByRole("menuitem", { name: "Chỉnh sửa bằng mã code" }).click();
     const editor = page.getByRole("dialog", { name: "Chỉnh sửa hình" });
-    await editor.getByLabel("Mô tả hình").fill("Mô tả chỉ sửa metadata");
     await editor.getByLabel("Chú thích").fill("Chú thích chỉ sửa metadata");
     await editor.getByRole("button", { name: "Áp dụng" }).click();
 
@@ -805,7 +880,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     expect(mock.figureActions.applyPayloads[0]).toMatchObject({
       revisionId: figure.currentRevisionId,
       sourceVersion: figure.sourceVersion,
-      altText: "Mô tả chỉ sửa metadata",
+      altText: "Hình tam giác ABC",
       caption: "Chú thích chỉ sửa metadata",
     });
   });
@@ -893,7 +968,6 @@ test.describe("M9.8 admin AI generation panel", () => {
                   sourceTarget: { scope: "WHOLE_FIGURE", locator: null },
                 },
               ],
-              altText: "Tam giác ABC và các cạnh tương ứng.",
               caption: "Tam giác ABC.",
             },
           ],
@@ -1223,6 +1297,147 @@ test.describe("M9.8 admin AI generation panel", () => {
       });
   });
 
+  test("previews and applies textbook raster cleanup from the magic-wand action", async ({
+    page,
+  }) => {
+    const textbookFigure = stemFigureFixture({
+      id: "figure-raster-cleanup",
+      assetUrl: svgDataUrl(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><rect width="120" height="80" fill="white"/><path d="M12 58H108M34 45L68 24" fill="none" stroke="#475569" stroke-width="4"/></svg>`,
+      ),
+      currentAssetKind: "TEXTBOOK_SOURCE",
+      sourceKind: "ADMIN_UPLOAD",
+      sourceReferenceImages: [sourceReferenceFixture()],
+    });
+    const uploadedFigure = stemFigureFixture({
+      id: "figure-raster-upload",
+      assetUrl: svgDataUrl(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><rect width="120" height="80" fill="white"/></svg>`,
+      ),
+      currentAssetKind: "ADMIN_UPLOAD",
+      sourceKind: "ADMIN_UPLOAD",
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent(
+        [String(textbookFigure.id), String(uploadedFigure.id)],
+        true,
+      ),
+      stemFigures: [textbookFigure, uploadedFigure],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const textbookCard = page.locator('[data-admin-stem-figure="figure-raster-cleanup"]');
+    const uploadedCard = page.locator('[data-admin-stem-figure="figure-raster-upload"]');
+    await expect(uploadedCard.getByRole("button", { name: "Chỉnh sửa ảnh" })).toHaveCount(
+      0,
+    );
+    await textbookCard.getByRole("button", { name: "Chỉnh sửa ảnh" }).click();
+
+    const dialog = page.getByRole("dialog", {
+      name: "Chỉnh sửa ảnh sách giáo khoa",
+    });
+    await expect(dialog).toBeVisible();
+    const originalImage = dialog.getByRole("img", { name: "Hình tam giác ABC" });
+    await expect
+      .poll(() =>
+        originalImage.evaluate((image) => {
+          const rasterImage = image as HTMLImageElement;
+          return (
+            rasterImage.getBoundingClientRect().width <= rasterImage.naturalWidth + 0.5
+          );
+        }),
+      )
+      .toBe(true);
+
+    await expect(dialog.getByRole("button", { name: "Áp dụng" })).toBeDisabled();
+    await dialog.getByRole("button", { name: /Làm nét ảnh/u }).click();
+    await expect(
+      dialog.getByRole("button", { name: /Xóa chi tiết thừa/u }),
+    ).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Xem trước" })).toHaveCount(0);
+
+    await expect.poll(() => mock.figureActions.rasterPreviewPayloads).toHaveLength(1);
+    expect(mock.figureActions.rasterPreviewPayloads[0]).toContain('"enhance":true');
+    expect(mock.figureActions.rasterPreviewPayloads[0]).toContain(
+      '"pipelineVersion":"TEXTBOOK_RASTER_CLEANUP_V2"',
+    );
+    await expect(dialog.getByText("Bản xem trước đã sẵn sàng.")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Sau chỉnh sửa" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await dialog.getByRole("button", { name: "Áp dụng" }).click();
+
+    await expect.poll(() => mock.figureActions.rasterApplyPayloads).toHaveLength(1);
+    expect(mock.figureActions.rasterApplyPayloads[0]).toContain(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(mock.figureActions.rasterApplyPayloads[0]).toContain("baseSourceVersion");
+    await expect(dialog).toBeVisible();
+    await expect(page.getByText("Đã áp dụng lượt làm nét ảnh.")).toBeVisible();
+    await expect(dialog.getByText("Đã áp dụng lượt làm nét.")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /Làm nét ảnh/u })).toBeEnabled();
+    await expect(
+      dialog.getByRole("button", { name: /Xóa chi tiết thừa/u }),
+    ).toBeEnabled();
+    const closeFooterButton = dialog
+      .getByRole("button", { name: "Đóng" })
+      .filter({ hasText: "Đóng" });
+    await expect(closeFooterButton).toBeVisible();
+
+    await dialog.getByRole("button", { name: /Xóa chi tiết thừa/u }).click();
+    await expect(dialog.getByRole("button", { name: /Làm nét ảnh/u })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Xem trước" })).toHaveCount(0);
+    const maskCanvas = dialog
+      .getByRole("img", {
+        name: "Hình tam giác ABC",
+      })
+      .locator("xpath=following-sibling::canvas");
+    await expect(maskCanvas).toBeVisible();
+    const maskBox = await maskCanvas.boundingBox();
+    expect(maskBox).not.toBeNull();
+    if (!maskBox) throw new Error("Raster mask canvas is not visible.");
+    await page.mouse.move(
+      maskBox.x + maskBox.width * 0.45,
+      maskBox.y + maskBox.height * 0.5,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      maskBox.x + maskBox.width * 0.55,
+      maskBox.y + maskBox.height * 0.5,
+    );
+    await page.mouse.up();
+    await expect.poll(() => mock.figureActions.rasterPreviewPayloads).toHaveLength(2);
+    expect(mock.figureActions.rasterPreviewPayloads[1]).toContain(
+      "99999999-9999-4999-8999-999999999999",
+    );
+    expect(mock.figureActions.rasterPreviewPayloads[1]).toContain(
+      'name="baseSourceVersion"',
+    );
+    expect(mock.figureActions.rasterPreviewPayloads[1]).toMatch(
+      /name="baseSourceVersion"[\s\S]*?\r?\n\r?\n3\r?\n/u,
+    );
+    expect(mock.figureActions.rasterPreviewPayloads[1]).toContain(
+      '"removeSimpleDetails":true',
+    );
+    await expect(dialog.getByText("Bản xem trước đã sẵn sàng.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Áp dụng" }).click();
+    await expect.poll(() => mock.figureActions.rasterApplyPayloads).toHaveLength(2);
+    expect(mock.figureActions.rasterApplyPayloads[1]).toContain(
+      "99999999-9999-4999-8999-999999999999",
+    );
+    expect(mock.figureActions.rasterApplyPayloads[1]).toContain(
+      '"removeSimpleDetails":true',
+    );
+    await expect(dialog).toBeVisible();
+    await expect(page.getByText("Đã áp dụng lượt xóa chi tiết thừa.")).toBeVisible();
+    await expect(dialog.getByText("Đã áp dụng lượt xóa chi tiết.")).toBeVisible();
+    await closeFooterButton.click();
+    await expect(dialog).toHaveCount(0);
+  });
+
   test("configures the figure model and edits the exact system and user prompts", async ({
     page,
   }) => {
@@ -1372,6 +1587,7 @@ async function setupAiGenerationMock(
     initialReviewStatus?: "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "HIDDEN";
     runningPolls?: number;
     initialSummaryContent?: unknown;
+    initialSummaryGenerationInput?: Record<string, unknown>;
     phaseOneBlockJsonByPath?: Record<string, unknown>;
     lessonTitle?: string;
     stemFigures?: Array<Record<string, unknown>>;
@@ -1390,6 +1606,8 @@ async function setupAiGenerationMock(
     deleted: [] as string[],
     previewModes: [] as string[],
     previewPayloads: [] as Array<Record<string, unknown>>,
+    rasterApplyPayloads: [] as string[],
+    rasterPreviewPayloads: [] as string[],
   };
   const jobs = new Map<
     string,
@@ -1400,6 +1618,14 @@ async function setupAiGenerationMock(
       type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
     }
   >();
+  if (options.initialSummaryGenerationInput) {
+    jobs.set("job-summary-existing", {
+      inputMetaJson: structuredClone(options.initialSummaryGenerationInput),
+      polls: 1,
+      resourceId: "summary-review",
+      type: "SUMMARY",
+    });
+  }
   const sets: Record<"QUIZ" | "FLASHCARD" | "TEST", Array<Record<string, unknown>>> = {
     QUIZ: [],
     FLASHCARD: [],
@@ -1744,6 +1970,44 @@ async function setupAiGenerationMock(
               max_output_tokens: 12_000,
             },
             referenceImages,
+          },
+        });
+      }
+      if (method === "POST" && suffix === "/raster-edits/preview") {
+        figureActions.rasterPreviewPayloads.push(request.postData() ?? "");
+        return fulfillJson(route, 200, {
+          data: {
+            pipelineVersion: "TEXTBOOK_RASTER_CLEANUP_V2",
+            previewDataUrl: svgDataUrl(
+              `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><rect width="120" height="80" fill="white"/><path d="M12 58H108M34 45L68 24" fill="none" stroke="#0f172a" stroke-width="3"/></svg>`,
+            ),
+            width: 120,
+            height: 80,
+            maskCoverageRatio: null,
+            backgroundVariance: null,
+            warnings: [],
+          },
+        });
+      }
+      if (method === "POST" && suffix === "/raster-edits/apply") {
+        figureActions.rasterApplyPayloads.push(request.postData() ?? "");
+        const revisionId =
+          figureActions.rasterApplyPayloads.length === 1
+            ? "99999999-9999-4999-8999-999999999999"
+            : "77777777-7777-4777-8777-777777777777";
+        const appliedFigure = {
+          ...figure,
+          currentRevisionId: revisionId,
+          sourceVersion: Number(figure?.sourceVersion ?? 1) + 1,
+        };
+        state.figures = state.figures.map((item) =>
+          item.id === figureId ? appliedFigure : item,
+        );
+        return fulfillJson(route, 201, {
+          data: {
+            figure: appliedFigure,
+            auditId: "88888888-8888-4888-8888-888888888888",
+            revisionId,
           },
         });
       }

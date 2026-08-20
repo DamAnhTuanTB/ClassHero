@@ -68,6 +68,7 @@ export function AiGenerationConfigDialog({
   isOpen,
   isSubmitting,
   lessonId,
+  initialGenerationConfiguration,
   initialModelConfiguration,
   quizTargetSetId,
   targetGrade,
@@ -79,6 +80,7 @@ export function AiGenerationConfigDialog({
   isOpen: boolean;
   isSubmitting: boolean;
   lessonId: string;
+  initialGenerationConfiguration?: Record<string, unknown> | null;
   initialModelConfiguration?: AdminAiModelConfiguration;
   quizTargetSetId?: string;
   targetGrade: number | null;
@@ -113,7 +115,12 @@ export function AiGenerationConfigDialog({
     resolver: zodResolver(adminAiGenerationFormSchema),
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: getDefaultValues(type, documents, targetGrade),
+    defaultValues: getInitialValues(
+      type,
+      documents,
+      targetGrade,
+      initialGenerationConfiguration,
+    ),
   });
 
   useEffect(() => {
@@ -127,9 +134,20 @@ export function AiGenerationConfigDialog({
     const requestSequence = ++previewRequestSequenceRef.current;
     previewRequestInFlightRef.current = false;
     setIsPreviewRequestPending(false);
-    const values = getDefaultValues(type, documents, targetGrade);
-    hasAdminEditedSystemPromptRef.current = false;
-    hasAdminEditedUserPromptRef.current = false;
+    const values = getInitialValues(
+      type,
+      documents,
+      targetGrade,
+      initialGenerationConfiguration,
+    );
+    hasAdminEditedSystemPromptRef.current =
+      initialGenerationConfiguration !== null &&
+      initialGenerationConfiguration !== undefined &&
+      values.systemInstructions.trim().length > 0;
+    hasAdminEditedUserPromptRef.current =
+      initialGenerationConfiguration !== null &&
+      initialGenerationConfiguration !== undefined &&
+      values.userPrompt.trim().length > 0;
     form.reset(values);
     resetPreview();
     setPreviewErrorMessage(null);
@@ -138,7 +156,15 @@ export function AiGenerationConfigDialog({
     if ((type === "SUMMARY" || type === "QUIZ") && values.documentIds.length > 0) {
       previewRequestInFlightRef.current = true;
       setIsPreviewRequestPending(true);
-      void previewPrompt(toPromptPreviewPayload(values, { quizTargetSetId }))
+      void previewPrompt(
+        toPromptPreviewPayload(values, {
+          aiConfigurationCapability: getModelConfigurationCapability(
+            initialModelConfiguration,
+            values.summaryModel,
+          ),
+          quizTargetSetId,
+        }),
+      )
         .then((data) => {
           if (requestSequence !== previewRequestSequenceRef.current) return;
           setSummaryPreviewData(data);
@@ -200,6 +226,7 @@ export function AiGenerationConfigDialog({
   }, [
     documents,
     form,
+    initialGenerationConfiguration,
     isOpen,
     initialModelConfiguration,
     previewPrompt,
@@ -285,6 +312,7 @@ export function AiGenerationConfigDialog({
       const previewFields: Array<keyof AdminAiGenerationFormValues> = [
         "documentIds",
         "useTextbookSourceImages",
+        "autoEnhanceTextbookSourceImages",
         "styleInstructions",
         "summaryLength",
         "summaryTargetWordCount",
@@ -518,23 +546,56 @@ export function AiGenerationConfigDialog({
               />
 
               {type === "SUMMARY" ? (
-                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-muted)]">
-                  <CheckboxField
-                    id="ai-summary-use-textbook-source-images"
-                    label="Dùng ảnh gốc sách giáo khoa"
-                    checked={form.watch("useTextbookSourceImages")}
-                    onChange={(event) =>
-                      form.setValue(
-                        "useTextbookSourceImages",
-                        event.currentTarget.checked,
-                        {
+                <div className="space-y-2">
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-muted)]">
+                    <CheckboxField
+                      id="ai-summary-use-textbook-source-images"
+                      label="Dùng ảnh gốc sách giáo khoa"
+                      labelClassName="border-0"
+                      checked={form.watch("useTextbookSourceImages")}
+                      onChange={(event) => {
+                        const checked = event.currentTarget.checked;
+                        form.setValue("useTextbookSourceImages", checked, {
                           shouldDirty: true,
                           shouldTouch: true,
                           shouldValidate: true,
-                        },
-                      )
-                    }
-                  />
+                        });
+                        if (!checked) {
+                          form.setValue("autoEnhanceTextbookSourceImages", false, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                  {form.watch("useTextbookSourceImages") ? (
+                    <div className="ml-3 rounded-xl border border-sky-200 bg-sky-50/70 dark:border-sky-900/70 dark:bg-sky-950/20">
+                      <CheckboxField
+                        id="ai-summary-auto-enhance-textbook-source-images"
+                        label="Tự động làm nét ảnh"
+                        labelClassName="border-0"
+                        checked={form.watch("autoEnhanceTextbookSourceImages")}
+                        error={form.formState.errors.autoEnhanceTextbookSourceImages}
+                        onChange={(event) =>
+                          form.setValue(
+                            "autoEnhanceTextbookSourceImages",
+                            event.currentTarget.checked,
+                            {
+                              shouldDirty: true,
+                              shouldTouch: true,
+                              shouldValidate: true,
+                            },
+                          )
+                        }
+                      />
+                      <p className="-mt-1 px-4 pb-3 text-xs font-semibold leading-5 text-[var(--theme-text-muted)]">
+                        Giảm nhiễu và làm nét toàn bộ ảnh sách giáo khoa trước khi lưu.
+                        Không tăng số lượt gọi AI.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1109,6 +1170,7 @@ function getDefaultValues(
       .map((document) => document.id),
     style: "student_friendly",
     useTextbookSourceImages: false,
+    autoEnhanceTextbookSourceImages: false,
     styleInstructions: getPresentationPreset("student_friendly", targetGrade),
     summaryLength: "standard",
     summaryTargetWordCount: "",
@@ -1130,6 +1192,101 @@ function getDefaultValues(
     mediumCount: "3",
     hardCount: "2",
   };
+}
+
+function getInitialValues(
+  type: AdminAiGenerationType,
+  documents: AdminAiPanelDocument[],
+  targetGrade: number | null,
+  initialConfiguration?: Record<string, unknown> | null,
+): AdminAiGenerationFormValues {
+  const defaults = getDefaultValues(type, documents, targetGrade);
+  if (type !== "SUMMARY" || !initialConfiguration) return defaults;
+
+  const availableDocumentIds = new Set(
+    documents.filter((document) => document.canUseForSummary).map((document) => document.id),
+  );
+  const restoredDocumentIds = readStringArray(initialConfiguration.documentIds).filter(
+    (documentId) => availableDocumentIds.has(documentId),
+  );
+  const restoredStyle = isSummaryStyle(initialConfiguration.style)
+    ? initialConfiguration.style
+    : defaults.style;
+  const useTextbookSourceImages = readBoolean(
+    initialConfiguration.useTextbookSourceImages,
+    defaults.useTextbookSourceImages,
+  );
+
+  return {
+    ...defaults,
+    documentIds:
+      restoredDocumentIds.length > 0 ? restoredDocumentIds : defaults.documentIds,
+    useTextbookSourceImages,
+    autoEnhanceTextbookSourceImages:
+      useTextbookSourceImages &&
+      readBoolean(
+        initialConfiguration.autoEnhanceTextbookSourceImages,
+        defaults.autoEnhanceTextbookSourceImages,
+      ),
+    style: restoredStyle,
+    styleInstructions: readString(
+      initialConfiguration.styleInstructions,
+      getPresentationPreset(restoredStyle, targetGrade),
+    ),
+    summaryLength: isSummaryLength(initialConfiguration.length)
+      ? initialConfiguration.length
+      : defaults.summaryLength,
+    summaryTargetWordCount: readNumericText(initialConfiguration.targetWordCount),
+    extraInstructions: readString(
+      initialConfiguration.extraInstructions,
+      defaults.extraInstructions,
+    ),
+    systemInstructions: readString(
+      initialConfiguration.systemInstructions,
+      defaults.systemInstructions,
+    ),
+    userPrompt: readString(initialConfiguration.userPrompt, defaults.userPrompt),
+    summaryModel: readString(initialConfiguration.model, defaults.summaryModel),
+    summaryTemperature: readNumericText(initialConfiguration.temperature),
+    summaryReasoningEffort: isAiReasoningEffort(initialConfiguration.reasoningEffort)
+      ? initialConfiguration.reasoningEffort
+      : defaults.summaryReasoningEffort,
+    summaryMaxOutputTokens: readNumericText(initialConfiguration.maxOutputTokens),
+  };
+}
+
+function getModelConfigurationCapability(
+  configuration: AdminAiModelConfiguration | undefined,
+  model: string,
+) {
+  return configuration?.modelOptions.find((option) => option.model === model)?.capabilities
+    ?.aiConfiguration;
+}
+
+function readString(value: unknown, fallback: string) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function readBoolean(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function readNumericText(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+}
+
+function isSummaryStyle(value: unknown): value is AdminSummaryStyle {
+  return value === "student_friendly" || value === "concise" || value === "academic";
+}
+
+function isSummaryLength(value: unknown): value is AdminSummaryLength {
+  return value === "short" || value === "standard" || value === "detailed";
 }
 
 function toPayload(
@@ -1259,6 +1416,9 @@ function toSummaryPayload(
     type: "SUMMARY",
     documentIds: values.documentIds,
     ...(values.useTextbookSourceImages ? { useTextbookSourceImages: true } : {}),
+    ...(values.useTextbookSourceImages && values.autoEnhanceTextbookSourceImages
+      ? { autoEnhanceTextbookSourceImages: true }
+      : {}),
     style: values.style,
     ...(styleInstructions ? { styleInstructions } : {}),
     length: values.summaryLength,

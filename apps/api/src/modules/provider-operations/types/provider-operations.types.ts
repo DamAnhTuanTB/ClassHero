@@ -31,6 +31,7 @@ export type AiFeatureRoute = {
   model: string;
   temperature: number | null;
   reasoningEffort: string | null;
+  maxInputTokens?: number | null;
   maxOutputTokens: number | null;
   candidates: ProviderRouteCandidate[];
   hasConfiguration: boolean;

@@ -109,6 +109,10 @@ interface SummaryBlockRendererProps {
     blockPath: string;
     block: BlockData;
   }) => React.ReactNode;
+  renderBlockSourceAction?: (input: {
+    blockPath: string;
+    block: BlockData;
+  }) => React.ReactNode;
   phaseOneBlockJsonByPath?: Readonly<Record<string, unknown>> | null;
   onPhaseOneBlockJsonChange?: (blockPath: string, value: unknown) => void;
   onPhaseOneLayoutOperation?: (
@@ -136,6 +140,7 @@ export function SummaryBlockRenderer({
   viewMode = "SPLIT",
   showEditorialMetadata = false,
   renderBlockImageActions,
+  renderBlockSourceAction,
   phaseOneBlockJsonByPath,
   onPhaseOneBlockJsonChange,
   onPhaseOneLayoutOperation,
@@ -1011,6 +1016,10 @@ export function SummaryBlockRenderer({
                         {/* Toolbar for UI_ONLY mode (Floating on the UI Block) */}
                         {!isBlockEditing && (
                           <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-md border border-slate-200 bg-white/90 px-1 py-0.5 opacity-100 shadow-sm transition-opacity focus-within:opacity-100 dark:border-slate-700 dark:bg-slate-800/90 sm:opacity-0 sm:group-hover/block:opacity-100">
+                            {renderBlockSourceAction?.({
+                              blockPath,
+                              block: blockToRender,
+                            })}
                             {renderBlockImageActions?.({
                               blockPath,
                               block: blockToRender,

@@ -170,6 +170,18 @@ Spacing/radius mặc định:
 - Field số trong admin như thứ tự, tiền VNĐ, phần trăm hoặc số lượng không dùng native number spinner/default browser UI; dùng input text styled cùng form chuẩn, `inputMode` phù hợp, chỉ nhận ký tự hợp lệ, normalize/format dữ liệu trước khi lưu và hiển thị đơn vị rõ khi cần.
 - Không đặt toggle học thử ở form lộ trình; học thử là cấu hình của buổi học cụ thể.
 - Action icon trong admin phải dùng màu theo ý nghĩa để dễ quét: sửa dùng xanh, xóa dùng đỏ, đóng/hủy dùng màu trung tính hoặc xanh nhẹ. Hành động xóa phải mở modal xác nhận rõ tên item trước khi thực thi.
+- Editor chỉnh nhẹ ảnh raster dùng icon `WandSparkles` với tooltip/aria-label
+  `Chỉnh sửa ảnh`; chỉ hiện khi asset hỗ trợ, không để một nút disabled khó hiểu
+  trên ảnh TeX. Modal giữ ba vùng header/content/footer, lazy-load và chỉ có hai
+  tool `Làm nét ảnh`, `Xóa chi tiết thừa`. Mask dùng màu tương phản bán trong
+  suốt, cỡ cọ nhỏ/vừa/lớn, undo/redo, xóa mask, zoom/pan và Pointer Events cho
+  mouse/touch/pen. Hai tool loại trừ nhau; làm nét tự preview khi chọn, xóa tự
+  preview sau mỗi stroke/undo/redo và không có nút preview riêng. Phải có
+  before/after, cảnh báo giới hạn nền phẳng và khóa `Áp dụng` khi auto-preview
+  hiện tại chưa sẵn sàng hoặc đã stale. `Áp dụng` chỉ commit tool đang chọn và
+  giữ modal mở; sau thành công reset tool/preview/mask, cập nhật ảnh hiện hành và
+  mở lại cả hai tool để admin tiếp tục. Khi đã có lượt được commit, action thoát
+  dùng nhãn `Đóng` thay vì `Hủy` vì đóng modal không hoàn tác revision đã lưu.
 - Toolbar ngữ cảnh có nhiều lệnh ngắn như chỉnh bảng phải dùng icon, chia nhóm
   theo chức năng và có tooltip tùy biến xuất hiện ngay khi hover/focus cùng
   `aria-label`; không chỉ dựa vào `title` native bị trễ và không trải một hàng

@@ -349,6 +349,12 @@ Các bước chung:
     thứ tự resolver. Figure nguồn thiếu crop, có nhiều candidate mơ hồ hoặc chỉ resolve được
     ảnh toàn trang chuyển `NEEDS_REVIEW` để admin chọn/thay/xóa thủ công; hệ thống
     không tự chọn một crop mơ hồ và không dùng cả trang PDF làm ảnh bài học.
+    Chỉ khi checkbox này bật, modal hiển thị thêm checkbox `Tự động làm nét ảnh`,
+    mặc định tắt. Khi bật, mỗi crop chắc chắn được chạy pipeline local
+    `TEXTBOOK_RASTER_CLEANUP_V2` trước khi tạo delivery WebP lossless. Bỏ chọn
+    checkbox cha phải ẩn và reset checkbox con; backend cũng vô hiệu hóa cờ con
+    nếu không dùng ảnh gốc. Cờ làm nét chỉ điều khiển hậu xử lý crop, không được
+    đưa vào prompt/provider Phase 1 và không phát sinh paid call.
 12. Ở chế độ mặc định, mỗi figure chạy render riêng. Compile + validator thành
     công thì figure tự
     chuyển `SUCCEEDED` và dùng asset R2, không có bước approve riêng. Retry cạn
@@ -380,6 +386,29 @@ code`, `Tải ảnh lên`, `Xem hình gốc`; nếu block có nhiều figure th�
 14. Nút `Lưu`/`Phát hành` chỉ bị chặn khi còn placeholder figure `FAILED` đang
     hoạt động hoặc initial figure còn render. Admin phải xóa, thay thế hoặc làm
     figure đó thành công; cảnh báo thiếu hình không phải blocker.
+15. Figure raster có asset hiện hành `TEXTBOOK_SOURCE` và trạng thái `SUCCEEDED`
+    hiển thị icon cây đũa `Chỉnh sửa ảnh` cạnh các action ảnh. Icon không xuất
+    hiện cho `AI_TEX`, figure đang xử lý/lỗi hoặc figure chưa có delivery asset.
+16. Editor mở dạng modal lazy-load. Admin chỉ chọn được một công cụ mỗi lần:
+    `Làm nét ảnh` hoặc `Xóa chi tiết thừa`; công cụ còn lại bị disable cho đến khi
+    bỏ chọn công cụ hiện tại. Chọn làm nét sẽ tự chạy preview. Với xóa chi tiết,
+    admin tô mask bằng chuột, cảm ứng hay bút và preview tự cập nhật sau mỗi nét,
+    undo/redo hoặc clear; không có bước bấm `Xem trước` riêng.
+    Preset làm nét v2 giữ mức denoise/sharpen đã chốt và tăng saturation `1.06`
+    để màu ký hiệu đậm hơn nhẹ; không hạ brightness toàn ảnh hoặc đổi hue chủ ý.
+17. Preview xử lý trên bản thu nhỏ, không ghi database/R2. Công cụ xóa chỉ dành
+    cho chi tiết nhỏ trên nền gần đồng nhất; modal có cỡ cọ và zoom/pan. Nếu cọ
+    vượt mép, canvas clip phần ngoài ảnh và backend vẫn xử lý phần mask bên trong
+    nếu coverage/bounding box hợp lệ, còn đủ mẫu nền sạch từ các phía trong ảnh
+    và variance đạt gate; chạm mép tự nó không phải lỗi.
+18. Khi bấm `Áp dụng`, backend tự đọc delivery asset hiện hành, kiểm mutation
+    guard, loại/kích thước ảnh, mask, tỷ lệ vùng tô và độ đồng nhất nền. Kết quả
+    được encode WebP lossless, lưu file/revision mới rồi mới atomically đổi
+    `currentRevisionId`. Modal vẫn mở, bỏ chọn tool vừa áp dụng, xóa preview/mask
+    tạm của lượt đó và dùng figure trong response làm ảnh cùng mutation guard mới.
+    Admin có thể chọn tool còn lại ngay trong modal; mỗi nút `Áp dụng` chỉ commit
+    đúng lượt làm nét hoặc xóa hiện tại. Lỗi hoặc request stale giữ nguyên ảnh
+    đang dùng và giữ modal để admin sửa hoặc thử lại.
 
 Acceptance Criteria:
 
@@ -401,6 +430,10 @@ Acceptance Criteria:
   paid call Phase 2. Crop tự điền phải đi qua cùng
   validation MIME/kích thước, chuẩn hóa WebP, R2 và revision audit với action
   `Dùng hình này`; không tham chiếu trực tiếp object OCR tạm thời khi delivery.
+- Checkbox tự động làm nét phải được snapshot cùng request draft/job, chỉ hợp lệ
+  khi `useTextbookSourceImages=true`, áp dụng cho toàn bộ crop tự promote và ghi
+  metadata pipeline vào delivery. Crop làm nét lỗi phải giữ `NEEDS_REVIEW`, không
+  âm thầm lưu bản chưa làm nét trái lựa chọn của admin.
 - Mọi action giữ vị trí cuộn. Xóa figure xóa reference khỏi Summary và soft-delete
   metadata; cleanup object storage chạy tách biệt, không xóa nhầm asset đang dùng.
 - Block đã xóa figure hoặc chưa từng có figure vẫn mở được luồng AI/code/upload.
@@ -426,6 +459,14 @@ Acceptance Criteria:
 - Figure `AI_TEX` mở source editor và preview SVG song song. Admin sửa source,
   compile draft local rồi chỉ apply revision đã qua validator; không có click
   preview để định vị source, PDF/SyncTeX hay chỉnh vector trực tiếp.
+- Editor raster chỉ nhận figure `TEXTBOOK_SOURCE` đã `SUCCEEDED`, không âm thầm
+  rasterize `AI_TEX`. Preview không tạo revision/file; apply thành công tạo
+  revision bất biến, giữ provenance crop sách giáo khoa và ghi audit. Không lưu
+  mask thô và không gọi OpenAI/Gemini hay provider chỉnh ảnh.
+- Vùng xóa vượt giới hạn, chạm nền nhiều họa tiết/gradient hoặc có độ biến thiên
+  màu vượt ngưỡng phải bị từ chối với hướng dẫn thu nhỏ vùng chọn hoặc dùng ảnh
+  thay thế; hệ thống không được hứa xóa vật thể phức tạp, nối lại đường hay tự
+  sáng tạo phần hình bị che.
 
 ### 7.1. Admin cấu hình model và theo dõi chi phí AI/OCR
 
@@ -435,6 +476,9 @@ Acceptance Criteria:
 4. Xem chi phí theo ngày/tuần/tháng, breakdown model/chức năng và usage event.
 5. Khi provider đổi giá, thêm price version với nguồn chính thức và ngày hiệu lực; lịch sử cũ không bị tính lại.
 6. Khi bật `Tạm dừng khi hết ngân sách`, UI hiển thị tiền đã dùng, đang giữ chỗ và còn lại. Mỗi paid call phải giữ chỗ nguyên tử trước; nếu không đủ số dư hoặc không ước lượng được upper bound thì job bị chặn trước provider call.
+7. Tại tab `Thiết lập mặc định`, admin nhập `Giới hạn token đầu vào` và
+   `Giới hạn token đầu ra` cho từng tính năng. Tab `Quản lý model` không hiển
+   thị giới hạn kỹ thuật hoặc trần token.
 
 Acceptance Criteria:
 
@@ -443,6 +487,8 @@ Acceptance Criteria:
 - OCR retry tiếp tục `pdfId` đã có, cache hit có cost 0 và saving.
 - Đổi model/giá/budget/accounting có audit; version conflict buộc tải lại.
 - Nhiều worker chạy đồng thời không làm tổng `đã dùng + đang giữ chỗ` vượt hard limit; budget error không fallback/retry và hiển thị thông báo thân thiện.
+- Cấu hình tính năng dùng cho paid call phải có giới hạn input/output hợp lệ;
+  thiếu một trong hai thì fail-closed trước provider call.
 
 ---
 

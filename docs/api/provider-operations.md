@@ -6,6 +6,8 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 | --------- | ------------------------------------------------------- | -------------------------------------------------------- |
 | `GET`     | `/admin/provider-operations/overview`                   | KPI chi phí tháng, cache saving, reliability và budget   |
 | `GET`     | `/admin/provider-operations/catalog`                    | Catalog AI/OCR, credential status và price versions      |
+| `POST`    | `/admin/provider-operations/catalog`                    | Thêm model/dịch vụ provider vào catalog                  |
+| `PUT`     | `/admin/provider-operations/catalog/:id`                | Sửa metadata của model/dịch vụ                            |
 | `POST`    | `/admin/provider-operations/catalog/:id/price-versions` | Thêm giá có ngày hiệu lực và nguồn chính thức            |
 | `GET/PUT` | `/admin/provider-operations/ai-configurations`          | Đọc/lưu model chính, fallback, temperature, token limit  |
 | `GET/PUT` | `/admin/provider-operations/ocr-settings`               | Trạng thái OCR/cache và thiết lập tỷ giá/price freshness |
@@ -15,10 +17,9 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 | `GET`     | `/admin/provider-operations/usage/events`               | Event list phân trang và filter                          |
 | `GET`     | `/admin/provider-operations/audit-history`              | Lịch sử đổi model/giá/budget/accounting                  |
 
-`POST /admin/provider-operations/catalog/:id/price-versions` chỉ thay dữ liệu giá
-do admin gửi và tự kế thừa điều kiện kỹ thuật của rate tương ứng từ phiên bản đang
-hiệu lực. Vì vậy cập nhật đơn giá không được xóa `maxInputTokens` hoặc metadata
-routing/budget khác.
+`GET/PUT /ai-configurations` trả/nhận `maxInputTokens` và `maxOutputTokens` theo
+từng feature. Cả hai là số nguyên dương; thiếu một giới hạn thì budget guard
+fail-closed. Catalog create/update và price-version API không nhận hai field này.
 
 ## Concurrency và validation
 

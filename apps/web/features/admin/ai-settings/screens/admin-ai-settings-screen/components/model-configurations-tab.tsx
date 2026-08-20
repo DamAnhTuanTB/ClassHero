@@ -32,11 +32,11 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
   const [configurations, setConfigurations] = useState(data.configurations);
 
   const stableDataJson = JSON.stringify(
-    data.configurations.map(({ updatedAt, ...rest }) => rest)
+    data.configurations.map(({ updatedAt, ...rest }) => rest),
   );
   useEffect(() => {
     setConfigurations(data.configurations);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stableDataJson]);
 
   const update = (
@@ -79,12 +79,16 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                     if (!value) {
                       updateData.temperature = null;
                       updateData.reasoningEffort = null;
+                      updateData.maxInputTokens = null;
                       updateData.maxOutputTokens = null;
+                    } else {
+                      updateData.maxInputTokens = configuration.maxInputTokens ?? 200000;
+                      updateData.maxOutputTokens = configuration.maxOutputTokens ?? 4096;
                     }
                     update(configuration.feature, updateData);
                   }}
                 />
-                
+
                 {(() => {
                   const primaryModel = data.models.find(
                     (m) => m.id === configuration.primaryCatalogItemId,
@@ -93,11 +97,11 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
 
                   const supportsTemp = supportsTemperature(
                     primaryModel.externalKey,
-                    (primaryModel.capabilities as any)?.aiConfiguration
+                    (primaryModel.capabilities as any)?.aiConfiguration,
                   );
                   const supportsReasoning = supportsReasoningEffort(
                     primaryModel.externalKey,
-                    (primaryModel.capabilities as any)?.aiConfiguration
+                    (primaryModel.capabilities as any)?.aiConfiguration,
                   );
 
                   return (
@@ -125,13 +129,17 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                               <SelectItem value="__default__">
                                 Mặc định của model
                               </SelectItem>
-                                {(() => {
-                                  const baseLevels = (primaryModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
-                                  const levelsSet = new Set(baseLevels || []);
-                                  if (configuration.reasoningEffort && configuration.reasoningEffort !== "__default__") {
-                                    levelsSet.add(configuration.reasoningEffort);
-                                  }
-                                  const levels = Array.from(levelsSet);
+                              {(() => {
+                                const baseLevels = (primaryModel.capabilities as any)
+                                  ?.reasoningEffortLevels as string[] | undefined;
+                                const levelsSet = new Set(baseLevels || []);
+                                if (
+                                  configuration.reasoningEffort &&
+                                  configuration.reasoningEffort !== "__default__"
+                                ) {
+                                  levelsSet.add(configuration.reasoningEffort);
+                                }
+                                const levels = Array.from(levelsSet);
                                 const labels: Record<string, string> = {
                                   minimal: "Tối thiểu (Minimal)",
                                   low: "Thấp (Low)",
@@ -143,8 +151,19 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                                 };
                                 const options = levels?.length
                                   ? [...levels].sort((a, b) => {
-                                      const order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
-                                      return (order.indexOf(a) > -1 ? order.indexOf(a) : 99) - (order.indexOf(b) > -1 ? order.indexOf(b) : 99);
+                                      const order = [
+                                        "none",
+                                        "minimal",
+                                        "low",
+                                        "medium",
+                                        "high",
+                                        "xhigh",
+                                        "max",
+                                      ];
+                                      return (
+                                        (order.indexOf(a) > -1 ? order.indexOf(a) : 99) -
+                                        (order.indexOf(b) > -1 ? order.indexOf(b) : 99)
+                                      );
                                     })
                                   : [];
                                 return options.map((level) => (
@@ -174,19 +193,31 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                     </>
                   );
                 })()}
-                
-                {configuration.primaryCatalogItemId && (
-                  <NumericSettingsField
-                    id={`${configuration.feature.toLocaleLowerCase()}-max-output-tokens`}
-                    label="Độ dài tối đa"
-                    value={configuration.maxOutputTokens ?? 4096}
-                    min={128}
-                    max={128000}
-                    onChange={(value) =>
-                      update(configuration.feature, { maxOutputTokens: value })
-                    }
-                  />
-                )}
+
+                {configuration.primaryCatalogItemId ? (
+                  <>
+                    <NumericSettingsField
+                      id={`${configuration.feature.toLocaleLowerCase()}-max-input-tokens`}
+                      label="Giới hạn token đầu vào"
+                      value={configuration.maxInputTokens ?? 200000}
+                      min={128}
+                      max={2000000}
+                      onChange={(value) =>
+                        update(configuration.feature, { maxInputTokens: value })
+                      }
+                    />
+                    <NumericSettingsField
+                      id={`${configuration.feature.toLocaleLowerCase()}-max-output-tokens`}
+                      label="Giới hạn token đầu ra"
+                      value={configuration.maxOutputTokens ?? 4096}
+                      min={128}
+                      max={100000}
+                      onChange={(value) =>
+                        update(configuration.feature, { maxOutputTokens: value })
+                      }
+                    />
+                  </>
+                ) : null}
               </div>
 
               {/* Cột 2: Mô hình thay thế */}
@@ -219,11 +250,11 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
 
                     const supportsTemp = supportsTemperature(
                       fallbackModel.externalKey,
-                      (fallbackModel.capabilities as any)?.aiConfiguration
+                      (fallbackModel.capabilities as any)?.aiConfiguration,
                     );
                     const supportsReasoning = supportsReasoningEffort(
                       fallbackModel.externalKey,
-                      (fallbackModel.capabilities as any)?.aiConfiguration
+                      (fallbackModel.capabilities as any)?.aiConfiguration,
                     );
 
                     return (
@@ -235,10 +266,13 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                               label="Reasoning Effort"
                             />
                             <Select
-                              value={configuration.fallbackReasoningEffort ?? "__default__"}
+                              value={
+                                configuration.fallbackReasoningEffort ?? "__default__"
+                              }
                               onValueChange={(value) =>
                                 update(configuration.feature, {
-                                  fallbackReasoningEffort: value === "__default__" ? null : value,
+                                  fallbackReasoningEffort:
+                                    value === "__default__" ? null : value,
                                 })
                               }
                             >
@@ -252,9 +286,14 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                                   Mặc định của model
                                 </SelectItem>
                                 {(() => {
-                                  const baseLevels = (fallbackModel.capabilities as any)?.reasoningEffortLevels as string[] | undefined;
+                                  const baseLevels = (fallbackModel.capabilities as any)
+                                    ?.reasoningEffortLevels as string[] | undefined;
                                   const levelsSet = new Set(baseLevels || []);
-                                  if (configuration.fallbackReasoningEffort && configuration.fallbackReasoningEffort !== "__default__") {
+                                  if (
+                                    configuration.fallbackReasoningEffort &&
+                                    configuration.fallbackReasoningEffort !==
+                                      "__default__"
+                                  ) {
                                     levelsSet.add(configuration.fallbackReasoningEffort);
                                   }
                                   const levels = Array.from(levelsSet);
@@ -269,8 +308,21 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                                   };
                                   const options = levels?.length
                                     ? [...levels].sort((a, b) => {
-                                        const order = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
-                                        return (order.indexOf(a) > -1 ? order.indexOf(a) : 99) - (order.indexOf(b) > -1 ? order.indexOf(b) : 99);
+                                        const order = [
+                                          "none",
+                                          "minimal",
+                                          "low",
+                                          "medium",
+                                          "high",
+                                          "xhigh",
+                                          "max",
+                                        ];
+                                        return (
+                                          (order.indexOf(a) > -1
+                                            ? order.indexOf(a)
+                                            : 99) -
+                                          (order.indexOf(b) > -1 ? order.indexOf(b) : 99)
+                                        );
                                       })
                                     : [];
                                   return options.map((level) => (
@@ -293,7 +345,9 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                             max={2}
                             allowDecimal
                             onChange={(value) =>
-                              update(configuration.feature, { fallbackTemperature: value })
+                              update(configuration.feature, {
+                                fallbackTemperature: value,
+                              })
                             }
                           />
                         )}
@@ -304,10 +358,10 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
                   {configuration.fallbackCatalogItemId && (
                     <NumericSettingsField
                       id={`${configuration.feature.toLocaleLowerCase()}-fallback-max-output-tokens`}
-                      label="Độ dài tối đa"
+                      label="Giới hạn token đầu ra"
                       value={configuration.fallbackMaxOutputTokens ?? 4096}
                       min={128}
-                      max={128000}
+                      max={100000}
                       onChange={(value) =>
                         update(configuration.feature, { fallbackMaxOutputTokens: value })
                       }
@@ -324,7 +378,19 @@ export function ModelConfigurationsTab({ data, isSaving, onSave }: Props) {
         <button
           type="button"
           disabled={isSaving || configurations.length === 0}
-          onClick={() => onSave(configurations)}
+          onClick={() =>
+            onSave(
+              configurations.map((configuration) =>
+                configuration.primaryCatalogItemId
+                  ? {
+                      ...configuration,
+                      maxInputTokens: configuration.maxInputTokens ?? 200000,
+                      maxOutputTokens: configuration.maxOutputTokens ?? 4096,
+                    }
+                  : configuration,
+              ),
+            )
+          }
           className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold transition disabled:opacity-60"
         >
           {isSaving ? (
@@ -398,7 +464,7 @@ function ModelSelect({
                     disabled={model.status === "DISABLED" || !model.credentialConfigured}
                   >
                     {model.displayName}
-                    {!model.credentialConfigured ? " · Chưa sẵn sàng" : ""}
+                    {!model.credentialConfigured ? " · Chưa có credential" : ""}
                   </SelectItem>
                 ))}
                 {groupIndex < providerGroups.length - 1 ? <SelectSeparator /> : null}
@@ -407,7 +473,6 @@ function ModelSelect({
           </SelectContent>
         </Select>
       </div>
-
     </div>
   );
 }

@@ -1,1 +1,2 @@
 - 2026-08-20: Rút gọn README và current context thành các điểm vào vận hành ngắn gọn, bổ sung guard chống tài liệu Codex phình thành lịch sử lặp lại, đồng thời sửa liên kết pattern UI và thêm hướng dẫn lưu final-screen artifact.
+- 2026-08-20: Hoàn thiện luồng Summary dùng ảnh nguồn và điều hướng trang/khối, bổ sung editor làm nét/xóa chi tiết raster SGK bằng pipeline local có revision/audit, đồng thời chuyển giới hạn input/output token sang cấu hình từng tính năng AI với migration, routing, UI quản trị, regression tests và docs contract tương ứng.

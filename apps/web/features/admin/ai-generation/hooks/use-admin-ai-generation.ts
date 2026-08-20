@@ -21,6 +21,8 @@ import {
   replaceAdminStemFigure,
   retryAdminStemFigure,
   promoteAdminStemFigureSourceCrop,
+  applyAdminStemFigureRasterEdit,
+  previewAdminStemFigureRasterEdit,
 } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
 import type {
   AdminAiGenerationPayload,
@@ -30,6 +32,7 @@ import type {
   AdminQuizGenerationPayload,
   AdminStemFigure,
   AdminStemFigureCreateAiInput,
+  AdminStemFigureRasterEditInput,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import type { LessonSummaryPhaseOneLayoutOperation } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 import { useAuthSessionStore } from "@/features/auth/session/auth-session";
@@ -209,6 +212,24 @@ export function useAdminStemFigureSourceCrop(lessonId: string) {
         input.sourceObjectKey,
         session?.accessToken ?? "",
       ),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePreviewAdminStemFigureRasterEdit(lessonId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  return useMutation({
+    mutationFn: (input: AdminStemFigureRasterEditInput) =>
+      previewAdminStemFigureRasterEdit(lessonId, input, session?.accessToken ?? ""),
+  });
+}
+
+export function useApplyAdminStemFigureRasterEdit(lessonId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  const invalidate = useInvalidateStemFigures(lessonId);
+  return useMutation({
+    mutationFn: (input: AdminStemFigureRasterEditInput) =>
+      applyAdminStemFigureRasterEdit(lessonId, input, session?.accessToken ?? ""),
     onSuccess: invalidate,
   });
 }

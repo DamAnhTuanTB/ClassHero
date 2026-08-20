@@ -45,6 +45,15 @@ export class GenerateLessonSummaryDto {
   @IsBoolean()
   useTextbookSourceImages?: boolean;
 
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      "Khi dùng crop ảnh SGK, tự động giảm nhiễu và làm nét trước khi lưu delivery",
+  })
+  @IsOptional()
+  @IsBoolean()
+  autoEnhanceTextbookSourceImages?: boolean;
+
   @ApiProperty({
     type: [String],
     description: "Danh sách lesson_documents.id thuộc đúng buổi học",

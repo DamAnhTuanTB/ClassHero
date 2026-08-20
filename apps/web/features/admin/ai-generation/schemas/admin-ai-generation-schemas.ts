@@ -46,6 +46,7 @@ export const adminAiGenerationFormSchema = z
     type: generationTypeSchema,
     documentIds: z.array(z.string().uuid()).max(20, "Chọn tối đa 20 tài liệu"),
     useTextbookSourceImages: z.boolean(),
+    autoEnhanceTextbookSourceImages: z.boolean(),
     style: summaryStyleSchema,
     styleInstructions: z
       .string()
@@ -78,6 +79,13 @@ export const adminAiGenerationFormSchema = z
     hardCount: numericTextSchema("Số câu khó", 0, 50),
   })
   .superRefine((values, context) => {
+    if (values.autoEnhanceTextbookSourceImages && !values.useTextbookSourceImages) {
+      context.addIssue({
+        code: "custom",
+        path: ["autoEnhanceTextbookSourceImages"],
+        message: "Chỉ có thể làm nét khi dùng ảnh gốc sách giáo khoa",
+      });
+    }
     if (
       (values.type === "SUMMARY" || values.type === "QUIZ") &&
       values.documentIds.length === 0

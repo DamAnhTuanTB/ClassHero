@@ -17,6 +17,7 @@ import {
 } from "#api/modules/ai/types/lesson-summary.types";
 import type { LessonSummarySubjectKey } from "#api/modules/ai/types/lesson-summary-subject.types";
 import type { MissingRequiredFigure } from "#api/modules/ai/utils/lesson-summary-figure-requirement";
+import { buildLessonSummaryFigureAltText } from "#api/modules/ai/utils/lesson-summary-figure-alt-text";
 
 export type LessonSummaryFigureDraft = {
   blockPath: string;
@@ -113,7 +114,14 @@ export function mapLessonSummaryProviderOutput(input: {
         theoryPath,
       );
       blocks.push(theory);
-      addFigures(figures, theoryPath, item.theory.figures, input.packetPageCount);
+      addFigures(
+        figures,
+        theoryPath,
+        item.theory.figures,
+        input.packetPageCount,
+        item.theory,
+        sourceSection.displayHeading,
+      );
 
       validateExampleProvenance(item.example, input.packetPageCount);
       const examplePath = `sections.${sections.length}.blocks.${blocks.length}`;
@@ -131,7 +139,14 @@ export function mapLessonSummaryProviderOutput(input: {
           examplePath,
         ),
       );
-      addFigures(figures, examplePath, item.example.figures, input.packetPageCount);
+      addFigures(
+        figures,
+        examplePath,
+        item.example.figures,
+        input.packetPageCount,
+        item.example,
+        sourceSection.displayHeading,
+      );
     }
     if (blocks.length === 0) continue;
     const heading = requireText(sourceSection.displayHeading, "displayHeading");
@@ -169,6 +184,8 @@ export function mapLessonSummaryProviderOutput(input: {
     standardPath,
     input.output.applicationExercises.standardExercise.figures,
     input.packetPageCount,
+    input.output.applicationExercises.standardExercise,
+    "Bài tập vận dụng",
   );
   const realWorldPath = `sections.${sections.length}.blocks.1`;
   phaseOneBlocks[realWorldPath] = structuredClone(
@@ -195,6 +212,8 @@ export function mapLessonSummaryProviderOutput(input: {
     realWorldPath,
     input.output.applicationExercises.realWorldExercise.figures,
     input.packetPageCount,
+    input.output.applicationExercises.realWorldExercise,
+    "Bài tập vận dụng",
   );
   sections.push({
     order: sections.length + 1,
@@ -266,6 +285,8 @@ function addFigures(
   blockPath: string,
   blockFigures: StemFigureProviderPlanDraft[],
   packetPageCount: number,
+  block: LessonSummaryProviderTheoryBlock | LessonSummaryProviderExampleBlock,
+  sectionHeading: string,
 ) {
   for (const [figureIndex, figure] of blockFigures.entries()) {
     for (const reference of figure.sourceReferences) {
@@ -283,6 +304,11 @@ function addFigures(
         ...figure,
         figurePlanContractVersion: 3,
         localId: `F${String(figures.length + 1).padStart(3, "0")}`,
+        altText: buildLessonSummaryFigureAltText({
+          caption: figure.caption,
+          block,
+          sectionHeading,
+        }),
       },
     });
   }

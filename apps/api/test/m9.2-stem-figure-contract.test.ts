@@ -203,7 +203,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
   it("keeps source locators structured without a semantic figure field", () => {
     const plan = {
       figureOrigin: "TEXTBOOK_SOURCE" as const,
-      altText: "Hình hộp với các vectơ cùng phương",
       caption: "Các vectơ cùng phương trong hình hộp.",
       sourceReferences: [
         {
@@ -219,12 +218,17 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     };
 
     expect(stemFigureProviderPlanDraftSchema.safeParse(plan).success).toBe(true);
+    expect(
+      stemFigureProviderPlanDraftSchema.safeParse({
+        ...plan,
+        altText: "OpenAI không được trả field này ở Phase 1.",
+      }).success,
+    ).toBe(false);
   });
 
   it("validates whole-figure and subfigure source targets", () => {
     const basePlan = {
       figureOrigin: "TEXTBOOK_SOURCE" as const,
-      altText: "Đường thẳng và vectơ chỉ phương",
       caption: null,
       sourceReferences: [
         {
@@ -881,7 +885,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       theoryContent: "Nội dung ban đầu.",
       illustrationProblem: "Đề bài ban đầu.",
       illustrationFigure: {
-        altText: "Hình minh họa",
         caption: null,
       },
     });
@@ -1164,7 +1167,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
                 geometryStatement: null,
                 figures: [
                   figurePlan({
-                    altText: "Tam giác ABC vuông tại A",
                     caption: "Tam giác vuông ABC",
                   }),
                 ],
@@ -2142,7 +2144,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     const generatedPlan = {
       figureOrigin: "GENERATED_FROM_BRIEF" as const,
       sourceReferences: [],
-      altText: "Mô hình cộng phân số",
       caption: null,
     };
 
@@ -2997,7 +2998,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "lesson-summary-pdf-packet-five-block-prompt-v18-schema-alignment",
     );
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-five-block-schema-v17-conditional-invariants",
+      "lesson-summary-pdf-packet-five-block-schema-v18-no-provider-alt-text",
     );
   });
 
@@ -3041,6 +3042,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     const serializedSchema = JSON.stringify(structuredFormat.schema);
     expect(serializedSchema).toContain('"AI_AUTHORED"');
     expect(serializedSchema).toContain('"maxItems":0');
+    expect(serializedSchema).not.toContain('"altText"');
     expect(
       (
         structuredFormat.schema as {
@@ -3057,7 +3059,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       theoryContent: "Hai đường thẳng vuông góc khi tích vô hướng bằng không.",
       illustrationProblem: "Xét hai đường thẳng có vectơ chỉ phương vuông góc.",
       illustrationFigure: {
-        altText: "Hai đường thẳng với các vectơ chỉ phương vuông góc",
         caption: "Hai đường thẳng vuông góc và các vectơ chỉ phương tương ứng",
       },
     });
@@ -3086,6 +3087,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
 
       expect(serializedSchema).not.toMatch(/\(\?(?:[=!]|<[=!])/u);
       expect(serializedSchema).toContain("caption");
+      expect(serializedSchema).not.toContain("altText");
       expect(serializedSchema).not.toContain("referenceRole");
       expect(serializedSchema).not.toContain("essentialElements");
       expect(serializedSchema).not.toContain("GEOMETRY_3D");
@@ -3143,7 +3145,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       theoryContent: "Muốn cộng hai phân số cùng mẫu, cộng các tử và giữ nguyên mẫu.",
       illustrationProblem: "Tính 1/5 + 2/5 bằng mô hình trực quan.",
       illustrationFigure: {
-        altText: "Mô hình trực quan cho phép cộng phân số",
         caption: null,
       },
     });
@@ -3161,6 +3162,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(mapped.figures[0]?.draft.localId).toBe("F001");
     expect(mapped.figures[0]?.draft.figureOrigin).toBe("GENERATED_FROM_BRIEF");
     expect(mapped.figures[0]?.draft.sourceReferences).toEqual([]);
+    expect(mapped.figures[0]?.draft.altText).toBe(
+      "Hình minh họa cho Tính 1/5 + 2/5 bằng mô hình trực quan.",
+    );
   });
 
   it("preserves multiple Phase 1 source references for one textbook figure", () => {
@@ -3170,7 +3174,6 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       theoryContent: "Quan sát hai trạng thái liên tiếp của phép dựng.",
       illustrationProblem: "Giải thích phép dựng qua hai hình nguồn.",
       illustrationFigure: {
-        altText: "Hai trạng thái của phép dựng hình học",
         caption: "Các bước của phép dựng",
       },
     });
@@ -3775,14 +3778,12 @@ function textOnlyExample(exampleKind: "STANDARD_EXERCISE" | "REAL_WORLD_EXERCISE
 
 function figurePlan(
   input: {
-    altText: string;
     caption: string | null;
   } & Record<string, unknown>,
 ) {
   return {
     figureOrigin: "GENERATED_FROM_BRIEF" as const,
     sourceReferences: [],
-    altText: input.altText,
     caption: input.caption,
   };
 }
@@ -3793,7 +3794,6 @@ function buildMathProviderOutput(input: {
   theoryContent: string;
   illustrationProblem: string;
   illustrationFigure?: {
-    altText: string;
     caption: string | null;
   } & Record<string, unknown>;
 }) {

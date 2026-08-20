@@ -238,6 +238,7 @@ export class AiProviderCallService {
     let lastError: unknown;
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]!;
+      const maxInputTokens = route.maxInputTokens ?? candidate.maxInputTokens;
       const maxOutputTokens = route.maxOutputTokens ?? input.maxTokens;
       const reasoningEffort = toAiReasoningEffort(route.reasoningEffort);
       const requestFingerprint = fingerprintRequest(input);
@@ -279,7 +280,7 @@ export class AiProviderCallService {
             candidate.catalogItemId ?? candidate.model,
           ].join(":"),
           usageUpperBound: {
-            promptTokens: candidate.maxInputTokens ?? 0,
+            promptTokens: maxInputTokens ?? 0,
             completionTokens: maxOutputTokens ?? 0,
           },
           rates: candidate.rates,
@@ -288,10 +289,10 @@ export class AiProviderCallService {
             ProviderUsageMetric.OUTPUT_TOKEN,
           ],
           estimateUnavailableReason:
-            candidate.maxInputTokens == null || candidate.maxInputTokens <= 0
-              ? "Chưa có giới hạn đầu vào của mô hình nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
+            maxInputTokens == null || maxInputTokens <= 0
+              ? "Chưa có giới hạn token đầu vào trong Thiết lập mặc định nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
               : maxOutputTokens == null || maxOutputTokens <= 0
-                ? "Chưa có giới hạn độ dài đầu ra nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
+                ? "Chưa có giới hạn token đầu ra trong Thiết lập mặc định nên yêu cầu AI đã được dừng để bảo vệ ngân sách."
                 : undefined,
         },
       );

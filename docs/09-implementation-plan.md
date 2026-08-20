@@ -164,6 +164,8 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 52.3   | `M9.11` | Admin Cài đặt AI/OCR UI                                                    |
 | 52.4   | `M9.12` | Hard-stop ngân sách tuyệt đối bằng reservation                             |
 | 52.5   | `M9.17` | Summary tùy chọn dùng trực tiếp ảnh gốc SGK, bỏ qua Phase 2                |
+| 52.6   | `M9.18` | Admin chỉnh nhẹ raster SGK: làm nét và xóa chi tiết nền đơn giản — Done 2026-08-20 |
+| 52.7   | `M9.19` | Quản lý giới hạn input/output theo tính năng AI — Done 2026-08-20 |
 | 53     | `M9.4`  | Student request-new reserve-first UI + API                              |
 | 54     | `M9.5`  | AI explanation cache inline UI + API                                       |
 | 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                              |
@@ -282,6 +284,11 @@ Ghi chú:
   luồng học sinh; đã Done ngày 2026-08-03.
 - `M9.2` hiện gồm pipeline TeX/TikZ Summary lớp 3–12, phụ thuộc Redis/BullMQ,
   isolated TeX renderer, file/R2 và admin panel `M9.8`. Quiz/Test chưa dùng figure.
+- `M9.18` phụ thuộc figure revision/delivery asset của `M9.2`, UI quản trị `M9.8`
+  và luồng crop SGK `M9.17`. Task chỉ xử lý local raster `TEXTBOOK_SOURCE`, không
+  gọi provider/worker và không chặn các student flow `M9.4-M9.7`.
+- `M9.19` phụ thuộc catalog/routing `M9.9`, API `M9.10`, UI `M9.11` và budget
+  reservation `M9.12`; migration phải backfill trước khi routing đọc nguồn mới.
 - `M9.4` phụ thuộc `M9.2`, `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
   nối luôn các action request-new hiện có trên UI học sinh.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline

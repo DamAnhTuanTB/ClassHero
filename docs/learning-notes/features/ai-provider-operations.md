@@ -53,8 +53,18 @@ flowchart TD
 - Usage chuẩn hóa phục vụ tính phí và provider usage nguyên bản phục vụ audit là
   hai lớp dữ liệu khác nhau. Metadata upload/xóa file của backend phải nằm ở nhánh
   riêng; nếu trộn vào provider usage thì UI không được gọi object đó là `raw usage`.
+- Giới hạn input/output dùng cho budget reservation là policy của từng tính năng,
+  nên phải đặt cạnh model routing trong `Thiết lập mặc định`. Không đưa context
+  window kỹ thuật hoặc trần token vào `Quản lý model`: admin không cần duy trì
+  metadata provider chỉ để vận hành feature.
+- Catalog model chỉ nên sở hữu identity, capability, trạng thái và bảng giá. Khi
+  một giới hạn thay đổi theo use case thay vì theo model, đặt nó ở feature config
+  giúp UI rõ nghĩa và route snapshot tự chứa đủ dữ liệu để worker chạy ổn định.
+- Khi request cho phép override model, snapshot phải cập nhật đồng thời model cấp
+  route và candidate list. Nếu chỉ thay candidate, UI có thể hiển thị model mặc định
+  trong khi worker thực thi model được chọn.
 
 ## Task liên quan
 
-- `M9.9-M9.11`
+- `M9.9-M9.12`, `M9.19`
 - `M4.6`

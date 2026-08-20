@@ -15,8 +15,10 @@ visual validator local đủ sức bảo đảm model luôn nghe ảnh trước.
 
 - Xóa `visualIntent` khỏi Phase 1, render plan, Summary content, raw provider
   output, API/UI, generation brief, provider request, hash, fixtures và test.
-- Phase 1 chỉ trả `figureOrigin`, structured `sourceReferences/sourceTarget`,
-  `altText` và `caption`.
+- Phase 1 chỉ trả `figureOrigin`, structured `sourceReferences/sourceTarget` và
+  `caption`; JSON Schema gửi provider không có `altText`.
+- Backend tự tạo `altText` accessibility từ caption hoặc ngữ cảnh block sau
+  Phase 1. Phase 2 không nhận hoặc trả field này, và UI sửa mã không cho nhập nó.
 - Có ảnh nguồn: Stage 2 nhận ảnh + source target + projection tối thiểu của block;
   ảnh khóa baseline, `adminInstructions` chỉ khóa delta được gọi tên.
 - Không ảnh nguồn: Stage 2 tự dựng từ projection block, không qua semantic brief
@@ -34,7 +36,8 @@ visual validator local đủ sức bảo đảm model luôn nghe ảnh trước.
 - Không còn text brief cạnh tranh với ảnh nguồn trong request dựng hình.
 - Hình không nguồn phụ thuộc trực tiếp chất lượng `problem`/nội dung kiến thức;
   vì vậy projection phải ổn định, tối thiểu và không gửi lời giải/đáp án.
-- Alt/caption vẫn phục vụ UI/accessibility nhưng không được dùng như prompt ngầm.
+- Caption vẫn do Phase 1 tạo để hiển thị. Alt text chỉ là metadata accessibility
+  nội bộ do backend tạo, không được dùng như prompt ngầm hoặc field chỉnh tay.
 - Cutover cần maintenance window, migration JSON, cancel job v2 và restart
   worker; không thể rolling deploy API/worker khác version.
 - Các request full-page mơ hồ phải dừng trước paid call và chờ admin chọn target.

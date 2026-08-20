@@ -36,6 +36,12 @@ export class UpdateAiFeatureConfigurationItemDto {
   @IsOptional()
   @IsInt()
   @Min(128)
+  @Max(2_000_000)
+  maxInputTokens?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(128)
   @Max(100_000)
   maxOutputTokens?: number | null;
 

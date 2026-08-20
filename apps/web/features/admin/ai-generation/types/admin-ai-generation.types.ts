@@ -2,6 +2,10 @@ import type { AiReasoningEffort } from "@learning-path/shared";
 import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type AdminAiGenerationType = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
+export type AdminAiGenerationDialogRequest = {
+  type: AdminAiGenerationType;
+  mode: "CREATE" | "EDIT";
+};
 export type AdminAiJobStatus =
   "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 export type AdminAiDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
@@ -123,6 +127,7 @@ export type AdminSummaryGenerationPayload = {
   type: "SUMMARY";
   documentIds: string[];
   useTextbookSourceImages?: boolean;
+  autoEnhanceTextbookSourceImages?: boolean;
   style: AdminSummaryStyle;
   styleInstructions?: string;
   length: AdminSummaryLength;
@@ -293,8 +298,17 @@ export interface AdminLessonSummary {
   source: "ADMIN" | "AI";
   reviewStatus: AdminLessonSummaryReviewStatus;
   aiGenerationId: string | null;
+  sourcePages?: AdminLessonSummarySourcePage[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminLessonSummarySourcePage {
+  packetPageNumber: number;
+  sourceFileId: string;
+  sourcePdfPageNumber: number;
+  printedPageLabel: string | null;
+  documentTitle: string;
 }
 
 export type AdminStemFigureStatus =
@@ -491,4 +505,32 @@ export interface AdminStemFigureCompileResult {
   sourceVersion?: number;
   previewSvg?: string;
   diagnosticBatch?: AdminStemFigureDiagnosticBatch;
+}
+
+export interface AdminStemFigureRasterEditOperations {
+  enhance: boolean;
+  removeSimpleDetails: boolean;
+  pipelineVersion: "TEXTBOOK_RASTER_CLEANUP_V2";
+}
+
+export interface AdminStemFigureRasterEditInput {
+  figure: AdminStemFigure;
+  operations: AdminStemFigureRasterEditOperations;
+  mask: Blob | null;
+}
+
+export interface AdminStemFigureRasterEditPreview {
+  pipelineVersion: "TEXTBOOK_RASTER_CLEANUP_V2";
+  previewDataUrl: string;
+  width: number;
+  height: number;
+  maskCoverageRatio: number | null;
+  backgroundVariance: number | null;
+  warnings: string[];
+}
+
+export interface AdminStemFigureRasterEditApplyResult {
+  figure: AdminStemFigure;
+  auditId: string;
+  revisionId: string;
 }

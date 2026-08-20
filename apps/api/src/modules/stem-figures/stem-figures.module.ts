@@ -11,6 +11,7 @@ import { StemFigureJobService } from "#api/modules/stem-figures/services/stem-fi
 import { StemFigureArtifactService } from "#api/modules/stem-figures/services/stem-figure-artifact.service";
 import { StemFigureDraftService } from "#api/modules/stem-figures/services/stem-figure-draft.service";
 import { StemFigureRepairService } from "#api/modules/stem-figures/services/stem-figure-repair.service";
+import { StemFigureRasterEditService } from "#api/modules/stem-figures/services/stem-figure-raster-edit.service";
 import { StemFiguresService } from "#api/modules/stem-figures/services/stem-figures.service";
 import { SvgValidatorService } from "#api/modules/stem-figures/services/svg-validator.service";
 import { TexRendererClientService } from "#api/modules/stem-figures/services/tex-renderer-client.service";
@@ -24,6 +25,7 @@ import { FigureReferenceResolverService } from "#api/modules/stem-figures/servic
     StemFigureArtifactService,
     StemFigureDraftService,
     StemFigureRepairService,
+    StemFigureRasterEditService,
     StemFiguresService,
     SvgValidatorService,
     TexRendererClientService,
@@ -36,6 +38,7 @@ import { FigureReferenceResolverService } from "#api/modules/stem-figures/servic
     StemFigureArtifactService,
     StemFigureDraftService,
     StemFigureRepairService,
+    StemFigureRasterEditService,
     StemFiguresService,
     SvgValidatorService,
     TexRendererClientService,

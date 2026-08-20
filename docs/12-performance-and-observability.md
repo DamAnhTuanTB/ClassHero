@@ -174,6 +174,9 @@ không enqueue `DIAGRAM_RENDERING`. Metrics phải ghi riêng mode, số crop t�
 số figure cần xem lại, số figure do AI đề xuất bị bỏ qua và xác nhận
 `phase_two_enqueued_count=0`, `phase_two_provider_call_count=0`. UI không cần
 poll figure rendering nếu sau bước import không còn figure active.
+Nếu snapshot `autoEnhanceTextbookSourceImages=true`, Sharp chạy local trên từng
+crop ngay trước upload delivery và vẫn tuân pixel/byte cap M9.18. Ghi thêm
+`sourceFigureEnhancedCount`; không log bytes/object key và không gọi provider.
 
 Performance và cost rules:
 
@@ -214,6 +217,9 @@ Provider operations rules:
 - Timeline/breakdown lọc tối đa 366 ngày, event list phân trang và có index theo thời gian/category/provider/feature; chart admin không thêm thư viện nặng.
 - OCR cache hit không tạo delay giả. Mathpix retry resume `pdfId` đã lưu để tránh double-charge; debug artifact local tắt mặc định ở production.
 - Hard-stop `M9.12` serialize ngắn chỉ ở bước reserve theo `period + scope`; không giữ database lock trong lúc gọi provider. Lock scope theo thứ tự cố định để tránh deadlock.
+- Reservation AI lấy giới hạn input/output từ cấu hình của đúng feature, không
+  lấy từ catalog model hoặc bảng giá. Log/metric phải phân biệt cấu hình thiếu
+  giới hạn và budget không đủ; cả hai đều bị chặn trước provider call.
 - Theo dõi metric/log `budget_reservation_granted`, `budget_reservation_denied`, `budget_reservation_uncertain`, thời gian chờ lock, reconciliation drift và số job bị chặn không retry. Cảnh báo nếu actual cost vượt reservation hoặc có reservation `UNCERTAIN` quá SLA.
 - Có reconciliation idempotent cho reservation bị bỏ lại do crash; fail-safe giữ ngân sách thay vì tự release khi chưa rõ provider đã bill hay chưa.
 
@@ -280,6 +286,19 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   `Cập nhật dữ liệu`; đổi nguồn ảnh phải invalidate preview phía client thay vì
   âm thầm giữ request cũ. Preview chỉ resolve route/schema và ước tính token/chi
   phí, không gọi provider trả phí.
+- Editor raster M9.18 phải được dynamic import. Preview dùng bản có cạnh dài tối
+  đa `1600px`, làm nét tự preview một lần khi chọn; xóa chỉ preview sau một
+  stroke/undo/redo hoàn tất với debounce ngắn, không gọi theo từng pointer move.
+  Response cũ bị bỏ qua khi state đã stale và preview không ghi R2/database.
+  Apply chạy đồng bộ chỉ khi ảnh/mask nằm trong pixel/byte/time cap
+  versioned; ảnh vượt cap bị từ chối thân thiện thay vì giữ request lâu hoặc âm
+  thầm giảm độ phân giải. Apply nối tiếp trong cùng modal dùng thẳng figure trả về
+  để cập nhật ảnh và mutation guard; không chờ đóng/mở lại editor để lấy revision.
+- Ghi `raster_edit_preview_duration_ms`, `raster_edit_apply_duration_ms`, loại
+  operation, số pixel nguồn, output bytes, mask coverage, background variance và
+  rejection reason. Không log raw image, mask, signed URL hay object key. M9.18
+  không có provider usage và không thêm worker/job ở v1; mục tiêu p95 apply local
+  trong giới hạn hợp lệ là `<= 3s`.
 - Lesson detail chỉ polling tổng usage khi figure phase 2 còn hoạt động; khi phase
   chuyển sang terminal phải refetch một lần để chốt số tiền. Modal chi tiết usage
   chỉ polling khi đang mở, query theo `aiGenerationId`, phân trang và dùng aggregate

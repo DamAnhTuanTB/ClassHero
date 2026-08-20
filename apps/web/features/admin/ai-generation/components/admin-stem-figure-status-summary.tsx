@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import type {
   AdminAiModelConfiguration,
+  AdminLessonSummaryContent,
   AdminStemFigure,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 
@@ -18,13 +19,17 @@ const StemFigureOverviewDialog = dynamic(
 );
 
 export function AdminStemFigureStatusSummary({
+  content,
   figures,
   lessonId,
   modelConfiguration,
+  onNavigateToBlock,
 }: {
+  content: AdminLessonSummaryContent;
   figures: AdminStemFigure[];
   lessonId: string;
   modelConfiguration?: AdminAiModelConfiguration;
+  onNavigateToBlock: (blockPath: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const hasProcessingFigure = figures.some((figure) =>
@@ -61,11 +66,16 @@ export function AdminStemFigureStatusSummary({
 
       {isOpen ? (
         <StemFigureOverviewDialog
+          content={content}
           figures={figures}
           isOpen={isOpen}
           lessonId={lessonId}
           modelConfiguration={modelConfiguration}
           onClose={() => setIsOpen(false)}
+          onNavigateToBlock={(blockPath) => {
+            setIsOpen(false);
+            onNavigateToBlock(blockPath);
+          }}
         />
       ) : null}
     </>

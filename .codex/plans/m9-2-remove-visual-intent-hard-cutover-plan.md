@@ -45,7 +45,6 @@ Figure provider output chỉ còn:
       }
     }
   ],
-  "altText": "Đường thẳng và vectơ chỉ phương tương ứng.",
   "caption": "Vectơ chỉ phương của đường thẳng."
 }
 ```
@@ -56,7 +55,6 @@ Figure do AI tự đề xuất:
 {
   "figureOrigin": "GENERATED_FROM_BRIEF",
   "sourceReferences": [],
-  "altText": "Minh họa trực quan cho nội dung của khối kiến thức.",
   "caption": null
 }
 ```
@@ -70,8 +68,9 @@ Invariant:
    nhiều ảnh tham chiếu cho một figure, không phải nhiều figure độc lập.
 5. `sourceTarget` chỉ định phần nào của ảnh nguồn được dùng, không mô tả phải vẽ
    gì. Không đưa source target vào mode không có ảnh.
-6. `altText` và `caption` chỉ phục vụ accessibility/display. Stage 2 không được
-   nhận hai field này.
+6. `caption` phục vụ display và chỉ do Phase 1 trả. `altText` không thuộc schema
+   của Phase 1 hay Phase 2; backend tự tạo metadata accessibility từ caption hoặc
+   ngữ cảnh block, và editor không hiển thị field nhập tay.
 7. Backend cấp `localId` và stamp `figurePlanContractVersion=3`; model không tự
    trả version hoặc ID.
 
@@ -204,7 +203,8 @@ Không có bất kỳ mode nào nhận `visualIntent`.
 
 ### 7.3. Metadata-only
 
-- Sửa alt text/caption cập nhật metadata, không compile và không gọi AI.
+- Sửa caption cập nhật metadata, không compile và không gọi AI; alt text do backend
+  quản lý, không có field chỉnh tay.
 - Thay metadata không đổi source hash, reference snapshot hoặc delivery asset.
 
 ## 8. API và UI

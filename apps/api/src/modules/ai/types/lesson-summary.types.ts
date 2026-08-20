@@ -11,7 +11,7 @@ import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summ
 export const LESSON_SUMMARY_PROMPT_VERSION =
   "lesson-summary-pdf-packet-five-block-prompt-v18-schema-alignment";
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-five-block-schema-v17-conditional-invariants";
+  "lesson-summary-pdf-packet-five-block-schema-v18-no-provider-alt-text";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -266,7 +266,6 @@ const stemFigureSourceReferenceSchema = z
   .strict();
 
 const stemFigureProviderDisplayShape = {
-  altText: z.string().trim().min(1).max(500),
   caption: semanticFigureCaptionSchema,
 };
 const stemFigureTextbookProviderPlanSchema = z
@@ -301,8 +300,18 @@ const stemFigurePlanIdentityShape = {
     .regex(/^F\d{3}$/u),
 };
 export const stemFigurePlanDraftSchema = z.discriminatedUnion("figureOrigin", [
-  stemFigureTextbookProviderPlanSchema.extend(stemFigurePlanIdentityShape).strict(),
-  stemFigureGeneratedProviderPlanSchema.extend(stemFigurePlanIdentityShape).strict(),
+  stemFigureTextbookProviderPlanSchema
+    .extend({
+      ...stemFigurePlanIdentityShape,
+      altText: z.string().trim().min(1).max(500),
+    })
+    .strict(),
+  stemFigureGeneratedProviderPlanSchema
+    .extend({
+      ...stemFigurePlanIdentityShape,
+      altText: z.string().trim().min(1).max(500),
+    })
+    .strict(),
 ]);
 /**
  * Only the semantic fields required to resolve references and render a figure.
@@ -741,6 +750,7 @@ export const lessonSummaryJobInputSchema = z
     packetHash: z.string().regex(/^[a-f0-9]{64}$/),
     manifestHash: z.string().regex(/^[a-f0-9]{64}$/),
     useTextbookSourceImages: z.boolean().default(false),
+    autoEnhanceTextbookSourceImages: z.boolean().default(false),
     targetGrade: z.number().int().min(1).max(12).nullable().default(null),
     subjectKey: lessonSummarySubjectKeySchema,
     subjectName: z.string().trim().min(1).max(120),
@@ -768,7 +778,16 @@ export const lessonSummaryJobInputSchema = z
       .max(LESSON_SUMMARY_MAX_CONFIGURED_OUTPUT_TOKENS)
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.autoEnhanceTextbookSourceImages && !value.useTextbookSourceImages) {
+      context.addIssue({
+        code: "custom",
+        path: ["autoEnhanceTextbookSourceImages"],
+        message: "Chỉ có thể tự động làm nét khi dùng ảnh gốc sách giáo khoa.",
+      });
+    }
+  });
 
 export type LessonSummaryOutput = z.infer<typeof lessonSummaryOutputSchema>;
 export type LessonSummaryJobInput = z.infer<typeof lessonSummaryJobInputSchema>;
