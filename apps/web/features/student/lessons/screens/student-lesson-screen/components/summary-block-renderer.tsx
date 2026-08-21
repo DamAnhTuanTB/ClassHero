@@ -29,6 +29,7 @@ import {
   X,
   CheckCircle2,
   Combine,
+  Replace,
 } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import {
@@ -49,6 +50,7 @@ import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
+type ConvertibleBlockType = "knowledge" | "property" | "theorem" | "note";
 type PendingDeleteTarget =
   | {
       kind: "SECTION";
@@ -130,6 +132,7 @@ interface SummaryBlockRendererProps {
   }) => React.ReactNode;
   phaseOneBlockJsonByPath?: Readonly<Record<string, unknown>> | null;
   onPhaseOneBlockJsonChange?: (blockPath: string, value: unknown) => void;
+  onBlockTypeChange?: (blockPath: string, targetType: ConvertibleBlockType) => void;
   onPhaseOneLayoutOperation?: (
     operation:
       | { type: "MERGE_SECTION"; sectionIndex: number }
@@ -156,6 +159,99 @@ const BLOCK_CONFIG: Record<string, { label: string; color: string; icon: any }> 
   example: { label: "Ví dụ", color: "blue", icon: PlayCircle },
 };
 
+const CONVERTIBLE_BLOCK_TYPES: ConvertibleBlockType[] = [
+  "knowledge",
+  "property",
+  "theorem",
+  "note",
+];
+
+const BLOCK_TYPE_MENU_STYLES: Record<
+  ConvertibleBlockType,
+  { icon: string; item: string }
+> = {
+  knowledge: {
+    icon: "text-yellow-600 dark:text-yellow-400",
+    item: "hover:bg-yellow-50 focus-visible:ring-yellow-500 dark:hover:bg-yellow-950/40",
+  },
+  property: {
+    icon: "text-teal-600 dark:text-teal-400",
+    item: "hover:bg-teal-50 focus-visible:ring-teal-500 dark:hover:bg-teal-950/40",
+  },
+  theorem: {
+    icon: "text-green-600 dark:text-green-400",
+    item: "hover:bg-green-50 focus-visible:ring-green-500 dark:hover:bg-green-950/40",
+  },
+  note: {
+    icon: "text-rose-600 dark:text-rose-400",
+    item: "hover:bg-rose-50 focus-visible:ring-rose-500 dark:hover:bg-rose-950/40",
+  },
+};
+
+function BlockTypeConversionMenu({
+  currentType,
+  onConvert,
+}: {
+  currentType: ConvertibleBlockType;
+  onConvert: (targetType: ConvertibleBlockType) => void;
+}) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  return (
+    <div
+      className="relative"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setIsOpen(false);
+      }}
+    >
+      <ImmediateTooltip content="Chuyển đổi loại khối">
+        <button
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+          aria-label="Chuyển đổi loại khối"
+          className="grid h-7 w-7 place-items-center rounded text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-400 dark:hover:bg-violet-950/50 dark:hover:text-violet-300"
+          onClick={() => setIsOpen((open) => !open)}
+          type="button"
+        >
+          <Replace className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </ImmediateTooltip>
+
+      {isOpen ? (
+        <div
+          aria-label="Chọn loại khối cần chuyển đổi"
+          className="absolute right-0 top-full z-40 mt-1 w-56 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface)] p-1.5 text-left shadow-xl"
+          role="menu"
+        >
+          {CONVERTIBLE_BLOCK_TYPES.filter((type) => type !== currentType).map((type) => {
+            const config = BLOCK_CONFIG[type]!;
+            const styles = BLOCK_TYPE_MENU_STYLES[type];
+            const Icon = config.icon;
+            return (
+              <button
+                key={type}
+                className={`flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--theme-text)] transition focus-visible:outline-none focus-visible:ring-2 ${styles.item}`}
+                onClick={() => {
+                  onConvert(type);
+                  setIsOpen(false);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <Icon className={`h-4 w-4 ${styles.icon}`} aria-hidden="true" />
+                Chuyển thành {config.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SummaryBlockRenderer({
   data,
   displayTitle,
@@ -167,6 +263,7 @@ export function SummaryBlockRenderer({
   renderBlockSourceAction,
   phaseOneBlockJsonByPath,
   onPhaseOneBlockJsonChange,
+  onBlockTypeChange,
   onPhaseOneLayoutOperation,
   showTableOfContents = false,
   stemFigureVisuals,
@@ -1197,6 +1294,17 @@ export function SummaryBlockRenderer({
                               blockPath,
                               block: blockToRender,
                             })}
+                            {onBlockTypeChange &&
+                            CONVERTIBLE_BLOCK_TYPES.includes(
+                              blockToRender.type as ConvertibleBlockType,
+                            ) ? (
+                              <BlockTypeConversionMenu
+                                currentType={blockToRender.type as ConvertibleBlockType}
+                                onConvert={(targetType) =>
+                                  onBlockTypeChange(blockPath, targetType)
+                                }
+                              />
+                            ) : null}
                             {viewMode === "UI_ONLY" && (
                               <ImmediateTooltip content="Chỉnh sửa nội dung khối">
                                 <button
@@ -1328,6 +1436,17 @@ export function SummaryBlockRenderer({
                                   </button>
                                 </ImmediateTooltip>
                               )}
+                              {onBlockTypeChange &&
+                              CONVERTIBLE_BLOCK_TYPES.includes(
+                                blockToRender.type as ConvertibleBlockType,
+                              ) ? (
+                                <BlockTypeConversionMenu
+                                  currentType={blockToRender.type as ConvertibleBlockType}
+                                  onConvert={(targetType) =>
+                                    onBlockTypeChange(blockPath, targetType)
+                                  }
+                                />
+                              ) : null}
                               <ImmediateTooltip
                                 content={
                                   bIdx === 0 && idx === 0

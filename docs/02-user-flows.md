@@ -338,6 +338,10 @@ Các bước chung:
     trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
     Stage 1 bắt buộc tạo brief; backend không suy hình bằng tiêu đề/từ khóa.
     Example Hình học lớp 7–9 bắt buộc có bảng GT–KL; lớp 10–12 không có bảng này.
+    Trong bước review, toolbar của `knowledge`, `property`, `theorem`, `note` cho
+    admin chuyển sang một trong ba loại còn lại. Lựa chọn chỉ đổi bản nháp và
+    preview cục bộ; dữ liệu thật chỉ thay đổi khi admin bấm `Lưu nội dung` hoặc
+    `Phát hành`.
 11. Trong modal `Sinh kiến thức`, checkbox `Dùng ảnh gốc sách giáo khoa` mặc
     định tắt. Khi bật, Stage 1 vẫn đi qua nguyên entrypoint, packet, prompt,
     provider schema, validation và mapper hiện tại, không thêm nhánh theo

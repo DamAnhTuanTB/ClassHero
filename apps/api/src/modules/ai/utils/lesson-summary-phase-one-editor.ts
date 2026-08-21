@@ -1,7 +1,11 @@
 import {
   getLessonSummaryProviderTransportOutputSchema,
+  lessonSummaryMvpBlockSchema,
+  lessonSummaryProviderNoteTransportSchema,
+  lessonSummaryTheoryBlockTransportSchema,
   type LessonSummaryProviderTransportOutput,
 } from "#api/modules/ai/types/lesson-summary.types";
+import { normalizeLessonSummaryNoteContent } from "@learning-path/shared";
 import type { LessonSummarySubjectKey } from "#api/modules/ai/types/lesson-summary-subject.types";
 import {
   mapLessonSummaryProviderOutput,
@@ -128,12 +132,37 @@ export function applyLessonSummaryPhaseOneBlockEdits(input: {
   }
 
   const providerOutput = structuredClone(input.snapshot.providerOutput);
+  const manualTypeOverrides = new Map<string, Record<string, unknown>>();
   for (const blockPath of expectedPaths) {
     const providerPath = input.snapshot.providerPaths[blockPath];
-    if (
-      !providerPath ||
-      !setValueAtPath(providerOutput, providerPath, input.blocks[blockPath])
-    ) {
+    const rawBlock = input.blocks[blockPath];
+    const providerBlock = providerPath
+      ? getValueAtPath(providerOutput, providerPath)
+      : undefined;
+    if (isCrossFamilyConvertibleTypeChange(providerBlock, rawBlock)) {
+      const targetType = rawBlock.type;
+      const overrideSchema =
+        targetType === "note"
+          ? lessonSummaryProviderNoteTransportSchema
+          : lessonSummaryTheoryBlockTransportSchema;
+      const parsedOverride = overrideSchema.safeParse(rawBlock);
+      if (!parsedOverride.success) {
+        return {
+          success: false as const,
+          code: "LESSON_SUMMARY_PHASE_ONE_SCHEMA_INVALID",
+          message: "Raw JSON chưa đúng schema Phase 1 nên chưa thể lưu.",
+          details: {
+            issues: parsedOverride.error.issues.slice(0, 40).map((issue) => ({
+              path: `${blockPath}.${issue.path.join(".")}`,
+              message: issue.message,
+            })),
+          },
+        };
+      }
+      manualTypeOverrides.set(blockPath, parsedOverride.data as Record<string, unknown>);
+      continue;
+    }
+    if (!providerPath || !setValueAtPath(providerOutput, providerPath, rawBlock)) {
       return {
         success: false as const,
         code: "LESSON_SUMMARY_PHASE_ONE_PATH_INVALID",
@@ -184,7 +213,19 @@ export function applyLessonSummaryPhaseOneBlockEdits(input: {
         details: { operations: input.snapshot.layoutOperations ?? [] },
       };
     }
-    mapped = layoutMapped;
+    const overridden = applyManualBlockTypeOverrides(layoutMapped, manualTypeOverrides);
+    if (!overridden) {
+      return {
+        success: false as const,
+        code: "LESSON_SUMMARY_PHASE_ONE_SCHEMA_INVALID",
+        message: "Khối sau khi chuyển đổi chưa đúng schema nên chưa thể lưu.",
+        details: { blockPaths: [...manualTypeOverrides.keys()] },
+      };
+    }
+    mapped = {
+      ...overridden,
+      phaseOneBlocks: structuredClone(input.blocks),
+    };
   } catch (error) {
     return {
       success: false as const,
@@ -201,10 +242,53 @@ export function applyLessonSummaryPhaseOneBlockEdits(input: {
     snapshot: {
       ...input.snapshot,
       providerOutput: parsed.data,
-      blocks: mapped.phaseOneBlocks,
+      blocks: structuredClone(input.blocks),
       providerPaths: mapped.phaseOneProviderPaths,
     } satisfies LessonSummaryPhaseOneSnapshot,
   };
+}
+
+function applyManualBlockTypeOverrides(
+  mapped: MappedLessonSummaryOutput,
+  overrides: ReadonlyMap<string, Record<string, unknown>>,
+): MappedLessonSummaryOutput | null {
+  if (overrides.size === 0) return mapped;
+  const copy = structuredClone(mapped);
+  for (const [blockPath, rawBlock] of overrides) {
+    const position = parseBlockPath(blockPath);
+    if (!position) return null;
+    const currentBlock =
+      copy.content.sections[position.sectionIndex]?.blocks[position.blockIndex];
+    if (!currentBlock) return null;
+
+    const preserved = {
+      figures: currentBlock.figures,
+      reviewIssues: currentBlock.reviewIssues,
+    };
+    const candidate =
+      rawBlock.type === "note"
+        ? compactRecord({
+            type: rawBlock.type,
+            content:
+              typeof rawBlock.content === "string"
+                ? normalizeLessonSummaryNoteContent(rawBlock.content)
+                : rawBlock.content,
+            sourcePageNumbers: rawBlock.sourcePageNumbers,
+            ...preserved,
+          })
+        : compactRecord({
+            type: rawBlock.type,
+            title: rawBlock.title,
+            content: rawBlock.content,
+            sourcePageNumbers: rawBlock.sourcePageNumbers,
+            ...preserved,
+          });
+    const parsed = lessonSummaryMvpBlockSchema.safeParse(candidate);
+    if (!parsed.success) return null;
+    copy.content.sections[position.sectionIndex]!.blocks[position.blockIndex] =
+      parsed.data;
+  }
+  return copy;
 }
 
 function applyLayoutOperationsToMappedOutput(
@@ -504,6 +588,54 @@ function setValueAtPath(root: Record<string, unknown>, path: string, value: unkn
   if (!isRecord(current) || !(last in current)) return false;
   current[last] = structuredClone(value);
   return true;
+}
+
+type ConvertibleRawBlock = Record<string, unknown> & {
+  type: "knowledge" | "property" | "theorem" | "note";
+};
+
+function isCrossFamilyConvertibleTypeChange(
+  providerBlock: unknown,
+  rawBlock: unknown,
+): rawBlock is ConvertibleRawBlock {
+  if (!isRecord(providerBlock) || !isRecord(rawBlock)) return false;
+  const providerType = providerBlock.type;
+  const rawType = rawBlock.type;
+  if (!isConvertibleBlockType(providerType) || !isConvertibleBlockType(rawType)) {
+    return false;
+  }
+  return isTheoryBlockType(providerType) !== isTheoryBlockType(rawType);
+}
+
+function isConvertibleBlockType(value: unknown): value is ConvertibleRawBlock["type"] {
+  return ["knowledge", "property", "theorem", "note"].includes(String(value));
+}
+
+function isTheoryBlockType(value: ConvertibleRawBlock["type"]) {
+  return value !== "note";
+}
+
+function getValueAtPath(root: Record<string, unknown>, path: string) {
+  let current: unknown = root;
+  for (const segment of path.split(".")) {
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        return undefined;
+      }
+      current = current[index];
+      continue;
+    }
+    if (!isRecord(current) || !(segment in current)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
+
+function compactRecord(value: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  );
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {

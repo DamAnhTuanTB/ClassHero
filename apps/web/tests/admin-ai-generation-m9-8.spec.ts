@@ -1108,6 +1108,70 @@ test.describe("M9.8 admin AI generation panel", () => {
     expect(mock.figureActions.previewModes).toHaveLength(2);
   });
 
+  test("converts Summary block type as a colored local draft until save", async ({
+    page,
+  }) => {
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent(),
+      phaseOneBlockJsonByPath: {
+        "sections.0.blocks.0": {
+          type: "knowledge",
+          title: "Tam giác",
+          content: "Quan sát các đỉnh và cạnh của tam giác.",
+          sourcePageNumbers: [1],
+          figures: [],
+        },
+      },
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const block = page.locator("#block-0-0");
+    await block.hover();
+    await block.getByRole("button", { name: "Chuyển đổi loại khối" }).click();
+    const menu = page.getByRole("menu", { name: "Chọn loại khối cần chuyển đổi" });
+    await expect(
+      menu.getByRole("menuitem", { name: "Chuyển thành Tính chất" }).locator("svg"),
+    ).toHaveClass(/text-teal-600/);
+    await expect(
+      menu.getByRole("menuitem", { name: "Chuyển thành Định lí" }).locator("svg"),
+    ).toHaveClass(/text-green-600/);
+    await expect(
+      menu.getByRole("menuitem", { name: "Chuyển thành Chú ý" }).locator("svg"),
+    ).toHaveClass(/text-rose-600/);
+    await menu.getByRole("menuitem", { name: "Chuyển thành Định lí" }).click();
+
+    await block.getByRole("button", { name: "Chuyển đổi loại khối" }).click();
+    await expect(
+      page
+        .getByRole("menu", { name: "Chọn loại khối cần chuyển đổi" })
+        .getByRole("menuitem", { name: "Chuyển thành Kiến thức" })
+        .locator("svg"),
+    ).toHaveClass(/text-yellow-600/);
+    await page
+      .getByRole("menu", { name: "Chọn loại khối cần chuyển đổi" })
+      .getByRole("menuitem", { name: "Chuyển thành Chú ý" })
+      .click();
+
+    await expect(block).toContainText("Chú ý");
+    expect(mock.summaryPutPayloads).toHaveLength(0);
+
+    await page
+      .getByTestId("summary-header-actions")
+      .getByRole("button", { name: "Lưu nội dung" })
+      .click();
+    await expect.poll(() => mock.summaryPutPayloads).toHaveLength(1);
+    expect(mock.summaryPutPayloads[0]).toMatchObject({
+      phaseOneBlockJsonByPath: {
+        "sections.0.blocks.0": {
+          type: "note",
+          content: "Quan sát các đỉnh và cạnh của tam giác.",
+          sourcePageNumbers: [1],
+        },
+      },
+    });
+  });
+
   test("handles textbook, uploaded, deleted, and never-had-image reference states", async ({
     page,
   }, testInfo) => {

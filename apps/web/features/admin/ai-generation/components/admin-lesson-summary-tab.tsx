@@ -61,6 +61,8 @@ import {
   applyPhaseOneLayoutOperation,
   applyPhaseOneBlockPreview,
   applyPhaseOneBlocksPreview,
+  convertPhaseOneBlockType,
+  type LessonSummaryConvertibleBlockType,
   type LessonSummaryPhaseOneLayoutOperation,
 } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 import { toAdminLessonSummaryBlockElementId } from "@/features/admin/ai-generation/utils/admin-lesson-summary-block";
@@ -672,6 +674,26 @@ export function AdminLessonSummaryTab({
                   applyPhaseOneBlockPreview(current, blockPath, value),
                 );
               }}
+              onBlockTypeChange={
+                phaseOneBlockJsonByPath
+                  ? (
+                      blockPath: string,
+                      targetType: LessonSummaryConvertibleBlockType,
+                    ) => {
+                      const converted = convertPhaseOneBlockType(
+                        phaseOneBlockJsonByPath[blockPath],
+                        targetType,
+                      );
+                      if (!converted) return;
+                      setPhaseOneBlockJsonByPath((current) =>
+                        current ? { ...current, [blockPath]: converted } : current,
+                      );
+                      setContent((current) =>
+                        applyPhaseOneBlockPreview(current, blockPath, converted),
+                      );
+                    }
+                  : undefined
+              }
               onPhaseOneLayoutOperation={applyLayoutOperation}
               stemFigureVisuals={stemFigureVisuals}
               onChange={(newData) =>

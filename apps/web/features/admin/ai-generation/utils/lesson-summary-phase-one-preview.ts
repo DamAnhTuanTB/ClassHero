@@ -2,6 +2,25 @@ import type { AdminLessonSummaryContent } from "@/features/admin/ai-generation/t
 
 const THEORY_TYPES = new Set(["knowledge", "property", "theorem"]);
 
+export const LESSON_SUMMARY_CONVERTIBLE_BLOCK_TYPES = [
+  "knowledge",
+  "property",
+  "theorem",
+  "note",
+] as const;
+
+export type LessonSummaryConvertibleBlockType =
+  (typeof LESSON_SUMMARY_CONVERTIBLE_BLOCK_TYPES)[number];
+
+const CONVERTED_BLOCK_DEFAULT_TITLES: Record<
+  Exclude<LessonSummaryConvertibleBlockType, "note">,
+  string
+> = {
+  knowledge: "Kiến thức",
+  property: "Tính chất",
+  theorem: "Định lí",
+};
+
 export type LessonSummaryPhaseOneLayoutOperation =
   | { type: "MERGE_SECTION"; sectionIndex: number }
   | { type: "DELETE_SECTION"; sectionIndex: number }
@@ -161,6 +180,33 @@ export function applyPhaseOneBlocksPreview(
   );
 }
 
+export function convertPhaseOneBlockType(
+  rawBlock: unknown,
+  targetType: LessonSummaryConvertibleBlockType,
+): Record<string, unknown> | null {
+  if (!isRecord(rawBlock) || !isConvertibleBlockType(rawBlock.type)) return null;
+  if (rawBlock.type === targetType) return structuredClone(rawBlock);
+
+  const shared = {
+    content: rawBlock.content,
+    sourcePageNumbers: rawBlock.sourcePageNumbers,
+  };
+  if (targetType === "note") {
+    return compact({ type: targetType, ...shared });
+  }
+
+  const currentTitle =
+    typeof rawBlock.title === "string" && rawBlock.title.trim().length > 0
+      ? rawBlock.title
+      : CONVERTED_BLOCK_DEFAULT_TITLES[targetType];
+  return compact({
+    type: targetType,
+    title: currentTitle,
+    ...shared,
+    figures: Array.isArray(rawBlock.figures) ? rawBlock.figures : [],
+  });
+}
+
 function mapRawBlockForPreview(
   rawBlock: Record<string, unknown>,
   currentBlock: Record<string, unknown>,
@@ -256,4 +302,10 @@ function rebuildGroupedBlockRecord(sections: unknown[][]) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isConvertibleBlockType(
+  value: unknown,
+): value is LessonSummaryConvertibleBlockType {
+  return LESSON_SUMMARY_CONVERTIBLE_BLOCK_TYPES.some((type) => type === value);
 }

@@ -754,6 +754,13 @@ Hình chưa có crop chính xác sẽ cần kiểm tra thủ công.` Checkbox ch
 mã code`, `Tải ảnh lên` và `Xem ảnh sách giáo khoa` khi figure đích có reference
   SGK; nhiều figure bắt buộc chọn target. Action cuối và icon mở nhanh ở chính
   figure cùng mở một khung ảnh nguồn ngay trong block để đối chiếu với ảnh hiện tại.
+- Toolbar của bốn block `knowledge`, `property`, `theorem`, `note` có icon
+  `Chuyển đổi loại khối`. Click/tap mở menu ba type đích còn lại; icon và hover
+  của từng lựa chọn dùng đúng màu chủ đạo của type đích (Kiến thức vàng, Tính
+  chất teal, Định lí xanh lá, Chú ý rose). Chọn type chỉ cập nhật draft/preview
+  local, không gọi API; chỉ action `Lưu nội dung`/`Phát hành` mới persist. Khi
+  chuyển từ `note` sang theory chưa có title, UI điền nhãn type đích làm title
+  mặc định để admin có thể sửa tiếp.
 - Mọi figure có `Xóa`, `Thay bằng ảnh mới`, `Tạo mới bằng AI`, `Tạo mới bằng mã
 code` và `Chỉnh sửa bằng mã code`. Action chỉnh sửa mã chỉ bật khi asset
   hiện hành có source `AI_TEX`; raster upload/SGK hiển thị disabled kèm lý do.

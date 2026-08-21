@@ -5,6 +5,7 @@ import {
   applyPhaseOneLayoutOperation,
   applyPhaseOneBlockPreview,
   applyPhaseOneBlocksPreview,
+  convertPhaseOneBlockType,
 } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 
 test("xóa block khỏi raw và đánh lại block path trước khi lưu", () => {
@@ -146,6 +147,42 @@ test("cập nhật realtime nhiều block raw cho preview song song", () => {
     problem: "Đề bài mới",
     solution: "Lời giải mới",
     answer: "Đáp án mới",
+  });
+});
+
+test("chuyển theory thành chú ý chỉ đổi bản raw nháp và bỏ field không hợp lệ", () => {
+  const original = {
+    type: "knowledge",
+    title: "Kiến thức cũ",
+    content: "Nội dung cần giữ",
+    sourcePageNumbers: [1],
+    figures: [{ caption: "Hình nguồn" }],
+  };
+
+  expect(convertPhaseOneBlockType(original, "note")).toEqual({
+    type: "note",
+    content: "Nội dung cần giữ",
+    sourcePageNumbers: [1],
+  });
+  expect(original.type).toBe("knowledge");
+});
+
+test("chuyển chú ý thành định lí bổ sung tiêu đề mặc định có thể sửa tiếp", () => {
+  expect(
+    convertPhaseOneBlockType(
+      {
+        type: "note",
+        content: "Nội dung cần giữ",
+        sourcePageNumbers: [2],
+      },
+      "theorem",
+    ),
+  ).toEqual({
+    type: "theorem",
+    title: "Định lí",
+    content: "Nội dung cần giữ",
+    sourcePageNumbers: [2],
+    figures: [],
   });
 });
 

@@ -734,6 +734,10 @@ Behavior:
   transaction.
 - Ghép từng object đã sửa về đúng vị trí trong provider output gốc, validate lại
   bằng strict schema tương ứng với môn và lớp rồi mới map/upsert Summary.
+- Cho phép đổi qua lại giữa `knowledge`, `property`, `theorem`, `note`. Backend
+  validate raw theo schema của type đích, giữ figure/revision/asset hiện tại và
+  áp type override sau mapper khi chuyển giữa họ theory và note; endpoint vẫn chỉ
+  được gọi từ action `Lưu`/`Phát hành`, không gọi ngay khi admin chọn trong menu.
 - Cho sửa text, `caption` và provenance hợp lệ của figure đã tồn tại; raw Phase 1
   không có `altText`.
   Không cho thêm/xóa phần tử `figures[]` qua raw;

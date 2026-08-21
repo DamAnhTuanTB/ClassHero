@@ -1219,11 +1219,12 @@ function assertRawFigureCountsUnchanged(
   previousBlocks: Record<string, unknown>,
   nextBlocks: Record<string, unknown>,
 ) {
-  const changedPaths = Object.keys(previousBlocks).filter(
-    (blockPath) =>
-      readRawFigureCount(previousBlocks[blockPath]) !==
-      readRawFigureCount(nextBlocks[blockPath]),
-  );
+  const changedPaths = Object.keys(previousBlocks).filter((blockPath) => {
+    const previousBlock = previousBlocks[blockPath];
+    const nextBlock = nextBlocks[blockPath];
+    if (isTheoryToNoteTypeConversion(previousBlock, nextBlock)) return false;
+    return readRawFigureCount(previousBlock) !== readRawFigureCount(nextBlock);
+  });
   if (changedPaths.length > 0) {
     throwBadRequest(
       "LESSON_SUMMARY_PHASE_ONE_FIGURE_COUNT_CHANGED",
@@ -1231,6 +1232,14 @@ function assertRawFigureCountsUnchanged(
       { blockPaths: changedPaths },
     );
   }
+}
+
+function isTheoryToNoteTypeConversion(previousBlock: unknown, nextBlock: unknown) {
+  if (!isRecord(previousBlock) || !isRecord(nextBlock)) return false;
+  return (
+    ["knowledge", "property", "theorem"].includes(String(previousBlock.type)) &&
+    nextBlock.type === "note"
+  );
 }
 
 function readRawFigureCount(value: unknown) {
