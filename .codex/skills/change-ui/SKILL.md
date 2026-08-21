@@ -84,6 +84,11 @@ Changelog is not written during UI iteration. It is written only during `/commit
 - When creating or touching any form, first pick the closest approved/reference form pattern from `apps/web/components/common/forms`, a similar feature form, or `docs/ui-references/approved-patterns.md`; reuse or upgrade that pattern instead of making a new visual/control variant. If no matching pattern exists, state the assumption in the plan/final.
 - Run a mandatory form-quality audit before final response: follow the closest approved/reference form pattern first (`mode: "onChange"`, `reValidateMode: "onChange"`, pass `form.formState.errors.<field>` directly to field primitives, and do not call `trigger()` right after `reset()` on modal open), every required/limited field must show a visible error state and message while the user edits, validation copy must match the failing rule (`Nhập ...` only for empty required fields, separate copy for min length/format/range/duplicate), required text fields should use the shared validation helper such as `requiredTrimmedText`, modal/drawer action buttons must stay clickable for invalid/pristine forms so submit can reveal inline validation errors and only disable for pending/saving or a hard missing prerequisite, modal/drawer forms must reset/default correctly, and numeric fields must not use native browser number controls when the app already has styled text/numeric inputs.
 - Include or preserve loading, empty, error, disabled, hover/focus states when the touched UI needs them.
+- Khi owner yêu cầu sửa `tất cả icon` hoặc `tất cả tooltip` kèm ảnh màn hình,
+  phải rà đủ mọi cấp toolbar đang hiển thị trong vùng ảnh, gồm toolbar đề mục,
+  khối nội dung, card/media và trạng thái chỉnh sửa tương ứng. Không được chỉ sửa
+  toolbar gần nội dung nhất rồi bỏ sót toolbar cha; nút đã có nhãn chữ phải được
+  phân biệt rõ với icon-only button trong phạm vi thực hiện và báo cáo.
 - When the owner requests a scoped visual change such as color only, preserve every
   unrequested visual property and effect, including shadow depth, glow, transform,
   border, radius, spacing, hover, active and focus behavior. Do not replace the
