@@ -1,6 +1,7 @@
 import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
 import type { LessonSummarySubjectSnapshot } from "#api/modules/ai/types/lesson-summary-subject.types";
 import {
+  LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
   LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
   resolveLessonSummaryOutputTokenFloor,
   LESSON_SUMMARY_PROMPT_VERSION,
@@ -42,6 +43,9 @@ const LESSON_SUMMARY_STRUCTURE_INVARIANT_LINES = [
 const LESSON_SUMMARY_STRUCTURE_INVARIANTS =
   LESSON_SUMMARY_STRUCTURE_INVARIANT_LINES.join("\n");
 
+export const LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION =
+  "Trong tất cả trường hiển thị cho học sinh gồm `title`, `content`, `problem`, `solution`, `answer` và `caption`, nội dung phải tự đủ nghĩa, độc lập với hình ảnh và không được nhắc, yêu cầu hoặc chỉ dẫn người học xem, quan sát hay tham chiếu đến bất kỳ hình ảnh nào. Không được chép mã định danh hình của tài liệu nguồn như `Hình 5.26`, `Hình 7.12a`, `Figure 3.4` hoặc cách viết tương đương. Mã hình nguồn chỉ được lưu trong `sourceReferences.figureLabel` để backend tìm đúng ảnh.";
+
 export const LESSON_SUMMARY_COMMON_SYSTEM_PROMPT = [
   "### I. VAI TRÒ VÀ NGUYÊN TẮC CƠ BẢN",
   "1. Bạn là trợ lý biên soạn nội dung học tập bằng tiếng Việt.",
@@ -71,7 +75,9 @@ export const LESSON_SUMMARY_COMMON_SYSTEM_PROMPT = [
   "5. Mỗi example Toán phải tự phân loại bằng isGeometry. Với bài Hình học lớp 7–9, isGeometry=true và geometryStatement bắt buộc khác null, là bảng GT–KL: hypotheses chứa đúng dữ kiện đã cho, conclusions chứa đúng yêu cầu cần tìm/chứng minh. Với Hình học lớp 10–12, vẫn đặt isGeometry=true nhưng geometryStatement bắt buộc bằng null. Mọi nội dung không phải Hình học đặt isGeometry=false và geometryStatement bắt buộc bằng null; giả thiết được dùng trực tiếp trong mạch lời giải.",
   "6. Phân biệt ngắt dòng thị giác do dàn trang với ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện và cấu trúc công thức theo chức năng trong nguồn; không tạo hoặc gộp cấu trúc chỉ vì vị trí xuống dòng trong ảnh PDF.",
   "7. Giữ quan hệ giữa câu dẫn và phần nội dung theo sau, dùng công thức inline hay display theo vai trò ngữ nghĩa và độ phức tạp. Bảo toàn các nhóm ý độc lập, dấu câu có chức năng và khoảng trắng LaTeX hợp lệ.",
-  `8. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+  `8. ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
+  `9. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+  `10. ${LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION}`,
   "",
   LESSON_SUMMARY_STRUCTURE_INVARIANTS,
   "",

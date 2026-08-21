@@ -1,3 +1,4 @@
 - 2026-08-21: Nâng cấp trình biên tập Summary M9 với thao tác di chuyển section/block giữ đồng bộ đường dẫn hình, bổ sung action lưu/phát hành ở header, cải thiện luồng dùng ảnh gốc sách giáo khoa và khung chỉnh ảnh, đồng thời cập nhật contract, tài liệu và regression tests liên quan.
 - 2026-08-21: Bổ sung modal đổi hoặc xóa caption metadata-only cho hình STEM, cập nhật contract và regression test tương ứng, đồng thời chuẩn hóa tooltip hệ thống cho các icon toolbar mục tiêu, đề mục, khối và hình trong trình biên tập Summary.
 - 2026-08-21: Cập nhật skill đổi UI để yêu cầu rà đủ mọi cấp toolbar trong vùng ảnh khi owner yêu cầu sửa tất cả icon hoặc tooltip, tránh bỏ sót toolbar cha và phân biệt rõ icon-only với nút đã có nhãn chữ.
+- 2026-08-21: Cải thiện Summary để nội dung tự đủ nghĩa, giữ dấu câu và bố cục công thức nhiều dòng, đồng thời cho công thức display dài cuộn ngang cục bộ với thanh cuộn dễ dùng và bổ sung regression tests responsive/contract tương ứng.

@@ -559,10 +559,19 @@ Contract provider:
 - Theory/note có `sourcePageNumbers`. Example có `origin` và
   `sourcePageNumbers`; lời giải là string bắt buộc, phải diễn giải đầy đủ theo
   thứ tự và phong cách SGK, không rút thành gợi ý ngắn.
-- Content/solution phải giữ cấu trúc ký hiệu có ý nghĩa của SGK: không thay
-  `\Leftrightarrow` bằng văn xuôi dài, không phá hệ điều kiện/dấu ngoặc nhóm,
-  không tách câu dẫn khỏi công thức inline. Câu dẫn mở danh sách, hệ hoặc display
-  ở dòng sau phải có dấu `:`; xuống dòng phải theo cấu trúc lập luận, không tùy ý.
+- Mọi field nội dung `content`, `problem`, `solution`, `answer` phải bảo toàn và
+  tự khôi phục dấu câu có chức năng khi quan hệ trình bày xác định rõ. Câu dẫn mở
+  danh sách, hệ, bảng hoặc display ở dòng sau phải có dấu `:`; dấu `,`, `;`, `.`
+  phải đúng quan hệ câu và không để chuỗi `..` thay cho dấu câu hợp lệ.
+  `\Leftrightarrow` chỉ biểu diễn tương đương hai chiều, `\Rightarrow` chỉ biểu
+  diễn suy ra một chiều; không tự thêm ký hiệu nếu lập luận không chứng minh quan
+  hệ đó. Các display liên tiếp thuộc cùng hệ/nhóm/chuỗi biến đổi phải dùng một
+  khối `aligned`/`split` và ngắt tại toán tử hợp lý; không để từ nối như `và`,
+  `nên`, `do đó` thành dòng rời. Công thức độc lập không cùng mạch không bị ép
+  gộp. Riêng một chuỗi tính/biến đổi có từ hai dấu `=` cấp ngoài cùng trở lên
+  phải đặt mỗi dấu `=` cùng bước biến đổi trên một dòng riêng; không áp dụng cho
+  các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu
+  `=` trong cấu trúc lồng nhau.
 - Trong mọi example/bài tập của Summary, nếu `problem`, `solution` hoặc `answer`
   có các ý con mang nhãn `a)`, `b)`, `c)` hoặc nhãn chữ cái tương đương thì mỗi
   ý con bắt buộc bắt đầu ở một dòng riêng; không được đặt hai nhãn ý con trên cùng

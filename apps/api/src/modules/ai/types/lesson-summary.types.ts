@@ -9,9 +9,9 @@ import { z } from "zod";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSION =
-  "lesson-summary-pdf-packet-five-block-prompt-v18-schema-alignment";
+  "lesson-summary-pdf-packet-five-block-prompt-v21-image-independent-fields";
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-five-block-schema-v18-no-provider-alt-text";
+  "lesson-summary-pdf-packet-five-block-schema-v20-equality-chain-linebreak";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -42,6 +42,8 @@ export const lessonSummaryLengthSchema = z.enum(["short", "standard", "detailed"
 const nonEmptyText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
 const LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION =
   "Không coi ngắt dòng do dàn trang là ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện, dấu câu dẫn và cấu trúc công thức theo chức năng trong nguồn; chọn inline hay display theo vai trò và độ phức tạp, không theo vị trí xuống dòng trong ảnh PDF.";
+export const LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION =
+  "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa. Chỉ dùng $\\Leftrightarrow$ cho quan hệ tương đương hai chiều và $\\Rightarrow$ cho suy ra một chiều; không tự thêm hai ký hiệu này khi lập luận không chứng minh quan hệ tương ứng. Khi nhiều công thức display liên tiếp thuộc cùng một hệ, nhóm trường hợp hoặc chuỗi biến đổi, nhóm chúng trong một khối `$$\\begin{aligned}...\\end{aligned}$$` hoặc môi trường `split` phù hợp và ngắt dòng tại toán tử quan hệ/phép biến đổi hợp lý; không để các từ nối như `và`, `nên`, `do đó` thành dòng rời giữa hai công thức. Nếu một chuỗi tính hoặc biến đổi có từ hai dấu `=` cấp ngoài cùng trở lên, bắt buộc đặt mỗi dấu `=` cùng bước biến đổi tương ứng trên một dòng riêng trong `aligned`/`split`: dòng đầu có dạng `A &= B`, các dòng sau có dạng `&= C`. Không áp dụng quy tắc này cho các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu `=` nằm trong cấu trúc lồng nhau. Công thức độc lập ngắn hoặc không cùng một mạch vẫn giữ riêng, không ép gộp.";
 export const LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
   "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
 const baseBlockSchema = z.object({
@@ -71,7 +73,7 @@ const knowledgeBlockSchema = baseBlockSchema
     type: z.literal("knowledge"),
     title: nonEmptyText(240),
     content: nonEmptyText(6_000).describe(
-      `Chỉ trình bày lý thuyết; không chứa ví dụ/bài tập. Bao gồm định nghĩa, công thức, tiêu chuẩn, quy tắc, phương pháp và trình tự không được nguồn/câu dẫn thông báo rõ là định lí hay tính chất. Bảo toàn ký hiệu tương đương, hệ điều kiện, dấu ngoặc nhóm, bullet và dấu câu dẫn của nguồn; không văn xuôi hóa công thức. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`,
+      `Chỉ trình bày lý thuyết; không chứa ví dụ/bài tập. Bao gồm định nghĩa, công thức, tiêu chuẩn, quy tắc, phương pháp và trình tự không được nguồn/câu dẫn thông báo rõ là định lí hay tính chất. Bảo toàn ký hiệu tương đương, hệ điều kiện, dấu ngoặc nhóm, bullet và dấu câu dẫn của nguồn; không văn xuôi hóa công thức. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
     ),
   })
   .strict();
@@ -81,7 +83,7 @@ const propertyBlockSchema = baseBlockSchema
     type: z.literal("property"),
     title: nonEmptyText(240),
     content: nonEmptyText(6_000).describe(
-      `Chỉ dùng cho phát biểu được nhãn, câu dẫn hoặc ngữ nghĩa xung quanh thông báo rõ là một tính chất; không chứa ví dụ/bài tập. Một bảng tiêu chuẩn, quy tắc, phương pháp hoặc chuỗi tương đương không tự trở thành property chỉ vì nó gồm nhiều mệnh đề chuyên môn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`,
+      `Chỉ dùng cho phát biểu được nhãn, câu dẫn hoặc ngữ nghĩa xung quanh thông báo rõ là một tính chất; không chứa ví dụ/bài tập. Một bảng tiêu chuẩn, quy tắc, phương pháp hoặc chuỗi tương đương không tự trở thành property chỉ vì nó gồm nhiều mệnh đề chuyên môn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
     ),
   })
   .strict();
@@ -89,9 +91,15 @@ const propertyBlockSchema = baseBlockSchema
 const exampleBlockSchema = z
   .object({
     type: z.literal("example"),
-    problem: nonEmptyText(4_000),
-    solution: nonEmptyText(10_000),
-    answer: nonEmptyText(3_000),
+    problem: nonEmptyText(4_000).describe(
+      `${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    solution: nonEmptyText(10_000).describe(
+      `${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
+    answer: nonEmptyText(3_000).describe(
+      `${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+    ),
     isGeometry: z.boolean().optional(),
     geometryStatement: lessonSummaryGeometryStatementSchema.optional(),
     figures: z.array(stemFigureVisualSchema).max(3).default([]),
@@ -104,7 +112,7 @@ const noteBlockSchema = baseBlockSchema
   .extend({
     type: z.literal("note"),
     content: nonEmptyText(3_000).describe(
-      "Chỉ dùng cho ý Chú ý, Lưu ý hoặc Nhận xét có trong nguồn. Không bắt đầu content bằng Chú ý:, Lưu ý: hoặc Nhận xét: vì giao diện đã hiển thị nhãn khối. Ví dụ là tùy chọn; nếu có phải tự đủ dữ kiện và không phụ thuộc hình/ảnh/URL của tài liệu nguồn.",
+      `Chỉ dùng cho ý Chú ý, Lưu ý hoặc Nhận xét có trong nguồn. Không bắt đầu content bằng Chú ý:, Lưu ý: hoặc Nhận xét: vì giao diện đã hiển thị nhãn khối. Ví dụ là tùy chọn; nếu có phải tự đủ dữ kiện và không phụ thuộc hình/ảnh/URL của tài liệu nguồn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
     ),
   })
   .strict();
@@ -114,7 +122,7 @@ const theoremBlockSchema = baseBlockSchema
     type: z.literal("theorem"),
     title: nonEmptyText(240),
     content: nonEmptyText(6_000).describe(
-      `Chỉ dùng cho phát biểu được nhãn hoặc câu dẫn bên ngoài phát biểu thông báo rõ là một định lí; không chứa ví dụ/bài tập. Điều kiện tương đương, tiêu chuẩn hay công thức quan trọng không tự trở thành theorem chỉ vì nội dung chuyên môn của nó. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`,
+      `Chỉ dùng cho phát biểu được nhãn hoặc câu dẫn bên ngoài phát biểu thông báo rõ là một định lí; không chứa ví dụ/bài tập. Điều kiện tương đương, tiêu chuẩn hay công thức quan trọng không tự trở thành theorem chỉ vì nội dung chuyên môn của nó. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
     ),
   })
   .strict();
@@ -189,7 +197,7 @@ export type LessonSummaryMvpBlock = z.infer<typeof lessonSummaryMvpBlockSchema>;
 
 const LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION =
   "Chỉ chứa thân lời giải; không chứa tiêu đề do UI sở hữu và không lặp lại dữ liệu đã tách sang geometryStatement.";
-const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Tuân theo cách lập luận của hồ sơ môn học trong system prompt, giữ đúng thứ tự suy luận và không biến toàn bộ lời giải thành checklist rời rạc. Bảo toàn ký hiệu tương đương và hệ ngoặc nhóm có ý nghĩa. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION} ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION}`;
+const LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_SOLUTION_OWNERSHIP_DESCRIPTION} Tuân theo cách lập luận của hồ sơ môn học trong system prompt, giữ đúng thứ tự suy luận và không biến toàn bộ lời giải thành checklist rời rạc. Bảo toàn ký hiệu tương đương và hệ ngoặc nhóm có ý nghĩa. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION} ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`;
 const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION =
   "Bắt buộc khác null cho bài Hình học lớp 7–9 và phải chứa bảng Giả thiết–Kết luận; Hình học lớp 10–12 và nội dung không phải Hình học phải trả null. Khi có giá trị, không chép lại bảng này vào solution.";
 const LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_DESCRIPTION = `${LESSON_SUMMARY_PROVIDER_GEOMETRY_STATEMENT_OWNERSHIP_DESCRIPTION} hypotheses chỉ chứa dữ kiện có sẵn trong đề và conclusions ghi đúng điều cần kết luận.`;
@@ -364,7 +372,7 @@ function createLessonSummaryTheoryBlockTransportSchema(
         type: z.literal("knowledge"),
         title: transportText(240),
         content: transportText(6_000).describe(
-          `Nội dung kiến thức/định nghĩa/tiêu chuẩn/quy tắc/phương pháp đầy đủ theo nguồn khi không có semantic cue rõ cho định lí/tính chất. Bảo toàn ký hiệu tương đương, hệ ngoặc nhóm, bullet, dấu câu dẫn và bố cục công thức có ý nghĩa; không văn xuôi hóa. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
+          `Nội dung kiến thức/định nghĩa/tiêu chuẩn/quy tắc/phương pháp đầy đủ theo nguồn khi không có semantic cue rõ cho định lí/tính chất. Bảo toàn ký hiệu tương đương, hệ ngoặc nhóm, bullet, dấu câu dẫn và bố cục công thức có ý nghĩa; không văn xuôi hóa. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
         ),
       })
       .strict(),
@@ -374,7 +382,7 @@ function createLessonSummaryTheoryBlockTransportSchema(
         type: z.literal("property"),
         title: transportText(240),
         content: transportText(6_000).describe(
-          `Phát biểu được nhãn/câu dẫn/ngữ nghĩa xung quanh thông báo rõ là tính chất, đầy đủ theo nguồn. Không dùng property chỉ vì nội dung là bảng tiêu chuẩn, quy tắc, phương pháp hoặc chuỗi tương đương. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
+          `Phát biểu được nhãn/câu dẫn/ngữ nghĩa xung quanh thông báo rõ là tính chất, đầy đủ theo nguồn. Không dùng property chỉ vì nội dung là bảng tiêu chuẩn, quy tắc, phương pháp hoặc chuỗi tương đương. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
         ),
       })
       .strict(),
@@ -384,7 +392,7 @@ function createLessonSummaryTheoryBlockTransportSchema(
         type: z.literal("theorem"),
         title: transportText(240),
         content: transportText(6_000).describe(
-          `Phát biểu được nhãn hoặc câu dẫn bên ngoài phát biểu thông báo rõ là định lí, đầy đủ theo nguồn. Điều kiện tương đương, tiêu chuẩn hay công thức quan trọng không tự trở thành theorem chỉ vì nội dung chuyên môn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
+          `Phát biểu được nhãn hoặc câu dẫn bên ngoài phát biểu thông báo rõ là định lí, đầy đủ theo nguồn. Điều kiện tương đương, tiêu chuẩn hay công thức quan trọng không tự trở thành theorem chỉ vì nội dung chuyên môn. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} Không hấp thụ đoạn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn tương đương; các đoạn đó phải thành NOTE riêng.`,
         ),
       })
       .strict(),
@@ -398,7 +406,7 @@ export const lessonSummaryProviderNoteTransportSchema = z
   .object({
     type: z.literal("note"),
     content: transportText(3_000).describe(
-      "Ý Chú ý/Nhận xét/Lưu ý bổ trợ đúng phần kiến thức liên quan; đi thẳng vào nội dung và không lặp nhãn loại block. Khi nguồn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn có cùng chức năng thì bắt buộc biểu diễn bằng NOTE này, không gộp vào theory.",
+      `Ý Chú ý/Nhận xét/Lưu ý bổ trợ đúng phần kiến thức liên quan; đi thẳng vào nội dung và không lặp nhãn loại block. Khi nguồn có nhãn rõ Chú ý, Nhận xét, Lưu ý hoặc lời dẫn có cùng chức năng thì bắt buộc biểu diễn bằng NOTE này, không gộp vào theory. ${LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION} ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION}`,
     ),
     sourcePageNumbers: providerTheorySourcePageNumbersSchema,
   })
@@ -430,13 +438,13 @@ function createLessonSummaryProviderExampleTransportSchema(
     type: z.literal("example"),
     exampleKind: z.literal(exampleKind),
     problem: transportText(4_000).describe(
-      `Đề ví dụ minh họa trực tiếp và đủ phạm vi của theory cùng UNIT. Nếu theory có nhiều trường hợp hoặc nhiều cách làm độc lập, dùng bài nhiều ý bao phủ chúng hoặc tách theory thành các UNIT nhỏ hơn; không chỉ minh họa một nhánh rồi bỏ các nhánh còn lại. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+      `Đề ví dụ minh họa trực tiếp và đủ phạm vi của theory cùng UNIT. Nếu theory có nhiều trường hợp hoặc nhiều cách làm độc lập, dùng bài nhiều ý bao phủ chúng hoặc tách theory thành các UNIT nhỏ hơn; không chỉ minh họa một nhánh rồi bỏ các nhánh còn lại. ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
     ),
     solution: transportText(10_000).describe(
       LESSON_SUMMARY_PROVIDER_SOLUTION_DESCRIPTION,
     ),
     answer: transportText(3_000).describe(
-      `Đáp án hoặc kết quả cuối của bài. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+      `Đáp án hoặc kết quả cuối của bài. ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
     ),
     figures: figureSchema,
   };
@@ -508,13 +516,13 @@ function createLessonSummaryProviderNonMathExampleTransportSchema(
     type: z.literal("example"),
     exampleKind: z.literal(exampleKind),
     problem: transportText(4_000).describe(
-      `Đề ví dụ/bài tập đầy đủ dữ kiện và yêu cầu. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+      `Đề ví dụ/bài tập đầy đủ dữ kiện và yêu cầu. ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
     ),
     solution: transportText(10_000).describe(
-      `Lời giải đầy đủ theo phong cách sách giáo khoa; chỉ chứa thân lời giải, không chứa tiêu đề do UI sở hữu và không lặp lại answer. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+      `Lời giải đầy đủ theo phong cách sách giáo khoa; chỉ chứa thân lời giải, không chứa tiêu đề do UI sở hữu và không lặp lại answer. ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
     ),
     answer: transportText(3_000).describe(
-      `Đáp án hoặc kết quả cuối của bài. ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
+      `Đáp án hoặc kết quả cuối của bài. ${LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION} ${LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION}`,
     ),
     figures: figureSchema,
   };

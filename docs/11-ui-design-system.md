@@ -489,6 +489,11 @@ Một màn hình UI chỉ xem là xong khi:
   đường ngang ngăn hai hàng. Không thay bằng hai badge/heading rời. Trên mobile,
   cột nhãn thu gọn, nội dung/KaTeX tự xuống dòng hoặc cuộn ngang cục bộ nhưng các
   đường ngăn vẫn liên tục; màu đường và chữ phải đủ tương phản ở light/dark.
+- Công thức display dài trong nội dung học tập không được scale toàn bộ SVG/KaTeX
+  để ép vừa viewport. Giữ cỡ chữ đọc được và cho chính khối công thức cuộn ngang
+  cục bộ; nếu nội dung sinh được nhiều dòng theo ngữ nghĩa thì ưu tiên
+  `aligned`/`split`. Khoảng trắng dọc quanh công thức phải gọn, không tạo vùng
+  trống lớn trong khi chữ toán lại bị thu nhỏ.
 - Text trong visual Toán không được đè lên nét hình hoặc marker. Cơ chế tránh va
   chạm phải ưu tiên vùng trống gần nhất, giữ đúng phía/ngữ nghĩa của nhãn và dùng
   khoảng dịch nhỏ có giới hạn; không được làm sạch hình bằng cách đẩy nhãn ra xa.

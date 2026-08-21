@@ -12,6 +12,7 @@ import {
 } from "#api/modules/ai/types/lesson-content-generation.types";
 import {
   getLessonSummaryProviderTransportOutputSchema,
+  LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
   LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
   lessonSummaryOutputSchema,
   lessonSummaryProviderTransportOutputSchema,
@@ -29,7 +30,10 @@ import {
   applyLessonSummaryPhaseOneBlockEdits,
   prepareLessonSummaryPhaseOneLayoutEdits,
 } from "#api/modules/ai/utils/lesson-summary-phase-one-editor";
-import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
+import {
+  buildLessonSummaryStructuredInput,
+  LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION,
+} from "#api/modules/ai/utils/lesson-summary-prompt";
 import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 import {
   buildOpenAiResponseInput,
@@ -3122,6 +3126,65 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     }
   });
 
+  it("keeps functional punctuation and readable multiline math layout in every Summary text field", () => {
+    const request = buildLessonSummaryStructuredInput({
+      lessonId,
+      lessonTitle: "Bài học có công thức nhiều dòng",
+      targetGrade: 9,
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      documentIds: ["00000000-0000-4000-8000-000000000003"],
+      sourceHash: "a".repeat(64),
+      packet: testPacket,
+      configuration: {
+        style: "student_friendly",
+        styleInstructions: "",
+        length: "standard",
+        targetWordCount: null,
+        extraInstructions: "",
+      },
+    });
+    expect(request.systemPrompt).toContain(
+      LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+    );
+    expect(request.systemPrompt).toContain("phải kết thúc bằng dấu `:`");
+    expect(request.systemPrompt).toContain("$\\Leftrightarrow$");
+    expect(request.systemPrompt).toContain("$\\Rightarrow$");
+    expect(request.systemPrompt).toContain("$$\\begin{aligned}...\\end{aligned}$$");
+    expect(request.systemPrompt).toContain("không để chuỗi `..`");
+    expect(request.systemPrompt).toContain("có từ hai dấu `=` cấp ngoài cùng trở lên");
+    expect(request.systemPrompt).toContain(
+      "Không áp dụng quy tắc này cho các phương trình độc lập",
+    );
+    expect(request.systemPrompt).toContain(
+      LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION,
+    );
+    expect(request.systemPrompt).toContain(
+      "nội dung phải tự đủ nghĩa, độc lập với hình ảnh",
+    );
+    expect(request.systemPrompt).toContain(
+      "Mã hình nguồn chỉ được lưu trong `sourceReferences.figureLabel`",
+    );
+
+    for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
+      const schema =
+        getLessonSummaryProviderTransportOutputSchema(subjectKey).toJSONSchema();
+      expect(JSON.stringify(schema)).not.toContain(
+        LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION,
+      );
+      for (const field of ["content", "problem", "solution", "answer"] as const) {
+        const descriptions = collectPropertyDescriptions(schema, field);
+        expect(descriptions.length).toBeGreaterThan(0);
+        expect(
+          descriptions.every((description) =>
+            description.includes(
+              LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+            ),
+          ),
+        ).toBe(true);
+      }
+    }
+  });
+
   it("keeps the Math-only GT–KL field out of non-Math Summary schemas", () => {
     expect(
       JSON.stringify(
@@ -3327,10 +3390,10 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).not.toContain("theo đề, brief");
     expect(request.systemPrompt).not.toContain("brief sơ đồ thí nghiệm");
     expect(request.promptVersion).toBe(
-      "lesson-summary-pdf-packet-five-block-prompt-v18-schema-alignment",
+      "lesson-summary-pdf-packet-five-block-prompt-v21-image-independent-fields",
     );
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-five-block-schema-v18-no-provider-alt-text",
+      "lesson-summary-pdf-packet-five-block-schema-v20-equality-chain-linebreak",
     );
   });
 
