@@ -55,7 +55,7 @@ export function AdminStemFigureSourceCropPanel({
             aria-hidden="true"
           />
           <h2 className="truncate text-lg font-extrabold text-[var(--theme-text-strong)]">
-            Xem hình trong sách giáo khoa
+            Xem ảnh sách giáo khoa
           </h2>
         </div>
       </header>
@@ -99,7 +99,7 @@ export function AdminStemFigureSourceCropPanel({
             checked={enhance}
             disabled={isUsing || isBusy}
             id={`stem-figure-source-crop-enhance-${figure.id}`}
-            label="Làm nét ảnh"
+            label="Tự động làm nét ảnh"
             labelClassName="bg-[var(--theme-surface-muted)]"
             onChange={(event) => setEnhance(event.currentTarget.checked)}
             wrapperClassName="ml-auto mt-4 w-full max-w-sm"
@@ -129,7 +129,7 @@ export function AdminStemFigureSourceCropPanel({
           ) : (
             <Check className="h-4 w-4" aria-hidden="true" />
           )}
-          {isUsing ? (enhance ? "Đang làm nét..." : "Đang áp dụng...") : "Áp dụng"}
+          {isUsing ? (enhance ? "Đang làm nét..." : "Đang áp dụng...") : "Dùng hình này"}
         </button>
       </footer>
     </section>

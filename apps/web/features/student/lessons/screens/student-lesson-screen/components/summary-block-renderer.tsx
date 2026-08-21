@@ -28,6 +28,7 @@ import {
   ArrowDown,
   X,
   CheckCircle2,
+  Combine,
 } from "lucide-react";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import {
@@ -132,7 +133,15 @@ interface SummaryBlockRendererProps {
     operation:
       | { type: "MERGE_SECTION"; sectionIndex: number }
       | { type: "DELETE_SECTION"; sectionIndex: number }
-      | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number },
+      | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number }
+      | { type: "MOVE_SECTION"; sectionIndex: number; targetSectionIndex: number }
+      | {
+          type: "MOVE_BLOCK";
+          sectionIndex: number;
+          blockIndex: number;
+          targetSectionIndex: number;
+          targetBlockIndex: number;
+        },
   ) => void;
   showTableOfContents?: boolean;
 }
@@ -556,6 +565,28 @@ export function SummaryBlockRenderer({
       {data.sections?.map((section, idx) => {
         const isSectionEditing =
           viewMode === "SPLIT" || editingItems.has(`section-${idx}`);
+        const mergeSectionIntoPrevious = () => {
+          if (idx === 0 || !data.sections?.[idx - 1]) return;
+
+          const newData = structuredClone(data);
+          const currentSection = newData.sections?.[idx];
+          const previousSection = newData.sections?.[idx - 1];
+          if (!currentSection || !previousSection || !newData.sections) return;
+
+          previousSection.blocks = [
+            ...(previousSection.blocks ?? []),
+            ...(currentSection.blocks ?? []),
+          ];
+          newData.sections.splice(idx, 1);
+          newData.sections.forEach((item, index) => {
+            item.order = index + 1;
+          });
+          onPhaseOneLayoutOperation?.({
+            type: "MERGE_SECTION",
+            sectionIndex: idx,
+          });
+          onChange?.(newData);
+        };
 
         const renderSectionActions = () => (
           <>
@@ -569,6 +600,20 @@ export function SummaryBlockRenderer({
                 <PenTool className="w-4 h-4" />
               </button>
             )}
+            <button
+              type="button"
+              aria-label="Gộp nội dung vào đề mục trước"
+              disabled={idx === 0}
+              onClick={mergeSectionIntoPrevious}
+              className="flex items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-blue-400"
+              title={
+                idx === 0
+                  ? "Không thể gộp vì đây là đề mục đầu tiên"
+                  : "Gộp nội dung vào đề mục trước"
+              }
+            >
+              <Combine className="h-4 w-4" aria-hidden="true" />
+            </button>
             <div
               title="Kéo thả để sắp xếp đề mục"
               draggable
@@ -593,6 +638,11 @@ export function SummaryBlockRenderer({
                   newData.sections.forEach((s, i) => {
                     s.order = i + 1;
                   });
+                  onPhaseOneLayoutOperation?.({
+                    type: "MOVE_SECTION",
+                    sectionIndex: idx,
+                    targetSectionIndex: idx - 1,
+                  });
                   onChange?.(newData);
                 }
               }}
@@ -612,6 +662,11 @@ export function SummaryBlockRenderer({
                   newData.sections[idx + 1] = temp!;
                   newData.sections.forEach((s, i) => {
                     s.order = i + 1;
+                  });
+                  onPhaseOneLayoutOperation?.({
+                    type: "MOVE_SECTION",
+                    sectionIndex: idx,
+                    targetSectionIndex: idx + 1,
                   });
                   onChange?.(newData);
                 }
@@ -727,6 +782,11 @@ export function SummaryBlockRenderer({
                   });
 
                   newData.sections = sections;
+                  onPhaseOneLayoutOperation?.({
+                    type: "MOVE_SECTION",
+                    sectionIndex: draggedSection,
+                    targetSectionIndex: idx,
+                  });
                   onChange?.(newData);
                 }
                 setDraggedSection(null);
@@ -750,9 +810,17 @@ export function SummaryBlockRenderer({
                   sourceSection.blocks = sourceBlocks;
 
                   const targetBlocks = [...(targetSection.blocks || [])];
+                  const targetBlockIndex = targetBlocks.length;
                   targetBlocks.push(draggedBlockData);
                   targetSection.blocks = targetBlocks;
 
+                  onPhaseOneLayoutOperation?.({
+                    type: "MOVE_BLOCK",
+                    sectionIndex: sourceSectionIdx,
+                    blockIndex: sourceBlockIdx,
+                    targetSectionIndex: idx,
+                    targetBlockIndex,
+                  });
                   onChange?.(newData);
                 }
                 setDraggedItem(null);
@@ -804,42 +872,6 @@ export function SummaryBlockRenderer({
                               <X className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={() => {
-                              if (idx === 0) return;
-                              const newData = { ...data };
-                              if (newData.sections) {
-                                const currentBlocks =
-                                  newData.sections![idx]!.blocks || [];
-                                const prevBlocks =
-                                  newData.sections![idx - 1]!.blocks || [];
-                                newData.sections![idx - 1]!.blocks = [
-                                  ...prevBlocks,
-                                  ...currentBlocks,
-                                ];
-                                newData.sections!.splice(idx, 1);
-
-                                newData.sections.forEach((s, i) => {
-                                  s.order = i + 1;
-                                });
-                                onPhaseOneLayoutOperation?.({
-                                  type: "MERGE_SECTION",
-                                  sectionIndex: idx,
-                                });
-                                onChange?.(newData);
-                              }
-                            }}
-                            title={
-                              idx === 0
-                                ? "Không thể gộp vì đây là đề mục đầu tiên"
-                                : "Xóa tiêu đề và gộp khối vào đề mục trên"
-                            }
-                            className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                         <ReactJson
                           src={{ displayHeading: section.displayHeading }}
@@ -951,13 +983,28 @@ export function SummaryBlockRenderer({
                       blocks[bIdx] = blocks[bIdx - 1]!;
                       blocks[bIdx - 1] = temp!;
                       newData.sections![idx]!.blocks = blocks;
+                      onPhaseOneLayoutOperation?.({
+                        type: "MOVE_BLOCK",
+                        sectionIndex: idx,
+                        blockIndex: bIdx,
+                        targetSectionIndex: idx,
+                        targetBlockIndex: bIdx - 1,
+                      });
                     } else if (idx > 0) {
                       const currentBlocks = [...newData.sections![idx]!.blocks!];
                       const blockToMove = currentBlocks.splice(bIdx, 1)[0]!;
                       newData.sections![idx]!.blocks = currentBlocks;
                       if (!newData.sections![idx - 1]!.blocks)
                         newData.sections![idx - 1]!.blocks = [];
+                      const targetBlockIndex = newData.sections![idx - 1]!.blocks!.length;
                       newData.sections![idx - 1]!.blocks!.push(blockToMove);
+                      onPhaseOneLayoutOperation?.({
+                        type: "MOVE_BLOCK",
+                        sectionIndex: idx,
+                        blockIndex: bIdx,
+                        targetSectionIndex: idx - 1,
+                        targetBlockIndex,
+                      });
                     }
                     onChange?.(newData);
                   }
@@ -973,6 +1020,13 @@ export function SummaryBlockRenderer({
                       newBlocks[bIdx] = newBlocks[bIdx + 1]!;
                       newBlocks[bIdx + 1] = temp!;
                       newData.sections![idx]!.blocks = newBlocks;
+                      onPhaseOneLayoutOperation?.({
+                        type: "MOVE_BLOCK",
+                        sectionIndex: idx,
+                        blockIndex: bIdx,
+                        targetSectionIndex: idx,
+                        targetBlockIndex: bIdx + 1,
+                      });
                     } else if (idx < (data.sections?.length || 0) - 1) {
                       const currentBlocks = [...blocks];
                       const blockToMove = currentBlocks.splice(bIdx, 1)[0]!;
@@ -980,6 +1034,13 @@ export function SummaryBlockRenderer({
                       if (!newData.sections![idx + 1]!.blocks)
                         newData.sections![idx + 1]!.blocks = [];
                       newData.sections![idx + 1]!.blocks!.unshift(blockToMove);
+                      onPhaseOneLayoutOperation?.({
+                        type: "MOVE_BLOCK",
+                        sectionIndex: idx,
+                        blockIndex: bIdx,
+                        targetSectionIndex: idx + 1,
+                        targetBlockIndex: 0,
+                      });
                     }
                     onChange?.(newData);
                   }
@@ -1050,6 +1111,13 @@ export function SummaryBlockRenderer({
                             targetSection.blocks = targetBlocks;
                           }
 
+                          onPhaseOneLayoutOperation?.({
+                            type: "MOVE_BLOCK",
+                            sectionIndex: sourceSectionIdx,
+                            blockIndex: sourceBlockIdx,
+                            targetSectionIndex: targetSectionIdx,
+                            targetBlockIndex: targetBlockIdx,
+                          });
                           onChange?.(newData);
                         }
                         setDraggedItem(null);

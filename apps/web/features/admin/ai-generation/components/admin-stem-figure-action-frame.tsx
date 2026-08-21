@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Bot, Trash2, WandSparkles } from "lucide-react";
+import { BookOpen, Bot, ImageUp, Trash2, WandSparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -54,15 +54,19 @@ export function AdminStemFigureActionFrame({
   children,
   contextActions,
   figure,
+  isSourceCropOpen,
   lessonId,
   modelConfiguration,
+  onSourceCropOpenChange,
   sourceCropContainerClassName,
 }: {
   children: ReactNode;
   contextActions?: ReactNode;
   figure: AdminStemFigure;
+  isSourceCropOpen?: boolean;
   lessonId: string;
   modelConfiguration?: AdminAiModelConfiguration;
+  onSourceCropOpenChange?: (isOpen: boolean) => void;
   sourceCropContainerClassName?: string;
 }) {
   const retryMutation = useRetryAdminStemFigure(lessonId);
@@ -75,18 +79,25 @@ export function AdminStemFigureActionFrame({
   const [isCreatingCode, setIsCreatingCode] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCreateAi, setShowCreateAi] = useState(false);
-  const [showSourceCrop, setShowSourceCrop] = useState(false);
+  const [internalSourceCropOpen, setInternalSourceCropOpen] = useState(false);
   const [showRasterEditor, setShowRasterEditor] = useState(false);
   const hasTextbookImage = figure.sourceReferenceImages.length > 0;
   const isNotebookOrigin = figure.currentAssetKind === "TEXTBOOK_SOURCE";
-  const originLabel = isNotebookOrigin ? "Notebook" : "AI";
-  const OriginIcon = isNotebookOrigin ? BookOpen : Bot;
+  const isUploadOrigin = figure.currentAssetKind === "ADMIN_UPLOAD";
+  const originLabel = isNotebookOrigin ? "Notebook" : isUploadOrigin ? "Upload" : "AI";
+  const OriginIcon = isNotebookOrigin ? BookOpen : isUploadOrigin ? ImageUp : Bot;
   const canEditRaster =
     figure.status === "SUCCEEDED" &&
     figure.currentAssetKind === "TEXTBOOK_SOURCE" &&
     figure.hasCurrentAsset &&
     figure.pendingRevisionId === null &&
     Boolean(figure.assetUrl);
+  const showSourceCrop = isSourceCropOpen ?? internalSourceCropOpen;
+
+  function setShowSourceCrop(isOpen: boolean) {
+    setInternalSourceCropOpen(isOpen);
+    onSourceCropOpenChange?.(isOpen);
+  }
 
   async function run(action: () => Promise<unknown>, success: string) {
     try {
@@ -146,12 +157,16 @@ export function AdminStemFigureActionFrame({
             className={`absolute left-3 top-3 z-30 inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-xs shadow-sm sm:left-4 sm:top-4 ${
               isNotebookOrigin
                 ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-200"
-                : "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/70 dark:text-violet-200"
+                : isUploadOrigin
+                  ? "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/70 dark:text-sky-200"
+                  : "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/70 dark:text-violet-200"
             }`}
             title={
               isNotebookOrigin
                 ? "Ảnh có nguồn gốc từ sách giáo khoa"
-                : "Ảnh có nguồn gốc từ AI hoặc nguồn khác"
+                : isUploadOrigin
+                  ? "Ảnh do admin tải lên"
+                  : "Ảnh được tạo bằng AI"
             }
           >
             <OriginIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -177,11 +192,11 @@ export function AdminStemFigureActionFrame({
           ) : null}
           {hasTextbookImage ? (
             <button
-              aria-label="Xem hình trong sách giáo khoa"
+              aria-label="Xem ảnh sách giáo khoa"
               aria-pressed={showSourceCrop}
               className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
-              onClick={() => setShowSourceCrop((isVisible) => !isVisible)}
-              title="Xem hình trong sách giáo khoa"
+              onClick={() => setShowSourceCrop(!showSourceCrop)}
+              title="Xem ảnh sách giáo khoa"
               type="button"
             >
               <BookOpen className="h-4 w-4" aria-hidden="true" />

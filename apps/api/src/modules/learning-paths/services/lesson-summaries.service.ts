@@ -253,17 +253,48 @@ export class LessonSummariesService {
         );
       }
       const layoutOperations = (dto.phaseOneLayoutOperations ?? []).map((operation) => {
-        if (operation.type !== "DELETE_BLOCK") {
+        if (operation.type === "MERGE_SECTION" || operation.type === "DELETE_SECTION") {
           return {
             type: operation.type,
             sectionIndex: operation.sectionIndex,
           } as const;
         }
+        if (operation.type === "MOVE_SECTION") {
+          if (operation.targetSectionIndex === undefined) {
+            throwBadRequest(
+              "LESSON_SUMMARY_PHASE_ONE_LAYOUT_INVALID",
+              "Thao tác di chuyển section thiếu vị trí đích.",
+            );
+          }
+          return {
+            type: operation.type,
+            sectionIndex: operation.sectionIndex,
+            targetSectionIndex: operation.targetSectionIndex,
+          } as const;
+        }
         if (operation.blockIndex === undefined) {
           throwBadRequest(
             "LESSON_SUMMARY_PHASE_ONE_LAYOUT_INVALID",
-            "Thao tác xóa block thiếu vị trí block.",
+            "Thao tác với block thiếu vị trí block.",
           );
+        }
+        if (operation.type === "MOVE_BLOCK") {
+          if (
+            operation.targetSectionIndex === undefined ||
+            operation.targetBlockIndex === undefined
+          ) {
+            throwBadRequest(
+              "LESSON_SUMMARY_PHASE_ONE_LAYOUT_INVALID",
+              "Thao tác di chuyển block thiếu vị trí đích.",
+            );
+          }
+          return {
+            type: operation.type,
+            sectionIndex: operation.sectionIndex,
+            blockIndex: operation.blockIndex,
+            targetSectionIndex: operation.targetSectionIndex,
+            targetBlockIndex: operation.targetBlockIndex,
+          } as const;
         }
         return {
           type: operation.type,
@@ -317,8 +348,24 @@ export class LessonSummariesService {
           figure,
         ]),
       );
+      const historicalDeletedFigures = await transaction.stemFigure.findMany({
+        where: { lessonSummaryId: summary.id, deletedAt: { not: null } },
+        select: { id: true, blockPath: true, figureIndex: true },
+      });
+      const relocatedDeletedFigures = historicalDeletedFigures.flatMap((figure) => {
+        const nextPath = prepared.blockPathChanges.get(figure.blockPath);
+        return nextPath === null
+          ? []
+          : [{ ...figure, blockPath: nextPath ?? figure.blockPath }];
+      });
+      const deletedFigurePositions = new Set(
+        relocatedDeletedFigures.map((figure) =>
+          stemFigurePositionKey(figure.blockPath, figure.figureIndex),
+        ),
+      );
       const missingFigurePositions = [...plannedFigures.keys()].filter(
-        (position) => !activeFigures.has(position),
+        (position) =>
+          !activeFigures.has(position) && !deletedFigurePositions.has(position),
       );
       if (missingFigurePositions.length > 0) {
         throwBadRequest(
@@ -328,14 +375,32 @@ export class LessonSummariesService {
         );
       }
 
+      const changedDeletedFigures = historicalDeletedFigures.filter((figure) =>
+        prepared.blockPathChanges.has(figure.blockPath),
+      );
+      const movedDeletedFigures = relocatedDeletedFigures.filter((figure) => {
+        const original = historicalDeletedFigures.find((item) => item.id === figure.id);
+        return original?.blockPath !== figure.blockPath;
+      });
+
       const content = structuredClone(applied.mapped.content);
-      for (const figure of [...movedFigures, ...deletedFigures]) {
+      for (const figure of [
+        ...movedFigures,
+        ...deletedFigures,
+        ...changedDeletedFigures,
+      ]) {
         await transaction.stemFigure.update({
           where: { id: figure.id },
           data: { blockPath: `layout-operation-${figure.id}` },
         });
       }
       for (const figure of movedFigures) {
+        await transaction.stemFigure.update({
+          where: { id: figure.id },
+          data: { blockPath: figure.blockPath },
+        });
+      }
+      for (const figure of movedDeletedFigures) {
         await transaction.stemFigure.update({
           where: { id: figure.id },
           data: { blockPath: figure.blockPath },

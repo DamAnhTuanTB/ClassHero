@@ -58,6 +58,8 @@ export function AdminStemFigureRasterEditorDialog({
   const [hasApplied, setHasApplied] = useState(false);
   const [brushSize, setBrushSize] = useState<StemFigureRasterBrushSize>("MEDIUM");
   const [canvasSize, setCanvasSize] = useState({ width: 1, height: 1 });
+  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(null);
+  const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
   const [maskRevision, setMaskRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [view, setView] = useState<"ORIGINAL" | "PREVIEW">("ORIGINAL");
@@ -83,6 +85,40 @@ export function AdminStemFigureRasterEditorDialog({
   const editKey = `${enhance}:${removeSimpleDetails}:${maskRevision}`;
   const previewIsFresh = preview?.key === editKey;
   const pending = previewMutation.isPending || applyMutation.isPending;
+  const fitScale = Math.min(
+    1,
+    viewportSize.width / canvasSize.width,
+    viewportSize.height / canvasSize.height,
+  );
+  const displayWidth = Math.max(1, Math.round(canvasSize.width * fitScale * zoom));
+  const displayHeight = Math.max(1, Math.round(canvasSize.height * fitScale * zoom));
+
+  useEffect(() => {
+    if (!viewportElement || !isOpen) return;
+
+    const measureViewport = () => {
+      const styles = window.getComputedStyle(viewportElement);
+      const horizontalPadding =
+        Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+      const verticalPadding =
+        Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+      const nextSize = {
+        width: Math.max(1, viewportElement.clientWidth - horizontalPadding - 2),
+        height: Math.max(1, viewportElement.clientHeight - verticalPadding - 2),
+      };
+
+      setViewportSize((current) =>
+        current.width === nextSize.width && current.height === nextSize.height
+          ? current
+          : nextSize,
+      );
+    };
+
+    measureViewport();
+    const observer = new ResizeObserver(measureViewport);
+    observer.observe(viewportElement);
+    return () => observer.disconnect();
+  }, [isOpen, viewportElement]);
 
   useEffect(() => {
     if (maskRevision === 0) return;
@@ -391,7 +427,11 @@ export function AdminStemFigureRasterEditorDialog({
             </div>
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-auto p-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5">
+          <div
+            ref={setViewportElement}
+            className="relative min-h-0 flex-1 overflow-auto p-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5"
+            data-raster-editor-viewport
+          >
             {previewMutation.isPending ? (
               <div className="absolute inset-0 z-20 grid place-items-center bg-[var(--theme-surface)]/75 backdrop-blur-sm">
                 <div
@@ -408,16 +448,18 @@ export function AdminStemFigureRasterEditorDialog({
             ) : null}
             <div className="mx-auto grid min-h-full place-items-center">
               <div
-                className="relative overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white shadow-sm"
+                className="relative box-content overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white shadow-sm"
                 style={{
-                  width: `${canvasSize.width * zoom}px`,
-                  maxWidth: `${zoom * 100}%`,
+                  height: `${displayHeight}px`,
+                  width: `${displayWidth}px`,
                 }}
               >
-                <div className={view === "ORIGINAL" ? "relative" : "hidden"}>
+                <div
+                  className={view === "ORIGINAL" ? "relative h-full w-full" : "hidden"}
+                >
                   <img
                     alt={workingFigure.altText}
-                    className="block h-auto w-full select-none"
+                    className="block h-full w-full select-none"
                     draggable={false}
                     onLoad={(event) => {
                       const naturalWidth = event.currentTarget.naturalWidth;
@@ -449,7 +491,7 @@ export function AdminStemFigureRasterEditorDialog({
                 {preview?.data.previewDataUrl ? (
                   <img
                     alt={`Bản xem trước: ${workingFigure.altText}`}
-                    className={view === "PREVIEW" ? "block h-auto w-full" : "hidden"}
+                    className={view === "PREVIEW" ? "block h-full w-full" : "hidden"}
                     src={preview.data.previewDataUrl}
                   />
                 ) : null}

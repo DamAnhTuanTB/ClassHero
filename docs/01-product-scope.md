@@ -103,8 +103,10 @@ Admin có quyền:
 - Quản lý từng hình STEM trong tóm tắt: xem lỗi, xóa, tải ảnh thay thế, sinh lại
   bằng AI, xem SVG preview và tự sửa LaTeX figure snippet khi cần. Không có
   editor click-to-source/SyncTeX trên PDF hoặc preview trong phạm vi hiện tại.
-- Trong khung ảnh SGK của một figure, checkbox `Làm nét ảnh` mặc định
-  tắt. Admin bấm `Áp dụng` để promote crop; chỉ khi checkbox được bật hệ
+- Menu ảnh của block có lựa chọn `Xem ảnh sách giáo khoa` khi figure đích có
+  reference SGK; lựa chọn này mở cùng khung ảnh nguồn ngay trong block như icon
+  mở nhanh ở figure. Trong khung, checkbox `Tự động làm nét ảnh` mặc định tắt.
+  Admin bấm `Dùng hình này` để promote crop; chỉ khi checkbox được bật hệ
   thống mới chạy preset làm nét local trước khi promote. Cả hai nhánh đều
   không phát sinh provider trả phí.
 - Có thể thay hàng loạt các hình còn tồn tại từ lượt AI sinh Summary ban đầu bằng

@@ -14,9 +14,18 @@ import {
 } from "class-validator";
 
 export class LessonSummaryPhaseOneLayoutOperationDto {
-  @ApiProperty({ enum: ["MERGE_SECTION", "DELETE_SECTION", "DELETE_BLOCK"] })
-  @IsIn(["MERGE_SECTION", "DELETE_SECTION", "DELETE_BLOCK"])
-  type!: "MERGE_SECTION" | "DELETE_SECTION" | "DELETE_BLOCK";
+  @ApiProperty({
+    enum: [
+      "MERGE_SECTION",
+      "DELETE_SECTION",
+      "DELETE_BLOCK",
+      "MOVE_SECTION",
+      "MOVE_BLOCK",
+    ],
+  })
+  @IsIn(["MERGE_SECTION", "DELETE_SECTION", "DELETE_BLOCK", "MOVE_SECTION", "MOVE_BLOCK"])
+  type!:
+    "MERGE_SECTION" | "DELETE_SECTION" | "DELETE_BLOCK" | "MOVE_SECTION" | "MOVE_BLOCK";
 
   @ApiProperty({ example: 1 })
   @IsInt()
@@ -28,6 +37,18 @@ export class LessonSummaryPhaseOneLayoutOperationDto {
   @IsInt()
   @Min(0)
   blockIndex?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  targetSectionIndex?: number;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  targetBlockIndex?: number;
 }
 
 export class UpdateLessonSummaryPhaseOneBlocksDto {

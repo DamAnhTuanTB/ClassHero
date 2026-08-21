@@ -2,13 +2,10 @@
 
 import {
   BookImage,
-  EyeOff,
   Eye,
   Loader2,
   Pencil,
   RefreshCw,
-  Save,
-  Send,
   Sparkles,
   Trash2,
   LayoutTemplate,
@@ -70,6 +67,7 @@ import {
   createTextbookImageBulkReplacePlan,
   useAdminReplaceAllTextbookImages,
 } from "@/features/admin/ai-generation/hooks/use-admin-replace-all-textbook-images";
+import { AdminLessonSummaryPublishActions } from "@/features/admin/ai-generation/components/admin-lesson-summary-publish-actions";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 const ReplaceAllTextbookImagesDialog = dynamic(
@@ -128,6 +126,7 @@ export function AdminLessonSummaryTab({
   const [selectedSourcePageNumbers, setSelectedSourcePageNumbers] = useState<
     number[] | null
   >(null);
+  const [sourceCropFigureId, setSourceCropFigureId] = useState<string | null>(null);
   const unresolvedReviewIssueCount = countUnresolvedReviewIssues(content);
   const textbookImageBulkReplacePlan = useMemo(
     () => createTextbookImageBulkReplacePlan(figuresQuery.data ?? []),
@@ -174,12 +173,23 @@ export function AdminLessonSummaryTab({
       return figure ? (
         <AdminStemFigureInline
           figure={figure}
+          isSourceCropOpen={sourceCropFigureId === figure.id}
           lessonId={lessonId}
           modelConfiguration={panelQuery.data?.summaryConfiguration}
+          onSourceCropOpenChange={(isOpen) =>
+            setSourceCropFigureId((current) =>
+              isOpen ? figure.id : current === figure.id ? null : current,
+            )
+          }
         />
       ) : null;
     },
-    [lessonId, panelQuery.data?.summaryConfiguration, stemFiguresById],
+    [
+      lessonId,
+      panelQuery.data?.summaryConfiguration,
+      sourceCropFigureId,
+      stemFiguresById,
+    ],
   );
   const stemFiguresByBlockPath = useMemo(() => {
     const groups = new Map<string, AdminStemFigure[]>();
@@ -199,6 +209,7 @@ export function AdminLessonSummaryTab({
         blockPath={blockPath}
         figures={stemFiguresByBlockPath.get(blockPath) ?? []}
         lessonId={lessonId}
+        onViewTextbookSource={(figure) => setSourceCropFigureId(figure.id)}
       />
     ),
     [lessonId, stemFiguresByBlockPath],
@@ -465,7 +476,10 @@ export function AdminLessonSummaryTab({
 
         <div className="flex flex-col items-end gap-2">
           {summary ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div
+              className="flex flex-wrap items-center justify-end gap-2"
+              data-testid="summary-header-actions"
+            >
               <span className="group relative">
                 <button
                   aria-label="Thay các hình từ lượt AI sinh ban đầu còn lại bằng hình gốc sách giáo khoa đã làm nét"
@@ -494,6 +508,14 @@ export function AdminLessonSummaryTab({
                   Thay các hình AI ban đầu còn lại bằng ảnh gốc SGK đã làm nét
                 </span>
               </span>
+              <AdminLessonSummaryPublishActions
+                compact
+                figureActionsBlocked={figureActionsBlocked}
+                figureBlockerTitle={figureBlockerTitle}
+                isPending={upsertMutation.isPending}
+                reviewStatus={summary.reviewStatus}
+                onSave={save}
+              />
               <button
                 type="button"
                 onClick={onEdit}
@@ -671,7 +693,10 @@ export function AdminLessonSummaryTab({
         />
       )}
 
-      <div className="flex flex-col-reverse gap-2 border-t border-[var(--theme-border)] pt-4 sm:flex-row sm:justify-end">
+      <div
+        className="flex flex-col-reverse gap-2 border-t border-[var(--theme-border)] pt-4 sm:flex-row sm:justify-end"
+        data-testid="summary-footer-actions"
+      >
         <button
           type="button"
           disabled={upsertMutation.isPending}
@@ -685,43 +710,13 @@ export function AdminLessonSummaryTab({
           )}
           {summary ? "Tạo mới" : "Tạo Kiến thức"}
         </button>
-        <button
-          type="button"
-          disabled={upsertMutation.isPending || figureActionsBlocked}
-          onClick={() => save("SAVE")}
-          title={figureBlockerTitle}
-          className="theme-button-primary-subtle inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
-        >
-          {upsertMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Save className="h-4 w-4" aria-hidden="true" />
-          )}
-          Lưu nội dung
-        </button>
-        {summary?.reviewStatus !== "APPROVED" ? (
-          <button
-            type="button"
-            disabled={upsertMutation.isPending || figureActionsBlocked}
-            onClick={() => save("PUBLISH")}
-            title={figureBlockerTitle ?? "Phát hành tóm tắt"}
-            className="theme-button-primary inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 text-sm font-extrabold disabled:opacity-60"
-          >
-            <Send className="h-4 w-4" aria-hidden="true" />
-            Phát hành
-          </button>
-        ) : null}
-        {summary?.reviewStatus === "APPROVED" ? (
-          <button
-            type="button"
-            disabled={upsertMutation.isPending}
-            onClick={() => save("WITHDRAW")}
-            className="theme-button-neutral inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-extrabold disabled:opacity-60"
-          >
-            <EyeOff className="h-4 w-4" aria-hidden="true" />
-            Thu hồi phát hành
-          </button>
-        ) : null}
+        <AdminLessonSummaryPublishActions
+          figureActionsBlocked={figureActionsBlocked}
+          figureBlockerTitle={figureBlockerTitle}
+          isPending={upsertMutation.isPending}
+          reviewStatus={summary?.reviewStatus}
+          onSave={save}
+        />
       </div>
       <DeleteConfirmDialog
         confirmLabel="Xóa vĩnh viễn"

@@ -701,7 +701,15 @@ Body:
   "phaseOneLayoutOperations": [
     { "type": "DELETE_BLOCK", "sectionIndex": 0, "blockIndex": 1 },
     { "type": "DELETE_SECTION", "sectionIndex": 2 },
-    { "type": "MERGE_SECTION", "sectionIndex": 1 }
+    { "type": "MERGE_SECTION", "sectionIndex": 1 },
+    { "type": "MOVE_SECTION", "sectionIndex": 2, "targetSectionIndex": 0 },
+    {
+      "type": "MOVE_BLOCK",
+      "sectionIndex": 0,
+      "blockIndex": 1,
+      "targetSectionIndex": 1,
+      "targetBlockIndex": 0
+    }
   ],
   "source": "ADMIN",
   "reviewStatus": "NEEDS_REVIEW"
@@ -720,6 +728,10 @@ Behavior:
   toàn bộ block vào section ngay trước rồi đánh lại section/block path. Lịch sử
   layout được lưu cùng snapshot để lần Lưu/tải lại sau không dựng lại block hoặc
   section đã xóa.
+- `MOVE_SECTION` và `MOVE_BLOCK` lưu đúng thao tác kéo thả/nút lên-xuống. Chỉ số
+  đích được tính trên mảng sau khi phần tử nguồn đã được lấy ra; backend dùng cùng
+  thao tác để đánh lại raw block path và `stem_figures.block_path` trong một
+  transaction.
 - Ghép từng object đã sửa về đúng vị trí trong provider output gốc, validate lại
   bằng strict schema tương ứng với môn và lớp rồi mới map/upsert Summary.
 - Cho sửa text, `caption` và provenance hợp lệ của figure đã tồn tại; raw Phase 1
@@ -730,6 +742,9 @@ Behavior:
   provider, không enqueue Stage 2/diagram rendering và không tự tạo ảnh mới.
 - Figure thuộc block bị xóa được soft-delete; figure thuộc block chỉ đổi vị trí
   được cập nhật `blockPath` trong cùng transaction và giữ nguyên revision/asset.
+- Figure đã soft-delete không giữ chỗ unique của một block đang được dịch chuyển;
+  tombstone của figure đi theo block nếu block được đổi vị trí, và raw plan tương
+  ứng được phép tồn tại mà không dựng lại reference hình trong Summary.
 - Chỉ được frontend gọi khi admin bấm `Lưu` hoặc `Phát hành`; thay đổi realtime
   trong preview trước đó chỉ là state cục bộ chưa persist.
 - Lượt sinh cũ không có snapshot version 2 trả lỗi

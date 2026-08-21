@@ -194,29 +194,38 @@ Figure hiện light-only. UI dark đặt figure trên surface sáng, không tự
 Summary AI có ba biểu diễn liên quan nhưng khác vai trò: preview đã map để render,
 raw block Phase 1 để admin sửa, và provider output gốc để strict-validate lại khi
 Lưu. Vì vậy xóa một block chỉ khỏi preview là chưa đủ; lần Lưu kế tiếp sẽ map raw
-cũ và làm block xuất hiện lại. Tương tự, gộp section mà không đánh lại raw
-`blockPath` sẽ khiến khung JSON ở vị trí mới báo nhầm là thiếu raw Phase 1.
+cũ và làm block xuất hiện lại. Tương tự, gộp hoặc kéo đổi vị trí mà không đánh
+lại raw `blockPath` sẽ khiến khung JSON ở vị trí mới báo nhầm là thiếu raw Phase
+1 hoặc làm figure vẫn trỏ vào tọa độ cũ.
 
 ```mermaid
 flowchart LR
-  A[Admin xóa block, section hoặc heading] --> B[Cập nhật preview]
+  A[Admin xóa, gộp hoặc đổi vị trí] --> B[Cập nhật preview]
   A --> C[Đánh lại raw block path]
   A --> D[Ghi layout operation có thứ tự]
   B --> E[PUT phase-one-blocks]
   C --> E
   D --> E
   E --> F[Strict-validate provider output gốc]
-  F --> G[Replay delete/merge lên content và snapshot]
+  F --> G[Replay delete, merge hoặc move lên content và snapshot]
   G --> H[Đổi figure blockPath hoặc soft-delete]
   H --> I[Persist cùng transaction]
 ```
 
 Layout operation là overlay biên tập, không sửa méo provider schema. Backend giữ
 provider output hợp lệ để audit/validate, rồi replay `DELETE_BLOCK`,
-`DELETE_SECTION` hoặc `MERGE_SECTION` sau mapper. Operation phải được lưu cùng snapshot để các lần sửa
-sau tiếp tục nhìn đúng layout hiện tại. Figure của block chỉ đổi vị trí giữ nguyên
-revision/asset; figure thuộc block bị xóa dùng soft-delete để không còn reference
-active nhưng vẫn giữ khả năng điều tra dữ liệu.
+`DELETE_SECTION`, `MERGE_SECTION`, `MOVE_BLOCK` hoặc `MOVE_SECTION` sau mapper.
+Operation phải được lưu cùng snapshot để các lần sửa sau tiếp tục nhìn đúng
+layout hiện tại. Figure của block chỉ đổi vị trí giữ nguyên revision/asset; figure
+thuộc block bị xóa dùng soft-delete để không còn reference active nhưng vẫn giữ
+khả năng điều tra dữ liệu.
+
+Soft-delete không tự giải phóng unique key trong PostgreSQL. Với unique vị trí
+`(lesson_summary_id, block_path, figure_index)`, một figure đã xóa vẫn có thể giữ
+tọa độ mà block khác sắp chuyển tới. Transaction structural edit vì vậy phải đưa
+cả figure active lẫn tombstone bị ảnh hưởng sang `blockPath` tạm, sau đó mới gán
+tọa độ cuối. Tombstone đi theo block khi reorder và được phép đại diện cho một
+figure plan đã bị admin xóa, nên lần lưu sau không hiểu nhầm đây là dữ liệu mất.
 
 ## Coverage lớp 3–12
 

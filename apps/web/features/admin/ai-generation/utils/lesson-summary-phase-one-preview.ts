@@ -5,7 +5,15 @@ const THEORY_TYPES = new Set(["knowledge", "property", "theorem"]);
 export type LessonSummaryPhaseOneLayoutOperation =
   | { type: "MERGE_SECTION"; sectionIndex: number }
   | { type: "DELETE_SECTION"; sectionIndex: number }
-  | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number };
+  | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number }
+  | { type: "MOVE_SECTION"; sectionIndex: number; targetSectionIndex: number }
+  | {
+      type: "MOVE_BLOCK";
+      sectionIndex: number;
+      blockIndex: number;
+      targetSectionIndex: number;
+      targetBlockIndex: number;
+    };
 
 export function applyPhaseOneLayoutOperation(
   blocks: Record<string, unknown>,
@@ -70,6 +78,25 @@ export function applyPhaseOneLayoutOperation(
         ];
       }),
     );
+  }
+
+  if (operation.type === "MOVE_SECTION") {
+    const sections = groupEntriesBySection(parsedEntries);
+    const [section] = sections.splice(operation.sectionIndex, 1);
+    if (!section || operation.targetSectionIndex > sections.length) return blocks;
+    sections.splice(operation.targetSectionIndex, 0, section);
+    return rebuildGroupedBlockRecord(sections);
+  }
+
+  if (operation.type === "MOVE_BLOCK") {
+    const sections = groupEntriesBySection(parsedEntries);
+    const sourceSection = sections[operation.sectionIndex];
+    const targetSection = sections[operation.targetSectionIndex];
+    if (!sourceSection || !targetSection) return blocks;
+    const [block] = sourceSection.splice(operation.blockIndex, 1);
+    if (!block || operation.targetBlockIndex > targetSection.length) return blocks;
+    targetSection.splice(operation.targetBlockIndex, 0, block);
+    return rebuildGroupedBlockRecord(sections);
   }
 
   if (operation.sectionIndex < 1) return blocks;
@@ -200,6 +227,30 @@ function rebuildBlockRecord(
         `sections.${entry.sectionIndex}.blocks.${entry.blockIndex}`,
         entry.value,
       ]),
+  );
+}
+
+function groupEntriesBySection(
+  entries: Array<{
+    value: unknown;
+    position: { sectionIndex: number; blockIndex: number } | null;
+  }>,
+) {
+  const sectionCount =
+    Math.max(...entries.map((entry) => entry.position?.sectionIndex ?? -1)) + 1;
+  const sections = Array.from({ length: sectionCount }, () => [] as unknown[]);
+  for (const entry of entries) {
+    const position = entry.position!;
+    sections[position.sectionIndex]![position.blockIndex] = entry.value;
+  }
+  return sections;
+}
+
+function rebuildGroupedBlockRecord(sections: unknown[][]) {
+  return rebuildBlockRecord(
+    sections.flatMap((section, sectionIndex) =>
+      section.map((value, blockIndex) => ({ value, sectionIndex, blockIndex })),
+    ),
   );
 }
 

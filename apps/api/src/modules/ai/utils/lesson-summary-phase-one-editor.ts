@@ -11,7 +11,15 @@ import {
 export type LessonSummaryPhaseOneLayoutOperation =
   | { type: "MERGE_SECTION"; sectionIndex: number }
   | { type: "DELETE_SECTION"; sectionIndex: number }
-  | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number };
+  | { type: "DELETE_BLOCK"; sectionIndex: number; blockIndex: number }
+  | { type: "MOVE_SECTION"; sectionIndex: number; targetSectionIndex: number }
+  | {
+      type: "MOVE_BLOCK";
+      sectionIndex: number;
+      blockIndex: number;
+      targetSectionIndex: number;
+      targetBlockIndex: number;
+    };
 
 export type LessonSummaryPhaseOneSnapshot = {
   type: "lesson_summary_phase_one_blocks";
@@ -234,7 +242,7 @@ function applyLayoutOperationsToMappedOutput(
       current.content.sections.forEach((item, index) => {
         item.order = index + 1;
       });
-    } else {
+    } else if (operation.type === "MERGE_SECTION") {
       if (operation.sectionIndex < 1) return null;
       const section = current.content.sections[operation.sectionIndex];
       const previousSection = current.content.sections[operation.sectionIndex - 1];
@@ -244,6 +252,24 @@ function applyLayoutOperationsToMappedOutput(
       current.content.sections.forEach((item, index) => {
         item.order = index + 1;
       });
+    } else if (operation.type === "MOVE_SECTION") {
+      const [section] = current.content.sections.splice(operation.sectionIndex, 1);
+      if (!section || operation.targetSectionIndex > current.content.sections.length) {
+        return null;
+      }
+      current.content.sections.splice(operation.targetSectionIndex, 0, section);
+      current.content.sections.forEach((item, index) => {
+        item.order = index + 1;
+      });
+    } else {
+      const sourceSection = current.content.sections[operation.sectionIndex];
+      const targetSection = current.content.sections[operation.targetSectionIndex];
+      if (!sourceSection || !targetSection) return null;
+      const [block] = sourceSection.blocks.splice(operation.blockIndex, 1);
+      if (!block || operation.targetBlockIndex > targetSection.blocks.length) {
+        return null;
+      }
+      targetSection.blocks.splice(operation.targetBlockIndex, 0, block);
     }
 
     current = {
@@ -324,6 +350,25 @@ function applyLayoutOperationToRecord<T>(
     );
   }
 
+  if (operation.type === "MOVE_SECTION") {
+    const sections = groupRecordEntriesBySection(entries);
+    const [section] = sections.splice(operation.sectionIndex, 1);
+    if (!section || operation.targetSectionIndex > sections.length) return null;
+    sections.splice(operation.targetSectionIndex, 0, section);
+    return rebuildGroupedBlockRecord(sections);
+  }
+
+  if (operation.type === "MOVE_BLOCK") {
+    const sections = groupRecordEntriesBySection(entries);
+    const sourceSection = sections[operation.sectionIndex];
+    const targetSection = sections[operation.targetSectionIndex];
+    if (!sourceSection || !targetSection) return null;
+    const [block] = sourceSection.splice(operation.blockIndex, 1);
+    if (!block || operation.targetBlockIndex > targetSection.length) return null;
+    targetSection.splice(operation.targetBlockIndex, 0, block);
+    return rebuildGroupedBlockRecord(sections);
+  }
+
   if (operation.sectionIndex < 1) return null;
   const previousBlockCount = entries.filter(
     (entry) => entry.position?.sectionIndex === operation.sectionIndex - 1,
@@ -374,6 +419,30 @@ function rebuildBlockRecord<T>(
   );
 }
 
+function groupRecordEntriesBySection<T>(
+  entries: Array<{
+    value: T;
+    position: { sectionIndex: number; blockIndex: number } | null;
+  }>,
+) {
+  const sectionCount =
+    Math.max(...entries.map((entry) => entry.position?.sectionIndex ?? -1)) + 1;
+  const sections = Array.from({ length: sectionCount }, () => [] as T[]);
+  for (const entry of entries) {
+    const position = entry.position!;
+    sections[position.sectionIndex]![position.blockIndex] = entry.value;
+  }
+  return sections;
+}
+
+function rebuildGroupedBlockRecord<T>(sections: T[][]) {
+  return rebuildBlockRecord(
+    sections.flatMap((section, sectionIndex) =>
+      section.map((value, blockIndex) => ({ value, sectionIndex, blockIndex })),
+    ),
+  );
+}
+
 function isLayoutOperation(
   value: unknown,
 ): value is LessonSummaryPhaseOneLayoutOperation {
@@ -384,6 +453,24 @@ function isLayoutOperation(
   }
   if (value.type === "MERGE_SECTION") return sectionIndex >= 1;
   if (value.type === "DELETE_SECTION") return sectionIndex >= 0;
+  if (value.type === "MOVE_SECTION") {
+    return (
+      sectionIndex >= 0 &&
+      Number.isInteger(value.targetSectionIndex) &&
+      Number(value.targetSectionIndex) >= 0
+    );
+  }
+  if (value.type === "MOVE_BLOCK") {
+    return (
+      sectionIndex >= 0 &&
+      Number.isInteger(value.blockIndex) &&
+      Number(value.blockIndex) >= 0 &&
+      Number.isInteger(value.targetSectionIndex) &&
+      Number(value.targetSectionIndex) >= 0 &&
+      Number.isInteger(value.targetBlockIndex) &&
+      Number(value.targetBlockIndex) >= 0
+    );
+  }
   return (
     value.type === "DELETE_BLOCK" &&
     sectionIndex >= 0 &&

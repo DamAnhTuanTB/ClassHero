@@ -751,8 +751,9 @@ Hình chưa có crop chính xác sẽ cần kiểm tra thủ công.` Checkbox ch
   đúng vị trí, error code/message rút gọn và ba action xóa/thay/sinh lại.
 - Toolbar của mọi loại Summary block có menu ảnh mở bằng hover trên desktop và
   click/tap/focus trên thiết bị cảm ứng. Menu gồm `Tạo mới bằng AI`, `Tạo mới bằng
-mã code`, `Tải ảnh lên`; nhiều figure bắt buộc chọn target. Xem hình gốc nằm ở
-  chính figure để có thể phủ ảnh nguồn đúng lên ảnh AI tương ứng.
+mã code`, `Tải ảnh lên` và `Xem ảnh sách giáo khoa` khi figure đích có reference
+  SGK; nhiều figure bắt buộc chọn target. Action cuối và icon mở nhanh ở chính
+  figure cùng mở một khung ảnh nguồn ngay trong block để đối chiếu với ảnh hiện tại.
 - Mọi figure có `Xóa`, `Thay bằng ảnh mới`, `Tạo mới bằng AI`, `Tạo mới bằng mã
 code` và `Chỉnh sửa bằng mã code`. Action chỉnh sửa mã chỉ bật khi asset
   hiện hành có source `AI_TEX`; raster upload/SGK hiển thị disabled kèm lý do.
@@ -779,15 +780,15 @@ liệu`; modal có model cùng control capability-aware cho Temperature/Reasonin
   Block sở hữu chỉ dùng kiểm chứng phần ảnh không quyết định. UI preview phải
   diễn đạt đúng precedence này. Khi field
   rỗng/blank, preview request không hiển thị key hay câu prompt về yêu cầu bổ sung.
-- Figure có reference sách giáo khoa hiển thị icon `Xem hình trong sách giáo khoa`
+- Figure có reference sách giáo khoa hiển thị icon `Xem ảnh sách giáo khoa`
   trực tiếp bên trái menu ba chấm. Icon chèn khung ảnh gốc vào ngay phía trên ảnh
   hiện tại trong cùng block để hai ảnh cùng hiển thị; không mở modal/drawer,
   không phủ ảnh hiện tại và không tạo thanh cuộn riêng. Icon là toggle: bấm lần
   đầu mở khung, bấm lại chính icon đó đóng khung. Khung này hiển thị đúng
   tỷ lệ/kích thước preview của cùng crop trong modal `Tạo mới hình bằng AI` bằng
   một component dùng chung (`max-height: 256px`, `object-contain`). Reference
-  image lấy từ immutable snapshot, cho chọn crop và có footer `Hủy` / `Áp dụng`.
-  Checkbox `Làm nét ảnh` nằm căn phải gần cụm action và mặc định tắt;
+  image lấy từ immutable snapshot, cho chọn crop và có footer `Hủy` / `Dùng hình này`.
+  Checkbox `Tự động làm nét ảnh` nằm căn phải gần cụm action và mặc định tắt;
   chỉ khi admin tích chọn thì request mới chạy `TEXTBOOK_RASTER_CLEANUP_V2`
   trước khi promote. Ảnh toàn trang fallback vẫn xem được nhưng action dùng
   trực tiếp bị khóa; khi revision AI đang chạy, action dùng crop cũng bị khóa để

@@ -1,0 +1,1 @@
+- 2026-08-21: Nâng cấp trình biên tập Summary M9 với thao tác di chuyển section/block giữ đồng bộ đường dẫn hình, bổ sung action lưu/phát hành ở header, cải thiện luồng dùng ảnh gốc sách giáo khoa và khung chỉnh ảnh, đồng thời cập nhật contract, tài liệu và regression tests liên quan.

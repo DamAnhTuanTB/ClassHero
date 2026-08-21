@@ -11,12 +11,16 @@ import type {
 
 export function AdminStemFigureInline({
   figure,
+  isSourceCropOpen,
   lessonId,
   modelConfiguration,
+  onSourceCropOpenChange,
 }: {
   figure: AdminStemFigure;
+  isSourceCropOpen?: boolean;
   lessonId: string;
   modelConfiguration?: AdminAiModelConfiguration;
+  onSourceCropOpenChange?: (isOpen: boolean) => void;
 }) {
   const candidateActive = ["QUEUED", "RENDERING", "REPAIRING"].includes(figure.status);
 
@@ -24,8 +28,10 @@ export function AdminStemFigureInline({
     <div className="my-4" data-admin-stem-figure={figure.id}>
       <AdminStemFigureActionFrame
         figure={figure}
+        isSourceCropOpen={isSourceCropOpen}
         lessonId={lessonId}
         modelConfiguration={modelConfiguration}
+        onSourceCropOpenChange={onSourceCropOpenChange}
       >
         <StemFigure
           displaySize={

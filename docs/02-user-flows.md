@@ -369,7 +369,8 @@ Các bước chung:
     figure; mảng rỗng xác nhận hình do AI đề xuất vẽ mới, mảng có phần tử chỉ ra
     đúng trang/nhãn/phạm vi hình SGK.
 13. Mọi block có menu ảnh dùng chung gồm `Tạo mới bằng AI`, `Tạo mới bằng mã
-code`, `Tải ảnh lên`, `Xem hình gốc`; nếu block có nhiều figure thì admin phải
+code`, `Tải ảnh lên`, `Xem ảnh sách giáo khoa`; action cuối chỉ hiện khi block có
+    figure mang reference SGK. Nếu block có nhiều figure thì admin phải
     chọn đúng figure trước khi thao tác. Mọi figure có các action tương ứng cùng
     `Xóa`; chỉ figure có source `AI_TEX` mới bật `Chỉnh sửa bằng mã code`, còn ảnh
     upload/ảnh sách dạng raster phải disable action sửa mã.
@@ -383,8 +384,9 @@ code`, `Tải ảnh lên`, `Xem hình gốc`; nếu block có nhiều figure th�
     hiện tại. Mọi phần ảnh ngoài delta phải được giữ nguyên; block sở hữu chỉ dùng
     kiểm chứng phần ảnh không quyết định. Nếu field rỗng,
     request provider không chứa key hoặc câu prompt nói về yêu cầu bổ sung.
-    Khi mở `Xem hình trong sách giáo khoa`, chọn một `OCR_CROP`, tùy chọn
-    checkbox `Làm nét ảnh` rồi bấm `Áp dụng`. Checkbox mặc định tắt; khi
+    Khi mở `Xem ảnh sách giáo khoa` từ menu block hoặc icon mở nhanh ở figure,
+    khung ảnh nguồn xuất hiện ngay trong block. Admin chọn một `OCR_CROP`, tùy chọn
+    checkbox `Tự động làm nét ảnh` rồi bấm `Dùng hình này`. Checkbox mặc định tắt; khi
     tắt backend promote crop đã chuẩn hóa mà không chạy preset làm nét. Khi bật,
     backend chạy `TEXTBOOK_RASTER_CLEANUP_V2`, tạo delivery WebP lossless rồi mới
     promote revision. UI hiển thị `Đang áp dụng...` hoặc `Đang làm nét...`

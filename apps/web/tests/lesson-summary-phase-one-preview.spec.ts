@@ -59,6 +59,46 @@ test("xóa section khỏi raw và kéo các section phía sau lên", () => {
   });
 });
 
+test("đổi vị trí block trong cùng section thì raw đi theo đúng block", () => {
+  const result = applyPhaseOneLayoutOperation(
+    {
+      "sections.0.blocks.0": { title: "A" },
+      "sections.0.blocks.1": { title: "B" },
+      "sections.0.blocks.2": { title: "C" },
+    },
+    {
+      type: "MOVE_BLOCK",
+      sectionIndex: 0,
+      blockIndex: 0,
+      targetSectionIndex: 0,
+      targetBlockIndex: 1,
+    },
+  );
+
+  expect(result).toEqual({
+    "sections.0.blocks.0": { title: "B" },
+    "sections.0.blocks.1": { title: "A" },
+    "sections.0.blocks.2": { title: "C" },
+  });
+});
+
+test("đổi vị trí section thì raw và block path của cả section đi cùng nhau", () => {
+  const result = applyPhaseOneLayoutOperation(
+    {
+      "sections.0.blocks.0": { title: "A" },
+      "sections.1.blocks.0": { title: "B" },
+      "sections.1.blocks.1": { title: "C" },
+    },
+    { type: "MOVE_SECTION", sectionIndex: 1, targetSectionIndex: 0 },
+  );
+
+  expect(result).toEqual({
+    "sections.0.blocks.0": { title: "B" },
+    "sections.0.blocks.1": { title: "C" },
+    "sections.1.blocks.0": { title: "A" },
+  });
+});
+
 test("cập nhật preview lý thuyết từ raw mà không mutate content đã lưu", () => {
   const content = createContent();
   const result = applyPhaseOneBlockPreview(content, "sections.0.blocks.0", {

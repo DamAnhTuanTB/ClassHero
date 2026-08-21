@@ -468,23 +468,36 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByText("Heading OCR gốc: 1 CỌNG HAI SỐ")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("button", { name: "Duyệt tóm tắt" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Lưu nội dung" }).click();
+    await expect(page.getByRole("button", { name: "Lưu nội dung" })).toHaveCount(2);
+    await page
+      .getByTestId("summary-footer-actions")
+      .getByRole("button", { name: "Lưu nội dung" })
+      .click();
     await expect.poll(() => mock.summary?.reviewStatus).toBe("NEEDS_REVIEW");
     await expect(page.getByText("Bản nháp", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Thu hồi phát hành" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Phát hành", exact: true }).click();
+    await page
+      .getByTestId("summary-header-actions")
+      .getByRole("button", { name: "Phát hành", exact: true })
+      .click();
     await expect.poll(() => mock.summary?.reviewStatus).toBe("APPROVED");
     await expect(page.getByText("Đã phát hành", { exact: true }).first()).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Phát hành", exact: true }),
     ).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Thu hồi phát hành" }).click();
+    await page
+      .getByTestId("summary-header-actions")
+      .getByRole("button", { name: "Thu hồi phát hành" })
+      .click();
     await expect.poll(() => mock.summary?.reviewStatus).toBe("HIDDEN");
     await expect(page.getByText("Đã thu hồi", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Hiện lại tóm tắt" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Phát hành", exact: true }).click();
+    await page
+      .getByTestId("summary-header-actions")
+      .getByRole("button", { name: "Phát hành", exact: true })
+      .click();
     await expect.poll(() => mock.summary?.reviewStatus).toBe("APPROVED");
     await expect(
       page.getByRole("button", { name: "Phát hành", exact: true }),
@@ -657,17 +670,13 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeVisible();
     await overviewCodeDialog.getByRole("button", { name: "Đóng" }).click();
     await expect(overviewCodeDialog).toHaveCount(0);
-    await overviewCard
-      .getByRole("button", { name: "Xem hình trong sách giáo khoa" })
-      .click();
-    await expect(overviewCard.getByText("Xem hình trong sách giáo khoa")).toBeVisible();
+    await overviewCard.getByRole("button", { name: "Xem ảnh sách giáo khoa" }).click();
+    await expect(overviewCard.getByText("Xem ảnh sách giáo khoa")).toBeVisible();
     await expect(
       overviewCard.getByAltText("Hình sách giáo khoa · trang 23"),
     ).toBeVisible();
-    await overviewCard
-      .getByRole("button", { name: "Xem hình trong sách giáo khoa" })
-      .click();
-    await expect(overviewCard.getByText("Xem hình trong sách giáo khoa")).toHaveCount(0);
+    await overviewCard.getByRole("button", { name: "Xem ảnh sách giáo khoa" }).click();
+    await expect(overviewCard.getByText("Xem ảnh sách giáo khoa")).toHaveCount(0);
     await overviewCard.getByRole("button", { name: "Đi đến khối chứa Ảnh 1" }).click();
     await expect(figureStatusDetails).toHaveCount(0);
     await expect(page.locator("#block-0-0")).toBeInViewport();
@@ -686,9 +695,15 @@ test.describe("M9.8 admin AI generation panel", () => {
       await expect(card.getByRole("button", { name: "Xóa hình" })).toBeVisible();
       await page.keyboard.press("Escape");
     }
-    await expect(page.getByRole("button", { name: "Lưu nội dung" })).toBeDisabled();
     await expect(
-      page.getByRole("button", { name: "Phát hành", exact: true }),
+      page
+        .getByTestId("summary-header-actions")
+        .getByRole("button", { name: "Lưu nội dung" }),
+    ).toBeDisabled();
+    await expect(
+      page
+        .getByTestId("summary-header-actions")
+        .getByRole("button", { name: "Phát hành", exact: true }),
     ).toBeDisabled();
     await page.screenshot({
       path: `../../.codex/artifacts/m9-2-stem-figure-lifecycle/admin-lifecycle-light-${testInfo.project.name}.png`,
@@ -708,9 +723,15 @@ test.describe("M9.8 admin AI generation panel", () => {
     await figureStatusSummary.getByRole("button", { name: "Tổng 1 ảnh" }).click();
     await expect(figureStatusDetails).toContainText(/Cần xem lại\s*0/u);
     await expect(figureStatusDetails).toContainText(/Lỗi\s*1/u);
-    await expect(page.getByRole("button", { name: "Lưu nội dung" })).toBeEnabled();
     await expect(
-      page.getByRole("button", { name: "Phát hành", exact: true }),
+      page
+        .getByTestId("summary-header-actions")
+        .getByRole("button", { name: "Lưu nội dung" }),
+    ).toBeEnabled();
+    await expect(
+      page
+        .getByTestId("summary-header-actions")
+        .getByRole("button", { name: "Phát hành", exact: true }),
     ).toBeEnabled();
     await expect(page.getByText("Hình đang được xử lý")).toHaveCount(0);
   });
@@ -987,7 +1008,10 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByText("sourceReferences", { exact: true })).toHaveCount(1);
     await expect(page.getByRole("tabpanel")).toContainText("Hình 4.2");
     await page.getByRole("button", { name: "Chỉ xem UI" }).click();
-    await page.getByRole("button", { name: "Lưu nội dung" }).click();
+    await page
+      .getByTestId("summary-header-actions")
+      .getByRole("button", { name: "Lưu nội dung" })
+      .click();
     await expect.poll(() => mock.summaryPutPayloads).toHaveLength(1);
     expect(JSON.stringify(mock.summaryPutPayloads[0])).not.toContain('"visualIntent"');
 
@@ -1154,26 +1178,26 @@ test.describe("M9.8 admin AI generation panel", () => {
       '[data-admin-stem-figure="figure-page-fallback"]',
     );
     await expect(
-      textbookCard.getByRole("button", { name: "Xem hình trong sách giáo khoa" }),
+      textbookCard.getByRole("button", { name: "Xem ảnh sách giáo khoa" }),
     ).toBeVisible();
     await expect(textbookCard.getByLabel("Nguồn gốc ảnh: Notebook")).toBeVisible();
-    await expect(uploadCard.getByLabel("Nguồn gốc ảnh: AI")).toBeVisible();
+    await expect(uploadCard.getByLabel("Nguồn gốc ảnh: Upload")).toBeVisible();
     await expect(revivedCard.getByText("Notebook", { exact: true })).toHaveCount(0);
     await expect(revivedCard.getByText("AI", { exact: true })).toHaveCount(0);
     await expect(
-      revivedCard.getByRole("button", { name: "Xem hình trong sách giáo khoa" }),
+      revivedCard.getByRole("button", { name: "Xem ảnh sách giáo khoa" }),
     ).toBeVisible();
     await expect(
-      uploadCard.getByRole("button", { name: "Xem hình trong sách giáo khoa" }),
+      uploadCard.getByRole("button", { name: "Xem ảnh sách giáo khoa" }),
     ).toHaveCount(0);
     await expect(
       pageFallbackCard.getByRole("button", {
-        name: "Xem hình trong sách giáo khoa",
+        name: "Xem ảnh sách giáo khoa",
       }),
     ).toBeVisible();
 
     const textbookSourceButton = textbookCard.getByRole("button", {
-      name: "Xem hình trong sách giáo khoa",
+      name: "Xem ảnh sách giáo khoa",
     });
     await textbookSourceButton.click();
     const sourcePanel = textbookCard.getByRole("region", {
@@ -1187,7 +1211,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await textbookSourceButton.click();
     await expect(sourcePanel).toBeVisible();
     await expect(
-      page.getByRole("dialog", { name: "Xem hình trong sách giáo khoa" }),
+      page.getByRole("dialog", { name: "Xem ảnh sách giáo khoa" }),
     ).toHaveCount(0);
     const sourceImage = sourcePanel.getByRole("img", {
       name: "Hình sách giáo khoa · trang 23",
@@ -1213,24 +1237,39 @@ test.describe("M9.8 admin AI generation panel", () => {
       ),
     ).toBe(false);
     await expect(
-      sourcePanel.getByRole("checkbox", { name: "Làm nét ảnh" }),
+      sourcePanel.getByRole("checkbox", { name: "Tự động làm nét ảnh" }),
     ).not.toBeChecked();
-    await expect(sourcePanel.getByRole("button", { name: "Áp dụng" })).toBeEnabled();
+    await expect(
+      sourcePanel.getByRole("button", { name: "Dùng hình này" }),
+    ).toBeEnabled();
     await expect(sourcePanel.getByRole("button", { name: "Hủy" })).toBeVisible();
     await sourcePanel.getByRole("button", { name: "Hủy" }).click();
     await expect(sourcePanel).toBeHidden();
 
+    const sourceCropBlockImageButton = page
+      .locator("#block-0-0")
+      .getByRole("button", { name: "Thao tác với hình của khối" });
+    await sourceCropBlockImageButton.click();
+    await page
+      .getByLabel("Chọn hình cần thao tác")
+      .selectOption("figure-textbook-current");
+    await page.getByRole("menuitem", { name: "Xem ảnh sách giáo khoa" }).click();
+    await expect(sourcePanel).toBeVisible();
+    await sourcePanel.getByRole("button", { name: "Hủy" }).click();
+
     await pageFallbackCard
-      .getByRole("button", { name: "Xem hình trong sách giáo khoa" })
+      .getByRole("button", { name: "Xem ảnh sách giáo khoa" })
       .click();
     const fallbackPanel = pageFallbackCard.getByRole("region", {
       name: "Hình gốc trong sách giáo khoa",
     });
     await expect(fallbackPanel.getByRole("img", { name: "Trang 23" })).toBeVisible();
     await expect(
-      fallbackPanel.getByRole("checkbox", { name: "Làm nét ảnh" }),
+      fallbackPanel.getByRole("checkbox", { name: "Tự động làm nét ảnh" }),
     ).toHaveCount(0);
-    await expect(fallbackPanel.getByRole("button", { name: "Áp dụng" })).toBeDisabled();
+    await expect(
+      fallbackPanel.getByRole("button", { name: "Dùng hình này" }),
+    ).toBeDisabled();
     await fallbackPanel.getByRole("button", { name: "Hủy" }).click();
 
     await assertSingleReferenceChoice(page, "figure-textbook-current", "Tạo mới lại");
@@ -1271,7 +1310,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     await blockImageButton.click();
     await expect(page.getByRole("menuitem", { name: "Tạo mới bằng AI" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Tải ảnh lên" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Xem hình gốc" })).toHaveCount(0);
+    await expect(
+      page.getByRole("menuitem", { name: "Xem ảnh sách giáo khoa" }),
+    ).toHaveCount(0);
     await page.getByRole("menuitem", { name: "Tạo mới bằng AI" }).click();
     const emptyReferenceDialog = page.getByRole("dialog", {
       name: "Tạo mới hình bằng AI",
@@ -1322,16 +1363,16 @@ test.describe("M9.8 admin AI generation panel", () => {
     await page.getByRole("tab", { name: "Kiến thức" }).click();
 
     const card = page.locator('[data-admin-stem-figure="figure-source-crop-enhance"]');
-    await card.getByRole("button", { name: "Xem hình trong sách giáo khoa" }).click();
+    await card.getByRole("button", { name: "Xem ảnh sách giáo khoa" }).click();
     const sourcePanel = card.getByRole("region", {
       name: "Hình gốc trong sách giáo khoa",
     });
     const enhanceCheckbox = sourcePanel.getByRole("checkbox", {
-      name: "Làm nét ảnh",
+      name: "Tự động làm nét ảnh",
     });
     await expect(enhanceCheckbox).not.toBeChecked();
 
-    await sourcePanel.getByRole("button", { name: "Áp dụng" }).click();
+    await sourcePanel.getByRole("button", { name: "Dùng hình này" }).click();
     await expect(
       sourcePanel.getByRole("button", { name: "Đang áp dụng..." }),
     ).toBeDisabled();
@@ -1345,11 +1386,11 @@ test.describe("M9.8 admin AI generation panel", () => {
       page.getByText("Đã dùng crop sách giáo khoa làm hình chính thức."),
     ).toBeVisible();
 
-    await card.getByRole("button", { name: "Xem hình trong sách giáo khoa" }).click();
+    await card.getByRole("button", { name: "Xem ảnh sách giáo khoa" }).click();
     await expect(sourcePanel).toBeVisible();
     await expect(enhanceCheckbox).not.toBeChecked();
     await enhanceCheckbox.check();
-    await sourcePanel.getByRole("button", { name: "Áp dụng" }).click();
+    await sourcePanel.getByRole("button", { name: "Dùng hình này" }).click();
     await expect(
       sourcePanel.getByRole("button", { name: "Đang làm nét..." }),
     ).toBeDisabled();
@@ -1398,7 +1439,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     const textbookCard = page.locator('[data-admin-stem-figure="figure-raster-cleanup"]');
     const uploadedCard = page.locator('[data-admin-stem-figure="figure-raster-upload"]');
     await expect(textbookCard.getByLabel("Nguồn gốc ảnh: Notebook")).toBeVisible();
-    await expect(uploadedCard.getByLabel("Nguồn gốc ảnh: AI")).toBeVisible();
+    await expect(uploadedCard.getByLabel("Nguồn gốc ảnh: Upload")).toBeVisible();
     await expect(uploadedCard.getByRole("button", { name: "Chỉnh sửa ảnh" })).toHaveCount(
       0,
     );

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Bot, Code2, Image as ImageIcon, ImageUp, Loader2 } from "lucide-react";
+import { BookOpen, Bot, Code2, Image as ImageIcon, ImageUp, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -34,10 +34,12 @@ export function AdminBlockImageActions({
   blockPath,
   figures,
   lessonId,
+  onViewTextbookSource,
 }: {
   blockPath: string;
   figures: AdminStemFigure[];
   lessonId: string;
+  onViewTextbookSource: (figure: AdminStemFigure) => void;
 }) {
   const ensureMutation = useEnsureAdminStemFigureForBlock(lessonId);
   const createMutation = useCreateNewAdminStemFigure(lessonId);
@@ -64,6 +66,9 @@ export function AdminBlockImageActions({
 
   const selected = figures.find((figure) => figure.id === selectedId) ?? null;
   const needsSelection = figures.length > 1 && !selected;
+  const hasTextbookSource = figures.some(
+    (figure) => figure.sourceReferenceImages.length > 0,
+  );
   const busy =
     ensureMutation.isPending || createMutation.isPending || replaceMutation.isPending;
 
@@ -172,6 +177,20 @@ export function AdminBlockImageActions({
                 inputRef.current?.click();
               }}
             />
+            {hasTextbookSource ? (
+              <BlockMenuItem
+                disabled={
+                  busy || needsSelection || !selected?.sourceReferenceImages.length
+                }
+                icon={BookOpen}
+                label="Xem ảnh sách giáo khoa"
+                onClick={() => {
+                  if (!selected) return;
+                  setIsOpen(false);
+                  onViewTextbookSource(selected);
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -753,7 +753,9 @@ encode WebP lossless trước khi promote. Nếu một crop không thể xử l�
 cap/validation thì figure đó giữ `NEEDS_REVIEW`; không fallback âm thầm sang crop
 chưa làm nét.
 
-Action hậu kiểm thủ công có checkbox `Làm nét ảnh` và gửi cờ
+Action hậu kiểm thủ công mở từ `Xem ảnh sách giáo khoa` trong menu block hoặc
+icon mở nhanh ở figure, dùng chung khung ảnh nguồn ngay trong block. Khung có
+checkbox `Tự động làm nét ảnh`, CTA `Dùng hình này` và gửi cờ
 `enhance` riêng, không dùng cờ cấp lượt sinh. Mặc định `false` promote
 `OCR_CROP` qua luồng chuẩn hóa raster hiện có. Khi `true`, backend chạy cùng
 preset `TEXTBOOK_RASTER_CLEANUP_V2` và encode WebP lossless trước khi promote.
