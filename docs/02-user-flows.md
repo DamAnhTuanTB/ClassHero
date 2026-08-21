@@ -373,7 +373,10 @@ code`, `Tải ảnh lên`, `Xem ảnh sách giáo khoa`; action cuối chỉ hi�
     figure mang reference SGK. Nếu block có nhiều figure thì admin phải
     chọn đúng figure trước khi thao tác. Mọi figure có các action tương ứng cùng
     `Xóa`; chỉ figure có source `AI_TEX` mới bật `Chỉnh sửa bằng mã code`, còn ảnh
-    upload/ảnh sách dạng raster phải disable action sửa mã.
+    upload/ảnh sách dạng raster phải disable action sửa mã. Mỗi figure có asset
+    hiện hành đều có icon `Đổi caption`; modal chấp nhận cả caption có nội dung và
+    caption rỗng. Lưu caption chỉ cập nhật metadata trên revision hiện hành và
+    Summary reference, không biên dịch, upload lại ảnh hoặc gọi AI.
     Modal tạo hình AI có nút `Xem dữ liệu`, hiển thị cùng cây JSON của modal Tạo
     kiến thức và phản ánh request OpenAI đầy đủ theo lựa chọn/field hiện tại. Nếu
     admin nhập `Yêu cầu cho hình mới`, request phải phản ánh đúng cách làm đã

@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpen, Bot, ImageUp, Trash2, WandSparkles } from "lucide-react";
+import { BookOpen, Bot, Captions, ImageUp, Trash2, WandSparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import { AdminStemFigureActionsMenu } from "@/features/admin/ai-generation/components/admin-stem-figure-actions-menu";
 import {
   useAdminStemFigureSourceCrop,
@@ -49,6 +50,13 @@ const StemFigureRasterEditorDialog = dynamic(
     ),
   { ssr: false },
 );
+const StemFigureCaptionDialog = dynamic(
+  () =>
+    import("@/features/admin/ai-generation/components/admin-stem-figure-caption-dialog").then(
+      (module) => module.AdminStemFigureCaptionDialog,
+    ),
+  { ssr: false },
+);
 
 export function AdminStemFigureActionFrame({
   children,
@@ -81,6 +89,7 @@ export function AdminStemFigureActionFrame({
   const [showCreateAi, setShowCreateAi] = useState(false);
   const [internalSourceCropOpen, setInternalSourceCropOpen] = useState(false);
   const [showRasterEditor, setShowRasterEditor] = useState(false);
+  const [showCaptionDialog, setShowCaptionDialog] = useState(false);
   const hasTextbookImage = figure.sourceReferenceImages.length > 0;
   const isNotebookOrigin = figure.currentAssetKind === "TEXTBOOK_SOURCE";
   const isUploadOrigin = figure.currentAssetKind === "ADMIN_UPLOAD";
@@ -175,8 +184,20 @@ export function AdminStemFigureActionFrame({
         ) : null}
         <div className="absolute right-14 top-3 z-30 flex items-center gap-2 sm:right-16 sm:top-4">
           {contextActions}
+          {figure.hasCurrentAsset && figure.currentRevisionId ? (
+            <ImmediateTooltip content="Sửa chú thích hiển thị dưới hình">
+              <button
+                aria-label="Đổi caption"
+                className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
+                onClick={() => setShowCaptionDialog(true)}
+                type="button"
+              >
+                <Captions className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </ImmediateTooltip>
+          ) : null}
           {canEditRaster ? (
-            <span className="group relative">
+            <ImmediateTooltip content="Chỉnh sửa trực tiếp ảnh sách giáo khoa">
               <button
                 aria-label="Chỉnh sửa ảnh"
                 className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
@@ -185,33 +206,40 @@ export function AdminStemFigureActionFrame({
               >
                 <WandSparkles className="h-4 w-4" aria-hidden="true" />
               </button>
-              <span className="pointer-events-none absolute right-0 top-11 z-40 whitespace-nowrap rounded-md bg-slate-950 px-2 py-1 text-xs font-bold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                Chỉnh sửa ảnh
-              </span>
-            </span>
+            </ImmediateTooltip>
           ) : null}
           {hasTextbookImage ? (
-            <button
-              aria-label="Xem ảnh sách giáo khoa"
-              aria-pressed={showSourceCrop}
-              className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
-              onClick={() => setShowSourceCrop(!showSourceCrop)}
-              title="Xem ảnh sách giáo khoa"
-              type="button"
+            <ImmediateTooltip
+              content={
+                showSourceCrop
+                  ? "Đóng phần ảnh sách giáo khoa"
+                  : "Xem ảnh sách giáo khoa dùng làm nguồn"
+              }
             >
-              <BookOpen className="h-4 w-4" aria-hidden="true" />
-            </button>
+              <button
+                aria-label="Xem ảnh sách giáo khoa"
+                aria-pressed={showSourceCrop}
+                className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
+                onClick={() => setShowSourceCrop(!showSourceCrop)}
+                type="button"
+              >
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </ImmediateTooltip>
           ) : null}
-          <button
-            aria-label="Xóa hình"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
-            disabled={deleteMutation.isPending}
-            onClick={() => setIsDeleting(true)}
-            title="Xóa hình"
-            type="button"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <ImmediateTooltip content="Xóa hình khỏi bản kiến thức">
+            <span className="inline-flex">
+              <button
+                aria-label="Xóa hình"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
+                disabled={deleteMutation.isPending}
+                onClick={() => setIsDeleting(true)}
+                type="button"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </span>
+          </ImmediateTooltip>
         </div>
         <AdminStemFigureActionsMenu
           canEditCode={figure.sourceKind === "AI_TEX"}
@@ -297,6 +325,14 @@ export function AdminStemFigureActionFrame({
           isOpen
           lessonId={lessonId}
           onClose={() => setShowRasterEditor(false)}
+        />
+      ) : null}
+      {showCaptionDialog ? (
+        <StemFigureCaptionDialog
+          figure={figure}
+          isOpen
+          lessonId={lessonId}
+          onClose={() => setShowCaptionDialog(false)}
         />
       ) : null}
       <DeleteConfirmDialog

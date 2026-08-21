@@ -757,6 +757,9 @@ mã code`, `Tải ảnh lên` và `Xem ảnh sách giáo khoa` khi figure đích
 - Mọi figure có `Xóa`, `Thay bằng ảnh mới`, `Tạo mới bằng AI`, `Tạo mới bằng mã
 code` và `Chỉnh sửa bằng mã code`. Action chỉnh sửa mã chỉ bật khi asset
   hiện hành có source `AI_TEX`; raster upload/SGK hiển thị disabled kèm lý do.
+  Figure có asset hiện hành còn hiển thị icon `Đổi caption` ngay trên toolbar;
+  icon mở modal có textarea tùy chọn và hai action `Hủy`/`Lưu caption`. Caption
+  rỗng vẫn được phép lưu và được gỡ khỏi phần hiển thị dưới ảnh.
   `Tạo mới bằng AI` chỉ mở modal và chưa gọi provider; mục `1. Cách tạo hình` cho
   admin chọn `Tạo mới lại` hoặc `Sửa ảnh hiện tại`, nhập yêu cầu rồi bấm `Tạo mới`
   mới enqueue. Cách tạo mới gửi ảnh sách như Stage 2; cách sửa gửi ảnh sách cùng

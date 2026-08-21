@@ -873,7 +873,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(reopenedEditor).toHaveCount(0);
   });
 
-  test("applies metadata-only edits without compiling the current figure", async ({
+  test("changes or clears a figure caption without compiling the current figure", async ({
     page,
   }) => {
     const figure = stemFigureFixture({
@@ -891,11 +891,11 @@ test.describe("M9.8 admin AI generation panel", () => {
     await page.getByRole("tab", { name: "Kiến thức" }).click();
 
     const card = page.locator(`[data-admin-stem-figure="${String(figure.id)}"]`);
-    await card.getByRole("button", { name: "Mở menu thao tác hình" }).click();
-    await page.getByRole("menuitem", { name: "Chỉnh sửa bằng mã code" }).click();
-    const editor = page.getByRole("dialog", { name: "Chỉnh sửa hình" });
-    await editor.getByLabel("Chú thích").fill("Chú thích chỉ sửa metadata");
-    await editor.getByRole("button", { name: "Áp dụng" }).click();
+    await card.getByRole("button", { name: "Đổi caption" }).click();
+    const editor = page.getByRole("dialog", { name: "Đổi caption" });
+    await expect(editor.getByLabel("Caption")).toHaveValue("Tam giác ABC");
+    await editor.getByLabel("Caption").fill("");
+    await editor.getByRole("button", { name: "Lưu caption" }).click();
 
     await expect.poll(() => mock.figureActions.applies).toBe(1);
     expect(mock.figureActions.compilePayloads).toHaveLength(0);
@@ -903,8 +903,9 @@ test.describe("M9.8 admin AI generation panel", () => {
       revisionId: figure.currentRevisionId,
       sourceVersion: figure.sourceVersion,
       altText: "Hình tam giác ABC",
-      caption: "Chú thích chỉ sửa metadata",
+      caption: null,
     });
+    await expect(editor).toHaveCount(0);
   });
 
   test("compiles a changed source before applying when admin skips preview", async ({
@@ -1182,6 +1183,12 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeVisible();
     await expect(textbookCard.getByLabel("Nguồn gốc ảnh: Notebook")).toBeVisible();
     await expect(uploadCard.getByLabel("Nguồn gốc ảnh: Upload")).toBeVisible();
+    await expect(textbookCard.getByRole("button", { name: "Đổi caption" })).toBeVisible();
+    await expect(uploadCard.getByRole("button", { name: "Đổi caption" })).toBeVisible();
+    await expect(revivedCard.getByRole("button", { name: "Đổi caption" })).toHaveCount(0);
+    await expect(
+      pageFallbackCard.getByRole("button", { name: "Đổi caption" }),
+    ).toHaveCount(0);
     await expect(revivedCard.getByText("Notebook", { exact: true })).toHaveCount(0);
     await expect(revivedCard.getByText("AI", { exact: true })).toHaveCount(0);
     await expect(

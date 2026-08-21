@@ -1005,7 +1005,9 @@ ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
   Nếu `revisionId` là revision hiện hành, endpoint chỉ cập nhật metadata và
   Summary reference mà không biên dịch hoặc upload lại ảnh. Nếu là revision
   `DRAFT_READY`, endpoint promote atomically revision còn khớp current revision
-  và áp dụng metadata mới nhất do admin nhập.
+  và áp dụng metadata mới nhất do admin nhập. Client được gửi `caption=null` hoặc
+  chuỗi rỗng; backend chuẩn hóa cả hai thành `null`, nên thao tác xóa caption là
+  hợp lệ và vẫn giữ nguyên asset/source hiện hành.
 - `POST /admin/lessons/:lessonId/stem-figures/:figureId/retry`: force enqueue
   lại từ diagnostic batch mới nhất, trả `202`.
 - `POST /admin/lessons/:lessonId/stem-figures/:figureId/create-new-ai/preview`:

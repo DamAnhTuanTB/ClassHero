@@ -103,6 +103,9 @@ Admin có quyền:
 - Quản lý từng hình STEM trong tóm tắt: xem lỗi, xóa, tải ảnh thay thế, sinh lại
   bằng AI, xem SVG preview và tự sửa LaTeX figure snippet khi cần. Không có
   editor click-to-source/SyncTeX trên PDF hoặc preview trong phạm vi hiện tại.
+- Mỗi hình có asset hiện hành hiển thị action `Đổi caption`. Modal cho phép sửa
+  hoặc xóa trắng caption; caption rỗng được lưu hợp lệ thành `null` mà không thay
+  ảnh, biên dịch lại hoặc gọi AI.
 - Menu ảnh của block có lựa chọn `Xem ảnh sách giáo khoa` khi figure đích có
   reference SGK; lựa chọn này mở cùng khung ảnh nguồn ngay trong block như icon
   mở nhanh ở figure. Trong khung, checkbox `Tự động làm nét ảnh` mặc định tắt.

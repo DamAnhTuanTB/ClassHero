@@ -45,6 +45,7 @@ import {
   LessonSummaryTableOfContents,
 } from "@/components/common/content/lesson-summary-table-of-contents";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 
 // Define a type for any generic block (loose typing since it comes from JSON)
 type BlockData = any;
@@ -519,28 +520,34 @@ export function SummaryBlockRenderer({
             </div>
 
             {!isReadOnly && viewMode === "UI_ONLY" && (
-              <button
-                type="button"
-                onClick={() => toggleEdit("objectives")}
-                className="absolute top-2 right-2 p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors opacity-0 group-hover/obj:opacity-100 z-10"
-                title="Chỉnh sửa Mục tiêu"
-              >
-                <PenTool className="w-4 h-4" />
-              </button>
+              <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover/obj:opacity-100 focus-within:opacity-100">
+                <ImmediateTooltip content="Chỉnh sửa mục tiêu học tập">
+                  <button
+                    aria-label="Chỉnh sửa mục tiêu học tập"
+                    type="button"
+                    onClick={() => toggleEdit("objectives")}
+                    className="rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                  >
+                    <PenTool className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </ImmediateTooltip>
+              </div>
             )}
 
             {!isReadOnly && isObjectivesEditing && (
               <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto max-h-[300px]">
                 {viewMode === "UI_ONLY" && (
                   <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
-                    <button
-                      type="button"
-                      onClick={() => toggleEdit("objectives")}
-                      title="Đóng chế độ chỉnh sửa"
-                      className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <ImmediateTooltip content="Đóng phần chỉnh sửa mục tiêu">
+                      <button
+                        aria-label="Đóng phần chỉnh sửa mục tiêu"
+                        type="button"
+                        onClick={() => toggleEdit("objectives")}
+                        className="flex items-center gap-1 p-1.5 text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </ImmediateTooltip>
                   </div>
                 )}
                 <ReactJson
@@ -591,105 +598,132 @@ export function SummaryBlockRenderer({
         const renderSectionActions = () => (
           <>
             {viewMode === "UI_ONLY" && (
-              <button
-                type="button"
-                onClick={() => toggleEdit(`section-${idx}`)}
-                className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
-                title="Chỉnh sửa Đề mục"
-              >
-                <PenTool className="w-4 h-4" />
-              </button>
+              <ImmediateTooltip content="Chỉnh sửa tên đề mục">
+                <button
+                  aria-label="Chỉnh sửa tên đề mục"
+                  type="button"
+                  onClick={() => toggleEdit(`section-${idx}`)}
+                  className="rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                >
+                  <PenTool className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </ImmediateTooltip>
             )}
-            <button
-              type="button"
-              aria-label="Gộp nội dung vào đề mục trước"
-              disabled={idx === 0}
-              onClick={mergeSectionIntoPrevious}
-              className="flex items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-blue-400"
-              title={
+            <ImmediateTooltip
+              content={
                 idx === 0
-                  ? "Không thể gộp vì đây là đề mục đầu tiên"
-                  : "Gộp nội dung vào đề mục trước"
+                  ? "Đề mục đầu tiên không thể gộp lên trên"
+                  : "Gộp đề mục này vào đề mục phía trên"
               }
             >
-              <Combine className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <div
-              title="Kéo thả để sắp xếp đề mục"
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = "move";
-                setDraggedSection(idx);
-              }}
-              onDragEnd={() => setDraggedSection(null)}
-              className="p-1.5 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm flex items-center justify-center"
+              <span className="inline-flex">
+                <button
+                  type="button"
+                  aria-label="Gộp nội dung vào đề mục trước"
+                  disabled={idx === 0}
+                  onClick={mergeSectionIntoPrevious}
+                  className="flex items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-blue-400"
+                >
+                  <Combine className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </span>
+            </ImmediateTooltip>
+            <ImmediateTooltip content="Kéo để sắp xếp vị trí đề mục">
+              <div
+                aria-label="Kéo để sắp xếp vị trí đề mục"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  setDraggedSection(idx);
+                }}
+                onDragEnd={() => setDraggedSection(null)}
+                className="flex cursor-grab items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm transition-colors hover:text-slate-700 active:cursor-grabbing dark:border-slate-700 dark:bg-slate-800"
+              >
+                <GripVertical className="h-4 w-4" aria-hidden="true" />
+              </div>
+            </ImmediateTooltip>
+            <ImmediateTooltip
+              content={idx === 0 ? "Đề mục đã ở vị trí đầu tiên" : "Đưa đề mục lên trước"}
             >
-              <GripVertical className="w-4 h-4" />
-            </div>
-            <button
-              type="button"
-              disabled={idx === 0}
-              onClick={() => {
-                const newData = { ...data };
-                if (newData.sections) {
-                  const temp = newData.sections[idx];
-                  newData.sections[idx] = newData.sections[idx - 1]!;
-                  newData.sections[idx - 1] = temp!;
-                  newData.sections.forEach((s, i) => {
-                    s.order = i + 1;
-                  });
-                  onPhaseOneLayoutOperation?.({
-                    type: "MOVE_SECTION",
-                    sectionIndex: idx,
-                    targetSectionIndex: idx - 1,
-                  });
-                  onChange?.(newData);
-                }
-              }}
-              className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors disabled:opacity-30 disabled:hover:text-slate-500 flex items-center justify-center"
-              title="Di chuyển lên"
-            >
-              <ArrowUp className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              disabled={idx === (data.sections?.length || 0) - 1}
-              onClick={() => {
-                const newData = { ...data };
-                if (newData.sections) {
-                  const temp = newData.sections[idx];
-                  newData.sections[idx] = newData.sections[idx + 1]!;
-                  newData.sections[idx + 1] = temp!;
-                  newData.sections.forEach((s, i) => {
-                    s.order = i + 1;
-                  });
-                  onPhaseOneLayoutOperation?.({
-                    type: "MOVE_SECTION",
-                    sectionIndex: idx,
-                    targetSectionIndex: idx + 1,
-                  });
-                  onChange?.(newData);
-                }
-              }}
-              className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors disabled:opacity-30 disabled:hover:text-slate-500 flex items-center justify-center"
-              title="Di chuyển xuống"
-            >
-              <ArrowDown className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setPendingDeleteTarget({
-                  kind: "SECTION",
-                  itemName: section.displayHeading || `Đề mục ${idx + 1}`,
-                  sectionIndex: idx,
-                })
+              <span className="inline-flex">
+                <button
+                  aria-label="Đưa đề mục lên trước"
+                  type="button"
+                  disabled={idx === 0}
+                  onClick={() => {
+                    const newData = { ...data };
+                    if (newData.sections) {
+                      const temp = newData.sections[idx];
+                      newData.sections[idx] = newData.sections[idx - 1]!;
+                      newData.sections[idx - 1] = temp!;
+                      newData.sections.forEach((s, i) => {
+                        s.order = i + 1;
+                      });
+                      onPhaseOneLayoutOperation?.({
+                        type: "MOVE_SECTION",
+                        sectionIndex: idx,
+                        targetSectionIndex: idx - 1,
+                      });
+                      onChange?.(newData);
+                    }
+                  }}
+                  className="flex items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                >
+                  <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </span>
+            </ImmediateTooltip>
+            <ImmediateTooltip
+              content={
+                idx === (data.sections?.length || 0) - 1
+                  ? "Đề mục đã ở vị trí cuối cùng"
+                  : "Đưa đề mục xuống sau"
               }
-              className="p-1.5 bg-white border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded shadow-sm text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors flex items-center justify-center"
-              title="Xóa toàn bộ đề mục"
             >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <span className="inline-flex">
+                <button
+                  aria-label="Đưa đề mục xuống sau"
+                  type="button"
+                  disabled={idx === (data.sections?.length || 0) - 1}
+                  onClick={() => {
+                    const newData = { ...data };
+                    if (newData.sections) {
+                      const temp = newData.sections[idx];
+                      newData.sections[idx] = newData.sections[idx + 1]!;
+                      newData.sections[idx + 1] = temp!;
+                      newData.sections.forEach((s, i) => {
+                        s.order = i + 1;
+                      });
+                      onPhaseOneLayoutOperation?.({
+                        type: "MOVE_SECTION",
+                        sectionIndex: idx,
+                        targetSectionIndex: idx + 1,
+                      });
+                      onChange?.(newData);
+                    }
+                  }}
+                  className="flex items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                >
+                  <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </span>
+            </ImmediateTooltip>
+            <ImmediateTooltip content="Xóa đề mục và toàn bộ khối bên trong">
+              <button
+                aria-label="Xóa đề mục và toàn bộ khối bên trong"
+                type="button"
+                onClick={() =>
+                  setPendingDeleteTarget({
+                    kind: "SECTION",
+                    itemName: section.displayHeading || `Đề mục ${idx + 1}`,
+                    sectionIndex: idx,
+                  })
+                }
+                className="flex items-center justify-center rounded border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition-colors hover:text-red-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </ImmediateTooltip>
             <div className="relative">
               <button
                 type="button"
@@ -863,14 +897,16 @@ export function SummaryBlockRenderer({
                       <div className="relative border rounded-lg p-3 bg-slate-50 dark:bg-slate-900 overflow-auto w-full mb-4 [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[100px] [&_textarea]:!mt-2 [&_textarea]:!p-2 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
                         <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
                           {viewMode === "UI_ONLY" && (
-                            <button
-                              type="button"
-                              onClick={() => toggleEdit(`section-${idx}`)}
-                              title="Đóng chế độ chỉnh sửa"
-                              className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                            <ImmediateTooltip content="Đóng phần chỉnh sửa đề mục">
+                              <button
+                                aria-label="Đóng phần chỉnh sửa đề mục"
+                                type="button"
+                                onClick={() => toggleEdit(`section-${idx}`)}
+                                className="flex items-center gap-1 p-1.5 text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                              >
+                                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                              </button>
+                            </ImmediateTooltip>
                           )}
                         </div>
                         <ReactJson
@@ -1162,124 +1198,62 @@ export function SummaryBlockRenderer({
                               block: blockToRender,
                             })}
                             {viewMode === "UI_ONLY" && (
-                              <button
-                                type="button"
-                                onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
-                                title="Chỉnh sửa Khối"
-                                className="p-1.5 rounded text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors mr-1"
-                              >
-                                <PenTool className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={handleMoveUp}
-                              title="Di chuyển lên"
-                              disabled={bIdx === 0 && idx === 0}
-                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
-                            >
-                              <ArrowUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleMoveDown}
-                              title="Di chuyển xuống"
-                              disabled={
-                                bIdx === (section.blocks?.length || 0) - 1 &&
-                                idx === (data.sections?.length || 0) - 1
-                              }
-                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
-                            >
-                              <ArrowDown className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newData = { ...data };
-                                if (newData.sections?.[idx]?.blocks) {
-                                  const blocks = [...newData.sections[idx].blocks];
-                                  const copiedBlock = JSON.parse(
-                                    JSON.stringify(blocks[bIdx]),
-                                  );
-                                  blocks.splice(bIdx + 1, 0, copiedBlock);
-                                  newData.sections[idx].blocks = blocks;
-                                  onChange(newData);
-                                }
-                              }}
-                              title="Nhân bản khối này"
-                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPendingDeleteTarget({
-                                  kind: "BLOCK",
-                                  blockIndex: bIdx,
-                                  itemName:
-                                    BLOCK_CONFIG[blockToRender.type]?.label ??
-                                    "Khối nội dung",
-                                  sectionIndex: idx,
-                                })
-                              }
-                              title="Xóa khối này"
-                              className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
-                            <div
-                              title="Kéo thả để sắp xếp"
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = "move";
-                                setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
-                              }}
-                              onDragEnd={() => setDraggedItem(null)}
-                              className="p-1.5 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 transition-colors"
-                            >
-                              <GripVertical className="w-3.5 h-3.5" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Toolbar for SPLIT mode (Inside the JSON Editor) */}
-                        {isBlockEditing && (
-                          <div className="w-full h-full relative border rounded-lg bg-slate-50 dark:bg-slate-900 p-3 overflow-auto max-h-[500px] [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[200px] [&_textarea]:!mt-2 [&_textarea]:!p-3 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
-                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
-                              {viewMode === "UI_ONLY" && (
+                              <ImmediateTooltip content="Chỉnh sửa nội dung khối">
                                 <button
+                                  aria-label="Chỉnh sửa nội dung khối"
                                   type="button"
                                   onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
-                                  title="Đóng chế độ chỉnh sửa"
-                                  className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors flex items-center gap-1"
+                                  className="mr-1 rounded p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <PenTool className="h-3.5 w-3.5" aria-hidden="true" />
                                 </button>
-                              )}
+                              </ImmediateTooltip>
+                            )}
+                            <ImmediateTooltip
+                              content={
+                                bIdx === 0 && idx === 0
+                                  ? "Khối đã ở vị trí đầu tiên"
+                                  : "Đưa khối lên trước"
+                              }
+                            >
+                              <span className="inline-flex">
+                                <button
+                                  aria-label="Đưa khối lên trước"
+                                  type="button"
+                                  onClick={handleMoveUp}
+                                  disabled={bIdx === 0 && idx === 0}
+                                  className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </span>
+                            </ImmediateTooltip>
+                            <ImmediateTooltip
+                              content={
+                                bIdx === (section.blocks?.length || 0) - 1 &&
+                                idx === (data.sections?.length || 0) - 1
+                                  ? "Khối đã ở vị trí cuối cùng"
+                                  : "Đưa khối xuống sau"
+                              }
+                            >
+                              <span className="inline-flex">
+                                <button
+                                  aria-label="Đưa khối xuống sau"
+                                  type="button"
+                                  onClick={handleMoveDown}
+                                  disabled={
+                                    bIdx === (section.blocks?.length || 0) - 1 &&
+                                    idx === (data.sections?.length || 0) - 1
+                                  }
+                                  className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </span>
+                            </ImmediateTooltip>
+                            <ImmediateTooltip content="Tạo một bản sao của khối">
                               <button
-                                type="button"
-                                onClick={handleMoveUp}
-                                title="Di chuyển lên"
-                                disabled={bIdx === 0 && idx === 0}
-                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleMoveDown}
-                                title="Di chuyển xuống"
-                                disabled={
-                                  bIdx === (section.blocks?.length || 0) - 1 &&
-                                  idx === (data.sections?.length || 0) - 1
-                                }
-                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors"
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </button>
-                              <button
+                                aria-label="Tạo bản sao của khối"
                                 type="button"
                                 onClick={() => {
                                   const newData = { ...data };
@@ -1293,12 +1267,14 @@ export function SummaryBlockRenderer({
                                     onChange(newData);
                                   }
                                 }}
-                                title="Nhân bản khối này"
-                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 transition-colors"
+                                className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
                               >
-                                <Copy className="w-3.5 h-3.5" />
+                                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                               </button>
+                            </ImmediateTooltip>
+                            <ImmediateTooltip content="Xóa khối nội dung này">
                               <button
+                                aria-label="Xóa khối nội dung"
                                 type="button"
                                 onClick={() =>
                                   setPendingDeleteTarget({
@@ -1310,24 +1286,151 @@ export function SummaryBlockRenderer({
                                     sectionIndex: idx,
                                   })
                                 }
-                                title="Xóa khối này"
-                                className="p-1.5 text-slate-500 hover:text-red-600 dark:text-slate-400 transition-colors"
+                                className="p-1.5 text-slate-500 transition-colors hover:text-red-600 dark:text-slate-400"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                               </button>
-                              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                            </ImmediateTooltip>
+                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                            <ImmediateTooltip content="Kéo để sắp xếp vị trí khối">
                               <div
-                                title="Kéo thả để sắp xếp"
+                                aria-label="Kéo để sắp xếp vị trí khối"
                                 draggable
                                 onDragStart={(e) => {
                                   e.dataTransfer.effectAllowed = "move";
                                   setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
                                 }}
                                 onDragEnd={() => setDraggedItem(null)}
-                                className="p-1.5 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 transition-colors"
+                                className="cursor-grab p-1.5 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
                               >
-                                <GripVertical className="w-3.5 h-3.5" />
+                                <GripVertical
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
                               </div>
+                            </ImmediateTooltip>
+                          </div>
+                        )}
+
+                        {/* Toolbar for SPLIT mode (Inside the JSON Editor) */}
+                        {isBlockEditing && (
+                          <div className="w-full h-full relative border rounded-lg bg-slate-50 dark:bg-slate-900 p-3 overflow-auto max-h-[500px] [&_*:has(textarea)]:!flex-wrap [&_*:has(>textarea)]:!basis-full [&_*:has(>textarea)]:!block [&_*:has(>textarea)]:!w-full [&_textarea]:!w-full [&_textarea]:!min-h-[200px] [&_textarea]:!mt-2 [&_textarea]:!p-3 [&_textarea]:!box-border [&_textarea]:!leading-relaxed">
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 z-10">
+                              {viewMode === "UI_ONLY" && (
+                                <ImmediateTooltip content="Đóng phần chỉnh sửa khối">
+                                  <button
+                                    aria-label="Đóng phần chỉnh sửa khối"
+                                    type="button"
+                                    onClick={() => toggleEdit(`block-${idx}-${bIdx}`)}
+                                    className="flex items-center gap-1 p-1.5 text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                                  >
+                                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                  </button>
+                                </ImmediateTooltip>
+                              )}
+                              <ImmediateTooltip
+                                content={
+                                  bIdx === 0 && idx === 0
+                                    ? "Khối đã ở vị trí đầu tiên"
+                                    : "Đưa khối lên trước"
+                                }
+                              >
+                                <span className="inline-flex">
+                                  <button
+                                    aria-label="Đưa khối lên trước"
+                                    type="button"
+                                    onClick={handleMoveUp}
+                                    disabled={bIdx === 0 && idx === 0}
+                                    className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
+                                  >
+                                    <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                                  </button>
+                                </span>
+                              </ImmediateTooltip>
+                              <ImmediateTooltip
+                                content={
+                                  bIdx === (section.blocks?.length || 0) - 1 &&
+                                  idx === (data.sections?.length || 0) - 1
+                                    ? "Khối đã ở vị trí cuối cùng"
+                                    : "Đưa khối xuống sau"
+                                }
+                              >
+                                <span className="inline-flex">
+                                  <button
+                                    aria-label="Đưa khối xuống sau"
+                                    type="button"
+                                    onClick={handleMoveDown}
+                                    disabled={
+                                      bIdx === (section.blocks?.length || 0) - 1 &&
+                                      idx === (data.sections?.length || 0) - 1
+                                    }
+                                    className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500 dark:text-slate-400"
+                                  >
+                                    <ArrowDown
+                                      className="h-3.5 w-3.5"
+                                      aria-hidden="true"
+                                    />
+                                  </button>
+                                </span>
+                              </ImmediateTooltip>
+                              <ImmediateTooltip content="Tạo một bản sao của khối">
+                                <button
+                                  aria-label="Tạo bản sao của khối"
+                                  type="button"
+                                  onClick={() => {
+                                    const newData = { ...data };
+                                    if (newData.sections?.[idx]?.blocks) {
+                                      const blocks = [...newData.sections[idx].blocks];
+                                      const copiedBlock = JSON.parse(
+                                        JSON.stringify(blocks[bIdx]),
+                                      );
+                                      blocks.splice(bIdx + 1, 0, copiedBlock);
+                                      newData.sections[idx].blocks = blocks;
+                                      onChange(newData);
+                                    }
+                                  }}
+                                  className="p-1.5 text-slate-500 transition-colors hover:text-blue-600 dark:text-slate-400"
+                                >
+                                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </ImmediateTooltip>
+                              <ImmediateTooltip content="Xóa khối nội dung này">
+                                <button
+                                  aria-label="Xóa khối nội dung"
+                                  type="button"
+                                  onClick={() =>
+                                    setPendingDeleteTarget({
+                                      kind: "BLOCK",
+                                      blockIndex: bIdx,
+                                      itemName:
+                                        BLOCK_CONFIG[blockToRender.type]?.label ??
+                                        "Khối nội dung",
+                                      sectionIndex: idx,
+                                    })
+                                  }
+                                  className="p-1.5 text-slate-500 transition-colors hover:text-red-600 dark:text-slate-400"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </ImmediateTooltip>
+                              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                              <ImmediateTooltip content="Kéo để sắp xếp vị trí khối">
+                                <div
+                                  aria-label="Kéo để sắp xếp vị trí khối"
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.effectAllowed = "move";
+                                    setDraggedItem({ sectionIdx: idx, blockIdx: bIdx });
+                                  }}
+                                  onDragEnd={() => setDraggedItem(null)}
+                                  className="cursor-grab p-1.5 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
+                                >
+                                  <GripVertical
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                </div>
+                              </ImmediateTooltip>
                             </div>
                             {hasPhaseOneBlockJson ? (
                               <ReactJson

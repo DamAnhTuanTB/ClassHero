@@ -22,6 +22,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
+import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
 import dynamic from "next/dynamic";
@@ -218,18 +219,25 @@ export function AdminLessonSummaryTab({
     const sourcePageNumbers = readBlockSourcePageNumbers(block);
     const hasSourcePages = sourcePageNumbers.length > 0;
     return (
-      <button
-        aria-label="Xem PDF nguồn của khối"
-        className="grid h-7 w-7 place-items-center rounded text-slate-500 transition hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-400 dark:hover:bg-sky-950/50 dark:hover:text-sky-300"
-        disabled={!hasSourcePages}
-        onClick={() => setSelectedSourcePageNumbers(sourcePageNumbers)}
-        title={
-          hasSourcePages ? "Xem PDF nguồn của khối" : "Khối này không có trang nguồn PDF"
+      <ImmediateTooltip
+        content={
+          hasSourcePages
+            ? "Xem các trang PDF làm nguồn cho khối"
+            : "Khối này chưa có trang PDF nguồn"
         }
-        type="button"
       >
-        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+        <span className="inline-flex">
+          <button
+            aria-label="Xem PDF nguồn của khối"
+            className="grid h-7 w-7 place-items-center rounded text-slate-500 transition hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-400 dark:hover:bg-sky-950/50 dark:hover:text-sky-300"
+            disabled={!hasSourcePages}
+            onClick={() => setSelectedSourcePageNumbers(sourcePageNumbers)}
+            type="button"
+          >
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </span>
+      </ImmediateTooltip>
     );
   }, []);
 
