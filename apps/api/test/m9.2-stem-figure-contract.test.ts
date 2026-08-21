@@ -2934,18 +2934,34 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
   it.each([
     {
       subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
-      allowed: ["hình học", "GT–KL"],
+      allowed: ["hình học", "isGeometry", "geometryStatement", "GT–KL"],
       forbidden: ["circuitikz", "chemfig", "mhchem"],
     },
     {
       subject: { key: "PHYSICS" as const, name: "Vật lý", slug: "vat-ly" },
       allowed: ["đơn vị SI", "quang học"],
-      forbidden: ["tkz-euclide", "tkz-tab", "chemfig", "mhchem"],
+      forbidden: [
+        "tkz-euclide",
+        "tkz-tab",
+        "chemfig",
+        "mhchem",
+        "isGeometry",
+        "geometryStatement",
+        "GT–KL",
+      ],
     },
     {
       subject: { key: "CHEMISTRY" as const, name: "Hóa học", slug: "hoa-hoc" },
       allowed: ["hóa trị", "công thức cấu tạo"],
-      forbidden: ["circuitikz", "tkz-euclide", "tkz-tab", "tikz-3dplot"],
+      forbidden: [
+        "circuitikz",
+        "tkz-euclide",
+        "tkz-tab",
+        "tikz-3dplot",
+        "isGeometry",
+        "geometryStatement",
+        "GT–KL",
+      ],
     },
   ])(
     "isolates every OpenAI input to $subject.name",
@@ -3639,10 +3655,10 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     });
 
     expect(gradeNine.systemPrompt).toContain(
-      "Mọi bài Hình học lớp 7–9 bắt buộc có `geometryStatement` khác null",
+      "Với bài Hình học lớp 7–9, `isGeometry=true` và `geometryStatement` bắt buộc khác null",
     );
     expect(gradeTwelve.systemPrompt).toContain(
-      "Hình học lớp 10–12 và mọi bài không phải Hình học bắt buộc trả `geometryStatement=null`",
+      "Với Hình học lớp 10–12, vẫn đặt `isGeometry=true` nhưng `geometryStatement=null`",
     );
   });
 

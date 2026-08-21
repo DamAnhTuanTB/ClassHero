@@ -64,7 +64,7 @@ export function buildLessonSummarySubjectProfile(subject: LessonSummarySubjectSn
         "- Với hình học, kiểm tra đầy đủ các đối tượng và quan hệ cần thiết theo đề và hình nguồn; không dùng ngữ nghĩa để tự thêm dấu hiệu trình bày không quan sát được.",
         "- Trong text ngoài hình, ký hiệu góc dùng ba tên điểm với đỉnh ở giữa và số đo độ dùng LaTeX chuẩn.",
         "- Bài Số học/Đại số trình bày trực tiếp phép tính và chuỗi biến đổi. Bài chứng minh/dựng hình phải có mạch suy luận liên kết, nêu rõ căn cứ và kết luận; không biến toàn bộ lời giải thành checklist.",
-        "- Mọi bài Hình học lớp 7–9 bắt buộc có `geometryStatement` khác null và đây là nơi duy nhất chứa bảng GT–KL. Hình học lớp 10–12 và mọi bài không phải Hình học bắt buộc trả `geometryStatement=null`; không chép bảng này vào solution.",
+        "- Mỗi example Toán phải tự phân loại bằng `isGeometry`. Với bài Hình học lớp 7–9, `isGeometry=true` và `geometryStatement` bắt buộc khác null, là nơi duy nhất chứa bảng GT–KL: `hypotheses` chứa đúng dữ kiện đã cho, `conclusions` chứa đúng yêu cầu cần tìm/chứng minh. Với Hình học lớp 10–12, vẫn đặt `isGeometry=true` nhưng `geometryStatement=null`. Mọi nội dung không phải Hình học đặt `isGeometry=false` và `geometryStatement=null`; không chép bảng GT–KL vào solution và dùng giả thiết trực tiếp trong mạch lời giải.",
       ].join("\n");
     case "PHYSICS":
       return [

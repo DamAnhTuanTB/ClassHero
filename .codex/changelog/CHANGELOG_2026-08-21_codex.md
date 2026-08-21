@@ -4,3 +4,4 @@
 - 2026-08-21: Cải thiện Summary để nội dung tự đủ nghĩa, giữ dấu câu và bố cục công thức nhiều dòng, đồng thời cho công thức display dài cuộn ngang cục bộ với thanh cuộn dễ dùng và bổ sung regression tests responsive/contract tương ứng.
 - 2026-08-21: Bổ sung thao tác chuyển đổi draft giữa các khối Kiến thức, Tính chất, Định lí và Chú ý với màu menu theo type, chỉ persist qua luồng lưu Summary, giữ nguyên hình hiện tại và đồng bộ API contract, tài liệu cùng regression tests.
 - 2026-08-21: Cập nhật skill `update-feature` để các yêu cầu chỉ xem, thảo luận hoặc lên kế hoạch được trả lời trong chat và không tự sửa docs, roadmap, context hay code khi owner chưa yêu cầu lưu.
+- 2026-08-21: Tách quy tắc `isGeometry` và bảng GT–KL khỏi system prompt lõi của Summary sang riêng profile Toán, đồng thời bổ sung regression test ngăn quy tắc Toán xuất hiện trong request môn Vật lý hoặc Hóa học.
