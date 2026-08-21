@@ -3,3 +3,4 @@
 - 2026-08-21: Cập nhật skill đổi UI để yêu cầu rà đủ mọi cấp toolbar trong vùng ảnh khi owner yêu cầu sửa tất cả icon hoặc tooltip, tránh bỏ sót toolbar cha và phân biệt rõ icon-only với nút đã có nhãn chữ.
 - 2026-08-21: Cải thiện Summary để nội dung tự đủ nghĩa, giữ dấu câu và bố cục công thức nhiều dòng, đồng thời cho công thức display dài cuộn ngang cục bộ với thanh cuộn dễ dùng và bổ sung regression tests responsive/contract tương ứng.
 - 2026-08-21: Bổ sung thao tác chuyển đổi draft giữa các khối Kiến thức, Tính chất, Định lí và Chú ý với màu menu theo type, chỉ persist qua luồng lưu Summary, giữ nguyên hình hiện tại và đồng bộ API contract, tài liệu cùng regression tests.
+- 2026-08-21: Cập nhật skill `update-feature` để các yêu cầu chỉ xem, thảo luận hoặc lên kế hoạch được trả lời trong chat và không tự sửa docs, roadmap, context hay code khi owner chưa yêu cầu lưu.

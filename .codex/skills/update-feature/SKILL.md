@@ -42,6 +42,9 @@ Before editing:
 
 - Treat this as a feature behavior change, not a bug fix.
 - This skill is docs/planning-only by default.
+- If the owner only asks to inspect, discuss, or "lên kế hoạch" and does not
+  explicitly ask to save/update docs or invoke `/update-feature`, return the plan
+  in chat only. Do not edit repository docs, plans, context, roadmap, or code.
 - Do not edit production code unless the owner explicitly says to implement in the same request.
 - Do not change stack.
 - Do not add behavior outside the owner's requested change.
