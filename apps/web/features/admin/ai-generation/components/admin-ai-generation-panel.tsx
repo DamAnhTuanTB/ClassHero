@@ -29,6 +29,7 @@ import type {
   AdminAiGenerationType,
   AdminAiPanelJob,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { useAdminQuizSets } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import {
   getUserFacingErrorMessage,
   sanitizeUserFacingMessage,
@@ -39,6 +40,14 @@ const AiGenerationConfigDialog = dynamic(
   () =>
     import("@/features/admin/ai-generation/components/ai-generation-config-dialog").then(
       (module) => module.AiGenerationConfigDialog,
+    ),
+  { ssr: false },
+);
+
+const AdminQuizGenerationDialog = dynamic(
+  () =>
+    import("@/features/admin/quiz/components/admin-quiz-generation-dialog").then(
+      (module) => module.AdminQuizGenerationDialog,
     ),
   { ssr: false },
 );
@@ -84,6 +93,7 @@ export function AdminAiGenerationPanel({
   requestedGeneration: AdminAiGenerationDialogRequest | null;
 }) {
   const panelQuery = useAdminAiGenerationPanel(lessonId);
+  const quizSetsQuery = useAdminQuizSets(lessonId);
   const generateMutation = useGenerateAdminLessonContent(lessonId);
   const [dialogRequest, setDialogRequest] =
     useState<AdminAiGenerationDialogRequest | null>(null);
@@ -161,7 +171,9 @@ export function AdminAiGenerationPanel({
           const isReady =
             card.type === "SUMMARY"
               ? panel.readiness.summaryReady
-              : panel.readiness.generationReady;
+              : card.type === "QUIZ"
+                ? panel.readiness.quizReady
+                : panel.readiness.generationReady;
           return (
             <GenerationCard
               key={card.type}
@@ -190,37 +202,67 @@ export function AdminAiGenerationPanel({
       })}
 
       {dialogRequest ? (
-        <AiGenerationConfigDialog
-          key={`${dialogRequest.type}-${dialogRequest.mode}`}
-          documents={panel.documents}
-          initialGenerationConfiguration={
-            dialogRequest.mode === "EDIT"
-              ? panel.jobs[dialogRequest.type]?.inputMetaJson
-              : null
-          }
-          isOpen
-          isSubmitting={generateMutation.isPending}
-          lessonId={lessonId}
-          initialModelConfiguration={panel.summaryConfiguration}
-          quizTargetSetId={quizTargetSetId}
-          targetGrade={panel.lesson.targetGrade}
-          type={dialogRequest.type}
-          onClose={() => !generateMutation.isPending && setDialogRequest(null)}
-          onSubmit={async (payload) => {
-            try {
-              await generateMutation.mutateAsync(payload);
-              toast.success("Hệ thống đã tiếp nhận yêu cầu tạo nội dung");
-              setDialogRequest(null);
-            } catch (error) {
-              toast.error(
-                getUserFacingErrorMessage(
-                  error,
-                  "Chưa thể bắt đầu tạo nội dung. Vui lòng thử lại.",
-                ),
-              );
+        dialogRequest.type === "QUIZ" ? (
+          <AdminQuizGenerationDialog
+            key={`QUIZ-${dialogRequest.mode}`}
+            documents={panel.documents}
+            initialGenerationConfiguration={
+              dialogRequest.mode === "EDIT" ? panel.jobs.QUIZ?.inputMetaJson : null
             }
-          }}
-        />
+            initialModelConfiguration={panel.quizConfiguration}
+            isOpen
+            isSubmitting={generateMutation.isPending}
+            lessonId={lessonId}
+            quizSets={quizSetsQuery.data ?? []}
+            quizTargetSetId={quizTargetSetId}
+            onClose={() => !generateMutation.isPending && setDialogRequest(null)}
+            onSubmit={async (payload) => {
+              try {
+                await generateMutation.mutateAsync(payload);
+                toast.success("Hệ thống đã tiếp nhận yêu cầu tạo Quiz");
+                setDialogRequest(null);
+              } catch (error) {
+                toast.error(
+                  getUserFacingErrorMessage(
+                    error,
+                    "Chưa thể bắt đầu tạo Quiz. Vui lòng thử lại.",
+                  ),
+                );
+              }
+            }}
+          />
+        ) : (
+          <AiGenerationConfigDialog
+            key={`${dialogRequest.type}-${dialogRequest.mode}`}
+            documents={panel.documents}
+            initialGenerationConfiguration={
+              dialogRequest.mode === "EDIT"
+                ? panel.jobs[dialogRequest.type]?.inputMetaJson
+                : null
+            }
+            isOpen
+            isSubmitting={generateMutation.isPending}
+            lessonId={lessonId}
+            initialModelConfiguration={panel.summaryConfiguration}
+            targetGrade={panel.lesson.targetGrade}
+            type={dialogRequest.type}
+            onClose={() => !generateMutation.isPending && setDialogRequest(null)}
+            onSubmit={async (payload) => {
+              try {
+                await generateMutation.mutateAsync(payload);
+                toast.success("Hệ thống đã tiếp nhận yêu cầu tạo nội dung");
+                setDialogRequest(null);
+              } catch (error) {
+                toast.error(
+                  getUserFacingErrorMessage(
+                    error,
+                    "Chưa thể bắt đầu tạo nội dung. Vui lòng thử lại.",
+                  ),
+                );
+              }
+            }}
+          />
+        )
       ) : null}
     </section>
   );
@@ -287,7 +329,7 @@ function GenerationCard({
           ) : (
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           )}
-          {type === "SUMMARY" ? "Tạo mới" : type === "QUIZ" ? "Tạo Quiz" : "Mở để duyệt"}
+          {type === "SUMMARY" || type === "QUIZ" ? "Tạo mới" : "Mở để duyệt"}
         </button>
       ) : (
         <button
@@ -307,9 +349,7 @@ function GenerationCard({
             <JobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
           ) : job?.status === "FAILED" ? (
             "Thử lại"
-          ) : type === "QUIZ" ? (
-            "Tạo Quiz"
-          ) : type === "SUMMARY" ? (
+          ) : type === "QUIZ" || type === "SUMMARY" ? (
             "Tạo mới"
           ) : (
             "Cấu hình"

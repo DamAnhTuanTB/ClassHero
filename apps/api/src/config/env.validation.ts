@@ -63,6 +63,14 @@ const envSchema = z
       .min(300)
       .max(86_400)
       .default(3_600),
+    AI_QUIZ_PACKET_MAX_MB: z.coerce.number().positive().max(49).default(45),
+    AI_QUIZ_PACKET_MAX_PAGES: z.coerce.number().int().positive().max(1_000).default(120),
+    AI_QUIZ_REQUEST_DRAFT_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(300)
+      .max(86_400)
+      .default(3_600),
     MAX_IMAGE_UPLOAD_MB: z.coerce.number().positive().default(10),
     MAX_AVATAR_UPLOAD_MB: z.coerce.number().positive().default(5),
     OCR_PROVIDER: z.enum(["mathpix"]).default("mathpix"),
@@ -110,6 +118,12 @@ const envSchema = z
       .transform((value) => value === "true")
       .default(false),
     AI_SUMMARY_PROMPT_CACHE_RETENTION: z.enum(["in_memory", "24h"]).default("in_memory"),
+    AI_QUIZ_SCHEMA_REFERENCE_STRATEGY: z.literal("ref_v2").default("ref_v2"),
+    AI_QUIZ_PROMPT_CACHE_KEY_ENABLED: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .default(true),
+    AI_QUIZ_PROMPT_CACHE_RETENTION: z.enum(["in_memory", "24h"]).default("in_memory"),
     AI_MONTHLY_BUDGET_VND: z.coerce.number().int().nonnegative().default(1500000),
     AI_STUDENT_CHAT_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
     AI_STUDENT_GENERATE_DAILY_LIMIT: z.coerce.number().int().positive().default(5),

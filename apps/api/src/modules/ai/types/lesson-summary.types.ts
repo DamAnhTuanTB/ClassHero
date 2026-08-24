@@ -9,9 +9,9 @@ import { z } from "zod";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSION =
-  "lesson-summary-pdf-packet-five-block-prompt-v21-image-independent-fields";
+  "lesson-summary-pdf-packet-five-block-prompt-v24-inference-alignment";
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-five-block-schema-v20-equality-chain-linebreak";
+  "lesson-summary-pdf-packet-five-block-schema-v22-inference-alignment";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -42,8 +42,14 @@ export const lessonSummaryLengthSchema = z.enum(["short", "standard", "detailed"
 const nonEmptyText = (maxLength: number) => z.string().trim().min(1).max(maxLength);
 const LESSON_SUMMARY_SEMANTIC_LAYOUT_DESCRIPTION =
   "Không coi ngắt dòng do dàn trang là ranh giới ngữ nghĩa. Bảo toàn câu, đoạn, danh sách, hệ điều kiện, dấu câu dẫn và cấu trúc công thức theo chức năng trong nguồn; chọn inline hay display theo vai trò và độ phức tạp, không theo vị trí xuống dòng trong ảnh PDF.";
-export const LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION =
-  "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa. Chỉ dùng $\\Leftrightarrow$ cho quan hệ tương đương hai chiều và $\\Rightarrow$ cho suy ra một chiều; không tự thêm hai ký hiệu này khi lập luận không chứng minh quan hệ tương ứng. Khi nhiều công thức display liên tiếp thuộc cùng một hệ, nhóm trường hợp hoặc chuỗi biến đổi, nhóm chúng trong một khối `$$\\begin{aligned}...\\end{aligned}$$` hoặc môi trường `split` phù hợp và ngắt dòng tại toán tử quan hệ/phép biến đổi hợp lý; không để các từ nối như `và`, `nên`, `do đó` thành dòng rời giữa hai công thức. Nếu một chuỗi tính hoặc biến đổi có từ hai dấu `=` cấp ngoài cùng trở lên, bắt buộc đặt mỗi dấu `=` cùng bước biến đổi tương ứng trên một dòng riêng trong `aligned`/`split`: dòng đầu có dạng `A &= B`, các dòng sau có dạng `&= C`. Không áp dụng quy tắc này cho các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu `=` nằm trong cấu trúc lồng nhau. Công thức độc lập ngắn hoặc không cùng một mạch vẫn giữ riêng, không ép gộp.";
+export const LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION = [
+  "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trước khi trả structured output, phải quét riêng từng field `content`, `problem`, `solution`, `answer` và từng công thức display trong field đó.",
+  "Nếu một công thức display là một chuỗi tính hoặc biến đổi duy nhất có từ hai dấu `=` cấp ngoài cùng trở lên, bắt buộc dùng `aligned`/`split` và đặt đúng một dấu `=` cấp ngoài cùng cùng bước biến đổi tương ứng trên mỗi dòng: dòng đầu có dạng `A &= B`, các dòng sau có dạng `&= C`. Công thức ngắn, vừa một dòng hoặc không tràn chiều ngang vẫn không phải ngoại lệ; tuyệt đối không giữ chuỗi đó trên một dòng.",
+  "Ví dụ tổng quát SAI: `$$A=B=C.$$` Ví dụ tổng quát ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
+  "Không áp dụng quy tắc này cho các phương trình độc lập, hệ phương trình, phép gán nhiều đại lượng hoặc dấu `=` nằm trong cấu trúc lồng nhau. Ngoài đúng các trường hợp đó, nếu bước tự kiểm tra còn thấy chuỗi tính/biến đổi vi phạm thì phải viết lại field trước khi trả output.",
+  "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa.",
+  "Chỉ dùng $\\Leftrightarrow$ cho quan hệ tương đương hai chiều và $\\Rightarrow$ cho suy ra một chiều; không tự thêm hai ký hiệu này khi lập luận không chứng minh quan hệ tương ứng. Khi nhiều công thức display liên tiếp thuộc cùng một hệ, nhóm trường hợp hoặc chuỗi biến đổi, nhóm chúng trong một khối `$$\\begin{aligned}...\\end{aligned}$$` hoặc môi trường `split` phù hợp và ngắt dòng tại toán tử quan hệ/phép biến đổi hợp lý; không để các từ nối như `và`, `nên`, `do đó` thành dòng rời giữa hai công thức. Trong `aligned`/`split`, đặt dấu `&` tại quan hệ chính cần căn như `=`; không đặt `&` ngay trước toán tử suy luận hoặc tương đương đứng đầu dòng như `\\Rightarrow`, `\\Leftrightarrow`, `\\Longrightarrow`, `\\Longleftrightarrow`, `\\implies`, `\\impliedby`, `\\iff` và các biến thể chiều ngược, vì toán tử sẽ bị đẩy vào cột dấu bằng. Khi dòng suy ra còn có dấu bằng, viết toán tử và vế trái trước dấu căn, ví dụ `\\Rightarrow\\quad a &= 2x`. Công thức độc lập ngắn hoặc không cùng một mạch vẫn giữ riêng, không ép gộp.",
+].join(" ");
 export const LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
   "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
 const baseBlockSchema = z.object({

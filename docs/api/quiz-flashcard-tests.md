@@ -25,25 +25,15 @@ Body:
 
 ```json
 {
-  "title": "Quiz cơ bản",
-  "difficulty": "EASY",
-  "questions": [
-    {
-      "questionType": "MULTIPLE_CHOICE",
-      "questionJson": {},
-      "optionsJson": {},
-      "correctAnswerJson": {},
-      "hintJson": {},
-      "gradingConfigJson": null,
-      "difficulty": "EASY"
-    }
-  ]
+  "title": "Quiz cơ bản"
 }
 ```
 
 Behavior:
 
 - Server tự gán `sortOrder` tiếp theo trong lesson.
+- Quiz set không nhận/trả `difficulty`; mức độ thuộc từng question và
+  request sinh Quiz bằng AI.
 
 #### `POST /admin/lessons/:lessonId/quiz-sets/generate-ai`
 
@@ -69,29 +59,108 @@ Body:
 
 Response: `202 Accepted` với `jobId`.
 
+Trước khi enqueue, client phải gọi
+`POST /admin/lessons/:lessonId/quiz-sets/prompt-preview`. Preview trả
+`requestDraftId`/`requestHash`, system prompt, user prompt, JSON Schema và biểu
+diễn request OpenAI. Lệnh generate gửi lại hai hash này; worker chỉ dùng immutable
+draft đã preview, không tự ghép lại input khác.
+
 Side effects:
 
 - Tạo `background_jobs` queue `AI_GENERATION`.
 - Tạo `ai_generations` type `QUIZ`.
 - Enqueue AI job.
-- `targetQuizSetId` phải thuộc đúng lesson. Nếu không gửi, backend dùng set đầu
-  tiên; nếu lesson chưa có set thì tạo duy nhất `Bộ câu hỏi 1`.
+- `targetQuizSetId` phải thuộc đúng lesson. Khi lesson đã có Quiz set, client lấy
+  giá trị từ select `Bộ câu hỏi được chọn` và phải gửi cùng một ID cho preview và
+  generate; select mặc định là tab đang mở. Chỉ khi lesson chưa có set, client bỏ
+  field này để backend tạo duy nhất `Bộ câu hỏi 1`.
 - Worker append item vào set đích, không tạo Quiz set/tab mới. Câu AI có
   `reviewStatus=NEEDS_REVIEW`; set thủ công hiện có không bị đổi thành `source=AI`.
-- Mỗi question là EXAMPLE core M9.2 cộng metadata chấm bài. `sourceMetadataJson`
-  chỉ lưu `aiGenerationId`, `generationQuestionIndex` và `exampleBlock`; Quiz
-  không lưu `sourceChunkIds`, `sources` hoặc `sourceHash` ở cấp câu vì nguồn chỉ
-  là context để AI biên soạn bài tập mới. `ai_explanations` giữ projection
-  Tiptap/diagram tương thích.
+- Mỗi question dùng contract riêng của Quiz. `sourceMetadataJson` chỉ lưu
+  `aiGenerationId`, `generationQuestionIndex` và `quizExplanationBlock` có
+  `type=quizExplanation`; Quiz không lưu `sourceChunkIds`, `sources` hoặc
+  `sourceHash` ở cấp câu vì nguồn chỉ là context để AI biên soạn bài tập mới.
+  `ai_explanations` giữ projection Tiptap của Quiz.
+- Source gửi provider là canonical raw PDF packet của đúng tài liệu/page range
+  đã chọn (`input_file`, `detail=high`), không phải OCR text. Chấp nhận PDF scan
+  thuần và PDF có text layer; OCR readiness không phải precondition riêng của
+  Quiz. Manifest/hash/ID nguồn vẫn được lưu trong draft để audit và kiểm stale,
+  nhưng không được nối thành text gửi provider.
+- JSON Schema preview/worker phải được dựng theo đúng request: chính xác
+  `questionCount`, chỉ các `questionTypes` đã chọn và đúng difficulty cố định khi
+  không phải `MIXED`. Output root chỉ có `questions`; không có `title` bị bỏ qua.
+- Bốn loại câu được định nghĩa trong system prompt; user prompt chỉ giữ cấu hình
+  động. `TEXT_INPUT` AI là một phép tính có đúng một yêu cầu và một kết quả số
+  chuẩn duy nhất trong `correctAnswer`, không phải câu văn/tự luận, câu hỏi ghép
+  hay danh sách các cách viết tương đương. Kết quả hữu tỉ dùng số nguyên hoặc
+  phân số tối giản; kết quả vô tỉ buộc `problem` yêu cầu làm tròn đến một chữ số
+  thập phân và `correctAnswer` chỉ giữ số đã làm tròn với dấu `.`. Backend lưu
+  đáp án AI thành mảng một phần tử và tự gán `numericComparison=true`. Bộ chấm
+  so sánh giá trị số chính xác, nên dữ liệu học sinh nhập như `1/2`, `2/4`,
+  `0.5`, `0.50`, `0,5` và `\frac{1}{2}` được coi là cùng một đáp án; mẫu số bằng
+  `0` không hợp lệ.
+- Với `TRUE_FALSE`, provider vẫn trả `explanation.solution` nhưng lời giải phải
+  nêu căn cứ và kết thúc bằng một câu liên kết tự nhiên xác nhận mệnh đề đúng hay
+  sai; không chấp nhận kết luận cụt kiểu “Mệnh đề đúng.” đứng tách khỏi lập luận.
+- Với `MULTI_STATEMENT_TRUE_FALSE`, raw provider question không có một
+  `explanation.solution` chung mà trả
+  `explanation.statementSolutions[] = { statementId, solution }[]`, đúng một
+  phần và đúng thứ tự cho mỗi statement. `statements[].id` và `statementId` chỉ
+  nhận chuỗi liên tiếp `a`, `b`, `c`, ...; `S1/S2`, số, chữ hoa hoặc ID tùy ý bị
+  provider schema từ chối. Raw explanation không có `answer`; mapper lấy
+  `statements[].value` để dựng canonical answer thành từng dòng `a) Đúng.`,
+  `b) Sai.`, đồng thời ghép lời giải thành các đoạn mang cùng nhãn trong
+  `quizExplanationBlock.solution`. Sai chuỗi nhãn hoặc coverage/order được ghi
+  cảnh báo `STATEMENT_ID_SEQUENCE_MISMATCH` hoặc
+  `STATEMENT_SOLUTION_COVERAGE_MISMATCH`.
+- Lời giải từng câu con bám phong cách SGK phù hợp với dạng bài: câu tính/biến
+  đổi lấy công thức và ký hiệu làm phần chính, văn xuôi chỉ nêu căn cứ/nối bước;
+  câu lý thuyết không cần tính dùng lập luận ngắn theo đúng khái niệm. Có thể dùng
+  lại câu chữ policy của Sinh kiến thức khi hoàn cảnh tương đương, nhưng không
+  sao chép máy móc contract field hoặc hành vi mapper khác domain.
+- Prompt/schema Quiz dùng cùng invariant dấu câu có chức năng của Sinh kiến
+  thức: câu dẫn trực tiếp sang danh sách hoặc display ở dòng sau có dấu `:`.
+  Với `aligned`/`split`, không căn `&` trước toán tử suy luận/tương đương đầu dòng
+  (`\Rightarrow`, `\Leftrightarrow`, dạng dài/ngược, `\implies`, `\impliedby`,
+  `\iff`); dấu căn đặt tại quan hệ chính như `=`.
+- Prompt và provider schema bắt buộc mọi môi trường LaTeX trong `$$...$$` có cặp
+  `\begin{X}`/`\end{X}` đúng tên và đúng thứ tự lồng. Backend tự chuẩn hóa toàn
+  bộ chuỗi trong câu ngay sau provider rồi chạy lại trước persistence: bổ sung
+  thẻ đóng còn thiếu, sửa delimiter `$$` đặt trước thẻ đóng, đóng nesting sai
+  thứ tự và bỏ thẻ đóng mồ côi. Đây là recovery deterministic, idempotent,
+  không ném lỗi, không tạo cảnh báo admin và không hồi tố câu đã lưu trước đó.
+- Sau khi output đã qua provider schema, semantic validator không xóa câu hoặc
+  chặn persistence. Sai lệch về phân bổ, option ID hoặc statement ID được lưu
+  vào `generationIssues` dưới dạng cảnh báo `REVIEWABLE`; câu AI vẫn ở trạng
+  thái `NEEDS_REVIEW` để admin kiểm tra.
+- Với Quiz AI `MULTIPLE_CHOICE`, mapper dựng `quizExplanationBlock.answer` từ
+  `correctOptionId` và nội dung option đúng theo dạng `A. nội dung phương án`.
+  Renderer thêm đúng một nhãn `Đáp án:` in đậm; solution kết luận rồi dừng và
+  card không chèn thêm tiêu đề `Lời giải` bên trong.
+- Quiz Toán persist `isGeometry` và `geometryStatement` trong
+  `quizExplanationBlock`. Lớp 7–9 chỉ câu Hình học có bảng GT–KL; khi khối chưa
+  xác định hoặc nằm ngoài 7–9 thì `geometryStatement=null`. Câu không Hình học
+  cũng để null. Việc có GT–KL không tự động tạo figure.
+- Figure không có quota và chỉ được tạo nếu thật sự cần. `solutionFigureMode` là
+  `NONE | REUSE_QUESTION | EXTEND_QUESTION`; mode mở rộng luôn dựng trên exact
+  revision của hình đề. Problem/solution vẫn phải tự đủ nghĩa khi không tải hình.
+- Hard cutover: API không đọc/ghi `exampleBlock`, không trả
+  `explanationExampleBlock` và không có fallback dữ liệu Quiz cũ theo shape Sinh
+  kiến thức. Student response dùng `explanationBlock`.
 - `GET /admin/lessons/:lessonId/quiz-sets` trả thêm
-  `pendingReviewQuestionCount` và `aiGenerations[]` theo set để UI duyệt/audit
-  nhiều lượt sinh trong cùng một bộ.
+  `pendingReviewQuestionCount`, `unpublishedApprovedQuestionCount` và
+  `aiGenerations[]` theo set để UI duyệt/audit nhiều lượt sinh trong cùng một
+  bộ. Admin hiển thị hàng câu AI chờ duyệt trước, sau đó bốn hàng câu đã duyệt
+  theo `MULTIPLE_CHOICE → TRUE_FALSE → MULTI_STATEMENT_TRUE_FALSE → TEXT_INPUT`.
 - Xóa câu AI cập nhật `generationAudit` của đúng `aiGenerationId`. Xóa 2 trong
   lượt 10 làm audit lượt đó còn 8, không tính câu thủ công/lượt AI khác.
 
 #### `PATCH /admin/quiz-sets/:quizSetId`
 
 Role: `ADMIN`.
+
+Body: `{ "title": "Bộ câu hỏi ôn tập" }`. Endpoint không nhận
+`difficulty`.
 
 #### `DELETE /admin/quiz-sets/:quizSetId`
 
@@ -104,10 +173,69 @@ Role: `ADMIN`.
 Body:
 
 ```json
-{ "reviewStatus": "APPROVED" }
+{ "reviewStatus": "APPROVED", "action": "PUBLISH" }
 ```
 
+`action` của Quiz có ba giá trị và dùng cùng state machine UI của Sinh kiến thức:
+
+- `SAVE`: giữ nguyên `reviewStatus` của bộ và đánh dấu mọi câu `APPROVED` hiện
+  tại là đã lưu sang bản học sinh. Cho phép vẫn còn câu AI đang chờ duyệt.
+- `PUBLISH`: yêu cầu không còn câu chưa duyệt, đánh dấu các câu `APPROVED` hiện
+  tại là đã phát hành và chuyển riêng bộ Quiz này sang `APPROVED`.
+- `WITHDRAW`: chuyển riêng bộ Quiz này sang `HIDDEN`; các mốc câu đã phát hành
+  được giữ để có thể phát hành lại.
+
+UI luôn có `Lưu`; cạnh đó là `Phát hành` khi bộ chưa phát hành hoặc
+`Thu hồi phát hành` khi bộ đang phát hành. Duyệt câu không tự phát hành bộ.
+
+#### `POST /admin/quiz-sets/:quizSetId/questions/review-all-ai`
+
+Role: `ADMIN`.
+
+- Không nhận body. Endpoint duyệt trong một transaction toàn bộ câu
+  `NEEDS_REVIEW` có lineage AI thuộc đúng Quiz set và chuyển lời giải liên quan
+  sang `APPROVED`.
+- Câu vừa duyệt giữ `publishedAt=null`; admin vẫn phải dùng `SAVE`/`PUBLISH` của
+  set trước khi học sinh nhận các câu mới.
+- Không duyệt nhầm câu thủ công đang chờ trong set `source=ADMIN`. Response trả
+  `approvedQuestionCount` và `pendingReviewQuestionCount`; gọi lại khi không còn
+  câu phù hợp là idempotent và trả count duyệt bằng `0`.
+
 ### 10.2. Admin quiz question item-level CRUD
+
+#### `GET /admin/quiz-sets/:quizSetId/questions`
+
+Role: `ADMIN`.
+
+- Với câu Quiz do AI sinh, response có thêm `generationQuestionJson`: object
+  câu hỏi hiện tại trong mutable structured output, lấy từ
+  `ai_generations.output_json.questions[generationQuestionIndex]`.
+- Khi admin sửa thành công một câu AI, backend ghi nội dung câu hỏi, phương án/mệnh
+  đề, đáp án, gợi ý, lời giải và độ khó hiện tại trở lại đúng vị trí trong
+  `output_json`, giữ các field provider-only chưa được CRUD chạm tới, rồi tính lại
+  `outputHash`. Refetch vì vậy trả JSON khớp UI mà không cần field hoặc bản lưu
+  `currentQuestionJson` riêng.
+- `generationQuestionJson` là `null` với câu thủ công, generation cũ không còn
+  output hoặc lineage không hợp lệ. Trường này chỉ phục vụ panel admin và không
+  được trả qua API học sinh.
+- Đây là raw JSON ở mức structured payload đã được SDK parse và schema validate,
+  không phải toàn bộ HTTP response envelope, token usage hoặc chuỗi byte JSON ban
+  đầu của provider. Sau lần admin sửa đầu tiên, nó là working snapshot mới nhất,
+  không còn là bản provider bất biến.
+
+#### `PATCH /admin/quiz-questions/:questionId/generation-json`
+
+Role: `ADMIN`.
+
+Body: `{ "generationQuestionJson": { ... } }`.
+
+- Chỉ áp dụng cho câu có lineage AI hợp lệ. Backend validate transport shape,
+  normalize LaTeX deterministic, map lại Quiz/explanation và ghi đè đúng câu
+  trong mutable `ai_generations.output_json` trong cùng transaction.
+- Semantic mismatch chỉ cập nhật `generationIssues` với `blocking=false`; câu
+  trở về `NEEDS_REVIEW` và vẫn được lưu để admin tiếp tục sửa/duyệt.
+- Không cho sửa subtree `figure` qua endpoint này; hình dùng workflow revision và
+  asset chuyên dụng để tránh JSON lệch delivery hiện hành.
 
 #### `POST /admin/quiz-sets/:quizSetId/questions`
 
@@ -239,7 +367,10 @@ Body:
   ID trong `optionsJson`, không thiếu, không thừa và không trùng.
 - `TRUE_FALSE` và `MULTI_STATEMENT_TRUE_FALSE` là hai contract riêng; API không
   tự chuyển boolean thành danh sách mệnh đề hoặc ngược lại.
-- Với `TEXT_INPUT`, `correctAnswerJson` là mảng câu trả lời được chấp nhận và `gradingConfigJson` chứa `caseSensitive`/`exactMatch`.
+- Với `TEXT_INPUT`, `correctAnswerJson` là mảng câu trả lời được chấp nhận và
+  `gradingConfigJson` chứa `caseSensitive`/`exactMatch`; có thể thêm
+  `numericComparison=true` để chấm các cách viết có cùng giá trị số thay vì so
+  chuỗi.
 - `hintJson` và `explanationJson` nhận Tiptap JSON hoặc `null`. Lời giải chi tiết thủ công được lưu trong `ai_explanations` với `source=ADMIN` và trả về qua relation `explanation`.
 - `questionJson`, `optionsJson[*].richText`, `hintJson` và
   `explanationJson` cùng nhận cây Tiptap rich content. Contract cho phép
@@ -273,11 +404,44 @@ Role: `ADMIN`.
 Behavior:
 
 - Cập nhật câu hỏi với cùng contract nội dung như create; cho phép đổi loại câu hỏi và xóa gợi ý/lời giải bằng `null`.
-- Quiz/Test hiện text-only. Endpoint không nhận `exampleBlock`, TeX/TikZ, SVG
-  hoặc metadata figure; source trace cấp câu vẫn bị loại theo contract M9.3.
+- Quiz nhận tùy chọn `quizExplanationBlock` theo schema riêng
+  `type=quizExplanation`; endpoint không nhận `exampleBlock`. Source trace cấp
+  câu vẫn bị loại theo contract M9.3. Figure AI được quản lý bằng resource riêng;
+  ảnh admin tự tải dùng endpoint figure upload, không nhúng base64 vào block.
+
+#### `POST /admin/quiz-questions/:questionId/figures/admin-upload`
+
+Role: `ADMIN`.
+
+- Gắn file ảnh admin đã upload vào role `QUESTION` hoặc `SOLUTION` của câu Quiz.
+- Đây là đường ảnh raster duy nhất của Quiz; AI chỉ sinh TeX/TikZ mới và không
+  dùng ảnh gốc/crop sách giáo khoa.
 - Khi gửi `explanationJson`, service tạo mới hoặc cập nhật `ai_explanations` nguồn `ADMIN`; nội dung rỗng/`null` gỡ lời giải khỏi câu hỏi.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation liên quan stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - Ghi audit log.
+
+#### `POST /admin/quiz-questions/:questionId/review`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{ "reviewStatus": "APPROVED" }
+```
+
+Behavior:
+
+- Chỉ cập nhật `reviewStatus` của câu Quiz được chỉ định và lời giải liên kết;
+  không duyệt các câu còn lại trong cùng bộ.
+- UI dùng chính endpoint này cho nút `Chấp nhận` trong banner warning của câu.
+  Khi response trả `APPROVED`, banner của câu được ẩn; endpoint không xóa hoặc
+  sửa `generationIssues` vì metadata này vẫn cần cho audit lượt sinh.
+- Ghi audit log `QUIZ_QUESTION_REVIEWED`.
+- Câu vừa duyệt có `publishedAt=null`; nếu bộ đã phát hành, học sinh vẫn chỉ thấy
+  bản câu đã được `Lưu`/`Phát hành` trước đó. Admin phải bấm `Lưu` của đúng bộ để
+  đưa các câu mới duyệt hoặc mới tạo sang học sinh.
+- Endpoint không tự chuyển bộ sang `APPROVED`.
 
 #### `DELETE /admin/quiz-questions/:questionId`
 
@@ -295,7 +459,11 @@ Behavior:
 
 - Yêu cầu lesson đã publish và student có enrollment active còn hạn cho khóa
   gốc/bản cá nhân hiệu lực, hoặc lesson bật trial.
-- Chỉ trả set/question chưa xóa, trạng thái `APPROVED` và set không phải reserve.
+- Chỉ trả set chưa xóa, `APPROVED`, không phải reserve; question phải đồng thời
+  `APPROVED` và có `publishedAt`.
+- Câu được nhóm ổn định theo thứ tự `MULTIPLE_CHOICE → TRUE_FALSE →
+MULTI_STATEMENT_TRUE_FALSE → TEXT_INPUT`; trong cùng loại vẫn giữ thứ tự
+  `sortOrder → createdAt → id`. Runner, resume và review dùng cùng thứ tự này.
 - Question chỉ gồm `questionJson`, `optionsJson`, `hintJson`, loại, độ khó và thứ
   tự; không trả `correctAnswerJson`, `gradingConfigJson`, `explanation` hoặc dữ
   liệu chấm điểm nội bộ.
@@ -340,7 +508,13 @@ Behavior:
 - `sourceAttemptId` luôn là attempt cha trực tiếp. Backend lần theo chuỗi
   cha-con để tìm attempt gốc dùng cho kết quả cộng dồn của toàn bộ bài.
 - Tạo sẵn answer placeholder cho đúng tập câu của attempt để server không tin
-  danh sách question ID do client gửi về sau.
+  danh sách question ID do client gửi về sau. Các placeholder này đồng thời là
+  snapshot membership và thứ tự đánh số của lượt làm: câu được admin thêm hoặc
+  xóa rồi lưu/phát hành sau thời điểm start chỉ ảnh hưởng attempt mới, không làm
+  đổi `totalCount`, `originalTotalCount` hoặc `questionNumber` của attempt đang
+  dở. Câu bị soft-delete vẫn thuộc attempt cũ để student hoàn thành nhất quán.
+- Tập câu chỉ lấy các câu `APPROVED` có `publishedAt`; câu admin vừa duyệt/tạo
+  nhưng chưa bấm `Lưu` hoặc `Phát hành` không được đưa vào attempt mới.
 - Response trả nội dung runner, hint, `correctAnswerJson`, `gradingConfigJson`
   và `explanationJson` đã duyệt để frontend chấm tức thì mà không chờ endpoint
   chấm riêng; request autosave progress chỉ lưu answer/cờ checked. Đây là đánh
@@ -361,6 +535,10 @@ Behavior:
   lời giải giống response start, `savedAnswers` gồm mọi đáp án đã autosave,
   `checkedAnswers` gồm các câu đã bấm kiểm tra và `currentQuestionIndex` là vị
   trí gần nhất.
+- Resume/review dựng thứ tự và số câu từ placeholder của attempt gốc, không từ
+  danh sách question hiện hành của Quiz set. Vì vậy câu được admin thêm hoặc xóa
+  rồi bấm `Lưu` trong lúc student đang làm không chen vào hoặc biến mất khỏi lượt
+  cũ; thay đổi chỉ áp dụng cho attempt bắt đầu sau đó.
 - Frontend dùng endpoint này để khôi phục runner sau refresh/F5 hoặc khi
   student đã thoát runner rồi vào Quiz lại, không tạo attempt mới khi vẫn còn
   lượt `IN_PROGRESS`.
@@ -418,6 +596,10 @@ Behavior:
 
 - Autosave vị trí câu và tùy chọn một đáp án nháp của attempt `IN_PROGRESS`
   thuộc chính student. Answer có thể chưa đầy đủ với câu nhiều mệnh đề/text.
+- Quiz chấp nhận marker `{ "__unanswered": true }` kèm `isChecked=true` khi
+  student bấm `Bỏ qua`. Server lưu marker, giữ `isAnswered=false`, đặt
+  `isChecked=true`; response resume/review trả feedback `isSkipped=true`. Câu
+  không thể bị ghi đè bởi autosave đáp án khác sau đó.
 - Server validate question thuộc attempt, shape đáp án và biên index; endpoint
   không hiển thị đáp án đúng hoặc feedback.
 - Response trả `attemptId`, `currentQuestionIndex`, `answeredCount` và
@@ -463,10 +645,12 @@ Behavior:
 - Nhận toàn bộ answer trong một request. Backend không tin danh sách question ID
   từ client: phải khớp chính xác các placeholder đã tạo cho attempt, không trùng
   và không thiếu câu.
-- Backend validate answer theo loại câu, chấm lại authoritative, lưu answers và
-  submit attempt trong một transaction.
+- Backend validate answer theo loại câu; marker `{ "__unanswered": true }`
+  được chấm sai với 0 điểm mà không qua validator answer đầy đủ. Backend chấm
+  lại authoritative, lưu answers và submit attempt trong một transaction.
 - Ở runner, frontend dùng answer đầy đủ làm căn cứ cho `Đã làm`/cảnh báo thiếu
-  câu; student không bắt buộc bấm nút kiểm tra ở từng câu.
+  câu; marker bỏ qua không tăng `Đã làm` nhưng loại câu đó khỏi cảnh báo thiếu.
+  Student không bắt buộc bấm nút kiểm tra ở từng câu.
 - Trả summary của chính attempt vừa submit gồm `id`, `sourceAttemptId`,
   `correctCount`, `wrongCount`, `totalCount`, `accuracyPercent` để backend giữ
   được lịch sử chi tiết của từng lượt làm.
@@ -875,6 +1059,20 @@ Behavior:
 
 - Cập nhật câu hỏi.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation stale.
+
+#### `POST /admin/test-questions/:questionId/review`
+
+Role: `ADMIN`.
+
+Body:
+
+```json
+{ "reviewStatus": "APPROVED" }
+```
+
+Behavior giống endpoint duyệt item-level của Quiz: chỉ duyệt câu Test được chỉ
+định và lời giải liên kết, ghi audit log `TEST_QUESTION_REVIEWED`, đồng thời đưa
+bộ về `APPROVED` khi không còn câu nào chờ duyệt.
 
 #### `DELETE /admin/test-questions/:questionId`
 

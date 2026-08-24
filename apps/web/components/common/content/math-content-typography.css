@@ -1,29 +1,16 @@
+.tiptap-content-view,
+.quiz-rich-content-prosemirror {
+  font-size: var(--learning-content-font-size) !important;
+}
+
+.tiptap-content-view :is(h1, h2, h3, h4, h5, h6, p, li, table, th, td),
+.quiz-rich-content-prosemirror :is(h1, h2, h3, h4, h5, h6, p, li, table, th, td) {
+  font-size: inherit !important;
+}
+
 .tiptap-content-view .katex,
 .quiz-rich-content-prosemirror .katex,
 .math-content-typography .katex {
   color: inherit;
-  font-family: inherit !important;
-  font-size: 1em !important;
-  font-weight: inherit !important;
-}
-
-.tiptap-content-view .katex :is(.mathnormal, .mathit),
-.quiz-rich-content-prosemirror .katex :is(.mathnormal, .mathit),
-.math-content-typography .katex :is(.mathnormal, .mathit) {
-  color: inherit;
-  font-family: inherit !important;
-  font-style: normal !important;
-  font-weight: inherit;
-}
-
-.tiptap-content-view .katex .mfrac,
-.quiz-rich-content-prosemirror .katex .mfrac,
-.math-content-typography .katex .mfrac {
-  font-size: calc(1em / 0.7) !important;
-}
-
-.tiptap-content-view .katex .mfrac .frac-line,
-.quiz-rich-content-prosemirror .katex .mfrac .frac-line,
-.math-content-typography .katex .mfrac .frac-line {
-  border-bottom-width: 2px !important;
+  font-size: var(--learning-content-math-optical-size) !important;
 }

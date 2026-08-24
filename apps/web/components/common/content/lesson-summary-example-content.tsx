@@ -104,7 +104,7 @@ export function LessonSummaryExampleContent({
       ) : null}
 
       {block.solution || block.answer ? (
-        <div className="mb-3 space-y-3 border-l-[3px] border-blue-500/30 pl-4 text-sm dark:border-blue-400/30">
+        <div className="learning-content-text mb-3 space-y-3 border-l-[3px] border-blue-500/30 pl-4 dark:border-blue-400/30">
           {block.solution ? (
             <div>
               <div className="mb-1.5 text-center font-bold text-slate-900 dark:text-slate-100">
@@ -164,7 +164,7 @@ export function LessonSummaryExampleCard({
         <PlayCircle className="h-4 w-4" aria-hidden="true" />
         {label} {displayNumber ?? ""}
       </div>
-      <div className="space-y-2 text-[15px] leading-relaxed text-slate-800 opacity-90 dark:text-slate-200">
+      <div className="learning-content-text space-y-2 leading-relaxed text-slate-800 opacity-90 dark:text-slate-200">
         <LessonSummaryExampleContent
           answerLabel={answerLabel}
           block={block}

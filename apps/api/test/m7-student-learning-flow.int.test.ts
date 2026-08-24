@@ -14,6 +14,8 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { FlashcardsService } from "#api/modules/flashcards/services/flashcards.service";
 import { PublicLearningPathsService } from "#api/modules/learning-paths/services/public-learning-paths.service";
 import { QuizAttemptScopeDto } from "#api/modules/quiz/dto/student-quiz-attempt.dto";
+import { QuizSetReviewActionDto } from "#api/modules/quiz/dto/review-quiz-set.dto";
+import { QuizService } from "#api/modules/quiz/services/quiz.service";
 import { StudentQuizAttemptsService } from "#api/modules/quiz/services/student-quiz-attempts.service";
 import { StudentLessonsService } from "#api/modules/student-learning/services/student-lessons.service";
 import { StudentTestAttemptsService } from "#api/modules/tests/services/student-test-attempts.service";
@@ -25,6 +27,7 @@ describe("M7 student learning flow integration", () => {
   let flashcardsService: FlashcardsService;
   let publicLearningPathsService: PublicLearningPathsService;
   let quizAttemptsService: StudentQuizAttemptsService;
+  let quizService: QuizService;
   let lessonsService: StudentLessonsService;
   let testAttemptsService: StudentTestAttemptsService;
   let studentUserId = "";
@@ -43,6 +46,7 @@ describe("M7 student learning flow integration", () => {
     flashcardsService = moduleRef.get(FlashcardsService);
     publicLearningPathsService = moduleRef.get(PublicLearningPathsService);
     quizAttemptsService = moduleRef.get(StudentQuizAttemptsService);
+    quizService = moduleRef.get(QuizService);
     lessonsService = moduleRef.get(StudentLessonsService);
     testAttemptsService = moduleRef.get(StudentTestAttemptsService);
 
@@ -137,6 +141,7 @@ describe("M7 student learning flow integration", () => {
         correctAnswerJson: ["B"],
         hintJson: documentWithText("Hãy cộng hai số."),
         reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
       },
     });
 
@@ -246,6 +251,382 @@ describe("M7 student learning flow integration", () => {
       quiz: { isRequired: true, isCompleted: false },
       flashcard: { isRequired: true, isCompleted: false },
     });
+  });
+
+  it("persists a skipped Quiz question as unanswered and grades it with zero points", async () => {
+    const skippedQuizSet = await prisma.quizSet.create({
+      data: {
+        lessonId,
+        title: `Quiz bỏ qua ${suffix}`,
+        reviewStatus: ReviewStatus.APPROVED,
+        createdById: adminUserId,
+        updatedById: adminUserId,
+      },
+    });
+    await prisma.quizQuestion.create({
+      data: {
+        quizSetId: skippedQuizSet.id,
+        lessonId,
+        questionType: QuestionType.MULTIPLE_CHOICE,
+        questionJson: documentWithText("5 + 5 bằng bao nhiêu?"),
+        optionsJson: [
+          { id: "A", richText: documentWithText("9") },
+          { id: "B", richText: documentWithText("10") },
+        ],
+        correctAnswerJson: ["B"],
+        hintJson: documentWithText("Cộng hai số hạng."),
+        reviewStatus: ReviewStatus.APPROVED,
+        publishedAt: new Date(),
+      },
+    });
+
+    const attempt = await quizAttemptsService.startAttempt(
+      skippedQuizSet.id,
+      studentUserId,
+      { scope: QuizAttemptScopeDto.ALL },
+    );
+    const questionId = attempt.questions[0]!.id;
+    const skippedAnswer = { __unanswered: true };
+
+    await expect(
+      quizAttemptsService.saveProgress(attempt.id, studentUserId, {
+        currentQuestionIndex: 0,
+        answer: {
+          questionId,
+          answerJson: skippedAnswer,
+          isChecked: true,
+        },
+      }),
+    ).resolves.toMatchObject({
+      attemptId: attempt.id,
+      answeredCount: 0,
+      checkedCount: 1,
+    });
+
+    const resumed = await quizAttemptsService.getCurrentAttempt(
+      skippedQuizSet.id,
+      studentUserId,
+    );
+    expect(resumed?.savedAnswers).toEqual([{ questionId, answerJson: skippedAnswer }]);
+    expect(resumed?.checkedAnswers[0]).toMatchObject({
+      questionId,
+      answerJson: skippedAnswer,
+      feedback: {
+        isCorrect: false,
+        isSkipped: true,
+        correctAnswerJson: ["B"],
+      },
+    });
+
+    await expect(
+      quizAttemptsService.submitAttempt(attempt.id, studentUserId, [
+        { questionId, answerJson: ["B"] },
+      ]),
+    ).rejects.toThrow("Câu Quiz đã bỏ qua không thể trả lời lại");
+
+    const result = await quizAttemptsService.submitAttempt(attempt.id, studentUserId, [
+      { questionId, answerJson: skippedAnswer },
+    ]);
+    expect(result).toMatchObject({ correctCount: 0, wrongCount: 1, totalCount: 1 });
+
+    const review = await quizAttemptsService.reviewAttempt(
+      attempt.id,
+      studentUserId,
+      QuizAttemptScopeDto.INCORRECT,
+    );
+    expect(review.questions[0]).toMatchObject({
+      id: questionId,
+      answerJson: skippedAnswer,
+      isCorrect: false,
+      isSkipped: true,
+      correctAnswerJson: ["B"],
+    });
+
+    await prisma.quizAttempt.deleteMany({ where: { quizSetId: skippedQuizSet.id } });
+    await prisma.quizQuestion.deleteMany({ where: { quizSetId: skippedQuizSet.id } });
+    await prisma.quizSet.delete({ where: { id: skippedQuizSet.id } });
+  });
+
+  it("keeps an in-progress Quiz snapshot stable when questions are added or deleted", async () => {
+    const orderedLesson = await prisma.lesson.create({
+      data: {
+        learningPathId,
+        chapterId,
+        orderIndex: 3,
+        title: "Bài kiểm tra thứ tự Quiz",
+        status: PublishStatus.PUBLISHED,
+        createdById: adminUserId,
+        updatedById: adminUserId,
+      },
+    });
+    const orderedSet = await prisma.quizSet.create({
+      data: {
+        lessonId: orderedLesson.id,
+        title: "Quiz theo nhóm loại câu",
+        reviewStatus: ReviewStatus.DRAFT,
+        createdById: adminUserId,
+        updatedById: adminUserId,
+      },
+    });
+    const createdQuestions = await Promise.all([
+      prisma.quizQuestion.create({
+        data: {
+          quizSetId: orderedSet.id,
+          lessonId: orderedLesson.id,
+          questionType: QuestionType.TEXT_INPUT,
+          questionJson: documentWithText("Nhập số bốn"),
+          correctAnswerJson: ["4"],
+          gradingConfigJson: { caseSensitive: false, exactMatch: true },
+          reviewStatus: ReviewStatus.APPROVED,
+          sortOrder: 0,
+        },
+      }),
+      prisma.quizQuestion.create({
+        data: {
+          quizSetId: orderedSet.id,
+          lessonId: orderedLesson.id,
+          questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+          questionJson: documentWithText("Xét hai mệnh đề"),
+          optionsJson: [
+            { id: "a", richText: documentWithText("Mệnh đề a") },
+            { id: "b", richText: documentWithText("Mệnh đề b") },
+          ],
+          correctAnswerJson: [
+            { statementId: "a", value: true },
+            { statementId: "b", value: false },
+          ],
+          reviewStatus: ReviewStatus.APPROVED,
+          sortOrder: 1,
+        },
+      }),
+      prisma.quizQuestion.create({
+        data: {
+          quizSetId: orderedSet.id,
+          lessonId: orderedLesson.id,
+          questionType: QuestionType.TRUE_FALSE,
+          questionJson: documentWithText("Bốn là số chẵn"),
+          correctAnswerJson: true,
+          reviewStatus: ReviewStatus.APPROVED,
+          sortOrder: 2,
+        },
+      }),
+      prisma.quizQuestion.create({
+        data: {
+          quizSetId: orderedSet.id,
+          lessonId: orderedLesson.id,
+          questionType: QuestionType.MULTIPLE_CHOICE,
+          questionJson: documentWithText("Chọn số bốn"),
+          optionsJson: [
+            { id: "A", richText: documentWithText("4") },
+            { id: "B", richText: documentWithText("5") },
+          ],
+          correctAnswerJson: ["A"],
+          reviewStatus: ReviewStatus.APPROVED,
+          sortOrder: 3,
+        },
+      }),
+    ]);
+
+    await quizService.reviewQuizSet(
+      orderedSet.id,
+      adminUserId,
+      {
+        action: QuizSetReviewActionDto.PUBLISH,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+      {},
+    );
+
+    const expectedTypes = [
+      QuestionType.MULTIPLE_CHOICE,
+      QuestionType.TRUE_FALSE,
+      QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+      QuestionType.TEXT_INPUT,
+    ];
+    const attempt = await quizAttemptsService.startAttempt(orderedSet.id, studentUserId, {
+      scope: QuizAttemptScopeDto.ALL,
+    });
+    expect(attempt.questions.map((question) => question.questionType)).toEqual(
+      expectedTypes,
+    );
+    expect(attempt.questions.map((question) => question.questionNumber)).toEqual([
+      1, 2, 3, 4,
+    ]);
+
+    await quizAttemptsService.saveProgress(attempt.id, studentUserId, {
+      currentQuestionIndex: 2,
+      answer: {
+        questionId: attempt.questions[0]!.id,
+        answerJson: ["A"],
+      },
+    });
+    const resumed = await quizAttemptsService.getCurrentAttempt(
+      orderedSet.id,
+      studentUserId,
+    );
+    expect(resumed?.currentQuestionIndex).toBe(2);
+    expect(resumed?.questions.map((question) => question.questionType)).toEqual(
+      expectedTypes,
+    );
+
+    const answerByQuestionId = new Map([
+      [createdQuestions[0]!.id, "4"],
+      [
+        createdQuestions[1]!.id,
+        [
+          { statementId: "a", value: true },
+          { statementId: "b", value: false },
+        ],
+      ],
+      [createdQuestions[2]!.id, true],
+      [createdQuestions[3]!.id, ["A"]],
+    ]);
+    await quizAttemptsService.submitAttempt(
+      attempt.id,
+      studentUserId,
+      attempt.questions.map((question) => ({
+        questionId: question.id,
+        answerJson: answerByQuestionId.get(question.id),
+      })),
+    );
+    const review = await quizAttemptsService.reviewAttempt(
+      attempt.id,
+      studentUserId,
+      QuizAttemptScopeDto.ALL,
+    );
+    expect(review.questions.map((question) => question.questionType)).toEqual(
+      expectedTypes,
+    );
+
+    const addedQuestion = await prisma.quizQuestion.create({
+      data: {
+        quizSetId: orderedSet.id,
+        lessonId: orderedLesson.id,
+        questionType: QuestionType.MULTIPLE_CHOICE,
+        questionJson: documentWithText("Chọn số năm"),
+        optionsJson: [
+          { id: "A", richText: documentWithText("5") },
+          { id: "B", richText: documentWithText("6") },
+        ],
+        correctAnswerJson: ["A"],
+        reviewStatus: ReviewStatus.APPROVED,
+        sortOrder: 4,
+      },
+    });
+    const beforeSave = await quizAttemptsService.startAttempt(
+      orderedSet.id,
+      studentUserId,
+      { scope: QuizAttemptScopeDto.ALL },
+    );
+    expect(beforeSave.questions).toHaveLength(4);
+
+    await quizService.reviewQuizSet(
+      orderedSet.id,
+      adminUserId,
+      {
+        action: QuizSetReviewActionDto.SAVE,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+      {},
+    );
+    const resumedInProgressAttempt = await quizAttemptsService.getCurrentAttempt(
+      orderedSet.id,
+      studentUserId,
+    );
+    expect(resumedInProgressAttempt).toMatchObject({
+      id: beforeSave.id,
+      originalTotalCount: 4,
+      totalCount: 4,
+    });
+    expect(
+      resumedInProgressAttempt?.questions.map((question) => question.questionNumber),
+    ).toEqual([1, 2, 3, 4]);
+
+    const submittedInProgressAttempt = await quizAttemptsService.submitAttempt(
+      beforeSave.id,
+      studentUserId,
+      beforeSave.questions.map((question) => ({
+        questionId: question.id,
+        answerJson: answerByQuestionId.get(question.id),
+      })),
+    );
+    expect(submittedInProgressAttempt).toMatchObject({
+      id: beforeSave.id,
+      correctCount: 4,
+      wrongCount: 0,
+      totalCount: 4,
+    });
+
+    const afterSave = await quizAttemptsService.startAttempt(
+      orderedSet.id,
+      studentUserId,
+      { scope: QuizAttemptScopeDto.ALL },
+    );
+    expect(afterSave.questions).toHaveLength(5);
+    expect(afterSave.questions.map((question) => question.questionType)).toEqual([
+      QuestionType.MULTIPLE_CHOICE,
+      ...expectedTypes,
+    ]);
+    answerByQuestionId.set(addedQuestion.id, ["A"]);
+
+    const deletedQuestionId = createdQuestions[2]!.id;
+    await quizService.deleteQuestion(deletedQuestionId, adminUserId, {});
+    await quizService.reviewQuizSet(
+      orderedSet.id,
+      adminUserId,
+      {
+        action: QuizSetReviewActionDto.SAVE,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+      {},
+    );
+
+    const resumedAfterDelete = await quizAttemptsService.getCurrentAttempt(
+      orderedSet.id,
+      studentUserId,
+    );
+    expect(resumedAfterDelete).toMatchObject({
+      id: afterSave.id,
+      originalTotalCount: 5,
+      totalCount: 5,
+    });
+    expect(resumedAfterDelete?.questions.map((question) => question.id)).toContain(
+      deletedQuestionId,
+    );
+    expect(
+      resumedAfterDelete?.questions.map((question) => question.questionNumber),
+    ).toEqual([1, 2, 3, 4, 5]);
+
+    const submittedAfterDelete = await quizAttemptsService.submitAttempt(
+      afterSave.id,
+      studentUserId,
+      afterSave.questions.map((question) => ({
+        questionId: question.id,
+        answerJson: answerByQuestionId.get(question.id),
+      })),
+    );
+    expect(submittedAfterDelete).toMatchObject({
+      id: afterSave.id,
+      correctCount: 5,
+      wrongCount: 0,
+      totalCount: 5,
+    });
+
+    const attemptAfterDelete = await quizAttemptsService.startAttempt(
+      orderedSet.id,
+      studentUserId,
+      { scope: QuizAttemptScopeDto.ALL },
+    );
+    expect(attemptAfterDelete.questions).toHaveLength(4);
+    expect(attemptAfterDelete.questions.map((question) => question.id)).not.toContain(
+      deletedQuestionId,
+    );
+    expect(
+      attemptAfterDelete.questions.map((question) => question.questionNumber),
+    ).toEqual([1, 2, 3, 4]);
+
+    await prisma.quizAttempt.deleteMany({ where: { lessonId: orderedLesson.id } });
+    await prisma.lesson.delete({ where: { id: orderedLesson.id } });
   });
 
   afterAll(async () => {
@@ -422,6 +803,7 @@ describe("M7 student learning flow integration", () => {
             ],
             correctAnswerJson: ["B"],
             reviewStatus: ReviewStatus.APPROVED,
+            publishedAt: new Date(),
             sortOrder: questionNumber - 1,
           },
         }),
@@ -799,10 +1181,7 @@ describe("M7 student learning flow integration", () => {
       score: 10,
     });
 
-    const failedRetake = await testAttemptsService.startAttempt(
-      lessonId,
-      studentUserId,
-    );
+    const failedRetake = await testAttemptsService.startAttempt(lessonId, studentUserId);
     const failedRetakeResult = await testAttemptsService.submitAttempt(
       failedRetake.id,
       studentUserId,

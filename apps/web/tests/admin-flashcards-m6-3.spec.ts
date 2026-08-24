@@ -725,7 +725,6 @@ async function setupFlashcardApiMock(
       id: "quiz-set-1",
       lessonId,
       title: "Bộ câu hỏi 1",
-      difficulty: "MIXED",
       source: "ADMIN",
       reviewStatus: "APPROVED",
       questionCount: quizQuestions.length,
@@ -830,14 +829,13 @@ async function setupFlashcardApiMock(
 
     if (method === "POST" && pathname === `/admin/lessons/${lessonId}/quiz-sets`) {
       const body = request.postDataJSON() as {
-        difficulty: string;
         title: string;
       };
+      expect(body).not.toHaveProperty("difficulty");
       const set = {
         id: `quiz-set-${quizSets.length + 1}`,
         lessonId,
         title: body.title,
-        difficulty: body.difficulty,
         source: "ADMIN",
         reviewStatus: "APPROVED",
         questionCount: 0,
@@ -860,9 +858,9 @@ async function setupFlashcardApiMock(
 
     if (method === "PATCH" && pathname === "/admin/quiz-sets/quiz-set-1") {
       const body = request.postDataJSON() as {
-        difficulty: string;
         title: string;
       };
+      expect(body).not.toHaveProperty("difficulty");
       const currentQuizSet = quizSets[0];
       if (!currentQuizSet) {
         return fulfillJson(route, 404, {

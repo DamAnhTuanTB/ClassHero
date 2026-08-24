@@ -89,6 +89,9 @@ AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY=ref_v2
 AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=false
 # in_memory | 24h; 24h chỉ được gửi khi model hỗ trợ
 AI_SUMMARY_PROMPT_CACHE_RETENTION=in_memory
+AI_QUIZ_SCHEMA_REFERENCE_STRATEGY=ref_v2
+AI_QUIZ_PROMPT_CACHE_KEY_ENABLED=true
+AI_QUIZ_PROMPT_CACHE_RETENTION=in_memory
 
 # Gemini
 GEMINI_API_KEY=change-me
@@ -320,6 +323,11 @@ Dùng phụ cho:
   cho Summary. `AI_SUMMARY_PROMPT_CACHE_RETENTION=24h` chỉ gửi extended retention
   cho model đã whitelist capability; mặc định `in_memory` omit provider field.
   Mọi thay đổi strategy hoặc cấu hình cache cần restart API và worker.
+- `AI_QUIZ_SCHEMA_REFERENCE_STRATEGY` được khóa ở `ref_v2`. Không dùng `auto`;
+  request draft và worker vẫn kiểm cùng schema/hash trước khi gọi provider.
+- `AI_QUIZ_PROMPT_CACHE_KEY_ENABLED=true` gửi stable cache routing key namespace
+  Quiz. `AI_QUIZ_PROMPT_CACHE_RETENTION` có cùng `in_memory | 24h` và capability
+  guard như Summary. Prompt cache không cache output và không đổi prompt/PDF.
 - Log `ai_generations`.
 - `AI_PROVIDER_TIMEOUT_MS` giới hạn các provider request ngắn như embedding.
 - `AI_GENERATION_TIMEOUT_MS` giới hạn riêng request sinh text/structured output dài;

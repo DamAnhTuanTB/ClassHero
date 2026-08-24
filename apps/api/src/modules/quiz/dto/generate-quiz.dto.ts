@@ -23,7 +23,7 @@ import {
   ValidateNested,
 } from "class-validator";
 
-import { LESSON_CONTENT_MIN_OUTPUT_TOKENS } from "#api/modules/ai/types/lesson-content-generation.types";
+import { QUIZ_MIN_OUTPUT_TOKENS } from "#api/modules/quiz/types/quiz-generation.types";
 
 export class QuizDifficultyCountsDto {
   @IsInt() @Min(0) @Max(50) easy!: number;
@@ -32,6 +32,19 @@ export class QuizDifficultyCountsDto {
 }
 
 export class GenerateQuizDto {
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID("4")
+  requestDraftId?: string;
+
+  @ApiPropertyOptional({
+    description: "SHA-256 của request Quiz đã preview",
+    pattern: "^[a-f0-9]{64}$",
+  })
+  @IsOptional()
+  @IsString()
+  requestHash?: string;
+
   @ApiPropertyOptional({
     format: "uuid",
     description:
@@ -74,6 +87,7 @@ export class GenerateQuizDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(4)
+  @ArrayUnique()
   @IsEnum(QuestionType, { each: true })
   questionTypes?: QuestionType[];
 
@@ -124,10 +138,10 @@ export class GenerateQuizDto {
   @IsIn(AI_REASONING_EFFORT_LEVELS)
   reasoningEffort?: AiReasoningEffort;
 
-  @ApiPropertyOptional({ minimum: LESSON_CONTENT_MIN_OUTPUT_TOKENS, maximum: 32_000 })
+  @ApiPropertyOptional({ minimum: QUIZ_MIN_OUTPUT_TOKENS, maximum: 32_000 })
   @IsOptional()
   @IsInt()
-  @Min(LESSON_CONTENT_MIN_OUTPUT_TOKENS)
+  @Min(QUIZ_MIN_OUTPUT_TOKENS)
   @Max(32_000)
   maxOutputTokens?: number;
 }

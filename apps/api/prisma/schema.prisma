@@ -270,8 +270,71 @@ enum BackgroundJobQueue {
   EMAIL_DELIVERY
   ZALO_DELIVERY
   DIAGRAM_RENDERING
+  QUIZ_FIGURE_RENDERING
   PAYMENT_POSTPROCESS
   PERSONAL_LEARNING_PATH_CLONE
+}
+
+enum QuizSolutionFigureMode {
+  NONE
+  REUSE_QUESTION
+  EXTEND_QUESTION
+}
+
+enum QuizFigureRole {
+  QUESTION
+  SOLUTION
+}
+
+enum QuizFigureStatus {
+  QUEUED
+  RENDERING
+  REPAIRING
+  SUCCEEDED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum QuizFigureRevisionStatus {
+  QUEUED
+  RENDERING
+  REPAIRING
+  DRAFT_READY
+  SUCCEEDED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum QuizFigureSourceKind {
+  AI_TEX
+  ADMIN_UPLOAD
+}
+
+enum QuizFigureRevisionOrigin {
+  INITIAL_AI
+  AUTO_REPAIR
+  ADMIN_EDIT
+  ADMIN_REGENERATE
+  ADMIN_UPLOAD
+  MANUAL_REPAIR
+}
+
+enum QuizFigureAttemptKind {
+  INITIAL
+  AI_REPAIR
+  INFRA_RETRY
+  ADMIN_EDIT
+  ADMIN_REGENERATE
+  ADMIN_UPLOAD
+  MANUAL_COMPILER_REPAIR
+  MANUAL_VALIDATOR_REPAIR
+  COMPILE_PREVIEW
+}
+
+enum QuizFigureAttemptStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
 }
 
 enum BackgroundJobStatus {
@@ -425,6 +488,8 @@ model User {
   updatedLessonSummaries      LessonSummary[]           @relation("LessonSummaryUpdatedBy")
   createdStemFigures          StemFigure[]              @relation("StemFigureCreatedBy")
   createdStemFigureRevisions  StemFigureRevision[]      @relation("StemFigureRevisionCreatedBy")
+  createdQuizFigures          QuizFigure[]              @relation("QuizFigureCreatedBy")
+  createdQuizFigureRevisions  QuizFigureRevision[]      @relation("QuizFigureRevisionCreatedBy")
   enrollmentsAsStudent        Enrollment[]              @relation("EnrollmentStudent")
   enrollmentsPaid             Enrollment[]              @relation("EnrollmentPaidBy")
   lessonProgress              LessonProgress[]          @relation("LessonProgressStudent")
@@ -553,6 +618,7 @@ model File {
   lessonDocuments         LessonDocument[]          @relation("LessonDocumentFile")
   aiExplanationImages     AiExplanation[]           @relation("AiExplanationImageFile")
   stemFigureDeliveries    StemFigureRevision[]      @relation("StemFigureRevisionDeliveryFile")
+  quizFigureDeliveries    QuizFigureRevision[]      @relation("QuizFigureRevisionDeliveryFile")
   newsItemCovers          NewsItem[]                @relation("NewsItemCoverFile")
   publicUrl               String?                   @map("public_url")
   checksum                String?
@@ -583,6 +649,7 @@ model BackgroundJob {
   providerUsageEvents        ProviderUsageEvent[]        @relation("ProviderUsageBackgroundJob")
   providerBudgetReservations ProviderBudgetReservation[] @relation("ProviderBudgetReservationBackgroundJob")
   stemFigureRenderAttempts   StemFigureRenderAttempt[]   @relation("StemFigureRenderAttemptJob")
+  quizFigureRenderAttempts   QuizFigureRenderAttempt[]   @relation("QuizFigureRenderAttemptJob")
   resourceType               String?                     @map("resource_type")
   resourceId                 String?                     @map("resource_id") @db.Uuid
   inputMeta                  Json?                       @map("input_meta_json")
@@ -723,34 +790,34 @@ model LearningPathChapter {
 }
 
 model Lesson {
-  id                     String                      @id @default(uuid()) @db.Uuid
-  sourceLessonId         String?                     @map("source_lesson_id") @db.Uuid
-  sourceLesson           Lesson?                     @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
-  personalizedCopies     Lesson[]                    @relation("PersonalLearningPathLessonSource")
-  learningPathId         String                      @map("learning_path_id") @db.Uuid
-  learningPath           LearningPath                @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  chapterId              String?                     @map("chapter_id") @db.Uuid
-  chapter                LearningPathChapter?        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  orderIndex             Int                         @map("order_index")
+  id                     String                       @id @default(uuid()) @db.Uuid
+  sourceLessonId         String?                      @map("source_lesson_id") @db.Uuid
+  sourceLesson           Lesson?                      @relation("PersonalLearningPathLessonSource", fields: [sourceLessonId], references: [id], onDelete: Restrict)
+  personalizedCopies     Lesson[]                     @relation("PersonalLearningPathLessonSource")
+  learningPathId         String                       @map("learning_path_id") @db.Uuid
+  learningPath           LearningPath                 @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  chapterId              String?                      @map("chapter_id") @db.Uuid
+  chapter                LearningPathChapter?         @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  orderIndex             Int                          @map("order_index")
   title                  String
-  shortDescription       String?                     @map("short_description")
-  lessonType             LessonType                  @default(BASIC) @map("lesson_type")
-  liveUrl                String?                     @map("live_url")
-  prepMaterialJson       Json?                       @map("prep_material_json")
-  scheduledAt            DateTime?                   @map("scheduled_at")
-  examOpenAt             DateTime?                   @map("exam_open_at")
-  videoUrl               String?                     @map("video_url")
-  customVideoSettings    Json?                       @map("custom_video_settings")
-  completionMinScore     Decimal                     @default(7) @map("completion_min_score") @db.Decimal(5, 2)
-  trialEnabled           Boolean                     @default(false) @map("trial_enabled")
-  status                 PublishStatus               @default(DRAFT)
-  createdById            String?                     @map("created_by_id") @db.Uuid
-  createdBy              User?                       @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedById            String?                     @map("updated_by_id") @db.Uuid
-  updatedBy              User?                       @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt              DateTime                    @default(now()) @map("created_at")
-  updatedAt              DateTime                    @updatedAt @map("updated_at")
-  deletedAt              DateTime?                   @map("deleted_at")
+  shortDescription       String?                      @map("short_description")
+  lessonType             LessonType                   @default(BASIC) @map("lesson_type")
+  liveUrl                String?                      @map("live_url")
+  prepMaterialJson       Json?                        @map("prep_material_json")
+  scheduledAt            DateTime?                    @map("scheduled_at")
+  examOpenAt             DateTime?                    @map("exam_open_at")
+  videoUrl               String?                      @map("video_url")
+  customVideoSettings    Json?                        @map("custom_video_settings")
+  completionMinScore     Decimal                      @default(7) @map("completion_min_score") @db.Decimal(5, 2)
+  trialEnabled           Boolean                      @default(false) @map("trial_enabled")
+  status                 PublishStatus                @default(DRAFT)
+  createdById            String?                      @map("created_by_id") @db.Uuid
+  createdBy              User?                        @relation("LessonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById            String?                      @map("updated_by_id") @db.Uuid
+  updatedBy              User?                        @relation("LessonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt              DateTime                     @default(now()) @map("created_at")
+  updatedAt              DateTime                     @updatedAt @map("updated_at")
+  deletedAt              DateTime?                    @map("deleted_at")
   materials              LessonMaterial[]
   documents              LessonDocument[]
   documentPageRanges     LessonDocumentPageRange[]
@@ -770,12 +837,14 @@ model Lesson {
   studentNotes           StudentNote[]
   videoComments          LessonVideoComment[]
   favorites              Favorite[]
-  backgroundJobs         BackgroundJob[]             @relation("BackgroundJobLesson")
+  backgroundJobs         BackgroundJob[]              @relation("BackgroundJobLesson")
   reports                Report[]
-  aiGenerations          AiGeneration[]              @relation("AiGenerationLesson")
+  aiGenerations          AiGeneration[]               @relation("AiGenerationLesson")
   aiExplanations         AiExplanation[]
   stemFigures            StemFigure[]
   summaryRequestDrafts   LessonSummaryRequestDraft[]
+  quizRequestDrafts      QuizGenerationRequestDraft[]
+  quizFigures            QuizFigure[]
   aiChatSessions         AiChatSession[]
   xpEvents               XpEvent[]
 
@@ -1024,6 +1093,38 @@ model LessonSummaryRequestDraft {
   @@map("lesson_summary_request_drafts")
 }
 
+model QuizGenerationRequestDraft {
+  id                 String    @id @default(uuid()) @db.Uuid
+  lessonId           String    @map("lesson_id") @db.Uuid
+  lesson             Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  createdById        String?   @map("created_by_id") @db.Uuid
+  requestHash        String    @map("request_hash")
+  packetHash         String    @map("packet_hash")
+  manifestHash       String    @map("manifest_hash")
+  packetObjectKey    String    @map("packet_object_key")
+  packetFilename     String    @map("packet_filename")
+  packetSizeBytes    BigInt    @map("packet_size_bytes")
+  packetPageCount    Int       @map("packet_page_count")
+  systemInstructions String    @map("system_instructions") @db.Text
+  userPrompt         String    @map("user_prompt") @db.Text
+  schemaName         String    @map("schema_name")
+  schemaVersion      String    @map("schema_version")
+  schemaHash         String    @map("schema_hash")
+  schemaJson         Json      @map("schema_json")
+  manifestJson       Json      @map("manifest_json")
+  sourceSnapshotJson Json      @map("source_snapshot_json")
+  modelConfigJson    Json      @map("model_config_json")
+  costEstimateJson   Json?     @map("cost_estimate_json")
+  expiresAt          DateTime  @map("expires_at")
+  consumedAt         DateTime? @map("consumed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([lessonId, createdAt(sort: Desc)])
+  @@index([requestHash])
+  @@index([expiresAt])
+  @@map("quiz_generation_request_drafts")
+}
+
 model DocumentChunk {
   id                  String                       @id @default(uuid()) @db.Uuid
   documentId          String                       @map("document_id") @db.Uuid
@@ -1114,39 +1215,39 @@ model StemFigure {
 }
 
 model StemFigureRevision {
-  id                    String                    @id @default(uuid()) @db.Uuid
-  stemFigureId          String                    @map("stem_figure_id") @db.Uuid
-  stemFigure            StemFigure                @relation("StemFigureRevisions", fields: [stemFigureId], references: [id], onDelete: Cascade)
-  sourceKind            StemFigureSourceKind      @default(AI_TEX) @map("source_kind")
-  origin                StemFigureRevisionOrigin
-  status                StemFigureRevisionStatus  @default(QUEUED)
-  latexSource           String?                   @map("latex_source") @db.Text
-  sourceHash            String?                   @map("source_hash")
-  referenceSnapshotJson Json?                     @map("reference_snapshot_json")
-  referenceSnapshotHash String?                   @map("reference_snapshot_hash")
-  generationBriefHash   String?                   @map("generation_brief_hash")
-  providerRequestSnapshotsJson Json?              @map("provider_request_snapshots_json")
-  sourceVersion         Int                       @map("source_version")
-  altText               String                    @map("alt_text")
-  caption               String?
-  previewSvg            String?                   @map("preview_svg") @db.Text
-  deliveryFileId        String?                   @map("delivery_file_id") @db.Uuid
-  deliveryFile          File?                     @relation("StemFigureRevisionDeliveryFile", fields: [deliveryFileId], references: [id], onDelete: SetNull)
-  sanitizedSvgHash      String?                   @map("sanitized_svg_hash")
-  rendererVersion       String?                   @map("renderer_version")
-  validatorVersion      String?                   @map("validator_version")
-  repairCount           Int                       @default(0) @map("repair_count")
-  maxRepairAttempts     Int                       @default(2) @map("max_repair_attempts")
-  lastErrorCategory     String?                   @map("last_error_category")
-  lastErrorCode         String?                   @map("last_error_code")
-  lastErrorMessage      String?                   @map("last_error_message") @db.Text
-  createdById           String?                   @map("created_by_id") @db.Uuid
-  createdBy             User?                     @relation("StemFigureRevisionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt             DateTime                  @default(now()) @map("created_at")
-  finishedAt            DateTime?                 @map("finished_at")
-  currentForFigure      StemFigure?               @relation("StemFigureCurrentRevision")
-  pendingForFigure      StemFigure?               @relation("StemFigurePendingRevision")
-  attempts              StemFigureRenderAttempt[]
+  id                           String                    @id @default(uuid()) @db.Uuid
+  stemFigureId                 String                    @map("stem_figure_id") @db.Uuid
+  stemFigure                   StemFigure                @relation("StemFigureRevisions", fields: [stemFigureId], references: [id], onDelete: Cascade)
+  sourceKind                   StemFigureSourceKind      @default(AI_TEX) @map("source_kind")
+  origin                       StemFigureRevisionOrigin
+  status                       StemFigureRevisionStatus  @default(QUEUED)
+  latexSource                  String?                   @map("latex_source") @db.Text
+  sourceHash                   String?                   @map("source_hash")
+  referenceSnapshotJson        Json?                     @map("reference_snapshot_json")
+  referenceSnapshotHash        String?                   @map("reference_snapshot_hash")
+  generationBriefHash          String?                   @map("generation_brief_hash")
+  providerRequestSnapshotsJson Json?                     @map("provider_request_snapshots_json")
+  sourceVersion                Int                       @map("source_version")
+  altText                      String                    @map("alt_text")
+  caption                      String?
+  previewSvg                   String?                   @map("preview_svg") @db.Text
+  deliveryFileId               String?                   @map("delivery_file_id") @db.Uuid
+  deliveryFile                 File?                     @relation("StemFigureRevisionDeliveryFile", fields: [deliveryFileId], references: [id], onDelete: SetNull)
+  sanitizedSvgHash             String?                   @map("sanitized_svg_hash")
+  rendererVersion              String?                   @map("renderer_version")
+  validatorVersion             String?                   @map("validator_version")
+  repairCount                  Int                       @default(0) @map("repair_count")
+  maxRepairAttempts            Int                       @default(2) @map("max_repair_attempts")
+  lastErrorCategory            String?                   @map("last_error_category")
+  lastErrorCode                String?                   @map("last_error_code")
+  lastErrorMessage             String?                   @map("last_error_message") @db.Text
+  createdById                  String?                   @map("created_by_id") @db.Uuid
+  createdBy                    User?                     @relation("StemFigureRevisionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt                    DateTime                  @default(now()) @map("created_at")
+  finishedAt                   DateTime?                 @map("finished_at")
+  currentForFigure             StemFigure?               @relation("StemFigureCurrentRevision")
+  pendingForFigure             StemFigure?               @relation("StemFigurePendingRevision")
+  attempts                     StemFigureRenderAttempt[]
 
   @@unique([stemFigureId, sourceVersion])
   @@index([stemFigureId, createdAt(sort: Desc)])
@@ -1241,7 +1342,6 @@ model QuizSet {
   lessonId          String         @map("lesson_id") @db.Uuid
   lesson            Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   title             String
-  difficulty        Difficulty     @default(MIXED)
   source            ContentSource  @default(ADMIN)
   reviewStatus      ReviewStatus   @default(APPROVED) @map("review_status")
   isReserve         Boolean        @default(false) @map("is_reserve")
@@ -1271,33 +1371,144 @@ model QuizSet {
 }
 
 model QuizQuestion {
-  id                 String              @id @default(uuid()) @db.Uuid
-  quizSetId          String              @map("quiz_set_id") @db.Uuid
-  quizSet            QuizSet             @relation(fields: [quizSetId], references: [id], onDelete: Cascade)
-  lessonId           String              @map("lesson_id") @db.Uuid
-  lesson             Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  questionType       QuestionType        @map("question_type")
-  questionJson       Json                @map("question_json")
-  optionsJson        Json?               @map("options_json")
-  correctAnswerJson  Json                @map("correct_answer_json")
-  hintJson           Json?               @map("hint_json")
-  gradingConfigJson  Json?               @map("grading_config_json")
-  sourceMetadataJson Json?               @map("source_metadata_json")
-  difficulty         Difficulty          @default(MEDIUM)
-  reviewStatus       ReviewStatus        @default(APPROVED) @map("review_status")
-  explanationId      String?             @map("explanation_id") @db.Uuid
-  explanation        AiExplanation?      @relation("QuizQuestionExplanation", fields: [explanationId], references: [id], onDelete: SetNull)
-  sortOrder          Int                 @default(0) @map("sort_order")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
-  deletedAt          DateTime?           @map("deleted_at")
+  id                 String                 @id @default(uuid()) @db.Uuid
+  quizSetId          String                 @map("quiz_set_id") @db.Uuid
+  quizSet            QuizSet                @relation(fields: [quizSetId], references: [id], onDelete: Cascade)
+  lessonId           String                 @map("lesson_id") @db.Uuid
+  lesson             Lesson                 @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questionType       QuestionType           @map("question_type")
+  questionJson       Json                   @map("question_json")
+  optionsJson        Json?                  @map("options_json")
+  correctAnswerJson  Json                   @map("correct_answer_json")
+  hintJson           Json?                  @map("hint_json")
+  gradingConfigJson  Json?                  @map("grading_config_json")
+  sourceMetadataJson Json?                  @map("source_metadata_json")
+  difficulty         Difficulty             @default(MEDIUM)
+  reviewStatus       ReviewStatus           @default(APPROVED) @map("review_status")
+  publishedAt        DateTime?              @map("published_at")
+  explanationId      String?                @map("explanation_id") @db.Uuid
+  explanation        AiExplanation?         @relation("QuizQuestionExplanation", fields: [explanationId], references: [id], onDelete: SetNull)
+  sortOrder          Int                    @default(0) @map("sort_order")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  deletedAt          DateTime?              @map("deleted_at")
   attemptAnswers     QuizAttemptAnswer[]
+  solutionFigureMode QuizSolutionFigureMode @default(NONE) @map("solution_figure_mode")
+  figures            QuizFigure[]
 
   @@index([quizSetId, sortOrder])
+  @@index([quizSetId, publishedAt])
   @@index([lessonId])
   @@index([lessonId, reviewStatus])
   @@index([explanationId])
   @@map("quiz_questions")
+}
+
+model QuizFigure {
+  id                String                    @id @default(uuid()) @db.Uuid
+  lessonId          String                    @map("lesson_id") @db.Uuid
+  lesson            Lesson                    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  quizQuestionId    String                    @map("quiz_question_id") @db.Uuid
+  quizQuestion      QuizQuestion              @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
+  role              QuizFigureRole
+  aiGenerationId    String?                   @map("ai_generation_id") @db.Uuid
+  aiGeneration      AiGeneration?             @relation("QuizFigureAiGeneration", fields: [aiGenerationId], references: [id], onDelete: SetNull)
+  planJson          Json?                     @map("plan_json")
+  subjectKey        String                    @map("subject_key") @db.VarChar(24)
+  subjectName       String                    @map("subject_name") @db.VarChar(120)
+  subjectSlug       String                    @map("subject_slug") @db.VarChar(140)
+  status            QuizFigureStatus          @default(QUEUED)
+  lastErrorCategory String?                   @map("last_error_category")
+  lastErrorCode     String?                   @map("last_error_code")
+  lastErrorMessage  String?                   @map("last_error_message") @db.Text
+  createdById       String?                   @map("created_by_id") @db.Uuid
+  createdBy         User?                     @relation("QuizFigureCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  currentRevisionId String?                   @unique @map("current_revision_id") @db.Uuid
+  currentRevision   QuizFigureRevision?       @relation("QuizFigureCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  pendingRevisionId String?                   @unique @map("pending_revision_id") @db.Uuid
+  pendingRevision   QuizFigureRevision?       @relation("QuizFigurePendingRevision", fields: [pendingRevisionId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+  deletedAt         DateTime?                 @map("deleted_at")
+  revisions         QuizFigureRevision[]      @relation("QuizFigureRevisions")
+  attempts          QuizFigureRenderAttempt[]
+
+  @@unique([quizQuestionId, role])
+  @@index([lessonId, status])
+  @@index([quizQuestionId, deletedAt])
+  @@index([aiGenerationId])
+  @@map("quiz_figures")
+}
+
+model QuizFigureRevision {
+  id                            String                    @id @default(uuid()) @db.Uuid
+  quizFigureId                  String                    @map("quiz_figure_id") @db.Uuid
+  quizFigure                    QuizFigure                @relation("QuizFigureRevisions", fields: [quizFigureId], references: [id], onDelete: Cascade)
+  sourceKind                    QuizFigureSourceKind      @default(AI_TEX) @map("source_kind")
+  origin                        QuizFigureRevisionOrigin
+  status                        QuizFigureRevisionStatus  @default(QUEUED)
+  latexSource                   String?                   @map("latex_source") @db.Text
+  sourceHash                    String?                   @map("source_hash")
+  sourceVersion                 Int                       @map("source_version")
+  derivedFromQuestionRevisionId String?                   @map("derived_from_question_revision_id") @db.Uuid
+  derivedFromQuestionRevision   QuizFigureRevision?       @relation("QuizFigureSolutionDerivation", fields: [derivedFromQuestionRevisionId], references: [id], onDelete: SetNull)
+  derivedSolutionRevisions      QuizFigureRevision[]      @relation("QuizFigureSolutionDerivation")
+  altText                       String                    @map("alt_text")
+  caption                       String?
+  previewSvg                    String?                   @map("preview_svg") @db.Text
+  deliveryFileId                String?                   @map("delivery_file_id") @db.Uuid
+  deliveryFile                  File?                     @relation("QuizFigureRevisionDeliveryFile", fields: [deliveryFileId], references: [id], onDelete: SetNull)
+  sanitizedSvgHash              String?                   @map("sanitized_svg_hash")
+  rendererVersion               String?                   @map("renderer_version")
+  validatorVersion              String?                   @map("validator_version")
+  repairCount                   Int                       @default(0) @map("repair_count")
+  maxRepairAttempts             Int                       @default(2) @map("max_repair_attempts")
+  lastErrorCategory             String?                   @map("last_error_category")
+  lastErrorCode                 String?                   @map("last_error_code")
+  lastErrorMessage              String?                   @map("last_error_message") @db.Text
+  createdById                   String?                   @map("created_by_id") @db.Uuid
+  createdBy                     User?                     @relation("QuizFigureRevisionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt                     DateTime                  @default(now()) @map("created_at")
+  finishedAt                    DateTime?                 @map("finished_at")
+  currentForFigure              QuizFigure?               @relation("QuizFigureCurrentRevision")
+  pendingForFigure              QuizFigure?               @relation("QuizFigurePendingRevision")
+  attempts                      QuizFigureRenderAttempt[]
+
+  @@unique([quizFigureId, sourceVersion])
+  @@index([quizFigureId, createdAt(sort: Desc)])
+  @@index([derivedFromQuestionRevisionId])
+  @@index([status, createdAt])
+  @@index([deliveryFileId])
+  @@map("quiz_figure_revisions")
+}
+
+model QuizFigureRenderAttempt {
+  id              String                  @id @default(uuid()) @db.Uuid
+  quizFigureId    String                  @map("quiz_figure_id") @db.Uuid
+  quizFigure      QuizFigure              @relation(fields: [quizFigureId], references: [id], onDelete: Cascade)
+  revisionId      String                  @map("revision_id") @db.Uuid
+  revision        QuizFigureRevision      @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  backgroundJobId String?                 @map("background_job_id") @db.Uuid
+  backgroundJob   BackgroundJob?          @relation("QuizFigureRenderAttemptJob", fields: [backgroundJobId], references: [id], onDelete: SetNull)
+  attemptNumber   Int                     @map("attempt_number")
+  sourceVersion   Int                     @map("source_version")
+  kind            QuizFigureAttemptKind
+  status          QuizFigureAttemptStatus @default(RUNNING)
+  sourceHash      String                  @map("source_hash")
+  compileLog      String?                 @map("compile_log") @db.Text
+  errorCategory   String?                 @map("error_category")
+  errorCode       String?                 @map("error_code")
+  validatorIssues Json?                   @map("validator_issues_json")
+  durationMs      Int?                    @map("duration_ms")
+  startedAt       DateTime                @default(now()) @map("started_at")
+  finishedAt      DateTime?               @map("finished_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+
+  @@unique([quizFigureId, attemptNumber])
+  @@index([backgroundJobId])
+  @@index([revisionId, createdAt])
+  @@index([quizFigureId, status])
+  @@map("quiz_figure_render_attempts")
 }
 
 model QuizAttempt {
@@ -1828,6 +2039,7 @@ model AiGeneration {
   providerUsageEvents        ProviderUsageEvent[]        @relation("ProviderUsageAiGeneration")
   providerBudgetReservations ProviderBudgetReservation[] @relation("ProviderBudgetReservationAiGeneration")
   stemFigures                StemFigure[]                @relation("StemFigureAiGeneration")
+  quizFigures                QuizFigure[]                @relation("QuizFigureAiGeneration")
 
   @@index([lessonId, type, status])
   @@index([backgroundJobId])

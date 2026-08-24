@@ -36,6 +36,7 @@ export class StudentLearningPrerequisitesService {
             some: {
               deletedAt: null,
               reviewStatus: ReviewStatus.APPROVED,
+              publishedAt: { not: null },
             },
           },
         },

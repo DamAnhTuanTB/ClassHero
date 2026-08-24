@@ -1906,7 +1906,7 @@ function BaseBlockContainer({
           <MathpixMarkdownRenderer content={normalizeBlockMath(block.title, block)} />
         </div>
       )}
-      <div className="space-y-2 opacity-90 text-[15px] leading-relaxed text-slate-800 dark:text-slate-200">
+      <div className="learning-content-text space-y-2 opacity-90 leading-relaxed text-slate-800 dark:text-slate-200">
         {children}
       </div>
     </div>

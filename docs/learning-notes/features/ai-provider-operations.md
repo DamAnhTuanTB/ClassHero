@@ -63,6 +63,11 @@ flowchart TD
 - Khi request cho phép override model, snapshot phải cập nhật đồng thời model cấp
   route và candidate list. Nếu chỉ thay candidate, UI có thể hiển thị model mặc định
   trong khi worker thực thi model được chọn.
+- Với flow có immutable request draft, mọi đường dựng payload — preview tự động,
+  preview thủ công và preview ngay trước submit — phải dùng cùng capability của
+  model. Nếu một đường không biết model dùng `TEMPERATURE` hay `REASONING_EFFORT`,
+  nó có thể lén giữ field đang bị ẩn trên UI và tạo snapshot khác payload generate;
+  backend phải tiếp tục từ chối mismatch thay vì nới lỏng kiểm tra.
 
 ## Task liên quan
 

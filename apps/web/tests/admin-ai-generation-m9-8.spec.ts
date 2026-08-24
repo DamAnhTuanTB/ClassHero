@@ -5,6 +5,8 @@ const lessonId = "lesson-ai-m9-8";
 const documentId = "11111111-1111-4111-8111-111111111111";
 const processingDocumentId = "22222222-2222-4222-8222-222222222222";
 const supplementalDocumentId = "33333333-3333-4333-8333-333333333333";
+const quizSetOneId = "55555555-5555-4555-8555-555555555551";
+const quizSetTwoId = "55555555-5555-4555-8555-555555555552";
 const questionTypes = [
   "MULTIPLE_CHOICE",
   "TRUE_FALSE",
@@ -46,6 +48,34 @@ test.describe("M9.8 admin AI generation panel", () => {
     const summaryDialog = page.getByRole("dialog", { name: "Tạo Kiến thức bằng AI" });
     await expect(summaryDialog.locator("select")).toHaveCount(0);
     await expect(summaryDialog.getByLabel("Cách trình bày")).toBeVisible();
+    await expect(summaryDialog.getByTestId("ai-prompt-markdown-preview")).toHaveCSS(
+      "overflow-y",
+      "auto",
+    );
+    await expect(summaryDialog.getByTestId("ai-prompt-markdown-preview")).toHaveCSS(
+      "max-height",
+      "384px",
+    );
+    await expect(summaryDialog.getByTestId("ai-prompt-preview-shell")).toHaveCSS(
+      "overflow-y",
+      "hidden",
+    );
+    const summaryTrailingSpace = await summaryDialog
+      .locator("form > div")
+      .first()
+      .evaluate((body) => {
+        body.scrollTop = body.scrollHeight;
+        const previewShell = body.querySelector(
+          '[data-testid="ai-prompt-preview-shell"]',
+        );
+        if (!previewShell) return Number.POSITIVE_INFINITY;
+        return (
+          body.getBoundingClientRect().bottom -
+          previewShell.getBoundingClientRect().bottom
+        );
+      });
+    expect(summaryTrailingSpace).toBeGreaterThanOrEqual(0);
+    expect(summaryTrailingSpace).toBeLessThanOrEqual(24);
     const documentSelect = summaryDialog.getByLabel("Tài liệu dùng để tạo", {
       exact: true,
     });
@@ -75,8 +105,15 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeEnabled();
     await summaryDialog.getByRole("button", { name: "Hủy" }).click();
 
-    await generationCard(page, "Quiz").getByRole("button", { name: "Tạo Quiz" }).click();
+    await generationCard(page, "Quiz").getByRole("button", { name: "Tạo mới" }).click();
     const quizDialog = page.getByRole("dialog", { name: "Tạo Quiz bằng AI" });
+    await expect(quizDialog.getByText("Nguồn PDF sẽ gửi AI")).toBeVisible();
+    await expect(quizDialog.getByLabel("Số câu hỏi")).toHaveValue("10");
+    await expect(quizDialog.getByLabel("Dễ", { exact: true })).toHaveValue("5");
+    await expect(quizDialog.getByLabel("Trung bình", { exact: true })).toHaveValue(
+      "3",
+    );
+    await expect(quizDialog.getByLabel("Khó", { exact: true })).toHaveValue("2");
     await quizDialog.getByLabel("Số câu hỏi").fill("2");
     await expect(
       quizDialog.getByText("Số câu phải lớn hơn hoặc bằng số loại câu hỏi đã chọn"),
@@ -89,10 +126,56 @@ test.describe("M9.8 admin AI generation panel", () => {
     await quizDialog.getByLabel("Mức độ").click();
     await quizDialog.getByRole("option", { name: "Khó" }).click();
     await expect(quizDialog.getByLabel("Mức độ")).toContainText("Khó");
+    await expect(
+      quizDialog.getByRole("button", { name: "Model", exact: true }),
+    ).toContainText("OpenAI · gpt-4.1-mini");
     await quizDialog.getByRole("button", { name: "Model", exact: true }).click();
+    await expect(
+      quizDialog.getByRole("option", { name: "Tự động theo Cài đặt AI" }),
+    ).toBeVisible();
     await quizDialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await quizDialog.getByLabel("Temperature").fill("0.1");
     await quizDialog.getByLabel("Giới hạn token đầu ra").fill("8000");
+    await quizDialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
+    await expect(quizDialog.getByText("Nguồn PDF sẽ gửi AI")).toBeVisible();
+    await expect(quizDialog.getByText("Model thực tế")).toBeVisible();
+    await expect(quizDialog.getByTestId("ai-prompt-markdown-preview")).toHaveCSS(
+      "overflow-y",
+      "auto",
+    );
+    await expect(quizDialog.getByTestId("ai-prompt-markdown-preview")).toHaveCSS(
+      "max-height",
+      "384px",
+    );
+    await expect(quizDialog.getByTestId("ai-prompt-preview-shell")).toHaveCSS(
+      "overflow-y",
+      "hidden",
+    );
+    const quizTrailingSpace = await quizDialog
+      .locator("form > div")
+      .first()
+      .evaluate((body) => {
+        body.scrollTop = body.scrollHeight;
+        const previewShell = body.querySelector(
+          '[data-testid="ai-prompt-preview-shell"]',
+        );
+        if (!previewShell) return Number.POSITIVE_INFINITY;
+        return (
+          body.getBoundingClientRect().bottom -
+          previewShell.getBoundingClientRect().bottom
+        );
+      });
+    expect(quizTrailingSpace).toBeGreaterThanOrEqual(0);
+    expect(quizTrailingSpace).toBeLessThanOrEqual(24);
+    await expect(quizDialog.getByRole("tab", { name: "Quy tắc hệ thống" })).toBeVisible();
+    await quizDialog.getByRole("button", { name: "Chỉnh sửa" }).click();
+    await expect(quizDialog.getByLabel("Markdown gốc — Quy tắc hệ thống")).toHaveValue(
+      mockSystemPrompt,
+    );
+    await quizDialog.getByRole("tab", { name: "Dữ liệu gửi đi" }).click();
+    await expect(
+      quizDialog.getByRole("region", { name: "Request OpenAI Responses API" }),
+    ).toBeVisible();
     await quizDialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
 
     await expect
@@ -101,12 +184,14 @@ test.describe("M9.8 admin AI generation panel", () => {
         questionCount: 2,
         difficulty: "HARD",
         questionTypes: ["MULTIPLE_CHOICE", "TRUE_FALSE"],
-        systemInstructions: mockSystemPrompt,
-        userPrompt: expect.stringContaining('"questionCount":2'),
         model: "gpt-4.1-mini",
         temperature: 0.1,
         maxOutputTokens: 8_000,
+        requestDraftId: "44444444-4444-4444-8444-444444444444",
+        requestHash: "a".repeat(64),
       });
+    expect(mock.payloads.QUIZ).not.toHaveProperty("systemInstructions");
+    expect(mock.payloads.QUIZ).not.toHaveProperty("userPrompt");
     expect(mock.promptPreviewPayloads.at(-1)).toMatchObject({
       questionCount: 2,
       difficulty: "HARD",
@@ -120,6 +205,297 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByText("Cần duyệt", { exact: true }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
+  });
+
+  test("keeps Quiz preview loading separate from Quiz submission", async ({ page }) => {
+    await setupAiGenerationMock(page, { promptPreviewDelayMs: 500 });
+    await page.goto(`/admin/lessons/${lessonId}`);
+
+    await generationCard(page, "Quiz").getByRole("button", { name: "Tạo mới" }).click();
+    const dialog = page.getByRole("dialog", { name: "Tạo Quiz bằng AI" });
+    const submitButton = dialog.getByRole("button", { name: "Bắt đầu tạo" });
+
+    await expect(
+      dialog.getByRole("button", { name: "Đang dựng dữ liệu" }),
+    ).toBeDisabled();
+    await expect(submitButton).toBeDisabled();
+    await expect(submitButton.locator("svg.animate-spin")).toHaveCount(0);
+
+    await expect(
+      dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }),
+    ).toBeEnabled();
+    await expect(submitButton).toBeEnabled();
+  });
+
+  test("clears a failed Quiz state immediately when retry is submitted", async ({
+    page,
+  }) => {
+    await setupAiGenerationMock(page, {
+      generationDelayMs: 800,
+      initialFailedQuizGeneration: true,
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+
+    const quizCard = generationCard(page, "Quiz");
+    await expect(quizCard.getByText("Tạo thất bại", { exact: true })).toBeVisible();
+    await quizCard.getByRole("button", { name: "Thử lại", exact: true }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Tạo Quiz bằng AI" });
+    await expect(dialog.getByRole("button", { name: "Bắt đầu tạo" })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
+
+    await expect(quizCard.getByText("Tạo thất bại", { exact: true })).toHaveCount(0);
+    await expect(quizCard.getByText("Đang chờ", { exact: true })).toBeVisible();
+    await expect(quizCard.getByRole("button", { name: /Đang xử lý/ })).toBeDisabled();
+  });
+
+  test("defaults Quiz generation to the active set and submits the selected set", async ({
+    page,
+  }) => {
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [
+        quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+        quizSetFixture(quizSetTwoId, "Bộ câu hỏi 2", 1),
+      ],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+    await page.getByRole("tab", { name: /Bộ câu hỏi 2/ }).click();
+
+    await generationCard(page, "Quiz").getByRole("button", { name: "Tạo mới" }).click();
+    const dialog = page.getByRole("dialog", { name: "Tạo Quiz bằng AI" });
+    const targetSetField = dialog.getByLabel("Bộ câu hỏi được chọn");
+    await expect(targetSetField).toContainText("Bộ câu hỏi 2");
+
+    await targetSetField.click();
+    await dialog.getByRole("option", { name: "Bộ câu hỏi 1" }).click();
+    await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
+
+    await expect
+      .poll(() => mock.payloads.QUIZ)
+      .toMatchObject({
+        targetQuizSetId: quizSetOneId,
+      });
+  });
+
+  test("keeps Quiz review warnings outside every view mode and accepts them through review", async ({
+    page,
+  }) => {
+    const generationId = "66666666-6666-4666-8666-666666666666";
+    const questionId = "77777777-7777-4777-8777-777777777777";
+    const approvedQuestionIds = {
+      multipleChoice: "77777777-7777-4777-8777-777777777771",
+      trueFalse: "77777777-7777-4777-8777-777777777772",
+      multiStatement: "77777777-7777-4777-8777-777777777773",
+      textInput: "77777777-7777-4777-8777-777777777774",
+    };
+    const quizSet = {
+      ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+      source: "AI",
+      reviewStatus: "NEEDS_REVIEW",
+      questionCount: 5,
+      _count: { questions: 5 },
+      pendingReviewQuestionCount: 1,
+      unpublishedApprovedQuestionCount: 4,
+      aiGenerations: [
+        {
+          id: generationId,
+          createdAt: new Date().toISOString(),
+          inputMetaJson: {
+            generationIssues: [
+              {
+                code: "DIFFICULTY_DISTRIBUTION_MISMATCH",
+                message: "Phân bổ Dễ/Trung bình/Khó chưa đúng số lượng đã cấu hình.",
+                blocking: false,
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [quizSet],
+      quizQuestions: [
+        quizQuestionFixture(questionId, quizSetOneId, generationId),
+        quizQuestionFixture(
+          approvedQuestionIds.multipleChoice,
+          quizSetOneId,
+          generationId,
+          { reviewStatus: "APPROVED" },
+        ),
+        quizQuestionFixture(approvedQuestionIds.trueFalse, quizSetOneId, generationId, {
+          questionType: "TRUE_FALSE",
+          reviewStatus: "APPROVED",
+        }),
+        quizQuestionFixture(
+          approvedQuestionIds.multiStatement,
+          quizSetOneId,
+          generationId,
+          {
+            questionType: "MULTI_STATEMENT_TRUE_FALSE",
+            reviewStatus: "APPROVED",
+          },
+        ),
+        quizQuestionFixture(approvedQuestionIds.textInput, quizSetOneId, generationId, {
+          questionType: "TEXT_INPUT",
+          reviewStatus: "APPROVED",
+        }),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+
+    const navigationRows = page.locator('[data-testid^="quiz-question-navigation-"]');
+    await expect(navigationRows).toHaveCount(5);
+    await expect(navigationRows).toContainText([
+      "Câu AI chờ duyệt",
+      "Trắc nghiệm",
+      "Đúng/Sai 1 mệnh đề",
+      "Đúng/Sai nhiều mệnh đề",
+      "Nhập đáp án",
+    ]);
+    await expect(
+      page.getByTestId("quiz-question-navigation-pending-ai").getByRole("tab"),
+    ).toHaveCount(1);
+
+    const quizStatistics = page.getByLabel("Thống kê bộ Quiz");
+    await expect(quizStatistics).toContainText("Tổng câu5");
+    await expect(quizStatistics).toContainText("Đã duyệt4");
+    await expect(quizStatistics).toContainText("AI chờ duyệt1");
+    await expect(quizStatistics).not.toContainText("Chưa lưu");
+    const unsavedWarning = page.getByTestId("quiz-unsaved-approved-warning");
+    await expect(unsavedWarning).toContainText(
+      "Bạn đã duyệt thêm 4 câu. Nhớ nhấn Lưu để cập nhật cho học sinh.",
+    );
+
+    const quizActions = page.getByLabel("Hành động bộ Quiz");
+    await expect(quizActions.getByRole("button", { name: "Lưu" })).toBeVisible();
+    await expect(quizActions.getByRole("button", { name: "Phát hành" })).toBeVisible();
+    await expect
+      .poll(() => quizActions.evaluate((element) => getComputedStyle(element).flexWrap))
+      .toBe("nowrap");
+    await expect
+      .poll(async () => {
+        const [actionsBox, warningBox] = await Promise.all([
+          quizActions.boundingBox(),
+          unsavedWarning.boundingBox(),
+        ]);
+        return Boolean(actionsBox && warningBox && warningBox.y > actionsBox.y);
+      })
+      .toBe(true);
+
+    await page.getByRole("button", { name: "Câu tiếp theo" }).click();
+    await expect(
+      page.locator(`#quiz-question-${approvedQuestionIds.multipleChoice}`),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Câu trước" }).click();
+    await expect(page.locator(`#quiz-question-${questionId}`)).toBeVisible();
+
+    const warning = page.getByTestId("quiz-generation-review-warning");
+    await expect(warning).toBeVisible();
+    await expect(warning.getByText("Đây là cảnh báo review")).toHaveCount(0);
+    await expect(
+      warning.locator("xpath=ancestor::section[starts-with(@aria-label, 'JSON câu')]"),
+    ).toHaveCount(0);
+    await expect(warning.locator("xpath=ancestor::article")).toHaveCount(0);
+
+    for (const mode of ["Chỉ xem UI", "Chỉ xem JSON", "Song song"]) {
+      await page.getByRole("button", { name: mode }).click();
+      await expect(warning).toBeVisible();
+    }
+
+    await warning.getByRole("button", { name: "Chấp nhận" }).click();
+    await expect
+      .poll(() => mock.quizReviewPayloads)
+      .toEqual([{ questionId, reviewStatus: "APPROVED" }]);
+    await expect(warning).toHaveCount(0);
+    await expect(page.getByTestId("quiz-question-navigation-pending-ai")).toHaveCount(0);
+    await expect(
+      page.getByTestId("quiz-question-navigation-MULTIPLE_CHOICE").getByRole("tab"),
+    ).toHaveCount(2);
+    await expect(
+      page.locator(`#quiz-question-${questionId}`).getByText("Đã duyệt", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    const publishButton = page.getByRole("button", {
+      name: "Phát hành",
+      exact: true,
+    });
+    await expect(publishButton).toBeEnabled();
+    await publishButton.click();
+    await expect
+      .poll(() => mock.quizSetReviewPayloads)
+      .toEqual([{ action: "PUBLISH", reviewStatus: "APPROVED" }]);
+    await expect(
+      page.getByRole("button", { name: "Thu hồi phát hành", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lưu", exact: true })).toBeVisible();
+  });
+
+  test("bulk reviews every pending AI question in the current Quiz set before save", async ({
+    page,
+  }) => {
+    const generationId = "66666666-6666-4666-8666-666666666667";
+    const firstPendingId = "77777777-7777-4777-8777-777777777775";
+    const secondPendingId = "77777777-7777-4777-8777-777777777776";
+    const approvedId = "77777777-7777-4777-8777-777777777777";
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [
+        {
+          ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+          source: "AI",
+          questionCount: 3,
+          _count: { questions: 3 },
+          pendingReviewQuestionCount: 2,
+          unpublishedApprovedQuestionCount: 1,
+        },
+      ],
+      quizQuestions: [
+        quizQuestionFixture(firstPendingId, quizSetOneId, generationId),
+        quizQuestionFixture(secondPendingId, quizSetOneId, generationId),
+        quizQuestionFixture(approvedId, quizSetOneId, generationId, {
+          reviewStatus: "APPROVED",
+        }),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+
+    const actions = page.getByLabel("Hành động bộ Quiz");
+    const difficultyStatistics = page.getByLabel("Thống kê mức độ Quiz");
+    await expect(difficultyStatistics).toContainText("Dễ0");
+    await expect(difficultyStatistics).toContainText("Trung bình3");
+    await expect(difficultyStatistics).toContainText("Khó0");
+    const reviewAllButton = actions.getByRole("button", {
+      name: "Duyệt tất cả",
+      exact: true,
+    });
+    const saveButton = actions.getByRole("button", { name: "Lưu", exact: true });
+    await expect(reviewAllButton).toBeEnabled();
+    await expect
+      .poll(async () => {
+        const [reviewAllBox, saveBox] = await Promise.all([
+          reviewAllButton.boundingBox(),
+          saveButton.boundingBox(),
+        ]);
+        return Boolean(reviewAllBox && saveBox && reviewAllBox.x < saveBox.x);
+      })
+      .toBe(true);
+
+    await reviewAllButton.click();
+    await expect.poll(() => mock.quizBulkReviewSetIds).toEqual([quizSetOneId]);
+    await expect(page.getByTestId("quiz-question-navigation-pending-ai")).toHaveCount(0);
+    const quizStatistics = page.getByLabel("Thống kê bộ Quiz");
+    await expect(quizStatistics).toContainText("Đã duyệt3");
+    await expect(quizStatistics).toContainText("AI chờ duyệt0");
+    await expect(page.getByTestId("quiz-unsaved-approved-warning")).toContainText(
+      "Bạn đã duyệt thêm 3 câu. Nhớ nhấn Lưu để cập nhật cho học sinh.",
+    );
+    await expect(reviewAllButton).toBeDisabled();
+    expect(mock.quizSetReviewPayloads).toEqual([]);
   });
 
   test("validates flashcard/test configuration and sends normalized payloads", async ({
@@ -327,6 +703,14 @@ test.describe("M9.8 admin AI generation panel", () => {
       });
 
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
+    await expect.poll(() => mock.promptPreviewPayloads.length).toBe(3);
+    const submissionPreviewPayload = mock.promptPreviewPayloads.at(-1);
+    expect(submissionPreviewPayload).toMatchObject({
+      model: "gpt-5.6-luna",
+      reasoningEffort: "xhigh",
+      maxOutputTokens: 20_000,
+    });
+    expect(submissionPreviewPayload).not.toHaveProperty("temperature");
     await expect
       .poll(() => mock.payloads.SUMMARY)
       .toMatchObject({
@@ -365,6 +749,13 @@ test.describe("M9.8 admin AI generation panel", () => {
       (button as HTMLButtonElement).click();
     });
     await expect.poll(() => mock.promptPreviewPayloads.length).toBe(2);
+    const refreshedPreviewPayload = mock.promptPreviewPayloads.at(-1);
+    expect(refreshedPreviewPayload).toMatchObject({
+      model: "gpt-5.6-luna",
+      reasoningEffort: "xhigh",
+      maxOutputTokens: 20_000,
+    });
+    expect(refreshedPreviewPayload).not.toHaveProperty("temperature");
     await dialog.getByRole("tab", { name: "Dữ liệu gửi đi" }).click();
     await dialog
       .getByRole("tabpanel")
@@ -1853,11 +2244,88 @@ async function seedAdminSession(page: Page) {
   );
 }
 
+function quizSetFixture(id: string, title: string, sortOrder: number) {
+  const timestamp = new Date().toISOString();
+  return {
+    id,
+    lessonId,
+    title,
+    source: "ADMIN",
+    reviewStatus: "DRAFT",
+    questionCount: 0,
+    sortOrder,
+    _count: { questions: 0 },
+    pendingReviewQuestionCount: 0,
+    aiGenerations: [],
+    aiGeneration: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function quizQuestionFixture(
+  id: string,
+  quizSetId: string,
+  aiGenerationId: string,
+  overrides: Record<string, unknown> = {},
+) {
+  const textDocument = (text: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
+  return {
+    id,
+    quizSetId,
+    questionType: "MULTIPLE_CHOICE",
+    difficulty: "MEDIUM",
+    questionJson: textDocument("Thể tích khối cầu bán kính 3 bằng bao nhiêu?"),
+    optionsJson: [
+      { id: "A", richText: textDocument("12π") },
+      { id: "B", richText: textDocument("27π") },
+      { id: "C", richText: textDocument("36π") },
+      { id: "D", richText: textDocument("108π") },
+    ],
+    correctAnswerJson: ["C"],
+    hintJson: textDocument("Dùng công thức thể tích khối cầu."),
+    gradingConfigJson: null,
+    explanation: null,
+    sourceMetadataJson: {
+      aiGenerationId,
+      generationQuestionIndex: 0,
+    },
+    generationQuestionJson: {
+      questionType: "MULTIPLE_CHOICE",
+      difficulty: "MEDIUM",
+      options: [
+        { id: "A", text: "$12\\pi$" },
+        { id: "B", text: "$27\\pi$" },
+        { id: "C", text: "$36\\pi$" },
+        { id: "D", text: "$108\\pi$" },
+      ],
+      correctOptionId: "C",
+      explanation: {
+        problem: "Thể tích khối cầu bán kính 3 bằng bao nhiêu?",
+        solution: "Vậy thể tích cần tìm là $36\\pi$.",
+        answer: "C. $36\\pi$",
+        isGeometry: false,
+        geometryStatement: null,
+      },
+    },
+    reviewStatus: "NEEDS_REVIEW",
+    solutionFigureMode: "NONE",
+    figures: [],
+    ...overrides,
+  };
+}
+
 async function setupAiGenerationMock(
   page: Page,
   options: {
     compileDelayMs?: number;
     compileFailure?: boolean;
+    generationDelayMs?: number;
+    initialFailedQuizGeneration?: boolean;
+    promptPreviewDelayMs?: number;
     sourceCropDelayMs?: number;
     initialReviewStatus?: "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "HIDDEN";
     runningPolls?: number;
@@ -1865,6 +2333,8 @@ async function setupAiGenerationMock(
     initialSummaryGenerationInput?: Record<string, unknown>;
     phaseOneBlockJsonByPath?: Record<string, unknown>;
     lessonTitle?: string;
+    quizQuestions?: Array<Record<string, unknown>>;
+    quizSets?: Array<Record<string, unknown>>;
     stemFigures?: Array<Record<string, unknown>>;
     summaryFiguresAfterGeneration?: Array<Record<string, unknown>>;
   } = {},
@@ -1873,6 +2343,15 @@ async function setupAiGenerationMock(
     {};
   const promptPreviewPayloads: unknown[] = [];
   const summaryPutPayloads: unknown[] = [];
+  const quizReviewPayloads: Array<{
+    questionId: string;
+    reviewStatus: string;
+  }> = [];
+  const quizSetReviewPayloads: Array<{
+    action?: string;
+    reviewStatus: string;
+  }> = [];
+  const quizBulkReviewSetIds: string[] = [];
   const figureActions = {
     applies: 0,
     applyPayloads: [] as Array<Record<string, unknown>>,
@@ -1891,6 +2370,7 @@ async function setupAiGenerationMock(
       inputMetaJson: Record<string, unknown>;
       polls: number;
       resourceId: string;
+      status?: "FAILED";
       type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
     }
   >();
@@ -1902,13 +2382,23 @@ async function setupAiGenerationMock(
       type: "SUMMARY",
     });
   }
+  if (options.initialFailedQuizGeneration) {
+    jobs.set("job-quiz-failed", {
+      inputMetaJson: {},
+      polls: 0,
+      resourceId: "",
+      status: "FAILED",
+      type: "QUIZ",
+    });
+  }
   const sets: Record<"QUIZ" | "FLASHCARD" | "TEST", Array<Record<string, unknown>>> = {
-    QUIZ: [],
+    QUIZ: structuredClone(options.quizSets ?? []),
     FLASHCARD: [],
     TEST: [],
   };
   const state: {
     figures: Array<Record<string, unknown>>;
+    quizQuestions: Array<Record<string, unknown>>;
     summary: {
       contentJson: unknown;
       id: string;
@@ -1922,6 +2412,7 @@ async function setupAiGenerationMock(
     } | null;
   } = {
     figures: structuredClone(options.stemFigures ?? []),
+    quizQuestions: structuredClone(options.quizQuestions ?? []),
     summary: options.initialSummaryContent
       ? {
           id: "summary-review",
@@ -2397,6 +2888,9 @@ async function setupAiGenerationMock(
         : [`USER PROMPT ${JSON.stringify(body)}`, subjectBoundary].join("\n\n");
       const isSummaryPreview =
         pathname === `/admin/lessons/${lessonId}/summary/prompt-preview`;
+      if (options.promptPreviewDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.promptPreviewDelayMs));
+      }
       const sourceManifest = JSON.stringify({
         version: 1,
         pages: [
@@ -2411,42 +2905,49 @@ async function setupAiGenerationMock(
       });
       return fulfillJson(route, 200, {
         data: {
-          promptVersion: "lesson-summary-prompt-v40",
-          schemaVersion: "lesson-summary-schema-v32",
+          ...(!isSummaryPreview
+            ? {
+                requestDraftId: "44444444-4444-4444-8444-444444444444",
+                requestHash: "a".repeat(64),
+                expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+              }
+            : {}),
+          promptVersion: isSummaryPreview
+            ? "lesson-summary-prompt-v40"
+            : "quiz-subject-prompt-v1",
+          schemaVersion: isSummaryPreview
+            ? "lesson-summary-schema-v32"
+            : "quiz-subject-schema-v1",
           systemPrompt,
           userPrompt,
           inputPrompt: `${userPrompt}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
-          ...(isSummaryPreview
-            ? {
-                openAiFileUploadRequest: {
-                  purpose: "user_data",
-                  file: '<File name="lesson-source.pdf" type="application/pdf" size=2048; <binary data omitted from preview>>',
-                },
-              }
-            : {}),
+          openAiFileUploadRequest: {
+            purpose: "user_data",
+            file: `<File name="${isSummaryPreview ? "lesson-source.pdf" : "quiz-source.pdf"}" type="application/pdf" size=2048; <binary data omitted from preview>>`,
+          },
           openAiRequest: {
             model: body.model ?? "gpt-4.1-mini",
             instructions: systemPrompt,
-            input: isSummaryPreview
-              ? [
+            input: [
+              {
+                role: "user",
+                content: [
                   {
-                    role: "user",
-                    content: [
-                      {
-                        type: "input_file",
-                        file_id: "<file_id returned by the OpenAI Files API at runtime>",
-                        detail: "high",
-                      },
-                      { type: "input_text", text: sourceManifest },
-                      { type: "input_text", text: userPrompt },
-                    ],
+                    type: "input_file",
+                    file_id: "<file_id returned by the OpenAI Files API at runtime>",
+                    detail: "high",
                   },
-                ]
-              : `${userPrompt}\n<context_chunks>\nNỘI DUNG CHUNK THỰC TẾ\n</context_chunks>`,
+                  { type: "input_text", text: sourceManifest },
+                  { type: "input_text", text: userPrompt },
+                ],
+              },
+            ],
             text: {
               format: {
                 type: "json_schema",
-                name: "lesson_summary_provider_contract",
+                name: isSummaryPreview
+                  ? "lesson_summary_provider_contract"
+                  : "generated_quiz",
                 strict: true,
                 schema: {
                   type: "object",
@@ -2459,6 +2960,7 @@ async function setupAiGenerationMock(
             max_output_tokens: body.maxOutputTokens ?? 8_000,
           },
           context: {
+            lessonTitle: "Số hữu tỉ",
             documentCount: 1,
             chunkCount: 12,
             estimatedTokens: 1_250,
@@ -2466,6 +2968,40 @@ async function setupAiGenerationMock(
             pdfInputTokens: 0,
             contextTokens: 1_000,
             maxContextTokens: 12_000,
+            ...(!isSummaryPreview
+              ? {
+                  schemaTokens: 250,
+                  packet: {
+                    filename: "quiz-source.pdf",
+                    sizeBytes: 2_048,
+                    pageCount: 1,
+                    packetHash: "b".repeat(64),
+                    manifestHash: "c".repeat(64),
+                    detail: "high",
+                    manifest: {
+                      version: 1,
+                      lessonId,
+                      packetHash: "b".repeat(64),
+                      pageCount: 1,
+                      pages: [
+                        {
+                          packetPageNumber: 1,
+                          sourceKey: "D01",
+                          lessonDocumentId: documentId,
+                          sourceDocumentId: documentId,
+                          sourceFileId: "file-source",
+                          sourcePdfPageNumber: 5,
+                          printedPageLabel: "5",
+                          pageRangeId: "range-source",
+                          documentTitle: "Giáo trình Toán 7",
+                          segmentOrder: 0,
+                        },
+                      ],
+                    },
+                  },
+                  chunks: [],
+                }
+              : {}),
           },
           configuration: {
             isDefaultConfigured: true,
@@ -2523,6 +3059,9 @@ async function setupAiGenerationMock(
         resourceId: `${type.toLowerCase()}-ai`,
         type,
       });
+      if (options.generationDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.generationDelayMs));
+      }
       return fulfillJson(route, 202, {
         data: { mode: "QUEUED", jobId, status: "QUEUED" },
       });
@@ -2572,10 +3111,79 @@ async function setupAiGenerationMock(
       method === "GET" &&
       /^\/admin\/(quiz-sets|test-sets)\/[^/]+\/questions$/.test(pathname)
     ) {
-      return fulfillJson(route, 200, { data: [] });
+      return fulfillJson(route, 200, {
+        data: pathname.includes("/quiz-sets/") ? state.quizQuestions : [],
+      });
     }
     if (method === "GET" && /^\/admin\/flashcard-sets\/[^/]+\/cards$/.test(pathname)) {
       return fulfillJson(route, 200, { data: [] });
+    }
+    const quizBulkReviewMatch = pathname.match(
+      /^\/admin\/quiz-sets\/([^/]+)\/questions\/review-all-ai$/,
+    );
+    if (method === "POST" && quizBulkReviewMatch) {
+      const setId = quizBulkReviewMatch[1] ?? "";
+      quizBulkReviewSetIds.push(setId);
+      const targetSet = sets.QUIZ.find((set) => set.id === setId);
+      let approvedQuestionCount = 0;
+      state.quizQuestions = state.quizQuestions.map((question) => {
+        const isPendingAiQuestion =
+          question.quizSetId === setId &&
+          question.reviewStatus === "NEEDS_REVIEW" &&
+          (Boolean(
+            (question.sourceMetadataJson as { aiGenerationId?: unknown } | null)
+              ?.aiGenerationId,
+          ) ||
+            targetSet?.source === "AI");
+        if (!isPendingAiQuestion) return question;
+        approvedQuestionCount += 1;
+        return { ...question, reviewStatus: "APPROVED" };
+      });
+      const pendingReviewQuestionCount = state.quizQuestions.filter(
+        (question) =>
+          question.quizSetId === setId && question.reviewStatus === "NEEDS_REVIEW",
+      ).length;
+      sets.QUIZ = sets.QUIZ.map((set) =>
+        set.id === setId
+          ? {
+              ...set,
+              pendingReviewQuestionCount,
+              unpublishedApprovedQuestionCount:
+                Number(set.unpublishedApprovedQuestionCount ?? 0) + approvedQuestionCount,
+            }
+          : set,
+      );
+      return fulfillJson(route, 201, {
+        data: { approvedQuestionCount, pendingReviewQuestionCount },
+      });
+    }
+    const quizSetReviewMatch = pathname.match(/^\/admin\/quiz-sets\/([^/]+)\/review$/);
+    if (method === "POST" && quizSetReviewMatch) {
+      const setId = quizSetReviewMatch[1] ?? "";
+      const body = request.postDataJSON() as {
+        action?: string;
+        reviewStatus: string;
+      };
+      quizSetReviewPayloads.push(body);
+      sets.QUIZ = sets.QUIZ.map((set) => {
+        if (set.id !== setId) return set;
+        return {
+          ...set,
+          reviewStatus:
+            body.action === "PUBLISH"
+              ? "APPROVED"
+              : body.action === "WITHDRAW"
+                ? "HIDDEN"
+                : set.reviewStatus,
+          unpublishedApprovedQuestionCount:
+            body.action === "SAVE" || body.action === "PUBLISH"
+              ? 0
+              : set.unpublishedApprovedQuestionCount,
+        };
+      });
+      return fulfillJson(route, 201, {
+        data: sets.QUIZ.find((set) => set.id === setId),
+      });
     }
     if (
       method === "POST" &&
@@ -2584,6 +3192,34 @@ async function setupAiGenerationMock(
       return fulfillJson(route, 201, {
         data: { reviewStatus: request.postDataJSON().reviewStatus },
       });
+    }
+    const quizQuestionReviewMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/review$/,
+    );
+    if (method === "POST" && quizQuestionReviewMatch) {
+      const questionId = quizQuestionReviewMatch[1] ?? "";
+      const reviewStatus = String(request.postDataJSON().reviewStatus);
+      quizReviewPayloads.push({ questionId, reviewStatus });
+      state.quizQuestions = state.quizQuestions.map((question) =>
+        question.id === questionId ? { ...question, reviewStatus } : question,
+      );
+      const updatedQuestion = state.quizQuestions.find(
+        (question) => question.id === questionId,
+      );
+      sets.QUIZ = sets.QUIZ.map((set) =>
+        set.id === String(updatedQuestion?.quizSetId ?? quizSetOneId)
+          ? {
+              ...set,
+              pendingReviewQuestionCount: Math.max(
+                0,
+                Number(set.pendingReviewQuestionCount ?? 0) - 1,
+              ),
+              unpublishedApprovedQuestionCount:
+                Number(set.unpublishedApprovedQuestionCount ?? 0) + 1,
+            }
+          : set,
+      );
+      return fulfillJson(route, 201, { data: updatedQuestion });
     }
 
     return fulfillJson(route, 404, {
@@ -2596,6 +3232,9 @@ async function setupAiGenerationMock(
     promptPreviewPayloads,
     summaryPutPayloads,
     figureActions,
+    quizReviewPayloads,
+    quizBulkReviewSetIds,
+    quizSetReviewPayloads,
     get summary() {
       return state.summary;
     },
@@ -2679,7 +3318,7 @@ function materialize(
     id: resourceId,
     lessonId,
     title: `${type === "FLASHCARD" ? "Flashcard" : type === "QUIZ" ? "Quiz" : "Test"} AI`,
-    difficulty: "MIXED",
+    ...(type === "QUIZ" ? {} : { difficulty: "MIXED" }),
     durationSeconds: 1_200,
     difficultyRatioJson: { easy: 0.4, medium: 0.5, hard: 0.1 },
     source: "AI",
@@ -2701,6 +3340,7 @@ function panelData(
       inputMetaJson: Record<string, unknown>;
       polls: number;
       resourceId: string;
+      status?: "FAILED";
       type: "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
     }
   >,
@@ -2712,16 +3352,17 @@ function panelData(
     TEST: null,
   };
   for (const [jobId, job] of jobs) {
-    const succeeded = job.polls > 0;
+    const status = job.status ?? (job.polls > 0 ? "SUCCEEDED" : "QUEUED");
+    const succeeded = status === "SUCCEEDED";
     latest[job.type] = {
       aiGenerationId: `generation-${job.type.toLowerCase()}`,
       type: job.type,
       jobId,
-      status: succeeded ? "SUCCEEDED" : "QUEUED",
+      status,
       resourceType: succeeded ? `${job.type}_SET` : null,
       resourceId: succeeded ? job.resourceId : null,
       reviewStatus: succeeded ? "NEEDS_REVIEW" : null,
-      error: null,
+      error: status === "FAILED" ? "Không thể tạo nội dung Quiz." : null,
       inputMetaJson: job.inputMetaJson,
       model: "gpt-5.6-luna",
       estimatedCostVnd: 1_096,
@@ -2737,9 +3378,11 @@ function panelData(
     readiness: {
       summaryReady: true,
       generationReady: true,
+      quizReady: true,
       readyDocumentCount: 1,
       embeddedDocumentCount: 1,
       reason: null,
+      quizReason: null,
     },
     documents: [
       {
@@ -2751,7 +3394,9 @@ function panelData(
         pageRange: { pageStart: 5, pageEnd: 9 },
         embeddingReady: true,
         canUseForSummary: true,
+        canUseForQuiz: true,
         unavailableReason: null,
+        quizUnavailableReason: null,
       },
       {
         id: processingDocumentId,
@@ -2762,7 +3407,9 @@ function panelData(
         pageRange: null,
         embeddingReady: false,
         canUseForSummary: false,
+        canUseForQuiz: false,
         unavailableReason: "Đang xử lý",
+        quizUnavailableReason: "Đang xử lý",
       },
       {
         id: supplementalDocumentId,
@@ -2773,10 +3420,37 @@ function panelData(
         pageRange: null,
         embeddingReady: true,
         canUseForSummary: true,
+        canUseForQuiz: true,
         unavailableReason: null,
+        quizUnavailableReason: null,
       },
     ],
     summaryConfiguration: {
+      isDefaultConfigured: true,
+      resolvedProvider: "OPENAI",
+      resolvedModel: "gpt-4.1-mini",
+      temperature: 0.2,
+      reasoningEffort: null,
+      maxOutputTokens: 8_000,
+      modelOptions: [
+        {
+          provider: "OPENAI",
+          model: "gpt-4.1-mini",
+          available: true,
+          capabilities: { aiConfiguration: "TEMPERATURE" },
+        },
+        {
+          provider: "OPENAI",
+          model: "gpt-5.6-luna",
+          available: true,
+          capabilities: {
+            aiConfiguration: "REASONING_EFFORT",
+            reasoningEffortLevels: ["low", "medium", "xhigh"],
+          },
+        },
+      ],
+    },
+    quizConfiguration: {
       isDefaultConfigured: true,
       resolvedProvider: "OPENAI",
       resolvedModel: "gpt-4.1-mini",

@@ -40,6 +40,11 @@ vì vậy select, TypeScript union, Prisma enum và backend validation phải th
 
 ## Front-end
 
+- Trong JSON review, `Thu lại toàn bộ` phải giữ root mở và hiển thị các scalar
+  cấp trên, nhưng thu object/array lồng trực tiếp thành `{...}`/`[...]`; với
+  `react-json-view` đây là depth `1`, không phải đóng root hoặc dùng depth `2`.
+  Vì viewer giữ trạng thái riêng ở từng node, action xổ/thu còn phải tạo revision
+  render mới để reset cả các nhánh người dùng đã mở thủ công.
 - Bảng màu chữ dùng popover riêng, giữ selection của Tiptap khi thao tác toolbar. Màu có sẵn áp dụng ngay; màu tùy chỉnh chỉ là giá trị nháp cho đến khi bấm `OK`.
 - Khi bấm đậm/nghiêng/gạch chân tại một con trỏ chưa chọn text, Tiptap chỉ đổi `stored marks` cho ký tự sắp nhập. Toolbar phải nghe transaction này để cập nhật trạng thái active ngay, không chờ document đổi sau lần gõ đầu tiên.
 - Khi image node được chọn, cùng nhóm nút căn lề cập nhật
@@ -80,6 +85,137 @@ UI nhập phút để thân thiện rồi chuyển sang giây tại API boundary
 
 Validator của loại nhiều mệnh đề kiểm tra tối thiểu 2 mệnh đề, ID không trùng,
 nội dung không rỗng và `correctAnswerJson` ánh xạ đúng một lần cho mọi ID.
+
+### AI Quiz: prompt động, schema theo request
+
+Luồng sinh Quiz giữ ba lớp trách nhiệm riêng. System prompt định nghĩa ý nghĩa
+bốn loại câu và quy tắc nội dung; user prompt chỉ mang cấu hình động như bài học,
+số câu, độ khó và loại đã chọn; JSON Schema biến các lựa chọn đó thành contract
+máy kiểm được. Schema chỉ mở các nhánh question type được yêu cầu, ép đúng số câu
+và ép difficulty khi không phải `MIXED`. Worker vẫn kiểm tra invariant liên câu
+như phân bổ độ khó và ID duy nhất, nhưng semantic validator chỉ ghi cảnh báo
+`REVIEWABLE`: không lọc câu, không ném lỗi và không hủy output OpenAI đã parse.
+Các câu được lưu ở `NEEDS_REVIEW` để admin quyết định.
+
+Schema reference strategy cũng là một phần của provider conditioning, không chỉ
+là tối ưu byte cho validator. Một strategy đã A/B và rollout cho Sinh kiến thức
+không tự động được phép áp dụng sang Quiz vì hai feature có schema, prompt và
+kiểu nội dung khác nhau. Theo quyết định hiện hành, Quiz khóa `ref_v2` trực tiếp
+ở config request; không dùng `auto` để bộ chọn kích thước tự đổi strategy giữa
+các schema version. Serializer chung vẫn giữ nhiều strategy cho compatibility,
+nhưng mỗi feature phải chốt strategy rõ ràng và kiểm chất lượng output riêng.
+
+Quiz dùng cùng mutable working snapshot với Sinh kiến thức.
+`quiz_questions` vẫn là projection chuẩn để app render và chấm điểm; khi admin
+lưu một câu AI, backend đồng thời dựng lại object provider-shaped từ projection,
+giữ các field provider-only như quyết định figure, ghi nó về đúng vị trí trong
+`ai_generations.output_json.questions[]` và tính lại `outputHash`. Panel JSON đọc
+trực tiếp object hiện tại này nên luôn khớp UI sau refetch. Không tạo
+`currentQuestionJson` hoặc snapshot provider bất biến riêng; vì vậy cơ chế này
+không nhân đôi dữ liệu lưu trữ, nhưng chủ động chấp nhận mất bản output AI ban đầu
+sau lần edit đầu tiên.
+
+`TEXT_INPUT` do AI sinh có scope hẹp hơn editor thủ công: đây là bài tính chỉ hỏi
+một lần và có một kết quả số duy nhất. Model chỉ trả một `correctAnswer` chuẩn:
+kết quả hữu tỉ dùng số nguyên hoặc phân số tối giản; kết quả vô tỉ buộc đề yêu
+cầu làm tròn đến một chữ số thập phân và dùng số đã làm tròn với dấu `.`. Mapper
+lưu đáp án thành mảng một phần tử rồi gắn `numericComparison=true`. Backend và
+phản hồi cục bộ trên web dùng cùng phép so sánh phân số chính xác, nên dữ liệu
+học sinh nhập như `1/2`, `2/4`, `0.5`, `0.50`, `0,5` và `\frac{1}{2}` tương
+đương mà không phát sinh sai số floating-point. Với canonical đã làm tròn `1.4`,
+các dạng `1,4`, `1.40` và `14/10` cũng được chấp nhận. Cách phân vai này ngăn
+model biến ô điền số thành tự luận, câu ghép hoặc danh sách đáp án đồng nghĩa.
+
+Phần lời giải Quiz chỉ có một tiêu đề do card bên ngoài sở hữu; renderer không
+chèn thêm heading cùng tên trong thân nội dung. Solution đi thẳng qua các bước
+cần thiết, kết luận rồi dừng, không nối thêm nhận xét tổng quát sau khi đã tìm ra
+đáp án. Dòng `Đáp án` là dữ liệu chấm, không phải văn bản kết luận tự do trong
+`explanation.answer`: trắc nghiệm lấy `correctOptionId` rồi đổi sang nhãn A/B/C,
+Đúng/Sai lấy boolean, nhiều mệnh đề lấy ánh xạ `statementId → boolean`, còn nhập
+đáp án lấy chuỗi canonical trong `correctAnswer`. Mapper và renderer cùng dùng
+quy tắc này nên preview admin, dữ liệu đã lưu và UI học sinh không thể hiển thị
+một câu diễn giải khác với đáp án thực sự dùng để chấm.
+
+Lời giải nhiều thực thể phải có cấu trúc dữ liệu nhiều thực thể ngay từ provider.
+Một string `solution` chung không thể bảo đảm từng mệnh đề có lập luận riêng, dù
+prompt có yêu cầu “kết luận đủ các ý”. Với `MULTI_STATEMENT_TRUE_FALSE`, schema
+vì vậy dùng `statementSolutions[]` keyed theo `statementId`; validator kiểm đủ ID
+và đúng thứ tự, còn mapper chỉ chịu trách nhiệm trình bày mỗi phần thành một đoạn
+riêng. Cách phân vai này tổng quát cho mọi output mà mỗi phần tử cần một giải
+thích độc lập: cấu trúc hóa ở schema trước, kiểm quan hệ ở semantic validator,
+rồi mới flatten ở presentation boundary.
+
+Quy tắc trình bày có thể kiểm tra bằng máy không được dừng ở prompt hoặc
+`description` của provider schema. Model vẫn có thể tuân thủ ở câu a) nhưng bỏ
+qua ở câu b) trong cùng output, trong khi Zod chỉ thấy cả hai đều là string hợp
+lệ. Với invariant câu kết luận cuối bắt đầu bằng `Vậy` phải là đoạn riêng,
+pipeline chuẩn hóa tổng quát thành đúng `\n\nVậy...` trước semantic validation và
+persistence; serializer áp dụng cùng normalizer khi đọc block cũ. Regression
+test phải khóa ca thiếu dòng trống, tính idempotent, câu chỉ có kết luận và
+counterexample chữ thường `như vậy` hoặc câu hỏi trích dẫn bắt đầu bằng `Vậy`
+không phải mở đầu kết luận cuối.
+
+ID kỹ thuật không nên lộ thành nhãn học tập. Với câu đúng/sai nhiều phần, schema
+provider chỉ nhận chuỗi liên tiếp `a`, `b`, `c`, ... và loại `S1/S2`; mapper còn
+dùng vị trí phần tử làm nhãn trình bày để lời giải luôn khớp danh sách câu. Đáp án
+không cần model viết lại bằng câu văn vì `statements[].value` đã là nguồn chấm
+điểm: mapper dựng canonical answer `a) Đúng.\nb) Sai.` và renderer tách newline
+thành các hàng độc lập. Loại bỏ dữ liệu AI trùng lặp vừa tránh “mệnh đề 1” vừa
+ngăn answer hiển thị lệch với answer dùng để chấm.
+
+Tái sử dụng policy giữa hai tính năng phải dựa trên hoàn cảnh tương đương. Quy
+tắc SGK, dấu câu chức năng hoặc mỗi ý xuống dòng có thể dùng lại câu chữ từ Sinh
+kiến thức khi cùng ngữ nghĩa; contract `statementSolutions`, nhãn a/b và canonical
+answer phải được thiết kế riêng cho Quiz. Với bài tính, lời giải lấy công thức và
+phép biến đổi làm phần chính; với nhận định lý thuyết không cần tính, lập luận
+ngắn bằng lời vẫn hợp lệ. Như vậy hệ thống tránh cả hai cực đoan: văn xuôi hóa
+mọi bài toán và ép công thức vào tình huống không cần công thức.
+
+Một invariant về nội dung phải được viết trước lựa chọn format của model. Nếu
+policy chỉ nói “khi khối `$$...$$` có nhiều dấu bằng thì dùng `aligned`”, model
+có thể tránh điều kiện bằng cách đặt cả chuỗi vào `$...$`. Contract đúng phải
+nhận diện bản chất chuỗi tính từ hai dấu `=` cấp ngoài cùng trở lên trước, rồi
+bắt buộc chuyển nó thành display nhiều dòng. Đồng thời, từ “gọn” chỉ được dùng để
+bỏ diễn giải lặp lại; nếu không đóng nghĩa này, model có thể hiểu thành gộp toàn
+bộ phép tính vào một câu văn dù schema vẫn hợp lệ.
+
+Dấu `&` trong `aligned` là điểm căn cột, không phải ký hiệu trang trí. Nếu viết
+`&\Rightarrow`, `&\Leftrightarrow` hoặc alias tương đương ở đầu dòng, toán tử bị
+đẩy tới cột dấu bằng. Prompt/schema phải hướng model đặt toán tử trước điểm căn,
+ví dụ `\Rightarrow\quad a &= 2x`; renderer dùng normalizer chung để sửa dữ liệu
+cũ. Normalizer nhận diện cả nhóm suy luận/tương đương (dạng thuận, ngược, dài,
+`\implies`, `\impliedby`, `\iff`) nhưng cố ý không sửa `\to`/`\mapsto`, vì hai
+dấu sau có thể mang nghĩa ánh xạ hoặc chuyển trạng thái hợp lệ. Regression test
+phải có cả ca sửa đúng, ca đã đúng giữ nguyên, idempotence và counterexample
+không được sửa.
+
+Quy tắc dấu câu cũng là invariant chức năng, không phải sở thích mỹ thuật. Có thể
+sao chép nguyên contract đã kiểm chứng từ Sinh kiến thức sang prompt/schema riêng
+của Quiz: câu dẫn trực tiếp sang danh sách, hệ, bảng hoặc công thức display ở
+dòng sau kết thúc bằng `:`; khi nội dung vẫn tiếp tục cùng dòng thì dùng dấu câu
+theo ngữ pháp thay vì thêm `:` máy móc. Riêng câu đúng/sai một mệnh đề phải nối
+kết luận với căn cứ bằng “Vì vậy”/“Do đó”, tránh câu đứng riêng kiểu “Mệnh đề
+đúng.” khiến mạch giải bị đứt.
+
+Trong system prompt, định nghĩa mỗi loại câu phải đi theo một mạch có chủ ngữ rõ:
+loại câu dùng cho việc gì, điều kiện dữ liệu là gì, khi nào không dùng loại đó và
+field đáp án chứa gì. Không viết câu phủ định cụt như “Không dùng cho câu văn” vì
+model và người đọc không xác định chắc câu đó đang bổ nghĩa cho loại câu hay cho
+riêng trường `problem`.
+
+```mermaid
+flowchart LR
+  A[Cấu hình admin] --> B[User prompt ngắn]
+  A --> C[Schema đúng count, type, difficulty]
+  D[System prompt định nghĩa 4 loại] --> E[OpenAI + PDF]
+  B --> E
+  C --> E
+  E --> F{Provider schema parse được?}
+  F -- Không --> G[Không có object hợp lệ để lưu]
+  F -- Có --> H[Semantic validator ghi cảnh báo]
+  H --> I[Mapper gắn chế độ chấm số]
+  I --> J[Lưu toàn bộ câu ở NEEDS_REVIEW]
+```
 
 Student lesson API dùng một access resolver chung trước khi đọc summary,
 quiz/flashcard/test. Resolver phân biệt enrollment và trial, đồng thời chặn truy
@@ -139,6 +275,12 @@ flowchart TD
 - Start attempt tạo placeholder theo tập câu server đã chọn. Endpoint check thay
   placeholder bằng answer thật và mới trả answer key/explanation. Submit chỉ
   tổng kết các câu đã check, vì vậy client không thể tráo question ID ở cuối.
+- Placeholder không chỉ chống tráo ID mà còn là snapshot membership/thứ tự của
+  lượt làm. Resume, submit và review phải đánh số từ answer rows của attempt gốc;
+  không được lấy `quiz_set.questions` hiện hành, vì câu admin thêm giữa lượt có
+  thể không render nhưng vẫn chen vào `questionNumber`, còn câu bị soft-delete có
+  thể biến mất và làm attempt không thể nộp. Cả thêm và xóa chỉ đổi membership
+  của attempt được start sau lần lưu/phát hành đó.
 - “Đã trả lời” và “đã kiểm tra” là hai trạng thái khác nhau. Nhãn `Đã làm` cùng
   cảnh báo thiếu câu phải dùng validator answer đầy đủ theo từng loại câu; nếu
   dùng feedback đã chấm, UI sẽ báo `0` dù student đã chọn đủ đáp án. Khi bấm
@@ -446,7 +588,12 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   căn field cao cố định, để `part(content)` không cắt công thức và kiểm tra
   runtime đồng thời `scrollHeight/clientHeight`, tâm dọc, bounding box của hai
   ô phân số và animation caret; typecheck không phát hiện được các lỗi layout
-  shadow DOM này.
+  shadow DOM này. Tâm hình học của line-box không trùng tâm nhìn thấy của glyph
+  `▢` vì baseline font đẩy glyph lên trên; caret giả phải dùng `left/top: 50%`,
+  `translate(-50%, -50%)` để căn hai trục và thêm optical shift theo font
+  `-0.083333em` (xấp xỉ `-1.5px` ở cỡ chữ `18px`). Test trình duyệt phải chuyển
+  selection qua cả tử số lẫn mẫu số, kiểm tra transform hai trục và đối chiếu
+  ảnh raster trên Chromium/WebKit thay vì chỉ tin computed line-box.
 - MathLive bọc `part(container)` trong một node nội bộ, nên đặt host
   `display:flex` có thể làm toàn bộ container co theo placeholder dù
   `part(container)` đã có `width:100%`; host full-width phải giữ `display:block`.
@@ -488,6 +635,22 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   được import trong renderer/editor, override dùng chung cũng phải được import
   sau KaTeX tại các entry đó; đặt rule trong Tailwind `globals.css` có thể bị
   cascade layer hoặc thứ tự chunk CSS ghi đè dù selector nhìn có vẻ đúng.
+- Text AI có display math như `\n\n$$...$$\n\n` phải được project thành các node
+  Tiptap riêng `paragraph -> blockMath -> paragraph`, không giữ cả chuỗi trong
+  một paragraph rồi chỉ tách delimiter ở renderer. Preview JSON và luồng lưu thật
+  phải dùng cùng quy tắc projection; nếu lệch nhau, newline được bảo toàn có thể
+  cộng với margin/padding KaTeX tạo khoảng trắng lớn, đồng thời block wrapper dễ
+  sinh DOM không hợp lệ trong `<p>`. Renderer legacy vẫn nên dùng phần tử phrasing
+  hợp lệ và CSS `display: block` làm fallback cho dữ liệu cũ.
+- Display math trong Mathpix/KaTeX chỉ có một lớp sở hữu spacing và overflow.
+  Khi `.math-block` đã giữ ink-safe padding và được bọc bởi formula scroll shell,
+  `.katex-display` bên trong phải bỏ margin/padding riêng; nếu cả ba lớp cùng cộng
+  khoảng cách thì phép biến đổi nhiều dòng bị tách quá xa khỏi câu dẫn và kết luận.
+- Câu Quiz AI có `quizExplanationBlock` phải luôn dùng card semantic `Lời giải`;
+  card Tiptap xám `Lời giải chi tiết` chỉ là fallback cho dữ liệu legacy không có
+  structured block. Các field optional theo JSON contract như
+  `geometryStatement: null` là trạng thái hợp lệ và không được làm type guard loại
+  cả block rồi âm thầm đổi UI sang fallback.
 - Tooltip mặc định của nút bàn phím MathLive nằm trong shadow DOM của
   `math-field`. Nếu để tooltip đó trong vùng nhập có `overflow-x: auto`, pseudo
   element khi hover có thể tăng `scrollWidth`, tạo thanh cuộn và vẫn bị
@@ -499,6 +662,16 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   bị render sai rồi đổi lại. Giữ nguyên kích thước/surface/focus ring của field
   cuối trong lúc khởi tạo, preload module từ `pointerdown` và chỉ thay nội dung
   bên trong khi custom element sẵn sàng.
+- Khi cần căn placeholder/input MathLive khớp tuyệt đối với input HTML, phải kiểm
+  tra cả `.ML__content` trong shadow DOM. MathLive 0.110 tự thêm `padding-left:
+  1px`; chỉ đồng bộ padding trên host `math-field` vẫn làm nội dung lệch ngang.
+  Preset student-answer phải bỏ phần đệm nội bộ này thay vì bù bằng số âm hoặc
+  hard-code padding host khác với input thường. Khi field rỗng được focus,
+  MathLive còn vẽ `.ML__caret::after` với optical offset `left: -0.045em`; offset
+  này làm caret tách khỏi chữ placeholder dù bounding box của hai node cùng mốc
+  trái. Preset student-answer phải đưa offset caret rỗng về `0`, giữ nguyên vị trí
+  placeholder, rồi regression test theo chuỗi focus -> blur -> focus trên cả
+  Chromium và WebKit thay vì chỉ đo box placeholder ở một thời điểm.
 - Không dùng cùng selector admin cho student rồi xóa field sau khi query. Selector
   student phải không lấy answer key/grading/storage key ngay từ database để giảm
   nguy cơ serializer hoặc log vô tình làm lộ dữ liệu.
@@ -516,6 +689,17 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   phải compose player thật trước thanh tab và truyền `customVideoSettings`; tab
   `Bài học` chỉ thay nội dung summary bên dưới. E2E cần assert vùng player để
   tránh một aggregate field có dữ liệu nhưng không có consumer UI.
+- Prompt có ví dụ LaTeX đúng vẫn không phải là parser: model có thể trả
+  `\begin{aligned}` nhưng thiếu `\end{aligned}` trong một string vẫn hợp lệ với
+  JSON Schema. Model cũng có thể mở inline math bằng `$` nhưng đóng nhầm
+  bằng backtick, khiến renderer nuốt phần văn bản kế tiếp vào công thức. Với
+  output AI mới, backend nên chạy recovery deterministic trước persistence:
+  nhận biết code span để không sửa nhầm, thay backtick đóng sai của nội dung
+  math-like bằng `$`, dùng stack để bổ sung thẻ đóng theo thứ tự lồng ngược,
+  sửa dấu `$$` đặt nhầm trước thẻ đóng và bỏ thẻ đóng mồ côi.
+  Normalizer phải idempotent, không ném lỗi và được kiểm bằng cả fixture
+  malformed lẫn counterexample hợp lệ; không dùng lỗi định dạng có thể sửa
+  chắc chắn để chặn cả job nội dung.
 
 ## File quan trọng
 

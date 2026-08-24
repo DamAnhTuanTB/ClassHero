@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { Difficulty, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import type {
   AuthenticatedRequest,
   AuthenticatedUser,
@@ -23,11 +23,12 @@ import { CurrentUser } from "#api/common/auth/current-user.decorator";
 import { JwtAuthGuard } from "#api/common/auth/jwt-auth.guard";
 import { Roles } from "#api/common/auth/roles.decorator";
 import { RolesGuard } from "#api/common/auth/roles.guard";
-import { LessonContentGenerationJobService } from "#api/modules/ai/services/lesson-content-generation-job.service";
 import { ReviewContentSetDto } from "#api/modules/ai/types/review-content-set.dto";
+import { ReviewQuizSetDto } from "#api/modules/quiz/dto/review-quiz-set.dto";
 import { GenerateQuizDto } from "#api/modules/quiz/dto/generate-quiz.dto";
 import {
   QuizQuestionContentDto,
+  UpdateQuizGenerationQuestionJsonDto,
   UpdateQuizQuestionContentDto,
 } from "#api/modules/quiz/dto/quiz-question-content.dto";
 import {
@@ -35,26 +36,19 @@ import {
   type CreateQuizSetDto,
   type UpdateQuizSetDto,
 } from "#api/modules/quiz/services/quiz.service";
-import { IsString, IsOptional, IsEnum } from "class-validator";
+import { QuizGenerationJobService } from "#api/modules/quiz/services/quiz-generation-job.service";
+import { IsString, IsOptional } from "class-validator";
 
 // We create wrapper DTOs for the sets for ClassValidator
 export class CreateQuizSetBodyDto implements CreateQuizSetDto {
   @IsString()
   title!: string;
-
-  @IsOptional()
-  @IsEnum(Difficulty)
-  difficulty?: Difficulty;
 }
 
 export class UpdateQuizSetBodyDto implements UpdateQuizSetDto {
   @IsOptional()
   @IsString()
   title?: string;
-
-  @IsOptional()
-  @IsEnum(Difficulty)
-  difficulty?: Difficulty;
 }
 
 @ApiTags("admin-quiz")
@@ -66,8 +60,8 @@ export class AdminQuizController {
   constructor(
     @Inject(QuizService)
     private readonly quizService: QuizService,
-    @Inject(LessonContentGenerationJobService)
-    private readonly generationJobs: LessonContentGenerationJobService,
+    @Inject(QuizGenerationJobService)
+    private readonly generationJobs: QuizGenerationJobService,
   ) {}
 
   @Get("lessons/:lessonId/quiz-sets")
@@ -92,8 +86,12 @@ export class AdminQuizController {
   @ApiOperation({
     summary: "Preview Quiz prompts, lesson source and estimated cost without calling AI",
   })
-  previewPrompt(@Param("lessonId") lessonId: string, @Body() dto: GenerateQuizDto) {
-    return this.generationJobs.previewQuiz(lessonId, dto);
+  previewPrompt(
+    @Param("lessonId") lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GenerateQuizDto,
+  ) {
+    return this.generationJobs.previewQuiz(lessonId, user.id, dto);
   }
 
   @Post("lessons/:lessonId/quiz-sets")
@@ -133,13 +131,27 @@ export class AdminQuizController {
   reviewSet(
     @Param("setId") setId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: ReviewContentSetDto,
+    @Body() dto: ReviewQuizSetDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.quizService.reviewQuizSet(
       setId,
       user.id,
       dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Post("quiz-sets/:setId/questions/review-all-ai")
+  @ApiOperation({ summary: "Review all pending AI questions in a quiz set" })
+  reviewAllPendingAiQuestions(
+    @Param("setId") setId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.quizService.reviewAllPendingAiQuestions(
+      setId,
+      user.id,
       getRequestContext(request),
     );
   }
@@ -185,6 +197,38 @@ export class AdminQuizController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.quizService.updateQuestion(
+      questionId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Patch("quiz-questions/:questionId/generation-json")
+  @ApiOperation({ summary: "Update the mutable AI JSON for one Quiz question" })
+  updateGenerationQuestionJson(
+    @Param("questionId") questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateQuizGenerationQuestionJsonDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.quizService.updateGenerationQuestionJson(
+      questionId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Post("quiz-questions/:questionId/review")
+  @ApiOperation({ summary: "Review one generated quiz question" })
+  reviewQuestion(
+    @Param("questionId") questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ReviewContentSetDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.quizService.reviewQuestion(
       questionId,
       user.id,
       dto,

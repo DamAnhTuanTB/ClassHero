@@ -25,7 +25,10 @@ import {
   previewAdminStemFigureRasterEdit,
 } from "@/features/admin/ai-generation/api/admin-ai-generation-api";
 import type {
+  AdminAiGenerationPanelData,
   AdminAiGenerationPayload,
+  AdminAiGenerationType,
+  AdminAiJobStatus,
   AdminLessonSummaryContent,
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
@@ -288,15 +291,59 @@ export function useAdminAiJob(jobId: string | null, enabled: boolean) {
 export function useGenerateAdminLessonContent(lessonId: string) {
   const session = useAuthSessionStore((state) => state.session);
   const queryClient = useQueryClient();
+  const panelQueryKey = adminAiGenerationQueryKeys.panel(lessonId);
   return useMutation({
     mutationFn: (payload: AdminAiGenerationPayload) =>
       generateAdminLessonContent(lessonId, payload, session?.accessToken ?? ""),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: adminAiGenerationQueryKeys.panel(lessonId),
-      });
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: panelQueryKey });
+      const previousPanel =
+        queryClient.getQueryData<AdminAiGenerationPanelData>(panelQueryKey);
+      queryClient.setQueryData<AdminAiGenerationPanelData>(panelQueryKey, (panel) =>
+        setPanelGenerationPending(panel, payload.type, null, "QUEUED"),
+      );
+      return { previousPanel };
+    },
+    onError: (_error, _payload, context) => {
+      if (context?.previousPanel) {
+        queryClient.setQueryData(panelQueryKey, context.previousPanel);
+      }
+    },
+    onSuccess: (job, payload) => {
+      queryClient.setQueryData<AdminAiGenerationPanelData>(panelQueryKey, (panel) =>
+        setPanelGenerationPending(panel, payload.type, job.jobId, job.status),
+      );
+      void queryClient.invalidateQueries({ queryKey: panelQueryKey });
     },
   });
+}
+
+function setPanelGenerationPending(
+  panel: AdminAiGenerationPanelData | undefined,
+  type: AdminAiGenerationType,
+  jobId: string | null,
+  status: AdminAiJobStatus,
+) {
+  const currentJob = panel?.jobs[type];
+  if (!panel || !currentJob) return panel;
+
+  const now = new Date().toISOString();
+  return {
+    ...panel,
+    jobs: {
+      ...panel.jobs,
+      [type]: {
+        ...currentJob,
+        jobId,
+        status,
+        error: null,
+        createdAt: now,
+        startedAt: null,
+        finishedAt: null,
+        updatedAt: now,
+      },
+    },
+  };
 }
 
 export function usePreviewAdminLessonSummaryPrompt(lessonId: string) {

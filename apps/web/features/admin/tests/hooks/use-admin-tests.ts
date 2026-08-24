@@ -7,6 +7,7 @@ import {
   deleteAdminTestSet,
   getAdminTestQuestions,
   getAdminTestSets,
+  reviewAdminTestQuestion,
   updateAdminTestQuestion,
   updateAdminTestSet,
   type AdminTestQuestionPayload,
@@ -165,6 +166,15 @@ export function useAdminTestQuestionMutations(setId: string, lessonId: string) {
         return updateAdminTestQuestion(questionId, data, session.accessToken);
       },
       onSuccess: invalidateQuestions,
+    }),
+    reviewQuestion: useMutation({
+      mutationFn: async (questionId: string) => {
+        if (!session?.accessToken) throw new Error("No token");
+        return reviewAdminTestQuestion(questionId, session.accessToken);
+      },
+      onSuccess: async () => {
+        await Promise.all([invalidateQuestions(), invalidateSets()]);
+      },
     }),
     deleteQuestion: useMutation({
       mutationFn: async (questionId: string) => {

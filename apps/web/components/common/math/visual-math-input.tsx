@@ -251,10 +251,15 @@ const mathfieldInteractionStyles = `
   }
 `;
 
-const studentPlaceholderCaretStyles = `
+function getStudentPlaceholderCaretStyles(weight: "bold" | "normal") {
+  return `
   @keyframes visual-math-placeholder-caret-blink {
     0%, 48% { opacity: 1; }
     49%, 100% { opacity: 0; }
+  }
+
+  .ML__content {
+    padding-left: 0 !important;
   }
 
   .ML__content-placeholder {
@@ -265,8 +270,15 @@ const studentPlaceholderCaretStyles = `
   }
 
   .ML__content-placeholder .ML__text {
+    font-family: var(--font-body), Arial, Helvetica, sans-serif !important;
     font-size: 0.8889em;
-    font-weight: 700;
+    font-style: normal;
+    font-weight: ${weight === "normal" ? 400 : 700};
+    letter-spacing: normal;
+  }
+
+  :host([data-empty]) .ML__focused .ML__caret::after {
+    left: 0;
   }
 
   .ML__focused .ML__cmr.ML__selected {
@@ -274,18 +286,22 @@ const studentPlaceholderCaretStyles = `
   }
 
   .ML__focused .ML__cmr.ML__selected::after {
+    --student-math-placeholder-caret-optical-shift-y: -0.083333em;
     content: "";
     position: absolute;
-    top: 18%;
-    bottom: 18%;
+    top: calc(50% + var(--student-math-placeholder-caret-optical-shift-y));
+    bottom: auto;
     left: 50%;
     width: 2px;
+    height: 64%;
+    transform: translate(-50%, -50%);
     border-radius: 999px;
     background: var(--_caret-color);
     pointer-events: none;
     animation: visual-math-placeholder-caret-blink 1.05s step-end infinite;
   }
 `;
+}
 
 export function VisualMathInput({
   accent = "primary",
@@ -296,6 +312,7 @@ export function VisualMathInput({
   onFocus,
   paletteId,
   placeholder = "\\text{Nhập công thức}",
+  placeholderWeight = "bold",
   preset = "full",
   showPalette = true,
   status = "idle",
@@ -309,6 +326,7 @@ export function VisualMathInput({
   onFocus?: () => void;
   paletteId?: string;
   placeholder?: string;
+  placeholderWeight?: "bold" | "normal";
   preset?: VisualMathInputPreset;
   showPalette?: boolean;
   status?: VisualMathInputStatus;
@@ -425,7 +443,8 @@ export function VisualMathInput({
 
         if (preset === "student-answer") {
           const placeholderCaretStyle = document.createElement("style");
-          placeholderCaretStyle.textContent = studentPlaceholderCaretStyles;
+          placeholderCaretStyle.textContent =
+            getStudentPlaceholderCaretStyles(placeholderWeight);
           mathfieldShadowRoot.append(placeholderCaretStyle);
         }
       }
@@ -515,7 +534,7 @@ export function VisualMathInput({
         mathfieldRef.current = null;
       }
     };
-  }, [ariaLabel, disabled, placeholder, preset]);
+  }, [ariaLabel, disabled, placeholder, placeholderWeight, preset]);
 
   useEffect(() => {
     const mathfield = mathfieldRef.current;

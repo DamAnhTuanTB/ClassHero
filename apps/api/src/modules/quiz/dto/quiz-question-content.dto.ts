@@ -74,10 +74,18 @@ export class QuizQuestionContentDto {
 
 export class UpdateQuizQuestionContentDto extends PartialType(QuizQuestionContentDto) {
   @ApiPropertyOptional({
-    description:
-      "Khối EXAMPLE dùng chung với Sinh kiến thức; chỉ dùng khi chỉnh trực tiếp nội dung/hình của câu AI",
+    description: "Khối lời giải có cấu trúc thuộc riêng câu Quiz",
   })
   @IsOptional()
   @IsObject()
-  exampleBlock?: Record<string, unknown>;
+  quizExplanationBlock?: Record<string, unknown>;
+}
+
+export class UpdateQuizGenerationQuestionJsonDto {
+  @ApiProperty({
+    description:
+      "Object câu Quiz theo structured-output contract hiện tại; được lưu vào mutable generation snapshot",
+  })
+  @IsObject()
+  generationQuestionJson!: Record<string, unknown>;
 }

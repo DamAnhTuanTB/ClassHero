@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleX } from "lucide-react";
+import { Check, CircleSlash2, CircleX } from "lucide-react";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
 import { StudentMathAnswerInput } from "@/features/student/lessons/screens/student-lesson-screen/components/student-math-answer-input";
 import type {
@@ -9,6 +9,9 @@ import type {
   StudentAssessmentQuestion,
 } from "@/features/student/lessons/types/student-lesson-types";
 import { cn } from "@/lib/utils";
+
+const QUIZ_CONTENT_NORMAL_WEIGHT_CLASS =
+  "font-normal [&_b]:font-normal [&_h2]:font-normal [&_h3]:font-normal [&_strong]:font-normal [&_th]:font-normal";
 
 export function AssessmentQuestionCard({
   accent = "quiz",
@@ -30,18 +33,43 @@ export function AssessmentQuestionCard({
   return (
     <section
       className={cn(
-        "student-assessment-content rounded-[1.4rem] border bg-white px-1.5 py-3 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:px-2.5 sm:py-4",
+        "student-assessment-content rounded-[1.4rem] bg-white px-1.5 dark:bg-[var(--theme-surface)] sm:px-2.5",
+        accent === "quiz" && "learning-content-text pb-2 pt-1",
         accent === "test"
-          ? "border-emerald-100 shadow-[0_18px_45px_-36px_rgb(16_185_129_/_55%)]"
-          : "border-sky-100 shadow-[0_18px_45px_-36px_rgb(2_132_199_/_55%)]",
+          ? "border border-emerald-100 py-3 shadow-[0_18px_45px_-36px_rgb(16_185_129_/_55%)] dark:border-[var(--theme-border)] sm:py-4"
+          : null,
       )}
     >
       <TiptapContentView
         content={question.questionJson}
-        className="text-base font-bold leading-6 text-slate-950 dark:text-[var(--theme-text-strong)]"
+        className={cn(
+          "text-base leading-6 text-slate-950 dark:text-[var(--theme-text-strong)]",
+          accent === "quiz" ? QUIZ_CONTENT_NORMAL_WEIGHT_CLASS : "font-bold",
+        )}
       />
 
-      <div className="mt-3">
+      {question.questionFigure?.url ? (
+        <figure className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-[var(--theme-border)]">
+          {/* The URL is produced by the trusted QuizFigure/File pipeline. */}
+          <img
+            src={question.questionFigure.url}
+            alt={question.questionFigure.altText}
+            className="mx-auto max-h-[28rem] w-auto max-w-full object-contain"
+          />
+          {question.questionFigure.caption ? (
+            <figcaption
+              className={cn(
+                "mt-2 text-center text-sm text-slate-500 dark:text-[var(--theme-text-muted)]",
+                accent === "quiz" ? "font-normal" : "font-bold",
+              )}
+            >
+              {question.questionFigure.caption}
+            </figcaption>
+          ) : null}
+        </figure>
+      ) : null}
+
+      <div className="mt-2">
         {question.questionType === "MULTIPLE_CHOICE" ? (
           <MultipleChoiceAnswer
             accent={accent}
@@ -80,22 +108,31 @@ export function AssessmentQuestionCard({
         )}
       </div>
 
-      {feedback ? (
+      {feedback &&
+      (question.questionType !== "MULTI_STATEMENT_TRUE_FALSE" || feedback.isSkipped) ? (
         <div
           role="status"
           className={cn(
-            "mt-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-black",
-            feedback.isCorrect
-              ? "border-emerald-200 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-300"
-              : "border-rose-200 text-rose-700 dark:border-rose-400/30 dark:text-rose-300",
+            "mt-1 flex items-center gap-2 rounded-2xl px-0 py-1 text-sm font-black",
+            feedback.isSkipped
+              ? "text-amber-600 dark:text-amber-300"
+              : feedback.isCorrect
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-rose-700 dark:text-rose-300",
           )}
         >
-          {feedback.isCorrect ? (
+          {feedback.isSkipped ? (
+            <CircleSlash2 className="h-5 w-5 shrink-0" aria-hidden="true" />
+          ) : feedback.isCorrect ? (
             <Check className="h-5 w-5 shrink-0" aria-hidden="true" />
           ) : (
             <CircleX className="h-5 w-5 shrink-0" aria-hidden="true" />
           )}
-          {feedback.isCorrect ? "Chính xác!" : "Chưa chính xác"}
+          {feedback.isSkipped
+            ? "Đã bỏ qua"
+            : feedback.isCorrect
+              ? "Chính xác!"
+              : "Chưa chính xác"}
         </div>
       ) : null}
     </section>
@@ -175,7 +212,11 @@ function MultipleChoiceAnswer({
             </span>
             <TiptapContentView
               content={option.richText}
-              className="min-w-0 flex-1 text-base font-bold text-inherit"
+              className={cn(
+                "min-w-0 flex-1 text-base text-inherit",
+                accent === "quiz" ? QUIZ_CONTENT_NORMAL_WEIGHT_CLASS : "font-bold",
+              )}
+              contentAlignment="left"
             />
           </button>
         );
@@ -277,15 +318,28 @@ function MultiStatementAnswer({
         return (
           <div
             key={statement.id}
-            className="student-mobile-border rounded-2xl border border-slate-200 p-3 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-soft)]"
+            className={cn(
+              "student-mobile-border rounded-2xl border p-3",
+              feedback?.isSkipped
+                ? "border-slate-200 bg-white dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-soft)]"
+                : statementFeedback
+                  ? statementFeedback.isCorrect
+                    ? "border-[var(--theme-success-border)] bg-[var(--theme-success-bg)]"
+                    : "border-[var(--theme-error-border)] bg-[var(--theme-error-bg)]"
+                  : "border-slate-200 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-soft)]",
+            )}
           >
             <div className="flex items-start gap-3">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-100 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-                {index + 1}
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sky-100 text-xs font-black text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                {accent === "quiz" ? getOptionLabel(index).toLowerCase() : index + 1}
               </span>
               <TiptapContentView
                 content={statement.richText}
-                className="min-w-0 flex-1 text-base font-bold leading-6 text-slate-950 dark:text-[var(--theme-text-strong)]"
+                className={cn(
+                  "min-w-0 flex-1 text-base leading-6 text-slate-950 dark:text-[var(--theme-text-strong)]",
+                  accent === "quiz" ? QUIZ_CONTENT_NORMAL_WEIGHT_CLASS : "font-bold",
+                )}
+                contentAlignment="left"
               />
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
@@ -297,11 +351,31 @@ function MultiStatementAnswer({
                   selected={selectedValue === value}
                   correct={statementFeedback?.correctValue === value}
                   hasFeedback={Boolean(statementFeedback)}
+                  revealCorrectAnswer={feedback?.isSkipped === true}
                   disabled={disabled}
                   onClick={() => update(statement.id, value)}
                 />
               ))}
             </div>
+            {statementFeedback && !feedback?.isSkipped ? (
+              <div className="mt-2 flex items-center px-0 text-sm">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 font-bold",
+                    statementFeedback.isCorrect
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : "text-rose-700 dark:text-rose-300",
+                  )}
+                >
+                  {statementFeedback.isCorrect ? (
+                    <Check className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <CircleX className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  )}
+                  {statementFeedback.isCorrect ? "Chính xác" : "Chưa chính xác"}
+                </span>
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -333,12 +407,25 @@ function TextAnswer({
         accent={accent}
         value={typeof answer === "string" ? answer : ""}
         disabled={disabled}
-        answerState={feedback?.isCorrect ? "correct" : feedback ? "incorrect" : "idle"}
+        answerState={
+          feedback?.isSkipped
+            ? "idle"
+            : feedback?.isCorrect
+              ? "correct"
+              : feedback
+                ? "incorrect"
+                : "idle"
+        }
         onChange={onChange}
       />
       {feedback && !feedback.isCorrect && correctAnswers.length > 0 ? (
-        <p className="mt-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
-          Đáp án đúng: {correctAnswers.join(" hoặc ")}
+        <p
+          className={cn(
+            "mt-2 text-sm text-emerald-700 dark:text-emerald-300",
+            accent === "quiz" ? "font-normal" : "font-bold",
+          )}
+        >
+          Đáp án: {correctAnswers.join(" hoặc ")}
         </p>
       ) : null}
     </div>
@@ -352,6 +439,7 @@ function ChoiceButton({
   hasFeedback,
   label,
   onClick,
+  revealCorrectAnswer = true,
   selected,
 }: {
   accent: "quiz" | "test";
@@ -360,20 +448,23 @@ function ChoiceButton({
   hasFeedback: boolean;
   label: string;
   onClick: () => void;
+  revealCorrectAnswer?: boolean;
   selected: boolean;
 }) {
   const selectedWrong = hasFeedback && selected && !correct;
+  const showCorrect = hasFeedback && correct && (selected || revealCorrectAnswer);
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "student-mobile-border min-h-11 rounded-xl border px-2 text-sm font-black transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-default",
+        "student-mobile-border min-h-11 rounded-xl border px-2 text-sm transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-default",
+        accent === "quiz" ? "font-normal" : "font-black",
         accent === "test"
           ? "focus-visible:ring-emerald-200"
           : "focus-visible:ring-sky-200",
-        hasFeedback && correct
+        showCorrect
           ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/45 dark:bg-emerald-500/10 dark:text-emerald-300"
           : selectedWrong
             ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-400/45 dark:bg-rose-500/10 dark:text-rose-300"

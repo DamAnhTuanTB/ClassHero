@@ -40,13 +40,14 @@ export const multiStatementCorrectAnswerSchema = z
 export const textInputGradingSchema = z.object({
   caseSensitive: z.boolean().default(false),
   exactMatch: z.boolean().default(true),
+  numericComparison: z.boolean().default(false),
   // Nếu không exactMatch thì có thể kiểm tra chứa danh sách keywords nào đó
   keywords: z.array(z.string()).optional(),
 });
 
 /**
  * Cấu trúc chung cho Correct Answer tùy theo loại câu hỏi
- * - MULTIPLE_CHOICE: mảng chứa ID của các options đúng.
+ * - MULTIPLE_CHOICE: mảng chứa đúng một ID phương án đúng (service enforce length=1).
  * - TRUE_FALSE: boolean.
  * - MULTI_STATEMENT_TRUE_FALSE: mảng ánh xạ statementId -> boolean.
  * - TEXT_INPUT: mảng các câu trả lời dạng text hợp lệ (e.g. ["25", "hai mươi lăm"]).

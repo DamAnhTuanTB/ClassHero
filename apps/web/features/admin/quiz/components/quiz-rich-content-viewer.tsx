@@ -11,6 +11,10 @@ import type {
   TiptapTextDocument,
 } from "@/types/rich-text";
 import { hasTiptapDocumentContent } from "@/lib/tiptap-rich-content";
+import {
+  LEARNING_CONTENT_KATEX_MACROS,
+  normalizeLearningContentLatex,
+} from "@/lib/learning-content-math";
 import { cn } from "@/lib/utils";
 import "@/features/admin/quiz/components/quiz-rich-content-editor.css";
 import "@/components/common/content/math-content-typography.css";
@@ -19,6 +23,7 @@ interface QuizRichContentViewerProps {
   ariaLabel?: string;
   className?: string;
   content: TiptapTextDocument | null | undefined;
+  contentAlignment?: "authored" | "left";
   fallback?: string;
 }
 
@@ -26,6 +31,7 @@ export function QuizRichContentViewer({
   ariaLabel,
   className,
   content,
+  contentAlignment = "authored",
   fallback = "",
 }: QuizRichContentViewerProps) {
   if (!content || !hasTiptapDocumentContent(content)) {
@@ -37,38 +43,50 @@ export function QuizRichContentViewer({
       aria-label={ariaLabel}
       className={cn(
         "quiz-rich-content-editor quiz-rich-content-viewer min-w-0",
+        contentAlignment === "left" && "quiz-rich-content-viewer--left-aligned",
         className,
       )}
     >
       <div className="quiz-rich-content-prosemirror">
-        {renderRichContentNodes(content.content)}
+        {renderRichContentNodes(content.content, contentAlignment)}
       </div>
     </div>
   );
 }
 
-function renderRichContentNodes(nodes: TiptapJsonNode[] | undefined) {
+function renderRichContentNodes(
+  nodes: TiptapJsonNode[] | undefined,
+  contentAlignment: "authored" | "left",
+) {
   return nodes?.map((node, index) => (
-    <Fragment key={`${node.type}-${index}`}>{renderRichContentNode(node)}</Fragment>
+    <Fragment key={`${node.type}-${index}`}>
+      {renderRichContentNode(node, contentAlignment)}
+    </Fragment>
   ));
 }
 
-function renderRichContentNode(node: TiptapJsonNode): ReactNode {
-  const children = renderRichContentNodes(node.content);
+function renderRichContentNode(
+  node: TiptapJsonNode,
+  contentAlignment: "authored" | "left",
+): ReactNode {
+  const children = renderRichContentNodes(node.content, contentAlignment);
 
   switch (node.type) {
     case "text":
       return renderTextWithFallbackMath(node.text ?? "", node.marks);
     case "paragraph":
       return (
-        <p data-indent={readIndent(node.attrs?.indent)} style={readBlockStyle(node)}>
+        <p
+          data-indent={readIndent(node.attrs?.indent)}
+          style={readBlockStyle(node, contentAlignment)}
+        >
           {children ?? <br />}
         </p>
       );
     case "heading": {
       const headingProps = {
         "data-indent": readIndent(node.attrs?.indent),
-        style: readBlockStyle(node),
+        style: readBlockStyle(node, contentAlignment),
       };
       return readNumber(node.attrs?.level, 2) === 3 ? (
         <h3 {...headingProps}>{children}</h3>
@@ -101,13 +119,17 @@ function renderRichContentNode(node: TiptapJsonNode): ReactNode {
     case "image":
       return <RichContentImage node={node} />;
     case "table":
-      return <RichContentTable node={node} />;
+      return <RichContentTable contentAlignment={contentAlignment} node={node} />;
     case "tableRow":
       return <tr>{children}</tr>;
     case "tableHeader":
-      return <RichContentTableCell node={node} tag="th" />;
+      return (
+        <RichContentTableCell contentAlignment={contentAlignment} node={node} tag="th" />
+      );
     case "tableCell":
-      return <RichContentTableCell node={node} tag="td" />;
+      return (
+        <RichContentTableCell contentAlignment={contentAlignment} node={node} tag="td" />
+      );
     default:
       return children;
   }
@@ -163,18 +185,18 @@ function renderFormula(node: TiptapJsonNode, displayMode: boolean) {
 
   if (displayMode) {
     return (
-      <div
+      <span
         className="tiptap-mathematics-render"
         data-latex={latex}
         data-type="block-math"
       >
-        <div
+        <span
           className="block-math-inner"
           {...(html ? { dangerouslySetInnerHTML: { __html: html } } : {})}
         >
           {html ? null : latex}
-        </div>
-      </div>
+        </span>
+      </span>
     );
   }
 
@@ -247,14 +269,22 @@ function RichContentImage({ node }: { node: TiptapJsonNode }) {
   );
 }
 
-function RichContentTableCell({ node, tag }: { node: TiptapJsonNode; tag: "td" | "th" }) {
+function RichContentTableCell({
+  contentAlignment,
+  node,
+  tag,
+}: {
+  contentAlignment: "authored" | "left";
+  node: TiptapJsonNode;
+  tag: "td" | "th";
+}) {
   const cellHeight = readOptionalBoundedNumber(node.attrs?.cellHeight, 32, 320);
   const cellProps = {
     colSpan: readNumber(node.attrs?.colspan, 1),
     rowSpan: readNumber(node.attrs?.rowspan, 1),
     ...(cellHeight ? { style: { height: `${cellHeight}px` } } : {}),
   };
-  const children = renderRichContentNodes(node.content);
+  const children = renderRichContentNodes(node.content, contentAlignment);
 
   return tag === "th" ? (
     <th {...cellProps}>{children}</th>
@@ -263,7 +293,13 @@ function RichContentTableCell({ node, tag }: { node: TiptapJsonNode; tag: "td" |
   );
 }
 
-function RichContentTable({ node }: { node: TiptapJsonNode }) {
+function RichContentTable({
+  contentAlignment,
+  node,
+}: {
+  contentAlignment: "authored" | "left";
+  node: TiptapJsonNode;
+}) {
   const columnWidths = readTableColumnWidths(node);
 
   return (
@@ -276,7 +312,7 @@ function RichContentTable({ node }: { node: TiptapJsonNode }) {
             ))}
           </colgroup>
         ) : null}
-        <tbody>{renderRichContentNodes(node.content)}</tbody>
+        <tbody>{renderRichContentNodes(node.content, contentAlignment)}</tbody>
       </table>
     </div>
   );
@@ -306,7 +342,14 @@ function readTableColumnWidths(table: TiptapJsonNode) {
   return widths;
 }
 
-function readBlockStyle(node: TiptapJsonNode): CSSProperties | undefined {
+function readBlockStyle(
+  node: TiptapJsonNode,
+  contentAlignment: "authored" | "left",
+): CSSProperties | undefined {
+  if (contentAlignment === "left") {
+    return { textAlign: "left" };
+  }
+
   const textAlign = node.attrs?.textAlign;
   if (
     textAlign === "left" ||
@@ -330,13 +373,9 @@ function readImageAlignment(value: unknown) {
 
 function renderFormulaHtml(latex: string, displayMode: boolean) {
   try {
-    return katex.renderToString(latex, {
+    return katex.renderToString(normalizeLearningContentLatex(latex), {
       displayMode,
-      macros: {
-        "\\N": "\\mathbb{N}",
-        "\\R": "\\mathbb{R}",
-        "\\Z": "\\mathbb{Z}",
-      },
+      macros: LEARNING_CONTENT_KATEX_MACROS,
       strict: false,
       throwOnError: false,
     });

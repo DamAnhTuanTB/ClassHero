@@ -162,13 +162,25 @@ describe("LessonAiGenerationPanelService", () => {
       title: "Phiếu mua hàng",
       pageRange: null,
       canUseForSummary: true,
+      canUseForQuiz: true,
       unavailableReason: null,
+      quizUnavailableReason: null,
     });
     expect(panel.summaryConfiguration).toMatchObject({
       isDefaultConfigured: true,
       resolvedProvider: "OPENAI",
       resolvedModel: "gpt-pdf",
       modelOptions: [expect.objectContaining({ model: "gpt-pdf" })],
+    });
+    expect(panel.quizConfiguration).toMatchObject({
+      isDefaultConfigured: true,
+      resolvedProvider: "OPENAI",
+      resolvedModel: "gpt-pdf",
+      modelOptions: [expect.objectContaining({ model: "gpt-pdf" })],
+    });
+    expect(panel.readiness).toMatchObject({
+      quizReady: true,
+      quizReason: null,
     });
     expect(panel.jobs.SUMMARY).toMatchObject({
       aiGenerationId: "generation-summary",

@@ -11,14 +11,20 @@ import type {
   TiptapTextDocument,
 } from "@/types/rich-text";
 import { tokenizeMathText } from "@learning-path/shared";
+import {
+  LEARNING_CONTENT_KATEX_MACROS,
+  normalizeLearningContentLatex,
+} from "@/lib/learning-content-math";
 import { cn } from "@/lib/utils";
 
 export function TiptapContentView({
   className,
   content,
+  contentAlignment = "authored",
 }: {
   className?: string;
   content: TiptapTextDocument | null | undefined;
+  contentAlignment?: "authored" | "left";
 }) {
   if (!content?.content?.length) {
     return null;
@@ -27,28 +33,47 @@ export function TiptapContentView({
   return (
     <div
       className={cn(
-        "tiptap-content-view space-y-3 text-[15px] leading-7 text-slate-700 dark:text-[var(--theme-text)]",
+        "tiptap-content-view space-y-3 leading-relaxed text-slate-700 dark:text-[var(--theme-text)]",
+        contentAlignment === "left" &&
+          "text-left [&_.katex-display]:!text-left [&_.katex-display>.katex]:!text-left",
         className,
       )}
     >
       {content.content.map((node, index) => (
-        <ContentNode key={`${node.type}-${index}`} node={node} />
+        <ContentNode
+          key={`${node.type}-${index}`}
+          contentAlignment={contentAlignment}
+          node={node}
+        />
       ))}
     </div>
   );
 }
 
-function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
+function ContentNode({
+  contentAlignment,
+  node,
+}: {
+  contentAlignment: "authored" | "left";
+  node: TiptapJsonNode;
+}): ReactNode {
   const children = node.content?.map((child, index) => (
-    <ContentNode key={`${child.type}-${index}`} node={child} />
+    <ContentNode
+      key={`${child.type}-${index}`}
+      contentAlignment={contentAlignment}
+      node={child}
+    />
   ));
 
   if (node.type === "text") {
-    return renderTextWithFallbackMath(node.text ?? "", node.marks);
+    return renderTextWithFallbackMath(node.text ?? "", node.marks, contentAlignment);
   }
   if (node.type === "paragraph") {
     return (
-      <p style={paragraphStyle(node)} className="min-h-5 whitespace-pre-wrap">
+      <p
+        style={paragraphStyle(node, contentAlignment)}
+        className="min-h-5 whitespace-pre-wrap"
+      >
         {children}
       </p>
     );
@@ -60,11 +85,11 @@ function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
         ? "text-lg font-black text-slate-900 dark:text-[var(--theme-text-strong)]"
         : "text-xl font-black text-slate-950 dark:text-[var(--theme-text-strong)]";
     return level === 3 ? (
-      <h3 className={classes} style={paragraphStyle(node)}>
+      <h3 className={classes} style={paragraphStyle(node, contentAlignment)}>
         {children}
       </h3>
     ) : (
-      <h2 className={classes} style={paragraphStyle(node)}>
+      <h2 className={classes} style={paragraphStyle(node, contentAlignment)}>
         {children}
       </h2>
     );
@@ -86,7 +111,12 @@ function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
     const html = renderMath(latex, node.type === "blockMath");
     return (
       <span
-        className={node.type === "blockMath" ? "my-3 block overflow-x-auto py-1" : ""}
+        className={cn(
+          node.type === "blockMath" && "my-3 block overflow-x-auto py-1",
+          contentAlignment === "left" &&
+            node.type === "blockMath" &&
+            "overflow-y-hidden text-left",
+        )}
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
@@ -104,7 +134,12 @@ function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
   }
   if (node.type === "table") {
     return (
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-[var(--theme-border)]">
+      <div
+        className={cn(
+          "overflow-x-auto rounded-xl border border-slate-200 dark:border-[var(--theme-border)]",
+          contentAlignment === "left" && "overflow-y-hidden",
+        )}
+      >
         <table className="w-full border-collapse text-sm">
           <tbody>{children}</tbody>
         </table>
@@ -132,14 +167,21 @@ function ContentNode({ node }: { node: TiptapJsonNode }): ReactNode {
   return <>{children}</>;
 }
 
-function renderTextWithFallbackMath(text: string, marks: TiptapJsonMark[] | undefined) {
+function renderTextWithFallbackMath(
+  text: string,
+  marks: TiptapJsonMark[] | undefined,
+  contentAlignment: "authored" | "left",
+) {
   return tokenizeMathText(text).map((token, index) =>
     token.type === "text" ? (
       <span key={`text-${index}`}>{applyMarks(token.value, marks)}</span>
     ) : (
       <span
         key={`math-${index}`}
-        className={token.display ? "my-3 block overflow-x-auto py-1" : ""}
+        className={cn(
+          token.display && "my-3 block overflow-x-auto py-1",
+          contentAlignment === "left" && token.display && "overflow-y-hidden text-left",
+        )}
         dangerouslySetInnerHTML={{
           __html: renderMath(token.latex, token.display),
         }}
@@ -161,12 +203,16 @@ function applyMarks(text: string, marks: TiptapJsonMark[] | undefined): ReactNod
   }, text);
 }
 
-function paragraphStyle(node: TiptapJsonNode): CSSProperties {
-  const textAlign = ["left", "center", "right", "justify"].includes(
-    String(node.attrs?.textAlign),
-  )
-    ? (node.attrs?.textAlign as CSSProperties["textAlign"])
-    : undefined;
+function paragraphStyle(
+  node: TiptapJsonNode,
+  contentAlignment: "authored" | "left",
+): CSSProperties {
+  const textAlign =
+    contentAlignment === "left"
+      ? "left"
+      : ["left", "center", "right", "justify"].includes(String(node.attrs?.textAlign))
+        ? (node.attrs?.textAlign as CSSProperties["textAlign"])
+        : undefined;
   const indent =
     typeof node.attrs?.indent === "number"
       ? Math.min(8, Math.max(0, node.attrs.indent))
@@ -179,8 +225,9 @@ function paragraphStyle(node: TiptapJsonNode): CSSProperties {
 
 function renderMath(latex: string, displayMode: boolean) {
   try {
-    return katex.renderToString(latex, {
+    return katex.renderToString(normalizeLearningContentLatex(latex), {
       displayMode,
+      macros: LEARNING_CONTENT_KATEX_MACROS,
       throwOnError: false,
       strict: false,
     });

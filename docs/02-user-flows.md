@@ -317,22 +317,30 @@ Các bước chung:
 1. Admin mở buổi học.
 2. Chọn loại nội dung cần tạo bằng AI.
 3. Nhập tham số như số lượng, độ khó, loại câu hỏi, thời gian làm bài nếu có.
-   Với Quiz, bộ đang mở được gửi làm `targetQuizSetId`; admin có thể chọn 1, 5,
-   10 hoặc số câu khác và chọn đúng tài liệu nguồn của buổi học.
+   Với Quiz, modal có select `Bộ câu hỏi được chọn` liệt kê các bộ hiện có và
+   mặc định là tab bộ đang mở. Admin có thể giữ hoặc đổi bộ đích; giá trị cuối
+   cùng được gửi làm `targetQuizSetId`, cùng số câu và tài liệu nguồn đã chọn.
 4. Backend tạo BullMQ job.
 5. Worker lấy context đúng `lesson_id`.
 6. Worker gọi AI qua `AiProvider`.
 7. Worker validate output bằng schema.
-8. Với Quiz, mỗi câu output là một block `EXAMPLE` dùng chung lõi M9.2, bọc thêm
-   metadata chấm bài. Worker append các câu vào bộ Quiz đang mở và danh sách câu
-   bên dưới; không tạo một bộ/tab mới cho từng lượt AI. Flashcard/Test vẫn lưu
-   theo set tương ứng của chúng.
+8. Với Quiz, worker dùng schema/prompt/mapper/renderer thuộc riêng domain Quiz và
+   lưu `quizExplanationBlock`; tuyệt đối không import hoặc gọi core Sinh kiến
+   thức. Worker append các câu vào bộ Quiz đang mở và danh sách câu bên dưới;
+   không tạo một bộ/tab mới cho từng lượt AI. Flashcard/Test vẫn lưu theo set
+   tương ứng của chúng.
 9. Sau khi một lượt Quiz hoàn tất, card AI vẫn giữ CTA `Tạo Quiz`; bấm lại mở
    modal cấu hình để append thêm một lượt câu mới vào bộ đang chọn. Trong tab
    Quiz, admin chọn câu bằng thanh số thứ tự và chỉ câu đang chọn được render
-   bên dưới. Câu AI có hai chế độ `Chỉ xem UI` và `Song song` (UI + JSON) theo
-   cùng pattern review của Sinh kiến thức; nhãn khối EXAMPLE trong ngữ cảnh Quiz
-   hiển thị là `Lời giải`.
+   bên dưới. Câu AI có ba chế độ `Chỉ xem UI`, `Chỉ xem JSON` và `Song song`
+   (UI + JSON) theo review riêng của Quiz; structured explanation hiển thị với
+   nhãn `Lời giải`. Nếu câu còn warning semantic, khối `Cần admin kiểm tra` nằm
+   ngay dưới thanh số câu và trước bộ chuyển chế độ nên luôn hiện ở cả ba chế độ.
+   Nút `Chấp nhận` duyệt câu hiện tại cùng lời giải liên kết; sau khi API xác nhận
+   `APPROVED`, warning của câu được ẩn nhưng metadata generation vẫn giữ để audit.
+   Admin cũng có thể bấm `Duyệt tất cả` trong bộ đang mở để duyệt toàn bộ câu AI
+   chờ duyệt của riêng bộ đó. Bulk review không tự đưa câu xuống học sinh; admin
+   vẫn phải bấm `Lưu` hoặc `Phát hành` theo trạng thái của bộ.
 10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
     `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
     trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
@@ -684,6 +692,10 @@ Các bước:
    thời đồng bộ trạng thái đã kiểm tra về server; chỉ lúc đó UI mới hiện
    feedback/lời giải.
    Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
+   Riêng Quiz có nút `Bỏ qua` cạnh `Gợi ý`; thao tác này lưu marker không trả
+   lời, khóa câu và hiển thị ngay đáp án đúng cùng lời giải. Câu bỏ qua nhận 0
+   điểm, không tăng `Đã làm`, nhưng được xem là đã xử lý để student có thể nộp
+   attempt và vẫn xuất hiện trong `Xem lại câu sai`.
 5. Student nộp bài; frontend gửi toàn bộ answer trong một request.
 6. Backend validate đúng tập câu của attempt và chấm lại authoritative.
 7. Backend lưu attempt và answers; nếu đây là lượt làm lại câu sai, backend giữ
@@ -707,6 +719,8 @@ Acceptance Criteria:
   không chỉ dựa vào React state/browser storage.
 - Mục Quiz `Đang làm` trong lịch sử hiển thị `X/Y câu đã làm`, trong đó `X` là
   số câu đã có đáp án đầy đủ đã autosave.
+- Trạng thái bỏ qua được lưu theo attempt ở server; sau Back, F5 hoặc đổi thiết
+  bị, câu vẫn bị khóa và tiếp tục hiển thị đáp án/lời giải.
 - Câu đúng/sai tính nhất quán.
 - Sau mọi lần submit, màn kết quả và các action xem lại/làm lại phải dùng attempt
   gốc đã cộng dồn.

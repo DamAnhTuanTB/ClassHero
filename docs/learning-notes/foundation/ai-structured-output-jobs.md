@@ -23,6 +23,18 @@ POST generate Summary
 API trả `background_jobs.id` làm `jobId`. Database là nguồn trạng thái durable;
 BullMQ chỉ vận chuyển công việc. UI poll job/figure và có thể phục hồi sau reload.
 
+Khi người dùng tạo lại sau một job `FAILED`, frontend phải chuyển cache của đúng
+loại nội dung sang `QUEUED` ngay, xóa lỗi và bỏ `jobId` cũ trong lúc POST đang
+chạy. Nếu API từ chối thì rollback snapshot; nếu API nhận job thì gắn `jobId`
+mới, bắt đầu poll và refetch panel ở nền. Chỉ invalidate rồi chờ refetch sẽ giữ
+badge lỗi cũ theo độ trễ mạng, còn poll nhầm `jobId` cũ có thể đưa UI trở lại lỗi
+ngay lập tức.
+
+Mọi worker cùng đọc một queue phải chạy cùng phiên bản prompt/schema/validator.
+Sau khi đổi contract AI phải restart toàn bộ worker cũ; một worker dev còn sót
+có thể nhận job mới, dựng hash bằng schema đã nạp trước đó và kết thúc bằng lỗi
+stale trước cả khi provider được gọi.
+
 Khi một Summary sinh ra nhiều figure, mapper gán vị trí theo thứ tự nội dung và
 worker có thể enqueue đồng thời bằng `Promise.all`; thứ tự hoàn tất vì vậy không
 phải contract. API/UI phải sắp xếp theo vị trí số
@@ -46,6 +58,14 @@ con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figu
   trước khi model bắt đầu sinh nội dung.
 - Prompt/schema/model/config/source hash phải được snapshot để worker không dùng
   dữ liệu stale.
+- Structured schema ép được kiểu và shape nhưng description của field vẫn là chỉ
+  dẫn ngôn ngữ cho model, không phải phép kiểm tra tất định. Khi product chủ động
+  giữ output nguyên văn và không dùng normalizer/validator hậu kỳ, invariant trình
+  bày quan trọng phải xuất hiện nổi bật ở cả system prompt lẫn description của
+  đúng field, nêu rõ các ngoại lệ đóng, có cặp phản ví dụ tổng quát SAI/ĐÚNG và
+  yêu cầu tự kiểm tra trước khi trả output. Một công thức ngắn không được trở
+  thành ngoại lệ ngầm chỉ vì model thấy nó vừa một dòng; mọi lần harden loại này
+  phải tăng prompt/schema version để request draft cũ không được tái sử dụng.
 - Summary figure draft chỉ chứa source LaTeX, alt text và caption. AI không trả raw
   SVG, URL hoặc geometry JSON.
 - Figure decision dùng hai tầng: subject profile quy định mức tối thiểu bắt buộc,

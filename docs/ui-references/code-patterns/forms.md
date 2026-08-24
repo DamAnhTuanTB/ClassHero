@@ -69,6 +69,7 @@ function openCreateModal() {
 ### Không làm
 
 - Không để toàn bộ modal/dialog scroll. Chỉ vùng nội dung giữa được `overflow-y-auto`; header/title và footer/action phải luôn visible.
+- Modal cấu hình AI có vùng xem system/user prompt dài được phép giữ một khung cuộn có giới hạn riêng để đọc prompt mà không làm trôi toàn bộ form. Wrapper gần nhất của preview phải cô lập overflow (`overflow-hidden` hoặc containment tương đương) để nội dung renderer bên trong không làm phình `scrollHeight` của body modal. Khi xuất hiện khoảng trắng dư, phải đo DOM runtime và sửa ownership của overflow; không được bỏ scrollbar prompt hoặc giới hạn chiều cao panel để che triệu chứng.
 - Không top-align modal trên mobile. Overlay/shell phải dùng căn giữa dọc-ngang (`items-center justify-center`) ở mọi breakpoint; modal dài thì dùng `max-height` và body scroll.
 - Không đặt mô tả/subtitle dưới title trong header modal. Header chỉ giữ title ngắn và nút icon `X` để đóng, hoặc control phụ thật cần thiết.
 - Không tạo modal thiếu đường thoát rõ ràng. Modal phải có nút action `Hủy` trong footer và nút icon `X` đóng ở header/shell.

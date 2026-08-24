@@ -1,7 +1,16 @@
 "use client";
 
+import katex from "katex";
+import "katex/contrib/mhchem";
+import "katex/dist/katex.min.css";
 import { useEffect, useRef } from "react";
 import "@/components/shared/mathpix-markdown-renderer.css";
+import {
+  LEARNING_CONTENT_KATEX_MACROS,
+  normalizeLearningContentLatex,
+  normalizeLearningContentMathMarkdown,
+} from "@/lib/learning-content-math";
+import { cn } from "@/lib/utils";
 
 /**
  * Renders Mathpix Markdown (MMD) content with LaTeX math and table support.
@@ -9,9 +18,11 @@ import "@/components/shared/mathpix-markdown-renderer.css";
  */
 export function MathpixMarkdownRenderer({
   content = "",
+  contentAlignment = "authored",
   className,
 }: {
   content?: string;
+  contentAlignment?: "authored" | "left";
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,9 +43,15 @@ export function MathpixMarkdownRenderer({
 
       const html = MathpixMarkdownModel.markdownToHTML(safeContent, {
         htmlTags: true,
+        outMath: {
+          include_latex: true,
+          include_svg: false,
+          output_format: "latex",
+        },
       });
       if (containerRef.current) {
         containerRef.current.innerHTML = html;
+        renderLearningContentMath(containerRef.current);
         disposeFormulaScrollbars = installPersistentFormulaScrollbars(
           containerRef.current,
         );
@@ -47,7 +64,63 @@ export function MathpixMarkdownRenderer({
     };
   }, [content]);
 
-  return <div ref={containerRef} className={`mmd-content ${className ?? ""}`} />;
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "mmd-content",
+        contentAlignment === "left" && "mmd-content--left-aligned",
+        className,
+      )}
+    />
+  );
+}
+
+function renderLearningContentMath(container: HTMLDivElement) {
+  for (const mathElement of container.querySelectorAll<HTMLElement>(
+    ".math-inline, .math-block",
+  )) {
+    const displayMode = mathElement.classList.contains("math-block");
+    const latex = readDelimitedLatex(mathElement.textContent ?? "", displayMode);
+    if (!latex) continue;
+
+    mathElement.innerHTML = katex.renderToString(
+      normalizeLearningContentLatex(latex),
+      {
+        displayMode,
+        macros: LEARNING_CONTENT_KATEX_MACROS,
+        strict: false,
+        throwOnError: false,
+      },
+    );
+  }
+}
+
+function readDelimitedLatex(value: string, displayMode: boolean) {
+  const normalizedValue = value.trim();
+  const delimiterPairs = displayMode
+    ? ([
+        ["$$", "$$"],
+        ["\\[", "\\]"],
+      ] as const)
+    : ([
+        ["$", "$"],
+        ["\\(", "\\)"],
+      ] as const);
+
+  for (const [openingDelimiter, closingDelimiter] of delimiterPairs) {
+    if (
+      normalizedValue.startsWith(openingDelimiter) &&
+      normalizedValue.endsWith(closingDelimiter)
+    ) {
+      return normalizedValue.slice(
+        openingDelimiter.length,
+        normalizedValue.length - closingDelimiter.length,
+      );
+    }
+  }
+
+  return normalizedValue;
 }
 
 function installPersistentFormulaScrollbars(container: HTMLDivElement) {
@@ -120,7 +193,7 @@ function installPersistentFormulaScrollbars(container: HTMLDivElement) {
 }
 
 function normalizeMathMarkdown(value: string) {
-  return value
+  const normalizedValue = value
     .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
     .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
     .replaceAll(`${String.fromCharCode(8)}eta`, "\\beta")
@@ -131,4 +204,8 @@ function normalizeMathMarkdown(value: string) {
       /\\{2,}(?=(?:angle|triangle|frac|dfrac|sqrt|cdot|times|left|right|mathrm|text|circ|widehat|overline|perp|parallel|cong|neq|ne|le|ge)\b)/gu,
       "\\",
     );
+
+  return normalizeLearningContentMathMarkdown(
+    normalizeLearningContentLatex(normalizedValue),
+  );
 }

@@ -3,6 +3,7 @@ import type {
   StudentAnswer,
   StudentAssessmentQuestion,
 } from "@/features/student/lessons/types/student-lesson-types";
+import { areEquivalentNumericAnswers } from "@learning-path/shared";
 
 export function isStudentAnswerComplete(
   question: StudentAssessmentQuestion,
@@ -32,6 +33,46 @@ export function isStudentAnswerComplete(
   }
   const normalizedAnswer = answer.trim();
   return normalizedAnswer.length > 0 && !normalizedAnswer.includes("\\placeholder");
+}
+
+export function isStudentAnswerSkipped(
+  answer: StudentAnswer | undefined,
+): answer is { __unanswered: true } {
+  return (
+    typeof answer === "object" &&
+    answer !== null &&
+    !Array.isArray(answer) &&
+    answer.__unanswered === true &&
+    Object.keys(answer).length === 1
+  );
+}
+
+export function createSkippedQuizFeedback(
+  question: StudentAssessmentQuestion,
+): CheckedAnswer {
+  if (question.correctAnswerJson === undefined) {
+    throw new Error("Quiz chưa có dữ liệu đáp án để bỏ qua câu.");
+  }
+
+  const statementResults =
+    question.questionType === "MULTI_STATEMENT_TRUE_FALSE"
+      ? readStatementAnswers(question.correctAnswerJson).map((statement) => ({
+          statementId: statement.statementId,
+          selectedValue: null,
+          correctValue: statement.value,
+          isCorrect: false,
+          pointsAwarded: 0,
+        }))
+      : null;
+
+  return {
+    isCorrect: false,
+    isSkipped: true,
+    correctAnswerJson: question.correctAnswerJson,
+    statementResults,
+    explanationJson: question.explanationJson ?? null,
+    explanationBlock: question.explanationBlock ?? null,
+  };
 }
 
 export function gradeStudentQuizAnswer(
@@ -82,6 +123,13 @@ export function gradeStudentQuizAnswer(
     );
   }
 
+  if (question.gradingConfigJson?.numericComparison === true) {
+    const isCorrect = readStringAnswers(correctAnswer).some((expectedAnswer) =>
+      areEquivalentNumericAnswers(String(answer), expectedAnswer),
+    );
+    return createFeedback(isCorrect, question, null);
+  }
+
   const selected = normalizeTextAnswer(
     String(answer),
     question.gradingConfigJson?.caseSensitive === true,
@@ -107,7 +155,7 @@ function createFeedback(
     correctAnswerJson: question.correctAnswerJson as StudentAnswer,
     statementResults,
     explanationJson: question.explanationJson ?? null,
-    explanationExampleBlock: question.explanationExampleBlock ?? null,
+    explanationBlock: question.explanationBlock ?? null,
   };
 }
 

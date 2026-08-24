@@ -538,7 +538,6 @@ export class PersonalLearningPathClonerService {
         id: getMappedId(quizSetIdMap, set.id),
         lessonId: getMappedId(lessonIdMap, set.lessonId),
         title: set.title,
-        difficulty: set.difficulty,
         source: set.source,
         reviewStatus: set.reviewStatus,
         isReserve: set.isReserve,

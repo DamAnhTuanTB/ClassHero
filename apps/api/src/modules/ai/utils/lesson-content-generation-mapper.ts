@@ -78,7 +78,7 @@ export function mapGeneratedQuestion(question: GeneratedQuestion) {
     questionType: question.questionType,
     difficulty: question.difficulty,
     questionJson: toTiptap(mappedExample.block.problem),
-    hintJson: "hint" in question && question.hint ? toTiptap(question.hint) : null,
+    hintJson: null,
     explanationJson: mappedExample.contentJson,
     exampleBlock: mappedExample.block,
     recoveryIssues: mappedExample.recoveryIssues,

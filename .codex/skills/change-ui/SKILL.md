@@ -41,6 +41,11 @@ Before editing:
 ## Scope Rules
 
 - Only change front-end UI code, styling, layout, text presentation, icons, visual states, mock visual data, or component composition.
+- A request to remove a field entirely, stop needing a field, or delete a domain
+  property is not UI-only merely because it includes a screenshot. Inspect the
+  client/API/database contract first; unless the owner explicitly says to only
+  hide it, route the work to `update-feature`/`task-full` and remove the full
+  contract instead of applying a front-end-only patch.
 - Do not edit backend, API contract, database, Prisma, worker, payment, storage, AI/RAG, env, or business rules.
 - Do not connect new real API calls.
 - Do not add product features outside the requested UI change.
@@ -95,16 +100,54 @@ Changelog is not written during UI iteration. It is written only during `/commit
   existing class or variant with another shared class unless its computed visual
   behavior is equivalent. When recoloring a 3D button, keep the original shadow
   offsets, blur, spread and press translation, and recolor every state together.
+- When the owner requests a `font-size`-only change, modify only the computed size.
+  Preserve `font-family`, `font-style`, `font-weight`, glyph rendering and existing
+  math typefaces; do not activate a shared typography class if it changes any of
+  those properties in addition to size.
+- When the owner explicitly requests one shared `font-size` for body text and math,
+  store that size in one root CSS custom property and make every relevant text,
+  KaTeX and MathJax path consume it; do not scatter literal pixel values across
+  components. KaTeX/MathJax should inherit `1em` by default. If the owner explicitly
+  clarifies that visual glyph height must match across different text and math
+  typefaces, use one shared relative optical-size token derived from the base size;
+  do not add per-component pixel values or change font family/style/weight. Measure
+  the actual font metrics, report that the computed math size differs from the base,
+  and verify inline/display math, tall delimiters and fractions by eye.
+- When recoloring one item in a finite semantic set such as `Dễ`/`Trung bình`/`Khó`,
+  audit and define the palette for the entire set in the same pass. Every item must
+  use a clearly separated hue family in both light and dark themes, and none may
+  collide with nearby semantic states such as `Đúng`, `Sai`, warning or destructive.
+  Adjacent hues such as amber/orange do not count as clearly separated for compact
+  badges when color is the primary visual distinction.
 - When a shared component receives a feature-specific accent, apply that accent to
   every accent-bearing element in the component (such as its icon, close control,
   primary action, border and related alert surface), including hover and dark
   states. Do not leave part of a Flashcard/Quiz flow on the default theme color.
 - UI changes must feel production-ready, not static mockups: visual hierarchy, copy, states, controls, and expected actions should match what a real user would use.
+- In compact repeated navigation such as question-number tabs, do not stack two or
+  more text badges under the primary label. Keep one semantic badge for the
+  information users must scan, and reduce repeated secondary metadata such as AI
+  origin to a subtle corner icon with an accessible label/tooltip.
 - Button text must never wrap to a second line. Keep all button labels one-line with `white-space: nowrap`/`whitespace-nowrap`; if the label does not fit, adjust layout, width, padding, font size, or copy instead of allowing wrapping.
 - Với editor công thức Toán/Lý/Hóa, LaTeX chỉ là định dạng dữ liệu lưu phía sau, không được dùng textarea/input mã LaTeX thô làm UX nhập chính. UI phải ưu tiên math field WYSIWYG có toolbar ký hiệu/cấu trúc trực quan; khi chọn phân số, căn, lũy thừa, tích phân hoặc cấu trúc tương tự, người dùng phải nhập trực tiếp vào từng vùng hiển thị thật và điều hướng được giữa các vùng bằng click/chạm, `Tab` hoặc phím mũi tên. Raw LaTeX chỉ được mở như chế độ nâng cao nếu owner yêu cầu rõ.
 - Decorative math expressions must not render a standalone Unicode `√` because
   many fonts omit the visible vinculum. Use the shared radical expression pattern
   with a real overbar and an explicit radicand such as `x` or `49`.
+- Multiple-choice and multi-statement answer content must always render left-aligned,
+  including display KaTeX and rich-text blocks with persisted center/right alignment.
+  Keep only the compact A/B/C/D label centered inside its badge; do not automatically
+  center the answer body just because it contains only a display formula. KaTeX sets
+  center alignment on both `.katex-display` and `.katex-display > .katex`; a scoped
+  answer override must target both elements instead of changing only the outer wrapper.
+  Mathpix may render display math as MathJax SVG (`.math-block` plus
+  `mjx-container[jax="SVG"][display="true"]`) instead of KaTeX. In that path, use the
+  shared renderer's `contentAlignment="left"` mode and override both the MathJax
+  container and its direct `svg` margin; changing only KaTeX selectors does not move
+  the visible formula.
+- Answer content must never show a vertical scrollbar. Formula, table, or code blocks
+  may retain local horizontal scrolling for long content, but their answer-scoped
+  horizontal scrollers must use `overflow-y: hidden` without a fixed/max height so
+  the answer card expands naturally instead of becoming vertically scrollable.
 - All modal/drawer UI must be vertically and horizontally centered in the viewport at every breakpoint, including mobile. Do not top-align modals on mobile; constrain long modals with max-height and scroll only the middle body region. Use a compact three-zone structure: fixed visible title-only header at the top, scrollable content in the middle, and fixed visible action/footer area at the bottom. Do not add descriptive subtitles under modal titles, do not let the entire modal scroll, and only the middle content region may scroll. Every modal/drawer must provide a footer `Hủy` action and an `X` close button in the header/shell. Keep modal footer padding compact; on mobile, keep the old rule of one action full width and two actions on one row by default; on laptop/desktop, modal footer buttons should size to their content (`max-content`/`w-auto`) instead of stretching full width.
 - Do not create or leave fake-static interaction. Any visible button, checkbox, tab, menu, input, toggle, accordion, modal, filter, pagination, upload, editor, chart control, or clickable-looking icon must use semantic elements, real state/handlers, and pressed/pending/disabled/loading feedback as appropriate. If API is not connected, implement local/mock state that behaves like the production interaction.
 - Avoid large redesign unless requested.

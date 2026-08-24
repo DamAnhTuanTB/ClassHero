@@ -204,7 +204,6 @@ describe("M6.5 student lesson content integration", () => {
         data: {
           lessonId,
           title: "Quiz được phép",
-          difficulty: Difficulty.MEDIUM,
           reviewStatus: ReviewStatus.APPROVED,
           sortOrder: 0,
           createdById: admin.id,

@@ -150,6 +150,22 @@ export class AdminTestsController {
     );
   }
 
+  @Post("test-questions/:questionId/review")
+  @ApiOperation({ summary: "Review one generated test question" })
+  reviewQuestion(
+    @Param("questionId") questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ReviewContentSetDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.testsService.reviewQuestion(
+      questionId,
+      user.id,
+      dto,
+      getRequestContext(request),
+    );
+  }
+
   @Delete("test-questions/:questionId")
   @ApiOperation({ summary: "Soft-delete a test question" })
   deleteQuestion(

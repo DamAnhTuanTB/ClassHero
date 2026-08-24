@@ -323,12 +323,23 @@ async function seedLearningContent(adminId: string) {
   const mathDomain = await prisma.domain.upsert({
     where: { slug: "toan" },
     update: { name: "Toán", sortOrder: 1 },
-    create: { id: "10000000-0000-4000-8000-000000000001", name: "Toán", slug: "toan", sortOrder: 1 },
+    create: {
+      id: "10000000-0000-4000-8000-000000000001",
+      name: "Toán",
+      slug: "toan",
+      sortOrder: 1,
+    },
   });
   const gradeSevenAudience = await prisma.targetAudience.upsert({
     where: { code: "GRADE_7" },
     update: { name: "Khối 7", grade: 7, sortOrder: 7 },
-    create: { id: "20000000-0000-4000-8000-000000000007", code: "GRADE_7", name: "Khối 7", grade: 7, sortOrder: 7 },
+    create: {
+      id: "20000000-0000-4000-8000-000000000007",
+      code: "GRADE_7",
+      name: "Khối 7",
+      grade: 7,
+      sortOrder: 7,
+    },
   });
 
   const learningPath = await prisma.learningPath.upsert({
@@ -688,7 +699,6 @@ async function seedQuizFlashcardAndTest(
     update: {
       lessonId,
       title: "Quiz cơ bản",
-      difficulty: Difficulty.EASY,
       questionCount: 3,
       sortOrder: 1,
       updatedById: adminId,
@@ -697,7 +707,6 @@ async function seedQuizFlashcardAndTest(
       id: ids.quizSet,
       lessonId,
       title: "Quiz cơ bản",
-      difficulty: Difficulty.EASY,
       source: ContentSource.ADMIN,
       reviewStatus: ReviewStatus.APPROVED,
       questionCount: 3,

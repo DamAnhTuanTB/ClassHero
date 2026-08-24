@@ -1,10 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { orderQuizQuestionsByType } from "@learning-path/shared";
 import { AttemptStatus, Prisma, ReviewStatus } from "@prisma/client";
 import {
   assertCompleteStudentAnswer,
   createPendingAnswerJson,
+  gradeUnansweredQuestion,
   gradeQuestionAnswer,
   isPendingAnswerJson,
+  isUnansweredAnswerJson,
   validateStudentAnswerDraft,
 } from "#api/common/assessment/question-grading";
 import {
@@ -20,6 +23,7 @@ import {
   type StartStudentQuizAttemptDto,
   type StudentQuizAnswerDto,
 } from "#api/modules/quiz/dto/student-quiz-attempt.dto";
+import { normalizeQuizConclusionParagraph } from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
 
 const studentQuizQuestionSelect = {
   id: true,
@@ -32,6 +36,20 @@ const studentQuizQuestionSelect = {
   sourceMetadataJson: true,
   difficulty: true,
   sortOrder: true,
+  solutionFigureMode: true,
+  figures: {
+    where: { deletedAt: null, status: "SUCCEEDED" },
+    select: {
+      role: true,
+      currentRevision: {
+        select: {
+          altText: true,
+          caption: true,
+          deliveryFile: { select: { id: true, publicUrl: true, mimeType: true } },
+        },
+      },
+    },
+  },
   explanation: {
     select: {
       contentJson: true,
@@ -277,16 +295,6 @@ export class StudentQuizAttemptsService {
         id: true,
         lessonId: true,
         title: true,
-        questions: {
-          where: {
-            deletedAt: null,
-            reviewStatus: ReviewStatus.APPROVED,
-          },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          select: {
-            id: true,
-          },
-        },
       },
     });
     if (!quizSet) {
@@ -310,7 +318,11 @@ export class StudentQuizAttemptsService {
           totalCount: true,
           currentQuestionIndex: true,
           answers: {
-            orderBy: { question: { sortOrder: "asc" } },
+            orderBy: [
+              { question: { sortOrder: "asc" } },
+              { question: { createdAt: "asc" } },
+              { question: { id: "asc" } },
+            ],
             select: {
               answerJson: true,
               isChecked: true,
@@ -342,10 +354,13 @@ export class StudentQuizAttemptsService {
       return null;
     }
 
-    const questionNumberById = createQuestionNumberById(quizSet.questions);
+    const orderedAnswers = orderQuizAnswersByQuestionType(attempt.answers);
     const rootAttempt = attempt.sourceAttemptId
       ? await this.resolveRootAttempt(attempt.sourceAttemptId, studentUserId, quizSetId)
       : null;
+    const questionNumberById = createAttemptQuestionNumberById(
+      rootAttempt?.answers ?? attempt.answers,
+    );
 
     return {
       id: attempt.id,
@@ -353,7 +368,7 @@ export class StudentQuizAttemptsService {
       status: attempt.status,
       sourceAttemptId: attempt.sourceAttemptId,
       totalCount: attempt.totalCount,
-      originalTotalCount: rootAttempt?.totalCount ?? quizSet.questions.length,
+      originalTotalCount: rootAttempt?.totalCount ?? attempt.totalCount,
       currentQuestionIndex: Math.min(
         Math.max(0, attempt.currentQuestionIndex),
         Math.max(0, attempt.totalCount - 1),
@@ -362,19 +377,19 @@ export class StudentQuizAttemptsService {
         id: quizSet.id,
         title: quizSet.title,
       },
-      questions: attempt.answers.map((answer) =>
+      questions: orderedAnswers.map((answer) =>
         serializeRunnerQuestion(
           answer.question,
           questionNumberById.get(answer.question.id),
         ),
       ),
-      savedAnswers: attempt.answers
+      savedAnswers: orderedAnswers
         .filter((answer) => !isPendingAnswerJson(answer.answerJson))
         .map((answer) => ({
           questionId: answer.question.id,
           answerJson: answer.answerJson,
         })),
-      checkedAnswers: attempt.answers
+      checkedAnswers: orderedAnswers
         .filter((answer) => answer.isChecked && !isPendingAnswerJson(answer.answerJson))
         .map((answer) => ({
           questionId: answer.question.id,
@@ -404,8 +419,9 @@ export class StudentQuizAttemptsService {
           where: {
             deletedAt: null,
             reviewStatus: ReviewStatus.APPROVED,
+            publishedAt: { not: null },
           },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
           select: studentQuizQuestionSelect,
         },
       },
@@ -415,10 +431,12 @@ export class StudentQuizAttemptsService {
     }
     await this.studentLessonAccessService.assertCanRead(quizSet.lessonId, studentUserId);
 
+    const orderedQuizQuestions = orderQuizQuestionsByType(quizSet.questions);
     const scope = input.scope ?? QuizAttemptScopeDto.ALL;
-    let allowedQuestionIds = quizSet.questions.map((question) => question.id);
+    let allowedQuestionIds = orderedQuizQuestions.map((question) => question.id);
     let sourceAttemptId: string | null = null;
-    let originalTotalCount = quizSet.questions.length;
+    let originalTotalCount = orderedQuizQuestions.length;
+    let questionNumberById = createQuestionNumberById(orderedQuizQuestions);
     if (scope === QuizAttemptScopeDto.INCORRECT && !input.sourceAttemptId) {
       throw badRequestException(
         "QUIZ_SOURCE_ATTEMPT_REQUIRED",
@@ -454,10 +472,16 @@ export class StudentQuizAttemptsService {
       );
       sourceAttemptId = source.id;
       originalTotalCount = rootAttempt.totalCount;
+      questionNumberById = createAttemptQuestionNumberById(rootAttempt.answers);
       const approvedQuestionIds = new Set(allowedQuestionIds);
-      allowedQuestionIds = source.answers
-        .map((answer) => answer.questionId)
-        .filter((questionId) => approvedQuestionIds.has(questionId));
+      const sourceQuestionIds = new Set(
+        source.answers
+          .map((answer) => answer.questionId)
+          .filter((questionId) => approvedQuestionIds.has(questionId)),
+      );
+      allowedQuestionIds = orderedQuizQuestions
+        .filter((question) => sourceQuestionIds.has(question.id))
+        .map((question) => question.id);
       if (allowedQuestionIds.length === 0) {
         throw badRequestException(
           scope === QuizAttemptScopeDto.INCORRECT
@@ -565,7 +589,6 @@ export class StudentQuizAttemptsService {
       });
     });
     const allowedQuestionIdSet = new Set(allowedQuestionIds);
-    const questionNumberById = createQuestionNumberById(quizSet.questions);
 
     return {
       ...attempt,
@@ -576,7 +599,7 @@ export class StudentQuizAttemptsService {
       scope,
       sourceAttemptId,
       originalTotalCount,
-      questions: quizSet.questions
+      questions: orderedQuizQuestions
         .filter((question) => allowedQuestionIdSet.has(question.id))
         .map((question) =>
           serializeRunnerQuestion(question, questionNumberById.get(question.id)),
@@ -657,15 +680,22 @@ export class StudentQuizAttemptsService {
             questionType: draftAnswer.question.questionType,
           })
         : null;
+    const isSkipped =
+      normalizedAnswerJson !== null && isUnansweredAnswerJson(normalizedAnswerJson);
     const checkedGrade =
       input.answer?.isChecked && normalizedAnswerJson !== null && draftAnswer
-        ? gradeQuestionAnswer({
-            answerJson: normalizedAnswerJson,
-            correctAnswerJson: draftAnswer.question.correctAnswerJson,
-            gradingConfigJson: draftAnswer.question.gradingConfigJson,
-            optionsJson: draftAnswer.question.optionsJson,
-            questionType: draftAnswer.question.questionType,
-          })
+        ? isSkipped
+          ? gradeUnansweredQuestion({
+              correctAnswerJson: draftAnswer.question.correctAnswerJson,
+              questionType: draftAnswer.question.questionType,
+            })
+          : gradeQuestionAnswer({
+              answerJson: normalizedAnswerJson,
+              correctAnswerJson: draftAnswer.question.correctAnswerJson,
+              gradingConfigJson: draftAnswer.question.gradingConfigJson,
+              optionsJson: draftAnswer.question.optionsJson,
+              questionType: draftAnswer.question.questionType,
+            })
         : null;
 
     await this.prisma.$transaction(async (transaction) => {
@@ -689,7 +719,7 @@ export class StudentQuizAttemptsService {
           },
           data: {
             answerJson: toInputJson(normalizedAnswerJson),
-            isAnswered: checkedGrade ? true : draftState.isAnswered,
+            isAnswered: checkedGrade ? !isSkipped : draftState.isAnswered,
             isChecked: Boolean(checkedGrade),
             isCorrect: checkedGrade?.isCorrect ?? false,
           },
@@ -700,7 +730,7 @@ export class StudentQuizAttemptsService {
     const answeredCount = attempt.answers.filter((answer) =>
       answer.id === draftAnswer?.id && !answer.isChecked && draftState
         ? checkedGrade
-          ? true
+          ? !isSkipped
           : draftState.isAnswered
         : answer.isAnswered,
     ).length;
@@ -765,11 +795,14 @@ export class StudentQuizAttemptsService {
       );
     }
     const answerJson = toJsonValue(rawAnswerJson);
-    assertCompleteStudentAnswer({
-      answerJson,
-      optionsJson: answer.question.optionsJson,
-      questionType: answer.question.questionType,
-    });
+    const isSkipped = isUnansweredAnswerJson(answerJson);
+    if (!isSkipped) {
+      assertCompleteStudentAnswer({
+        answerJson,
+        optionsJson: answer.question.optionsJson,
+        questionType: answer.question.questionType,
+      });
+    }
 
     if (answer.isChecked) {
       if (!jsonValuesEqual(answer.answerJson, answerJson)) {
@@ -781,18 +814,23 @@ export class StudentQuizAttemptsService {
       return serializeCheckedAnswer(answer.question, answer.answerJson);
     }
 
-    const grade = gradeQuestionAnswer({
-      answerJson,
-      correctAnswerJson: answer.question.correctAnswerJson,
-      gradingConfigJson: answer.question.gradingConfigJson,
-      optionsJson: answer.question.optionsJson,
-      questionType: answer.question.questionType,
-    });
+    const grade = isSkipped
+      ? gradeUnansweredQuestion({
+          correctAnswerJson: answer.question.correctAnswerJson,
+          questionType: answer.question.questionType,
+        })
+      : gradeQuestionAnswer({
+          answerJson,
+          correctAnswerJson: answer.question.correctAnswerJson,
+          gradingConfigJson: answer.question.gradingConfigJson,
+          optionsJson: answer.question.optionsJson,
+          questionType: answer.question.questionType,
+        });
     await this.prisma.quizAttemptAnswer.update({
       where: { id: answer.id },
       data: {
         answerJson: toInputJson(answerJson),
-        isAnswered: true,
+        isAnswered: !isSkipped,
         isChecked: true,
         isCorrect: grade.isCorrect,
       },
@@ -819,6 +857,7 @@ export class StudentQuizAttemptsService {
           select: {
             id: true,
             questionId: true,
+            answerJson: true,
             question: {
               select: studentQuizQuestionSelect,
             },
@@ -852,22 +891,45 @@ export class StudentQuizAttemptsService {
     }
 
     const gradedAnswers = attempt.answers.map((answer) => {
-      const answerJson = toJsonValue(submittedByQuestionId.get(answer.questionId));
-      assertCompleteStudentAnswer({
-        answerJson,
-        optionsJson: answer.question.optionsJson,
-        questionType: answer.question.questionType,
-      });
+      const submittedAnswerJson = toJsonValue(
+        submittedByQuestionId.get(answer.questionId),
+      );
+      if (
+        isUnansweredAnswerJson(answer.answerJson) &&
+        !isUnansweredAnswerJson(submittedAnswerJson)
+      ) {
+        throw conflictException(
+          "QUIZ_SKIPPED_ANSWER_LOCKED",
+          "Câu Quiz đã bỏ qua không thể trả lời lại trong lượt hiện tại",
+        );
+      }
+      const answerJson = isUnansweredAnswerJson(answer.answerJson)
+        ? answer.answerJson
+        : submittedAnswerJson;
+      const isSkipped = isUnansweredAnswerJson(answerJson);
+      if (!isSkipped) {
+        assertCompleteStudentAnswer({
+          answerJson,
+          optionsJson: answer.question.optionsJson,
+          questionType: answer.question.questionType,
+        });
+      }
       return {
         ...answer,
         answerJson,
-        grade: gradeQuestionAnswer({
-          answerJson,
-          correctAnswerJson: answer.question.correctAnswerJson,
-          gradingConfigJson: answer.question.gradingConfigJson,
-          optionsJson: answer.question.optionsJson,
-          questionType: answer.question.questionType,
-        }),
+        isSkipped,
+        grade: isSkipped
+          ? gradeUnansweredQuestion({
+              correctAnswerJson: answer.question.correctAnswerJson,
+              questionType: answer.question.questionType,
+            })
+          : gradeQuestionAnswer({
+              answerJson,
+              correctAnswerJson: answer.question.correctAnswerJson,
+              gradingConfigJson: answer.question.gradingConfigJson,
+              optionsJson: answer.question.optionsJson,
+              questionType: answer.question.questionType,
+            }),
       };
     });
     const correctCount = gradedAnswers.filter((answer) => answer.grade.isCorrect).length;
@@ -885,7 +947,7 @@ export class StudentQuizAttemptsService {
             where: { id: answer.id },
             data: {
               answerJson: toInputJson(answer.answerJson),
-              isAnswered: true,
+              isAnswered: !answer.isSkipped,
               isChecked: true,
               isCorrect: answer.grade.isCorrect,
             },
@@ -939,7 +1001,7 @@ export class StudentQuizAttemptsService {
             },
             data: {
               answerJson: toInputJson(answer.answerJson),
-              isAnswered: true,
+              isAnswered: !answer.isSkipped,
               isChecked: true,
               isCorrect: answer.grade.isCorrect,
             },
@@ -1027,23 +1089,13 @@ export class StudentQuizAttemptsService {
         correctCount: true,
         wrongCount: true,
         totalCount: true,
-        quizSet: {
-          select: {
-            questions: {
-              where: {
-                deletedAt: null,
-                reviewStatus: ReviewStatus.APPROVED,
-              },
-              orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-              select: {
-                id: true,
-              },
-            },
-          },
-        },
         answers: {
           where: scope === QuizAttemptScopeDto.INCORRECT ? { isCorrect: false } : {},
-          orderBy: { question: { sortOrder: "asc" } },
+          orderBy: [
+            { question: { sortOrder: "asc" } },
+            { question: { createdAt: "asc" } },
+            { question: { id: "asc" } },
+          ],
           select: {
             answerJson: true,
             isCorrect: true,
@@ -1061,7 +1113,7 @@ export class StudentQuizAttemptsService {
       );
     }
     await this.studentLessonAccessService.assertCanRead(attempt.lessonId, studentUserId);
-    const questionNumberById = createQuestionNumberById(attempt.quizSet.questions);
+    const orderedAnswers = orderQuizAnswersByQuestionType(attempt.answers);
     const rootAttempt = attempt.sourceAttemptId
       ? await this.resolveRootAttempt(
           attempt.sourceAttemptId,
@@ -1069,6 +1121,9 @@ export class StudentQuizAttemptsService {
           attempt.quizSetId,
         )
       : null;
+    const questionNumberById = createAttemptQuestionNumberById(
+      rootAttempt?.answers ?? attempt.answers,
+    );
 
     return {
       id: attempt.id,
@@ -1079,7 +1134,7 @@ export class StudentQuizAttemptsService {
       wrongCount: attempt.wrongCount,
       totalCount: attempt.totalCount,
       originalTotalCount: rootAttempt?.totalCount ?? attempt.totalCount,
-      questions: attempt.answers.map((answer) => ({
+      questions: orderedAnswers.map((answer) => ({
         ...serializeRunnerQuestion(
           answer.question,
           questionNumberById.get(answer.question.id),
@@ -1111,6 +1166,22 @@ export class StudentQuizAttemptsService {
           id: true,
           sourceAttemptId: true,
           totalCount: true,
+          answers: {
+            orderBy: [
+              { question: { sortOrder: "asc" } },
+              { question: { createdAt: "asc" } },
+              { question: { id: "asc" } },
+            ],
+            select: {
+              questionId: true,
+              question: {
+                select: {
+                  id: true,
+                  questionType: true,
+                },
+              },
+            },
+          },
         },
       });
       if (!currentAttempt) {
@@ -1138,6 +1209,12 @@ function serializeRunnerQuestion(
   }>,
   questionNumber = question.sortOrder + 1,
 ) {
+  const questionFigure = serializeQuizFigure(
+    question.figures.find((figure) => figure.role === "QUESTION"),
+  );
+  const ownSolutionFigure = serializeQuizFigure(
+    question.figures.find((figure) => figure.role === "SOLUTION"),
+  );
   return {
     id: question.id,
     questionType: question.questionType,
@@ -1151,22 +1228,69 @@ function serializeRunnerQuestion(
       question.explanation.staleAt === null
         ? question.explanation.contentJson
         : null,
-    explanationExampleBlock:
+    explanationBlock:
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
       question.explanation.staleAt === null
-        ? readExampleBlock(question.sourceMetadataJson)
+        ? readQuizExplanationBlock(question.sourceMetadataJson)
         : null,
     difficulty: question.difficulty,
     sortOrder: question.sortOrder,
     questionNumber,
+    solutionFigureMode: question.solutionFigureMode,
+    questionFigure,
+    solutionFigure:
+      question.solutionFigureMode === "REUSE_QUESTION"
+        ? questionFigure
+        : ownSolutionFigure,
     hasExplanation:
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
       question.explanation.staleAt === null,
   };
 }
 
+function serializeQuizFigure(
+  figure:
+    | Prisma.QuizQuestionGetPayload<{
+        select: typeof studentQuizQuestionSelect;
+      }>["figures"][number]
+    | undefined,
+) {
+  const revision = figure?.currentRevision;
+  const file = revision?.deliveryFile;
+  if (!revision || !file) return null;
+  return {
+    role: figure.role,
+    altText: revision.altText,
+    caption: revision.caption,
+    fileId: file.id,
+    mimeType: file.mimeType,
+    url: file.publicUrl,
+  };
+}
+
 function createQuestionNumberById(questions: ReadonlyArray<{ id: string }>) {
   return new Map(questions.map((question, index) => [question.id, index + 1]));
+}
+
+function createAttemptQuestionNumberById(
+  answers: ReadonlyArray<{
+    question: { id: string; questionType: string };
+  }>,
+) {
+  return createQuestionNumberById(
+    orderQuizQuestionsByType(answers.map((answer) => answer.question)),
+  );
+}
+
+function orderQuizAnswersByQuestionType<T extends { question: { questionType: string } }>(
+  answers: readonly T[],
+) {
+  return orderQuizQuestionsByType(
+    answers.map((answer) => ({
+      answer,
+      questionType: answer.question.questionType,
+    })),
+  ).map(({ answer }) => answer);
 }
 
 function serializeCheckedAnswer(
@@ -1175,15 +1299,22 @@ function serializeCheckedAnswer(
   }>,
   answerJson: Prisma.JsonValue,
 ) {
-  const grade = gradeQuestionAnswer({
-    answerJson,
-    correctAnswerJson: question.correctAnswerJson,
-    gradingConfigJson: question.gradingConfigJson,
-    optionsJson: question.optionsJson,
-    questionType: question.questionType,
-  });
+  const isSkipped = isUnansweredAnswerJson(answerJson);
+  const grade = isSkipped
+    ? gradeUnansweredQuestion({
+        correctAnswerJson: question.correctAnswerJson,
+        questionType: question.questionType,
+      })
+    : gradeQuestionAnswer({
+        answerJson,
+        correctAnswerJson: question.correctAnswerJson,
+        gradingConfigJson: question.gradingConfigJson,
+        optionsJson: question.optionsJson,
+        questionType: question.questionType,
+      });
   return {
     isCorrect: grade.isCorrect,
+    isSkipped,
     correctAnswerJson: question.correctAnswerJson,
     statementResults: grade.statementResults,
     explanationJson:
@@ -1191,20 +1322,32 @@ function serializeCheckedAnswer(
       question.explanation.staleAt === null
         ? question.explanation.contentJson
         : null,
-    explanationExampleBlock:
+    explanationBlock:
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
       question.explanation.staleAt === null
-        ? readExampleBlock(question.sourceMetadataJson)
+        ? readQuizExplanationBlock(question.sourceMetadataJson)
         : null,
   };
 }
 
-function readExampleBlock(value: Prisma.JsonValue | null): Prisma.JsonValue | null {
+function readQuizExplanationBlock(
+  value: Prisma.JsonValue | null,
+): Prisma.JsonValue | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const exampleBlock = value.exampleBlock;
-  return exampleBlock && typeof exampleBlock === "object" && !Array.isArray(exampleBlock)
-    ? exampleBlock
-    : null;
+  const explanationBlock = value.quizExplanationBlock;
+  if (
+    !explanationBlock ||
+    typeof explanationBlock !== "object" ||
+    Array.isArray(explanationBlock)
+  ) {
+    return null;
+  }
+  if (typeof explanationBlock.solution !== "string") return explanationBlock;
+
+  return {
+    ...explanationBlock,
+    solution: normalizeQuizConclusionParagraph(explanationBlock.solution),
+  };
 }
 
 function toJsonValue(value: unknown): Prisma.JsonValue {

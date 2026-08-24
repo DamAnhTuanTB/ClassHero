@@ -189,7 +189,14 @@ export function QuizReviewScreen({
               />
               <AssessmentExplanationPanel
                 content={question.explanationJson}
-                exampleBlock={question.explanationExampleBlock}
+                correctAnswer={question.correctAnswerJson}
+                explanationBlock={question.explanationBlock}
+                optionIds={question.optionsJson?.map((option) => option.id)}
+                questionType={question.questionType}
+                separateAnswerItems={
+                  question.questionType === "MULTI_STATEMENT_TRUE_FALSE"
+                }
+                solutionFigure={question.solutionFigure}
               />
             </div>
           ) : (

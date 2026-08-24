@@ -266,7 +266,7 @@
   align-items: center;
   overflow: hidden;
   border-radius: 1rem;
-  padding: 0 3.75rem 0 0.875rem;
+  padding: 0 3.75rem 0 0.75rem;
   font-size: 1.125rem;
   --contains-highlight-color: var(--theme-text-strong);
 }

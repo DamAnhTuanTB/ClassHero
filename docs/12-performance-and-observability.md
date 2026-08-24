@@ -193,6 +193,10 @@ Performance và cost rules:
 - Output token của Summary scale theo `targetWordCount` và có hard cap; route
   figure có output budget riêng. Không dùng một max-token cố định cho cả bài ngắn
   lẫn bài chi tiết dài.
+- Output token của Quiz có floor theo `questionCount` và dạng câu dài nhất đã
+  chọn, giữ tối thiểu 12.000 và hard cap 32.000. Preview, request draft, budget
+  reservation và worker phải dùng cùng resolved limit; request vượt cap cần chia
+  batch thay vì âm thầm cắt output.
 - Provider output deterministic-invalid hoặc incomplete trước khi có source kết
   thúc paid attempt với error code ổn định; BullMQ không gọi lại y hệt request đó.
 - Theo dõi riêng `provider_output_pass`, `source_policy_pass`, `compiler_invoked`,
@@ -279,12 +283,16 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   partial output, không log raw prompt/chunk/output. Response đã có usage phải được
   tính chi phí dù generation không persist được; response đã về nhưng thiếu usage
   giữ reservation `UNCERTAIN` thay vì giải phóng như một lỗi trước-provider.
-- Với Summary, log thêm `promptVersion`, `schemaVersion`, schema strategy,
+- Với Summary và Quiz, log thêm `promptVersion`, `schemaVersion`, schema strategy
+  requested/resolved, schema bytes,
   `cachedInputTokens`, `uncachedInputTokens` và cache-hit ratio; không log raw
   instructions, input, chunk hoặc cache key chứa dữ liệu người dùng.
 - Prompt Caching chỉ giảm phần input bị tính phí/độ trễ theo policy provider,
   không giảm tổng token được gửi. UI và báo cáo phải tách tổng input khỏi cached
   input để tránh hiểu sai việc tối ưu cache thành cắt dữ liệu nguồn.
+- Provider schema Quiz không lặp nguyên policy định dạng toàn cục trong các field
+  không phải lời giải. Root schema giữ contract dùng chung; các field `solution`
+  vẫn giữ policy đầy đủ tại chỗ vì đây là vùng conditioning nhạy chất lượng.
 - Stage 2 tạo STEM figure chỉ gửi semantic brief tối thiểu và đúng danh sách ảnh
   vision thực tế. Mỗi source reference có nhãn gửi tối đa bốn crop khớp chính xác
   khác object key để giữ đủ panel; số panel trong brief phải bằng số ảnh thực tế

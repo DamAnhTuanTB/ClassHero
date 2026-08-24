@@ -49,6 +49,7 @@ export const studentLessonSummarySelect = {
 const approvedQuizQuestionWhere = {
   deletedAt: null,
   reviewStatus: ReviewStatus.APPROVED,
+  publishedAt: { not: null },
 } satisfies Prisma.QuizQuestionWhereInput;
 
 const approvedFlashcardWhere = {
@@ -151,7 +152,6 @@ export const studentLessonContentSelect = {
     select: {
       id: true,
       title: true,
-      difficulty: true,
       source: true,
       sortOrder: true,
       _count: {
@@ -215,12 +215,11 @@ export const studentQuizSetSelect = {
   id: true,
   lessonId: true,
   title: true,
-  difficulty: true,
   source: true,
   sortOrder: true,
   questions: {
     where: approvedQuizQuestionWhere,
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       questionType: true,

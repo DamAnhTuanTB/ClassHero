@@ -67,10 +67,18 @@
   --theme-overlay: rgb(2 6 23 / 45%);
   --theme-tooltip-bg: #020617;
   --theme-tooltip-text: #ffffff;
+  /* Base size for authored learning text; math derives its optical size from it. */
+  --learning-content-font-size: 15px;
+  /* KaTeX has a lower visual x-height than Be Vietnam Pro at the same CSS size. */
+  --learning-content-math-optical-size: 1.18em;
   --theme-auth-ambient:
     radial-gradient(circle at 14% 12%, rgb(79 70 229 / 8%), transparent 28%),
     radial-gradient(circle at 88% 18%, rgb(16 185 129 / 8%), transparent 26%);
   color-scheme: light;
+}
+
+.learning-content-text {
+  font-size: var(--learning-content-font-size) !important;
 }
 
 html {

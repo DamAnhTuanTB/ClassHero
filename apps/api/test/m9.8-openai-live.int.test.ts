@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import { OpenAiProvider } from "#api/modules/ai/providers/openai.provider";
 import {
   generatedFlashcardOutputSchema,
-  generatedQuizOutputSchema,
   generatedTestOutputSchema,
   LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
@@ -16,9 +15,17 @@ import { mapLessonSummaryProviderOutput } from "#api/modules/ai/utils/lesson-sum
 import {
   buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
-  buildQuizPrompt,
   buildTestPrompt,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
+import {
+  getGeneratedQuizOutputSchema,
+  QUIZ_PROMPT_VERSION,
+  QUIZ_SCHEMA_VERSION,
+} from "#api/modules/quiz/types/quiz-generation.types";
+import {
+  buildQuizPrompt,
+  QUIZ_SYSTEM_PROMPT,
+} from "#api/modules/quiz/utils/quiz-generation-prompt";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
 loadEnv({ path: resolve(process.cwd(), "../../.env"), override: false });
@@ -99,7 +106,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     ]) {
       const output = await provider.generateStructured(
         {
-          systemPrompt: buildLessonContentSystemPrompt(mathSubject),
+          systemPrompt: QUIZ_SYSTEM_PROMPT,
           userPrompt: buildQuizPrompt({
             lessonTitle: "Số hữu tỉ",
             questionCount: quizCase.count,
@@ -109,11 +116,16 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
           }),
           contextChunks,
           outputName: quizCase.label.replaceAll("-", "_"),
-          promptVersion: LESSON_CONTENT_PROMPT_VERSION,
-          schemaVersion: LESSON_CONTENT_SCHEMA_VERSION,
+          promptVersion: QUIZ_PROMPT_VERSION,
+          schemaVersion: QUIZ_SCHEMA_VERSION,
           maxTokens: quizCase.count === 4 ? 2_800 : 1_600,
         },
-        generatedQuizOutputSchema,
+        getGeneratedQuizOutputSchema({
+          subjectKey: mathSubject.key,
+          questionCount: quizCase.count,
+          questionTypes: quizCase.types,
+          difficulty: quizCase.difficulty,
+        }),
       );
       expect(output.data.questions).toHaveLength(quizCase.count);
       expect(new Set(output.data.questions.map((item) => item.questionType))).toEqual(

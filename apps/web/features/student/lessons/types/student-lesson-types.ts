@@ -44,6 +44,15 @@ export type AssessmentOption = {
   richText: TiptapTextDocument;
 };
 
+export type QuizFigureAsset = {
+  role: "QUESTION" | "SOLUTION";
+  altText: string;
+  caption: string | null;
+  fileId: string;
+  mimeType: string;
+  url: string | null;
+};
+
 export type StudentAssessmentQuestion = {
   id: string;
   questionType: AssessmentQuestionType;
@@ -54,13 +63,17 @@ export type StudentAssessmentQuestion = {
   gradingConfigJson?: {
     caseSensitive?: boolean;
     exactMatch?: boolean;
+    numericComparison?: boolean;
   } | null;
   explanationJson?: TiptapTextDocument | null;
-  explanationExampleBlock?: unknown | null;
+  explanationBlock?: unknown | null;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   sortOrder: number;
   questionNumber?: number;
   hasExplanation?: boolean;
+  solutionFigureMode?: "NONE" | "REUSE_QUESTION" | "EXTEND_QUESTION";
+  questionFigure?: QuizFigureAsset | null;
+  solutionFigure?: QuizFigureAsset | null;
 };
 
 export type StudentLesson = {
@@ -132,7 +145,7 @@ export type QuizAttempt = {
 
 export type StatementResult = {
   statementId: string;
-  selectedValue: boolean;
+  selectedValue: boolean | null;
   correctValue: boolean;
   isCorrect: boolean;
   pointsAwarded: number;
@@ -140,10 +153,11 @@ export type StatementResult = {
 
 export type CheckedAnswer = {
   isCorrect: boolean;
+  isSkipped?: boolean;
   correctAnswerJson: StudentAnswer;
   statementResults: StatementResult[] | null;
   explanationJson: TiptapTextDocument | null;
-  explanationExampleBlock: unknown | null;
+  explanationBlock: unknown | null;
 };
 
 export type ResumableQuizAttempt = QuizAttempt & {

@@ -13,7 +13,7 @@ export function LessonSummaryGeometryStatementTable({
     <div className="my-4 overflow-x-auto">
       <table
         aria-label="Bảng giả thiết và kết luận"
-        className="w-full min-w-[280px] border-collapse text-[14px] sm:text-[15px]"
+        className="learning-content-text w-full min-w-[280px] border-collapse"
       >
         <tbody>
           <tr className="border-b-2 border-slate-400/80 dark:border-slate-500/90">

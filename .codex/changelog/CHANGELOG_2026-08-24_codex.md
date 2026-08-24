@@ -1,0 +1,1 @@
+- 2026-08-24: Hoàn thiện lát cắt quiz-owned generation gồm request draft PDF, structured output dùng schema reference, figure pipeline/review, migration và API/worker liên quan; đồng thời đồng bộ trải nghiệm quản trị/làm bài, chuẩn hóa nội dung toán học, test, tài liệu AI–quiz và quy tắc Codex hiện hành.

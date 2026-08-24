@@ -319,6 +319,11 @@ Component:
   phím mở bên dưới; không được nhân đôi thêm một ô nhập công thức.
 - Submit button.
 - Nút `Gợi ý` chủ động; không tự mở hint.
+- Nút `Bỏ qua` chỉ có trong Quiz và nằm cạnh `Gợi ý`. Bấm một lần sẽ khóa câu,
+  hiển thị đáp án đúng và mở lời giải ngay; trạng thái này phải giữ sau resume.
+  Nhãn `Đã bỏ qua` dùng màu vàng amber sáng; ô text input và thẻ của từng mệnh
+  đề đúng/sai vẫn giữ nền, viền trung tính, không dùng viền đỏ hoặc nền vàng.
+  Riêng lựa chọn đáp án đúng vẫn được đánh dấu xanh để học sinh xem lại.
 - Mỗi chấm trong dải trạng thái là một nút điều hướng trực tiếp tới câu tương
   ứng. Giữ nguyên mã màu đúng/sai/chưa kiểm tra, biểu diễn riêng câu hiện tại và
   có nhãn truy cập mô tả số câu cùng trạng thái.
@@ -327,12 +332,12 @@ Component:
   đã tải cùng attempt và không có pending network.
 - Nhãn `Đã làm` đếm các câu có answer đầy đủ theo đúng loại câu, kể cả khi chưa
   bấm `Kiểm tra đáp án`.
-- Ở câu cuối, `Hoàn thành` vẫn cho bấm. Nếu còn câu chưa có answer đầy đủ, runner không
-  submit và hiển thị cảnh báo inline liệt kê đúng số thứ tự các câu cần hoàn
-  thành; danh sách cập nhật trực tiếp theo answer hiện có. Nếu mọi answer đã
-  đầy đủ, frontend gửi toàn bộ answer trong một request submit để backend chấm
-  lại và lưu chính thức. Bấm `Câu trước` phải đóng cảnh báo, không tự hiện lại
-  khi quay về câu cuối.
+- Ở câu cuối, `Hoàn thành` vẫn cho bấm. Nếu còn câu chưa có answer đầy đủ và
+  chưa được bỏ qua, runner không submit và hiển thị cảnh báo inline liệt kê đúng
+  số thứ tự các câu cần hoàn thành; danh sách cập nhật trực tiếp theo answer hiện
+  có. Nếu mọi câu đã trả lời hoặc bỏ qua, frontend gửi toàn bộ answer/marker bỏ
+  qua trong một request submit để backend chấm lại và lưu chính thức. Bấm
+  `Câu trước` phải đóng cảnh báo, không tự hiện lại khi quay về câu cuối.
 - Nút quay lại trong runner của attempt chưa submit mở modal xác nhận
   `Bạn chưa hoàn thành xong bài Quiz. Vẫn thoát chứ?`; `Ở lại` giữ nguyên
   runner và `Vẫn thoát` mới quay về panel Quiz. Khi vào Quiz lại, frontend phải
@@ -681,14 +686,47 @@ Màn chi tiết buổi học admin:
   số thứ tự câu hỏi nằm ngay trên panel nội dung; chọn số nào chỉ render câu đó
   bên dưới, giữ điều hướng ngang gọn khi bộ có nhiều câu. Trong set vẫn có action
   `Thêm câu hỏi`, sửa và xóa từng câu.
-- Modal `Tạo Quiz bằng AI` luôn gắn với Quiz set đang mở. Khi job hoàn tất, mọi
-  câu hợp lệ xuất hiện như card bình thường trong danh sách câu bên dưới của set
-  đó; không dùng tên bài/số lượng câu AI làm tab Quiz mới.
+- Modal tạo/sửa Quiz set chỉ có tên bộ câu hỏi. Quiz set không có
+  field hoặc badge mức độ; mức độ chỉ hiển thị và chỉnh sửa ở từng câu.
+- Modal `Tạo Quiz bằng AI` có select `Bộ câu hỏi được chọn`, liệt kê các Quiz set
+  hiện có và mặc định đúng tab đang mở. Admin có thể đổi bộ đích trước khi gửi;
+  preview và generate phải dùng cùng giá trị `targetQuizSetId` của form. Khi job
+  hoàn tất, mọi câu hợp lệ xuất hiện như card bình thường trong bộ đã chọn; không
+  dùng tên bài/số lượng câu AI làm tab Quiz mới. Modal, schema form, document
+  selector, prompt preview/model configuration và readiness đều thuộc riêng
+  feature Quiz; không render qua modal hoặc state của Sinh kiến thức.
 - Card câu AI hiển thị đề, đáp án và lời giải text/KaTeX theo contract M9.3.
-  Quiz/Test không hiển thị hoặc chỉnh figure trong giai đoạn TeX/TikZ Summary
-  đầu tiên; không giữ fallback/editor của renderer hình cũ.
-- Một set trộn câu thủ công và câu AI vẫn giữ `source=ADMIN`; UI hiển thị số câu
-  AI cần duyệt và audit của lượt gần nhất (`tạo ban đầu / đã xóa / còn lại`).
+  Quiz dùng `QuizExplanationCard` và `quizExplanationBlock`, không dùng
+  `LessonSummaryExampleCard`. Hard cutover không render legacy `exampleBlock`.
+  Quiz/Test không hiển thị hoặc chỉnh figure trong giai đoạn TeX/TikZ Summary.
+- Câu Quiz AI có `Chỉ xem UI`, `Song song` và `Chỉ xem JSON`. JSON là mutable
+  working snapshot duy nhất, cho phép sửa/add/delete field và preview nội dung
+  cục bộ; bấm `Lưu JSON` mới projection xuống Quiz records và ghi ngược
+  `ai_generations.output_json`. Không có toggle/bản provider gốc thứ hai. Subtree
+  figure khóa edit trực tiếp và chuyển sang công cụ hình riêng. Warning semantic
+  hiển thị theo câu trong một banner độc lập nằm sau thanh số câu, trước bộ chuyển
+  chế độ và ngoài nội dung của cả ba chế độ xem. Banner chỉ có tiêu đề, danh sách
+  warning và nút `Chấp nhận`; không có câu giải thích lặp về review/blocking. Nút
+  này gọi cùng item-level review của câu hiện tại, có pending state, và banner ẩn
+  sau khi câu đã thành `APPROVED`.
+- Câu được xác định là nguồn AI bằng `sourceMetadataJson.aiGenerationId`: ô số
+  điều hướng và hàng action đầu card cùng hiển thị nhãn `AI`. Card đặt action
+  `Duyệt` ngay cạnh nhãn; action chỉ duyệt câu đang xem, có trạng thái pending và
+  đổi thành `Đã duyệt` khi thành công. Câu admin tạo mới không có metadata này nên
+  không hiển thị nhãn hoặc action AI. Nhãn AI dùng hệ màu sky/cyan, không dùng
+  màu tím.
+- Thanh điều hướng Quiz đặt câu AI `NEEDS_REVIEW` ở hàng trên cùng. Câu
+  `APPROVED` nằm trong bốn hàng cố định theo thứ tự Trắc nghiệm, Đúng/Sai một
+  mệnh đề, Đúng/Sai nhiều mệnh đề, Nhập đáp án; duyệt xong câu tự chuyển hàng.
+  Mỗi Quiz set có hàng action `Duyệt tất cả`, `Lưu` và một trong
+  `Phát hành`/`Thu hồi phát hành`, đồng nhất state machine của Sinh kiến thức.
+  `Duyệt tất cả` đứng trước `Lưu`, chỉ duyệt các câu AI đang chờ trong set hiện
+  tại, có pending/disabled state và không tự lưu hoặc phát hành. Khi bulk review
+  tạo câu đã duyệt chưa lưu, callout bên dưới hàng action nhắc admin bấm `Lưu` để
+  cập nhật cho học sinh.
+- Một set trộn câu thủ công và câu AI vẫn giữ `source=ADMIN`; card bộ câu hỏi chỉ
+  hiển thị thông tin và action cần cho quản trị, không hiển thị bộ đếm audit lượt
+  sinh `tạo ban đầu / đã xóa / còn lại`.
 - Form câu hỏi quiz hỗ trợ `MULTIPLE_CHOICE`, `TRUE_FALSE`,
   `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT`, mức độ, gợi ý và lời giải chi
   tiết. Multiple choice dùng danh sách phương án động:

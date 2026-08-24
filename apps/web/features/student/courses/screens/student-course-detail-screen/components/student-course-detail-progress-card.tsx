@@ -60,7 +60,7 @@ export function StudentCourseDetailProgressCard({
         </p>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-3">
         <StudentLessonTransitionLink
           lessonId={detail.continueLessonId}
           className="student-learn-cta-3d inline-flex min-h-12 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-sky-500 px-4 text-lg font-black text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"

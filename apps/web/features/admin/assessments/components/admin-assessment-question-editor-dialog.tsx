@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
@@ -21,7 +21,10 @@ import {
   QuizRichContentEditor,
   ScientificAnswerField,
 } from "@/features/admin/quiz/components/quiz-rich-content-editor";
-import { useAdminQuizQuestionMutations } from "@/features/admin/quiz/hooks/use-admin-quiz";
+import {
+  useAdminQuizFigureUpload,
+  useAdminQuizQuestionMutations,
+} from "@/features/admin/quiz/hooks/use-admin-quiz";
 import type { AdminTestQuestion } from "@/features/admin/tests/api/admin-tests-api";
 import { useAdminTestQuestionMutations } from "@/features/admin/tests/hooks/use-admin-tests";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
@@ -83,6 +86,7 @@ const questionFormSchema = z
     acceptedAnswers: z.array(acceptedAnswerSchema),
     caseSensitive: z.boolean(),
     exactMatch: z.boolean(),
+    numericComparison: z.boolean(),
     hintContent: tiptapDocumentSchema,
     explanationContent: tiptapDocumentSchema,
   })
@@ -191,6 +195,9 @@ export function AdminAssessmentQuestionEditorDialog({
     setId,
     lessonId,
   );
+  const uploadQuizFigure = useAdminQuizFigureUpload(setId);
+  const quizQuestion =
+    assessmentKind === "quiz" ? (question as AdminQuizQuestion | null) : null;
   const { createQuestion: createTestQuestion, updateQuestion: updateTestQuestion } =
     useAdminTestQuestionMutations(setId, lessonId);
   const form = useForm<QuestionFormValues>({
@@ -248,10 +255,7 @@ export function AdminAssessmentQuestionEditorDialog({
       onClose();
     } catch (error) {
       toast.error(
-        getUserFacingErrorMessage(
-          error,
-          "Chưa lưu được câu hỏi. Vui lòng thử lại.",
-        ),
+        getUserFacingErrorMessage(error, "Chưa lưu được câu hỏi. Vui lòng thử lại."),
       );
     }
   });
@@ -340,6 +344,94 @@ export function AdminAssessmentQuestionEditorDialog({
               />
             </div>
           </div>
+
+          {quizQuestion ? (
+            <section className="space-y-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-4">
+              <div>
+                <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                  Hình minh họa riêng của Quiz
+                </h3>
+                <p className="mt-1 text-xs font-medium text-[var(--theme-text-muted)]">
+                  Hình đề hiển thị khi làm bài. Hình lời giải chỉ hiển thị sau khi kiểm
+                  tra đáp án và phải được dựng trên hình đề.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(["QUESTION", "SOLUTION"] as const).map((role) => {
+                  const figure = quizQuestion.figures?.find((item) => item.role === role);
+                  const imageUrl = figure?.currentRevision?.deliveryFile?.publicUrl;
+                  const isPending =
+                    uploadQuizFigure.isPending &&
+                    uploadQuizFigure.variables?.role === role;
+                  return (
+                    <div
+                      key={role}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
+                    >
+                      <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                        {role === "QUESTION" ? "Hình đề" : "Hình lời giải"}
+                      </p>
+                      {imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imageUrl}
+                          alt={
+                            figure?.currentRevision?.altText ??
+                            (role === "QUESTION" ? "Hình đề Quiz" : "Hình lời giải Quiz")
+                          }
+                          className="mt-2 max-h-44 w-full rounded-lg object-contain"
+                        />
+                      ) : (
+                        <p className="mt-2 text-xs font-semibold text-[var(--theme-text-muted)]">
+                          {figure
+                            ? `Trạng thái: ${figure.status}`
+                            : "Chưa có hình được tải lên."}
+                        </p>
+                      )}
+                      <label className="theme-button-primary-subtle mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-extrabold">
+                        {isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Upload className="h-4 w-4" aria-hidden="true" />
+                        )}
+                        {imageUrl ? "Thay hình" : "Tải hình lên"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          disabled={uploadQuizFigure.isPending}
+                          onChange={async (event) => {
+                            const file = event.currentTarget.files?.[0];
+                            event.currentTarget.value = "";
+                            if (!file) return;
+                            try {
+                              await uploadQuizFigure.mutateAsync({
+                                questionId: quizQuestion.id,
+                                role,
+                                file,
+                                altText:
+                                  role === "QUESTION"
+                                    ? "Hình minh họa đề bài Quiz"
+                                    : "Hình minh họa lời giải Quiz mở rộng từ hình đề",
+                              });
+                              toast.success("Đã cập nhật hình Quiz");
+                            } catch (error) {
+                              toast.error(
+                                getUserFacingErrorMessage(
+                                  error,
+                                  "Chưa thể tải hình Quiz lên.",
+                                ),
+                              );
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           {questionType === "MULTIPLE_CHOICE" ? (
             <section className="space-y-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-4">
@@ -458,7 +550,7 @@ export function AdminAssessmentQuestionEditorDialog({
 
           {questionType === "TRUE_FALSE" ? (
             <section className="space-y-3">
-              <FieldLabel id="quiz-true-answer" label="Đáp án đúng" />
+              <FieldLabel id="quiz-true-answer" label="Đáp án" />
               <div className="grid grid-cols-2 gap-3">
                 {TRUE_FALSE_OPTIONS.map((option) => {
                   const selected = form.watch("trueFalseAnswer") === option.value;
@@ -796,6 +888,7 @@ function createEmptyDefaults(): QuestionFormValues {
     acceptedAnswers: [{ text: "" }],
     caseSensitive: false,
     exactMatch: true,
+    numericComparison: false,
     hintContent: createEmptyTiptapDocument(),
     explanationContent: createEmptyTiptapDocument(),
   };
@@ -838,6 +931,7 @@ function toFormValues(
         : [{ text: "" }],
     caseSensitive: question.gradingConfigJson?.caseSensitive ?? false,
     exactMatch: question.gradingConfigJson?.exactMatch ?? true,
+    numericComparison: question.gradingConfigJson?.numericComparison ?? false,
     hintContent: question.hintJson ?? createEmptyTiptapDocument(),
     explanationContent: question.explanation?.contentJson ?? createEmptyTiptapDocument(),
   };
@@ -895,6 +989,7 @@ function toPayload(values: QuestionFormValues): AdminQuizQuestionPayload {
     gradingConfigJson: {
       caseSensitive: values.caseSensitive,
       exactMatch: values.exactMatch,
+      numericComparison: values.numericComparison,
     },
   };
 }

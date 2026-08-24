@@ -84,7 +84,7 @@ export interface AiTextOutput extends AiProviderOutputMetadata {
   text: string;
 }
 
-export type AiStructuredSchemaReferenceStrategy = "inline" | "ref" | "ref_v2";
+export type AiStructuredSchemaReferenceStrategy = "inline" | "ref" | "ref_v2" | "auto";
 
 export type AiPromptCacheRetention = "in_memory" | "24h";
 
@@ -102,10 +102,11 @@ export interface AiStructuredInput extends AiTextInput {
   /**
    * Controls JSON Schema serialization only. `inline` preserves the OpenAI SDK
    * helper byte-for-byte; `ref` preserves the first `$defs/$ref` serializer;
-   * `ref_v2` only compacts additional exact duplicate schema subtrees.
+   * `ref_v2` only compacts additional exact duplicate schema subtrees;
+   * `auto` safely chooses the smallest serializer and falls back to inline.
    */
   schemaReferenceStrategy?: AiStructuredSchemaReferenceStrategy;
-  /** Summary-only cache routing policy. It never changes prompt/context content. */
+  /** Provider-neutral cache routing policy. It never changes prompt/context content. */
   promptCache?: AiPromptCacheConfiguration;
 }
 

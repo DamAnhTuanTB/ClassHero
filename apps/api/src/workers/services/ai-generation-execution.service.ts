@@ -9,6 +9,7 @@ import type {
 } from "#api/modules/ai/types/ai-generation.types";
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
+import { QuizGenerationService } from "#api/workers/services/quiz-generation.service";
 
 /**
  * Dispatch boundary for M9 generation handlers.
@@ -21,6 +22,8 @@ export class AiGenerationExecutionService {
     private readonly lessonSummaryGeneration: LessonSummaryGenerationService,
     @Inject(LessonContentGenerationService)
     private readonly lessonContentGeneration: LessonContentGenerationService,
+    @Inject(QuizGenerationService)
+    private readonly quizGeneration: QuizGenerationService,
   ) {}
 
   async generate(
@@ -29,8 +32,10 @@ export class AiGenerationExecutionService {
     if (context.type === AiGenerationType.SUMMARY) {
       return this.lessonSummaryGeneration.generate(context);
     }
+    if (context.type === AiGenerationType.QUIZ) {
+      return this.quizGeneration.generate(context);
+    }
     if (
-      context.type === AiGenerationType.QUIZ ||
       context.type === AiGenerationType.FLASHCARD ||
       context.type === AiGenerationType.TEST
     ) {
@@ -48,8 +53,10 @@ export class AiGenerationExecutionService {
     if (context.type === AiGenerationType.SUMMARY) {
       return this.lessonSummaryGeneration.persist(context, prepared);
     }
+    if (context.type === AiGenerationType.QUIZ) {
+      return this.quizGeneration.persist(context, prepared);
+    }
     if (
-      context.type === AiGenerationType.QUIZ ||
       context.type === AiGenerationType.FLASHCARD ||
       context.type === AiGenerationType.TEST
     ) {

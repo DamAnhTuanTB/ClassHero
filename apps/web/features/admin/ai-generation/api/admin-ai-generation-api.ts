@@ -10,6 +10,7 @@ import type {
   AdminLessonSummaryReviewStatus,
   AdminSummaryGenerationPayload,
   AdminQuizGenerationPayload,
+  AdminQuizPromptPreview,
   AdminStemFigure,
   AdminStemFigureCreateAiInput,
   AdminStemFigureCreateAiPreview,
@@ -21,6 +22,7 @@ import type {
 import type { LessonSummaryPhaseOneLayoutOperation } from "@/features/admin/ai-generation/utils/lesson-summary-phase-one-preview";
 
 const LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS = 120_000;
+const QUIZ_PROMPT_PREVIEW_TIMEOUT_MS = 120_000;
 
 export function getAdminAiGenerationPanel(lessonId: string, token: string) {
   return apiRequest<AdminAiGenerationPanelData>(
@@ -76,13 +78,13 @@ export function previewAdminQuizPrompt(
   token: string,
 ) {
   const { type: _type, ...body } = payload;
-  return apiRequest<AdminLessonSummaryPromptPreview>(
+  return apiRequest<AdminQuizPromptPreview>(
     `/admin/lessons/${lessonId}/quiz-sets/prompt-preview`,
     {
       method: "POST",
       body,
       token,
-      timeoutMs: LESSON_SUMMARY_PROMPT_PREVIEW_TIMEOUT_MS,
+      timeoutMs: QUIZ_PROMPT_PREVIEW_TIMEOUT_MS,
     },
   );
 }
@@ -379,6 +381,7 @@ export function reviewAdminGeneratedSet(
   resourceId: string,
   reviewStatus: AdminLessonSummaryReviewStatus,
   token: string,
+  action?: "SAVE" | "PUBLISH" | "WITHDRAW",
 ) {
   const resource = {
     QUIZ: "quiz-sets",
@@ -387,7 +390,7 @@ export function reviewAdminGeneratedSet(
   }[type];
   return apiRequest<unknown>(`/admin/${resource}/${resourceId}/review`, {
     method: "POST",
-    body: { reviewStatus },
+    body: { reviewStatus, ...(action ? { action } : {}) },
     token,
   });
 }

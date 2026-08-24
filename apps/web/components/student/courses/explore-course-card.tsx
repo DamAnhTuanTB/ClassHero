@@ -4,6 +4,7 @@ import {
   Crown,
   GraduationCap,
   LockKeyhole,
+  Play,
   PlayCircle,
   Star,
 } from "lucide-react";
@@ -191,14 +192,14 @@ export function ExploreCourseCard({
                   <p className="student-progress-accent-text text-sm font-bold leading-4 text-sky-600 dark:text-sky-300 sm:text-sm sm:leading-5">
                     {nextLessonLabel}
                   </p>
-                  <p className="student-soft-bold-text line-clamp-2 text-base font-extrabold leading-5 text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-base sm:leading-6">
+                  <p className="student-soft-bold-text mt-1 line-clamp-2 text-base font-extrabold leading-5 text-slate-600 dark:text-[var(--theme-text-strong)] sm:text-base sm:leading-6">
                     {course.nextLesson.title}
                   </p>
                 </div>
               </div>
 
               <span className="student-learn-cta-3d inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-500 px-3 text-[17px] font-extrabold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 sm:text-base">
-                <PlayCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <Play className="h-5 w-5 shrink-0 fill-current" aria-hidden="true" />
                 {nextLessonCtaLabel}
               </span>
             </div>
@@ -294,17 +295,19 @@ export function ExploreCourseCard({
                     : "student-detail-cta-outline border border-sky-400/70 bg-white text-sky-700 hover:border-sky-500/80 hover:bg-sky-50 focus-visible:ring-sky-100 dark:border-[var(--theme-primary-border)] dark:bg-[var(--theme-surface)] dark:text-sky-300",
                 )}
               >
-                {ctaLabel}
                 {isEnrolled && !isUnderMaintenance ? (
-                  <PlayCircle
-                    className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
-                    aria-hidden="true"
-                  />
+                  <>
+                    <Play className="h-5 w-5 shrink-0 fill-current" aria-hidden="true" />
+                    {ctaLabel}
+                  </>
                 ) : (
-                  <ArrowRight
-                    className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
-                    aria-hidden="true"
-                  />
+                  <>
+                    {ctaLabel}
+                    <ArrowRight
+                      className="h-6 w-6 shrink-0 sm:h-5 sm:w-5"
+                      aria-hidden="true"
+                    />
+                  </>
                 )}
               </span>
             </div>

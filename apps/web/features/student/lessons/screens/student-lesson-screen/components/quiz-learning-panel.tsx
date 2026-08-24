@@ -61,8 +61,10 @@ import { getQuizEntryActionLabel } from "@/features/student/lessons/utils/quiz-e
 import { getNextLearningSet } from "@/features/student/lessons/utils/learning-set-selection";
 import { getBrowserStudentLearningSurface } from "@/features/student/lessons/utils/student-learning-surface-route";
 import {
+  createSkippedQuizFeedback,
   gradeStudentQuizAnswer,
   isStudentAnswerComplete,
+  isStudentAnswerSkipped,
 } from "@/features/student/lessons/utils/student-answer-utils";
 import {
   pickQuizTransitionVariant,
@@ -315,6 +317,13 @@ export function QuizLearningPanel({
     onSaved: handleProgressSaved,
     token,
   });
+
+  useEffect(() => {
+    const currentQuestion = attempt?.questions[currentIndex];
+    if (currentQuestion && feedbackByQuestionId[currentQuestion.id]?.isSkipped) {
+      setIsExplanationOpen(true);
+    }
+  }, [attempt, currentIndex, feedbackByQuestionId]);
 
   useEffect(() => {
     if (!isBrowserStateResolved) return;
@@ -626,6 +635,38 @@ export function QuizLearningPanel({
     );
   }
 
+  function handleSkip() {
+    const question = attempt?.questions[currentIndex];
+    if (!attempt || !question || feedbackByQuestionId[question.id] || pendingAction) {
+      return;
+    }
+
+    try {
+      const skippedAnswer = { __unanswered: true } satisfies StudentAnswer;
+      const skippedFeedback = createSkippedQuizFeedback(question);
+      setAnswers((current) => ({ ...current, [question.id]: skippedAnswer }));
+      setFeedbackByQuestionId((current) => ({
+        ...current,
+        [question.id]: skippedFeedback,
+      }));
+      setIsHintOpen(false);
+      setIsExplanationOpen(true);
+      void quizProgressAutosave.saveAnswer({
+        attemptId: attempt.id,
+        currentQuestionIndex: currentIndex,
+        answer: {
+          questionId: question.id,
+          answerJson: skippedAnswer,
+          isChecked: true,
+        },
+      });
+    } catch (error) {
+      toast.error("Chưa bỏ qua được câu hỏi", {
+        description: getErrorMessage(error),
+      });
+    }
+  }
+
   async function handleSubmit() {
     if (!attempt || pendingAction) return false;
     setPendingAction("submit");
@@ -633,7 +674,10 @@ export function QuizLearningPanel({
       await quizProgressAutosave.flush();
       const submittedAnswers = attempt.questions.flatMap((question) => {
         const answer = answers[question.id];
-        if (answer === undefined || !isStudentAnswerComplete(question, answer)) {
+        if (
+          answer === undefined ||
+          (!isStudentAnswerComplete(question, answer) && !isStudentAnswerSkipped(answer))
+        ) {
           return [];
         }
         return [{ answerJson: answer, questionId: question.id }];
@@ -968,6 +1012,12 @@ export function QuizLearningPanel({
   const answeredQuestionIds = attempt.questions.flatMap((item) =>
     isStudentAnswerComplete(item, answers[item.id]) ? [item.id] : [],
   );
+  const handledQuestionIds = attempt.questions.flatMap((item) => {
+    const itemAnswer = answers[item.id];
+    return isStudentAnswerComplete(item, itemAnswer) || isStudentAnswerSkipped(itemAnswer)
+      ? [item.id]
+      : [];
+  });
 
   return renderWithCurtain(
     <QuizRunnerScreen
@@ -977,6 +1027,7 @@ export function QuizLearningPanel({
       feedback={feedback}
       feedbackByQuestionId={feedbackByQuestionId}
       answeredQuestionIds={answeredQuestionIds}
+      handledQuestionIds={handledQuestionIds}
       lessonTitle={lesson.title}
       pendingAction={pendingAction}
       isHintOpen={isHintOpen}
@@ -1033,6 +1084,7 @@ export function QuizLearningPanel({
         setIsExplanationOpen(false);
       }}
       onCheck={handleCheck}
+      onSkip={handleSkip}
       onSubmit={handleSubmit}
       onNext={() => {
         const nextIndex = Math.min(attempt.questions.length - 1, currentIndex + 1);
@@ -1130,19 +1182,18 @@ function createResumedQuizState(currentAttempt: ResumableQuizAttempt, quizSetId:
     Object.entries(storedProgress.checkedAnswers ?? {}).forEach(
       ([questionId, storedAnswer]) => {
         const question = currentAttempt.questions.find((item) => item.id === questionId);
-        if (
-          !question ||
-          feedbackByQuestionId[questionId] !== undefined ||
-          !isStudentAnswerComplete(question, storedAnswer)
-        ) {
+        if (!question || feedbackByQuestionId[questionId] !== undefined) {
           return;
         }
         try {
+          const isSkipped = isStudentAnswerSkipped(storedAnswer);
+          if (!isSkipped && !isStudentAnswerComplete(question, storedAnswer)) {
+            return;
+          }
           answers[questionId] = storedAnswer;
-          feedbackByQuestionId[questionId] = gradeStudentQuizAnswer(
-            question,
-            storedAnswer,
-          );
+          feedbackByQuestionId[questionId] = isSkipped
+            ? createSkippedQuizFeedback(question)
+            : gradeStudentQuizAnswer(question, storedAnswer);
         } catch {
           delete answers[questionId];
         }

@@ -7,7 +7,6 @@ export const quizSetFormSchema = z.object({
     maxLength: 180,
     maxMessage: "Tên bộ câu hỏi tối đa 180 ký tự",
   }),
-  difficulty: z.enum(["EASY", "MEDIUM", "HARD", "MIXED"]),
 });
 
 export type QuizSetFormValues = z.infer<typeof quizSetFormSchema>;

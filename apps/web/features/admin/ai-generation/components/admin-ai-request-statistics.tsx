@@ -20,7 +20,7 @@ export function AdminAiRequestStatistics({
 }: {
   details: AdminAiRequestStatistic[];
   estimatedCost: AdminAiEstimatedCost;
-  note: string;
+  note?: string;
 }) {
   const costDetails: AdminAiRequestStatistic[] = [
     {
@@ -65,9 +65,11 @@ export function AdminAiRequestStatistics({
           </div>
         ))}
       </dl>
-      <p className="mt-3 border-t border-[var(--theme-border)] pt-3 text-xs font-bold leading-5 text-[var(--theme-text-muted)]">
-        {note}
-      </p>
+      {note ? (
+        <p className="mt-3 border-t border-[var(--theme-border)] pt-3 text-xs font-bold leading-5 text-[var(--theme-text-muted)]">
+          {note}
+        </p>
+      ) : null}
     </div>
   );
 }

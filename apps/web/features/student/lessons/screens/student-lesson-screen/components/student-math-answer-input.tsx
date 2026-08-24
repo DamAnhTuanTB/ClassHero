@@ -45,6 +45,7 @@ export function StudentMathAnswerInput({
             paletteId={keyboardId}
             placeholder={"\\text{Nhập đáp án}"}
             preset="student-answer"
+            placeholderWeight={accent === "quiz" ? "normal" : "bold"}
             showPalette={keyboardIsVisible}
             status={answerState}
             onChange={onChange}
@@ -58,7 +59,8 @@ export function StudentMathAnswerInput({
             autoComplete="off"
             onChange={(event) => onChange(event.currentTarget.value)}
             className={cn(
-              "student-mobile-border h-16 w-full rounded-2xl border bg-white px-3 pr-14 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 dark:bg-[var(--theme-surface-soft)] dark:text-[var(--theme-text-strong)] dark:placeholder:text-slate-500",
+              "student-mobile-border h-16 w-full rounded-2xl border bg-white px-3 pr-14 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 dark:bg-[var(--theme-surface-soft)] dark:text-[var(--theme-text-strong)] dark:placeholder:text-slate-500",
+              accent === "quiz" ? "font-normal" : "font-bold",
               fieldStateClass,
             )}
             placeholder="Nhập đáp án"

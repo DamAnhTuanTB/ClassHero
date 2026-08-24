@@ -80,6 +80,24 @@ Non-negotiable:
 - For backend fixes in `apps/api/src`, preserve the alias convention: use `#api/...` for internal imports instead of `../` or `./`.
 - For backend fixes that touch HTTP errors, use `apps/api/src/common/errors` helpers/factories instead of adding direct Nest exception constructors with custom bodies in the fixed module.
 - For UI bugs, the fix must preserve production-like interaction. Do not replace broken behavior with static fake controls; visible buttons, checkbox/toggle state, tabs, menus, filters, forms, modals, and clickable-looking icons must keep semantic elements, state/handlers, and feedback.
+- When KaTeX and MathJax can render inside the same content wrapper, scope SVG
+  resets to the renderer-specific container (for example
+  `mjx-container[jax="SVG"] > svg`). Never apply a broad wrapper rule such as
+  `.mmd-content svg`, because it can override KaTeX's stretchy-delimiter SVG
+  layout and expose seams or connector strokes. Visually verify tall braces,
+  radicals and fractions at normal and enlarged zoom after changing math CSS.
+- For horizontally scrollable KaTeX display math, keep one canonical overflow
+  owner. Do not nest an `overflow-y: hidden` KaTeX display inside another clipped
+  math scroller: upper/lower limits and stretchy braces legitimately paint beyond
+  the inner line box and will lose strokes. Reserve ink-safe block padding on the
+  outer scroller, then verify the painted bounds of integrals with limits,
+  fractions, radicals, exponents/subscripts and tall delimiters against every
+  clipping ancestor.
+- Treat `\\right.` as LaTeX delimiter syntax, never as removable sentence
+  punctuation. When normalizing AI-authored display math, repair a misplaced
+  `$$` before `\\end{aligned}`/similar environments before parsing, and cover the
+  valid and malformed forms with regression tests instead of rendering raw red
+  fallback text.
 - For UI implementation bugs, do not invent local workaround gates when an approved code pattern exists. Forms, especially, must keep realtime validation from the shared/project pattern rather than patching symptoms with per-field `dirtyFields`/`touchedFields` logic.
 - If the bug reveals a small roadmap dependency/TODO issue, update `.codex/plans/codex-execution-plan.md`; ask the owner before major roadmap or scope changes.
 - If a fix requires a secret, paid service, production access, or large product decision, stop and ask.

@@ -20,29 +20,71 @@ const compactFormatCache = new WeakMap<
   Map<string, AutoParseableTextFormat<unknown>>
 >();
 
+export type AiStructuredTextFormatResolution<TOutput> = {
+  format: AutoParseableTextFormat<TOutput>;
+  resolvedReferenceStrategy: Exclude<AiStructuredSchemaReferenceStrategy, "auto">;
+  schemaBytes: number;
+};
+
 export function buildAiStructuredTextFormat<TOutput>(
   schema: AiOutputSchema<TOutput>,
   outputName: string,
   referenceStrategy: AiStructuredSchemaReferenceStrategy = "inline",
 ): AutoParseableTextFormat<TOutput> {
+  return resolveAiStructuredTextFormat(schema, outputName, referenceStrategy).format;
+}
+
+export function resolveAiStructuredTextFormat<TOutput>(
+  schema: AiOutputSchema<TOutput>,
+  outputName: string,
+  referenceStrategy: AiStructuredSchemaReferenceStrategy = "inline",
+): AiStructuredTextFormatResolution<TOutput> {
+  if (referenceStrategy === "auto") {
+    const candidates: AiStructuredTextFormatResolution<TOutput>[] = [
+      resolveAiStructuredTextFormat(schema, outputName, "inline"),
+    ];
+    for (const strategy of ["ref_v2", "ref"] as const) {
+      try {
+        candidates.push(resolveAiStructuredTextFormat(schema, outputName, strategy));
+      } catch {
+        // Inline is the compatibility baseline. A compact serializer must never
+        // make an otherwise valid generation request fail.
+      }
+    }
+    return candidates.reduce((smallest, candidate) =>
+      candidate.schemaBytes < smallest.schemaBytes ? candidate : smallest,
+    );
+  }
+
   if (referenceStrategy === "inline") {
-    return zodTextFormat(schema, outputName);
+    return toResolution(zodTextFormat(schema, outputName), "inline");
   }
 
   if (referenceStrategy === "ref_v2") {
     const cacheKey = `${outputName}:ref_v2`;
     const cached = compactFormatCache.get(schema as object)?.get(cacheKey);
     if (cached) {
-      return cached as AutoParseableTextFormat<TOutput>;
+      return toResolution(cached as AutoParseableTextFormat<TOutput>, "ref_v2");
     }
     const format = deepFreeze(buildReferenceTextFormat(schema, outputName, true));
     const schemaCache = compactFormatCache.get(schema as object) ?? new Map();
     schemaCache.set(cacheKey, format as AutoParseableTextFormat<unknown>);
     compactFormatCache.set(schema as object, schemaCache);
-    return format;
+    return toResolution(format, "ref_v2");
   }
 
-  return buildReferenceTextFormat(schema, outputName, false);
+  return toResolution(buildReferenceTextFormat(schema, outputName, false), "ref");
+}
+
+function toResolution<TOutput>(
+  format: AutoParseableTextFormat<TOutput>,
+  resolvedReferenceStrategy: Exclude<AiStructuredSchemaReferenceStrategy, "auto">,
+): AiStructuredTextFormatResolution<TOutput> {
+  return {
+    format,
+    resolvedReferenceStrategy,
+    schemaBytes: JSON.stringify(format.schema).length,
+  };
 }
 
 function buildReferenceTextFormat<TOutput>(
@@ -90,9 +132,9 @@ function compactAndRenameExactSchemaReferences(schema: JsonObject): JsonObject {
   const definitions = readDefinitions(compacted);
   const slots = collectExactReusableSchemaSlots(compacted);
 
-  hoistExactSlots(definitions, "__compact_geometry_statement", slots.geometry, [3, 6]);
-  hoistExactSlots(definitions, "__compact_marker_group", slots.markerGroups, 2);
-  hoistExactSlots(definitions, "__compact_measure", slots.measures, 2);
+  hoistEquivalentSlotGroups(definitions, "__compact_geometry_statement", slots.geometry);
+  hoistEquivalentSlotGroups(definitions, "__compact_marker_group", slots.markerGroups);
+  hoistEquivalentSlotGroups(definitions, "__compact_measure", slots.measures);
 
   return renameDefinitionsDeterministically(compacted);
 }
@@ -180,39 +222,30 @@ function collectExactReusableSchemaSlots(schema: JsonObject) {
     }
   });
 
-  const groupedMeasures = groupSlotsByCanonicalValue(measures).find(
-    (group) => group.length === 2,
-  );
   return {
     geometry,
     markerGroups,
-    measures: groupedMeasures ?? [],
+    measures,
   };
 }
 
-function hoistExactSlots(
+function hoistEquivalentSlotGroups(
   definitions: JsonObject,
-  definitionName: string,
+  definitionPrefix: string,
   slots: JsonSlot[],
-  expectedCount: number | readonly number[],
 ) {
-  if (slots.length === 0) return;
-  const expectedCounts = Array.isArray(expectedCount) ? expectedCount : [expectedCount];
-  if (!expectedCounts.includes(slots.length)) {
-    throw new Error(
-      `Expected ${expectedCounts.join(" or ")} exact schema slots for ${definitionName}, found ${slots.length}.`,
-    );
-  }
-  const canonical = stableJson(slots[0]!.value);
-  const mismatch = slots.find((slot) => stableJson(slot.value) !== canonical);
-  if (mismatch) {
-    throw new Error(
-      `Schema slot ${mismatch.path} is not equivalent to ${slots[0]!.path}.`,
-    );
-  }
-  definitions[definitionName] = structuredClone(slots[0]!.value);
-  for (const slot of slots) {
-    slot.replace({ $ref: `#/$defs/${definitionName}` });
+  const reusableGroups = groupSlotsByCanonicalValue(slots).filter(
+    (group) => group.length >= 2,
+  );
+  for (const [groupIndex, group] of reusableGroups.entries()) {
+    const definitionName =
+      reusableGroups.length === 1
+        ? definitionPrefix
+        : `${definitionPrefix}_${groupIndex + 1}`;
+    definitions[definitionName] = structuredClone(group[0]!.value);
+    for (const slot of group) {
+      slot.replace({ $ref: `#/$defs/${definitionName}` });
+    }
   }
 }
 

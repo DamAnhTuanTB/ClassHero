@@ -7,13 +7,17 @@ import {
   getAdminQuizQuestions,
   createAdminQuizQuestion,
   deleteAdminQuizQuestion,
+  reviewAllPendingAdminQuizQuestions,
+  reviewAdminQuizQuestion,
   updateAdminQuizQuestion,
+  updateAdminQuizGenerationQuestionJson,
   updateAdminQuizSet,
+  uploadAdminQuizImage,
+  attachAdminQuizFigureUpload,
   type AdminQuizQuestion,
   type AdminQuizQuestionPayload,
   type AdminQuizQuestionUpdatePayload,
   type AdminQuizSet,
-  type QuizDifficulty,
 } from "@/features/admin/quiz/api/admin-quiz-api";
 
 const adminQuizQueryKeys = {
@@ -81,7 +85,7 @@ export function useAdminQuizSetMutations(lessonId: string) {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (data: { title: string; difficulty?: QuizDifficulty }) => {
+    mutationFn: async (data: { title: string }) => {
       if (!session?.accessToken) throw new Error("No token");
       return createAdminQuizSet(lessonId, data, session.accessToken);
     },
@@ -113,13 +117,7 @@ export function useAdminQuizSetMutations(lessonId: string) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({
-      data,
-      setId,
-    }: {
-      data: { title: string; difficulty?: QuizDifficulty };
-      setId: string;
-    }) => {
+    mutationFn: async ({ data, setId }: { data: { title: string }; setId: string }) => {
       if (!session?.accessToken) throw new Error("No token");
       return updateAdminQuizSet(setId, data, session.accessToken);
     },
@@ -192,6 +190,31 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
     },
   });
 
+  const updateGenerationJsonMutation = useMutation({
+    mutationFn: async ({
+      questionId,
+      generationQuestionJson,
+    }: {
+      questionId: string;
+      generationQuestionJson: Record<string, unknown>;
+    }) => {
+      if (!session?.accessToken) throw new Error("No token");
+      return updateAdminQuizGenerationQuestionJson(
+        questionId,
+        generationQuestionJson,
+        session.accessToken,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.questions(setId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.sets(lessonId),
+      });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (questionId: string) => {
       if (!session?.accessToken) throw new Error("No token");
@@ -207,9 +230,77 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
     },
   });
 
+  const reviewMutation = useMutation({
+    mutationFn: async (questionId: string) => {
+      if (!session?.accessToken) throw new Error("No token");
+      return reviewAdminQuizQuestion(questionId, session.accessToken);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: adminQuizQueryKeys.questions(setId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: adminQuizQueryKeys.sets(lessonId),
+        }),
+      ]);
+    },
+  });
+
+  const reviewAllMutation = useMutation({
+    mutationFn: async () => {
+      if (!session?.accessToken) throw new Error("No token");
+      return reviewAllPendingAdminQuizQuestions(setId, session.accessToken);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: adminQuizQueryKeys.questions(setId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: adminQuizQueryKeys.sets(lessonId),
+        }),
+      ]);
+    },
+  });
+
   return {
     createQuestion: createMutation,
     updateQuestion: updateMutation,
+    updateGenerationJson: updateGenerationJsonMutation,
     deleteQuestion: deleteMutation,
+    reviewQuestion: reviewMutation,
+    reviewAllQuestions: reviewAllMutation,
   };
+}
+
+export function useAdminQuizFigureUpload(setId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      questionId: string;
+      role: "QUESTION" | "SOLUTION";
+      file: File;
+      altText: string;
+      caption?: string;
+    }) => {
+      if (!session?.accessToken) throw new Error("No token");
+      const uploaded = await uploadAdminQuizImage(input.file, session.accessToken);
+      return attachAdminQuizFigureUpload(
+        input.questionId,
+        {
+          role: input.role,
+          fileId: uploaded.fileId,
+          altText: input.altText,
+          caption: input.caption,
+        },
+        session.accessToken,
+      );
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: adminQuizQueryKeys.questions(setId),
+      }),
+  });
 }

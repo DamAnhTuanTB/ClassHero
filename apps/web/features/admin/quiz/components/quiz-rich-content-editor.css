@@ -570,9 +570,45 @@ body.quiz-table-row-resizing-active * {
 .quiz-rich-content-viewer
   .quiz-rich-content-prosemirror
   .tiptap-mathematics-render[data-type="block-math"] {
+  display: block;
   max-width: 100%;
   overflow-x: auto;
   text-align: center;
+}
+
+.quiz-rich-content-viewer
+  .quiz-rich-content-prosemirror
+  .tiptap-mathematics-render[data-type="block-math"]
+  > .block-math-inner {
+  display: block;
+}
+
+.quiz-rich-content-viewer--left-aligned .quiz-rich-content-prosemirror,
+.quiz-rich-content-viewer--left-aligned
+  .quiz-rich-content-prosemirror
+  .tiptap-mathematics-render[data-type="block-math"],
+.quiz-rich-content-viewer--left-aligned .quiz-rich-content-prosemirror .katex-display,
+.quiz-rich-content-viewer--left-aligned
+  .quiz-rich-content-prosemirror
+  .katex-display
+  > .katex {
+  text-align: left !important;
+}
+
+.quiz-rich-content-viewer--left-aligned
+  .quiz-rich-content-prosemirror
+  .tiptap-mathematics-render[data-type="block-math"] {
+  padding-block: 0;
+}
+
+.quiz-rich-content-viewer--left-aligned .quiz-rich-content-prosemirror .katex-display {
+  margin-block: 0;
+}
+
+.quiz-rich-content-viewer--left-aligned
+  .quiz-rich-content-prosemirror
+  :is(.tiptap-mathematics-render[data-type="block-math"], .tableWrapper, pre) {
+  overflow-y: hidden;
 }
 
 .quiz-rich-content-editor .tiptap-mathematics-render {

@@ -3,7 +3,7 @@ import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/common/prisma/prisma.service";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { QuizService } from "../src/modules/quiz/services/quiz.service";
-import { QuestionType, Difficulty, UserRole } from "@prisma/client";
+import { QuestionType, Difficulty, ReviewStatus, UserRole } from "@prisma/client";
 import { RequestContext } from "../src/common/api/request-context";
 import { randomUUID } from "crypto";
 import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
@@ -95,6 +95,7 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     );
     expect(set.id).toBeDefined();
     expect(set.title).toBe("Toán Đại Số 10");
+    expect(set).not.toHaveProperty("difficulty");
     testQuizSetId = set.id;
   });
 
@@ -308,5 +309,128 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     const questions = await quizService.listQuestionsBySet(testQuizSetId);
     expect(questions.length).toBe(2);
     expect(questions[0]?.explanation?.contentJson).toBeDefined();
+  });
+
+  it("should bulk review only pending AI questions in the selected quiz set", async () => {
+    const createPendingQuestion = (label: string) =>
+      quizService.createQuestion(
+        testQuizSetId,
+        testUserId,
+        {
+          questionType: QuestionType.TRUE_FALSE,
+          difficulty: Difficulty.EASY,
+          questionJson: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: label }],
+              },
+            ],
+          },
+          optionsJson: null,
+          correctAnswerJson: true,
+          explanationJson: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: `Lời giải ${label}` }],
+              },
+            ],
+          },
+        },
+        mockContext,
+      );
+
+    const [firstAiQuestion, secondAiQuestion, manualQuestion] = await Promise.all([
+      createPendingQuestion("Câu AI 1"),
+      createPendingQuestion("Câu AI 2"),
+      createPendingQuestion("Câu admin"),
+    ]);
+    const aiGenerationId = randomUUID();
+    await Promise.all([
+      prisma.quizQuestion.update({
+        where: { id: firstAiQuestion.id },
+        data: {
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+          sourceMetadataJson: { aiGenerationId, generationQuestionIndex: 0 },
+        },
+      }),
+      prisma.quizQuestion.update({
+        where: { id: secondAiQuestion.id },
+        data: {
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+          sourceMetadataJson: { aiGenerationId, generationQuestionIndex: 1 },
+        },
+      }),
+      prisma.quizQuestion.update({
+        where: { id: manualQuestion.id },
+        data: { reviewStatus: ReviewStatus.NEEDS_REVIEW },
+      }),
+      prisma.aiExplanation.updateMany({
+        where: {
+          id: {
+            in: [firstAiQuestion.explanationId, secondAiQuestion.explanationId].filter(
+              (id): id is string => Boolean(id),
+            ),
+          },
+        },
+        data: { reviewStatus: ReviewStatus.NEEDS_REVIEW },
+      }),
+    ]);
+
+    const result = await quizService.reviewAllPendingAiQuestions(
+      testQuizSetId,
+      testUserId,
+      mockContext,
+    );
+    expect(result).toEqual({
+      approvedQuestionCount: 2,
+      pendingReviewQuestionCount: 1,
+    });
+
+    const reviewedQuestions = await prisma.quizQuestion.findMany({
+      where: {
+        id: { in: [firstAiQuestion.id, secondAiQuestion.id, manualQuestion.id] },
+      },
+      select: { id: true, publishedAt: true, reviewStatus: true },
+    });
+    expect(
+      reviewedQuestions
+        .filter((question) => question.id !== manualQuestion.id)
+        .every(
+          (question) =>
+            question.reviewStatus === ReviewStatus.APPROVED &&
+            question.publishedAt === null,
+        ),
+    ).toBe(true);
+    expect(
+      reviewedQuestions.find((question) => question.id === manualQuestion.id)
+        ?.reviewStatus,
+    ).toBe(ReviewStatus.NEEDS_REVIEW);
+
+    const reviewedExplanations = await prisma.aiExplanation.findMany({
+      where: {
+        id: {
+          in: [firstAiQuestion.explanationId, secondAiQuestion.explanationId].filter(
+            (id): id is string => Boolean(id),
+          ),
+        },
+      },
+      select: { reviewStatus: true },
+    });
+    expect(
+      reviewedExplanations.every(
+        (explanation) => explanation.reviewStatus === ReviewStatus.APPROVED,
+      ),
+    ).toBe(true);
+
+    await expect(
+      quizService.reviewAllPendingAiQuestions(testQuizSetId, testUserId, mockContext),
+    ).resolves.toEqual({
+      approvedQuestionCount: 0,
+      pendingReviewQuestionCount: 1,
+    });
   });
 });

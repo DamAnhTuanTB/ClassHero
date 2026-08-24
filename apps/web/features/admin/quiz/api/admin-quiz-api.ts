@@ -25,20 +25,40 @@ export interface AdminQuizQuestionPayload {
   gradingConfigJson?: {
     caseSensitive: boolean;
     exactMatch: boolean;
+    numericComparison?: boolean;
     keywords?: string[];
   };
   explanationJson?: TiptapTextDocument | null;
 }
 
+export interface AdminQuizGenerationIssue {
+  classification?: "VALID" | "AUTO_FIXED" | "REVIEWABLE";
+  code: string;
+  message: string;
+  questionIndex?: number;
+  blocking?: boolean;
+  technicalDetails?: string;
+}
+
+export interface AdminQuizGenerationMetadata {
+  generationAudit?: {
+    requestedCount: number;
+    initialGeneratedCount: number;
+    deletedCount: number;
+    currentActiveCount: number;
+  };
+  generationIssues?: AdminQuizGenerationIssue[];
+  [key: string]: unknown;
+}
+
 export type AdminQuizQuestionUpdatePayload = Partial<AdminQuizQuestionPayload> & {
-  exampleBlock?: unknown;
+  quizExplanationBlock?: unknown;
 };
 
 export interface AdminQuizSet {
   id: string;
   lessonId: string;
   title: string;
-  difficulty: QuizDifficulty;
   source: string;
   reviewStatus: string;
   questionCount: number;
@@ -47,31 +67,15 @@ export interface AdminQuizSet {
     questions: number;
   };
   pendingReviewQuestionCount?: number;
+  unpublishedApprovedQuestionCount?: number;
   aiGenerations?: Array<{
     id: string;
     createdAt: string;
-    inputMetaJson: AdminQuizSet["aiGeneration"] extends infer T
-      ? T extends { inputMetaJson: infer M }
-        ? M
-        : never
-      : never;
+    inputMetaJson: AdminQuizGenerationMetadata | null;
   }>;
   aiGeneration?: {
     id: string;
-    inputMetaJson: {
-      generationAudit?: {
-        requestedCount: number;
-        initialGeneratedCount: number;
-        deletedCount: number;
-        currentActiveCount: number;
-      };
-      generationIssues?: Array<{
-        code: string;
-        message: string;
-        blocking?: boolean;
-      }>;
-      [key: string]: unknown;
-    } | null;
+    inputMetaJson: AdminQuizGenerationMetadata | null;
   } | null;
   createdAt: string;
   updatedAt: string;
@@ -89,6 +93,7 @@ export interface AdminQuizQuestion {
   gradingConfigJson: {
     caseSensitive?: boolean;
     exactMatch?: boolean;
+    numericComparison?: boolean;
     keywords?: string[];
   } | null;
   explanation: {
@@ -100,16 +105,43 @@ export interface AdminQuizQuestion {
   sourceMetadataJson: {
     aiGenerationId?: string;
     generationQuestionIndex?: number;
-    exampleBlock?: unknown;
+    quizExplanationBlock?: unknown;
     [key: string]: unknown;
   } | null;
+  generationQuestionJson?: Record<string, unknown> | null;
   reviewStatus: string;
+  solutionFigureMode: "NONE" | "REUSE_QUESTION" | "EXTEND_QUESTION";
+  figures: AdminQuizFigure[];
+}
+
+export interface AdminQuizFigure {
+  id: string;
+  role: "QUESTION" | "SOLUTION";
+  status: "QUEUED" | "RENDERING" | "REPAIRING" | "SUCCEEDED" | "NEEDS_REVIEW" | "FAILED";
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  currentRevision: {
+    id: string;
+    sourceKind: "AI_TEX" | "ADMIN_UPLOAD";
+    altText: string;
+    caption: string | null;
+    deliveryFile: {
+      id: string;
+      mimeType: string;
+      publicUrl: string | null;
+    } | null;
+  } | null;
 }
 
 export interface AdminQuizInitialData {
   questions: AdminQuizQuestion[];
   questionSetId: string | null;
   sets: AdminQuizSet[];
+}
+
+export interface AdminQuizBulkReviewResult {
+  approvedQuestionCount: number;
+  pendingReviewQuestionCount: number;
 }
 
 type AdminQuizReadOptions = Pick<ApiRequestOptions, "cache">;
@@ -128,7 +160,7 @@ export async function getAdminQuizSets(
 
 export async function createAdminQuizSet(
   lessonId: string,
-  data: { title: string; difficulty?: QuizDifficulty },
+  data: { title: string },
   token: string,
 ) {
   return apiRequest<AdminQuizSet>(`/admin/lessons/${lessonId}/quiz-sets`, {
@@ -140,7 +172,7 @@ export async function createAdminQuizSet(
 
 export async function updateAdminQuizSet(
   setId: string,
-  data: { title?: string; difficulty?: QuizDifficulty },
+  data: { title?: string },
   token: string,
 ) {
   return apiRequest<AdminQuizSet>(`/admin/quiz-sets/${setId}`, {
@@ -193,6 +225,39 @@ export async function updateAdminQuizQuestion(
   });
 }
 
+export async function updateAdminQuizGenerationQuestionJson(
+  questionId: string,
+  generationQuestionJson: Record<string, unknown>,
+  token: string,
+) {
+  return apiRequest<AdminQuizQuestion>(
+    `/admin/quiz-questions/${questionId}/generation-json`,
+    {
+      method: "PATCH",
+      body: { generationQuestionJson },
+      token,
+    },
+  );
+}
+
+export async function reviewAdminQuizQuestion(questionId: string, token: string) {
+  return apiRequest<AdminQuizQuestion>(`/admin/quiz-questions/${questionId}/review`, {
+    method: "POST",
+    body: { reviewStatus: "APPROVED" },
+    token,
+  });
+}
+
+export async function reviewAllPendingAdminQuizQuestions(setId: string, token: string) {
+  return apiRequest<AdminQuizBulkReviewResult>(
+    `/admin/quiz-sets/${setId}/questions/review-all-ai`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
+
 export async function deleteAdminQuizQuestion(questionId: string, token: string) {
   return apiRequest<{ success: boolean }>(`/admin/quiz-questions/${questionId}`, {
     method: "DELETE",
@@ -227,4 +292,20 @@ export async function uploadAdminQuizImage(file: File, token: string) {
     fileName: uploadedFile.originalName,
     imageUrl,
   };
+}
+
+export async function attachAdminQuizFigureUpload(
+  questionId: string,
+  data: {
+    role: "QUESTION" | "SOLUTION";
+    fileId: string;
+    altText: string;
+    caption?: string;
+  },
+  token: string,
+) {
+  return apiRequest<AdminQuizFigure>(
+    `/admin/quiz-questions/${questionId}/figures/admin-upload`,
+    { method: "POST", body: data, token },
+  );
 }

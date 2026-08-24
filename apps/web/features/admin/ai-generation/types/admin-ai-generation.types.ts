@@ -43,7 +43,9 @@ export interface AdminAiPanelDocument {
   pageRange: { pageStart: number; pageEnd: number } | null;
   embeddingReady: boolean;
   canUseForSummary: boolean;
+  canUseForQuiz: boolean;
   unavailableReason: string | null;
+  quizUnavailableReason: string | null;
 }
 
 export interface AdminAiModelConfiguration {
@@ -53,6 +55,9 @@ export interface AdminAiModelConfiguration {
   temperature: number | null;
   reasoningEffort: string | null;
   maxOutputTokens: number | null;
+  schemaReferenceStrategy?: string;
+  resolvedSchemaReferenceStrategy?: string;
+  schemaBytes?: number;
   modelOptions: Array<{
     provider: string;
     model: string;
@@ -96,12 +101,15 @@ export interface AdminAiGenerationPanelData {
   readiness: {
     summaryReady: boolean;
     generationReady: boolean;
+    quizReady: boolean;
     readyDocumentCount: number;
     embeddedDocumentCount: number;
     reason: string | null;
+    quizReason: string | null;
   };
   documents: AdminAiPanelDocument[];
   summaryConfiguration: AdminAiModelConfiguration;
+  quizConfiguration: AdminAiModelConfiguration;
   jobs: Record<AdminAiGenerationType, AdminAiPanelJob | null>;
 }
 
@@ -160,6 +168,8 @@ export type AdminQuizGenerationPayload = {
   temperature?: number;
   reasoningEffort?: AiReasoningEffort;
   maxOutputTokens?: number;
+  requestDraftId?: string;
+  requestHash?: string;
 };
 
 export type AdminAiGenerationPayload =
@@ -265,6 +275,60 @@ export interface AdminLessonSummaryPromptPreview {
     selectedModel: string | null;
     temperature: number;
     maxOutputTokens: number;
+  };
+  estimatedCost: {
+    available: boolean;
+    inputUpperBoundUsd: number | null;
+    inputUpperBoundVnd: number | null;
+    outputUpperBoundUsd: number | null;
+    outputUpperBoundVnd: number | null;
+    upperBoundUsd: number | null;
+    upperBoundVnd: number | null;
+    fxRateVndPerUsd: number;
+  };
+}
+
+export interface AdminQuizPromptPreview {
+  requestDraftId: string;
+  requestHash: string;
+  expiresAt: string;
+  promptVersion: string;
+  schemaVersion: string;
+  systemPrompt: string;
+  userPrompt: string;
+  inputPrompt: string;
+  openAiFileUploadRequest: {
+    purpose: "user_data";
+    file: string;
+  };
+  openAiRequest: {
+    model: string | null;
+    instructions: string;
+    input: unknown;
+    text: { format: Record<string, unknown> };
+    temperature?: number;
+    reasoning?: { effort: string };
+    max_output_tokens: number;
+    prompt_cache_key?: string;
+    prompt_cache_retention?: "24h";
+  };
+  context: {
+    lessonTitle: string;
+    documentCount: number;
+    chunkCount: number;
+    estimatedTokens: number;
+    textInputTokens: number;
+    pdfInputTokens: number;
+    promptTokens?: number;
+    schemaTokens?: number;
+    contextTokens: number;
+    maxContextTokens: number | null;
+    packet: NonNullable<AdminLessonSummaryPromptPreview["context"]["packet"]>;
+    chunks: [];
+  };
+  configuration: AdminAiModelConfiguration & {
+    targetQuizSet?: { id: string; title: string } | null;
+    selectedModel?: string | null;
   };
   estimatedCost: {
     available: boolean;

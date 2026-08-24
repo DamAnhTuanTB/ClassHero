@@ -1,3 +1,4 @@
+import { orderQuizQuestionsByType } from "@learning-path/shared";
 import { ReviewStatus } from "@prisma/client";
 import type { StudentLessonAccessContext } from "#api/modules/learning-paths/types/lesson.types";
 import type {
@@ -172,9 +173,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function serializeStudentQuizSet(record: StudentQuizSetRecord) {
+  const questions = orderQuizQuestionsByType(record.questions);
+
   return {
     ...record,
-    questionCount: record.questions.length,
+    questions,
+    questionCount: questions.length,
   };
 }
 

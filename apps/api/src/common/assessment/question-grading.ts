@@ -1,4 +1,5 @@
 import { Prisma, QuestionType } from "@prisma/client";
+import { areEquivalentNumericAnswers } from "@learning-path/shared";
 import { badRequestException } from "#api/common/errors/api-exception";
 
 const pendingAnswerMarker = "__pending";
@@ -6,7 +7,7 @@ const unansweredMarker = "__unanswered";
 
 export type StatementGradeResult = {
   statementId: string;
-  selectedValue: boolean;
+  selectedValue: boolean | null;
   correctValue: boolean;
   isCorrect: boolean;
   pointsAwarded: number;
@@ -240,6 +241,13 @@ export function gradeQuestionAnswer(input: {
 
   const acceptedAnswers = readStringArray(correctAnswerJson, "đáp án đúng");
   const gradingConfig = isRecord(gradingConfigJson) ? gradingConfigJson : {};
+  if (gradingConfig.numericComparison === true) {
+    const selected = String(answerJson);
+    const isCorrect = acceptedAnswers.some((answer) =>
+      areEquivalentNumericAnswers(selected, answer),
+    );
+    return simpleResult(isCorrect, effectivePoints);
+  }
   const caseSensitive = gradingConfig.caseSensitive === true;
   const exactMatch = gradingConfig.exactMatch !== false;
   const selected = normalizeTextAnswer(String(answerJson), caseSensitive);
@@ -249,6 +257,28 @@ export function gradeQuestionAnswer(input: {
   });
 
   return simpleResult(isCorrect, effectivePoints);
+}
+
+export function gradeUnansweredQuestion(input: {
+  correctAnswerJson: Prisma.JsonValue;
+  questionType: QuestionType;
+}): QuestionGradeResult {
+  const statementResults =
+    input.questionType === QuestionType.MULTI_STATEMENT_TRUE_FALSE
+      ? readStatementAnswers(input.correctAnswerJson).map((answer) => ({
+          statementId: answer.statementId,
+          selectedValue: null,
+          correctValue: answer.value,
+          isCorrect: false,
+          pointsAwarded: 0,
+        }))
+      : null;
+
+  return {
+    isCorrect: false,
+    pointsAwarded: 0,
+    statementResults,
+  };
 }
 
 function simpleResult(isCorrect: boolean, effectivePoints: number): QuestionGradeResult {

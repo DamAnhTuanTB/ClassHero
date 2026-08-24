@@ -26,13 +26,11 @@ import type {
 } from "#api/modules/ai/types/ai-generation.types";
 import {
   flashcardGenerationJobInputSchema,
-  getGeneratedQuizOutputSchema,
   getGeneratedTestOutputSchema,
   generatedFlashcardOutputSchema,
   LESSON_CONTENT_MAX_OUTPUT_TOKENS,
   LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
-  quizGenerationJobInputSchema,
   testGenerationJobInputSchema,
   type GeneratedQuestion,
 } from "#api/modules/ai/types/lesson-content-generation.types";
@@ -46,7 +44,6 @@ import {
 import {
   buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
-  buildQuizStructuredInput,
   buildTestPrompt,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 
@@ -67,7 +64,6 @@ export class LessonContentGenerationService {
   ): Promise<AiGenerationPreparedOutput> {
     if (!context.lessonId)
       throw new UnrecoverableError("AI content generation requires lessonId.");
-    if (context.type === AiGenerationType.QUIZ) return this.generateQuiz(context);
     if (context.type === AiGenerationType.FLASHCARD)
       return this.generateFlashcards(context);
     if (context.type === AiGenerationType.TEST) return this.generateTest(context);
@@ -82,8 +78,6 @@ export class LessonContentGenerationService {
   ): Promise<AiGenerationPersistenceResult> {
     if (!context.lessonId)
       throw new UnrecoverableError("AI content persistence requires lessonId.");
-    if (context.type === AiGenerationType.QUIZ)
-      return this.persistQuiz(context, prepared);
     if (context.type === AiGenerationType.FLASHCARD)
       return this.persistFlashcards(context, prepared);
     if (context.type === AiGenerationType.TEST)
@@ -91,62 +85,6 @@ export class LessonContentGenerationService {
     throw new UnrecoverableError(
       `Unsupported lesson content persistence type ${context.type}.`,
     );
-  }
-
-  private async generateQuiz(context: AiGenerationExecutionContext) {
-    const input = parseJobInput(quizGenerationJobInputSchema, context.inputMeta, "quiz");
-    const source = await this.retrieve(
-      context.lessonId!,
-      input.documentIds,
-      input.sourceHash,
-      "kiến thức trọng tâm và bài tập ôn tập của buổi học",
-    );
-    const request = buildQuizStructuredInput({
-      lessonId: source.lessonId,
-      lessonTitle: source.lessonTitle,
-      documentIds: source.documentIds,
-      sourceHash: source.sourceHash,
-      chunks: source.chunks.map((chunk) => ({
-        id: chunk.chunkId,
-        content: chunk.content,
-        score: chunk.score,
-        metadata: {
-          documentId: chunk.documentId,
-          chunkIndex: chunk.chunkIndex,
-          metadataJson: chunk.metadataJson,
-        },
-      })),
-      configuration: input,
-    });
-    const providerSchema = getGeneratedQuizOutputSchema(source.subject.key);
-    const output = this.providerCall
-      ? await this.providerCall.generateStructured(
-          providerContext(context),
-          request,
-          providerSchema,
-        )
-      : await this.aiService.generateStructured(request, providerSchema);
-    const validation = validateQuestionOutput({
-      questions: output.data.questions,
-      requestedCount: input.questionCount,
-      requestedTypes: input.questionTypes,
-      requestedDifficulty: input.difficulty,
-      difficultyCounts: input.difficultyCounts,
-      source,
-    });
-    if (validation.questions.length === 0) {
-      throw new UnrecoverableError(
-        "AI_OUTPUT_UNRENDERABLE: No valid Quiz question could be persisted.",
-      );
-    }
-    return {
-      action: "QUIZ",
-      output: {
-        ...output,
-        data: { ...output.data, questions: validation.questions },
-      },
-      contextMetadata: validation.metadata,
-    };
   }
 
   private async generateFlashcards(context: AiGenerationExecutionContext) {
@@ -256,91 +194,6 @@ export class LessonContentGenerationService {
     }
   }
 
-  private async persistQuiz(
-    context: AiGenerationExecutionContext,
-    prepared: AiGenerationPreparedOutput,
-  ) {
-    const input = parseJobInput(quizGenerationJobInputSchema, context.inputMeta, "quiz");
-    const output = parseAiStructuredOutput(
-      getGeneratedQuizOutputSchema(input.subjectKey),
-      prepared.output.data,
-    );
-    return this.prisma.$transaction(async (tx) => {
-      const set = await tx.quizSet.findFirst({
-        where: {
-          id: input.targetQuizSetId ?? undefined,
-          lessonId: context.lessonId!,
-          deletedAt: null,
-        },
-        select: { id: true, questionCount: true },
-      });
-      if (!set) {
-        throw new UnrecoverableError(
-          "QUIZ_TARGET_SET_NOT_FOUND: The selected Quiz set no longer exists.",
-        );
-      }
-      const lastQuestion = await tx.quizQuestion.findFirst({
-        where: { quizSetId: set.id, deletedAt: null },
-        orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
-        select: { sortOrder: true },
-      });
-      const firstSortOrder = (lastQuestion?.sortOrder ?? -1) + 1;
-      const mappingIssues: GenerationRecoveryIssue[] = [];
-      for (const [index, question] of output.questions.entries()) {
-        mappingIssues.push(
-          ...(await createGeneratedQuestion(
-            tx,
-            "quiz",
-            set.id,
-            context,
-            question,
-            firstSortOrder + index,
-            input.sourceHash,
-            index,
-          )),
-        );
-      }
-      await tx.quizSet.update({
-        where: { id: set.id },
-        data: {
-          questionCount: set.questionCount + output.questions.length,
-          updatedById: context.ownerUserId,
-        },
-      });
-      const recovery = readRecoveryMetadata(prepared.contextMetadata);
-      const generationIssues = [...recovery.issues, ...mappingIssues];
-      const generationAudit = {
-        requestedCount: input.questionCount,
-        initialGeneratedCount:
-          recovery.initialGeneratedCount > 0
-            ? recovery.initialGeneratedCount
-            : output.questions.length,
-        currentActiveCount: output.questions.length,
-        deletedCount: 0,
-      };
-      await tx.aiGeneration.update({
-        where: { id: context.aiGenerationId },
-        data: {
-          inputMetaJson: json({
-            ...asRecord(context.inputMeta),
-            generationAudit,
-            generationIssues,
-          }),
-        },
-      });
-      await auditGenerated(tx, context, "QuizSet", set.id);
-      return result(
-        "QUIZ_SET",
-        set.id,
-        generationIssues.length > 0
-          ? "Đã thêm câu hỏi AI vào bộ Quiz và giữ các mục cần admin kiểm tra."
-          : "Đã thêm câu hỏi AI vào bộ Quiz.",
-        output.questions.length,
-        { generationAudit, generationIssues },
-      );
-    });
-  }
-
   private async persistFlashcards(
     context: AiGenerationExecutionContext,
     prepared: AiGenerationPreparedOutput,
@@ -446,9 +299,8 @@ export class LessonContentGenerationService {
         select: { id: true },
       });
       for (const [index, question] of output.questions.entries()) {
-        await createGeneratedQuestion(
+        await createGeneratedTestQuestion(
           tx,
-          "test",
           set.id,
           context,
           question,
@@ -593,9 +445,8 @@ function assertDifficultyRatio(
   }
 }
 
-async function createGeneratedQuestion(
+async function createGeneratedTestQuestion(
   tx: Prisma.TransactionClient,
-  kind: "quiz" | "test",
   setId: string,
   context: AiGenerationExecutionContext,
   question: GeneratedQuestion,
@@ -610,10 +461,7 @@ async function createGeneratedQuestion(
   await tx.aiExplanation.create({
     data: {
       id: explanationId,
-      targetType:
-        kind === "quiz"
-          ? AiExplanationTargetType.QUIZ_QUESTION
-          : AiExplanationTargetType.TEST_QUESTION,
+      targetType: AiExplanationTargetType.TEST_QUESTION,
       targetId: id,
       lessonId: context.lessonId!,
       contentJson: json(mapped.explanationJson),
@@ -621,7 +469,7 @@ async function createGeneratedQuestion(
       reviewStatus: ReviewStatus.NEEDS_REVIEW,
       aiGenerationId: context.aiGenerationId,
       targetContentHash: hashAiValue(mapped.questionJson),
-      sourceContextHash: kind === "quiz" ? null : sourceHash,
+      sourceContextHash: sourceHash,
     },
   });
   const data = {
@@ -634,27 +482,20 @@ async function createGeneratedQuestion(
     hintJson: nullableJson(mapped.hintJson),
     gradingConfigJson: nullableJson(mapped.gradingConfigJson),
     sourceMetadataJson: json(
-      kind === "quiz"
-        ? {
-            aiGenerationId: context.aiGenerationId,
-            generationQuestionIndex: questionIndex,
-            exampleBlock: mapped.exampleBlock,
-          }
-        : await sourceMetadata(tx, sourceChunkIds, sourceHash, {
-            aiGenerationId: context.aiGenerationId,
-            generationQuestionIndex: questionIndex,
-            exampleBlock: mapped.exampleBlock,
-          }),
+      await sourceMetadata(tx, sourceChunkIds, sourceHash, {
+        aiGenerationId: context.aiGenerationId,
+        generationQuestionIndex: questionIndex,
+        exampleBlock: mapped.exampleBlock,
+      }),
     ),
     difficulty: mapped.difficulty,
     reviewStatus: ReviewStatus.NEEDS_REVIEW,
     explanationId,
     sortOrder,
   };
-  if (kind === "quiz")
-    await tx.quizQuestion.create({ data: { ...data, quizSetId: setId } });
-  else
-    await tx.testQuestion.create({ data: { ...data, testSetId: setId, points: null } });
+  await tx.testQuestion.create({
+    data: { ...data, testSetId: setId, points: null },
+  });
   return mapped.recoveryIssues.map((issue) => ({
     ...issue,
     questionIndex,
@@ -678,27 +519,21 @@ async function sourceMetadata(
 
 async function nextSetSortOrder(
   tx: Prisma.TransactionClient,
-  kind: "quiz" | "flashcard" | "test",
+  kind: "flashcard" | "test",
   lessonId: string,
 ) {
   const record =
-    kind === "quiz"
-      ? await tx.quizSet.findFirst({
+    kind === "flashcard"
+      ? await tx.flashcardSet.findFirst({
           where: { lessonId, deletedAt: null },
           orderBy: { sortOrder: "desc" },
           select: { sortOrder: true },
         })
-      : kind === "flashcard"
-        ? await tx.flashcardSet.findFirst({
-            where: { lessonId, deletedAt: null },
-            orderBy: { sortOrder: "desc" },
-            select: { sortOrder: true },
-          })
-        : await tx.testSet.findFirst({
-            where: { lessonId, deletedAt: null },
-            orderBy: { sortOrder: "desc" },
-            select: { sortOrder: true },
-          });
+      : await tx.testSet.findFirst({
+          where: { lessonId, deletedAt: null },
+          orderBy: { sortOrder: "desc" },
+          select: { sortOrder: true },
+        });
   return (record?.sortOrder ?? -1) + 1;
 }
 
@@ -745,167 +580,8 @@ function result(
   };
 }
 
-type GenerationRecoveryIssue = {
-  classification: "VALID" | "AUTO_FIXED" | "REVIEWABLE" | "UNRENDERABLE";
-  code: string;
-  message: string;
-  questionIndex?: number;
-  blocking: boolean;
-  technicalDetails?: string;
-};
-
-function validateQuestionOutput(input: {
-  questions: GeneratedQuestion[];
-  requestedCount: number;
-  requestedTypes: QuestionType[];
-  requestedDifficulty: Difficulty;
-  difficultyCounts: { easy: number; medium: number; hard: number } | null;
-  source: RetrievedSource;
-}) {
-  const issues: GenerationRecoveryIssue[] = [];
-  const questions = input.questions.filter((question, questionIndex) => {
-    if (!input.requestedTypes.includes(question.questionType)) {
-      issues.push({
-        classification: "UNRENDERABLE",
-        code: "QUESTION_TYPE_NOT_REQUESTED",
-        message: "Câu hỏi có loại nằm ngoài cấu hình admin đã chọn.",
-        questionIndex,
-        blocking: true,
-      });
-      return false;
-    }
-    if (question.questionType === QuestionType.MULTIPLE_CHOICE) {
-      const optionIds = question.options.map((option) => option.id);
-      if (
-        new Set(optionIds).size !== optionIds.length ||
-        question.correctOptionIds.some((id) => !optionIds.includes(id))
-      ) {
-        issues.push({
-          classification: "UNRENDERABLE",
-          code: "ANSWER_INVALID",
-          message:
-            "Đáp án trắc nghiệm không khớp các lựa chọn nên câu này đã được cô lập.",
-          questionIndex,
-          blocking: true,
-        });
-        return false;
-      }
-    }
-    try {
-      assertGeneratedContent({
-        items: [
-          {
-            text: [
-              question.example.problem,
-              question.example.solution,
-              question.example.answer,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-          },
-        ],
-        allowedChunkIds: new Set(input.source.chunks.map((chunk) => chunk.chunkId)),
-        contextTexts: input.source.chunks.map((chunk) => chunk.content),
-      });
-    } catch (error) {
-      issues.push({
-        classification: "REVIEWABLE",
-        code: "SOURCE_GROUNDING_NEEDS_REVIEW",
-        message: "Câu hỏi cần được đối chiếu lại với nguồn bài học.",
-        questionIndex,
-        blocking: true,
-        technicalDetails: error instanceof Error ? error.message : String(error),
-      });
-    }
-    return true;
-  });
-
-  if (input.questions.length !== input.requestedCount) {
-    issues.push({
-      classification: "REVIEWABLE",
-      code: "INITIAL_COUNT_MISMATCH",
-      message: `AI trả ${input.questions.length}/${input.requestedCount} câu ở lượt tạo ban đầu.`,
-      blocking: true,
-    });
-  }
-  if (
-    input.requestedCount >= input.requestedTypes.length &&
-    input.requestedTypes.some(
-      (type) => !questions.some((question) => question.questionType === type),
-    )
-  ) {
-    issues.push({
-      classification: "REVIEWABLE",
-      code: "QUESTION_TYPE_COVERAGE_MISMATCH",
-      message: "Bộ câu hỏi chưa bao phủ đủ các loại câu đã chọn.",
-      blocking: true,
-    });
-  }
-  if (
-    input.requestedDifficulty !== Difficulty.MIXED &&
-    questions.some((question) => question.difficulty !== input.requestedDifficulty)
-  ) {
-    issues.push({
-      classification: "REVIEWABLE",
-      code: "DIFFICULTY_MISMATCH",
-      message: "Một số câu có độ khó khác cấu hình admin đã chọn.",
-      blocking: true,
-    });
-  }
-  if (input.difficultyCounts) {
-    const actual = {
-      easy: questions.filter((question) => question.difficulty === Difficulty.EASY)
-        .length,
-      medium: questions.filter((question) => question.difficulty === Difficulty.MEDIUM)
-        .length,
-      hard: questions.filter((question) => question.difficulty === Difficulty.HARD)
-        .length,
-    };
-    if (
-      actual.easy !== input.difficultyCounts.easy ||
-      actual.medium !== input.difficultyCounts.medium ||
-      actual.hard !== input.difficultyCounts.hard
-    ) {
-      issues.push({
-        classification: "REVIEWABLE",
-        code: "DIFFICULTY_DISTRIBUTION_MISMATCH",
-        message: "Phân bổ Dễ/Trung bình/Khó chưa đúng số lượng đã cấu hình.",
-        blocking: true,
-      });
-    }
-  }
-  return {
-    questions,
-    metadata: {
-      initialGeneratedCount: input.questions.length,
-      validQuestionCount: questions.length,
-      issues,
-    },
-  };
-}
-
-function readRecoveryMetadata(value: unknown): {
-  initialGeneratedCount: number;
-  issues: GenerationRecoveryIssue[];
-} {
-  const record = asRecord(value);
-  return {
-    initialGeneratedCount:
-      typeof record.initialGeneratedCount === "number" ? record.initialGeneratedCount : 0,
-    issues: Array.isArray(record.issues)
-      ? (record.issues as GenerationRecoveryIssue[])
-      : [],
-  };
-}
-
 function readQuestionSourceChunkIds(question: GeneratedQuestion) {
   return "sourceChunkIds" in question ? question.sourceChunkIds : [];
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 function parseJobInput<T>(

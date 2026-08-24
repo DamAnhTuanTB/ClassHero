@@ -8,6 +8,7 @@ import type {
 
 export interface AdminTestSet extends Omit<AdminQuizSet, "questionCount" | "_count"> {
   durationSeconds: number;
+  difficulty: QuizDifficulty;
   difficultyRatioJson: {
     easy?: number;
     medium?: number;
@@ -99,6 +100,14 @@ export async function updateAdminTestQuestion(
   return apiRequest<AdminTestQuestion>(`/admin/test-questions/${questionId}`, {
     method: "PATCH",
     body: data,
+    token,
+  });
+}
+
+export async function reviewAdminTestQuestion(questionId: string, token: string) {
+  return apiRequest<AdminTestQuestion>(`/admin/test-questions/${questionId}/review`, {
+    method: "POST",
+    body: { reviewStatus: "APPROVED" },
     token,
   });
 }

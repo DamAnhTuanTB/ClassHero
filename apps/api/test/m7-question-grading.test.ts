@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCompleteStudentAnswer,
   createPendingAnswerJson,
+  gradeUnansweredQuestion,
   gradeQuestionAnswer,
   isPendingAnswerJson,
   validateStudentAnswerDraft,
@@ -60,6 +61,37 @@ describe("M7 assessment grading", () => {
     ]);
   });
 
+  it("grades every skipped multi-statement item with zero points and no selection", () => {
+    const result = gradeUnansweredQuestion({
+      questionType: QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+      correctAnswerJson: [
+        { statementId: "a", value: true },
+        { statementId: "b", value: false },
+      ],
+    });
+
+    expect(result).toEqual({
+      isCorrect: false,
+      pointsAwarded: 0,
+      statementResults: [
+        {
+          statementId: "a",
+          selectedValue: null,
+          correctValue: true,
+          isCorrect: false,
+          pointsAwarded: 0,
+        },
+        {
+          statementId: "b",
+          selectedValue: null,
+          correctValue: false,
+          isCorrect: false,
+          pointsAwarded: 0,
+        },
+      ],
+    });
+  });
+
   it("normalizes text input according to grading configuration", () => {
     const result = gradeQuestionAnswer({
       questionType: QuestionType.TEXT_INPUT,
@@ -73,6 +105,53 @@ describe("M7 assessment grading", () => {
     });
 
     expect(result.isCorrect).toBe(true);
+  });
+
+  it.each(["1/2", "2/4", "0.5", "0.50", "0,5", "5e-1", "\\frac{1}{2}"])(
+    "grades the numeric answer %s by value",
+    (answerJson) => {
+      const result = gradeQuestionAnswer({
+        questionType: QuestionType.TEXT_INPUT,
+        answerJson,
+        correctAnswerJson: ["0.5"],
+        optionsJson: null,
+        gradingConfigJson: {
+          caseSensitive: false,
+          exactMatch: true,
+          numericComparison: true,
+        },
+      });
+
+      expect(result.isCorrect).toBe(true);
+    },
+  );
+
+  it.each(["1.4", "1,4", "1.40", "14/10", "\\frac{7}{5}"])(
+    "grades the equivalent rounded numeric answer %s by value",
+    (answerJson) => {
+      const result = gradeQuestionAnswer({
+        questionType: QuestionType.TEXT_INPUT,
+        answerJson,
+        correctAnswerJson: ["1.4"],
+        optionsJson: null,
+        gradingConfigJson: { numericComparison: true },
+      });
+
+      expect(result.isCorrect).toBe(true);
+    },
+  );
+
+  it("does not accept invalid or different numeric values", () => {
+    for (const answerJson of ["1/0", "0.51", "một phần hai"]) {
+      const result = gradeQuestionAnswer({
+        questionType: QuestionType.TEXT_INPUT,
+        answerJson,
+        correctAnswerJson: ["0.5"],
+        optionsJson: null,
+        gradingConfigJson: { numericComparison: true },
+      });
+      expect(result.isCorrect).toBe(false);
+    }
   });
 
   it("requires every statement before an answer can be checked", () => {

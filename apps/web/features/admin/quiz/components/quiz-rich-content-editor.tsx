@@ -18,6 +18,10 @@ import katex from "katex";
 import "katex/contrib/mhchem";
 import "katex/dist/katex.min.css";
 import {
+  LEARNING_CONTENT_KATEX_MACROS,
+  normalizeLearningContentLatex,
+} from "@/lib/learning-content-math";
+import {
   AlignCenter,
   AlignJustify,
   AlignLeft,
@@ -266,11 +270,7 @@ export function QuizRichContentEditor({
         katexOptions: {
           throwOnError: false,
           strict: false,
-          macros: {
-            "\\R": "\\mathbb{R}",
-            "\\N": "\\mathbb{N}",
-            "\\Z": "\\mathbb{Z}",
-          },
+          macros: LEARNING_CONTENT_KATEX_MACROS,
         },
       }),
     ],
@@ -383,7 +383,7 @@ export function QuizRichContentEditor({
     <div>
       <div
         className={cn(
-          "quiz-rich-content-editor overflow-hidden rounded-xl border bg-[var(--theme-input-bg)] transition",
+          "quiz-rich-content-editor learning-content-text overflow-hidden rounded-xl border bg-[var(--theme-input-bg)] transition",
           compact && "quiz-rich-content-editor--compact",
           error
             ? "border-[var(--theme-error-border)]"
@@ -475,7 +475,8 @@ export function ScientificAnswerField({
   const previewHtml = useMemo(
     () =>
       value.trim()
-        ? katex.renderToString(value, {
+        ? katex.renderToString(normalizeLearningContentLatex(value), {
+            macros: LEARNING_CONTENT_KATEX_MACROS,
             throwOnError: false,
             strict: false,
           })

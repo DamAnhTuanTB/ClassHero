@@ -73,12 +73,11 @@ export function AdminStemFigureRasterEditorDialog({
   const mask = useStemFigureRasterMask({
     brushSize,
     canvasRef,
-    enabled: removeSimpleDetails && view === "ORIGINAL",
+    enabled: removeSimpleDetails,
     height: canvasSize.height,
     width: canvasSize.width,
     onChange: () => {
       setMaskRevision((current) => current + 1);
-      setView("ORIGINAL");
       setInlineError(null);
     },
   });
@@ -92,6 +91,10 @@ export function AdminStemFigureRasterEditorDialog({
   );
   const displayWidth = Math.max(1, Math.round(canvasSize.width * fitScale * zoom));
   const displayHeight = Math.max(1, Math.round(canvasSize.height * fitScale * zoom));
+  const displayedImageSource =
+    view === "PREVIEW" && preview?.data.previewDataUrl
+      ? preview.data.previewDataUrl
+      : (workingFigure.assetUrl ?? "");
 
   useEffect(() => {
     if (!viewportElement || !isOpen) return;
@@ -154,11 +157,13 @@ export function AdminStemFigureRasterEditorDialog({
         mask: maskBlob,
       });
       if (latestPreviewKeyRef.current === key) {
+        mask.acknowledgePreview();
         setPreview({ key, data });
         setView("PREVIEW");
       }
     } catch (error) {
       if (latestPreviewKeyRef.current === key) {
+        mask.acknowledgePreview();
         const message = getUserFacingErrorMessage(error, "Chưa tạo được bản xem trước.");
         setInlineError(message);
         setView("ORIGINAL");
@@ -229,7 +234,7 @@ export function AdminStemFigureRasterEditorDialog({
       setView("ORIGINAL");
       setLastAppliedTool(appliedTool);
       setHasApplied(true);
-      if (appliedTool === "REMOVE") mask.clear();
+      if (appliedTool === "REMOVE") mask.reset();
       toast.success(
         appliedTool === "ENHANCE"
           ? "Đã áp dụng lượt làm nét ảnh."
@@ -454,45 +459,52 @@ export function AdminStemFigureRasterEditorDialog({
                   width: `${displayWidth}px`,
                 }}
               >
-                <div
-                  className={view === "ORIGINAL" ? "relative h-full w-full" : "hidden"}
-                >
-                  <img
-                    alt={workingFigure.altText}
-                    className="block h-full w-full select-none"
-                    draggable={false}
-                    onLoad={(event) => {
-                      const naturalWidth = event.currentTarget.naturalWidth;
-                      const naturalHeight = event.currentTarget.naturalHeight;
-                      const scale = Math.min(
-                        1,
-                        PREVIEW_MAX_EDGE / Math.max(naturalWidth, naturalHeight),
-                      );
-                      setCanvasSize({
-                        width: Math.max(1, Math.round(naturalWidth * scale)),
-                        height: Math.max(1, Math.round(naturalHeight * scale)),
-                      });
+                <img
+                  alt={workingFigure.altText}
+                  className="block h-full w-full select-none"
+                  draggable={false}
+                  onLoad={(event) => {
+                    const naturalWidth = event.currentTarget.naturalWidth;
+                    const naturalHeight = event.currentTarget.naturalHeight;
+                    const scale = Math.min(
+                      1,
+                      PREVIEW_MAX_EDGE / Math.max(naturalWidth, naturalHeight),
+                    );
+                    setCanvasSize({
+                      width: Math.max(1, Math.round(naturalWidth * scale)),
+                      height: Math.max(1, Math.round(naturalHeight * scale)),
+                    });
+                  }}
+                  src={displayedImageSource}
+                />
+                <canvas
+                  ref={canvasRef}
+                  aria-label="Vùng tô chi tiết cần xóa"
+                  className={`absolute inset-0 z-10 h-full w-full ${
+                    removeSimpleDetails ? "cursor-none touch-none" : "pointer-events-none"
+                  }`}
+                  height={canvasSize.height}
+                  width={canvasSize.width}
+                  {...mask.bind}
+                />
+                {mask.cursor ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute z-10 rounded-full border-2 border-rose-500 bg-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                    data-raster-brush-cursor
+                    style={{
+                      height: `${Math.max(
+                        2,
+                        (mask.cursor.diameter / canvasSize.height) * displayHeight,
+                      )}px`,
+                      left: `${(mask.cursor.x / canvasSize.width) * 100}%`,
+                      top: `${(mask.cursor.y / canvasSize.height) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      width: `${Math.max(
+                        2,
+                        (mask.cursor.diameter / canvasSize.width) * displayWidth,
+                      )}px`,
                     }}
-                    src={workingFigure.assetUrl ?? ""}
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    aria-label="Vùng tô chi tiết cần xóa"
-                    className={`absolute inset-0 h-full w-full ${
-                      removeSimpleDetails
-                        ? "cursor-crosshair touch-none"
-                        : "pointer-events-none"
-                    }`}
-                    height={canvasSize.height}
-                    width={canvasSize.width}
-                    {...mask.bind}
-                  />
-                </div>
-                {preview?.data.previewDataUrl ? (
-                  <img
-                    alt={`Bản xem trước: ${workingFigure.altText}`}
-                    className={view === "PREVIEW" ? "block h-full w-full" : "hidden"}
-                    src={preview.data.previewDataUrl}
                   />
                 ) : null}
               </div>

@@ -1,3 +1,5 @@
+import { tokenizeMathText } from "@learning-path/shared";
+
 import type { TiptapJsonNode, TiptapTextDocument } from "@/types/rich-text";
 
 export function createEmptyTiptapDocument(): TiptapTextDocument {
@@ -18,6 +20,46 @@ export function createTextTiptapDocument(text: string): TiptapTextDocument {
       },
     ],
   };
+}
+
+export function createMathTextTiptapDocument(text: string): TiptapTextDocument {
+  const content: TiptapJsonNode[] = [];
+  let inlineContent: TiptapJsonNode[] = [];
+
+  const flushParagraph = () => {
+    const paragraphContent = trimParagraphBoundaryWhitespace(inlineContent);
+    if (paragraphContent.length > 0) {
+      content.push({ type: "paragraph", content: paragraphContent });
+    }
+    inlineContent = [];
+  };
+
+  for (const token of tokenizeMathText(text.trim())) {
+    if (token.type === "math") {
+      if (token.display) {
+        flushParagraph();
+        content.push({ type: "blockMath", attrs: { latex: token.latex } });
+      } else {
+        inlineContent.push({ type: "inlineMath", attrs: { latex: token.latex } });
+      }
+      continue;
+    }
+
+    const lines = token.value.split(/\n+/);
+    lines.forEach((line, index) => {
+      if (line) {
+        inlineContent.push({ type: "text", text: line });
+      }
+      if (index < lines.length - 1) {
+        flushParagraph();
+      }
+    });
+  }
+
+  flushParagraph();
+  return content.length > 0
+    ? { type: "doc", content }
+    : createEmptyTiptapDocument();
 }
 
 export function getTiptapDocumentText(document: TiptapTextDocument | null | undefined) {
@@ -98,4 +140,29 @@ function collectNodeText(node: TiptapJsonNode | null | undefined): string {
   }
 
   return values.filter(Boolean).join(" ");
+}
+
+function trimParagraphBoundaryWhitespace(nodes: TiptapJsonNode[]) {
+  const trimmed = nodes.map((node) => ({ ...node }));
+  const firstTextIndex = trimmed.findIndex((node) => node.type === "text");
+  let lastTextIndex = -1;
+  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
+    if (trimmed[index]?.type === "text") {
+      lastTextIndex = index;
+      break;
+    }
+  }
+
+  const firstText = trimmed[firstTextIndex]?.text;
+  if (firstTextIndex >= 0 && typeof firstText === "string") {
+    trimmed[firstTextIndex]!.text = firstText.trimStart();
+  }
+  const lastText = trimmed[lastTextIndex]?.text;
+  if (lastTextIndex >= 0 && typeof lastText === "string") {
+    trimmed[lastTextIndex]!.text = lastText.trimEnd();
+  }
+
+  return trimmed.filter(
+    (node) => node.type !== "text" || (typeof node.text === "string" && node.text),
+  );
 }

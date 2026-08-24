@@ -1,0 +1,492 @@
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import {
+  AiGenerationType,
+  BackgroundJobQueue,
+  BackgroundJobStatus,
+  Prisma,
+  QuizFigureAttemptKind,
+  QuizFigureAttemptStatus,
+  QuizFigureRevisionStatus,
+  QuizFigureRole,
+  QuizFigureStatus,
+} from "@prisma/client";
+import { Job, UnrecoverableError } from "bullmq";
+
+import { PrismaService } from "#api/common/prisma/prisma.service";
+import type {
+  BackgroundJobBullmqData,
+  BackgroundJobBullmqResult,
+} from "#api/jobs/background-job-queues";
+import { getJobErrorMessage } from "#api/jobs/job-error";
+import { toJobJson } from "#api/jobs/job-json";
+import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
+import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
+import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
+import { QuizTexRendererClientService } from "#api/modules/quiz-figures/services/quiz-tex-renderer-client.service";
+import {
+  buildQuestionFigureInput,
+  buildSolutionFigureExtensionInput,
+  generatedQuizQuestionFigureSchema,
+  generatedQuizSolutionExtensionSchema,
+  type QuizFigurePlan,
+} from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
+import {
+  applyQuizSolutionExtension,
+  assertQuizFigureLatexSource,
+  sanitizeQuizFigureSvg,
+} from "#api/modules/quiz-figures/utils/quiz-figure-source-policy";
+import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
+
+const durableJobSelect = {
+  id: true,
+  queue: true,
+  status: true,
+  ownerUserId: true,
+  resourceType: true,
+  resourceId: true,
+  inputMeta: true,
+  attempts: true,
+  maxAttempts: true,
+} satisfies Prisma.BackgroundJobSelect;
+
+@Injectable()
+export class QuizFigureRenderingProcessor {
+  private readonly logger = new Logger(QuizFigureRenderingProcessor.name);
+
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AiProviderCallService)
+    private readonly provider: AiProviderCallService,
+    @Inject(QuizTexRendererClientService)
+    private readonly renderer: QuizTexRendererClientService,
+    @Inject(QuizFigureArtifactService)
+    private readonly artifacts: QuizFigureArtifactService,
+    @Inject(QuizFigureJobService)
+    private readonly jobs: QuizFigureJobService,
+  ) {}
+
+  async process(
+    bullJob: Job<BackgroundJobBullmqData, BackgroundJobBullmqResult>,
+  ): Promise<BackgroundJobBullmqResult> {
+    const durableJob = await this.prisma.backgroundJob.findUnique({
+      where: { id: bullJob.data.backgroundJobId },
+      select: durableJobSelect,
+    });
+    if (!durableJob) throw new UnrecoverableError("Quiz figure job not found.");
+    if (durableJob.queue !== BackgroundJobQueue.QUIZ_FIGURE_RENDERING) {
+      throw new UnrecoverableError(`Job ${durableJob.id} is not a Quiz figure job.`);
+    }
+    if (durableJob.status === BackgroundJobStatus.SUCCEEDED) {
+      return skipped(durableJob, "Quiz figure job already succeeded.");
+    }
+    if (durableJob.status === BackgroundJobStatus.CANCELLED) {
+      throw new UnrecoverableError(`Quiz figure job ${durableJob.id} was cancelled.`);
+    }
+    const metadata = readRecord(durableJob.inputMeta);
+    const figureId = readRequiredString(metadata.figureId, "figureId");
+    const revisionId = readRequiredString(metadata.revisionId, "revisionId");
+    const latestAttempt = await this.prisma.quizFigureRenderAttempt.aggregate({
+      where: { quizFigureId: figureId },
+      _max: { attemptNumber: true },
+    });
+    const attemptNumber = (latestAttempt._max.attemptNumber ?? 0) + 1;
+    await this.prisma.backgroundJob.update({
+      where: { id: durableJob.id },
+      data: {
+        status: BackgroundJobStatus.RUNNING,
+        bullmqJobId: String(bullJob.id ?? durableJob.id),
+        attempts: attemptNumber,
+        startedAt: new Date(),
+        finishedAt: null,
+        errorMessage: null,
+      },
+    });
+
+    let attemptId: string | null = null;
+    try {
+      const figure = await this.prisma.quizFigure.findFirstOrThrow({
+        where: { id: figureId, deletedAt: null, pendingRevisionId: revisionId },
+        select: {
+          id: true,
+          role: true,
+          aiGenerationId: true,
+          quizQuestionId: true,
+          planJson: true,
+          subjectKey: true,
+          subjectName: true,
+          subjectSlug: true,
+          pendingRevision: {
+            select: {
+              id: true,
+              sourceVersion: true,
+              latexSource: true,
+              sourceHash: true,
+            },
+          },
+        },
+      });
+      if (!figure.pendingRevision) {
+        throw new UnrecoverableError("Quiz figure pending revision is missing.");
+      }
+      const plan = readPlan(figure.planJson);
+      const subject = readSubject(figure);
+      const routeSnapshot = readRouteSnapshot(metadata.routeSnapshot);
+      const source =
+        figure.pendingRevision.latexSource?.trim() ||
+        (await this.createSource({
+          figure,
+          plan,
+          subject,
+          routeSnapshot,
+          backgroundJobId: durableJob.id,
+          attempt: attemptNumber,
+        }));
+      assertQuizFigureLatexSource(source);
+      const sourceHash = QuizFigureJobService.sourceHash(source);
+      attemptId = (
+        await this.prisma.quizFigureRenderAttempt.create({
+          data: {
+            quizFigureId: figure.id,
+            revisionId: figure.pendingRevision.id,
+            backgroundJobId: durableJob.id,
+            attemptNumber,
+            sourceVersion: figure.pendingRevision.sourceVersion,
+            kind: QuizFigureAttemptKind.INITIAL,
+            status: QuizFigureAttemptStatus.RUNNING,
+            sourceHash,
+          },
+          select: { id: true },
+        })
+      ).id;
+      await this.prisma.$transaction([
+        this.prisma.quizFigureRevision.update({
+          where: { id: revisionId },
+          data: {
+            status: QuizFigureRevisionStatus.RENDERING,
+            latexSource: source,
+            sourceHash,
+          },
+        }),
+        this.prisma.quizFigure.update({
+          where: { id: figure.id },
+          data: { status: QuizFigureStatus.RENDERING },
+        }),
+      ]);
+      const rendered = await this.renderer.render(source, figure.subjectKey);
+      if (!rendered.ok) {
+        throw new Error(`${rendered.code}: ${rendered.log}`);
+      }
+      const svg = sanitizeQuizFigureSvg(rendered.svg);
+      await this.prisma.quizFigureRevision.update({
+        where: { id: revisionId },
+        data: {
+          previewSvg: svg,
+          sanitizedSvgHash: QuizFigureJobService.sourceHash(svg),
+          rendererVersion: rendered.rendererVersion,
+          validatorVersion: "quiz-svg-policy-v1",
+        },
+      });
+      await this.artifacts.promoteSvg({
+        figureId: figure.id,
+        revisionId,
+        svg,
+        actorUserId: durableJob.ownerUserId,
+      });
+      await this.prisma.quizFigureRenderAttempt.update({
+        where: { id: attemptId },
+        data: {
+          status: QuizFigureAttemptStatus.SUCCEEDED,
+          compileLog: rendered.log,
+          durationMs: rendered.durationMs,
+          finishedAt: new Date(),
+        },
+      });
+      const result: BackgroundJobBullmqResult = {
+        status: "SUCCEEDED",
+        queue: BackgroundJobQueue.QUIZ_FIGURE_RENDERING,
+        resourceType: "QUIZ_FIGURE",
+        resourceId: figure.id,
+        action: "QUIZ_FIGURE_RENDER",
+        message: "Đã tạo hình Quiz.",
+        handledAt: new Date().toISOString(),
+        details: { role: figure.role, revisionId },
+      };
+      await this.prisma.backgroundJob.update({
+        where: { id: durableJob.id },
+        data: {
+          status: BackgroundJobStatus.SUCCEEDED,
+          result: toJobJson(result),
+          finishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      if (figure.role === QuizFigureRole.QUESTION) {
+        await this.enqueueDependentSolutionFigure(
+          figure.quizQuestionId,
+          revisionId,
+          durableJob.ownerUserId,
+          routeSnapshot,
+        );
+      }
+      return result;
+    } catch (error) {
+      const message = getJobErrorMessage(error).slice(0, 2_000);
+      if (attemptId) {
+        await this.prisma.quizFigureRenderAttempt.update({
+          where: { id: attemptId },
+          data: {
+            status: QuizFigureAttemptStatus.FAILED,
+            errorCategory: "QUIZ_FIGURE_RENDER",
+            errorCode: firstErrorCode(message),
+            compileLog: message,
+            finishedAt: new Date(),
+          },
+        });
+      }
+      await this.prisma.$transaction([
+        this.prisma.quizFigureRevision.update({
+          where: { id: revisionId },
+          data: {
+            status: QuizFigureRevisionStatus.NEEDS_REVIEW,
+            lastErrorCategory: "QUIZ_FIGURE_RENDER",
+            lastErrorCode: firstErrorCode(message),
+            lastErrorMessage: message,
+            finishedAt: new Date(),
+          },
+        }),
+        this.prisma.quizFigure.update({
+          where: { id: figureId },
+          data: {
+            status: QuizFigureStatus.NEEDS_REVIEW,
+            lastErrorCategory: "QUIZ_FIGURE_RENDER",
+            lastErrorCode: firstErrorCode(message),
+            lastErrorMessage: message,
+          },
+        }),
+        this.prisma.backgroundJob.update({
+          where: { id: durableJob.id },
+          data: {
+            status: BackgroundJobStatus.FAILED,
+            errorMessage: message,
+            finishedAt: new Date(),
+          },
+        }),
+      ]);
+      await this.markDependentSolutionFigureBlocked(figureId, message);
+      this.logger.warn(`Quiz figure job ${durableJob.id} failed: ${message}`);
+      throw new UnrecoverableError(message);
+    }
+  }
+
+  private async createSource(input: {
+    figure: {
+      id: string;
+      role: QuizFigureRole;
+      aiGenerationId: string | null;
+      quizQuestionId: string;
+      pendingRevision: { id: string; sourceVersion: number } | null;
+    };
+    plan: QuizFigurePlan;
+    subject: QuizSubjectSnapshot;
+    routeSnapshot?: AiFeatureRoute;
+    backgroundJobId: string;
+    attempt: number;
+  }) {
+    const callContext = {
+      feature: AiGenerationType.QUIZ,
+      aiGenerationId: input.figure.aiGenerationId,
+      backgroundJobId: input.backgroundJobId,
+      attempt: input.attempt,
+      callSequence: 1,
+      routeSnapshot: input.routeSnapshot,
+      allowProviderFallback: false,
+    } as const;
+    if (input.figure.role === QuizFigureRole.QUESTION) {
+      const output = await this.provider.generateStructured(
+        callContext,
+        buildQuestionFigureInput({ subject: input.subject, plan: input.plan }),
+        generatedQuizQuestionFigureSchema,
+      );
+      return output.data.latexSource;
+    }
+    const questionFigure = await this.prisma.quizFigure.findFirst({
+      where: {
+        quizQuestionId: input.figure.quizQuestionId,
+        role: QuizFigureRole.QUESTION,
+        deletedAt: null,
+      },
+      select: {
+        currentRevision: { select: { id: true, latexSource: true, status: true } },
+      },
+    });
+    const baseRevision = questionFigure?.currentRevision;
+    if (!baseRevision?.latexSource || baseRevision.status !== "SUCCEEDED") {
+      throw new UnrecoverableError(
+        "QUIZ_SOLUTION_FIGURE_BASE_NOT_READY: Hình đề chưa sẵn sàng.",
+      );
+    }
+    const output = await this.provider.generateStructured(
+      callContext,
+      buildSolutionFigureExtensionInput({
+        subject: input.subject,
+        plan: input.plan,
+        exactQuestionLatexSource: baseRevision.latexSource,
+      }),
+      generatedQuizSolutionExtensionSchema,
+    );
+    await this.prisma.quizFigureRevision.update({
+      where: { id: input.figure.pendingRevision!.id },
+      data: { derivedFromQuestionRevisionId: baseRevision.id },
+    });
+    return applyQuizSolutionExtension(
+      baseRevision.latexSource,
+      output.data.extensionLatex,
+    );
+  }
+
+  private async enqueueDependentSolutionFigure(
+    quizQuestionId: string,
+    questionRevisionId: string,
+    ownerUserId: string | null,
+    routeSnapshot?: AiFeatureRoute,
+  ) {
+    const solution = await this.prisma.quizFigure.findFirst({
+      where: {
+        quizQuestionId,
+        role: QuizFigureRole.SOLUTION,
+        status: QuizFigureStatus.QUEUED,
+        deletedAt: null,
+      },
+      select: { id: true, pendingRevisionId: true },
+    });
+    if (!solution?.pendingRevisionId) return;
+    await this.prisma.quizFigureRevision.update({
+      where: { id: solution.pendingRevisionId },
+      data: { derivedFromQuestionRevisionId: questionRevisionId },
+    });
+    await this.jobs.enqueue(solution.id, ownerUserId, routeSnapshot);
+  }
+
+  private async markDependentSolutionFigureBlocked(
+    failedFigureId: string,
+    message: string,
+  ) {
+    const failedFigure = await this.prisma.quizFigure.findUnique({
+      where: { id: failedFigureId },
+      select: { role: true, quizQuestionId: true },
+    });
+    if (failedFigure?.role !== QuizFigureRole.QUESTION) return;
+    const solution = await this.prisma.quizFigure.findFirst({
+      where: {
+        quizQuestionId: failedFigure.quizQuestionId,
+        role: QuizFigureRole.SOLUTION,
+        status: QuizFigureStatus.QUEUED,
+        deletedAt: null,
+      },
+      select: { id: true, pendingRevisionId: true },
+    });
+    if (!solution) return;
+    await this.prisma.$transaction([
+      this.prisma.quizFigure.update({
+        where: { id: solution.id },
+        data: {
+          status: QuizFigureStatus.NEEDS_REVIEW,
+          lastErrorCategory: "QUIZ_SOLUTION_BASE",
+          lastErrorCode: "QUIZ_SOLUTION_FIGURE_BASE_FAILED",
+          lastErrorMessage: message,
+        },
+      }),
+      ...(solution.pendingRevisionId
+        ? [
+            this.prisma.quizFigureRevision.update({
+              where: { id: solution.pendingRevisionId },
+              data: {
+                status: QuizFigureRevisionStatus.NEEDS_REVIEW,
+                lastErrorCategory: "QUIZ_SOLUTION_BASE",
+                lastErrorCode: "QUIZ_SOLUTION_FIGURE_BASE_FAILED",
+                lastErrorMessage: message,
+                finishedAt: new Date(),
+              },
+            }),
+          ]
+        : []),
+    ]);
+  }
+}
+
+function readPlan(value: unknown): QuizFigurePlan {
+  const plan = readRecord(value);
+  if (
+    plan.version !== 1 ||
+    (plan.role !== "QUESTION" && plan.role !== "SOLUTION") ||
+    typeof plan.problem !== "string"
+  ) {
+    throw new UnrecoverableError("QUIZ_FIGURE_PLAN_INVALID");
+  }
+  return {
+    version: 1,
+    role: plan.role,
+    problem: plan.problem,
+    solution: typeof plan.solution === "string" ? plan.solution : undefined,
+    mode: plan.mode === "EXTEND_QUESTION" ? plan.mode : undefined,
+    addedObjects: readStringArray(plan.addedObjects),
+    clarifiedRelations: readStringArray(plan.clarifiedRelations),
+    caption: typeof plan.caption === "string" ? plan.caption : null,
+  };
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : undefined;
+}
+
+function readSubject(value: {
+  subjectKey: string;
+  subjectName: string;
+  subjectSlug: string;
+}): QuizSubjectSnapshot {
+  const key = ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"].includes(value.subjectKey)
+    ? (value.subjectKey as QuizSubjectSnapshot["key"])
+    : "GENERAL";
+  return { key, name: value.subjectName, slug: value.subjectSlug };
+}
+
+function readRouteSnapshot(value: unknown) {
+  return Object.keys(readRecord(value)).length > 0
+    ? (value as AiFeatureRoute)
+    : undefined;
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readRequiredString(value: unknown, field: string) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new UnrecoverableError(`Quiz figure job is missing ${field}.`);
+  }
+  return value;
+}
+
+function firstErrorCode(message: string) {
+  return message.match(/^([A-Z0-9_]+)/u)?.[1] ?? "QUIZ_FIGURE_RENDER_FAILED";
+}
+
+function skipped(
+  record: Prisma.BackgroundJobGetPayload<{ select: typeof durableJobSelect }>,
+  message: string,
+): BackgroundJobBullmqResult {
+  return {
+    status: "SKIPPED",
+    queue: record.queue,
+    resourceType: record.resourceType,
+    resourceId: record.resourceId,
+    action: "QUIZ_FIGURE_RENDER",
+    message,
+    handledAt: new Date().toISOString(),
+  };
+}

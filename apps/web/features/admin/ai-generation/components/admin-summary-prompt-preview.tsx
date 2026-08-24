@@ -123,16 +123,7 @@ export function AdminSummaryPromptPreview({
         : { temperature: effectiveTemperature }),
     max_output_tokens: Number(maxOutputTokens || preview.openAiRequest.max_output_tokens),
   };
-  const fullInputJson = [
-    ...(preview.openAiFileUploadRequest
-      ? [
-          "POST /v1/files (multipart/form-data)",
-          JSON.stringify(preview.openAiFileUploadRequest, null, 2),
-        ]
-      : []),
-    "POST /v1/responses (application/json)",
-    JSON.stringify(fullInputData, null, 2),
-  ].join("\n\n");
+  const fullInputJson = JSON.stringify(fullInputData, null, 2);
   const promptValue =
     activeTab === "system"
       ? effectiveSystemInstructions
@@ -275,7 +266,6 @@ export function AdminSummaryPromptPreview({
       <AdminAiRequestStatistics
         details={requestStatistics}
         estimatedCost={preview.estimatedCost}
-        note="Token PDF được ước tính trước khi gửi theo số trang; usage provider sau khi xử lý mới là số thực tế."
       />
 
       <div>
@@ -306,20 +296,7 @@ export function AdminSummaryPromptPreview({
           role="tabpanel"
           className="mt-2 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg-subtle)]"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border)] px-3 py-2">
-            <p className="text-xs font-bold text-[var(--theme-text-muted)]">
-              {activeTab === "system"
-                ? promptsAreVerbatim
-                  ? "Toàn bộ nội dung trong ô này được gửi nguyên văn làm quy tắc hệ thống"
-                  : "Profile môn học ở cuối luôn được server giữ lại khi gửi AI"
-                : activeTab === "user"
-                  ? promptsAreVerbatim
-                    ? "Toàn bộ nội dung trong ô này được gửi nguyên văn làm câu lệnh người dùng"
-                    : "Ranh giới môn học ở cuối luôn được server giữ lại khi gửi AI"
-                  : preview.openAiFileUploadRequest
-                    ? "Hai request đầu vào gửi OpenAI; binary PDF và file_id runtime được đánh dấu bằng placeholder"
-                    : "Request Responses API theo đúng các field được gửi đến OpenAI"}
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-[var(--theme-border)] px-3 py-2">
             <div className="ml-auto flex items-center gap-2">
               {activeTab !== "input" ? (
                 <div
@@ -401,28 +378,12 @@ export function AdminSummaryPromptPreview({
               />
             )
           ) : (
-            <div className="divide-y divide-[var(--theme-border)]">
-              {preview.openAiFileUploadRequest ? (
-                <section
-                  aria-label="Request OpenAI Files API"
-                  className="bg-[var(--theme-bg)]"
-                >
-                  <p className="border-b border-[var(--theme-border)] px-4 py-3 font-mono text-xs font-extrabold text-[var(--theme-text-strong)]">
-                    POST /v1/files · multipart/form-data
-                  </p>
-                  <AdminAiJsonInputViewer data={preview.openAiFileUploadRequest} />
-                </section>
-              ) : null}
-              <section
-                aria-label="Request OpenAI Responses API"
-                className="bg-[var(--theme-bg)]"
-              >
-                <p className="border-b border-[var(--theme-border)] px-4 py-3 font-mono text-xs font-extrabold text-[var(--theme-text-strong)]">
-                  POST /v1/responses · application/json
-                </p>
-                <AdminAiJsonInputViewer data={fullInputData} />
-              </section>
-            </div>
+            <section
+              aria-label="Request OpenAI Responses API"
+              className="bg-[var(--theme-bg)]"
+            >
+              <AdminAiJsonInputViewer data={fullInputData} />
+            </section>
           )}
         </div>
       </div>
@@ -437,7 +398,10 @@ export function AdminSummaryPromptPreview({
 
 function PromptMarkdownPreview({ content }: { content: string }) {
   return (
-    <div className="max-h-96 overflow-y-auto p-4">
+    <div
+      data-testid="ai-prompt-markdown-preview"
+      className="max-h-96 overflow-y-auto p-4"
+    >
       <MathpixMarkdownRenderer content={content} />
     </div>
   );

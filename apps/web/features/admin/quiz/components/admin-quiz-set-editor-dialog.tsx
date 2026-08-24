@@ -5,20 +5,12 @@ import { FileQuestion, Loader2, Plus, Save } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
-import { OptionField } from "@/components/common/forms/option-field";
 import { TextField } from "@/components/common/forms/text-field";
 import type { AdminQuizSet } from "@/features/admin/quiz/api/admin-quiz-api";
 import {
   quizSetFormSchema,
   type QuizSetFormValues,
 } from "@/features/admin/quiz/schemas/quiz-set-form-schema";
-
-const difficultyOptions = [
-  { value: "MIXED", label: "Hỗn hợp" },
-  { value: "EASY", label: "Dễ" },
-  { value: "MEDIUM", label: "Trung bình" },
-  { value: "HARD", label: "Khó" },
-];
 
 export function AdminQuizSetEditorDialog({
   defaultTitle,
@@ -39,14 +31,13 @@ export function AdminQuizSetEditorDialog({
     resolver: zodResolver(quizSetFormSchema),
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: { title: defaultTitle, difficulty: "MIXED" },
+    defaultValues: { title: defaultTitle },
   });
 
   useEffect(() => {
     if (!isOpen) return;
     form.reset({
       title: set?.title ?? defaultTitle,
-      difficulty: set?.difficulty ?? "MIXED",
     });
   }, [defaultTitle, form, isOpen, set]);
 
@@ -82,21 +73,6 @@ export function AdminQuizSetEditorDialog({
             error={form.formState.errors.title}
             autoFocus
             {...form.register("title")}
-          />
-          <OptionField
-            id="quiz-set-difficulty"
-            label="Mức độ"
-            value={form.watch("difficulty")}
-            options={difficultyOptions}
-            icon={null}
-            error={form.formState.errors.difficulty}
-            onChange={(value) =>
-              form.setValue("difficulty", value as QuizSetFormValues["difficulty"], {
-                shouldDirty: true,
-                shouldTouch: true,
-                shouldValidate: true,
-              })
-            }
           />
         </div>
 

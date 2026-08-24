@@ -4,7 +4,7 @@ import {
 } from "@learning-path/shared";
 import { z } from "zod";
 
-const generationTypeSchema = z.enum(["SUMMARY", "QUIZ", "FLASHCARD", "TEST"]);
+const generationTypeSchema = z.enum(["SUMMARY", "FLASHCARD", "TEST"]);
 const difficultySchema = z.enum(["EASY", "MEDIUM", "HARD", "MIXED"]);
 const questionTypeSchema = z.enum([
   "MULTIPLE_CHOICE",
@@ -86,17 +86,14 @@ export const adminAiGenerationFormSchema = z
         message: "Chỉ có thể làm nét khi dùng ảnh gốc sách giáo khoa",
       });
     }
-    if (
-      (values.type === "SUMMARY" || values.type === "QUIZ") &&
-      values.documentIds.length === 0
-    ) {
+    if (values.type === "SUMMARY" && values.documentIds.length === 0) {
       context.addIssue({
         code: "custom",
         path: ["documentIds"],
         message: "Chọn ít nhất một tài liệu",
       });
     }
-    if ((values.type === "SUMMARY" || values.type === "QUIZ") && values.summaryModel) {
+    if (values.type === "SUMMARY" && values.summaryModel) {
       if (!values.summaryMaxOutputTokens) {
         context.addIssue({
           code: "custom",
@@ -105,7 +102,7 @@ export const adminAiGenerationFormSchema = z
         });
       }
     }
-    if (values.type === "QUIZ" || values.type === "TEST") {
+    if (values.type === "TEST") {
       if (values.questionTypes.length === 0) {
         context.addIssue({
           code: "custom",
@@ -118,17 +115,6 @@ export const adminAiGenerationFormSchema = z
           code: "custom",
           path: ["count"],
           message: "Số câu tối đa là 50",
-        });
-      }
-    }
-    if (values.type === "QUIZ" && values.difficulty === "MIXED") {
-      const total =
-        Number(values.easyCount) + Number(values.mediumCount) + Number(values.hardCount);
-      if (total !== Number(values.count)) {
-        context.addIssue({
-          code: "custom",
-          path: ["hardCount"],
-          message: `Tổng Dễ, Trung bình, Khó phải bằng ${values.count} câu (hiện là ${total})`,
         });
       }
     }

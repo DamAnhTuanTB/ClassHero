@@ -12,7 +12,6 @@ Chi tiết tách từ `docs/04-database-model.md`. File index chính vẫn là `
 id uuid pk
 lesson_id uuid fk lessons.id
 title string
-difficulty Difficulty default MIXED
 source ContentSource default ADMIN
 review_status ReviewStatus default APPROVED
 is_reserve boolean default false
@@ -30,7 +29,8 @@ deleted_at timestamp?
 Rules:
 
 - Bộ AI tạo do học sinh yêu cầu có `source = AI`, `review_status = NEEDS_REVIEW`, `is_reserve = true`.
-- Dù chưa duyệt, học sinh vẫn được dùng nếu service chọn bộ đó.
+- Học sinh chỉ nhận bộ khi chính bộ đã được admin phát hành
+  (`review_status = APPROVED`) và không dùng bộ reserve trực tiếp.
 
 ### 7.2. `quiz_questions`
 
@@ -47,7 +47,9 @@ grading_config_json jsonb?
 source_metadata_json jsonb?
 difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
+published_at timestamp?
 explanation_id uuid? fk ai_explanations.id
+solution_figure_mode QuizSolutionFigureMode default NONE
 sort_order int default 0
 created_at timestamp
 updated_at timestamp
@@ -59,6 +61,7 @@ Index:
 - `quiz_set_id`.
 - `lesson_id`.
 - `(lesson_id, review_status)`.
+- `(quiz_set_id, published_at)`.
 
 Rules:
 
@@ -81,11 +84,34 @@ Rules:
   vẫn giữ boolean và không cần chuyển đổi dữ liệu.
 - Chuỗi đáp án `TEXT_INPUT` có thể chứa LaTeX/mhchem canonical nhưng không lưu
   marks/ảnh vì server cần chuẩn hóa và so khớp đáp án học sinh.
-- Item AI lưu `source_metadata_json` gồm source hash, chunk IDs và metadata
-  document/page dùng cho admin review/debug; field này không trả cho student.
+- Item Quiz do AI sinh lưu `source_metadata_json` gồm `aiGenerationId`,
+  `generationQuestionIndex` và `quizExplanationBlock` thuộc riêng Quiz. Quiz
+  không lưu source hash/chunk/page ở cấp câu và không đọc legacy `exampleBlock`.
+  Student chỉ nhận projection `explanationBlock`, không nhận metadata nội bộ.
+- `quizExplanationBlock` giữ `isGeometry` và bảng GT–KL khi schema môn/lớp yêu
+  cầu. Phân loại Hình học không quyết định `solution_figure_mode`.
+- `solution_figure_mode`: `NONE`, `REUSE_QUESTION` hoặc `EXTEND_QUESTION`.
+  EXTEND luôn có revision lời giải trỏ `derived_from_question_revision_id` tới
+  exact current revision của hình đề.
 - Với `TEXT_INPUT`, các đáp án chấp nhận nằm trong `correct_answer_json`; `grading_config_json` chứa cấu hình so khớp như `caseSensitive`, `exactMatch` và có thể mở rộng thêm `trimWhitespace`, `numericTolerance`, `unitRequired`, `acceptedUnits`.
 - Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`: `target_type=QUIZ_QUESTION`, `target_id=quiz_questions.id`, `source=ADMIN`, `review_status=APPROVED`; `quiz_questions.explanation_id` trỏ tới bản ghi này.
 - Khi admin sửa nội dung/correct answer/hint, service phải mark explanation stale hoặc xóa `explanation_id` theo AI/RAG spec.
+- `published_at` là watermark phát hành của từng câu, không phải snapshot JSON.
+  Câu mới tạo, vừa sửa hoặc vừa duyệt có giá trị `null`; action `SAVE`/`PUBLISH`
+  của bộ đóng dấu cho mọi câu `APPROVED` hiện tại. Student luôn lọc cả
+  `review_status=APPROVED` và `published_at IS NOT NULL`.
+
+### 7.2a. `quiz_figures`, `quiz_figure_revisions`, `quiz_figure_render_attempts`
+
+- `quiz_figures` có tối đa một row cho mỗi `(quiz_question_id, role)` với role
+  `QUESTION | SOLUTION`, giữ lifecycle, plan, subject snapshot và current/pending
+  revision.
+- `quiz_figure_revisions` là nguồn chuẩn của TeX/TikZ hoặc file `ADMIN_UPLOAD`,
+  preview/delivery asset và lineage. Revision SOLUTION do AI mở rộng phải trỏ
+  exact revision QUESTION đã dùng làm nền.
+- `quiz_figure_render_attempts` audit từng lần provider/compile/render và usage.
+- Đây là các bảng thuộc riêng Quiz, không FK/import sang `stem_figures` của
+  Summary. AI không lưu crop/ảnh gốc SGK; admin upload là đường raster riêng.
 
 ### 7.3. `quiz_attempts`
 
@@ -131,6 +157,10 @@ Rules:
   đáp án đã đầy đủ theo loại câu, còn `is_checked` chỉ bật sau khi student bấm
   kiểm tra. Khi submit, payload phải chứa đúng một answer cho mọi placeholder;
   server chấm lại và cập nhật toàn bộ answer trong cùng transaction.
+- Tập placeholder là nguồn chuẩn cho `total_count`, thứ tự và số câu khi resume,
+  submit, retry hoặc review. Việc admin thêm hoặc soft-delete rồi lưu/phát hành
+  câu không được thêm/xóa placeholder của attempt `IN_PROGRESS` đã tồn tại; thay
+  đổi membership chỉ áp dụng cho attempt mới.
 - `quiz_attempts.current_question_index` là vị trí resume dùng chung giữa các
   thiết bị. Client vẫn có thể mirror local để phản hồi nhanh nhưng server là
   nguồn chính.

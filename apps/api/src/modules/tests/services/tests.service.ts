@@ -413,6 +413,83 @@ export class TestsService {
     });
   }
 
+  async reviewQuestion(
+    questionId: string,
+    userId: string,
+    input: { reviewStatus: ReviewStatus },
+    context: RequestContext,
+  ) {
+    const current = await this.prisma.testQuestion.findFirst({
+      where: { id: questionId, deletedAt: null },
+      select: {
+        id: true,
+        testSetId: true,
+        explanationId: true,
+        reviewStatus: true,
+      },
+    });
+    if (!current) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      if (current.explanationId) {
+        await transaction.aiExplanation.update({
+          where: { id: current.explanationId },
+          data: { reviewStatus: input.reviewStatus },
+        });
+      }
+      const updated = await transaction.testQuestion.update({
+        where: { id: questionId },
+        data: { reviewStatus: input.reviewStatus },
+        include: {
+          explanation: {
+            select: {
+              id: true,
+              contentJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
+          },
+        },
+      });
+
+      const pendingReviewQuestionCount = await transaction.testQuestion.count({
+        where: {
+          testSetId: current.testSetId,
+          deletedAt: null,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+      });
+      if (
+        input.reviewStatus === ReviewStatus.APPROVED &&
+        pendingReviewQuestionCount === 0
+      ) {
+        await transaction.testSet.update({
+          where: { id: current.testSetId },
+          data: { reviewStatus: ReviewStatus.APPROVED, updatedById: userId },
+        });
+      }
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "TEST_QUESTION_REVIEWED",
+          entityType: "TestQuestion",
+          entityId: questionId,
+          before: toInputJson({ reviewStatus: current.reviewStatus }),
+          after: toInputJson({
+            reviewStatus: updated.reviewStatus,
+            pendingReviewQuestionCount,
+          }),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return updated;
+    });
+  }
+
   async deleteQuestion(questionId: string, _userId: string, _context: RequestContext) {
     const question = await this.prisma.testQuestion.findFirst({
       where: { id: questionId, deletedAt: null },

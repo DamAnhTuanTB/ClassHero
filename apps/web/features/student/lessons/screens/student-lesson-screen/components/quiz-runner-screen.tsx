@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   Lightbulb,
   Loader2,
+  SkipForward,
   TriangleAlert,
 } from "lucide-react";
 import { ClassHeroLogo } from "@/components/common/brand/classhero-logo";
@@ -109,6 +110,7 @@ export function QuizRunnerScreen({
   currentIndex,
   feedback,
   feedbackByQuestionId,
+  handledQuestionIds,
   isExplanationOpen,
   isHintOpen,
   lessonTitle,
@@ -118,6 +120,7 @@ export function QuizRunnerScreen({
   onNext,
   onPrevious,
   onQuestionSelect,
+  onSkip,
   onSubmit,
   onToggleExplanation,
   onToggleHint,
@@ -129,6 +132,7 @@ export function QuizRunnerScreen({
   currentIndex: number;
   feedback: CheckedAnswer | undefined;
   feedbackByQuestionId: Readonly<Record<string, CheckedAnswer>>;
+  handledQuestionIds: ReadonlyArray<string>;
   isExplanationOpen: boolean;
   isHintOpen: boolean;
   lessonTitle: string;
@@ -138,6 +142,7 @@ export function QuizRunnerScreen({
   onNext: () => void;
   onPrevious: () => void;
   onQuestionSelect: (index: number) => void;
+  onSkip: () => void;
   onSubmit: () => Promise<boolean>;
   onToggleExplanation: () => void;
   onToggleHint: () => void;
@@ -188,13 +193,13 @@ export function QuizRunnerScreen({
 
   const totalCount = attempt.questions.length;
   const questionNumber = question.questionNumber ?? currentIndex + 1;
-  const originalTotalCount = attempt.originalTotalCount ?? totalCount;
   const isLast = currentIndex === totalCount - 1;
   const isAnswerComplete = isStudentAnswerComplete(question, answer);
   const progressPercent = ((currentIndex + 1) / Math.max(totalCount, 1)) * 100;
   const answeredQuestionIdSet = new Set(answeredQuestionIds);
+  const handledQuestionIdSet = new Set(handledQuestionIds);
   const incompleteQuestionNumbers = attempt.questions.flatMap((item, index) =>
-    answeredQuestionIdSet.has(item.id) ? [] : [item.questionNumber ?? index + 1],
+    handledQuestionIdSet.has(item.id) ? [] : [item.questionNumber ?? index + 1],
   );
   const isIncompleteAlertVisible =
     incompleteAlertAttemptId === attempt.id && incompleteQuestionNumbers.length > 0;
@@ -226,6 +231,11 @@ export function QuizRunnerScreen({
   function handleToggleHint() {
     dismissIncompleteAlert();
     onToggleHint();
+  }
+
+  function handleSkip() {
+    dismissIncompleteAlert();
+    onSkip();
   }
 
   function handleToggleExplanation() {
@@ -306,23 +316,23 @@ export function QuizRunnerScreen({
               </p>
               <h1
                 id="quiz-question-title"
-                className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)] sm:text-3xl"
+                className="mt-1 text-2xl font-black leading-tight text-slate-950 dark:text-[var(--theme-text-strong)]"
               >
                 Câu hỏi {questionNumber}
               </h1>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              <span className="rounded-2xl border border-blue-300 bg-blue-200 px-3 py-2 text-xs font-black text-blue-800 shadow-[0_3px_0_rgb(147_197_253)] dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200 dark:shadow-[0_3px_0_rgb(30_58_138)]">
+              <span className="student-preserve-mobile-shadow rounded-2xl border border-blue-300 bg-blue-200 px-3 py-2 text-xs font-black text-blue-800 shadow-[0_3px_0_rgb(147_197_253)] dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200 dark:shadow-[0_3px_0_rgb(30_58_138)]">
                 Đã làm {answeredQuestionIds.length}
               </span>
-              <span className="rounded-2xl border border-sky-300 bg-sky-200 px-3 py-2 text-xs font-black text-sky-800 shadow-[0_3px_0_rgb(125_211_252)] dark:border-sky-400/30 dark:bg-sky-500/25 dark:text-sky-200 dark:shadow-[0_3px_0_rgb(12_74_110)]">
+              <span className="student-preserve-mobile-shadow rounded-2xl border border-sky-300 bg-sky-200 px-3 py-2 text-xs font-black text-sky-800 shadow-[0_3px_0_rgb(125_211_252)] dark:border-sky-400/30 dark:bg-sky-500/25 dark:text-sky-200 dark:shadow-[0_3px_0_rgb(12_74_110)]">
                 {totalCount} câu
               </span>
             </div>
           </div>
 
           <div
-            className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-[var(--theme-surface-muted)]"
+            className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-[var(--theme-surface-muted)] sm:mt-4"
             role="progressbar"
             aria-label="Tiến độ làm Quiz"
             aria-valuemin={0}
@@ -336,8 +346,8 @@ export function QuizRunnerScreen({
           </div>
         </section>
 
-        <div className="mt-4 rounded-[1.25rem] border border-sky-100 bg-white px-2 py-2.5 shadow-[0_24px_55px_-42px_rgb(2_132_199_/_60%)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:py-3">
-          <div className="mb-2 flex items-center px-0.5">
+        <div className="mt-4 rounded-[1.25rem] border border-sky-100 bg-white px-2 py-2.5 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface)] sm:py-3">
+          <div className="mb-0 flex items-center px-0.5">
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-100 text-sm font-black text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
                 {String(questionNumber).padStart(2, "0")}
@@ -356,7 +366,7 @@ export function QuizRunnerScreen({
           />
 
           {!feedback && isAnswerComplete ? (
-            <div className="mt-3 flex justify-end md:justify-center">
+            <div className="mt-2 flex justify-end md:justify-center">
               <button
                 type="button"
                 aria-label="Kiểm tra đáp án"
@@ -374,18 +384,32 @@ export function QuizRunnerScreen({
             </div>
           ) : null}
 
-          {question.hintJson ? (
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={handleToggleHint}
-                className="inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl bg-amber-50 px-4 text-base font-black text-amber-700 transition hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300"
-              >
-                <Lightbulb className="h-5 w-5" aria-hidden="true" />
-                {isHintOpen ? "Ẩn gợi ý" : "Gợi ý"}
-              </button>
-              {isHintOpen ? (
-                <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-400/30 dark:bg-amber-500/10">
+          {!feedback ? (
+            <div className="mt-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {question.hintJson ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(pendingAction)}
+                    onClick={handleToggleHint}
+                    className="inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl bg-amber-100 px-4 text-base font-black text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+                  >
+                    <Lightbulb className="h-5 w-5" aria-hidden="true" />
+                    {isHintOpen ? "Ẩn gợi ý" : "Gợi ý"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={Boolean(pendingAction)}
+                  onClick={handleSkip}
+                  className="student-mobile-border inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 text-base font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-soft)] dark:text-[var(--theme-text)] dark:hover:border-amber-400/40 dark:hover:bg-amber-500/10 dark:hover:text-amber-300"
+                >
+                  <SkipForward className="h-5 w-5" aria-hidden="true" />
+                  Bỏ qua
+                </button>
+              </div>
+              {question.hintJson && isHintOpen ? (
+                <div className="learning-content-text mt-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-400/30 dark:bg-amber-500/10">
                   <TiptapContentView content={question.hintJson} />
                 </div>
               ) : null}
@@ -395,7 +419,12 @@ export function QuizRunnerScreen({
           {feedback ? (
             <AssessmentExplanationPanel
               content={feedback.explanationJson}
-              exampleBlock={feedback.explanationExampleBlock}
+              correctAnswer={feedback.correctAnswerJson}
+              explanationBlock={feedback.explanationBlock}
+              optionIds={question.optionsJson?.map((option) => option.id)}
+              questionType={question.questionType}
+              separateAnswerItems={question.questionType === "MULTI_STATEMENT_TRUE_FALSE"}
+              solutionFigure={question.solutionFigure}
               isOpen={isExplanationOpen}
               onToggle={handleToggleExplanation}
             />
@@ -417,25 +446,29 @@ export function QuizRunnerScreen({
                 disabled={Boolean(pendingAction)}
                 onClick={() => handleQuestionSelect(index)}
                 aria-label={
-                  itemFeedback
-                    ? `Câu ${itemQuestionNumber}: ${
-                        itemFeedback.isCorrect ? "đúng" : "sai"
-                      }`
-                    : isItemAnswered
-                      ? `Câu ${itemQuestionNumber}: đã làm, chưa kiểm tra`
-                      : `Câu ${itemQuestionNumber}: chưa làm`
+                  itemFeedback?.isSkipped
+                    ? `Câu ${itemQuestionNumber}: đã bỏ qua`
+                    : itemFeedback
+                      ? `Câu ${itemQuestionNumber}: ${
+                          itemFeedback.isCorrect ? "đúng" : "sai"
+                        }`
+                      : isItemAnswered
+                        ? `Câu ${itemQuestionNumber}: đã làm, chưa kiểm tra`
+                        : `Câu ${itemQuestionNumber}: chưa làm`
                 }
                 aria-current={index === currentIndex ? "step" : undefined}
                 className={cn(
                   "relative h-3 shrink-0 rounded-full transition-[width,background-color,filter,transform] duration-200 before:absolute before:-inset-x-1 before:-inset-y-2 before:rounded-lg before:content-[''] hover:brightness-95 active:scale-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 disabled:opacity-100 motion-reduce:transition-none dark:focus-visible:ring-sky-500/30",
                   index === currentIndex ? "w-8" : "w-3",
-                  itemFeedback?.isCorrect
-                    ? "bg-emerald-400"
-                    : itemFeedback
-                      ? "bg-rose-400"
-                      : isItemAnswered
-                        ? "bg-blue-400"
-                        : "bg-slate-300 dark:bg-slate-600",
+                  itemFeedback?.isSkipped
+                    ? "bg-amber-400"
+                    : itemFeedback?.isCorrect
+                      ? "bg-emerald-400"
+                      : itemFeedback
+                        ? "bg-rose-400"
+                        : isItemAnswered
+                          ? "bg-blue-400"
+                          : "bg-slate-300 dark:bg-slate-600",
                 )}
               />
             );

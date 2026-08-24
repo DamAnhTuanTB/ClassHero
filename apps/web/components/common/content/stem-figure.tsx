@@ -4,6 +4,11 @@ import { AlertTriangle, Clock3, LoaderCircle } from "lucide-react";
 import { tokenizeMathText } from "@learning-path/shared";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import "@/components/common/content/math-content-typography.css";
+import {
+  LEARNING_CONTENT_KATEX_MACROS,
+  normalizeLearningContentLatex,
+} from "@/lib/learning-content-math";
 
 export type StemFigureVisual = {
   kind: "TEX_FIGURE";
@@ -76,7 +81,7 @@ export function StemFigure({
         src={imageUrl}
       />
       {visual.caption ? (
-        <figcaption className="mt-3 text-center text-sm font-medium leading-6 text-slate-600">
+        <figcaption className="learning-content-text mt-3 text-center font-medium leading-relaxed text-slate-600">
           <StemFigureMathText value={visual.caption} />
         </figcaption>
       ) : null}
@@ -91,7 +96,11 @@ export function StemFigureMathText({ value }: { value: string }) {
     ) : (
       <span
         key={`math-${index}`}
-        className={token.display ? "my-2 block overflow-x-auto py-1" : "inline"}
+        className={
+          token.display
+            ? "math-content-typography my-2 block overflow-x-auto py-1"
+            : "math-content-typography inline"
+        }
         dangerouslySetInnerHTML={{
           __html: renderMath(token.latex, token.display),
         }}
@@ -102,8 +111,9 @@ export function StemFigureMathText({ value }: { value: string }) {
 
 function renderMath(latex: string, displayMode: boolean) {
   try {
-    return katex.renderToString(latex, {
+    return katex.renderToString(normalizeLearningContentLatex(latex), {
       displayMode,
+      macros: LEARNING_CONTENT_KATEX_MACROS,
       throwOnError: false,
       strict: false,
     });

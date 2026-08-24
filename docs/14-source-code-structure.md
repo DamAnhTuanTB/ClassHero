@@ -161,6 +161,12 @@ Rules:
 - Prisma known error detection/mapping dùng helper trong `common/errors/prisma-error.mapper.ts`.
 - Common layer không chứa logic nghiệp vụ của một domain cụ thể.
 - Domain có thể wrap helper common để chọn message/mã lỗi nghiệp vụ, nhưng không tự dựng body lỗi HTTP thủ công nhiều nơi.
+- Core Sinh kiến thức là private boundary: mọi file/schema/helper/service/worker
+  có tên `lesson-summary-*` chỉ được Summary và StemFigure thuộc Summary import.
+  Quiz, Flashcard, Test và flow khác không được import để tái sử dụng prompt,
+  schema, mapper, subject profile, context hoặc renderer. Flow cần khả năng tương
+  tự phải sở hữu implementation trong domain của chính nó; chỉ provider, queue,
+  routing, retrieval và accounting trung lập được dùng chung.
 
 ### 3.2. Domain module folders
 

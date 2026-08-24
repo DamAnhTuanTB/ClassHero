@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { isSupportedNumericAnswer } from "@learning-path/shared";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import type { getRequestContext } from "#api/common/api/request-context";
@@ -6,15 +7,19 @@ import {
   AiGenerationStatus,
   AiExplanationTargetType,
   ContentSource,
-  Difficulty,
   Prisma,
   QuestionType,
   ReviewStatus,
 } from "@prisma/client";
 import {
   QuizQuestionContentDto,
+  UpdateQuizGenerationQuestionJsonDto,
   UpdateQuizQuestionContentDto,
 } from "#api/modules/quiz/dto/quiz-question-content.dto";
+import {
+  QuizSetReviewActionDto,
+  type ReviewQuizSetDto,
+} from "#api/modules/quiz/dto/review-quiz-set.dto";
 import {
   correctAnswerSchema,
   multiStatementCorrectAnswerSchema,
@@ -24,20 +29,34 @@ import {
 } from "#api/modules/quiz/types/quiz.types";
 import { getTiptapText } from "#api/common/validation/rich-text-content";
 import {
-  lessonSummaryMvpBlockSchema,
-  type LessonSummaryMvpBlock,
-} from "#api/modules/ai/types/lesson-summary.types";
+  getGeneratedQuizOutputSchema,
+  quizExplanationBlockSchema,
+  quizSubjectKeySchema,
+  type QuizExplanationBlock,
+} from "#api/modules/quiz/types/quiz-generation.types";
+import { quizFigureSelect } from "#api/modules/quiz-figures/services/quiz-figures.service";
+import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import {
+  readQuizGenerationQuestion,
+  readQuizGenerationQuestionReference,
+  replaceQuizGenerationQuestionOutput,
+  updateQuizGenerationQuestionOutput,
+} from "#api/modules/quiz/utils/quiz-generation-output";
+import {
+  normalizeGeneratedQuizQuestionContent,
+  normalizeQuizExplanationBlock,
+} from "#api/modules/quiz/utils/quiz-generation-content-normalizer";
+import { mapGeneratedQuizQuestion } from "#api/modules/quiz/utils/quiz-generation-mapper";
+import { validateQuizOutput } from "#api/modules/quiz/utils/quiz-generation-validation";
 
 type RequestContext = ReturnType<typeof getRequestContext>;
 
 export interface CreateQuizSetDto {
   title: string;
-  difficulty?: Difficulty;
 }
 
 export interface UpdateQuizSetDto {
   title?: string;
-  difficulty?: Difficulty;
   reviewStatus?: ReviewStatus;
 }
 
@@ -66,13 +85,23 @@ export class QuizService {
     });
     if (sets.length === 0) return [];
     const setIds = sets.map((set) => set.id);
-    const [pendingGroups, aiGenerations] = await Promise.all([
+    const [pendingGroups, unpublishedGroups, aiGenerations] = await Promise.all([
       this.prisma.quizQuestion.groupBy({
         by: ["quizSetId"],
         where: {
           quizSetId: { in: setIds },
           deletedAt: null,
           reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.quizQuestion.groupBy({
+        by: ["quizSetId"],
+        where: {
+          quizSetId: { in: setIds },
+          deletedAt: null,
+          reviewStatus: ReviewStatus.APPROVED,
+          publishedAt: null,
         },
         _count: { _all: true },
       }),
@@ -90,6 +119,9 @@ export class QuizService {
     const pendingBySetId = new Map(
       pendingGroups.map((group) => [group.quizSetId, group._count._all]),
     );
+    const unpublishedBySetId = new Map(
+      unpublishedGroups.map((group) => [group.quizSetId, group._count._all]),
+    );
     const generationsBySetId = new Map<string, typeof aiGenerations>();
     aiGenerations.forEach((generation) => {
       if (!generation.targetId) return;
@@ -100,6 +132,7 @@ export class QuizService {
     return sets.map((set) => ({
       ...set,
       pendingReviewQuestionCount: pendingBySetId.get(set.id) ?? 0,
+      unpublishedApprovedQuestionCount: unpublishedBySetId.get(set.id) ?? 0,
       aiGenerations: generationsBySetId.get(set.id) ?? [],
     }));
   }
@@ -127,7 +160,6 @@ export class QuizService {
         data: {
           lessonId,
           title: dto.title,
-          difficulty: dto.difficulty || Difficulty.MIXED,
           source: ContentSource.ADMIN,
           sortOrder: (lastSet?.sortOrder ?? -1) + 1,
           createdById: userId,
@@ -162,7 +194,7 @@ export class QuizService {
   async reviewQuizSet(
     setId: string,
     userId: string,
-    input: { reviewStatus: ReviewStatus },
+    input: ReviewQuizSetDto,
     context: RequestContext,
   ) {
     const current = await this.prisma.quizSet.findUnique({
@@ -172,27 +204,53 @@ export class QuizService {
     if (!current) {
       throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
     }
+    const action =
+      input.action ??
+      (input.reviewStatus === ReviewStatus.APPROVED
+        ? QuizSetReviewActionDto.PUBLISH
+        : input.reviewStatus === ReviewStatus.HIDDEN
+          ? QuizSetReviewActionDto.WITHDRAW
+          : QuizSetReviewActionDto.SAVE);
     return this.prisma.$transaction(async (transaction) => {
-      const questions = await transaction.quizQuestion.findMany({
-        where: { quizSetId: setId, deletedAt: null },
-        select: { explanationId: true },
-      });
-      await transaction.quizQuestion.updateMany({
-        where: { quizSetId: setId, deletedAt: null },
-        data: { reviewStatus: input.reviewStatus },
-      });
-      const explanationIds = questions.flatMap((question) =>
-        question.explanationId ? [question.explanationId] : [],
-      );
-      if (explanationIds.length > 0) {
-        await transaction.aiExplanation.updateMany({
-          where: { id: { in: explanationIds } },
-          data: { reviewStatus: input.reviewStatus },
+      if (action === QuizSetReviewActionDto.PUBLISH) {
+        const unreviewedQuestionCount = await transaction.quizQuestion.count({
+          where: {
+            quizSetId: setId,
+            deletedAt: null,
+            reviewStatus: { not: ReviewStatus.APPROVED },
+          },
+        });
+        if (unreviewedQuestionCount > 0) {
+          throw badRequestException(
+            "QUIZ_SET_HAS_UNREVIEWED_QUESTIONS",
+            "Cần duyệt hết câu hỏi trước khi phát hành bộ Quiz",
+            { unreviewedQuestionCount },
+          );
+        }
+      }
+      const publishedAt = new Date();
+      if (
+        action === QuizSetReviewActionDto.SAVE ||
+        action === QuizSetReviewActionDto.PUBLISH
+      ) {
+        await transaction.quizQuestion.updateMany({
+          where: {
+            quizSetId: setId,
+            deletedAt: null,
+            reviewStatus: ReviewStatus.APPROVED,
+          },
+          data: { publishedAt },
         });
       }
+      const nextReviewStatus =
+        action === QuizSetReviewActionDto.PUBLISH
+          ? ReviewStatus.APPROVED
+          : action === QuizSetReviewActionDto.WITHDRAW
+            ? ReviewStatus.HIDDEN
+            : current.reviewStatus;
       const updated = await transaction.quizSet.update({
         where: { id: setId },
-        data: { reviewStatus: input.reviewStatus, updatedById: userId },
+        data: { reviewStatus: nextReviewStatus, updatedById: userId },
       });
       await transaction.auditLog.create({
         data: {
@@ -201,7 +259,11 @@ export class QuizService {
           entityType: "QuizSet",
           entityId: setId,
           before: toInputJson(current),
-          after: toInputJson({ id: updated.id, reviewStatus: updated.reviewStatus }),
+          after: toInputJson({
+            id: updated.id,
+            action,
+            reviewStatus: updated.reviewStatus,
+          }),
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         },
@@ -230,7 +292,7 @@ export class QuizService {
   // --- Quiz Question ---
 
   async listQuestionsBySet(setId: string) {
-    return this.prisma.quizQuestion.findMany({
+    const questions = await this.prisma.quizQuestion.findMany({
       where: { quizSetId: setId, deletedAt: null },
       orderBy: { sortOrder: "asc" },
       include: {
@@ -242,7 +304,46 @@ export class QuizService {
             staleAt: true,
           },
         },
+        figures: {
+          where: { deletedAt: null },
+          orderBy: { role: "asc" },
+          select: quizFigureSelect,
+        },
       },
+    });
+    const generationIds = [
+      ...new Set(
+        questions.flatMap((question) => {
+          const reference = readQuizGenerationQuestionReference(
+            question.sourceMetadataJson,
+          );
+          return reference ? [reference.aiGenerationId] : [];
+        }),
+      ),
+    ];
+    const generations =
+      generationIds.length > 0
+        ? await this.prisma.aiGeneration.findMany({
+            where: { id: { in: generationIds } },
+            select: { id: true, outputJson: true },
+          })
+        : [];
+    const outputByGenerationId = new Map(
+      generations.map((generation) => [generation.id, generation.outputJson]),
+    );
+
+    return questions.map((question) => {
+      const reference = readQuizGenerationQuestionReference(question.sourceMetadataJson);
+      const generationQuestionJson = reference
+        ? readQuizGenerationQuestion(
+            outputByGenerationId.get(reference.aiGenerationId),
+            reference.generationQuestionIndex,
+          )
+        : null;
+      return {
+        ...question,
+        generationQuestionJson,
+      };
     });
   }
 
@@ -356,20 +457,22 @@ export class QuizService {
         dto.explanationJson ?? toOptionalJsonRecord(question.explanation?.contentJson),
     };
     validateQuestionContent(mergedContent);
-    let exampleBlock: Extract<LessonSummaryMvpBlock, { type: "example" }> | null = null;
-    if (dto.exampleBlock) {
-      const parsedExampleBlock = lessonSummaryMvpBlockSchema.safeParse(dto.exampleBlock);
-      if (!parsedExampleBlock.success || parsedExampleBlock.data.type !== "example") {
+    let quizExplanationBlock: QuizExplanationBlock | null = null;
+    if (dto.quizExplanationBlock) {
+      const parsedExplanationBlock = quizExplanationBlockSchema.safeParse(
+        dto.quizExplanationBlock,
+      );
+      if (!parsedExplanationBlock.success) {
         throw badRequestException(
-          "QUIZ_EXAMPLE_BLOCK_INVALID",
-          "Khối Ví dụ của câu Quiz không đúng cấu trúc dùng chung với Sinh kiến thức",
-          parsedExampleBlock.success ? undefined : parsedExampleBlock.error.flatten(),
+          "QUIZ_EXPLANATION_BLOCK_INVALID",
+          "Khối lời giải của câu Quiz không đúng cấu trúc Quiz",
+          parsedExplanationBlock.error.flatten(),
         );
       }
-      exampleBlock = parsedExampleBlock.data;
+      quizExplanationBlock = normalizeQuizExplanationBlock(parsedExplanationBlock.data);
     }
 
-    const updateData: Prisma.QuizQuestionUpdateInput = {};
+    const updateData: Prisma.QuizQuestionUpdateInput = { publishedAt: null };
     if (dto.questionType) updateData.questionType = dto.questionType;
     if (dto.difficulty) updateData.difficulty = dto.difficulty;
     if (dto.questionJson) updateData.questionJson = toInputJson(dto.questionJson);
@@ -394,18 +497,18 @@ export class QuizService {
     if (mergedContent.questionType !== QuestionType.TEXT_INPUT) {
       updateData.gradingConfigJson = Prisma.DbNull;
     }
-    if (exampleBlock) {
+    if (quizExplanationBlock) {
       updateData.sourceMetadataJson = toInputJson(
-        replaceStructuredExample(question.sourceMetadataJson, exampleBlock),
+        replaceQuizExplanationBlock(question.sourceMetadataJson, quizExplanationBlock),
       );
     } else if (changesExplanationContext(dto) || dto.explanationJson !== undefined) {
       updateData.sourceMetadataJson = toInputJson(
-        removeStructuredExample(question.sourceMetadataJson),
+        removeQuizExplanationBlock(question.sourceMetadataJson),
       );
     }
 
     return this.prisma.$transaction(async (transaction) => {
-      if (exampleBlock && question.explanationId) {
+      if (quizExplanationBlock && question.explanationId) {
         await transaction.aiExplanation.update({
           where: { id: question.explanationId },
           data: { staleAt: null },
@@ -434,7 +537,7 @@ export class QuizService {
             : { connect: { id: explanationId } };
       }
 
-      return transaction.quizQuestion.update({
+      const updatedQuestion = await transaction.quizQuestion.update({
         where: { id: questionId },
         data: updateData,
         include: {
@@ -448,6 +551,362 @@ export class QuizService {
           },
         },
       });
+
+      await syncQuizGenerationOutput(transaction, updatedQuestion);
+      return updatedQuestion;
+    });
+  }
+
+  async updateGenerationQuestionJson(
+    questionId: string,
+    userId: string,
+    dto: UpdateQuizGenerationQuestionJsonDto,
+    context: RequestContext,
+  ) {
+    const question = await this.prisma.quizQuestion.findUnique({
+      where: { id: questionId, deletedAt: null },
+      include: {
+        explanation: {
+          select: {
+            id: true,
+            contentJson: true,
+            reviewStatus: true,
+            staleAt: true,
+          },
+        },
+      },
+    });
+    if (!question) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
+    }
+
+    const reference = readQuizGenerationQuestionReference(question.sourceMetadataJson);
+    if (!reference) {
+      throw badRequestException(
+        "QUIZ_GENERATION_JSON_NOT_AVAILABLE",
+        "Câu hỏi này không thuộc một lượt sinh Quiz có JSON làm việc.",
+      );
+    }
+    const generation = await this.prisma.aiGeneration.findUnique({
+      where: { id: reference.aiGenerationId },
+      select: { inputMetaJson: true, outputJson: true },
+    });
+    if (!generation) {
+      throw badRequestException(
+        "QUIZ_GENERATION_JSON_NOT_AVAILABLE",
+        "Không tìm thấy JSON làm việc của lượt sinh Quiz.",
+      );
+    }
+
+    const inputMeta = toRecordOrEmpty(generation.inputMetaJson);
+    const subjectKey = quizSubjectKeySchema.safeParse(inputMeta.subjectKey);
+    if (!subjectKey.success) {
+      throw badRequestException(
+        "QUIZ_GENERATION_SUBJECT_INVALID",
+        "Snapshot môn học của lượt sinh Quiz không hợp lệ.",
+      );
+    }
+    const targetGrade = readNullableGrade(inputMeta.targetGrade);
+    const parsed = getGeneratedQuizOutputSchema({
+      subjectKey: subjectKey.data,
+      targetGrade,
+      questionCount: 1,
+    }).safeParse({ questions: [dto.generationQuestionJson] });
+    if (!parsed.success) {
+      throw badRequestException(
+        "QUIZ_GENERATION_JSON_INVALID",
+        "JSON câu Quiz chưa đúng cấu trúc cần thiết để lưu.",
+        parsed.error.flatten(),
+      );
+    }
+
+    const currentGenerationQuestion = readQuizGenerationQuestion(
+      generation.outputJson,
+      reference.generationQuestionIndex,
+    );
+    if (!currentGenerationQuestion) {
+      throw badRequestException(
+        "QUIZ_GENERATION_JSON_NOT_AVAILABLE",
+        "Không tìm thấy câu tương ứng trong JSON làm việc của lượt sinh Quiz.",
+      );
+    }
+    if (
+      hashAiValue(currentGenerationQuestion.figure ?? null) !==
+      hashAiValue(dto.generationQuestionJson.figure ?? null)
+    ) {
+      throw badRequestException(
+        "QUIZ_GENERATION_FIGURE_EDIT_UNSUPPORTED",
+        "Không sửa trực tiếp quyết định hình trong JSON; hãy dùng công cụ quản lý hình của câu Quiz.",
+      );
+    }
+
+    const normalizedQuestion = normalizeGeneratedQuizQuestionContent(
+      parsed.data.questions[0]!,
+    );
+    const mapped = mapGeneratedQuizQuestion(normalizedQuestion);
+    const currentOutput = replaceQuizGenerationQuestionOutput(
+      generation.outputJson,
+      reference.generationQuestionIndex,
+      normalizedQuestion as unknown as Record<string, unknown>,
+    );
+    if (!currentOutput) {
+      throw badRequestException(
+        "QUIZ_GENERATION_JSON_NOT_AVAILABLE",
+        "Không thể cập nhật câu tương ứng trong JSON làm việc của lượt sinh Quiz.",
+      );
+    }
+    const semanticReview = validateQuizOutput({
+      questions: [normalizedQuestion],
+      requestedCount: 1,
+      requestedTypes: [normalizedQuestion.questionType],
+      requestedDifficulty: normalizedQuestion.difficulty,
+      difficultyCounts: null,
+    });
+    const generationIssues = [
+      ...readGenerationIssuesForOtherQuestions(
+        inputMeta.generationIssues,
+        reference.generationQuestionIndex,
+      ),
+      ...semanticReview.metadata.issues.map((issue) => ({
+        ...issue,
+        questionIndex: reference.generationQuestionIndex,
+      })),
+      ...mapped.recoveryIssues.map((issue) => ({
+        ...issue,
+        questionIndex: reference.generationQuestionIndex,
+        blocking: false,
+      })),
+    ];
+
+    return this.prisma.$transaction(async (transaction) => {
+      const explanationId = await syncExplanation(transaction, {
+        currentExplanationId: question.explanationId,
+        explanationJson: mapped.explanationJson,
+        lessonId: question.lessonId,
+        questionId,
+      });
+      const updated = await transaction.quizQuestion.update({
+        where: { id: questionId },
+        data: {
+          questionType: mapped.questionType,
+          difficulty: mapped.difficulty,
+          questionJson: toInputJson(mapped.questionJson),
+          optionsJson: toNullableInputJson(mapped.optionsJson),
+          correctAnswerJson: toInputJson(mapped.correctAnswerJson),
+          hintJson: toNullableInputJson(mapped.hintJson),
+          gradingConfigJson: toNullableInputJson(mapped.gradingConfigJson),
+          sourceMetadataJson: toInputJson(
+            replaceQuizExplanationBlock(
+              question.sourceMetadataJson,
+              mapped.explanationBlock,
+            ),
+          ),
+          solutionFigureMode: normalizedQuestion.figure.solutionFigureMode,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+          publishedAt: null,
+          ...(explanationId
+            ? { explanation: { connect: { id: explanationId } } }
+            : { explanation: { disconnect: true } }),
+        },
+        include: {
+          explanation: {
+            select: {
+              id: true,
+              contentJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
+          },
+          figures: {
+            where: { deletedAt: null },
+            orderBy: { role: "asc" },
+            select: quizFigureSelect,
+          },
+        },
+      });
+      await transaction.aiGeneration.update({
+        where: { id: reference.aiGenerationId },
+        data: {
+          outputJson: toInputJson(currentOutput),
+          outputHash: hashAiValue(currentOutput),
+          inputMetaJson: toInputJson({
+            ...inputMeta,
+            generationIssues,
+          }),
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "QUIZ_QUESTION_GENERATION_JSON_UPDATED",
+          entityType: "QuizQuestion",
+          entityId: questionId,
+          before: toInputJson(currentGenerationQuestion),
+          after: toInputJson(normalizedQuestion),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return {
+        ...updated,
+        generationQuestionJson: normalizedQuestion,
+      };
+    });
+  }
+
+  async reviewQuestion(
+    questionId: string,
+    userId: string,
+    input: { reviewStatus: ReviewStatus },
+    context: RequestContext,
+  ) {
+    const current = await this.prisma.quizQuestion.findUnique({
+      where: { id: questionId, deletedAt: null },
+      select: {
+        id: true,
+        quizSetId: true,
+        explanationId: true,
+        reviewStatus: true,
+      },
+    });
+    if (!current) {
+      throw notFoundException("NOT_FOUND", "Không tìm thấy câu hỏi");
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      if (current.explanationId) {
+        await transaction.aiExplanation.update({
+          where: { id: current.explanationId },
+          data: { reviewStatus: input.reviewStatus },
+        });
+      }
+      const updated = await transaction.quizQuestion.update({
+        where: { id: questionId },
+        data: { reviewStatus: input.reviewStatus, publishedAt: null },
+        include: {
+          explanation: {
+            select: {
+              id: true,
+              contentJson: true,
+              reviewStatus: true,
+              staleAt: true,
+            },
+          },
+        },
+      });
+
+      const pendingReviewQuestionCount = await transaction.quizQuestion.count({
+        where: {
+          quizSetId: current.quizSetId,
+          deletedAt: null,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "QUIZ_QUESTION_REVIEWED",
+          entityType: "QuizQuestion",
+          entityId: questionId,
+          before: toInputJson({ reviewStatus: current.reviewStatus }),
+          after: toInputJson({
+            reviewStatus: updated.reviewStatus,
+            pendingReviewQuestionCount,
+          }),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+      return updated;
+    });
+  }
+
+  async reviewAllPendingAiQuestions(
+    setId: string,
+    userId: string,
+    context: RequestContext,
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      const quizSet = await transaction.quizSet.findUnique({
+        where: { id: setId, deletedAt: null },
+        select: { id: true, source: true },
+      });
+      if (!quizSet) {
+        throw notFoundException("NOT_FOUND", "Không tìm thấy bộ Quiz");
+      }
+
+      const pendingQuestions = await transaction.quizQuestion.findMany({
+        where: {
+          quizSetId: setId,
+          deletedAt: null,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+        select: {
+          id: true,
+          explanationId: true,
+          sourceMetadataJson: true,
+        },
+      });
+      const aiQuestions = pendingQuestions.filter(
+        (question) =>
+          quizSet.source === ContentSource.AI ||
+          readQuizGenerationQuestionReference(question.sourceMetadataJson) !== null,
+      );
+      const questionIds = aiQuestions.map((question) => question.id);
+      const explanationIds = aiQuestions.flatMap((question) =>
+        question.explanationId ? [question.explanationId] : [],
+      );
+
+      if (explanationIds.length > 0) {
+        await transaction.aiExplanation.updateMany({
+          where: { id: { in: explanationIds } },
+          data: { reviewStatus: ReviewStatus.APPROVED },
+        });
+      }
+      const approved =
+        questionIds.length > 0
+          ? await transaction.quizQuestion.updateMany({
+              where: {
+                id: { in: questionIds },
+                deletedAt: null,
+                reviewStatus: ReviewStatus.NEEDS_REVIEW,
+              },
+              data: {
+                reviewStatus: ReviewStatus.APPROVED,
+                publishedAt: null,
+              },
+            })
+          : { count: 0 };
+      const pendingReviewQuestionCount = await transaction.quizQuestion.count({
+        where: {
+          quizSetId: setId,
+          deletedAt: null,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+      });
+
+      if (approved.count > 0) {
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: userId,
+            action: "QUIZ_AI_QUESTIONS_BULK_REVIEWED",
+            entityType: "QuizSet",
+            entityId: setId,
+            before: toInputJson({ pendingAiQuestionCount: aiQuestions.length }),
+            after: toInputJson({
+              approvedQuestionCount: approved.count,
+              pendingReviewQuestionCount,
+            }),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+      }
+
+      return {
+        approvedQuestionCount: approved.count,
+        pendingReviewQuestionCount,
+      };
     });
   }
 
@@ -591,6 +1050,23 @@ function toRecordOrEmpty(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function readNullableGrade(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 12
+    ? value
+    : null;
+}
+
+function readGenerationIssuesForOtherQuestions(
+  value: unknown,
+  editedQuestionIndex: number,
+) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((issue) => {
+    if (!issue || typeof issue !== "object" || Array.isArray(issue)) return true;
+    return (issue as Record<string, unknown>).questionIndex !== editedQuestionIndex;
+  });
+}
+
 function readNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -599,25 +1075,25 @@ function readGenerationQuestionIndex(value: unknown, fallback: number) {
   return readNumber(toRecordOrEmpty(value).generationQuestionIndex, fallback);
 }
 
-function removeStructuredExample(value: unknown) {
+function removeQuizExplanationBlock(value: unknown) {
   const metadata = toRecordOrEmpty(value);
-  const { exampleBlock: _exampleBlock, ...rest } = metadata;
+  const { quizExplanationBlock: _quizExplanationBlock, ...rest } = metadata;
   return rest;
 }
 
-function replaceStructuredExample(
+function replaceQuizExplanationBlock(
   value: unknown,
-  exampleBlock: Extract<LessonSummaryMvpBlock, { type: "example" }>,
+  quizExplanationBlock: QuizExplanationBlock,
 ) {
   const metadata = toRecordOrEmpty(value);
   const {
-    exampleBlock: _oldExampleBlock,
+    quizExplanationBlock: _oldQuizExplanationBlock,
     sourceChunkIds: _sourceChunkIds,
     sourceHash: _sourceHash,
     sources: _sources,
     ...rest
   } = metadata;
-  return { ...rest, exampleBlock };
+  return { ...rest, quizExplanationBlock };
 }
 
 function validateQuestionContent(dto: QuizQuestionContentDto) {
@@ -671,13 +1147,14 @@ function validateQuestionContent(dto: QuizQuestionContentDto) {
     }
     if (
       !Array.isArray(correctAnswer.data) ||
+      correctAnswer.data.length !== 1 ||
       correctAnswer.data.some(
         (answerId) => typeof answerId !== "string" || !optionIds.includes(answerId),
       )
     ) {
       throw badRequestException(
         "QUIZ_QUESTION_CORRECT_OPTION_NOT_FOUND",
-        "Đáp án đúng phải thuộc danh sách phương án trả lời",
+        "Câu trắc nghiệm phải có đúng một đáp án và đáp án đó phải thuộc danh sách phương án",
       );
     }
   }
@@ -759,6 +1236,17 @@ function validateQuestionContent(dto: QuizQuestionContentDto) {
         "QUIZ_QUESTION_INVALID_GRADING_CONFIG",
         "Cấu hình chấm câu trả lời chưa hợp lệ",
         gradingConfig.error.flatten(),
+      );
+    }
+    if (
+      gradingConfig.data.numericComparison &&
+      correctAnswer.data.some(
+        (answer) => typeof answer !== "string" || !isSupportedNumericAnswer(answer),
+      )
+    ) {
+      throw badRequestException(
+        "QUIZ_QUESTION_INVALID_NUMERIC_ANSWERS",
+        "Đáp án dùng chế độ chấm số phải là giá trị số hợp lệ",
       );
     }
   }
@@ -848,6 +1336,35 @@ function toOptionalJsonValue<T>(value: Prisma.JsonValue | null | undefined) {
 
 function toInputJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+async function syncQuizGenerationOutput(
+  transaction: Prisma.TransactionClient,
+  question: Parameters<typeof updateQuizGenerationQuestionOutput>[2],
+) {
+  const reference = readQuizGenerationQuestionReference(question.sourceMetadataJson);
+  if (!reference) return;
+
+  const generation = await transaction.aiGeneration.findUnique({
+    where: { id: reference.aiGenerationId },
+    select: { outputJson: true },
+  });
+  if (!generation) return;
+
+  const currentOutput = updateQuizGenerationQuestionOutput(
+    generation.outputJson,
+    reference.generationQuestionIndex,
+    question,
+  );
+  if (!currentOutput) return;
+
+  await transaction.aiGeneration.update({
+    where: { id: reference.aiGenerationId },
+    data: {
+      outputJson: toInputJson(currentOutput),
+      outputHash: hashAiValue(currentOutput),
+    },
+  });
 }
 
 function toNullableInputJson(

@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 File này là snapshot định hướng nhanh, không phải nhật ký triển khai. Source of
 truth vẫn là `AGENTS.md`, docs domain, milestone/ADR liên quan và code hiện tại.
@@ -16,6 +16,9 @@ phần mở rộng quản trị hình STEM:
   block sở hữu figure. Backend không còn suy hoặc gửi `pairedTheory`.
 - Phạm vi hình hiện chỉ áp dụng cho Lesson Summary. Quiz, Flashcard, Test,
   Explanation và Chat vẫn text-only.
+- Quiz đã hard-cutover sang core riêng trong domain Quiz: schema/prompt/subject,
+  context/job/worker/mapper, form cấu hình và renderer đều không dùng lõi Lesson
+  Summary. Runtime chỉ đọc `quizExplanationBlock`, không có fallback dữ liệu cũ.
 - Figure chỉ có light theme; dark UI đặt hình trên surface sáng.
 - Worker/API/web của pipeline phải deploy cùng version và worker phải được
   restart sau khi code liên quan thay đổi.

@@ -27,7 +27,7 @@ import type {
   AiTokenUsage,
 } from "#api/modules/ai/types/ai-text.types";
 import type { AiOpenAiConfig } from "#api/modules/ai/utils/ai-config.helper";
-import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
+import { resolveAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 import {
   assertEmbeddingInput,
   assertEmbeddingOutput,
@@ -176,11 +176,12 @@ export class OpenAiProvider implements AiProvider {
     assertAiOutputName(input.outputName);
     const startedAt = Date.now();
     const modelToUse = input.model ?? this.config.structuredModel;
-    const structuredTextFormat = buildAiStructuredTextFormat(
+    const structuredTextFormatResolution = resolveAiStructuredTextFormat(
       schema,
       input.outputName,
       input.schemaReferenceStrategy,
     );
+    const structuredTextFormat = structuredTextFormatResolution.format;
     const preparedInput = await this.prepareResponseInput(input);
     try {
       const response = await this.client.responses.parse(
@@ -237,7 +238,10 @@ export class OpenAiProvider implements AiProvider {
         this.logger.debug(
           `[PROMPT_CACHE] output=${input.outputName} model=${response.model ?? modelToUse} ` +
             `prompt=${input.promptVersion} schema=${input.schemaVersion} ` +
-            `strategy=${input.schemaReferenceStrategy ?? "inline"} input=${usage.promptTokens} ` +
+            `strategy=${input.schemaReferenceStrategy ?? "inline"} ` +
+            `resolvedStrategy=${structuredTextFormatResolution.resolvedReferenceStrategy} ` +
+            `schemaBytes=${structuredTextFormatResolution.schemaBytes} ` +
+            `input=${usage.promptTokens} ` +
             `cached=${cachedTokens} uncached=${uncachedTokens} ` +
             `hitRatio=${hitRatio.toFixed(4)}`,
         );

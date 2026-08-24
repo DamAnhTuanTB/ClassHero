@@ -5,6 +5,7 @@ import {
   QuestionType,
   ReviewStatus,
 } from "@prisma/client";
+import { isSupportedNumericAnswer } from "@learning-path/shared";
 import { badRequestException } from "#api/common/errors/api-exception";
 import { getTiptapText } from "#api/common/validation/rich-text-content";
 import {
@@ -157,6 +158,17 @@ export function validateQuestionContent(dto: TestQuestionContentDto) {
         "TEST_QUESTION_INVALID_GRADING_CONFIG",
         "Cấu hình chấm câu trả lời chưa hợp lệ",
         gradingConfig.error.flatten(),
+      );
+    }
+    if (
+      gradingConfig.data.numericComparison &&
+      correctAnswer.data.some(
+        (answer) => typeof answer !== "string" || !isSupportedNumericAnswer(answer),
+      )
+    ) {
+      throw badRequestException(
+        "TEST_QUESTION_INVALID_NUMERIC_ANSWERS",
+        "Đáp án dùng chế độ chấm số phải là giá trị số hợp lệ",
       );
     }
   }

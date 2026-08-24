@@ -12,23 +12,18 @@ import { TextField } from "@/components/common/forms/text-field";
 import { TextareaField } from "@/components/common/forms/textarea-field";
 import { AdminDocumentMultiSelectField } from "@/features/admin/ai-generation/components/admin-document-multi-select-field";
 import { AdminSummaryPromptPreview } from "@/features/admin/ai-generation/components/admin-summary-prompt-preview";
-import {
-  usePreviewAdminLessonSummaryPrompt,
-  usePreviewAdminQuizPrompt,
-} from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
+import { usePreviewAdminLessonSummaryPrompt } from "@/features/admin/ai-generation/hooks/use-admin-ai-generation";
 import {
   adminAiGenerationFormSchema,
   type AdminAiGenerationFormValues,
 } from "@/features/admin/ai-generation/schemas/admin-ai-generation-schemas";
 import type {
   AdminAiGenerationPayload,
-  AdminAiGenerationType,
   AdminAiConfigurationCapability,
   AdminAiModelConfiguration,
   AdminAiPanelDocument,
   AdminAiQuestionType,
   AdminSummaryGenerationPayload,
-  AdminQuizGenerationPayload,
   AdminSummaryLength,
   AdminSummaryStyle,
   AdminLessonSummaryPromptPreview,
@@ -63,6 +58,8 @@ const questionTypeOptions = [
   { value: "TEXT_INPUT", label: "Nhập đáp án" },
 ] as const;
 
+type AiGenerationConfigType = "SUMMARY" | "FLASHCARD" | "TEST";
+
 export function AiGenerationConfigDialog({
   documents,
   isOpen,
@@ -70,7 +67,6 @@ export function AiGenerationConfigDialog({
   lessonId,
   initialGenerationConfiguration,
   initialModelConfiguration,
-  quizTargetSetId,
   targetGrade,
   type,
   onClose,
@@ -82,18 +78,16 @@ export function AiGenerationConfigDialog({
   lessonId: string;
   initialGenerationConfiguration?: Record<string, unknown> | null;
   initialModelConfiguration?: AdminAiModelConfiguration;
-  quizTargetSetId?: string;
   targetGrade: number | null;
-  type: AdminAiGenerationType;
+  type: AiGenerationConfigType;
   onClose: () => void;
   onSubmit: (payload: AdminAiGenerationPayload) => Promise<void>;
 }) {
   const summaryPreviewMutation = usePreviewAdminLessonSummaryPrompt(lessonId);
-  const quizPreviewMutation = usePreviewAdminQuizPrompt(lessonId);
-  const previewMutation = type === "QUIZ" ? quizPreviewMutation : summaryPreviewMutation;
+  const previewMutation = summaryPreviewMutation;
   const resetPreview = previewMutation.reset;
   const previewPrompt = previewMutation.mutateAsync as (
-    payload: AdminSummaryGenerationPayload | AdminQuizGenerationPayload,
+    payload: AdminSummaryGenerationPayload,
   ) => Promise<AdminLessonSummaryPromptPreview>;
   const [summaryPreviewTab, setSummaryPreviewTab] = useState<"system" | "user" | "input">(
     "system",
@@ -153,7 +147,7 @@ export function AiGenerationConfigDialog({
     setPreviewErrorMessage(null);
     setSummaryPreviewTab("system");
     setSummaryPreviewData(null);
-    if ((type === "SUMMARY" || type === "QUIZ") && values.documentIds.length > 0) {
+    if (type === "SUMMARY" && values.documentIds.length > 0) {
       previewRequestInFlightRef.current = true;
       setIsPreviewRequestPending(true);
       void previewPrompt(
@@ -162,7 +156,6 @@ export function AiGenerationConfigDialog({
             initialModelConfiguration,
             values.summaryModel,
           ),
-          quizTargetSetId,
         }),
       )
         .then((data) => {
@@ -230,7 +223,6 @@ export function AiGenerationConfigDialog({
     isOpen,
     initialModelConfiguration,
     previewPrompt,
-    quizTargetSetId,
     resetPreview,
     targetGrade,
     type,
@@ -238,7 +230,6 @@ export function AiGenerationConfigDialog({
 
   const title = {
     SUMMARY: "Tạo Kiến thức bằng AI",
-    QUIZ: "Tạo Quiz bằng AI",
     FLASHCARD: "Tạo Flashcard bằng AI",
     TEST: "Tạo bài Test bằng AI",
   }[type];
@@ -247,9 +238,6 @@ export function AiGenerationConfigDialog({
   const easyRatioField = form.register("easyRatio");
   const mediumRatioField = form.register("mediumRatio");
   const hardRatioField = form.register("hardRatio");
-  const easyCountField = form.register("easyCount");
-  const mediumCountField = form.register("mediumCount");
-  const hardCountField = form.register("hardCount");
   const targetWordCountField = form.register("summaryTargetWordCount");
   const temperatureField = form.register("summaryTemperature");
   const maxOutputTokensField = form.register("summaryMaxOutputTokens");
@@ -324,22 +312,8 @@ export function AiGenerationConfigDialog({
         "summaryReasoningEffort",
         "summaryMaxOutputTokens",
       ];
-      if (type === "QUIZ") {
-        previewFields.push(
-          "count",
-          "difficulty",
-          "easyCount",
-          "mediumCount",
-          "hardCount",
-          "questionTypes",
-        );
-      }
       const isValid = await form.trigger(previewFields);
-      if (
-        !isValid ||
-        (form.getValues("type") !== "SUMMARY" && form.getValues("type") !== "QUIZ")
-      )
-        return;
+      if (!isValid || form.getValues("type") !== "SUMMARY") return;
       const previewValues = form.getValues();
       const promptPreviewValues = preparePromptPreviewValues(previewValues, {
         preserveSystemPrompt: hasAdminEditedSystemPromptRef.current,
@@ -348,7 +322,6 @@ export function AiGenerationConfigDialog({
       const preview = await previewPrompt(
         toPromptPreviewPayload(promptPreviewValues, {
           aiConfigurationCapability,
-          quizTargetSetId,
         }),
       );
       if (requestSequence !== previewRequestSequenceRef.current) return;
@@ -391,7 +364,7 @@ export function AiGenerationConfigDialog({
 
   function validateModelSelection() {
     if (
-      (type === "SUMMARY" || type === "QUIZ") &&
+      type === "SUMMARY" &&
       !form.getValues("summaryModel") &&
       !modelConfiguration?.isDefaultConfigured
     ) {
@@ -410,7 +383,7 @@ export function AiGenerationConfigDialog({
       ariaLabel={title}
       isOpen={isOpen}
       onClose={() => !isDialogBusy && onClose()}
-      panelClassName={type === "SUMMARY" || type === "QUIZ" ? "max-w-3xl" : "max-w-xl"}
+      panelClassName={type === "SUMMARY" ? "max-w-3xl" : "max-w-xl"}
     >
       <form
         className="flex min-h-0 flex-1 flex-col"
@@ -423,7 +396,7 @@ export function AiGenerationConfigDialog({
             return;
           }
           if (
-            (type === "SUMMARY" || type === "QUIZ") &&
+            type === "SUMMARY" &&
             !values.summaryModel &&
             !modelConfiguration?.isDefaultConfigured
           ) {
@@ -431,7 +404,7 @@ export function AiGenerationConfigDialog({
             return;
           }
           if (
-            (type === "SUMMARY" || type === "QUIZ") &&
+            type === "SUMMARY" &&
             values.summaryModel &&
             showTemperature &&
             !values.summaryTemperature
@@ -446,10 +419,10 @@ export function AiGenerationConfigDialog({
             let submissionValues = values;
             let currentPreviewForSubmission: AdminLessonSummaryPromptPreview | null =
               null;
-            if (type === "SUMMARY" || type === "QUIZ") {
+            if (type === "SUMMARY") {
               setIsPreparingSubmission(true);
               setPreviewErrorMessage(null);
-              const promptsAreVerbatim = type === "SUMMARY";
+              const promptsAreVerbatim = true;
               const hasCustomSystemInstructions = hasAdminEditedSystemPromptRef.current;
               const hasCustomUserPrompt = hasAdminEditedUserPromptRef.current;
               const promptPreviewValues = preparePromptPreviewValues(values, {
@@ -462,7 +435,6 @@ export function AiGenerationConfigDialog({
                 currentPreview = await previewPrompt(
                   toPromptPreviewPayload(promptPreviewValues, {
                     aiConfigurationCapability,
-                    quizTargetSetId,
                   }),
                 );
               } catch (error) {
@@ -503,7 +475,6 @@ export function AiGenerationConfigDialog({
             }
             const payload = toPayload(submissionValues, {
               aiConfigurationCapability,
-              quizTargetSetId,
             });
             await onSubmit(
               payload.type === "SUMMARY" && currentPreviewForSubmission
@@ -530,7 +501,7 @@ export function AiGenerationConfigDialog({
           ref={scrollViewportRef}
           className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5"
         >
-          {type === "SUMMARY" || type === "QUIZ" ? (
+          {type === "SUMMARY" ? (
             <>
               <AdminDocumentMultiSelectField
                 documents={documents}
@@ -597,131 +568,6 @@ export function AiGenerationConfigDialog({
                     </div>
                   ) : null}
                 </div>
-              ) : null}
-
-              {type === "QUIZ" ? (
-                <>
-                  <div className="rounded-xl border border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] p-3 text-sm font-semibold text-[var(--theme-info-text)]">
-                    Các câu AI sẽ được thêm vào “
-                    {summaryPreviewData?.configuration.targetQuizSet?.title ??
-                      "Bộ câu hỏi 1"}
-                    ” và hiển thị trong danh sách câu hỏi bên dưới, không tạo tab mới.
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <TextField
-                      id="ai-generation-count"
-                      label="Số câu hỏi"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      icon={null}
-                      error={form.formState.errors.count}
-                      {...countField}
-                      onChange={numericChange(countField.onChange)}
-                    />
-                    <OptionField
-                      id="ai-generation-difficulty"
-                      label="Mức độ"
-                      value={form.watch("difficulty")}
-                      options={difficultyOptions}
-                      icon={null}
-                      error={form.formState.errors.difficulty}
-                      onChange={(value) =>
-                        form.setValue(
-                          "difficulty",
-                          value as AdminAiGenerationFormValues["difficulty"],
-                          {
-                            shouldDirty: true,
-                            shouldTouch: true,
-                            shouldValidate: true,
-                          },
-                        )
-                      }
-                    />
-                  </div>
-                  <div
-                    className="flex flex-wrap gap-2"
-                    aria-label="Chọn nhanh số câu Quiz"
-                  >
-                    {[1, 5, 10].map((questionCount) => (
-                      <button
-                        key={questionCount}
-                        type="button"
-                        onClick={() => {
-                          const counts = getBalancedDifficultyCounts(questionCount);
-                          form.setValue("count", String(questionCount), {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          });
-                          form.setValue("easyCount", String(counts.easy), {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          });
-                          form.setValue("mediumCount", String(counts.medium), {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          });
-                          form.setValue("hardCount", String(counts.hard), {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          });
-                        }}
-                        className={cn(
-                          "min-h-9 rounded-lg border px-3 text-xs font-extrabold transition",
-                          form.watch("count") === String(questionCount)
-                            ? "border-[var(--theme-primary)] bg-[var(--theme-primary-subtle)] text-[var(--theme-primary)]"
-                            : "border-[var(--theme-border)] bg-[var(--theme-surface)] text-[var(--theme-text-muted)] hover:bg-[var(--theme-surface-soft)]",
-                        )}
-                      >
-                        {questionCount} câu
-                      </button>
-                    ))}
-                  </div>
-                  {form.watch("difficulty") === "MIXED" ? (
-                    <fieldset className="space-y-3">
-                      <legend className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                        Số câu theo độ khó
-                      </legend>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <TextField
-                          id="ai-quiz-easy-count"
-                          label="Dễ"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          icon={null}
-                          error={form.formState.errors.easyCount}
-                          {...easyCountField}
-                          onChange={numericChange(easyCountField.onChange, () =>
-                            form.trigger(["easyCount", "mediumCount", "hardCount"]),
-                          )}
-                        />
-                        <TextField
-                          id="ai-quiz-medium-count"
-                          label="Trung bình"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          icon={null}
-                          error={form.formState.errors.mediumCount}
-                          {...mediumCountField}
-                          onChange={numericChange(mediumCountField.onChange, () =>
-                            form.trigger(["easyCount", "mediumCount", "hardCount"]),
-                          )}
-                        />
-                        <TextField
-                          id="ai-quiz-hard-count"
-                          label="Khó"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          icon={null}
-                          error={form.formState.errors.hardCount}
-                          {...hardCountField}
-                          onChange={numericChange(hardCountField.onChange, () =>
-                            form.trigger(["easyCount", "mediumCount", "hardCount"]),
-                          )}
-                        />
-                      </div>
-                    </fieldset>
-                  ) : null}
-                </>
               ) : null}
 
               <fieldset className="space-y-2">
@@ -964,8 +810,9 @@ export function AiGenerationConfigDialog({
               ) : null}
               {summaryPreviewData ? (
                 <div
+                  data-testid="ai-prompt-preview-shell"
                   className={cn(
-                    "relative transition-opacity duration-200",
+                    "relative overflow-hidden transition-opacity duration-200",
                     isPreviewRequestPending && "opacity-50",
                   )}
                 >
@@ -1038,7 +885,7 @@ export function AiGenerationConfigDialog({
             </>
           )}
 
-          {type === "QUIZ" || type === "TEST" ? (
+          {type === "TEST" ? (
             <fieldset className="space-y-2">
               <legend className="text-sm font-extrabold text-[var(--theme-text-strong)]">
                 Loại câu hỏi
@@ -1155,7 +1002,7 @@ export function AiGenerationConfigDialog({
 }
 
 function getDefaultValues(
-  type: AdminAiGenerationType,
+  type: AiGenerationConfigType,
   documents: AdminAiPanelDocument[],
   targetGrade: number | null,
 ): AdminAiGenerationFormValues {
@@ -1195,7 +1042,7 @@ function getDefaultValues(
 }
 
 function getInitialValues(
-  type: AdminAiGenerationType,
+  type: AiGenerationConfigType,
   documents: AdminAiPanelDocument[],
   targetGrade: number | null,
   initialConfiguration?: Record<string, unknown> | null,
@@ -1293,7 +1140,6 @@ function toPayload(
   values: AdminAiGenerationFormValues,
   options?: {
     aiConfigurationCapability?: AdminAiConfigurationCapability;
-    quizTargetSetId?: string;
   },
 ): AdminAiGenerationPayload {
   if (values.type === "SUMMARY") {
@@ -1307,12 +1153,6 @@ function toPayload(
       cardCount: Number(values.count),
       difficulty: values.difficulty,
     };
-  }
-  if (values.type === "QUIZ") {
-    return toQuizPayload(values, {
-      aiConfigurationCapability: options?.aiConfigurationCapability,
-      quizTargetSetId: options?.quizTargetSetId,
-    });
   }
   return {
     type: values.type,
@@ -1331,12 +1171,9 @@ function toPromptPreviewPayload(
   values: AdminAiGenerationFormValues,
   options: {
     aiConfigurationCapability?: AdminAiConfigurationCapability;
-    quizTargetSetId?: string;
   } = {},
 ) {
-  return values.type === "QUIZ"
-    ? toQuizPayload(values, options)
-    : toSummaryPayload(values, options);
+  return toSummaryPayload(values, options);
 }
 
 function preparePromptPreviewValues(
@@ -1350,55 +1187,6 @@ function preparePromptPreviewValues(
     ...values,
     systemInstructions: options.preserveSystemPrompt ? values.systemInstructions : "",
     userPrompt: options.preserveUserPrompt ? values.userPrompt : "",
-  };
-}
-
-function toQuizPayload(
-  values: AdminAiGenerationFormValues,
-  options: {
-    aiConfigurationCapability?: AdminAiConfigurationCapability;
-    quizTargetSetId?: string;
-  } = {},
-): AdminQuizGenerationPayload {
-  const extraInstructions = values.extraInstructions.trim();
-  const styleInstructions = values.styleInstructions.trim();
-  const systemInstructions = values.systemInstructions.trim();
-  const userPrompt = values.userPrompt.trim();
-  return {
-    type: "QUIZ",
-    ...(options.quizTargetSetId ? { targetQuizSetId: options.quizTargetSetId } : {}),
-    documentIds: values.documentIds,
-    questionCount: Number(values.count),
-    difficulty: values.difficulty,
-    ...(values.difficulty === "MIXED"
-      ? {
-          difficultyCounts: {
-            easy: Number(values.easyCount),
-            medium: Number(values.mediumCount),
-            hard: Number(values.hardCount),
-          },
-        }
-      : {}),
-    questionTypes: values.questionTypes,
-    style: values.style,
-    ...(styleInstructions ? { styleInstructions } : {}),
-    ...(extraInstructions ? { extraInstructions } : {}),
-    ...(systemInstructions ? { systemInstructions } : {}),
-    ...(userPrompt ? { userPrompt } : {}),
-    ...(values.summaryModel ? { model: values.summaryModel } : {}),
-    ...(values.summaryModel &&
-    values.summaryTemperature &&
-    supportsTemperature(values.summaryModel, options.aiConfigurationCapability)
-      ? { temperature: Number(values.summaryTemperature) }
-      : {}),
-    ...(values.summaryModel &&
-    values.summaryReasoningEffort &&
-    supportsReasoningEffort(values.summaryModel, options.aiConfigurationCapability)
-      ? { reasoningEffort: values.summaryReasoningEffort }
-      : {}),
-    ...(values.summaryMaxOutputTokens
-      ? { maxOutputTokens: Number(values.summaryMaxOutputTokens) }
-      : {}),
   };
 }
 
@@ -1484,16 +1272,6 @@ function getPresentationPreset(style: string, targetGrade: number | null) {
   return targetGrade
     ? "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi."
     : "Dễ hiểu, gần gũi và phù hợp với người học của khóa học.";
-}
-
-function getBalancedDifficultyCounts(questionCount: number) {
-  const medium = Math.ceil(questionCount / 3);
-  const easy = Math.ceil((questionCount - medium) / 2);
-  return {
-    easy,
-    medium,
-    hard: questionCount - easy - medium,
-  };
 }
 
 function updateQuestionTypes(

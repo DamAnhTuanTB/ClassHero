@@ -1,4 +1,3 @@
-import { AI_REASONING_EFFORT_LEVELS } from "@learning-path/shared";
 import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
@@ -37,26 +36,12 @@ const nonMathAssessmentExampleSchema = z
   .object(assessmentExampleBaseShape)
   .strict();
 
-const commonQuizQuestionFields = {
-  difficulty: difficultySchema,
-  hint: text(1_000),
-  example: mathAssessmentExampleSchema.describe(
-    "Nội dung chữ của một câu Quiz: đề, lời giải, đáp án và GT–KL nếu phù hợp. Không sinh hình trong pipeline Quiz.",
-  ),
-};
-
 const commonTestQuestionFields = {
   difficulty: difficultySchema,
   example: mathAssessmentExampleSchema.describe(
     "Nội dung chữ của một câu Test. Không sinh hình trong pipeline Test.",
   ),
   sourceChunkIds: sourceChunkIdsSchema,
-};
-const nonMathQuizQuestionFields = {
-  ...commonQuizQuestionFields,
-  example: nonMathAssessmentExampleSchema.describe(
-    "Nội dung chữ của một câu Quiz: đề, lời giải và đáp án theo đúng schema của môn hiện tại.",
-  ),
 };
 const nonMathTestQuestionFields = {
   ...commonTestQuestionFields,
@@ -109,21 +94,10 @@ function buildQuestionUnion<T extends z.ZodRawShape>(commonFields: T) {
   ]);
 }
 
-export const generatedQuizQuestionSchema = buildQuestionUnion(commonQuizQuestionFields);
 export const generatedTestQuestionSchema = buildQuestionUnion(commonTestQuestionFields);
-const generatedNonMathQuizQuestionSchema = buildQuestionUnion(
-  nonMathQuizQuestionFields,
-);
 const generatedNonMathTestQuestionSchema = buildQuestionUnion(
   nonMathTestQuestionFields,
 );
-
-export const generatedQuizOutputSchema = z
-  .object({
-    title: text(180),
-    questions: z.array(generatedQuizQuestionSchema).min(1).max(50),
-  })
-  .strict();
 
 export const generatedTestOutputSchema = z
   .object({
@@ -132,26 +106,12 @@ export const generatedTestOutputSchema = z
   })
   .strict();
 
-const generatedNonMathQuizOutputSchema = z
-  .object({
-    title: text(180),
-    questions: z.array(generatedNonMathQuizQuestionSchema).min(1).max(50),
-  })
-  .strict();
 const generatedNonMathTestOutputSchema = z
   .object({
     title: text(180),
     questions: z.array(generatedNonMathTestQuestionSchema).min(1).max(50),
   })
   .strict();
-
-export function getGeneratedQuizOutputSchema(
-  subjectKey: z.infer<typeof lessonSummarySubjectKeySchema>,
-) {
-  return subjectKey === "MATH"
-    ? generatedQuizOutputSchema
-    : generatedNonMathQuizOutputSchema;
-}
 
 export function getGeneratedTestOutputSchema(
   subjectKey: z.infer<typeof lessonSummarySubjectKeySchema>,
@@ -162,9 +122,7 @@ export function getGeneratedTestOutputSchema(
 }
 
 export const generatedQuestionSchema = z.union([
-  generatedQuizQuestionSchema,
   generatedTestQuestionSchema,
-  generatedNonMathQuizQuestionSchema,
   generatedNonMathTestQuestionSchema,
 ]);
 
@@ -199,40 +157,6 @@ const sourceSnapshotSchema = z
   })
   .strict();
 
-const difficultyCountsSchema = z
-  .object({
-    easy: z.number().int().min(0).max(50),
-    medium: z.number().int().min(0).max(50),
-    hard: z.number().int().min(0).max(50),
-  })
-  .strict();
-
-export const quizGenerationJobInputSchema = sourceSnapshotSchema
-  .extend({
-    targetQuizSetId: z.uuid().nullable().default(null),
-    questionCount: z.number().int().min(1).max(50),
-    difficulty: z.nativeEnum(Difficulty),
-    difficultyCounts: difficultyCountsSchema.nullable().default(null),
-    questionTypes: z.array(z.nativeEnum(QuestionType)).min(1).max(4),
-    style: z
-      .enum(["student_friendly", "concise", "academic"])
-      .default("student_friendly"),
-    styleInstructions: z.string().trim().max(1_000).default(""),
-    extraInstructions: z.string().trim().max(2_000).default(""),
-    systemInstructions: z.string().trim().max(64_000).default(""),
-    userPrompt: z.string().trim().max(16_000).default(""),
-    model: z.string().trim().max(200).optional(),
-    temperature: z.number().min(0).max(1).optional(),
-    reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),
-    maxOutputTokens: z
-      .number()
-      .int()
-      .min(LESSON_CONTENT_MIN_OUTPUT_TOKENS)
-      .max(32_000)
-      .optional(),
-  })
-  .strict();
-
 export const flashcardGenerationJobInputSchema = sourceSnapshotSchema
   .extend({
     cardCount: z.number().int().min(1).max(60),
@@ -256,10 +180,8 @@ export const testGenerationJobInputSchema = sourceSnapshotSchema
   .strict();
 
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
-export type GeneratedQuizOutput = z.infer<typeof generatedQuizOutputSchema>;
 export type GeneratedFlashcardOutput = z.infer<typeof generatedFlashcardOutputSchema>;
 export type GeneratedTestOutput = z.infer<typeof generatedTestOutputSchema>;
-export type QuizGenerationJobInput = z.infer<typeof quizGenerationJobInputSchema>;
 export type FlashcardGenerationJobInput = z.infer<
   typeof flashcardGenerationJobInputSchema
 >;

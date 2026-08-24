@@ -91,6 +91,7 @@ describe("M6.1 Quiz Schema Validation", () => {
       if (result.success) {
         expect(result.data.caseSensitive).toBe(false);
         expect(result.data.exactMatch).toBe(true);
+        expect(result.data.numericComparison).toBe(false);
       }
     });
   });

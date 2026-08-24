@@ -35,8 +35,10 @@ flowchart LR
 
 1. `AdminStemFigureActionFrame` chỉ hiện icon khi asset là
    `TEXTBOOK_SOURCE`, `SUCCEEDED`, có delivery và không có pending revision.
-2. Modal Canvas lưu các nét tô dạng stroke để undo/redo mà không giữ hàng chục
-   bitmap lớn. Khi gửi API, Canvas mới xuất một PNG mask trong suốt.
+2. Modal lưu các nét tô dạng stroke để undo/redo mà không giữ hàng chục bitmap
+   lớn. Hook tách danh sách stroke tích lũy dùng cho preview/apply khỏi lớp nét
+   đỏ tạm đang vẽ trên Canvas. Sau mỗi preview, lớp đỏ được xóa nhưng danh sách
+   tích lũy vẫn được dựng lại trên Canvas ngoài màn hình để xuất PNG mask đầy đủ.
 3. Web gửi mutation guard, đúng một operation và optional mask tới preview/apply.
    Preview làm nét chạy ngay khi chọn tool; preview xóa chạy sau mỗi stroke với
    debounce ngắn, không gọi API ở từng pixel pointer-move.
@@ -64,6 +66,9 @@ flowchart LR
 
 - Canvas chỉ là lớp mask trong suốt đặt trên ảnh, nên không đọc pixel ảnh R2 và
   không bị phụ thuộc CORS để vẽ.
+- Canvas và con trỏ cọ phải phủ cùng một phần tử ảnh đang hiển thị, kể cả khi
+  modal chuyển từ ảnh gốc sang ảnh preview. Nếu ẩn cả Canvas theo tab ảnh gốc,
+  lượt preview đầu sẽ vô tình khóa mọi nét tô tiếp theo.
 - Pointer Events dùng chung cho chuột, cảm ứng và bút.
 - Zoom `100%` hiển thị tối đa đúng kích thước pixel tự nhiên của crop; không kéo
   ảnh nhỏ phủ đầy modal vì browser interpolation sẽ làm cả trước/sau cùng nhòe.

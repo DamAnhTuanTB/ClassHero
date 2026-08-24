@@ -60,7 +60,8 @@ export class LessonAiGenerationPanelService {
   ) {}
 
   async getForAdmin(lessonId: string) {
-    const [lesson, summaryRoute, activeModels, ...generations] = await Promise.all([
+    const [lesson, summaryRoute, quizRoute, activeModels, ...generations] =
+      await Promise.all([
       this.prisma.lesson.findFirst({
         where: {
           id: lessonId,
@@ -108,6 +109,7 @@ export class LessonAiGenerationPanelService {
         },
       }),
       this.modelRouting.resolve(AiGenerationType.SUMMARY),
+      this.modelRouting.resolve(AiGenerationType.QUIZ),
       this.modelRouting.getAllActiveModels(),
       ...PANEL_GENERATION_TYPES.map((type) =>
         this.prisma.aiGeneration.findFirst({
@@ -116,7 +118,7 @@ export class LessonAiGenerationPanelService {
           select: panelGenerationSelect,
         }),
       ),
-    ]);
+      ]);
 
     if (!lesson) {
       throwLessonNotFound();
@@ -154,6 +156,10 @@ export class LessonAiGenerationPanelService {
         document.status === DocumentStatus.READY &&
         document.chunkCount > 0 &&
         packetUnavailableReason === null;
+      const quizUnavailableReason =
+        getQuizDocumentUnavailableReason(document) ??
+        getQuizPacketDocumentUnavailableReason(document);
+      const canUseForQuiz = quizUnavailableReason === null;
       return {
         id: document.id,
         title: document.title?.trim() || document.file.originalName,
@@ -166,8 +172,10 @@ export class LessonAiGenerationPanelService {
           printedPageNumberBySourcePage,
         ),
         canUseForSummary,
+        canUseForQuiz,
         unavailableReason:
           getSummaryDocumentUnavailableReason(document) ?? packetUnavailableReason,
+        quizUnavailableReason,
         embeddingReady:
           document.embeddingProvider === AiProviderName.OPENAI &&
           document.embeddingModel === embeddingConfig.model &&
@@ -178,6 +186,8 @@ export class LessonAiGenerationPanelService {
     const summaryReady = readyDocuments.length > 0;
     const generationReady =
       summaryReady && readyDocuments.every((document) => document.embeddingReady);
+    const quizDocuments = documents.filter((document) => document.canUseForQuiz);
+    const quizReady = quizDocuments.length > 0;
     const latestByType = new Map<AiGenerationType, PanelGenerationRecord>();
     for (const generation of generations) {
       if (generation) latestByType.set(generation.type, generation);
@@ -189,6 +199,12 @@ export class LessonAiGenerationPanelService {
       summaryCandidates[0] ??
       null;
     const summaryModelOptions = activeModels.filter(supportsHighDetailPdfInput);
+    const quizCandidates = quizRoute.candidates.filter(supportsHighDetailPdfInput);
+    const resolvedQuizCandidate =
+      quizCandidates.find((candidate) => candidate.available) ??
+      quizCandidates[0] ??
+      null;
+    const quizModelOptions = activeModels.filter(supportsHighDetailPdfInput);
 
     return {
       lesson: {
@@ -203,6 +219,7 @@ export class LessonAiGenerationPanelService {
       readiness: {
         summaryReady,
         generationReady,
+        quizReady,
         readyDocumentCount: readyDocuments.length,
         embeddedDocumentCount: readyDocuments.filter(
           (document) => document.embeddingReady,
@@ -211,6 +228,11 @@ export class LessonAiGenerationPanelService {
           activeDocumentCount: lesson.documents.length,
           summaryReady,
           generationReady,
+        }),
+        quizReason: getQuizReadinessReason({
+          activeDocumentCount: lesson.documents.length,
+          quizDocumentCount: quizDocuments.length,
+          quizReady,
         }),
       },
       documents,
@@ -222,6 +244,20 @@ export class LessonAiGenerationPanelService {
         reasoningEffort: summaryRoute.reasoningEffort,
         maxOutputTokens: summaryRoute.maxOutputTokens,
         modelOptions: summaryModelOptions.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
+      quizConfiguration: {
+        isDefaultConfigured: quizRoute.hasConfiguration,
+        resolvedProvider: resolvedQuizCandidate?.provider ?? null,
+        resolvedModel: resolvedQuizCandidate?.model ?? null,
+        temperature: quizRoute.temperature,
+        reasoningEffort: quizRoute.reasoningEffort,
+        maxOutputTokens: quizRoute.maxOutputTokens,
+        modelOptions: quizModelOptions.map((candidate) => ({
           provider: candidate.provider,
           model: candidate.model,
           available: candidate.available,
@@ -289,6 +325,15 @@ function getSummaryDocumentUnavailableReason(document: {
   return null;
 }
 
+function getQuizDocumentUnavailableReason(document: {
+  status: DocumentStatus;
+}) {
+  if (document.status === DocumentStatus.UPLOADED) return "Đang chờ xử lý Quiz";
+  if (document.status === DocumentStatus.PROCESSING) return "Đang xử lý Quiz";
+  if (document.status === DocumentStatus.FAILED) return "Xử lý Quiz thất bại";
+  return null;
+}
+
 function getPacketDocumentUnavailableReason(document: {
   activeOcrArtifactId: string | null;
   sourceDocumentId: string | null;
@@ -309,8 +354,31 @@ function getPacketDocumentUnavailableReason(document: {
   }
   const activeOcrArtifactId =
     document.activeOcrArtifactId ?? document.sourceDocument?.activeOcrArtifactId ?? null;
-  if (!activeOcrArtifactId) return "Chưa có dữ liệu OCR";
+  if (!activeOcrArtifactId) return "PDF chưa được xác nhận là searchable";
 
+  const hasSourceDocument = document.sourceDocumentId !== null;
+  const hasPageRange = document.pageRange !== null;
+  if (hasSourceDocument !== hasPageRange) return "Liên kết khoảng trang chưa hoàn chỉnh";
+  if (hasSourceDocument && document.sourceDocument?.status !== DocumentStatus.READY) {
+    return "Tài liệu nguồn chưa sẵn sàng";
+  }
+  return null;
+}
+
+function getQuizPacketDocumentUnavailableReason(document: {
+  sourceDocumentId: string | null;
+  pageRange: { pageStart: number; pageEnd: number } | null;
+  file: {
+    mimeType: string;
+    checksum: string | null;
+    status: string;
+  };
+  sourceDocument: { status: DocumentStatus } | null;
+}) {
+  if (document.file.mimeType !== "application/pdf") return "Chỉ hỗ trợ file PDF";
+  if (document.file.status === "DELETED" || !document.file.checksum) {
+    return "File PDF không còn khả dụng";
+  }
   const hasSourceDocument = document.sourceDocumentId !== null;
   const hasPageRange = document.pageRange !== null;
   if (hasSourceDocument !== hasPageRange) return "Liên kết khoảng trang chưa hoàn chỉnh";
@@ -386,5 +454,18 @@ function getReadinessReason(input: {
   if (!input.generationReady) {
     return "Đang chờ tạo embedding cho tài liệu.";
   }
+  return null;
+}
+
+function getQuizReadinessReason(input: {
+  activeDocumentCount: number;
+  quizDocumentCount: number;
+  quizReady: boolean;
+}) {
+  if (input.activeDocumentCount === 0) return "Buổi học chưa có tài liệu cho Quiz.";
+  if (input.quizDocumentCount === 0) {
+    return "Tài liệu Quiz chưa có PDF sẵn sàng.";
+  }
+  if (!input.quizReady) return "PDF Quiz chưa sẵn sàng.";
   return null;
 }

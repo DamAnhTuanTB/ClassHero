@@ -21,6 +21,12 @@ import { AiGenerationExecutionService } from "#api/workers/services/ai-generatio
 import { AiGenerationWorkerService } from "#api/workers/services/ai-generation-worker.service";
 import { LessonSummaryGenerationService } from "#api/workers/services/lesson-summary-generation.service";
 import { LessonContentGenerationService } from "#api/workers/services/lesson-content-generation.service";
+import { QuizGenerationContextService } from "#api/modules/quiz/services/quiz-generation-context.service";
+import { QuizSourcePacketService } from "#api/modules/quiz/services/quiz-source-packet.service";
+import { QuizGenerationService } from "#api/workers/services/quiz-generation.service";
+import { QuizFiguresModule } from "#api/modules/quiz-figures/quiz-figures.module";
+import { QuizFigureRenderingProcessor } from "#api/workers/processors/quiz-figure-rendering.processor";
+import { QuizFigureRenderingWorkerService } from "#api/workers/services/quiz-figure-rendering-worker.service";
 import { ProviderOperationsModule } from "#api/modules/provider-operations/provider-operations.module";
 import { StemFiguresModule } from "#api/modules/stem-figures/stem-figures.module";
 import { StemFigureRenderingProcessor } from "#api/workers/processors/stem-figure-rendering.processor";
@@ -38,6 +44,7 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     AiModule,
     FilesModule,
     StemFiguresModule,
+    QuizFiguresModule,
   ],
   providers: [
     DocumentProcessingProcessor,
@@ -57,8 +64,13 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
     AiGenerationWorkerService,
     LessonSummaryGenerationService,
     LessonContentGenerationService,
+    QuizGenerationContextService,
+    QuizSourcePacketService,
+    QuizGenerationService,
     StemFigureRenderingProcessor,
     StemFigureRenderingWorkerService,
+    QuizFigureRenderingProcessor,
+    QuizFigureRenderingWorkerService,
   ],
 })
 export class WorkerModule {}

@@ -35,7 +35,9 @@ test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Tes
   await page.screenshot({
     path: testInfo.outputPath("student-quiz-transition-dark.png"),
   });
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Gợi ý" }).click();
   await expect(page.getByText("Hãy cộng hai số.")).toBeVisible();
   await page.screenshot({
@@ -178,7 +180,9 @@ test("stale Quiz runner history never flashes or reopens over the plain Quiz tab
   await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
 
   await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expect(page).toHaveURL(/learningSurface=quiz-runner/);
 
   await page.evaluate(() => {
@@ -314,7 +318,9 @@ test("completed test offers review and a new test attempt", async ({ page }) => 
   await page.getByRole("button", { name: "Xem lại tất cả" }).click();
   const reviewScreen = page.getByTestId("test-review-screen");
   await expect(reviewScreen.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
-  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await reviewScreen.getByRole("button", { name: "Quay lại kết quả Bài thi" }).click();
 
   const retryTestButton = page.getByRole("button", { name: "Làm lại bài thi mới" });
@@ -523,7 +529,9 @@ test("Quiz and Flashcard history label active sessions with activity-specific co
     .click();
   await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Các bộ Quiz đã làm" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toHaveCount(0);
 
   await page.goto(`/student/lessons/${lessonId}?tab=flashcard`);
@@ -706,7 +714,9 @@ test("quiz review uses history title and boundary exit actions", async ({ page }
 
   const reviewScreen = page.getByTestId("quiz-review-screen");
   await expect(reviewScreen.getByText("Bộ 1", { exact: true })).toBeVisible();
-  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/3" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expect(reviewScreen.getByRole("button", { name: "Trở về" })).toBeVisible();
   await expect(reviewScreen.getByRole("button", { name: "Câu tiếp" })).toBeVisible();
   await expect(reviewScreen.getByRole("button", { name: "Câu trước" })).toHaveCount(0);
@@ -715,10 +725,14 @@ test("quiz review uses history title and boundary exit actions", async ({ page }
 
   await reviewButton.click();
   await reviewScreen.getByRole("button", { name: "Câu tiếp" }).click();
-  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("heading", { name: "Câu hỏi 2", exact: true }),
+  ).toBeVisible();
   await expect(reviewScreen.getByRole("button", { name: "Câu trước" })).toBeVisible();
   await reviewScreen.getByRole("button", { name: "Câu tiếp" }).click();
-  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("heading", { name: "Câu hỏi 3", exact: true }),
+  ).toBeVisible();
   await expect(
     reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }),
   ).toBeVisible();
@@ -1046,12 +1060,101 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await expect(page.getByTestId("assessment-result-confetti")).toHaveCount(0);
   await page.getByRole("button", { name: "Xem lại tất cả" }).click();
   await expect(page.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Kết thúc xem lại" }).click();
   await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
   await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
   await page.getByRole("button", { name: "Làm bộ Quiz mới" }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("Quiz skip locks the question, reveals the answer and persists after reload", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, { testReady: false, testPasses: false });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+
+  const skipProgressRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "PATCH" &&
+      request.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
+      isSkippedQuizAnswer(request.postDataJSON()?.answer?.answerJson),
+  );
+  await page.getByRole("button", { name: "Bỏ qua" }).click();
+  await skipProgressRequest;
+
+  await expect(page.getByText("Đã bỏ qua", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cộng hai với hai được bốn.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /A.*3/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /B.*4/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Bỏ qua", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Đã làm 0", { exact: true })).toBeVisible();
+
+  await page.reload();
+
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Đã bỏ qua", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cộng hai với hai được bốn.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /A.*3/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /B.*4/ })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Hoàn thành Quiz" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
+  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Xem lại câu sai" })).toBeEnabled();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("skipped text Quiz keeps a neutral input border and a bright amber status", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+    quizQuestionType: "TEXT_INPUT",
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+  await page.getByRole("button", { name: "Bỏ qua", exact: true }).click();
+
+  const answerInput = page.getByPlaceholder("Nhập đáp án");
+  const skippedStatus = page.getByText("Đã bỏ qua", { exact: true });
+  await expect(answerInput).toBeDisabled();
+  await expect(answerInput).toHaveClass(/border-slate-200/);
+  await expect(answerInput).not.toHaveClass(/border-rose-/);
+  await expect(skippedStatus).toHaveClass(/text-amber-600/);
+  await expect(page.getByText("Cộng hai với hai được bốn.")).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("skipped multi-statement Quiz keeps statement cards neutral", async ({ page }) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+    quizQuestionType: "MULTI_STATEMENT_TRUE_FALSE",
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+  await page.getByRole("button", { name: "Bỏ qua", exact: true }).click();
+
+  const statementCards = page.locator("div.student-mobile-border.rounded-2xl.border.p-3");
+  await expect(statementCards).toHaveCount(2);
+  for (const statementCard of await statementCards.all()) {
+    await expect(statementCard).toHaveClass(/border-slate-200/);
+    await expect(statementCard).toHaveClass(/bg-white/);
+    await expect(statementCard).not.toHaveClass(/bg-amber-/);
+  }
+  await expect(page.getByText("Đã bỏ qua", { exact: true })).toHaveClass(
+    /text-amber-600/,
+  );
   await expectNoFrameworkOverlay(page);
 });
 
@@ -1496,14 +1599,11 @@ async function expectLessonDocumentToScroll(page: Page) {
       page.evaluate(() => ({
         bodyOverflow: document.body.style.overflow,
         hasHiddenFlashcardRunner: Boolean(
-          document.querySelector(
-            '[hidden] [data-testid="flashcard-runner-screen"]',
-          ),
+          document.querySelector('[hidden] [data-testid="flashcard-runner-screen"]'),
         ),
         htmlOverflow: document.documentElement.style.overflow,
         isScrollable:
-          document.documentElement.scrollHeight >
-          document.documentElement.clientHeight,
+          document.documentElement.scrollHeight > document.documentElement.clientHeight,
       })),
     )
     .toEqual({
@@ -1677,11 +1777,15 @@ test("quiz status dots navigate directly to the selected question", async ({ pag
   await expect(firstQuestionDot).toHaveAttribute("aria-current", "step");
 
   await thirdQuestionDot.click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 3", exact: true }),
+  ).toBeVisible();
   await expect(thirdQuestionDot).toHaveAttribute("aria-current", "step");
 
   await firstQuestionDot.click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expect(firstQuestionDot).toHaveAttribute("aria-current", "step");
   await expectNoFrameworkOverlay(page);
 });
@@ -1697,7 +1801,9 @@ test("quiz continues at the last question with its unchecked answer after back",
   await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
   await page.getByRole("button", { name: "Bắt đầu" }).click();
   await page.getByRole("button", { name: "Câu 3: chưa làm" }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 3", exact: true }),
+  ).toBeVisible();
   const autosave = page.waitForResponse(
     (response) =>
       response.url().endsWith("/student/quiz-attempts/quiz-attempt-m7/progress") &&
@@ -1724,7 +1830,9 @@ test("quiz continues at the last question with its unchecked answer after back",
   await expect(continueButton).toBeVisible();
   await continueButton.click();
 
-  await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 3", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: /A.*3/ })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -1798,7 +1906,9 @@ test("unfinished quiz asks for confirmation before leaving the runner", async ({
 
   await exitDialog.getByRole("button", { name: "Ở lại" }).click();
   await expect(exitDialog).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
 
   const checkedOption = page.getByRole("button", { name: /B.*4/ });
   await checkedOption.click();
@@ -1828,7 +1938,9 @@ test("browser back returns from the quiz runner to the lesson detail", async ({
   });
   await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
   await page.getByRole("button", { name: "Bắt đầu" }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
 
   await page.goBack();
 
@@ -1838,7 +1950,9 @@ test("browser back returns from the quiz runner to the lesson detail", async ({
 
   await exitDialog.getByRole("button", { name: "Ở lại" }).click();
   await expect(exitDialog).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
 
   await page.goBack();
   await expect(exitDialog).toBeVisible();
@@ -1871,10 +1985,14 @@ test("reload keeps the quiz overview closed while an unfinished attempt remains"
   await page.reload();
 
   await expect(enterQuizButton).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Câu hỏi 1", exact: true })).toHaveCount(
+    0,
+  );
 
   await enterQuizButton.click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -1897,7 +2015,7 @@ test("answer autosave and checking keep the active Quiz runner mounted", async (
   await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
   await page.getByRole("button", { name: "Bắt đầu" }).click();
 
-  const runner = page.getByRole("heading", { name: "Câu hỏi 1/1" });
+  const runner = page.getByRole("heading", { name: "Câu hỏi 1", exact: true });
   const resumeLoadingScreen = page.getByLabel("Đang mở lại lượt Quiz");
   await expect(runner).toBeVisible();
   await expect
@@ -1942,7 +2060,9 @@ test("reload restores unchecked answers and checked quiz results from the API", 
   await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
   await page.getByRole("button", { name: "Bắt đầu" }).click();
   await page.getByRole("button", { name: "Câu tiếp" }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 2", exact: true }),
+  ).toBeVisible();
 
   const firstOption = page.getByRole("button", { name: /A.*3/ });
   const secondOption = page.getByRole("button", { name: /B.*4/ });
@@ -1993,7 +2113,9 @@ test("reload restores unchecked answers and checked quiz results from the API", 
   });
   await page.reload();
 
-  await expect(page.getByRole("heading", { name: "Câu hỏi 2/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 2", exact: true }),
+  ).toBeVisible();
   await expect(firstOption).toHaveAttribute("aria-pressed", "true");
   await expect(secondOption).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Kiểm tra đáp án" })).toBeVisible();
@@ -2051,7 +2173,9 @@ test("reload restores an unchecked text answer from the API", async ({ page }) =
   await page.getByRole("button", { name: "Bắt đầu" }).click();
   await page.getByRole("button", { name: "Câu tiếp" }).click();
   await page.getByRole("button", { name: "Câu tiếp" }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 3", exact: true }),
+  ).toBeVisible();
 
   const answerInput = page.getByPlaceholder("Nhập đáp án");
   const autosave = page.waitForResponse(
@@ -2066,13 +2190,13 @@ test("reload restores an unchecked text answer from the API", async ({ page }) =
 
   await page.reload();
 
-  await expect(page.getByRole("heading", { name: "Câu hỏi 3/3" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 3", exact: true }),
+  ).toBeVisible();
   await expect(page.getByPlaceholder("Nhập đáp án")).toHaveValue("-2.5");
 });
 
-test("multi-statement math matches the emphasized statement typography", async ({
-  page,
-}) => {
+test("multi-statement math keeps native KaTeX fraction typography", async ({ page }) => {
   await setupStudentLearningApiMock(page, {
     testReady: false,
     testPasses: false,
@@ -2109,15 +2233,19 @@ test("multi-statement math matches the emphasized statement typography", async (
     };
   });
 
-  expect(mathTypography).toEqual(textTypography);
-  expect(
-    await fractionLine.evaluate((element) =>
-      Number.parseFloat(getComputedStyle(element).borderBottomWidth),
-    ),
-  ).toBeGreaterThanOrEqual(2);
+  expect(mathTypography.color).toBe(textTypography.color);
+  expect(mathTypography.fontFamily).toContain("KaTeX");
+  expect(mathTypography.fontFamily).not.toBe(textTypography.fontFamily);
+  expect(mathTypography.fontWeight).toBe("400");
+
+  const fractionLineWidth = await fractionLine.evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).borderBottomWidth),
+  );
+  expect(fractionLineWidth).toBeGreaterThan(0);
+  expect(fractionLineWidth).toBeLessThan(2);
 });
 
-test("all supported question math inherits the surrounding typography", async ({
+test("all supported question math preserves native KaTeX glyph styles", async ({
   page,
 }) => {
   await setupStudentLearningApiMock(page, {
@@ -2150,6 +2278,11 @@ test("all supported question math inherits the surrounding typography", async ({
       fontWeight: style.fontWeight,
     };
   });
+  const mathOpticalScale = await questionContent.evaluate((element) =>
+    Number.parseFloat(
+      getComputedStyle(element).getPropertyValue("--learning-content-math-optical-size"),
+    ),
+  );
   const mathTypography = await mathExpressions.evaluateAll((elements) =>
     elements.map((element) => {
       const style = getComputedStyle(element);
@@ -2182,19 +2315,32 @@ test("all supported question math inherits the surrounding typography", async ({
     }),
   );
 
-  expect(mathTypography).toEqual(Array.from({ length: 9 }, () => textTypography));
-  expect(fractionTypography).toEqual(textTypography);
+  for (const typography of mathTypography) {
+    expect(typography.color).toBe(textTypography.color);
+    expect(typography.fontFamily).toContain("KaTeX");
+    expect(Number.parseFloat(typography.fontSize)).toBeCloseTo(
+      Number.parseFloat(textTypography.fontSize) * mathOpticalScale,
+      1,
+    );
+    expect(typography.fontWeight).toBe("400");
+  }
+
+  expect(fractionTypography.color).toBe(textTypography.color);
+  expect(fractionTypography.fontFamily).toContain("KaTeX");
+  expect(fractionTypography.fontWeight).toBe("400");
+  expect(Number.parseFloat(fractionTypography.fontSize)).toBeLessThan(
+    Number.parseFloat(mathTypography[0]?.fontSize ?? "0"),
+  );
+
   for (const typography of mathTextTypography) {
-    expect(typography).toEqual({
-      color: textTypography.color,
-      fontFamily: textTypography.fontFamily,
-      fontStyle: "normal",
-      fontWeight: textTypography.fontWeight,
-    });
+    expect(typography.color).toBe(textTypography.color);
+    expect(typography.fontFamily).toContain("KaTeX");
+    expect(["italic", "normal"]).toContain(typography.fontStyle);
+    expect(typography.fontWeight).toBe("400");
   }
 });
 
-test("math fraction stays vertically centered without input scrollbars", async ({
+test("math fraction placeholder caret stays optically centered without input scrollbars", async ({
   page,
 }) => {
   const mathliveWarnings: string[] = [];
@@ -2221,6 +2367,15 @@ test("math fraction stays vertically centered without input scrollbars", async (
   const nativePlaceholderColor = await nativeAnswerInput.evaluate(
     (element) => getComputedStyle(element, "::placeholder").color,
   );
+  const nativePlaceholderLeft = await nativeAnswerInput.evaluate((element) => {
+    const field = element as HTMLElement;
+    const style = getComputedStyle(field);
+    return (
+      field.getBoundingClientRect().left +
+      Number.parseFloat(style.borderLeftWidth) +
+      Number.parseFloat(style.paddingLeft)
+    );
+  });
   await page.evaluate(() => {
     const samples: Array<{
       borderStyle: string;
@@ -2285,6 +2440,52 @@ test("math fraction stays vertically centered without input scrollbars", async (
   }
   const formulaPlaceholder = page.getByText("Nhập đáp án", { exact: true });
   await expect(formulaPlaceholder).toHaveCount(1);
+  const readEmptyMathFieldCaret = () =>
+    mathField.evaluate((element) => {
+      const caret = element.shadowRoot?.querySelector<HTMLElement>(".ML__caret");
+      const caretAfterStyle = caret ? getComputedStyle(caret, "::after") : null;
+
+      return caretAfterStyle
+        ? {
+            left: caretAfterStyle.left,
+            visibility: caretAfterStyle.visibility,
+          }
+        : null;
+    });
+  const focusedEmptyMathFieldCaret = await readEmptyMathFieldCaret();
+  expect(focusedEmptyMathFieldCaret).toMatchObject({
+    left: "0px",
+    visibility: "visible",
+  });
+  const focusedFormulaPlaceholderBox = await formulaPlaceholder.boundingBox();
+  expect(focusedFormulaPlaceholderBox).not.toBeNull();
+  expect(
+    Math.abs(
+      (focusedFormulaPlaceholderBox?.x ?? Number.POSITIVE_INFINITY) -
+        nativePlaceholderLeft,
+    ),
+  ).toBeLessThanOrEqual(0.5);
+  await page.getByRole("heading", { name: "Nhập câu trả lời" }).click();
+  await expect
+    .poll(() => mathField.evaluate((element) => document.activeElement === element))
+    .toBe(false);
+  await mathField.click();
+  await expect
+    .poll(() => mathField.evaluate((element) => document.activeElement === element))
+    .toBe(true);
+  const refocusedFormulaPlaceholderBox = await formulaPlaceholder.boundingBox();
+  const refocusedEmptyMathFieldCaret = await readEmptyMathFieldCaret();
+  expect(refocusedEmptyMathFieldCaret).toMatchObject({
+    left: "0px",
+    visibility: "visible",
+  });
+  expect(refocusedFormulaPlaceholderBox).not.toBeNull();
+  expect(
+    Math.abs(
+      (refocusedFormulaPlaceholderBox?.x ?? Number.POSITIVE_INFINITY) -
+        (focusedFormulaPlaceholderBox?.x ?? Number.NEGATIVE_INFINITY),
+    ),
+  ).toBeLessThanOrEqual(0.01);
   const formulaPlaceholderColor = await formulaPlaceholder.evaluate(
     (element) => getComputedStyle(element).color,
   );
@@ -2340,6 +2541,9 @@ test("math fraction stays vertically centered without input scrollbars", async (
     )
     .toBe("-2");
   await expect(formulaPlaceholder).toBeHidden();
+  await mathField.evaluate((element) => {
+    (element as HTMLElement & { value: string }).value = "";
+  });
   await page.getByRole("button", { name: "Chèn phân số" }).click();
 
   const readMathFieldMetrics = () =>
@@ -2377,6 +2581,31 @@ test("math fraction stays vertically centered without input scrollbars", async (
         placeholderCaretLeft: selectedPlaceholder
           ? getComputedStyle(selectedPlaceholder, "::after").left
           : null,
+        placeholderCaretOpticalShift: selectedPlaceholder
+          ? getComputedStyle(selectedPlaceholder, "::after")
+              .getPropertyValue("--student-math-placeholder-caret-optical-shift-y")
+              .trim()
+          : null,
+        placeholderCaretSelfCenterDelta: selectedPlaceholder
+          ? (() => {
+              const style = getComputedStyle(selectedPlaceholder, "::after");
+              const translateY =
+                style.transform === "none"
+                  ? 0
+                  : new DOMMatrixReadOnly(style.transform).m42;
+              return Math.abs(translateY + Number.parseFloat(style.height) / 2);
+            })()
+          : null,
+        placeholderCaretHorizontalCenterDelta: selectedPlaceholder
+          ? (() => {
+              const style = getComputedStyle(selectedPlaceholder, "::after");
+              const translateX =
+                style.transform === "none"
+                  ? 0
+                  : new DOMMatrixReadOnly(style.transform).m41;
+              return Math.abs(translateX + Number.parseFloat(style.width) / 2);
+            })()
+          : null,
         activeElementIsField: document.activeElement === field,
         selectedNodeCount:
           field.shadowRoot?.querySelectorAll(".ML__selected").length ?? 0,
@@ -2403,12 +2632,32 @@ test("math fraction stays vertically centered without input scrollbars", async (
   expect(metrics.contentOverflow).toBe("visible");
   expect(metrics.placeholderCaretAnimation).toBe("visual-math-placeholder-caret-blink");
   expect(metrics.placeholderCaretLeft).not.toBe("auto");
+  expect(metrics.placeholderCaretOpticalShift).toBe("-0.083333em");
+  expect(metrics.placeholderCaretSelfCenterDelta).toBeCloseTo(0, 2);
+  expect(metrics.placeholderCaretHorizontalCenterDelta).toBeCloseTo(0, 2);
   expect(metrics.selectedNodeCount).toBeGreaterThan(0);
   expect(metrics.slotBoxCount).toBeGreaterThanOrEqual(2);
   expect(metrics.placeholdersInsideField).toBe(true);
 
   const numeratorBox = await mathField.locator(".ML__cmr.ML__selected").boundingBox();
   expect(numeratorBox).not.toBeNull();
+  await mathField.evaluate((element) => {
+    (
+      element as HTMLElement & {
+        executeCommand: (command: string) => boolean;
+      }
+    ).executeCommand("moveToNextPlaceholder");
+  });
+  await expect
+    .poll(async () => {
+      const selectedBox = await mathField.locator(".ML__cmr.ML__selected").boundingBox();
+      return selectedBox && numeratorBox ? selectedBox.y > numeratorBox.y : false;
+    })
+    .toBe(true);
+  const denominatorMetrics = await readMathFieldMetrics();
+  expect(denominatorMetrics.placeholderCaretOpticalShift).toBe("-0.083333em");
+  expect(denominatorMetrics.placeholderCaretSelfCenterDelta).toBeCloseTo(0, 2);
+  expect(denominatorMetrics.placeholderCaretHorizontalCenterDelta).toBeCloseTo(0, 2);
   if (numeratorBox) {
     await page.mouse.click(
       numeratorBox.x + numeratorBox.width / 2,
@@ -2495,7 +2744,9 @@ test("test remains locked after open time when quiz and flashcard are incomplete
   await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
   await page.getByRole("button", { name: "Làm Quiz" }).click();
   await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -2534,15 +2785,15 @@ test("test prerequisite actions reflect partial Flashcard completion", async ({
   });
   await page.goto(`/student/lessons/${lessonId}?tab=test`);
 
-  await expect(
-    page.getByText("Cần hoàn thành Quiz để mở khóa bài thi."),
-  ).toBeVisible();
+  await expect(page.getByText("Cần hoàn thành Quiz để mở khóa bài thi.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Quiz" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Làm Flashcard" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Bắt đầu bài thi" })).toBeDisabled();
   await page.getByRole("button", { name: "Làm Quiz" }).click();
   await expect(page.getByRole("status", { name: "Đang chuẩn bị Quiz" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -2632,7 +2883,9 @@ test("failed test shows retry warning and cannot use the score", async ({ page }
   await expect(reviewScreen.getByText("Xem lại các câu trả lời sai")).toHaveClass(
     /text-emerald-700/,
   );
-  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expect(
     reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }),
   ).toHaveClass(/bg-emerald-600/);
@@ -2641,7 +2894,9 @@ test("failed test shows retry warning and cannot use the score", async ({ page }
 
   await page.getByRole("button", { name: "Xem lại tất cả" }).click();
   await expect(reviewScreen.getByText("Xem lại tất cả câu trả lời")).toBeVisible();
-  await expect(reviewScreen.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    reviewScreen.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await reviewScreen.getByRole("button", { name: "Kết thúc xem lại" }).click();
   await expect(page.getByRole("heading", { name: "Kết quả Bài thi" })).toBeVisible();
 
@@ -2727,7 +2982,9 @@ test("Quiz keeps the new active set after back and reload", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Kết quả Quiz" })).toBeVisible();
 
   await page.getByRole("button", { name: "Làm bộ Quiz mới" }).click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Quay lại màn Quiz" }).click();
   await page
     .getByRole("dialog", { name: "Thoát bài Quiz?" })
@@ -2749,7 +3006,9 @@ test("Quiz keeps the new active set after back and reload", async ({ page }) => 
   await expect(continueButton).toBeVisible();
   await expect(page.getByRole("button", { name: "Xem lại", exact: true })).toHaveCount(0);
   await continueButton.click();
-  await expect(page.getByRole("heading", { name: "Câu hỏi 1/1" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
   await expectNoFrameworkOverlay(page);
 });
 
@@ -3115,7 +3374,10 @@ async function setupStudentLearningApiMock(
       if (options.quizStatusGate) {
         await options.quizStatusGate;
       }
-      const answeredCount = currentQuizAttempt?.savedAnswers.length ?? 0;
+      const answeredCount =
+        currentQuizAttempt?.savedAnswers.filter(
+          (answer) => !isSkippedQuizAnswer(answer.answerJson),
+        ).length ?? 0;
       const checkedCount = currentQuizAttempt?.checkedAnswers.length ?? 0;
       return fulfillJson(route, 200, {
         data: currentQuizAttempt
@@ -3198,7 +3460,9 @@ async function setupStudentLearningApiMock(
                 state: "IN_PROGRESS",
                 startedAt: new Date().toISOString(),
                 completedAt: null,
-                answeredCount: currentQuizAttempt.savedAnswers.length,
+                answeredCount: currentQuizAttempt.savedAnswers.filter(
+                  (answer) => !isSkippedQuizAnswer(answer.answerJson),
+                ).length,
                 correctCount: 0,
                 wrongCount: 0,
                 totalCount: currentQuizAttempt.totalCount,
@@ -3289,13 +3553,16 @@ async function setupStudentLearningApiMock(
           },
         ];
         if (body.answer.isChecked) {
+          const feedback = isSkippedQuizAnswer(body.answer.answerJson)
+            ? skippedQuizFeedbackPayload()
+            : quizFeedbackPayload();
           targetAttempt.checkedAnswers = [
             ...targetAttempt.checkedAnswers.filter(
               (answer) => answer.questionId !== body.answer?.questionId,
             ),
             {
               answerJson: body.answer.answerJson,
-              feedback: quizFeedbackPayload(),
+              feedback,
               questionId: body.answer.questionId,
             },
           ];
@@ -3305,7 +3572,9 @@ async function setupStudentLearningApiMock(
         data: {
           attemptId: targetAttempt.id,
           currentQuestionIndex: targetAttempt.currentQuestionIndex,
-          answeredCount: targetAttempt.savedAnswers.length,
+          answeredCount: targetAttempt.savedAnswers.filter(
+            (answer) => !isSkippedQuizAnswer(answer.answerJson),
+          ).length,
           checkedCount: targetAttempt.checkedAnswers.length,
         },
       });
@@ -3361,12 +3630,18 @@ async function setupStudentLearningApiMock(
       method === "POST" &&
       pathname === "/student/quiz-attempts/quiz-attempt-m7/submit"
     ) {
+      const body = request.postDataJSON() as {
+        answers: Array<{ answerJson: unknown; questionId: string }>;
+      };
+      const isSkipped = body.answers.some((answer) =>
+        isSkippedQuizAnswer(answer.answerJson),
+      );
       const submittedAttempt = {
         id: "quiz-attempt-m7",
-        correctCount: 1,
-        wrongCount: 0,
+        correctCount: isSkipped ? 0 : 1,
+        wrongCount: isSkipped ? 1 : 0,
         totalCount: 1,
-        accuracyPercent: 100,
+        accuracyPercent: isSkipped ? 0 : 100,
       };
       const aggregateResult = options.quizSubmitAggregateResult ?? submittedAttempt;
       latestQuizAttempt = aggregateResult;
@@ -3489,6 +3764,24 @@ function quizFeedbackPayload() {
     statementResults: null,
     explanationJson: documentWithText("Cộng hai với hai được bốn."),
   };
+}
+
+function skippedQuizFeedbackPayload() {
+  return {
+    ...quizFeedbackPayload(),
+    isCorrect: false,
+    isSkipped: true,
+  };
+}
+
+function isSkippedQuizAnswer(value: unknown) {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "__unanswered" in value &&
+    value.__unanswered === true
+  );
 }
 
 function quizReviewPayload(questionCount = 1) {
