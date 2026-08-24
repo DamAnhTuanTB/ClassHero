@@ -5,7 +5,6 @@ import {
   QuestionType,
   ReviewStatus,
 } from "@prisma/client";
-import { isSupportedNumericAnswer } from "@learning-path/shared";
 import { badRequestException } from "#api/common/errors/api-exception";
 import { getTiptapText } from "#api/common/validation/rich-text-content";
 import {
@@ -13,7 +12,7 @@ import {
   multiStatementCorrectAnswerSchema,
   multiStatementOptionsSchema,
   multipleChoiceOptionsSchema,
-  textInputGradingSchema,
+  textInputCorrectAnswerSchema,
 } from "#api/modules/quiz/types/quiz.types";
 import type {
   TestQuestionContentDto,
@@ -70,6 +69,7 @@ export function validateQuestionContent(dto: TestQuestionContentDto) {
     }
     if (
       !Array.isArray(correctAnswer.data) ||
+      correctAnswer.data.length !== 1 ||
       correctAnswer.data.some(
         (answerId) => typeof answerId !== "string" || !optionIds.includes(answerId),
       )
@@ -141,34 +141,12 @@ export function validateQuestionContent(dto: TestQuestionContentDto) {
   }
 
   if (dto.questionType === QuestionType.TEXT_INPUT) {
-    if (
-      !Array.isArray(correctAnswer.data) ||
-      correctAnswer.data.some(
-        (answer) => typeof answer !== "string" || answer.trim().length === 0,
-      )
-    ) {
+    const textAnswer = textInputCorrectAnswerSchema.safeParse(dto.correctAnswerJson);
+    if (!textAnswer.success) {
       throw badRequestException(
         "TEST_QUESTION_INVALID_TEXT_ANSWERS",
-        "Câu hỏi nhập đáp án cần ít nhất một câu trả lời hợp lệ",
-      );
-    }
-    const gradingConfig = textInputGradingSchema.safeParse(dto.gradingConfigJson ?? {});
-    if (!gradingConfig.success) {
-      throw badRequestException(
-        "TEST_QUESTION_INVALID_GRADING_CONFIG",
-        "Cấu hình chấm câu trả lời chưa hợp lệ",
-        gradingConfig.error.flatten(),
-      );
-    }
-    if (
-      gradingConfig.data.numericComparison &&
-      correctAnswer.data.some(
-        (answer) => typeof answer !== "string" || !isSupportedNumericAnswer(answer),
-      )
-    ) {
-      throw badRequestException(
-        "TEST_QUESTION_INVALID_NUMERIC_ANSWERS",
-        "Đáp án dùng chế độ chấm số phải là giá trị số hợp lệ",
+        "Câu hỏi nhập đáp án cần đúng một đáp án chuẩn hợp lệ",
+        textAnswer.error.flatten(),
       );
     }
   }

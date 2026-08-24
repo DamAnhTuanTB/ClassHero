@@ -24,6 +24,14 @@ export function isSupportedNumericAnswer(value: string) {
   return parseNumericAnswer(value) !== null;
 }
 
+export function areEquivalentTextInputAnswers(left: string, right: string) {
+  if (areEquivalentNumericAnswers(left, right)) {
+    return true;
+  }
+
+  return normalizeTextInputAnswer(left) === normalizeTextInputAnswer(right);
+}
+
 function parseNumericAnswer(value: string): RationalNumber | null {
   const normalized = unwrapMathDelimiters(value)
     .replaceAll("−", "-")
@@ -89,4 +97,8 @@ function unwrapMathDelimiters(value: string) {
     return trimmed.slice(2, -2).trim();
   }
   return trimmed;
+}
+
+function normalizeTextInputAnswer(value: string) {
+  return value.normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase("vi");
 }

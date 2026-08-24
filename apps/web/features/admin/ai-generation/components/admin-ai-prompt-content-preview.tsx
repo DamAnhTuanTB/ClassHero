@@ -1,8 +1,13 @@
 "use client";
 
 import { Braces } from "lucide-react";
+import rehypeKatex from "rehype-katex";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import "katex/dist/katex.min.css";
+import "@/components/shared/mathpix-markdown-renderer.css";
 
-import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import { AdminAiJsonInputViewer } from "@/features/admin/ai-generation/components/admin-ai-json-input-viewer";
 
 type PromptKind = "system" | "user";
@@ -28,7 +33,7 @@ export function AdminAiPromptContentPreview({
     <div>
       {structuredPrompt.introduction ? (
         <div className="border-b border-[var(--theme-border)] p-4">
-          <MathpixMarkdownRenderer content={structuredPrompt.introduction} />
+          <PromptMarkdownContent content={structuredPrompt.introduction} />
         </div>
       ) : null}
 
@@ -55,8 +60,25 @@ export function AdminAiPromptContentPreview({
 
 function PromptMarkdownPreview({ content }: { content: string }) {
   return (
-    <div className="max-h-96 overflow-y-auto p-4">
-      <MathpixMarkdownRenderer content={content} />
+    <div
+      className="max-h-96 overflow-y-auto p-4"
+      data-testid="admin-ai-prompt-markdown-preview"
+    >
+      <PromptMarkdownContent content={content} />
+    </div>
+  );
+}
+
+function PromptMarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="mmd-content whitespace-pre-wrap break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-[var(--theme-surface-soft)] [&_pre]:p-3">
+      <ReactMarkdown
+        rehypePlugins={[rehypeKatex]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        skipHtml
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

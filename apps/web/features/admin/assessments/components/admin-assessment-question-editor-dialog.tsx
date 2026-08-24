@@ -7,7 +7,6 @@ import { Controller, useFieldArray, useForm, type Resolver } from "react-hook-fo
 import { toast } from "sonner";
 import { z } from "zod";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
-import { CheckboxField } from "@/components/common/forms/checkbox-field";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
 import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
@@ -54,10 +53,6 @@ const optionSchema = z.object({
   content: tiptapDocumentSchema,
 });
 
-const acceptedAnswerSchema = z.object({
-  text: z.string(),
-});
-
 const statementSchema = z.object({
   statementId: z.string().min(1),
   content: tiptapDocumentSchema,
@@ -83,10 +78,7 @@ const questionFormSchema = z
     correctOptionId: z.string(),
     trueFalseAnswer: z.enum(["true", "false"]),
     statements: z.array(statementSchema),
-    acceptedAnswers: z.array(acceptedAnswerSchema),
-    caseSensitive: z.boolean(),
-    exactMatch: z.boolean(),
-    numericComparison: z.boolean(),
+    acceptedAnswer: z.string(),
     hintContent: tiptapDocumentSchema,
     explanationContent: tiptapDocumentSchema,
   })
@@ -162,14 +154,11 @@ const questionFormSchema = z
       });
     }
 
-    if (
-      value.questionType === "TEXT_INPUT" &&
-      !value.acceptedAnswers.some((answer) => answer.text.trim())
-    ) {
+    if (value.questionType === "TEXT_INPUT" && !value.acceptedAnswer.trim()) {
       context.addIssue({
         code: "custom",
-        path: ["acceptedAnswers"],
-        message: "Cần ít nhất một đáp án được chấp nhận",
+        path: ["acceptedAnswer"],
+        message: "Hãy nhập đáp án đúng",
       });
     }
   });
@@ -210,10 +199,6 @@ export function AdminAssessmentQuestionEditorDialog({
   const statements = useFieldArray({
     control: form.control,
     name: "statements",
-  });
-  const acceptedAnswers = useFieldArray({
-    control: form.control,
-    name: "acceptedAnswers",
   });
   const questionType = form.watch("questionType");
   const correctOptionId = form.watch("correctOptionId");
@@ -706,75 +691,29 @@ export function AdminAssessmentQuestionEditorDialog({
 
           {questionType === "TEXT_INPUT" ? (
             <section className="space-y-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                    Các đáp án được chấp nhận
-                  </h3>
-                  <p className="mt-1 text-xs font-medium text-[var(--theme-text-muted)]">
-                    Có thể thêm nhiều cách viết tương đương.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => acceptedAnswers.append({ text: "" })}
-                  className="theme-button-primary-subtle inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-extrabold"
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Thêm đáp án
-                </button>
+              <div>
+                <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                  Đáp án đúng
+                </h3>
+                <p className="mt-1 text-xs font-medium text-[var(--theme-text-muted)]">
+                  Nhập một đáp án chuẩn. Hệ thống tự chấp nhận các cách viết có cùng giá
+                  trị.
+                </p>
               </div>
-              {acceptedAnswers.fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="grid grid-cols-[minmax(0,1fr)_2.5rem] items-start gap-2"
-                >
-                  <Controller
-                    control={form.control}
-                    name={`acceptedAnswers.${index}.text`}
-                    render={({ field: answerField, fieldState }) => (
-                      <ScientificAnswerField
-                        id={`accepted-answer-${field.id}`}
-                        value={answerField.value}
-                        onChange={answerField.onChange}
-                        onBlur={answerField.onBlur}
-                        placeholder={`Đáp án được chấp nhận ${index + 1}`}
-                        error={fieldState.error?.message}
-                      />
-                    )}
+              <Controller
+                control={form.control}
+                name="acceptedAnswer"
+                render={({ field, fieldState }) => (
+                  <ScientificAnswerField
+                    id="text-input-correct-answer"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    placeholder="Nhập đáp án đúng"
+                    error={fieldState.error?.message}
                   />
-                  <ImmediateTooltip
-                    content={
-                      index === 0
-                        ? "Không thể xóa đáp án đầu tiên"
-                        : `Xóa đáp án ${index + 1}`
-                    }
-                  >
-                    <button
-                      type="button"
-                      aria-label={`Xóa đáp án ${index + 1}`}
-                      disabled={index === 0}
-                      onClick={() => acceptedAnswers.remove(index)}
-                      className="theme-button-danger-subtle grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </ImmediateTooltip>
-                </div>
-              ))}
-              <FormError message={form.formState.errors.acceptedAnswers?.root?.message} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <CheckboxField
-                  id="quiz-case-sensitive"
-                  label="Phân biệt chữ hoa / thường"
-                  {...form.register("caseSensitive")}
-                />
-                <CheckboxField
-                  id="quiz-exact-match"
-                  label="Yêu cầu khớp toàn bộ đáp án"
-                  {...form.register("exactMatch")}
-                />
-              </div>
+                )}
+              />
             </section>
           ) : null}
 
@@ -885,10 +824,7 @@ function createEmptyDefaults(): QuestionFormValues {
     correctOptionId: "",
     trueFalseAnswer: "true",
     statements: [createEmptyStatement(), createEmptyStatement()],
-    acceptedAnswers: [{ text: "" }],
-    caseSensitive: false,
-    exactMatch: true,
-    numericComparison: false,
+    acceptedAnswer: "",
     hintContent: createEmptyTiptapDocument(),
     explanationContent: createEmptyTiptapDocument(),
   };
@@ -925,13 +861,8 @@ function toFormValues(
             answer: statementAnswerById.get(statement.id) === false ? "false" : "true",
           }))
         : emptyDefaults.statements,
-    acceptedAnswers:
-      question.questionType === "TEXT_INPUT" && correctAnswers.length
-        ? correctAnswers.map((answer) => ({ text: answer }))
-        : [{ text: "" }],
-    caseSensitive: question.gradingConfigJson?.caseSensitive ?? false,
-    exactMatch: question.gradingConfigJson?.exactMatch ?? true,
-    numericComparison: question.gradingConfigJson?.numericComparison ?? false,
+    acceptedAnswer:
+      question.questionType === "TEXT_INPUT" ? (correctAnswers[0] ?? "") : "",
     hintContent: question.hintJson ?? createEmptyTiptapDocument(),
     explanationContent: question.explanation?.contentJson ?? createEmptyTiptapDocument(),
   };
@@ -983,14 +914,7 @@ function toPayload(values: QuestionFormValues): AdminQuizQuestionPayload {
 
   return {
     ...base,
-    correctAnswerJson: values.acceptedAnswers
-      .map((answer) => answer.text.trim())
-      .filter(Boolean),
-    gradingConfigJson: {
-      caseSensitive: values.caseSensitive,
-      exactMatch: values.exactMatch,
-      numericComparison: values.numericComparison,
-    },
+    correctAnswerJson: [values.acceptedAnswer.trim()],
   };
 }
 

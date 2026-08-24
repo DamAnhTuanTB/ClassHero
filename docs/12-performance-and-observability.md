@@ -176,6 +176,11 @@ xếp danh sách theo vị trí số
 `section -> block -> figureIndex` để thứ tự hiển thị ổn định. UI dùng một query
 figure duy nhất, invalidate ngay khi job Summary terminal và poll 1,5 giây khi
 còn figure active để đồng bộ ảnh/counter.
+Isolated renderer còn có compile concurrency toàn cục độc lập với các queue;
+container 1 vCPU dùng mặc định `1`. LuaTeX font-name database phải được tạo sẵn
+thành seed trong image rồi copy một lần sang cache writable dùng chung trong
+tmpfs, không rebuild trong `HOME` tạm của từng request. Hai lớp này giữ queue
+throughput nhưng ngăn nhiều loại figure cùng làm quá tải CPU renderer.
 
 Ngoại lệ M9.17: khi job snapshot `useTextbookSourceImages=true`, Phase 1 vẫn chạy
 như cũ nhưng worker chỉ copy/normalize crop OCR hợp lệ sang delivery asset và
@@ -290,15 +295,29 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
 - Prompt Caching chỉ giảm phần input bị tính phí/độ trễ theo policy provider,
   không giảm tổng token được gửi. UI và báo cáo phải tách tổng input khỏi cached
   input để tránh hiểu sai việc tối ưu cache thành cắt dữ liệu nguồn.
-- Provider schema Quiz không lặp nguyên policy định dạng toàn cục trong các field
-  không phải lời giải. Root schema giữ contract dùng chung; các field `solution`
-  vẫn giữ policy đầy đủ tại chỗ vì đây là vùng conditioning nhạy chất lượng.
+- Provider schema Summary và Quiz không lặp nguyên policy định dạng toàn cục trong
+  từng field. Root schema giữ contract dùng chung; các field `solution` dùng một
+  shared definition qua `$defs`/`$ref` để giữ conditioning riêng của lời giải mà
+  không nhân bản theo từng loại example/question. Summary `ref_v2` phải giữ byte
+  budget tối đa `22.000` cho Toán 7–9, `18.500` cho Toán 10–12 và `17.500` cho
+  subject không phải Toán.
 - Stage 2 tạo STEM figure chỉ gửi semantic brief tối thiểu và đúng danh sách ảnh
   vision thực tế. Mỗi source reference có nhãn gửi tối đa bốn crop khớp chính xác
-  khác object key để giữ đủ panel; số panel trong brief phải bằng số ảnh thực tế
-  và mỗi ảnh ánh xạ một panel riêng. Nhãn mơ hồ chỉ chọn một crop. Ảnh nguyên trang
+  khác object key để giữ đủ panel. Trước provider call, worker tự xoay theo
+  metadata, resize trong khung tối đa `2048x2048`, chuyển PNG và khử trùng lặp
+  bằng SHA-256 của nội dung đã chuẩn hóa. Chỉ ảnh trùng nội dung mới bị loại;
+  các panel khác nhau vẫn giữ nguyên thứ tự, gửi `detail=high` và mỗi ảnh ánh xạ
+  một panel riêng. Nhãn mơ hồ chỉ chọn một crop. Ảnh nguyên trang
   PDF chỉ giữ làm fallback khi block không có nhãn hình cụ thể hoặc không resolve
   được crop đáng tin cậy. Không lặp provenance trang/object key/hash trong prompt.
+- Compiler diagnostic đầy đủ tiếp tục lưu trên render attempt. Payload repair
+  chỉ gửi toàn bộ issue đã chuẩn hóa và tối đa `12.000` ký tự phần đuôi raw log
+  cho category `COMPILER`; category khác không gửi raw log lặp lại issue.
+- Figure Phase 2 của Quiz dùng profile môn chuyên vẽ thay vì hồ sơ generation
+  Phase 1. Output schema chỉ còn source TeX cần dùng, schema strategy `auto` và
+  prompt cache `in_memory`; không gửi các mảng báo cáo tự kiểm không được worker
+  tiêu thụ. Request trace phải ghi requested/resolved strategy, schema bytes và
+  ước tính text/image/total token; Quiz giữ trace trong durable job input metadata.
 - Preview request tạo lại STEM figure chỉ chạy theo thao tác `Xem dữ liệu` hoặc
   `Cập nhật dữ liệu`; đổi nguồn ảnh phải invalidate preview phía client thay vì
   âm thầm giữ request cũ. Preview chỉ resolve route/schema và ước tính token/chi

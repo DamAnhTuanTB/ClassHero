@@ -126,6 +126,9 @@ Admin có quyền:
   mask hợp lệ bên trong vẫn được xử lý.
 - Tạo, sửa, xóa quiz.
 - Dùng AI tạo quiz.
+- Với từng hình đề/hình lời giải của Quiz, admin có cùng bộ thao tác quản trị như
+  hình Sinh kiến thức: chỉnh sửa hoặc tạo mới bằng mã code, tạo mới bằng AI, tải
+  ảnh lên, xóa ảnh và chỉnh sửa caption.
 - Tạo, sửa, xóa flashcard.
 - Dùng AI tạo flashcard.
 - Tạo, sửa, xóa bài kiểm tra.
@@ -308,7 +311,13 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
 
 - Một buổi học có thể có nhiều bộ quiz.
 - Quiz có thể do admin tạo hoặc AI tạo.
+- Admin có thể phát hành một bộ Quiz ngay khi có ít nhất một câu đã duyệt; câu
+  chưa duyệt không xuất hiện với học sinh và không chặn phát hành.
+- Sau lần phát hành đầu tiên, action `Lưu` đưa các câu mới duyệt vào lượt phát
+  hành gần nhất của cùng bộ thay vì tạo một lượt phát hành mới.
 - Mỗi câu quiz có câu hỏi, lựa chọn/câu trả lời, đáp án đúng, gợi ý, lời giải chi tiết.
+- Hình đề và hình lời giải là resource có revision riêng; admin có thể sửa/tạo
+  TeX, tạo lại bằng AI, thay bằng ảnh upload, xóa và đổi caption ngay trên card.
 - Loại câu hỏi gồm bốn lựa chọn: trắc nghiệm, đúng/sai, đúng/sai nhiều mệnh đề
   và tự nhập đáp án.
 - `Đúng/Sai` giữ dạng một câu hỏi với một đáp án boolean chung.
@@ -327,8 +336,12 @@ Phần mở rộng `M15` được triển khai sau luồng học sinh cốt lõi
   editor, cắt xén trực tiếp bằng khung kéo phủ trên ảnh với lưới một phần ba,
   đặt lại vùng cắt và xóa nhanh ngay trên preview ảnh; thao tác cắt không phá
   hủy ảnh gốc và alignment/kích thước/vùng cắt được lưu cùng Tiptap JSON.
-- Đáp án chấm tự động của câu `TEXT_INPUT` vẫn là chuỗi canonical để so khớp,
-  nhưng được phép chứa LaTeX/mhchem và có công cụ xem trước công thức.
+- Câu `TEXT_INPUT` chỉ có một chuỗi đáp án canonical do admin nhập; modal không
+  cho thêm biến thể và không hiển thị cấu hình phân biệt hoa/thường hoặc khớp
+  toàn bộ. Backend tự chấm tương đương: nếu hai chuỗi là số hợp lệ thì so sánh
+  giá trị chính xác (`0.5`, `0,5`, `1/2`, `2/4` tương đương), nếu không thì
+  chuẩn hóa Unicode/khoảng trắng và so sánh không phân biệt hoa thường. Field
+  đáp án vẫn hỗ trợ LaTeX/mhchem và xem trước công thức.
 - Panel Quiz hiển thị `Bắt đầu` khi student chưa từng mở runner của lượt hiện
   tại, `Tiếp tục làm` ngay khi lượt đã từng được mở dù chưa kiểm tra câu nào,
   và `Xem lại` khi đã hoàn thành mà không còn lượt đang làm. `Bắt đầu` luôn mở

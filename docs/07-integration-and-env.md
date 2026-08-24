@@ -128,6 +128,7 @@ AI_SUMMARY_PACKET_MAX_PAGES=120
 # Isolated TeX Live renderer (worker-only internal service)
 TEX_RENDERER_URL=http://localhost:8080
 TEX_RENDERER_TOKEN=local-tex-renderer-token
+TEX_RENDER_CONCURRENCY=1
 TEX_RENDER_REQUEST_TIMEOUT_MS=30000
 TEX_RENDER_MAX_AI_REPAIRS=2
 TEX_RENDER_MAX_SOURCE_BYTES=40000
@@ -468,6 +469,14 @@ compiler đầy đủ mới được bounded OpenAI repair. Mỗi repair gửi t
 log của lượt compile đó. Source policy, validator, provider, timeout, network,
 storage và lỗi hạ tầng không tự retry; các thao tác retry thủ công vẫn theo
 lifecycle hình hiện có.
+
+Renderer tạo sẵn LuaTeX font-name database làm seed trong image. Khi container
+boot, seed được copy một lần sang `TEXMFCACHE` writable trong tmpfs vì luaotfload
+có thể bổ sung module cache lazy; mọi child process dùng chung cache này thay vì
+đặt trong `HOME` tạm bị xóa sau mỗi lượt. `TEX_RENDER_CONCURRENCY` là giới hạn
+compile toàn cục của container, khác với concurrency từng BullMQ queue. Với
+resource limit 1 vCPU, mặc định dùng `1` để tránh Summary và Quiz cộng dồn nhiều
+LuaLaTeX process rồi cùng chạm timeout.
 
 ---
 

@@ -62,7 +62,10 @@ export class QuizQuestionContentDto {
   @IsTiptapJson()
   hintJson?: Record<string, unknown> | null;
 
-  @ApiPropertyOptional({ description: "Cấu hình chấm điểm cho câu hỏi tự luận" })
+  @ApiPropertyOptional({
+    description:
+      "Cấu hình legacy chỉ để tương thích client cũ; backend bỏ qua khi chấm TEXT_INPUT",
+  })
   @IsOptional()
   gradingConfigJson?: TextInputGradingConfig;
 

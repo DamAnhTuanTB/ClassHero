@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import type { Job } from "bullmq";
 import { UnrecoverableError } from "bullmq";
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -15,6 +16,7 @@ import type {
   BackgroundJobBullmqResult,
 } from "#api/jobs/background-job-queues";
 import { createStemFigureDiagnosticBatch } from "#api/modules/stem-figures/utils/stem-figure-diagnostics";
+import { prepareStemFigureProviderReferenceImages } from "#api/modules/stem-figures/utils/stem-figure-reference-images";
 import { AiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import {
   ProviderBudgetError,
@@ -60,6 +62,48 @@ function createGenerationBrief(input: {
 }
 
 describe("M9.2 STEM figure rendering processor", () => {
+  it("resizes reference images, keeps high detail, and removes exact duplicate content", async () => {
+    const first = await sharp({
+      create: { width: 3_000, height: 1_000, channels: 3, background: "#ffffff" },
+    })
+      .png()
+      .toBuffer();
+    const second = await sharp({
+      create: { width: 900, height: 600, channels: 3, background: "#000000" },
+    })
+      .png()
+      .toBuffer();
+    const storage = {
+      downloadObject: vi.fn(async (objectKey: string) =>
+        objectKey === "distinct.png" ? second : first,
+      ),
+    };
+    const prepared = await prepareStemFigureProviderReferenceImages({
+      assets: [
+        referenceAsset("first.png"),
+        referenceAsset("duplicate.png"),
+        referenceAsset("distinct.png"),
+      ],
+      downloadObject: storage.downloadObject,
+    });
+
+    expect(prepared.assets.map((asset) => asset.objectKey)).toEqual([
+      "first.png",
+      "distinct.png",
+    ]);
+    expect(prepared.assets.every((asset) => asset.mimeType === "image/png")).toBe(
+      true,
+    );
+    expect(prepared.images.every((image) => image.detail === "high")).toBe(true);
+    const firstPrepared = Buffer.from(
+      prepared.images[0]!.imageUrl.split(",")[1]!,
+      "base64",
+    );
+    const metadata = await sharp(firstPrepared).metadata();
+    expect(metadata.width).toBe(2_048);
+    expect(metadata.height).toBeLessThanOrEqual(2_048);
+  });
+
   it("generates one figure from its exact local brief before the first compile", async () => {
     const generationBrief = createGenerationBrief({
       blockContent: {
@@ -764,6 +808,9 @@ function createProcessor(
     createNew?: ReturnType<typeof vi.fn>;
   },
   artifacts: ReturnType<typeof createArtifactsMock>,
+  storage: { downloadObject: ReturnType<typeof vi.fn> } = {
+    downloadObject: vi.fn(),
+  },
 ) {
   return new StemFigureRenderingProcessor(
     prisma as never,
@@ -771,7 +818,18 @@ function createProcessor(
     validator as never,
     repair as never,
     artifacts as never,
+    storage as never,
   );
+}
+
+function referenceAsset(objectKey: string) {
+  return {
+    objectKey,
+    mimeType: "image/png",
+    label: objectKey,
+    packetPageNumber: 1,
+    source: "OCR_CROP",
+  };
 }
 
 function createPrismaMock(input: {

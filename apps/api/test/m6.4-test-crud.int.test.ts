@@ -160,11 +160,7 @@ describe("M6.4 test CRUD integration", () => {
         questionType: QuestionType.TEXT_INPUT,
         difficulty: Difficulty.EASY,
         questionJson: documentWithText("Viết kết quả của 3 × 3."),
-        correctAnswerJson: ["9", "chín"],
-        gradingConfigJson: {
-          caseSensitive: false,
-          exactMatch: true,
-        },
+        correctAnswerJson: ["9"],
       },
       context,
     );
@@ -173,10 +169,7 @@ describe("M6.4 test CRUD integration", () => {
     expect(multipleChoice.explanation?.contentJson).toEqual(
       documentWithText("2 + 2 = 4."),
     );
-    expect(textInput.gradingConfigJson).toEqual({
-      caseSensitive: false,
-      exactMatch: true,
-    });
+    expect(textInput.gradingConfigJson).toBeNull();
 
     const set = await prisma.testSet.findUnique({ where: { id: primarySetId } });
     expect(set?.questionCount).toBe(2);

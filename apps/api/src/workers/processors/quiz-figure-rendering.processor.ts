@@ -19,7 +19,10 @@ import type {
 } from "#api/jobs/background-job-queues";
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
-import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
+import {
+  AiProviderCallService,
+  type ResolvedAiStructuredRequestTrace,
+} from "#api/modules/ai/services/ai-provider-call.service";
 import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
 import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
 import { QuizTexRendererClientService } from "#api/modules/quiz-figures/services/quiz-tex-renderer-client.service";
@@ -124,6 +127,9 @@ export class QuizFigureRenderingProcessor {
               sourceHash: true,
             },
           },
+          currentRevision: {
+            select: { latexSource: true },
+          },
         },
       });
       if (!figure.pendingRevision) {
@@ -132,6 +138,10 @@ export class QuizFigureRenderingProcessor {
       const plan = readPlan(figure.planJson);
       const subject = readSubject(figure);
       const routeSnapshot = readRouteSnapshot(metadata.routeSnapshot);
+      const adminInstructions = readOptionalString(metadata.adminInstructions);
+      const aiMode = readQuizFigureAiMode(metadata.aiMode);
+      const systemPrompt = readOptionalString(metadata.systemPrompt);
+      const userPrompt = readOptionalString(metadata.userPrompt);
       const source =
         figure.pendingRevision.latexSource?.trim() ||
         (await this.createSource({
@@ -141,6 +151,10 @@ export class QuizFigureRenderingProcessor {
           routeSnapshot,
           backgroundJobId: durableJob.id,
           attempt: attemptNumber,
+          adminInstructions,
+          aiMode,
+          systemPrompt,
+          userPrompt,
         }));
       assertQuizFigureLatexSource(source);
       const sourceHash = QuizFigureJobService.sourceHash(source);
@@ -286,12 +300,17 @@ export class QuizFigureRenderingProcessor {
       aiGenerationId: string | null;
       quizQuestionId: string;
       pendingRevision: { id: string; sourceVersion: number } | null;
+      currentRevision: { latexSource: string | null } | null;
     };
     plan: QuizFigurePlan;
     subject: QuizSubjectSnapshot;
     routeSnapshot?: AiFeatureRoute;
     backgroundJobId: string;
     attempt: number;
+    adminInstructions?: string;
+    aiMode: "REGENERATE" | "EDIT_CURRENT";
+    systemPrompt?: string;
+    userPrompt?: string;
   }) {
     const callContext = {
       feature: AiGenerationType.QUIZ,
@@ -301,11 +320,32 @@ export class QuizFigureRenderingProcessor {
       callSequence: 1,
       routeSnapshot: input.routeSnapshot,
       allowProviderFallback: false,
+      onResolvedRequest: (request: ResolvedAiStructuredRequestTrace) =>
+        this.recordProviderRequestSnapshot({
+          backgroundJobId: input.backgroundJobId,
+          role: input.figure.role,
+          attempt: input.attempt,
+          request,
+        }),
     } as const;
     if (input.figure.role === QuizFigureRole.QUESTION) {
+      const structuredInput = buildQuestionFigureInput({
+        subject: input.subject,
+        plan: input.plan,
+        adminInstructions: input.adminInstructions,
+        mode: input.aiMode,
+        currentLatexSource:
+          input.aiMode === "EDIT_CURRENT"
+            ? input.figure.currentRevision?.latexSource
+            : null,
+      });
       const output = await this.provider.generateStructured(
         callContext,
-        buildQuestionFigureInput({ subject: input.subject, plan: input.plan }),
+        {
+          ...structuredInput,
+          systemPrompt: input.systemPrompt ?? structuredInput.systemPrompt,
+          userPrompt: input.userPrompt ?? structuredInput.userPrompt,
+        },
         generatedQuizQuestionFigureSchema,
       );
       return output.data.latexSource;
@@ -326,13 +366,24 @@ export class QuizFigureRenderingProcessor {
         "QUIZ_SOLUTION_FIGURE_BASE_NOT_READY: Hình đề chưa sẵn sàng.",
       );
     }
+    const structuredInput = buildSolutionFigureExtensionInput({
+      subject: input.subject,
+      plan: input.plan,
+      exactQuestionLatexSource: baseRevision.latexSource,
+      adminInstructions: input.adminInstructions,
+      mode: input.aiMode,
+      currentSolutionLatexSource:
+        input.aiMode === "EDIT_CURRENT"
+          ? input.figure.currentRevision?.latexSource
+          : null,
+    });
     const output = await this.provider.generateStructured(
       callContext,
-      buildSolutionFigureExtensionInput({
-        subject: input.subject,
-        plan: input.plan,
-        exactQuestionLatexSource: baseRevision.latexSource,
-      }),
+      {
+        ...structuredInput,
+        systemPrompt: input.systemPrompt ?? structuredInput.systemPrompt,
+        userPrompt: input.userPrompt ?? structuredInput.userPrompt,
+      },
       generatedQuizSolutionExtensionSchema,
     );
     await this.prisma.quizFigureRevision.update({
@@ -343,6 +394,44 @@ export class QuizFigureRenderingProcessor {
       baseRevision.latexSource,
       output.data.extensionLatex,
     );
+  }
+
+  private async recordProviderRequestSnapshot(input: {
+    backgroundJobId: string;
+    role: QuizFigureRole;
+    attempt: number;
+    request: ResolvedAiStructuredRequestTrace;
+  }) {
+    await this.prisma.$transaction(async (transaction) => {
+      const job = await transaction.backgroundJob.findUniqueOrThrow({
+        where: { id: input.backgroundJobId },
+        select: { inputMeta: true },
+      });
+      const metadata = readRecord(job.inputMeta);
+      const existing = Array.isArray(metadata.providerRequestSnapshots)
+        ? metadata.providerRequestSnapshots
+        : [];
+      const snapshots = existing.filter((snapshot) => {
+        const record = readRecord(snapshot);
+        return record.attempt !== input.attempt || record.role !== input.role;
+      });
+      snapshots.push({
+        version: 1,
+        role: input.role,
+        attempt: input.attempt,
+        createdAt: new Date().toISOString(),
+        request: input.request,
+      });
+      await transaction.backgroundJob.update({
+        where: { id: input.backgroundJobId },
+        data: {
+          inputMeta: toJobJson({
+            ...metadata,
+            providerRequestSnapshots: snapshots.slice(-10),
+          }),
+        },
+      });
+    });
   }
 
   private async enqueueDependentSolutionFigure(
@@ -470,6 +559,14 @@ function readRequiredString(value: unknown, field: string) {
     throw new UnrecoverableError(`Quiz figure job is missing ${field}.`);
   }
   return value;
+}
+
+function readOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readQuizFigureAiMode(value: unknown): "REGENERATE" | "EDIT_CURRENT" {
+  return value === "EDIT_CURRENT" ? "EDIT_CURRENT" : "REGENERATE";
 }
 
 function firstErrorCode(message: string) {

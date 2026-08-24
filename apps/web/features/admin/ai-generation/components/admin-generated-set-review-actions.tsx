@@ -13,6 +13,7 @@ import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { cn } from "@/lib/utils";
 
 export function AdminGeneratedSetReviewActions({
+  approvedQuestionCount = 0,
   isReviewingAllPending = false,
   lessonId,
   onReviewAllPending,
@@ -21,8 +22,8 @@ export function AdminGeneratedSetReviewActions({
   setId,
   source,
   type,
-  unpublishedApprovedQuestionCount = 0,
 }: {
+  approvedQuestionCount?: number;
   isReviewingAllPending?: boolean;
   lessonId: string;
   onReviewAllPending?: () => void;
@@ -31,7 +32,6 @@ export function AdminGeneratedSetReviewActions({
   setId: string;
   source: string;
   type: Exclude<AdminAiGenerationType, "SUMMARY">;
-  unpublishedApprovedQuestionCount?: number;
 }) {
   const token = useAuthSessionStore((state) => state.session?.accessToken ?? "");
   const queryClient = useQueryClient();
@@ -51,7 +51,7 @@ export function AdminGeneratedSetReviewActions({
       ]);
       toast.success(
         input.action === "SAVE"
-          ? "Đã lưu nội dung bộ Quiz"
+          ? "Đã lưu vào lượt phát hành gần nhất"
           : input.action === "PUBLISH"
             ? "Đã phát hành bộ Quiz"
             : input.action === "WITHDRAW"
@@ -73,7 +73,7 @@ export function AdminGeneratedSetReviewActions({
 
   const isStandaloneAiSet = source === "AI";
   const isQuiz = type === "QUIZ";
-  const isPublishBlocked = isQuiz && pendingReviewQuestionCount > 0;
+  const isPublishBlocked = isQuiz && approvedQuestionCount < 1;
   const currentReviewStatus: AdminLessonSummaryReviewStatus =
     reviewStatus === "NEEDS_REVIEW" ||
     reviewStatus === "APPROVED" ||
@@ -138,7 +138,7 @@ export function AdminGeneratedSetReviewActions({
             }
             title={
               isPublishBlocked
-                ? "Cần duyệt hết câu hỏi trước khi phát hành bộ Quiz"
+                ? "Cần có ít nhất 1 câu Quiz được duyệt để phát hành"
                 : "Phát hành bộ Quiz"
             }
             className="theme-button-primary inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60"

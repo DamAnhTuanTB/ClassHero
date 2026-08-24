@@ -76,6 +76,18 @@ vì vậy select, TypeScript union, Prisma enum và backend validation phải th
   Response create có thể không chứa aggregate `_count` như response list, nên
   hook phải chuẩn hóa `_count` từ `questionCount` trước khi đưa object vào cache;
   component vẫn cần fallback an toàn để dữ liệu tạm không làm sập toàn màn.
+- `questionFigure.caption` trong JSON AI chỉ là kế hoạch Phase 1, không phải ảnh.
+  Ảnh thật đi qua `quiz_figures` và revision có delivery URL sau khi worker dựng
+  SVG. Vì vậy card review phải đọc `question.figures`, hiển thị asset terminal và
+  chỉ poll query khi còn trạng thái `QUEUED`/`RENDERING`/`REPAIRING`; nếu chỉ
+  render JSON câu hỏi thì hình đã tạo thành công vẫn bị “vô hình” trên giao diện.
+- Visual policy có rule bất biến phải được nối vào cả system prompt mặc định lẫn
+  system prompt tùy biến; nếu custom prompt thay hoàn toàn default thì các đường
+  gọi admin/preview có thể bỏ qua policy. Marker mũi tên/chevron đánh dấu song
+  song bị cấm trên mọi hình, nhưng phải phân biệt với mũi tên mang nghĩa hướng của
+  trục, vector, lực, tia hoặc luồng truyền. Cung góc cần khóa đúng miền giữa hai
+  tia, đặc biệt góc trong đa giác phải nằm phía trong thay vì dựa vào thứ tự tia
+  ngẫu nhiên của lệnh `\\pic`.
 
 ## Back-end/API
 
@@ -513,6 +525,13 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 
 ## Luồng lỗi thường gặp
 
+- Khi modal sinh Quiz thấy danh sách set rỗng, không được suy ra rằng database
+  chắc chắn chưa có set: cache web có thể cũ hoặc một job khác vừa tạo set. Trước
+  khi mở modal, web phải refetch danh sách authoritative. Ở API, request không có
+  `targetQuizSetId` chỉ được tạo `Bộ câu hỏi 1` khi query xác nhận lesson thật sự
+  chưa có set; nếu đã có, API phải từ chối và yêu cầu tải lại thay vì fallback
+  sang set đầu tiên. Quy tắc hai lớp này ngăn câu mới bị append vào một bộ Quiz
+  cũ mà admin không nhìn thấy trong snapshot UI.
 - Tăng `z-index` không sửa được popover bị cắt nếu ancestor có `overflow: hidden`; cần portal ra ancestor không cắt nội dung.
 - `instanceof HTMLTableCellElement` có thể không ổn khi DOM đến từ realm/view khác. Với interaction bảng, kiểm tra semantic `TD`/`TH`/`TR` phù hợp hơn.
 - Gán style vào `<tr>` cũ không có tác dụng nếu ProseMirror vừa thay DOM. Cần resolve lại hàng hiện tại và ghi chiều cao qua transaction để UI và JSON cùng cập nhật.
@@ -664,7 +683,7 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   bên trong khi custom element sẵn sàng.
 - Khi cần căn placeholder/input MathLive khớp tuyệt đối với input HTML, phải kiểm
   tra cả `.ML__content` trong shadow DOM. MathLive 0.110 tự thêm `padding-left:
-  1px`; chỉ đồng bộ padding trên host `math-field` vẫn làm nội dung lệch ngang.
+1px`; chỉ đồng bộ padding trên host `math-field` vẫn làm nội dung lệch ngang.
   Preset student-answer phải bỏ phần đệm nội bộ này thay vì bù bằng số âm hoặc
   hard-code padding host khác với input thường. Khi field rỗng được focus,
   MathLive còn vẽ `.ML__caret::after` với optical offset `left: -0.045em`; offset

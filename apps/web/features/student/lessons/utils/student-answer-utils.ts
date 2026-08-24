@@ -3,7 +3,7 @@ import type {
   StudentAnswer,
   StudentAssessmentQuestion,
 } from "@/features/student/lessons/types/student-lesson-types";
-import { areEquivalentNumericAnswers } from "@learning-path/shared";
+import { areEquivalentTextInputAnswers } from "@learning-path/shared";
 
 export function isStudentAnswerComplete(
   question: StudentAssessmentQuestion,
@@ -123,25 +123,12 @@ export function gradeStudentQuizAnswer(
     );
   }
 
-  if (question.gradingConfigJson?.numericComparison === true) {
-    const isCorrect = readStringAnswers(correctAnswer).some((expectedAnswer) =>
-      areEquivalentNumericAnswers(String(answer), expectedAnswer),
-    );
-    return createFeedback(isCorrect, question, null);
+  const canonicalAnswer = readStringAnswers(correctAnswer)[0];
+  if (canonicalAnswer === undefined) {
+    throw new Error("Quiz chưa có đáp án chuẩn hợp lệ.");
   }
-
-  const selected = normalizeTextAnswer(
-    String(answer),
-    question.gradingConfigJson?.caseSensitive === true,
-  );
-  const exactMatch = question.gradingConfigJson?.exactMatch !== false;
-  const isCorrect = readStringAnswers(correctAnswer).some((expectedAnswer) => {
-    const expected = normalizeTextAnswer(
-      expectedAnswer,
-      question.gradingConfigJson?.caseSensitive === true,
-    );
-    return exactMatch ? selected === expected : selected.includes(expected);
-  });
+  const selected = String(answer);
+  const isCorrect = areEquivalentTextInputAnswers(selected, canonicalAnswer);
   return createFeedback(isCorrect, question, null);
 }
 
@@ -191,11 +178,6 @@ function equalStringSets(left: string[], right: string[]) {
     normalizedLeft.length === normalizedRight.length &&
     normalizedLeft.every((value, index) => value === normalizedRight[index])
   );
-}
-
-function normalizeTextAnswer(value: string, caseSensitive: boolean) {
-  const normalized = value.trim().replace(/\s+/g, " ");
-  return caseSensitive ? normalized : normalized.toLocaleLowerCase("vi");
 }
 
 function roundScore(value: number) {

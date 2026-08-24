@@ -255,7 +255,7 @@ export class TestsService {
           optionsJson: toNullableInputJson(dto.optionsJson),
           correctAnswerJson: toInputJson(dto.correctAnswerJson),
           hintJson: toNullableInputJson(dto.hintJson),
-          gradingConfigJson: toNullableInputJson(dto.gradingConfigJson),
+          gradingConfigJson: Prisma.DbNull,
           points:
             dto.points === undefined || dto.points === null
               ? null
@@ -356,9 +356,6 @@ export class TestsService {
     if (dto.hintJson !== undefined) {
       updateData.hintJson = toNullableInputJson(dto.hintJson);
     }
-    if (dto.gradingConfigJson !== undefined) {
-      updateData.gradingConfigJson = toNullableInputJson(dto.gradingConfigJson);
-    }
     if (dto.points !== undefined) {
       updateData.points = dto.points === null ? null : new Prisma.Decimal(dto.points);
     }
@@ -368,9 +365,7 @@ export class TestsService {
     ) {
       updateData.optionsJson = Prisma.DbNull;
     }
-    if (mergedContent.questionType !== QuestionType.TEXT_INPUT) {
-      updateData.gradingConfigJson = Prisma.DbNull;
-    }
+    updateData.gradingConfigJson = Prisma.DbNull;
 
     return this.prisma.$transaction(async (transaction) => {
       if (

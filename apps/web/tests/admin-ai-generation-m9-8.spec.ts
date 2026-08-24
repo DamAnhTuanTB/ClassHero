@@ -110,9 +110,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(quizDialog.getByText("Nguồn PDF sẽ gửi AI")).toBeVisible();
     await expect(quizDialog.getByLabel("Số câu hỏi")).toHaveValue("10");
     await expect(quizDialog.getByLabel("Dễ", { exact: true })).toHaveValue("5");
-    await expect(quizDialog.getByLabel("Trung bình", { exact: true })).toHaveValue(
-      "3",
-    );
+    await expect(quizDialog.getByLabel("Trung bình", { exact: true })).toHaveValue("3");
     await expect(quizDialog.getByLabel("Khó", { exact: true })).toHaveValue("2");
     await quizDialog.getByLabel("Số câu hỏi").fill("2");
     await expect(
@@ -278,6 +276,28 @@ test.describe("M9.8 admin AI generation panel", () => {
       });
   });
 
+  test("refreshes Quiz sets before opening generation so an existing set is never hidden", async ({
+    page,
+  }) => {
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [],
+      quizSetsAfterFirstRequest: [quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0)],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await expect.poll(() => mock.quizSetListRequests).toBe(1);
+
+    await generationCard(page, "Quiz").getByRole("button", { name: "Tạo mới" }).click();
+    const dialog = page.getByRole("dialog", { name: "Tạo Quiz bằng AI" });
+    await expect(dialog.getByLabel("Bộ câu hỏi được chọn")).toContainText("Bộ câu hỏi 1");
+    await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
+
+    await expect
+      .poll(() => mock.payloads.QUIZ)
+      .toMatchObject({
+        targetQuizSetId: quizSetOneId,
+      });
+  });
+
   test("keeps Quiz review warnings outside every view mode and accepts them through review", async ({
     page,
   }) => {
@@ -348,15 +368,21 @@ test.describe("M9.8 admin AI generation panel", () => {
 
     const navigationRows = page.locator('[data-testid^="quiz-question-navigation-"]');
     await expect(navigationRows).toHaveCount(5);
+    await expect(page.getByTestId("quiz-pending-ai-heading")).toContainText(
+      "AI chờ duyệt",
+    );
+    await expect(page.getByTestId("quiz-approved-heading")).toContainText("Đã duyệt");
     await expect(navigationRows).toContainText([
-      "Câu AI chờ duyệt",
+      "Trắc nghiệm",
       "Trắc nghiệm",
       "Đúng/Sai 1 mệnh đề",
       "Đúng/Sai nhiều mệnh đề",
       "Nhập đáp án",
     ]);
     await expect(
-      page.getByTestId("quiz-question-navigation-pending-ai").getByRole("tab"),
+      page
+        .getByTestId("quiz-question-navigation-pending-ai-MULTIPLE_CHOICE")
+        .getByRole("tab"),
     ).toHaveCount(1);
 
     const quizStatistics = page.getByLabel("Thống kê bộ Quiz");
@@ -366,12 +392,16 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(quizStatistics).not.toContainText("Chưa lưu");
     const unsavedWarning = page.getByTestId("quiz-unsaved-approved-warning");
     await expect(unsavedWarning).toContainText(
-      "Bạn đã duyệt thêm 4 câu. Nhớ nhấn Lưu để cập nhật cho học sinh.",
+      "Bạn đã duyệt thêm 4 câu. Nhớ nhấn Lưu để cập nhật vào lượt phát hành gần nhất cho học sinh.",
     );
 
     const quizActions = page.getByLabel("Hành động bộ Quiz");
     await expect(quizActions.getByRole("button", { name: "Lưu" })).toBeVisible();
-    await expect(quizActions.getByRole("button", { name: "Phát hành" })).toBeVisible();
+    const publishButton = quizActions.getByRole("button", {
+      name: "Phát hành",
+      exact: true,
+    });
+    await expect(publishButton).toBeEnabled();
     await expect
       .poll(() => quizActions.evaluate((element) => getComputedStyle(element).flexWrap))
       .toBe("nowrap");
@@ -419,10 +449,6 @@ test.describe("M9.8 admin AI generation panel", () => {
         exact: true,
       }),
     ).toBeVisible();
-    const publishButton = page.getByRole("button", {
-      name: "Phát hành",
-      exact: true,
-    });
     await expect(publishButton).toBeEnabled();
     await publishButton.click();
     await expect
@@ -432,6 +458,178 @@ test.describe("M9.8 admin AI generation panel", () => {
       page.getByRole("button", { name: "Thu hồi phát hành", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Lưu", exact: true })).toBeVisible();
+  });
+
+  test("renders a generated Quiz figure asset in UI and split review modes", async ({
+    page,
+  }) => {
+    const generationId = "66666666-6666-4666-8666-666666666650";
+    const questionId = "77777777-7777-4777-8777-777777777750";
+    const figureUrl = svgDataUrl(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120"><circle cx="80" cy="60" r="48" fill="none" stroke="#0f172a" stroke-width="3"/><path d="M45 32L124 46L105 96L45 32Z" fill="none" stroke="#0369a1" stroke-width="3"/></svg>`,
+    );
+    await setupAiGenerationMock(page, {
+      quizSets: [
+        {
+          ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+          source: "AI",
+          questionCount: 1,
+          _count: { questions: 1 },
+          pendingReviewQuestionCount: 1,
+        },
+      ],
+      quizQuestions: [
+        quizQuestionFixture(questionId, quizSetOneId, generationId, {
+          figures: [
+            {
+              id: "88888888-8888-4888-8888-888888888850",
+              role: "QUESTION",
+              status: "SUCCEEDED",
+              lastErrorCode: null,
+              lastErrorMessage: null,
+              currentRevision: {
+                id: "99999999-9999-4999-8999-999999999950",
+                sourceKind: "AI_TEX",
+                sourceVersion: 1,
+                latexSource: [
+                  "\\begin{tikzpicture}",
+                  "\\draw (0,0) circle (1);",
+                  "% QUIZ_SOLUTION_EXTENSION",
+                  "\\end{tikzpicture}",
+                ].join("\n"),
+                previewSvg: null,
+                altText: "Tứ giác ABCD nội tiếp đường tròn",
+                caption: "Tứ giác nội tiếp $ABCD$.",
+                deliveryFile: {
+                  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa50",
+                  mimeType: "image/svg+xml",
+                  publicUrl: figureUrl,
+                },
+              },
+            },
+          ],
+        }),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+
+    const figure = page.getByTestId("admin-quiz-question-figure");
+    const figureFrame = page.getByTestId("admin-quiz-figure-action-frame");
+    await expect(figure.getByAltText("Tứ giác ABCD nội tiếp đường tròn")).toBeVisible();
+    await expect(figure.locator("figcaption")).toContainText("Tứ giác nội tiếp");
+
+    await figureFrame.getByRole("button", { name: "Mở menu thao tác hình" }).click();
+    for (const action of [
+      "Chỉnh sửa bằng mã code",
+      "Tạo mới bằng mã code",
+      "Tạo mới bằng AI",
+      "Tải ảnh lên",
+    ]) {
+      await expect(page.getByRole("menuitem", { name: action })).toBeVisible();
+    }
+    await page.getByRole("menuitem", { name: "Tạo mới bằng mã code" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Tạo mới hình bằng mã code" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await figureFrame.getByRole("button", { name: "Mở menu thao tác hình" }).click();
+    await page.getByRole("menuitem", { name: "Tạo mới bằng AI" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Tạo mới hình bằng AI" }),
+    ).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Tạo mới lại/u })).toBeChecked();
+    await expect(
+      page.getByRole("radio", { name: /Chỉnh sửa hình hiện tại/u }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Xem dữ liệu" })).toBeVisible();
+    await page.getByRole("button", { name: "Xem dữ liệu" }).click();
+    await expect(page.getByRole("tab", { name: "Quy tắc hệ thống" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Câu lệnh người dùng" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Dữ liệu gửi đi" })).toBeVisible();
+    await expect(page.getByTestId("admin-ai-prompt-markdown-preview")).toContainText(
+      "Khi dùng \\pic phải chọn đúng thứ tự tia; chỉ vẽ góc ngoài",
+    );
+    await expect(page.getByTestId("admin-ai-prompt-markdown-preview")).toContainText(
+      "(1) tính lại từng số đo; (2) với angle=X--V--Y, tính miền quét",
+    );
+    await page.keyboard.press("Escape");
+
+    await figureFrame.getByRole("button", { name: "Chỉnh sửa caption" }).click();
+    await expect(page.getByRole("dialog", { name: "Chỉnh sửa caption" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await figureFrame.getByRole("button", { name: "Xóa ảnh" }).click();
+    const deleteDialog = page.getByRole("dialog", { name: "Xóa hình Quiz" });
+    await expect(deleteDialog).toBeVisible();
+    await deleteDialog.getByRole("button", { name: "Hủy" }).click();
+
+    await page.getByRole("button", { name: "Song song" }).click();
+    await expect(figure.getByAltText("Tứ giác ABCD nội tiếp đường tròn")).toBeVisible();
+  });
+
+  test("preserves the page scroll position when navigating Quiz cards", async ({
+    page,
+  }) => {
+    const firstQuestionId = "77777777-7777-4777-8777-777777777761";
+    const secondQuestionId = "77777777-7777-4777-8777-777777777762";
+    const quizSet = {
+      ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+      questionCount: 2,
+      _count: { questions: 2 },
+    };
+    const approvedQuestionOverrides = {
+      generationQuestionJson: null,
+      reviewStatus: "APPROVED",
+      sourceMetadataJson: null,
+    };
+    await setupAiGenerationMock(page, {
+      quizSets: [quizSet],
+      quizQuestions: [
+        quizQuestionFixture(
+          firstQuestionId,
+          quizSetOneId,
+          "generation-scroll-position",
+          approvedQuestionOverrides,
+        ),
+        quizQuestionFixture(
+          secondQuestionId,
+          quizSetOneId,
+          "generation-scroll-position",
+          approvedQuestionOverrides,
+        ),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+    await expect(page.locator(`#quiz-question-${firstQuestionId}`)).toBeVisible();
+
+    const nextQuestionButton = page.getByRole("button", { name: "Câu tiếp theo" });
+    await nextQuestionButton.evaluate((button) => {
+      const buttonTop = button.getBoundingClientRect().top;
+      window.scrollTo({
+        behavior: "auto",
+        top: Math.max(0, window.scrollY + buttonTop - 120),
+      });
+    });
+    const scrollPositionBeforeNext = await page.evaluate(() => window.scrollY);
+    expect(scrollPositionBeforeNext).toBeGreaterThan(0);
+
+    await nextQuestionButton.click();
+    await expect(page.locator(`#quiz-question-${secondQuestionId}`)).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBe(scrollPositionBeforeNext);
+
+    const previousQuestionButton = page.getByRole("button", { name: "Câu trước" });
+    const scrollPositionBeforePrevious = await page.evaluate(() => window.scrollY);
+    await previousQuestionButton.click();
+    await expect(page.locator(`#quiz-question-${firstQuestionId}`)).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBe(scrollPositionBeforePrevious);
   });
 
   test("bulk reviews every pending AI question in the current Quiz set before save", async ({
@@ -492,10 +690,73 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(quizStatistics).toContainText("Đã duyệt3");
     await expect(quizStatistics).toContainText("AI chờ duyệt0");
     await expect(page.getByTestId("quiz-unsaved-approved-warning")).toContainText(
-      "Bạn đã duyệt thêm 3 câu. Nhớ nhấn Lưu để cập nhật cho học sinh.",
+      "Bạn đã duyệt thêm 3 câu. Nhớ nhấn Lưu để cập nhật vào lượt phát hành gần nhất cho học sinh.",
     );
     await expect(reviewAllButton).toBeDisabled();
     expect(mock.quizSetReviewPayloads).toEqual([]);
+  });
+
+  test("hides a generation-level warning after one question in that generation is accepted", async ({
+    page,
+  }) => {
+    const generationId = "66666666-6666-4666-8666-666666666668";
+    const firstPendingId = "77777777-7777-4777-8777-777777777778";
+    const secondPendingId = "77777777-7777-4777-8777-777777777779";
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [
+        {
+          ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+          source: "AI",
+          questionCount: 2,
+          _count: { questions: 2 },
+          pendingReviewQuestionCount: 2,
+          aiGenerations: [
+            {
+              id: generationId,
+              createdAt: new Date().toISOString(),
+              inputMetaJson: {
+                generationIssues: [
+                  {
+                    code: "DIFFICULTY_DISTRIBUTION_MISMATCH",
+                    message: "Phân bổ mức độ cần admin xác nhận.",
+                    blocking: false,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      quizQuestions: [
+        quizQuestionFixture(firstPendingId, quizSetOneId, generationId),
+        quizQuestionFixture(secondPendingId, quizSetOneId, generationId, {
+          questionType: "TRUE_FALSE",
+        }),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+
+    await expect(page.getByTestId("quiz-approved-heading")).toContainText("Đã duyệt0");
+    const publishButton = page
+      .getByLabel("Hành động bộ Quiz")
+      .getByRole("button", { name: "Phát hành", exact: true });
+    await expect(publishButton).toBeDisabled();
+    const warning = page.getByTestId("quiz-generation-review-warning");
+    await expect(warning).toBeVisible();
+    await warning.getByRole("button", { name: "Chấp nhận" }).click();
+    await expect
+      .poll(() => mock.quizReviewPayloads)
+      .toEqual([{ questionId: firstPendingId, reviewStatus: "APPROVED" }]);
+    await expect(publishButton).toBeEnabled();
+
+    await page
+      .getByTestId("quiz-question-navigation-pending-ai-TRUE_FALSE")
+      .getByRole("tab")
+      .click();
+    await expect(page.locator(`#quiz-question-${secondPendingId}`)).toBeVisible();
+    await expect(warning).toHaveCount(0);
   });
 
   test("validates flashcard/test configuration and sends normalized payloads", async ({
@@ -2308,7 +2569,6 @@ function quizQuestionFixture(
         solution: "Vậy thể tích cần tìm là $36\\pi$.",
         answer: "C. $36\\pi$",
         isGeometry: false,
-        geometryStatement: null,
       },
     },
     reviewStatus: "NEEDS_REVIEW",
@@ -2335,6 +2595,7 @@ async function setupAiGenerationMock(
     lessonTitle?: string;
     quizQuestions?: Array<Record<string, unknown>>;
     quizSets?: Array<Record<string, unknown>>;
+    quizSetsAfterFirstRequest?: Array<Record<string, unknown>>;
     stemFigures?: Array<Record<string, unknown>>;
     summaryFiguresAfterGeneration?: Array<Record<string, unknown>>;
   } = {},
@@ -2428,6 +2689,7 @@ async function setupAiGenerationMock(
       : null,
   };
   let stemFigureListRequests = 0;
+  let quizSetListRequests = 0;
 
   await page.route(`${apiBaseUrl}/**`, async (route) => {
     const request = route.request();
@@ -3099,6 +3361,10 @@ async function setupAiGenerationMock(
     }
 
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}/quiz-sets`) {
+      quizSetListRequests += 1;
+      if (quizSetListRequests > 1 && options.quizSetsAfterFirstRequest) {
+        sets.QUIZ = structuredClone(options.quizSetsAfterFirstRequest);
+      }
       return fulfillJson(route, 200, { data: sets.QUIZ });
     }
     if (method === "GET" && pathname === `/admin/lessons/${lessonId}/flashcard-sets`) {
@@ -3196,6 +3462,70 @@ async function setupAiGenerationMock(
     const quizQuestionReviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/review$/,
     );
+    const quizFigurePreviewMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/create-new-ai\/preview$/,
+    );
+    if (method === "POST" && quizFigurePreviewMatch) {
+      const body = request.postDataJSON() as { mode?: string };
+      const quizFigureSystemPrompt = [
+        "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
+        "- Môn học cố định: Toán.",
+        "- Mọi cung góc phải nằm đúng miền. Khi dùng \\pic phải chọn đúng thứ tự tia; chỉ vẽ góc ngoài khi đề yêu cầu.",
+        "Trước khi trả latexSource: (1) tính lại từng số đo; (2) với angle=X--V--Y, tính miền quét.",
+      ].join("\n");
+      return fulfillJson(route, 200, {
+        data: {
+          mode: body.mode ?? "REGENERATE",
+          adminInstructions: null,
+          providerInput: {
+            model: "gpt-test",
+            instructions: quizFigureSystemPrompt,
+            input: [
+              {
+                role: "user",
+                content: [{ type: "input_text", text: "Dữ liệu câu Quiz" }],
+              },
+            ],
+          },
+          systemPrompt: quizFigureSystemPrompt,
+          userPrompt: "Dữ liệu câu Quiz",
+          configuration: {
+            isDefaultConfigured: true,
+            resolvedProvider: "OPENAI",
+            resolvedModel: "gpt-test",
+            temperature: null,
+            reasoningEffort: "medium",
+            maxOutputTokens: 12_000,
+            modelOptions: [
+              {
+                provider: "OPENAI",
+                model: "gpt-test",
+                available: true,
+                capabilities: {
+                  aiConfiguration: "REASONING_EFFORT",
+                  reasoningEffortLevels: ["low", "medium", "high"],
+                },
+              },
+            ],
+          },
+          context: {
+            textInputTokens: 300,
+            imageInputTokens: 0,
+            estimatedTokens: 300,
+          },
+          estimatedCost: {
+            available: true,
+            inputUpperBoundUsd: 0.001,
+            inputUpperBoundVnd: 25,
+            outputUpperBoundUsd: 0.01,
+            outputUpperBoundVnd: 250,
+            upperBoundUsd: 0.011,
+            upperBoundVnd: 275,
+            fxRateVndPerUsd: 25_000,
+          },
+        },
+      });
+    }
     if (method === "POST" && quizQuestionReviewMatch) {
       const questionId = quizQuestionReviewMatch[1] ?? "";
       const reviewStatus = String(request.postDataJSON().reviewStatus);
@@ -3240,6 +3570,9 @@ async function setupAiGenerationMock(
     },
     get stemFigureListRequests() {
       return stemFigureListRequests;
+    },
+    get quizSetListRequests() {
+      return quizSetListRequests;
     },
   };
 }

@@ -1,8 +1,9 @@
+import { normalizeMathTextLatexCommands } from "@learning-path/shared";
+
 import type { GeneratedQuizQuestion } from "#api/modules/quiz/types/quiz-generation.types";
 
 const DISPLAY_MATH_BLOCK_PATTERN = /\$\$([\s\S]*?)\$\$/gu;
-const LATEX_ENVIRONMENT_TOKEN_PATTERN =
-  /\\(begin|end)\{([A-Za-z][A-Za-z0-9*]*)\}/gu;
+const LATEX_ENVIRONMENT_TOKEN_PATTERN = /\\(begin|end)\{([A-Za-z][A-Za-z0-9*]*)\}/gu;
 const MISPLACED_DISPLAY_MATH_CLOSER_PATTERN =
   /\$\$(?=(?:\s*\\end\{[A-Za-z][A-Za-z0-9*]*\})+\s*\$\$)/gu;
 
@@ -74,8 +75,7 @@ export function normalizeQuizInlineMathDelimiters(value: string) {
         inDisplayMath = !inDisplayMath;
         inlineMathContentStart = null;
       } else if (!inDisplayMath) {
-        inlineMathContentStart =
-          inlineMathContentStart === null ? cursor + 1 : null;
+        inlineMathContentStart = inlineMathContentStart === null ? cursor + 1 : null;
       }
       normalized += value.slice(cursor, cursor + delimiterLength);
       cursor += delimiterLength;
@@ -162,7 +162,7 @@ function isInlineMathClosingBoundary(character: string | undefined) {
 function normalizeGeneratedQuizValue<T>(value: T): T {
   if (typeof value === "string") {
     return normalizeQuizDisplayMathEnvironments(
-      normalizeQuizInlineMathDelimiters(value),
+      normalizeMathTextLatexCommands(normalizeQuizInlineMathDelimiters(value)),
     ) as T;
   }
   if (Array.isArray(value)) {

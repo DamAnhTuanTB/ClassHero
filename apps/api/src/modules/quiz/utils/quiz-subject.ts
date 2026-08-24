@@ -44,8 +44,9 @@ export function buildQuizSubjectProfile(subject: QuizSubjectSnapshot) {
       return [
         ...heading,
         "- Kiểm tra giả thiết, phép biến đổi, điều kiện xác định, kí hiệu và kết luận toán học.",
-        "- Trong mỗi `explanation`, tự xác định `isGeometry`. Với câu Hình học lớp 7–9, đặt `isGeometry=true` và bắt buộc có `geometryStatement`; đây là nơi duy nhất chứa bảng giả thiết–kết luận (GT–KL). `hypotheses` chỉ chứa dữ kiện đề bài cho, còn `conclusions` chỉ chứa yêu cầu cần tìm hoặc chứng minh. Khi khối lớp chưa xác định hoặc nằm ngoài lớp 7–9, câu Hình học vẫn đặt `isGeometry=true` nhưng `geometryStatement=null`. Câu không phải Hình học đặt `isGeometry=false` và `geometryStatement=null`. Không chép lại bảng GT–KL trong `solution`; hãy dùng các giả thiết trực tiếp trong mạch lời giải.",
-        "- Quyết định tạo hình độc lập với `isGeometry` và `geometryStatement`; không tạo hình chỉ vì câu hỏi thuộc Hình học hoặc có bảng GT–KL.",
+        "- Trong mỗi `explanation`, tự xác định `isGeometry`: đặt `true` cho câu Hình học và `false` cho câu không phải Hình học. Quiz không trả bảng giả thiết–kết luận; hãy dùng trực tiếp các dữ kiện đề bài trong mạch lời giải.",
+        "- `isGeometry` không tự động đồng nghĩa với có hình, nhưng phải được dùng làm tín hiệu khi quyết định hình. Nếu `isGeometry=true` và câu có cấu hình cụ thể gồm các đối tượng hoặc quan hệ vị trí tham gia mạch giải, mặc định phải tạo `questionFigure`; chỉ bỏ hình cho câu định nghĩa, công thức hoặc tính chất tổng quát không phụ thuộc cấu hình.",
+        "- Câu Đại số vẫn phải tạo `questionFigure` khi đồ thị hàm số, hệ trục tọa độ, đường số, miền nghiệm, bảng biến thiên, bảng xét dấu, bảng dữ liệu, biểu đồ hoặc sơ đồ là đối tượng học sinh phải đọc, dựng, so sánh hay dùng để suy luận; các câu này giữ `isGeometry=false` nếu không thuộc Hình học.",
         "- Ký hiệu góc theo cách viết SGK phải dùng dấu mũ trên ba chữ cái và chữ chỉ đỉnh bắt buộc đứng ở vị trí thứ hai. Ví dụ, góc có đỉnh B với hai cạnh BA và BC phải viết là $\\widehat{ABC}$ hoặc $\\widehat{CBA}$; không dùng ký hiệu ∠ABC và không viết $\\widehat{BAC}$ vì biểu thức sau có đỉnh A.",
         "- Bài Số học hoặc Đại số phải trình bày trực tiếp phép tính và chuỗi biến đổi. Bài chứng minh hoặc dựng hình phải có mạch suy luận liên kết, nêu rõ căn cứ và kết luận; không biến toàn bộ lời giải thành danh sách bước rời rạc.",
         "- Nếu có hình, mọi điểm, đường và quan hệ trên hình phải được nêu trong `problem` hoặc `solution` tương ứng; hình không được bổ sung dữ kiện toán học mới.",
@@ -68,6 +69,44 @@ export function buildQuizSubjectProfile(subject: QuizSubjectSnapshot) {
       return [
         ...heading,
         "- Môn này chưa có bộ quy tắc chuyên biệt; không tự suy diễn thuật ngữ hoặc quy ước ngoài PDF nguồn.",
+      ].join("\n");
+  }
+}
+
+/**
+ * Figure Phase 2 only needs the subject rules that can change the drawing.
+ * Keeping this separate prevents the much larger question/explanation profile
+ * (solution formatting, unit-conversion steps, etc.) from being sent
+ * again to the image-code call.
+ */
+export function buildQuizFigureSubjectProfile(subject: QuizSubjectSnapshot) {
+  const heading = [
+    "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
+    `- Môn học cố định: ${subject.name}.`,
+    "- Chỉ dùng ký hiệu và quy ước trực quan của môn này; không đưa nội dung lạc môn vào hình.",
+  ];
+
+  switch (subject.key) {
+    case "MATH":
+      return [
+        ...heading,
+        "- Ký hiệu hình học phải gắn đúng đối tượng và đúng quan hệ; chữ giữa của ký hiệu góc ba chữ là đỉnh góc.",
+        "- Hình chỉ dùng dữ kiện trong problem; caption chỉ định hướng trình bày, không bổ sung/ghi đè dữ kiện. Mở rộng lời giải chỉ thêm đối tượng/quan hệ trong solution.",
+      ].join("\n");
+    case "PHYSICS":
+      return [
+        ...heading,
+        "- Giữ đúng đại lượng, đơn vị, chiều vector, điểm đặt, mốc quy chiếu, nút nối và cực tính được mô tả.",
+      ].join("\n");
+    case "CHEMISTRY":
+      return [
+        ...heading,
+        "- Giữ đúng công thức, liên kết, hóa trị, điện tích, dụng cụ, chất, chiều truyền và điểm nối được mô tả.",
+      ].join("\n");
+    case "GENERAL":
+      return [
+        ...heading,
+        "- Không tự suy diễn thuật ngữ, ký hiệu hoặc quy ước chuyên môn ngoài nội dung đã cung cấp.",
       ].join("\n");
   }
 }

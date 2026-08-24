@@ -44,11 +44,11 @@ describe("LessonAiGenerationPanelService", () => {
               title: "Phiếu mua hàng",
               kind: "PRIMARY_FROM_SOURCE",
               status: DocumentStatus.READY,
-              chunkCount: 1,
-              embeddingProvider: AiProviderName.OPENAI,
-              embeddingModel: "text-embedding-3-small",
-              embeddingDimensions: 1536,
-              activeOcrArtifactId: "ocr-uploaded-primary",
+              chunkCount: 0,
+              embeddingProvider: null,
+              embeddingModel: null,
+              embeddingDimensions: null,
+              activeOcrArtifactId: null,
               sourceDocumentId: null,
               file: {
                 originalName: "receipt.pdf",
@@ -160,7 +160,9 @@ describe("LessonAiGenerationPanelService", () => {
     expect(panel.documents[0]?.pageRange).toEqual({ pageStart: 29, pageEnd: 40 });
     expect(panel.documents[1]).toMatchObject({
       title: "Phiếu mua hàng",
+      chunkCount: 0,
       pageRange: null,
+      embeddingReady: false,
       canUseForSummary: true,
       canUseForQuiz: true,
       unavailableReason: null,

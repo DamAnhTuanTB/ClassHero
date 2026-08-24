@@ -264,6 +264,13 @@ describe("provider operations cost accounting", () => {
         maxOutputTokens: 8_000,
         promptVersion: "v1",
         schemaVersion: "v1",
+        resolvedSchemaReferenceStrategy: "inline",
+        schemaBytes: expect.any(Number),
+        inputTokenEstimate: expect.objectContaining({
+          textInputTokens: expect.any(Number),
+          imageInputTokens: 0,
+          estimatedTokens: expect.any(Number),
+        }),
         textFormat: expect.objectContaining({ type: "json_schema" }),
       }),
     );

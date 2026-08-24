@@ -42,6 +42,10 @@ Before editing:
 
 - Treat this as a feature behavior change, not a bug fix.
 - This skill is docs/planning-only by default.
+- A direct imperative that clearly asks to change the running feature now, such
+  as “bỏ field này cho tôi”, “sửa logic này” or “đổi thành behavior này”, counts
+  as an explicit implementation request unless the owner says they only want a
+  plan/discussion. Do not report the feature as changed when only docs changed.
 - If the owner only asks to inspect, discuss, or "lên kế hoạch" and does not
   explicitly ask to save/update docs or invoke `/update-feature`, return the plan
   in chat only. Do not edit repository docs, plans, context, roadmap, or code.

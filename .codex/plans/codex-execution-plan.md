@@ -33,12 +33,14 @@ Update note 2026-08-03:
   này phải xong trước `M9.4`.
 - Plan hardening M9.3 được đồng bộ ngày 2026-08-11 tại
   `.codex/plans/m9-3-ai-quiz-generation-completion-plan.md`; các subtask lõi
-  M9.3/M9.8/M7.2/M7.4 vẫn giữ trạng thái `Done`.
-- Corrective implementation M9.3 chốt Quiz output là danh sách EXAMPLE M9.2 cộng
-  assessment metadata. Worker append vào `targetQuizSetId` đang mở, không tạo tab
-  mới; lineage/audit theo question giữ đúng case 10→8. Admin/student dùng chung
-  EXAMPLE schema/prompt/recovery/compiler/renderer/editor với Sinh kiến thức;
-  Quiz không trả hoặc lưu sourceChunkIds ở cấp câu.
+  M9.8/M7.2/M7.4 vẫn giữ trạng thái `Done`.
+- Corrective M9.3 hoàn tất ngày 2026-08-24: chỉ Quiz bỏ hoàn toàn
+  `geometryStatement`/GT–KL khỏi provider output, mapper, persistence projection,
+  API và UI; Quiz vẫn giữ `isGeometry` khi cần, còn Summary/Example không đổi.
+- M9.3 giữ schema/prompt/mapper/renderer thuộc riêng domain Quiz. Worker append
+  vào `targetQuizSetId` đang mở, không tạo tab mới; lineage/audit theo question
+  giữ đúng case 10→8. Quiz không trả hoặc lưu sourceChunkIds ở cấp câu và không
+  dùng contract GT–KL của EXAMPLE Sinh kiến thức.
 
 Update note 2026-08-12:
 
@@ -311,6 +313,9 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     initial count; sau đó admin được xóa câu và giữ số còn lại trong cùng
     set/generation. Question hợp lệ hiện ngay ở danh sách tab Quiz dưới trạng thái
     review; không tạo staging screen riêng. Đây không phải subtask roadmap mới.
+    42.2. Corrective 2026-08-24 Done: bỏ `geometryStatement`/GT–KL khỏi riêng Quiz trên
+    provider schema, mapper, persistence projection, API, UI và test; giữ
+    `isGeometry`, không thay đổi Summary/Example.
 43. `M9.8` - Admin AI generation panel UI. Done 2026-08-03.
     43.0.1. M9.13–M9.16 là lịch sử của nhánh renderer JSON cũ, không chạy trên
     nhánh TeX/TikZ.

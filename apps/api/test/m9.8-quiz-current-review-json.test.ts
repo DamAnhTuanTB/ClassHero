@@ -51,7 +51,10 @@ describe("M9.8 mutable Quiz generation output", () => {
         solution: "Lời giải gốc",
         answer: "A. Phương án gốc",
         isGeometry: false,
-        geometryStatement: null,
+        geometryStatement: {
+          hypotheses: ["Dữ kiện cũ"],
+          conclusions: ["Kết luận cũ"],
+        },
       },
       correctOptionId: "A",
     };
@@ -104,6 +107,7 @@ describe("M9.8 mutable Quiz generation output", () => {
       },
     });
     expect(result?.questions[0]).toHaveProperty("figure", rawProviderQuestionJson.figure);
+    expect(result?.questions[0]).not.toHaveProperty("explanation.geometryStatement");
     expect(result?.questions[1]).toEqual({ questionType: "TRUE_FALSE" });
     expect(result?.generationMeta).toEqual({ requestedCount: 2 });
     expect(rawProviderQuestionJson.explanation.problem).toBe("Câu hỏi gốc");
@@ -183,7 +187,7 @@ describe("M9.8 mutable Quiz generation output", () => {
     expect(result?.explanation).not.toHaveProperty("statementSolutions");
   });
 
-  it("keeps every current accepted answer when a text-input question was expanded", () => {
+  it("keeps only the canonical text-input answer in the mutable generation JSON", () => {
     const result = buildCurrentQuizQuestionJson(
       {
         questionType: QuestionType.TEXT_INPUT,
@@ -217,11 +221,11 @@ describe("M9.8 mutable Quiz generation output", () => {
     );
 
     expect(result).toMatchObject({
-      correctAnswer: ["1/2", "0.5"],
+      correctAnswer: "1/2",
       explanation: {
         problem: "Nhập kết quả.",
         solution: "Hai cách viết tương đương.",
-        answer: "1/2\n0.5",
+        answer: "1/2",
       },
     });
   });

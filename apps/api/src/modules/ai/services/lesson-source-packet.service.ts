@@ -3,7 +3,6 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { DocumentStatus } from "@prisma/client";
 import { PDFDocument } from "pdf-lib";
-import { PDFParse } from "pdf-parse";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
@@ -129,8 +128,6 @@ export class LessonSourcePacketService {
         { sizeBytes: bytes.length, maxBytes },
       );
     }
-    await assertSearchable(bytes);
-
     const packetHash = sha256(bytes);
     const manifest = {
       version: 1 as const,
@@ -285,13 +282,12 @@ export class LessonSourcePacketService {
         document.file.mimeType !== "application/pdf" ||
         document.file.status === "DELETED" ||
         !document.file.checksum ||
-        !activeOcrArtifactId ||
         hasSourceDocument !== hasPageRange ||
         (hasSourceDocument && document.sourceDocument?.status !== DocumentStatus.READY)
       ) {
         throw new LessonSourcePacketError(
           "AI_PDF_SOURCE_NOT_READY",
-          `Tài liệu ${document.title ?? document.file.originalName} chưa đủ điều kiện searchable PDF.`,
+          `Tài liệu ${document.title ?? document.file.originalName} chưa đủ điều kiện tạo PDF packet.`,
           { documentId: document.id },
         );
       }
@@ -336,24 +332,6 @@ function resolvePageNumbers(
     { length: document.pageRange.pageEnd - document.pageRange.pageStart + 1 },
     (_, index) => document.pageRange!.pageStart + index,
   );
-}
-
-async function assertSearchable(buffer: Buffer) {
-  const clone = new Uint8Array(buffer.length);
-  clone.set(buffer);
-  const parser = new PDFParse({ data: clone });
-  try {
-    const text = await parser.getText();
-    const searchablePages = text.pages.filter((page) => page.text.trim().length >= 8);
-    if (searchablePages.length / Math.max(1, text.total) < 0.5) {
-      throw new LessonSourcePacketError(
-        "AI_PDF_SOURCE_NOT_READY",
-        "Packet PDF không có lớp text searchable đủ trên các trang nội dung.",
-      );
-    }
-  } finally {
-    await parser.destroy();
-  }
 }
 
 function readPrintedPageLabel(value: unknown) {

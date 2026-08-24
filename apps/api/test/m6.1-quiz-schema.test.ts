@@ -2,6 +2,7 @@ import {
   multiStatementCorrectAnswerSchema,
   multiStatementOptionsSchema,
   multipleChoiceOptionsSchema,
+  textInputCorrectAnswerSchema,
   textInputGradingSchema,
   correctAnswerSchema,
 } from "../src/modules/quiz/types/quiz.types";
@@ -93,6 +94,14 @@ describe("M6.1 Quiz Schema Validation", () => {
         expect(result.data.exactMatch).toBe(true);
         expect(result.data.numericComparison).toBe(false);
       }
+    });
+  });
+
+  describe("textInputCorrectAnswerSchema", () => {
+    it("accepts exactly one canonical answer", () => {
+      expect(textInputCorrectAnswerSchema.safeParse(["0.5"]).success).toBe(true);
+      expect(textInputCorrectAnswerSchema.safeParse([]).success).toBe(false);
+      expect(textInputCorrectAnswerSchema.safeParse(["0.5", "1/2"]).success).toBe(false);
     });
   });
 

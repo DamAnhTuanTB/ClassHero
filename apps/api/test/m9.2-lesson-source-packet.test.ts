@@ -394,7 +394,8 @@ describe("M9.2 lesson source PDF packet", () => {
     expect(storage.uploadBuffer).not.toHaveBeenCalled();
   });
 
-  it("rejects sources without an active searchable OCR artifact before upload", async () => {
+  it("accepts a valid PDF without an active OCR artifact", async () => {
+    const pdf = await searchablePdf(["Page one"]);
     const document = sourceDocument({
       id: "doc-primary",
       kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
@@ -405,8 +406,8 @@ describe("M9.2 lesson source PDF packet", () => {
     document.activeOcrArtifactId = null;
     document.sourceDocument!.activeOcrArtifactId = null;
     const storage = {
-      downloadObject: vi.fn(),
-      uploadBuffer: vi.fn(),
+      downloadObject: vi.fn(async () => pdf),
+      uploadBuffer: vi.fn(async () => undefined),
       deleteObject: vi.fn(),
     };
     const service = new LessonSourcePacketService(
@@ -418,11 +419,11 @@ describe("M9.2 lesson source PDF packet", () => {
       packetConfig() as never,
     );
 
-    await expect(service.build("lesson-1", ["doc-primary"])).rejects.toMatchObject<
-      Partial<LessonSourcePacketError>
-    >({ code: "AI_PDF_SOURCE_NOT_READY" });
-    expect(storage.downloadObject).not.toHaveBeenCalled();
-    expect(storage.uploadBuffer).not.toHaveBeenCalled();
+    const packet = await service.build("lesson-1", ["doc-primary"]);
+
+    expect(packet.manifest.pageCount).toBe(1);
+    expect(storage.downloadObject).toHaveBeenCalledOnce();
+    expect(storage.uploadBuffer).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -457,7 +458,7 @@ describe("M9.2 lesson source PDF packet", () => {
         document.sourceDocument!.status = DocumentStatus.PROCESSING;
       },
     ],
-  ])("rejects an ineligible searchable source: %s", async (_label, mutate) => {
+  ])("rejects an ineligible PDF source: %s", async (_label, mutate) => {
     const document = sourceDocument({
       id: "doc-invalid",
       kind: LessonDocumentKind.PRIMARY_FROM_SOURCE,
@@ -521,7 +522,7 @@ describe("M9.2 lesson source PDF packet", () => {
     expect(storage.uploadBuffer).not.toHaveBeenCalled();
   });
 
-  it("rejects a PDF packet whose pages do not contain a sufficient searchable text layer", async () => {
+  it("accepts a scan-only PDF packet without a text layer", async () => {
     const pdf = await nonSearchablePdf(2);
     const document = sourceDocument({
       id: "doc-no-searchable-text",
@@ -544,10 +545,10 @@ describe("M9.2 lesson source PDF packet", () => {
       packetConfig() as never,
     );
 
-    await expect(service.build("lesson-1", [document.id])).rejects.toMatchObject<
-      Partial<LessonSourcePacketError>
-    >({ code: "AI_PDF_SOURCE_NOT_READY" });
-    expect(storage.uploadBuffer).not.toHaveBeenCalled();
+    const packet = await service.build("lesson-1", [document.id]);
+
+    expect(packet.manifest.pageCount).toBe(2);
+    expect(storage.uploadBuffer).toHaveBeenCalledOnce();
   });
 
   it("rejects excessive page counts and packet sizes before storage upload", async () => {
@@ -689,8 +690,15 @@ async function searchablePdf(pageTexts: string[]) {
 
 async function nonSearchablePdf(pageCount: number) {
   const pdf = await PDFDocument.create();
+  const scannedPageImage = await pdf.embedPng(
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
   for (let index = 0; index < pageCount; index += 1) {
-    pdf.addPage([595, 842]);
+    const page = pdf.addPage([595, 842]);
+    page.drawImage(scannedPageImage, { x: 0, y: 0, width: 595, height: 842 });
   }
   return Buffer.from(await pdf.save({ useObjectStreams: false }));
 }

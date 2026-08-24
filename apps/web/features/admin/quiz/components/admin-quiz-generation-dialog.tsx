@@ -332,6 +332,8 @@ export function AdminQuizGenerationDialog({
   const hardCountField = form.register("hardCount");
   const temperatureField = form.register("temperature");
   const maxOutputTokensField = form.register("maxOutputTokens");
+  const revalidateDifficultyCounts = () =>
+    form.trigger(["questionCount", "easyCount", "mediumCount", "hardCount"]);
 
   return (
     <EditorDialogShell
@@ -399,7 +401,10 @@ export function AdminQuizGenerationDialog({
               icon={null}
               error={form.formState.errors.questionCount}
               {...questionCountField}
-              onChange={numericChange(questionCountField.onChange)}
+              onChange={numericChange(
+                questionCountField.onChange,
+                revalidateDifficultyCounts,
+              )}
             />
             <OptionField
               id="ai-quiz-difficulty"
@@ -438,7 +443,10 @@ export function AdminQuizGenerationDialog({
                     ]
                   }
                   {...(field as typeof easyCountField)}
-                  onChange={numericChange((field as typeof easyCountField).onChange)}
+                  onChange={numericChange(
+                    (field as typeof easyCountField).onChange,
+                    revalidateDifficultyCounts,
+                  )}
                 />
               ))}
             </div>
@@ -957,10 +965,14 @@ function updateQuestionTypes(
   update(checked ? [...current, type] : current.filter((item) => item !== type));
 }
 
-function numericChange(onChange: (event: ChangeEvent<HTMLInputElement>) => void) {
+function numericChange(
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void,
+  afterChange?: () => void,
+) {
   return (event: ChangeEvent<HTMLInputElement>) => {
     event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "");
     onChange(event);
+    afterChange?.();
   };
 }
 

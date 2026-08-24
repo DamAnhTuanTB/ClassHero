@@ -10,7 +10,11 @@ import type {
   TiptapJsonNode,
   TiptapTextDocument,
 } from "@/types/rich-text";
-import { tokenizeMathText } from "@learning-path/shared";
+import {
+  normalizeLatexCommandBackslashes,
+  normalizeMathTextLatexCommands,
+  tokenizeMathText,
+} from "@learning-path/shared";
 import {
   LEARNING_CONTENT_KATEX_MACROS,
   normalizeLearningContentLatex,
@@ -107,7 +111,10 @@ function ContentNode({
     return <br />;
   }
   if (node.type === "inlineMath" || node.type === "blockMath") {
-    const latex = typeof node.attrs?.latex === "string" ? node.attrs.latex : "";
+    const latex =
+      typeof node.attrs?.latex === "string"
+        ? normalizeLatexCommandBackslashes(node.attrs.latex)
+        : "";
     const html = renderMath(latex, node.type === "blockMath");
     return (
       <span
@@ -172,7 +179,7 @@ function renderTextWithFallbackMath(
   marks: TiptapJsonMark[] | undefined,
   contentAlignment: "authored" | "left",
 ) {
-  return tokenizeMathText(text).map((token, index) =>
+  return tokenizeMathText(normalizeMathTextLatexCommands(text)).map((token, index) =>
     token.type === "text" ? (
       <span key={`text-${index}`}>{applyMarks(token.value, marks)}</span>
     ) : (

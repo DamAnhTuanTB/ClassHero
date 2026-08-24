@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -62,6 +63,7 @@ import {
   useAdminQuizSets,
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { QuizRichContentViewer } from "@/features/admin/quiz/components/quiz-rich-content-viewer";
+import { AdminQuizFigurePreview } from "@/features/admin/quiz/components/admin-quiz-figure-preview";
 import type {
   AdminTestQuestion,
   AdminTestSet,
@@ -696,37 +698,50 @@ function QuizSetPanel({
           id: string;
           label: string;
           questions: AdminQuizQuestion[];
+          isPendingAi?: boolean;
           type?: OrderedQuizQuestionType;
         }>,
       };
     }
 
     const quizQuestions = (questions ?? []) as AdminQuizQuestion[];
-    const pendingQuestions = quizQuestions.filter(
-      (question) =>
-        question.reviewStatus === "NEEDS_REVIEW" &&
-        (Boolean(question.sourceMetadataJson?.aiGenerationId) ||
-          activeSet.source === "AI"),
+    const pendingQuestions = orderQuizQuestionsByType(
+      quizQuestions.filter(
+        (question) =>
+          question.reviewStatus === "NEEDS_REVIEW" &&
+          (Boolean(question.sourceMetadataJson?.aiGenerationId) ||
+            activeSet.source === "AI"),
+      ),
     );
     const approvedQuestions = orderQuizQuestionsByType(
       quizQuestions.filter((question) => question.reviewStatus === "APPROVED"),
     );
-    const rows = [
-      ...(pendingQuestions.length > 0
+    const pendingRows = QUIZ_QUESTION_TYPE_ORDER.flatMap((type) => {
+      const questionsForType = pendingQuestions.filter(
+        (question) => question.questionType === type,
+      );
+
+      return questionsForType.length > 0
         ? [
             {
-              id: "pending-ai",
-              icon: Sparkles,
-              label: "Câu AI chờ duyệt",
-              questions: pendingQuestions,
+              id: `pending-ai-${type}`,
+              icon: approvedQuizQuestionRowIcons[type],
+              label: approvedQuizQuestionRowLabels[type],
+              questions: questionsForType,
+              isPendingAi: true,
+              type,
             },
           ]
-        : []),
+        : [];
+    });
+    const rows = [
+      ...pendingRows,
       ...QUIZ_QUESTION_TYPE_ORDER.map((type) => ({
         id: type,
         icon: approvedQuizQuestionRowIcons[type],
         label: approvedQuizQuestionRowLabels[type],
         questions: approvedQuestions.filter((question) => question.questionType === type),
+        isPendingAi: false,
         type,
       })),
     ];
@@ -781,6 +796,7 @@ function QuizSetPanel({
       : selectedQuizQuestion;
   const selectedGenerationIssues = getSelectedQuizGenerationIssues(
     isTest ? null : (activeSet as AdminQuizSet),
+    (questions ?? []) as AdminQuizQuestion[],
     selectedQuizQuestion,
   );
   const {
@@ -863,8 +879,18 @@ function QuizSetPanel({
       (currentIndex + offset + navigationQuestions.length) % navigationQuestions.length;
     const nextQuestion = navigationQuestions[nextIndex];
     if (!nextQuestion) return;
+
+    const scrollPosition = {
+      left: window.scrollX,
+      top: window.scrollY,
+    };
     setSelectedQuestionId(nextQuestion.id);
-    focusQuestionNumber(nextQuestion.id);
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        ...scrollPosition,
+        behavior: "auto",
+      });
+    });
   };
 
   const unpublishedApprovedQuestionCount =
@@ -960,6 +986,7 @@ function QuizSetPanel({
           </>
         )}
         <AdminGeneratedSetReviewActions
+          approvedQuestionCount={quizQuestionNavigation.approvedQuestions.length}
           isReviewingAllPending={isReviewingAllQuestions}
           lessonId={lessonId}
           onReviewAllPending={isTest ? undefined : onReviewAllQuestions}
@@ -968,7 +995,6 @@ function QuizSetPanel({
               ? activeSet.pendingReviewQuestionCount
               : quizQuestionNavigation.pendingQuestions.length
           }
-          unpublishedApprovedQuestionCount={unpublishedApprovedQuestionCount}
           reviewStatus={activeSet.reviewStatus}
           setId={activeSet.id}
           source={activeSet.source}
@@ -997,7 +1023,7 @@ function QuizSetPanel({
                 <strong className="rounded bg-sky-100 px-1.5 py-0.5 font-black text-sky-700 dark:bg-sky-900 dark:text-sky-200">
                   Lưu
                 </strong>{" "}
-                để cập nhật cho học sinh.
+                để cập nhật vào lượt phát hành gần nhất cho học sinh.
               </span>
             </span>
           </div>
@@ -1040,141 +1066,174 @@ function QuizSetPanel({
       quizQuestionNavigation.navigableQuestions.length > 0 &&
       selectedQuestionIndex >= 0 ? (
         <div className="grid gap-2">
+          {quizQuestionNavigation.pendingQuestions.length > 0 ? (
+            <div
+              className="flex w-fit items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-extrabold text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200"
+              data-testid="quiz-pending-ai-heading"
+            >
+              <Sparkles className="size-4" aria-hidden="true" />
+              <span>AI chờ duyệt</span>
+              <span className="rounded-full bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-black leading-none tabular-nums text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+                {quizQuestionNavigation.pendingQuestions.length}
+              </span>
+            </div>
+          ) : null}
           <div
             ref={questionNumbersRef}
             role="tablist"
             aria-label="Chọn câu hỏi Quiz"
-            className="min-w-0 overflow-x-auto py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="min-w-0 py-0.5"
           >
-            <div className="grid min-w-max gap-2">
-              {quizQuestionNavigation.rows.map((row) => {
-                const isPendingAiRow = row.id === "pending-ai";
+            <div className="grid min-w-0 gap-2">
+              {quizQuestionNavigation.rows.map((row, rowIndex) => {
+                const isPendingAiRow = row.isPendingAi === true;
+                const shouldRenderApprovedHeading =
+                  !isPendingAiRow &&
+                  (rowIndex === 0 ||
+                    quizQuestionNavigation.rows[rowIndex - 1]?.isPendingAi === true);
                 const RowIcon = row.icon;
 
                 return (
-                  <div
-                    key={row.id}
-                    role="group"
-                    aria-label={row.label}
-                    data-testid={`quiz-question-navigation-${row.id}`}
-                    className="grid grid-cols-[11.5rem_auto] items-stretch gap-2"
-                  >
-                    <div
-                      className={cn(
-                        "relative flex min-h-14 items-center gap-2 overflow-hidden rounded-xl border px-2.5 py-1.5 shadow-sm",
-                        isPendingAiRow
-                          ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200"
-                          : "border-[var(--theme-border)] bg-white text-[var(--theme-text-strong)] dark:bg-slate-950",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute inset-y-2 left-0 w-1 rounded-r-full",
-                          isPendingAiRow
-                            ? "bg-amber-400 dark:bg-amber-500"
-                            : "bg-sky-400 dark:bg-sky-500",
-                        )}
-                        aria-hidden="true"
-                      />
-                      <span
-                        className={cn(
-                          "grid size-7 shrink-0 place-items-center rounded-lg",
-                          isPendingAiRow
-                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/70 dark:text-amber-200"
-                            : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-                        )}
+                  <Fragment key={row.id}>
+                    {shouldRenderApprovedHeading ? (
+                      <div
+                        className="flex w-fit items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/35 dark:text-emerald-200"
+                        data-testid="quiz-approved-heading"
                       >
-                        <RowIcon className="size-4" aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0 flex-1 text-xs font-extrabold leading-snug">
-                        {row.label}
-                      </span>
-                      <span
-                        className={cn(
-                          "grid min-w-6 shrink-0 place-items-center rounded-full px-1.5 py-1 text-[10px] font-black leading-none tabular-nums",
-                          isPendingAiRow
-                            ? "bg-amber-200/70 text-amber-900 dark:bg-amber-800 dark:text-amber-100"
-                            : "bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
-                        )}
-                        aria-label={`${row.questions.length} câu`}
-                      >
-                        {row.questions.length}
-                      </span>
-                    </div>
-                    <div className="flex min-h-14 items-center gap-1.5">
-                      {row.questions.length === 0 ? (
-                        <span className="text-xs font-medium italic text-[var(--theme-text-muted)]">
-                          Chưa có câu
+                        <CheckCircle2 className="size-4" aria-hidden="true" />
+                        <span>Đã duyệt</span>
+                        <span className="rounded-full bg-emerald-200/70 px-1.5 py-0.5 text-[10px] font-black leading-none tabular-nums text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
+                          {quizQuestionNavigation.approvedQuestions.length}
                         </span>
-                      ) : (
-                        row.questions.map((question, rowIndex) => {
-                          const isSelected = question.id === selectedQuestionId;
-                          const isAiGenerated = Boolean(
-                            question.sourceMetadataJson?.aiGenerationId,
-                          );
-                          const approvedIndex =
-                            quizQuestionNavigation.approvedQuestions.findIndex(
-                              (item) => item.id === question.id,
+                      </div>
+                    ) : null}
+                    <div
+                      role="group"
+                      aria-label={row.label}
+                      data-testid={`quiz-question-navigation-${row.id}`}
+                      className="grid min-w-0 grid-cols-1 items-start gap-2 sm:grid-cols-[11.5rem_minmax(0,1fr)]"
+                    >
+                      <div
+                        className={cn(
+                          "relative flex min-h-14 items-center gap-2 overflow-hidden rounded-xl border px-2.5 py-1.5 shadow-sm",
+                          isPendingAiRow
+                            ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200"
+                            : "border-[var(--theme-border)] bg-white text-[var(--theme-text-strong)] dark:bg-slate-950",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "absolute inset-y-2 left-0 w-1 rounded-r-full",
+                            isPendingAiRow
+                              ? "bg-amber-400 dark:bg-amber-500"
+                              : "bg-sky-400 dark:bg-sky-500",
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span
+                          className={cn(
+                            "grid size-7 shrink-0 place-items-center rounded-lg",
+                            isPendingAiRow
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/70 dark:text-amber-200"
+                              : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+                          )}
+                        >
+                          <RowIcon className="size-4" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1 text-xs font-extrabold leading-snug">
+                          {row.label}
+                        </span>
+                        <span
+                          className={cn(
+                            "grid min-w-6 shrink-0 place-items-center rounded-full px-1.5 py-1 text-[10px] font-black leading-none tabular-nums",
+                            isPendingAiRow
+                              ? "bg-amber-200/70 text-amber-900 dark:bg-amber-800 dark:text-amber-100"
+                              : "bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
+                          )}
+                          aria-label={`${row.questions.length} câu`}
+                        >
+                          {row.questions.length}
+                        </span>
+                      </div>
+                      <div className="flex min-h-14 min-w-0 flex-wrap items-center gap-1.5">
+                        {row.questions.length === 0 ? (
+                          <span className="text-xs font-medium italic text-[var(--theme-text-muted)]">
+                            Chưa có câu
+                          </span>
+                        ) : (
+                          row.questions.map((question) => {
+                            const isSelected = question.id === selectedQuestionId;
+                            const isAiGenerated = Boolean(
+                              question.sourceMetadataJson?.aiGenerationId,
                             );
-                          const displayNumber =
-                            approvedIndex >= 0 ? approvedIndex + 1 : rowIndex + 1;
-                          const navigationIndex =
-                            quizQuestionNavigation.navigableQuestions.findIndex(
-                              (item) => item.id === question.id,
-                            );
-                          return (
-                            <button
-                              key={question.id}
-                              ref={(element) =>
-                                setQuestionNumberRef(question.id, element)
-                              }
-                              type="button"
-                              role="tab"
-                              aria-controls={`quiz-question-${question.id}`}
-                              aria-label={`Xem câu ${displayNumber}, ${row.label}, mức độ ${difficultyLabel(question.difficulty)}${isAiGenerated ? ", do AI tạo" : ""}`}
-                              aria-selected={isSelected}
-                              tabIndex={isSelected ? 0 : -1}
-                              onClick={() => setSelectedQuestionId(question.id)}
-                              onKeyDown={(event) =>
-                                handleQuestionNumbersKeyDown(event, navigationIndex)
-                              }
-                              className={cn(
-                                "relative flex min-h-14 w-[5.25rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1.5 font-extrabold transition",
-                                isSelected
-                                  ? "border-[var(--theme-primary)] bg-[var(--theme-primary)] text-white shadow-sm dark:text-[var(--theme-primary-foreground)]"
-                                  : "border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text-muted)] hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)]",
-                              )}
-                            >
-                              {isAiGenerated ? (
-                                <span
-                                  title="Câu do AI tạo"
-                                  className={cn(
-                                    "absolute right-1 top-1 grid size-[1.125rem] place-items-center rounded-full",
-                                    isSelected
-                                      ? "bg-white/20 text-white dark:text-[var(--theme-primary-foreground)]"
-                                      : "bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
-                                  )}
-                                >
-                                  <Sparkles className="size-2.5" aria-hidden="true" />
-                                </span>
-                              ) : null}
-                              <span className="text-sm leading-none">
-                                {displayNumber}
-                              </span>
-                              <span
+                            const approvedIndex =
+                              quizQuestionNavigation.approvedQuestions.findIndex(
+                                (item) => item.id === question.id,
+                              );
+                            const pendingIndex =
+                              quizQuestionNavigation.pendingQuestions.findIndex(
+                                (item) => item.id === question.id,
+                              );
+                            const displayNumber =
+                              approvedIndex >= 0 ? approvedIndex + 1 : pendingIndex + 1;
+                            const navigationIndex =
+                              quizQuestionNavigation.navigableQuestions.findIndex(
+                                (item) => item.id === question.id,
+                              );
+                            return (
+                              <button
+                                key={question.id}
+                                ref={(element) =>
+                                  setQuestionNumberRef(question.id, element)
+                                }
+                                type="button"
+                                role="tab"
+                                aria-controls={`quiz-question-${question.id}`}
+                                aria-label={`Xem câu ${displayNumber}, ${row.label}, mức độ ${difficultyLabel(question.difficulty)}${isAiGenerated ? ", do AI tạo" : ""}`}
+                                aria-selected={isSelected}
+                                tabIndex={isSelected ? 0 : -1}
+                                onClick={() => setSelectedQuestionId(question.id)}
+                                onKeyDown={(event) =>
+                                  handleQuestionNumbersKeyDown(event, navigationIndex)
+                                }
                                 className={cn(
-                                  "whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-black leading-none tracking-wide",
-                                  questionDifficultyBadgeClassName(question.difficulty),
+                                  "relative flex min-h-14 w-[5.25rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1.5 font-extrabold transition",
+                                  isSelected
+                                    ? "border-[var(--theme-primary)] bg-[var(--theme-primary)] text-white shadow-sm dark:text-[var(--theme-primary-foreground)]"
+                                    : "border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text-muted)] hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)]",
                                 )}
                               >
-                                {difficultyLabel(question.difficulty)}
-                              </span>
-                            </button>
-                          );
-                        })
-                      )}
+                                {isAiGenerated ? (
+                                  <span
+                                    title="Câu do AI tạo"
+                                    className={cn(
+                                      "absolute right-1 top-1 grid size-[1.125rem] place-items-center rounded-full",
+                                      isSelected
+                                        ? "bg-white/20 text-white dark:text-[var(--theme-primary-foreground)]"
+                                        : "bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
+                                    )}
+                                  >
+                                    <Sparkles className="size-2.5" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                                <span className="text-sm leading-none">
+                                  {displayNumber}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-black leading-none tracking-wide",
+                                    questionDifficultyBadgeClassName(question.difficulty),
+                                  )}
+                                >
+                                  {difficultyLabel(question.difficulty)}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </Fragment>
                 );
               })}
             </div>
@@ -1316,6 +1375,7 @@ function QuizSetPanel({
                 assessmentKind={assessmentKind}
                 index={index}
                 question={question}
+                setId={activeSet.id}
                 onDelete={() => onDeleteQuestion(question)}
                 onEdit={() => onEditQuestion(question)}
                 onReview={() => onReviewQuestion(question)}
@@ -1338,6 +1398,7 @@ function QuizSetPanel({
                     assessmentKind={assessmentKind}
                     index={selectedQuestionDisplayIndex}
                     question={previewQuizQuestion ?? selectedQuestion}
+                    setId={activeSet.id}
                     onDelete={() => onDeleteQuestion(selectedQuestion)}
                     onEdit={() => onEditQuestion(selectedQuestion)}
                     onNext={() => selectRelativeQuizQuestion(1)}
@@ -1462,6 +1523,7 @@ function QuizSetPanel({
               assessmentKind={assessmentKind}
               index={selectedQuestionDisplayIndex}
               question={selectedQuestion}
+              setId={activeSet.id}
               onDelete={() => onDeleteQuestion(selectedQuestion)}
               onEdit={() => onEditQuestion(selectedQuestion)}
               onNext={() => selectRelativeQuizQuestion(1)}
@@ -1481,6 +1543,7 @@ function QuizSetPanel({
 
 function getSelectedQuizGenerationIssues(
   set: AdminQuizSet | null,
+  questions: AdminQuizQuestion[],
   question: AdminQuizQuestion | undefined,
 ) {
   if (question?.reviewStatus === "APPROVED") return [];
@@ -1488,9 +1551,18 @@ function getSelectedQuizGenerationIssues(
   const questionIndex = question?.sourceMetadataJson?.generationQuestionIndex;
   if (!set || !generationId || typeof questionIndex !== "number") return [];
   const generation = set.aiGenerations?.find((item) => item.id === generationId);
-  return (generation?.inputMetaJson?.generationIssues ?? []).filter(
-    (issue) => issue.questionIndex === undefined || issue.questionIndex === questionIndex,
+  const hasApprovedQuestionInGeneration = questions.some(
+    (candidate) =>
+      candidate.reviewStatus === "APPROVED" &&
+      candidate.sourceMetadataJson?.aiGenerationId === generationId,
   );
+  return (generation?.inputMetaJson?.generationIssues ?? []).filter((issue) => {
+    if (issue.questionIndex === undefined) {
+      return !hasApprovedQuestionInGeneration;
+    }
+
+    return issue.questionIndex === questionIndex;
+  });
 }
 
 function QuestionCard({
@@ -1504,6 +1576,7 @@ function QuestionCard({
   onReview,
   isQuestionNavigationDisabled = false,
   isReviewing,
+  setId,
 }: {
   assessmentKind: "quiz" | "test";
   index: number;
@@ -1515,9 +1588,17 @@ function QuestionCard({
   onReview: () => void;
   isQuestionNavigationDisabled?: boolean;
   isReviewing: boolean;
+  setId: string;
 }) {
   const isAiGenerated = Boolean(question.sourceMetadataJson?.aiGenerationId);
   const isApproved = question.reviewStatus === "APPROVED";
+  const quizQuestion = assessmentKind === "quiz" ? (question as AdminQuizQuestion) : null;
+  const questionFigure = quizQuestion?.figures.find(
+    (figure) => figure.role === "QUESTION",
+  );
+  const solutionFigure = quizQuestion?.figures.find(
+    (figure) => figure.role === "SOLUTION",
+  );
   const correctAnswers = getStringAnswers(question.correctAnswerJson);
   const statementAnswerById = new Map(
     getMultiStatementAnswers(question.correctAnswerJson).map((answer) => [
@@ -1648,6 +1729,15 @@ function QuestionCard({
         </div>
       </div>
 
+      {questionFigure ? (
+        <AdminQuizFigurePreview
+          figure={questionFigure}
+          questionId={question.id}
+          role="QUESTION"
+          setId={setId}
+        />
+      ) : null}
+
       {question.questionType === "MULTIPLE_CHOICE" ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {question.optionsJson?.map((option, optionIndex) => {
@@ -1726,10 +1816,10 @@ function QuestionCard({
         <div className="flex items-baseline gap-2 rounded-lg border border-[var(--theme-success-border)] bg-[var(--theme-success-bg)] p-3">
           <p className="shrink-0 font-normal text-[var(--theme-success-text)]">Đáp án:</p>
           <ul className="min-w-0 flex-1 space-y-1 font-normal leading-relaxed text-[var(--theme-success-text)]">
-            {correctAnswers.map((answer, answerIndex) => (
+            {correctAnswers.slice(0, 1).map((answer, answerIndex) => (
               <li
                 key={`${answerIndex}-${answer}`}
-                aria-label={`Đáp án được chấp nhận ${answerIndex + 1}`}
+                aria-label="Đáp án đúng"
                 className="break-words"
               >
                 <MathpixMarkdownRenderer
@@ -1748,7 +1838,11 @@ function QuestionCard({
         </div>
       )}
 
-      {hint || explanation || quizExplanationBlock || testExampleBlock ? (
+      {solutionFigure ||
+      hint ||
+      explanation ||
+      quizExplanationBlock ||
+      testExampleBlock ? (
         <div className="space-y-3">
           {hint ? (
             <div className="rounded-lg border border-[var(--theme-info-border)] bg-[var(--theme-info-bg)] p-3">
@@ -1762,6 +1856,14 @@ function QuestionCard({
                 content={question.hintJson}
               />
             </div>
+          ) : null}
+          {solutionFigure ? (
+            <AdminQuizFigurePreview
+              figure={solutionFigure}
+              questionId={question.id}
+              role="SOLUTION"
+              setId={setId}
+            />
           ) : null}
           {quizExplanationBlock ? (
             <QuizExplanationCard
@@ -1941,6 +2043,7 @@ function getAssessmentCopy(assessmentKind: "quiz" | "test") {
         addSetLabel: "Thêm bộ đề",
         createFirstSetLabel: "Tạo bộ đề đầu tiên",
         deleteSetTitle: "Xóa bộ đề",
+        description: "Quản lý các bộ đề và câu hỏi kiểm tra của buổi học.",
         heading: "Quản lý Bài kiểm tra",
         setName: "bộ đề",
         setNamePlural: "bộ đề",
@@ -1949,6 +2052,7 @@ function getAssessmentCopy(assessmentKind: "quiz" | "test") {
         addSetLabel: "Thêm bộ câu hỏi",
         createFirstSetLabel: "Tạo bộ câu hỏi đầu tiên",
         deleteSetTitle: "Xóa bộ câu hỏi",
+        description: "Quản lý các bộ câu hỏi luyện tập của buổi học.",
         heading: "Quản lý Quiz",
         setName: "bộ câu hỏi",
         setNamePlural: "bộ câu hỏi",

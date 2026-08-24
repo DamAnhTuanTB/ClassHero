@@ -78,7 +78,7 @@ M14 testing/hardening/deploy
   `M9.9 -> M4.6 -> M9.10 -> M9.11 -> M9.12`; dùng nền `M9.1`, `M4.4` và admin shell. `M9.12` là bước hardening cuối, phải hoàn tất trước khi coi hard-stop là giới hạn tuyệt đối trong production.
   `M9.8` đứng ngay sau `M9.3` để admin kiểm thử generation trên UI và đã Done
   ngày 2026-08-03; mã task không đổi để giữ ổn định lịch sử tham chiếu.
-- `M9.2` hiện bao gồm searchable-PDF packet, exact request draft, multimodal
+- `M9.2` hiện bao gồm PDF packet chấp nhận cả scan thuần và text layer, exact request draft, multimodal
   reference và TeX/TikZ Summary lớp 3–12. Nó phụ thuộc `M4.1` storage, `M4.3`
   BullMQ, `M4.4` OCR artifact/page mapping, `M9.1` provider foundation và admin
   panel `M9.8`; Summary mới không còn phụ thuộc retrieval chunks `M5.3`.

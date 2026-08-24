@@ -90,7 +90,6 @@ export class LessonAiGenerationPanelService {
               embeddingProvider: true,
               embeddingModel: true,
               embeddingDimensions: true,
-              activeOcrArtifactId: true,
               sourceDocumentId: true,
               file: {
                 select: {
@@ -102,7 +101,7 @@ export class LessonAiGenerationPanelService {
               },
               pageRange: { select: { pageStart: true, pageEnd: true } },
               sourceDocument: {
-                select: { status: true, activeOcrArtifactId: true },
+                select: { status: true },
               },
             },
           },
@@ -154,7 +153,6 @@ export class LessonAiGenerationPanelService {
       const packetUnavailableReason = getPacketDocumentUnavailableReason(document);
       const canUseForSummary =
         document.status === DocumentStatus.READY &&
-        document.chunkCount > 0 &&
         packetUnavailableReason === null;
       const quizUnavailableReason =
         getQuizDocumentUnavailableReason(document) ??
@@ -306,10 +304,7 @@ function readPrintedPageNumber(metadataJson: Prisma.JsonValue | null) {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function getSummaryDocumentUnavailableReason(document: {
-  status: DocumentStatus;
-  chunkCount: number;
-}) {
+function getSummaryDocumentUnavailableReason(document: { status: DocumentStatus }) {
   if (document.status === DocumentStatus.UPLOADED) {
     return "Đang chờ xử lý";
   }
@@ -318,9 +313,6 @@ function getSummaryDocumentUnavailableReason(document: {
   }
   if (document.status === DocumentStatus.FAILED) {
     return "Xử lý thất bại";
-  }
-  if (document.chunkCount === 0) {
-    return "Chưa có nội dung để tạo";
   }
   return null;
 }
@@ -335,7 +327,6 @@ function getQuizDocumentUnavailableReason(document: {
 }
 
 function getPacketDocumentUnavailableReason(document: {
-  activeOcrArtifactId: string | null;
   sourceDocumentId: string | null;
   pageRange: { pageStart: number; pageEnd: number } | null;
   file: {
@@ -343,19 +334,12 @@ function getPacketDocumentUnavailableReason(document: {
     checksum: string | null;
     status: string;
   };
-  sourceDocument: {
-    status: DocumentStatus;
-    activeOcrArtifactId: string | null;
-  } | null;
+  sourceDocument: { status: DocumentStatus } | null;
 }) {
   if (document.file.mimeType !== "application/pdf") return "Chỉ hỗ trợ file PDF";
   if (document.file.status === "DELETED" || !document.file.checksum) {
     return "File PDF không còn khả dụng";
   }
-  const activeOcrArtifactId =
-    document.activeOcrArtifactId ?? document.sourceDocument?.activeOcrArtifactId ?? null;
-  if (!activeOcrArtifactId) return "PDF chưa được xác nhận là searchable";
-
   const hasSourceDocument = document.sourceDocumentId !== null;
   const hasPageRange = document.pageRange !== null;
   if (hasSourceDocument !== hasPageRange) return "Liên kết khoảng trang chưa hoàn chỉnh";
@@ -449,7 +433,7 @@ function getReadinessReason(input: {
     return "Buổi học chưa có tài liệu.";
   }
   if (!input.summaryReady) {
-    return "Tài liệu chưa xử lý xong hoặc chưa có đoạn nội dung.";
+    return "Tài liệu chưa xử lý xong hoặc PDF chưa sẵn sàng.";
   }
   if (!input.generationReady) {
     return "Đang chờ tạo embedding cho tài liệu.";

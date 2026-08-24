@@ -14,11 +14,25 @@ import {
   updateAdminQuizSet,
   uploadAdminQuizImage,
   attachAdminQuizFigureUpload,
+  applyAdminQuizFigureDraft,
+  compileAdminQuizFigureDraft,
+  createNewAdminQuizFigureWithAi,
+  previewNewAdminQuizFigureWithAi,
+  deleteAdminQuizFigure,
   type AdminQuizQuestion,
+  type AdminQuizFigure,
+  type AdminQuizFigureCreateAiInput,
+  updateAdminQuizFigureCaption,
   type AdminQuizQuestionPayload,
   type AdminQuizQuestionUpdatePayload,
   type AdminQuizSet,
 } from "@/features/admin/quiz/api/admin-quiz-api";
+
+const ACTIVE_QUIZ_FIGURE_STATUSES = new Set<AdminQuizFigure["status"]>([
+  "QUEUED",
+  "RENDERING",
+  "REPAIRING",
+]);
 
 const adminQuizQueryKeys = {
   all: ["admin", "quiz"] as const,
@@ -150,7 +164,18 @@ export function useAdminQuizQuestions(
     }),
     enabled: enabled && !!session?.accessToken && !!setId,
     initialData,
+    refetchInterval: (query) =>
+      hasActiveQuizFigureJobs(query.state.data) ? 2_000 : false,
+    refetchIntervalInBackground: false,
   });
+}
+
+export function hasActiveQuizFigureJobs(questions?: AdminQuizQuestion[]) {
+  return Boolean(
+    questions?.some((question) =>
+      question.figures?.some((figure) => ACTIVE_QUIZ_FIGURE_STATUSES.has(figure.status)),
+    ),
+  );
 }
 
 export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
@@ -220,13 +245,21 @@ export function useAdminQuizQuestionMutations(setId: string, lessonId: string) {
       if (!session?.accessToken) throw new Error("No token");
       return deleteAdminQuizQuestion(questionId, session.accessToken);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: adminQuizQueryKeys.questions(setId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: adminQuizQueryKeys.sets(lessonId),
-      });
+    onSuccess: async (_result, questionId) => {
+      queryClient.setQueriesData<AdminQuizQuestion[]>(
+        { queryKey: adminQuizQueryKeys.questions(setId) },
+        (currentQuestions) =>
+          currentQuestions?.filter((question) => question.id !== questionId),
+      );
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: adminQuizQueryKeys.questions(setId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: adminQuizQueryKeys.sets(lessonId),
+        }),
+      ]);
     },
   });
 
@@ -303,4 +336,140 @@ export function useAdminQuizFigureUpload(setId: string) {
         queryKey: adminQuizQueryKeys.questions(setId),
       }),
   });
+}
+
+export function useAdminQuizFigureMutations(setId: string) {
+  const session = useAuthSessionStore((state) => state.session);
+  const queryClient = useQueryClient();
+  const token = session?.accessToken ?? "";
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: adminQuizQueryKeys.questions(setId),
+    });
+
+  const compileDraft = useMutation({
+    mutationFn: (input: {
+      questionId: string;
+      figure: AdminQuizFigure;
+      latexSource: string;
+      altText: string;
+      caption: string | null;
+    }) => {
+      const revision = input.figure.currentRevision;
+      return compileAdminQuizFigureDraft(
+        input.questionId,
+        input.figure.id,
+        {
+          baseRevisionId: revision?.id ?? null,
+          sourceVersion: revision?.sourceVersion ?? 1,
+          latexSource: input.latexSource,
+          altText: input.altText,
+          caption: input.caption,
+        },
+        token,
+      );
+    },
+  });
+  const applyDraft = useMutation({
+    mutationFn: (input: {
+      questionId: string;
+      figure: AdminQuizFigure;
+      revisionId: string;
+      sourceVersion: number;
+    }) =>
+      applyAdminQuizFigureDraft(
+        input.questionId,
+        input.figure.id,
+        {
+          baseRevisionId: input.figure.currentRevision?.id ?? null,
+          revisionId: input.revisionId,
+          sourceVersion: input.sourceVersion,
+        },
+        token,
+      ),
+    onSuccess: invalidate,
+  });
+  const createWithAi = useMutation({
+    mutationFn: (
+      input: {
+        questionId: string;
+        figure: AdminQuizFigure;
+      } & AdminQuizFigureCreateAiInput,
+    ) =>
+      createNewAdminQuizFigureWithAi(
+        input.questionId,
+        input.figure.id,
+        {
+          baseRevisionId: input.figure.currentRevision?.id ?? null,
+          mode: input.mode,
+          adminInstructions: input.adminInstructions,
+          model: input.model,
+          temperature: input.temperature,
+          reasoningEffort: input.reasoningEffort,
+          systemPrompt: input.systemPrompt,
+          userPrompt: input.userPrompt,
+        },
+        token,
+      ),
+    onSuccess: invalidate,
+  });
+  const previewWithAi = useMutation({
+    mutationFn: (
+      input: {
+        questionId: string;
+        figure: AdminQuizFigure;
+      } & AdminQuizFigureCreateAiInput,
+    ) =>
+      previewNewAdminQuizFigureWithAi(
+        input.questionId,
+        input.figure.id,
+        {
+          baseRevisionId: input.figure.currentRevision?.id ?? null,
+          mode: input.mode,
+          adminInstructions: input.adminInstructions,
+          model: input.model,
+          temperature: input.temperature,
+          reasoningEffort: input.reasoningEffort,
+          systemPrompt: input.systemPrompt,
+          userPrompt: input.userPrompt,
+        },
+        token,
+      ),
+  });
+  const updateCaption = useMutation({
+    mutationFn: (input: {
+      questionId: string;
+      figure: AdminQuizFigure;
+      caption: string | null;
+    }) =>
+      updateAdminQuizFigureCaption(
+        input.questionId,
+        input.figure.id,
+        {
+          baseRevisionId: input.figure.currentRevision?.id ?? null,
+          caption: input.caption,
+        },
+        token,
+      ),
+    onSuccess: invalidate,
+  });
+  const deleteFigure = useMutation({
+    mutationFn: (input: { questionId: string; figure: AdminQuizFigure }) =>
+      deleteAdminQuizFigure(
+        input.questionId,
+        input.figure.id,
+        { baseRevisionId: input.figure.currentRevision?.id ?? null },
+        token,
+      ),
+    onSuccess: invalidate,
+  });
+
+  return {
+    applyDraft,
+    compileDraft,
+    createWithAi,
+    previewWithAi,
+    deleteFigure,
+    updateCaption,
+  };
 }

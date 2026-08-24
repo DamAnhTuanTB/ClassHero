@@ -1342,11 +1342,15 @@ function readQuizExplanationBlock(
   ) {
     return null;
   }
-  if (typeof explanationBlock.solution !== "string") return explanationBlock;
+  const safeExplanationBlock = { ...explanationBlock };
+  delete safeExplanationBlock.geometryStatement;
+  if (typeof safeExplanationBlock.solution !== "string") {
+    return safeExplanationBlock;
+  }
 
   return {
-    ...explanationBlock,
-    solution: normalizeQuizConclusionParagraph(explanationBlock.solution),
+    ...safeExplanationBlock,
+    solution: normalizeQuizConclusionParagraph(safeExplanationBlock.solution),
   };
 }
 

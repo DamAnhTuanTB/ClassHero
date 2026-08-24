@@ -1,5 +1,5 @@
 import { Prisma, QuestionType } from "@prisma/client";
-import { areEquivalentNumericAnswers } from "@learning-path/shared";
+import { areEquivalentTextInputAnswers } from "@learning-path/shared";
 import { badRequestException } from "#api/common/errors/api-exception";
 
 const pendingAnswerMarker = "__pending";
@@ -185,8 +185,7 @@ export function gradeQuestionAnswer(input: {
   optionsJson: Prisma.JsonValue | null;
   questionType: QuestionType;
 }): QuestionGradeResult {
-  const { answerJson, correctAnswerJson, gradingConfigJson, optionsJson, questionType } =
-    input;
+  const { answerJson, correctAnswerJson, optionsJson, questionType } = input;
   const effectivePoints = input.effectivePoints ?? 1;
 
   assertCompleteStudentAnswer({ answerJson, optionsJson, questionType });
@@ -239,22 +238,12 @@ export function gradeQuestionAnswer(input: {
     };
   }
 
-  const acceptedAnswers = readStringArray(correctAnswerJson, "đáp án đúng");
-  const gradingConfig = isRecord(gradingConfigJson) ? gradingConfigJson : {};
-  if (gradingConfig.numericComparison === true) {
-    const selected = String(answerJson);
-    const isCorrect = acceptedAnswers.some((answer) =>
-      areEquivalentNumericAnswers(selected, answer),
-    );
-    return simpleResult(isCorrect, effectivePoints);
+  const canonicalAnswer = readStringArray(correctAnswerJson, "đáp án đúng")[0];
+  if (canonicalAnswer === undefined) {
+    throw invalidStoredAnswer();
   }
-  const caseSensitive = gradingConfig.caseSensitive === true;
-  const exactMatch = gradingConfig.exactMatch !== false;
-  const selected = normalizeTextAnswer(String(answerJson), caseSensitive);
-  const isCorrect = acceptedAnswers.some((answer) => {
-    const expected = normalizeTextAnswer(answer, caseSensitive);
-    return exactMatch ? selected === expected : selected.includes(expected);
-  });
+  const selected = String(answerJson);
+  const isCorrect = areEquivalentTextInputAnswers(selected, canonicalAnswer);
 
   return simpleResult(isCorrect, effectivePoints);
 }
@@ -334,11 +323,6 @@ function equalStringSets(left: string[], right: string[]) {
     normalizedLeft.length === normalizedRight.length &&
     normalizedLeft.every((value, index) => value === normalizedRight[index])
   );
-}
-
-function normalizeTextAnswer(value: string, caseSensitive: boolean) {
-  const normalized = value.trim().replace(/\s+/g, " ");
-  return caseSensitive ? normalized : normalized.toLocaleLowerCase("vi");
 }
 
 function roundScore(value: number) {

@@ -10,7 +10,6 @@ import {
   StemFigureStatus,
 } from "@prisma/client";
 import { Job, UnrecoverableError } from "bullmq";
-import sharp from "sharp";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
@@ -29,11 +28,14 @@ import { StemFigureArtifactService } from "#api/modules/stem-figures/services/st
 import { StemFigureJobService } from "#api/modules/stem-figures/services/stem-figure-job.service";
 import {
   StemFigureRepairService,
+  resolveStemFigureProviderReferenceAssets,
   type StemFigureRepairKind,
 } from "#api/modules/stem-figures/services/stem-figure-repair.service";
 import { SvgValidatorService } from "#api/modules/stem-figures/services/svg-validator.service";
 import { TexRendererClientService } from "#api/modules/stem-figures/services/tex-renderer-client.service";
-import { stemFigureGenerationBriefSchema } from "#api/modules/stem-figures/types/stem-figure-generation.types";
+import {
+  stemFigureGenerationBriefSchema,
+} from "#api/modules/stem-figures/types/stem-figure-generation.types";
 import type {
   StemFigureProviderRequestSnapshot,
   StemFigureProviderRequestSnapshotCollection,
@@ -44,6 +46,7 @@ import {
   parseStemFigureDiagnosticBatch,
 } from "#api/modules/stem-figures/utils/stem-figure-diagnostics";
 import { validateTexSourcePolicy } from "#api/modules/stem-figures/utils/tex-source-policy";
+import { prepareStemFigureProviderReferenceImages } from "#api/modules/stem-figures/utils/stem-figure-reference-images";
 
 const renderJobSelect = {
   id: true,
@@ -497,6 +500,14 @@ export class StemFigureRenderingProcessor {
       const brief =
         input.metadata.generationBrief ??
         (await this.buildRegenerationBrief(input.figure));
+      const preparedReferences = await prepareStemFigureProviderReferenceImages({
+        assets: resolveStemFigureProviderReferenceAssets(brief),
+        downloadObject: (objectKey) => this.storage.downloadObject(objectKey),
+      });
+      const providerBrief = {
+        ...brief,
+        referenceAssets: preparedReferences.assets,
+      };
       const source = await this.repairService.createNew({
         figureId: input.figure.id,
         revisionId: input.revision.id,
@@ -504,8 +515,8 @@ export class StemFigureRenderingProcessor {
         backgroundJobId: input.durableJob.id,
         jobAttempt: input.jobAttempt,
         subject: subjectSnapshot(input.figure),
-        brief,
-        referenceImages: await this.loadReferenceImages(brief.referenceAssets),
+        brief: providerBrief,
+        referenceImages: preparedReferences.images,
         routeSnapshot: input.metadata.routeSnapshot,
         systemPrompt: input.metadata.systemPrompt,
         userPrompt: input.metadata.userPrompt,
@@ -550,23 +561,6 @@ export class StemFigureRenderingProcessor {
       return this.updateRevisionSource(input.figure.id, input.revision, repaired, 0);
     }
     return input.revision;
-  }
-
-  private async loadReferenceImages(
-    assets: Array<{ objectKey: string; mimeType: string }>,
-  ) {
-    return Promise.all(
-      assets.map(async (asset) => {
-        const downloaded = await this.storage.downloadObject(asset.objectKey);
-        const isSvg = asset.mimeType.includes("svg");
-        const bytes = isSvg ? await sharp(downloaded).png().toBuffer() : downloaded;
-        const mimeType = isSvg ? "image/png" : asset.mimeType;
-        return {
-          imageUrl: `data:${mimeType};base64,${bytes.toString("base64")}`,
-          detail: "high" as const,
-        };
-      }),
-    );
   }
 
   private async buildRegenerationBrief(figure: {

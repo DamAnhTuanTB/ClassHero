@@ -95,7 +95,7 @@ Side effects:
   hay danh sách các cách viết tương đương. Kết quả hữu tỉ dùng số nguyên hoặc
   phân số tối giản; kết quả vô tỉ buộc `problem` yêu cầu làm tròn đến một chữ số
   thập phân và `correctAnswer` chỉ giữ số đã làm tròn với dấu `.`. Backend lưu
-  đáp án AI thành mảng một phần tử và tự gán `numericComparison=true`. Bộ chấm
+  đáp án AI thành mảng một phần tử và lưu `gradingConfigJson=null`. Bộ chấm
   so sánh giá trị số chính xác, nên dữ liệu học sinh nhập như `1/2`, `2/4`,
   `0.5`, `0.50`, `0,5` và `\frac{1}{2}` được coi là cùng một đáp án; mẫu số bằng
   `0` không hợp lệ.
@@ -137,10 +137,11 @@ Side effects:
   `correctOptionId` và nội dung option đúng theo dạng `A. nội dung phương án`.
   Renderer thêm đúng một nhãn `Đáp án:` in đậm; solution kết luận rồi dừng và
   card không chèn thêm tiêu đề `Lời giải` bên trong.
-- Quiz Toán persist `isGeometry` và `geometryStatement` trong
-  `quizExplanationBlock`. Lớp 7–9 chỉ câu Hình học có bảng GT–KL; khi khối chưa
-  xác định hoặc nằm ngoài 7–9 thì `geometryStatement=null`. Câu không Hình học
-  cũng để null. Việc có GT–KL không tự động tạo figure.
+- Quiz Toán chỉ persist `isGeometry` trong `quizExplanationBlock`; provider,
+  mapper và API không nhận/trả `geometryStatement`, `hypotheses` hoặc
+  `conclusions` cho bất kỳ khối lớp nào. Key cũ nếu còn trong JSON lịch sử không
+  được project ra response và bị loại khi câu AI được lưu lại. Quyết định tạo
+  figure vẫn độc lập với `isGeometry`. Contract GT–KL của Summary không đổi.
 - Figure không có quota và chỉ được tạo nếu thật sự cần. `solutionFigureMode` là
   `NONE | REUSE_QUESTION | EXTEND_QUESTION`; mode mở rộng luôn dựng trên exact
   revision của hình đề. Problem/solution vẫn phải tự đủ nghĩa khi không tải hình.
@@ -179,14 +180,19 @@ Body:
 `action` của Quiz có ba giá trị và dùng cùng state machine UI của Sinh kiến thức:
 
 - `SAVE`: giữ nguyên `reviewStatus` của bộ và đánh dấu mọi câu `APPROVED` hiện
-  tại là đã lưu sang bản học sinh. Cho phép vẫn còn câu AI đang chờ duyệt.
-- `PUBLISH`: yêu cầu không còn câu chưa duyệt, đánh dấu các câu `APPROVED` hiện
-  tại là đã phát hành và chuyển riêng bộ Quiz này sang `APPROVED`.
+  tại là đã lưu sang bản học sinh. Nếu bộ đã có lượt phát hành, các câu này dùng
+  đúng timestamp của lượt phát hành gần nhất; thao tác `SAVE` không tạo lượt
+  phát hành mới. Cho phép vẫn còn câu AI đang chờ duyệt.
+- `PUBLISH`: chỉ yêu cầu có ít nhất một câu `APPROVED`, không bị chặn bởi các câu
+  còn chờ duyệt. Action tạo mốc phát hành mới cho toàn bộ câu `APPROVED` hiện tại
+  và chuyển riêng bộ Quiz này sang `APPROVED`; câu chưa duyệt tiếp tục có
+  `publishedAt=null` và không hiển thị cho học sinh.
 - `WITHDRAW`: chuyển riêng bộ Quiz này sang `HIDDEN`; các mốc câu đã phát hành
   được giữ để có thể phát hành lại.
 
 UI luôn có `Lưu`; cạnh đó là `Phát hành` khi bộ chưa phát hành hoặc
-`Thu hồi phát hành` khi bộ đang phát hành. Duyệt câu không tự phát hành bộ.
+`Thu hồi phát hành` khi bộ đang phát hành. `Phát hành` khả dụng ngay khi có ít
+nhất một câu đã duyệt. Duyệt câu không tự phát hành bộ.
 
 #### `POST /admin/quiz-sets/:quizSetId/questions/review-all-ai`
 
@@ -367,10 +373,12 @@ Body:
   ID trong `optionsJson`, không thiếu, không thừa và không trùng.
 - `TRUE_FALSE` và `MULTI_STATEMENT_TRUE_FALSE` là hai contract riêng; API không
   tự chuyển boolean thành danh sách mệnh đề hoặc ngược lại.
-- Với `TEXT_INPUT`, `correctAnswerJson` là mảng câu trả lời được chấp nhận và
-  `gradingConfigJson` chứa `caseSensitive`/`exactMatch`; có thể thêm
-  `numericComparison=true` để chấm các cách viết có cùng giá trị số thay vì so
-  chuỗi.
+- Với `TEXT_INPUT`, `correctAnswerJson` là mảng chứa đúng một chuỗi đáp án
+  canonical. Client không gửi cấu hình so khớp; `gradingConfigJson` cũ được bỏ
+  qua và bản ghi mới/cập nhật lưu `null`. Backend tự so sánh giá trị số chính
+  xác trước (`0.5`, `0,5`, `1/2`, `2/4`, `\\frac{1}{2}` tương đương), rồi
+  fallback về chuỗi đã chuẩn hóa Unicode/khoảng trắng và không phân biệt hoa
+  thường khi hai phía không cùng là số hợp lệ.
 - `hintJson` và `explanationJson` nhận Tiptap JSON hoặc `null`. Lời giải chi tiết thủ công được lưu trong `ai_explanations` với `source=ADMIN` và trả về qua relation `explanation`.
 - `questionJson`, `optionsJson[*].richText`, `hintJson` và
   `explanationJson` cùng nhận cây Tiptap rich content. Contract cho phép
@@ -392,7 +400,7 @@ Body:
   `widthPercent=100`; node cũ thiếu `baseWidthPercent` mặc định dùng `100` để
   không đổi cách hiển thị. Xóa node ảnh khỏi rich content không đồng nghĩa xóa
   file storage ở endpoint câu hỏi.
-- Với `TEXT_INPUT`, mỗi phần tử `correctAnswerJson` vẫn là string canonical
+- Với `TEXT_INPUT`, phần tử duy nhất của `correctAnswerJson` là string canonical
   dùng để chấm; string có thể chứa LaTeX hoặc mhchem như
   `\frac{1}{2}`/`\ce{H2O}`.
 - Server tự gán `sortOrder` tiếp theo trong quiz set.
@@ -416,9 +424,44 @@ Role: `ADMIN`.
 - Gắn file ảnh admin đã upload vào role `QUESTION` hoặc `SOLUTION` của câu Quiz.
 - Đây là đường ảnh raster duy nhất của Quiz; AI chỉ sinh TeX/TikZ mới và không
   dùng ảnh gốc/crop sách giáo khoa.
+- AI figure Phase 2 hard-cutover sang output tối giản: hình đề trả duy nhất
+  `latexSource`, hình lời giải trả duy nhất `extensionLatex`. Không còn
+  `semanticChecks`, `readabilityChecks` hoặc `extensionPlan`; Zod strict reject
+  nếu provider trả lại các field cũ. `addedObjects`/`clarifiedRelations` của
+  Phase 1 vẫn là input bắt buộc của lượt mở rộng lời giải, không bị xóa.
+- Call figure dùng profile môn chuyên vẽ, schema strategy `auto` và prompt cache
+  `in_memory`. Worker lưu request trace (prompt/schema version, strategy
+  requested/resolved, schema bytes và token text/ảnh/tổng ước tính) vào
+  `BackgroundJob.inputMeta` để audit, không gọi thêm provider để tạo preview.
 - Khi gửi `explanationJson`, service tạo mới hoặc cập nhật `ai_explanations` nguồn `ADMIN`; nội dung rỗng/`null` gỡ lời giải khỏi câu hỏi.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation liên quan stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - Ghi audit log.
+
+#### Admin quản lý revision hình Quiz
+
+Role: `ADMIN`.
+
+- `POST /admin/quiz-questions/:questionId/figures/:figureId/drafts/compile` biên
+  dịch TeX cục bộ, tạo revision `DRAFT_READY` và trả `previewSvg`; không gọi AI.
+- `POST /admin/quiz-questions/:questionId/figures/:figureId/drafts/apply` áp dụng
+  đúng draft đã biên dịch với optimistic guard `baseRevisionId`.
+- `POST /admin/quiz-questions/:questionId/figures/:figureId/create-new-ai` tạo
+  revision `ADMIN_REGENERATE`, enqueue `QUIZ_FIGURE_RENDERING`. Body có đúng hai
+  mode `REGENERATE` (`Tạo mới lại`) và `EDIT_CURRENT` (`Chỉnh sửa hình hiện
+  tại`); mode edit yêu cầu revision hiện hành là `AI_TEX` và gửi source TikZ hiện
+  tại cho model để sửa tối thiểu. Optional `adminInstructions`, model,
+  Temperature/Reasoning Effort và prompt override được snapshot trong job input.
+- `POST /admin/quiz-questions/:questionId/figures/:figureId/create-new-ai/preview`
+  không enqueue job và không gọi provider; endpoint trả đúng system prompt, user
+  prompt, Responses API payload, model đã resolve, token và chi phí ước tính để
+  modal `Xem dữ liệu` dùng chung ngôn ngữ với Sinh kiến thức.
+- `PATCH /admin/quiz-questions/:questionId/figures/:figureId/caption` tạo revision
+  metadata mới, không mutate mất lịch sử revision cũ.
+- `DELETE /admin/quiz-questions/:questionId/figures/:figureId` xóa mềm. Xóa hình
+  đề xóa mềm cả hình lời giải phụ thuộc và đặt `solutionFigureMode=NONE`; xóa
+  riêng hình lời giải chuyển về `REUSE_QUESTION` khi hình đề còn hợp lệ.
+- Mọi mutation dùng `baseRevisionId`; conflict yêu cầu UI tải lại thay vì ghi đè
+  revision mới hơn. Quiz không gọi service/private schema của Summary.
 
 #### `POST /admin/quiz-questions/:questionId/review`
 
@@ -440,7 +483,7 @@ Behavior:
 - Ghi audit log `QUIZ_QUESTION_REVIEWED`.
 - Câu vừa duyệt có `publishedAt=null`; nếu bộ đã phát hành, học sinh vẫn chỉ thấy
   bản câu đã được `Lưu`/`Phát hành` trước đó. Admin phải bấm `Lưu` của đúng bộ để
-  đưa các câu mới duyệt hoặc mới tạo sang học sinh.
+  đưa các câu mới duyệt hoặc mới tạo vào lượt phát hành gần nhất cho học sinh.
 - Endpoint không tự chuyển bộ sang `APPROVED`.
 
 #### `DELETE /admin/quiz-questions/:questionId`

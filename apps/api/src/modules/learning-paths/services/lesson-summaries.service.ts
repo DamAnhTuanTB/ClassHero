@@ -33,8 +33,8 @@ import {
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import {
-  buildAiStructuredTextFormat,
   estimateAiStructuredInputTokens,
+  resolveAiStructuredTextFormat,
 } from "#api/modules/ai/utils/ai-structured-output-format";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 import {
@@ -694,7 +694,7 @@ export class LessonSummariesService {
       userPrompt: configuration.userPrompt,
     });
     const inputPrompt = buildAiUserPrompt(request);
-    const structuredTextFormat = buildAiStructuredTextFormat(
+    const structuredTextFormatResolution = resolveAiStructuredTextFormat(
       getLessonSummaryProviderTransportOutputSchema(
         sourceContext.subject.key,
         "CONTEXTUAL",
@@ -703,6 +703,7 @@ export class LessonSummariesService {
       request.outputName,
       request.schemaReferenceStrategy,
     );
+    const structuredTextFormat = structuredTextFormatResolution.format;
     const pdfInputTokens = Math.max(1, sourceContext.packet.manifest.pageCount * 1_000);
     const sourceManifestText = JSON.stringify(sourceContext.packet.modelManifest);
     const inputTokenEstimate = estimateAiStructuredInputTokens({
@@ -786,6 +787,9 @@ export class LessonSummariesService {
       temperature: resolvedTemperature,
       reasoningEffort: resolvedReasoningEffort,
       maxOutputTokens,
+      schemaReferenceStrategy: request.schemaReferenceStrategy,
+      resolvedSchemaReferenceStrategy:
+        structuredTextFormatResolution.resolvedReferenceStrategy,
       detail: "high",
     });
     const expiresAt = new Date(
@@ -830,6 +834,10 @@ export class LessonSummariesService {
           temperature: resolvedTemperature,
           reasoningEffort: resolvedReasoningEffort,
           maxOutputTokens,
+          schemaReferenceStrategy: request.schemaReferenceStrategy,
+          resolvedSchemaReferenceStrategy:
+            structuredTextFormatResolution.resolvedReferenceStrategy,
+          schemaBytes: structuredTextFormatResolution.schemaBytes,
           pdfDetail: "high",
           routeSnapshot: route,
         } as unknown as Prisma.InputJsonValue,
@@ -918,6 +926,10 @@ export class LessonSummariesService {
         temperature: route.temperature ?? request.temperature ?? 0.2,
         reasoningEffort: route.reasoningEffort ?? null,
         maxOutputTokens,
+        schemaReferenceStrategy: request.schemaReferenceStrategy ?? "inline",
+        resolvedSchemaReferenceStrategy:
+          structuredTextFormatResolution.resolvedReferenceStrategy,
+        schemaBytes: structuredTextFormatResolution.schemaBytes,
         modelOptions: allActiveModels.map((candidate) => ({
           provider: candidate.provider,
           model: candidate.model,

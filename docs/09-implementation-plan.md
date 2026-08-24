@@ -157,7 +157,7 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 48     | `M5.4`  | Hybrid search cho công thức/ký hiệu                                        |
 | 49     | `M9.1`  | AiModule structured output foundation                                      |
 | 50     | `M9.2`  | Admin generate Summary từ searchable PDF + multimodal TeX/TikZ lớp 3–12 |
-| 51     | `M9.3`  | Admin generate quiz/flashcard/test                                         |
+| 51     | `M9.3`  | Admin generate quiz/flashcard/test — corrective bỏ GT–KL Quiz Done         |
 | 52     | `M9.8`  | Admin AI generation panel UI — Done 2026-08-03                             |
 | 52.1   | `M9.9`  | Provider catalog, AI routing, Gemini fallback và usage accounting          |
 | 52.2   | `M9.10` | Admin provider operations API                                              |

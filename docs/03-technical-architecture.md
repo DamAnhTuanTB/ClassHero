@@ -348,7 +348,9 @@ Concurrency mặc định hiện tại:
 - PDF processing: 1-2.
 - Embedding: 4.
 - AI generation: 4.
-- TeX figure rendering: 3 trên mỗi worker process.
+- TeX figure job: 3 trên mỗi worker process; isolated renderer áp dụng thêm
+  compile concurrency toàn cục theo CPU container (mặc định 1 khi cấp 1 vCPU) để
+  các queue Summary/Quiz không cộng dồn số tiến trình LuaLaTeX ngoài kiểm soát.
 - Notification/email/Zalo: 3-5.
 
 Cần cấu hình bằng env, không hard-code cố định.
@@ -432,6 +434,10 @@ tạo figure light. Phạm vi hình bắt buộc là lớp 3–12 nhưng giai đ
 vào Summary; Quiz/Test/Flashcard/Explanation/Chat giữ text-only. Không AI Vision.
 AI/admin chỉ cung cấp fragment có một root drawing environment; renderer là nơi
 duy nhất thêm document wrapper, package và library theo ADR-0015.
+Image renderer phải tạo sẵn font-name database của LuaTeX làm cache seed. Khi
+container boot, seed được copy một lần sang cache writable trong tmpfs và dùng
+chung giữa các lượt compile; thư mục `HOME`/output của từng source vẫn tách riêng
+trong tmpfs và bị xóa sau lượt render.
 
 ---
 

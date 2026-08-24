@@ -3,6 +3,7 @@ import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/common/prisma/prisma.service";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { QuizService } from "../src/modules/quiz/services/quiz.service";
+import { QuizSetReviewActionDto } from "../src/modules/quiz/dto/review-quiz-set.dto";
 import { QuestionType, Difficulty, ReviewStatus, UserRole } from "@prisma/client";
 import { RequestContext } from "../src/common/api/request-context";
 import { randomUUID } from "crypto";
@@ -431,6 +432,127 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     ).resolves.toEqual({
       approvedQuestionCount: 0,
       pendingReviewQuestionCount: 1,
+    });
+  });
+
+  it("publishes with one approved question and saves later approvals into the latest release", async () => {
+    const set = await quizService.createQuizSet(
+      testLessonId,
+      testUserId,
+      { title: "Quiz phát hành từng phần" },
+      mockContext,
+    );
+    const [approvedQuestion, pendingQuestion] = await Promise.all([
+      prisma.quizQuestion.create({
+        data: {
+          quizSetId: set.id,
+          lessonId: testLessonId,
+          questionType: QuestionType.TRUE_FALSE,
+          questionJson: {
+            type: "doc",
+            content: [{ type: "text", text: "Câu đã duyệt" }],
+          },
+          correctAnswerJson: true,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+      }),
+      prisma.quizQuestion.create({
+        data: {
+          quizSetId: set.id,
+          lessonId: testLessonId,
+          questionType: QuestionType.TRUE_FALSE,
+          questionJson: {
+            type: "doc",
+            content: [{ type: "text", text: "Câu chờ duyệt" }],
+          },
+          correctAnswerJson: false,
+          reviewStatus: ReviewStatus.NEEDS_REVIEW,
+        },
+      }),
+    ]);
+
+    await expect(
+      quizService.reviewQuizSet(
+        set.id,
+        testUserId,
+        {
+          action: QuizSetReviewActionDto.PUBLISH,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+        mockContext,
+      ),
+    ).resolves.toMatchObject({ reviewStatus: ReviewStatus.APPROVED });
+
+    const firstRelease = await prisma.quizQuestion.findMany({
+      where: { id: { in: [approvedQuestion.id, pendingQuestion.id] } },
+      select: { id: true, publishedAt: true },
+    });
+    const firstPublishedAt = firstRelease.find(
+      (question) => question.id === approvedQuestion.id,
+    )?.publishedAt;
+    expect(firstPublishedAt).toBeInstanceOf(Date);
+    expect(
+      firstRelease.find((question) => question.id === pendingQuestion.id)?.publishedAt,
+    ).toBeNull();
+
+    await quizService.reviewQuestion(
+      pendingQuestion.id,
+      testUserId,
+      { reviewStatus: ReviewStatus.APPROVED },
+      mockContext,
+    );
+    await quizService.reviewQuizSet(
+      set.id,
+      testUserId,
+      {
+        action: QuizSetReviewActionDto.SAVE,
+        reviewStatus: ReviewStatus.APPROVED,
+      },
+      mockContext,
+    );
+
+    const savedQuestions = await prisma.quizQuestion.findMany({
+      where: { id: { in: [approvedQuestion.id, pendingQuestion.id] } },
+      select: { publishedAt: true },
+    });
+    expect(savedQuestions).toHaveLength(2);
+    expect(
+      savedQuestions.every(
+        (question) => question.publishedAt?.getTime() === firstPublishedAt?.getTime(),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects publishing a Quiz set without an approved question", async () => {
+    const set = await quizService.createQuizSet(
+      testLessonId,
+      testUserId,
+      { title: "Quiz chưa có câu duyệt" },
+      mockContext,
+    );
+    await prisma.quizQuestion.create({
+      data: {
+        quizSetId: set.id,
+        lessonId: testLessonId,
+        questionType: QuestionType.TRUE_FALSE,
+        questionJson: { type: "doc", content: [{ type: "text", text: "Chờ duyệt" }] },
+        correctAnswerJson: true,
+        reviewStatus: ReviewStatus.NEEDS_REVIEW,
+      },
+    });
+
+    await expect(
+      quizService.reviewQuizSet(
+        set.id,
+        testUserId,
+        {
+          action: QuizSetReviewActionDto.PUBLISH,
+          reviewStatus: ReviewStatus.APPROVED,
+        },
+        mockContext,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "QUIZ_SET_HAS_NO_APPROVED_QUESTIONS" },
     });
   });
 });

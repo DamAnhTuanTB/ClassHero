@@ -4,7 +4,29 @@ Ngày lập: 2026-08-10
 
 Ngày rà soát theo toàn bộ `.codex/plans`: 2026-08-11
 
-Trạng thái: `Đã triển khai và kiểm chứng ngày 2026-08-11`
+Trạng thái: baseline `Đã triển khai và kiểm chứng ngày 2026-08-11`; corrective
+Quiz-only bên dưới đã triển khai và kiểm chứng ngày 2026-08-24.
+
+## Corrective override 2026-08-24 — bỏ GT–KL khỏi riêng Quiz
+
+Quyết định mới nhất của owner supersede mọi dòng cũ trong kế hoạch này yêu cầu
+Quiz kế thừa hoặc hiển thị `geometryStatement`, `hypotheses`, `conclusions` hay
+bảng GT–KL từ EXAMPLE/Summary:
+
+- Provider schema Quiz Toán chỉ giữ `isGeometry` khi pipeline cần phân loại.
+- Mọi khối lớp của Quiz đều không trả hoặc lưu mới `geometryStatement`,
+  `hypotheses`, `conclusions`; mapper, mutable JSON projection, API và UI Quiz
+  cũng không còn các field/bảng này.
+- Key cũ trong JSON lịch sử không được projection ra API/UI và bị loại khi câu
+  AI được lưu lại; không cần migration cột vì dữ liệu nằm trong JSON.
+- Summary/Example Hình học và Test nằm ngoài corrective này, giữ contract hiện
+  hành. Figure Quiz tiếp tục quyết định độc lập với `isGeometry`.
+- Acceptance mới của M9.3 chỉ đạt khi focused tests chứng minh field cũ bị từ
+  chối/loại trên provider, mapper, persistence projection, API và UI Quiz, đồng
+  thời regression Summary/Example vẫn giữ GT–KL.
+
+Phần còn lại của tài liệu giữ làm lịch sử baseline; khi có câu chữ mâu thuẫn về
+GT–KL của Quiz thì override này và `docs/06-ai-rag-spec.md` là nguồn áp dụng.
 
 Task sở hữu chính:
 

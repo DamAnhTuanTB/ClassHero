@@ -5,15 +5,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAiStructuredTextFormat,
+  estimateAiStructuredInputTokens,
   resolveAiStructuredTextFormat,
 } from "#api/modules/ai/utils/ai-structured-output-format";
+import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import {
   QUIZ_CONCLUSION_PARAGRAPH_POLICY,
   QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY,
   getGeneratedQuizOutputSchema,
   QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY,
+  QUIZ_FIGURE_SELECTION_POLICY,
   QUIZ_FUNCTIONAL_PUNCTUATION_AND_INFERENCE_LAYOUT_POLICY,
   QUIZ_GRADE_APPROPRIATE_KNOWLEDGE_POLICY,
+  QUIZ_HINT_QUALITY_POLICY,
   QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY,
   QUIZ_PROMPT_VERSION,
   QUIZ_SCHEMA_VERSION,
@@ -40,6 +44,8 @@ import {
 } from "#api/modules/quiz/utils/quiz-generation-output";
 import {
   buildQuizStructuredInput,
+  QUIZ_REAL_WORLD_APPLICATION_COVERAGE_POLICY,
+  QUIZ_SOURCE_NOVELTY_POLICY,
   QUIZ_SYSTEM_PROMPT,
 } from "#api/modules/quiz/utils/quiz-generation-prompt";
 import { validateQuizOutput } from "#api/modules/quiz/utils/quiz-generation-validation";
@@ -49,6 +55,7 @@ import {
   generatedQuizQuestionFigureSchema,
   generatedQuizSolutionExtensionSchema,
   QUIZ_FIGURE_EXTENSION_MARKER,
+  QUIZ_FIGURE_PROMPT_VERSION,
 } from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
 import {
   applyQuizSolutionExtension,
@@ -147,7 +154,6 @@ describe("M9.3 Quiz-owned generation core", () => {
             solution: "$1/2$ có dạng $a/b$ với $b \\ne 0$.",
             answer: "Đúng",
             isGeometry: false,
-            geometryStatement: null,
           },
           figure: {
             questionFigure: null,
@@ -226,7 +232,6 @@ describe("M9.3 Quiz-owned generation core", () => {
         solution: "2 chia hết cho 2.",
         answer: "Đúng",
         isGeometry: false,
-        geometryStatement: null,
       },
       figure: {
         questionFigure: null,
@@ -260,7 +265,6 @@ describe("M9.3 Quiz-owned generation core", () => {
           },
         ],
         isGeometry: false,
-        geometryStatement: null,
       },
       figure: {
         questionFigure: null,
@@ -283,17 +287,12 @@ describe("M9.3 Quiz-owned generation core", () => {
   });
 
   it("deterministically separates the final Quiz conclusion paragraph", () => {
-    const inlineConclusion =
-      "Giá trị này không bằng 11. Vậy câu b) sai.";
+    const inlineConclusion = "Giá trị này không bằng 11. Vậy câu b) sai.";
     const normalized = normalizeQuizConclusionParagraph(inlineConclusion);
 
-    expect(normalized).toBe(
-      "Giá trị này không bằng 11.\n\nVậy câu b) sai.",
-    );
+    expect(normalized).toBe("Giá trị này không bằng 11.\n\nVậy câu b) sai.");
     expect(normalizeQuizConclusionParagraph(normalized)).toBe(normalized);
-    expect(normalizeQuizConclusionParagraph("Vậy câu b) sai.")).toBe(
-      "Vậy câu b) sai.",
-    );
+    expect(normalizeQuizConclusionParagraph("Vậy câu b) sai.")).toBe("Vậy câu b) sai.");
     expect(
       normalizeQuizConclusionParagraph(
         "Nếu kết quả như vậy thì cần kiểm tra lại dữ kiện.",
@@ -324,7 +323,6 @@ describe("M9.3 Quiz-owned generation core", () => {
           },
         ],
         isGeometry: false,
-        geometryStatement: null,
       },
       figure: {
         questionFigure: null,
@@ -459,9 +457,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).toContain(
       "ví dụ đã giải, bài tập, câu hỏi ôn tập và bài vận dụng",
     );
-    expect(request.systemPrompt).toContain(
-      "câu hỏi mới cùng dạng hoặc biến thể phù hợp",
-    );
+    expect(request.systemPrompt).toContain("câu hỏi mới cùng dạng hoặc biến thể phù hợp");
     expect(request.systemPrompt).toContain(
       "tự lập nội bộ danh sách các dạng bài có thể đánh giá trong PDF",
     );
@@ -478,15 +474,33 @@ describe("M9.3 Quiz-owned generation core", () => {
       "không trả danh sách phân tích này trong output",
     );
     expect(request.systemPrompt).toContain(
-      "không được chỉ thay số liệu một cách máy móc",
+      "tự đối chiếu câu dự kiến đó với từng ví dụ đã giải",
+    );
+    expect(request.systemPrompt).toContain(QUIZ_SOURCE_NOVELTY_POLICY);
+    expect(request.systemPrompt).toContain("chữ ký nội dung của mỗi cặp");
+    expect(request.systemPrompt).toContain("thêm yêu cầu làm tròn");
+    expect(request.systemPrompt).toContain(
+      "phải thay đổi thật sự ít nhất hai chiều trong bốn chiều",
+    );
+    expect(request.systemPrompt).toContain("Ví dụ không hợp lệ theo mẫu tổng quát");
+    expect(request.systemPrompt).toContain("Counterexample hợp lệ theo mẫu tổng quát");
+    expect(request.systemPrompt).toContain("phải bỏ câu đó và biên soạn một câu mới");
+    expect(request.systemPrompt).toContain(QUIZ_REAL_WORLD_APPLICATION_COVERAGE_POLICY);
+    expect(request.systemPrompt).toContain(
+      "Coverage ứng dụng thực tế là một trục độc lập",
     );
     expect(request.systemPrompt).toContain(
-      "Phải tự giải lại theo dữ kiện mới",
+      "output bắt buộc phải có ít nhất một câu ứng dụng thực tế mới",
+    );
+    expect(request.systemPrompt).toContain(
+      "Không được gộp mất bài thực tế vào bài chuẩn",
+    );
+    expect(request.systemPrompt).toContain("không tái sử dụng bối cảnh đặc thù");
+    expect(request.systemPrompt).toContain(
+      "Nếu PDF không có bài ứng dụng thực tế có thể đánh giá",
     );
     expect(request.systemPrompt).toContain(QUIZ_GRADE_APPROPRIATE_KNOWLEDGE_POLICY);
-    expect(request.systemPrompt).toContain(
-      "không vượt quá khối lớp mục tiêu",
-    );
+    expect(request.systemPrompt).toContain("không vượt quá khối lớp mục tiêu");
     expect(request.systemPrompt).toContain(
       "kể cả khi cách giải đó đúng về mặt chuyên môn",
     );
@@ -500,12 +514,8 @@ describe("M9.3 Quiz-owned generation core", () => {
       retention: "in_memory",
     });
     expect(request.maxTokens).toBe(12_000);
-    expect(request.promptVersion).toBe(
-      "quiz-pdf-figure-prompt-v33-source-archetype-coverage",
-    );
-    expect(request.schemaVersion).toBe(
-      "quiz-pdf-figure-schema-v21-grade-bounded-solutions",
-    );
+    expect(request.promptVersion).toBe("quiz-pdf-figure-prompt-v40-math-visual-need");
+    expect(request.schemaVersion).toBe("quiz-pdf-figure-schema-v26-math-visual-need");
     expect(request.promptVersion).toBe(QUIZ_PROMPT_VERSION);
     expect(request.schemaVersion).toBe(QUIZ_SCHEMA_VERSION);
     expect(request.systemPrompt).toContain(QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY);
@@ -562,16 +572,36 @@ describe("M9.3 Quiz-owned generation core", () => {
       detail: "high",
     });
     expect(request.inputTextItems).toBeUndefined();
+    expect(request.systemPrompt).toContain(QUIZ_FIGURE_SELECTION_POLICY);
     expect(request.systemPrompt).toContain(
-      "không tạo hình chỉ vì câu hỏi thuộc Hình học",
+      "Nếu `isGeometry=true` và câu có cấu hình cụ thể",
+    );
+    expect(request.systemPrompt).toContain("mặc định phải tạo `questionFigure`");
+    expect(request.systemPrompt).toContain(
+      "không được trả `questionFigure=null` cho tất cả các câu đó",
+    );
+    expect(request.systemPrompt).toContain("Counterexample được phép không có hình");
+    expect(request.systemPrompt).toContain(
+      "đồ thị hàm số, hệ trục tọa độ, đường số, miền nghiệm",
+    );
+    expect(request.systemPrompt).toContain(
+      "bảng biến thiên, bảng xét dấu, bảng dữ liệu, biểu đồ hoặc sơ đồ",
+    );
+    expect(request.systemPrompt).toContain(
+      "các câu này giữ `isGeometry=false` nếu không thuộc Hình học",
+    );
+    expect(request.systemPrompt).not.toContain("khi không chắc chắn, chọn không có hình");
+    expect(request.systemPrompt).not.toContain(
+      "Quyết định tạo hình độc lập với `isGeometry`",
     );
     expect(request.userPrompt).not.toContain("explanation");
     expect(request.userPrompt).not.toContain("PDF packet");
     expect(request.userPrompt).not.toContain("figure");
     expect(request.userPrompt).not.toContain("prompt hoặc quy trình AI");
-    expect(request.systemPrompt).toContain("Hình học lớp 7–9");
-    expect(request.systemPrompt).toContain("khối lớp chưa xác định");
-    expect(request.systemPrompt).toContain("`hypotheses` chỉ chứa dữ kiện đề bài cho");
+    expect(request.systemPrompt).toContain("Quiz không trả bảng giả thiết–kết luận");
+    expect(request.systemPrompt).not.toContain("geometryStatement");
+    expect(request.systemPrompt).not.toContain("hypotheses");
+    expect(request.systemPrompt).not.toContain("conclusions");
     expect(request.systemPrompt).toContain(
       "góc có đỉnh B với hai cạnh BA và BC phải viết là $\\widehat{ABC}$ hoặc $\\widehat{CBA}$",
     );
@@ -594,7 +624,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       "`hint` và `caption` không được bổ sung dữ kiện mới",
     );
     expect(request.systemPrompt).toContain(
-      "Nếu hình chỉ lặp lại dữ kiện đơn giản đã rõ bằng chữ mà không tăng khả năng hiểu",
+      "việc đề bài tự đủ nghĩa không làm hình trở thành thừa",
     );
     expect(request.systemPrompt).toContain("Không biến chỉ dẫn dành cho AI");
     expect(request.systemPrompt).toContain(
@@ -603,8 +633,18 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(request.systemPrompt).toContain(
       "chuỗi tính/biến đổi có từ hai dấu `=` cấp ngoài cùng trở lên luôn phải thành display nhiều dòng",
     );
+    expect(request.systemPrompt).toContain(QUIZ_HINT_QUALITY_POLICY);
+    expect(request.systemPrompt).toContain("ít nhất một cầu nối suy luận cụ thể");
+    expect(request.systemPrompt).toContain("`Dùng công thức phù hợp`");
+    expect(request.systemPrompt).toContain("Counterexample hợp lệ theo mẫu tổng quát");
     expect(request.systemPrompt).toContain(
-      "hint ngắn giúp định hướng nhưng không lộ thẳng đáp án",
+      "Không dùng các động từ mơ hồ như `ghép`, `nối`, `kết hợp`",
+    );
+    expect(request.systemPrompt).toContain(
+      "`hint` được phép và nên dùng công thức LaTeX",
+    );
+    expect(request.systemPrompt).toContain(
+      "Nếu cần từ hai bước trở lên, mỗi bước phải bắt đầu ở dòng riêng",
     );
     expect(request.systemPrompt).toContain(
       "riêng MULTI_STATEMENT_TRUE_FALSE chỉ có `problem` và `statementSolutions`, không có `solution` hoặc `answer` chung",
@@ -706,11 +746,11 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(physicsRequest.systemPrompt).not.toContain("isGeometry");
   });
 
-  it("enforces the same grade-aware Geometry and GT–KL output branches as Summary", () => {
+  it("keeps geometry classification and permits no figure for a general-formula counterexample", () => {
     const baseQuestion = {
       questionType: QuestionType.TRUE_FALSE,
       difficulty: Difficulty.EASY,
-      hint: "Dùng tính chất tứ giác nội tiếp.",
+      hint: "Đối chiếu với công thức diện tích hình tròn theo bán kính.",
       figure: {
         questionFigure: null,
         solutionFigureMode: "NONE" as const,
@@ -719,15 +759,10 @@ describe("M9.3 Quiz-owned generation core", () => {
       correctAnswer: true,
     };
     const geometryExplanation = {
-      problem:
-        "Cho tứ giác $ABCD$ nội tiếp đường tròn. Chứng minh $\\angle A+\\angle C=180^\\circ$.",
-      solution: "Hai góc đối của tứ giác nội tiếp có tổng bằng $180^\\circ$.",
-      answer: "$\\angle A+\\angle C=180^\\circ$.",
+      problem: "Diện tích hình tròn bán kính $r$ được tính bởi $S=\\pi r^2$.",
+      solution: "Theo công thức diện tích hình tròn, $S=\\pi r^2$ nên khẳng định đúng.",
+      answer: "Khẳng định đúng.",
       isGeometry: true,
-      geometryStatement: {
-        hypotheses: ["Tứ giác $ABCD$ nội tiếp một đường tròn."],
-        conclusions: ["$\\angle A+\\angle C=180^\\circ$."],
-      },
     };
     const grade9Schema = getGeneratedQuizOutputSchema({
       subjectKey: "MATH",
@@ -743,7 +778,13 @@ describe("M9.3 Quiz-owned generation core", () => {
         questions: [
           {
             ...baseQuestion,
-            explanation: { ...geometryExplanation, geometryStatement: null },
+            explanation: {
+              ...geometryExplanation,
+              geometryStatement: {
+                hypotheses: ["Hình tròn có bán kính $r$."],
+                conclusions: ["$S=\\pi r^2$."],
+              },
+            },
           },
         ],
       }).success,
@@ -757,7 +798,7 @@ describe("M9.3 Quiz-owned generation core", () => {
           },
         ],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
 
     const grade12Schema = getGeneratedQuizOutputSchema({
       subjectKey: "MATH",
@@ -768,19 +809,11 @@ describe("M9.3 Quiz-owned generation core", () => {
         questions: [
           {
             ...baseQuestion,
-            explanation: {
-              ...geometryExplanation,
-              geometryStatement: null,
-            },
+            explanation: geometryExplanation,
           },
         ],
       }).success,
     ).toBe(true);
-    expect(
-      grade12Schema.safeParse({
-        questions: [{ ...baseQuestion, explanation: geometryExplanation }],
-      }).success,
-    ).toBe(false);
 
     const unknownGradeSchema = getGeneratedQuizOutputSchema({ subjectKey: "MATH" });
     expect(
@@ -788,16 +821,11 @@ describe("M9.3 Quiz-owned generation core", () => {
         questions: [
           {
             ...baseQuestion,
-            explanation: { ...geometryExplanation, geometryStatement: null },
+            explanation: geometryExplanation,
           },
         ],
       }).success,
     ).toBe(true);
-    expect(
-      unknownGradeSchema.safeParse({
-        questions: [{ ...baseQuestion, explanation: geometryExplanation }],
-      }).success,
-    ).toBe(false);
   });
 
   it("builds a request-scoped schema for count, type, difficulty and server-owned text grading", () => {
@@ -871,7 +899,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     for (const fieldPrefix of [
       "Phần nội dung chính của câu hỏi",
       "Kết luận ngắn gọn, nhất quán với lời giải",
-      "Gợi ý ngắn định hướng bước đầu",
+      "Gợi ý ngắn nhưng phải tự đủ nghĩa",
     ]) {
       const fieldDescription = providerSchemaDescriptions.find((description) =>
         description.startsWith(fieldPrefix),
@@ -897,15 +925,15 @@ describe("M9.3 Quiz-owned generation core", () => {
       "Phần nội dung chính của câu hỏi phải nêu đủ đối tượng, ký hiệu, dữ kiện và yêu cầu chuyên môn nếu dạng câu cần, để học sinh trả lời được mà không cần xem hình minh họa. Không thêm nhãn hoặc câu dẫn chỉ nhắc lại thao tác đã được `questionType` thể hiện.",
       "Thân lời giải phải đầy đủ và mạch lạc theo phong cách sách giáo khoa: chỉ bỏ diễn giải lặp lại, không gộp phép tính nhiều bước vào câu văn; sau khi thực hiện đủ các bước cần thiết thì kết luận rồi dừng, không viết thêm nhận xét hoặc tính chất tổng quát sau kết luận. Lời giải phải hiểu được mà không cần xem hình minh họa.",
       "Kết luận ngắn gọn, nhất quán với lời giải và không chứa tiền tố `Đáp án:`.",
-      "Gợi ý ngắn định hướng bước đầu nhưng không tiết lộ trực tiếp đáp án.",
     ]) {
       expect(providerSchemaJson).toContain(fieldDescription);
     }
+    expect(providerSchemaDescriptions).toContain(QUIZ_HINT_QUALITY_POLICY);
     const allQuestionTypesSchema = getGeneratedQuizOutputSchema({
-        subjectKey: "GENERAL",
-        questionCount: 1,
-        difficulty: Difficulty.HARD,
-      });
+      subjectKey: "GENERAL",
+      questionCount: 1,
+      difficulty: Difficulty.HARD,
+    });
     const allQuestionTypesResolution = resolveAiStructuredTextFormat(
       allQuestionTypesSchema,
       "generated_quiz",
@@ -943,9 +971,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(solutionDescriptions[0]).toContain(QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY);
     expect(solutionDescriptions[0]).toContain(QUIZ_SUBPART_LINEBREAK_POLICY);
     expect(solutionDescriptions[0]).toContain(QUIZ_CONCLUSION_PARAGRAPH_POLICY);
-    expect(solutionDescriptions[0]).not.toContain(
-      QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY,
-    );
+    expect(solutionDescriptions[0]).not.toContain(QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY);
     const solutionReferences = [
       ...allQuestionTypesProviderSchemaJson.matchAll(
         /"solution":\{"\$ref":"(#\/\$defs\/[^"]+)"\}/gu,
@@ -1170,11 +1196,7 @@ describe("M9.3 Quiz-owned generation core", () => {
 
     const mapped = mapGeneratedQuizQuestion(textQuestion);
     expect(mapped.correctAnswerJson).toEqual(["2"]);
-    expect(mapped.gradingConfigJson).toEqual({
-      caseSensitive: false,
-      exactMatch: true,
-      numericComparison: true,
-    });
+    expect(mapped.gradingConfigJson).toBeNull();
   });
 
   it("keeps semantic validation issues as non-blocking admin warnings", () => {
@@ -1401,7 +1423,9 @@ describe("M9.3 Quiz-owned generation core", () => {
       "utf8",
     );
     expect(rendererSource).not.toMatch(/>\s*Lời giải\s*<\/div>/u);
-    expect(rendererSource).toContain("aria-label={`Phương án ${answerOptionId}`}");
+    expect(rendererSource).toContain(
+      "aria-label={`Phương án ${answerDisplay.optionLabel}`}",
+    );
     expect(rendererSource).toContain("Đáp án:");
     expect(rendererSource).toContain('contentAlignment="left"');
 
@@ -1426,23 +1450,103 @@ describe("M9.3 Quiz-owned generation core", () => {
         role: "QUESTION",
         problem: "Cho tam giác ABC vuông tại A.",
         solution: "Dựng đường cao AH rồi chứng minh hệ thức.",
-        caption: "Tam giác ABC vuông tại A",
+        caption: "Tam giác ABC đều",
       },
     });
     expect(request.userPrompt).toContain("Cho tam giác ABC vuông tại A");
+    expect(request.userPrompt).toContain("Tam giác ABC đều");
     expect(request.userPrompt).not.toContain("Dựng đường cao AH");
+    const editRequest = buildQuestionFigureInput({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      plan: {
+        version: 1,
+        role: "QUESTION",
+        problem: "Cho tam giác ABC vuông tại A.",
+        caption: "Tam giác ABC vuông tại A",
+      },
+      mode: "EDIT_CURRENT",
+      currentLatexSource:
+        "\\begin{tikzpicture}\\draw (0,0)--(1,0);\\end{tikzpicture}",
+      adminInstructions: "Đặt nhãn A xa cạnh hơn.",
+    });
+    expect(editRequest.userPrompt).toContain('"mode":"EDIT_CURRENT"');
+    expect(editRequest.userPrompt).toContain('"currentLatexSource"');
+    expect(editRequest.userPrompt).toContain("Đặt nhãn A xa cạnh hơn");
+    expect(editRequest.systemPrompt).toContain("sửa tối thiểu currentLatexSource");
     expect(request.systemPrompt).toContain("tuyệt đối không chứa đáp án");
     expect(request.systemPrompt).toContain(
       "mọi đối tượng, quan hệ, ký hiệu và chú thích mang nghĩa",
     );
     expect(request.systemPrompt).toContain("không tạo ra cách hiểu sai hoặc mơ hồ");
     expect(request.systemPrompt).toContain(
-      "đối chiếu lại từng nét mang nghĩa với problem/caption",
+      "problem là nguồn dữ kiện có thẩm quyền duy nhất",
     );
-    expect(request.systemPrompt).toContain("semanticChecks");
-    expect(request.systemPrompt).toContain("readabilityChecks");
-    expect(request.systemPrompt).toContain("đường trung trực phải có cả hai dấu hiệu");
+    expect(request.systemPrompt).toContain(
+      "caption chỉ mô tả trọng tâm minh họa",
+    );
+    expect(request.systemPrompt).toContain(
+      "Nếu caption mâu thuẫn, mơ hồ hoặc vượt quá problem",
+    );
+    expect(request.systemPrompt).toContain(
+      "đối chiếu lại từng nét mang nghĩa với problem",
+    );
+    expect(request.systemPrompt).not.toContain("problem/caption");
+    expect(request.systemPrompt).not.toContain("semanticChecks");
+    expect(request.systemPrompt).not.toContain("readabilityChecks");
+    expect(request.systemPrompt).not.toContain("GT–KL");
+    expect(request.schemaReferenceStrategy).toBe("auto");
+    expect(request.promptCache).toEqual({
+      namespace: "quiz-figure-question",
+      keyEnabled: true,
+      retention: "in_memory",
+    });
+    const questionFormat = resolveAiStructuredTextFormat(
+      generatedQuizQuestionFigureSchema,
+      request.outputName,
+      request.schemaReferenceStrategy,
+    );
+    expect(questionFormat.resolvedReferenceStrategy).toBe("inline");
+    expect(questionFormat.schemaBytes).toBeLessThan(350);
+    expect(JSON.stringify(questionFormat.format.schema)).not.toMatch(
+      /semanticChecks|readabilityChecks/u,
+    );
+    expect(
+      estimateAiStructuredInputTokens({
+        systemPrompt: request.systemPrompt,
+        inputPrompt: buildAiUserPrompt(request),
+        structuredTextFormat: questionFormat.format,
+      }).textInputTokens,
+    ).toBeLessThan(1_250);
+    expect(request.systemPrompt).toContain("bao phủ Hình học và trực quan Đại số");
+    expect(request.systemPrompt).toContain("Cấm tuyệt đối marker mũi tên hoặc chevron");
+    expect(request.systemPrompt).toContain(
+      "hướng của trục, vector, lực, tia hoặc luồng truyền",
+    );
+    expect(request.systemPrompt).toContain(
+      "góc trong đa giác phải nằm phía trong đa giác",
+    );
+    expect(request.systemPrompt).not.toContain(
+      "các đường song song dùng cùng kiểu mũi tên",
+    );
+    expect(request.systemPrompt).toContain("Đồ thị/hệ trục/đường số/miền nghiệm");
+    expect(request.systemPrompt).toContain("Bảng biến thiên/xét dấu/dữ liệu/biểu đồ");
+    expect(request.promptVersion).toBe(
+      "quiz-figure-prompt-v20-problem-authoritative-caption-advisory",
+    );
+    expect(request.promptVersion).toBe(QUIZ_FIGURE_PROMPT_VERSION);
     expect(request.systemPrompt).toContain("không ký hiệu kết luận học sinh cần tìm");
+    expect(request.systemPrompt).toContain("Bắt buộc dựng trước, chú thích sau");
+    expect(request.systemPrompt).toContain(
+      "tính lại từng số đo nhìn thấy từ tọa độ/phép dựng",
+    );
+    expect(request.systemPrompt).toContain(
+      "angle=X--V--Y, tính miền quét ngược chiều kim đồng hồ",
+    );
+    expect(request.systemPrompt).toContain(
+      "dựng lại tọa độ hoặc đổi thứ tự tia",
+    );
+    expect(request.systemPrompt).toContain("cấm chỉ sửa nhãn");
+    expect(request.systemPrompt).toContain("không trả thêm field/báo cáo");
     expect(request.systemPrompt).toContain(
       "ký hiệu quan hệ độc lập không chồng, chạm hoặc tụ sát",
     );
@@ -1454,22 +1558,10 @@ describe("M9.3 Quiz-owned generation core", () => {
           "\\end{tikzpicture}",
         ].join("\n"),
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       generatedQuizQuestionFigureSchema.safeParse({
-        semanticChecks: [
-          {
-            fact: "Tam giác ABC vuông tại A",
-            latexEvidence: "\\draw (A) -- (B) -- (C) -- cycle",
-          },
-        ],
-        readabilityChecks: [
-          {
-            element: "Nhãn A",
-            placement: "node[above] tại tọa độ A",
-            clearance: "tách khỏi các cạnh và nhãn lân cận",
-          },
-        ],
+        semanticChecks: [],
         latexSource: [
           "\\begin{tikzpicture}",
           "\\draw (A) -- (B) -- (C) -- cycle;",
@@ -1477,7 +1569,7 @@ describe("M9.3 Quiz-owned generation core", () => {
           "\\end{tikzpicture}",
         ].join("\n"),
       }).success,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("builds the solution figure by inserting commands into the exact question source", () => {
@@ -1516,40 +1608,44 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(requestPayload.requiredAddedObjects).toEqual(["Đường cao AH"]);
     expect(requestPayload.requiredClarifiedRelations).toEqual(["AH vuông góc BC"]);
     expect(request.systemPrompt).toContain("không trả lại toàn bộ hình");
-    expect(request.systemPrompt).toContain("extensionPlan.addedObjects");
-    expect(request.systemPrompt).toContain("extensionPlan.clarifiedRelations");
-    expect(request.systemPrompt).toContain("readabilityChecks");
+    expect(request.systemPrompt).not.toContain("extensionPlan");
+    expect(request.systemPrompt).not.toContain("readabilityChecks");
+    expect(request.systemPrompt).toContain("requiredAddedObjects");
+    expect(request.systemPrompt).toContain("requiredClarifiedRelations");
+    expect(request.schemaReferenceStrategy).toBe("auto");
+    expect(request.promptCache).toEqual({
+      namespace: "quiz-figure-solution",
+      keyEnabled: true,
+      retention: "in_memory",
+    });
+    const solutionFormat = resolveAiStructuredTextFormat(
+      generatedQuizSolutionExtensionSchema,
+      request.outputName,
+      request.schemaReferenceStrategy,
+    );
+    expect(solutionFormat.resolvedReferenceStrategy).toBe("inline");
+    expect(solutionFormat.schemaBytes).toBeLessThan(350);
+    expect(JSON.stringify(solutionFormat.format.schema)).not.toMatch(
+      /extensionPlan|readabilityChecks/u,
+    );
+    expect(
+      estimateAiStructuredInputTokens({
+        systemPrompt: request.systemPrompt,
+        inputPrompt: buildAiUserPrompt(request),
+        structuredTextFormat: solutionFormat.format,
+      }).textInputTokens,
+    ).toBeLessThan(1_250);
     expect(
       generatedQuizSolutionExtensionSchema.safeParse({
         extensionLatex: "\\draw[dashed] (0,0) -- (1,1);",
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       generatedQuizSolutionExtensionSchema.safeParse({
-        extensionPlan: {
-          addedObjects: [
-            {
-              fact: "Đường cao AH",
-              latexEvidence: "\\draw[dashed] (A) -- (H)",
-            },
-          ],
-          clarifiedRelations: [
-            {
-              fact: "AH vuông góc BC",
-              latexEvidence: "right-angle marker tại H",
-            },
-          ],
-        },
-        readabilityChecks: [
-          {
-            element: "Nhãn H",
-            placement: "node[below] tại H",
-            clearance: "tách khỏi dấu góc vuông",
-          },
-        ],
+        extensionPlan: {},
         extensionLatex: "\\draw[dashed] (A) -- (H);",
       }).success,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("uses separate reusable visual grammar for Physics and Chemistry", () => {
@@ -1567,10 +1663,29 @@ describe("M9.3 Quiz-owned generation core", () => {
       subject: { key: "CHEMISTRY", name: "Hóa học", slug: "hoa-hoc" },
       plan,
     });
+    expect(physics.systemPrompt).toContain("Cấm tuyệt đối marker mũi tên hoặc chevron");
     expect(physics.systemPrompt).toContain("vector phải có đúng gốc");
     expect(physics.systemPrompt).not.toContain("hóa trị");
+    expect(chemistry.systemPrompt).toContain("Cấm tuyệt đối marker mũi tên hoặc chevron");
     expect(chemistry.systemPrompt).toContain("đúng liên kết, hóa trị và điện tích");
     expect(chemistry.systemPrompt).not.toContain("lực gắn đúng vật");
+  });
+
+  it("keeps admin figure regeneration instructions scoped as presentation data", () => {
+    const request = buildQuestionFigureInput({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      plan: {
+        version: 1,
+        role: "QUESTION",
+        problem: "Cho tam giác ABC.",
+        caption: "Tam giác ABC",
+      },
+      adminInstructions: "Đặt nhãn thoáng hơn.",
+    });
+    expect(JSON.parse(request.userPrompt)).toMatchObject({
+      adminInstructions: "Đặt nhãn thoáng hơn.",
+    });
+    expect(request.systemPrompt).toContain("cấm thêm dữ kiện, lộ đáp án");
   });
 
   it("accepts the XML declaration and generator comment emitted by dvisvgm", () => {
@@ -1621,8 +1736,9 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
         "Hàm số liên tục trên đoạn $[0,1]`. Vậy câu b) đúng.",
       ),
     ).toBe("Hàm số liên tục trên đoạn $[0,1]$. Vậy câu b) đúng.");
-    expect(normalizeQuizInlineMathDelimiters("Tại vị trí $x`, ta có kết quả."))
-      .toBe("Tại vị trí $x$, ta có kết quả.");
+    expect(normalizeQuizInlineMathDelimiters("Tại vị trí $x`, ta có kết quả.")).toBe(
+      "Tại vị trí $x$, ta có kết quả.",
+    );
     expect(
       normalizeQuizInlineMathDelimiters(
         "Vì $\\dfrac{\\pi}{2}\\approx 1.5708`, nên làm tròn được $1.6$.",
@@ -1633,8 +1749,9 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
         "Trên đoạn $[0,4]`. Hai đường thẳng $x=0$, $x=4`; quay quanh $Ox$.",
       ),
     ).toBe("Trên đoạn $[0,4]$. Hai đường thẳng $x=0$, $x=4$; quay quanh $Ox$.");
-    expect(normalizeQuizInlineMathDelimiters("Giữ `price=$5` và $x=1$."))
-      .toBe("Giữ `price=$5` và $x=1$.");
+    expect(normalizeQuizInlineMathDelimiters("Giữ `price=$5` và $x=1$.")).toBe(
+      "Giữ `price=$5` và $x=1$.",
+    );
   });
 
   it("normalizes every generated Quiz string while preserving valid content", () => {
@@ -1647,7 +1764,6 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
         solution: String.raw`$$\begin{aligned}x&=1\\&=1.$$`,
         answer: "Đúng",
         isGeometry: false,
-        geometryStatement: null,
       },
       figure: {
         questionFigure: null,
@@ -1661,6 +1777,37 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
       String.raw`$$\begin{aligned}x&=1\\&=1.\end{aligned}$$`,
     );
     expect(normalizeGeneratedQuizQuestionLatex(question).hint).toBe(question.hint);
+  });
+
+  it("repairs missing backslashes for known LaTeX commands only inside math", () => {
+    const question = {
+      questionType: QuestionType.TEXT_INPUT,
+      difficulty: Difficulty.EASY,
+      hint: String.raw`Nhận diện quan hệ $ widehat{X}+\widehat{Y}=180^circ$ rồi lập phép tính.`,
+      explanation: {
+        problem: String.raw`Biết $ widehat{X}=m^circ$. Tính $\widehat{Y}$.`,
+        solution: String.raw`Dòng chữ widehat{X} giữ nguyên. Ký hiệu $xwidehat{Y}$ không phải lệnh.`,
+        answer: "n",
+        isGeometry: true,
+      },
+      figure: {
+        questionFigure: null,
+        solutionFigureMode: "NONE" as const,
+        solutionFigurePlan: null,
+      },
+      correctAnswer: "1",
+    };
+
+    const normalized = normalizeGeneratedQuizQuestionLatex(question);
+    expect(normalized.hint).toBe(
+      String.raw`Nhận diện quan hệ $ \widehat{X}+\widehat{Y}=180^\circ$ rồi lập phép tính.`,
+    );
+    expect(normalized.explanation.problem).toBe(
+      String.raw`Biết $ \widehat{X}=m^\circ$. Tính $\widehat{Y}$.`,
+    );
+    expect(normalized.explanation.solution).toContain("Dòng chữ widehat{X}");
+    expect(normalized.explanation.solution).toContain("$xwidehat{Y}$");
+    expect(normalizeGeneratedQuizQuestionLatex(normalized)).toEqual(normalized);
   });
 
   it("repairs mistyped inline delimiters across generated Quiz problem and solutions", () => {
@@ -1681,7 +1828,6 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
           },
         ],
         isGeometry: false,
-        geometryStatement: null,
       },
       figure: {
         questionFigure: null,
@@ -1699,8 +1845,6 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
     expect(normalized.explanation.statementSolutions[0]?.solution).toContain(
       "trên $[0,1]$.",
     );
-    expect(normalized.explanation.statementSolutions[1]?.solution).toContain(
-      "$S(1)=4$.",
-    );
+    expect(normalized.explanation.statementSolutions[1]?.solution).toContain("$S(1)=4$.");
   });
 });

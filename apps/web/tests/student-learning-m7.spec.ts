@@ -1790,6 +1790,59 @@ test("quiz status dots navigate directly to the selected question", async ({ pag
   await expectNoFrameworkOverlay(page);
 });
 
+test("quiz keyboard shortcuts check answers and navigate between questions", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+    quizQuestionCount: 3,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+
+  const selectedOption = page.getByRole("button", { name: /B.*4/ });
+  await selectedOption.click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Chính xác!")).toBeVisible();
+
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 2", exact: true }),
+  ).toBeVisible();
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
+test("quiz arrow shortcuts preserve caret navigation while editing a text answer", async ({
+  page,
+}) => {
+  await setupStudentLearningApiMock(page, {
+    testReady: false,
+    testPasses: false,
+    quizQuestionCount: 2,
+    quizQuestionType: "TEXT_INPUT",
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu" }).click();
+
+  const answerInput = page.getByPlaceholder("Nhập đáp án");
+  await answerInput.fill("-2.5");
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.getByRole("heading", { name: "Câu hỏi 1", exact: true }),
+  ).toBeVisible();
+
+  await expect(page.getByRole("button", { name: "Kiểm tra đáp án" })).toBeEnabled();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Chính xác!")).toBeVisible();
+  await expectNoFrameworkOverlay(page);
+});
+
 test("quiz continues at the last question with its unchecked answer after back", async ({
   page,
 }) => {

@@ -1,1 +1,2 @@
 - 2026-08-24: Hoàn thiện lát cắt quiz-owned generation gồm request draft PDF, structured output dùng schema reference, figure pipeline/review, migration và API/worker liên quan; đồng thời đồng bộ trải nghiệm quản trị/làm bài, chuẩn hóa nội dung toán học, test, tài liệu AI–quiz và quy tắc Codex hiện hành.
+- 2026-08-24: Hoàn thiện luồng tạo, chỉnh sửa và quản trị hình Quiz theo trải nghiệm Sinh kiến thức; đồng thời harden prompt/renderer AI, chuẩn hóa đáp án số và nội dung toán học, cập nhật UI học–quản trị, test, tài liệu, cấu hình vận hành và hướng dẫn Codex liên quan.

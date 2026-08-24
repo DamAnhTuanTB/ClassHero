@@ -41,7 +41,7 @@ const MODE_OPTIONS: Array<{
   },
   {
     value: "CURRENT_ONLY",
-    label: "Sửa ảnh hiện tại",
+    label: "Chỉnh sửa hình hiện tại",
     description:
       "Sửa tối thiểu code TikZ hiện tại theo yêu cầu và đối chiếu ảnh gốc sách giáo khoa.",
   },

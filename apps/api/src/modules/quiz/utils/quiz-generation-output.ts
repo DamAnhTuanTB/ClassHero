@@ -42,7 +42,17 @@ export function readQuizGenerationQuestion(
 ): Record<string, unknown> | null {
   if (!isRecord(outputJson) || !Array.isArray(outputJson.questions)) return null;
   const question = outputJson.questions[questionIndex];
-  return isRecord(question) ? question : null;
+  return isRecord(question) ? stripQuizGeometryStatementFromQuestion(question) : null;
+}
+
+export function stripQuizGeometryStatementFromMetadata(value: unknown) {
+  if (!isRecord(value)) return value;
+  const metadata = cloneJsonRecord(value);
+  if (!isRecord(metadata.quizExplanationBlock)) return metadata;
+  const explanationBlock = cloneJsonRecord(metadata.quizExplanationBlock);
+  delete explanationBlock.geometryStatement;
+  metadata.quizExplanationBlock = explanationBlock;
+  return metadata;
 }
 
 /** @deprecated Use readQuizGenerationQuestion; outputJson is a mutable snapshot. */
@@ -67,6 +77,7 @@ export function buildCurrentQuizQuestionJson(
   const explanation = isRecord(current.explanation)
     ? cloneJsonRecord(current.explanation)
     : {};
+  delete explanation.geometryStatement;
   const currentExplanationBlock = readCurrentExplanationBlock(
     question.sourceMetadataJson,
   );
@@ -81,9 +92,6 @@ export function buildCurrentQuizQuestionJson(
     explanation.answer = currentExplanationBlock.answer;
     if (typeof currentExplanationBlock.isGeometry === "boolean") {
       explanation.isGeometry = currentExplanationBlock.isGeometry;
-    }
-    if ("geometryStatement" in currentExplanationBlock) {
-      explanation.geometryStatement = currentExplanationBlock.geometryStatement;
     }
   } else {
     if (currentExplanationText) {
@@ -130,8 +138,7 @@ export function buildCurrentQuizQuestionJson(
     }
     case QuestionType.TEXT_INPUT: {
       const acceptedAnswers = readStringAnswers(question.correctAnswerJson);
-      current.correctAnswer =
-        acceptedAnswers.length <= 1 ? (acceptedAnswers[0] ?? null) : acceptedAnswers;
+      current.correctAnswer = acceptedAnswers[0] ?? null;
       break;
     }
   }
@@ -169,7 +176,8 @@ export function replaceQuizGenerationQuestionOutput(
 
   const currentOutput = cloneJsonRecord(outputJson);
   const questions = [...outputJson.questions];
-  questions[questionIndex] = cloneJsonRecord(generationQuestionJson);
+  questions[questionIndex] =
+    stripQuizGeometryStatementFromQuestion(generationQuestionJson);
   currentOutput.questions = questions;
   return currentOutput;
 }
@@ -195,8 +203,19 @@ function buildCurrentAnswer(question: CurrentQuizQuestionJsonSource) {
         )
         .join("\n");
     case QuestionType.TEXT_INPUT:
-      return readStringAnswers(question.correctAnswerJson).join("\n");
+      return readStringAnswers(question.correctAnswerJson)[0] ?? "";
   }
+}
+
+function stripQuizGeometryStatementFromQuestion(
+  question: Record<string, unknown>,
+): Record<string, unknown> {
+  const sanitized = cloneJsonRecord(question);
+  if (!isRecord(sanitized.explanation)) return sanitized;
+  const explanation = cloneJsonRecord(sanitized.explanation);
+  delete explanation.geometryStatement;
+  sanitized.explanation = explanation;
+  return sanitized;
 }
 
 function readQuizOptions(value: unknown) {

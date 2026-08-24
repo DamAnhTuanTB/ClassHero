@@ -97,6 +97,32 @@ export function AdminAiGenerationPanel({
   const generateMutation = useGenerateAdminLessonContent(lessonId);
   const [dialogRequest, setDialogRequest] =
     useState<AdminAiGenerationDialogRequest | null>(null);
+  const [isRefreshingQuizSets, setIsRefreshingQuizSets] = useState(false);
+
+  async function handleOpenGenerationDialog(type: AdminAiGenerationType) {
+    if (type !== "QUIZ") {
+      setDialogRequest({ type, mode: "CREATE" });
+      return;
+    }
+    if (isRefreshingQuizSets) return;
+
+    setIsRefreshingQuizSets(true);
+    try {
+      const result = await quizSetsQuery.refetch();
+      if (result.isError) {
+        toast.error(
+          getUserFacingErrorMessage(
+            result.error,
+            "Chưa tải được danh sách bộ Quiz. Vui lòng thử lại.",
+          ),
+        );
+        return;
+      }
+      setDialogRequest({ type, mode: "CREATE" });
+    } finally {
+      setIsRefreshingQuizSets(false);
+    }
+  }
 
   useEffect(() => {
     if (!requestedGeneration) {
@@ -179,9 +205,10 @@ export function AdminAiGenerationPanel({
               key={card.type}
               {...card}
               isActive={isActive}
+              isPreparing={card.type === "QUIZ" && isRefreshingQuizSets}
               isReady={isReady}
               job={job}
-              onGenerate={() => setDialogRequest({ type: card.type, mode: "CREATE" })}
+              onGenerate={() => void handleOpenGenerationDialog(card.type)}
               onOpen={() => onOpenResult(card.type, job?.resourceId ?? null)}
             />
           );
@@ -272,6 +299,7 @@ function GenerationCard({
   description,
   icon: Icon,
   isActive,
+  isPreparing,
   isReady,
   job,
   label,
@@ -282,6 +310,7 @@ function GenerationCard({
   description: string;
   icon: typeof BookOpenText;
   isActive: boolean;
+  isPreparing: boolean;
   isReady: boolean;
   job: AdminAiPanelJob | null;
   label: string;
@@ -335,17 +364,19 @@ function GenerationCard({
         <button
           type="button"
           onClick={onGenerate}
-          disabled={!isReady || isActive}
+          disabled={!isReady || isActive || isPreparing}
           className="theme-button-primary mt-4 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isActive ? (
+          {isActive || isPreparing ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           ) : job?.status === "FAILED" ? (
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
           ) : (
             <Sparkles className="h-4 w-4" aria-hidden="true" />
           )}
-          {isActive ? (
+          {isPreparing ? (
+            "Đang tải bộ Quiz"
+          ) : isActive ? (
             <JobTimer createdAt={job!.createdAt} prefix="Đang xử lý (" suffix=")" />
           ) : job?.status === "FAILED" ? (
             "Thử lại"

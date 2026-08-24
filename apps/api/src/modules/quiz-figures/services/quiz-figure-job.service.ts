@@ -25,6 +25,12 @@ export class QuizFigureJobService {
     figureId: string,
     ownerUserId?: string | null,
     routeSnapshot?: AiFeatureRoute,
+    createOptions?: {
+      adminInstructions?: string | null;
+      aiMode?: "REGENERATE" | "EDIT_CURRENT";
+      systemPrompt?: string | null;
+      userPrompt?: string | null;
+    },
   ) {
     const figure = await this.prisma.quizFigure.findUniqueOrThrow({
       where: { id: figureId },
@@ -69,6 +75,10 @@ export class QuizFigureJobService {
             revisionId: revision.id,
             role: figure.role,
             routeSnapshot: routeSnapshot ?? null,
+            adminInstructions: createOptions?.adminInstructions ?? null,
+            aiMode: createOptions?.aiMode ?? "REGENERATE",
+            systemPrompt: createOptions?.systemPrompt ?? null,
+            userPrompt: createOptions?.userPrompt ?? null,
           }),
           maxAttempts: 1,
         },

@@ -73,7 +73,7 @@ Rules:
   thật nằm ở object storage với `files.purpose=QUESTION_IMAGE`.
 - `correct_answer_json` của `MULTIPLE_CHOICE` chỉ chứa ID còn tồn tại trong
   `options_json`; của `TRUE_FALSE` là một boolean chung; của `TEXT_INPUT` là
-  mảng chuỗi được chấp nhận.
+  mảng chứa đúng một chuỗi đáp án canonical để giữ shape JSON hiện hành.
 - Với `MULTI_STATEMENT_TRUE_FALSE`, `question_json` giữ đề dẫn chung;
   `options_json` là mảng tối thiểu 2 phần tử
   `{ id: string, richText: TiptapDoc }` có ID duy nhất; và
@@ -88,12 +88,18 @@ Rules:
   `generationQuestionIndex` và `quizExplanationBlock` thuộc riêng Quiz. Quiz
   không lưu source hash/chunk/page ở cấp câu và không đọc legacy `exampleBlock`.
   Student chỉ nhận projection `explanationBlock`, không nhận metadata nội bộ.
-- `quizExplanationBlock` giữ `isGeometry` và bảng GT–KL khi schema môn/lớp yêu
-  cầu. Phân loại Hình học không quyết định `solution_figure_mode`.
+- `quizExplanationBlock` của Quiz Toán chỉ giữ `isGeometry`; không lưu
+  `geometryStatement`, `hypotheses` hoặc `conclusions`. Key cũ trong JSON lịch
+  sử không còn thuộc contract, không được projection ra API/UI và bị loại khi
+  câu AI được lưu lại. Phân loại Hình học không quyết định
+  `solution_figure_mode`. Summary/Example giữ contract GT–KL riêng.
 - `solution_figure_mode`: `NONE`, `REUSE_QUESTION` hoặc `EXTEND_QUESTION`.
   EXTEND luôn có revision lời giải trỏ `derived_from_question_revision_id` tới
   exact current revision của hình đề.
-- Với `TEXT_INPUT`, các đáp án chấp nhận nằm trong `correct_answer_json`; `grading_config_json` chứa cấu hình so khớp như `caseSensitive`, `exactMatch` và có thể mở rộng thêm `trimWhitespace`, `numericTolerance`, `unitRequired`, `acceptedUnits`.
+- Với `TEXT_INPUT`, `correct_answer_json` chứa đúng một chuỗi canonical. Backend
+  tự so sánh tương đương số chính xác và fallback về chuỗi đã chuẩn hóa;
+  `grading_config_json` không còn điều khiển cách chấm và bản ghi mới/cập nhật
+  lưu `null`. Field nullable được giữ để tương thích dữ liệu cũ, không cần migration.
 - Lời giải chi tiết do admin nhập tái sử dụng `ai_explanations`: `target_type=QUIZ_QUESTION`, `target_id=quiz_questions.id`, `source=ADMIN`, `review_status=APPROVED`; `quiz_questions.explanation_id` trỏ tới bản ghi này.
 - Khi admin sửa nội dung/correct answer/hint, service phải mark explanation stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - `published_at` là watermark phát hành của từng câu, không phải snapshot JSON.
@@ -379,7 +385,8 @@ Rules:
 - API trả thêm `effectivePoints` (không lưu cột riêng) để UI/flow chấm điểm dùng
   được điểm đã chia đều; phần dư do làm tròn được phân bổ theo thứ tự câu hỏi để
   tổng vẫn đúng `test_sets.total_score`.
-- Với `TEXT_INPUT`, dùng `grading_config_json` như quiz.
+- Với `TEXT_INPUT`, dùng cùng một đáp án canonical và bộ chấm tự động như Quiz;
+  `grading_config_json` mới/cập nhật lưu `null`.
 - Test hỗ trợ đủ bốn loại `MULTIPLE_CHOICE`, `TRUE_FALSE`,
   `MULTI_STATEMENT_TRUE_FALSE`, `TEXT_INPUT` với cùng shape dữ liệu như Quiz.
 - `test_questions.TRUE_FALSE` tiếp tục nhận một boolean chung.

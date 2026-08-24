@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { isSupportedNumericAnswer } from "@learning-path/shared";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import type { getRequestContext } from "#api/common/api/request-context";
@@ -25,7 +24,7 @@ import {
   multiStatementCorrectAnswerSchema,
   multiStatementOptionsSchema,
   multipleChoiceOptionsSchema,
-  textInputGradingSchema,
+  textInputCorrectAnswerSchema,
 } from "#api/modules/quiz/types/quiz.types";
 import { getTiptapText } from "#api/common/validation/rich-text-content";
 import {
@@ -40,6 +39,7 @@ import {
   readQuizGenerationQuestion,
   readQuizGenerationQuestionReference,
   replaceQuizGenerationQuestionOutput,
+  stripQuizGeometryStatementFromMetadata,
   updateQuizGenerationQuestionOutput,
 } from "#api/modules/quiz/utils/quiz-generation-output";
 import {
@@ -213,22 +213,34 @@ export class QuizService {
           : QuizSetReviewActionDto.SAVE);
     return this.prisma.$transaction(async (transaction) => {
       if (action === QuizSetReviewActionDto.PUBLISH) {
-        const unreviewedQuestionCount = await transaction.quizQuestion.count({
+        const approvedQuestionCount = await transaction.quizQuestion.count({
           where: {
             quizSetId: setId,
             deletedAt: null,
-            reviewStatus: { not: ReviewStatus.APPROVED },
+            reviewStatus: ReviewStatus.APPROVED,
           },
         });
-        if (unreviewedQuestionCount > 0) {
+        if (approvedQuestionCount < 1) {
           throw badRequestException(
-            "QUIZ_SET_HAS_UNREVIEWED_QUESTIONS",
-            "Cần duyệt hết câu hỏi trước khi phát hành bộ Quiz",
-            { unreviewedQuestionCount },
+            "QUIZ_SET_HAS_NO_APPROVED_QUESTIONS",
+            "Cần có ít nhất 1 câu Quiz được duyệt để phát hành",
+            { approvedQuestionCount },
           );
         }
       }
-      const publishedAt = new Date();
+      const latestPublication =
+        action === QuizSetReviewActionDto.SAVE
+          ? await transaction.quizQuestion.findFirst({
+              where: {
+                quizSetId: setId,
+                deletedAt: null,
+                publishedAt: { not: null },
+              },
+              orderBy: { publishedAt: "desc" },
+              select: { publishedAt: true },
+            })
+          : null;
+      const publishedAt = latestPublication?.publishedAt ?? new Date();
       if (
         action === QuizSetReviewActionDto.SAVE ||
         action === QuizSetReviewActionDto.PUBLISH
@@ -342,6 +354,9 @@ export class QuizService {
         : null;
       return {
         ...question,
+        sourceMetadataJson: stripQuizGeometryStatementFromMetadata(
+          question.sourceMetadataJson,
+        ),
         generationQuestionJson,
       };
     });
@@ -378,7 +393,7 @@ export class QuizService {
           optionsJson: toNullableInputJson(dto.optionsJson),
           correctAnswerJson: toInputJson(dto.correctAnswerJson),
           hintJson: toNullableInputJson(dto.hintJson),
-          gradingConfigJson: toNullableInputJson(dto.gradingConfigJson),
+          gradingConfigJson: Prisma.DbNull,
           reviewStatus: ReviewStatus.APPROVED,
           sortOrder: (lastQuestion?.sortOrder ?? -1) + 1,
         },
@@ -485,18 +500,13 @@ export class QuizService {
     if (dto.hintJson !== undefined) {
       updateData.hintJson = toNullableInputJson(dto.hintJson);
     }
-    if (dto.gradingConfigJson !== undefined) {
-      updateData.gradingConfigJson = toNullableInputJson(dto.gradingConfigJson);
-    }
     if (
       mergedContent.questionType !== QuestionType.MULTIPLE_CHOICE &&
       mergedContent.questionType !== QuestionType.MULTI_STATEMENT_TRUE_FALSE
     ) {
       updateData.optionsJson = Prisma.DbNull;
     }
-    if (mergedContent.questionType !== QuestionType.TEXT_INPUT) {
-      updateData.gradingConfigJson = Prisma.DbNull;
-    }
+    updateData.gradingConfigJson = Prisma.DbNull;
     if (quizExplanationBlock) {
       updateData.sourceMetadataJson = toInputJson(
         replaceQuizExplanationBlock(question.sourceMetadataJson, quizExplanationBlock),
@@ -1219,34 +1229,12 @@ function validateQuestionContent(dto: QuizQuestionContentDto) {
   }
 
   if (dto.questionType === QuestionType.TEXT_INPUT) {
-    if (
-      !Array.isArray(correctAnswer.data) ||
-      correctAnswer.data.some(
-        (answer) => typeof answer !== "string" || answer.trim().length === 0,
-      )
-    ) {
+    const textAnswer = textInputCorrectAnswerSchema.safeParse(dto.correctAnswerJson);
+    if (!textAnswer.success) {
       throw badRequestException(
         "QUIZ_QUESTION_INVALID_TEXT_ANSWERS",
-        "Câu hỏi nhập đáp án cần ít nhất một câu trả lời hợp lệ",
-      );
-    }
-    const gradingConfig = textInputGradingSchema.safeParse(dto.gradingConfigJson ?? {});
-    if (!gradingConfig.success) {
-      throw badRequestException(
-        "QUIZ_QUESTION_INVALID_GRADING_CONFIG",
-        "Cấu hình chấm câu trả lời chưa hợp lệ",
-        gradingConfig.error.flatten(),
-      );
-    }
-    if (
-      gradingConfig.data.numericComparison &&
-      correctAnswer.data.some(
-        (answer) => typeof answer !== "string" || !isSupportedNumericAnswer(answer),
-      )
-    ) {
-      throw badRequestException(
-        "QUIZ_QUESTION_INVALID_NUMERIC_ANSWERS",
-        "Đáp án dùng chế độ chấm số phải là giá trị số hợp lệ",
+        "Câu hỏi nhập đáp án cần đúng một đáp án chuẩn hợp lệ",
+        textAnswer.error.flatten(),
       );
     }
   }

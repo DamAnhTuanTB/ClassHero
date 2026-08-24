@@ -1,4 +1,9 @@
 import { apiRequest, type ApiRequestOptions } from "@/lib/api-client";
+import type {
+  AdminAiModelConfiguration,
+  AdminStemFigureCreateAiPreview,
+} from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import type { AiReasoningEffort } from "@learning-path/shared";
 import type { TiptapTextDocument } from "@/types/rich-text";
 
 export type QuizDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
@@ -22,12 +27,6 @@ export interface AdminQuizQuestionPayload {
   optionsJson?: AdminQuizOption[];
   correctAnswerJson: string[] | boolean | AdminMultiStatementAnswer[];
   hintJson?: TiptapTextDocument | null;
-  gradingConfigJson?: {
-    caseSensitive: boolean;
-    exactMatch: boolean;
-    numericComparison?: boolean;
-    keywords?: string[];
-  };
   explanationJson?: TiptapTextDocument | null;
 }
 
@@ -123,6 +122,9 @@ export interface AdminQuizFigure {
   currentRevision: {
     id: string;
     sourceKind: "AI_TEX" | "ADMIN_UPLOAD";
+    sourceVersion: number;
+    latexSource: string | null;
+    previewSvg: string | null;
     altText: string;
     caption: string | null;
     deliveryFile: {
@@ -131,6 +133,31 @@ export interface AdminQuizFigure {
       publicUrl: string | null;
     } | null;
   } | null;
+}
+
+export interface AdminQuizFigureCompileResult {
+  revisionId: string;
+  sourceVersion: number;
+  status: "DRAFT_READY";
+  previewSvg: string;
+}
+
+export interface AdminQuizFigureCreateAiInput {
+  mode: "REGENERATE" | "EDIT_CURRENT";
+  adminInstructions: string | null;
+  model?: string | null;
+  temperature?: number | null;
+  reasoningEffort?: AiReasoningEffort | null;
+  systemPrompt?: string | null;
+  userPrompt?: string | null;
+}
+
+export interface AdminQuizFigureCreateAiPreview extends Omit<
+  AdminStemFigureCreateAiPreview,
+  "referenceImageMode" | "generationBrief" | "referenceImages" | "configuration"
+> {
+  mode: AdminQuizFigureCreateAiInput["mode"];
+  configuration: AdminAiModelConfiguration;
 }
 
 export interface AdminQuizInitialData {
@@ -307,5 +334,87 @@ export async function attachAdminQuizFigureUpload(
   return apiRequest<AdminQuizFigure>(
     `/admin/quiz-questions/${questionId}/figures/admin-upload`,
     { method: "POST", body: data, token },
+  );
+}
+
+export function compileAdminQuizFigureDraft(
+  questionId: string,
+  figureId: string,
+  data: {
+    baseRevisionId: string | null;
+    sourceVersion: number;
+    latexSource: string;
+    altText: string;
+    caption: string | null;
+  },
+  token: string,
+) {
+  return apiRequest<AdminQuizFigureCompileResult>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/drafts/compile`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function applyAdminQuizFigureDraft(
+  questionId: string,
+  figureId: string,
+  data: {
+    baseRevisionId: string | null;
+    revisionId: string;
+    sourceVersion: number;
+  },
+  token: string,
+) {
+  return apiRequest<{ status: "SUCCEEDED"; revisionId: string }>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/drafts/apply`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function createNewAdminQuizFigureWithAi(
+  questionId: string,
+  figureId: string,
+  data: AdminQuizFigureCreateAiInput & { baseRevisionId: string | null },
+  token: string,
+) {
+  return apiRequest<{ jobId: string; status: string }>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/create-new-ai`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function previewNewAdminQuizFigureWithAi(
+  questionId: string,
+  figureId: string,
+  data: AdminQuizFigureCreateAiInput & { baseRevisionId: string | null },
+  token: string,
+) {
+  return apiRequest<AdminQuizFigureCreateAiPreview>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/create-new-ai/preview`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function updateAdminQuizFigureCaption(
+  questionId: string,
+  figureId: string,
+  data: { baseRevisionId: string | null; caption: string | null },
+  token: string,
+) {
+  return apiRequest<AdminQuizFigure>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/caption`,
+    { method: "PATCH", body: data, token },
+  );
+}
+
+export function deleteAdminQuizFigure(
+  questionId: string,
+  figureId: string,
+  data: { baseRevisionId: string | null },
+  token: string,
+) {
+  return apiRequest<{ deleted: true; figureId: string }>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}`,
+    { method: "DELETE", body: data, token },
   );
 }

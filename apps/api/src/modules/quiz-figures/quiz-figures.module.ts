@@ -6,6 +6,7 @@ import { FilesModule } from "#api/modules/files/files.module";
 import { JobsModule } from "#api/modules/jobs/jobs.module";
 import { AdminQuizFiguresController } from "#api/modules/quiz-figures/controllers/admin-quiz-figures.controller";
 import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
+import { QuizFigureDraftService } from "#api/modules/quiz-figures/services/quiz-figure-draft.service";
 import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
 import { QuizFiguresService } from "#api/modules/quiz-figures/services/quiz-figures.service";
 import { QuizTexRendererClientService } from "#api/modules/quiz-figures/services/quiz-tex-renderer-client.service";
@@ -15,12 +16,14 @@ import { QuizTexRendererClientService } from "#api/modules/quiz-figures/services
   controllers: [AdminQuizFiguresController],
   providers: [
     QuizFigureArtifactService,
+    QuizFigureDraftService,
     QuizFigureJobService,
     QuizFiguresService,
     QuizTexRendererClientService,
   ],
   exports: [
     QuizFigureArtifactService,
+    QuizFigureDraftService,
     QuizFigureJobService,
     QuizFiguresService,
     QuizTexRendererClientService,

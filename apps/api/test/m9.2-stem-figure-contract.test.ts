@@ -11,6 +11,7 @@ import {
 import {
   getLessonSummaryProviderTransportOutputSchema,
   LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+  LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION,
   LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
   lessonSummaryOutputSchema,
   lessonSummaryProviderTransportOutputSchema,
@@ -33,7 +34,10 @@ import {
   LESSON_SUMMARY_COMMON_SYSTEM_PROMPT,
   LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION,
 } from "#api/modules/ai/utils/lesson-summary-prompt";
-import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
+import {
+  buildAiStructuredTextFormat,
+  resolveAiStructuredTextFormat,
+} from "#api/modules/ai/utils/ai-structured-output-format";
 import {
   buildOpenAiResponseInput,
   buildOpenAiStructuredResponseRequest,
@@ -47,7 +51,10 @@ import {
   buildLessonContentSystemPrompt,
   buildTestPrompt,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
-import { StemFigureRepairService } from "#api/modules/stem-figures/services/stem-figure-repair.service";
+import {
+  StemFigureRepairService,
+  toStemFigureProviderDiagnosticBatch,
+} from "#api/modules/stem-figures/services/stem-figure-repair.service";
 import {
   FigureReferenceResolverService,
   selectReferenceImages,
@@ -116,6 +123,34 @@ function collectPropertyDescriptions(value: unknown, propertyName: string): stri
     descriptions.push(...collectPropertyDescriptions(nested, propertyName));
   }
   return descriptions;
+}
+
+function collectAllDescriptions(value: unknown): string[] {
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const descriptions = typeof record.description === "string" ? [record.description] : [];
+  for (const nested of Object.values(record)) {
+    descriptions.push(...collectAllDescriptions(nested));
+  }
+  return descriptions;
+}
+
+function collectPropertyReferences(value: unknown, propertyName: string): string[] {
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const references: string[] = [];
+  const properties = record.properties;
+  if (properties && typeof properties === "object") {
+    const property = (properties as Record<string, unknown>)[propertyName];
+    if (property && typeof property === "object") {
+      const reference = (property as Record<string, unknown>).$ref;
+      if (typeof reference === "string") references.push(reference);
+    }
+  }
+  for (const nested of Object.values(record)) {
+    references.push(...collectPropertyReferences(nested, propertyName));
+  }
+  return references;
 }
 
 function figureBrief(
@@ -1583,7 +1618,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
 
     const request = generateStructured.mock.calls[0]?.[1];
     expect(request.promptVersion).toBe(
-      "stem-figure-generate-from-block-v53-owner-block-only",
+      "stem-figure-generate-from-block-v54-global-visual-policy",
     );
     expect(request.maxTokens).toBe(12_000);
     expect(request.systemPrompt).toContain("tự thiết kế một hình LuaLaTeX/TikZ mới");
@@ -1592,6 +1627,13 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
     expect(request.systemPrompt).toContain(
       "Không tự phát minh số đo, nhãn, quan hệ, điều kiện hoặc kết luận",
+    );
+    expect(request.systemPrompt).toContain("Cấm tuyệt đối marker mũi tên hoặc chevron");
+    expect(request.systemPrompt).toContain(
+      "hướng của trục, vector, lực, tia hoặc luồng truyền",
+    );
+    expect(request.systemPrompt).toContain(
+      "góc trong đa giác phải nằm phía trong đa giác",
     );
     expect(request.systemPrompt).not.toContain("SOURCE_CROP_ONLY");
     expect(request.systemPrompt).not.toContain("CURRENT_ONLY");
@@ -1886,7 +1928,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     >;
     expect(request.inputImages).toHaveLength(1);
     expect(request.promptVersion).toBe(
-      "stem-figure-edit-current-source-v53-owner-block-only",
+      "stem-figure-edit-current-source-v54-global-visual-policy",
     );
     expect(providerBrief).toMatchObject({
       reference: {
@@ -2063,7 +2105,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("currentLatexSource");
         expect(request.promptVersion).toBe(
-          "stem-figure-regenerate-from-source-v53-owner-block-only",
+          "stem-figure-regenerate-from-source-v54-global-visual-policy",
         );
       } else if (mode === "CURRENT_ONLY") {
         expect(request.systemPrompt).toContain(
@@ -2074,7 +2116,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("tự thiết kế một hình");
         expect(request.promptVersion).toBe(
-          "stem-figure-edit-current-source-v53-owner-block-only",
+          "stem-figure-edit-current-source-v54-global-visual-policy",
         );
       } else {
         expect(request.systemPrompt).toContain(
@@ -2086,7 +2128,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         expect(request.systemPrompt).not.toContain("ảnh reference");
         expect(request.systemPrompt).not.toContain("currentLatexSource");
         expect(request.promptVersion).toBe(
-          "stem-figure-generate-from-block-v53-owner-block-only",
+          "stem-figure-generate-from-block-v54-global-visual-policy",
         );
       }
     },
@@ -2225,7 +2267,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
     expect(request.systemPrompt).toContain("ưu tiên phép dựng TikZ đơn giản");
     expect(request.promptVersion).toBe(
-      "stem-figure-generate-from-block-v53-owner-block-only",
+      "stem-figure-generate-from-block-v54-global-visual-policy",
     );
   });
 
@@ -2242,6 +2284,8 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       promptVersion: input.promptVersion,
       schemaVersion: input.schemaVersion,
       schemaReferenceStrategy: input.schemaReferenceStrategy,
+      resolvedSchemaReferenceStrategy: "inline",
+      schemaBytes: 205,
       systemPrompt: input.systemPrompt,
       userPrompt: input.userPrompt,
       inputTextItems: input.inputTextItems,
@@ -2258,7 +2302,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
           additionalProperties: false,
         },
       },
-      promptCache: undefined,
+      promptCache: input.promptCache,
       inputTokenEstimate: {
         textInputTokens: 1_200,
         imageInputTokens: 1_000,
@@ -2366,7 +2410,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "Chọn tập đối tượng và quan hệ tối thiểu nhưng đủ",
     );
     expect(request.promptVersion).toBe(
-      "stem-figure-generate-from-block-v53-owner-block-only",
+      "stem-figure-generate-from-block-v54-global-visual-policy",
     );
   });
 
@@ -2445,9 +2489,14 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       },
     });
     expect(previewStructuredRequest.mock.calls[0]?.[1]).toMatchObject({
-      systemPrompt: "SYSTEM CUSTOM",
       userPrompt: "USER CUSTOM",
     });
+    expect(previewStructuredRequest.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "SYSTEM CUSTOM",
+    );
+    expect(previewStructuredRequest.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "Cấm tuyệt đối marker mũi tên hoặc chevron",
+    );
     expect(generateStructured.mock.calls[0]?.[0]).toMatchObject({
       routeSnapshot: {
         model: "gpt-5.6-luna",
@@ -2456,9 +2505,14 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       },
     });
     expect(generateStructured.mock.calls[0]?.[1]).toMatchObject({
-      systemPrompt: "SYSTEM CUSTOM",
       userPrompt: "USER CUSTOM",
     });
+    expect(generateStructured.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "SYSTEM CUSTOM",
+    );
+    expect(generateStructured.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "Cấm tuyệt đối marker mũi tên hoặc chevron",
+    );
   });
 
   it("uses only explicit figure provenance", () => {
@@ -2866,7 +2920,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "Không chép nguyên đề bài, lý thuyết, phép tính trung gian hoặc kết luận lên hình",
     );
     expect(request.promptVersion).toBe(
-      "stem-figure-generate-from-block-v53-owner-block-only",
+      "stem-figure-generate-from-block-v54-global-visual-policy",
     );
     expect(request.inputImages).toEqual([]);
   });
@@ -3121,7 +3175,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     }
   });
 
-  it("requires every labeled subpart to start on its own line across Summary fields and subjects", () => {
+  it("keeps the labeled-subpart policy once at the Summary provider root", () => {
     const request = buildLessonSummaryStructuredInput({
       lessonId,
       lessonTitle: "Bài học nhiều ý",
@@ -3139,16 +3193,31 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       },
     });
     expect(request.systemPrompt).toContain(LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION);
+    expect(request.systemPrompt).toContain("bắt buộc thực hiện đầy đủ");
+    expect(request.systemPrompt).toContain(
+      "Cấm lời giải kiểu gợi ý `thay vào công thức`, `làm tương tự`, `suy ra ngay`",
+    );
 
     for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
-      const schema =
-        getLessonSummaryProviderTransportOutputSchema(subjectKey).toJSONSchema();
+      const schema = resolveAiStructuredTextFormat(
+        getLessonSummaryProviderTransportOutputSchema(subjectKey),
+        "lesson_summary_provider_contract",
+        "ref_v2",
+      ).format.schema;
+      expect((schema as { description?: string }).description).toContain(
+        LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
+      );
+      expect(
+        collectAllDescriptions(schema).filter((description) =>
+          description.includes(LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION),
+        ),
+      ).toHaveLength(1);
       for (const field of ["problem", "solution", "answer"] as const) {
         const descriptions = collectPropertyDescriptions(schema, field);
-        expect(descriptions.length).toBeGreaterThan(0);
         expect(
-          descriptions.every((description) =>
-            description.includes(LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION),
+          descriptions.every(
+            (description) =>
+              !description.includes(LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION),
           ),
         ).toBe(true);
       }
@@ -3204,21 +3273,60 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
 
     for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
-      const schema =
-        getLessonSummaryProviderTransportOutputSchema(subjectKey).toJSONSchema();
+      const schema = resolveAiStructuredTextFormat(
+        getLessonSummaryProviderTransportOutputSchema(subjectKey),
+        "lesson_summary_provider_contract",
+        "ref_v2",
+      ).format.schema;
       expect(JSON.stringify(schema)).not.toContain(
         LESSON_SUMMARY_LEARNER_FACING_IMAGE_INDEPENDENCE_INSTRUCTION,
       );
+      expect((schema as { description?: string }).description).toBe(
+        LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION,
+      );
+      expect(
+        collectAllDescriptions(schema).filter((description) =>
+          description.includes(
+            LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+          ),
+        ),
+      ).toHaveLength(1);
       for (const field of ["content", "problem", "solution", "answer"] as const) {
         const descriptions = collectPropertyDescriptions(schema, field);
-        expect(descriptions.length).toBeGreaterThan(0);
         expect(
-          descriptions.every((description) =>
-            description.includes(
-              LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
-            ),
+          descriptions.every(
+            (description) =>
+              !description.includes(
+                LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+              ),
           ),
         ).toBe(true);
+      }
+    }
+  });
+
+  it("reuses one problem, solution and answer schema across every Summary example", () => {
+    for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
+      const schema = resolveAiStructuredTextFormat(
+        getLessonSummaryProviderTransportOutputSchema(subjectKey, "CONTEXTUAL", 9),
+        "lesson_summary_provider_contract",
+        "ref_v2",
+      ).format.schema;
+
+      for (const field of ["problem", "solution", "answer"] as const) {
+        const references = collectPropertyReferences(schema, field);
+        expect(references.length).toBeGreaterThan(1);
+        expect(new Set(references).size).toBe(1);
+        if (field === "solution") {
+          const definitionKey = references[0]?.replace("#/$defs/", "");
+          const definition = definitionKey
+            ? (schema as { $defs?: Record<string, { description?: string }> }).$defs?.[
+                definitionKey
+              ]
+            : undefined;
+          expect(definition?.description).toContain("không làm tắt");
+          expect(definition?.description).toContain("không bỏ bước biến đổi");
+        }
       }
     }
   });
@@ -3430,7 +3538,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "lesson-summary-pdf-packet-five-block-prompt-v24-inference-alignment",
     );
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-five-block-schema-v22-inference-alignment",
+      "lesson-summary-pdf-packet-five-block-schema-v23-root-formatting-shared-example-fields",
     );
   });
 
@@ -3916,7 +4024,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect(serializedInput).toContain(allowed);
       expect(serializedInput).toContain(subject.name);
       expect(request.promptVersion).toBe(
-        "stem-figure-batch-repair-v9-source-diagnostics-only",
+        "stem-figure-batch-repair-v10-global-visual-policy",
       );
       expect(request.userPrompt).not.toContain("collectionComplete");
       expect(request.userPrompt).not.toContain('"column":null');
@@ -3927,6 +4035,10 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       );
       expect(request.systemPrompt).toContain(
         "Đây là lượt sửa kỹ thuật, không phải lượt thiết kế lại",
+      );
+      expect(request.systemPrompt).toContain("Cấm tuyệt đối marker mũi tên hoặc chevron");
+      expect(request.systemPrompt).toContain(
+        "góc trong đa giác phải nằm phía trong đa giác",
       );
       expect(request.userPrompt).not.toContain("admin");
       for (const value of forbidden) expect(serializedInput).not.toContain(value);
@@ -3980,6 +4092,32 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(providerPrompts).not.toContain("adminInstructions");
     expect(providerPrompts).not.toContain("Yêu cầu cuối cùng của admin");
     expect(providerPrompts).not.toContain("yêu cầu bổ sung");
+  });
+
+  it("keeps the full diagnostic batch for audit but bounds the provider projection", () => {
+    const rawLogExcerpt = `compiler-prefix-${"x".repeat(20_000)}-compiler-tail`;
+    const compilerBatch = createStemFigureDiagnosticBatch({
+      attemptId: "00000000-0000-4000-8000-000000000004",
+      sourceVersion: 1,
+      sourceHash: "b".repeat(64),
+      category: "COMPILER",
+      issues: [{ code: "TEX_ERROR", message: "Compiler error" }],
+      rawLogExcerpt,
+      collectionComplete: true,
+    });
+    const compilerProjection = toStemFigureProviderDiagnosticBatch(compilerBatch);
+
+    expect(compilerBatch.rawLogExcerpt).toBe(rawLogExcerpt);
+    expect(compilerProjection.rawLogExcerpt).toHaveLength(12_000);
+    expect(compilerProjection.rawLogExcerpt).toContain("compiler-tail");
+    expect(compilerProjection.rawLogExcerpt).not.toContain("compiler-prefix");
+
+    const validatorProjection = toStemFigureProviderDiagnosticBatch({
+      ...compilerBatch,
+      category: "VALIDATOR",
+    });
+    expect(validatorProjection).not.toHaveProperty("rawLogExcerpt");
+    expect(validatorProjection.issues).toHaveLength(1);
   });
 
   it("keeps Test strictly text-only", () => {

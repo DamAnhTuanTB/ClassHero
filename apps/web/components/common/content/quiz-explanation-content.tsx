@@ -1,6 +1,7 @@
 "use client";
 
 import { PlayCircle } from "lucide-react";
+import { normalizeMathTextLatexCommands } from "@learning-path/shared";
 
 import {
   removeQuizDisplayMathTerminalPeriods,
@@ -10,18 +11,12 @@ import {
 } from "@/components/common/content/quiz-explanation-content-normalizer";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 
-export interface QuizGeometryStatement {
-  hypotheses: string[];
-  conclusions: string[];
-}
-
 export interface QuizExplanationBlockData {
   type: "quizExplanation";
   problem: string;
   solution: string | null;
   answer: string;
   isGeometry?: boolean;
-  geometryStatement?: QuizGeometryStatement | null;
 }
 
 export function isQuizExplanationBlockData(
@@ -34,10 +29,7 @@ export function isQuizExplanationBlockData(
     typeof block.problem === "string" &&
     (block.solution === null || typeof block.solution === "string") &&
     typeof block.answer === "string" &&
-    (block.isGeometry === undefined || typeof block.isGeometry === "boolean") &&
-    (block.geometryStatement === undefined ||
-      block.geometryStatement === null ||
-      isQuizGeometryStatement(block.geometryStatement))
+    (block.isGeometry === undefined || typeof block.isGeometry === "boolean")
   );
 }
 
@@ -83,9 +75,6 @@ export function QuizExplanationCard({
       <div className="space-y-3 leading-relaxed text-slate-800 opacity-90 dark:text-slate-200">
         {showProblem ? (
           <MathpixMarkdownRenderer content={normalizeQuizMath(block.problem)} />
-        ) : null}
-        {block.geometryStatement ? (
-          <QuizGeometryStatementTable statement={block.geometryStatement} />
         ) : null}
         {block.solution || answerContent ? (
           <div className="space-y-1.5 border-l-[3px] border-sky-500/30 pl-4 dark:border-sky-400/30">
@@ -142,68 +131,6 @@ export function QuizExplanationCard({
   );
 }
 
-function QuizGeometryStatementTable({ statement }: { statement: QuizGeometryStatement }) {
-  return (
-    <div className="my-4 overflow-x-auto">
-      <table
-        aria-label="Bảng giả thiết và kết luận của câu Quiz"
-        className="w-full min-w-[280px] border-collapse"
-      >
-        <tbody>
-          {[
-            ["GT", statement.hypotheses],
-            ["KL", statement.conclusions],
-          ].map(([label, values], rowIndex) => (
-            <tr
-              key={label as string}
-              className={
-                rowIndex === 0
-                  ? "border-b-2 border-slate-400/80 dark:border-slate-500/90"
-                  : undefined
-              }
-            >
-              <th
-                scope="row"
-                className="w-12 border-r-2 border-slate-400/80 px-2 py-3 text-center align-middle font-black text-slate-800 dark:border-slate-500/90 dark:text-slate-100 sm:w-16 sm:px-3"
-              >
-                {label}
-              </th>
-              <td className="px-3 py-3 align-middle text-slate-800 dark:text-slate-100 sm:px-5">
-                <div className="space-y-1.5">
-                  {(values as string[]).map((value, index) => (
-                    <MathpixMarkdownRenderer
-                      key={`${value}-${index}`}
-                      className="[&>*]:my-0"
-                      content={normalizeQuizMath(value)}
-                    />
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function isQuizGeometryStatement(value: unknown): value is QuizGeometryStatement {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const statement = value as Record<string, unknown>;
-  return (
-    isNonEmptyStringArray(statement.hypotheses) &&
-    isNonEmptyStringArray(statement.conclusions)
-  );
-}
-
-function isNonEmptyStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((item) => typeof item === "string" && item.trim().length > 0)
-  );
-}
-
 function normalizeQuizSolution(value: string) {
   return removeQuizDisplayMathTerminalPeriods(
     normalizeQuizMath(value)
@@ -220,7 +147,7 @@ function normalizeQuizSolution(value: string) {
 }
 
 function normalizeQuizMath(value: string) {
-  return value
+  return normalizeMathTextLatexCommands(value)
     .replace(
       /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu,
       (_, first: string, vertex: string, second: string) =>

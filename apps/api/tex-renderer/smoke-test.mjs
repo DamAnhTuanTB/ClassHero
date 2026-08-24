@@ -131,15 +131,16 @@ for (const smokeCase of cases) {
     }),
   });
   const result = await response.json();
-  if (
-    !response.ok ||
-    result.ok !== true ||
-    !result.svg?.includes("<svg")
-  ) {
+  if (!response.ok || result.ok !== true || !result.svg?.includes("<svg")) {
     throw new Error(`${smokeCase.name} failed: ${JSON.stringify(result)}`);
   }
   if (/viewBox=['"]0 -792 612 792['"]/u.test(result.svg)) {
-    throw new Error(`${smokeCase.name} failed: renderer returned an uncropped Letter page`);
+    throw new Error(
+      `${smokeCase.name} failed: renderer returned an uncropped Letter page`,
+    );
+  }
+  if (/Font names database not found, generating new one/iu.test(result.log ?? "")) {
+    throw new Error(`${smokeCase.name} failed: LuaTeX font cache was rebuilt at runtime`);
   }
   if (outputDirectory) {
     await mkdir(outputDirectory, { recursive: true });
@@ -175,6 +176,32 @@ if (
 process.stdout.write(
   `multi-error-compiler: ok (${failure.issues.length} issues in one complete batch)\n`,
 );
+
+const burstSource = String.raw`\begin{tikzpicture}
+  \draw (0,0) circle (1);
+\end{tikzpicture}`;
+const burstResults = await Promise.all(
+  Array.from({ length: 6 }, async () => {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ latexSource: burstSource, subjectKey: "MATH" }),
+    });
+    return { response, result: await response.json() };
+  }),
+);
+for (const { response, result } of burstResults) {
+  if (!response.ok || result.ok !== true || !result.svg?.includes("<svg")) {
+    throw new Error(`concurrent render burst failed: ${JSON.stringify(result)}`);
+  }
+  if (/Font names database not found, generating new one/iu.test(result.log ?? "")) {
+    throw new Error("concurrent render burst rebuilt the LuaTeX font cache at runtime");
+  }
+}
+process.stdout.write(`concurrent-render-burst: ok (${burstResults.length} requests)\n`);
 
 const standaloneResponse = await fetch(endpoint, {
   method: "POST",

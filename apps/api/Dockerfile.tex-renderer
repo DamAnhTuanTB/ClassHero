@@ -1,6 +1,8 @@
 FROM node:24-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TEXMFCACHE=/tmp/texmf-cache
+ENV TEXMF_CACHE_SEED=/var/cache/texmf-seed
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -21,6 +23,13 @@ RUN apt-get update \
 RUN apt-get update \
   && apt-get install -y --no-install-recommends texlive-plain-generic \
   && rm -rf /var/lib/apt/lists/*
+
+# Build LuaTeX's font-name database once in the image. On container boot the
+# renderer copies this immutable seed into writable tmpfs because luaotfload can
+# lazily add cache modules even when the font-name database already exists.
+RUN mkdir -p "$TEXMF_CACHE_SEED" \
+  && TEXMFCACHE="$TEXMF_CACHE_SEED" luaotfload-tool --update --force \
+  && chmod -R a+rX "$TEXMF_CACHE_SEED"
 
 WORKDIR /srv/tex-renderer
 COPY apps/api/tex-renderer/server.mjs ./server.mjs

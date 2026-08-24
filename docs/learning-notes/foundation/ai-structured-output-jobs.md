@@ -108,6 +108,15 @@ giữ cho audit; chỉ render plan và immutable reference snapshot dùng vị t
 canonical. Cách tách raw/effective này cho phép vừa debug được model, vừa
 không truyền lỗi trang sang Stage 2 hoặc M9.17.
 
+### PDF packet của Summary không phụ thuộc OCR
+
+Summary gửi PDF bằng `input_file` với page images, nên lớp text ẩn, OCR artifact,
+chunks và embedding không phải điều kiện đầu vào. Packet builder chỉ xác nhận file
+là PDF đọc được, đúng lesson/page range và không vượt giới hạn trang/dung lượng;
+PDF scan thuần đi cùng một code path, không bị chặn và không tạo warning riêng.
+OCR/chunks vẫn phục vụ retrieval, Flashcard/Test và resolver ảnh, nhưng không được
+dùng như gate ngầm của Summary.
+
 ### Chuẩn hóa trình bày output AI ở front-end
 
 Heuristic trình bày không được chạy mù trên toàn bộ Markdown. Khi FE cần tách các
@@ -168,6 +177,15 @@ TeX do AI tạo là untrusted code:
 - SVG validator dùng allowlist, chặn script/event/foreignObject/external reference
   và giới hạn viewBox/node/path/bytes.
 - Chỉ sanitized SVG hợp lệ mới thành preview.
+
+Workspace tạm của source và cache runtime có vòng đời khác nhau. `HOME`, file
+TeX, PDF trung gian và SVG của mỗi source phải tách riêng rồi xóa; riêng font-name
+database của LuaTeX là artifact hạ tầng đắt tiền, phải tạo sẵn trong image và
+dùng làm seed. Khi container boot, renderer copy seed một lần sang cache writable
+trong tmpfs để luaotfload có thể thêm module cache lazy. Nếu đặt cache trong
+`HOME` tạm, mỗi request sẽ rebuild font database và dễ timeout khi nhiều figure
+chạy cùng lúc. Concurrency compile phải được giới hạn tại chính renderer vì các
+BullMQ queue độc lập không biết tổng tải LuaLaTeX mà queue còn lại đang tạo ra.
 
 ## Admin review và storage
 

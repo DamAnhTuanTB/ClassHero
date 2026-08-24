@@ -1,4 +1,4 @@
-import { tokenizeMathText } from "@learning-path/shared";
+import { normalizeMathTextLatexCommands, tokenizeMathText } from "@learning-path/shared";
 
 import type { TiptapJsonNode, TiptapTextDocument } from "@/types/rich-text";
 
@@ -34,7 +34,7 @@ export function createMathTextTiptapDocument(text: string): TiptapTextDocument {
     inlineContent = [];
   };
 
-  for (const token of tokenizeMathText(text.trim())) {
+  for (const token of tokenizeMathText(normalizeMathTextLatexCommands(text.trim()))) {
     if (token.type === "math") {
       if (token.display) {
         flushParagraph();
@@ -57,9 +57,7 @@ export function createMathTextTiptapDocument(text: string): TiptapTextDocument {
   }
 
   flushParagraph();
-  return content.length > 0
-    ? { type: "doc", content }
-    : createEmptyTiptapDocument();
+  return content.length > 0 ? { type: "doc", content } : createEmptyTiptapDocument();
 }
 
 export function getTiptapDocumentText(document: TiptapTextDocument | null | undefined) {

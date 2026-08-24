@@ -24,8 +24,8 @@ import { AiModelRoutingService } from "#api/modules/provider-operations/services
 import { ProviderUsageService } from "#api/modules/provider-operations/services/provider-usage.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import {
-  buildAiStructuredTextFormat,
   estimateAiStructuredInputTokens,
+  resolveAiStructuredTextFormat,
 } from "#api/modules/ai/utils/ai-structured-output-format";
 import { calculateProviderCost } from "#api/modules/provider-operations/utils/provider-cost-calculator";
 
@@ -41,6 +41,8 @@ export type ResolvedAiStructuredRequestTrace = {
   promptVersion: string;
   schemaVersion: string;
   schemaReferenceStrategy: AiStructuredInput["schemaReferenceStrategy"];
+  resolvedSchemaReferenceStrategy: "inline" | "ref" | "ref_v2";
+  schemaBytes: number;
   systemPrompt: string;
   userPrompt: string;
   inputTextItems: AiStructuredInput["inputTextItems"];
@@ -63,14 +65,14 @@ export type ResolvedAiStructuredRequestTrace = {
   }>;
   textFormat: Record<string, unknown>;
   promptCache: AiStructuredInput["promptCache"];
-};
-
-export type ResolvedAiStructuredRequestPreview = ResolvedAiStructuredRequestTrace & {
   inputTokenEstimate: {
     textInputTokens: number;
     imageInputTokens: number;
     estimatedTokens: number;
   };
+};
+
+export type ResolvedAiStructuredRequestPreview = ResolvedAiStructuredRequestTrace & {
   estimatedCost: {
     available: boolean;
     inputUpperBoundUsd: number | null;
@@ -136,16 +138,7 @@ export class AiProviderCallService {
         context.maxOutputTokensOverride ?? route.maxOutputTokens ?? input.maxTokens,
     } satisfies AiStructuredInput;
     const trace = buildResolvedRequestTrace({ candidate, input: resolvedInput, schema });
-    const imageInputTokens = trace.inputImages.reduce(
-      (total, image) => total + estimateImageInputTokens(image.detail),
-      0,
-    );
-    const inputTokenEstimate = estimateAiStructuredInputTokens({
-      systemPrompt: resolvedInput.systemPrompt,
-      inputPrompt: buildAiUserPrompt(resolvedInput),
-      structuredTextFormat: trace.textFormat,
-      additionalInputTokens: imageInputTokens,
-    });
+    const inputTokenEstimate = trace.inputTokenEstimate;
     const fxRateVndPerUsd = await this.getFxRateVndPerUsd();
     const requiredMetrics = new Set([
       ProviderUsageMetric.INPUT_TOKEN,
@@ -187,11 +180,6 @@ export class AiProviderCallService {
       : null;
     return {
       ...trace,
-      inputTokenEstimate: {
-        textInputTokens: inputTokenEstimate.textInputTokens,
-        imageInputTokens,
-        estimatedTokens: inputTokenEstimate.estimatedTokens,
-      },
       estimatedCost: totalCost
         ? {
             available: true,
@@ -374,11 +362,32 @@ function buildResolvedRequestTrace<TOutput>(input: {
   input: AiStructuredInput;
   schema: AiOutputSchema<TOutput>;
 }): ResolvedAiStructuredRequestTrace {
-  const textFormat = buildAiStructuredTextFormat(
+  const textFormatResolution = resolveAiStructuredTextFormat(
     input.schema,
     input.input.outputName,
     input.input.schemaReferenceStrategy,
   );
+  const textFormat = textFormatResolution.format;
+  const inputImages = (input.input.inputImages ?? []).map((image, order) => {
+    const decoded = readDataUrl(image.imageUrl);
+    return {
+      order,
+      detail: image.detail ?? null,
+      mimeType: decoded.mimeType,
+      byteLength: decoded.byteLength,
+      sha256: hashValue(image.imageUrl),
+    };
+  });
+  const imageInputTokens = inputImages.reduce(
+    (total, image) => total + estimateImageInputTokens(image.detail),
+    0,
+  );
+  const inputTokenEstimate = estimateAiStructuredInputTokens({
+    systemPrompt: input.input.systemPrompt,
+    inputPrompt: buildAiUserPrompt(input.input),
+    structuredTextFormat: textFormat,
+    additionalInputTokens: imageInputTokens,
+  });
   return {
     provider: input.candidate.provider,
     model: input.candidate.model,
@@ -391,6 +400,8 @@ function buildResolvedRequestTrace<TOutput>(input: {
     promptVersion: input.input.promptVersion,
     schemaVersion: input.input.schemaVersion,
     schemaReferenceStrategy: input.input.schemaReferenceStrategy,
+    resolvedSchemaReferenceStrategy: textFormatResolution.resolvedReferenceStrategy,
+    schemaBytes: textFormatResolution.schemaBytes,
     systemPrompt: input.input.systemPrompt,
     userPrompt: input.input.userPrompt,
     inputTextItems: input.input.inputTextItems,
@@ -404,18 +415,14 @@ function buildResolvedRequestTrace<TOutput>(input: {
       fileDataSha256: file.fileData ? hashValue(file.fileData) : null,
       fileDataCharacters: file.fileData?.length ?? null,
     })),
-    inputImages: (input.input.inputImages ?? []).map((image, order) => {
-      const decoded = readDataUrl(image.imageUrl);
-      return {
-        order,
-        detail: image.detail ?? null,
-        mimeType: decoded.mimeType,
-        byteLength: decoded.byteLength,
-        sha256: hashValue(image.imageUrl),
-      };
-    }),
+    inputImages,
     textFormat: JSON.parse(JSON.stringify(textFormat)) as Record<string, unknown>,
     promptCache: input.input.promptCache,
+    inputTokenEstimate: {
+      textInputTokens: inputTokenEstimate.textInputTokens,
+      imageInputTokens,
+      estimatedTokens: inputTokenEstimate.estimatedTokens,
+    },
   };
 }
 

@@ -170,6 +170,10 @@ Spacing/radius mặc định:
 - Field số trong admin như thứ tự, tiền VNĐ, phần trăm hoặc số lượng không dùng native number spinner/default browser UI; dùng input text styled cùng form chuẩn, `inputMode` phù hợp, chỉ nhận ký tự hợp lệ, normalize/format dữ liệu trước khi lưu và hiển thị đơn vị rõ khi cần.
 - Không đặt toggle học thử ở form lộ trình; học thử là cấu hình của buổi học cụ thể.
 - Action icon trong admin phải dùng màu theo ý nghĩa để dễ quét: sửa dùng xanh, xóa dùng đỏ, đóng/hủy dùng màu trung tính hoặc xanh nhẹ. Hành động xóa phải mở modal xác nhận rõ tên item trước khi thực thi.
+- Action câu trước/câu tiếp theo thay nội dung ngay trong cùng một card phải giữ
+  nguyên tọa độ cuộn của trang. Không focus một control nằm ngoài viewport sau
+  click khiến trình duyệt tự cuộn; keyboard navigation trong tablist vẫn được
+  phép chuyển focus giữa các tab bằng cơ chế riêng.
 - Editor chỉnh nhẹ ảnh raster dùng icon `WandSparkles` với tooltip/aria-label
   `Chỉnh sửa ảnh`; chỉ hiện khi asset hỗ trợ, không để một nút disabled khó hiểu
   trên ảnh TeX. Modal giữ ba vùng header/content/footer, lazy-load và chỉ có hai
@@ -484,11 +488,13 @@ Một màn hình UI chỉ xem là xong khi:
   được chấp nhận một case mới bằng cách làm giảm chất lượng case cũ; phát sinh
   clip, chồng text–nét, chồng text–text, sai marker hoặc thay đổi ngữ nghĩa ở bất
   kỳ golden nào đều là regression chặn nghiệm thu.
-- Bảng giả thiết–kết luận của chứng minh Hình học phải giữ đúng quy ước SGK: cột
+- Bảng giả thiết–kết luận của chứng minh Hình học trong Summary/Example phải giữ
+  đúng quy ước SGK: cột
   trái chỉ có nhãn `GT`, `KL`; một đường dọc ngăn cột nhãn với nội dung và một
   đường ngang ngăn hai hàng. Không thay bằng hai badge/heading rời. Trên mobile,
   cột nhãn thu gọn, nội dung/KaTeX tự xuống dòng hoặc cuộn ngang cục bộ nhưng các
   đường ngăn vẫn liên tục; màu đường và chữ phải đủ tương phản ở light/dark.
+  Quiz không render bảng GT–KL và không nhận field này từ API.
 - Công thức display dài trong nội dung học tập không được scale toàn bộ SVG/KaTeX
   để ép vừa viewport. Giữ cỡ chữ đọc được và cho chính khối công thức cuộn ngang
   cục bộ; nếu nội dung sinh được nhiều dòng theo ngữ nghĩa thì ưu tiên
@@ -501,7 +507,7 @@ Một màn hình UI chỉ xem là xong khi:
   edit; student/read-only không render focus target, highlight hoặc action xóa.
   Label/marker selectable phải có hit area trong suốt đủ dùng bằng chuột/touch và
   keyboard, nhưng không đổi nét nhìn thấy hoặc lọt vào screenshot figure chuẩn.
-- Khi chọn một marker group bằng nhau/song song, toàn bộ glyph cùng quan hệ phải
+- Khi chọn một marker group bằng nhau, toàn bộ glyph cùng quan hệ phải
   highlight. Icon xóa là HTML overlay destructive có `aria-label`, touch target
   khoảng `44px`, nằm trong biên figure và mở confirm dialog trước khi thay draft.
   Click nền hoặc `Esc` bỏ chọn. Không dùng click một lần để xóa ngay phần tử SVG.
@@ -524,7 +530,7 @@ Một màn hình UI chỉ xem là xong khi:
   SVG thực tế, mục tiêu tối thiểu `10px` trên mobile; không được co theo viewBox
   rộng đến mức hai hình đặt cạnh nhau làm tên đỉnh khó đọc.
 - Vạch chia trục số là nét phân độ, không phải marker hai đoạn bằng nhau. UI phải
-  bỏ `EQUAL_LENGTH`/`PARALLEL` gắn nhầm vào vạch chia để tránh nét màu chồng lên
+  bỏ `EQUAL_LENGTH` gắn nhầm vào vạch chia để tránh nét màu chồng lên
   đường trục. Vạch phải ngắn, đồng đều, mục tiêu khoảng 2% và không quá 3% cạnh
   ngắn viewBox; trên mobile không được cao như cột hoặc cạnh hình.
 - Phải phân biệt đúng ba đối tượng cơ bản theo SGK Kết nối tri thức: `LINE` kéo
@@ -548,9 +554,15 @@ Một màn hình UI chỉ xem là xong khi:
   đường dóng nét đứt về Ox/Oy; không ghép tên với
   tọa độ. Điểm trên Ox/Oy vẫn cần nhãn số của vạch tương ứng. Nhãn số của trục và
   tên điểm phải ở trong bán kính nhỏ quanh vạch/dấu điểm: đổi hướng
-  trước khi tăng khoảng cách, không né va chạm bằng cách đẩy chữ ra xa. Marker
-  song song dạng mũi tên là tùy chọn, không được tự thêm khi đề/source không yêu
-  cầu và quan hệ đã rõ bằng nội dung cùng bố cục hình.
+  trước khi tăng khoảng cách, không né va chạm bằng cách đẩy chữ ra xa.
+- Mọi hình trong hệ thống cấm tuyệt đối marker mũi tên/chevron dùng để đánh dấu
+  hai đường hoặc hai cạnh song song, kể cả khi ảnh nguồn hay source hiện tại có
+  marker đó. Quan hệ song song được thể hiện bằng phép dựng và nội dung chữ. Quy
+  tắc này không cấm mũi tên mang nghĩa hướng của trục, vector, lực, tia hoặc luồng
+  truyền.
+- Cung và nhãn số đo góc phải nằm trong đúng miền giữa hai tia được gọi tên. Góc
+  trong đa giác phải được vẽ phía trong đa giác; chỉ dùng miền ngoài hoặc góc phản
+  khi nội dung yêu cầu rõ góc ngoài hoặc góc phản.
 - Nhãn độ dài cạnh phải nằm sát vùng giữa cạnh và chỉ hở đủ để không chạm nét hoặc
   marker. Khoảng hở tính theo cỡ chữ thích ứng của hình, không lấy cạnh dài viewBox
   khiến `3 cm`, `4 cm`, `r`, `h` trôi xa trên mobile.

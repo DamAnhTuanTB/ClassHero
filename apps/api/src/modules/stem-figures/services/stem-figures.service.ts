@@ -49,7 +49,10 @@ import {
 } from "#api/modules/stem-figures/selectors/stem-figure.selects";
 import { serializeStemFigure } from "#api/modules/stem-figures/serializers/stem-figure.serializers";
 import { StemFigureJobService } from "#api/modules/stem-figures/services/stem-figure-job.service";
-import { StemFigureRepairService } from "#api/modules/stem-figures/services/stem-figure-repair.service";
+import {
+  resolveStemFigureProviderReferenceAssets,
+  StemFigureRepairService,
+} from "#api/modules/stem-figures/services/stem-figure-repair.service";
 import { parseStemFigureDiagnosticBatch } from "#api/modules/stem-figures/utils/stem-figure-diagnostics";
 import {
   buildStemFigureGenerationBrief,
@@ -59,6 +62,7 @@ import {
 import { resolveCourseSubject } from "#api/modules/ai/utils/lesson-summary-subject";
 import { ensureStemFigureSummaryReference } from "#api/modules/stem-figures/utils/stem-figure-summary-reference";
 import { compareStemFigurePositions } from "#api/modules/stem-figures/utils/stem-figure-position";
+import { prepareStemFigureProviderReferenceImages } from "#api/modules/stem-figures/utils/stem-figure-reference-images";
 import {
   applyConservativeRasterEnhancement,
   STEM_FIGURE_RASTER_EDIT_MAX_PIXELS,
@@ -420,13 +424,21 @@ export class StemFiguresService {
     this.assertMutationHead(figure, dto);
     const { generationBrief } = await this.prepareCreateNewAi(figure, dto);
     const routeSnapshot = await this.resolveCreateAiRoute(dto);
+    const preparedReferences = await prepareStemFigureProviderReferenceImages({
+      assets: resolveStemFigureProviderReferenceAssets(generationBrief),
+      downloadObject: (objectKey) => this.storage.downloadObject(objectKey),
+    });
+    const providerBrief = {
+      ...generationBrief,
+      referenceAssets: preparedReferences.assets,
+    };
     const providerPreview = await this.repair.previewCreateInput({
       subject: {
         key: lessonSummarySubjectKeySchema.parse(figure.subjectKey),
         name: figure.subjectName,
         slug: figure.subjectSlug,
       },
-      brief: generationBrief,
+      brief: providerBrief,
       routeSnapshot,
       systemPrompt: dto.systemPrompt,
       userPrompt: dto.userPrompt,
@@ -434,12 +446,16 @@ export class StemFiguresService {
     return {
       referenceImageMode: generationBrief.referenceImageMode,
       adminInstructions: generationBrief.adminInstructions,
-      generationBrief,
+      generationBrief: providerBrief,
       ...providerPreview,
       referenceImages: await Promise.all(
-        generationBrief.referenceAssets.map(async (asset, order) => ({
+        providerBrief.referenceAssets.map(async (asset, order) => ({
           order,
           ...asset,
+          mimeType:
+            generationBrief.referenceAssets.find(
+              (source) => source.objectKey === asset.objectKey,
+            )?.mimeType ?? asset.mimeType,
           accessUrl: await this.storage
             .createSignedGetUrl(asset.objectKey)
             .catch(() => null),

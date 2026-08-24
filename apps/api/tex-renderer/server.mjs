@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -14,13 +14,23 @@ import {
 const port = readPositiveInteger(process.env.TEX_RENDERER_PORT, 8080);
 const token = process.env.TEX_RENDERER_TOKEN ?? "";
 const timeoutMs = readPositiveInteger(process.env.TEX_RENDER_TIMEOUT_MS, 20_000);
-const maxSourceBytes = readPositiveInteger(process.env.TEX_RENDER_MAX_SOURCE_BYTES, 40_000);
+const renderConcurrency = readPositiveInteger(process.env.TEX_RENDER_CONCURRENCY, 1);
+const maxSourceBytes = readPositiveInteger(
+  process.env.TEX_RENDER_MAX_SOURCE_BYTES,
+  40_000,
+);
 const maxSvgBytes = readPositiveInteger(process.env.TEX_RENDER_MAX_SVG_BYTES, 2_000_000);
 const rendererVersion = process.env.TEX_RENDERER_VERSION ?? "texlive-debian-v3-snippet";
+const texmfCache =
+  process.env.TEXMFCACHE?.trim() || join(tmpdir(), "tex-renderer-texmf-cache");
+const texmfCacheSeed = process.env.TEXMF_CACHE_SEED?.trim() || "";
+const renderLimiter = createConcurrencyLimiter(renderConcurrency);
 
 if (token.length < 16) {
   throw new Error("TEX_RENDERER_TOKEN must contain at least 16 characters.");
 }
+
+await prepareTexmfCache(texmfCache, texmfCacheSeed);
 
 const server = createServer(async (request, response) => {
   if (request.method === "GET" && request.url === "/health") {
@@ -50,7 +60,9 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, "0.0.0.0", () => {
-  process.stdout.write(`TeX renderer listening on ${port}.\n`);
+  process.stdout.write(
+    `TeX renderer listening on ${port} with compile concurrency ${renderConcurrency}.\n`,
+  );
 });
 
 async function handleRender(request, response) {
@@ -99,7 +111,7 @@ async function handleRender(request, response) {
       collectionComplete: true,
     });
   }
-  const result = await renderLatex(body.latexSource, subjectKey);
+  const result = await renderLimiter.run(() => renderLatex(body.latexSource, subjectKey));
   return sendJson(response, result.ok ? 200 : 422, result);
 }
 
@@ -143,8 +155,7 @@ async function renderLatex(latexSource, subjectKey) {
           compilerIssues.length > 0
             ? compilerIssues
             : [diagnosticIssue(code, latex.log || "LuaLaTeX did not complete.")],
-        collectionComplete:
-          !latex.timedOut && !latex.fatalStop && !latex.outputTruncated,
+        collectionComplete: !latex.timedOut && !latex.fatalStop && !latex.outputTruncated,
         durationMs: Date.now() - startedAt,
         rendererVersion: `${rendererVersion}+${compilerProfileVersion}`,
       };
@@ -180,7 +191,9 @@ async function renderLatex(latexSource, subjectKey) {
         category: "SOURCE",
         code: "SVG_OUTPUT_TOO_LARGE",
         log: `SVG exceeds ${maxSvgBytes} bytes.`,
-        issues: [diagnosticIssue("SVG_OUTPUT_TOO_LARGE", `SVG exceeds ${maxSvgBytes} bytes.`)],
+        issues: [
+          diagnosticIssue("SVG_OUTPUT_TOO_LARGE", `SVG exceeds ${maxSvgBytes} bytes.`),
+        ],
         collectionComplete: true,
         durationMs: Date.now() - startedAt,
         rendererVersion: `${rendererVersion}+${compilerProfileVersion}`,
@@ -206,6 +219,7 @@ async function runCommand(command, args, cwd) {
       env: {
         PATH: process.env.PATH,
         HOME: cwd,
+        TEXMFCACHE: texmfCache,
         TEXMFOUTPUT: cwd,
         openin_any: "p",
         openout_any: "p",
@@ -263,6 +277,46 @@ async function runCommand(command, args, cwd) {
   });
 }
 
+function createConcurrencyLimiter(limit) {
+  let active = 0;
+  const waiting = [];
+
+  const acquire = () => {
+    if (active < limit) {
+      active += 1;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => waiting.push(resolve));
+  };
+
+  const release = () => {
+    const next = waiting.shift();
+    if (next) {
+      next();
+      return;
+    }
+    active -= 1;
+  };
+
+  return {
+    async run(task) {
+      await acquire();
+      try {
+        return await task();
+      } finally {
+        release();
+      }
+    },
+  };
+}
+
+async function prepareTexmfCache(cachePath, seedPath) {
+  await mkdir(cachePath, { recursive: true });
+  if (seedPath && seedPath !== cachePath) {
+    await cp(seedPath, cachePath, { recursive: true, force: true });
+  }
+}
+
 function parseCompilerIssues(log) {
   const issues = [];
   const lines = log.split(/\r?\n/u);
@@ -278,7 +332,10 @@ function parseCompilerIssues(log) {
       continue;
     }
     if (line.startsWith("! ")) {
-      const lineHint = lines.slice(index + 1, index + 4).join(" ").match(/l\.(\d+)/u);
+      const lineHint = lines
+        .slice(index + 1, index + 4)
+        .join(" ")
+        .match(/l\.(\d+)/u);
       issues.push({
         ...diagnosticIssue("TEX_COMPILE_ERROR", line.slice(2)),
         file: "fragment.tex",
@@ -342,5 +399,7 @@ function trimLog(value) {
 }
 
 function safeErrorMessage(error) {
-  return error instanceof Error ? error.message.slice(0, 2_000) : String(error).slice(0, 2_000);
+  return error instanceof Error
+    ? error.message.slice(0, 2_000)
+    : String(error).slice(0, 2_000);
 }

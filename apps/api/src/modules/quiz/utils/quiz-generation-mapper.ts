@@ -56,10 +56,6 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
     ...("isGeometry" in question.explanation
       ? { isGeometry: question.explanation.isGeometry }
       : {}),
-    ...("geometryStatement" in question.explanation &&
-    question.explanation.geometryStatement
-      ? { geometryStatement: question.explanation.geometryStatement }
-      : {}),
     origin: "AI_AUTHORED",
   };
   const common = {
@@ -115,11 +111,7 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
         ...common,
         optionsJson: null,
         correctAnswerJson: [question.correctAnswer],
-        gradingConfigJson: {
-          caseSensitive: false,
-          exactMatch: true,
-          numericComparison: true,
-        },
+        gradingConfigJson: null,
       };
   }
 }

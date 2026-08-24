@@ -796,8 +796,11 @@ Rules:
 
 - `documentIds` là `lesson_documents.id`, bắt buộc unique và thuộc đúng
   `lessonId` trên URL.
-- Mọi document phải active, `READY`, trỏ tới canonical PDF searchable đã pass
-  readiness và có page range hợp lệ; API không nhận raw PDF/text từ client.
+- Mọi document phải active, `READY`, trỏ tới PDF canonical đọc được và có page
+  range hợp lệ; PDF scan thuần, PDF có/không có text layer và PDF chưa có OCR
+  artifact đều hợp lệ. Summary không kiểm text coverage, không yêu cầu
+  OCR/chunks/embedding và không trả warning về text layer. API không nhận raw
+  PDF/text từ client.
 - `requestDraftId` và `requestHash` từ prompt-preview là bắt buộc ở generate.
   Draft phải chưa hết hạn/chưa consume và còn khớp source + generation config.
 - `useTextbookSourceImages` là boolean optional, mặc định `false`, và phải là một
@@ -945,6 +948,11 @@ Behavior:
   giới hạn output và danh sách model khả dụng. Token input được tách thành
   `textInputTokens`, `pdfInputTokens` và `estimatedTokens` (tổng hai phần); PDF
   chỉ là estimate trước khi gọi provider, không phải usage đã thanh toán.
+- `configuration` trả thêm `schemaReferenceStrategy` được request,
+  `resolvedSchemaReferenceStrategy` thực tế và `schemaBytes`. Cùng ba giá trị này
+  được snapshot trong `modelConfigJson` của request draft và strategy
+  requested/resolved tham gia `requestHash`, giúp đối chiếu chính xác preview với
+  payload worker mà không log raw prompt/schema.
 - `estimatedCost` tách `inputUpperBoundUsd/Vnd`,
   `outputUpperBoundUsd/Vnd` và `upperBoundUsd/Vnd` tổng. Input dùng tổng token
   text + PDF ước tính; output dùng `maxOutputTokens`, nên nhãn UI phải nói rõ
@@ -1068,8 +1076,14 @@ ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
   thiết kế lại phần ảnh không được nhắc.
   Khi field rỗng, request repair cũng không được thêm câu nói về yêu cầu admin.
   Mỗi source reference có nhãn gửi tối đa bốn OCR crop khớp chính xác khác object
-  key để bảo toàn figure nhiều panel; provider brief phải khai báo `panelCount`
-  đúng bằng số ảnh và invariant một ảnh/một panel. Nhãn mơ hồ chỉ chọn một crop tốt nhất.
+  key để bảo toàn figure nhiều panel. Worker chuẩn hóa orientation, resize trong
+  `2048x2048`, chuyển PNG và loại ảnh trùng SHA-256 sau chuẩn hóa trước khi gửi;
+  panel khác nội dung vẫn được giữ nguyên thứ tự ở `detail=high` và provider brief
+  khai báo policy một ảnh/một panel. Nhãn mơ hồ chỉ chọn một crop tốt nhất.
+  Create và repair dùng schema strategy `auto`, prompt cache `in_memory`; request
+  snapshot trả/lưu thêm strategy đã resolve, schema bytes và token text/ảnh/tổng
+  ước tính. Full compiler log vẫn lưu ở attempt, còn provider repair chỉ nhận
+  issues chuẩn hóa cộng tối đa `12.000` ký tự phần đuôi log compiler.
   Reference không có nhãn hình cụ thể, hoặc nhãn không khớp crop đáng tin cậy,
   phải resolve ảnh nguyên trang PDF làm fallback; metadata trang chỉ dùng nội bộ
   và không gửi lặp trong provider-facing JSON.
@@ -1405,6 +1419,8 @@ Behavior:
 - `canUseForSummary` dùng cùng điều kiện packet với endpoint prompt-preview:
   tài liệu trích xuất phải có đủ source document và page range; PDF nền tảng tải
   trực tiếp không có hai liên kết này vẫn hợp lệ và dùng toàn bộ các trang.
+  `chunkCount`, embedding, OCR artifact và text layer không tham gia điều kiện
+  này; PDF scan hợp lệ phải được chọn mà không có `unavailableReason`.
 - Mỗi job chỉ trả trạng thái durable, `jobId`, resource đích, review status,
   lỗi, timestamps và metadata accounting tối thiểu để UI khôi phục/polling sau
   reload. `estimatedCostVnd` là tổng chi phí đã ghi nhận của toàn lần sinh;

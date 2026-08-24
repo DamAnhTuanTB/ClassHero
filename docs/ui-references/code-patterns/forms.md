@@ -70,6 +70,7 @@ function openCreateModal() {
 
 - Không để toàn bộ modal/dialog scroll. Chỉ vùng nội dung giữa được `overflow-y-auto`; header/title và footer/action phải luôn visible.
 - Modal cấu hình AI có vùng xem system/user prompt dài được phép giữ một khung cuộn có giới hạn riêng để đọc prompt mà không làm trôi toàn bộ form. Wrapper gần nhất của preview phải cô lập overflow (`overflow-hidden` hoặc containment tương đương) để nội dung renderer bên trong không làm phình `scrollHeight` của body modal. Khi xuất hiện khoảng trắng dư, phải đo DOM runtime và sửa ownership của overflow; không được bỏ scrollbar prompt hoặc giới hạn chiều cao panel để che triệu chứng.
+- Preview system/user prompt phải dùng Markdown renderer an toàn cho nội dung kỹ thuật: chỉ parse công thức có delimiter toán rõ ràng và giữ nguyên lệnh TeX/TikZ nằm trong văn bản như `\pic`, `\draw` hoặc `\end{tikzpicture}`. Không dùng renderer nội dung học tập có heuristic nhận diện TeX cho toàn bộ prompt, vì có thể nuốt lệnh và xóa khoảng trắng của phần văn xuôi theo sau.
 - Không top-align modal trên mobile. Overlay/shell phải dùng căn giữa dọc-ngang (`items-center justify-center`) ở mọi breakpoint; modal dài thì dùng `max-height` và body scroll.
 - Không đặt mô tả/subtitle dưới title trong header modal. Header chỉ giữ title ngắn và nút icon `X` để đóng, hoặc control phụ thật cần thiết.
 - Không tạo modal thiếu đường thoát rõ ràng. Modal phải có nút action `Hủy` trong footer và nút icon `X` đóng ở header/shell.
@@ -87,6 +88,7 @@ function openCreateModal() {
 - Error truyền trực tiếp từ `form.formState.errors.<field>` vào primitive field.
 - Submit dùng `handleSubmit`, hoặc helper intent đã có nếu form dùng button `type="button"`.
 - Submit/action trong modal không phụ thuộc `formState.isValid`, `dirtyFields`, required-empty check thủ công hoặc `errors` để khóa nút; validation chặn payload invalid, còn button vẫn cho bấm để người dùng thấy lỗi.
+- Với validation chéo phụ thuộc nhiều field, như `easy + medium + hard = total`, mỗi field tham gia phải revalidate cùng nhóm dependency sau `onChange` bằng `form.trigger([...])` hoặc cơ chế `deps` tương đương. Không chỉ revalidate field vừa sửa khi issue được gắn vào field khác, vì error cũ sẽ bị kẹt dù tổng mới đã hợp lệ.
 - Modal shell căn giữa dọc-ngang ở mọi viewport. Modal form có header/body/footer tách biệt; header và footer dùng `shrink-0`, body dùng `min-h-0 flex-1 overflow-y-auto`; header dùng padding gọn như `px-4 py-3`, footer dùng padding gọn như `p-3 sm:p-4`.
 - Với admin modal title-only header, shell đặt nút `X` trong action rail cao bằng header (`absolute right-4 top-0 flex h-16 items-center`) và header dùng `min-h-16 items-center`, để nút đóng luôn căn giữa dọc với title.
 - Modal có nút `Hủy` trong footer và nút icon `X` đóng ở header/shell, cả hai gọi đúng close/cancel handler và có disabled/pending state phù hợp khi đang lưu.

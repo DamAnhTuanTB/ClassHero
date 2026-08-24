@@ -188,12 +188,12 @@ export class QuizGenerationJobService {
     input: QueueQuizGenerationInput,
   ) {
     await this.cleanupRequestDraftPackets(lessonId, actorUserId);
-    const source = await this.loadPacket(lessonId, input.documentIds);
-    if (!source.packet) throw new Error("Missing Quiz source packet.");
     const targetQuizSet = await this.resolveQuizTargetSet(
       lessonId,
       input.targetQuizSetId,
     );
+    const source = await this.loadPacket(lessonId, input.documentIds);
+    if (!source.packet) throw new Error("Missing Quiz source packet.");
     const configuration = {
       ...normalizeConfiguration(input, targetQuizSet?.id ?? null),
       ...this.resolveQuizTransportConfiguration(),
@@ -559,11 +559,19 @@ export class QuizGenerationJobService {
       }
       return selected;
     }
-    return this.prisma.quizSet.findFirst({
+
+    const existing = await this.prisma.quizSet.findFirst({
       where: { lessonId, deletedAt: null },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: { id: true, title: true },
     });
+    if (existing) {
+      throw badRequestException(
+        "QUIZ_TARGET_SET_REQUIRED",
+        "Danh sách bộ Quiz đã thay đổi. Hãy tải lại và chọn đúng bộ Quiz trước khi tạo.",
+      );
+    }
+    return null;
   }
 
   private async ensureQuizTargetSet(

@@ -7,6 +7,10 @@ import {
   isProtectedQuizGenerationJsonEdit,
 } from "@/features/admin/quiz/utils/quiz-generation-json";
 import { createTextTiptapDocument } from "@/lib/tiptap-rich-content";
+import {
+  normalizeLatexCommandBackslashes,
+  normalizeMathTextLatexCommands,
+} from "@learning-path/shared";
 
 const currentQuestion: AdminQuizQuestion = {
   id: "question-1",
@@ -33,6 +37,22 @@ const currentQuestion: AdminQuizQuestion = {
 };
 
 test.describe("Quiz mutable generation JSON preview", () => {
+  test("repairs missing LaTeX command backslashes without changing prose", () => {
+    expect(normalizeLatexCommandBackslashes("widehat{X}+\\widehat{Y}=180^circ")).toBe(
+      "\\widehat{X}+\\widehat{Y}=180^\\circ",
+    );
+    expect(
+      normalizeMathTextLatexCommands(
+        String.raw`Dòng chữ widehat{X}; công thức $ widehat{X}=m^circ$; biểu thức $xwidehat{Y}$.`,
+      ),
+    ).toBe(
+      String.raw`Dòng chữ widehat{X}; công thức $ \widehat{X}=m^\circ$; biểu thức $xwidehat{Y}$.`,
+    );
+    expect(normalizeLatexCommandBackslashes(String.raw`\text{widehat{X} in prose}`)).toBe(
+      String.raw`\text{widehat{X} in prose}`,
+    );
+  });
+
   test("projects edited working JSON into the local Quiz preview", () => {
     const generationQuestionJson = {
       questionType: "MULTIPLE_CHOICE",
@@ -48,7 +68,10 @@ test.describe("Quiz mutable generation JSON preview", () => {
         solution: "Lời giải mới",
         answer: "B. Phương án B mới",
         isGeometry: false,
-        geometryStatement: null,
+        geometryStatement: {
+          hypotheses: ["Dữ liệu cũ"],
+          conclusions: ["Kết luận cũ"],
+        },
       },
       figure: {
         questionFigure: null,
@@ -66,7 +89,18 @@ test.describe("Quiz mutable generation JSON preview", () => {
     expect(preview.correctAnswerJson).toEqual(["B"]);
     expect(preview.optionsJson?.map((option) => option.id)).toEqual(["A", "B"]);
     expect(preview.sourceMetadataJson?.aiGenerationId).toBe("generation-1");
-    expect(preview.generationQuestionJson).toBe(generationQuestionJson);
+    expect(preview.sourceMetadataJson?.quizExplanationBlock).not.toHaveProperty(
+      "geometryStatement",
+    );
+    expect(preview.generationQuestionJson).toEqual({
+      ...generationQuestionJson,
+      explanation: {
+        problem: "Câu hỏi mới",
+        solution: "Lời giải mới",
+        answer: "B. Phương án B mới",
+        isGeometry: false,
+      },
+    });
   });
 
   test("uses TEXT_INPUT correctAnswer instead of explanation answer in the preview", () => {
@@ -79,7 +113,6 @@ test.describe("Quiz mutable generation JSON preview", () => {
         solution: "Thể tích tính được là $2.1$.",
         answer: "Thể tích xấp xỉ bằng $2.1$.",
         isGeometry: false,
-        geometryStatement: null,
       },
     });
 
@@ -125,7 +158,6 @@ $$\\begin{aligned}S&=\\int_0^1 3x^2\\,dx\\\\&=[x^3]_0^1\\\\&=1.\\end{aligned}$$
 Vậy chọn phương án A.`,
         answer: "A. $1$",
         isGeometry: false,
-        geometryStatement: null,
       },
     });
 
@@ -138,9 +170,7 @@ Vậy chọn phương án A.`,
     ]);
     expect(explanationNodes[1]?.attrs?.latex).toContain("\\begin{aligned}");
     expect(
-      isQuizExplanationBlockData(
-        preview.sourceMetadataJson?.quizExplanationBlock,
-      ),
+      isQuizExplanationBlockData(preview.sourceMetadataJson?.quizExplanationBlock),
     ).toBe(true);
     expect(
       explanationNodes

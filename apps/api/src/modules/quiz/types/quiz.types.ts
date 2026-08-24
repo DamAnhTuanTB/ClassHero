@@ -35,7 +35,8 @@ export const multiStatementCorrectAnswerSchema = z
   .min(2, "Phải có đáp án cho ít nhất 2 mệnh đề");
 
 /**
- * Grading Config (Cấu hình chấm điểm) cho TEXT_INPUT
+ * Cấu hình legacy cho TEXT_INPUT. Bộ chấm hiện tại không dùng các cờ này;
+ * schema chỉ giữ để tương thích payload/dữ liệu cũ.
  */
 export const textInputGradingSchema = z.object({
   caseSensitive: z.boolean().default(false),
@@ -45,12 +46,17 @@ export const textInputGradingSchema = z.object({
   keywords: z.array(z.string()).optional(),
 });
 
+export const textInputCorrectAnswerSchema = z
+  .array(z.string().trim().min(1, "Đáp án chuẩn không được để trống"))
+  .length(1, "Câu nhập đáp án phải có đúng một đáp án chuẩn");
+
 /**
  * Cấu trúc chung cho Correct Answer tùy theo loại câu hỏi
  * - MULTIPLE_CHOICE: mảng chứa đúng một ID phương án đúng (service enforce length=1).
  * - TRUE_FALSE: boolean.
  * - MULTI_STATEMENT_TRUE_FALSE: mảng ánh xạ statementId -> boolean.
- * - TEXT_INPUT: mảng các câu trả lời dạng text hợp lệ (e.g. ["25", "hai mươi lăm"]).
+ * - TEXT_INPUT: mảng chứa đúng một đáp án canonical (service enforce bằng
+ *   textInputCorrectAnswerSchema).
  */
 export const correctAnswerSchema = z.union([
   z.array(z.string()).min(1, "Cần chọn ít nhất 1 đáp án đúng cho Multiple Choice"), // For MULTIPLE_CHOICE & TEXT_INPUT

@@ -189,12 +189,12 @@ export function QuizRunnerScreen({
   }, [attempt.id, attempt.quizSet.id]);
 
   const question = attempt.questions[currentIndex];
-  if (!question) return null;
-
   const totalCount = attempt.questions.length;
-  const questionNumber = question.questionNumber ?? currentIndex + 1;
+  const questionNumber = question?.questionNumber ?? currentIndex + 1;
   const isLast = currentIndex === totalCount - 1;
-  const isAnswerComplete = isStudentAnswerComplete(question, answer);
+  const isAnswerComplete = question
+    ? isStudentAnswerComplete(question, answer)
+    : false;
   const progressPercent = ((currentIndex + 1) / Math.max(totalCount, 1)) * 100;
   const answeredQuestionIdSet = new Set(answeredQuestionIds);
   const handledQuestionIdSet = new Set(handledQuestionIds);
@@ -203,6 +203,28 @@ export function QuizRunnerScreen({
   );
   const isIncompleteAlertVisible =
     incompleteAlertAttemptId === attempt.id && incompleteQuestionNumbers.length > 0;
+  const keyboardShortcutStateRef = useRef({
+    currentIndex,
+    hasFeedback: Boolean(feedback),
+    isAnswerComplete,
+    isExitDialogOpen,
+    isPending: Boolean(pendingAction),
+    onCheck,
+    onNext,
+    onPrevious,
+    totalCount,
+  });
+  keyboardShortcutStateRef.current = {
+    currentIndex,
+    hasFeedback: Boolean(feedback),
+    isAnswerComplete,
+    isExitDialogOpen,
+    isPending: Boolean(pendingAction),
+    onCheck,
+    onNext,
+    onPrevious,
+    totalCount,
+  };
 
   function dismissIncompleteAlert() {
     setIncompleteAlertAttemptId(null);
@@ -288,6 +310,58 @@ export function QuizRunnerScreen({
     setIsExitDialogOpen(false);
   }
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const shortcutState = keyboardShortcutStateRef.current;
+
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        shortcutState.isExitDialogOpen ||
+        shortcutState.isPending
+      ) {
+        return;
+      }
+
+      if (event.key === "Enter") {
+        if (shortcutState.hasFeedback || !shortcutState.isAnswerComplete) return;
+
+        event.preventDefault();
+        setIncompleteAlertAttemptId(null);
+        shortcutState.onCheck();
+        return;
+      }
+
+      if (isQuizAnswerEditingTarget(event.target)) return;
+
+      if (event.key === "ArrowLeft" && shortcutState.currentIndex > 0) {
+        event.preventDefault();
+        setIncompleteAlertAttemptId(null);
+        shortcutState.onPrevious();
+        return;
+      }
+
+      if (
+        event.key === "ArrowRight" &&
+        shortcutState.currentIndex < shortcutState.totalCount - 1
+      ) {
+        event.preventDefault();
+        setIncompleteAlertAttemptId(null);
+        shortcutState.onNext();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
+
+  if (!question) return null;
+
   return (
     <div
       className="fixed inset-0 z-[80] overflow-y-auto bg-[linear-gradient(180deg,#e0f2fe_0%,#f0f9ff_100%)] text-slate-950 dark:bg-none dark:bg-[var(--theme-bg)] dark:text-[var(--theme-text-strong)]"
@@ -370,6 +444,7 @@ export function QuizRunnerScreen({
               <button
                 type="button"
                 aria-label="Kiểm tra đáp án"
+                aria-keyshortcuts="Enter"
                 disabled={Boolean(pendingAction)}
                 onClick={handleCheck}
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-sky-500 px-5 text-base font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition hover:bg-sky-400 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] disabled:opacity-60 dark:bg-sky-600 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:hover:bg-sky-500 dark:active:shadow-[0_1px_0_rgb(7_89_133)] sm:w-auto md:px-8"
@@ -402,9 +477,9 @@ export function QuizRunnerScreen({
                   type="button"
                   disabled={Boolean(pendingAction)}
                   onClick={handleSkip}
-                  className="student-mobile-border inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 text-base font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-soft)] dark:text-[var(--theme-text)] dark:hover:border-amber-400/40 dark:hover:bg-amber-500/10 dark:hover:text-amber-300"
+                  className="student-mobile-border inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 text-base font-black text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[var(--theme-border)] dark:bg-[var(--theme-surface-soft)] dark:text-[var(--theme-text)] dark:hover:border-slate-500 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
                 >
-                  <SkipForward className="h-5 w-5" aria-hidden="true" />
+                  <SkipForward className="h-[18px] w-[18px]" aria-hidden="true" />
                   Bỏ qua
                 </button>
               </div>
@@ -492,6 +567,7 @@ export function QuizRunnerScreen({
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button
             type="button"
+            aria-keyshortcuts="ArrowLeft"
             disabled={currentIndex === 0 || Boolean(pendingAction)}
             onClick={handlePrevious}
             className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl border border-sky-200 bg-white px-3 text-base font-black text-sky-700 shadow-[0_4px_0_rgb(186_230_253)] transition hover:bg-sky-50 active:translate-y-[3px] active:shadow-[0_1px_0_rgb(186_230_253)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-400/30 dark:bg-[var(--theme-surface)] dark:text-sky-300 dark:shadow-[0_4px_0_rgb(7_89_133)] dark:active:shadow-[0_1px_0_rgb(7_89_133)]"
@@ -518,6 +594,7 @@ export function QuizRunnerScreen({
           ) : (
             <button
               type="button"
+              aria-keyshortcuts="ArrowRight"
               disabled={Boolean(pendingAction)}
               onClick={handleNext}
               className="student-preserve-mobile-shadow inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-2xl bg-sky-600 px-3 text-base font-black text-white shadow-[0_4px_0_rgb(3_105_161)] transition active:translate-y-[3px] active:shadow-[0_1px_0_rgb(3_105_161)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none dark:disabled:bg-slate-700 enabled:hover:bg-sky-500"
@@ -535,5 +612,15 @@ export function QuizRunnerScreen({
         onConfirm={handleConfirmExit}
       />
     </div>
+  );
+}
+
+function isQuizAnswerEditingTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, math-field, [contenteditable="true"], [role="textbox"]',
+    ),
   );
 }

@@ -92,19 +92,40 @@ describe("M7 assessment grading", () => {
     });
   });
 
-  it("normalizes text input according to grading configuration", () => {
+  it("normalizes text input automatically without admin grading flags", () => {
     const result = gradeQuestionAnswer({
       questionType: QuestionType.TEXT_INPUT,
       answerJson: "  Hà Nội  ",
       correctAnswerJson: ["hà nội"],
       optionsJson: null,
-      gradingConfigJson: {
-        caseSensitive: false,
-        exactMatch: true,
-      },
+      gradingConfigJson: { caseSensitive: true, exactMatch: false },
     });
 
     expect(result.isCorrect).toBe(true);
+  });
+
+  it("does not use the removed partial-match grading behavior", () => {
+    const result = gradeQuestionAnswer({
+      questionType: QuestionType.TEXT_INPUT,
+      answerJson: "Thủ đô Hà Nội",
+      correctAnswerJson: ["Hà Nội"],
+      optionsJson: null,
+      gradingConfigJson: { exactMatch: false },
+    });
+
+    expect(result.isCorrect).toBe(false);
+  });
+
+  it("ignores legacy answer variants after the first canonical answer", () => {
+    const result = gradeQuestionAnswer({
+      questionType: QuestionType.TEXT_INPUT,
+      answerJson: "0.5",
+      correctAnswerJson: ["1/3", "0.5"],
+      optionsJson: null,
+      gradingConfigJson: null,
+    });
+
+    expect(result.isCorrect).toBe(false);
   });
 
   it.each(["1/2", "2/4", "0.5", "0.50", "0,5", "5e-1", "\\frac{1}{2}"])(
@@ -115,11 +136,7 @@ describe("M7 assessment grading", () => {
         answerJson,
         correctAnswerJson: ["0.5"],
         optionsJson: null,
-        gradingConfigJson: {
-          caseSensitive: false,
-          exactMatch: true,
-          numericComparison: true,
-        },
+        gradingConfigJson: null,
       });
 
       expect(result.isCorrect).toBe(true);
@@ -134,7 +151,7 @@ describe("M7 assessment grading", () => {
         answerJson,
         correctAnswerJson: ["1.4"],
         optionsJson: null,
-        gradingConfigJson: { numericComparison: true },
+        gradingConfigJson: null,
       });
 
       expect(result.isCorrect).toBe(true);
@@ -148,7 +165,7 @@ describe("M7 assessment grading", () => {
         answerJson,
         correctAnswerJson: ["0.5"],
         optionsJson: null,
-        gradingConfigJson: { numericComparison: true },
+        gradingConfigJson: null,
       });
       expect(result.isCorrect).toBe(false);
     }

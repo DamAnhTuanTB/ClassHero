@@ -19,14 +19,17 @@ export function buildQuizQuestionPreviewFromGenerationJson(
   current: AdminQuizQuestion,
   generationQuestionJson: Record<string, unknown>,
 ): AdminQuizQuestion {
+  const sanitizedGenerationQuestionJson =
+    stripLegacyQuizGeometryStatement(generationQuestionJson);
   const questionType =
-    readQuestionType(generationQuestionJson.questionType) ?? current.questionType;
+    readQuestionType(sanitizedGenerationQuestionJson.questionType) ??
+    current.questionType;
   const difficulty =
-    readDifficulty(generationQuestionJson.difficulty) ?? current.difficulty;
-  const explanation = asRecord(generationQuestionJson.explanation);
+    readDifficulty(sanitizedGenerationQuestionJson.difficulty) ?? current.difficulty;
+  const explanation = asRecord(sanitizedGenerationQuestionJson.explanation);
   const problem = readString(explanation?.problem) ?? "";
-  const hint = readString(generationQuestionJson.hint);
-  const mapped = mapQuestionSpecificFields(questionType, generationQuestionJson);
+  const hint = readString(sanitizedGenerationQuestionJson.hint);
+  const mapped = mapQuestionSpecificFields(questionType, sanitizedGenerationQuestionJson);
   const answer = buildPreviewAnswer(questionType, mapped);
   const solution = buildPreviewSolution(questionType, explanation);
   const explanationBlock = {
@@ -36,9 +39,6 @@ export function buildQuizQuestionPreviewFromGenerationJson(
     answer,
     ...(typeof explanation?.isGeometry === "boolean"
       ? { isGeometry: explanation.isGeometry }
-      : {}),
-    ...(explanation && "geometryStatement" in explanation
-      ? { geometryStatement: explanation.geometryStatement }
       : {}),
     origin: "AI_AUTHORED",
   };
@@ -63,8 +63,16 @@ export function buildQuizQuestionPreviewFromGenerationJson(
       ...(current.sourceMetadataJson ?? {}),
       quizExplanationBlock: explanationBlock,
     },
-    generationQuestionJson,
+    generationQuestionJson: sanitizedGenerationQuestionJson,
   };
+}
+
+function stripLegacyQuizGeometryStatement(value: Record<string, unknown>) {
+  const explanation = asRecord(value.explanation);
+  if (!explanation || !("geometryStatement" in explanation)) return value;
+  const safeExplanation = { ...explanation };
+  delete safeExplanation.geometryStatement;
+  return { ...value, explanation: safeExplanation };
 }
 
 export function isProtectedQuizGenerationJsonEdit(input: {

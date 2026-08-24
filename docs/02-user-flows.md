@@ -247,12 +247,22 @@ Các bước:
    sau khi chèn, admin kéo đường biên dọc để đổi độ rộng cột, kéo đường biên
    ngang để đổi chiều cao hàng, thêm/xóa hàng cột, chọn nhiều ô để gộp và tách
    ô đã gộp bằng toolbar icon có tooltip xuất hiện ngay khi hover/focus.
-6. Với câu tự nhập đáp án, admin nhập một hoặc nhiều chuỗi được chấp nhận; có
-   thể chèn và xem trước LaTeX/mhchem nhưng dữ liệu vẫn là chuỗi để chấm điểm.
+6. Với câu tự nhập đáp án, admin nhập đúng một chuỗi đáp án chuẩn; có thể chèn
+   và xem trước LaTeX/mhchem nhưng không khai báo thêm biến thể hoặc cấu hình
+   hoa/thường/khớp toàn bộ. Backend tự nhận diện các cách viết có cùng giá trị
+   số và fallback về chuỗi đã chuẩn hóa khi đáp án không phải số.
 7. Với câu `Đúng/Sai`, admin chọn một đáp án boolean Đúng hoặc Sai cho toàn
    câu. Với câu `Đúng/Sai nhiều mệnh đề`, admin nhập đề dẫn chung, thêm các
    mệnh đề và chọn Đúng/Sai độc lập cho từng mệnh đề.
 8. Backend validate nội dung, đáp án đúng và lưu toàn bộ Tiptap JSON.
+9. Khi bộ có ít nhất một câu đã duyệt, admin có thể `Phát hành` dù vẫn còn câu
+   chờ duyệt; học sinh chỉ nhận các câu đã duyệt trong lượt phát hành đó.
+10. Sau khi duyệt thêm câu, admin bấm `Lưu` để đưa chúng vào lượt phát hành gần
+    nhất của cùng bộ mà không tạo lượt phát hành mới.
+11. Với mỗi hình đề/hình lời giải trên card Quiz, admin mở menu hình để chỉnh sửa
+    bằng mã code, tạo mới bằng mã code, tạo mới bằng AI hoặc tải ảnh lên; các icon
+    cạnh menu dùng để chỉnh caption và xóa ảnh. Sửa/tạo code phải biên dịch và xem
+    trước trước khi áp dụng. Xóa hình đề đồng thời xóa hình lời giải phụ thuộc.
 
 Acceptance Criteria:
 
@@ -276,6 +286,8 @@ Acceptance Criteria:
 - `Đúng/Sai` chỉ lưu một boolean chung; `Đúng/Sai nhiều mệnh đề` là loại câu
   hỏi khác và lưu ánh xạ theo từng mệnh đề.
 - Editor/modal được lazy-load khi admin mở, không làm chậm tải lesson detail.
+- Nút `Phát hành` chỉ bị khóa khi chưa có câu nào được duyệt; câu chờ duyệt không
+  khóa nút. `Lưu` giữ nguyên trạng thái bộ và dùng mốc của lượt phát hành gần nhất.
 
 ---
 
@@ -340,7 +352,11 @@ Các bước chung:
    `APPROVED`, warning của câu được ẩn nhưng metadata generation vẫn giữ để audit.
    Admin cũng có thể bấm `Duyệt tất cả` trong bộ đang mở để duyệt toàn bộ câu AI
    chờ duyệt của riêng bộ đó. Bulk review không tự đưa câu xuống học sinh; admin
-   vẫn phải bấm `Lưu` hoặc `Phát hành` theo trạng thái của bộ.
+   vẫn phải bấm `Lưu` hoặc `Phát hành` theo trạng thái của bộ. Khi admin dùng
+   icon câu trước/câu tiếp theo trên card, UI thay câu tại chỗ và giữ nguyên tọa
+   độ cuộn hiện tại của trang.
+   Mỗi figure Quiz dùng cùng ngôn ngữ thao tác với figure Sinh kiến thức nhưng
+   gọi API/revision/worker riêng của domain Quiz; không import core Summary.
 10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
     `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
     trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
@@ -691,6 +707,9 @@ Các bước:
    `Kiểm tra đáp án` vẫn chấm local tức thì để không tăng độ trễ cảm nhận, đồng
    thời đồng bộ trạng thái đã kiểm tra về server; chỉ lúc đó UI mới hiện
    feedback/lời giải.
+   Student có thể bấm `Enter` để thực hiện cùng hành động kiểm tra khi answer đã
+   đầy đủ; `ArrowLeft`/`ArrowRight` chuyển câu trước/câu tiếp, trừ khi focus đang
+   ở field nhập text/công thức cần dùng phím mũi tên để di chuyển con trỏ.
    Với câu `Đúng/Sai nhiều mệnh đề`, student trả lời từng mệnh đề độc lập.
    Riêng Quiz có nút `Bỏ qua` cạnh `Gợi ý`; thao tác này lưu marker không trả
    lời, khóa câu và hiển thị ngay đáp án đúng cùng lời giải. Câu bỏ qua nhận 0
@@ -730,6 +749,8 @@ Acceptance Criteria:
 - Student không sửa được attempt đã submit.
 - Điều hướng xem lại không có nút biên bị disabled: câu đầu luôn có `Trở về`,
   câu cuối luôn có `Kết thúc xem lại`; câu giữa vẫn dùng `Câu trước`/`Câu tiếp`.
+- Điều khiển bàn phím trong runner cho kết quả giống các nút tương ứng và không
+  kích hoạt khi action đang pending hoặc modal xác nhận thoát đang mở.
 
 ---
 
