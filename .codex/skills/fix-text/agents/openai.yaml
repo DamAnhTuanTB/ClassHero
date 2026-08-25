@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix Text"
+  short_description: "Rà và sửa đồng bộ quy tắc sinh nội dung chữ AI"
+  default_prompt: "Use $fix-text to rà soát và sửa đồng bộ quy tắc sinh nội dung chữ AI theo đúng feature, vai trò nội dung, môn và biến thể liên quan."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix Draw"
+  short_description: "Rà và sửa đồng bộ quy tắc vẽ hình AI"
+  default_prompt: "Use $fix-draw to rà soát và sửa đồng bộ quy tắc vẽ hình AI theo đúng feature, môn và mode liên quan."

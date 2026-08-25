@@ -1,0 +1,1 @@
+- 2026-08-25: Thêm hai skill Codex `fix-draw` và `fix-text` để audit, lập kế hoạch và đồng bộ có điều kiện các quy tắc sinh hình và nội dung chữ AI theo đúng tính năng, vai trò nội dung, môn học, biến thể và lớp contract thực sự liên quan.
