@@ -1,0 +1,2 @@
+ALTER TYPE "QuizFigureRevisionOrigin" ADD VALUE 'AI_REFINEMENT';
+ALTER TYPE "QuizFigureAttemptKind" ADD VALUE 'AI_REFINEMENT';

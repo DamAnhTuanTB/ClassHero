@@ -141,6 +141,11 @@ function compactAndRenameExactSchemaReferences(schema: JsonObject): JsonObject {
 
 function readDefinitions(schema: JsonObject): JsonObject {
   const definitions = schema.$defs;
+  if (definitions === undefined) {
+    const emptyDefinitions: JsonObject = {};
+    schema.$defs = emptyDefinitions;
+    return emptyDefinitions;
+  }
   if (!isJsonObject(definitions)) {
     throw new Error("Reference schema does not contain a $defs object.");
   }

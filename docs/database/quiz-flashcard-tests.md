@@ -93,9 +93,12 @@ Rules:
   sử không còn thuộc contract, không được projection ra API/UI và bị loại khi
   câu AI được lưu lại. Phân loại Hình học không quyết định
   `solution_figure_mode`. Summary/Example giữ contract GT–KL riêng.
-- `solution_figure_mode`: `NONE`, `REUSE_QUESTION` hoặc `EXTEND_QUESTION`.
-  EXTEND luôn có revision lời giải trỏ `derived_from_question_revision_id` tới
-  exact current revision của hình đề.
+- `solution_figure_mode`: `NONE`, `EXTEND_QUESTION` hoặc `REDRAW_AS_MODEL`.
+  Không có mode lặp nguyên hình đề trong lời giải. EXTEND luôn có revision lời
+  giải trỏ `derived_from_question_revision_id` tới exact revision hình đề đã dùng
+  làm nền. REDRAW cũng giữ pointer này làm provenance của hình được mô hình hóa
+  lại, nhưng source lời giải là một figure hoàn chỉnh mới chứ không phải phần
+  extension chèn vào source hình đề.
 - Với `TEXT_INPUT`, `correct_answer_json` chứa đúng một chuỗi canonical. Backend
   tự so sánh tương đương số chính xác và fallback về chuỗi đã chuẩn hóa;
   `grading_config_json` không còn điều khiển cách chấm và bản ghi mới/cập nhật
@@ -113,9 +116,13 @@ Rules:
   `QUESTION | SOLUTION`, giữ lifecycle, plan, subject snapshot và current/pending
   revision.
 - `quiz_figure_revisions` là nguồn chuẩn của TeX/TikZ hoặc file `ADMIN_UPLOAD`,
-  preview/delivery asset và lineage. Revision SOLUTION do AI mở rộng phải trỏ
-  exact revision QUESTION đã dùng làm nền.
+  preview/delivery asset và lineage. Revision SOLUTION do AI mở rộng hoặc vẽ lại
+  phải trỏ exact revision QUESTION đã dùng làm nền hoặc nguồn provenance.
 - `quiz_figure_render_attempts` audit từng lần provider/compile/render và usage.
+- Action `Tinh chỉnh` dùng revision origin và attempt kind `AI_REFINEMENT`; nó
+  luôn tạo pending revision mới, không ghi đè source/file của current revision.
+  Figure có thể chuyển `QUEUED/RUNNING` trong khi current revision `SUCCEEDED`
+  vẫn là asset đọc cho student cho tới khi candidate được promote nguyên tử.
 - Đây là các bảng thuộc riêng Quiz, không FK/import sang `stem_figures` của
   Summary. AI không lưu crop/ảnh gốc SGK; admin upload là đường raster riêng.
 

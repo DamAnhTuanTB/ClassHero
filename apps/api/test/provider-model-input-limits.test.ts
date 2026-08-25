@@ -1,5 +1,6 @@
 import {
   AiGenerationType,
+  AiModelPurpose,
   AiProviderName,
   Prisma,
   ProviderCatalogCategory,
@@ -33,6 +34,7 @@ describe("AI feature input limits", () => {
         configurations: [
           {
             feature: AiGenerationType.SUMMARY,
+            purpose: AiModelPurpose.TEXT,
             primaryCatalogItemId: "00000000-0000-4000-8000-000000000001",
             maxOutputTokens: 16_000,
             expectedVersion: 1,
@@ -62,8 +64,11 @@ describe("AI feature input limits", () => {
       configService() as never,
     );
 
-    await expect(routing.resolve(AiGenerationType.SUMMARY)).resolves.toEqual(
+    await expect(
+      routing.resolve(AiGenerationType.SUMMARY, AiModelPurpose.IMAGE),
+    ).resolves.toEqual(
       expect.objectContaining({
+        purpose: AiModelPurpose.IMAGE,
         maxInputTokens: 200_000,
         maxOutputTokens: 16_000,
       }),
@@ -95,6 +100,7 @@ describe("AI feature input limits", () => {
     );
     const route: AiFeatureRoute = {
       feature: AiGenerationType.SUMMARY,
+      purpose: AiModelPurpose.TEXT,
       version: 2,
       model: "gpt-4.1-mini",
       temperature: 0.2,
@@ -148,7 +154,7 @@ describe("AI feature input limits", () => {
     );
 
     expect(reserveAndStart).toHaveBeenCalledWith(
-      expect.any(Object),
+      expect.objectContaining({ purpose: AiModelPurpose.TEXT }),
       expect.objectContaining({
         usageUpperBound: {
           promptTokens: 45_000,

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   AiGenerationType,
+  AiModelPurpose,
   Prisma,
   ProviderBudgetReservationStatus,
   ProviderBudgetScope,
@@ -38,6 +39,7 @@ type StartUsageInput = {
   backgroundJobId?: string | null;
   sourceDocumentId?: string | null;
   feature?: AiGenerationType | null;
+  purpose?: AiModelPurpose | null;
   attempt?: number;
   cacheStatus?: string | null;
 };
@@ -97,6 +99,7 @@ export class ProviderUsageService {
         backgroundJobId: true,
         sourceDocumentId: true,
         feature: true,
+        purpose: true,
         attempt: true,
         cacheStatus: true,
         createdAt: true,
@@ -113,6 +116,7 @@ export class ProviderUsageService {
         backgroundJobId: event.backgroundJobId,
         sourceDocumentId: event.sourceDocumentId,
         feature: event.feature,
+        purpose: event.purpose,
         attempt: event.attempt,
         cacheStatus: event.cacheStatus,
       },
@@ -511,6 +515,7 @@ export class ProviderUsageService {
         backgroundJobId: input.backgroundJobId ?? null,
         sourceDocumentId: input.sourceDocumentId ?? null,
         feature: input.feature ?? null,
+        purpose: input.purpose ?? null,
         attempt: Math.max(1, input.attempt ?? 1),
         cacheStatus: input.cacheStatus ?? null,
         fxRateVndPerUsd,

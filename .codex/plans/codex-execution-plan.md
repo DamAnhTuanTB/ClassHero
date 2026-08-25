@@ -140,6 +140,13 @@ Update note 2026-08-20:
 model`. `maxInputTokens` cùng `maxOutputTokens` thuộc cấu hình từng feature tại
   `Admin -> Cài đặt AI -> Thiết lập mặc định`; route snapshot/reservation dùng
   feature config, catalog chỉ quản lý metadata và giá.
+- Owner bổ sung `M9.20` ngày 2026-08-25: mỗi Summary/Quiz/Flashcard/Test có hai
+  route model mặc định độc lập `TEXT` và `IMAGE`. Modal sinh Summary/Quiz hiển
+  thị override riêng cho Phase 1/Phase 2; worker figure chỉ dùng route IMAGE.
+  Flashcard/Test lưu đủ cấu hình ảnh nhưng chưa mở pipeline sinh hình trong task này.
+- `M9.20` đã triển khai ngày 2026-08-25: schema/API/UI có đủ tám pair; Summary và
+  Quiz chụp hai route vào immutable draft/job; figure worker ưu tiên route IMAGE,
+  usage event lưu purpose và job legacy tiếp tục fallback route cũ.
 
 ## 1. Phạm vi bước này
 
@@ -324,6 +331,7 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     43.3. `M9.10` - Admin provider operations API.
     43.4. `M9.11` - Admin Cài đặt AI/OCR UI.
     43.5. `M9.12` - Hard-stop ngân sách tuyệt đối bằng reservation nguyên tử. Done 2026-08-03.
+    43.6. `M9.20` - Tách model route Phase 1 text / Phase 2 ảnh theo từng feature. Done 2026-08-25.
 44. `M9.4` - Student request-new reserve-first UI + API.
 45. `M9.5` - AI explanation cache inline UI + API.
 46. `M9.6` - Chat AI trong lesson bằng RAG.

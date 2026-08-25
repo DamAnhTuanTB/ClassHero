@@ -1,1 +1,2 @@
 - 2026-08-25: Thêm hai skill Codex `fix-draw` và `fix-text` để audit, lập kế hoạch và đồng bộ có điều kiện các quy tắc sinh hình và nội dung chữ AI theo đúng tính năng, vai trò nội dung, môn học, biến thể và lớp contract thực sự liên quan.
+- 2026-08-25: Hoàn thiện luồng AI hai phase cho Summary/Quiz/Thẻ ghi nhớ/Bài kiểm tra, tách model tạo nội dung và tạo hình, đồng bộ prompt vẽ hình theo môn học, bổ sung quản lý–tinh chỉnh–thống kê chi phí ảnh Quiz, sửa hiển thị công thức và cập nhật toàn bộ contract, migration, worker, UI, tài liệu và test liên quan.

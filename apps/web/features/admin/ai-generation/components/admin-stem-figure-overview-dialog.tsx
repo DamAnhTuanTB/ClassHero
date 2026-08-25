@@ -1,27 +1,18 @@
 "use client";
 
-import {
-  AlertTriangle,
-  CircleAlert,
-  CircleCheckBig,
-  CircleX,
-  Clock3,
-  Eye,
-  ImageIcon,
-  LocateFixed,
-  LoaderCircle,
-} from "lucide-react";
+import { AlertTriangle, Eye, ImageIcon, LocateFixed, LoaderCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import { AdminFigureStatusBadge } from "@/components/admin/admin-figure-status-badge";
+import { AdminFigureStatusCounts } from "@/components/admin/admin-figure-status-counts";
 import { StemFigureMathText } from "@/components/common/content/stem-figure";
 import { AdminStemFigureActionFrame } from "@/features/admin/ai-generation/components/admin-stem-figure-action-frame";
 import type {
   AdminAiModelConfiguration,
   AdminLessonSummaryContent,
   AdminStemFigure,
-  AdminStemFigureStatus,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import {
   findAdminLessonSummaryFigureBlockPath,
@@ -58,7 +49,6 @@ export function AdminStemFigureOverviewDialog({
     figureId: string;
   } | null>(null);
   const orderedFigures = useMemo(() => [...figures].sort(compareFigures), [figures]);
-  const counts = countStatuses(orderedFigures);
   const selectedFigure = selectedBlock
     ? figures.find((figure) => figure.id === selectedBlock.figureId)
     : null;
@@ -78,26 +68,7 @@ export function AdminStemFigureOverviewDialog({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          <div aria-live="polite" className="mb-4 flex flex-wrap gap-2">
-            <StatusCount label="Tổng" value={counts.total} variant="neutral" />
-            <StatusCount
-              label="Thành công"
-              value={counts.succeeded}
-              variant="succeeded"
-            />
-            <StatusCount
-              label="Cần xem lại"
-              value={counts.needsReview}
-              variant="needsReview"
-            />
-            <StatusCount label="Lỗi" value={counts.failed} variant="failed" />
-            <StatusCount label="Chờ xử lý" value={counts.queued} variant="queued" />
-            <StatusCount
-              label="Đang xử lý"
-              value={counts.processing}
-              variant="processing"
-            />
-          </div>
+          <AdminFigureStatusCounts figures={orderedFigures} />
 
           {orderedFigures.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -173,8 +144,6 @@ function FigureOverviewCard({
   onViewBlock: (blockPath: string) => void;
 }) {
   const imageUrl = figure.assetUrl ?? toSvgDataUrl(figure.previewSvg);
-  const status = getStatusPresentation(figure.status);
-  const StatusIcon = status.icon;
   const blockPath = findAdminLessonSummaryFigureBlockPath(
     content,
     figure.id,
@@ -196,15 +165,7 @@ function FigureOverviewCard({
             <StemFigureMathText value={figure.caption ?? figure.altText} />
           </p>
         </div>
-        <span
-          className={`inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-extrabold ${status.className}`}
-        >
-          <StatusIcon
-            aria-hidden="true"
-            className={`h-3.5 w-3.5 ${status.spins ? "animate-spin" : ""}`}
-          />
-          {status.label}
-        </span>
+        <AdminFigureStatusBadge status={figure.status} />
       </div>
 
       <AdminStemFigureActionFrame
@@ -284,109 +245,6 @@ function FigurePlaceholder({ figure }: { figure: AdminStemFigure }) {
       ) : null}
     </div>
   );
-}
-
-type StatusVariant =
-  "neutral" | "queued" | "processing" | "succeeded" | "needsReview" | "failed";
-
-function StatusCount({
-  label,
-  value,
-  variant,
-}: {
-  label: string;
-  value: number;
-  variant: StatusVariant;
-}) {
-  const classes: Record<StatusVariant, string> = {
-    neutral:
-      "border-[var(--theme-border)] bg-[var(--theme-surface-soft)] text-[var(--theme-text-muted)]",
-    queued:
-      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200",
-    processing:
-      "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
-    succeeded:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
-    needsReview:
-      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200",
-    failed:
-      "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200",
-  };
-  return (
-    <span
-      className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-extrabold tabular-nums ${classes[variant]}`}
-    >
-      {label} <strong>{value}</strong>
-    </span>
-  );
-}
-
-function countStatuses(figures: AdminStemFigure[]) {
-  const counts = {
-    total: figures.length,
-    queued: 0,
-    processing: 0,
-    succeeded: 0,
-    needsReview: 0,
-    failed: 0,
-  };
-  for (const figure of figures) {
-    if (figure.status === "QUEUED") counts.queued += 1;
-    if (figure.status === "RENDERING" || figure.status === "REPAIRING") {
-      counts.processing += 1;
-    }
-    if (figure.status === "SUCCEEDED") counts.succeeded += 1;
-    if (figure.status === "NEEDS_REVIEW") counts.needsReview += 1;
-    if (figure.status === "FAILED") counts.failed += 1;
-  }
-  return counts;
-}
-
-function getStatusPresentation(status: AdminStemFigureStatus) {
-  return {
-    QUEUED: {
-      label: "Chờ xử lý",
-      icon: Clock3,
-      spins: false,
-      className:
-        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200",
-    },
-    RENDERING: {
-      label: "Đang render",
-      icon: LoaderCircle,
-      spins: true,
-      className:
-        "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
-    },
-    REPAIRING: {
-      label: "Đang sửa",
-      icon: LoaderCircle,
-      spins: true,
-      className:
-        "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
-    },
-    SUCCEEDED: {
-      label: "Thành công",
-      icon: CircleCheckBig,
-      spins: false,
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
-    },
-    NEEDS_REVIEW: {
-      label: "Cần xem lại",
-      icon: CircleAlert,
-      spins: false,
-      className:
-        "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200",
-    },
-    FAILED: {
-      label: "Lỗi",
-      icon: CircleX,
-      spins: false,
-      className:
-        "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200",
-    },
-  }[status];
 }
 
 function compareFigures(left: AdminStemFigure, right: AdminStemFigure) {

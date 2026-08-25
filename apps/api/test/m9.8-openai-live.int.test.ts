@@ -19,12 +19,12 @@ import {
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 import {
   getGeneratedQuizOutputSchema,
-  QUIZ_PROMPT_VERSION,
+  QUIZ_PROMPT_VERSIONS,
   QUIZ_SCHEMA_VERSION,
 } from "#api/modules/quiz/types/quiz-generation.types";
 import {
   buildQuizPrompt,
-  QUIZ_SYSTEM_PROMPT,
+  buildQuizSubjectSystemPrompt,
 } from "#api/modules/quiz/utils/quiz-generation-prompt";
 import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
 
@@ -106,7 +106,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
     ]) {
       const output = await provider.generateStructured(
         {
-          systemPrompt: QUIZ_SYSTEM_PROMPT,
+          systemPrompt: buildQuizSubjectSystemPrompt(mathSubject),
           userPrompt: buildQuizPrompt({
             lessonTitle: "Số hữu tỉ",
             questionCount: quizCase.count,
@@ -116,7 +116,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
           }),
           contextChunks,
           outputName: quizCase.label.replaceAll("-", "_"),
-          promptVersion: QUIZ_PROMPT_VERSION,
+          promptVersion: QUIZ_PROMPT_VERSIONS.MATH,
           schemaVersion: QUIZ_SCHEMA_VERSION,
           maxTokens: quizCase.count === 4 ? 2_800 : 1_600,
         },

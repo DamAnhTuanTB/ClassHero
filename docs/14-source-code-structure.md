@@ -149,6 +149,7 @@ Code dùng chung trong API đặt ở `apps/api/src/common`.
 ```txt
 apps/api/src/common/
 ├── api/          # Response envelope/interceptor
+├── ai/           # Policy/helper AI trung lập, dùng được giữa nhiều domain
 ├── auth/         # Guard/decorator/user request type
 ├── errors/       # HTTP exception factory/filter, Prisma error mapper
 ├── prisma/       # Prisma module/service
@@ -160,6 +161,15 @@ Rules:
 - HTTP exception phải đi qua `common/errors/api-exception.ts`.
 - Prisma known error detection/mapping dùng helper trong `common/errors/prisma-error.mapper.ts`.
 - Common layer không chứa logic nghiệp vụ của một domain cụ thể.
+- Policy AI đặt trong `common/ai` chỉ được chứa invariant trung lập thực sự dùng
+  giữa nhiều flow; nguồn dữ kiện, prompt/schema, mapper và lifecycle riêng của
+  Summary, Quiz hoặc domain khác vẫn phải thuộc module sở hữu.
+- Policy chuyên môn Toán, Vật lý, Hóa học không được đặt trong `common/ai` hoặc
+  dùng policy của một môn làm core cho môn khác. Summary/StemFigure và Quiz phải
+  tự sở hữu các file system prompt hoàn chỉnh theo môn. Không dùng chung bất kỳ
+  prompt prose hoặc prompt fragment nào giữa các môn, kể cả role, output contract,
+  safety instruction hay helper ghép section; chỉ hạ tầng code ngoài prompt như
+  provider, queue, schema, validator, accounting và persistence được dùng chung.
 - Domain có thể wrap helper common để chọn message/mã lỗi nghiệp vụ, nhưng không tự dựng body lỗi HTTP thủ công nhiều nơi.
 - Core Sinh kiến thức là private boundary: mọi file/schema/helper/service/worker
   có tên `lesson-summary-*` chỉ được Summary và StemFigure thuộc Summary import.

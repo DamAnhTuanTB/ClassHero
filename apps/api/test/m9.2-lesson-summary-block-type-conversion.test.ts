@@ -91,7 +91,6 @@ function createFixture() {
                 {
                   figureOrigin: "GENERATED_FROM_BRIEF",
                   sourceReferences: [],
-                  caption: "Hình minh họa kiến thức",
                 },
               ],
             },

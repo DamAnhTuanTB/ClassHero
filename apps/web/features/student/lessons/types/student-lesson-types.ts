@@ -71,7 +71,7 @@ export type StudentAssessmentQuestion = {
   sortOrder: number;
   questionNumber?: number;
   hasExplanation?: boolean;
-  solutionFigureMode?: "NONE" | "REUSE_QUESTION" | "EXTEND_QUESTION";
+  solutionFigureMode?: "NONE" | "EXTEND_QUESTION" | "REDRAW_AS_MODEL";
   questionFigure?: QuizFigureAsset | null;
   solutionFigure?: QuizFigureAsset | null;
 };

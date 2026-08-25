@@ -67,6 +67,17 @@ export const adminAiGenerationFormSchema = z
     summaryTemperature: optionalNumericTextSchema("Temperature", 0, 1, true),
     summaryReasoningEffort: z.union([z.literal(""), z.enum(AI_REASONING_EFFORT_LEVELS)]),
     summaryMaxOutputTokens: optionalNumericTextSchema("Số token đầu ra", 8_000, 32_000),
+    summaryFigureModel: z.string().max(200),
+    summaryFigureTemperature: optionalNumericTextSchema("Temperature tạo hình", 0, 1, true),
+    summaryFigureReasoningEffort: z.union([
+      z.literal(""),
+      z.enum(AI_REASONING_EFFORT_LEVELS),
+    ]),
+    summaryFigureMaxOutputTokens: optionalNumericTextSchema(
+      "Số token đầu ra tạo hình",
+      128,
+      32_000,
+    ),
     count: numericTextSchema("Số lượng", 1, 60),
     difficulty: difficultySchema,
     questionTypes: z.array(questionTypeSchema).max(4),
@@ -101,6 +112,13 @@ export const adminAiGenerationFormSchema = z
           message: "Vui lòng nhập số token đầu ra",
         });
       }
+    }
+    if (values.type === "SUMMARY" && values.summaryFigureModel && !values.summaryFigureMaxOutputTokens) {
+      context.addIssue({
+        code: "custom",
+        path: ["summaryFigureMaxOutputTokens"],
+        message: "Vui lòng nhập số token đầu ra tạo hình",
+      });
     }
     if (values.type === "TEST") {
       if (values.questionTypes.length === 0) {

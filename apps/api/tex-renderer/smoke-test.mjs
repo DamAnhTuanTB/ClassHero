@@ -22,6 +22,22 @@ const cases = [
 \end{tikzpicture}`,
   },
   {
+    name: "math-local-relation-markers",
+    subjectKey: "MATH",
+    source: String.raw`\usetikzlibrary{angles,calc,decorations.markings,quotes}
+\begin{tikzpicture}
+  \coordinate (A) at (0,0);
+  \coordinate (M) at (2,0);
+  \coordinate (B) at (4,0);
+  \coordinate (P) at (2,2);
+  \draw (A)--(B);
+  \draw[dashed] (M)--(P);
+  \pic[draw,angle radius=4mm] {right angle=A--M--P};
+  \draw[postaction={decorate},decoration={markings,mark=at position 0.5 with {\draw (0,-2pt)--(0,2pt);}}] (A)--(M);
+  \draw[postaction={decorate},decoration={markings,mark=at position 0.5 with {\draw (0,-2pt)--(0,2pt);}}] (M)--(B);
+\end{tikzpicture}`,
+  },
+  {
     name: "user-gem-cosine-fragment",
     subjectKey: "MATH",
     source: String.raw`\begin{tikzpicture}[scale=0.85, >=stealth]

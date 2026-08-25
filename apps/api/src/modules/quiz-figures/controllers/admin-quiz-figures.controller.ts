@@ -23,6 +23,7 @@ import {
   ApplyQuizFigureDraftDto,
   CompileQuizFigureDraftDto,
   CreateQuizFigureAiDto,
+  RefineQuizFigureWithAiDto,
   QuizFigureRevisionGuardDto,
   UpdateQuizFigureCaptionDto,
 } from "#api/modules/quiz-figures/dto/quiz-figure-revision.dto";
@@ -98,6 +99,28 @@ export class AdminQuizFiguresController {
     @Body() dto: CreateQuizFigureAiDto,
   ) {
     return this.figures.previewNewAi(questionId, figureId, dto);
+  }
+
+  @Post(":questionId/figures/:figureId/refine-ai/preview")
+  @ApiOperation({ summary: "Preview the exact AI refinement request" })
+  previewRefinement(
+    @Param("questionId") questionId: string,
+    @Param("figureId") figureId: string,
+    @Body() dto: RefineQuizFigureWithAiDto,
+  ) {
+    return this.figures.previewRefinement(questionId, figureId, dto);
+  }
+
+  @Post(":questionId/figures/:figureId/refine-ai")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Refine one successful Quiz figure with AI vision" })
+  refineWithAi(
+    @Param("questionId") questionId: string,
+    @Param("figureId") figureId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RefineQuizFigureWithAiDto,
+  ) {
+    return this.figures.refineWithAi(questionId, figureId, user.id, dto);
   }
 
   @Patch(":questionId/figures/:figureId/caption")

@@ -60,7 +60,6 @@ function plan(origin: "TEXTBOOK_SOURCE" | "GENERATED_FROM_BRIEF" = "TEXTBOOK_SOU
           ]
         : [],
     altText: "Hai panel của hình gốc",
-    caption: "Hình minh họa",
     figurePlanContractVersion: 3,
     localId: "F001",
   });

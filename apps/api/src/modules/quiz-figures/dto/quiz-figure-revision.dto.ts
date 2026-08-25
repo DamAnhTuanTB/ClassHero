@@ -103,6 +103,8 @@ export class CreateQuizFigureAiDto extends QuizFigureRevisionGuardDto {
   userPrompt?: string;
 }
 
+export class RefineQuizFigureWithAiDto extends QuizFigureRevisionGuardDto {}
+
 export class UpdateQuizFigureCaptionDto extends QuizFigureRevisionGuardDto {
   @ApiPropertyOptional({ maxLength: 500, nullable: true })
   @IsOptional()

@@ -99,15 +99,28 @@ export function AdminAiGenerationUsageDialog({
                         eventsQuery.data.items.map((event) => (
                           <tr
                             key={event.id}
-                            className="cursor-pointer transition-colors hover:bg-[var(--theme-surface-soft)]"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Xem chi tiết ${event.catalogItem?.displayName ?? event.provider}, ${formatVnd(event.costVnd)}`}
+                            className="cursor-pointer transition-colors hover:bg-[var(--theme-surface-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-primary)]"
                             onClick={() => setSelectedEvent(event)}
+                            onKeyDown={(keyboardEvent) => {
+                              if (
+                                keyboardEvent.key === "Enter" ||
+                                keyboardEvent.key === " "
+                              ) {
+                                keyboardEvent.preventDefault();
+                                setSelectedEvent(event);
+                              }
+                            }}
                           >
                             <td className="px-4 py-3">
                               <p className="font-extrabold text-[var(--theme-text-strong)]">
                                 {event.catalogItem?.displayName ?? event.provider}
                               </p>
                               <p className="text-xs text-[var(--theme-text-muted)]">
-                                {formatUsagePurpose(event)} · {usageStatusLabels[event.status]}
+                                {formatUsagePurpose(event)} ·{" "}
+                                {usageStatusLabels[event.status]}
                                 {formatCacheStatus(event.cacheStatus)
                                   ? ` · ${formatCacheStatus(event.cacheStatus)}`
                                   : ""}

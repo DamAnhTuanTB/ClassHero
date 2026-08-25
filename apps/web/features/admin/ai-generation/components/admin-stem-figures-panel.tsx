@@ -1,7 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-
+import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
 import { StemFigure } from "@/components/common/content/stem-figure";
 import { AdminStemFigureActionFrame } from "@/features/admin/ai-generation/components/admin-stem-figure-action-frame";
 import type {
@@ -50,14 +49,7 @@ export function AdminStemFigureInline({
           }}
         />
         {candidateActive && figure.hasCurrentAsset ? (
-          <div
-            aria-busy="true"
-            className="mx-3 -mt-2 flex min-h-12 animate-pulse items-center justify-center gap-2 rounded-b-xl border border-t-0 border-sky-200 bg-sky-50 px-3 text-center text-xs font-extrabold text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 sm:mx-4"
-          >
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Đang sinh bản hình mới tại vị trí này. Ảnh hiện hành được giữ cho đến khi bản
-            mới thành công
-          </div>
+          <AdminFigureCandidateProgress />
         ) : null}
       </AdminStemFigureActionFrame>
 

@@ -19,6 +19,7 @@ import type {
 } from "#api/jobs/background-job-queues";
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
+import { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
 import {
   AiProviderCallService,
   type ResolvedAiStructuredRequestTrace,
@@ -28,11 +29,19 @@ import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-fi
 import { QuizTexRendererClientService } from "#api/modules/quiz-figures/services/quiz-tex-renderer-client.service";
 import {
   buildQuestionFigureInput,
+  buildQuizFigureRefinementInput,
   buildSolutionFigureExtensionInput,
+  buildSolutionFigureRedrawInput,
   generatedQuizQuestionFigureSchema,
+  generatedQuizFigureRefinementSchema,
   generatedQuizSolutionExtensionSchema,
+  generatedQuizSolutionRedrawSchema,
+  quizFigurePlanSchema,
+  readQuizFigureTargetGrade,
+  resolveQuizFigureSystemPrompt,
   type QuizFigurePlan,
 } from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
+import { buildQuizFigureRefinementImageDataUrl } from "#api/modules/quiz-figures/utils/quiz-figure-refinement-image";
 import {
   applyQuizSolutionExtension,
   assertQuizFigureLatexSource,
@@ -67,6 +76,8 @@ export class QuizFigureRenderingProcessor {
     private readonly artifacts: QuizFigureArtifactService,
     @Inject(QuizFigureJobService)
     private readonly jobs: QuizFigureJobService,
+    @Inject(ObjectStorageService)
+    private readonly storage: ObjectStorageService,
   ) {}
 
   async process(
@@ -119,6 +130,7 @@ export class QuizFigureRenderingProcessor {
           subjectKey: true,
           subjectName: true,
           subjectSlug: true,
+          aiGeneration: { select: { inputMetaJson: true } },
           pendingRevision: {
             select: {
               id: true,
@@ -128,7 +140,11 @@ export class QuizFigureRenderingProcessor {
             },
           },
           currentRevision: {
-            select: { latexSource: true },
+            select: {
+              latexSource: true,
+              sourceKind: true,
+              deliveryFile: { select: { mimeType: true, objectKey: true } },
+            },
           },
         },
       });
@@ -136,10 +152,15 @@ export class QuizFigureRenderingProcessor {
         throw new UnrecoverableError("Quiz figure pending revision is missing.");
       }
       const plan = readPlan(figure.planJson);
+      if (plan.role !== figure.role) {
+        throw new UnrecoverableError("QUIZ_FIGURE_PLAN_ROLE_MISMATCH");
+      }
       const subject = readSubject(figure);
+      const targetGrade = readQuizFigureTargetGrade(figure.aiGeneration?.inputMetaJson);
       const routeSnapshot = readRouteSnapshot(metadata.routeSnapshot);
       const adminInstructions = readOptionalString(metadata.adminInstructions);
       const aiMode = readQuizFigureAiMode(metadata.aiMode);
+      const operation = readQuizFigureOperation(metadata.operation);
       const systemPrompt = readOptionalString(metadata.systemPrompt);
       const userPrompt = readOptionalString(metadata.userPrompt);
       const source =
@@ -148,15 +169,24 @@ export class QuizFigureRenderingProcessor {
           figure,
           plan,
           subject,
+          targetGrade,
           routeSnapshot,
           backgroundJobId: durableJob.id,
           attempt: attemptNumber,
           adminInstructions,
           aiMode,
+          operation,
           systemPrompt,
           userPrompt,
         }));
-      assertQuizFigureLatexSource(source);
+      assertQuizFigureLatexSource(source, {
+        requireExtensionMarker:
+          figure.role === QuizFigureRole.QUESTION ||
+          (operation === "REFINE_CURRENT" &&
+            Boolean(
+              figure.currentRevision?.latexSource?.includes("% QUIZ_SOLUTION_EXTENSION"),
+            )),
+      });
       const sourceHash = QuizFigureJobService.sourceHash(source);
       attemptId = (
         await this.prisma.quizFigureRenderAttempt.create({
@@ -166,7 +196,10 @@ export class QuizFigureRenderingProcessor {
             backgroundJobId: durableJob.id,
             attemptNumber,
             sourceVersion: figure.pendingRevision.sourceVersion,
-            kind: QuizFigureAttemptKind.INITIAL,
+            kind:
+              operation === "REFINE_CURRENT"
+                ? QuizFigureAttemptKind.AI_REFINEMENT
+                : QuizFigureAttemptKind.INITIAL,
             status: QuizFigureAttemptStatus.RUNNING,
             sourceHash,
           },
@@ -221,8 +254,12 @@ export class QuizFigureRenderingProcessor {
         queue: BackgroundJobQueue.QUIZ_FIGURE_RENDERING,
         resourceType: "QUIZ_FIGURE",
         resourceId: figure.id,
-        action: "QUIZ_FIGURE_RENDER",
-        message: "Đã tạo hình Quiz.",
+        action:
+          operation === "REFINE_CURRENT" ? "QUIZ_FIGURE_REFINE" : "QUIZ_FIGURE_RENDER",
+        message:
+          operation === "REFINE_CURRENT"
+            ? "Đã tinh chỉnh hình Quiz."
+            : "Đã tạo hình Quiz.",
         handledAt: new Date().toISOString(),
         details: { role: figure.role, revisionId },
       };
@@ -300,15 +337,21 @@ export class QuizFigureRenderingProcessor {
       aiGenerationId: string | null;
       quizQuestionId: string;
       pendingRevision: { id: string; sourceVersion: number } | null;
-      currentRevision: { latexSource: string | null } | null;
+      currentRevision: {
+        latexSource: string | null;
+        sourceKind: string;
+        deliveryFile: { mimeType: string; objectKey: string } | null;
+      } | null;
     };
     plan: QuizFigurePlan;
     subject: QuizSubjectSnapshot;
+    targetGrade: number | null;
     routeSnapshot?: AiFeatureRoute;
     backgroundJobId: string;
     attempt: number;
     adminInstructions?: string;
     aiMode: "REGENERATE" | "EDIT_CURRENT";
+    operation: "GENERATE" | "REFINE_CURRENT";
     systemPrompt?: string;
     userPrompt?: string;
   }) {
@@ -328,10 +371,43 @@ export class QuizFigureRenderingProcessor {
           request,
         }),
     } as const;
+    if (input.operation === "REFINE_CURRENT") {
+      const current = input.figure.currentRevision;
+      if (
+        !current?.latexSource?.trim() ||
+        current.sourceKind !== "AI_TEX" ||
+        current.deliveryFile?.mimeType !== "image/svg+xml" ||
+        !current.deliveryFile.objectKey
+      ) {
+        throw new UnrecoverableError("QUIZ_FIGURE_REFINEMENT_SOURCE_REQUIRED");
+      }
+      const renderedSvg = await this.storage.downloadObject(
+        current.deliveryFile.objectKey,
+      );
+      const currentImageDataUrl =
+        await buildQuizFigureRefinementImageDataUrl(renderedSvg);
+      const structuredInput = buildQuizFigureRefinementInput({
+        subject: input.subject,
+        plan: input.plan,
+        targetGrade: input.targetGrade,
+        currentLatexSource: current.latexSource,
+        currentImageDataUrl,
+      });
+      const output = await this.provider.generateStructured(
+        callContext,
+        structuredInput,
+        generatedQuizFigureRefinementSchema,
+      );
+      return output.data.latexSource;
+    }
     if (input.figure.role === QuizFigureRole.QUESTION) {
+      if (input.plan.role !== "QUESTION") {
+        throw new UnrecoverableError("QUIZ_QUESTION_FIGURE_PLAN_INVALID");
+      }
       const structuredInput = buildQuestionFigureInput({
         subject: input.subject,
         plan: input.plan,
+        targetGrade: input.targetGrade,
         adminInstructions: input.adminInstructions,
         mode: input.aiMode,
         currentLatexSource:
@@ -343,7 +419,10 @@ export class QuizFigureRenderingProcessor {
         callContext,
         {
           ...structuredInput,
-          systemPrompt: input.systemPrompt ?? structuredInput.systemPrompt,
+          systemPrompt: resolveQuizFigureSystemPrompt(
+            structuredInput.systemPrompt,
+            input.systemPrompt,
+          ),
           userPrompt: input.userPrompt ?? structuredInput.userPrompt,
         },
         generatedQuizQuestionFigureSchema,
@@ -366,30 +445,60 @@ export class QuizFigureRenderingProcessor {
         "QUIZ_SOLUTION_FIGURE_BASE_NOT_READY: Hình đề chưa sẵn sàng.",
       );
     }
+    if (input.plan.role !== "SOLUTION") {
+      throw new UnrecoverableError("QUIZ_SOLUTION_FIGURE_PLAN_INVALID");
+    }
+    const currentSolutionLatexSource =
+      input.aiMode === "EDIT_CURRENT" ? input.figure.currentRevision?.latexSource : null;
+    await this.prisma.quizFigureRevision.update({
+      where: { id: input.figure.pendingRevision!.id },
+      data: { derivedFromQuestionRevisionId: baseRevision.id },
+    });
+    if (input.plan.mode === "REDRAW_AS_MODEL") {
+      const structuredInput = buildSolutionFigureRedrawInput({
+        subject: input.subject,
+        plan: input.plan,
+        targetGrade: input.targetGrade,
+        exactQuestionLatexSource: baseRevision.latexSource,
+        adminInstructions: input.adminInstructions,
+        mode: input.aiMode,
+        currentSolutionLatexSource,
+      });
+      const output = await this.provider.generateStructured(
+        callContext,
+        {
+          ...structuredInput,
+          systemPrompt: resolveQuizFigureSystemPrompt(
+            structuredInput.systemPrompt,
+            input.systemPrompt,
+          ),
+          userPrompt: input.userPrompt ?? structuredInput.userPrompt,
+        },
+        generatedQuizSolutionRedrawSchema,
+      );
+      return output.data.latexSource;
+    }
     const structuredInput = buildSolutionFigureExtensionInput({
       subject: input.subject,
       plan: input.plan,
+      targetGrade: input.targetGrade,
       exactQuestionLatexSource: baseRevision.latexSource,
       adminInstructions: input.adminInstructions,
       mode: input.aiMode,
-      currentSolutionLatexSource:
-        input.aiMode === "EDIT_CURRENT"
-          ? input.figure.currentRevision?.latexSource
-          : null,
+      currentSolutionLatexSource,
     });
     const output = await this.provider.generateStructured(
       callContext,
       {
         ...structuredInput,
-        systemPrompt: input.systemPrompt ?? structuredInput.systemPrompt,
+        systemPrompt: resolveQuizFigureSystemPrompt(
+          structuredInput.systemPrompt,
+          input.systemPrompt,
+        ),
         userPrompt: input.userPrompt ?? structuredInput.userPrompt,
       },
       generatedQuizSolutionExtensionSchema,
     );
-    await this.prisma.quizFigureRevision.update({
-      where: { id: input.figure.pendingRevision!.id },
-      data: { derivedFromQuestionRevisionId: baseRevision.id },
-    });
     return applyQuizSolutionExtension(
       baseRevision.latexSource,
       output.data.extensionLatex,
@@ -505,30 +614,18 @@ export class QuizFigureRenderingProcessor {
 }
 
 function readPlan(value: unknown): QuizFigurePlan {
-  const plan = readRecord(value);
-  if (
-    plan.version !== 1 ||
-    (plan.role !== "QUESTION" && plan.role !== "SOLUTION") ||
-    typeof plan.problem !== "string"
-  ) {
+  const parsed = quizFigurePlanSchema.safeParse(omitLegacyAiCaption(value));
+  if (!parsed.success) {
     throw new UnrecoverableError("QUIZ_FIGURE_PLAN_INVALID");
   }
-  return {
-    version: 1,
-    role: plan.role,
-    problem: plan.problem,
-    solution: typeof plan.solution === "string" ? plan.solution : undefined,
-    mode: plan.mode === "EXTEND_QUESTION" ? plan.mode : undefined,
-    addedObjects: readStringArray(plan.addedObjects),
-    clarifiedRelations: readStringArray(plan.clarifiedRelations),
-    caption: typeof plan.caption === "string" ? plan.caption : null,
-  };
+  return parsed.data;
 }
 
-function readStringArray(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : undefined;
+function omitLegacyAiCaption(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(([key]) => key !== "caption"),
+  );
 }
 
 function readSubject(value: {
@@ -567,6 +664,10 @@ function readOptionalString(value: unknown) {
 
 function readQuizFigureAiMode(value: unknown): "REGENERATE" | "EDIT_CURRENT" {
   return value === "EDIT_CURRENT" ? "EDIT_CURRENT" : "REGENERATE";
+}
+
+function readQuizFigureOperation(value: unknown): "GENERATE" | "REFINE_CURRENT" {
+  return value === "REFINE_CURRENT" ? "REFINE_CURRENT" : "GENERATE";
 }
 
 function firstErrorCode(message: string) {

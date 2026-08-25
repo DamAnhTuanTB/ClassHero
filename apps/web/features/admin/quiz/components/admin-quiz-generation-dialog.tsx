@@ -64,6 +64,7 @@ const DEFAULT_QUIZ_DIFFICULTY_COUNTS = {
 export function AdminQuizGenerationDialog({
   documents,
   initialGenerationConfiguration,
+  initialFigureModelConfiguration,
   initialModelConfiguration,
   isOpen,
   isSubmitting,
@@ -75,6 +76,7 @@ export function AdminQuizGenerationDialog({
 }: {
   documents: AdminAiPanelDocument[];
   initialGenerationConfiguration?: Record<string, unknown> | null;
+  initialFigureModelConfiguration: AdminAiModelConfiguration;
   initialModelConfiguration: AdminAiModelConfiguration;
   isOpen: boolean;
   isSubmitting: boolean;
@@ -103,12 +105,14 @@ export function AdminQuizGenerationDialog({
         documents,
         initialGenerationConfiguration,
         initialModelConfiguration,
+        initialFigureModelConfiguration,
         quizSets,
         quizTargetSetId,
       ),
     [
       documents,
       initialGenerationConfiguration,
+      initialFigureModelConfiguration,
       initialModelConfiguration,
       quizSets,
       quizTargetSetId,
@@ -214,6 +218,14 @@ export function AdminQuizGenerationDialog({
     (option) => option.model === selectedModel,
   );
   const capability = selectedModelInfo?.capabilities?.aiConfiguration;
+  const selectedFigureModel = form.watch("figureModel");
+  const selectedFigureModelInfo = initialFigureModelConfiguration.modelOptions.find(
+    (option) => option.model === selectedFigureModel,
+  );
+  const figureCapability = selectedFigureModelInfo?.capabilities?.aiConfiguration;
+  const figureReasoningOptions = buildReasoningOptions(
+    selectedFigureModelInfo?.capabilities?.reasoningEffortLevels,
+  );
   const reasoningOptions = [
     { value: "", label: "Mặc định của model" },
     ...(selectedModelInfo?.capabilities?.reasoningEffortLevels ?? [])
@@ -332,6 +344,8 @@ export function AdminQuizGenerationDialog({
   const hardCountField = form.register("hardCount");
   const temperatureField = form.register("temperature");
   const maxOutputTokensField = form.register("maxOutputTokens");
+  const figureTemperatureField = form.register("figureTemperature");
+  const figureMaxOutputTokensField = form.register("figureMaxOutputTokens");
   const revalidateDifficultyCounts = () =>
     form.trigger(["questionCount", "easyCount", "mediumCount", "hardCount"]);
 
@@ -536,121 +550,205 @@ export function AdminQuizGenerationDialog({
             {...form.register("extraInstructions")}
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <OptionField
-              id="ai-quiz-model"
-              label="Model"
-              value={selectedModel}
-              options={[
-                ...(modelConfiguration.isDefaultConfigured
-                  ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
-                  : []),
-                ...modelConfiguration.modelOptions.map((option) => ({
-                  value: option.model,
-                  label: `${formatProviderLabel(option.provider)} · ${option.model}${
-                    option.available ? "" : " · Chưa khả dụng"
-                  }`,
-                  disabled: !option.available,
-                })),
-              ]}
-              icon={null}
-              error={form.formState.errors.model}
-              onChange={(value) => {
-                form.setValue("model", value, {
-                  shouldDirty: true,
-                  shouldTouch: true,
-                  shouldValidate: true,
-                });
-                if (value || modelConfiguration.isDefaultConfigured) {
-                  form.clearErrors("model");
-                } else {
-                  form.setError("model", { message: "Vui lòng chọn model" });
-                }
-                const nextModel = modelConfiguration.modelOptions.find(
-                  (option) => option.model === value,
-                );
-                const nextCapability = nextModel?.capabilities?.aiConfiguration;
-                const allowedReasoningEffortLevels =
-                  nextModel?.capabilities?.reasoningEffortLevels?.filter(
-                    isAiReasoningEffort,
-                  ) ?? [];
-                const currentReasoningEffort = form.getValues("reasoningEffort");
-                if (
-                  currentReasoningEffort &&
-                  (value === "" ||
-                    nextCapability !== "REASONING_EFFORT" ||
-                    !allowedReasoningEffortLevels.includes(currentReasoningEffort))
-                ) {
-                  form.setValue("reasoningEffort", "", {
+          <section className="space-y-4 rounded-xl border border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] p-4">
+            <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+              Phase 1 · Model tạo nội dung Quiz
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <OptionField
+                id="ai-quiz-model"
+                label="Model"
+                value={selectedModel}
+                options={[
+                  ...(modelConfiguration.isDefaultConfigured
+                    ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
+                    : []),
+                  ...modelConfiguration.modelOptions.map((option) => ({
+                    value: option.model,
+                    label: `${formatProviderLabel(option.provider)} · ${option.model}${
+                      option.available ? "" : " · Chưa khả dụng"
+                    }`,
+                    disabled: !option.available,
+                  })),
+                ]}
+                icon={null}
+                error={form.formState.errors.model}
+                onChange={(value) => {
+                  form.setValue("model", value, {
                     shouldDirty: true,
                     shouldTouch: true,
                     shouldValidate: true,
                   });
-                }
-                if (
-                  form.getValues("temperature") &&
-                  (value === "" || nextCapability !== "TEMPERATURE")
-                ) {
-                  form.setValue("temperature", "", {
+                  if (value || modelConfiguration.isDefaultConfigured) {
+                    form.clearErrors("model");
+                  } else {
+                    form.setError("model", { message: "Vui lòng chọn model" });
+                  }
+                  const nextModel = modelConfiguration.modelOptions.find(
+                    (option) => option.model === value,
+                  );
+                  const nextCapability = nextModel?.capabilities?.aiConfiguration;
+                  const allowedReasoningEffortLevels =
+                    nextModel?.capabilities?.reasoningEffortLevels?.filter(
+                      isAiReasoningEffort,
+                    ) ?? [];
+                  const currentReasoningEffort = form.getValues("reasoningEffort");
+                  if (
+                    currentReasoningEffort &&
+                    (value === "" ||
+                      nextCapability !== "REASONING_EFFORT" ||
+                      !allowedReasoningEffortLevels.includes(currentReasoningEffort))
+                  ) {
+                    form.setValue("reasoningEffort", "", {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    });
+                  }
+                  if (
+                    form.getValues("temperature") &&
+                    (value === "" || nextCapability !== "TEMPERATURE")
+                  ) {
+                    form.setValue("temperature", "", {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    });
+                  }
+                }}
+              />
+              {selectedModel === "" ? (
+                <div className="hidden sm:block" aria-hidden="true" />
+              ) : (
+                <>
+                  {supportsReasoningEffort(selectedModel, capability) ? (
+                    <OptionField
+                      id="ai-quiz-reasoning-effort"
+                      label="Reasoning Effort"
+                      value={form.watch("reasoningEffort")}
+                      options={reasoningOptions}
+                      icon={null}
+                      error={form.formState.errors.reasoningEffort}
+                      onChange={(value) => {
+                        if (value !== "" && !isAiReasoningEffort(value)) return;
+                        form.setValue("reasoningEffort", value, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        });
+                      }}
+                    />
+                  ) : null}
+                  {supportsTemperature(selectedModel, capability) ? (
+                    <TextField
+                      id="ai-quiz-temperature"
+                      label="Temperature"
+                      inputMode="decimal"
+                      icon={null}
+                      error={form.formState.errors.temperature}
+                      {...temperatureField}
+                      onChange={decimalChange(temperatureField.onChange)}
+                    />
+                  ) : null}
+                  {!supportsReasoningEffort(selectedModel, capability) &&
+                  !supportsTemperature(selectedModel, capability) ? (
+                    <div className="hidden sm:block" aria-hidden="true" />
+                  ) : null}
+                </>
+              )}
+            </div>
+            {selectedModel !== "" ? (
+              <TextField
+                id="ai-quiz-max-output-tokens"
+                label="Giới hạn token đầu ra"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                icon={null}
+                error={form.formState.errors.maxOutputTokens}
+                {...maxOutputTokensField}
+                onChange={numericChange(maxOutputTokensField.onChange)}
+              />
+            ) : null}
+          </section>
+
+          <section className="space-y-4 rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4">
+            <div>
+              <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                Phase 2 · Model tạo hình Quiz
+              </h3>
+              <p className="mt-1 text-xs font-semibold text-[var(--theme-text-muted)]">
+                Cấu hình này chỉ được dùng khi câu Quiz cần sinh hình minh họa.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <OptionField
+                id="ai-quiz-figure-model"
+                label="Model tạo hình"
+                value={selectedFigureModel}
+                options={[
+                  ...(initialFigureModelConfiguration.isDefaultConfigured
+                    ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
+                    : []),
+                  ...initialFigureModelConfiguration.modelOptions.map((option) => ({
+                    value: option.model,
+                    label: `${formatProviderLabel(option.provider)} · ${option.model}${
+                      option.available ? "" : " · Chưa khả dụng"
+                    }`,
+                    disabled: !option.available,
+                  })),
+                ]}
+                icon={null}
+                error={form.formState.errors.figureModel}
+                onChange={(value) =>
+                  form.setValue("figureModel", value, {
                     shouldDirty: true,
-                    shouldTouch: true,
                     shouldValidate: true,
-                  });
+                  })
                 }
-              }}
-            />
-            {selectedModel === "" ? (
-              <div className="hidden sm:block" aria-hidden="true" />
-            ) : (
-              <>
-                {supportsReasoningEffort(selectedModel, capability) ? (
-                  <OptionField
-                    id="ai-quiz-reasoning-effort"
-                    label="Reasoning Effort"
-                    value={form.watch("reasoningEffort")}
-                    options={reasoningOptions}
-                    icon={null}
-                    error={form.formState.errors.reasoningEffort}
-                    onChange={(value) => {
-                      if (value !== "" && !isAiReasoningEffort(value)) return;
-                      form.setValue("reasoningEffort", value, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      });
-                    }}
-                  />
-                ) : null}
-                {supportsTemperature(selectedModel, capability) ? (
-                  <TextField
-                    id="ai-quiz-temperature"
-                    label="Temperature"
-                    inputMode="decimal"
-                    icon={null}
-                    error={form.formState.errors.temperature}
-                    {...temperatureField}
-                    onChange={decimalChange(temperatureField.onChange)}
-                  />
-                ) : null}
-                {!supportsReasoningEffort(selectedModel, capability) &&
-                !supportsTemperature(selectedModel, capability) ? (
-                  <div className="hidden sm:block" aria-hidden="true" />
-                ) : null}
-              </>
-            )}
-          </div>
-          {selectedModel !== "" ? (
-            <TextField
-              id="ai-quiz-max-output-tokens"
-              label="Giới hạn token đầu ra"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              icon={null}
-              error={form.formState.errors.maxOutputTokens}
-              {...maxOutputTokensField}
-              onChange={numericChange(maxOutputTokensField.onChange)}
-            />
-          ) : null}
+              />
+              {selectedFigureModel &&
+              supportsReasoningEffort(selectedFigureModel, figureCapability) ? (
+                <OptionField
+                  id="ai-quiz-figure-reasoning-effort"
+                  label="Reasoning Effort"
+                  value={form.watch("figureReasoningEffort")}
+                  options={figureReasoningOptions}
+                  icon={null}
+                  error={form.formState.errors.figureReasoningEffort}
+                  onChange={(value) => {
+                    if (value !== "" && !isAiReasoningEffort(value)) return;
+                    form.setValue("figureReasoningEffort", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
+                />
+              ) : selectedFigureModel &&
+                supportsTemperature(selectedFigureModel, figureCapability) ? (
+                <TextField
+                  id="ai-quiz-figure-temperature"
+                  label="Temperature"
+                  inputMode="decimal"
+                  icon={null}
+                  error={form.formState.errors.figureTemperature}
+                  {...figureTemperatureField}
+                  onChange={decimalChange(figureTemperatureField.onChange)}
+                />
+              ) : null}
+            </div>
+            {selectedFigureModel ? (
+              <TextField
+                id="ai-quiz-figure-max-output-tokens"
+                label="Giới hạn token đầu ra tạo hình"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                icon={null}
+                error={form.formState.errors.figureMaxOutputTokens}
+                {...figureMaxOutputTokensField}
+                onChange={numericChange(figureMaxOutputTokensField.onChange)}
+              />
+            ) : null}
+          </section>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-[var(--theme-text-muted)]">
@@ -765,6 +863,7 @@ function getInitialValues(
   documents: AdminAiPanelDocument[],
   initial?: Record<string, unknown> | null,
   initialModelConfiguration?: AdminAiModelConfiguration,
+  initialFigureModelConfiguration?: AdminAiModelConfiguration,
   quizSets: AdminQuizSet[] = [],
   quizTargetSetId?: string,
 ): AdminQuizGenerationFormValues {
@@ -772,12 +871,8 @@ function getInitialValues(
     documents.filter((document) => document.canUseForQuiz).map((document) => document.id),
   );
   const hasRestoredQuestionCount =
-    typeof initial?.questionCount === "number" &&
-    Number.isFinite(initial.questionCount);
-  const questionCount = readNumber(
-    initial?.questionCount,
-    DEFAULT_QUIZ_QUESTION_COUNT,
-  );
+    typeof initial?.questionCount === "number" && Number.isFinite(initial.questionCount);
+  const questionCount = readNumber(initial?.questionCount, DEFAULT_QUIZ_QUESTION_COUNT);
   const balanced = hasRestoredQuestionCount
     ? getBalancedDifficultyCounts(questionCount)
     : DEFAULT_QUIZ_DIFFICULTY_COUNTS;
@@ -799,6 +894,18 @@ function getInitialValues(
     ? initial.reasoningEffort
     : "";
   const restoredTargetSetId = readString(initial?.targetQuizSetId, "");
+  const configuredFigureModel =
+    initialFigureModelConfiguration?.isDefaultConfigured &&
+    initialFigureModelConfiguration.resolvedModel
+      ? initialFigureModelConfiguration.resolvedModel
+      : "";
+  const restoredFigureModel = readString(initial?.figureModel, "");
+  const figureModel = restoredFigureModel || configuredFigureModel;
+  const usesConfiguredFigureDefaults =
+    restoredFigureModel === "" && configuredFigureModel !== "";
+  const figureModelCapability = initialFigureModelConfiguration?.modelOptions.find(
+    (option) => option.model === figureModel,
+  )?.capabilities?.aiConfiguration;
   const targetQuizSetId =
     (quizTargetSetId &&
     (quizSets.length === 0 || quizSets.some((set) => set.id === quizTargetSetId))
@@ -859,6 +966,27 @@ function getInitialValues(
       (usesConfiguredDefaults
         ? readNumericText(initialModelConfiguration?.maxOutputTokens)
         : ""),
+    figureModel,
+    figureTemperature:
+      readNumericText(initial?.figureTemperature) ||
+      (usesConfiguredFigureDefaults &&
+      supportsTemperature(figureModel, figureModelCapability)
+        ? readNumericText(initialFigureModelConfiguration?.temperature)
+        : ""),
+    figureReasoningEffort:
+      (isAiReasoningEffort(initial?.figureReasoningEffort)
+        ? initial.figureReasoningEffort
+        : "") ||
+      (usesConfiguredFigureDefaults &&
+      supportsReasoningEffort(figureModel, figureModelCapability) &&
+      isAiReasoningEffort(initialFigureModelConfiguration?.reasoningEffort)
+        ? initialFigureModelConfiguration.reasoningEffort
+        : ""),
+    figureMaxOutputTokens:
+      readNumericText(initial?.figureMaxOutputTokens) ||
+      (usesConfiguredFigureDefaults
+        ? readNumericText(initialFigureModelConfiguration?.maxOutputTokens)
+        : ""),
   };
 }
 
@@ -907,7 +1035,35 @@ function toPayload(
     ...(values.maxOutputTokens
       ? { maxOutputTokens: Number(values.maxOutputTokens) }
       : {}),
+    ...(values.figureModel ? { figureModel: values.figureModel } : {}),
+    ...(values.figureModel && values.figureTemperature
+      ? { figureTemperature: Number(values.figureTemperature) }
+      : {}),
+    ...(values.figureModel && values.figureReasoningEffort
+      ? { figureReasoningEffort: values.figureReasoningEffort }
+      : {}),
+    ...(values.figureMaxOutputTokens
+      ? { figureMaxOutputTokens: Number(values.figureMaxOutputTokens) }
+      : {}),
   };
+}
+
+function buildReasoningOptions(levels: string[] | undefined) {
+  const labels: Record<string, string> = {
+    minimal: "Tối thiểu (Minimal)",
+    low: "Thấp (Low)",
+    medium: "Trung bình (Medium)",
+    high: "Cao (High)",
+    none: "Không (None)",
+    xhigh: "Rất cao (Extra High)",
+    max: "Tối đa (Max)",
+  };
+  return [
+    { value: "", label: "Mặc định của model" },
+    ...(levels ?? [])
+      .filter(isAiReasoningEffort)
+      .map((level) => ({ value: level, label: labels[level] ?? level })),
+  ];
 }
 
 function applyResolvedDefaultConfiguration(

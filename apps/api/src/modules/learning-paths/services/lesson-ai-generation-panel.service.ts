@@ -1,5 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { AiGenerationType, AiProviderName, DocumentStatus, Prisma } from "@prisma/client";
+import {
+  AiGenerationType,
+  AiModelPurpose,
+  AiProviderName,
+  DocumentStatus,
+  Prisma,
+} from "@prisma/client";
 
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { AiService } from "#api/modules/ai/services/ai.service";
@@ -60,7 +66,15 @@ export class LessonAiGenerationPanelService {
   ) {}
 
   async getForAdmin(lessonId: string) {
-    const [lesson, summaryRoute, quizRoute, activeModels, ...generations] =
+    const [
+      lesson,
+      summaryRoute,
+      summaryFigureRoute,
+      quizRoute,
+      quizFigureRoute,
+      activeModels,
+      ...generations
+    ] =
       await Promise.all([
       this.prisma.lesson.findFirst({
         where: {
@@ -107,8 +121,10 @@ export class LessonAiGenerationPanelService {
           },
         },
       }),
-      this.modelRouting.resolve(AiGenerationType.SUMMARY),
-      this.modelRouting.resolve(AiGenerationType.QUIZ),
+      this.modelRouting.resolve(AiGenerationType.SUMMARY, AiModelPurpose.TEXT),
+      this.modelRouting.resolve(AiGenerationType.SUMMARY, AiModelPurpose.IMAGE),
+      this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.TEXT),
+      this.modelRouting.resolve(AiGenerationType.QUIZ, AiModelPurpose.IMAGE),
       this.modelRouting.getAllActiveModels(),
       ...PANEL_GENERATION_TYPES.map((type) =>
         this.prisma.aiGeneration.findFirst({
@@ -203,6 +219,14 @@ export class LessonAiGenerationPanelService {
       quizCandidates[0] ??
       null;
     const quizModelOptions = activeModels.filter(supportsHighDetailPdfInput);
+    const resolvedSummaryFigureCandidate =
+      summaryFigureRoute.candidates.find((candidate) => candidate.available) ??
+      summaryFigureRoute.candidates[0] ??
+      null;
+    const resolvedQuizFigureCandidate =
+      quizFigureRoute.candidates.find((candidate) => candidate.available) ??
+      quizFigureRoute.candidates[0] ??
+      null;
 
     return {
       lesson: {
@@ -248,6 +272,20 @@ export class LessonAiGenerationPanelService {
           capabilities: candidate.capabilitiesJson,
         })),
       },
+      summaryFigureConfiguration: {
+        isDefaultConfigured: summaryFigureRoute.hasConfiguration,
+        resolvedProvider: resolvedSummaryFigureCandidate?.provider ?? null,
+        resolvedModel: resolvedSummaryFigureCandidate?.model ?? null,
+        temperature: summaryFigureRoute.temperature,
+        reasoningEffort: summaryFigureRoute.reasoningEffort,
+        maxOutputTokens: summaryFigureRoute.maxOutputTokens,
+        modelOptions: activeModels.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
       quizConfiguration: {
         isDefaultConfigured: quizRoute.hasConfiguration,
         resolvedProvider: resolvedQuizCandidate?.provider ?? null,
@@ -256,6 +294,20 @@ export class LessonAiGenerationPanelService {
         reasoningEffort: quizRoute.reasoningEffort,
         maxOutputTokens: quizRoute.maxOutputTokens,
         modelOptions: quizModelOptions.map((candidate) => ({
+          provider: candidate.provider,
+          model: candidate.model,
+          available: candidate.available,
+          capabilities: candidate.capabilitiesJson,
+        })),
+      },
+      quizFigureConfiguration: {
+        isDefaultConfigured: quizFigureRoute.hasConfiguration,
+        resolvedProvider: resolvedQuizFigureCandidate?.provider ?? null,
+        resolvedModel: resolvedQuizFigureCandidate?.model ?? null,
+        temperature: quizFigureRoute.temperature,
+        reasoningEffort: quizFigureRoute.reasoningEffort,
+        maxOutputTokens: quizFigureRoute.maxOutputTokens,
+        modelOptions: activeModels.map((candidate) => ({
           provider: candidate.provider,
           model: candidate.model,
           available: candidate.available,

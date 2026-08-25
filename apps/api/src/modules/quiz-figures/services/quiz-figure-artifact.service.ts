@@ -21,6 +21,10 @@ export class QuizFigureArtifactService {
     @Inject(ConfigService) private readonly config: ConfigService<EnvConfig, true>,
   ) {}
 
+  async readDeliveryObject(objectKey: string) {
+    return this.storage.downloadObject(objectKey);
+  }
+
   async promoteSvg(input: {
     figureId: string;
     revisionId: string;

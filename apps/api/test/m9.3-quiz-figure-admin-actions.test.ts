@@ -85,6 +85,12 @@ describe("M9.3 Quiz figure admin actions", () => {
         findFirst: vi.fn().mockResolvedValue({
           id: figureId,
           role: "QUESTION",
+          planJson: {
+            version: 1,
+            role: "QUESTION",
+            problem: "Cho tam giác ABC.",
+            caption: "Tam giác ABC",
+          },
           currentRevisionId,
           currentRevision: {
             altText: "Hình đề",
@@ -147,6 +153,169 @@ describe("M9.3 Quiz figure admin actions", () => {
     );
   });
 
+  it("reserves the full-source output budget for a redrawn solution model", async () => {
+    const prisma = {
+      quizFigure: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce({
+            id: figureId,
+            role: "SOLUTION",
+            planJson: {
+              version: 1,
+              role: "SOLUTION",
+              mode: "REDRAW_AS_MODEL",
+              problem: "Mảnh đất ABCDEF có các kích thước đã cho.",
+              solution: "Kẻ CE vuông góc DE để chia mảnh đất thành hai hình chữ nhật.",
+              modelingGoal: "Vẽ lại mảnh đất thành hai miền chữ nhật.",
+              modeledObjects: ["Đa giác ABCDEF", "Đoạn CE"],
+              clarifiedRelations: ["CE vuông góc DE"],
+              caption: "Mô hình toán học của mảnh đất",
+            },
+            currentRevisionId,
+            currentRevision: {
+              altText: "Mô hình lời giải",
+              caption: "Mô hình toán học của mảnh đất",
+            },
+          })
+          .mockResolvedValueOnce({ id: "question-figure-id" }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      quizFigureRevision: {
+        findFirst: vi.fn().mockResolvedValue({ sourceVersion: 1 }),
+        create: vi.fn().mockResolvedValue({ id: draftRevisionId }),
+      },
+    };
+    const jobs = {
+      enqueue: vi.fn().mockResolvedValue({ id: "job-redraw", status: "QUEUED" }),
+    };
+    const route = {
+      feature: "QUIZ",
+      version: 1,
+      model: "gpt-test",
+      temperature: null,
+      reasoningEffort: "medium",
+      maxInputTokens: 20_000,
+      maxOutputTokens: 8_000,
+      candidates: [
+        {
+          provider: "OPENAI",
+          model: "gpt-test",
+          available: true,
+          capabilitiesJson: { aiConfiguration: "REASONING_EFFORT" },
+        },
+      ],
+      hasConfiguration: true,
+    };
+    const modelRouting = { resolve: vi.fn().mockResolvedValue(route) };
+    const service = new QuizFiguresService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      jobs as never,
+      {} as never,
+      modelRouting as never,
+    );
+
+    await service.createNewAi(questionId, figureId, actorUserId, {
+      baseRevisionId: currentRevisionId,
+      mode: "REGENERATE",
+    });
+
+    expect(jobs.enqueue).toHaveBeenCalledWith(
+      figureId,
+      actorUserId,
+      expect.objectContaining({ maxOutputTokens: 12_000 }),
+      expect.objectContaining({ aiMode: "REGENERATE" }),
+    );
+  });
+
+  it("queues AI refinement only for a successful TikZ revision", async () => {
+    const prisma = {
+      quizFigure: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: figureId,
+          role: "QUESTION",
+          status: "SUCCEEDED",
+          planJson: {
+            version: 1,
+            role: "QUESTION",
+            problem: "Cho tam giác ABC vuông tại A.",
+          },
+          currentRevisionId,
+          currentRevision: {
+            status: "SUCCEEDED",
+            sourceKind: "AI_TEX",
+            latexSource,
+            deliveryFileId: "77777777-7777-4777-8777-777777777777",
+            deliveryFile: { mimeType: "image/svg+xml" },
+            derivedFromQuestionRevisionId: null,
+            altText: "Hình đề",
+            caption: null,
+          },
+        }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      quizFigureRevision: {
+        findFirst: vi.fn().mockResolvedValue({ sourceVersion: 2 }),
+        create: vi.fn().mockResolvedValue({ id: draftRevisionId }),
+      },
+    };
+    const route = {
+      feature: "QUIZ",
+      purpose: "IMAGE",
+      version: 1,
+      model: "gpt-test",
+      temperature: null,
+      reasoningEffort: "medium",
+      maxInputTokens: 20_000,
+      maxOutputTokens: 12_000,
+      candidates: [
+        {
+          provider: "OPENAI",
+          model: "gpt-test",
+          available: true,
+          capabilitiesJson: { aiConfiguration: "REASONING_EFFORT" },
+        },
+      ],
+      hasConfiguration: true,
+    };
+    const jobs = {
+      enqueue: vi.fn().mockResolvedValue({ id: "job-refine", status: "QUEUED" }),
+    };
+    const modelRouting = { resolve: vi.fn().mockResolvedValue(route) };
+    const service = new QuizFiguresService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      jobs as never,
+      {} as never,
+      modelRouting as never,
+    );
+
+    await expect(
+      service.refineWithAi(questionId, figureId, actorUserId, {
+        baseRevisionId: currentRevisionId,
+      }),
+    ).resolves.toEqual({ jobId: "job-refine", status: "QUEUED" });
+
+    expect(modelRouting.resolve).toHaveBeenCalledWith("QUIZ", "IMAGE");
+    expect(prisma.quizFigureRevision.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        origin: "AI_REFINEMENT",
+        sourceKind: "AI_TEX",
+        status: "QUEUED",
+      }),
+      select: { id: true },
+    });
+    expect(jobs.enqueue).toHaveBeenCalledWith(
+      figureId,
+      actorUserId,
+      expect.objectContaining({ model: "gpt-test" }),
+      { aiMode: "EDIT_CURRENT", operation: "REFINE_CURRENT" },
+    );
+  });
+
   it("soft-deletes a question figure together with its dependent solution", async () => {
     const tx = {
       quizFigure: {
@@ -183,5 +352,44 @@ describe("M9.3 Quiz figure admin actions", () => {
     expect(tx.quizQuestion.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { solutionFigureMode: "NONE" } }),
     );
+  });
+
+  it("sets the mode to NONE when deleting only the solution figure", async () => {
+    const tx = {
+      quizFigure: {
+        update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn(),
+      },
+      quizQuestion: { update: vi.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      quizFigure: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: figureId,
+          role: "SOLUTION",
+          currentRevisionId,
+          currentRevision: null,
+        }),
+      },
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    const service = new QuizFiguresService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await service.deleteFigure(questionId, figureId, {
+      baseRevisionId: currentRevisionId,
+    });
+
+    expect(tx.quizFigure.updateMany).not.toHaveBeenCalled();
+    expect(tx.quizQuestion.update).toHaveBeenCalledWith({
+      where: { id: questionId },
+      data: { solutionFigureMode: "NONE" },
+    });
   });
 });

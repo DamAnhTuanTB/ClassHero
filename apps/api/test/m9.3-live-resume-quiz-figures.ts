@@ -6,7 +6,7 @@ import { QuizFigureRole, QuizFigureStatus, UserRole } from "@prisma/client";
 import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
-import { QUIZ_PROMPT_VERSION } from "#api/modules/quiz/types/quiz-generation.types";
+import { QUIZ_PROMPT_VERSIONS } from "#api/modules/quiz/types/quiz-generation.types";
 
 const lessonIds = [
   "b700e523-0e2e-4168-8b6a-9a32a91123ac",
@@ -35,7 +35,7 @@ async function main() {
           where: {
             lessonId,
             status: "SUCCEEDED",
-            promptVersion: QUIZ_PROMPT_VERSION,
+            promptVersion: QUIZ_PROMPT_VERSIONS.MATH,
           },
           orderBy: { createdAt: "desc" },
           select: { id: true, lessonId: true },

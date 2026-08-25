@@ -32,17 +32,31 @@ export const usageStatusLabels: Record<UsageEvent["status"], string> = {
   FAILED: "Không thành công",
 };
 
+const usagePurposeLabelsByResourceType: Record<string, string> = {
+  QUIZ_FIGURE: "Tạo hình minh họa Quiz",
+  STEM_FIGURE: "Tạo hình minh họa",
+};
+
 export function formatCacheStatus(value: string | null) {
   if (!value) return null;
   return value.toUpperCase() === "HIT" ? "Đã dùng kết quả có sẵn" : "Xử lý mới";
 }
 
 export function formatUsagePurpose(event: UsageEvent) {
-  if (event.backgroundJob?.resourceType === "STEM_FIGURE") {
-    return "Tạo hình minh họa";
+  const resourceType = event.backgroundJob?.resourceType;
+  if (resourceType && usagePurposeLabelsByResourceType[resourceType]) {
+    return usagePurposeLabelsByResourceType[resourceType];
   }
   if (event.feature) {
-    return aiFeatureLabels[event.feature];
+    const phaseLabel =
+      event.purpose === "IMAGE"
+        ? "Phase 2 · Tạo hình"
+        : event.purpose === "TEXT"
+          ? "Phase 1 · Tạo nội dung"
+          : null;
+    return phaseLabel
+      ? `${aiFeatureLabels[event.feature]} · ${phaseLabel}`
+      : aiFeatureLabels[event.feature];
   }
   return event.category === "OCR_SERVICE" ? "Xử lý tài liệu" : "Gọi mô hình AI";
 }

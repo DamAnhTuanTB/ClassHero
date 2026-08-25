@@ -28,6 +28,7 @@ export class QuizFigureJobService {
     createOptions?: {
       adminInstructions?: string | null;
       aiMode?: "REGENERATE" | "EDIT_CURRENT";
+      operation?: "GENERATE" | "REFINE_CURRENT";
       systemPrompt?: string | null;
       userPrompt?: string | null;
     },
@@ -77,6 +78,7 @@ export class QuizFigureJobService {
             routeSnapshot: routeSnapshot ?? null,
             adminInstructions: createOptions?.adminInstructions ?? null,
             aiMode: createOptions?.aiMode ?? "REGENERATE",
+            operation: createOptions?.operation ?? "GENERATE",
             systemPrompt: createOptions?.systemPrompt ?? null,
             userPrompt: createOptions?.userPrompt ?? null,
           }),

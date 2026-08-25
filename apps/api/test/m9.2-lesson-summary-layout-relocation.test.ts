@@ -122,7 +122,7 @@ describe("M9.2 lesson Summary layout relocation", () => {
             status: StemFigureRevisionStatus.SUCCEEDED,
             deliveryFileId: "00000000-0000-4000-8000-000000000107",
             altText: activePlan.altText,
-            caption: activePlan.caption,
+            caption: null,
           },
           pendingRevision: null,
         },
@@ -234,7 +234,6 @@ function createProviderOutput() {
                 {
                   figureOrigin: "GENERATED_FROM_BRIEF",
                   sourceReferences: [],
-                  caption: "Hình minh họa vectơ chỉ phương",
                 },
               ],
             },

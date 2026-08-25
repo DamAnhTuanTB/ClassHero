@@ -1,5 +1,6 @@
 export type ProviderCategory = "AI_MODEL" | "OCR_SERVICE";
 export type AiFeature = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
+export type AiModelPurpose = "TEXT" | "IMAGE";
 export type UsageGranularity = "DAY" | "WEEK" | "MONTH";
 
 export type PriceRate = {
@@ -49,6 +50,7 @@ export type AiModelOption = {
 
 export type AiFeatureConfiguration = {
   feature: AiFeature;
+  purpose: AiModelPurpose;
   primaryCatalogItemId: string | null;
   fallbackCatalogItemId: string | null;
   temperature: number | null;
@@ -154,6 +156,7 @@ export type UsageEvent = {
   category: ProviderCategory;
   provider: string;
   feature: AiFeature | null;
+  purpose: AiModelPurpose | null;
   status: "RUNNING" | "SUCCEEDED" | "FAILED";
   cacheStatus: string | null;
   totalTokens: number;

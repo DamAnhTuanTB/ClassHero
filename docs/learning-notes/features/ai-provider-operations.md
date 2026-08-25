@@ -8,7 +8,7 @@ Admin có một nơi để chọn model cho từng chức năng, biết OCR có 
 
 ```mermaid
 flowchart TD
-  A[Admin lưu model chính và fallback] --> B[API kiểm version, capability, credential status]
+  A[Admin lưu model chính và fallback theo feature + phase] --> B[API kiểm version, capability, credential status]
   B --> C[DB lưu config mới và audit]
   D[API enqueue AI job] --> E[Chụp route và price snapshot]
   E --> F[Worker gọi model chính]
@@ -27,6 +27,10 @@ flowchart TD
 - UI `/admin/ai-settings` dùng TanStack Query gọi `admin/provider-operations`.
 - Controller chỉ cho role ADMIN. Service validate optimistic `expectedVersion`, ghi audit và aggregate usage.
 - `AiGenerationJobService` chụp route snapshot lúc enqueue. `AiProviderCallService` gọi provider, fallback có kiểm soát và ghi usage event.
+- Mỗi tính năng có route `TEXT` và `IMAGE` độc lập. Job Summary/Quiz giữ route
+  text ở `providerRouteSnapshot` để tương thích dữ liệu cũ và route hình ở
+  `imageRouteSnapshot`; figure worker ưu tiên route hình rồi mới fallback snapshot
+  legacy. Usage event lưu `purpose` để chi phí hai phase không bị trộn khi audit.
 - OCR cache hit ghi saving; cache miss lưu `pdfId` ngay. Retry đọc lại ID này để tiếp tục thay vì submit file lần nữa.
 - Mỗi usage event giữ price version và tỷ giá lúc gọi, nên đổi bảng giá mới không làm lịch sử thay đổi.
 - Một lần sinh nội dung có thể tạo nhiều usage event, ví dụ một lượt sinh kiến thức
@@ -68,8 +72,14 @@ flowchart TD
   model. Nếu một đường không biết model dùng `TEMPERATURE` hay `REASONING_EFFORT`,
   nó có thể lén giữ field đang bị ẩn trên UI và tạo snapshot khác payload generate;
   backend phải tiếp tục từ chối mismatch thay vì nới lỏng kiểm tra.
+- Tách route theo phase phải dùng khóa `(feature, purpose)`, không suy purpose từ
+  tên model hoặc loại job. Snapshot phải được chụp lúc preview/enqueue để một lần
+  admin đổi mặc định sau đó không làm worker đang chạy đổi model giữa chừng.
+- Khi thêm metadata route mới vào `inputMeta` của durable job, schema Zod strict ở
+  worker phải nhận đúng key đó trong cùng thay đổi. Snapshot phase mới nên là field
+  tùy chọn để job cũ vẫn chạy bằng route legacy; key lạ khác vẫn phải bị từ chối.
 
 ## Task liên quan
 
-- `M9.9-M9.12`, `M9.19`
+- `M9.9-M9.12`, `M9.19`, `M9.20`
 - `M4.6`

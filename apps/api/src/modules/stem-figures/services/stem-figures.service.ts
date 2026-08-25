@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   AiGenerationType,
+  AiModelPurpose,
   FilePurpose,
   FileStatus,
   FileVisibility,
@@ -191,7 +192,6 @@ export class StemFiguresService {
     const altText =
       previousRevision?.altText ??
       buildLessonSummaryFigureAltText({
-        caption: null,
         block: blockContext.block,
         sectionHeading: blockContext.sectionHeading,
       });
@@ -467,7 +467,10 @@ export class StemFiguresService {
   private async resolveCreateAiRoute(
     dto: CreateNewStemFigureAiDto,
   ): Promise<AiFeatureRoute> {
-    const baseRoute = await this.modelRouting.resolve(AiGenerationType.SUMMARY);
+    const baseRoute = await this.modelRouting.resolve(
+      AiGenerationType.SUMMARY,
+      AiModelPurpose.IMAGE,
+    );
     if (!dto.model && (dto.temperature != null || dto.reasoningEffort != null)) {
       throwBadRequest(
         "AI_MODEL_REQUIRED_FOR_CONFIGURATION",

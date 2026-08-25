@@ -38,6 +38,17 @@ NestJS module/service
 - PrismaClient: client TypeScript dùng để query database.
 - NestJS provider: biến PrismaClient thành service có thể inject trong controller/service khác.
 - Migration: lưu thay đổi database thành file versioned trong repo.
+- Enum hard-cutover phải chuyển mọi row mang giá trị cũ trước khi thay PostgreSQL
+  enum. Nếu Prisma Client mới đọc một row còn giá trị đã xóa khỏi schema, lỗi xảy
+  ra ngay ở truy vấn đọc dù `findMany` không lọc theo enum đó. Migration đổi dữ
+  liệu và thay type nên được bọc transaction để không để database ở trạng thái
+  nửa cũ nửa mới.
+- Khi `prisma migrate status` báo migration đã ghi trong database nhưng file
+  tương ứng không còn trong repo, không chạy `migrate deploy` hoặc `db push` mù
+  quáng. Với local recovery, phải đọc enum/row và `_prisma_migrations` bằng raw
+  query, thực thi đúng migration đã review, kiểm tra dữ liệu rồi mới dùng
+  `migrate resolve --applied`. Đây là đường phục hồi ngoại lệ; luồng chuẩn vẫn là
+  giữ lịch sử migration đồng nhất giữa repo và database.
 - pgvector: extension cần cho embedding và semantic search ở các milestone AI/RAG.
 - Prisma relation: mô tả quan hệ giữa model như `User -> StudentProfile`, `User -> File`, `User -> BackgroundJob`; Prisma dùng phần này để generate client query có type an toàn.
 - Durable job table: `background_jobs` lưu trạng thái job lâu dài để API có thể trả `jobId` và UI xem tiến trình, thay vì chỉ dựa vào trạng thái trong Redis/BullMQ.

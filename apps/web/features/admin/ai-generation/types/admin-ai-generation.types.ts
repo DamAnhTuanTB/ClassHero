@@ -109,7 +109,9 @@ export interface AdminAiGenerationPanelData {
   };
   documents: AdminAiPanelDocument[];
   summaryConfiguration: AdminAiModelConfiguration;
+  summaryFigureConfiguration: AdminAiModelConfiguration;
   quizConfiguration: AdminAiModelConfiguration;
+  quizFigureConfiguration: AdminAiModelConfiguration;
   jobs: Record<AdminAiGenerationType, AdminAiPanelJob | null>;
 }
 
@@ -147,6 +149,10 @@ export type AdminSummaryGenerationPayload = {
   temperature?: number;
   reasoningEffort?: AiReasoningEffort;
   maxOutputTokens?: number;
+  figureModel?: string;
+  figureTemperature?: number;
+  figureReasoningEffort?: AiReasoningEffort;
+  figureMaxOutputTokens?: number;
   requestDraftId?: string;
   requestHash?: string;
 };
@@ -168,6 +174,10 @@ export type AdminQuizGenerationPayload = {
   temperature?: number;
   reasoningEffort?: AiReasoningEffort;
   maxOutputTokens?: number;
+  figureModel?: string;
+  figureTemperature?: number;
+  figureReasoningEffort?: AiReasoningEffort;
+  figureMaxOutputTokens?: number;
   requestDraftId?: string;
   requestHash?: string;
 };

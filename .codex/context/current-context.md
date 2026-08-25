@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-08-21
+Last updated: 2026-08-25
 
 File này là snapshot định hướng nhanh, không phải nhật ký triển khai. Source of
 truth vẫn là `AGENTS.md`, docs domain, milestone/ADR liên quan và code hiện tại.
@@ -14,8 +14,8 @@ phần mở rộng quản trị hình STEM:
   `visualIntent`; không giữ legacy reader, dual schema hoặc fallback.
 - Stage 1 giữ provenance/source target; Stage 2 chỉ nhận projection của đúng
   block sở hữu figure. Backend không còn suy hoặc gửi `pairedTheory`.
-- Phạm vi hình hiện chỉ áp dụng cho Lesson Summary. Quiz, Flashcard, Test,
-  Explanation và Chat vẫn text-only.
+- Phạm vi hình hiện áp dụng cho Lesson Summary và Quiz bằng hai pipeline độc lập.
+  Flashcard, Test, Explanation và Chat vẫn chưa sinh figure.
 - Quiz đã hard-cutover sang core riêng trong domain Quiz: schema/prompt/subject,
   context/job/worker/mapper, form cấu hình và renderer đều không dùng lõi Lesson
   Summary. Runtime chỉ đọc `quizExplanationBlock`, không có fallback dữ liệu cũ.
@@ -35,6 +35,10 @@ Các subtask mới nhất:
 - `M9.19`: giới hạn input/output thuộc từng AI feature trong
   `Cài đặt AI -> Thiết lập mặc định`; catalog/model management không giữ hoặc
   hiển thị token limit. Route snapshot và budget reservation đọc feature config.
+- `M9.20`: mỗi Summary/Quiz/Flashcard/Test có route `TEXT` và `IMAGE` độc lập.
+  Summary/Quiz modal cho override từng phase; immutable draft/job giữ hai
+  snapshot và figure worker ưu tiên route IMAGE. Flashcard/Test mới lưu cấu
+  hình mặc định, chưa sinh hình.
 
 ## 2. Contract cần nhớ
 
@@ -60,6 +64,8 @@ Các subtask mới nhất:
 - `M9.19`: focused route/reservation/API/UI contract tests, migration
   deploy/status, Prisma validate và API/web typecheck/lint pass theo coverage
   matrix hiện tại.
+- `M9.20`: Prisma validate, focused route/summary/quiz tests, scoped lint,
+  API/web typecheck/build và worker boot pass; không gọi provider trả phí.
 - Verification M9.17-M9.19 dùng mock/local artifact, không gọi provider trả phí.
 
 Chi tiết lịch sử live audit, chi phí và screenshot nằm trong `.codex/artifacts/`
@@ -75,7 +81,8 @@ và các plan M9; không lặp lại tại snapshot này.
   `docs/database/provider-operations.md`.
 - Performance/observability: `docs/12-performance-and-observability.md`.
 - Quyết định: `docs/decisions/ADR-0018-remove-visual-intent-hard-cutover.md`,
-  `docs/decisions/ADR-0019-local-stem-figure-raster-cleanup.md`.
+  `docs/decisions/ADR-0019-local-stem-figure-raster-cleanup.md`,
+  `docs/decisions/ADR-0023-phase-specific-ai-model-routing.md`.
 - Plan corrective chính:
   `.codex/plans/m9-2-remove-visual-intent-hard-cutover-plan.md`.
 

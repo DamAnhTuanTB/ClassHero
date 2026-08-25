@@ -1,5 +1,6 @@
 import type {
   AiGenerationType,
+  AiModelPurpose,
   AiProviderName,
   ProviderCatalogCategory,
   ProviderUsageMetric,
@@ -27,6 +28,7 @@ export type ProviderRouteCandidate = {
 
 export type AiFeatureRoute = {
   feature: AiGenerationType;
+  purpose?: AiModelPurpose;
   version: number;
   model: string;
   temperature: number | null;

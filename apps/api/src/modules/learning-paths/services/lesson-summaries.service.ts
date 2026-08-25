@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { isAiReasoningEffort } from "@learning-path/shared";
 import {
   AiGenerationType,
+  AiModelPurpose,
   Prisma,
   ProviderUsageMetric,
   StemFigureRevisionStatus,
@@ -23,20 +24,23 @@ import {
 } from "#api/modules/ai/services/lesson-summary-context.service";
 import {
   LESSON_SUMMARY_MAX_OUTPUT_TOKENS,
-  LESSON_SUMMARY_PROMPT_VERSION,
   LESSON_SUMMARY_SCHEMA_VERSION,
   getLessonSummaryProviderTransportOutputSchema,
   resolveLessonSummaryOutputTokenFloor,
   stemFigureRenderPlanSchema,
   type LessonSummaryJobInput,
 } from "#api/modules/ai/types/lesson-summary.types";
+import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import {
   estimateAiStructuredInputTokens,
   resolveAiStructuredTextFormat,
 } from "#api/modules/ai/utils/ai-structured-output-format";
-import { buildLessonSummaryStructuredInput } from "#api/modules/ai/utils/lesson-summary-prompt";
+import {
+  buildLessonSummaryStructuredInput,
+  resolveLessonSummaryPromptVersion,
+} from "#api/modules/ai/utils/lesson-summary-prompt";
 import {
   applyLessonSummaryPhaseOneBlockEdits,
   prepareLessonSummaryPhaseOneLayoutEdits,
@@ -420,7 +424,7 @@ export class LessonSummariesService {
         const plan = planned ? { ...planned, localId: figure.localPlanId } : currentPlan;
         const metadataRevision = figure.currentRevision ?? figure.pendingRevision;
         const altText = planned?.altText ?? metadataRevision?.altText ?? "Hình minh họa";
-        const caption = planned?.caption ?? metadataRevision?.caption ?? null;
+        const caption = metadataRevision?.caption ?? null;
         const parsedPlan = stemFigureRenderPlanSchema.safeParse(plan);
         if (!parsedPlan.success) {
           throwBadRequest(
@@ -607,8 +611,18 @@ export class LessonSummariesService {
     const route = readJsonRecord(
       readJsonRecord(draft.modelConfigJson).routeSnapshot,
     ) as unknown as AiFeatureRoute;
+    const imageRouteRecord = readJsonRecord(
+      readJsonRecord(draft.modelConfigJson).imageRouteSnapshot,
+    );
+    const imageRouteSnapshot =
+      Object.keys(imageRouteRecord).length > 0
+        ? (imageRouteRecord as unknown as AiFeatureRoute)
+        : route;
 
     const requestId = randomUUID();
+    const subjectKey = lessonSummarySubjectKeySchema.parse(
+      readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
+    );
     const inputMeta = {
       requestDraftId: draft.id,
       requestHash: draft.requestHash,
@@ -617,10 +631,11 @@ export class LessonSummariesService {
       documentIds,
       sourceHash: currentSourceHash,
       targetGrade: readNumber(sourceSnapshot.targetGrade),
-      subjectKey: readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
+      subjectKey,
       subjectName: readRequiredString(sourceSnapshot.subjectName, "subjectName"),
       subjectSlug: readRequiredString(sourceSnapshot.subjectSlug, "subjectSlug"),
       ...configuration,
+      imageRouteSnapshot,
     } as const;
     const job = await this.aiGenerationJobs.createAndEnqueue({
       type: AiGenerationType.SUMMARY,
@@ -628,7 +643,7 @@ export class LessonSummariesService {
       lessonId,
       targetType: "LESSON",
       targetId: lessonId,
-      promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
+      promptVersion: resolveLessonSummaryPromptVersion(subjectKey),
       schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
       inputFingerprint: {
         lessonId,
@@ -677,6 +692,7 @@ export class LessonSummariesService {
       this.resolvePromptCacheConfiguration(),
     );
     const { baseRoute, route } = await this.resolveSummaryRoute(dto);
+    const imageRoute = await this.resolveSummaryImageRoute(dto);
     const request = buildLessonSummaryStructuredInput({
       lessonId,
       lessonTitle: sourceContext.lessonTitle,
@@ -840,6 +856,7 @@ export class LessonSummariesService {
           schemaBytes: structuredTextFormatResolution.schemaBytes,
           pdfDetail: "high",
           routeSnapshot: route,
+          imageRouteSnapshot: imageRoute,
         } as unknown as Prisma.InputJsonValue,
         costEstimateJson: estimatedCost
           ? ({
@@ -860,7 +877,7 @@ export class LessonSummariesService {
       requestDraftId: draft.id,
       requestHash,
       expiresAt,
-      promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
+      promptVersion: request.promptVersion,
       schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
       systemPrompt: request.systemPrompt,
       userPrompt: request.userPrompt,
@@ -1018,7 +1035,10 @@ export class LessonSummariesService {
   }
 
   private async resolveSummaryRoute(dto: GenerateLessonSummaryDto) {
-    const baseRoute = await this.modelRouting.resolve(AiGenerationType.SUMMARY);
+    const baseRoute = await this.modelRouting.resolve(
+      AiGenerationType.SUMMARY,
+      AiModelPurpose.TEXT,
+    );
     let candidates = baseRoute.candidates.filter(supportsHighDetailPdfInput);
     if (!dto.model && candidates.length === 0) {
       throwBadRequest(
@@ -1078,6 +1098,36 @@ export class LessonSummariesService {
       }
     }
     return { baseRoute, route };
+  }
+
+  private async resolveSummaryImageRoute(dto: GenerateLessonSummaryDto) {
+    const baseRoute = await this.modelRouting.resolve(
+      AiGenerationType.SUMMARY,
+      AiModelPurpose.IMAGE,
+    );
+    let candidates = baseRoute.candidates;
+    if (dto.figureModel) {
+      const selectedCandidate =
+        candidates.find(
+          (candidate) => candidate.model === dto.figureModel && candidate.available,
+        ) ?? (await this.modelRouting.resolveCandidateByModel(dto.figureModel));
+      if (!selectedCandidate?.available) {
+        throwBadRequest(
+          "AI_MODEL_NOT_AVAILABLE",
+          "Model tạo hình đã chọn không còn khả dụng cho phần kiến thức.",
+          { model: dto.figureModel },
+        );
+      }
+      candidates = [selectedCandidate];
+    }
+    return {
+      ...baseRoute,
+      model: candidates[0]?.model ?? baseRoute.model,
+      candidates,
+      temperature: dto.figureTemperature ?? baseRoute.temperature,
+      reasoningEffort: dto.figureReasoningEffort ?? baseRoute.reasoningEffort,
+      maxOutputTokens: dto.figureMaxOutputTokens ?? baseRoute.maxOutputTokens,
+    } satisfies AiFeatureRoute;
   }
 
   private async getFxRateVndPerUsd() {

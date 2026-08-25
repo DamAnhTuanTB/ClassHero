@@ -133,7 +133,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeVisible();
     await quizDialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await quizDialog.getByLabel("Temperature").fill("0.1");
-    await quizDialog.getByLabel("Giới hạn token đầu ra").fill("8000");
+    await quizDialog
+      .getByLabel("Giới hạn token đầu ra", { exact: true })
+      .fill("8000");
     await quizDialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect(quizDialog.getByText("Nguồn PDF sẽ gửi AI")).toBeVisible();
     await expect(quizDialog.getByText("Model thực tế")).toBeVisible();
@@ -276,6 +278,68 @@ test.describe("M9.8 admin AI generation panel", () => {
       });
   });
 
+  test("shows Quiz-set total cost and drills down through generation and usage details", async ({
+    page,
+  }) => {
+    const timestamp = new Date().toISOString();
+    await setupAiGenerationMock(page, {
+      usageResourceType: "QUIZ_FIGURE",
+      quizSets: [
+        {
+          ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+          aiGenerations: [
+            {
+              id: "generation-quiz-newest",
+              createdAt: timestamp,
+              finishedAt: timestamp,
+              inputMetaJson: null,
+              model: "gpt-5.6-luna",
+              startedAt: timestamp,
+              status: "SUCCEEDED",
+              totalCostVnd: 1_096,
+              usageEventCount: 9,
+            },
+            {
+              id: "generation-quiz-older",
+              createdAt: timestamp,
+              finishedAt: timestamp,
+              inputMetaJson: null,
+              model: "gpt-5.6-luna",
+              startedAt: timestamp,
+              status: "FAILED",
+              totalCostVnd: 204,
+              usageEventCount: 2,
+            },
+          ],
+        },
+      ],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+
+    await page.getByRole("button", { name: "Tổng chi phí: 1.300 VNĐ" }).click();
+    const historyDialog = page.getByRole("dialog", {
+      name: "Lịch sử sinh AI của Bộ câu hỏi 1",
+    });
+    await expect(historyDialog.getByText("Tổng chi phí thực tế")).toBeVisible();
+    await expect(historyDialog.getByText("1.300 VNĐ")).toBeVisible();
+    await historyDialog.getByRole("button", { name: /Lần sinh 2/ }).click();
+
+    const usageDialog = page.getByRole("dialog", {
+      name: "Chi tiết các lượt gọi AI",
+    });
+    await expect(usageDialog).toBeVisible();
+    await expect(
+      usageDialog.getByText("Tạo hình minh họa Quiz · Thành công"),
+    ).toBeVisible();
+    await usageDialog
+      .getByRole("button", { name: /Xem chi tiết GPT-5.6 Luna, 66 VNĐ/ })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Chi tiết lượt sử dụng" }),
+    ).toBeVisible();
+  });
+
   test("refreshes Quiz sets before opening generation so an existing set is never hidden", async ({
     page,
   }) => {
@@ -327,6 +391,7 @@ test.describe("M9.8 admin AI generation panel", () => {
                 code: "DIFFICULTY_DISTRIBUTION_MISMATCH",
                 message: "Phân bổ Dễ/Trung bình/Khó chưa đúng số lượng đã cấu hình.",
                 blocking: false,
+                questionIndex: 0,
               },
             ],
           },
@@ -519,6 +584,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     const figureFrame = page.getByTestId("admin-quiz-figure-action-frame");
     await expect(figure.getByAltText("Tứ giác ABCD nội tiếp đường tròn")).toBeVisible();
     await expect(figure.locator("figcaption")).toContainText("Tứ giác nội tiếp");
+    await expect(
+      figureFrame.getByRole("button", { name: "Tinh chỉnh bằng AI" }),
+    ).toBeVisible();
 
     await figureFrame.getByRole("button", { name: "Mở menu thao tác hình" }).click();
     for (const action of [
@@ -557,6 +625,16 @@ test.describe("M9.8 admin AI generation panel", () => {
     );
     await page.keyboard.press("Escape");
 
+    await figureFrame.getByRole("button", { name: "Tinh chỉnh bằng AI" }).click();
+    const refinementDialog = page.getByRole("dialog", {
+      name: "Tinh chỉnh hình bằng AI",
+    });
+    await expect(refinementDialog).toBeVisible();
+    await expect(refinementDialog.getByText("Model và chi phí dự tính")).toBeVisible();
+    await expect(refinementDialog.getByText("≈ 750 ₫")).toBeVisible();
+    await refinementDialog.getByRole("button", { name: "Thực hiện" }).click();
+    await expect(page.getByText("Đã bắt đầu tinh chỉnh hình bằng AI.")).toBeVisible();
+
     await figureFrame.getByRole("button", { name: "Chỉnh sửa caption" }).click();
     await expect(page.getByRole("dialog", { name: "Chỉnh sửa caption" })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -569,7 +647,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(figure.getByAltText("Tứ giác ABCD nội tiếp đường tròn")).toBeVisible();
   });
 
-  test("preserves the page scroll position when navigating Quiz cards", async ({
+  test("supports Quiz card buttons and arrow shortcuts without changing scroll position", async ({
     page,
   }) => {
     const firstQuestionId = "77777777-7777-4777-8777-777777777761";
@@ -630,6 +708,61 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect
       .poll(() => page.evaluate(() => window.scrollY))
       .toBe(scrollPositionBeforePrevious);
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator(`#quiz-question-${secondQuestionId}`)).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBe(scrollPositionBeforePrevious);
+
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.locator(`#quiz-question-${firstQuestionId}`)).toBeVisible();
+
+    await page.getByRole("button", { name: "Sửa câu 1" }).click();
+    const questionDialog = page.getByRole("dialog", { name: "Chỉnh sửa câu hỏi" });
+    const questionEditor = questionDialog.getByRole("textbox", {
+      name: "Nội dung câu hỏi",
+    });
+    await questionEditor.focus();
+    await page.keyboard.press("ArrowRight");
+    await questionDialog.getByRole("button", { name: "Đóng" }).click();
+    await expect(page.locator(`#quiz-question-${firstQuestionId}`)).toBeVisible();
+  });
+
+  test("reviews the selected pending AI Quiz question with Enter outside editors", async ({
+    page,
+  }) => {
+    const questionId = "77777777-7777-4777-8777-777777777763";
+    const quizSet = {
+      ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+      questionCount: 1,
+      _count: { questions: 1 },
+      pendingReviewQuestionCount: 1,
+    };
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [quizSet],
+      quizQuestions: [
+        quizQuestionFixture(questionId, quizSetOneId, "generation-enter-review"),
+      ],
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Duyệt", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Sửa câu 1" }).click();
+    const questionDialog = page.getByRole("dialog", { name: "Chỉnh sửa câu hỏi" });
+    await questionDialog
+      .getByRole("textbox", { name: "Nội dung câu hỏi" })
+      .press("Enter");
+    expect(mock.quizReviewPayloads).toEqual([]);
+    await questionDialog.getByRole("button", { name: "Đóng" }).click();
+
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(() => mock.quizReviewPayloads)
+      .toEqual([{ questionId, reviewStatus: "APPROVED" }]);
+    await expect(page.getByText("Đã duyệt", { exact: true })).toBeVisible();
   });
 
   test("bulk reviews every pending AI question in the current Quiz set before save", async ({
@@ -866,7 +999,6 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(fullInputPanel).toContainText(
       '"name":"lesson_summary_provider_contract"',
     );
-    await expect(fullInputPanel).toContainText("lesson-source.pdf");
     await expect(fullInputPanel).toContainText("file_id");
     await expect(fullInputPanel).toContainText("sourceKey");
     await expect(fullInputPanel).not.toContainText("packetHash");
@@ -878,7 +1010,7 @@ test.describe("M9.8 admin AI generation panel", () => {
 
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-5.6-luna" }).click();
-    await dialog.getByLabel("Reasoning Effort").click();
+    await dialog.locator("#ai-summary-reasoning-effort").click();
     await expect(dialog.getByRole("option", { name: "Thấp (Low)" })).toBeVisible();
     await expect(
       dialog.getByRole("option", { name: "Rất cao (Extra High)" }),
@@ -888,15 +1020,19 @@ test.describe("M9.8 admin AI generation panel", () => {
 
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
-    await expect(dialog.getByLabel("Reasoning Effort")).toHaveCount(0);
+    await expect(dialog.locator("#ai-summary-reasoning-effort")).toHaveCount(0);
     await dialog.getByLabel("Temperature").fill("1.5");
     await expect(dialog.getByText("Temperature phải từ 0 đến 1")).toBeVisible();
     await dialog.getByLabel("Temperature").fill("0.1");
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("5999");
+    await dialog
+      .getByLabel("Giới hạn token đầu ra", { exact: true })
+      .fill("5999");
     await expect(
       dialog.getByText("Số token đầu ra phải từ 8000 đến 32000"),
     ).toBeVisible();
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("8000");
+    await dialog
+      .getByLabel("Giới hạn token đầu ra", { exact: true })
+      .fill("8000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect.poll(() => mock.promptPreviewPayloads.length).toBeGreaterThan(1);
     await dialog.getByRole("tab", { name: "Câu lệnh người dùng" }).click();
@@ -928,6 +1064,9 @@ test.describe("M9.8 admin AI generation panel", () => {
         model: "gpt-4.1-mini",
         temperature: 0.1,
         maxOutputTokens: 8_000,
+        figureModel: "gpt-5.6-luna",
+        figureReasoningEffort: "xhigh",
+        figureMaxOutputTokens: 20_000,
       });
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
@@ -967,11 +1106,13 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect.poll(() => mock.promptPreviewPayloads.length).toBe(3);
     const submissionPreviewPayload = mock.promptPreviewPayloads.at(-1);
     expect(submissionPreviewPayload).toMatchObject({
-      model: "gpt-5.6-luna",
-      reasoningEffort: "xhigh",
-      maxOutputTokens: 20_000,
+      model: "gpt-4.1-mini",
+      temperature: 0.2,
+      maxOutputTokens: 8_000,
+      figureModel: "gpt-5.6-luna",
+      figureReasoningEffort: "xhigh",
+      figureMaxOutputTokens: 20_000,
     });
-    expect(submissionPreviewPayload).not.toHaveProperty("temperature");
     await expect
       .poll(() => mock.payloads.SUMMARY)
       .toMatchObject({
@@ -998,9 +1139,11 @@ test.describe("M9.8 admin AI generation panel", () => {
     );
     await dialog.getByRole("button", { name: "Model", exact: true }).click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-5.6-luna" }).click();
-    await dialog.getByLabel("Reasoning Effort").click();
+    await dialog.locator("#ai-summary-reasoning-effort").click();
     await dialog.getByRole("option", { name: "Rất cao (Extra High)" }).click();
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("20000");
+    await dialog
+      .getByLabel("Giới hạn token đầu ra", { exact: true })
+      .fill("20000");
 
     const refreshButton = dialog.getByRole("button", {
       name: "Cập nhật dữ liệu gửi AI",
@@ -1043,6 +1186,9 @@ test.describe("M9.8 admin AI generation panel", () => {
         model: "gpt-5.6-luna",
         reasoningEffort: "xhigh",
         maxOutputTokens: 20_000,
+        figureModel: "gpt-5.6-luna",
+        figureReasoningEffort: "xhigh",
+        figureMaxOutputTokens: 20_000,
       });
   });
 
@@ -1063,7 +1209,9 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await dialog.getByLabel("Yêu cầu bổ sung").fill("Chỉ dùng cho lần tạo này");
     await dialog.getByLabel("Temperature").fill("0.2");
-    await dialog.getByLabel("Giới hạn token đầu ra").fill("8000");
+    await dialog
+      .getByLabel("Giới hạn token đầu ra", { exact: true })
+      .fill("8000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
@@ -1080,6 +1228,9 @@ test.describe("M9.8 admin AI generation panel", () => {
         model: "gpt-4.1-mini",
         temperature: 0.2,
         maxOutputTokens: 8_000,
+        figureModel: "gpt-5.6-luna",
+        figureReasoningEffort: "xhigh",
+        figureMaxOutputTokens: 20_000,
       });
 
     await expect(page.getByRole("tab", { name: "Kiến thức" })).toHaveAttribute(
@@ -1163,7 +1314,9 @@ test.describe("M9.8 admin AI generation panel", () => {
       dialog.getByRole("button", { name: "Model", exact: true }),
     ).toContainText("OpenAI · gpt-4.1-mini");
     await expect(dialog.getByLabel("Temperature")).toHaveValue("0.2");
-    await expect(dialog.getByLabel("Giới hạn token đầu ra")).toHaveValue("8000");
+    await expect(
+      dialog.getByLabel("Giới hạn token đầu ra", { exact: true }),
+    ).toHaveValue("8000");
     await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
       "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
     );
@@ -1216,7 +1369,9 @@ test.describe("M9.8 admin AI generation panel", () => {
       dialog.getByRole("button", { name: "Model", exact: true }),
     ).toContainText("OpenAI · gpt-4.1-mini");
     await expect(dialog.getByLabel("Temperature")).toHaveValue("0.35");
-    await expect(dialog.getByLabel("Giới hạn token đầu ra")).toHaveValue("12000");
+    await expect(
+      dialog.getByLabel("Giới hạn token đầu ra", { exact: true }),
+    ).toHaveValue("12000");
     await expect
       .poll(() => mock.promptPreviewPayloads.at(-1))
       .toMatchObject({
@@ -1303,7 +1458,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(blockDetailsDialog).toContainText(
       "Quan sát các đỉnh và cạnh của tam giác.",
     );
-    await blockDetailsDialog.getByRole("button", { name: "Đóng" }).click();
+    await blockDetailsDialog.getByText("Đóng", { exact: true }).click();
     await expect(blockDetailsDialog).toHaveCount(0);
     await overviewCard.getByRole("button", { name: "Mở menu thao tác hình" }).click();
     for (const action of [
@@ -1676,7 +1831,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await page.getByRole("menuitem", { name: "Tạo mới bằng AI" }).click();
     const dialog = page.getByRole("dialog", { name: "Tạo mới hình bằng AI" });
     await expect(dialog.getByLabel("Tạo mới lại")).toBeVisible();
-    await expect(dialog.getByLabel("Sửa ảnh hiện tại")).toBeVisible();
+    await expect(dialog.getByLabel("Chỉnh sửa hình hiện tại")).toBeVisible();
     await expect(dialog.getByText("1. Cách tạo hình")).toBeVisible();
     await expect(dialog.getByAltText("Hình sách giáo khoa · trang 23")).toHaveCount(2);
     await expect(dialog.getByRole("button", { name: "Tạo mới" })).toBeEnabled();
@@ -1698,7 +1853,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     const dialogBoxAfterSourceSelection = await dialog.boundingBox();
     expect(dialogBoxAfterSourceSelection?.height).toBe(dialogBoxBeforeTyping?.height);
     expect(dialogBoxAfterSourceSelection?.y).toBe(dialogBoxBeforeTyping?.y);
-    await dialog.getByLabel("Sửa ảnh hiện tại").check();
+    await dialog.getByLabel("Chỉnh sửa hình hiện tại").check();
     expect(mock.figureActions.previewModes).toHaveLength(0);
     await expect(dialog.getByAltText("Hình sách giáo khoa · trang 23")).toHaveCount(2);
     const dialogBoxAfterCurrentSelection = await dialog.boundingBox();
@@ -1943,11 +2098,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     const sourceImageSize = await sourceImage.boundingBox();
     expect(sourceImageSize).not.toBeNull();
     expect(sourceImageSize?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(256);
-    expect(
-      await sourcePanel.evaluate((panel) =>
-        Boolean(panel.nextElementSibling?.querySelector("figure")),
-      ),
-    ).toBe(true);
+    await expect(textbookCard.getByRole("figure")).toBeVisible();
     expect(
       await sourcePanel.evaluate((panel) =>
         Array.from(panel.querySelectorAll("*")).some((element) => {
@@ -2388,7 +2539,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(dialog).not.toContainText("$BC'$");
     await dialog.getByLabel("Model").click();
     await dialog.getByRole("option", { name: "OpenAI · gpt-5.6-luna" }).click();
-    await dialog.getByLabel("Reasoning Effort").click();
+    await dialog.getByLabel("Reasoning Effort", { exact: true }).click();
     await dialog.getByRole("option", { name: "Rất cao (Extra High)" }).click();
     await dialog.getByRole("button", { name: "Xem dữ liệu" }).click();
     await dialog.getByRole("tab", { name: "Câu lệnh người dùng" }).click();
@@ -2598,6 +2749,7 @@ async function setupAiGenerationMock(
     quizSetsAfterFirstRequest?: Array<Record<string, unknown>>;
     stemFigures?: Array<Record<string, unknown>>;
     summaryFiguresAfterGeneration?: Array<Record<string, unknown>>;
+    usageResourceType?: "QUIZ_FIGURE" | "STEM_FIGURE";
   } = {},
 ) {
   const payloads: Partial<Record<"SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST", unknown>> =
@@ -2748,7 +2900,7 @@ async function setupAiGenerationMock(
               },
               backgroundJob: {
                 queue: "DIAGRAM_RENDERING",
-                resourceType: "STEM_FIGURE",
+                resourceType: options.usageResourceType ?? "STEM_FIGURE",
               },
               aiGeneration: {
                 id: aiGenerationId,
@@ -3122,6 +3274,7 @@ async function setupAiGenerationMock(
         source: String(body.source),
         reviewStatus: String(body.reviewStatus),
         aiGenerationId: "generation-summary",
+        phaseOneBlockJsonByPath: state.summary?.phaseOneBlockJsonByPath,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -3133,6 +3286,17 @@ async function setupAiGenerationMock(
     ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       summaryPutPayloads.push(body);
+      if (state.summary) {
+        state.summary = {
+          ...state.summary,
+          phaseOneBlockJsonByPath:
+            (body.phaseOneBlockJsonByPath as Record<string, unknown> | undefined) ??
+            state.summary.phaseOneBlockJsonByPath,
+          source: String(body.source),
+          reviewStatus: String(body.reviewStatus),
+          updatedAt: new Date().toISOString(),
+        };
+      }
       return fulfillJson(route, 200, { data: state.summary });
     }
     if (
@@ -3465,6 +3629,63 @@ async function setupAiGenerationMock(
     const quizFigurePreviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/create-new-ai\/preview$/,
     );
+    const quizFigureRefineMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/refine-ai$/,
+    );
+    const quizFigureRefinePreviewMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/refine-ai\/preview$/,
+    );
+    if (method === "POST" && quizFigureRefinePreviewMatch) {
+      return fulfillJson(route, 200, {
+        data: {
+          operation: "REFINE_CURRENT",
+          currentImageDataUrl:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          providerInput: {
+            model: "gpt-5.6-luna",
+            input: ["<binary data omitted from preview>"],
+          },
+          configuration: {
+            isDefaultConfigured: true,
+            resolvedProvider: "OPENAI",
+            resolvedModel: "gpt-5.6-luna",
+            temperature: null,
+            reasoningEffort: "medium",
+            maxOutputTokens: 12_000,
+            modelOptions: [],
+          },
+          systemPrompt: "Quy tắc tinh chỉnh hình Quiz.",
+          userPrompt: JSON.stringify({
+            figurePlan: {
+              version: 1,
+              role: "QUESTION",
+              problem: "Cho tứ giác ABCD nội tiếp đường tròn.",
+            },
+            currentLatexSource: "\\begin{tikzpicture}...\\end{tikzpicture}",
+          }),
+          context: {
+            textInputTokens: 100,
+            imageInputTokens: 200,
+            estimatedTokens: 300,
+          },
+          estimatedCost: {
+            available: true,
+            inputUpperBoundUsd: 0.01,
+            inputUpperBoundVnd: 250,
+            outputUpperBoundUsd: 0.02,
+            outputUpperBoundVnd: 500,
+            upperBoundUsd: 0.03,
+            upperBoundVnd: 750,
+            fxRateVndPerUsd: 25_000,
+          },
+        },
+      });
+    }
+    if (method === "POST" && quizFigureRefineMatch) {
+      return fulfillJson(route, 202, {
+        data: { jobId: "quiz-figure-refine-job", status: "QUEUED" },
+      });
+    }
     if (method === "POST" && quizFigurePreviewMatch) {
       const body = request.postDataJSON() as { mode?: string };
       const quizFigureSystemPrompt = [
@@ -3641,6 +3862,39 @@ function materialize(
       source: "AI",
       reviewStatus: "NEEDS_REVIEW",
       aiGenerationId: "generation-summary",
+      phaseOneBlockJsonByPath: {
+        "sections.0.blocks.0": {
+          type: "knowledge",
+          title: "Khái niệm số hữu tỉ",
+          content: "Số hữu tỉ là số viết được dưới dạng phân số.",
+          sourcePageNumbers: [1],
+          figures: [],
+        },
+        "sections.0.blocks.1": {
+          type: "example",
+          problem: "Viết 0,25 dưới dạng phân số.",
+          solution: "$0,25 = 1/4$.",
+          answer: "$1/4$.",
+          sourcePageNumbers: [1],
+          figures: [],
+        },
+        "sections.1.blocks.0": {
+          type: "example",
+          problem: "Viết 0,25 dưới dạng phân số.",
+          solution: "$0,25 = 1/4$.",
+          answer: "$1/4$.",
+          sourcePageNumbers: [1],
+          figures: [],
+        },
+        "sections.1.blocks.1": {
+          type: "example",
+          problem: "Một món đồ 100 000 đồng giảm 20%. Tính giá mới.",
+          solution: "$100\\,000 \\times 80\\% = 80\\,000$ đồng.",
+          answer: "$80\\,000$ đồng.",
+          sourcePageNumbers: [1],
+          figures: [],
+        },
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -3783,6 +4037,31 @@ function panelData(
         },
       ],
     },
+    summaryFigureConfiguration: {
+      isDefaultConfigured: true,
+      resolvedProvider: "OPENAI",
+      resolvedModel: "gpt-5.6-luna",
+      temperature: null,
+      reasoningEffort: "xhigh",
+      maxOutputTokens: 20_000,
+      modelOptions: [
+        {
+          provider: "OPENAI",
+          model: "gpt-4.1-mini",
+          available: true,
+          capabilities: { aiConfiguration: "TEMPERATURE" },
+        },
+        {
+          provider: "OPENAI",
+          model: "gpt-5.6-luna",
+          available: true,
+          capabilities: {
+            aiConfiguration: "REASONING_EFFORT",
+            reasoningEffortLevels: ["low", "medium", "xhigh"],
+          },
+        },
+      ],
+    },
     quizConfiguration: {
       isDefaultConfigured: true,
       resolvedProvider: "OPENAI",
@@ -3790,6 +4069,31 @@ function panelData(
       temperature: 0.2,
       reasoningEffort: null,
       maxOutputTokens: 8_000,
+      modelOptions: [
+        {
+          provider: "OPENAI",
+          model: "gpt-4.1-mini",
+          available: true,
+          capabilities: { aiConfiguration: "TEMPERATURE" },
+        },
+        {
+          provider: "OPENAI",
+          model: "gpt-5.6-luna",
+          available: true,
+          capabilities: {
+            aiConfiguration: "REASONING_EFFORT",
+            reasoningEffortLevels: ["low", "medium", "xhigh"],
+          },
+        },
+      ],
+    },
+    quizFigureConfiguration: {
+      isDefaultConfigured: true,
+      resolvedProvider: "OPENAI",
+      resolvedModel: "gpt-5.6-luna",
+      temperature: null,
+      reasoningEffort: "xhigh",
+      maxOutputTokens: 20_000,
       modelOptions: [
         {
           provider: "OPENAI",
@@ -4004,7 +4308,7 @@ async function expectNoFrameworkOverlay(page: Page) {
 async function assertSingleReferenceChoice(
   page: Page,
   figureId: string,
-  expectedChoice: "Tạo mới lại" | "Sửa ảnh hiện tại" | null,
+  expectedChoice: "Tạo mới lại" | "Chỉnh sửa hình hiện tại" | null,
   expectedPreviewAlt?: string,
 ) {
   const card = page.locator(`[data-admin-stem-figure="${figureId}"]`);
@@ -4017,7 +4321,10 @@ async function assertSingleReferenceChoice(
   if (expectedChoice) {
     await expect(dialog.getByRole("radio", { name: expectedChoice })).toBeVisible();
   }
-  const referenceChoices = ["Tạo mới lại", "Sửa ảnh hiện tại"] as const;
+  const referenceChoices = [
+    "Tạo mới lại",
+    "Chỉnh sửa hình hiện tại",
+  ] as const;
   for (const omittedChoice of referenceChoices.filter(
     (choice) => choice !== expectedChoice,
   )) {

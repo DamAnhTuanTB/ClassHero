@@ -1,11 +1,7 @@
 export function buildLessonSummaryFigureAltText(input: {
-  caption: string | null;
   block: unknown;
   sectionHeading: string;
 }) {
-  const caption = normalizeText(input.caption);
-  if (caption) return caption.slice(0, 500);
-
   const block = readRecord(input.block);
   const subject =
     normalizeText(block?.title) ??

@@ -9,7 +9,10 @@ const forbiddenPatterns: Array<[RegExp, string]> = [
   [/<(?:svg|script|iframe|foreignObject)\b/iu, "raw active markup"],
 ];
 
-export function assertQuizFigureLatexSource(source: string) {
+export function assertQuizFigureLatexSource(
+  source: string,
+  options: { requireExtensionMarker?: boolean } = {},
+) {
   for (const [pattern, label] of forbiddenPatterns) {
     if (pattern.test(source)) throw new Error(`QUIZ_FIGURE_SOURCE_FORBIDDEN: ${label}`);
   }
@@ -17,7 +20,10 @@ export function assertQuizFigureLatexSource(source: string) {
   if ((roots?.length ?? 0) !== 1) {
     throw new Error("QUIZ_FIGURE_SOURCE_ROOT_INVALID");
   }
-  if (!source.includes(QUIZ_FIGURE_EXTENSION_MARKER)) {
+  if (
+    options.requireExtensionMarker !== false &&
+    !source.includes(QUIZ_FIGURE_EXTENSION_MARKER)
+  ) {
     throw new Error("QUIZ_FIGURE_EXTENSION_MARKER_MISSING");
   }
 }

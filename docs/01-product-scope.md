@@ -45,9 +45,14 @@ MVP tập trung vào việc giúp:
 - Có nhiều bộ quiz/flashcard/bài thi trong một buổi học.
 - Có kho bộ dự phòng do AI tạo.
 - Có AI tạo tóm tắt, quiz, flashcard, bài kiểm tra, lời giải chi tiết và chat theo buổi học.
-- Admin quản lý giới hạn token đầu vào và đầu ra theo từng tính năng trong tab
-  `Thiết lập mặc định` của màn Cài đặt AI; không yêu cầu admin nhập giới hạn kỹ
-  thuật của provider ở catalog model.
+- Sinh kiến thức và Quiz dùng system prompt chuyên môn độc lập cho Toán, Vật lý
+  và Hóa học; không lấy quy tắc của một môn làm core cho môn khác. Chỉ hạ tầng
+  kỹ thuật trung lập được phép dùng chung giữa các môn/domain.
+- Admin quản lý hai route model độc lập theo từng tính năng `SUMMARY`, `QUIZ`,
+  `FLASHCARD`, `TEST` trong tab `Thiết lập mặc định`: `Phase 1 - tạo text` và
+  `Phase 2 - tạo ảnh`. Mỗi route có model chính/dự phòng, capability setting và
+  giới hạn token đầu vào/đầu ra riêng; không yêu cầu admin nhập giới hạn kỹ thuật
+  của provider ở catalog model.
 - Khi sinh tóm tắt, admin có thể chọn dùng trực tiếp crop ảnh gốc sách giáo khoa
   đã trích xuất thay vì gọi AI vẽ lại hình.
 - Admin có thể chỉnh nhẹ ảnh raster sách giáo khoa đã dùng trong tóm tắt bằng
@@ -129,6 +134,18 @@ Admin có quyền:
 - Với từng hình đề/hình lời giải của Quiz, admin có cùng bộ thao tác quản trị như
   hình Sinh kiến thức: chỉnh sửa hoặc tạo mới bằng mã code, tạo mới bằng AI, tải
   ảnh lên, xóa ảnh và chỉnh sửa caption.
+- Với hình Quiz TikZ đã sinh thành công, admin có action `Tinh chỉnh`. Hệ thống
+  gửi đồng thời source hiện tại, ảnh render hiện tại và figure plan gốc cho model
+  ảnh để đánh giá toàn diện rồi trả một source TikZ hoàn chỉnh mới. Tinh chỉnh
+  bao gồm sửa sai/vô lý/thiếu đối tượng, quan hệ, nhãn, số đo, bố cục và khả năng
+  đọc; không bị giới hạn ở làm đẹp mỹ thuật. Bấm action chỉ mở modal cho admin
+  xem ảnh, prompt/request thực tế và chi phí tối đa ước tính; chỉ nút `Thực hiện`
+  mới enqueue paid call, còn `Hủy` không phát sinh chi phí. Ảnh hiện hành chỉ đổi
+  sau khi source mới vượt source policy, compile, SVG validator và promote thành công.
+- Quiz không lặp lại nguyên hình đề trong phần lời giải. Hình lời giải chỉ được
+  tạo khi cần bổ sung nét trên đúng hình đề hoặc cần vẽ lại toàn bộ thành một mô
+  hình toán học khác về bố cục/phong cách nhưng giữ nguyên dữ kiện. Đề bài và lời
+  giải bằng chữ luôn phải tự đủ nghĩa khi không tải được hình.
 - Tạo, sửa, xóa flashcard.
 - Dùng AI tạo flashcard.
 - Tạo, sửa, xóa bài kiểm tra.

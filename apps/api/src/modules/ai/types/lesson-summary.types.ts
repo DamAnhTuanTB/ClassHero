@@ -8,10 +8,14 @@ import { z } from "zod";
 
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
-export const LESSON_SUMMARY_PROMPT_VERSION =
-  "lesson-summary-pdf-packet-five-block-prompt-v24-inference-alignment";
+export const LESSON_SUMMARY_PROMPT_VERSIONS = {
+  MATH: "lesson-summary-math-v27-no-figure-caption",
+  PHYSICS: "lesson-summary-physics-v27-no-figure-caption",
+  CHEMISTRY: "lesson-summary-chemistry-v27-no-figure-caption",
+  GENERAL: "lesson-summary-general-v27-no-figure-caption",
+} as const;
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-five-block-schema-v23-root-formatting-shared-example-fields";
+  "lesson-summary-pdf-packet-five-block-schema-v24-no-figure-caption";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -223,28 +227,6 @@ const lessonSummaryProviderSolutionFieldSchema = transportText(10_000).describe(
 const lessonSummaryProviderAnswerFieldSchema = transportText(3_000).describe(
   "Đáp án hoặc kết quả cuối của bài; không lặp lại toàn bộ thân lời giải.",
 );
-// Keep lookaround out of the provider-facing JSON Schema. OpenAI Structured
-// Outputs does not support it, while Zod can still enforce it after parsing.
-const SOURCE_FIGURE_LABEL_ONLY_PATTERN =
-  /^\s*(?:(?:hình|figure|fig\.?)\s*)?[A-Za-z]?\d+(?:\s*[.-]\s*\d+)*(?:\s*[a-z])?\s*$/iu;
-const semanticFigureCaptionSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(500)
-  .nullable()
-  .superRefine((caption, context) => {
-    if (caption !== null && SOURCE_FIGURE_LABEL_ONLY_PATTERN.test(caption)) {
-      context.addIssue({
-        code: "custom",
-        message:
-          "Caption phải mô tả nội dung hoặc ý nghĩa của hình, không được chỉ là mã hình nguồn.",
-      });
-    }
-  })
-  .describe(
-    "Chú thích ngắn có ý nghĩa sư phạm, mô tả đối tượng, quan hệ hoặc thông điệp chính mà người học nhìn thấy. Đây không phải mã tra cứu crop: không được chỉ chép mã hình nguồn hoặc số thứ tự. Mã hình SGK phải nằm ở sourceReferences.figureLabel. Nếu không có chú thích hữu ích ngoài ngữ cảnh block thì trả null.",
-  );
 const providerSourcePageNumbersSchema = z.array(z.number().int().positive()).max(20);
 const providerTheorySourcePageNumbersSchema = providerSourcePageNumbersSchema
   .min(1)
@@ -293,16 +275,12 @@ const stemFigureSourceReferenceSchema = z
   })
   .strict();
 
-const stemFigureProviderDisplayShape = {
-  caption: semanticFigureCaptionSchema,
-};
 const stemFigureTextbookProviderPlanSchema = z
   .object({
     figureOrigin: z
       .literal("TEXTBOOK_SOURCE")
       .describe("Hình trực quan có thật trong PDF và bắt buộc có sourceReferences."),
     sourceReferences: z.array(stemFigureSourceReferenceSchema).min(1).max(5),
-    ...stemFigureProviderDisplayShape,
   })
   .strict();
 const stemFigureGeneratedProviderPlanSchema = z
@@ -313,7 +291,6 @@ const stemFigureGeneratedProviderPlanSchema = z
         "Hình mới do AI đề xuất; đây chỉ là nhãn provenance, không yêu cầu hoặc cho phép thêm field brief.",
       ),
     sourceReferences: z.array(stemFigureSourceReferenceSchema).max(0),
-    ...stemFigureProviderDisplayShape,
   })
   .strict();
 export const stemFigureProviderPlanDraftSchema = z.discriminatedUnion("figureOrigin", [
@@ -343,12 +320,13 @@ export const stemFigurePlanDraftSchema = z.discriminatedUnion("figureOrigin", [
 ]);
 /**
  * Only the semantic fields required to resolve references and render a figure.
- * Display metadata such as caption/alt text has its own revision lifecycle and
- * must not make an otherwise valid render plan unreadable after those display
- * rules evolve.
+ * Alternative text has its own revision lifecycle and must not make an otherwise
+ * valid render plan unreadable after accessibility rules evolve.
  */
 const stemFigureRenderDisplayShape = {
   altText: z.string().nullable().optional(),
+  // Backward-compatible persisted/admin metadata only. Provider-facing plans
+  // intentionally do not expose or request this field.
   caption: z.string().nullable().optional(),
 };
 export const stemFigureRenderPlanSchema = z.discriminatedUnion("figureOrigin", [
@@ -783,6 +761,7 @@ export const lessonSummaryJobInputSchema = z
       .max(LESSON_SUMMARY_MAX_SYSTEM_INSTRUCTIONS_CHARACTERS)
       .default(""),
     userPrompt: z.string().max(16_000).default(""),
+    imageRouteSnapshot: z.record(z.string(), z.unknown()).optional(),
     model: z.string().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),
     reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),

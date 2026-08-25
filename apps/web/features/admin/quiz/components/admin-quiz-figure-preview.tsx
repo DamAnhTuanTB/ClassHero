@@ -1,8 +1,10 @@
 import { Loader2 } from "lucide-react";
 
+import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
 import { AdminQuizFigureActionFrame } from "@/features/admin/quiz/components/admin-quiz-figure-action-frame";
+import { AdminQuizFigureCostBadge } from "@/features/admin/quiz/components/admin-quiz-figure-cost-badge";
 import { cn } from "@/lib/utils";
 
 const PROCESSING_STATUSES = new Set<AdminQuizFigure["status"]>([
@@ -24,6 +26,7 @@ export function AdminQuizFigurePreview({
 }) {
   const imageUrl = figure.currentRevision?.deliveryFile?.publicUrl;
   const roleLabel = role === "QUESTION" ? "Hình đề" : "Hình lời giải";
+  const isProcessing = PROCESSING_STATUSES.has(figure.status);
 
   if (imageUrl) {
     return (
@@ -37,18 +40,21 @@ export function AdminQuizFigurePreview({
             src={imageUrl}
             alt={figure.currentRevision?.altText || roleLabel}
             className="mx-auto max-h-[28rem] w-full object-contain"
+            decoding="async"
+            loading="lazy"
           />
           {figure.currentRevision?.caption ? (
             <figcaption className="mt-2 text-center text-sm font-medium leading-relaxed text-slate-600">
               <MathpixMarkdownRenderer content={figure.currentRevision.caption} />
             </figcaption>
           ) : null}
+          <AdminQuizFigureCostBadge costVnd={figure.openAiGenerationCostVnd} />
         </figure>
+        {isProcessing ? <AdminFigureCandidateProgress /> : null}
       </AdminQuizFigureActionFrame>
     );
   }
 
-  const isProcessing = PROCESSING_STATUSES.has(figure.status);
   return (
     <AdminQuizFigureActionFrame figure={figure} questionId={questionId} setId={setId}>
       <div

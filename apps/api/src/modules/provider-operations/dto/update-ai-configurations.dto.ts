@@ -13,11 +13,14 @@ import {
   Min,
   ValidateNested,
 } from "class-validator";
-import { AiGenerationType } from "@prisma/client";
+import { AiGenerationType, AiModelPurpose } from "@prisma/client";
 
 export class UpdateAiFeatureConfigurationItemDto {
   @IsEnum(AiGenerationType)
   feature!: AiGenerationType;
+
+  @IsEnum(AiModelPurpose)
+  purpose!: AiModelPurpose;
 
   @IsOptional()
   @IsUUID()
@@ -73,7 +76,7 @@ export class UpdateAiFeatureConfigurationItemDto {
 export class UpdateAiConfigurationsDto {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(8)
   @ValidateNested({ each: true })
   @Type(() => UpdateAiFeatureConfigurationItemDto)
   configurations!: UpdateAiFeatureConfigurationItemDto[];

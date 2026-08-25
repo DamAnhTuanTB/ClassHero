@@ -237,6 +237,7 @@ export function AdminAiGenerationPanel({
               dialogRequest.mode === "EDIT" ? panel.jobs.QUIZ?.inputMetaJson : null
             }
             initialModelConfiguration={panel.quizConfiguration}
+            initialFigureModelConfiguration={panel.quizFigureConfiguration}
             isOpen
             isSubmitting={generateMutation.isPending}
             lessonId={lessonId}
@@ -271,6 +272,7 @@ export function AdminAiGenerationPanel({
             isSubmitting={generateMutation.isPending}
             lessonId={lessonId}
             initialModelConfiguration={panel.summaryConfiguration}
+            initialFigureModelConfiguration={panel.summaryFigureConfiguration}
             targetGrade={panel.lesson.targetGrade}
             type={dialogRequest.type}
             onClose={() => !generateMutation.isPending && setDialogRequest(null)}

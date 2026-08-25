@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  Coins,
   Clock3,
   Code2,
   Columns,
@@ -64,6 +65,7 @@ import {
 } from "@/features/admin/quiz/hooks/use-admin-quiz";
 import { QuizRichContentViewer } from "@/features/admin/quiz/components/quiz-rich-content-viewer";
 import { AdminQuizFigurePreview } from "@/features/admin/quiz/components/admin-quiz-figure-preview";
+import { AdminQuizFigureStatusSummary } from "@/features/admin/quiz/components/admin-quiz-figure-status-summary";
 import type {
   AdminTestQuestion,
   AdminTestSet,
@@ -103,6 +105,14 @@ const AdminQuizSetEditorDialog = dynamic(
   () =>
     import("@/features/admin/quiz/components/admin-quiz-set-editor-dialog").then(
       (module) => module.AdminQuizSetEditorDialog,
+    ),
+  { ssr: false },
+);
+
+const AdminQuizGenerationHistoryDialog = dynamic(
+  () =>
+    import("@/features/admin/quiz/components/admin-quiz-generation-history-dialog").then(
+      (module) => module.AdminQuizGenerationHistoryDialog,
     ),
   { ssr: false },
 );
@@ -678,6 +688,10 @@ function QuizSetPanel({
   const questions = questionsQuery.data;
   const queryRenderState = getQueryRenderState(questionsQuery);
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [questionNavigationTargetId, setQuestionNavigationTargetId] = useState<
+    string | null
+  >(null);
+  const [isGenerationHistoryOpen, setIsGenerationHistoryOpen] = useState(false);
   const [questionViewMode, setQuestionViewMode] =
     useState<QuizQuestionViewMode>("UI_ONLY");
   const [jsonViewState, setJsonViewState] = useState<{
@@ -823,6 +837,35 @@ function QuizSetPanel({
   }, [persistedQuestionReviewJson, selectedQuestionId]);
 
   useEffect(() => {
+    if (
+      !questionNavigationTargetId ||
+      selectedQuestionId !== questionNavigationTargetId
+    ) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      focusQuestionNumber(questionNavigationTargetId);
+      const target =
+        document.getElementById(`quiz-question-${questionNavigationTargetId}`) ??
+        document.getElementById(`${assessmentKind}-set-panel-${activeSet.id}`);
+      target?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      setQuestionNavigationTargetId(null);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [
+    activeSet.id,
+    assessmentKind,
+    focusQuestionNumber,
+    questionNavigationTargetId,
+    selectedQuestionId,
+  ]);
+
+  useEffect(() => {
     const savedMode = localStorage.getItem("admin-ai-quiz-question-view-mode");
     if (savedMode === "UI_ONLY" || savedMode === "JSON_ONLY" || savedMode === "SPLIT") {
       setQuestionViewMode(savedMode);
@@ -868,30 +911,88 @@ function QuizSetPanel({
     focusQuestionNumber(nextQuestion.id);
   }
 
-  const selectRelativeQuizQuestion = (offset: -1 | 1) => {
-    const navigationQuestions = quizQuestionNavigation.navigableQuestions;
-    if (navigationQuestions.length <= 1) return;
-    const currentIndex = navigationQuestions.findIndex(
-      (question) => question.id === selectedQuestionId,
-    );
-    if (currentIndex < 0) return;
-    const nextIndex =
-      (currentIndex + offset + navigationQuestions.length) % navigationQuestions.length;
-    const nextQuestion = navigationQuestions[nextIndex];
-    if (!nextQuestion) return;
+  const selectRelativeQuizQuestion = useCallback(
+    (offset: -1 | 1) => {
+      const navigationQuestions = quizQuestionNavigation.navigableQuestions;
+      if (navigationQuestions.length <= 1) return false;
+      const currentIndex = navigationQuestions.findIndex(
+        (question) => question.id === selectedQuestionId,
+      );
+      if (currentIndex < 0) return false;
+      const nextIndex =
+        (currentIndex + offset + navigationQuestions.length) % navigationQuestions.length;
+      const nextQuestion = navigationQuestions[nextIndex];
+      if (!nextQuestion) return false;
 
-    const scrollPosition = {
-      left: window.scrollX,
-      top: window.scrollY,
-    };
-    setSelectedQuestionId(nextQuestion.id);
-    requestAnimationFrame(() => {
-      window.scrollTo({
-        ...scrollPosition,
-        behavior: "auto",
+      const scrollPosition = {
+        left: window.scrollX,
+        top: window.scrollY,
+      };
+      setSelectedQuestionId(nextQuestion.id);
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          ...scrollPosition,
+          behavior: "auto",
+        });
       });
-    });
-  };
+      return true;
+    },
+    [quizQuestionNavigation.navigableQuestions, selectedQuestionId],
+  );
+
+  useEffect(() => {
+    if (isTest) return;
+
+    function handleQuizShortcut(event: globalThis.KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        (event.key !== "Enter" &&
+          event.key !== "ArrowLeft" &&
+          event.key !== "ArrowRight") ||
+        document.querySelector('[role="dialog"][aria-modal="true"]')
+      ) {
+        return;
+      }
+
+      if (event.key === "Enter") {
+        const canReviewSelectedQuestion =
+          selectedQuizQuestion?.reviewStatus !== "APPROVED" &&
+          Boolean(selectedQuizQuestion?.sourceMetadataJson?.aiGenerationId) &&
+          reviewingQuestionId !== selectedQuizQuestion?.id;
+        if (
+          !selectedQuizQuestion ||
+          !canReviewSelectedQuestion ||
+          isQuestionReviewShortcutTarget(event.target)
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        onReviewQuestion(selectedQuizQuestion);
+        return;
+      }
+
+      if (isQuestionNavigationShortcutTarget(event.target)) return;
+
+      const didNavigate = selectRelativeQuizQuestion(event.key === "ArrowLeft" ? -1 : 1);
+      if (didNavigate) event.preventDefault();
+    }
+
+    window.addEventListener("keydown", handleQuizShortcut);
+    return () => window.removeEventListener("keydown", handleQuizShortcut);
+  }, [
+    isTest,
+    onReviewQuestion,
+    reviewingQuestionId,
+    selectedQuizQuestion,
+    selectRelativeQuizQuestion,
+  ]);
 
   const unpublishedApprovedQuestionCount =
     activeSet.unpublishedApprovedQuestionCount ?? 0;
@@ -902,6 +1003,11 @@ function QuizSetPanel({
     },
     { EASY: 0, HARD: 0, MEDIUM: 0 },
   );
+
+  function navigateToQuizQuestion(questionId: string) {
+    setQuestionNavigationTargetId(questionId);
+    setSelectedQuestionId(questionId);
+  }
 
   const setSummary = (
     <div className="flex flex-col gap-4 rounded-xl border border-[var(--theme-border)] bg-white p-4 shadow-sm dark:bg-slate-950 sm:flex-row sm:items-center sm:justify-between sm:p-5">
@@ -919,6 +1025,28 @@ function QuizSetPanel({
                 <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
                 {formatDuration((activeSet as AdminTestSet).durationSeconds)}
               </span>
+            </>
+          ) : null}
+          {!isTest ? (
+            <>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setIsGenerationHistoryOpen(true)}
+                className="-m-1 inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md p-1 text-sm font-extrabold text-[var(--theme-text-muted)] transition-colors hover:bg-[var(--theme-surface-soft)] hover:text-[var(--theme-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)]"
+                title="Xem toàn bộ lịch sử sinh và chi phí của bộ Quiz"
+              >
+                <Coins className="size-4" aria-hidden="true" />
+                Tổng chi phí: {formatQuizGenerationCost(activeSet as AdminQuizSet)}
+              </button>
+              {questions ? (
+                <AdminQuizFigureStatusSummary
+                  approvedQuestions={quizQuestionNavigation.approvedQuestions}
+                  onNavigateToQuestion={navigateToQuizQuestion}
+                  pendingQuestions={quizQuestionNavigation.pendingQuestions}
+                  setId={activeSet.id}
+                />
+              ) : null}
             </>
           ) : null}
         </div>
@@ -1537,8 +1665,23 @@ function QuizSetPanel({
           )
         ) : null}
       </section>
+      {!isTest ? (
+        <AdminQuizGenerationHistoryDialog
+          isOpen={isGenerationHistoryOpen}
+          onClose={() => setIsGenerationHistoryOpen(false)}
+          quizSet={activeSet as AdminQuizSet}
+        />
+      ) : null}
     </div>
   );
+}
+
+function formatQuizGenerationCost(set: AdminQuizSet) {
+  const totalCostVnd = (set.aiGenerations ?? []).reduce(
+    (total, generation) => total + generation.totalCostVnd,
+    0,
+  );
+  return `${new Intl.NumberFormat("vi-VN").format(totalCostVnd)} VNĐ`;
 }
 
 function getSelectedQuizGenerationIssues(
@@ -1646,6 +1789,7 @@ function QuestionCard({
                   disabled={isReviewing}
                   onClick={onReview}
                   className="theme-button-primary-subtle inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:opacity-60"
+                  aria-keyshortcuts="Enter"
                 >
                   {isReviewing ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -1684,6 +1828,7 @@ function QuestionCard({
                   onClick={onPrevious}
                   className="theme-button-neutral grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Câu trước"
+                  aria-keyshortcuts="ArrowLeft"
                   title="Câu trước"
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -1694,6 +1839,7 @@ function QuestionCard({
                   onClick={onNext}
                   className="theme-button-neutral grid h-10 w-10 place-items-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Câu tiếp theo"
+                  aria-keyshortcuts="ArrowRight"
                   title="Câu tiếp theo"
                 >
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -1890,6 +2036,27 @@ function QuestionCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function isQuestionNavigationShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, math-field, [contenteditable="true"], [role="textbox"], [role="combobox"], [role="listbox"], [role="menu"], [role="slider"], [role="spinbutton"], [role="tablist"], [role="tree"]',
+    ),
+  );
+}
+
+function isQuestionReviewShortcutTarget(target: EventTarget | null) {
+  if (isQuestionNavigationShortcutTarget(target)) return true;
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      'a, button, summary, [role="button"], [role="link"], [role="menuitem"], [role="option"], [role="checkbox"], [role="radio"], [role="switch"]',
+    ),
   );
 }
 

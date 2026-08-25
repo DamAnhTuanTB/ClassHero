@@ -57,6 +57,10 @@ Codex phải ưu tiên:
 - API/data cho UI phải trả đúng metadata cần hiển thị, có pagination/list limit, tránh trả rich text/blob/include lớn nếu màn chưa dùng.
 - Tránh hydration mismatch trên mobile: formatter ngày/tiền/sort phải deterministic giữa server và client; browser-only logic chỉ chạy sau hydrate; attribute do browser/autofill chèn vào input phải được xử lý ở primitive phù hợp.
 - TanStack Query cho cache, `staleTime`, prefetch, mutation pending và invalidate.
+- Cấu hình AI theo phase dùng cùng một request `GET/PUT ai-configurations` cho
+  tối đa tám item; không fetch riêng từng feature hoặc từng phase. Modal sinh
+  Summary/Quiz nhận cả cấu hình text/ảnh từ panel data hiện có, không tạo query
+  model thứ hai khi mở modal.
 - Debounce search/filter/input gọi API liên tục.
 - Pagination/infinite query/virtualization cho danh sách dài.
 - Tối ưu image: kích thước phù hợp mobile, responsive image, lazy load ảnh ngoài viewport.
@@ -217,6 +221,11 @@ Performance và cost rules:
 - Compile + validator pass mới upload/promote delivery SVG lên R2. Candidate
   `NEEDS_REVIEW/FAILED` giữ private artifacts và không ghi đè current asset.
 - Student không compile hoặc poll job, chỉ tải current SVG/raster đã promote từ R2.
+- `NONE` không tạo job/asset hình lời giải và API không nhân đôi URL hình đề.
+  `EXTEND_QUESTION` và `REDRAW_AS_MODEL` đều có đúng một call Phase 2 cho hình
+  lời giải sau khi hình đề thành công; mode vẽ lại trả full source nhưng vẫn dùng
+  cùng queue, output budget và compile/validator pipeline, không gọi thêm một
+  provider chỉ để chuyển style.
 - Cache/idempotency dùng `sourceHash + sourceVersion`; source không đổi không
   được tạo lại cùng job đang active.
 - Giới hạn mặc định: source 40 KB, SVG 2 MB, 20.000 node, 1,5 triệu ký tự path,
@@ -229,10 +238,24 @@ Performance và cost rules:
 - Coverage/test representative phải trải lớp 3–12 và các package đã công bố,
   nhưng mặc định dùng fixture local. Live OpenAI test luôn opt-in và phải tuân
   cost guard.
+- Quiz `Tinh chỉnh` là một paid call theo thao tác chủ động, không chạy tự động
+  sau mỗi lần sinh. Worker tải SVG current tối đa 2 MB, raster PNG nền trắng với
+  cạnh dài tối đa 1600 px, gửi đúng một ảnh `detail=high` cùng source/plan và dùng
+  route `QUIZ/IMAGE`. Log/usage phải phân biệt operation `REFINE_CURRENT`, origin
+  và attempt kind `AI_REFINEMENT`; không log raw source, data URL hoặc object key.
+  Preview modal được phép raster hóa/tính token nhưng không gọi provider; JSON
+  hiển thị thay bytes ảnh bằng placeholder để tránh payload DOM quá lớn. UI giữ
+  current asset và hiển thị trạng thái candidate trong normal flow; không polling
+  hoặc gọi lại provider sau terminal state.
 
 Provider operations rules:
 
 - Timeline/breakdown lọc tối đa 366 ngày, event list phân trang và có index theo thời gian/category/provider/feature; chart admin không thêm thư viện nặng.
+- Nhãn mục đích của từng usage event phải ưu tiên operation cụ thể từ
+  `backgroundJob.resourceType` trước nhãn feature tổng quát. Tối thiểu phải phân
+  biệt `STEM_FIGURE` là `Tạo hình minh họa` và `QUIZ_FIGURE` là
+  `Tạo hình minh họa Quiz`; chỉ fallback về `SUMMARY`/`QUIZ`/`FLASHCARD`/`TEST`
+  khi event không có resource type chuyên biệt.
 - OCR cache hit không tạo delay giả. Mathpix retry resume `pdfId` đã lưu để tránh double-charge; debug artifact local tắt mặc định ở production.
 - Hard-stop `M9.12` serialize ngắn chỉ ở bước reserve theo `period + scope`; không giữ database lock trong lúc gọi provider. Lock scope theo thứ tự cố định để tránh deadlock.
 - Reservation AI lấy giới hạn input/output từ cấu hình của đúng feature, không
@@ -318,6 +341,10 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   prompt cache `in_memory`; không gửi các mảng báo cáo tự kiểm không được worker
   tiêu thụ. Request trace phải ghi requested/resolved strategy, schema bytes và
   ước tính text/image/total token; Quiz giữ trace trong durable job input metadata.
+- Prompt cache, request draft và trace của Sinh kiến thức/Quiz phải phân vùng theo
+  `subjectKey`; figure Phase 2 phân vùng thêm theo mode/role. Prompt version dùng
+  cho Toán, Lý và Hóa phải khác nhau để cache hit hoặc retry không thể tái sử dụng
+  system prompt chuyên môn của môn khác.
 - Preview request tạo lại STEM figure chỉ chạy theo thao tác `Xem dữ liệu` hoặc
   `Cập nhật dữ liệu`; đổi nguồn ảnh phải invalidate preview phía client thay vì
   âm thầm giữ request cũ. Preview chỉ resolve route/schema và ước tính token/chi

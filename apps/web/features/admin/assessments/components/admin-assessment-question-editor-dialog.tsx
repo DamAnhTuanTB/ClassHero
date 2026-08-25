@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
-import { useEffect } from "react";
+import { Check, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -20,6 +20,12 @@ import {
   QuizRichContentEditor,
   ScientificAnswerField,
 } from "@/features/admin/quiz/components/quiz-rich-content-editor";
+import {
+  ADMIN_QUIZ_FIGURE_ROLES,
+  AdminQuizFigureUploadFields,
+  type AdminQuizDraftFigureFiles,
+  type AdminQuizFigureRole,
+} from "@/features/admin/quiz/components/admin-quiz-figure-upload-fields";
 import {
   useAdminQuizFigureUpload,
   useAdminQuizQuestionMutations,
@@ -187,6 +193,10 @@ export function AdminAssessmentQuestionEditorDialog({
   const uploadQuizFigure = useAdminQuizFigureUpload(setId);
   const quizQuestion =
     assessmentKind === "quiz" ? (question as AdminQuizQuestion | null) : null;
+  const [draftFigureFiles, setDraftFigureFiles] =
+    useState<AdminQuizDraftFigureFiles>({});
+  const [isUploadingNewQuestionFigures, setIsUploadingNewQuestionFigures] =
+    useState(false);
   const { createQuestion: createTestQuestion, updateQuestion: updateTestQuestion } =
     useAdminTestQuestionMutations(setId, lessonId);
   const form = useForm<QuestionFormValues>({
@@ -204,14 +214,61 @@ export function AdminAssessmentQuestionEditorDialog({
   const correctOptionId = form.watch("correctOptionId");
   const statementValues = form.watch("statements");
   const isSaving =
-    assessmentKind === "test"
+    isUploadingNewQuestionFigures ||
+    (assessmentKind === "test"
       ? createTestQuestion.isPending || updateTestQuestion.isPending
-      : createQuestion.isPending || updateQuestion.isPending;
+      : createQuestion.isPending || updateQuestion.isPending);
 
   useEffect(() => {
     if (!isOpen) return;
     form.reset(question ? toFormValues(question) : createEmptyDefaults());
+    setDraftFigureFiles({});
   }, [form, isOpen, question]);
+
+  const selectQuizFigureFile = async (role: AdminQuizFigureRole, file: File) => {
+    if (!quizQuestion) {
+      setDraftFigureFiles((current) => ({ ...current, [role]: file }));
+      return;
+    }
+
+    try {
+      await uploadQuizFigure.mutateAsync({
+        questionId: quizQuestion.id,
+        role,
+        file,
+        altText: getQuizFigureAltText(role),
+      });
+      toast.success("Đã cập nhật hình Quiz");
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(error, "Chưa thể tải hình Quiz lên."),
+      );
+    }
+  };
+
+  const uploadDraftFigures = async (questionId: string) => {
+    const failedRoles: AdminQuizFigureRole[] = [];
+    setIsUploadingNewQuestionFigures(true);
+    try {
+      for (const role of ADMIN_QUIZ_FIGURE_ROLES) {
+        const file = draftFigureFiles[role];
+        if (!file) continue;
+        try {
+          await uploadQuizFigure.mutateAsync({
+            questionId,
+            role,
+            file,
+            altText: getQuizFigureAltText(role),
+          });
+        } catch {
+          failedRoles.push(role);
+        }
+      }
+    } finally {
+      setIsUploadingNewQuestionFigures(false);
+    }
+    return failedRoles;
+  };
 
   const submit = form.handleSubmit(async (values) => {
     const payload = toPayload(values);
@@ -232,10 +289,20 @@ export function AdminAssessmentQuestionEditorDialog({
       } else {
         if (assessmentKind === "test") {
           await createTestQuestion.mutateAsync(payload);
+          toast.success("Đã thêm câu hỏi");
         } else {
-          await createQuestion.mutateAsync(payload);
+          const createdQuestion = await createQuestion.mutateAsync(payload);
+          const failedFigureRoles = await uploadDraftFigures(createdQuestion.id);
+          if (failedFigureRoles.length > 0) {
+            toast.warning(
+              `Đã thêm câu hỏi nhưng chưa tải được ${failedFigureRoles
+                .map(getQuizFigureRoleLabel)
+                .join(" và ")}. Bạn có thể mở chỉnh sửa để tải lại.`,
+            );
+          } else {
+            toast.success("Đã thêm câu hỏi");
+          }
         }
-        toast.success("Đã thêm câu hỏi");
       }
       onClose();
     } catch (error) {
@@ -330,92 +397,16 @@ export function AdminAssessmentQuestionEditorDialog({
             </div>
           </div>
 
-          {quizQuestion ? (
-            <section className="space-y-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-4">
-              <div>
-                <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                  Hình minh họa riêng của Quiz
-                </h3>
-                <p className="mt-1 text-xs font-medium text-[var(--theme-text-muted)]">
-                  Hình đề hiển thị khi làm bài. Hình lời giải chỉ hiển thị sau khi kiểm
-                  tra đáp án và phải được dựng trên hình đề.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {(["QUESTION", "SOLUTION"] as const).map((role) => {
-                  const figure = quizQuestion.figures?.find((item) => item.role === role);
-                  const imageUrl = figure?.currentRevision?.deliveryFile?.publicUrl;
-                  const isPending =
-                    uploadQuizFigure.isPending &&
-                    uploadQuizFigure.variables?.role === role;
-                  return (
-                    <div
-                      key={role}
-                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
-                    >
-                      <p className="text-sm font-extrabold text-[var(--theme-text-strong)]">
-                        {role === "QUESTION" ? "Hình đề" : "Hình lời giải"}
-                      </p>
-                      {imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={imageUrl}
-                          alt={
-                            figure?.currentRevision?.altText ??
-                            (role === "QUESTION" ? "Hình đề Quiz" : "Hình lời giải Quiz")
-                          }
-                          className="mt-2 max-h-44 w-full rounded-lg object-contain"
-                        />
-                      ) : (
-                        <p className="mt-2 text-xs font-semibold text-[var(--theme-text-muted)]">
-                          {figure
-                            ? `Trạng thái: ${figure.status}`
-                            : "Chưa có hình được tải lên."}
-                        </p>
-                      )}
-                      <label className="theme-button-primary-subtle mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-extrabold">
-                        {isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <Upload className="h-4 w-4" aria-hidden="true" />
-                        )}
-                        {imageUrl ? "Thay hình" : "Tải hình lên"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          disabled={uploadQuizFigure.isPending}
-                          onChange={async (event) => {
-                            const file = event.currentTarget.files?.[0];
-                            event.currentTarget.value = "";
-                            if (!file) return;
-                            try {
-                              await uploadQuizFigure.mutateAsync({
-                                questionId: quizQuestion.id,
-                                role,
-                                file,
-                                altText:
-                                  role === "QUESTION"
-                                    ? "Hình minh họa đề bài Quiz"
-                                    : "Hình minh họa lời giải Quiz mở rộng từ hình đề",
-                              });
-                              toast.success("Đã cập nhật hình Quiz");
-                            } catch (error) {
-                              toast.error(
-                                getUserFacingErrorMessage(
-                                  error,
-                                  "Chưa thể tải hình Quiz lên.",
-                                ),
-                              );
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+          {assessmentKind === "quiz" ? (
+            <AdminQuizFigureUploadFields
+              question={quizQuestion}
+              draftFiles={draftFigureFiles}
+              disabled={uploadQuizFigure.isPending || isSaving}
+              pendingRole={
+                uploadQuizFigure.isPending ? uploadQuizFigure.variables?.role : undefined
+              }
+              onFileSelect={selectQuizFigureFile}
+            />
           ) : null}
 
           {questionType === "MULTIPLE_CHOICE" ? (
@@ -951,6 +942,16 @@ function getStringAnswers(
     correctAnswer.every((answer): answer is string => typeof answer === "string")
     ? correctAnswer
     : [];
+}
+
+function getQuizFigureAltText(role: AdminQuizFigureRole) {
+  return role === "QUESTION"
+    ? "Hình minh họa đề bài Quiz"
+    : "Hình minh họa lời giải Quiz mở rộng từ hình đề";
+}
+
+function getQuizFigureRoleLabel(role: AdminQuizFigureRole) {
+  return role === "QUESTION" ? "hình đề" : "hình lời giải";
 }
 
 function getMultiStatementAnswers(

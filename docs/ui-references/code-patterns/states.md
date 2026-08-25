@@ -22,6 +22,10 @@ Dùng cho màn có data/action.
   hữu feedback loading; button nguồn giữ nguyên icon/label, không render
   spinner, progress hoặc copy `Đang...`, nhưng vẫn khóa bấm lặp bằng state nội
   bộ/disabled.
+- Khi tác vụ đang tạo candidate mới nhưng vẫn giữ media hiện hành, progress phải
+  nằm trong normal flow ở một khối riêng bên dưới media. Không dùng margin âm,
+  absolute positioning hoặc bỏ biên phía trên khiến progress chồng lên nội dung
+  hiện hành.
 - Full-page loading/error phải căn giữa cả chiều ngang lẫn chiều dọc bằng vùng bao có chiều cao viewport. State trong shell có header/sidebar căn giữa phần nội dung còn lại; state trong tab/card chỉ căn giữa vùng được cấp.
 - Với initial loading ngắn, trì hoãn hiển thị khoảng `250-300ms`; nếu loading đã xuất hiện thì giữ tối thiểu khoảng `300ms` để tránh nháy.
 - Fetch/prefetch dữ liệu của các tab ngay khi đủ dependency và chạy song song khi có thể; khi đổi tab, ưu tiên cache và không thay dữ liệu đang có bằng skeleton chỉ vì background refetch.

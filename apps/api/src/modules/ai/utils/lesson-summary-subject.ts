@@ -1,5 +1,3 @@
-import { STEM_FIGURE_TOOLBOX_MANIFEST } from "@learning-path/shared";
-
 import type {
   LessonSummarySubjectKey,
   LessonSummarySubjectSnapshot,
@@ -47,96 +45,6 @@ function normalizeSubjectAlias(value: string) {
     .replaceAll(/[^a-z0-9]+/gu, "-")
     .replaceAll(/^-|-$/gu, "");
 }
-
-export function buildLessonSummarySubjectProfile(subject: LessonSummarySubjectSnapshot) {
-  const heading = [
-    "### HỒ SƠ MÔN HỌC BẮT BUỘC",
-    `- Môn học cố định của khóa: ${subject.name}.`,
-    "- Chỉ dùng kiến thức, thuật ngữ, quy ước và cách trình bày thuộc môn học này; bỏ qua dữ liệu lạc môn nếu có trong tài liệu nguồn.",
-    "- Không pha thêm hướng dẫn chuyên môn của bất kỳ môn nào khác.",
-  ];
-
-  switch (subject.key) {
-    case "MATH":
-      return [
-        ...heading,
-        "- Quyết định figure theo quan hệ hình nguồn–block trong quy tắc hệ thống; không ép mọi block có hình chỉ vì bài được gọi là Hình học.",
-        "- Với hình học, kiểm tra đầy đủ các đối tượng và quan hệ cần thiết theo đề và hình nguồn; không dùng ngữ nghĩa để tự thêm dấu hiệu trình bày không quan sát được.",
-        "- Trong text ngoài hình, ký hiệu góc dùng ba tên điểm với đỉnh ở giữa và số đo độ dùng LaTeX chuẩn.",
-        "- Bài Số học/Đại số trình bày trực tiếp phép tính và chuỗi biến đổi. Bài chứng minh/dựng hình phải có mạch suy luận liên kết, nêu rõ căn cứ và kết luận; không biến toàn bộ lời giải thành checklist.",
-        "- Mỗi example Toán phải tự phân loại bằng `isGeometry`. Với bài Hình học lớp 7–9, `isGeometry=true` và `geometryStatement` bắt buộc khác null, là nơi duy nhất chứa bảng GT–KL: `hypotheses` chứa đúng dữ kiện đã cho, `conclusions` chứa đúng yêu cầu cần tìm/chứng minh. Với Hình học lớp 10–12, vẫn đặt `isGeometry=true` nhưng `geometryStatement=null`. Mọi nội dung không phải Hình học đặt `isGeometry=false` và `geometryStatement=null`; không chép bảng GT–KL vào solution và dùng giả thiết trực tiếp trong mạch lời giải.",
-      ].join("\n");
-    case "PHYSICS":
-      return [
-        ...heading,
-        "- Quyết định figure theo quan hệ hình nguồn–block trong quy tắc hệ thống; không tạo hình trang trí chỉ vì tên chủ đề.",
-        "- Kiểm tra chặt chẽ đại lượng, đơn vị SI, chiều vector, dấu, mốc quy chiếu và quy ước của hiện tượng trong bài.",
-        "- Sơ đồ mạch phải đúng nút nối, cực, chiều dòng điện và kí hiệu linh kiện; hình cơ học/quang học phải đúng phương, chiều, tia và tỉ lệ mang ý nghĩa vật lý.",
-      ].join("\n");
-    case "CHEMISTRY":
-      return [
-        ...heading,
-        "- Quyết định figure theo quan hệ hình nguồn–block trong quy tắc hệ thống; không tạo hình trang trí chỉ vì tên chủ đề.",
-        "- Kiểm tra chặt chẽ công thức chất, hóa trị, hệ số, điện tích, trạng thái, điều kiện phản ứng và bảo toàn nguyên tố theo dữ liệu nguồn.",
-        "- Phương trình, kí hiệu và công thức cấu tạo phải đúng quy ước Hóa học; nếu cần figure sơ đồ thí nghiệm thì phải giữ đúng dụng cụ, chất và chiều diễn biến quan sát được trong nguồn.",
-      ].join("\n");
-    case "GENERAL":
-      return [
-        ...heading,
-        "- Quyết định figure theo quan hệ hình nguồn–block trong quy tắc hệ thống; không tạo hình trang trí chỉ vì tên chủ đề.",
-        "- Chưa có profile chuyên môn riêng cho domain này; không tự suy diễn quy ước ngoài nguồn.",
-      ].join("\n");
-  }
-}
-
-export function buildStemFigureRepairSubjectProfile(
-  subject: LessonSummarySubjectSnapshot,
-) {
-  return [
-    buildStemFigureGenerationSubjectProfile(subject),
-    "- Khi sửa hình, chỉ sửa lỗi compile/validator được cung cấp và giữ nguyên ý nghĩa chuyên môn của hình.",
-  ].join("\n");
-}
-
-export function buildStemFigureGenerationSubjectProfile(
-  subject: LessonSummarySubjectSnapshot,
-) {
-  const heading = [
-    "### HỒ SƠ MÔN HỌC VÀ TOOLBOX",
-    `- Môn học cố định: ${subject.name}.`,
-    buildStemFigureSnippetContract(subject.key),
-  ];
-  switch (subject.key) {
-    case "MATH":
-      return heading.join("\n");
-    case "PHYSICS":
-      return [
-        ...heading,
-        "- Giữ đúng đơn vị, chiều vector, nút nối/cực mạch điện, tia sáng, mốc quy chiếu và quy ước vật lý.",
-      ].join("\n");
-    case "CHEMISTRY":
-      return [
-        ...heading,
-        "- Giữ đúng công thức, hóa trị, điện tích, hệ số, trạng thái, điều kiện phản ứng và bố trí thí nghiệm.",
-      ].join("\n");
-    case "GENERAL":
-      return [...heading, "- Không tự suy diễn quy ước chuyên môn ngoài brief."].join(
-        "\n",
-      );
-  }
-}
-
-function buildStemFigureSnippetContract(subjectKey: LessonSummarySubjectKey) {
-  const profile = STEM_FIGURE_TOOLBOX_MANIFEST.subjects[subjectKey];
-  return [
-    `- Renderer đã cài package: ${profile.packages.map(({ name, options }) => (options ? `${name}[${options}]` : name)).join(", ")}.`,
-    `- TikZ library được phép chọn trong local header: ${profile.tikzLibraries.join(", ") || "không có"}.`,
-    `- PGFPlots library được phép chọn trong local header: ${profile.pgfplotsLibraries.join(", ") || "không có"}.`,
-    `- Local header chỉ được dùng: ${profile.headerCommands.map((command) => `\\${command}`).join(", ")}.`,
-    `- Sau local header phải có đúng một root: ${profile.rootEnvironments.join(" hoặc ")}. axis chỉ được nằm bên trong tikzpicture.`,
-  ].join("\n");
-}
-
 export function buildLessonContentSubjectProfile(subject: LessonSummarySubjectSnapshot) {
   const heading = [
     "### HỒ SƠ MÔN HỌC BẮT BUỘC",

@@ -23,6 +23,7 @@ import { parseAiStructuredOutput } from "#api/modules/ai/utils/ai-output-validat
 import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured-output-format";
 import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
 import { QuizGenerationContextService } from "#api/modules/quiz/services/quiz-generation-context.service";
+import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import {
   getGeneratedQuizOutputSchema,
   quizGenerationJobInputSchema,
@@ -269,17 +270,25 @@ export class QuizGenerationService {
         },
       };
     });
+    const imageRouteSnapshot =
+      readImageRouteSnapshot(input.imageRouteSnapshot) ?? context.providerRouteSnapshot;
     await Promise.all(
       persisted.questionFigureIds.map((figureId) =>
         this.quizFigureJobs.enqueue(
           figureId,
           context.ownerUserId,
-          context.providerRouteSnapshot,
+          imageRouteSnapshot,
         ),
       ),
     );
     return persisted.response;
   }
+}
+
+function readImageRouteSnapshot(value: unknown): AiFeatureRoute | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as AiFeatureRoute)
+    : undefined;
 }
 
 function providerContext(context: AiGenerationExecutionContext) {
@@ -344,7 +353,7 @@ async function createGeneratedQuizQuestion(
     },
   });
   let questionFigureId: string | null = null;
-  if (question.figure.questionFigure) {
+  if (question.figure.requiresQuestionFigure) {
     const questionFigure = await tx.quizFigure.create({
       data: {
         lessonId: context.lessonId!,
@@ -355,7 +364,6 @@ async function createGeneratedQuizQuestion(
           version: 1,
           role: "QUESTION",
           problem: question.explanation.problem,
-          caption: question.figure.questionFigure.caption,
         }),
         subjectKey,
         subjectName,
@@ -373,7 +381,6 @@ async function createGeneratedQuizQuestion(
         status: "QUEUED",
         sourceVersion: 1,
         altText: buildQuestionFigureAltText(question.explanation.problem),
-        caption: question.figure.questionFigure.caption,
         createdById: context.ownerUserId,
       },
       select: { id: true },
@@ -383,7 +390,19 @@ async function createGeneratedQuizQuestion(
       data: { pendingRevisionId: questionRevision.id },
     });
 
-    if (question.figure.solutionFigureMode === "EXTEND_QUESTION") {
+    if (question.figure.solutionFigureMode !== "NONE") {
+      const persistedSolutionPlan =
+        question.figure.solutionFigureMode === "EXTEND_QUESTION"
+          ? {
+              addedObjects: question.figure.solutionFigurePlan.addedObjects,
+              clarifiedRelations: question.figure.solutionFigurePlan.clarifiedRelations,
+            }
+          : {
+              modelingGoal: question.figure.solutionFigurePlan.modelingGoal,
+              modeledObjects: question.figure.solutionFigurePlan.modeledObjects,
+              clarifiedRelations: question.figure.solutionFigurePlan.clarifiedRelations,
+            };
+      const isExtension = question.figure.solutionFigureMode === "EXTEND_QUESTION";
       const solutionFigure = await tx.quizFigure.create({
         data: {
           lessonId: context.lessonId!,
@@ -393,12 +412,10 @@ async function createGeneratedQuizQuestion(
           planJson: json({
             version: 1,
             role: "SOLUTION",
-            mode: "EXTEND_QUESTION",
+            mode: question.figure.solutionFigureMode,
             problem: question.explanation.problem,
             solution: getGeneratedQuizSolutionText(question),
-            addedObjects: question.figure.solutionFigurePlan.addedObjects,
-            clarifiedRelations: question.figure.solutionFigurePlan.clarifiedRelations,
-            caption: question.figure.questionFigure.caption,
+            ...persistedSolutionPlan,
           }),
           subjectKey,
           subjectName,
@@ -414,8 +431,7 @@ async function createGeneratedQuizQuestion(
           origin: "INITIAL_AI",
           status: "QUEUED",
           sourceVersion: 1,
-          altText: `Hình lời giải mở rộng cho ${buildQuestionFigureAltText(question.explanation.problem)}`,
-          caption: question.figure.questionFigure.caption,
+          altText: `${isExtension ? "Hình lời giải mở rộng" : "Mô hình toán học của lời giải"} cho ${buildQuestionFigureAltText(question.explanation.problem)}`,
           createdById: context.ownerUserId,
         },
         select: { id: true },

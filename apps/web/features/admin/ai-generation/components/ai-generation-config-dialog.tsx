@@ -66,6 +66,7 @@ export function AiGenerationConfigDialog({
   isSubmitting,
   lessonId,
   initialGenerationConfiguration,
+  initialFigureModelConfiguration,
   initialModelConfiguration,
   targetGrade,
   type,
@@ -77,6 +78,7 @@ export function AiGenerationConfigDialog({
   isSubmitting: boolean;
   lessonId: string;
   initialGenerationConfiguration?: Record<string, unknown> | null;
+  initialFigureModelConfiguration?: AdminAiModelConfiguration;
   initialModelConfiguration?: AdminAiModelConfiguration;
   targetGrade: number | null;
   type: AiGenerationConfigType;
@@ -143,6 +145,28 @@ export function AiGenerationConfigDialog({
       initialGenerationConfiguration !== undefined &&
       values.userPrompt.trim().length > 0;
     form.reset(values);
+    if (
+      type === "SUMMARY" &&
+      !values.summaryFigureModel &&
+      initialFigureModelConfiguration?.isDefaultConfigured &&
+      initialFigureModelConfiguration.resolvedModel
+    ) {
+      form.setValue("summaryFigureModel", initialFigureModelConfiguration.resolvedModel);
+      form.setValue(
+        "summaryFigureTemperature",
+        readNumericText(initialFigureModelConfiguration.temperature),
+      );
+      form.setValue(
+        "summaryFigureReasoningEffort",
+        isAiReasoningEffort(initialFigureModelConfiguration.reasoningEffort)
+          ? initialFigureModelConfiguration.reasoningEffort
+          : "",
+      );
+      form.setValue(
+        "summaryFigureMaxOutputTokens",
+        readNumericText(initialFigureModelConfiguration.maxOutputTokens),
+      );
+    }
     resetPreview();
     setPreviewErrorMessage(null);
     setSummaryPreviewTab("system");
@@ -220,6 +244,7 @@ export function AiGenerationConfigDialog({
     documents,
     form,
     initialGenerationConfiguration,
+    initialFigureModelConfiguration,
     isOpen,
     initialModelConfiguration,
     previewPrompt,
@@ -241,6 +266,8 @@ export function AiGenerationConfigDialog({
   const targetWordCountField = form.register("summaryTargetWordCount");
   const temperatureField = form.register("summaryTemperature");
   const maxOutputTokensField = form.register("summaryMaxOutputTokens");
+  const figureTemperatureField = form.register("summaryFigureTemperature");
+  const figureMaxOutputTokensField = form.register("summaryFigureMaxOutputTokens");
 
   const selectedModelId = form.watch("summaryModel");
   const previewConfiguration = summaryPreviewData?.configuration;
@@ -252,6 +279,14 @@ export function AiGenerationConfigDialog({
   const aiConfigurationCapability = selectedModelInfo?.capabilities?.aiConfiguration;
   const configuredReasoningEffortLevels =
     selectedModelInfo?.capabilities?.reasoningEffortLevels;
+  const selectedFigureModel = form.watch("summaryFigureModel");
+  const selectedFigureModelInfo = initialFigureModelConfiguration?.modelOptions.find(
+    (option) => option.model === selectedFigureModel,
+  );
+  const figureCapability = selectedFigureModelInfo?.capabilities?.aiConfiguration;
+  const figureReasoningOptions = buildReasoningOptions(
+    selectedFigureModelInfo?.capabilities?.reasoningEffortLevels,
+  );
 
   const reasoningOptions = [
     { value: "", label: "Mặc định của model" },
@@ -651,122 +686,208 @@ export function AiGenerationConfigDialog({
                 {...form.register("extraInstructions")}
               />
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <OptionField
-                  id="ai-summary-model"
-                  label="Model"
-                  value={form.watch("summaryModel")}
-                  options={[
-                    ...(modelConfiguration?.isDefaultConfigured
-                      ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
-                      : []),
-                    ...(modelConfiguration?.modelOptions ?? []).map((option) => ({
-                      value: option.model,
-                      label: `${formatProviderLabel(option.provider)} · ${option.model}${
-                        option.available ? "" : " · Chưa khả dụng"
-                      }`,
-                      disabled: !option.available,
-                    })),
-                  ]}
-                  icon={null}
-                  error={form.formState.errors.summaryModel}
-                  onChange={(value) => {
-                    form.setValue("summaryModel", value, {
-                      shouldDirty: true,
-                      shouldTouch: true,
-                      shouldValidate: true,
-                    });
-                    if (value || modelConfiguration?.isDefaultConfigured) {
-                      form.clearErrors("summaryModel");
-                    } else {
-                      form.setError("summaryModel", { message: "Vui lòng chọn model" });
-                    }
-                    const nextModel = modelConfiguration?.modelOptions.find(
-                      (option) => option.model === value,
-                    );
-                    const nextCapability = nextModel?.capabilities?.aiConfiguration;
-                    const allowedReasoningEffortLevels =
-                      nextModel?.capabilities?.reasoningEffortLevels?.filter(
-                        isAiReasoningEffort,
-                      ) ?? [];
-                    const currentReasoningEffort = form.getValues(
-                      "summaryReasoningEffort",
-                    );
-                    if (
-                      currentReasoningEffort &&
-                      (value === "" ||
-                        nextCapability !== "REASONING_EFFORT" ||
-                        !allowedReasoningEffortLevels.includes(currentReasoningEffort))
-                    ) {
-                      form.setValue("summaryReasoningEffort", "", {
+              <section className="space-y-4 rounded-xl border border-[var(--theme-primary-border)] bg-[var(--theme-primary-soft)] p-4">
+                <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                  Phase 1 · Model tạo nội dung
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <OptionField
+                    id="ai-summary-model"
+                    label="Model"
+                    value={form.watch("summaryModel")}
+                    options={[
+                      ...(modelConfiguration?.isDefaultConfigured
+                        ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
+                        : []),
+                      ...(modelConfiguration?.modelOptions ?? []).map((option) => ({
+                        value: option.model,
+                        label: `${formatProviderLabel(option.provider)} · ${option.model}${
+                          option.available ? "" : " · Chưa khả dụng"
+                        }`,
+                        disabled: !option.available,
+                      })),
+                    ]}
+                    icon={null}
+                    error={form.formState.errors.summaryModel}
+                    onChange={(value) => {
+                      form.setValue("summaryModel", value, {
                         shouldDirty: true,
                         shouldTouch: true,
                         shouldValidate: true,
                       });
-                    }
-                    if (
-                      form.getValues("summaryTemperature") &&
-                      (value === "" || nextCapability !== "TEMPERATURE")
-                    ) {
-                      form.setValue("summaryTemperature", "", {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      });
-                    }
-                  }}
-                />
-                {form.watch("summaryModel") === "" ? (
-                  <div className="hidden sm:block" aria-hidden="true" />
-                ) : (
-                  <>
-                    {showReasoningEffort && (
-                      <OptionField
-                        id="ai-summary-reasoning-effort"
-                        label="Reasoning Effort"
-                        value={form.watch("summaryReasoningEffort") || ""}
-                        options={reasoningOptions}
-                        icon={null}
-                        error={form.formState.errors.summaryReasoningEffort}
-                        onChange={(value) => {
-                          if (value !== "" && !isAiReasoningEffort(value)) return;
-                          form.setValue("summaryReasoningEffort", value, {
-                            shouldDirty: true,
-                            shouldTouch: true,
-                            shouldValidate: true,
-                          });
-                        }}
-                      />
-                    )}
-                    {showTemperature && (
-                      <TextField
-                        id="ai-summary-temperature"
-                        label="Temperature"
-                        inputMode="decimal"
-                        icon={null}
-                        error={form.formState.errors.summaryTemperature}
-                        {...temperatureField}
-                        onChange={decimalChange(temperatureField.onChange)}
-                      />
-                    )}
-                    {!showReasoningEffort && !showTemperature && (
-                      <div className="hidden sm:block" aria-hidden="true" />
-                    )}
-                  </>
+                      if (value || modelConfiguration?.isDefaultConfigured) {
+                        form.clearErrors("summaryModel");
+                      } else {
+                        form.setError("summaryModel", { message: "Vui lòng chọn model" });
+                      }
+                      const nextModel = modelConfiguration?.modelOptions.find(
+                        (option) => option.model === value,
+                      );
+                      const nextCapability = nextModel?.capabilities?.aiConfiguration;
+                      const allowedReasoningEffortLevels =
+                        nextModel?.capabilities?.reasoningEffortLevels?.filter(
+                          isAiReasoningEffort,
+                        ) ?? [];
+                      const currentReasoningEffort = form.getValues(
+                        "summaryReasoningEffort",
+                      );
+                      if (
+                        currentReasoningEffort &&
+                        (value === "" ||
+                          nextCapability !== "REASONING_EFFORT" ||
+                          !allowedReasoningEffortLevels.includes(currentReasoningEffort))
+                      ) {
+                        form.setValue("summaryReasoningEffort", "", {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        });
+                      }
+                      if (
+                        form.getValues("summaryTemperature") &&
+                        (value === "" || nextCapability !== "TEMPERATURE")
+                      ) {
+                        form.setValue("summaryTemperature", "", {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
+                  />
+                  {form.watch("summaryModel") === "" ? (
+                    <div className="hidden sm:block" aria-hidden="true" />
+                  ) : (
+                    <>
+                      {showReasoningEffort && (
+                        <OptionField
+                          id="ai-summary-reasoning-effort"
+                          label="Reasoning Effort"
+                          value={form.watch("summaryReasoningEffort") || ""}
+                          options={reasoningOptions}
+                          icon={null}
+                          error={form.formState.errors.summaryReasoningEffort}
+                          onChange={(value) => {
+                            if (value !== "" && !isAiReasoningEffort(value)) return;
+                            form.setValue("summaryReasoningEffort", value, {
+                              shouldDirty: true,
+                              shouldTouch: true,
+                              shouldValidate: true,
+                            });
+                          }}
+                        />
+                      )}
+                      {showTemperature && (
+                        <TextField
+                          id="ai-summary-temperature"
+                          label="Temperature"
+                          inputMode="decimal"
+                          icon={null}
+                          error={form.formState.errors.summaryTemperature}
+                          {...temperatureField}
+                          onChange={decimalChange(temperatureField.onChange)}
+                        />
+                      )}
+                      {!showReasoningEffort && !showTemperature && (
+                        <div className="hidden sm:block" aria-hidden="true" />
+                      )}
+                    </>
+                  )}
+                </div>
+                {form.watch("summaryModel") !== "" && (
+                  <TextField
+                    id="ai-summary-max-output-tokens"
+                    label="Giới hạn token đầu ra"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    icon={null}
+                    error={form.formState.errors.summaryMaxOutputTokens}
+                    {...maxOutputTokensField}
+                    onChange={numericChange(maxOutputTokensField.onChange)}
+                  />
                 )}
-              </div>
-              {form.watch("summaryModel") !== "" && (
-                <TextField
-                  id="ai-summary-max-output-tokens"
-                  label="Giới hạn token đầu ra"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  icon={null}
-                  error={form.formState.errors.summaryMaxOutputTokens}
-                  {...maxOutputTokensField}
-                  onChange={numericChange(maxOutputTokensField.onChange)}
-                />
-              )}
+              </section>
+
+              <section className="space-y-4 rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-bg)] p-4">
+                <div>
+                  <h3 className="text-sm font-extrabold text-[var(--theme-text-strong)]">
+                    Phase 2 · Model tạo hình
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold text-[var(--theme-text-muted)]">
+                    Chỉ dùng cho các hình được tạo sau khi nội dung Phase 1 hoàn tất.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <OptionField
+                    id="ai-summary-figure-model"
+                    label="Model tạo hình"
+                    value={selectedFigureModel}
+                    options={[
+                      ...(initialFigureModelConfiguration?.isDefaultConfigured
+                        ? [{ value: "", label: "Tự động theo Cài đặt AI" }]
+                        : []),
+                      ...(initialFigureModelConfiguration?.modelOptions ?? []).map(
+                        (option) => ({
+                          value: option.model,
+                          label: `${formatProviderLabel(option.provider)} · ${option.model}${
+                            option.available ? "" : " · Chưa khả dụng"
+                          }`,
+                          disabled: !option.available,
+                        }),
+                      ),
+                    ]}
+                    icon={null}
+                    error={form.formState.errors.summaryFigureModel}
+                    onChange={(value) => {
+                      form.setValue("summaryFigureModel", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }}
+                  />
+                  {selectedFigureModel &&
+                  supportsReasoningEffort(selectedFigureModel, figureCapability) ? (
+                    <OptionField
+                      id="ai-summary-figure-reasoning-effort"
+                      label="Reasoning Effort"
+                      value={form.watch("summaryFigureReasoningEffort")}
+                      options={figureReasoningOptions}
+                      icon={null}
+                      error={form.formState.errors.summaryFigureReasoningEffort}
+                      onChange={(value) => {
+                        if (value !== "" && !isAiReasoningEffort(value)) return;
+                        form.setValue("summaryFigureReasoningEffort", value, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }}
+                    />
+                  ) : selectedFigureModel &&
+                    supportsTemperature(selectedFigureModel, figureCapability) ? (
+                    <TextField
+                      id="ai-summary-figure-temperature"
+                      label="Temperature"
+                      inputMode="decimal"
+                      icon={null}
+                      error={form.formState.errors.summaryFigureTemperature}
+                      {...figureTemperatureField}
+                      onChange={decimalChange(figureTemperatureField.onChange)}
+                    />
+                  ) : null}
+                </div>
+                {selectedFigureModel ? (
+                  <TextField
+                    id="ai-summary-figure-max-output-tokens"
+                    label="Giới hạn token đầu ra tạo hình"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    icon={null}
+                    error={form.formState.errors.summaryFigureMaxOutputTokens}
+                    {...figureMaxOutputTokensField}
+                    onChange={numericChange(figureMaxOutputTokensField.onChange)}
+                  />
+                ) : null}
+              </section>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-semibold text-[var(--theme-text-muted)]">
@@ -1028,6 +1149,10 @@ function getDefaultValues(
     summaryTemperature: "",
     summaryReasoningEffort: "",
     summaryMaxOutputTokens: "",
+    summaryFigureModel: "",
+    summaryFigureTemperature: "",
+    summaryFigureReasoningEffort: "",
+    summaryFigureMaxOutputTokens: "",
     count: type === "FLASHCARD" ? "10" : "8",
     difficulty: "MIXED",
     questionTypes: questionTypeOptions.map((option) => option.value),
@@ -1051,7 +1176,9 @@ function getInitialValues(
   if (type !== "SUMMARY" || !initialConfiguration) return defaults;
 
   const availableDocumentIds = new Set(
-    documents.filter((document) => document.canUseForSummary).map((document) => document.id),
+    documents
+      .filter((document) => document.canUseForSummary)
+      .map((document) => document.id),
   );
   const restoredDocumentIds = readStringArray(initialConfiguration.documentIds).filter(
     (documentId) => availableDocumentIds.has(documentId),
@@ -1099,6 +1226,19 @@ function getInitialValues(
       ? initialConfiguration.reasoningEffort
       : defaults.summaryReasoningEffort,
     summaryMaxOutputTokens: readNumericText(initialConfiguration.maxOutputTokens),
+    summaryFigureModel: readString(
+      initialConfiguration.figureModel,
+      defaults.summaryFigureModel,
+    ),
+    summaryFigureTemperature: readNumericText(initialConfiguration.figureTemperature),
+    summaryFigureReasoningEffort: isAiReasoningEffort(
+      initialConfiguration.figureReasoningEffort,
+    )
+      ? initialConfiguration.figureReasoningEffort
+      : defaults.summaryFigureReasoningEffort,
+    summaryFigureMaxOutputTokens: readNumericText(
+      initialConfiguration.figureMaxOutputTokens,
+    ),
   };
 }
 
@@ -1106,8 +1246,8 @@ function getModelConfigurationCapability(
   configuration: AdminAiModelConfiguration | undefined,
   model: string,
 ) {
-  return configuration?.modelOptions.find((option) => option.model === model)?.capabilities
-    ?.aiConfiguration;
+  return configuration?.modelOptions.find((option) => option.model === model)
+    ?.capabilities?.aiConfiguration;
 }
 
 function readString(value: unknown, fallback: string) {
@@ -1230,7 +1370,35 @@ function toSummaryPayload(
     ...(values.summaryMaxOutputTokens
       ? { maxOutputTokens: Number(values.summaryMaxOutputTokens) }
       : {}),
+    ...(values.summaryFigureModel ? { figureModel: values.summaryFigureModel } : {}),
+    ...(values.summaryFigureModel && values.summaryFigureTemperature
+      ? { figureTemperature: Number(values.summaryFigureTemperature) }
+      : {}),
+    ...(values.summaryFigureModel && values.summaryFigureReasoningEffort
+      ? { figureReasoningEffort: values.summaryFigureReasoningEffort }
+      : {}),
+    ...(values.summaryFigureMaxOutputTokens
+      ? { figureMaxOutputTokens: Number(values.summaryFigureMaxOutputTokens) }
+      : {}),
   };
+}
+
+function buildReasoningOptions(levels: string[] | undefined) {
+  const labels: Record<string, string> = {
+    minimal: "Tối thiểu (Minimal)",
+    low: "Thấp (Low)",
+    medium: "Trung bình (Medium)",
+    high: "Cao (High)",
+    none: "Không (None)",
+    xhigh: "Rất cao (Extra High)",
+    max: "Tối đa (Max)",
+  };
+  return [
+    { value: "", label: "Mặc định của model" },
+    ...(levels ?? [])
+      .filter(isAiReasoningEffort)
+      .map((level) => ({ value: level, label: labels[level] ?? level })),
+  ];
 }
 
 function numericChange(

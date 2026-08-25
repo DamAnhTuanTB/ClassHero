@@ -1,6 +1,6 @@
 "use client";
 
-import { Captions, Trash2 } from "lucide-react";
+import { Captions, Trash2, WandSparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -36,6 +36,13 @@ const CaptionDialog = dynamic(
     ),
   { ssr: false },
 );
+const RefinementDialog = dynamic(
+  () =>
+    import(
+      "@/features/admin/quiz/components/admin-quiz-figure-refinement-dialog"
+    ).then((module) => module.AdminQuizFigureRefinementDialog),
+  { ssr: false },
+);
 
 export function AdminQuizFigureActionFrame({
   children,
@@ -55,7 +62,14 @@ export function AdminQuizFigureActionFrame({
   const [showAi, setShowAi] = useState(false);
   const [showCaption, setShowCaption] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showRefinement, setShowRefinement] = useState(false);
   const revision = figure.currentRevision;
+  const canRefine = Boolean(
+    figure.status === "SUCCEEDED" &&
+      revision?.sourceKind === "AI_TEX" &&
+      revision.latexSource?.trim() &&
+      revision.deliveryFile?.mimeType === "image/svg+xml",
+  );
 
   async function upload(file: File) {
     try {
@@ -85,11 +99,23 @@ export function AdminQuizFigureActionFrame({
   return (
     <>
       <div
-        className="relative isolate [&>:first-child]:pt-16"
+        className="relative isolate mx-auto w-full max-w-2xl [&>:first-child]:pt-16"
         data-testid="admin-quiz-figure-action-frame"
       >
         {children}
         <div className="absolute right-14 top-3 z-30 flex items-center gap-2 sm:right-16 sm:top-4">
+          {canRefine ? (
+            <ImmediateTooltip content="Tinh chỉnh bằng AI">
+              <button
+                aria-label="Tinh chỉnh bằng AI"
+                className="theme-button-primary-subtle grid h-9 w-9 place-items-center rounded-lg shadow-sm"
+                onClick={() => setShowRefinement(true)}
+                type="button"
+              >
+                <WandSparkles className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </ImmediateTooltip>
+          ) : null}
           {revision ? (
             <ImmediateTooltip content="Chỉnh sửa caption">
               <button
@@ -163,6 +189,15 @@ export function AdminQuizFigureActionFrame({
           figure={figure}
           isOpen
           onClose={() => setShowCaption(false)}
+          questionId={questionId}
+          setId={setId}
+        />
+      ) : null}
+      {showRefinement ? (
+        <RefinementDialog
+          figure={figure}
+          isOpen
+          onClose={() => setShowRefinement(false)}
           questionId={questionId}
           setId={setId}
         />

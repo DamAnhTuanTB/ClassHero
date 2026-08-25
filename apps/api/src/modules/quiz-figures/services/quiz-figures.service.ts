@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { AiGenerationType, QuizFigureRole } from "@prisma/client";
+import { AiGenerationType, AiModelPurpose, QuizFigureRole } from "@prisma/client";
 
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import { PrismaService } from "#api/common/prisma/prisma.service";
@@ -8,24 +8,36 @@ import {
   type ResolvedAiStructuredRequestPreview,
 } from "#api/modules/ai/services/ai-provider-call.service";
 import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
-import { buildOpenAiStructuredResponseRequest } from "#api/modules/ai/utils/openai-response-request";
+import {
+  buildOpenAiStructuredResponseRequest,
+  OPENAI_PREVIEW_BINARY_DATA,
+} from "#api/modules/ai/utils/openai-response-request";
 import type {
   ApplyQuizFigureDraftDto,
   CompileQuizFigureDraftDto,
   CreateQuizFigureAiDto,
   QuizFigureRevisionGuardDto,
+  RefineQuizFigureWithAiDto,
   UpdateQuizFigureCaptionDto,
 } from "#api/modules/quiz-figures/dto/quiz-figure-revision.dto";
 import { QuizFigureArtifactService } from "#api/modules/quiz-figures/services/quiz-figure-artifact.service";
 import { QuizFigureDraftService } from "#api/modules/quiz-figures/services/quiz-figure-draft.service";
 import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-figure-job.service";
 import {
+  buildQuizFigureRefinementInput,
   buildQuestionFigureInput,
   buildSolutionFigureExtensionInput,
+  buildSolutionFigureRedrawInput,
+  generatedQuizFigureRefinementSchema,
   generatedQuizQuestionFigureSchema,
   generatedQuizSolutionExtensionSchema,
+  generatedQuizSolutionRedrawSchema,
+  quizFigurePlanSchema,
+  readQuizFigureTargetGrade,
+  resolveQuizFigureSystemPrompt,
   type QuizFigurePlan,
 } from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
+import { buildQuizFigureRefinementImageDataUrl } from "#api/modules/quiz-figures/utils/quiz-figure-refinement-image";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
@@ -56,7 +68,7 @@ export class QuizFiguresService {
   }) {
     const question = await this.prisma.quizQuestion.findFirst({
       where: { id: input.questionId, deletedAt: null },
-      select: { id: true, lessonId: true },
+      select: { id: true, lessonId: true, solutionFigureMode: true },
     });
     if (!question) {
       throw notFoundException("QUIZ_QUESTION_NOT_FOUND", "Không tìm thấy câu Quiz.");
@@ -118,7 +130,12 @@ export class QuizFiguresService {
         }),
         this.prisma.quizQuestion.update({
           where: { id: question.id },
-          data: { solutionFigureMode: "EXTEND_QUESTION" },
+          data: {
+            solutionFigureMode:
+              question.solutionFigureMode === "REDRAW_AS_MODEL"
+                ? "REDRAW_AS_MODEL"
+                : "EXTEND_QUESTION",
+          },
         }),
       ]);
     }
@@ -154,6 +171,8 @@ export class QuizFiguresService {
   ) {
     const figure = await this.requireFigure(questionId, figureId);
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
+    const plan = readPlan(figure.planJson);
+    this.assertPlanRole(figure.role, plan);
     if (
       dto.mode === "EDIT_CURRENT" &&
       (figure.currentRevision?.sourceKind !== "AI_TEX" ||
@@ -210,7 +229,11 @@ export class QuizFiguresService {
         lastErrorMessage: null,
       },
     });
-    const routeSnapshot = await this.resolveAiRoute(dto, figure.role);
+    const routeSnapshot = await this.resolveAiRoute(
+      dto,
+      figure.role,
+      plan.role === "SOLUTION" ? plan.mode : undefined,
+    );
     const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
       adminInstructions: dto.adminInstructions?.trim() || null,
       aiMode: dto.mode,
@@ -234,14 +257,27 @@ export class QuizFiguresService {
       );
     }
     const plan = readPlan(figure.planJson);
+    this.assertPlanRole(figure.role, plan);
     const subject = readSubject(figure);
-    const routeSnapshot = await this.resolveAiRoute(dto, figure.role);
+    const targetGrade = readQuizFigureTargetGrade(figure.aiGeneration?.inputMetaJson);
+    const routeSnapshot = await this.resolveAiRoute(
+      dto,
+      figure.role,
+      plan.role === "SOLUTION" ? plan.mode : undefined,
+    );
     let structuredInput: AiStructuredInput;
     let trace: ResolvedAiStructuredRequestPreview;
     if (figure.role === QuizFigureRole.QUESTION) {
+      if (plan.role !== "QUESTION") {
+        throw badRequestException(
+          "QUIZ_FIGURE_PLAN_INVALID",
+          "Dữ liệu dựng hình đề của câu Quiz không hợp lệ.",
+        );
+      }
       structuredInput = buildQuestionFigureInput({
         subject,
         plan,
+        targetGrade,
         adminInstructions: dto.adminInstructions,
         mode: dto.mode,
         currentLatexSource: figure.currentRevision?.latexSource,
@@ -253,6 +289,12 @@ export class QuizFiguresService {
         generatedQuizQuestionFigureSchema,
       );
     } else {
+      if (plan.role !== "SOLUTION") {
+        throw badRequestException(
+          "QUIZ_FIGURE_PLAN_INVALID",
+          "Dữ liệu dựng hình lời giải của câu Quiz không hợp lệ.",
+        );
+      }
       const base = await this.prisma.quizFigure.findFirst({
         where: {
           quizQuestionId: questionId,
@@ -270,20 +312,39 @@ export class QuizFiguresService {
           "Hình đề phải sẵn sàng trước khi tạo hình lời giải.",
         );
       }
-      structuredInput = buildSolutionFigureExtensionInput({
-        subject,
-        plan,
-        exactQuestionLatexSource: base.currentRevision.latexSource,
-        adminInstructions: dto.adminInstructions,
-        mode: dto.mode,
-        currentSolutionLatexSource: figure.currentRevision?.latexSource,
-      });
-      structuredInput = applyPromptOverrides(structuredInput, dto);
-      trace = await this.provider.previewStructuredRequest(
-        { feature: AiGenerationType.QUIZ, routeSnapshot },
-        structuredInput,
-        generatedQuizSolutionExtensionSchema,
-      );
+      if (plan.mode === "REDRAW_AS_MODEL") {
+        structuredInput = buildSolutionFigureRedrawInput({
+          subject,
+          plan,
+          targetGrade,
+          exactQuestionLatexSource: base.currentRevision.latexSource,
+          adminInstructions: dto.adminInstructions,
+          mode: dto.mode,
+          currentSolutionLatexSource: figure.currentRevision?.latexSource,
+        });
+        structuredInput = applyPromptOverrides(structuredInput, dto);
+        trace = await this.provider.previewStructuredRequest(
+          { feature: AiGenerationType.QUIZ, routeSnapshot },
+          structuredInput,
+          generatedQuizSolutionRedrawSchema,
+        );
+      } else {
+        structuredInput = buildSolutionFigureExtensionInput({
+          subject,
+          plan,
+          targetGrade,
+          exactQuestionLatexSource: base.currentRevision.latexSource,
+          adminInstructions: dto.adminInstructions,
+          mode: dto.mode,
+          currentSolutionLatexSource: figure.currentRevision?.latexSource,
+        });
+        structuredInput = applyPromptOverrides(structuredInput, dto);
+        trace = await this.provider.previewStructuredRequest(
+          { feature: AiGenerationType.QUIZ, routeSnapshot },
+          structuredInput,
+          generatedQuizSolutionExtensionSchema,
+        );
+      }
     }
     const resolvedRequest = {
       ...structuredInput,
@@ -300,6 +361,161 @@ export class QuizFiguresService {
       adminInstructions: dto.adminInstructions?.trim() || null,
       providerInput: buildOpenAiStructuredResponseRequest({
         request: resolvedRequest,
+        model: trace.model,
+        structuredTextFormat: trace.textFormat,
+      }),
+      configuration: {
+        isDefaultConfigured: routeSnapshot.hasConfiguration,
+        resolvedProvider: trace.provider,
+        resolvedModel: trace.model,
+        temperature: trace.temperature,
+        reasoningEffort: trace.reasoningEffort,
+        maxOutputTokens: trace.maxOutputTokens,
+        modelOptions: modelOptions.map((option) => ({
+          provider: option.provider,
+          model: option.model,
+          available: option.available,
+          capabilities: option.capabilitiesJson,
+        })),
+      },
+      systemPrompt: trace.systemPrompt,
+      userPrompt: trace.userPrompt,
+      context: trace.inputTokenEstimate,
+      estimatedCost: trace.estimatedCost,
+    };
+  }
+
+  async refineWithAi(
+    questionId: string,
+    figureId: string,
+    actorUserId: string,
+    dto: RefineQuizFigureWithAiDto,
+  ) {
+    const figure = await this.requireFigure(questionId, figureId);
+    this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
+    const current = figure.currentRevision;
+    if (
+      figure.status !== "SUCCEEDED" ||
+      current?.status !== "SUCCEEDED" ||
+      current.sourceKind !== "AI_TEX" ||
+      !current.latexSource?.trim() ||
+      !current.deliveryFileId ||
+      current.deliveryFile?.mimeType !== "image/svg+xml"
+    ) {
+      throw badRequestException(
+        "QUIZ_FIGURE_REFINEMENT_SOURCE_REQUIRED",
+        "Chỉ có thể tinh chỉnh hình TikZ đã tạo thành công.",
+      );
+    }
+    const plan = readPlan(figure.planJson);
+    this.assertPlanRole(figure.role, plan);
+    const routeSnapshot = await this.resolveAiRoute(
+      { mode: "EDIT_CURRENT" },
+      figure.role,
+      plan.role === "SOLUTION" ? plan.mode : undefined,
+    );
+    const latest = await this.prisma.quizFigureRevision.findFirst({
+      where: { quizFigureId: figure.id },
+      orderBy: { sourceVersion: "desc" },
+      select: { sourceVersion: true },
+    });
+    const revision = await this.prisma.quizFigureRevision.create({
+      data: {
+        quizFigureId: figure.id,
+        sourceKind: "AI_TEX",
+        origin: "AI_REFINEMENT",
+        status: "QUEUED",
+        sourceVersion: (latest?.sourceVersion ?? 0) + 1,
+        derivedFromQuestionRevisionId: current.derivedFromQuestionRevisionId,
+        altText: current.altText,
+        caption: current.caption,
+        createdById: actorUserId,
+      },
+      select: { id: true },
+    });
+    await this.prisma.quizFigure.update({
+      where: { id: figure.id },
+      data: {
+        status: "QUEUED",
+        pendingRevisionId: revision.id,
+        lastErrorCategory: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+    });
+    const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
+      aiMode: "EDIT_CURRENT",
+      operation: "REFINE_CURRENT",
+    });
+    return { jobId: job.id, status: job.status };
+  }
+
+  async previewRefinement(
+    questionId: string,
+    figureId: string,
+    dto: RefineQuizFigureWithAiDto,
+  ) {
+    const figure = await this.requireFigure(questionId, figureId);
+    this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
+    const current = figure.currentRevision;
+    if (
+      figure.status !== "SUCCEEDED" ||
+      current?.status !== "SUCCEEDED" ||
+      current.sourceKind !== "AI_TEX" ||
+      !current.latexSource?.trim() ||
+      !current.deliveryFileId ||
+      current.deliveryFile?.mimeType !== "image/svg+xml" ||
+      !current.deliveryFile.objectKey
+    ) {
+      throw badRequestException(
+        "QUIZ_FIGURE_REFINEMENT_SOURCE_REQUIRED",
+        "Chỉ có thể tinh chỉnh hình TikZ đã tạo thành công.",
+      );
+    }
+    const plan = readPlan(figure.planJson);
+    this.assertPlanRole(figure.role, plan);
+    const routeSnapshot = await this.resolveAiRoute(
+      { mode: "EDIT_CURRENT" },
+      figure.role,
+      plan.role === "SOLUTION" ? plan.mode : undefined,
+    );
+    const currentSvg = await this.artifacts.readDeliveryObject(
+      current.deliveryFile.objectKey,
+    );
+    const currentImageDataUrl = await buildQuizFigureRefinementImageDataUrl(currentSvg);
+    const structuredInput = buildQuizFigureRefinementInput({
+      subject: readSubject(figure),
+      plan,
+      targetGrade: readQuizFigureTargetGrade(figure.aiGeneration?.inputMetaJson),
+      currentLatexSource: current.latexSource,
+      currentImageDataUrl,
+    });
+    const trace = await this.provider.previewStructuredRequest(
+      { feature: AiGenerationType.QUIZ, routeSnapshot },
+      structuredInput,
+      generatedQuizFigureRefinementSchema,
+    );
+    const previewRequest = {
+      ...structuredInput,
+      model: trace.model,
+      temperature: trace.temperature ?? undefined,
+      reasoningEffort: trace.reasoningEffort ?? undefined,
+      maxTokens: trace.maxOutputTokens ?? undefined,
+      systemPrompt: trace.systemPrompt,
+      userPrompt: trace.userPrompt,
+      inputImages: [
+        {
+          imageUrl: `data:image/png;base64,${OPENAI_PREVIEW_BINARY_DATA}`,
+          detail: "high" as const,
+        },
+      ],
+    };
+    const modelOptions = await this.modelRouting.getAllActiveModels();
+    return {
+      operation: "REFINE_CURRENT" as const,
+      currentImageDataUrl,
+      providerInput: buildOpenAiStructuredResponseRequest({
+        request: previewRequest,
         model: trace.model,
         structuredTextFormat: trace.textFormat,
       }),
@@ -405,17 +621,9 @@ export class QuizFiguresService {
           data: { solutionFigureMode: "NONE" },
         });
       } else {
-        const hasQuestionFigure = await tx.quizFigure.count({
-          where: {
-            quizQuestionId: questionId,
-            role: "QUESTION",
-            deletedAt: null,
-            currentRevisionId: { not: null },
-          },
-        });
         await tx.quizQuestion.update({
           where: { id: questionId },
-          data: { solutionFigureMode: hasQuestionFigure ? "REUSE_QUESTION" : "NONE" },
+          data: { solutionFigureMode: "NONE" },
         });
       }
     });
@@ -428,13 +636,16 @@ export class QuizFiguresService {
       select: {
         id: true,
         role: true,
+        status: true,
         planJson: true,
         subjectKey: true,
         subjectName: true,
         subjectSlug: true,
+        aiGeneration: { select: { inputMetaJson: true } },
         currentRevisionId: true,
         currentRevision: {
           select: {
+            status: true,
             sourceKind: true,
             latexSource: true,
             sourceHash: true,
@@ -442,6 +653,7 @@ export class QuizFiguresService {
             altText: true,
             caption: true,
             deliveryFileId: true,
+            deliveryFile: { select: { mimeType: true, objectKey: true } },
             sanitizedSvgHash: true,
             rendererVersion: true,
             validatorVersion: true,
@@ -458,8 +670,12 @@ export class QuizFiguresService {
   private async resolveAiRoute(
     dto: CreateQuizFigureAiDto,
     role: QuizFigureRole,
+    solutionMode?: "EXTEND_QUESTION" | "REDRAW_AS_MODEL",
   ): Promise<AiFeatureRoute> {
-    const base = await this.modelRouting.resolve(AiGenerationType.QUIZ);
+    const base = await this.modelRouting.resolve(
+      AiGenerationType.QUIZ,
+      AiModelPurpose.IMAGE,
+    );
     let candidates = base.candidates;
     if (dto.model) {
       const selected =
@@ -508,8 +724,20 @@ export class QuizFiguresService {
         capability === "REASONING_EFFORT"
           ? (dto.reasoningEffort ?? base.reasoningEffort)
           : null,
-      maxOutputTokens: role === QuizFigureRole.QUESTION ? 12_000 : 8_000,
+      maxOutputTokens:
+        role === QuizFigureRole.QUESTION || solutionMode === "REDRAW_AS_MODEL"
+          ? 12_000
+          : 8_000,
     };
+  }
+
+  private assertPlanRole(role: QuizFigureRole, plan: QuizFigurePlan) {
+    if (plan.role !== role) {
+      throw badRequestException(
+        "QUIZ_FIGURE_PLAN_ROLE_MISMATCH",
+        "Dữ liệu dựng hình không khớp vai trò hình Quiz.",
+      );
+    }
   }
 
   private assertBaseRevision(current: string | null, expected?: string | null) {
@@ -523,27 +751,21 @@ export class QuizFiguresService {
 }
 
 function readPlan(value: unknown): QuizFigurePlan {
-  const plan = readRecord(value);
-  if (
-    plan.version !== 1 ||
-    (plan.role !== "QUESTION" && plan.role !== "SOLUTION") ||
-    typeof plan.problem !== "string"
-  ) {
+  const parsed = quizFigurePlanSchema.safeParse(omitLegacyAiCaption(value));
+  if (!parsed.success) {
     throw badRequestException(
       "QUIZ_FIGURE_PLAN_INVALID",
       "Dữ liệu dựng hình của câu Quiz không hợp lệ.",
     );
   }
-  return {
-    version: 1,
-    role: plan.role,
-    problem: plan.problem,
-    solution: typeof plan.solution === "string" ? plan.solution : undefined,
-    mode: plan.mode === "EXTEND_QUESTION" ? plan.mode : undefined,
-    addedObjects: readStringArray(plan.addedObjects),
-    clarifiedRelations: readStringArray(plan.clarifiedRelations),
-    caption: typeof plan.caption === "string" ? plan.caption : null,
-  };
+  return parsed.data;
+}
+
+function omitLegacyAiCaption(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(([key]) => key !== "caption"),
+  );
 }
 
 function applyPromptOverrides(
@@ -552,7 +774,7 @@ function applyPromptOverrides(
 ): AiStructuredInput {
   return {
     ...input,
-    systemPrompt: dto.systemPrompt?.trim() || input.systemPrompt,
+    systemPrompt: resolveQuizFigureSystemPrompt(input.systemPrompt, dto.systemPrompt),
     userPrompt: dto.userPrompt?.trim() || input.userPrompt,
   };
 }
@@ -572,12 +794,6 @@ function readRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-function readStringArray(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : undefined;
 }
 
 function readAiConfigurationCapability(value: unknown) {

@@ -226,6 +226,11 @@ enum AiGenerationType {
   DIAGRAM_RENDER
 }
 
+enum AiModelPurpose {
+  TEXT
+  IMAGE
+}
+
 enum AiGenerationStatus {
   QUEUED
   RUNNING
@@ -277,8 +282,8 @@ enum BackgroundJobQueue {
 
 enum QuizSolutionFigureMode {
   NONE
-  REUSE_QUESTION
   EXTEND_QUESTION
+  REDRAW_AS_MODEL
 }
 
 enum QuizFigureRole {
@@ -313,6 +318,7 @@ enum QuizFigureSourceKind {
 enum QuizFigureRevisionOrigin {
   INITIAL_AI
   AUTO_REPAIR
+  AI_REFINEMENT
   ADMIN_EDIT
   ADMIN_REGENERATE
   ADMIN_UPLOAD
@@ -322,6 +328,7 @@ enum QuizFigureRevisionOrigin {
 enum QuizFigureAttemptKind {
   INITIAL
   AI_REPAIR
+  AI_REFINEMENT
   INFRA_RETRY
   ADMIN_EDIT
   ADMIN_REGENERATE
@@ -2109,7 +2116,8 @@ model ProviderPriceRate {
 
 model AiFeatureModelConfig {
   id                    String               @id @default(uuid()) @db.Uuid
-  feature               AiGenerationType     @unique
+  feature               AiGenerationType
+  purpose               AiModelPurpose       @default(TEXT)
   primaryCatalogItemId  String               @map("primary_catalog_item_id") @db.Uuid
   primaryCatalogItem    ProviderCatalogItem  @relation("AiFeaturePrimaryCatalogItem", fields: [primaryCatalogItemId], references: [id], onDelete: Restrict)
   fallbackCatalogItemId String?              @map("fallback_catalog_item_id") @db.Uuid
@@ -2131,6 +2139,7 @@ model AiFeatureModelConfig {
 
   @@index([primaryCatalogItemId])
   @@index([fallbackCatalogItemId])
+  @@unique([feature, purpose])
   @@map("ai_feature_model_configs")
 }
 
@@ -2149,6 +2158,7 @@ model ProviderUsageEvent {
   sourceDocumentId      String?                    @map("source_document_id") @db.Uuid
   sourceDocument        SourceDocument?            @relation("ProviderUsageSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   feature               AiGenerationType?
+  purpose               AiModelPurpose?
   attempt               Int                        @default(1)
   providerRequestId     String?                    @map("provider_request_id")
   status                ProviderUsageStatus        @default(RUNNING)

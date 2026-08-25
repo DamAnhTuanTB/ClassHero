@@ -3,10 +3,11 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { badRequestException, notFoundException } from "#api/common/errors/api-exception";
 import type { getRequestContext } from "#api/common/api/request-context";
 import {
-  AiGenerationStatus,
   AiExplanationTargetType,
+  AiGenerationType,
   ContentSource,
   Prisma,
+  ProviderUsageStatus,
   QuestionType,
   ReviewStatus,
 } from "@prisma/client";
@@ -85,48 +86,94 @@ export class QuizService {
     });
     if (sets.length === 0) return [];
     const setIds = sets.map((set) => set.id);
-    const [pendingGroups, unpublishedGroups, aiGenerations] = await Promise.all([
-      this.prisma.quizQuestion.groupBy({
-        by: ["quizSetId"],
-        where: {
-          quizSetId: { in: setIds },
-          deletedAt: null,
-          reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        },
-        _count: { _all: true },
-      }),
-      this.prisma.quizQuestion.groupBy({
-        by: ["quizSetId"],
-        where: {
-          quizSetId: { in: setIds },
-          deletedAt: null,
-          reviewStatus: ReviewStatus.APPROVED,
-          publishedAt: null,
-        },
-        _count: { _all: true },
-      }),
-      this.prisma.aiGeneration.findMany({
-        where: {
-          type: "QUIZ",
-          status: AiGenerationStatus.SUCCEEDED,
-          targetType: "QUIZ_SET",
-          targetId: { in: setIds },
-        },
-        orderBy: { createdAt: "desc" },
-        select: { id: true, targetId: true, inputMetaJson: true, createdAt: true },
-      }),
-    ]);
+    const [pendingGroups, unpublishedGroups, aiGenerations, usageGroups] =
+      await Promise.all([
+        this.prisma.quizQuestion.groupBy({
+          by: ["quizSetId"],
+          where: {
+            quizSetId: { in: setIds },
+            deletedAt: null,
+            reviewStatus: ReviewStatus.NEEDS_REVIEW,
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.quizQuestion.groupBy({
+          by: ["quizSetId"],
+          where: {
+            quizSetId: { in: setIds },
+            deletedAt: null,
+            reviewStatus: ReviewStatus.APPROVED,
+            publishedAt: null,
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.aiGeneration.findMany({
+          where: {
+            type: AiGenerationType.QUIZ,
+            targetType: "QUIZ_SET",
+            targetId: { in: setIds },
+          },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            targetId: true,
+            status: true,
+            model: true,
+            inputMetaJson: true,
+            startedAt: true,
+            finishedAt: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.providerUsageEvent.groupBy({
+          by: ["aiGenerationId"],
+          where: {
+            aiGenerationId: { not: null },
+            aiGeneration: {
+              type: AiGenerationType.QUIZ,
+              targetType: "QUIZ_SET",
+              targetId: { in: setIds },
+            },
+          },
+          _count: { _all: true },
+          _sum: { costVnd: true },
+        }),
+      ]);
     const pendingBySetId = new Map(
       pendingGroups.map((group) => [group.quizSetId, group._count._all]),
     );
     const unpublishedBySetId = new Map(
       unpublishedGroups.map((group) => [group.quizSetId, group._count._all]),
     );
-    const generationsBySetId = new Map<string, typeof aiGenerations>();
+    const usageByGenerationId = new Map(
+      usageGroups.flatMap((group) =>
+        group.aiGenerationId
+          ? [
+              [
+                group.aiGenerationId,
+                {
+                  totalCostVnd: group._sum.costVnd ?? 0,
+                  usageEventCount: group._count._all,
+                },
+              ] as const,
+            ]
+          : [],
+      ),
+    );
+    type QuizGenerationListItem = (typeof aiGenerations)[number] & {
+      totalCostVnd: number;
+      usageEventCount: number;
+    };
+    const generationsBySetId = new Map<string, QuizGenerationListItem[]>();
     aiGenerations.forEach((generation) => {
       if (!generation.targetId) return;
       const current = generationsBySetId.get(generation.targetId) ?? [];
-      current.push(generation);
+      const usage = usageByGenerationId.get(generation.id);
+      current.push({
+        ...generation,
+        totalCostVnd: usage?.totalCostVnd ?? 0,
+        usageEventCount: usage?.usageEventCount ?? 0,
+      });
       generationsBySetId.set(generation.targetId, current);
     });
     return sets.map((set) => ({
@@ -333,16 +380,51 @@ export class QuizService {
         }),
       ),
     ];
-    const generations =
+    const currentFigureAssets = questions.flatMap((question) =>
+      question.figures.flatMap((figure) => {
+        const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
+        return deliveryFileId ? [{ figureId: figure.id, deliveryFileId }] : [];
+      }),
+    );
+    const figureIds = [...new Set(currentFigureAssets.map((asset) => asset.figureId))];
+    const deliveryFileIds = [
+      ...new Set(currentFigureAssets.map((asset) => asset.deliveryFileId)),
+    ];
+    const [generations, figureCostAttempts] = await Promise.all([
       generationIds.length > 0
-        ? await this.prisma.aiGeneration.findMany({
+        ? this.prisma.aiGeneration.findMany({
             where: { id: { in: generationIds } },
             select: { id: true, outputJson: true },
           })
-        : [];
+        : Promise.resolve([]),
+      figureIds.length > 0
+        ? this.prisma.quizFigureRenderAttempt.findMany({
+            where: {
+              quizFigureId: { in: figureIds },
+              revision: { deliveryFileId: { in: deliveryFileIds } },
+            },
+            select: {
+              quizFigureId: true,
+              revision: { select: { deliveryFileId: true } },
+              backgroundJob: {
+                select: {
+                  providerUsageEvents: {
+                    where: {
+                      provider: "OPENAI",
+                      status: ProviderUsageStatus.SUCCEEDED,
+                    },
+                    select: { id: true, costVnd: true },
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
     const outputByGenerationId = new Map(
       generations.map((generation) => [generation.id, generation.outputJson]),
     );
+    const openAiCostByFigureAsset = collectOpenAiFigureCosts(figureCostAttempts);
 
     return questions.map((question) => {
       const reference = readQuizGenerationQuestionReference(question.sourceMetadataJson);
@@ -354,6 +436,17 @@ export class QuizService {
         : null;
       return {
         ...question,
+        figures: question.figures.map((figure) => {
+          const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
+          return {
+            ...figure,
+            openAiGenerationCostVnd: deliveryFileId
+              ? (openAiCostByFigureAsset.get(
+                  quizFigureAssetKey(figure.id, deliveryFileId),
+                ) ?? null)
+              : null,
+          };
+        }),
         sourceMetadataJson: stripQuizGeometryStatementFromMetadata(
           question.sourceMetadataJson,
         ),
@@ -993,6 +1086,39 @@ export class QuizService {
 
     return { success: true, ...result };
   }
+}
+
+function collectOpenAiFigureCosts(
+  attempts: Array<{
+    quizFigureId: string;
+    revision: { deliveryFileId: string | null };
+    backgroundJob: {
+      providerUsageEvents: Array<{ id: string; costVnd: number }>;
+    } | null;
+  }>,
+) {
+  const costs = new Map<string, number>();
+  const eventIdsByAsset = new Map<string, Set<string>>();
+
+  for (const attempt of attempts) {
+    const deliveryFileId = attempt.revision.deliveryFileId;
+    if (!deliveryFileId) continue;
+    const key = quizFigureAssetKey(attempt.quizFigureId, deliveryFileId);
+    const seenEventIds = eventIdsByAsset.get(key) ?? new Set<string>();
+
+    for (const event of attempt.backgroundJob?.providerUsageEvents ?? []) {
+      if (seenEventIds.has(event.id)) continue;
+      seenEventIds.add(event.id);
+      costs.set(key, (costs.get(key) ?? 0) + event.costVnd);
+    }
+    eventIdsByAsset.set(key, seenEventIds);
+  }
+
+  return costs;
+}
+
+function quizFigureAssetKey(figureId: string, deliveryFileId: string) {
+  return `${figureId}:${deliveryFileId}`;
 }
 
 async function updateGenerationCurationMetadata(

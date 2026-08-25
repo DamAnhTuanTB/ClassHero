@@ -56,6 +56,13 @@ export const adminQuizGenerationSchema = z
     temperature: optionalNumber("Temperature", 0, 1, true),
     reasoningEffort: z.union([z.literal(""), z.enum(AI_REASONING_EFFORT_LEVELS)]),
     maxOutputTokens: optionalNumber("Số token đầu ra", 1_000, 32_000),
+    figureModel: z.string().max(200),
+    figureTemperature: optionalNumber("Temperature tạo hình", 0, 1, true),
+    figureReasoningEffort: z.union([
+      z.literal(""),
+      z.enum(AI_REASONING_EFFORT_LEVELS),
+    ]),
+    figureMaxOutputTokens: optionalNumber("Số token đầu ra tạo hình", 128, 32_000),
   })
   .superRefine((values, context) => {
     if (values.model && !values.maxOutputTokens) {
@@ -63,6 +70,13 @@ export const adminQuizGenerationSchema = z
         code: "custom",
         path: ["maxOutputTokens"],
         message: "Vui lòng nhập số token đầu ra",
+      });
+    }
+    if (values.figureModel && !values.figureMaxOutputTokens) {
+      context.addIssue({
+        code: "custom",
+        path: ["figureMaxOutputTokens"],
+        message: "Vui lòng nhập số token đầu ra tạo hình",
       });
     }
     if (values.difficulty === "MIXED") {

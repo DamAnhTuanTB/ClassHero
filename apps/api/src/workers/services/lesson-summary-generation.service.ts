@@ -192,7 +192,10 @@ export class LessonSummaryGenerationService {
         targetGrade: input.data.targetGrade,
         packetManifest: manifest,
         requestDraftId: draft.id,
-        routeSnapshot: normalizeFigureRouteSnapshot(context.providerRouteSnapshot),
+        routeSnapshot: normalizeFigureRouteSnapshot(
+          readImageRouteSnapshot(input.data.imageRouteSnapshot) ??
+            context.providerRouteSnapshot,
+        ),
       },
     };
   }
@@ -351,7 +354,7 @@ export class LessonSummaryGenerationService {
             generationBriefHash: generationBrief ? hashAiValue(generationBrief) : null,
             sourceVersion: 1,
             altText: item.draft.altText,
-            caption: item.draft.caption,
+            caption: null,
             createdById: context.ownerUserId,
           },
           select: { id: true },
@@ -365,7 +368,7 @@ export class LessonSummaryGenerationService {
           figureId: created.id,
           figureOrigin: item.draft.figureOrigin,
           altText: item.draft.altText,
-          caption: item.draft.caption,
+          caption: null,
           status: initialStatus,
         });
         createdFigures.push({
@@ -651,6 +654,12 @@ function readFigureRouteSnapshot(value: unknown): AiFeatureRoute | undefined {
   const route = (value as Record<string, unknown>).routeSnapshot;
   return route && typeof route === "object" && !Array.isArray(route)
     ? (route as AiFeatureRoute)
+    : undefined;
+}
+
+function readImageRouteSnapshot(value: unknown): AiFeatureRoute | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as AiFeatureRoute)
     : undefined;
 }
 

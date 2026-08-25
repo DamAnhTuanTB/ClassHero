@@ -76,18 +76,51 @@ vì vậy select, TypeScript union, Prisma enum và backend validation phải th
   Response create có thể không chứa aggregate `_count` như response list, nên
   hook phải chuẩn hóa `_count` từ `questionCount` trước khi đưa object vào cache;
   component vẫn cần fallback an toàn để dữ liệu tạm không làm sập toàn màn.
-- `questionFigure.caption` trong JSON AI chỉ là kế hoạch Phase 1, không phải ảnh.
+- `questionFigure` trong JSON AI chỉ là object rỗng đánh dấu Phase 1 cần hình,
+  không phải ảnh và không mang caption hiển thị.
   Ảnh thật đi qua `quiz_figures` và revision có delivery URL sau khi worker dựng
   SVG. Vì vậy card review phải đọc `question.figures`, hiển thị asset terminal và
   chỉ poll query khi còn trạng thái `QUEUED`/`RENDERING`/`REPAIRING`; nếu chỉ
   render JSON câu hỏi thì hình đã tạo thành công vẫn bị “vô hình” trên giao diện.
-- Visual policy có rule bất biến phải được nối vào cả system prompt mặc định lẫn
-  system prompt tùy biến; nếu custom prompt thay hoàn toàn default thì các đường
-  gọi admin/preview có thể bỏ qua policy. Marker mũi tên/chevron đánh dấu song
-  song bị cấm trên mọi hình, nhưng phải phân biệt với mũi tên mang nghĩa hướng của
-  trục, vector, lực, tia hoặc luồng truyền. Cung góc cần khóa đúng miền giữa hai
-  tia, đặc biệt góc trong đa giác phải nằm phía trong thay vì dựa vào thứ tự tia
-  ngẫu nhiên của lệnh `\\pic`.
+- Phase 2 chỉ nhận `problem` làm nguồn semantic, tự lập whitelist dữ kiện được cho trực tiếp rồi
+  mới dựng source. Hình có thể mang hình dáng thỏa dữ kiện, nhưng marker, nhãn,
+  màu nhấn hoặc đường phụ không được xác nhận một tính chất chỉ suy ra trong lời
+  giải. Phase 1 và Phase 2 đều không yêu cầu OpenAI sinh caption hình; caption do
+  admin nhập và dữ liệu cũ vẫn là metadata revision độc lập.
+- “Lời giải tự đủ nghĩa bằng chữ” và “lời giải không cần hình bổ sung” là hai
+  quyết định độc lập. Phase 1 phải lấy các đối tượng/quan hệ trực quan thật sự
+  được dùng trong solution trừ đi phần đã có ở hình đề. Phần chênh thiết yếu trên
+  cùng nền dẫn tới `EXTEND_QUESTION`; đổi hẳn cách biểu diễn dẫn tới
+  `REDRAW_AS_MODEL`; delta rỗng hoặc chỉ có thay số/tính toán mới dẫn tới `NONE`.
+  Cách so sánh này tránh việc một phép dựng quan trọng bị bỏ hình chỉ vì vẫn có
+  thể diễn đạt bằng văn bản.
+- Custom system prompt của Quiz vẫn là full override theo chủ đích của sản phẩm;
+  backend không âm thầm nối prompt mặc định vào nội dung admin đã nhập. Những
+  quy tắc trình bày như cấm marker song song, cấm `AB \\parallel CD`/`AB // CD`
+  và cấm tên góc dạng chữ trên canvas phải được hướng dẫn trong prompt mặc định,
+  không được nâng thành backend rejection gate. Provider output vẫn đi tiếp tới
+  compile/render dù chưa đạt gu trình bày; backend chỉ reject vì policy an toàn,
+  cấu trúc TeX hoặc lỗi kỹ thuật thật sự. Mũi tên chỉ hướng của trục, vector, lực,
+  tia hoặc luồng truyền vẫn hợp lệ.
+- Ký hiệu tên đường tròn `$(O)$` trong văn bản đề và nhãn điểm tâm `$O$` trên
+  canvas là hai tầng biểu đạt của cùng một đối tượng, không phải hai nhãn cần vẽ.
+  Hình đề/vẽ lại chỉ giữ một điểm và một nhãn tâm `$O$`; lượt
+  `EXTEND_QUESTION` dùng lại coordinate tâm trong base và không thêm `$(O)$` hay
+  một `$O$` thứ hai. Đây là prompt invariant, không phải backend rejection gate.
+- “Đáp án, phương án và lời giải cùng khớp” chỉ là nhất quán nội bộ, chưa phải
+  bằng chứng toán học. Prompt Toán cần buộc model giải từ dữ kiện trước khi nhìn
+  phương án, kiểm tra đủ giả thiết của định lý, rồi dùng một phép kiểm độc lập
+  như thế ngược, kiểm tra miền/đơn vị/cận hoặc biểu diễn hình học khác. Regression
+  nên dùng invariant và counterexample tổng quát: một số đỉnh nằm trên đường tròn
+  không đủ cho kết luận nội tiếp, trong khi cấu hình đủ mọi giả thiết vẫn phải
+  được phép dùng định lý tương ứng.
+
+- System prompt mặc định của Quiz được sở hữu trọn vẹn theo môn. File Toán, Lý,
+  Hóa và General tự chứa cả role, contract đầu ra, safety prose và policy chuyên
+  môn; không import một core prompt chung. Với figure Phase 2, mode hình đề, mở
+  rộng lời giải và vẽ lại mô hình được chọn bên trong subject module đã resolve.
+  Dispatcher chỉ định tuyến, còn schema/provider/worker vẫn dùng chung ở tầng kỹ
+  thuật. Nhờ vậy sửa prompt Hóa không thể vô tình làm thay đổi prompt Toán.
 
 ## Back-end/API
 
@@ -182,6 +215,32 @@ answer phải được thiết kế riêng cho Quiz. Với bài tính, lời gi�
 phép biến đổi làm phần chính; với nhận định lý thuyết không cần tính, lập luận
 ngắn bằng lời vẫn hợp lệ. Như vậy hệ thống tránh cả hai cực đoan: văn xuôi hóa
 mọi bài toán và ép công thức vào tình huống không cần công thức.
+
+Với hình vector do AI sinh, tên điểm phải bắt đầu từ chính coordinate sở hữu rồi
+đổi anchor/quay quanh coordinate khi va chạm; không đặt bằng một tọa độ rời. “Đặt
+nhãn đo gần giữa” chỉ nên là preference, không phải một coordinate bắt buộc. Nhãn
+đo phải neo trên đúng path sở hữu hoặc coordinate nội suy từ chính hai đầu mút,
+với khoảng hở pháp tuyến nhỏ để không trôi vào vùng trắng. Layout cần có chuỗi
+fallback giữ nguyên liên thuộc: trượt nhãn dọc chính đối tượng bằng `pos`, đổi
+phía pháp tuyến rồi mới tăng nhẹ khoảng hở; midpoint trống vẫn là vị trí hợp lệ.
+Nếu không còn vị trí sát path mà không va chạm, model phải dùng leader line thay
+vì để nhãn đứng tự do. Marker quan hệ cũng không
+được dựng độc lập bằng offset x/y: đường, giao điểm, dấu vuông góc và vạch bằng
+nhau phải dùng chung anchor ngữ nghĩa và hệ phương cục bộ. Compile thành công chỉ
+chứng minh source hợp lệ; regression prompt còn phải khóa bước kiểm collision và
+hình dạng marker trên toàn canvas.
+
+Riêng số đo góc, cung và nhãn không được coi là một marker duy nhất rồi đặt chữ
+ngay trên path. Chúng cần anchor/bán kính riêng: cung bám đỉnh/hai tia, nhãn nằm
+theo phân giác đúng miền và ngay phía ngoài cung với khe hở nhỏ. Nếu va chạm phải
+đổi đồng bộ bán kính cung và vị trí nhãn dọc phân giác, không chỉ đẩy số đo sâu
+vào vùng trắng hoặc vá bằng offset cố định. Đây vẫn là prompt-quality rule;
+backend không reject output chỉ vì bố cục nhãn chưa đạt.
+
+Ngưỡng token trong regression test chỉ là budget chống prompt phình ngoài chủ
+đích, không phải giới hạn nghiệp vụ hay provider. Riêng system prompt vẽ hình
+không dùng hard-cap này: vẫn đo token để quan sát chi phí/context, nhưng không rút
+gọn contract đến mức mơ hồ; invariant hình học rõ ràng được ưu tiên trước.
 
 Một invariant về nội dung phải được viết trước lựa chọn format của model. Nếu
 policy chỉ nói “khi khối `$$...$$` có nhiều dấu bằng thì dùng `aligned`”, model
@@ -559,6 +618,13 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   Read-only renderer phải dùng `(marks ?? []).reduce(..., text)` để luôn giữ
   `text` làm giá trị ban đầu; dùng `marks?.reduce(...)` sẽ trả về `undefined` và
   làm mất toàn bộ chữ thường, trong khi ảnh hoặc công thức vẫn có thể hiển thị.
+- Card tổng quan lấy nội dung câu hỏi từ Tiptap JSON phải dùng cùng rich-content
+  renderer với màn Quiz; helper plain-text chỉ phù hợp cho search, aria label
+  hoặc log. Không render chuỗi plain text có lệnh LaTeX ra UI, và khi surface yêu
+  cầu xem đầy đủ thì không dùng `truncate`/`line-clamp`. Action đi tới câu phải
+  mang đúng question ID và display number theo nhóm navigation hiện hành, chọn
+  câu bằng ID rồi chỉ scroll sau khi câu đích đã render; không suy số câu từ vị
+  trí mảng API thô hoặc scroll trước khi React commit.
 - Mathpix Markdown render nội dung sau khi component đã mount và thường sinh
   thêm một `<div>` gốc. Không đặt renderer block này trực tiếp trong `<li>` mà
   giữ wrapper cùng phần tử con ở chế độ inline; nếu không Safari/WebKit có thể
@@ -665,6 +731,14 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   Khi `.math-block` đã giữ ink-safe padding và được bọc bởi formula scroll shell,
   `.katex-display` bên trong phải bỏ margin/padding riêng; nếu cả ba lớp cùng cộng
   khoảng cách thì phép biến đổi nhiều dòng bị tách quá xa khỏi câu dẫn và kết luận.
+- Khi sửa backslash bị escape hai lần trước lệnh LaTeX, phải bảo toàn cặp `\\`
+  dùng để xuống dòng trong `aligned`, `split`, `cases` và các môi trường tương tự.
+  Một cụm slash có độ dài lẻ đã là `các cặp xuống dòng + một slash của lệnh` nên
+  phải giữ nguyên; cụm có độ dài chẵn mới có một slash escape dư và chỉ được bỏ
+  đúng một ký tự. Không dùng regex gom mọi cụm slash lặp về một slash, vì cặp
+  xuống dòng `\\` đứng liền trước lệnh `\widehat{C}` sẽ bị nuốt và làm hai bước
+  tính dính cùng dòng. Regression test phải có cả lệnh escape hai lần cần sửa và
+  dòng hợp lệ bắt đầu bằng lệnh như `\widehat`, `\sqrt` hoặc `\frac`.
 - Câu Quiz AI có `quizExplanationBlock` phải luôn dùng card semantic `Lời giải`;
   card Tiptap xám `Lời giải chi tiết` chỉ là fallback cho dữ liệu legacy không có
   structured block. Các field optional theo JSON contract như

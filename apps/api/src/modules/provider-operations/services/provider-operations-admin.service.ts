@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   AiGenerationType,
+  AiModelPurpose,
   Prisma,
   ProviderBudgetScope,
   ProviderCatalogCategory,
@@ -41,6 +42,7 @@ const MANAGED_AI_FEATURES = [
   AiGenerationType.FLASHCARD,
   AiGenerationType.TEST,
 ] as const;
+const MANAGED_AI_PURPOSES = [AiModelPurpose.TEXT, AiModelPurpose.IMAGE] as const;
 
 @Injectable()
 export class ProviderOperationsAdminService {
@@ -143,7 +145,9 @@ export class ProviderOperationsAdminService {
       dto.category === ProviderCatalogCategory.AI_MODEL ? [...MANAGED_AI_FEATURES] : [];
 
     // Include the aiConfiguration if provided
-    let capabilitiesJson: Record<string, any> = { features: defaultCapabilities };
+    const capabilitiesJson: Record<string, unknown> = {
+      features: defaultCapabilities,
+    };
     if (dto.aiConfiguration) {
       capabilitiesJson.aiConfiguration = dto.aiConfiguration;
       if (
@@ -161,7 +165,7 @@ export class ProviderOperationsAdminService {
         externalKey: dto.externalKey,
         displayName: dto.displayName,
         createdAt: dto.createdAt ? new Date(dto.createdAt) : undefined,
-        capabilitiesJson,
+        capabilitiesJson: capabilitiesJson as Prisma.InputJsonObject,
         priceVersions: dto.initialPrice
           ? {
               create: {
@@ -209,7 +213,7 @@ export class ProviderOperationsAdminService {
       throwNotFound("PROVIDER_CATALOG_ITEM_NOT_FOUND", "Không tìm thấy model.");
     }
 
-    let capabilitiesJson = item.capabilitiesJson as Record<string, any> | null;
+    let capabilitiesJson = item.capabilitiesJson as Record<string, unknown> | null;
     if (dto.aiConfiguration) {
       if (!capabilitiesJson || typeof capabilitiesJson !== "object") {
         capabilitiesJson = {};
@@ -334,7 +338,7 @@ export class ProviderOperationsAdminService {
           primaryCatalogItem: true,
           fallbackCatalogItem: true,
         },
-        orderBy: { feature: "asc" },
+        orderBy: [{ feature: "asc" }, { purpose: "asc" }],
       }),
       this.prisma.providerCatalogItem.findMany({
         where: { category: ProviderCatalogCategory.AI_MODEL },
@@ -359,23 +363,29 @@ export class ProviderOperationsAdminService {
     });
 
     return {
-      configurations: MANAGED_AI_FEATURES.map((feature) => {
-        const config = configurations.find((c) => c.feature === feature);
-        return {
-          feature,
-          primaryCatalogItemId: config?.primaryCatalogItemId ?? null,
-          fallbackCatalogItemId: config?.fallbackCatalogItemId ?? null,
-          temperature: config?.temperature?.toNumber() ?? null,
-          reasoningEffort: config?.reasoningEffort ?? null,
-          maxInputTokens: config?.maxInputTokens ?? null,
-          maxOutputTokens: config?.maxOutputTokens ?? null,
-          fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
-          fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
-          fallbackMaxOutputTokens: config?.fallbackMaxOutputTokens ?? null,
-          version: config?.version ?? 0,
-          updatedAt: config?.updatedAt ?? new Date(),
-        };
-      }),
+      configurations: MANAGED_AI_FEATURES.flatMap((feature) =>
+        MANAGED_AI_PURPOSES.map((purpose) => {
+          const config = configurations.find(
+            (candidate) =>
+              candidate.feature === feature && candidate.purpose === purpose,
+          );
+          return {
+            feature,
+            purpose,
+            primaryCatalogItemId: config?.primaryCatalogItemId ?? null,
+            fallbackCatalogItemId: config?.fallbackCatalogItemId ?? null,
+            temperature: config?.temperature?.toNumber() ?? null,
+            reasoningEffort: config?.reasoningEffort ?? null,
+            maxInputTokens: config?.maxInputTokens ?? null,
+            maxOutputTokens: config?.maxOutputTokens ?? null,
+            fallbackTemperature: config?.fallbackTemperature?.toNumber() ?? null,
+            fallbackReasoningEffort: config?.fallbackReasoningEffort ?? null,
+            fallbackMaxOutputTokens: config?.fallbackMaxOutputTokens ?? null,
+            version: config?.version ?? 0,
+            updatedAt: config?.updatedAt ?? new Date(),
+          };
+        }),
+      ),
       models: catalog.map((item) => ({
         id: item.id,
         provider: item.provider,
@@ -389,13 +399,18 @@ export class ProviderOperationsAdminService {
   }
 
   async updateAiConfigurations(actorUserId: string, dto: UpdateAiConfigurationsDto) {
-    const features = new Set(dto.configurations.map((item) => item.feature));
+    const configurationKeys = new Set(
+      dto.configurations.map((item) => `${item.feature}:${item.purpose}`),
+    );
     if (
-      features.size !== dto.configurations.length ||
+      configurationKeys.size !== dto.configurations.length ||
       dto.configurations.some(
         (item) =>
           !MANAGED_AI_FEATURES.includes(
             item.feature as (typeof MANAGED_AI_FEATURES)[number],
+          ) ||
+          !MANAGED_AI_PURPOSES.includes(
+            item.purpose as (typeof MANAGED_AI_PURPOSES)[number],
           ),
       )
     ) {
@@ -414,7 +429,7 @@ export class ProviderOperationsAdminService {
           throwBadRequest(
             "AI_CONFIGURATION_FALLBACK_DUPLICATE",
             "Model dự phòng phải khác model chính.",
-            { feature: item.feature },
+            { feature: item.feature, purpose: item.purpose },
           );
         }
         if (
@@ -424,7 +439,7 @@ export class ProviderOperationsAdminService {
           throwBadRequest(
             "AI_CONFIGURATION_TOKEN_LIMIT_REQUIRED",
             "Vui lòng cấu hình giới hạn token đầu vào và đầu ra cho tính năng.",
-            { feature: item.feature },
+            { feature: item.feature, purpose: item.purpose },
           );
         }
         const catalogIds = [item.primaryCatalogItemId, item.fallbackCatalogItemId].filter(
@@ -446,25 +461,33 @@ export class ProviderOperationsAdminService {
           throwBadRequest(
             "AI_CONFIGURATION_MODEL_INVALID",
             "Model đã chọn không khả dụng cho chức năng này.",
-            { feature: item.feature },
+            { feature: item.feature, purpose: item.purpose },
           );
         }
 
         const before = await transaction.aiFeatureModelConfig.findUnique({
-          where: { feature: item.feature },
+          where: {
+            feature_purpose: { feature: item.feature, purpose: item.purpose },
+          },
         });
         if ((before?.version ?? 0) !== item.expectedVersion) {
           throwConflict(
             "AI_CONFIGURATION_VERSION_CONFLICT",
             "Cấu hình đã được thay đổi ở nơi khác. Vui lòng tải lại.",
-            { feature: item.feature, currentVersion: before?.version ?? 0 },
+            {
+              feature: item.feature,
+              purpose: item.purpose,
+              currentVersion: before?.version ?? 0,
+            },
           );
         }
 
         if (!item.primaryCatalogItemId) {
           if (before) {
             await transaction.aiFeatureModelConfig.delete({
-              where: { feature: item.feature },
+              where: {
+                feature_purpose: { feature: item.feature, purpose: item.purpose },
+              },
             });
             await transaction.auditLog.create({
               data: {
@@ -480,9 +503,12 @@ export class ProviderOperationsAdminService {
         }
 
         const after = await transaction.aiFeatureModelConfig.upsert({
-          where: { feature: item.feature },
+          where: {
+            feature_purpose: { feature: item.feature, purpose: item.purpose },
+          },
           create: {
             feature: item.feature,
+            purpose: item.purpose,
             primaryCatalogItemId: item.primaryCatalogItemId,
             fallbackCatalogItemId: item.fallbackCatalogItemId ?? null,
             temperature: item.temperature,
@@ -1109,7 +1135,7 @@ export class ProviderOperationsAdminService {
             createdAt: new Date(model.created * 1000).toISOString(),
           }));
         return models;
-      } catch (error) {
+      } catch {
         throwBadRequest("OPENAI_FETCH_FAILED", "Không thể lấy danh sách model OpenAI");
       }
     } else if (provider === "GEMINI") {
@@ -1131,7 +1157,7 @@ export class ProviderOperationsAdminService {
             createdAt: null,
           }));
         return models;
-      } catch (error) {
+      } catch {
         throwBadRequest("GEMINI_FETCH_FAILED", "Không thể lấy danh sách model Gemini");
       }
     }
@@ -1215,7 +1241,7 @@ function hasCapability(value: Prisma.JsonValue | null, feature: AiGenerationType
     return value.includes(feature);
   }
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    const features = (value as any).features;
+    const features = (value as Record<string, unknown>).features;
     return Array.isArray(features) && features.includes(feature);
   }
   return false;

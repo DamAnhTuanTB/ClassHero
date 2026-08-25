@@ -838,6 +838,14 @@ Rules:
   model do admin thiết lập tại màn Cài đặt AI; `maxOutputTokens` giới hạn
   `8000..32000`. Bỏ trống thì dùng Cài đặt AI hiện tại với sàn mặc định `8000`
   cho Summary.
+- Bốn field trên là override Phase 1. Khi `useTextbookSourceImages=false`, client
+  có thể gửi thêm `figureModel`, `figureTemperature`, `figureReasoningEffort`,
+  `figureMaxOutputTokens` làm override Phase 2. Bỏ trống thì backend resolve
+  `(SUMMARY, IMAGE)` từ Cài đặt AI, độc lập với route `(SUMMARY, TEXT)`. Preview,
+  request draft/hash và job snapshot phải giữ cả hai route; figure worker không
+  được dùng model Phase 1 cho job mới. Khi dùng ảnh gốc SGK, UI vẫn hiển thị cấu
+  hình Phase 2 nhưng nêu rõ lượt này không gọi model tạo ảnh và chi phí Phase 2
+  bằng `0`.
 
 Response: `202 Accepted`.
 

@@ -13,7 +13,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Embedding và retrieval theo lesson](features/embedding-retrieval.md) | OpenAI embedding, durable worker, pgvector isolation, hybrid search và token budget                  | `M5.1`-`M5.4`  | Đã cập nhật |
 | [Quiz, flashcard và test](features/quiz-flashcard-test.md)            | Rich content, CRUD, student runner, prerequisite, review, best/completion và Top 5                    | `M6.1`-`M7.5`  | Đã cập nhật |
 | [Student course browsing](features/student-course-browsing.md)        | Student danh sách/khám phá/chi tiết lộ trình nối public API thật                                     | `M3.5`         | Đã cập nhật |
-| [Cài đặt AI và provider operations](features/ai-provider-operations.md) | Model routing, Gemini fallback, OCR retry, price snapshot, usage, budget và admin UI                  | `M9.9-M9.11`, `M4.6` | Đã cập nhật |
+| [Cài đặt AI và provider operations](features/ai-provider-operations.md) | Model routing theo phase, Gemini fallback, OCR retry, price snapshot, usage, budget và admin UI                  | `M9.9-M9.12`, `M9.19-M9.20`, `M4.6` | Đã cập nhật |
 | [Chỉnh nhẹ ảnh raster sách giáo khoa](features/stem-figure-raster-cleanup.md) | Canvas mask, Sharp local, preview read-only và immutable WebP revision                            | `M9.17-M9.18` | Đã cập nhật |
 
 ## Foundation Notes

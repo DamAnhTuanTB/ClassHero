@@ -7,9 +7,9 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 | `GET`     | `/admin/provider-operations/overview`                   | KPI chi phí tháng, cache saving, reliability và budget   |
 | `GET`     | `/admin/provider-operations/catalog`                    | Catalog AI/OCR, credential status và price versions      |
 | `POST`    | `/admin/provider-operations/catalog`                    | Thêm model/dịch vụ provider vào catalog                  |
-| `PUT`     | `/admin/provider-operations/catalog/:id`                | Sửa metadata của model/dịch vụ                            |
+| `PUT`     | `/admin/provider-operations/catalog/:id`                | Sửa metadata của model/dịch vụ                           |
 | `POST`    | `/admin/provider-operations/catalog/:id/price-versions` | Thêm giá có ngày hiệu lực và nguồn chính thức            |
-| `GET/PUT` | `/admin/provider-operations/ai-configurations`          | Đọc/lưu model chính, fallback, temperature, token limit  |
+| `GET/PUT` | `/admin/provider-operations/ai-configurations`          | Đọc/lưu route text/ảnh theo feature                      |
 | `GET/PUT` | `/admin/provider-operations/ocr-settings`               | Trạng thái OCR/cache và thiết lập tỷ giá/price freshness |
 | `GET/PUT` | `/admin/provider-operations/budgets`                    | Ngân sách `ALL/AI/OCR`, warning thresholds, hard stop    |
 | `GET`     | `/admin/provider-operations/usage/timeline`             | Timeline `DAY/WEEK/MONTH`, tối đa 366 ngày               |
@@ -17,14 +17,19 @@ Tất cả endpoint dưới đây yêu cầu Bearer token role `ADMIN`, prefix `
 | `GET`     | `/admin/provider-operations/usage/events`               | Event list phân trang và filter                          |
 | `GET`     | `/admin/provider-operations/audit-history`              | Lịch sử đổi model/giá/budget/accounting                  |
 
-`GET/PUT /ai-configurations` trả/nhận `maxInputTokens` và `maxOutputTokens` theo
-từng feature. Cả hai là số nguyên dương; thiếu một giới hạn thì budget guard
-fail-closed. Catalog create/update và price-version API không nhận hai field này.
+`GET/PUT /ai-configurations` trả/nhận tối đa tám cấu hình, đúng một item cho mỗi
+cặp `feature = SUMMARY | QUIZ | FLASHCARD | TEST` và
+`purpose = TEXT | IMAGE`. Mỗi item có model chính/dự phòng, temperature hoặc
+reasoning effort, `maxInputTokens`, `maxOutputTokens`, `version`; optimistic
+conflict được kiểm tra theo đúng cặp. Hai giới hạn token là số nguyên dương;
+thiếu một giới hạn thì budget guard fail-closed. Catalog create/update và
+price-version API không nhận hai field này.
 
 ## Concurrency và validation
 
 - PUT configuration/budget/accounting bắt buộc `expectedVersion`; mismatch trả `409` để UI tải lại.
-- Model phải đúng category/capability; fallback khác primary.
+- Không được gửi trùng `(feature, purpose)`. Model phải đúng category/capability
+  của feature; fallback khác primary.
 - Catalog trả toàn bộ model AI `ACTIVE` phù hợp capability để UI nhóm ô chọn theo provider; model thiếu credential vẫn được hiển thị nhưng bị vô hiệu hóa kèm lý do.
 - Price version chỉ thêm mới. Backend đóng khoảng hiệu lực cũ thay vì overwrite.
 - Timeline dùng múi giờ `Asia/Ho_Chi_Minh`, tuần bắt đầu thứ Hai.
@@ -45,6 +50,9 @@ fail-closed. Catalog create/update và price-version API không nhận hai field
   `cachedInputTokens`, `completionTokens` và `totalTokens` vẫn là dữ liệu đã
   chuẩn hóa dùng để tính phí. Record lịch sử dạng phẳng vẫn được API trả nguyên
   để bảo toàn khả năng đọc dữ liệu cũ.
+- Usage event AI trả thêm `purpose: TEXT | IMAGE | null`; UI dùng field này để
+  phân biệt Phase 1 tạo nội dung và Phase 2 tạo hình. Event lịch sử có thể là
+  `null`.
 
 ## Hard-stop tuyệt đối (`M9.12`)
 

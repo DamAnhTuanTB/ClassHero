@@ -18,6 +18,8 @@ import {
   compileAdminQuizFigureDraft,
   createNewAdminQuizFigureWithAi,
   previewNewAdminQuizFigureWithAi,
+  previewAdminQuizFigureRefinement,
+  refineAdminQuizFigureWithAi,
   deleteAdminQuizFigure,
   type AdminQuizQuestion,
   type AdminQuizFigure,
@@ -436,6 +438,25 @@ export function useAdminQuizFigureMutations(setId: string) {
         token,
       ),
   });
+  const refineWithAi = useMutation({
+    mutationFn: (input: { questionId: string; figure: AdminQuizFigure }) =>
+      refineAdminQuizFigureWithAi(
+        input.questionId,
+        input.figure.id,
+        { baseRevisionId: input.figure.currentRevision?.id ?? null },
+        token,
+      ),
+    onSuccess: invalidate,
+  });
+  const previewRefinement = useMutation({
+    mutationFn: (input: { questionId: string; figure: AdminQuizFigure }) =>
+      previewAdminQuizFigureRefinement(
+        input.questionId,
+        input.figure.id,
+        { baseRevisionId: input.figure.currentRevision?.id ?? null },
+        token,
+      ),
+  });
   const updateCaption = useMutation({
     mutationFn: (input: {
       questionId: string;
@@ -469,6 +490,8 @@ export function useAdminQuizFigureMutations(setId: string) {
     compileDraft,
     createWithAi,
     previewWithAi,
+    previewRefinement,
+    refineWithAi,
     deleteFigure,
     updateCaption,
   };

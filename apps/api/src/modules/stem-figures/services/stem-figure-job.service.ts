@@ -182,9 +182,11 @@ function readGenerationRouteSnapshot(
 ): AiFeatureRoute | undefined {
   for (const value of [generation?.inputMetaJson, generation?.backgroundJob?.inputMeta]) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-    const snapshot = (value as Record<string, unknown>).providerRouteSnapshot;
-    if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) {
-      return snapshot as AiFeatureRoute;
+    const record = value as Record<string, unknown>;
+    for (const snapshot of [record.imageRouteSnapshot, record.providerRouteSnapshot]) {
+      if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) {
+        return snapshot as AiFeatureRoute;
+      }
     }
   }
   return undefined;

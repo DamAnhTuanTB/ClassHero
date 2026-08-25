@@ -262,7 +262,14 @@ Các bước:
 11. Với mỗi hình đề/hình lời giải trên card Quiz, admin mở menu hình để chỉnh sửa
     bằng mã code, tạo mới bằng mã code, tạo mới bằng AI hoặc tải ảnh lên; các icon
     cạnh menu dùng để chỉnh caption và xóa ảnh. Sửa/tạo code phải biên dịch và xem
-    trước trước khi áp dụng. Xóa hình đề đồng thời xóa hình lời giải phụ thuộc.
+    trước trước khi áp dụng. Xóa hình đề đồng thời xóa hình lời giải phụ thuộc;
+    xóa riêng hình lời giải đưa câu về `solutionFigureMode=NONE` và không lặp lại
+    hình đề trong khối lời giải.
+12. Figure decision của Quiz chỉ có `NONE`, `EXTEND_QUESTION` và
+    `REDRAW_AS_MODEL`. `EXTEND_QUESTION` chèn nét trên exact source hình đề;
+    `REDRAW_AS_MODEL` dựng một source hoàn chỉnh mới để mô hình hóa lại cùng bài
+    toán theo biểu diễn toán học khác. Cả hai hình lời giải đều chỉ bổ trợ trực
+    quan; nội dung chữ không được nhắc hoặc phụ thuộc vào hình.
 
 Acceptance Criteria:
 
@@ -357,6 +364,17 @@ Các bước chung:
    độ cuộn hiện tại của trang.
    Mỗi figure Quiz dùng cùng ngôn ngữ thao tác với figure Sinh kiến thức nhưng
    gọi API/revision/worker riêng của domain Quiz; không import core Summary.
+   Với revision TikZ `SUCCEEDED`, nút `Tinh chỉnh` nằm trong góc trên bên phải
+   của chính khung ảnh. Khi bấm, backend snapshot optimistic `baseRevisionId`,
+   figure plan, full source và ảnh render hiện tại; worker gửi gói multimodal cho
+   model ảnh, nhận full source mới rồi chạy lại policy/compile/validator. Trước
+   khi enqueue, modal hiển thị ảnh input, system prompt, dữ kiện/source, request
+   OpenAI đã ẩn bytes nhị phân và ước tính token/chi phí; `Hủy` chỉ đóng modal,
+   `Thực hiện` mới bắt đầu job. Current
+   revision và ảnh học sinh đang thấy được giữ nguyên trong lúc job chạy hoặc khi
+   candidate lỗi; chỉ candidate thành công mới được promote nguyên tử. Sau khi
+   asset OpenAI thành công, admin thấy chi phí thực tế bằng VNĐ ở góc dưới phải
+   của đúng khung ảnh; sửa caption trên cùng asset không làm mất số tiền này.
 10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
     `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
     trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì
@@ -515,23 +533,29 @@ Acceptance Criteria:
 ### 7.1. Admin cấu hình model và theo dõi chi phí AI/OCR
 
 1. Admin mở `/admin/ai-settings` từ sidebar.
-2. Chọn model chính/dự phòng cho tóm tắt, Quiz, Flashcard, bài kiểm tra; lưu bằng optimistic version.
+2. Với từng loại tóm tắt, Quiz, Flashcard và bài kiểm tra, cấu hình riêng hai
+   route `Phase 1 - tạo text` và `Phase 2 - tạo ảnh`; mỗi route có model
+   chính/dự phòng và được lưu bằng optimistic version độc lập.
 3. Xem OCR provider/cache/credential status, tỷ giá và ngân sách.
 4. Xem chi phí theo ngày/tuần/tháng, breakdown model/chức năng và usage event.
 5. Khi provider đổi giá, thêm price version với nguồn chính thức và ngày hiệu lực; lịch sử cũ không bị tính lại.
 6. Khi bật `Tạm dừng khi hết ngân sách`, UI hiển thị tiền đã dùng, đang giữ chỗ và còn lại. Mỗi paid call phải giữ chỗ nguyên tử trước; nếu không đủ số dư hoặc không ước lượng được upper bound thì job bị chặn trước provider call.
 7. Tại tab `Thiết lập mặc định`, admin nhập `Giới hạn token đầu vào` và
-   `Giới hạn token đầu ra` cho từng tính năng. Tab `Quản lý model` không hiển
-   thị giới hạn kỹ thuật hoặc trần token.
+   `Giới hạn token đầu ra` cho từng phase của từng tính năng. Tab `Quản lý
+model` không hiển thị giới hạn kỹ thuật hoặc trần token.
+8. Modal sinh kiến thức và sinh Quiz hiển thị hai nhóm cấu hình model riêng cho
+   Phase 1/Phase 2. Bỏ trống override thì mỗi phase dùng đúng route mặc định của
+   chính feature; thay model Phase 1 không được làm đổi model tạo ảnh và ngược lại.
 
 Acceptance Criteria:
 
 - Backend enforce role ADMIN và không trả secret.
-- Job đã enqueue giữ route snapshot; fallback chỉ cho lỗi provider tạm thời.
+- Job đã enqueue giữ riêng snapshot route text và route ảnh; fallback chỉ cho
+  lỗi provider tạm thời trong chính phase đang chạy.
 - OCR retry tiếp tục `pdfId` đã có, cache hit có cost 0 và saving.
 - Đổi model/giá/budget/accounting có audit; version conflict buộc tải lại.
 - Nhiều worker chạy đồng thời không làm tổng `đã dùng + đang giữ chỗ` vượt hard limit; budget error không fallback/retry và hiển thị thông báo thân thiện.
-- Cấu hình tính năng dùng cho paid call phải có giới hạn input/output hợp lệ;
+- Cấu hình feature + phase dùng cho paid call phải có giới hạn input/output hợp lệ;
   thiếu một trong hai thì fail-closed trước provider call.
 
 ---

@@ -35,7 +35,9 @@ export class QuizFigureDraftService {
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const latexSource = dto.latexSource.trim();
     try {
-      assertQuizFigureLatexSource(latexSource);
+      assertQuizFigureLatexSource(latexSource, {
+        requireExtensionMarker: figure.role === "QUESTION",
+      });
     } catch (error) {
       throw badRequestException(
         "QUIZ_FIGURE_SOURCE_POLICY_REJECTED",
@@ -139,7 +141,7 @@ export class QuizFigureDraftService {
   private async requireFigure(questionId: string, figureId: string) {
     const figure = await this.prisma.quizFigure.findFirst({
       where: { id: figureId, quizQuestionId: questionId, deletedAt: null },
-      select: { id: true, subjectKey: true, currentRevisionId: true },
+      select: { id: true, role: true, subjectKey: true, currentRevisionId: true },
     });
     if (!figure) {
       throw notFoundException("QUIZ_FIGURE_NOT_FOUND", "Không tìm thấy hình Quiz.");

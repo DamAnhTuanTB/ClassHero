@@ -305,7 +305,6 @@ function addFigures(
         figurePlanContractVersion: 3,
         localId: `F${String(figures.length + 1).padStart(3, "0")}`,
         altText: buildLessonSummaryFigureAltText({
-          caption: figure.caption,
           block,
           sectionHeading,
         }),

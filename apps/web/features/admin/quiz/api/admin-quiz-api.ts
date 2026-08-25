@@ -70,7 +70,13 @@ export interface AdminQuizSet {
   aiGenerations?: Array<{
     id: string;
     createdAt: string;
+    finishedAt: string | null;
     inputMetaJson: AdminQuizGenerationMetadata | null;
+    model: string | null;
+    startedAt: string | null;
+    status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+    totalCostVnd: number;
+    usageEventCount: number;
   }>;
   aiGeneration?: {
     id: string;
@@ -109,7 +115,7 @@ export interface AdminQuizQuestion {
   } | null;
   generationQuestionJson?: Record<string, unknown> | null;
   reviewStatus: string;
-  solutionFigureMode: "NONE" | "REUSE_QUESTION" | "EXTEND_QUESTION";
+  solutionFigureMode: "NONE" | "EXTEND_QUESTION" | "REDRAW_AS_MODEL";
   figures: AdminQuizFigure[];
 }
 
@@ -117,6 +123,7 @@ export interface AdminQuizFigure {
   id: string;
   role: "QUESTION" | "SOLUTION";
   status: "QUEUED" | "RENDERING" | "REPAIRING" | "SUCCEEDED" | "NEEDS_REVIEW" | "FAILED";
+  openAiGenerationCostVnd?: number | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
   currentRevision: {
@@ -158,6 +165,14 @@ export interface AdminQuizFigureCreateAiPreview extends Omit<
 > {
   mode: AdminQuizFigureCreateAiInput["mode"];
   configuration: AdminAiModelConfiguration;
+}
+
+export interface AdminQuizFigureRefinementPreview extends Omit<
+  AdminQuizFigureCreateAiPreview,
+  "mode"
+> {
+  operation: "REFINE_CURRENT";
+  currentImageDataUrl: string;
 }
 
 export interface AdminQuizInitialData {
@@ -391,6 +406,30 @@ export function previewNewAdminQuizFigureWithAi(
 ) {
   return apiRequest<AdminQuizFigureCreateAiPreview>(
     `/admin/quiz-questions/${questionId}/figures/${figureId}/create-new-ai/preview`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function refineAdminQuizFigureWithAi(
+  questionId: string,
+  figureId: string,
+  data: { baseRevisionId: string | null },
+  token: string,
+) {
+  return apiRequest<{ jobId: string; status: string }>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/refine-ai`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function previewAdminQuizFigureRefinement(
+  questionId: string,
+  figureId: string,
+  data: { baseRevisionId: string | null },
+  token: string,
+) {
+  return apiRequest<AdminQuizFigureRefinementPreview>(
+    `/admin/quiz-questions/${questionId}/figures/${figureId}/refine-ai/preview`,
     { method: "POST", body: data, token },
   );
 }

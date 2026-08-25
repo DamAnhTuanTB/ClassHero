@@ -8,7 +8,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import { AiProviderCallService } from "#api/modules/ai/services/ai-provider-call.service";
 import { LessonSourcePacketService } from "#api/modules/ai/services/lesson-source-packet.service";
 import {
-  LESSON_SUMMARY_PROMPT_VERSION,
+  LESSON_SUMMARY_PROMPT_VERSIONS,
   LESSON_SUMMARY_SCHEMA_VERSION,
   getLessonSummaryProviderTransportOutputSchema,
 } from "#api/modules/ai/types/lesson-summary.types";
@@ -26,7 +26,7 @@ async function main() {
   const outputPath = resolve(
     process.cwd(),
     process.env.M9_2_LIVE_OUTPUT ??
-      `../../.codex/artifacts/m9.2-five-block-live-b15/b15-${LESSON_SUMMARY_PROMPT_VERSION}-${model}.json`,
+      `../../.codex/artifacts/m9.2-five-block-live-b15/b15-${LESSON_SUMMARY_PROMPT_VERSIONS.MATH}-${model}.json`,
   );
   if (process.env.M9_2_LIVE_FORCE !== "1") {
     const cached = await readFile(outputPath, "utf8").catch(() => null);
@@ -99,7 +99,7 @@ async function main() {
         feature: AiGenerationType.SUMMARY,
         attempt: 1,
         callSequence: 1,
-        idempotencyKey: `m9.2-live-stage-one:${lessonId}:${LESSON_SUMMARY_PROMPT_VERSION}:${model}`,
+        idempotencyKey: `m9.2-live-stage-one:${lessonId}:${LESSON_SUMMARY_PROMPT_VERSIONS.MATH}:${model}`,
         routeSnapshot: {
           feature: AiGenerationType.SUMMARY,
           version: 1,
@@ -130,7 +130,7 @@ async function main() {
           lessonId,
           lessonTitle: lesson.title,
           model,
-          promptVersion: LESSON_SUMMARY_PROMPT_VERSION,
+          promptVersion: LESSON_SUMMARY_PROMPT_VERSIONS.MATH,
           schemaVersion: LESSON_SUMMARY_SCHEMA_VERSION,
           usage: result.usage ?? null,
           providerRequestId: result.providerRequestId ?? null,

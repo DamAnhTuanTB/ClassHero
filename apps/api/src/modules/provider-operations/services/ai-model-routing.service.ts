@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   AiGenerationType,
+  AiModelPurpose,
   AiProviderName,
   ProviderCatalogCategory,
   ProviderCatalogStatus,
@@ -28,13 +29,16 @@ export class AiModelRoutingService {
     private readonly configService: ConfigService<EnvConfig, true>,
   ) {}
 
-  async resolve(feature: AiGenerationType): Promise<AiFeatureRoute> {
+  async resolve(
+    feature: AiGenerationType,
+    purpose: AiModelPurpose = AiModelPurpose.TEXT,
+  ): Promise<AiFeatureRoute> {
     if (!EDITABLE_FEATURES.has(feature)) {
-      return this.getEnvironmentFallback(feature);
+      return this.getEnvironmentFallback(feature, purpose);
     }
 
     const configuration = await this.prisma.aiFeatureModelConfig.findUnique({
-      where: { feature },
+      where: { feature_purpose: { feature, purpose } },
       include: {
         primaryCatalogItem: {
           include: { priceVersions: priceVersionInclude() },
@@ -46,7 +50,7 @@ export class AiModelRoutingService {
     });
 
     if (!configuration) {
-      return this.getEnvironmentFallback(feature);
+      return this.getEnvironmentFallback(feature, purpose);
     }
 
     const candidates = [
@@ -58,6 +62,7 @@ export class AiModelRoutingService {
 
     return {
       feature,
+      purpose,
       version: configuration.version,
       model: configuration.primaryCatalogItem.externalKey,
       temperature: configuration.temperature?.toNumber() ?? null,
@@ -169,10 +174,14 @@ export class AiModelRoutingService {
     };
   }
 
-  private getEnvironmentFallback(feature: AiGenerationType): AiFeatureRoute {
+  private getEnvironmentFallback(
+    feature: AiGenerationType,
+    purpose: AiModelPurpose,
+  ): AiFeatureRoute {
     const model = this.configService.get("OPENAI_STRUCTURED_MODEL", { infer: true });
     return {
       feature,
+      purpose,
       version: 0,
       model: "default-model",
       temperature: null,

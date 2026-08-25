@@ -9,6 +9,7 @@ import type {
   AdminLessonSummaryContent,
   AdminStemFigure,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { hasActiveAdminFigure } from "@/lib/admin-figure-status";
 
 const StemFigureOverviewDialog = dynamic(
   () =>
@@ -32,9 +33,7 @@ export function AdminStemFigureStatusSummary({
   onNavigateToBlock: (blockPath: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const hasProcessingFigure = figures.some((figure) =>
-    ["QUEUED", "RENDERING", "REPAIRING"].includes(figure.status),
-  );
+  const hasProcessingFigure = hasActiveAdminFigure(figures);
 
   return (
     <>

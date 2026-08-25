@@ -2,8 +2,14 @@ import { AI_REASONING_EFFORT_LEVELS } from "@learning-path/shared";
 import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
-export const QUIZ_PROMPT_VERSION = "quiz-pdf-figure-prompt-v40-math-visual-need";
-export const QUIZ_SCHEMA_VERSION = "quiz-pdf-figure-schema-v26-math-visual-need";
+export const QUIZ_PROMPT_VERSIONS = {
+  MATH: "quiz-math-v48-single-true-false-no-figure",
+  PHYSICS: "quiz-physics-v47-single-true-false-no-figure",
+  CHEMISTRY: "quiz-chemistry-v47-single-true-false-no-figure",
+  GENERAL: "quiz-general-v47-single-true-false-no-figure",
+} as const;
+export const QUIZ_SCHEMA_VERSION =
+  "quiz-pdf-figure-schema-v30-single-true-false-no-figure";
 export const QUIZ_MAX_OUTPUT_TOKENS = 12_000;
 export const QUIZ_MIN_OUTPUT_TOKENS = 1_000;
 export const QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
@@ -84,7 +90,7 @@ export const QUIZ_HINT_QUALITY_POLICY = [
   "Gợi ý ngắn nhưng phải tự đủ nghĩa và cung cấp ít nhất một cầu nối suy luận cụ thể từ dữ kiện hoặc yêu cầu của chính câu hỏi đến khái niệm, quan hệ, quy tắc hoặc thao tác đầu tiên cần dùng.",
   "Gợi ý phải giúp học sinh hiểu vì sao hướng đó phù hợp với cấu hình, điều kiện hoặc đại lượng đang hỏi; không chỉ nhắc lại một công thức, định nghĩa hay sự thật rời rạc mà không nối nó với bài cụ thể.",
   "Dùng thuật ngữ và tên quan hệ chuyên môn rõ ràng. Không dùng các động từ mơ hồ như `ghép`, `nối`, `kết hợp` thay cho việc nêu chính xác hai đối tượng có quan hệ gì và cần lập hay kiểm tra hệ thức nào; chỉ dùng các động từ này khi thao tác ghép/nối/kết hợp chính là thao tác chuyên môn đang được hỏi và đối tượng thao tác đã rõ.",
-  "`hint` được phép và nên dùng công thức LaTeX khi công thức giúp thể hiện quan hệ rõ hơn văn xuôi. Dùng `$...$` cho công thức inline và `$$...$$` cho công thức trọng tâm ở dòng riêng; mọi lệnh LaTeX như `\\widehat`, `\\frac`, `\\sqrt` phải giữ đúng dấu `\\`. Được nêu quan hệ hay công thức cần dùng, nhưng không thay hết dữ kiện để tính ra kết quả cuối.",
+  "`hint` được phép và nên dùng công thức LaTeX khi công thức giúp thể hiện quan hệ rõ hơn văn xuôi. Dùng `$...$` cho công thức inline và `$$...$$` cho công thức trọng tâm ở dòng riêng; mọi lệnh LaTeX như `\\frac`, `\\sqrt`, `\\alpha` phải giữ đúng dấu `\\`. Được nêu quan hệ hay công thức cần dùng, nhưng không thay hết dữ kiện để tính ra kết quả cuối.",
   "Trình bày theo đơn vị suy luận, không dồn nhiều bước thành một khối văn xuôi. Nếu chỉ cần một cầu nối thì dùng một đoạn ngắn, có thể kèm công thức. Nếu cần từ hai bước trở lên, mỗi bước phải bắt đầu ở dòng riêng và có thể dùng danh sách đánh số; công thức display phải nằm trên dòng riêng với dòng trống phía trước và sau.",
   "Không dùng câu chung chung như `Dùng công thức phù hợp`, `Thực hiện phép tính`, `Xét định nghĩa`, `Làm tương tự` hoặc cách diễn đạt tương đương. Không tiết lộ kết quả cuối, ID phương án, giá trị đúng/sai hoặc trình bày trọn vẹn lời giải.",
   "Ví dụ không hợp lệ theo mẫu tổng quát: viết `Hãy ghép đại lượng này với đại lượng kia rồi tính`, hoặc chỉ nêu một hệ thức đúng mà không cho biết hệ thức đó liên quan thế nào đến yêu cầu của câu hỏi.",
@@ -93,13 +99,10 @@ export const QUIZ_HINT_QUALITY_POLICY = [
 ].join(" ");
 
 export const QUIZ_FIGURE_SELECTION_POLICY = [
-  "Quyết định hình theo nhu cầu sư phạm của từng câu, không đặt quota cứng và không dùng riêng tên môn, tên bài hoặc một nhãn phân loại làm điều kiện máy móc.",
-  "Bắt buộc tạo `questionFigure` khi đề nêu nhiều đối tượng mà cấu hình, cấu tạo, vị trí, thứ tự, hướng, đường truyền, sự nối kết, giao nhau, tiếp xúc, song song, vuông góc hoặc quan hệ giữa chúng tham gia vào việc hiểu hay giải bài.",
-  "Bắt buộc tạo `questionFigure` cho câu mà đồ thị hàm số, hệ trục tọa độ, đường số, miền nghiệm, bảng biến thiên, bảng xét dấu, bảng dữ liệu, biểu đồ hoặc sơ đồ là đối tượng phải đọc, dựng, so sánh hay suy luận; quy tắc này áp dụng cả khi câu không được phân loại là Hình học.",
-  "Chỉ được dùng `questionFigure=null` khi câu chỉ hỏi định nghĩa, nhận dạng khái niệm, công thức hoặc tính chất tổng quát, hay một phép tính đại lượng thuần túy mà không có cấu hình hoặc quan hệ trực quan nào tham gia mạch suy luận và hình không làm rõ thêm bước nào.",
-  "Quy tắc bắt buộc tạo hình vẫn áp dụng khi mọi dữ kiện đã được nêu đủ bằng chữ; yêu cầu đề bài tự đủ nghĩa là nguyên tắc an toàn, không phải lý do loại hình. Không được chọn null chỉ vì có thể mô tả lại toàn bộ dữ kiện bằng chữ.",
-  "Trước khi trả JSON, phải rà lại toàn bộ câu. Nếu có ít nhất một câu thỏa điều kiện bắt buộc tạo hình ở trên thì không được trả `questionFigure=null` cho tất cả các câu đó.",
-  "Ví dụ tổng quát cần hình: một bài dùng quan hệ giữa các điểm, đường, góc hoặc đường tròn trong một cấu hình cụ thể để suy luận; hoặc một bài buộc đọc/dựng đồ thị hay bảng. Counterexample được phép không có hình: câu chỉ hỏi công thức tổng quát, hoặc phép tính Đại số chỉ thay dữ kiện vào biểu thức mà không đọc/dựng đồ thị hay bảng.",
+  "Quyết định hình theo policy chuyên môn của đúng môn trong system prompt hiện tại; không đặt quota cứng và không dùng riêng tên môn, tên bài hoặc một nhãn phân loại làm điều kiện máy móc.",
+  "Ngoại lệ nghiệp vụ bắt buộc: câu TRUE_FALSE chỉ có đúng một mệnh đề luôn không tạo hình đề hoặc hình lời giải; phải trả `requiresQuestionFigure=false`, `solutionFigureMode=NONE` và `solutionFigurePlan=null`. Quy tắc này không áp dụng cho MULTI_STATEMENT_TRUE_FALSE.",
+  "Đề bài và lời giải vẫn phải tự đủ nghĩa bằng chữ. Đây là nguyên tắc an toàn cho người học, không phải lý do tự động loại hình khi policy của môn xác định biểu diễn trực quan là cần thiết.",
+  "Trước khi trả JSON, rà lại từng câu theo đúng policy môn và chọn chính xác một trong bốn contract: không có hình, chỉ có hình đề với lời giải NONE, EXTEND_QUESTION hoặc REDRAW_AS_MODEL.",
 ].join(" ");
 
 export const QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY = [
@@ -263,24 +266,14 @@ const numericAnswerSchema = z
     "Đúng một đáp án số chuẩn. Chỉ dùng một trong ba dạng: số nguyên; phân số tối giản `p/q` có mẫu dương cho kết quả hữu tỉ không nguyên; hoặc số thập phân dùng dấu `.` và đúng một chữ số sau dấu thập phân cho kết quả vô tỉ đã được yêu cầu làm tròn. Không dùng dấu `,`, ký hiệu khoa học, LaTeX, ký hiệu vô tỉ, đơn vị, câu văn, xuống dòng hoặc nhiều phương án.",
   );
 
-const questionFigurePlanSchema = z
-  .object({
-    caption: text(500)
-      .nullable()
-      .describe(
-        "Mô tả ngắn, tự đủ nghĩa về cấu hình hoặc quan hệ cần minh họa; không thêm dữ kiện mới và dùng null khi hình không cần chú thích.",
-      ),
-  })
-  .strict();
-
-const solutionFigurePlanSchema = z
+const extendedSolutionFigurePlanSchema = z
   .object({
     addedObjects: z
       .array(text(300))
       .min(1)
       .max(20)
       .describe(
-        "Các đối tượng trực quan mới, thiết yếu phải thêm trên đúng hình đề để theo dõi lời giải, ví dụ điểm, đường, vector, tia sáng, bộ phận mạch điện hoặc liên kết hóa học.",
+        "Các đối tượng trực quan mới, thiết yếu phải thêm trên đúng hình đề để theo dõi lời giải; dùng đúng tên và quy ước của môn hiện tại.",
       ),
     clarifiedRelations: z
       .array(text(300))
@@ -292,16 +285,57 @@ const solutionFigurePlanSchema = z
   })
   .strict();
 
+const redrawnSolutionFigurePlanSchema = z
+  .object({
+    modelingGoal: text(500).describe(
+      "Mục tiêu chuyển biểu diễn: nêu phần thực tế hoặc bố cục cần lược bỏ và cách mô hình chuyên môn mới giúp theo dõi lời giải; không mô tả đáp án thay cho solution.",
+    ),
+    modeledObjects: z
+      .array(text(300))
+      .min(1)
+      .max(20)
+      .describe(
+        "Toàn bộ đối tượng thiết yếu phải xuất hiện trong hình lời giải được vẽ lại, gồm đối tượng từ đề và mọi đối tượng phụ đã được nêu rõ trong solution.",
+      ),
+    clarifiedRelations: z
+      .array(text(300))
+      .min(1)
+      .max(20)
+      .describe(
+        "Các quan hệ hoặc kết luận đã có trong problem/solution cần thể hiện rõ trên mô hình mới bằng ký hiệu chuẩn của môn hiện tại.",
+      ),
+  })
+  .strict();
+
+const quizNoFigureDecisionSchema = z
+  .object({
+    requiresQuestionFigure: z
+      .literal(false)
+      .describe(
+        "Không tạo hình đề. Với TRUE_FALSE một mệnh đề, đây là giá trị bắt buộc; với loại câu khác, chỉ dùng khi policy của đúng môn xác định không cần hình.",
+      ),
+    solutionFigureMode: z.literal("NONE").describe("Không tạo hình cho lời giải."),
+    solutionFigurePlan: z
+      .null()
+      .describe("Bắt buộc là null khi `solutionFigureMode=NONE`."),
+  })
+  .strict();
+
 export const quizFigureDecisionSchema = z
   .union([
+    quizNoFigureDecisionSchema,
     z
       .object({
-        questionFigure: z
-          .null()
+        requiresQuestionFigure: z
+          .literal(true)
           .describe(
-            "Chỉ không tạo hình khi câu không có cấu hình, đồ thị, bảng, biểu đồ, sơ đồ hoặc quan hệ trực quan cần làm rõ; không được chọn null cho câu Hình học có cấu hình cụ thể hay câu Đại số phải đọc, dựng hoặc suy luận từ biểu diễn trực quan chỉ vì đề đã tự đủ nghĩa bằng chữ.",
+            "Tạo hình đề vì câu thuộc trường hợp cần hình theo policy của đúng môn.",
           ),
-        solutionFigureMode: z.literal("NONE").describe("Không tạo hình cho lời giải."),
+        solutionFigureMode: z
+          .literal("NONE")
+          .describe(
+            "Chỉ không tạo hình lời giải khi phép kiểm kê visual delta giữa solution và hình đề rỗng, hoặc phần chênh chỉ là thay số, biến đổi công thức, giá trị đáp án hay câu kết luận không tạo thêm đối tượng/quan hệ trực quan hữu ích. Việc solution tự đủ nghĩa bằng chữ không phải lý do để chọn NONE khi còn visual delta thiết yếu.",
+          ),
         solutionFigurePlan: z
           .null()
           .describe("Bắt buộc là null khi `solutionFigureMode=NONE`."),
@@ -309,37 +343,39 @@ export const quizFigureDecisionSchema = z
       .strict(),
     z
       .object({
-        questionFigure: questionFigurePlanSchema.describe(
-          "Kế hoạch tối thiểu cho hình đề. Đây là lựa chọn mặc định bắt buộc với câu Hình học có cấu hình cụ thể, câu Đại số dùng đồ thị/hệ trục/miền nghiệm/bảng biến thiên/bảng xét dấu/bảng dữ liệu, và mọi câu mà hình làm rõ cấu tạo, vị trí, hướng hoặc quan hệ giữa nhiều đối tượng.",
-        ),
+        requiresQuestionFigure: z
+          .literal(true)
+          .describe("Tạo hình đề để dùng làm nền của hình lời giải mở rộng."),
         solutionFigureMode: z
-          .enum(["NONE", "REUSE_QUESTION"])
+          .literal("EXTEND_QUESTION")
           .describe(
-            "Chọn NONE nếu lời giải không cần hình; chọn REUSE_QUESTION nếu lời giải dùng nguyên hình đề, không thêm đối tượng hoặc quan hệ.",
+            "Bắt buộc mở rộng đúng hình đề khi solution dùng ít nhất một đối tượng hoặc quan hệ trực quan thiết yếu chưa có trên hình đề và các phần bổ sung vẫn dùng cùng nền/hệ tọa độ.",
           ),
-        solutionFigurePlan: z
-          .null()
-          .describe("Bắt buộc là null khi không mở rộng hình đề."),
+        solutionFigurePlan: extendedSolutionFigurePlanSchema.describe(
+          "Liệt kê chính xác phần phải bổ sung trên hình đề; không mô tả lại toàn bộ hình.",
+        ),
       })
       .strict(),
     z
       .object({
-        questionFigure: questionFigurePlanSchema.describe(
-          "Kế hoạch tối thiểu cho hình đề sẽ được dùng làm nền của hình lời giải.",
-        ),
-        solutionFigureMode: z
-          .literal("EXTEND_QUESTION")
+        requiresQuestionFigure: z
+          .literal(true)
           .describe(
-            "Mở rộng đúng hình đề bằng các đối tượng và quan hệ cần cho lời giải.",
+            "Tạo hình đề để dùng làm tham chiếu và provenance cho hình lời giải vẽ lại.",
           ),
-        solutionFigurePlan: solutionFigurePlanSchema.describe(
-          "Liệt kê chính xác phần phải bổ sung trên hình đề; không mô tả lại toàn bộ hình.",
+        solutionFigureMode: z
+          .literal("REDRAW_AS_MODEL")
+          .describe(
+            "Vẽ một hình lời giải hoàn chỉnh mới để mô hình hóa lại cùng dữ kiện theo bố cục hoặc phong cách chuyên môn khác; không chèn vào source hình đề.",
+          ),
+        solutionFigurePlan: redrawnSolutionFigurePlanSchema.describe(
+          "Mô tả đầy đủ mục tiêu chuyển biểu diễn, các đối tượng và quan hệ phải có trong mô hình lời giải mới.",
         ),
       })
       .strict(),
   ])
   .describe(
-    "Quyết định có dùng hình hay không và cách dùng hình đề trong lời giải. Câu Hình học có cấu hình cụ thể và câu Đại số phải đọc, dựng hoặc suy luận từ đồ thị, hệ trục, miền nghiệm hay bảng biểu mặc định phải có hình; câu chỉ hỏi định nghĩa, công thức hoặc tính chất tổng quát không phụ thuộc biểu diễn trực quan có thể không có hình. Hình chỉ bổ trợ trực quan, không được chứa dữ kiện mà nội dung chữ chưa nêu.",
+    "Quyết định có dùng hình hay không và cách tạo hình lời giải theo policy của đúng môn. Trước khi chọn mode phải so sánh các đối tượng/quan hệ trực quan solution thật sự dùng với hình đề: delta rỗng hoặc chỉ là tính toán thuần túy thì NONE; delta thiết yếu trên cùng nền thì EXTEND_QUESTION; cần một biểu diễn hoàn chỉnh khác thì REDRAW_AS_MODEL. Hình chỉ bổ trợ trực quan, không được chứa dữ kiện mà nội dung chữ chưa nêu.",
   );
 
 const ALL_GENERATED_QUESTION_TYPES = [
@@ -365,6 +401,7 @@ function createQuestionSchemas<
       .object({
         questionType: z.literal(QuestionType.MULTIPLE_CHOICE),
         ...commonFields,
+        figure: quizFigureDecisionSchema,
         options: z
           .array(optionSchema)
           .min(2)
@@ -382,6 +419,9 @@ function createQuestionSchemas<
       .object({
         questionType: z.literal(QuestionType.TRUE_FALSE),
         ...commonFields,
+        figure: quizNoFigureDecisionSchema.describe(
+          "TRUE_FALSE chỉ có một mệnh đề nên không tạo hình đề hoặc hình lời giải. Bắt buộc trả đúng `requiresQuestionFigure=false`, `solutionFigureMode=NONE`, `solutionFigurePlan=null`.",
+        ),
         explanation: trueFalseExplanationSchema,
         correctAnswer: z
           .boolean()
@@ -391,12 +431,17 @@ function createQuestionSchemas<
       })
       .strict()
       .describe(
-        [QUIZ_TRUE_FALSE_PROBLEM_POLICY, QUIZ_TRUE_FALSE_SOLUTION_POLICY].join(" "),
+        [
+          QUIZ_TRUE_FALSE_PROBLEM_POLICY,
+          QUIZ_TRUE_FALSE_SOLUTION_POLICY,
+          "Loại câu này không được tạo hình đề hoặc hình lời giải.",
+        ].join(" "),
       ),
     [QuestionType.MULTI_STATEMENT_TRUE_FALSE]: z
       .object({
         questionType: z.literal(QuestionType.MULTI_STATEMENT_TRUE_FALSE),
         ...commonFields,
+        figure: quizFigureDecisionSchema,
         explanation: multiStatementExplanationSchema,
         statements: z
           .array(
@@ -427,6 +472,7 @@ function createQuestionSchemas<
       .object({
         questionType: z.literal(QuestionType.TEXT_INPUT),
         ...commonFields,
+        figure: quizFigureDecisionSchema,
         explanation: textInputExplanationSchema,
         correctAnswer: numericAnswerSchema,
       })
@@ -462,7 +508,6 @@ function createNonMathQuizQuestionFields(difficulty: z.ZodType<Difficulty>) {
     explanation: nonMathQuizExplanationSchema.describe(
       "Gồm đề bài, lời giải và đáp án theo đúng môn hiện tại; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa.",
     ),
-    figure: quizFigureDecisionSchema,
   };
 }
 
@@ -481,7 +526,6 @@ const _generatedMathQuizQuestionSchema = buildQuestionSchema(
     explanation: createMathQuizExplanationSchema(
       multipleChoiceQuizExplanationContentShape,
     ),
-    figure: quizFigureDecisionSchema,
   },
   ALL_GENERATED_QUESTION_TYPES,
   createMathQuizExplanationSchema(trueFalseQuizExplanationContentShape),
@@ -516,7 +560,6 @@ export function getGeneratedQuizOutputSchema(
             ).describe(
               "Gồm đề bài, lời giải, đáp án và trường phân loại Hình học; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa.",
             ),
-            figure: quizFigureDecisionSchema,
           },
           requestedTypes,
           createMathQuizExplanationSchema(trueFalseQuizExplanationContentShape).describe(
@@ -601,6 +644,7 @@ export const quizGenerationJobInputSchema = sourceSnapshotSchema
     extraInstructions: z.string().trim().max(2_000).default(""),
     systemInstructions: z.string().trim().max(64_000).default(""),
     userPrompt: z.string().trim().max(16_000).default(""),
+    imageRouteSnapshot: z.record(z.string(), z.unknown()).optional(),
     model: z.string().trim().max(200).optional(),
     temperature: z.number().min(0).max(1).optional(),
     reasoningEffort: z.enum(AI_REASONING_EFFORT_LEVELS).optional(),

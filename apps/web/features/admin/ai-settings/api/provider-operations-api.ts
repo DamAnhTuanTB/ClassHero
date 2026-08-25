@@ -37,12 +37,16 @@ export const updateAiConfigurations = (
     body: {
       configurations: configurations.map((configuration) => ({
         feature: configuration.feature,
+        purpose: configuration.purpose,
         primaryCatalogItemId: configuration.primaryCatalogItemId,
         fallbackCatalogItemId: configuration.fallbackCatalogItemId,
         temperature: configuration.temperature,
         reasoningEffort: configuration.reasoningEffort,
         maxInputTokens: configuration.maxInputTokens,
         maxOutputTokens: configuration.maxOutputTokens,
+        fallbackTemperature: configuration.fallbackTemperature,
+        fallbackReasoningEffort: configuration.fallbackReasoningEffort,
+        fallbackMaxOutputTokens: configuration.fallbackMaxOutputTokens,
         expectedVersion: configuration.version,
       })),
     },

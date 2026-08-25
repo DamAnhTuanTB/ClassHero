@@ -66,3 +66,6 @@ Hệ quả tốt/xấu/cần lưu ý.
 | `ADR-0018-remove-visual-intent-hard-cutover.md`  | Accepted   | Xóa visual intent; Stage 2 dùng ảnh + block projection và runtime chỉ nhận figure plan v3                    |
 | `ADR-0019-local-stem-figure-raster-cleanup.md`   | Accepted   | Chỉnh nhẹ raster SGK bằng Canvas + Sharp, revision lossless; không AI inpainting                             |
 | `ADR-0020-quiz-owned-generation-core.md`         | Accepted   | Tách hard-cutover Quiz khỏi toàn bộ core Sinh kiến thức; chỉ dùng chung hạ tầng AI trung lập                 |
+| `ADR-0021-quiz-solution-figure-redraw-mode.md`   | Accepted   | Bỏ mode lặp hình đề; thêm mode vẽ lại hình lời giải thành mô hình toán học có source riêng                   |
+| `ADR-0022-subject-isolated-ai-system-prompts.md` | Accepted   | Tách system prompt Toán/Lý/Hóa trong Sinh kiến thức và Quiz; chỉ chia sẻ contract kỹ thuật trung lập         |
+| `ADR-0023-phase-specific-ai-model-routing.md`    | Accepted   | Tách route model TEXT/IMAGE theo từng Summary/Quiz/Flashcard/Test và snapshot độc lập theo phase             |

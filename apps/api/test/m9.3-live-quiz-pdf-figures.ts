@@ -37,8 +37,7 @@ const naturalTargets = [
 const figureValidationTargets = [
   {
     lessonId: "fd689ece-dc92-450a-b43e-197fd91a3f28",
-    label:
-      "Toán 9 tập 2 · Bài 28 · Đường tròn ngoại tiếp và nội tiếp tam giác",
+    label: "Toán 9 tập 2 · Bài 28 · Đường tròn ngoại tiếp và nội tiếp tam giác",
   },
 ] as const;
 const complexFigureTargets = figureValidationTargets;
@@ -51,7 +50,7 @@ const targets =
       ? complexFigureTargets
       : liveScenario === "proof-extension"
         ? proofExtensionTargets
-      : naturalTargets;
+        : naturalTargets;
 
 const naturalGenerationInput = {
   questionCount: 3,
@@ -86,7 +85,7 @@ const genuineFigureGenerationInput = {
   extraInstructions: [
     "Đây là kiểm thử tự nhiên về nhu cầu trực quan trong bài đường tròn ngoại tiếp và nội tiếp tam giác; không nhắm trước số hình hoặc bất kỳ figure mode nào.",
     "Biên soạn câu mới bao phủ hợp lí cả nhận biết, tính toán và suy luận hoặc dựng hình trong đúng phạm vi PDF.",
-    "Mỗi câu phải tự quyết định NONE, REUSE_QUESTION hoặc EXTEND_QUESTION chỉ theo nhu cầu sư phạm thực của chính câu đó; không thêm đối tượng hay bước dựng để tạo nhu cầu hình.",
+    "Mỗi câu phải tự quyết định NONE, EXTEND_QUESTION hoặc REDRAW_AS_MODEL chỉ theo nhu cầu sư phạm thực của chính câu đó; không thêm đối tượng hay bước dựng để tạo nhu cầu hình.",
     "Nếu nội dung bằng chữ và công thức đã đủ rõ thì bắt buộc chọn NONE, kể cả với câu Hình học.",
     "Problem và solution phải tự đủ nghĩa, không nhắc đến việc xem, quan sát hay bổ sung hình.",
   ].join(" "),
@@ -104,7 +103,7 @@ const complexFigureGenerationInput = {
     "Đây là kiểm thử một câu tổng hợp có cấu hình trực quan tự nhiên trong bài đường tròn ngoại tiếp và nội tiếp tam giác.",
     "Biên soạn một câu mới về một tam giác nhọn không đặc biệt, kết hợp việc xác định tâm đường tròn ngoại tiếp từ các đường trung trực và tâm đường tròn nội tiếp từ các đường phân giác cùng các chân đường vuông góc tới ba cạnh; yêu cầu học sinh xác định hai đường tròn và giải thích đầy đủ.",
     "Mọi điểm và đường cần cho lời giải phải được định nghĩa ngay trong problem và thực sự được dùng; không lấy lại dữ kiện hay cách hỏi của ví dụ/bài tập nguồn.",
-    "Đây đồng thời là ca kiểm thử một hình duy nhất: solution phải dùng đúng cấu hình đã có trong problem, không thêm điểm hoặc đường dựng riêng cho lời giải. Chỉ chọn REUSE_QUESTION nếu sơ đồ thực sự giúp học sinh đọc cấu hình; nếu vẫn không cần thì chọn NONE.",
+    "Đây đồng thời là ca kiểm thử một hình duy nhất: solution phải dùng đúng cấu hình đã có trong problem, không thêm điểm hoặc đường dựng riêng cho lời giải. Vì phần lời giải không cần asset riêng nên chọn NONE; hình đề không được lặp lại trong phần lời giải.",
     "Problem và solution vẫn phải tự đủ nghĩa, không nhắc đến việc xem, quan sát hay bổ sung hình.",
   ].join(" "),
   model: LIVE_MODEL,
@@ -122,7 +121,7 @@ const proofExtensionGenerationInput = {
     "Biên soạn bài toán: cho tam giác nhọn có ba cạnh đôi một khác nhau, O là tâm đường tròn ngoại tiếp; M và N lần lượt là trung điểm của AB và AC. Yêu cầu chứng minh OM vuông góc AB và ON vuông góc AC.",
     "Không lấy lại câu hỏi hoặc lời giải của ví dụ/bài tập nguồn. Problem phải tự đủ nghĩa và mọi đối tượng ban đầu đều được định nghĩa rõ.",
     "Nếu hình thật sự giúp đọc cấu hình, hình đề chỉ thể hiện dữ kiện ban đầu, các đoạn OM và ON nhưng không được đánh dấu kết luận vuông góc hoặc chứa các bán kính phụ dùng trong chứng minh.",
-    "Solution phải là lời giải chứng minh đầy đủ, độc lập với hình. Nếu cần minh họa các tam giác dùng để chứng minh thì dùng EXTEND_QUESTION để chỉ bổ sung các bán kính thích hợp và ký hiệu kết luận đã chứng minh trên đúng source hình đề; không tạo hình lời giải độc lập.",
+    "Solution phải là lời giải chứng minh đầy đủ, độc lập với hình. Nếu cần minh họa các tam giác dùng để chứng minh thì dùng EXTEND_QUESTION để chỉ bổ sung các bán kính thích hợp và ký hiệu kết luận đã chứng minh trên đúng source hình đề; chỉ dùng REDRAW_AS_MODEL khi thật sự cần một biểu diễn toán học hoàn chỉnh khác.",
   ].join(" "),
   model: LIVE_MODEL,
   reasoningEffort: "medium" as const,
@@ -136,7 +135,7 @@ const generationInput =
       ? complexFigureGenerationInput
       : liveScenario === "proof-extension"
         ? proofExtensionGenerationInput
-      : naturalGenerationInput;
+        : naturalGenerationInput;
 
 async function main() {
   if (process.env.M9_3_LIVE_EXECUTE !== "1") {
@@ -164,9 +163,7 @@ async function main() {
       );
       const phaseOneUpperBoundVnd = preview.estimatedCost.upperBoundVnd ?? 0;
       if (
-        totalCostVnd +
-          phaseOneUpperBoundVnd +
-          PHASE_TWO_RESERVE_VND_PER_LESSON >
+        totalCostVnd + phaseOneUpperBoundVnd + PHASE_TWO_RESERVE_VND_PER_LESSON >
         LIVE_BUDGET_VND
       ) {
         results.push({
@@ -223,11 +220,7 @@ async function main() {
       const persistedFigureCount = await prisma.quizFigure.count({
         where: { aiGenerationId: aiGeneration.id, deletedAt: null },
       });
-      const figures = await waitForFigures(
-        prisma,
-        aiGeneration.id,
-        persistedFigureCount,
-      );
+      const figures = await waitForFigures(prisma, aiGeneration.id, persistedFigureCount);
       const usage = await summarizeUsage(prisma, aiGeneration.id);
       totalCostVnd += usage.costVnd;
       results.push({
@@ -240,11 +233,7 @@ async function main() {
         phaseOneUpperBoundVnd,
         mainJob,
         aiGeneration,
-        contract: summarizeContract(
-          questions,
-          figures,
-          generationInput.questionCount,
-        ),
+        contract: summarizeContract(questions, figures, generationInput.questionCount),
         questions,
         figures,
         usage,
@@ -358,10 +347,7 @@ async function summarizeUsage(prisma: PrismaService, aiGenerationId: string) {
       (total, event) => total + event.cachedInputTokens,
       0,
     ),
-    completionTokens: events.reduce(
-      (total, event) => total + event.completionTokens,
-      0,
-    ),
+    completionTokens: events.reduce((total, event) => total + event.completionTokens, 0),
     events,
   };
 }
@@ -380,8 +366,7 @@ function summarizeContract(
   expectedQuestionCount: number,
 ) {
   const modes = questions.reduce<Record<string, number>>((counts, question) => {
-    counts[question.solutionFigureMode] =
-      (counts[question.solutionFigureMode] ?? 0) + 1;
+    counts[question.solutionFigureMode] = (counts[question.solutionFigureMode] ?? 0) + 1;
     return counts;
   }, {});
   const extensionLineageValid = figures
@@ -389,14 +374,13 @@ function summarizeContract(
     .every((solution) => {
       const question = figures.find(
         (figure) =>
-          figure.quizQuestionId === solution.quizQuestionId &&
-          figure.role === "QUESTION",
+          figure.quizQuestionId === solution.quizQuestionId && figure.role === "QUESTION",
       );
       return (
         Boolean(solution.currentRevision) &&
         Boolean(question?.currentRevision) &&
         solution.currentRevision?.derivedFromQuestionRevisionId ===
-        question?.currentRevision?.id
+          question?.currentRevision?.id
       );
     });
   return {

@@ -58,6 +58,13 @@ con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figu
   trước khi model bắt đầu sinh nội dung.
 - Prompt/schema/model/config/source hash phải được snapshot để worker không dùng
   dữ liệu stale.
+- Prompt dài là một contract có cấu trúc, không phải chuỗi câu nối dòng. Mỗi môn
+  phải có system prompt chuyên môn tự đủ; không tạo “policy toàn hệ thống” chứa
+  core Toán rồi nối thêm nhánh Lý/Hóa. Cả role, output/safety prose và hợp đồng
+  lượt gọi cũng được sao chép vào file từng môn thay vì import từ prompt common;
+  dispatcher chỉ chọn subject/mode. Sự lặp này có chủ đích: đổi một môn không làm
+  prompt môn khác thay đổi ngầm. Rule chống lộ đáp án thuộc riêng lượt hình đề,
+  không thuộc mode lời giải để tránh vô hiệu hóa `clarifiedRelations`.
 - Structured schema ép được kiểu và shape nhưng description của field vẫn là chỉ
   dẫn ngôn ngữ cho model, không phải phép kiểm tra tất định. Khi product chủ động
   giữ output nguyên văn và không dùng normalizer/validator hậu kỳ, invariant trình
@@ -66,8 +73,9 @@ con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figu
   yêu cầu tự kiểm tra trước khi trả output. Một công thức ngắn không được trở
   thành ngoại lệ ngầm chỉ vì model thấy nó vừa một dòng; mọi lần harden loại này
   phải tăng prompt/schema version để request draft cũ không được tái sử dụng.
-- Summary figure draft chỉ chứa source LaTeX, alt text và caption. AI không trả raw
-  SVG, URL hoặc geometry JSON.
+- Summary Phase 1 figure plan chỉ chứa provenance và source reference; Phase 2
+  chỉ trả source LaTeX. AI không trả caption hiển thị, alt text, raw SVG, URL hoặc
+  geometry JSON; backend tự tạo alt text từ ngữ cảnh block.
 - Figure decision dùng hai tầng: subject profile quy định mức tối thiểu bắt buộc,
   còn AI chủ động bổ sung hình ngoài danh sách khi hình cần cho việc hiểu đúng.
   Danh sách hệ thống là mức sàn, không phải whitelist hay danh sách đóng.
@@ -76,10 +84,10 @@ con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figu
   không dùng Vision, không chọn package và không gọi thêm provider.
 - Mapper lưu `TEX_FIGURE` reference trong content và source/state ở bảng riêng.
 - Schema nhận output mới và schema đọc dữ liệu vận hành đã lưu không nên bị buộc
-  chung một cách máy móc. Với figure, caption/alt text là metadata của revision;
-  render-plan chỉ gồm ngữ nghĩa cần resolve crop và dựng hình. Vì vậy một rule
-  caption mới có thể từ chối output mới nhưng không được vô tình khóa nút sinh
-  lại của một render-plan vẫn đủ dữ liệu hình học.
+  chung một cách máy móc. Với figure, caption thủ công/legacy và alt text là
+  metadata của revision; render-plan chỉ gồm ngữ nghĩa cần resolve crop và dựng
+  hình. Provider schema không nhận caption, nhưng reader persisted vẫn phải đọc
+  được plan/revision cũ để không khóa nút sinh lại.
 - Giai đoạn hiện tại chỉ Summary có figure; Quiz/Test/Flashcard/Explanation/Chat
   giữ text-only.
 
@@ -196,12 +204,21 @@ preview nằm trong database; student chỉ nhận delivery asset của current 
 `SUCCEEDED`.
 
 Một source TikZ biên dịch được vẫn có thể sai chất lượng. Khi đã gửi ảnh sách giáo
-khoa, prompt nên coi ảnh là chuẩn trực quan thay vì chồng thêm nhiều công thức
-đặt nhãn, góc, anchor hoặc khoảng cách. Các quy tắc vá lẻ dễ cạnh tranh với ảnh
-nguồn và khiến model tối ưu theo câu chữ thay vì tái tạo hình. Prompt chung chỉ
-cần khóa thứ tự ưu tiên, cấm thiếu/thừa nét, yêu cầu nhãn gần đúng đối tượng mà
-không chạm nét và yêu cầu source biên dịch được; lỗi cụ thể được giữ làm regression
-fixture, không nối tiếp thành một đoạn chỉ dẫn mới.
+khoa, prompt vẫn coi ảnh là chuẩn trực quan và không áp khoảng cách số hoặc công
+thức offset cố định cạnh tranh với bố cục nguồn. Tuy vậy, invariant liên thuộc
+không gian vẫn dùng chung về ý nghĩa trong từng prompt môn: tên điểm neo từ đúng
+coordinate, nhãn góc theo phân giác sát ngoài cung, nhãn đo neo trên đúng path và
+đối tượng tương thích gần nhãn nhất phải là chủ sở hữu. Chuỗi fallback phải đổi
+anchor/trượt/đổi phía trước khi tăng khoảng hở; leader line trong ảnh nguồn được
+bảo toàn. Lỗi cụ thể chỉ là regression fixture, không trở thành khoảng cách vá
+riêng cho một hình.
+
+Một ngoại lệ chuẩn hóa không phụ thuộc fixture là tách notation ngoài hình khỏi
+nhãn đối tượng trên canvas. Ví dụ `$(O)$` trong văn bản bên ngoài canvas chỉ gọi đường tròn
+tâm `O`; canvas không được sao chép thêm node `$(O)$` bên cạnh điểm tâm đã mang
+nhãn `$O$`. Khi mode được phép sửa toàn source, loại node tên đường tròn dư nhưng
+giữ một coordinate/điểm và một nhãn tâm. Đây là bảo toàn semantic identity, không
+phải validator thị giác hay lý do từ chối source đã biên dịch được.
 
 Prompt provider không phải nơi lưu audit metadata. Chỉ gửi dữ liệu và ràng buộc
 mà model có thể dùng để quyết định output; prompt/schema version, tên manifest,

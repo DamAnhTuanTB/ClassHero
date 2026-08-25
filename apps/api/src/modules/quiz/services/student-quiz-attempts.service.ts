@@ -38,7 +38,10 @@ const studentQuizQuestionSelect = {
   sortOrder: true,
   solutionFigureMode: true,
   figures: {
-    where: { deletedAt: null, status: "SUCCEEDED" },
+    where: {
+      deletedAt: null,
+      currentRevision: { is: { status: "SUCCEEDED" } },
+    },
     select: {
       role: true,
       currentRevision: {
@@ -1238,10 +1241,7 @@ function serializeRunnerQuestion(
     questionNumber,
     solutionFigureMode: question.solutionFigureMode,
     questionFigure,
-    solutionFigure:
-      question.solutionFigureMode === "REUSE_QUESTION"
-        ? questionFigure
-        : ownSolutionFigure,
+    solutionFigure: ownSolutionFigure,
     hasExplanation:
       question.explanation?.reviewStatus === ReviewStatus.APPROVED &&
       question.explanation.staleAt === null,

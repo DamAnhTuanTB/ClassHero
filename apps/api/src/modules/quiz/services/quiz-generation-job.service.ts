@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { isAiReasoningEffort, type AiReasoningEffort } from "@learning-path/shared";
 import {
   AiGenerationType,
+  AiModelPurpose,
   Difficulty,
   Prisma,
   ProviderUsageMetric,
@@ -40,12 +41,15 @@ import {
 import {
   getGeneratedQuizOutputSchema,
   QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS,
-  QUIZ_PROMPT_VERSION,
   QUIZ_SCHEMA_VERSION,
+  quizSubjectKeySchema,
   resolveQuizOutputTokenFloor,
   type QuizGenerationJobInput,
 } from "#api/modules/quiz/types/quiz-generation.types";
-import { buildQuizStructuredInput } from "#api/modules/quiz/utils/quiz-generation-prompt";
+import {
+  buildQuizStructuredInput,
+  resolveQuizPromptVersion,
+} from "#api/modules/quiz/utils/quiz-generation-prompt";
 
 const ALL_QUESTION_TYPES = Object.values(QuestionType);
 
@@ -67,6 +71,10 @@ export interface QueueQuizGenerationInput {
   temperature?: number;
   reasoningEffort?: AiReasoningEffort;
   maxOutputTokens?: number;
+  figureModel?: string;
+  figureTemperature?: number;
+  figureReasoningEffort?: AiReasoningEffort;
+  figureMaxOutputTokens?: number;
 }
 
 @Injectable()
@@ -144,6 +152,16 @@ export class QuizGenerationJobService {
     const route = readJsonRecord(
       readJsonRecord(draft.modelConfigJson).routeSnapshot,
     ) as unknown as AiFeatureRoute;
+    const imageRouteRecord = readJsonRecord(
+      readJsonRecord(draft.modelConfigJson).imageRouteSnapshot,
+    );
+    const imageRouteSnapshot =
+      Object.keys(imageRouteRecord).length > 0
+        ? (imageRouteRecord as unknown as AiFeatureRoute)
+        : route;
+    const subjectKey = quizSubjectKeySchema.parse(
+      readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
+    );
     const inputMeta = {
       requestDraftId: draft.id,
       requestHash: draft.requestHash,
@@ -152,11 +170,12 @@ export class QuizGenerationJobService {
       documentIds,
       sourceHash: currentSourceHash,
       targetGrade: readNullableNumber(sourceSnapshot.targetGrade),
-      subjectKey: readRequiredString(sourceSnapshot.subjectKey, "subjectKey"),
+      subjectKey,
       subjectName: readRequiredString(sourceSnapshot.subjectName, "subjectName"),
       subjectSlug: readRequiredString(sourceSnapshot.subjectSlug, "subjectSlug"),
       ...configuration,
       targetQuizSetId,
+      imageRouteSnapshot,
     };
     const job = await this.jobs.createAndEnqueue({
       type: AiGenerationType.QUIZ,
@@ -164,7 +183,7 @@ export class QuizGenerationJobService {
       lessonId,
       targetType: "QUIZ_SET",
       targetId: targetQuizSetId,
-      promptVersion: QUIZ_PROMPT_VERSION,
+      promptVersion: resolveQuizPromptVersion(subjectKey),
       schemaVersion: QUIZ_SCHEMA_VERSION,
       inputFingerprint: { lessonId, ...inputMeta },
       inputMeta,
@@ -212,6 +231,7 @@ export class QuizGenerationJobService {
       ...configuration,
     };
     const { baseRoute, route } = await this.resolveQuizRoute(input);
+    const imageRoute = await this.resolveQuizImageRoute(input);
     const request = buildQuizStructuredInput({
       lessonId,
       lessonTitle: source.lessonTitle,
@@ -321,6 +341,7 @@ export class QuizGenerationJobService {
           schemaBytes: structuredTextFormatResolution.schemaBytes,
           pdfDetail: "high",
           routeSnapshot: route,
+          imageRouteSnapshot: imageRoute,
         } as unknown as Prisma.InputJsonValue,
         costEstimateJson: costs.total
           ? ({
@@ -343,7 +364,7 @@ export class QuizGenerationJobService {
       requestDraftId: draft.id,
       requestHash,
       expiresAt,
-      promptVersion: QUIZ_PROMPT_VERSION,
+      promptVersion: request.promptVersion,
       schemaVersion: QUIZ_SCHEMA_VERSION,
       systemPrompt: request.systemPrompt,
       userPrompt: request.userPrompt,
@@ -477,7 +498,10 @@ export class QuizGenerationJobService {
   }
 
   private async resolveQuizRoute(input: QueueQuizGenerationInput) {
-    const baseRoute = await this.modelRouting.resolve(AiGenerationType.QUIZ);
+    const baseRoute = await this.modelRouting.resolve(
+      AiGenerationType.QUIZ,
+      AiModelPurpose.TEXT,
+    );
     let candidates = baseRoute.candidates.filter(supportsHighDetailPdfInput);
     if (!input.model && candidates.length === 0) {
       throw badRequestException(
@@ -518,6 +542,35 @@ export class QuizGenerationJobService {
       ),
     };
     return { baseRoute, route };
+  }
+
+  private async resolveQuizImageRoute(input: QueueQuizGenerationInput) {
+    const baseRoute = await this.modelRouting.resolve(
+      AiGenerationType.QUIZ,
+      AiModelPurpose.IMAGE,
+    );
+    let candidates = baseRoute.candidates;
+    if (input.figureModel) {
+      const selected =
+        candidates.find(
+          (candidate) => candidate.model === input.figureModel && candidate.available,
+        ) ?? (await this.modelRouting.resolveCandidateByModel(input.figureModel));
+      if (!selected?.available) {
+        throw badRequestException(
+          "AI_MODEL_NOT_AVAILABLE",
+          "Model tạo hình đã chọn không còn khả dụng cho Quiz.",
+        );
+      }
+      candidates = [selected];
+    }
+    return {
+      ...baseRoute,
+      model: candidates[0]?.model ?? baseRoute.model,
+      candidates,
+      temperature: input.figureTemperature ?? baseRoute.temperature,
+      reasoningEffort: input.figureReasoningEffort ?? baseRoute.reasoningEffort,
+      maxOutputTokens: input.figureMaxOutputTokens ?? baseRoute.maxOutputTokens,
+    } satisfies AiFeatureRoute;
   }
 
   private resolveQuizTransportConfiguration(): Pick<

@@ -253,6 +253,7 @@ export class AiProviderCallService {
           aiGenerationId: context.aiGenerationId,
           backgroundJobId: context.backgroundJobId,
           feature: context.feature,
+          purpose: route.purpose ?? null,
           attempt: context.attempt,
         },
         {

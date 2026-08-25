@@ -557,15 +557,50 @@ Một màn hình UI chỉ xem là xong khi:
   trước khi tăng khoảng cách, không né va chạm bằng cách đẩy chữ ra xa.
 - Mọi hình trong hệ thống cấm tuyệt đối marker mũi tên/chevron dùng để đánh dấu
   hai đường hoặc hai cạnh song song, kể cả khi ảnh nguồn hay source hiện tại có
-  marker đó. Quan hệ song song được thể hiện bằng phép dựng và nội dung chữ. Quy
-  tắc này không cấm mũi tên mang nghĩa hướng của trục, vector, lực, tia hoặc luồng
-  truyền.
+  marker đó. Quan hệ song song chỉ được thể hiện bằng phép dựng và nội dung đề/
+  lời giải bên ngoài canvas; cấm ghi `AB \\parallel CD`, `BC // AD` hoặc câu
+  quan hệ tương đương trực tiếp lên hình. Quy tắc này không cấm mũi tên mang nghĩa
+  hướng của trục, vector, lực, tia hoặc luồng truyền.
 - Cung và nhãn số đo góc phải nằm trong đúng miền giữa hai tia được gọi tên. Góc
   trong đa giác phải được vẽ phía trong đa giác; chỉ dùng miền ngoài hoặc góc phản
-  khi nội dung yêu cầu rõ góc ngoài hoặc góc phản.
-- Nhãn độ dài cạnh phải nằm sát vùng giữa cạnh và chỉ hở đủ để không chạm nét hoặc
-  marker. Khoảng hở tính theo cỡ chữ thích ứng của hình, không lấy cạnh dài viewBox
-  khiến `3 cm`, `4 cm`, `r`, `h` trôi xa trên mobile.
+  khi nội dung yêu cầu rõ góc ngoài hoặc góc phản. Cấm ghi tên góc dạng chữ như
+  `ABC`, `DAB`, `∠ABC` hoặc `$\widehat{ABC}$` cạnh cung góc trên canvas. Hình chỉ
+  dùng cung góc/dấu vuông neo đúng tại đỉnh và chỉ kèm số đo/biểu thức nếu đó là
+  dữ kiện đã cho; ký hiệu góc trong đề, lời giải hoặc caption phải dùng dạng SGK
+  có dấu mũ như `$\widehat{ABC}$`, với chữ chỉ đỉnh ở vị trí thứ hai.
+- Cung góc và nhãn số đo là hai phần tử độc lập, không dùng chung anchor hoặc bán
+  kính. Nhãn đặt theo phân giác trong, mặc định xa đỉnh hơn cung; bounding box của
+  cả số và ký hiệu độ phải tách rời hoàn toàn khỏi cung và hai tia/cạnh, có khoảng
+  trắng nhìn thấy rõ. Khi va chạm phải dịch nhãn dọc phân giác, đổi bán kính cung
+  hoặc dùng node riêng; không dùng một offset cố định cho mọi kích thước góc.
+- Mọi nhãn phải gắn chính xác với đối tượng mà nó biểu diễn và đặt gần sát đối
+  tượng đó nhất có thể. Nhãn độ dài ưu tiên vùng giữa cạnh nhưng không bắt buộc
+  đúng midpoint. Nếu vùng ưu tiên đã có tên điểm, marker, nét hoặc nhãn khác thì
+  lần lượt trượt nhãn dọc chính cạnh trong vùng giữa, đổi phía pháp tuyến hoặc
+  tăng khoảng hở cục bộ vừa đủ; tên điểm có thể đổi góc neo quanh chính điểm.
+  Nếu vùng giữa trống thì đặt đúng giữa vẫn hợp lệ. Không để nhãn chồng/cắt nét
+  hoặc trôi sang gần đối tượng khác làm sai liên thuộc. Khoảng hở tính theo cỡ
+  chữ thích ứng của hình, không lấy cạnh dài viewBox khiến `3 cm`, `4 cm`, `r`,
+  `h` trôi xa trên mobile.
+- Nhãn trực tiếp trên cạnh, đoạn hoặc cung phải gọn: chỉ ghi giá trị/biểu thức và
+  đơn vị như `3 cm`, `x + 1`, `r`, không lặp tên đối tượng thành `AB = 3 cm`.
+  Tên điểm và số đo là hai nhãn riêng. Cấm viết câu hoặc phương trình quan hệ giữa
+  các đối tượng đã đặt tên như `AB = CD`, `AB \\parallel CD`, `OA \\perp BC`
+  trực tiếp trên canvas; quan hệ phải nằm trong nội dung chữ bên ngoài hình và,
+  khi cần hiển thị, được mã hóa bằng phép dựng hoặc marker hình học chuẩn.
+- Dấu vuông góc, vạch bằng nhau và marker hình học khác phải dùng chung coordinate
+  neo với phép dựng. Dấu vuông theo hai tia thật bằng `\\pic` `right angle` hoặc
+  hệ trục cục bộ tương đương; vạch bằng nhau nằm trực tiếp trên path và quay theo
+  tiếp tuyến/pháp tuyến. Không vẽ marker bằng offset x/y tuyệt đối hoặc co giãn
+  x/y không đồng nhất. Gate visual phải kiểm marker đúng hình/đúng neo và bounding
+  box nhãn không giao nhau, cắt nét hoặc marker ở mọi hướng của đoạn.
+- Các rule nhãn/marker trên áp dụng cho toàn bộ hình AI của hệ thống: hình
+  Summary/StemFigure và hình đề, hình lời giải mở rộng hoặc hình lời giải vẽ lại
+  của Quiz trong mọi prompt mặc định. Đây là rule sinh hình, không phải điều kiện
+  backend được phép reject artifact: backend không chặn output AI vì marker song
+  song, tên góc hoặc chữ quan hệ còn xuất hiện. Custom system prompt của Quiz là
+  full override có chủ đích nên admin phải tự đưa lại rule trình bày muốn giữ; ảnh
+  upload thủ công giữ nguyên nội dung do admin cung cấp và phải được duyệt bằng mắt.
 - Trục số chỉ hiển thị một kí hiệu tại gốc: ưu tiên nhãn số `0`; không đồng thời
   lặp thêm tên điểm `O` tại cùng vị trí. Hệ trục Oxy làm ngược lại: ưu tiên `O`
   và bỏ nhãn `0` trùng nghĩa tại gốc.

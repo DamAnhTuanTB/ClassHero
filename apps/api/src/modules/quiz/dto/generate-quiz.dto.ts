@@ -144,4 +144,29 @@ export class GenerateQuizDto {
   @Min(QUIZ_MIN_OUTPUT_TOKENS)
   @Max(32_000)
   maxOutputTokens?: number;
+
+  @ApiPropertyOptional({ maxLength: 200, description: "Model riêng cho Phase 2 tạo hình" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  figureModel?: string;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 1 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(1)
+  figureTemperature?: number;
+
+  @ApiPropertyOptional({ enum: AI_REASONING_EFFORT_LEVELS })
+  @IsOptional()
+  @IsIn(AI_REASONING_EFFORT_LEVELS)
+  figureReasoningEffort?: AiReasoningEffort;
+
+  @ApiPropertyOptional({ minimum: 128, maximum: 32_000 })
+  @IsOptional()
+  @IsInt()
+  @Min(128)
+  @Max(32_000)
+  figureMaxOutputTokens?: number;
 }
