@@ -11,6 +11,7 @@ import {
 import {
   getLessonSummaryProviderTransportOutputSchema,
   LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+  LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION,
   LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION,
   LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
   lessonSummaryOutputSchema,
@@ -2420,7 +2421,18 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(preview).toMatchObject({
       providerInput: {
         model: "gpt-5.6-luna",
-        instructions: expect.stringContaining("LuaLaTeX/TikZ"),
+        input: expect.arrayContaining([
+          expect.objectContaining({
+            role: "developer",
+            content: [
+              expect.objectContaining({
+                text: expect.stringContaining("LuaLaTeX/TikZ"),
+                prompt_cache_breakpoint: { mode: "explicit" },
+              }),
+            ],
+          }),
+        ]),
+        prompt_cache_options: { mode: "explicit", ttl: "30m" },
         reasoning: { effort: "medium" },
         max_output_tokens: 12_000,
         text: {
@@ -2442,6 +2454,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(JSON.stringify(preview)).toContain("Giữ nhãn rõ ràng.");
     expect(JSON.stringify(preview)).toContain('"type":"input_image"');
     expect(preview.providerInput).not.toHaveProperty("provider");
+    expect(preview.providerInput).not.toHaveProperty("instructions");
     expect(preview.providerInput).not.toHaveProperty("promptVersion");
     expect(preview.providerInput).not.toHaveProperty("schemaVersion");
     expect(JSON.stringify(preview.providerInput)).not.toContain('"preview"');
@@ -3065,7 +3078,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       allowed: ["hình học", "isGeometry", "geometryStatement", "GT–KL"],
       forbidden: ["circuitikz", "chemfig", "mhchem"],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
-      promptVersion: "lesson-summary-math-v27-no-figure-caption",
+      promptVersion: "lesson-summary-math-v29-declared-standard-notation",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3084,7 +3097,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
-      promptVersion: "lesson-summary-physics-v27-no-figure-caption",
+      promptVersion: "lesson-summary-physics-v29-declared-standard-notation",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3103,7 +3116,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
-      promptVersion: "lesson-summary-chemistry-v27-no-figure-caption",
+      promptVersion: "lesson-summary-chemistry-v29-declared-standard-notation",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
@@ -3366,6 +3379,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect((schema as { description?: string }).description).toBe(
         LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION,
       );
+      expect((schema as { description?: string }).description).toContain(
+        LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION,
+      );
       expect(
         collectAllDescriptions(schema).filter((description) =>
           description.includes(
@@ -3463,6 +3479,8 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.userPrompt).toBe("Yêu cầu tùy chỉnh của admin.");
     expect(request.systemPrompt).not.toContain("HỒ SƠ MÔN HỌC");
     expect(request.systemPrompt).not.toContain("YÊU CẦU VỀ HÌNH MINH HỌA");
+    expect(request.systemPrompt).not.toContain("TÍNH LIÊN TỤC CỦA PHÉP BIẾN ĐỔI");
+    expect(request.systemPrompt).not.toContain("KHAI BÁO VÀ ỔN ĐỊNH KÝ HIỆU");
     expect(request.userPrompt).not.toContain("PHẠM VI MÔN HỌC");
   });
 
@@ -3618,7 +3636,9 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("`\\Leftrightarrow`");
     expect(request.systemPrompt).toContain("`\\iff`");
     expect(request.systemPrompt).toContain("`\\impliedby`");
-    expect(request.promptVersion).toBe("lesson-summary-math-v27-no-figure-caption");
+    expect(request.promptVersion).toBe(
+      "lesson-summary-math-v29-declared-standard-notation",
+    );
     expect(request.schemaVersion).toBe(
       "lesson-summary-pdf-packet-five-block-schema-v24-no-figure-caption",
     );
@@ -4006,6 +4026,11 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expected: "hóa trị",
       forbidden: ["đơn vị SI", "chứng minh hình học"],
     },
+    {
+      subject: { key: "GENERAL" as const, name: "Môn khác", slug: "mon-khac" },
+      expected: "quy ước thông dụng của domain",
+      forbidden: ["đơn vị SI", "hóa trị", "chứng minh hình học"],
+    },
   ])(
     "isolates Flashcard and Test prompts to $subject.name",
     ({ subject, expected, forbidden }) => {
@@ -4029,6 +4054,13 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       ].join("\n");
       expect(serializedInput).toContain(expected);
       expect(serializedInput).toContain(subject.name);
+      expect(serializedInput).toContain(
+        "giới thiệu đúng một lần trước lần dùng đầu tiên",
+      );
+      expect(serializedInput).toContain(
+        "Mặt trước Flashcard được phép hỏi chính ý nghĩa của một ký hiệu",
+      );
+      expect(serializedInput).toContain("Counterexample hợp lệ");
       for (const value of forbidden) expect(serializedInput).not.toContain(value);
     },
   );

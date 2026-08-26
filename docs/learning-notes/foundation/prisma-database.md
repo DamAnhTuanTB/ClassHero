@@ -49,6 +49,14 @@ NestJS module/service
   query, thực thi đúng migration đã review, kiểm tra dữ liệu rồi mới dùng
   `migrate resolve --applied`. Đây là đường phục hồi ngoại lệ; luồng chuẩn vẫn là
   giữ lịch sử migration đồng nhất giữa repo và database.
+- Không chỉ dựa vào `prisma migrate status` để kết luận chuỗi migration
+  khỏe: lệnh này có thể báo `up to date` dù database có migration mồ côi
+  hoặc file đã bị sửa sau khi apply. Mỗi thay đổi schema phải có migration
+  ngay trong cùng thay đổi; không xóa, đổi tên hay sửa migration đã apply.
+  Trước khi bàn giao, hãy chạy `prisma migrate deploy` trên một database tạm
+  rỗng và so sánh schema cuối với `schema.prisma`. Nếu phải bổ sung migration
+  sửa lịch sử cho các môi trường đã có cột, dùng DDL idempotent như
+  `ADD COLUMN IF NOT EXISTS` và vẫn test cả fresh database lẫn database hiện hữu.
 - pgvector: extension cần cho embedding và semantic search ở các milestone AI/RAG.
 - Prisma relation: mô tả quan hệ giữa model như `User -> StudentProfile`, `User -> File`, `User -> BackgroundJob`; Prisma dùng phần này để generate client query có type an toàn.
 - Durable job table: `background_jobs` lưu trạng thái job lâu dài để API có thể trả `jobId` và UI xem tiến trình, thay vì chỉ dựa vào trạng thái trong Redis/BullMQ.

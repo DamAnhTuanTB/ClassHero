@@ -70,6 +70,12 @@ export function hasTiptapDocumentContent(
   return getTiptapDocumentText(document).length > 0;
 }
 
+export function removeTrailingOptionPeriod(
+  document: TiptapTextDocument,
+): TiptapTextDocument {
+  return stripTrailingPeriod(document).node as TiptapTextDocument;
+}
+
 export function areTiptapDocumentsEquivalent(
   left: TiptapTextDocument,
   right: TiptapTextDocument,
@@ -138,6 +144,46 @@ function collectNodeText(node: TiptapJsonNode | null | undefined): string {
   }
 
   return values.filter(Boolean).join(" ");
+}
+
+function stripTrailingPeriod(node: TiptapJsonNode): {
+  hasVisibleContent: boolean;
+  node: TiptapJsonNode;
+  removed: boolean;
+} {
+  if (node.type === "text") {
+    const text = node.text ?? "";
+    const hasVisibleContent = text.trim().length > 0;
+    const nextText = text.replace(/(?<!\.)\.(\s*)$/u, "$1");
+
+    return {
+      hasVisibleContent,
+      node: nextText === text ? node : { ...node, text: nextText },
+      removed: nextText !== text,
+    };
+  }
+
+  if (!node.content?.length) {
+    return {
+      hasVisibleContent: node.type !== "doc" && node.type !== "paragraph",
+      node,
+      removed: false,
+    };
+  }
+
+  for (let index = node.content.length - 1; index >= 0; index -= 1) {
+    const result = stripTrailingPeriod(node.content[index]!);
+    if (result.removed) {
+      const content = [...node.content];
+      content[index] = result.node;
+      return { hasVisibleContent: true, node: { ...node, content }, removed: true };
+    }
+    if (result.hasVisibleContent) {
+      return { hasVisibleContent: true, node, removed: false };
+    }
+  }
+
+  return { hasVisibleContent: false, node, removed: false };
 }
 
 function trimParagraphBoundaryWhitespace(nodes: TiptapJsonNode[]) {

@@ -16,6 +16,7 @@ import {
   QUIZ_GRADE_APPROPRIATE_KNOWLEDGE_POLICY,
   QUIZ_HINT_QUALITY_POLICY,
   QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY,
+  QUIZ_LOGICAL_DERIVATION_POLICY,
   QUIZ_PROMPT_VERSIONS,
   QUIZ_SCHEMA_VERSION,
   QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY,
@@ -118,6 +119,29 @@ describe("M9.3 Quiz-owned generation core", () => {
       "SYSTEM CUSTOM",
     );
     expect(resolveQuizFigureSystemPrompt(defaultPrompt, "   ")).toBe(defaultPrompt);
+  });
+
+  it("does not inject default derivation rules into a custom Quiz text prompt", () => {
+    const configuration = requestConfiguration();
+    const customSystemInstructions = "  System Quiz tùy chỉnh của admin.  ";
+    const request = buildQuizStructuredInput({
+      lessonId: "lesson-quiz-custom-prompt",
+      lessonTitle: "Bài học tùy chỉnh",
+      documentIds: [documentId],
+      sourceHash,
+      packet: {
+        filename: "quiz-source.pdf",
+        bytes: Buffer.from("pdf-fixture"),
+      },
+      configuration: {
+        ...configuration,
+        systemInstructions: customSystemInstructions,
+      },
+    });
+
+    expect(request.systemPrompt).toBe(customSystemInstructions);
+    expect(request.systemPrompt).not.toContain("TÍNH LIÊN TỤC CỦA PHÉP BIẾN ĐỔI");
+    expect(request.systemPrompt).not.toContain("KHAI BÁO VÀ ỔN ĐỊNH KÝ HIỆU");
   });
 
   it("resolves the original provider question from generation lineage", () => {
@@ -291,6 +315,51 @@ describe("M9.3 Quiz-owned generation core", () => {
         "không áp dụng ngoại lệ này cho MULTI_STATEMENT_TRUE_FALSE",
       );
     }
+  });
+
+  it("requires logically grouped explicit solution paragraphs across every Quiz subject", () => {
+    for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
+      const prompt = buildQuizSubjectSystemPrompt({
+        key: subjectKey,
+        name: subjectKey,
+        slug: subjectKey.toLowerCase(),
+      });
+
+      expect(prompt).toContain(
+        "Trong mọi `solution` và `statementSolutions[].solution`, phải tách tường minh theo đơn vị lập luận",
+      );
+      expect(prompt).toContain(
+        "không phụ thuộc lời giải có tính toán, biến đổi hay chỉ dùng văn xuôi, chứng minh hoặc giải thích",
+      );
+      expect(prompt).toContain("Ranh giới đoạn phải hợp lý về logic và trình bày");
+      expect(prompt).toContain("một đơn vị lập luận ngắn thì giữ trong một đoạn");
+      expect(prompt).toContain("`\\n\\n`");
+      expect(prompt).toContain(
+        "dù bắt đầu bằng `Vậy`, `Vì vậy`, `Do đó`, `Suy ra` hay không có từ nối",
+      );
+      expect(prompt).not.toContain(
+        "Không tách riêng các từ nối `vì`, `nên`, `do đó` thành đoạn văn",
+      );
+    }
+
+    const schemaDescriptions = collectJsonSchemaDescriptions(
+      resolveAiStructuredTextFormat(
+        getGeneratedQuizOutputSchema({ subjectKey: "GENERAL" }),
+        "generated_quiz",
+        "ref_v2",
+      ).format.schema,
+    );
+    const solutionDescription = schemaDescriptions.find((description) =>
+      description.startsWith("Thân lời giải phải đầy đủ và mạch lạc"),
+    );
+
+    expect(solutionDescription).toContain(
+      "Trong mọi `solution` và `statementSolutions[].solution`, phải tách tường minh theo đơn vị lập luận",
+    );
+    expect(solutionDescription).toContain(
+      "Ranh giới đoạn phải hợp lý về logic và trình bày",
+    );
+    expect(solutionDescription).toContain("`\\n\\n`");
   });
 
   it("keeps figure decisions available for MULTI_STATEMENT_TRUE_FALSE", () => {
@@ -734,9 +803,9 @@ describe("M9.3 Quiz-owned generation core", () => {
       retention: "in_memory",
     });
     expect(request.maxTokens).toBe(12_000);
-    expect(request.promptVersion).toBe("quiz-math-v48-single-true-false-no-figure");
+    expect(request.promptVersion).toBe("quiz-math-v51-declared-standard-notation");
     expect(request.schemaVersion).toBe(
-      "quiz-pdf-figure-schema-v30-single-true-false-no-figure",
+      "quiz-pdf-figure-schema-v31-explicit-solution-paragraphs",
     );
     expect(request.promptVersion).toBe(QUIZ_PROMPT_VERSIONS.MATH);
     expect(request.schemaVersion).toBe(QUIZ_SCHEMA_VERSION);
@@ -1001,7 +1070,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(physicsRequest.systemPrompt).not.toContain("SYSTEM PROMPT QUIZ MÔN HÓA HỌC");
     expect(physicsRequest.systemPrompt).not.toContain("$\\widehat{ABC}$");
     expect(physicsRequest.promptVersion).toBe(
-      "quiz-physics-v47-single-true-false-no-figure",
+      "quiz-physics-v51-declared-standard-notation",
     );
 
     const chemistryRequest = buildQuizStructuredInput({
@@ -1029,7 +1098,7 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(chemistryRequest.systemPrompt).not.toContain("vector hoặc lực");
     expect(chemistryRequest.systemPrompt).toContain("hình học phân tử");
     expect(chemistryRequest.promptVersion).toBe(
-      "quiz-chemistry-v47-single-true-false-no-figure",
+      "quiz-chemistry-v51-declared-standard-notation",
     );
   });
 
@@ -1060,6 +1129,87 @@ describe("M9.3 Quiz-owned generation core", () => {
     expect(prompt).not.toContain("10 dm");
     expect(prompt).not.toContain("24 dm");
     expect(prompt).not.toContain("13 dm");
+  });
+
+  it("requires subject-specific independent verification for every non-Math Quiz prompt", () => {
+    const cases = [
+      {
+        subject: {
+          key: "PHYSICS" as const,
+          name: "Vật lý",
+          slug: "vat-ly",
+        },
+        heading: "CƠ CHẾ KIỂM CHỨNG VẬT LÝ BẮT BUỘC",
+        requiredVocabulary: [
+          "hệ quy chiếu",
+          "phân tích thứ nguyên và đơn vị",
+          "tính khả thi vật lý",
+        ],
+        forbiddenVocabulary: ["hóa trị/số oxi hóa", "bảo toàn nguyên tố"],
+      },
+      {
+        subject: {
+          key: "CHEMISTRY" as const,
+          name: "Hóa học",
+          slug: "hoa-hoc",
+        },
+        heading: "CƠ CHẾ KIỂM CHỨNG HÓA HỌC BẮT BUỘC",
+        requiredVocabulary: [
+          "hóa trị/số oxi hóa",
+          "bảo toàn nguyên tố và điện tích",
+          "chất giới hạn",
+        ],
+        forbiddenVocabulary: ["hệ quy chiếu", "phân tích thứ nguyên"],
+      },
+      {
+        subject: {
+          key: "GENERAL" as const,
+          name: "Ngữ văn",
+          slug: "ngu-van",
+        },
+        heading: "CƠ CHẾ KIỂM CHỨNG CHUYÊN MÔN BẮT BUỘC",
+        requiredVocabulary: [
+          "đối chiếu ngược từng kết luận với dữ kiện và PDF nguồn",
+          "thử một phản ví dụ hoặc trường hợp biên",
+          "không biến tương quan thành nhân quả",
+        ],
+        forbiddenVocabulary: ["hóa trị/số oxi hóa", "hệ quy chiếu"],
+      },
+    ];
+
+    for (const testCase of cases) {
+      const prompt = buildQuizSubjectSystemPrompt(testCase.subject);
+
+      expect(prompt).toContain(testCase.heading);
+      expect(prompt).toContain("tự giải từng câu từ dữ kiện gốc");
+      expect(prompt).toContain("ít nhất một phép kiểm tra độc lập");
+      expect(prompt).toContain("Không chỉ đọc lại");
+      expect(prompt).toContain(
+        "phải xác định kết quả đúng trước rồi mới đối chiếu với `options`",
+      );
+      expect(prompt).toContain("phải kiểm chứng riêng từng mệnh đề");
+      expect(prompt).toContain(
+        "Sự nhất quán giữa `options`, `correctOptionId`, `solution` và `answer` không chứng minh chúng đúng",
+      );
+      expect(prompt).toContain("không được trả câu đó");
+
+      for (const vocabulary of testCase.requiredVocabulary) {
+        expect(prompt).toContain(vocabulary);
+      }
+      for (const vocabulary of testCase.forbiddenVocabulary) {
+        expect(prompt).not.toContain(vocabulary);
+      }
+    }
+
+    expect(QUIZ_PROMPT_VERSIONS.PHYSICS).toBe(
+      "quiz-physics-v51-declared-standard-notation",
+    );
+    expect(QUIZ_PROMPT_VERSIONS.CHEMISTRY).toBe(
+      "quiz-chemistry-v51-declared-standard-notation",
+    );
+    expect(QUIZ_PROMPT_VERSIONS.GENERAL).toBe(
+      "quiz-general-v51-declared-standard-notation",
+    );
   });
 
   it("keeps Physics and Chemistry provider schemas free of Math-only figure vocabulary", () => {
@@ -1257,6 +1407,7 @@ describe("M9.3 Quiz-owned generation core", () => {
       expect(fieldDescription).not.toContain(QUIZ_SUBPART_LINEBREAK_POLICY);
     }
     expect(providerSchemaDescriptions[0]).toContain(QUIZ_SUBPART_LINEBREAK_POLICY);
+    expect(providerSchemaDescriptions[0]).toContain(QUIZ_LOGICAL_DERIVATION_POLICY);
     expect(providerSchemaJson).toContain(QUIZ_CONCLUSION_PARAGRAPH_POLICY);
     expect(providerSchemaJson).not.toContain(QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY);
     expect(providerSchemaJson).toContain("QUY TẮC CỨNG VỀ MÔI TRƯỜNG LATEX");
@@ -2483,5 +2634,44 @@ $$\begin{aligned}V&=\pi\int_3^5(25-x^2)\,dx\\&=\frac{52\pi}{3}.\end{aligned}$$`)
       "trên $[0,1]$.",
     );
     expect(normalized.explanation.statementSolutions[1]?.solution).toContain("$S(1)=4$.");
+  });
+
+  it("repairs escaped closing math delimiters without changing prose currency", () => {
+    const question = {
+      questionType: QuestionType.MULTIPLE_CHOICE,
+      difficulty: Difficulty.MEDIUM,
+      hint: String.raw`Giữ nguyên giá viết là \$5 ngoài công thức.`,
+      explanation: {
+        problem: String.raw`Tính $x+1\$.`,
+        solution: String.raw`Ta có:
+
+$$\widehat{A}+\widehat{C}=180^\circ.\$$
+
+Suy ra $\widehat{C}=112^\circ\$.`,
+        answer: "A",
+        isGeometry: true,
+      },
+      figure: {
+        requiresQuestionFigure: false,
+        solutionFigureMode: "NONE" as const,
+        solutionFigurePlan: null,
+      },
+      options: [
+        { id: "A" as const, text: String.raw`$112^\circ$` },
+        { id: "B" as const, text: String.raw`$68^\circ$` },
+      ],
+      correctOptionId: "A" as const,
+    };
+
+    const normalized = normalizeGeneratedQuizQuestionLatex(question);
+    expect(normalized.hint).toBe(question.hint);
+    expect(normalized.explanation.problem).toBe(String.raw`Tính $x+1$.`);
+    expect(normalized.explanation.solution).toContain(
+      String.raw`$$\widehat{A}+\widehat{C}=180^\circ.$$`,
+    );
+    expect(normalized.explanation.solution).toContain(
+      String.raw`$\widehat{C}=112^\circ$.`,
+    );
+    expect(normalizeGeneratedQuizQuestionLatex(normalized)).toEqual(normalized);
   });
 });

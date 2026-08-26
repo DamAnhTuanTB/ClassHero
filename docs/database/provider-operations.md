@@ -24,7 +24,10 @@ Domain này phục vụ màn `/admin/ai-settings` và không lưu secret provide
   chi phí của một lần sinh. `ai_generations.estimated_cost_vnd` chỉ là projection
   denormalized để truy vấn nhanh/giữ tương thích; UI/API phải aggregate hoặc đối
   chiếu event khi cần số tiền chính xác sau các lượt gọi phase sau.
-- AI token tách input, cached input và output. OCR lưu pages; cache hit có `cost_vnd=0` và `estimated_saved_cost_vnd`.
+- AI token tách input, cached input, cache-write input và output. Cột
+  `cache_write_input_tokens` lưu số token OpenAI GPT-5.6+ báo đã ghi vào prompt
+  cache; cost calculator áp hệ số `1.25x` trên input rate. OCR lưu pages; cache
+  hit có `cost_vnd=0` và `estimated_saved_cost_vnd`.
 - `raw_usage_json` của lượt AI mới tách `providerUsage` nguyên bản khỏi
   `fileOperations` do backend ghi. Không trộn metadata xử lý file vào object usage
   của provider; các cột token chuẩn hóa mới là nguồn tính phí và aggregate.

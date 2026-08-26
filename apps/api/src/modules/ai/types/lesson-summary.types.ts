@@ -9,10 +9,10 @@ import { z } from "zod";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSIONS = {
-  MATH: "lesson-summary-math-v27-no-figure-caption",
-  PHYSICS: "lesson-summary-physics-v27-no-figure-caption",
-  CHEMISTRY: "lesson-summary-chemistry-v27-no-figure-caption",
-  GENERAL: "lesson-summary-general-v27-no-figure-caption",
+  MATH: "lesson-summary-math-v29-declared-standard-notation",
+  PHYSICS: "lesson-summary-physics-v29-declared-standard-notation",
+  CHEMISTRY: "lesson-summary-chemistry-v29-declared-standard-notation",
+  GENERAL: "lesson-summary-general-v29-declared-standard-notation",
 } as const;
 export const LESSON_SUMMARY_SCHEMA_VERSION =
   "lesson-summary-pdf-packet-five-block-schema-v24-no-figure-caption";
@@ -54,11 +54,18 @@ export const LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION =
   "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa.",
   "Chỉ dùng $\\Leftrightarrow$ cho quan hệ tương đương hai chiều và $\\Rightarrow$ cho suy ra một chiều; không tự thêm hai ký hiệu này khi lập luận không chứng minh quan hệ tương ứng. Khi nhiều công thức display liên tiếp thuộc cùng một hệ, nhóm trường hợp hoặc chuỗi biến đổi, nhóm chúng trong một khối `$$\\begin{aligned}...\\end{aligned}$$` hoặc môi trường `split` phù hợp và ngắt dòng tại toán tử quan hệ/phép biến đổi hợp lý; không để các từ nối như `và`, `nên`, `do đó` thành dòng rời giữa hai công thức. Trong `aligned`/`split`, đặt dấu `&` tại quan hệ chính cần căn như `=`; không đặt `&` ngay trước toán tử suy luận hoặc tương đương đứng đầu dòng như `\\Rightarrow`, `\\Leftrightarrow`, `\\Longrightarrow`, `\\Longleftrightarrow`, `\\implies`, `\\impliedby`, `\\iff` và các biến thể chiều ngược, vì toán tử sẽ bị đẩy vào cột dấu bằng. Khi dòng suy ra còn có dấu bằng, viết toán tử và vế trái trước dấu căn, ví dụ `\\Rightarrow\\quad a &= 2x`. Công thức độc lập ngắn hoặc không cùng một mạch vẫn giữ riêng, không ép gộp.",
 ].join(" ");
+export const LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION = [
+  "QUY TẮC CỨNG VỀ MẠCH BIẾN ĐỔI TRONG EXAMPLE/PHƯƠNG PHÁP: nhận diện chuỗi theo quan hệ logic, không theo cách đã chia delimiter. Từ hai công thức liên tiếp trở lên cùng biến đổi một biểu thức/phương trình, cùng cô lập một đại lượng hoặc cùng duy trì tập nghiệm vẫn là một chuỗi duy nhất, dù mỗi công thức nằm trong display riêng và chỉ có một dấu `=`.",
+  "Phải gom chuỗi đó trong một `aligned`/`split`, giữ đại lượng cần tìm ở vế trái sau khi đã cô lập và thể hiện bước chuyển vế, thế, rút gọn, khai căn, chia hoặc biến đổi chính. Được gộp số học hiển nhiên nhưng không được nhảy qua bước chuyên môn quyết định.",
+  "Nếu phép biến đổi có thể sinh nhiều nhánh, làm mất nghiệm hoặc đòi hỏi điều kiện, phải nêu điều kiện và chỉ loại nhánh theo ngữ cảnh chuyên môn. Ví dụ tổng quát SAI: ba display rời `u^2=p^2-q^2`, `u^2=r`, `u=\\sqrt{r}` không nêu điều kiện; dạng ĐÚNG gom hai bước tính trong một `aligned`, rồi nêu điều kiện trước kết luận.",
+  "Counterexample hợp lệ: các phương trình độc lập của một hệ, các phép gán cho những đại lượng khác nhau hoặc một phép tính một bước vẫn giữ riêng. Với `SOURCE_EXACT`, giữ phương pháp của nguồn nhưng phải bảo toàn liên kết logic và điều kiện; không đổi sang phương pháp khác chỉ để rút gọn.",
+].join(" ");
 export const LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
   "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
 export const LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION = [
   "Các quy tắc định dạng sau áp dụng cho mọi field văn bản trong structured output.",
   LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
+  LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION,
   LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
 ].join(" ");
 const baseBlockSchema = z.object({

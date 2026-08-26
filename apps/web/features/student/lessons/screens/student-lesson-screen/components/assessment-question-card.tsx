@@ -8,6 +8,7 @@ import type {
   StudentAnswer,
   StudentAssessmentQuestion,
 } from "@/features/student/lessons/types/student-lesson-types";
+import { removeTrailingOptionPeriod } from "@/lib/tiptap-rich-content";
 import { cn } from "@/lib/utils";
 
 const QUIZ_CONTENT_NORMAL_WEIGHT_CLASS =
@@ -211,9 +212,9 @@ function MultipleChoiceAnswer({
               {getOptionLabel(index)}
             </span>
             <TiptapContentView
-              content={option.richText}
+              content={removeTrailingOptionPeriod(option.richText)}
               className={cn(
-                "min-w-0 flex-1 text-base text-inherit",
+                "min-w-0 flex-1 text-base",
                 accent === "quiz" ? QUIZ_CONTENT_NORMAL_WEIGHT_CLASS : "font-bold",
               )}
               contentAlignment="left"

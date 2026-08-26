@@ -7,9 +7,7 @@ import { buildAiStructuredTextFormat } from "#api/modules/ai/utils/ai-structured
 
 const outputSchema = lessonSummaryProviderTransportOutputSchema;
 
-function createRequest(
-  overrides: Partial<AiStructuredInput> = {},
-): AiStructuredInput {
+function createRequest(overrides: Partial<AiStructuredInput> = {}): AiStructuredInput {
   return {
     systemPrompt: "SYSTEM CONTRACT",
     userPrompt: "USER REQUEST A",
@@ -71,9 +69,7 @@ describe("M9.2 OpenAI prompt cache routing", () => {
     expect(keyFor(createRequest({ systemPrompt: "UPDATED CONTRACT" }))).not.toBe(
       baseline,
     );
-    expect(
-      keyFor(createRequest({ schemaReferenceStrategy: "ref" })),
-    ).not.toBe(baseline);
+    expect(keyFor(createRequest({ schemaReferenceStrategy: "ref" }))).not.toBe(baseline);
     expect(keyFor(request, "gpt-5.4-2026-03-05")).not.toBe(baseline);
   });
 
@@ -101,5 +97,26 @@ describe("M9.2 OpenAI prompt cache routing", () => {
         structuredTextFormat: textFormat,
       }),
     ).not.toHaveProperty("prompt_cache_retention");
+  });
+
+  it("uses an explicit 30-minute breakpoint contract for GPT-5.6+", () => {
+    const request = createRequest();
+    const textFormat = buildAiStructuredTextFormat(
+      outputSchema,
+      request.outputName,
+      request.schemaReferenceStrategy,
+    );
+
+    const fields = buildOpenAiPromptCacheFields({
+      request,
+      model: "gpt-5.6-luna",
+      structuredTextFormat: textFormat,
+    });
+
+    expect(fields).toMatchObject({
+      prompt_cache_key: expect.any(String),
+      prompt_cache_options: { mode: "explicit", ttl: "30m" },
+    });
+    expect(fields).not.toHaveProperty("prompt_cache_retention");
   });
 });

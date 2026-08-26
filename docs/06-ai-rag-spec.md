@@ -96,6 +96,7 @@ interface AiStructuredOutput<TOutput> {
   usage?: {
     promptTokens?: number;
     cachedInputTokens?: number;
+    cacheWriteInputTokens?: number;
     completionTokens?: number;
     reasoningTokens?: number;
     totalTokens?: number;
@@ -521,6 +522,15 @@ dùng document chunks theo contract riêng.
   mục tiêu. Không dùng định lý, thuật ngữ hoặc phương pháp của khối lớp
   cao hơn để rút gọn bài, dù cách giải đó đúng. Khi nguồn có phương pháp
   phù hợp, model phải ưu tiên mạch giải và ký hiệu của nguồn.
+- Nội dung có công thức của Quiz/Test và mặt sau/lời giải thích của Flashcard
+  được khuyến khích dùng ký hiệu để ngắn gọn, nhưng phải ưu tiên theo thứ tự:
+  ký hiệu của nguồn, ký hiệu chuẩn gắn với công thức/quy ước của đúng môn, rồi
+  mới đến ký hiệu thông dụng do model tự đặt. Mọi ký hiệu mới do nội dung hiện
+  tại tạo ra phải được gọi tên đúng một lần trước lần dùng đầu tiên, kèm đại
+  lượng/đối tượng và đơn vị, mốc/chiều hoặc chỉ số phân biệt khi môn học yêu cầu;
+  sau đó không được đổi nghĩa. Không định nghĩa lại ký hiệu đã có rõ trong đề,
+  hằng số/toán tử/đơn vị chuẩn, tên điểm hay công thức hóa học; nội dung thuần
+  văn xuôi hoặc lời giải không cần biến phụ cũng không bị ép tạo ký hiệu.
 - `hint` Quiz phải ngắn nhưng tự đủ nghĩa và chứa ít nhất một cầu nối suy
   luận cụ thể từ dữ kiện/yêu cầu của câu đến khái niệm, quan hệ,
   quy tắc hoặc thao tác đầu tiên. Không chỉ nhắc lại công thức/định nghĩa,
@@ -532,9 +542,10 @@ dùng document chunks theo contract riêng.
   với số mắt xích cần định hướng, không validate chất lượng bằng ngưỡng
   ký tự cố định.
 - Pipeline Quiz repair deterministic lệnh LaTeX chuẩn bị thiếu dấu `\\` chỉ bên
-  trong math delimiter trước khi persist. Repair phải idempotent, không đổi prose
-  hoặc identifier không khớp ngữ pháp lệnh; renderer dùng cùng quy tắc cho math
-  node lịch sử để tránh fallback đỏ mà không ghi đè dữ liệu cũ.
+  trong math delimiter và dấu đóng `$`/`$$` bị escape nhầm trước khi persist.
+  Repair phải idempotent, không đổi prose, currency escape hoặc identifier không
+  khớp ngữ pháp lệnh; renderer dùng cùng quy tắc cho math node lịch sử để tránh
+  fallback đỏ hoặc lộ delimiter mà không ghi đè dữ liệu cũ.
 - Với Toán, có thể biến đổi số liệu, ngữ cảnh, cách hỏi và mức độ nhận thức, nhưng vẫn giữ đúng kỹ năng của page range buổi học.
 - Flashcard/Test có thể lưu source chunk/page metadata ở mức item để truy vết nội bộ. Quiz là bài tập mới do AI biên soạn nên không yêu cầu provider trả và không lưu `sourceChunkIds`, `sources` hoặc `sourceHash` trong từng câu; tài liệu nguồn chỉ làm context ở lúc sinh.
 - UI cho học sinh không cần hiển thị source page cho quiz/test mặc định. Source page hữu ích hơn cho admin review, debug AI generation, report sai câu và chat Q&A theo tài liệu.
@@ -598,6 +609,25 @@ solutionFigurePlan: null }`, vì vậy không tạo hình đề hoặc hình l�
   của Summary và Quiz đều khóa invariant này. Renderer nội dung học dùng cùng
   normalizer để sửa dữ liệu cũ có lỗi căn tương ứng; `\to` và `\mapsto` không bị
   đổi vì thường biểu diễn ánh xạ/chuyển trạng thái, không phải toán tử kết luận.
+- Kiểm tra chuỗi biến đổi phải dựa trên quan hệ ngữ nghĩa giữa các bước, không
+  chỉ đếm dấu `=` bên trong từng delimiter. Hai hay nhiều display liên tiếp vẫn
+  là một chuỗi nếu chúng cùng biến đổi một biểu thức, cô lập một đại lượng hoặc
+  duy trì tập nghiệm; khi đó phải nhóm vào `aligned`/`split`, giữ đại lượng cần
+  tìm ở vế trái sau khi cô lập và thể hiện phép biến đổi quyết định. Các phép
+  khai căn, bình phương, chia cho biểu thức, logarit hoặc rút gọn phân thức phải
+  nêu điều kiện, giữ đủ nhánh hợp lệ rồi mới loại theo ngữ cảnh. Phương trình độc
+  lập của một hệ, phép gán cho đại lượng khác nhau và phép tính thật sự chỉ một
+  bước là counterexample hợp lệ, không bị ép thành chuỗi. Invariant này áp dụng
+  cho `solution` và `statementSolutions[].solution` của cả bốn profile
+  Toán/Lý/Hóa/General; profile môn tự thích nghi điều kiện, đơn vị và miền giá trị.
+- Quiz khuyến khích ký hiệu chuẩn nhưng không áp bảng ký hiệu cứng. `problem`
+  phải ràng buộc mọi ký hiệu mới nó tạo ra ngay lần xuất hiện đầu tiên;
+  `solution`, `statementSolutions[].solution` và `hint` được dùng lại ký hiệu đã
+  có trong đề/ngữ cảnh, còn ký hiệu phụ mới phải được giới thiệu đúng một lần
+  trước khi đi vào công thức và giữ nguyên nghĩa. `options`, `statements` và
+  `answer` không được tự đưa vào ký hiệu chưa được ràng buộc. Đây là semantic
+  authority thuộc system prompt theo từng môn; không thêm field, validator hay
+  phép rewrite hậu kỳ chỉ để đoán nghĩa ký hiệu.
 
 ### 5.1. Summary generation
 
@@ -682,6 +712,23 @@ Contract provider:
   cặp phản ví dụ tổng quát `A=B=C` một dòng và dạng đúng `aligned`, đồng thời yêu
   cầu model tự quét lại từng field trước khi trả output. Pipeline không tự viết
   lại công thức hậu kỳ; nội dung vẫn do provider trả theo prompt/schema đã duyệt.
+- Với `content` có phương pháp tính và `solution` của example, model còn phải
+  kiểm tra tính liên tục ngữ nghĩa giữa từng cặp bước kề nhau, kể cả khi mỗi bước
+  nằm trong display riêng và chỉ có một dấu `=`. Không được nhảy qua phép đổi đơn
+  vị, thế, chuyển vế, chia, khai căn hoặc bước chuyên môn quyết định; phải nêu
+  điều kiện và căn cứ chọn nhánh. Quy tắc áp dụng cho Toán/Lý/Hóa/General với
+  wording riêng theo môn. Với `SOURCE_EXACT`, chỉ chuẩn hóa cách nhóm các dòng
+  tương đương và giữ nguyên phương pháp/kết luận nguồn; nếu nguồn thiếu căn cứ
+  hoặc mâu thuẫn thì chọn ví dụ khác hay provenance phù hợp, không bịa bước mới.
+- `content` có phương pháp và mọi example của Summary ưu tiên ký hiệu nguồn rồi
+  đến ký hiệu chuẩn của công thức đúng môn. Ký hiệu mới do block tạo ra phải
+  được gọi tên đúng một lần trước lần dùng đầu tiên, kèm đối tượng/đơn vị/mốc,
+  chiều hoặc chỉ số cần thiết theo môn, và giữ một ý nghĩa xuyên suốt; `answer`
+  không tự tạo ký hiệu mới. Không định nghĩa lại ký hiệu đã có rõ hoặc quy ước
+  chuẩn phù hợp khối lớp, cũng không ép đoạn văn không cần biến phải đặt biến.
+  Với `SOURCE_EXACT`, giữ ký hiệu và ý nghĩa của nguồn; nếu rút gọn làm mất câu
+  định nghĩa cần thiết thì mang câu đó vào trước lần dùng đầu tiên thay vì đổi
+  ký hiệu. Quy tắc này chỉ nằm trong system prompt, không đổi JSON shape/schema.
 - Trong mọi example/bài tập của Summary, nếu `problem`, `solution` hoặc `answer`
   có các ý con mang nhãn `a)`, `b)`, `c)` hoặc nhãn chữ cái tương đương thì mỗi
   ý con bắt buộc bắt đầu ở một dòng riêng; không được đặt hai nhãn ý con trên cùng
@@ -1139,17 +1186,29 @@ phép không có hình. Câu Đại số vẫn bắt buộc đặt `requiresQues
 trục, đường số, miền nghiệm, bảng biến thiên, bảng xét dấu, bảng dữ liệu, biểu đồ
 hoặc sơ đồ là đối tượng phải đọc, dựng, so sánh hay suy luận, dù
 `isGeometry=false`.
-Riêng prompt Toán phải thực hiện kiểm chứng hai lượt trước khi trả dữ liệu chấm:
-lượt đầu lập mô hình và giải từ dữ kiện gốc, không neo theo phương án; lượt sau
-dùng một kiểm tra độc lập phù hợp như thế ngược kết quả, đối chiếu miền giá trị,
-đơn vị/cận hoặc một biểu diễn hình học khác. Mọi định lý chỉ được dùng sau khi
-đủ giả thiết trên đúng cấu hình; việc `options`, `correctOptionId`, `solution` và
-`answer` cùng khớp nhau không thay thế kiểm chứng chuyên môn. Nếu kết quả không
-khớp đúng một phương án hoặc hai lượt kiểm tra mâu thuẫn, model phải biên soạn
-lại câu và giải lại trước khi trả JSON. Đây là quality invariant của default
-Math system prompt, không phải semantic rejection gate và không thay đổi trạng
-thái `NEEDS_REVIEW`; custom system prompt full override vẫn tự chịu trách nhiệm
-giữ invariant tương đương.
+Mọi default system prompt Quiz phải thực hiện kiểm chứng hai lượt trước khi trả
+dữ liệu chấm: lượt đầu lập mô hình và giải từ dữ kiện gốc, không neo theo phương
+án; lượt sau dùng ít nhất một kiểm tra độc lập phù hợp và không chỉ đọc lại đúng
+mạch giải thứ nhất. Với Toán, kiểm tra gồm giả thiết định lý, thế ngược, miền giá
+trị, đơn vị/cận hoặc biểu diễn khác. Với Vật lý, kiểm tra gồm hệ/mốc/chiều, điều
+kiện áp dụng định luật, thứ nguyên, bảo toàn, trường hợp biên, bậc độ lớn và tính
+khả thi vật lý. Với Hóa học, kiểm tra gồm công thức/trạng thái/điều kiện phản ứng,
+bảo toàn nguyên tố và điện tích, quan hệ mol/khối lượng, chất giới hạn và tính
+khả thi hóa học. Với môn chưa có profile riêng, mọi kết luận phải truy ngược được
+về dữ kiện và PDF nguồn; kiểm tra độc lập có thể dùng điều kiện định nghĩa/quy
+tắc, phản ví dụ, trường hợp biên hoặc mạch lập luận tương đương và không được mở
+rộng kết luận ngoài nguồn.
+
+Với MULTIPLE_CHOICE, model phải xác định kết quả trước rồi mới gán phương án;
+với TRUE_FALSE/MULTI_STATEMENT_TRUE_FALSE phải kiểm chứng riêng từng mệnh đề;
+với TEXT_INPUT phải thay hoặc đối chiếu đáp án chuẩn trở lại đề. Việc `options`,
+`correctOptionId`, `solution` và `answer` cùng khớp nhau không thay thế kiểm chứng
+chuyên môn. Nếu hai lượt mâu thuẫn, còn thiếu điều kiện, kết quả không khả thi
+hoặc không khớp đúng một phương án, model phải biên soạn lại câu và giải lại
+trước khi trả JSON. Đây là quality invariant của các default subject system
+prompt, không phải semantic rejection gate và không thay đổi trạng thái
+`NEEDS_REVIEW`; custom system prompt full override vẫn tự chịu trách nhiệm giữ
+invariant tương đương.
 User prompt Quiz dùng cùng quy ước trình bày dễ đọc của Sinh kiến thức: một tiêu
 đề nhiệm vụ, sau đó là các bullet theo thứ tự bài học, môn học, khối lớp/văn
 phong, số câu, độ khó, loại câu và yêu cầu bổ sung của admin nếu có. Builder và
@@ -1165,7 +1224,12 @@ transport của Quiz khóa `schemaReferenceStrategy=ref_v2`; không dùng `auto`
 tránh bộ chọn kích thước đổi strategy ngầm giữa các schema version. Sinh kiến
 thức tiếp tục dùng `ref_v2` đã được A/B và rollout riêng. Quiz gửi stable
 `prompt_cache_key` theo model + prompt/schema contract; cache chỉ tái sử dụng
-prefix input, không cache câu trả lời.
+prefix input, không cache câu trả lời. Với OpenAI GPT-5.6+, transport đặt system
+prompt ổn định trong message `developer`, gắn
+`prompt_cache_breakpoint={ mode: "explicit" }` đúng cuối khối này và gửi
+`prompt_cache_options={ mode: "explicit", ttl: "30m" }`; PDF, source manifest,
+custom user input và dữ liệu động luôn đứng phía sau breakpoint. Model cũ giữ
+`instructions` và retention contract legacy để không đổi hành vi.
 Sau khi persist, `ai_generations.output_json` của Quiz là mutable working
 snapshot giống Sinh kiến thức, không phải bản provider bất biến. Khi admin lưu
 một câu AI, backend giữ các field provider-only, ghi projection hiện tại vào đúng
@@ -1387,15 +1451,19 @@ Validation:
 - Câu Quiz là bài tập để học sinh trực tiếp giải, tính toán, xác định hoặc chứng
   minh theo kiến thức lesson; không sinh câu hỏi meta yêu cầu kể lại quy trình,
   mô tả cách biên soạn hay trình bày một workflow/thí nghiệm như mục tiêu độc lập.
-- Solution phân đoạn theo đơn vị lập luận như trường solution của Example bên
-  Sinh kiến thức: với bài tính, tách câu nêu căn cứ/công thức, khối display chứa
-  phép tính hoặc biến đổi và câu kết luận khi cần. Không nhét toàn bộ phép tính
-  nhiều bước vào giữa một đoạn văn. Yêu cầu gọn chỉ bỏ diễn giải lặp lại, không
-  cho phép gộp hoặc văn xuôi hóa bước toán học; sau khi thực hiện đủ bước và xác
-  định kết quả hoặc phương án đúng thì kết luận và dừng, không nối thêm nhận xét,
-  tính chất tổng quát hay cách giải khác.
-- Câu kết luận cuối bắt đầu bằng “Vậy” phải là một đoạn riêng, có một dòng trống
-  phía trước. Với `MULTIPLE_CHOICE`, kết luận trong `solution` phải trả lời trực
+- Mọi `solution` và `statementSolutions[].solution` phân đoạn tường minh
+  theo đơn vị lập luận, áp dụng cho mọi môn, loại câu và độ khó,
+  không chỉ bài có tính toán. Khi có từ hai đơn vị trở lên, mỗi
+  đơn vị phải bắt đầu trong đoạn riêng và được phân cách bằng `\n\n`.
+  Ranh giới đoạn bám logic: chỉ chuyển đoạn khi vai trò suy luận chuyển
+  từ căn cứ sang hệ quả trung gian, phép tính/biến đổi tiếp theo hoặc
+  kết luận; không bẻ sau mỗi câu, công thức inline hay từ nối. Các giả
+  thiết cùng phục vụ một suy luận ở cùng đoạn; lời giải chỉ có một
+  đơn vị ngắn được giữ trong một đoạn. Yêu cầu gọn chỉ bỏ diễn
+  giải lặp lại, không cho phép gộp nhiều mắt xích thành văn xuôi.
+- Câu kết luận cuối phải là một đoạn riêng, dù bắt đầu bằng
+  “Vậy”, “Vì vậy”, “Do đó”, “Suy ra” hay không có từ nối. Với
+  `MULTIPLE_CHOICE`, kết luận trong `solution` phải trả lời trực
   tiếp đúng đại lượng, đối tượng hoặc yêu cầu của đề; không viết “Vậy chọn phương
   án C”, “Vậy đáp án là C” hoặc cách diễn đạt tương đương. ID và nội dung phương
   án đúng vẫn nằm trong dữ liệu chấm và `explanation.answer` theo contract riêng.
@@ -1410,6 +1478,12 @@ Validation:
   ví dụ `$A=B=C$`, `$$A=B=C$$`, một ví dụ đúng `aligned` và bước tự quét lại
   trước khi trả output. Không áp dụng cho các phương trình độc lập, hệ phương
   trình, phép gán nhiều đại lượng hoặc dấu `=` trong cấu trúc lồng nhau.
+- Quy tắc trên không thể bị lách bằng cách tách mỗi phép biến đổi thành một
+  display chỉ có một dấu `=`. Prompt/schema phải yêu cầu nhận diện chuỗi theo
+  quan hệ logic, nhóm các bước liên tiếp, giữ đại lượng đích ở vế trái sau khi cô
+  lập, nêu phép biến đổi chính và điều kiện bảo toàn nghiệm/miền giá trị. Trước
+  khi trả output, model đối chiếu từng cặp bước kề nhau; các phương trình độc lập,
+  phép gán khác đại lượng và phép tính một bước vẫn là ngoại lệ hợp lệ.
 - Để tránh lặp input không cần thiết, các invariant định dạng toàn cục về chuỗi
   dấu bằng, dấu câu/căn hàng, cân bằng môi trường LaTeX và xuống dòng ý con chỉ
   xuất hiện một lần tại root provider schema. Các field không phải lời giải chỉ

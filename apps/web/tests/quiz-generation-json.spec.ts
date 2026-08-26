@@ -178,4 +178,38 @@ Vậy chọn phương án A.`,
         .some((node) => node.content?.some((child) => child.type === "blockMath")),
     ).toBe(false);
   });
+
+  test("sửa delimiter đóng bị escape nhầm trước khi dựng preview lời giải", () => {
+    const preview = buildQuizQuestionPreviewFromGenerationJson(currentQuestion, {
+      questionType: "MULTIPLE_CHOICE",
+      difficulty: "MEDIUM",
+      options: [
+        { id: "A", text: String.raw`$112^\circ$.` },
+        { id: "B", text: String.raw`$68^\circ$.` },
+      ],
+      correctOptionId: "A",
+      explanation: {
+        problem: "Tính số đo góc.",
+        solution: String.raw`Ta có:
+
+$$\widehat{A}+\widehat{C}=180^\circ.\$$
+
+Suy ra $\widehat{C}=112^\circ\$.`,
+        answer: "A",
+        isGeometry: true,
+      },
+    });
+
+    const explanationNodes = preview.explanation?.contentJson.content ?? [];
+    expect(explanationNodes.map((node) => node.type)).toEqual([
+      "paragraph",
+      "blockMath",
+      "paragraph",
+      "paragraph",
+    ]);
+    expect(explanationNodes[1]?.attrs?.latex).toBe(
+      String.raw`\widehat{A}+\widehat{C}=180^\circ.`,
+    );
+    expect(JSON.stringify(explanationNodes)).not.toContain("\\$$");
+  });
 });

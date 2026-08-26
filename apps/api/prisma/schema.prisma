@@ -2166,6 +2166,7 @@ model ProviderUsageEvent {
   cacheStatus           String?                    @map("cache_status")
   promptTokens          Int                        @default(0) @map("prompt_tokens")
   cachedInputTokens     Int                        @default(0) @map("cached_input_tokens")
+  cacheWriteInputTokens Int                        @default(0) @map("cache_write_input_tokens")
   completionTokens      Int                        @default(0) @map("completion_tokens")
   totalTokens           Int                        @default(0) @map("total_tokens")
   pages                 Int                        @default(0)

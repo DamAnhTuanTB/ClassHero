@@ -5,6 +5,7 @@ import { isAiReasoningEffort, type AiReasoningEffort } from "@learning-path/shar
 import {
   AiGenerationType,
   AiModelPurpose,
+  AiProviderName,
   Difficulty,
   Prisma,
   ProviderUsageMetric,
@@ -16,6 +17,7 @@ import { PrismaService } from "#api/common/prisma/prisma.service";
 import type { EnvConfig } from "#api/config/env.validation";
 import { AiGenerationJobService } from "#api/modules/ai/services/ai-generation-job.service";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import { supportsOpenAiExplicitPromptCaching } from "#api/modules/ai/utils/ai-prompt-cache";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import {
   estimateAiStructuredInputTokens,
@@ -276,6 +278,11 @@ export class QuizGenerationJobService {
       fxRate,
       inputTokenEstimate.estimatedTokens,
       maxOutputTokens,
+      Boolean(
+        candidate?.provider === AiProviderName.OPENAI &&
+        request.promptCache &&
+        supportsOpenAiExplicitPromptCaching(candidate.model),
+      ),
     );
     const schemaJson = structuredTextFormat.schema;
     const schemaHash = hashAiValue(schemaJson);
@@ -709,6 +716,7 @@ function estimateCosts(
   fxRate: number,
   inputTokens: number,
   outputTokens: number,
+  useExplicitPromptCache: boolean,
 ) {
   const required = new Set([
     ProviderUsageMetric.INPUT_TOKEN,
@@ -717,9 +725,13 @@ function estimateCosts(
   const available = new Set(candidate?.rates.map((rate) => rate.metric) ?? []);
   const canEstimate = [...required].every((metric) => available.has(metric));
   if (!candidate || !canEstimate) return { input: null, output: null, total: null };
+  const inputUsageUpperBound = {
+    promptTokens: inputTokens,
+    ...(useExplicitPromptCache ? { cacheWriteInputTokens: inputTokens } : {}),
+  };
   return {
     input: calculateProviderCost(
-      { promptTokens: inputTokens, completionTokens: 0, requestCount: 1 },
+      { ...inputUsageUpperBound, completionTokens: 0, requestCount: 1 },
       candidate.rates,
       fxRate,
     ),
@@ -729,7 +741,7 @@ function estimateCosts(
       fxRate,
     ),
     total: calculateProviderCost(
-      { promptTokens: inputTokens, completionTokens: outputTokens, requestCount: 1 },
+      { ...inputUsageUpperBound, completionTokens: outputTokens, requestCount: 1 },
       candidate.rates,
       fxRate,
     ),

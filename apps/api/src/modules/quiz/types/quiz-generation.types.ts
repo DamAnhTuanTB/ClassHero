@@ -3,13 +3,13 @@ import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
 export const QUIZ_PROMPT_VERSIONS = {
-  MATH: "quiz-math-v48-single-true-false-no-figure",
-  PHYSICS: "quiz-physics-v47-single-true-false-no-figure",
-  CHEMISTRY: "quiz-chemistry-v47-single-true-false-no-figure",
-  GENERAL: "quiz-general-v47-single-true-false-no-figure",
+  MATH: "quiz-math-v51-declared-standard-notation",
+  PHYSICS: "quiz-physics-v51-declared-standard-notation",
+  CHEMISTRY: "quiz-chemistry-v51-declared-standard-notation",
+  GENERAL: "quiz-general-v51-declared-standard-notation",
 } as const;
 export const QUIZ_SCHEMA_VERSION =
-  "quiz-pdf-figure-schema-v30-single-true-false-no-figure";
+  "quiz-pdf-figure-schema-v31-explicit-solution-paragraphs";
 export const QUIZ_MAX_OUTPUT_TOKENS = 12_000;
 export const QUIZ_MIN_OUTPUT_TOKENS = 1_000;
 export const QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
@@ -52,6 +52,14 @@ export const QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY = [
   "Nếu phát hiện chuỗi vi phạm khi tự kiểm tra, phải chuyển chuỗi inline hoặc display một dòng đó thành display nhiều dòng trước khi trả kết quả.",
 ].join(" ");
 
+export const QUIZ_LOGICAL_DERIVATION_POLICY = [
+  "QUY TẮC CỨNG VỀ MẠCH BIẾN ĐỔI: nhận diện chuỗi theo quan hệ logic, không theo cách đã chia delimiter. Từ hai công thức liên tiếp trở lên cùng biến đổi một biểu thức/phương trình, cùng cô lập một đại lượng hoặc cùng duy trì tập nghiệm vẫn là một chuỗi duy nhất, dù mỗi công thức đang nằm trong display riêng và chỉ có một dấu `=`.",
+  "Phải gom chuỗi đó vào một khối `aligned`/`split`, giữ đại lượng cần tìm ở vế trái sau khi đã cô lập và cho thấy tường minh phép chuyển vế, thế, rút gọn, khai căn, chia hoặc biến đổi chính làm thay đổi biểu thức. Được gộp số học hiển nhiên, nhưng không được nhảy qua bước đại số hay suy luận quyết định.",
+  "Nếu một phép biến đổi có thể sinh nhiều nhánh, làm mất nghiệm hoặc đòi hỏi điều kiện — như khai căn, bình phương, chia cho biểu thức chứa biến, logarit hay rút gọn mẫu — phải nêu điều kiện, giữ đủ nhánh hợp lệ rồi mới loại theo ngữ cảnh. Với đại lượng hình học là độ dài, phải nêu tính dương trước khi chọn căn dương.",
+  "Ví dụ tổng quát SAI: viết ba display rời `u^2=p^2-q^2`, `u^2=r`, `u=\\sqrt{r}` mà không nêu phép biến đổi hay điều kiện. Dạng ĐÚNG: gom phần tính `u^2 &= p^2-q^2` rồi `&=r` trong một `aligned`; sau đó nêu điều kiện phù hợp trước khi kết luận `u=\\sqrt{r}`.",
+  "Counterexample hợp lệ: hai phương trình độc lập của một hệ, hai phép gán cho hai đại lượng khác nhau hoặc một phép tính một bước không phải bị ép thành chuỗi. Trước khi trả output, kiểm tra từng cặp bước liên tiếp: phải xác định được phép biến đổi, quan hệ tương đương/suy ra và điều kiện bảo toàn tập nghiệm; nếu không, phải viết lại mạch lời giải.",
+].join(" ");
+
 export const QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY = [
   "QUY TẮC CỨNG VỀ MÔI TRƯỜNG LATEX: trong mọi khối công thức display `$$...$$`, mỗi lệnh `\\begin{X}` bắt buộc có đúng lệnh `\\end{X}` tương ứng, đóng theo thứ tự lồng ngược và nằm trước dấu `$$` kết thúc khối.",
   "Tuyệt đối không kết thúc khối ngay sau nội dung của `aligned`, `split`, `cases`, `array`, `matrix` hoặc môi trường khác khi chưa viết lệnh `\\end{...}` tương ứng. Ví dụ SAI: `$$\\begin{aligned}A&=B\\\\&=C.$$`; ví dụ ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
@@ -72,13 +80,13 @@ export const QUIZ_TRUE_FALSE_PROBLEM_POLICY =
   "`explanation.problem` phải bắt đầu trực tiếp bằng đúng một mệnh đề cần xét. Không thêm nhãn hoặc câu dẫn chỉ nhắc lại thao tác đúng/sai, như `Mệnh đề:`, `Mệnh đề sau đúng hay sai?`, `Đánh giá mệnh đề sau` hoặc cách diễn đạt tương đương. Ví dụ SAI: `Mệnh đề: P`; ví dụ ĐÚNG: `P`.";
 
 export const QUIZ_TRUE_FALSE_SOLUTION_POLICY =
-  "Với TRUE_FALSE, `explanation.solution` phải giải thích vì sao mệnh đề đúng hoặc sai rồi kết thúc bằng một câu liên kết tự nhiên với lập luận, như `Vì vậy, mệnh đề đã cho là đúng.` hoặc `Do đó, mệnh đề đã cho là sai.`. Không dùng câu cụt, tách rời ngữ cảnh như `Mệnh đề đúng.` hoặc `Mệnh đề sai.`.";
+  "Với TRUE_FALSE, `explanation.solution` phải giải thích vì sao mệnh đề đúng hoặc sai rồi kết thúc bằng một câu liên kết tự nhiên với lập luận, như `Vì vậy, mệnh đề đã cho là đúng.` hoặc `Do đó, mệnh đề đã cho là sai.`. Câu kết luận này phải tuân thủ quy tắc đoạn kết luận chung của mọi lời giải. Không dùng câu cụt, tách rời ngữ cảnh như `Mệnh đề đúng.` hoặc `Mệnh đề sai.`.";
 
 export const QUIZ_SUBPART_LINEBREAK_POLICY =
   "Trong một câu Quiz có nhiều ý, mỗi ý mang nhãn a), b), c), ... phải bắt đầu ở dòng riêng trong `problem`, `solution` và `answer`; không đặt hai ý trên cùng một dòng. Riêng MULTI_STATEMENT_TRUE_FALSE, mỗi lời giải nằm trong một phần tử `statementSolutions` riêng, còn mapper dựng mỗi đáp án a), b), c), ... thành một dòng độc lập.";
 
 export const QUIZ_CONCLUSION_PARAGRAPH_POLICY =
-  "Câu kết luận cuối bắt đầu bằng `Vậy` phải nằm trong một đoạn riêng: chèn đúng một dòng trống trước câu kết luận, không nối câu này vào cùng đoạn văn hoặc cùng dòng với phép tính, công thức hay lập luận ngay trước đó.";
+  "Câu kết luận cuối phải nằm trong một đoạn riêng, dù bắt đầu bằng `Vậy`, `Vì vậy`, `Do đó`, `Suy ra` hay không có từ nối: chèn đúng một dòng trống trước câu kết luận, không nối câu này vào cùng đoạn văn hoặc cùng dòng với phép tính, công thức hay lập luận ngay trước đó.";
 
 export const QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY =
   "Với MULTIPLE_CHOICE, câu kết luận cuối phải trả lời trực tiếp đúng đại lượng, đối tượng hoặc yêu cầu mà `problem` hỏi, chẳng hạn `Vậy thể tích cần tìm là $V$.`; không được kết luận bằng thao tác làm bài hoặc ID phương án như `Vậy chọn phương án C.`, `Vậy đáp án là C.` hay cách diễn đạt tương đương. ID phương án chỉ thuộc dữ liệu chấm điểm và field `answer` theo contract riêng.";
@@ -108,8 +116,11 @@ export const QUIZ_FIGURE_SELECTION_POLICY = [
 export const QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY = [
   "Lời giải Quiz bắt đầu trực tiếp và thực hiện đủ các bước cần cho chính câu đang giải: nêu công thức hoặc căn cứ, thay dữ kiện, viết phép biến đổi hay suy luận trung gian, rồi kết luận. Không viết kiểu gợi ý `thay vào công thức`, `làm tương tự`, `suy ra ngay` mà bỏ qua thao tác.",
   "Nếu PDF nguồn có phương pháp hoặc cách ký hiệu phù hợp với dạng bài mới, dùng đó làm chuẩn về thứ tự lập luận, cấu trúc công thức và mức xuống dòng; không chép lại bài/lời giải nguồn, không đổi sang phương pháp xa lạ và không chuyển biểu thức thành đoạn văn dài.",
-  "Với câu cần tính toán hoặc biến đổi, công thức, chuỗi biến đổi và ký hiệu toán học phải là phần trình bày chính; văn xuôi chỉ nêu căn cứ hoặc nối các bước. Với câu nhận định lý thuyết không cần phép tính, dùng lập luận ngắn, trực tiếp theo đúng khái niệm hoặc quy tắc liên quan.",
-  "Trong `solution` hoặc `statementSolutions[].solution` có tính toán, phải tách theo đơn vị lập luận: câu nêu căn cứ/công thức; khối display chứa phép tính hoặc biến đổi; rồi câu kết luận khi cần. Nếu câu dẫn đứng ngay trước khối display thì kết thúc bằng dấu `:`. Không nhét toàn bộ phép tính nhiều bước vào giữa một đoạn văn; yêu cầu gọn chỉ cho phép bỏ diễn giải lặp lại, không cho phép gộp hoặc văn xuôi hóa các bước toán học.",
+  "Với câu cần tính toán hoặc biến đổi, công thức, chuỗi biến đổi và ký hiệu toán học phải là phần trình bày chính; văn xuôi chỉ nêu căn cứ hoặc nối các bước. Với câu nhận định lý thuyết không cần phép tính, dùng lập luận ngắn, trực tiếp theo đúng khái niệm hoặc quy tắc liên quan nhưng vẫn phải tách đoạn theo từng đơn vị lập luận.",
+  "Trong mọi `solution` và `statementSolutions[].solution`, phải tách tường minh theo đơn vị lập luận, không phụ thuộc lời giải có tính toán, biến đổi hay chỉ dùng văn xuôi, chứng minh hoặc giải thích. Khi có từ hai đơn vị lập luận trở lên, mỗi đơn vị — như nêu căn cứ, rút ra hệ quả trung gian, thực hiện phép tính/biến đổi hoặc kết luận — phải bắt đầu trong một đoạn riêng, giữa hai đoạn có đúng một dòng trống. Nếu câu dẫn đứng ngay trước khối display thì kết thúc bằng dấu `:`. Không nhét nhiều mắt xích suy luận hoặc toàn bộ phép tính nhiều bước vào một đoạn văn; yêu cầu gọn chỉ cho phép bỏ diễn giải lặp lại, không cho phép gộp hoặc văn xuôi hóa các bước.",
+  "Không nhét toàn bộ phép tính nhiều bước vào giữa một đoạn văn.",
+  "Counterexample hợp lệ: nếu lời giải chỉ có đúng một đơn vị lập luận ngắn thì giữ trong một đoạn; không bẻ từng câu, từng công thức ngắn hoặc chỉ riêng từ nối thành các đoạn vụn. Khi `Vì`, `Nên`, `Do đó` hoặc `Suy ra` mở đầu một đoạn mới, từ nối phải đi cùng nội dung của đoạn đó. Các giả thiết liên tiếp cùng phục vụ một suy luận được giữ trong cùng một đoạn.",
+  "Ranh giới đoạn phải hợp lý về logic và trình bày: chỉ bắt đầu đoạn mới khi vai trò suy luận chuyển từ căn cứ sang hệ quả trung gian, phép tính/biến đổi tiếp theo hoặc kết luận. Không xuống đoạn chỉ vì câu dài, sau mỗi câu, sau mỗi công thức inline hay ngay trước mỗi từ nối. Hai đơn vị lập luận tách biệt phải được phân cách trong giá trị chuỗi bằng `\\n\\n`.",
   QUIZ_CONCLUSION_PARAGRAPH_POLICY,
   QUIZ_SUBPART_LINEBREAK_POLICY,
 ].join(" ");
@@ -594,6 +605,7 @@ export function getGeneratedQuizOutputSchema(
     .describe(
       [
         QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY,
+        QUIZ_LOGICAL_DERIVATION_POLICY,
         QUIZ_FUNCTIONAL_PUNCTUATION_AND_INFERENCE_LAYOUT_POLICY,
         QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY,
         QUIZ_SUBPART_LINEBREAK_POLICY,

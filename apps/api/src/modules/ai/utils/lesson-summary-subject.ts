@@ -58,6 +58,7 @@ export function buildLessonContentSubjectProfile(subject: LessonSummarySubjectSn
       return [
         ...heading,
         "- Kiểm tra chặt chẽ giả thiết, phép biến đổi, điều kiện xác định, kí hiệu và kết luận toán học.",
+        "- Ưu tiên ký hiệu đúng nguồn rồi đến ký hiệu chuẩn của công thức Toán; ký hiệu phụ mới phải được gọi tên theo đại lượng/đối tượng trước khi dùng và không đổi nghĩa giữa chừng.",
         "- Với chứng minh hình học lớp 7–9, example.geometryStatement phải có GT và KL; trường hợp khác để null.",
         "- Chuẩn hóa kí hiệu góc theo ba điểm với đỉnh ở giữa, ví dụ ∠ABC có đỉnh B.",
       ].join("\n");
@@ -65,16 +66,19 @@ export function buildLessonContentSubjectProfile(subject: LessonSummarySubjectSn
       return [
         ...heading,
         "- Kiểm tra chặt chẽ đại lượng, đơn vị SI, chiều vector, dấu, mốc quy chiếu và quy ước của hiện tượng trong bài.",
+        "- Ưu tiên ký hiệu đúng công thức Vật lý; khi tạo ký hiệu mới phải nêu đại lượng, vật/hệ hoặc mốc/chiều liên quan và đơn vị khi cần trước lần dùng đầu tiên.",
       ].join("\n");
     case "CHEMISTRY":
       return [
         ...heading,
         "- Kiểm tra chặt chẽ công thức chất, hóa trị, hệ số, điện tích, trạng thái, điều kiện phản ứng và bảo toàn nguyên tố theo dữ liệu nguồn.",
+        "- Ưu tiên ký hiệu chuẩn của công thức Hóa học; đại lượng mới phải nêu rõ chất/đối tượng, chỉ số phân biệt và đơn vị khi cần trước lần dùng đầu tiên.",
       ].join("\n");
     case "GENERAL":
       return [
         ...heading,
         "- Chưa có profile chuyên môn riêng cho domain này; không tự suy diễn quy ước chuyên môn ngoài nguồn.",
+        "- Ưu tiên ký hiệu của nguồn rồi đến quy ước thông dụng của domain; mọi ký hiệu phụ mới phải được định nghĩa rõ trước khi dùng và giữ nguyên ý nghĩa.",
       ].join("\n");
   }
 }

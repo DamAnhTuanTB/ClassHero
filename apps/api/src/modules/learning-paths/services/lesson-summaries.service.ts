@@ -5,6 +5,7 @@ import { isAiReasoningEffort } from "@learning-path/shared";
 import {
   AiGenerationType,
   AiModelPurpose,
+  AiProviderName,
   Prisma,
   ProviderUsageMetric,
   StemFigureRevisionStatus,
@@ -33,6 +34,7 @@ import {
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 import { buildAiUserPrompt } from "#api/modules/ai/utils/ai-prompt";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
+import { supportsOpenAiExplicitPromptCaching } from "#api/modules/ai/utils/ai-prompt-cache";
 import {
   estimateAiStructuredInputTokens,
   resolveAiStructuredTextFormat,
@@ -750,11 +752,20 @@ export class LessonSummariesService {
     const canEstimateCost = [...requiredCostMetrics].every((metric) =>
       pricedMetrics.has(metric),
     );
+    const inputUsageUpperBound = {
+      promptTokens: inputTokenEstimate.estimatedTokens,
+      ...(resolvedCandidate?.provider === AiProviderName.OPENAI &&
+      request.promptCache &&
+      resolvedModel &&
+      supportsOpenAiExplicitPromptCaching(resolvedModel)
+        ? { cacheWriteInputTokens: inputTokenEstimate.estimatedTokens }
+        : {}),
+    };
     const estimatedInputCost =
       resolvedCandidate && canEstimateCost
         ? calculateProviderCost(
             {
-              promptTokens: inputTokenEstimate.estimatedTokens,
+              ...inputUsageUpperBound,
               completionTokens: 0,
               requestCount: 1,
             },
@@ -778,7 +789,7 @@ export class LessonSummariesService {
       resolvedCandidate && canEstimateCost
         ? calculateProviderCost(
             {
-              promptTokens: inputTokenEstimate.estimatedTokens,
+              ...inputUsageUpperBound,
               completionTokens: maxOutputTokens,
               requestCount: 1,
             },

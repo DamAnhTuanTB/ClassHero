@@ -80,7 +80,10 @@ import {
   AdminTestExplanationCard,
   isTestExplanationBlockData,
 } from "@/features/admin/tests/components/admin-test-explanation-content";
-import { getTiptapDocumentText } from "@/lib/tiptap-rich-content";
+import {
+  getTiptapDocumentText,
+  removeTrailingOptionPeriod,
+} from "@/lib/tiptap-rich-content";
 import { getQueryRenderState } from "@/lib/query-render-state";
 import { useRevealActiveHorizontalItem } from "@/lib/use-reveal-active-horizontal-item";
 import { useStableTabPanelHeight } from "@/lib/use-stable-tab-panel-height";
@@ -1903,8 +1906,8 @@ function QuestionCard({
                 </span>
                 <QuizRichContentViewer
                   ariaLabel={`Nội dung đáp án ${answerOptionLabel(optionIndex)}`}
-                  className="min-w-0 flex-1"
-                  content={option.richText}
+                  className="min-w-0 flex-1 text-[var(--theme-text)]"
+                  content={removeTrailingOptionPeriod(option.richText)}
                   contentAlignment="left"
                 />
               </div>

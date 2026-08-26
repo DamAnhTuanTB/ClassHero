@@ -1,0 +1,1 @@
+- 2026-08-26: Hoàn thiện luồng AI Quiz/Summary/Flashcard/Test với explicit prompt caching GPT-5.6 và accounting cache-write, bổ sung các migration phục hồi schema, siết chất lượng lời giải/ký hiệu/LaTeX/phân đoạn, chuẩn hóa hiển thị phương án trắc nghiệm và đồng bộ UI usage, regression test cùng tài liệu liên quan.

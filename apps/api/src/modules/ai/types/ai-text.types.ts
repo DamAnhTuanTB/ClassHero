@@ -60,6 +60,7 @@ export interface AiInputImage {
 export interface AiTokenUsage {
   promptTokens?: number;
   cachedInputTokens?: number;
+  cacheWriteInputTokens?: number;
   completionTokens?: number;
   reasoningTokens?: number;
   totalTokens?: number;

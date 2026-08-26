@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
-export const LESSON_CONTENT_PROMPT_VERSION = "lesson-content-subject-prompt-v6";
+export const LESSON_CONTENT_PROMPT_VERSION =
+  "lesson-content-subject-prompt-v7-declared-standard-notation";
 export const LESSON_CONTENT_SCHEMA_VERSION = "lesson-content-subject-schema-v6";
 export const LESSON_CONTENT_MAX_CONTEXT_TOKENS = 8_000;
 export const LESSON_CONTENT_MAX_OUTPUT_TOKENS = 12_000;
@@ -32,9 +33,7 @@ const mathAssessmentExampleSchema = z
   })
   .strict();
 
-const nonMathAssessmentExampleSchema = z
-  .object(assessmentExampleBaseShape)
-  .strict();
+const nonMathAssessmentExampleSchema = z.object(assessmentExampleBaseShape).strict();
 
 const commonTestQuestionFields = {
   difficulty: difficultySchema,
@@ -95,9 +94,7 @@ function buildQuestionUnion<T extends z.ZodRawShape>(commonFields: T) {
 }
 
 export const generatedTestQuestionSchema = buildQuestionUnion(commonTestQuestionFields);
-const generatedNonMathTestQuestionSchema = buildQuestionUnion(
-  nonMathTestQuestionFields,
-);
+const generatedNonMathTestQuestionSchema = buildQuestionUnion(nonMathTestQuestionFields);
 
 export const generatedTestOutputSchema = z
   .object({

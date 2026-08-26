@@ -42,6 +42,37 @@ describe("provider operations cost accounting", () => {
     expect(result.costVnd).toBe(12_125);
   });
 
+  it("prices GPT-5.6 cache writes at 1.25x regular input", () => {
+    const result = calculateProviderCost(
+      {
+        promptTokens: 1_000_000,
+        cachedInputTokens: 200_000,
+        cacheWriteInputTokens: 300_000,
+        completionTokens: 0,
+      },
+      [
+        rate(ProviderUsageMetric.INPUT_TOKEN, 1_000_000, 1),
+        rate(ProviderUsageMetric.CACHED_INPUT_TOKEN, 1_000_000, 0.1),
+      ],
+      25_000,
+    );
+
+    expect(result.costUsd).toBe(0.895);
+    expect(result.costVnd).toBe(22_375);
+  });
+
+  it("reserves the 1.25x worst case when every input token may be a cache write", () => {
+    const estimate = estimateProviderReservation(
+      { promptTokens: 1_000, cacheWriteInputTokens: 1_000 },
+      [rate(ProviderUsageMetric.INPUT_TOKEN, 1_000, 1)],
+      25_000,
+      [ProviderUsageMetric.INPUT_TOKEN],
+    );
+
+    expect(estimate.costUsd).toBe(1.25);
+    expect(estimate.costVnd).toBe(31_250);
+  });
+
   it("calculates page pricing and keeps zero-usage events free", () => {
     const rates = [rate(ProviderUsageMetric.PAGE, 1, 0.005)];
     expect(calculateProviderCost({ pages: 20 }, rates, 25_000)).toEqual({
@@ -179,13 +210,17 @@ describe("provider operations cost accounting", () => {
       usage: {
         promptTokens: 1_579,
         cachedInputTokens: 0,
+        cacheWriteInputTokens: 1_400,
         completionTokens: 1_930,
         reasoningTokens: 1_258,
         totalTokens: 3_509,
       },
       providerUsageRaw: {
         input_tokens: 1_579,
-        input_tokens_details: { cached_tokens: 0 },
+        input_tokens_details: {
+          cached_tokens: 0,
+          cache_write_tokens: 1_400,
+        },
         output_tokens: 1_930,
         output_tokens_details: { reasoning_tokens: 1_258 },
         total_tokens: 3_509,
@@ -247,6 +282,11 @@ describe("provider operations cost accounting", () => {
         outputName: "summary",
         promptVersion: "v1",
         schemaVersion: "v1",
+        promptCache: {
+          namespace: "ls",
+          keyEnabled: true,
+          retention: "in_memory",
+        },
       },
       z.object({ title: z.string() }),
     );
@@ -255,6 +295,15 @@ describe("provider operations cost accounting", () => {
       expect.objectContaining({ reasoningEffort: "xhigh" }),
       expect.anything(),
       AiProviderName.OPENAI,
+    );
+    expect(usage.reserveAndStart).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        usageUpperBound: expect.objectContaining({
+          promptTokens: 32_000,
+          cacheWriteInputTokens: 32_000,
+        }),
+      }),
     );
     expect(onResolvedRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -278,12 +327,16 @@ describe("provider operations cost accounting", () => {
       "usage-1",
       expect.objectContaining({
         promptTokens: 1_579,
+        cacheWriteInputTokens: 1_400,
         completionTokens: 1_930,
         totalTokens: 3_509,
         rawUsage: {
           providerUsage: {
             input_tokens: 1_579,
-            input_tokens_details: { cached_tokens: 0 },
+            input_tokens_details: {
+              cached_tokens: 0,
+              cache_write_tokens: 1_400,
+            },
             output_tokens: 1_930,
             output_tokens_details: { reasoning_tokens: 1_258 },
             total_tokens: 3_509,

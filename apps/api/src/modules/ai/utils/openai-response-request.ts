@@ -69,20 +69,26 @@ export function buildOpenAiStructuredResponseRequest<
   responseInput?: OpenAiResponseInput;
 }) {
   const { request, model, structuredTextFormat } = input;
+  const responseInput = input.responseInput ?? buildOpenAiResponseInput(request);
+  const promptCacheFields = model
+    ? buildOpenAiPromptCacheFields({
+        request,
+        model,
+        structuredTextFormat,
+      })
+    : {};
+  const usesExplicitPromptCache =
+    promptCacheFields.prompt_cache_options?.mode === "explicit";
   return {
     model,
-    instructions: request.systemPrompt,
-    input: input.responseInput ?? buildOpenAiResponseInput(request),
+    ...(usesExplicitPromptCache ? {} : { instructions: request.systemPrompt }),
+    input: usesExplicitPromptCache
+      ? buildExplicitPromptCacheInput(request.systemPrompt, responseInput)
+      : responseInput,
     text: {
       format: structuredTextFormat,
     },
-    ...(model
-      ? buildOpenAiPromptCacheFields({
-          request,
-          model,
-          structuredTextFormat,
-        })
-      : {}),
+    ...promptCacheFields,
     ...(model !== null &&
     request.temperature !== undefined &&
     supportsOpenAiTemperature(model)
@@ -93,4 +99,33 @@ export function buildOpenAiStructuredResponseRequest<
       : {}),
     ...(request.maxTokens === undefined ? {} : { max_output_tokens: request.maxTokens }),
   };
+}
+
+function buildExplicitPromptCacheInput(
+  systemPrompt: string,
+  responseInput: OpenAiResponseInput,
+): OpenAI.Responses.ResponseInput {
+  const dynamicInput: OpenAI.Responses.ResponseInput =
+    typeof responseInput === "string"
+      ? [
+          {
+            role: "user",
+            content: [{ type: "input_text", text: responseInput }],
+          },
+        ]
+      : responseInput;
+
+  return [
+    {
+      role: "developer",
+      content: [
+        {
+          type: "input_text",
+          text: systemPrompt,
+          prompt_cache_breakpoint: { mode: "explicit" },
+        },
+      ],
+    },
+    ...dynamicInput,
+  ];
 }

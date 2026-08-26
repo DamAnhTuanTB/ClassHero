@@ -313,11 +313,19 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   giữ reservation `UNCERTAIN` thay vì giải phóng như một lỗi trước-provider.
 - Với Summary và Quiz, log thêm `promptVersion`, `schemaVersion`, schema strategy
   requested/resolved, schema bytes,
-  `cachedInputTokens`, `uncachedInputTokens` và cache-hit ratio; không log raw
-  instructions, input, chunk hoặc cache key chứa dữ liệu người dùng.
+  `cachedInputTokens`, `cacheWriteInputTokens`, `uncachedInputTokens` và cache-hit
+  ratio; không log raw instructions, input, chunk hoặc cache key chứa dữ liệu
+  người dùng.
 - Prompt Caching chỉ giảm phần input bị tính phí/độ trễ theo policy provider,
   không giảm tổng token được gửi. UI và báo cáo phải tách tổng input khỏi cached
-  input để tránh hiểu sai việc tối ưu cache thành cắt dữ liệu nguồn.
+  input và cache-write input để tránh hiểu sai việc tối ưu cache thành cắt dữ
+  liệu nguồn. OpenAI GPT-5.6+ tính cache write bằng `1.25x` input thường và cache
+  read bằng cached-input rate; reservation trước call phải giữ trường hợp xấu
+  nhất `1.25x` cho toàn bộ input có thể được ghi cache.
+- Summary/Quiz trên GPT-5.6+ phải dùng explicit breakpoint chính xác ở cuối
+  system/developer prompt ổn định; mọi PDF, manifest, custom user request và dữ
+  liệu theo lesson đứng sau breakpoint. `prompt_cache_options` dùng TTL `30m`;
+  không gửi `prompt_cache_retention` deprecated cho nhóm model này.
 - Provider schema Summary và Quiz không lặp nguyên policy định dạng toàn cục trong
   từng field. Root schema giữ contract dùng chung; các field `solution` dùng một
   shared definition qua `$defs`/`$ref` để giữ conditioning riêng của lời giải mà

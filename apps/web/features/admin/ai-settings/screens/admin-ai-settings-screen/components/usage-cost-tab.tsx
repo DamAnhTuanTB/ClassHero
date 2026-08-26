@@ -579,9 +579,15 @@ export function UsageCostTab({
                             0,
                             selectedEvent.cachedInputTokens ?? 0,
                           );
+                          const cacheWriteTokens = Math.max(
+                            0,
+                            selectedEvent.cacheWriteInputTokens ?? 0,
+                          );
                           const uncachedPromptTokens = Math.max(
                             0,
-                            (selectedEvent.promptTokens ?? 0) - cachedTokens,
+                            (selectedEvent.promptTokens ?? 0) -
+                              cachedTokens -
+                              cacheWriteTokens,
                           );
                           return (
                             <>
@@ -643,6 +649,36 @@ export function UsageCostTab({
                               </tr>
                               <tr>
                                 <td className="px-4 py-3 text-[var(--theme-text-strong)]">
+                                  Cache-write Tokens
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
+                                  {new Intl.NumberFormat("vi-VN").format(
+                                    cacheWriteTokens,
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right text-[var(--theme-text-muted)]">
+                                  {selectedEvent.priceVersion?.rates?.find(
+                                    (r) => r.metric === "INPUT_TOKEN",
+                                  )
+                                    ? `$${(selectedEvent.priceVersion.rates.find((r) => r.metric === "INPUT_TOKEN")?.unitPriceUsd ?? 0) * 1.25} / ${new Intl.NumberFormat("vi-VN").format(selectedEvent.priceVersion.rates.find((r) => r.metric === "INPUT_TOKEN")?.unitSize ?? 1)}`
+                                    : "-"}
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
+                                  $
+                                  {(
+                                    (cacheWriteTokens *
+                                      (selectedEvent.priceVersion?.rates?.find(
+                                        (r) => r.metric === "INPUT_TOKEN",
+                                      )?.unitPriceUsd ?? 0) *
+                                      1.25) /
+                                    (selectedEvent.priceVersion?.rates?.find(
+                                      (r) => r.metric === "INPUT_TOKEN",
+                                    )?.unitSize ?? 1)
+                                  ).toFixed(6)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-3 text-[var(--theme-text-strong)]">
                                   Completion Tokens
                                 </td>
                                 <td className="px-4 py-3 font-semibold text-right text-[var(--theme-text-strong)]">
@@ -698,6 +734,15 @@ export function UsageCostTab({
                                       (selectedEvent.priceVersion?.rates?.find(
                                         (r) => r.metric === "CACHED_INPUT_TOKEN",
                                       )?.unitSize ?? 1);
+                                    const wRateUsd =
+                                      (cacheWriteTokens *
+                                        (selectedEvent.priceVersion?.rates?.find(
+                                          (r) => r.metric === "INPUT_TOKEN",
+                                        )?.unitPriceUsd ?? 0) *
+                                        1.25) /
+                                      (selectedEvent.priceVersion?.rates?.find(
+                                        (r) => r.metric === "INPUT_TOKEN",
+                                      )?.unitSize ?? 1);
                                     const oRateUsd =
                                       ((selectedEvent.completionTokens ?? 0) *
                                         (selectedEvent.priceVersion?.rates?.find(
@@ -711,7 +756,8 @@ export function UsageCostTab({
                                       <div className="flex flex-col items-end gap-0.5">
                                         <div className="text-xs font-normal text-[var(--theme-text-muted)] tracking-tight">
                                           = ${pRateUsd.toFixed(6)} + $
-                                          {cRateUsd.toFixed(6)} + ${oRateUsd.toFixed(6)}
+                                          {cRateUsd.toFixed(6)} + ${wRateUsd.toFixed(6)} +
+                                          ${oRateUsd.toFixed(6)}
                                         </div>
                                         <div className="text-base text-[var(--theme-primary)] mt-0.5">
                                           $

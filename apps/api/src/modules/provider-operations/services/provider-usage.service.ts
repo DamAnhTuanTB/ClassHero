@@ -154,6 +154,7 @@ export class ProviderUsageService {
           providerRequestId: input.providerRequestId,
           promptTokens: Math.max(0, input.promptTokens ?? 0),
           cachedInputTokens: Math.max(0, input.cachedInputTokens ?? 0),
+          cacheWriteInputTokens: Math.max(0, input.cacheWriteInputTokens ?? 0),
           completionTokens: Math.max(0, input.completionTokens ?? 0),
           totalTokens: Math.max(0, input.totalTokens ?? 0),
           pages: Math.max(0, input.pages ?? 0),
@@ -235,6 +236,10 @@ export class ProviderUsageService {
             ? {
                 promptTokens: Math.max(0, measuredUsage.promptTokens ?? 0),
                 cachedInputTokens: Math.max(0, measuredUsage.cachedInputTokens ?? 0),
+                cacheWriteInputTokens: Math.max(
+                  0,
+                  measuredUsage.cacheWriteInputTokens ?? 0,
+                ),
                 completionTokens: Math.max(0, measuredUsage.completionTokens ?? 0),
                 totalTokens: Math.max(0, measuredUsage.totalTokens ?? 0),
                 requestCount: 1,

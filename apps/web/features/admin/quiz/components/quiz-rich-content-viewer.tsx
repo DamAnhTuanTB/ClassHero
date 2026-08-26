@@ -3,7 +3,7 @@
 import katex from "katex";
 import "katex/contrib/mhchem";
 import "katex/dist/katex.min.css";
-import { tokenizeMathText } from "@learning-path/shared";
+import { normalizeMathTextLatexCommands, tokenizeMathText } from "@learning-path/shared";
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import type {
   TiptapJsonMark,
@@ -136,7 +136,7 @@ function renderRichContentNode(
 }
 
 function renderTextWithFallbackMath(text: string, marks: TiptapJsonMark[] | undefined) {
-  return tokenizeMathText(text).map((token, index) => (
+  return tokenizeMathText(normalizeMathTextLatexCommands(text)).map((token, index) => (
     <Fragment key={`${token.type}-${index}`}>
       {token.type === "text"
         ? renderTextMarks(token.value, marks)

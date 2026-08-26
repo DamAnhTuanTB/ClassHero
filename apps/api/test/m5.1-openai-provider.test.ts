@@ -357,7 +357,10 @@ describe("OpenAiProvider", () => {
         output_parsed: { status: "ok", value: 2 },
         usage: {
           input_tokens: 1_579,
-          input_tokens_details: { cached_tokens: 0 },
+          input_tokens_details: {
+            cached_tokens: 0,
+            cache_write_tokens: 1_400,
+          },
           output_tokens: 1_930,
           output_tokens_details: { reasoning_tokens: 1_258 },
           total_tokens: 3_509,
@@ -381,6 +384,11 @@ describe("OpenAiProvider", () => {
           promptVersion: "pdf-v1",
           schemaVersion: "pdf-v1",
           model: "gpt-5.6-terra",
+          promptCache: {
+            namespace: "ls",
+            keyEnabled: true,
+            retention: "24h",
+          },
         },
         schema,
       );
@@ -393,6 +401,16 @@ describe("OpenAiProvider", () => {
         expect.objectContaining({
           input: [
             {
+              role: "developer",
+              content: [
+                {
+                  type: "input_text",
+                  text: "Read the lesson packet.",
+                  prompt_cache_breakpoint: { mode: "explicit" },
+                },
+              ],
+            },
+            {
               role: "user",
               content: [
                 { type: "input_file", file_id: "file-packet-1", detail: "high" },
@@ -404,6 +422,8 @@ describe("OpenAiProvider", () => {
               ],
             },
           ],
+          prompt_cache_options: { mode: "explicit", ttl: "30m" },
+          prompt_cache_key: expect.any(String),
         }),
         { timeout: 600_000 },
       );
@@ -416,11 +436,20 @@ describe("OpenAiProvider", () => {
       ]);
       expect(result.providerUsageRaw).toEqual({
         input_tokens: 1_579,
-        input_tokens_details: { cached_tokens: 0 },
+        input_tokens_details: {
+          cached_tokens: 0,
+          cache_write_tokens: 1_400,
+        },
         output_tokens: 1_930,
         output_tokens_details: { reasoning_tokens: 1_258 },
         total_tokens: 3_509,
       });
+      expect(result.usage).toMatchObject({
+        promptTokens: 1_579,
+        cachedInputTokens: 0,
+        cacheWriteInputTokens: 1_400,
+      });
+      expect(mockResponsesParse.mock.calls[0]?.[0]).not.toHaveProperty("instructions");
     });
 
     it("deletes an owned PDF even when the provider request fails", async () => {

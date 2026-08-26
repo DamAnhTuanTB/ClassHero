@@ -19,12 +19,20 @@ export function ProviderUsageEventDetailsDialog({
   if (!event) return null;
 
   const cachedTokens = Math.max(0, event.cachedInputTokens ?? 0);
-  const uncachedPromptTokens = Math.max(0, (event.promptTokens ?? 0) - cachedTokens);
+  const cacheWriteTokens = Math.max(0, event.cacheWriteInputTokens ?? 0);
+  const uncachedPromptTokens = Math.max(
+    0,
+    (event.promptTokens ?? 0) - cachedTokens - cacheWriteTokens,
+  );
   const inputRate = findRate(event, "INPUT_TOKEN");
+  const cacheWriteInputRate = inputRate
+    ? { ...inputRate, unitPriceUsd: inputRate.unitPriceUsd * 1.25 }
+    : undefined;
   const cachedInputRate = findRate(event, "CACHED_INPUT_TOKEN");
   const outputRate = findRate(event, "OUTPUT_TOKEN");
   const pageRate = findRate(event, "PAGE");
   const inputCost = calculateRateCost(uncachedPromptTokens, inputRate);
+  const cacheWriteInputCost = calculateRateCost(cacheWriteTokens, cacheWriteInputRate);
   const cachedInputCost = calculateRateCost(cachedTokens, cachedInputRate);
   const outputCost = calculateRateCost(event.completionTokens ?? 0, outputRate);
   const pageCost = calculateRateCost(event.pages ?? 0, pageRate);
@@ -90,6 +98,12 @@ export function ProviderUsageEventDetailsDialog({
                         cost={cachedInputCost}
                         label="Cached Tokens"
                         rate={cachedInputRate}
+                      />
+                      <UsageCostRow
+                        amount={cacheWriteTokens}
+                        cost={cacheWriteInputCost}
+                        label="Cache-write Tokens"
+                        rate={cacheWriteInputRate}
                       />
                       <UsageCostRow
                         amount={event.completionTokens ?? 0}

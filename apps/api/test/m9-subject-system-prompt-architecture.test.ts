@@ -135,6 +135,76 @@ describe("subject-owned AI system prompt architecture", () => {
     }
   });
 
+  it("enforces logical derivation continuity in every Quiz and Summary subject prompt only", () => {
+    const subjectSpecificRules = {
+      MATH: ["độ dài dương", "khai căn"],
+      PHYSICS: ["đại lượng vật lí", "điều kiện vật lí"],
+      CHEMISTRY: ["đại lượng hóa học", "miền vật lí-hóa học"],
+      GENERAL: ["không ép nội dung thuần văn xuôi thành công thức", "phù hợp ngữ cảnh"],
+    } as const;
+
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const quiz = buildQuizSubjectSystemPrompt(snapshot);
+      const summary = buildLessonSummarySubjectSystemPrompt(subject);
+
+      for (const prompt of [quiz, summary]) {
+        expect(prompt).toContain("TÍNH LIÊN TỤC CỦA PHÉP BIẾN ĐỔI");
+        expect(prompt).toContain("quan hệ logic giữa các dòng");
+        expect(prompt).toContain("mỗi display chỉ có một dấu `=`");
+        expect(prompt).toContain("Counterexample hợp lệ");
+        expect(prompt).toContain("đối chiếu từng cặp dòng kề nhau");
+        for (const rule of subjectSpecificRules[subject.key]) {
+          expect(prompt).toContain(rule);
+        }
+      }
+
+      expect(summary).toContain("Với `SOURCE_EXACT`");
+
+      for (const figurePrompt of [
+        buildQuizFigureSystemPrompt(snapshot, "QUESTION"),
+        buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK"),
+      ]) {
+        expect(figurePrompt).not.toContain("TÍNH LIÊN TỤC CỦA PHÉP BIẾN ĐỔI");
+      }
+    }
+  });
+
+  it("declares and stabilizes standard notation in every learner-facing text prompt only", () => {
+    const subjectSpecificRules = {
+      MATH: ["công thức Toán", "đơn vị hoặc miền giá trị"],
+      PHYSICS: ["công thức Vật lý", "vật/hệ hoặc mốc/chiều"],
+      CHEMISTRY: ["công thức Hóa học", "chất/đối tượng nào", "chỉ số phân biệt"],
+      GENERAL: ["ký hiệu chuẩn của domain", "nội dung thuần văn xuôi"],
+    } as const;
+
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const quiz = buildQuizSubjectSystemPrompt(snapshot);
+      const summary = buildLessonSummarySubjectSystemPrompt(subject);
+
+      for (const prompt of [quiz, summary]) {
+        expect(prompt).toContain("KHAI BÁO VÀ ỔN ĐỊNH KÝ HIỆU");
+        expect(prompt).toContain("giới thiệu đúng một lần trước lần dùng đầu tiên");
+        expect(prompt).toContain("Gọi $q$ là ...");
+        expect(prompt).toContain("Counterexample hợp lệ");
+        expect(prompt).toContain("rà từng ký hiệu ở lần xuất hiện đầu tiên");
+        for (const rule of subjectSpecificRules[subject.key]) {
+          expect(prompt).toContain(rule);
+        }
+      }
+
+      expect(summary).toContain("Với `SOURCE_EXACT`");
+
+      for (const figurePrompt of [
+        buildQuizFigureSystemPrompt(snapshot, "QUESTION"),
+        buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK"),
+      ]) {
+        expect(figurePrompt).not.toContain("KHAI BÁO VÀ ỔN ĐỊNH KÝ HIỆU");
+      }
+    }
+  });
+
   it("keeps Quiz refinement prompts dedicated, concise and isolated by subject", () => {
     const uniqueRules = {
       MATH: [

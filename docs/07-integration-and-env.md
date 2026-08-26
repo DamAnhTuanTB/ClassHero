@@ -87,7 +87,7 @@ OPENAI_EMBEDDING_DIMENSIONS=1536
 AI_SUMMARY_SCHEMA_REFERENCE_STRATEGY=ref_v2
 # Stable cache routing không thay prompt/context
 AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=false
-# in_memory | 24h; 24h chỉ được gửi khi model hỗ trợ
+# in_memory | 24h; GPT-5.6+ luôn dùng explicit breakpoint TTL 30m
 AI_SUMMARY_PROMPT_CACHE_RETENTION=in_memory
 AI_QUIZ_SCHEMA_REFERENCE_STRATEGY=ref_v2
 AI_QUIZ_PROMPT_CACHE_KEY_ENABLED=true
@@ -321,14 +321,18 @@ Dùng phụ cho:
   output hợp lệ, Zod parser và pipeline sau provider; đổi strategy không cần
   migration hoặc regenerate Summary.
 - `AI_SUMMARY_PROMPT_CACHE_KEY_ENABLED=true` gửi stable `prompt_cache_key` riêng
-  cho Summary. `AI_SUMMARY_PROMPT_CACHE_RETENTION=24h` chỉ gửi extended retention
-  cho model đã whitelist capability; mặc định `in_memory` omit provider field.
-  Mọi thay đổi strategy hoặc cấu hình cache cần restart API và worker.
+  cho Summary. Với GPT-5.6+, backend luôn dùng explicit breakpoint ở cuối system
+  prompt ổn định và `prompt_cache_options` TTL `30m`; giá trị retention env không
+  gửi field legacy. Với model cũ, `AI_SUMMARY_PROMPT_CACHE_RETENTION=24h` chỉ gửi
+  extended retention khi model đã whitelist capability; mặc định `in_memory`
+  omit provider field. Mọi thay đổi strategy hoặc cấu hình cache cần restart API
+  và worker.
 - `AI_QUIZ_SCHEMA_REFERENCE_STRATEGY` được khóa ở `ref_v2`. Không dùng `auto`;
   request draft và worker vẫn kiểm cùng schema/hash trước khi gọi provider.
 - `AI_QUIZ_PROMPT_CACHE_KEY_ENABLED=true` gửi stable cache routing key namespace
   Quiz. `AI_QUIZ_PROMPT_CACHE_RETENTION` có cùng `in_memory | 24h` và capability
-  guard như Summary. Prompt cache không cache output và không đổi prompt/PDF.
+  guard legacy như Summary; GPT-5.6+ dùng explicit breakpoint TTL `30m`. Prompt
+  cache không cache output và không đổi prompt/PDF.
 - Log `ai_generations`.
 - `AI_PROVIDER_TIMEOUT_MS` giới hạn các provider request ngắn như embedding.
 - `AI_GENERATION_TIMEOUT_MS` giới hạn riêng request sinh text/structured output dài;

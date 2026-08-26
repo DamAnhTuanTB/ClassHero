@@ -13,6 +13,8 @@ export const LESSON_CONTENT_COMMON_SYSTEM_PROMPT = [
   "Đáp án đánh giá và example.answer/solution phải nhất quán tuyệt đối.",
   "Pipeline Test hiện không sinh hình; không trả TeX/TikZ, diagramSpec, SVG, HTML, script hay URL ảnh.",
   "Mọi quy tắc chuyên môn phải lấy từ đúng hồ sơ môn học của khóa hiện tại.",
+  "Trong `example.problem`/`example.solution` của Test và `back`/`explanation` của Flashcard, ưu tiên ký hiệu đã dùng trong nguồn; nếu nguồn không quy định thì dùng ký hiệu chuẩn gắn với công thức hoặc quy ước thông dụng của đúng môn. Mỗi ký hiệu mới do nội dung hiện tại tạo ra và chưa được ràng buộc trong đề, mặt trước hoặc ngữ cảnh trực tiếp phải được giới thiệu đúng một lần trước lần dùng đầu tiên, nêu rõ đại lượng/đối tượng và đơn vị hay chỉ số phân biệt khi cần; sau đó giữ nguyên một ý nghĩa xuyên suốt.",
+  "Không định nghĩa lại ký hiệu đã được đề hoặc mặt trước giới thiệu rõ, hằng số/toán tử/đơn vị chuẩn phù hợp khối lớp, tên điểm/đối tượng đã nêu hay công thức hóa học chuẩn. Mặt trước Flashcard được phép hỏi chính ý nghĩa của một ký hiệu; khi đó không tiết lộ định nghĩa ở mặt trước mà trả lời ở `back`, còn `explanation` chỉ phải khai báo các ký hiệu phụ mới của nó. Counterexample hợp lệ: một lời giải không tạo ký hiệu phụ thì trình bày trực tiếp bằng tên đại lượng, không bị ép đặt biến.",
   "Giữ LaTeX khi cần và trả đúng structured output, không thêm field ngoài schema.",
 ].join(" ");
 
@@ -55,24 +57,16 @@ export function buildTestPrompt(input: {
   return appendSubjectBoundary(lines.join("\n"), input.subject);
 }
 
-export function buildLessonContentSystemPrompt(
-  subject: LessonSummarySubjectSnapshot,
-) {
+export function buildLessonContentSystemPrompt(subject: LessonSummarySubjectSnapshot) {
   return [
     LESSON_CONTENT_COMMON_SYSTEM_PROMPT,
     buildLessonContentSubjectProfile(subject),
   ].join("\n\n");
 }
 
-function appendSubjectBoundary(
-  value: string,
-  subject: LessonSummarySubjectSnapshot,
-) {
+function appendSubjectBoundary(value: string, subject: LessonSummarySubjectSnapshot) {
   return [
-    stripRequiredPromptBlock(
-      value,
-      "### PHẠM VI MÔN HỌC KHÔNG ĐƯỢC GHI ĐÈ",
-    ),
+    stripRequiredPromptBlock(value, "### PHẠM VI MÔN HỌC KHÔNG ĐƯỢC GHI ĐÈ"),
     "### PHẠM VI MÔN HỌC KHÔNG ĐƯỢC GHI ĐÈ",
     `Khóa hiện tại thuộc môn ${subject.name} (${subject.key}). Chỉ xử lý môn này và không áp dụng thuật ngữ hoặc quy ước chuyên môn của môn khác.`,
   ].join("\n\n");

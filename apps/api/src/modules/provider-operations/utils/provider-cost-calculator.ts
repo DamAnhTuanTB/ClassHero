@@ -14,16 +14,19 @@ export type ProviderReservationEstimate = ProviderCostResult & {
   missingMetrics: ProviderUsageMetric[];
 };
 
+const OPENAI_EXPLICIT_CACHE_WRITE_INPUT_MULTIPLIER = 1.25;
+
 export function calculateProviderCost(
   usage: ProviderUsageAmounts,
   rates: PriceRateSnapshot[],
   fxRateVndPerUsd: number,
 ): ProviderCostResult {
-  const cachedTokens = Math.max(0, usage.cachedInputTokens ?? 0);
-  const billableInputTokens = Math.max(0, (usage.promptTokens ?? 0) - cachedTokens);
+  const inputAmounts = resolveInputTokenAmounts(usage);
   const amounts: Record<ProviderUsageMetric, number> = {
-    [ProviderUsageMetric.INPUT_TOKEN]: billableInputTokens,
-    [ProviderUsageMetric.CACHED_INPUT_TOKEN]: cachedTokens,
+    [ProviderUsageMetric.INPUT_TOKEN]:
+      inputAmounts.uncachedTokens +
+      inputAmounts.cacheWriteTokens * OPENAI_EXPLICIT_CACHE_WRITE_INPUT_MULTIPLIER,
+    [ProviderUsageMetric.CACHED_INPUT_TOKEN]: inputAmounts.cachedTokens,
     [ProviderUsageMetric.OUTPUT_TOKEN]: Math.max(0, usage.completionTokens ?? 0),
     [ProviderUsageMetric.PAGE]: Math.max(0, usage.pages ?? 0),
     [ProviderUsageMetric.REQUEST]: Math.max(0, usage.requestCount ?? 1),
@@ -57,12 +60,12 @@ export function estimateProviderReservation(
   fxRateVndPerUsd: number,
   requiredMetrics: ProviderUsageMetric[],
 ): ProviderReservationEstimate {
+  const inputAmounts = resolveInputTokenAmounts(usageUpperBound);
   const amounts: Record<ProviderUsageMetric, number> = {
-    [ProviderUsageMetric.INPUT_TOKEN]: Math.max(0, usageUpperBound.promptTokens ?? 0),
-    [ProviderUsageMetric.CACHED_INPUT_TOKEN]: Math.max(
-      0,
-      usageUpperBound.cachedInputTokens ?? 0,
-    ),
+    [ProviderUsageMetric.INPUT_TOKEN]:
+      inputAmounts.uncachedTokens +
+      inputAmounts.cacheWriteTokens * OPENAI_EXPLICIT_CACHE_WRITE_INPUT_MULTIPLIER,
+    [ProviderUsageMetric.CACHED_INPUT_TOKEN]: inputAmounts.cachedTokens,
     [ProviderUsageMetric.OUTPUT_TOKEN]: Math.max(
       0,
       usageUpperBound.completionTokens ?? 0,
@@ -92,5 +95,19 @@ export function estimateProviderReservation(
     costUsd: roundUsd(costUsd),
     costVnd: Math.max(0, Math.ceil(costUsd * fxRateVndPerUsd)),
     missingMetrics,
+  };
+}
+
+function resolveInputTokenAmounts(usage: ProviderUsageAmounts) {
+  const promptTokens = Math.max(0, usage.promptTokens ?? 0);
+  const cachedTokens = Math.min(promptTokens, Math.max(0, usage.cachedInputTokens ?? 0));
+  const cacheWriteTokens = Math.min(
+    promptTokens - cachedTokens,
+    Math.max(0, usage.cacheWriteInputTokens ?? 0),
+  );
+  return {
+    cachedTokens,
+    cacheWriteTokens,
+    uncachedTokens: Math.max(0, promptTokens - cachedTokens - cacheWriteTokens),
   };
 }

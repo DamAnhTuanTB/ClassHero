@@ -167,7 +167,7 @@ function findMatchingBrace(value: string, openBraceIndex: number) {
  * Learner-facing prose outside math is intentionally preserved verbatim.
  */
 export function normalizeMathTextLatexCommands(value: string) {
-  return value.replace(
+  return normalizeEscapedMathClosers(value).replace(
     MATH_DELIMITER_PATTERN,
     (
       _match,
@@ -188,4 +188,84 @@ export function normalizeMathTextLatexCommands(value: string) {
       return `$${normalizeLatexCommandBackslashes(dollarInline ?? "")}$`;
     },
   );
+}
+
+/**
+ * Repairs an accidental escape before a closing math delimiter. Providers can
+ * emit `\$`/`\$$` where the backslash was meant for the preceding LaTeX command;
+ * only an active math span followed by a closing boundary is repaired so prose
+ * currency escapes remain untouched.
+ */
+export function normalizeEscapedMathClosers(value: string) {
+  let normalized = "";
+  let cursor = 0;
+  let codeDelimiterLength = 0;
+  let mathDelimiterLength = 0;
+
+  while (cursor < value.length) {
+    const character = value[cursor]!;
+
+    if (character === "`") {
+      const delimiterLength = countRepeatedCharacter(value, cursor, "`");
+      if (codeDelimiterLength === 0) {
+        codeDelimiterLength = delimiterLength;
+      } else if (codeDelimiterLength === delimiterLength) {
+        codeDelimiterLength = 0;
+      }
+      normalized += value.slice(cursor, cursor + delimiterLength);
+      cursor += delimiterLength;
+      continue;
+    }
+
+    if (codeDelimiterLength > 0) {
+      normalized += character;
+      cursor += 1;
+      continue;
+    }
+
+    if (character === "\\") {
+      const escapedDelimiterLength = countRepeatedCharacter(value, cursor + 1, "$");
+      if (
+        mathDelimiterLength > 0 &&
+        escapedDelimiterLength === mathDelimiterLength &&
+        isMathClosingBoundary(value[cursor + 1 + escapedDelimiterLength])
+      ) {
+        normalized += "$".repeat(escapedDelimiterLength);
+        mathDelimiterLength = 0;
+        cursor += escapedDelimiterLength + 1;
+        continue;
+      }
+
+      normalized += value.slice(cursor, cursor + Math.min(2, value.length - cursor));
+      cursor += Math.min(2, value.length - cursor);
+      continue;
+    }
+
+    if (character === "$") {
+      const delimiterLength = Math.min(countRepeatedCharacter(value, cursor, "$"), 2);
+      if (mathDelimiterLength === 0) {
+        mathDelimiterLength = delimiterLength;
+      } else if (mathDelimiterLength === delimiterLength) {
+        mathDelimiterLength = 0;
+      }
+      normalized += "$".repeat(delimiterLength);
+      cursor += delimiterLength;
+      continue;
+    }
+
+    normalized += character;
+    cursor += 1;
+  }
+
+  return normalized;
+}
+
+function countRepeatedCharacter(value: string, start: number, character: string) {
+  let end = start;
+  while (value[end] === character) end += 1;
+  return end - start;
+}
+
+function isMathClosingBoundary(character: string | undefined) {
+  return character === undefined || /[\s.,;:!?)]/u.test(character);
 }

@@ -47,9 +47,10 @@ price-version API không nhận hai field này.
 - Với usage event AI mới, `rawUsageJson` là audit envelope gồm
   `providerUsage` giữ nguyên object usage do provider trả và `fileOperations`
   chứa metadata upload/xóa file tạm của backend. Các cột `promptTokens`,
-  `cachedInputTokens`, `completionTokens` và `totalTokens` vẫn là dữ liệu đã
-  chuẩn hóa dùng để tính phí. Record lịch sử dạng phẳng vẫn được API trả nguyên
-  để bảo toàn khả năng đọc dữ liệu cũ.
+  `cachedInputTokens`, `cacheWriteInputTokens`, `completionTokens` và
+  `totalTokens` vẫn là dữ liệu đã chuẩn hóa dùng để tính phí. Cache-write token
+  của OpenAI GPT-5.6+ được tính theo `1.25x` input rate. Record lịch sử dạng phẳng
+  vẫn được API trả nguyên để bảo toàn khả năng đọc dữ liệu cũ.
 - Usage event AI trả thêm `purpose: TEXT | IMAGE | null`; UI dùng field này để
   phân biệt Phase 1 tạo nội dung và Phase 2 tạo hình. Event lịch sử có thể là
   `null`.

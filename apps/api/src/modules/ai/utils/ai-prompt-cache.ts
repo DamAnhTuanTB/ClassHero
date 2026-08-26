@@ -4,6 +4,10 @@ import type { AiStructuredInput } from "#api/modules/ai/types/ai-text.types";
 
 type OpenAiPromptCacheFields = {
   prompt_cache_key?: string;
+  prompt_cache_options?: {
+    mode: "explicit";
+    ttl: "30m";
+  };
   prompt_cache_retention?: "24h";
 };
 
@@ -38,6 +42,14 @@ export function buildOpenAiPromptCacheFields(input: {
     fields.prompt_cache_key = [namespace, modelHash, contractHash, prefixHash].join(":");
   }
 
+  if (supportsOpenAiExplicitPromptCaching(input.model)) {
+    fields.prompt_cache_options = {
+      mode: "explicit",
+      ttl: "30m",
+    };
+    return fields;
+  }
+
   if (
     configuration.retention === "24h" &&
     supportsOpenAiExtendedPromptCacheRetention(input.model)
@@ -49,9 +61,17 @@ export function buildOpenAiPromptCacheFields(input: {
 }
 
 /**
- * Keep this deliberately conservative. GPT-5.4 is the pinned Summary model and
- * uses the pre-GPT-5.6 retention contract documented by OpenAI.
+ * GPT-5.6+ supports exact cache boundaries and the new 30-minute TTL contract.
  */
+export function supportsOpenAiExplicitPromptCaching(model: string) {
+  const match = model.toLowerCase().match(/^gpt-(\d+)\.(\d+)(?:-|$)/u);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > 5 || (major === 5 && minor >= 6);
+}
+
+/** Legacy extended-retention field used only before GPT-5.6. */
 export function supportsOpenAiExtendedPromptCacheRetention(model: string) {
   return /^gpt-5\.4(?:-|$)/u.test(model.toLowerCase());
 }

@@ -2,6 +2,7 @@ import type {
   AiGenerationType,
   AiModelPurpose,
   AiProviderName,
+  Prisma,
   ProviderCatalogCategory,
   ProviderUsageMetric,
 } from "@prisma/client";
@@ -22,7 +23,7 @@ export type ProviderRouteCandidate = {
   model: string;
   maxInputTokens: number | null;
   available: boolean;
-  capabilitiesJson?: any;
+  capabilitiesJson?: Prisma.JsonValue | null;
   rates: PriceRateSnapshot[];
 };
 
@@ -42,6 +43,7 @@ export type AiFeatureRoute = {
 export type ProviderUsageAmounts = {
   promptTokens?: number;
   cachedInputTokens?: number;
+  cacheWriteInputTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
   pages?: number;

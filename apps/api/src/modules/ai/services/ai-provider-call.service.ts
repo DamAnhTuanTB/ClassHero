@@ -5,9 +5,9 @@ import {
   type AiReasoningEffort,
 } from "@learning-path/shared";
 import {
+  AiProviderName,
   ProviderUsageMetric,
   type AiGenerationType,
-  type AiProviderName,
 } from "@prisma/client";
 import { createHash } from "node:crypto";
 
@@ -28,6 +28,7 @@ import {
   resolveAiStructuredTextFormat,
 } from "#api/modules/ai/utils/ai-structured-output-format";
 import { calculateProviderCost } from "#api/modules/provider-operations/utils/provider-cost-calculator";
+import { supportsOpenAiExplicitPromptCaching } from "#api/modules/ai/utils/ai-prompt-cache";
 
 export type ResolvedAiStructuredRequestTrace = {
   provider: AiProviderName;
@@ -149,10 +150,15 @@ export class AiProviderCallService {
       pricedMetrics.has(metric),
     );
     const maxOutputTokens = trace.maxOutputTokens ?? 0;
+    const inputUsageUpperBound = buildInputUsageUpperBound({
+      candidate,
+      input: resolvedInput,
+      promptTokens: inputTokenEstimate.estimatedTokens,
+    });
     const inputCost = canEstimateCost
       ? calculateProviderCost(
           {
-            promptTokens: inputTokenEstimate.estimatedTokens,
+            ...inputUsageUpperBound,
             completionTokens: 0,
             requestCount: 1,
           },
@@ -170,7 +176,7 @@ export class AiProviderCallService {
     const totalCost = canEstimateCost
       ? calculateProviderCost(
           {
-            promptTokens: inputTokenEstimate.estimatedTokens,
+            ...inputUsageUpperBound,
             completionTokens: maxOutputTokens,
             requestCount: 1,
           },
@@ -269,7 +275,11 @@ export class AiProviderCallService {
             candidate.catalogItemId ?? candidate.model,
           ].join(":"),
           usageUpperBound: {
-            promptTokens: maxInputTokens ?? 0,
+            ...buildInputUsageUpperBound({
+              candidate,
+              input: resolvedInput,
+              promptTokens: maxInputTokens ?? 0,
+            }),
             completionTokens: maxOutputTokens ?? 0,
           },
           rates: candidate.rates,
@@ -295,6 +305,7 @@ export class AiProviderCallService {
         const recorded = await this.usage.succeed(usageEvent.id, {
           promptTokens: usage?.promptTokens,
           cachedInputTokens: usage?.cachedInputTokens,
+          cacheWriteInputTokens: usage?.cacheWriteInputTokens,
           completionTokens: usage?.completionTokens,
           totalTokens: usage?.totalTokens,
           providerRequestId: output.providerRequestId,
@@ -352,6 +363,21 @@ export class AiProviderCallService {
     });
     return setting?.fxRateVndPerUsd.toNumber() ?? 25_000;
   }
+}
+
+function buildInputUsageUpperBound(input: {
+  candidate: AiFeatureRoute["candidates"][number];
+  input: AiStructuredInput;
+  promptTokens: number;
+}) {
+  return {
+    promptTokens: input.promptTokens,
+    ...(input.candidate.provider === AiProviderName.OPENAI &&
+    input.input.promptCache &&
+    supportsOpenAiExplicitPromptCaching(input.candidate.model)
+      ? { cacheWriteInputTokens: input.promptTokens }
+      : {}),
+  };
 }
 
 function estimateImageInputTokens(detail: string | null) {

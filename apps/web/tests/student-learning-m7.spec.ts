@@ -981,6 +981,15 @@ test("lesson summary and quiz reveal feedback only after explicit actions", asyn
   await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
 
   await expect(page.getByText("Chính xác!")).toBeVisible();
+  const correctOptionColors = await secondOption.evaluate((button) => {
+    const content = button.querySelector<HTMLElement>(".tiptap-content-view");
+    return {
+      button: getComputedStyle(button).color,
+      content: content ? getComputedStyle(content).color : null,
+    };
+  });
+  expect(correctOptionColors.content).not.toBeNull();
+  expect(correctOptionColors.content).not.toBe(correctOptionColors.button);
   expect(perQuestionCheckRequests).toHaveLength(0);
   await expect(incompleteAlert).toHaveCount(0);
   await expect(page.getByText("Cộng hai với hai được bốn.")).toHaveCount(0);

@@ -163,6 +163,7 @@ export type UsageEvent = {
   pages: number;
   promptTokens: number;
   cachedInputTokens: number;
+  cacheWriteInputTokens: number;
   completionTokens: number;
   estimatedCostUsd: number;
   fxRateVndPerUsd: number;

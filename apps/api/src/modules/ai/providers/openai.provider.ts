@@ -233,7 +233,11 @@ export class OpenAiProvider implements AiProvider {
       const usage = toTokenUsage(response.usage);
       if (usage?.promptTokens !== undefined) {
         const cachedTokens = usage.cachedInputTokens ?? 0;
-        const uncachedTokens = Math.max(0, usage.promptTokens - cachedTokens);
+        const cacheWriteTokens = usage.cacheWriteInputTokens ?? 0;
+        const uncachedTokens = Math.max(
+          0,
+          usage.promptTokens - cachedTokens - cacheWriteTokens,
+        );
         const hitRatio = usage.promptTokens === 0 ? 0 : cachedTokens / usage.promptTokens;
         this.logger.debug(
           `[PROMPT_CACHE] output=${input.outputName} model=${response.model ?? modelToUse} ` +
@@ -242,7 +246,8 @@ export class OpenAiProvider implements AiProvider {
             `resolvedStrategy=${structuredTextFormatResolution.resolvedReferenceStrategy} ` +
             `schemaBytes=${structuredTextFormatResolution.schemaBytes} ` +
             `input=${usage.promptTokens} ` +
-            `cached=${cachedTokens} uncached=${uncachedTokens} ` +
+            `cached=${cachedTokens} cacheWrite=${cacheWriteTokens} ` +
+            `uncached=${uncachedTokens} ` +
             `hitRatio=${hitRatio.toFixed(4)}`,
         );
       }
@@ -354,7 +359,10 @@ function toTokenUsage(
         input_tokens: number;
         output_tokens: number;
         total_tokens: number;
-        input_tokens_details?: { cached_tokens?: number } | null;
+        input_tokens_details?: {
+          cached_tokens?: number;
+          cache_write_tokens?: number;
+        } | null;
         output_tokens_details?: { reasoning_tokens?: number } | null;
       }
     | null
@@ -367,6 +375,7 @@ function toTokenUsage(
   return {
     promptTokens: usage.input_tokens,
     cachedInputTokens: usage.input_tokens_details?.cached_tokens,
+    cacheWriteInputTokens: usage.input_tokens_details?.cache_write_tokens,
     completionTokens: usage.output_tokens,
     reasoningTokens: usage.output_tokens_details?.reasoning_tokens,
     totalTokens: usage.total_tokens,
