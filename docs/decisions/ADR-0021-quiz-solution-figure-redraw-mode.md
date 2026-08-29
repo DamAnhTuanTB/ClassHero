@@ -1,7 +1,7 @@
 # ADR-0021 - Vẽ lại hình lời giải Quiz thành mô hình toán học
 
 Date: 2026-08-24
-Status: Accepted
+Status: Superseded by ADR-0024
 
 ## Context
 

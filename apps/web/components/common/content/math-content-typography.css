@@ -14,3 +14,8 @@
   color: inherit;
   font-size: var(--learning-content-math-optical-size) !important;
 }
+
+/* Bold headings opt in so KaTeX follows the surrounding title weight. */
+.math-content-typography--inherit-math-weight .katex {
+  font-weight: inherit;
+}

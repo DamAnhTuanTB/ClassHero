@@ -2,7 +2,7 @@ const LEADING_NOTE_LABEL_PATTERN =
   /^\s*(?:(?:\*\*|__)\s*)?(?:chú\s*ý|lưu\s*ý|nhận\s*xét)(?:\s+\d+)?\s*(?:rằng\b\s*)?(?:[:：,.;\-–—]\s*)?(?:(?:\*\*|__)\s*)?(?:[:：,.;\-–—]\s*)?/iu;
 
 const MATH_DELIMITER_PATTERN =
-  /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|(?<!\\)\$(?!\$)([^$\n]+?)(?<!\\)\$(?!\$)/gu;
+  /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|(?<!\\)\$(?!\$)((?:\\.|[^$\\\n])+?)(?<!\\)\$(?!\$)/gu;
 
 export type MathTextToken =
   { type: "text"; value: string } | { type: "math"; display: boolean; latex: string };

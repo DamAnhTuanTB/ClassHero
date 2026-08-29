@@ -3,7 +3,7 @@
 import { AI_REASONING_EFFORT_LEVELS, isAiReasoningEffort } from "@learning-path/shared";
 import { Bot, Eye, EyeOff, Loader2, Pencil, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { OptionField } from "@/components/common/forms/option-field";
@@ -23,6 +23,7 @@ import {
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import type {
   AdminQuizFigure,
+  AdminQuizFigureAiTargetMode,
   AdminQuizFigureCreateAiInput,
   AdminQuizFigureCreateAiPreview,
 } from "@/features/admin/quiz/api/admin-quiz-api";
@@ -55,22 +56,61 @@ const REQUEST_PREVIEW_TABS: Array<{ value: RequestPreviewTab; label: string }> =
 ];
 
 export function AdminQuizFigureAiDialog({
-  figure,
+  figure: providedFigure,
   isOpen,
   onClose,
   questionId,
+  questionFigure = null,
   setId,
+  targetMode,
 }: {
-  figure: AdminQuizFigure;
+  figure: AdminQuizFigure | null;
   isOpen: boolean;
   onClose: () => void;
   questionId: string;
+  questionFigure?: AdminQuizFigure | null;
   setId: string;
+  targetMode?: AdminQuizFigureAiTargetMode;
 }) {
+  const emptyFigure = useMemo(
+    () => createEmptyFigure(targetMode ?? "QUESTION"),
+    [targetMode],
+  );
+  const figure = providedFigure ?? emptyFigure;
   const mutations = useAdminQuizFigureMutations(setId);
-  const createMutation = mutations.createWithAi;
-  const previewMutation = mutations.previewWithAi;
-  const mutatePreview = previewMutation.mutateAsync;
+  const createMutation = targetMode
+    ? mutations.createForQuestionWithAi
+    : mutations.createWithAi;
+  const previewMutation = targetMode
+    ? mutations.previewForQuestionWithAi
+    : mutations.previewWithAi;
+  const previewForQuestionWithAi = mutations.previewForQuestionWithAi.mutateAsync;
+  const previewWithAi = mutations.previewWithAi.mutateAsync;
+  const mutatePreview = useCallback(
+    (input: AdminQuizFigureCreateAiInput) =>
+      targetMode
+        ? previewForQuestionWithAi({
+            questionId,
+            targetMode,
+            targetFigure: providedFigure,
+            questionFigure,
+            ...input,
+          })
+        : previewWithAi({
+            questionId,
+            figure,
+            ...input,
+          }),
+    [
+      figure,
+      previewForQuestionWithAi,
+      previewWithAi,
+      providedFigure,
+      questionFigure,
+      questionId,
+      targetMode,
+    ],
+  );
   const resetPreview = previewMutation.reset;
   const [isMounted, setIsMounted] = useState(false);
   const [mode, setMode] = useState<AiMode>("REGENERATE");
@@ -100,7 +140,7 @@ export function AdminQuizFigureAiDialog({
       const sequence = ++previewSequenceRef.current;
       setIsPreviewPending(true);
       try {
-        const data = await mutatePreview({ questionId, figure, ...input });
+        const data = await mutatePreview(input);
         if (sequence !== previewSequenceRef.current) return null;
         setPreviewData(data);
         setPreviewInputKey(createPreviewInputKey(input));
@@ -127,7 +167,7 @@ export function AdminQuizFigureAiDialog({
         if (sequence === previewSequenceRef.current) setIsPreviewPending(false);
       }
     },
-    [figure, mutatePreview, questionId],
+    [figure.id, mutatePreview],
   );
 
   useEffect(() => setIsMounted(true), []);
@@ -202,8 +242,9 @@ export function AdminQuizFigureAiDialog({
       )
     : null;
   const canEditCurrent = Boolean(
-    figure.currentRevision?.sourceKind === "AI_TEX" &&
-    figure.currentRevision.latexSource?.trim(),
+    providedFigure?.currentRevision?.sourceKind === "AI_TEX" &&
+    providedFigure.currentRevision.latexSource?.trim() &&
+    (!targetMode || targetMode === "QUESTION" || targetMode === "SOLUTION"),
   );
 
   async function handleDataAction() {
@@ -218,11 +259,25 @@ export function AdminQuizFigureAiDialog({
 
   async function create() {
     try {
-      await createMutation.mutateAsync({ questionId, figure, ...currentInput });
+      if (targetMode) {
+        await mutations.createForQuestionWithAi.mutateAsync({
+          questionId,
+          targetMode,
+          targetFigure: providedFigure,
+          questionFigure,
+          ...currentInput,
+        });
+      } else {
+        await mutations.createWithAi.mutateAsync({
+          questionId,
+          figure,
+          ...currentInput,
+        });
+      }
       toast.success(
         mode === "EDIT_CURRENT"
           ? "Đã bắt đầu chỉnh sửa hình Quiz hiện tại bằng AI."
-          : "Đã bắt đầu tạo mới lại hình Quiz bằng AI.",
+          : `Đã bắt đầu ${targetMode ? targetModeLabel(targetMode).toLowerCase() : "tạo mới lại hình Quiz"} bằng AI.`,
       );
       onClose();
     } catch (error) {
@@ -263,13 +318,15 @@ export function AdminQuizFigureAiDialog({
         <header className="theme-dialog-header flex min-h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-extrabold text-[var(--theme-text-strong)]">
-              Tạo mới hình bằng AI
+              {targetMode ? targetModeLabel(targetMode) : "Tạo mới hình bằng AI"}
             </h2>
             <p className="line-clamp-1 text-xs text-[var(--theme-text-muted)]">
               <StemFigureMathText
                 value={
-                  figure.currentRevision?.caption ??
-                  "Tạo một phiên bản hình mới cho câu Quiz"
+                  providedFigure?.currentRevision?.caption ??
+                  (targetMode
+                    ? targetModeDescription(targetMode)
+                    : "Tạo một phiên bản hình mới cho câu Quiz")
                 }
               />
             </p>
@@ -326,12 +383,12 @@ export function AdminQuizFigureAiDialog({
               ))}
             </div>
             {mode === "EDIT_CURRENT" &&
-            figure.currentRevision?.deliveryFile?.publicUrl ? (
+            providedFigure?.currentRevision?.deliveryFile?.publicUrl ? (
               <div className="mt-3 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-white p-3">
                 <img
-                  alt={figure.currentRevision.altText}
+                  alt={providedFigure.currentRevision.altText}
                   className="mx-auto max-h-72 w-full object-contain"
-                  src={figure.currentRevision.deliveryFile.publicUrl}
+                  src={providedFigure.currentRevision.deliveryFile.publicUrl}
                 />
               </div>
             ) : null}
@@ -661,6 +718,35 @@ function emptyPreviewInput(mode: AiMode): AdminQuizFigureCreateAiInput {
     systemPrompt: null,
     userPrompt: null,
   };
+}
+
+function createEmptyFigure(targetMode: AdminQuizFigureAiTargetMode): AdminQuizFigure {
+  return {
+    id: `new-${targetMode.toLowerCase()}`,
+    role: targetMode === "QUESTION" ? "QUESTION" : "SOLUTION",
+    status: "QUEUED",
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    currentRevision: null,
+  };
+}
+
+function targetModeLabel(targetMode: AdminQuizFigureAiTargetMode) {
+  switch (targetMode) {
+    case "QUESTION":
+      return "Tạo hình AI cho đề bài";
+    case "SOLUTION":
+      return "Tạo hình AI cho lời giải";
+  }
+}
+
+function targetModeDescription(targetMode: AdminQuizFigureAiTargetMode) {
+  switch (targetMode) {
+    case "QUESTION":
+      return "Tạo hình minh họa mới từ nội dung đề bài hiện tại.";
+    case "SOLUTION":
+      return "Tạo một hình lời giải hoàn chỉnh mới từ đề bài và lời giải, không phụ thuộc hình đề.";
+  }
 }
 
 function createPreviewInputKey(input: AdminQuizFigureCreateAiInput) {

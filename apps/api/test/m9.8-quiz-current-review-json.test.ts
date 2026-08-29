@@ -39,8 +39,7 @@ describe("M9.8 mutable Quiz generation output", () => {
       hint: "Gợi ý gốc",
       figure: {
         questionFigure: null,
-        solutionFigureMode: "NONE",
-        solutionFigurePlan: null,
+        solutionFigure: false,
       },
       options: [
         { id: "A", text: "Phương án gốc" },
@@ -49,7 +48,6 @@ describe("M9.8 mutable Quiz generation output", () => {
       explanation: {
         problem: "Câu hỏi gốc",
         solution: "Lời giải gốc",
-        answer: "A. Phương án gốc",
         isGeometry: false,
         geometryStatement: {
           hypotheses: ["Dữ kiện cũ"],
@@ -103,11 +101,11 @@ describe("M9.8 mutable Quiz generation output", () => {
       explanation: {
         problem: "Câu hỏi đã sửa abc",
         solution: "Lời giải admin đã sửa",
-        answer: "B. $x^2$",
       },
     });
     expect(result?.questions[0]).toHaveProperty("figure", rawProviderQuestionJson.figure);
     expect(result?.questions[0]).not.toHaveProperty("explanation.geometryStatement");
+    expect(result?.questions[0]).not.toHaveProperty("explanation.answer");
     expect(result?.questions[1]).toEqual({ questionType: "TRUE_FALSE" });
     expect(result?.generationMeta).toEqual({ requestedCount: 2 });
     expect(rawProviderQuestionJson.explanation.problem).toBe("Câu hỏi gốc");
@@ -166,8 +164,7 @@ describe("M9.8 mutable Quiz generation output", () => {
         },
         figure: {
           questionFigure: null,
-          solutionFigureMode: "NONE",
-          solutionFigurePlan: null,
+          solutionFigure: false,
         },
       },
     );
@@ -181,10 +178,10 @@ describe("M9.8 mutable Quiz generation output", () => {
       explanation: {
         problem: "Đề dẫn đã sửa",
         solution: "Lời giải chung đã sửa",
-        answer: "a) Sai.\nb) Đúng.",
       },
     });
     expect(result?.explanation).not.toHaveProperty("statementSolutions");
+    expect(result?.explanation).not.toHaveProperty("answer");
   });
 
   it("keeps only the canonical text-input answer in the mutable generation JSON", () => {
@@ -210,12 +207,10 @@ describe("M9.8 mutable Quiz generation output", () => {
         explanation: {
           problem: "Đề cũ",
           solution: "Lời giải cũ",
-          answer: "1/2",
         },
         figure: {
           questionFigure: null,
-          solutionFigureMode: "NONE",
-          solutionFigurePlan: null,
+          solutionFigure: false,
         },
       },
     );
@@ -225,9 +220,9 @@ describe("M9.8 mutable Quiz generation output", () => {
       explanation: {
         problem: "Nhập kết quả.",
         solution: "Hai cách viết tương đương.",
-        answer: "1/2",
       },
     });
+    expect(result?.explanation).not.toHaveProperty("answer");
   });
 });
 

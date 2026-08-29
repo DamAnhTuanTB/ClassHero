@@ -692,6 +692,9 @@ Màn chi tiết buổi học admin:
   `Thêm câu hỏi`, sửa và xóa từng câu.
 - Modal tạo/sửa Quiz set chỉ có tên bộ câu hỏi. Quiz set không có
   field hoặc badge mức độ; mức độ chỉ hiển thị và chỉnh sửa ở từng câu.
+- Modal xóa Quiz set phải nói rõ đây là xóa vĩnh viễn cả bộ, câu hỏi, lời giải,
+  hình và lịch sử làm bài liên quan; không mô tả hoặc ngầm triển khai khôi phục
+  từ soft delete.
 - Modal `Tạo Quiz bằng AI` có select `Bộ câu hỏi được chọn`, liệt kê các Quiz set
   hiện có và mặc định đúng tab đang mở. Admin có thể đổi bộ đích trước khi gửi;
   preview và generate phải dùng cùng giá trị `targetQuizSetId` của form. Khi job
@@ -702,23 +705,58 @@ Màn chi tiết buổi học admin:
 - Card câu AI hiển thị đề, đáp án và lời giải text/KaTeX theo contract M9.3.
   Quiz dùng `QuizExplanationCard` và `quizExplanationBlock`, không dùng
   `LessonSummaryExampleCard`. Hard cutover không render legacy `exampleBlock`.
+  Mỗi khối lời giải Quiz admin có hai action rõ nghĩa `Tinh chỉnh lời giải` và
+  `Tạo lại lời giải`. Modal
+  lazy-load tự dựng preview từ đề, phương án/mệnh đề, đáp án đúng và lời giải hiện
+  tại; admin có ô yêu cầu bổ sung, thống kê token/chi phí và ba tab xem system
+  prompt, dữ liệu đề + lời giải, request OpenAI. Action chỉ làm rõ/làm đẹp lời
+  giải theo đáp án hiện tại; action tạo lại giải độc lập và có thể thay đồng bộ
+  đáp án, gợi ý, lời giải.
+  Khi form đổi, preview cũ bị đánh
+  dấu stale; execute/poll job có loading/disabled/terminal feedback và câu hỏi được
+  refresh về trạng thái cần duyệt lại.
   Test giữ text-only. Mỗi hình Quiz hiển thị cùng bộ action với hình Sinh kiến
   thức: `Chỉnh sửa bằng mã code`, `Tạo mới bằng mã code`, `Tạo mới bằng AI`,
   `Tải ảnh lên`, `Xóa ảnh`, `Chỉnh sửa caption`; implementation dùng adapter API
   riêng của Quiz thay vì import nghiệp vụ Summary.
-- Với current asset được tạo thành công qua OpenAI, khung hình admin hiển thị pill
-  `OpenAI · <giá> VNĐ` ở góc dưới bên phải. Giá là chi phí thực tế của đúng asset,
-  không hiện cho ảnh upload/code hoặc provider khác; pill phải đọc rõ ở cả theme
+- Với current asset Sinh kiến thức hoặc Quiz được tạo thành công qua OpenAI,
+  khung hình admin hiển thị pill `OpenAI · <giá> VNĐ` ở góc dưới bên phải. Nếu
+  đúng asset có `cachedInputTokens > 0`, pill `Cache OpenAI` xuất hiện ngay bên
+  trái pill giá. Giá/cache lấy từ usage thực tế của đúng asset, không hiện cho
+  ảnh upload/code/crop SGK hoặc provider khác; hàng pill phải đọc rõ ở cả theme
   sáng/tối và không che caption.
-- Student/admin chỉ hiển thị `solutionFigure` khi có asset SOLUTION riêng từ
-  `EXTEND_QUESTION` hoặc `REDRAW_AS_MODEL`; không render lại `questionFigure`
-  trong khối lời giải. Hình vẽ lại có thể khác bố cục/phong cách để thể hiện mô
-  hình toán học, nhưng vẫn dùng cùng component figure/revision hiện có.
+- Modal mã code của Sinh kiến thức và Quiz dùng chung trigger `Chỉnh nhanh` có
+  helper text `Không cần sửa mã`. Panel chia ba nhóm dễ quét: `Ẩn thông tin`
+  (độ dài, góc, nhãn số), `Đường nét` (xóa nét phụ đứt/chấm, mảnh/vừa/đậm) và
+  `Kích thước` (thu nhỏ/phóng to) và `Cỡ chữ nhãn` (nhãn chính/nhãn phụ theo ba
+  mức dễ hiểu). Mỗi action có mô tả ngắn, tự biên dịch preview và bật `Hoàn tác`.
+  Panel là popover nổi đè lên body modal, không tham gia layout và không co/đẩy
+  editor hoặc preview; trên màn nhỏ popover có vùng cuộn giới hạn.
+- Sau khi `Áp dụng` thay đổi kích thước, phải co/phóng toàn bộ card trực quan của
+  figure (ảnh, caption, badge chi phí/cache) và căn giữa. Không chỉ đổi width của
+  `<img>` bên trong một card vẫn full-width vì sẽ tạo khoảng trắng lớn và làm
+  admin/học sinh hiểu sai kích thước đã chọn.
+- Student/admin chỉ hiển thị `solutionFigure` khi có asset role `SOLUTION` riêng;
+  không render lại `questionFigure` trong khối lời giải. Asset lời giải được dựng
+  độc lập và có thể khác hoàn toàn bố cục hình đề, nhưng vẫn dùng cùng component
+  figure/revision hiện có.
 - Modal `Tạo mới bằng AI` của hình Quiz giữ cùng UI và flow với modal hình Sinh
   kiến thức: hai lựa chọn `Tạo mới lại`/`Chỉnh sửa hình hiện tại`, cấu hình model
   capability-aware, yêu cầu bổ sung, `Xem dữ liệu`, ba tab prompt/request, chỉnh
   prompt và thống kê/ước tính chi phí. Khác biệt duy nhất là Quiz không có khối
   ảnh gốc sách giáo khoa và không gửi reference image.
+- Modal `Tạo lại lời giải` có checkbox tương tự cho lời giải cũ, mặc định không
+  chọn; đáp án và gợi ý cũ luôn bị ẩn. Đổi checkbox phải cập nhật preview trước
+  khi nút `Thực hiện` được bật.
+- Header card Quiz có icon `ImagePlus` ngay trước action sửa. Icon mở menu semantic
+  gồm hai action độc lập: tạo hình đề và tạo hình lời giải; menu render qua portal
+  neo theo icon để không bị card `overflow` cắt cạnh trái/dưới. Action lời giải
+  nêu rõ hình được dựng mới từ lời giải, không cần hình đề, và option disabled luôn
+  hiển thị nguyên nhân. Hai action cũng hiện cho câu `TRUE_FALSE` một mệnh đề để
+  admin có thể chủ động tạo hình sau khi câu đã được lưu.
+- Hai action header dùng lại `AdminQuizFigureAiDialog`; khi target chưa có figure,
+  modal chạy question-level create/preview, còn khi đã có current cùng mode thì
+  vẫn cho `Chỉnh sửa hình hiện tại`.
 - Modal sinh kiến thức và sinh Quiz chia cấu hình model thành hai section rõ:
   `Phase 1 - tạo text` và `Phase 2 - tạo ảnh`. Mỗi section có lựa chọn tự động
   theo Cài đặt AI, model, capability-aware Temperature/Reasoning Effort và giới
@@ -893,6 +931,37 @@ liệu`; modal có model cùng control capability-aware cho Temperature/Reasonin
   được; nếu chưa có draft hợp lệ thì UI tự chạy cùng bước compile/validator và
   chỉ promote revision khi kết quả là `DRAFT_READY`. Không có PDF, SyncTeX,
   click-preview-to-source hoặc kéo-thả đối tượng SVG.
+- Editor source của Summary và Quiz có bộ `Chỉnh nhanh` dùng chung. Các phép biến
+  đổi source là deterministic và giới hạn theo cú pháp: node nhãn phải khớp toàn
+  bộ nội dung; nét phụ chỉ xóa command có option dashed/dotted; độ đậm chỉ sửa
+  stroke command; cỡ chữ chỉ sửa local `font=` của node đã phân loại chắc chắn.
+  `Kích thước`, `Nhãn chính` và `Nhãn phụ` dùng slider `10%–200%`, hiển thị giá
+  trị hiện tại và mốc gốc `100%`; chỉ commit khi thả/blur/Enter. Kích thước ghi
+  marker `% classhero-display-scale` trong source thay vì chỉ đổi
+  intrinsic SVG bị `object-contain` chuẩn hóa. Source mới tự gọi compile/validator hiện có để cập nhật
+  preview; lỗi không ghi đè source đang hợp lệ. History quick action tối đa trong
+  phiên cho phép `Hoàn tác`; khi admin tự gõ code, history được xóa để tránh ghi
+  đè thay đổi thủ công. Tên điểm, ký hiệu nguyên tố, đơn vị khác nhóm đã chọn và
+  node không xác định chắc chắn phải được giữ nguyên; current revision chỉ đổi
+  khi admin bấm `Áp dụng`. Marker tỷ lệ được response admin/student hydrate thành
+  `displayScale`; UI không lộ full source cho học sinh và không đổi cách hiển thị
+  của asset cũ không có marker.
+- Popover `Chỉnh nhanh` có section đầu `Nhãn và số đo (N)` dạng danh sách cuộn.
+  Mỗi row dùng nhãn loại ngắn (`Nhãn`, `Số đo`, `Chú thích`, `Nhãn linh kiện`),
+  input chứa nguyên nội dung text có thể sửa an toàn, icon cài đặt và icon xóa có
+  tooltip/`aria-label` theo đúng row. Icon cài đặt nằm cạnh icon xóa; mặc định
+  row gọn và chỉ khi bấm mới xổ bên dưới input ba slider `Ngang (x)`/`Dọc (y)`
+  (`-50pt–+50pt`, mốc `0`) và `Cỡ chữ` (`10%–200%`, mốc `100%`) của riêng row.
+  Tại một thời điểm chỉ mở một row để giữ danh sách hai cột dễ quét. Cỡ chữ riêng
+  nhân trên cỡ nền `Nhãn chính/Nhãn phụ`, không ghi đè hoặc làm mất tỷ lệ riêng
+  khi slider nhóm đổi. Row giữ cùng thứ tự với source; nội dung trùng nhau vẫn là
+  các row độc lập. Empty state ghi `Hình này không có nhãn hoặc số đo có
+thể chỉnh nhanh`; nếu parser gặp text construct chưa hỗ trợ, panel báo số mục
+  cần sửa trực tiếp trong mã và không tạo input giả. Input không compile ở từng
+  keystroke: commit khi blur/Enter hoặc được flush trước khi bấm `Biên dịch`, với
+  guard chống double event/compile; Escape hoàn
+  nguyên row đang nhập. Trong lúc compile chỉ khóa row đang commit và các action
+  làm đổi source; lỗi giữ input/source trước đó và đưa focus về row lỗi.
 - `Tạo mới bằng mã code` dùng lại editor/compile/error panel nhưng nạp snippet
   TikZ mới. Block chưa từng có hình hoặc đã xóa hình chỉ được gắn reference sau
   khi admin apply draft thành công; đóng modal/compile lỗi không tạo placeholder.

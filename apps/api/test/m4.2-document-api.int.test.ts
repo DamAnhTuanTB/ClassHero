@@ -501,6 +501,56 @@ describe("M4.2 document API integration", () => {
     expect(updatedRange).toEqual({ pageEnd: 4, pageStart: 3 });
   });
 
+  it("creates a top-level lesson with source extractions when no chapter is selected", async () => {
+    const sourceDocument = await createReadySourceDocument(prisma, {
+      pageCount: 4,
+      title: "Top-level lesson source",
+    });
+
+    const createResponse = await request(httpServer)
+      .post(`/api/v1/admin/learning-paths/${ids.learningPath}/lessons`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        chapterId: null,
+        completionMinScore: 7,
+        sourceDocumentExtractions: [
+          {
+            pageEnd: 4,
+            pageStart: 1,
+            sourceDocumentId: sourceDocument.id,
+          },
+        ],
+        status: PublishStatus.DRAFT,
+        title: "Top-level lesson with source pages",
+        trialEnabled: false,
+      })
+      .expect(201);
+
+    const createdLesson = createResponse.body.data;
+    cleanupIds.lessonIds.add(createdLesson.id);
+    expect(createdLesson.chapterId).toBeNull();
+
+    const createdDocument = await prisma.lessonDocument.findFirstOrThrow({
+      where: {
+        lessonId: createdLesson.id,
+        replacedAt: null,
+      },
+      select: {
+        id: true,
+        pageRangeId: true,
+        processingJobId: true,
+        sourceDocumentId: true,
+      },
+    });
+    cleanupIds.lessonDocumentIds.add(createdDocument.id);
+    if (createdDocument.processingJobId) {
+      cleanupIds.jobIds.add(createdDocument.processingJobId);
+    }
+
+    expect(createdDocument.pageRangeId).not.toBeNull();
+    expect(createdDocument.sourceDocumentId).toBe(sourceDocument.id);
+  });
+
   it("supports multiple source documents and multiple non-overlapping extractions per lesson", async () => {
     const beforeSources = await prisma.sourceDocument.count({
       where: {

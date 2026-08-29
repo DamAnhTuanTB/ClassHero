@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
+import { AdminAiFigureUsageBadges } from "@/components/admin/ai-figure-usage-badges";
 import { StemFigure } from "@/components/common/content/stem-figure";
 import { AdminStemFigureActionFrame } from "@/features/admin/ai-generation/components/admin-stem-figure-action-frame";
 import type {
@@ -37,6 +38,13 @@ export function AdminStemFigureInline({
             figure.currentAssetKind === "TEXTBOOK_SOURCE" ? "textbook-source" : "default"
           }
           showStatus
+          footer={
+            <AdminAiFigureUsageBadges
+              cachedInputTokens={figure.openAiCachedInputTokens}
+              costVnd={figure.openAiGenerationCostVnd}
+              testIdPrefix="admin-stem-figure"
+            />
+          }
           visual={{
             kind: "TEX_FIGURE",
             figureId: figure.id,
@@ -46,6 +54,7 @@ export function AdminStemFigureInline({
             previewSvg: figure.previewSvg ?? undefined,
             assetUrl: figure.assetUrl,
             lastErrorCategory: figure.lastErrorCategory,
+            displayScale: figure.displayScale,
           }}
         />
         {candidateActive && figure.hasCurrentAsset ? (

@@ -8,10 +8,8 @@ import {
   LessonContentContextError,
   LessonContentGenerationContextService,
 } from "#api/modules/ai/services/lesson-content-generation-context.service";
-import {
-  LESSON_CONTENT_PROMPT_VERSION,
-  LESSON_CONTENT_SCHEMA_VERSION,
-} from "#api/modules/ai/types/lesson-content-generation.types";
+import { LESSON_CONTENT_SCHEMA_VERSION } from "#api/modules/ai/types/lesson-content-generation.types";
+import { resolveLessonContentPromptVersion } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 
 const ALL_QUESTION_TYPES = Object.values(QuestionType);
 
@@ -83,7 +81,7 @@ export class LessonContentGenerationJobService {
       createdByUserId: actorUserId,
       lessonId,
       targetType: `${type}_SET`,
-      promptVersion: LESSON_CONTENT_PROMPT_VERSION,
+      promptVersion: resolveLessonContentPromptVersion(snapshot.subject.key),
       schemaVersion: LESSON_CONTENT_SCHEMA_VERSION,
       inputFingerprint: { lessonId, ...inputMeta },
       inputMeta,
@@ -111,7 +109,6 @@ export class LessonContentGenerationJobService {
       throw badRequestException(error.code, error.message);
     }
   }
-
 }
 
 function unique<T>(values: T[]) {

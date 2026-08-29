@@ -1,3 +1,9 @@
+import {
+  normalizeLatexCommandBackslashes,
+  normalizeMathTextLatexSegments,
+  normalizeMissingInlineMathClosers,
+} from "@learning-path/shared";
+
 export const LEARNING_CONTENT_KATEX_MACROS = {
   "\\frac": "\\dfrac",
   "\\N": "\\mathbb{N}",
@@ -33,7 +39,7 @@ const MISALIGNED_LEADING_INFERENCE_PATTERN =
 const LOGICAL_ALIGNMENT_ENVIRONMENT_PATTERN =
   /\\begin\{(aligned|alignedat|split)\}([\s\S]*?)\\end\{\1\}/gu;
 const REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN =
-  /\\{2,}(?=(?:angle|triangle|frac|dfrac|sqrt|cdot|times|left|right|mathrm|text|circ|widehat|overline|perp|parallel|cong|neq|ne|le|ge)\b)/gu;
+  /\\{2,}(?=(?:angle|triangle|frac|dfrac|tfrac|sqrt|overline|underline|widehat|widetilde|hat|tilde|bar|vec|dot|ddot|overrightarrow|overleftarrow|cdot|times|left|right|mathrm|mathbf|mathit|mathsf|mathtt|mathbb|mathcal|operatorname|text|ce|pu|circ|widehat|perp|parallel|cong|neq|ne|le|leq|ge|geq|approx|equiv|infty|sum|prod|int|lim|sin|cos|tan|cot|log|ln)\b)/gu;
 
 /**
  * Keep fraction numerators and denominators readable at the shared learning-content
@@ -41,7 +47,21 @@ const REPEATED_LATEX_COMMAND_BACKSLASH_PATTERN =
  * the script-size reduction used by inline `\\frac`.
  */
 export function normalizeLearningContentLatex(value: string) {
-  return value.replace(/\\frac\b/gu, "\\dfrac");
+  return normalizeLatexCommandBackslashes(
+    normalizeLearningContentLatexCommandEscapes(
+      normalizeDecodedLearningContentLatex(value),
+    ),
+  ).replace(/\\frac\b/gu, "\\dfrac");
+}
+
+function normalizeDecodedLearningContentLatex(value: string) {
+  return value
+    .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
+    .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
+    .replaceAll(`${String.fromCharCode(8)}eta`, "\\beta")
+    .replaceAll(`${String.fromCharCode(13)}ight`, "\\right")
+    .replaceAll(`${String.fromCharCode(28)}hat{`, "\\widehat{")
+    .replaceAll(`${String.fromCharCode(27)}0`, "\\circ");
 }
 
 /**
@@ -62,19 +82,35 @@ export function normalizeLearningContentLatexCommandEscapes(value: string) {
  * Summary and every other surface rendered through MathpixMarkdownRenderer.
  */
 export function normalizeMathpixMarkdown(value: string) {
-  const normalizedValue = normalizeLearningContentLatexCommandEscapes(
-    value
-      .replaceAll(`${String.fromCharCode(9)}riangle`, "\\triangle")
-      .replaceAll(`${String.fromCharCode(12)}rac`, "\\frac")
-      .replaceAll(`${String.fromCharCode(8)}eta`, "\\beta")
-      .replaceAll(`${String.fromCharCode(13)}ight`, "\\right")
-      .replaceAll(`${String.fromCharCode(28)}hat{`, "\\widehat{")
-      .replaceAll(`${String.fromCharCode(27)}0`, "\\circ"),
+  const repairedDisplayMathClosers = normalizeMissingInlineMathClosers(value).replace(
+    MISPLACED_DISPLAY_MATH_CLOSER_PATTERN,
+    "",
   );
 
-  return normalizeLearningContentMathMarkdown(
-    normalizeLearningContentLatex(normalizedValue),
+  return normalizeMathTextLatexSegments(repairedDisplayMathClosers, (latex) =>
+    normalizeLearningContentMathMarkdown(
+      normalizeLearningContentLatex(
+        trimMathDelimiterPadding(normalizeDecodedLearningContentLatex(latex)),
+      ),
+    ),
   );
+}
+
+function trimMathDelimiterPadding(value: string) {
+  let start = 0;
+  while (start < value.length && /\s/u.test(value[start]!)) start += 1;
+
+  let end = value.length;
+  while (end > start && /\s/u.test(value[end - 1]!)) {
+    let precedingBackslashes = 0;
+    for (let index = end - 2; index >= start && value[index] === "\\"; index -= 1) {
+      precedingBackslashes += 1;
+    }
+    if (precedingBackslashes % 2 === 1) break;
+    end -= 1;
+  }
+
+  return value.slice(start, end);
 }
 
 /**

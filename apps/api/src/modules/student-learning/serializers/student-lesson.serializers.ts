@@ -1,4 +1,7 @@
-import { orderQuizQuestionsByType } from "@learning-path/shared";
+import {
+  orderQuizQuestionsByType,
+  readStemFigureDisplayScale,
+} from "@learning-path/shared";
 import { ReviewStatus } from "@prisma/client";
 import type { StudentLessonAccessContext } from "#api/modules/learning-paths/types/lesson.types";
 import type {
@@ -104,6 +107,9 @@ export function serializeStudentLessonSummary(
             altText: figure.currentRevision?.altText ?? "Hình minh họa STEM",
             caption: figure.currentRevision?.caption ?? null,
             assetUrl: stemFigureAssetUrls.get(figure.id) ?? null,
+            displayScale: readStemFigureDisplayScale(
+              figure.currentRevision?.latexSource,
+            ),
           },
         ]),
       ),
@@ -122,6 +128,7 @@ function hydrateStemFigureReferences(
       altText: string;
       caption: string | null;
       assetUrl: string | null;
+      displayScale: number | null;
     }
   >,
 ) {
@@ -157,6 +164,7 @@ function hydrateStemFigureReferences(
                       altText: figure.altText,
                       caption: figure.caption,
                       assetUrl: figure.assetUrl,
+                      displayScale: figure.displayScale,
                     }
                   : visual;
               }),

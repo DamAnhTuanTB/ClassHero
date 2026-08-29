@@ -120,6 +120,7 @@ export interface AdminAiJobData {
   status: AdminAiJobStatus;
   resourceType: string | null;
   resourceId: string | null;
+  result?: unknown;
   error: string | null;
   createdAt: string;
   updatedAt: string;
@@ -492,6 +493,9 @@ export interface AdminStemFigure {
     | "ADMIN_UPLOAD"
     | "MANUAL_REPAIR"
     | null;
+  openAiGenerationCostVnd?: number | null;
+  openAiCachedInputTokens?: number | null;
+  displayScale?: number | null;
   latexSource: string | null;
   sourceHash: string;
   sourceVersion: number;

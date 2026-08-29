@@ -91,9 +91,7 @@ describe("M9.2 STEM figure rendering processor", () => {
       "first.png",
       "distinct.png",
     ]);
-    expect(prepared.assets.every((asset) => asset.mimeType === "image/png")).toBe(
-      true,
-    );
+    expect(prepared.assets.every((asset) => asset.mimeType === "image/png")).toBe(true);
     expect(prepared.images.every((image) => image.detail === "high")).toBe(true);
     const firstPrepared = Buffer.from(
       prepared.images[0]!.imageUrl.split(",")[1]!,
@@ -633,7 +631,7 @@ describe("M9.2 STEM figure rendering processor", () => {
     expect(artifacts.promoteSvg).not.toHaveBeenCalled();
   });
 
-  it("fails infrastructure errors without BullMQ or AI retry", async () => {
+  it("requeues a transient renderer failure while BullMQ attempts remain", async () => {
     const prisma = createPrismaMock({ repairCount: 0, maxRepairAttempts: 2 });
     const repair = { repair: vi.fn() };
     const processor = createProcessor(
@@ -671,15 +669,90 @@ describe("M9.2 STEM figure rendering processor", () => {
     expect(repair.repair).not.toHaveBeenCalled();
     expect(prisma.backgroundJob.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: BackgroundJobStatus.FAILED }),
+        data: expect.objectContaining({ status: BackgroundJobStatus.QUEUED }),
       }),
     );
     expect(prisma.stemFigureRevision.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: StemFigureRevisionStatus.FAILED,
+          status: StemFigureRevisionStatus.QUEUED,
           lastErrorCategory: "INFRASTRUCTURE",
         }),
+      }),
+    );
+  });
+
+  it("requeues a transient provider connection error before source generation", async () => {
+    const prisma = createPrismaMock({
+      repairCount: 0,
+      maxRepairAttempts: 0,
+      sourcePending: true,
+      generationBrief: createGenerationBrief({
+        blockContent: { type: "knowledge", content: "Vẽ sơ đồ minh họa." },
+      }),
+    });
+    const processor = createProcessor(
+      prisma,
+      { render: vi.fn() },
+      { validate: vi.fn() },
+      {
+        createNew: vi.fn(async () => {
+          throw new Error("Connection error.");
+        }),
+        repair: vi.fn(),
+      },
+      createArtifactsMock(),
+    );
+
+    await expect(processor.process(createJob(0, 3))).rejects.toThrow("Connection error.");
+    expect(prisma.backgroundJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: BackgroundJobStatus.QUEUED,
+          attempts: 1,
+        }),
+      }),
+    );
+    expect(prisma.stemFigureRevision.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: StemFigureRevisionStatus.QUEUED,
+          lastErrorCategory: "INFRASTRUCTURE",
+        }),
+      }),
+    );
+  });
+
+  it("marks a transient infrastructure failure final after the last attempt", async () => {
+    const prisma = createPrismaMock({ repairCount: 0, maxRepairAttempts: 2 });
+    const processor = createProcessor(
+      prisma,
+      {
+        render: vi.fn(async () => ({
+          ok: false,
+          category: "INFRASTRUCTURE",
+          code: "TEX_RENDERER_REQUEST_TIMEOUT",
+          log: "Request timed out.",
+          issues: [],
+          collectionComplete: false,
+        })),
+      },
+      { validate: vi.fn() },
+      { repair: vi.fn() },
+      createArtifactsMock(),
+    );
+
+    await expect(processor.process(createJob(2, 3))).rejects.toBeInstanceOf(
+      UnrecoverableError,
+    );
+    expect(prisma.backgroundJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: BackgroundJobStatus.FAILED }),
+      }),
+    );
+    expect(prisma.stemFigureRevision.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: StemFigureRevisionStatus.FAILED }),
       }),
     );
   });

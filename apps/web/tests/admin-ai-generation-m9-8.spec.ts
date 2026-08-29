@@ -133,9 +133,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     ).toBeVisible();
     await quizDialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await quizDialog.getByLabel("Temperature").fill("0.1");
-    await quizDialog
-      .getByLabel("Giới hạn token đầu ra", { exact: true })
-      .fill("8000");
+    await quizDialog.getByLabel("Giới hạn token đầu ra", { exact: true }).fill("8000");
     await quizDialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect(quizDialog.getByText("Nguồn PDF sẽ gửi AI")).toBeVisible();
     await expect(quizDialog.getByText("Model thực tế")).toBeVisible();
@@ -205,6 +203,94 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(page.getByText("Cần duyệt", { exact: true }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expectNoFrameworkOverlay(page);
+  });
+
+  test("opens solution refinement repeatedly and always allows closing while its job runs", async ({
+    page,
+  }) => {
+    const questionId = "77777777-7777-4777-8777-777777777724";
+    const quizSet = {
+      ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
+      questionCount: 1,
+      _count: { questions: 1 },
+    };
+    const mock = await setupAiGenerationMock(page, {
+      quizSets: [quizSet],
+      quizQuestions: [
+        quizQuestionFixture(questionId, quizSetOneId, "generation-refinement", {
+          sourceMetadataJson: {
+            aiGenerationId: "generation-refinement",
+            generationQuestionIndex: 0,
+            quizExplanationBlock: {
+              type: "quizExplanation",
+              problem: "Thể tích khối cầu bán kính 3 bằng bao nhiêu?",
+              solution: "Áp dụng công thức thể tích khối cầu.",
+              isGeometry: false,
+            },
+          },
+        }),
+      ],
+      solutionRefinementQueueDelayMs: 500,
+    });
+
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Quiz", exact: true }).click();
+    const openButton = page.getByRole("button", {
+      name: "Tinh chỉnh lời giải",
+      exact: true,
+    });
+
+    await openButton.click();
+    let dialog = page.getByRole("dialog", { name: "Tinh chỉnh lời giải bằng AI" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Đóng" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Tạo lại lời giải", exact: true }).click();
+    const regenerateDialog = page.getByRole("dialog", {
+      name: "Tạo lại lời giải bằng AI",
+    });
+    await expect(regenerateDialog).toBeVisible();
+    await expect(
+      regenerateDialog.getByText("AI không nhìn đáp án, gợi ý hay lời giải cũ"),
+    ).toBeVisible();
+    const rejectedSolutionCheckbox = regenerateDialog.getByLabel(
+      "Gửi lời giải hiện tại làm mẫu sai cần tránh",
+    );
+    await expect(rejectedSolutionCheckbox).not.toBeChecked();
+    await rejectedSolutionCheckbox.check();
+    await expect(
+      regenerateDialog.getByRole("button", { name: "Thực hiện" }),
+    ).toBeDisabled();
+    await regenerateDialog
+      .getByRole("button", { name: "Cập nhật dữ liệu gửi AI" })
+      .click();
+    await expect
+      .poll(() => mock.solutionRefinementPreviewPayloads.at(-1))
+      .toMatchObject({
+        mode: "REGENERATE",
+        includeCurrentSolutionAsRejected: true,
+      });
+    await expect(
+      regenerateDialog.getByRole("button", { name: "Thực hiện" }),
+    ).toBeEnabled();
+    await regenerateDialog.getByRole("button", { name: "Hủy" }).click();
+
+    await openButton.click();
+    dialog = page.getByRole("dialog", { name: "Tinh chỉnh lời giải bằng AI" });
+    await expect(dialog.getByText("Dữ liệu gửi đến OpenAI")).toBeVisible();
+    await dialog.getByRole("button", { name: "Thực hiện" }).click();
+    await expect(dialog.getByRole("button", { name: "Đóng" })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Đóng" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => mock.solutionRefinementPayloads).toHaveLength(1);
+
+    await openButton.click();
+    dialog = page.getByRole("dialog", { name: "Tinh chỉnh lời giải bằng AI" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Hủy" })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Hủy" }).click();
+    await expect(dialog).toHaveCount(0);
   });
 
   test("keeps Quiz preview loading separate from Quiz submission", async ({ page }) => {
@@ -411,6 +497,42 @@ test.describe("M9.8 admin AI generation panel", () => {
         quizQuestionFixture(approvedQuestionIds.trueFalse, quizSetOneId, generationId, {
           questionType: "TRUE_FALSE",
           reviewStatus: "APPROVED",
+          figures: [
+            {
+              id: "88888888-8888-4888-8888-888888888872",
+              role: "QUESTION",
+              status: "SUCCEEDED",
+              lastErrorCode: null,
+              lastErrorMessage: null,
+              currentRevision: {
+                id: "99999999-9999-4999-8999-999999999972",
+                origin: "ADMIN_REGENERATE",
+                status: "SUCCEEDED",
+                sourceKind: "AI_TEX",
+                sourceVersion: 1,
+                latexSource: "\\begin{tikzpicture}\\end{tikzpicture}",
+                previewSvg: null,
+                altText: "Hình đề",
+                caption: null,
+                deliveryFile: {
+                  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+                  mimeType: "image/svg+xml",
+                  publicUrl: svgDataUrl(
+                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"></svg>',
+                  ),
+                },
+              },
+            },
+            {
+              id: "88888888-8888-4888-8888-888888888873",
+              role: "SOLUTION",
+              status: "QUEUED",
+              pendingAiTargetMode: "SOLUTION",
+              lastErrorCode: null,
+              lastErrorMessage: null,
+              currentRevision: null,
+            },
+          ],
         }),
         quizQuestionFixture(
           approvedQuestionIds.multiStatement,
@@ -480,6 +602,43 @@ test.describe("M9.8 admin AI generation panel", () => {
       })
       .toBe(true);
 
+    await page
+      .getByTestId("quiz-question-navigation-TRUE_FALSE")
+      .getByRole("tab")
+      .click();
+    const trueFalseQuestionCard = page.locator(
+      `#quiz-question-${approvedQuestionIds.trueFalse}`,
+    );
+    await trueFalseQuestionCard
+      .getByRole("button", { name: "Tạo hình mới bằng AI" })
+      .click();
+    const figureAiMenu = page.getByRole("menu", {
+      name: "Chọn chế độ tạo hình AI",
+    });
+    await expect(
+      figureAiMenu.getByRole("menuitem", { name: /Tạo hình cho đề bài/u }),
+    ).toBeVisible();
+    const extendSolutionItem = figureAiMenu.getByRole("menuitem", {
+      name: /Bổ sung vào hình đề/u,
+    });
+    const redrawSolutionItem = figureAiMenu.getByRole("menuitem", {
+      name: /Tạo hình riêng cho lời giải/u,
+    });
+    await expect(extendSolutionItem).toBeDisabled();
+    await expect(extendSolutionItem).toContainText(
+      "Hình đang được xử lý, vui lòng chờ hoàn tất.",
+    );
+    await expect(redrawSolutionItem).toBeDisabled();
+    await expect(redrawSolutionItem).toContainText(
+      "Chờ hình đang tạo hoàn tất để chọn cách tạo khác.",
+    );
+    await expect(redrawSolutionItem).not.toContainText("Hình đang được xử lý");
+    await page.keyboard.press("Escape");
+    await page
+      .getByTestId("quiz-question-navigation-pending-ai-MULTIPLE_CHOICE")
+      .getByRole("tab")
+      .click();
+
     await page.getByRole("button", { name: "Câu tiếp theo" }).click();
     await expect(
       page.locator(`#quiz-question-${approvedQuestionIds.multipleChoice}`),
@@ -527,13 +686,13 @@ test.describe("M9.8 admin AI generation panel", () => {
 
   test("renders a generated Quiz figure asset in UI and split review modes", async ({
     page,
-  }) => {
+  }, testInfo) => {
     const generationId = "66666666-6666-4666-8666-666666666650";
     const questionId = "77777777-7777-4777-8777-777777777750";
     const figureUrl = svgDataUrl(
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120"><circle cx="80" cy="60" r="48" fill="none" stroke="#0f172a" stroke-width="3"/><path d="M45 32L124 46L105 96L45 32Z" fill="none" stroke="#0369a1" stroke-width="3"/></svg>`,
     );
-    await setupAiGenerationMock(page, {
+    const mock = await setupAiGenerationMock(page, {
       quizSets: [
         {
           ...quizSetFixture(quizSetOneId, "Bộ câu hỏi 1", 0),
@@ -550,6 +709,8 @@ test.describe("M9.8 admin AI generation panel", () => {
               id: "88888888-8888-4888-8888-888888888850",
               role: "QUESTION",
               status: "SUCCEEDED",
+              openAiGenerationCostVnd: 38,
+              openAiCachedInputTokens: 720,
               lastErrorCode: null,
               lastErrorMessage: null,
               currentRevision: {
@@ -557,11 +718,13 @@ test.describe("M9.8 admin AI generation panel", () => {
                 sourceKind: "AI_TEX",
                 sourceVersion: 1,
                 latexSource: [
+                  "% classhero-display-scale: 0.8",
                   "\\begin{tikzpicture}",
                   "\\draw (0,0) circle (1);",
                   "% QUIZ_SOLUTION_EXTENSION",
                   "\\end{tikzpicture}",
                 ].join("\n"),
+                displayScale: 0.8,
                 previewSvg: null,
                 altText: "Tứ giác ABCD nội tiếp đường tròn",
                 caption: "Tứ giác nội tiếp $ABCD$.",
@@ -582,10 +745,48 @@ test.describe("M9.8 admin AI generation panel", () => {
 
     const figure = page.getByTestId("admin-quiz-question-figure");
     const figureFrame = page.getByTestId("admin-quiz-figure-action-frame");
+    await figure.scrollIntoViewIfNeeded();
     await expect(figure.getByAltText("Tứ giác ABCD nội tiếp đường tròn")).toBeVisible();
     await expect(figure.locator("figcaption")).toContainText("Tứ giác nội tiếp");
+    await expect(figure.getByTestId("admin-quiz-figure-openai-cache")).toContainText(
+      "Cache OpenAI",
+    );
+    await expect(figure.getByTestId("admin-quiz-figure-openai-cost")).toContainText(
+      "OpenAI · 38 VNĐ",
+    );
+    await expect
+      .poll(() =>
+        figure.evaluate((element) => {
+          const container = element.parentElement;
+          return container
+            ? element.getBoundingClientRect().width /
+                container.getBoundingClientRect().width
+            : 0;
+        }),
+      )
+      .toBeLessThan(0.72);
+    await expect
+      .poll(() =>
+        figure.getByAltText("Tứ giác ABCD nội tiếp đường tròn").evaluate((element) => {
+          const frame = element.parentElement;
+          if (!frame) return 0;
+          const style = window.getComputedStyle(frame);
+          const contentWidth =
+            frame.clientWidth -
+            Number.parseFloat(style.paddingLeft) -
+            Number.parseFloat(style.paddingRight);
+          return element.getBoundingClientRect().width / contentWidth;
+        }),
+      )
+      .toBeGreaterThan(0.98);
+    await page.screenshot({
+      path: `../../.codex/artifacts/m9-23-quick-tools/admin-quiz-applied-scale-${testInfo.project.name}.png`,
+      fullPage: true,
+    });
     await expect(
-      figureFrame.getByRole("button", { name: "Tinh chỉnh bằng AI" }),
+      figureFrame.getByRole("button", {
+        name: "Tinh chỉnh bằng AI",
+      }),
     ).toBeVisible();
 
     await figureFrame.getByRole("button", { name: "Mở menu thao tác hình" }).click();
@@ -601,6 +802,43 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(
       page.getByRole("dialog", { name: "Tạo mới hình bằng mã code" }),
     ).toBeVisible();
+    const codeDialog = page.getByRole("dialog", {
+      name: "Tạo mới hình bằng mã code",
+    });
+    await page.waitForTimeout(250);
+    const sourcePaneHeightBefore = await codeDialog
+      .getByTestId("stem-figure-source-pane")
+      .evaluate((element) => element.getBoundingClientRect().height);
+    await codeDialog.getByRole("button", { name: "Chỉnh nhanh" }).click();
+    await expect(
+      codeDialog.getByRole("dialog", { name: "Công cụ chỉnh nhanh hình vẽ" }),
+    ).toBeVisible();
+    const sourcePaneHeightAfter = await codeDialog
+      .getByTestId("stem-figure-source-pane")
+      .evaluate((element) => element.getBoundingClientRect().height);
+    expect(sourcePaneHeightAfter).toBe(sourcePaneHeightBefore);
+    for (const action of [
+      "Ẩn độ dài",
+      "Ẩn số đo góc",
+      "Ẩn nhãn số",
+      "Xóa nét phụ",
+      "Nét mảnh",
+      "Nét vừa",
+      "Nét đậm",
+      "Thu nhỏ",
+      "Phóng to",
+    ]) {
+      await expect(codeDialog.getByRole("button", { name: action })).toBeVisible();
+    }
+    await expect(codeDialog.getByRole("group", { name: "Nhãn chính" })).toBeVisible();
+    await expect(codeDialog.getByRole("group", { name: "Nhãn phụ" })).toBeVisible();
+    const undoButton = codeDialog.getByRole("button", { name: "Hoàn tác" });
+    await expect(undoButton).toBeDisabled();
+    await codeDialog.getByRole("button", { name: "Nét đậm" }).click();
+    await expect(page.getByText(/Đã chỉnh 1 chi tiết/u)).toBeVisible();
+    await expect(undoButton).toBeEnabled();
+    await undoButton.click();
+    await expect(page.getByText(/Đã hoàn tác/u)).toBeVisible();
     await page.keyboard.press("Escape");
 
     await figureFrame.getByRole("button", { name: "Mở menu thao tác hình" }).click();
@@ -630,9 +868,27 @@ test.describe("M9.8 admin AI generation panel", () => {
       name: "Tinh chỉnh hình bằng AI",
     });
     await expect(refinementDialog).toBeVisible();
+    const adminInstructions = refinementDialog.getByLabel("1. Yêu cầu bổ sung của admin");
+    await expect(adminInstructions).toBeVisible();
+    await adminInstructions.fill("Sửa nhãn đang chồng nét.");
+    await expect(
+      refinementDialog.getByText(
+        "Dữ liệu xem trước chưa bao gồm yêu cầu bổ sung mới nhất.",
+      ),
+    ).toBeVisible();
+    await expect(
+      refinementDialog.getByRole("button", { name: "Thực hiện" }),
+    ).toBeDisabled();
+    await refinementDialog.getByRole("button", { name: "Cập nhật dữ liệu" }).click();
+    expect(mock.figureActions.refinementPreviewPayloads.at(-1)).toMatchObject({
+      adminInstructions: "Sửa nhãn đang chồng nét.",
+    });
     await expect(refinementDialog.getByText("Model và chi phí dự tính")).toBeVisible();
     await expect(refinementDialog.getByText("≈ 750 ₫")).toBeVisible();
     await refinementDialog.getByRole("button", { name: "Thực hiện" }).click();
+    expect(mock.figureActions.refinementPayloads.at(-1)).toMatchObject({
+      adminInstructions: "Sửa nhãn đang chồng nét.",
+    });
     await expect(page.getByText("Đã bắt đầu tinh chỉnh hình bằng AI.")).toBeVisible();
 
     await figureFrame.getByRole("button", { name: "Chỉnh sửa caption" }).click();
@@ -1024,15 +1280,11 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByLabel("Temperature").fill("1.5");
     await expect(dialog.getByText("Temperature phải từ 0 đến 1")).toBeVisible();
     await dialog.getByLabel("Temperature").fill("0.1");
-    await dialog
-      .getByLabel("Giới hạn token đầu ra", { exact: true })
-      .fill("5999");
+    await dialog.getByLabel("Giới hạn token đầu ra", { exact: true }).fill("5999");
     await expect(
       dialog.getByText("Số token đầu ra phải từ 8000 đến 32000"),
     ).toBeVisible();
-    await dialog
-      .getByLabel("Giới hạn token đầu ra", { exact: true })
-      .fill("8000");
+    await dialog.getByLabel("Giới hạn token đầu ra", { exact: true }).fill("8000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await expect.poll(() => mock.promptPreviewPayloads.length).toBeGreaterThan(1);
     await dialog.getByRole("tab", { name: "Câu lệnh người dùng" }).click();
@@ -1141,9 +1393,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByRole("option", { name: "OpenAI · gpt-5.6-luna" }).click();
     await dialog.locator("#ai-summary-reasoning-effort").click();
     await dialog.getByRole("option", { name: "Rất cao (Extra High)" }).click();
-    await dialog
-      .getByLabel("Giới hạn token đầu ra", { exact: true })
-      .fill("20000");
+    await dialog.getByLabel("Giới hạn token đầu ra", { exact: true }).fill("20000");
 
     const refreshButton = dialog.getByRole("button", {
       name: "Cập nhật dữ liệu gửi AI",
@@ -1209,9 +1459,7 @@ test.describe("M9.8 admin AI generation panel", () => {
     await dialog.getByRole("option", { name: "OpenAI · gpt-4.1-mini" }).click();
     await dialog.getByLabel("Yêu cầu bổ sung").fill("Chỉ dùng cho lần tạo này");
     await dialog.getByLabel("Temperature").fill("0.2");
-    await dialog
-      .getByLabel("Giới hạn token đầu ra", { exact: true })
-      .fill("8000");
+    await dialog.getByLabel("Giới hạn token đầu ra", { exact: true }).fill("8000");
     await dialog.getByRole("button", { name: "Cập nhật dữ liệu gửi AI" }).click();
     await dialog.getByRole("button", { name: "Bắt đầu tạo" }).click();
     await expect
@@ -1314,9 +1562,9 @@ test.describe("M9.8 admin AI generation panel", () => {
       dialog.getByRole("button", { name: "Model", exact: true }),
     ).toContainText("OpenAI · gpt-4.1-mini");
     await expect(dialog.getByLabel("Temperature")).toHaveValue("0.2");
-    await expect(
-      dialog.getByLabel("Giới hạn token đầu ra", { exact: true }),
-    ).toHaveValue("8000");
+    await expect(dialog.getByLabel("Giới hạn token đầu ra", { exact: true })).toHaveValue(
+      "8000",
+    );
     await expect(dialog.getByLabel("Cách trình bày")).toHaveValue(
       "Dễ hiểu, gần gũi, sử dụng cách diễn đạt và mức độ chi tiết phù hợp lứa tuổi.",
     );
@@ -1369,9 +1617,9 @@ test.describe("M9.8 admin AI generation panel", () => {
       dialog.getByRole("button", { name: "Model", exact: true }),
     ).toContainText("OpenAI · gpt-4.1-mini");
     await expect(dialog.getByLabel("Temperature")).toHaveValue("0.35");
-    await expect(
-      dialog.getByLabel("Giới hạn token đầu ra", { exact: true }),
-    ).toHaveValue("12000");
+    await expect(dialog.getByLabel("Giới hạn token đầu ra", { exact: true })).toHaveValue(
+      "12000",
+    );
     await expect
       .poll(() => mock.promptPreviewPayloads.at(-1))
       .toMatchObject({
@@ -1399,6 +1647,8 @@ test.describe("M9.8 admin AI generation panel", () => {
         status: "FAILED",
         hasCurrentAsset: true,
         assetUrl: currentAsset,
+        openAiGenerationCostVnd: 66,
+        openAiCachedInputTokens: 600,
         currentRevisionId: "11111111-1111-4111-8111-111111111111",
         pendingRevisionId: "22222222-2222-4222-8222-222222222222",
         lastErrorCategory: "COMPILER",
@@ -1430,6 +1680,14 @@ test.describe("M9.8 admin AI generation panel", () => {
     await page.goto(`/admin/lessons/${lessonId}`);
     await page.getByRole("tab", { name: "Kiến thức" }).click();
 
+    const inlineFigure = page.locator('[data-admin-stem-figure="figure-with-current"]');
+    await expect(
+      inlineFigure.getByTestId("admin-stem-figure-openai-cache"),
+    ).toContainText("Cache OpenAI");
+    await expect(inlineFigure.getByTestId("admin-stem-figure-openai-cost")).toContainText(
+      "OpenAI · 66 VNĐ",
+    );
+
     const figureStatusSummary = page.getByRole("group", {
       name: "Theo dõi xử lý hình STEM",
     });
@@ -1448,6 +1706,12 @@ test.describe("M9.8 admin AI generation panel", () => {
     const overviewCard = figureStatusDetails.locator(
       '[data-admin-stem-figure-overview="figure-with-current"]',
     );
+    await expect(
+      overviewCard.getByTestId("admin-stem-figure-overview-openai-cache"),
+    ).toBeVisible();
+    await expect(
+      overviewCard.getByTestId("admin-stem-figure-overview-openai-cost"),
+    ).toContainText("OpenAI · 66 VNĐ");
     await overviewCard
       .getByRole("button", { name: "Xem chi tiết khối chứa Ảnh 1" })
       .click();
@@ -1641,6 +1905,43 @@ test.describe("M9.8 admin AI generation panel", () => {
         (element) => element.parentElement?.parentElement === document.body,
       ),
     ).resolves.toBe(true);
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+    await expect(
+      editor.getByText(/Chọn một thao tác, hệ thống sẽ tự biên dịch/u),
+    ).toBeVisible();
+    await expect(editor.getByTestId("stem-figure-quick-actions-popover")).toBeVisible();
+    const previewWidthBefore = await editor
+      .getByTestId("stem-figure-draft-preview-image")
+      .evaluate((element) => element.getBoundingClientRect().width);
+    await page.screenshot({
+      path: `../../.codex/artifacts/m9-23-quick-tools/summary-${testInfo.project.name}.png`,
+      fullPage: true,
+    });
+    const figureSizeSlider = editor.getByRole("slider", {
+      name: "Toàn bộ hình (%)",
+    });
+    await figureSizeSlider.fill("80");
+    await figureSizeSlider.press("Enter");
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(1);
+    expect(mock.figureActions.compilePayloads[0]?.latexSource).toContain(
+      "% classhero-display-scale: 0.8",
+    );
+    await expect
+      .poll(() =>
+        editor
+          .getByTestId("stem-figure-draft-preview-image")
+          .evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBeLessThan(previewWidthBefore * 0.9);
+    await page.screenshot({
+      path: `../../.codex/artifacts/m9-23-quick-tools/summary-scale-${testInfo.project.name}.png`,
+      fullPage: true,
+    });
+    const quickUndo = editor.getByRole("button", { name: "Hoàn tác" });
+    await expect(quickUndo).toBeEnabled();
+    await quickUndo.click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(2);
+    await expect(quickUndo).toBeDisabled();
     const source = editor.getByLabel("Mã vẽ hình");
     await source.press("ControlOrMeta+End");
     await source.pressSequentially("\\dr");
@@ -1660,12 +1961,12 @@ test.describe("M9.8 admin AI generation panel", () => {
     await expect(reopenedEditor.getByRole("button", { name: "Áp dụng" })).toBeEnabled();
     await reopenedEditor.getByRole("button", { name: "Biên dịch" }).click();
     await expect(reopenedEditor.getByRole("button", { name: "Áp dụng" })).toBeEnabled();
-    expect(mock.figureActions.compilePayloads[0]).not.toHaveProperty("figureId");
+    expect(mock.figureActions.compilePayloads.at(-1)).not.toHaveProperty("figureId");
     await expect(reopenedEditor.getByAltText("Tam giác ABC")).toBeVisible();
     await expect(reopenedEditor.getByLabel("Mô tả hình")).toHaveCount(0);
     await reopenedEditor.getByLabel("Chú thích").fill("Chú thích mới");
     await expect(reopenedEditor.getByAltText("Chú thích mới")).toBeVisible();
-    expect(mock.figureActions.compilePayloads).toHaveLength(1);
+    expect(mock.figureActions.compilePayloads).toHaveLength(3);
     await page.screenshot({
       path: `../../.codex/artifacts/m9-2-stem-figure-lifecycle/admin-editor-light-${testInfo.project.name}.png`,
       fullPage: true,
@@ -1678,6 +1979,86 @@ test.describe("M9.8 admin AI generation panel", () => {
       caption: "Chú thích mới",
     });
     await expect(reopenedEditor).toHaveCount(0);
+  });
+
+  test("edits and deletes individual TikZ text slots without double compile", async ({
+    page,
+  }) => {
+    const figure = stemFigureFixture({
+      id: "figure-text-slot-editor",
+      blockPath: "sections.0.blocks.0",
+      latexSource: String.raw`\begin{tikzpicture}
+\draw (0,0)--(2,0);
+\node at (0,0) {$A$};
+\node at (2,0) {$A$};
+\node at (1,1) {$65^\circ$};
+\end{tikzpicture}`,
+    });
+    const mock = await setupAiGenerationMock(page, {
+      initialSummaryContent: summaryContent([String(figure.id)]),
+      stemFigures: [figure],
+    });
+    await page.goto(`/admin/lessons/${lessonId}`);
+    await page.getByRole("tab", { name: "Kiến thức" }).click();
+
+    const card = page.locator(`[data-admin-stem-figure="${String(figure.id)}"]`);
+    await card.getByRole("button", { name: "Mở menu thao tác hình" }).click();
+    await page.getByRole("menuitem", { name: "Chỉnh sửa bằng mã code" }).click();
+    const editor = page.getByRole("dialog", { name: /Chỉnh sửa hình/ });
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+
+    await expect(editor.getByText("Nhãn và số đo (3)")).toBeVisible();
+    const firstLabel = editor.getByRole("textbox", { name: "Nhãn 1" });
+    await expect(firstLabel).toHaveValue("A");
+    await firstLabel.fill("B");
+    await firstLabel.press("Enter");
+
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(1);
+    await page.waitForTimeout(150);
+    expect(mock.figureActions.compilePayloads).toHaveLength(1);
+    expect(mock.figureActions.compilePayloads[0]?.latexSource).toContain("{$B$}");
+    expect(
+      String(mock.figureActions.compilePayloads[0]?.latexSource).match(/\{\$A\$\}/gu),
+    ).toHaveLength(1);
+
+    await editor.getByRole("button", { name: "Cài đặt nhãn 1" }).click();
+    const horizontalSlider = editor.getByRole("slider", { name: "Ngang (x)" });
+    const verticalSlider = editor.getByRole("slider", { name: "Dọc (y)" });
+    await expect(horizontalSlider).toHaveValue("0");
+    await expect(verticalSlider).toHaveValue("0");
+    await expect(editor.getByRole("slider", { name: "Cỡ chữ" })).toHaveValue("100");
+    await horizontalSlider.fill("12");
+    await editor.getByRole("button", { name: "Biên dịch" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(2);
+    expect(mock.figureActions.compilePayloads[1]?.latexSource).toContain("xshift=+12pt");
+
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+    await editor.getByRole("button", { name: "Cài đặt nhãn 1" }).click();
+    await expect(editor.getByRole("slider", { name: "Ngang (x)" })).toHaveValue("12");
+    const fontSizeSlider = editor.getByRole("slider", { name: "Cỡ chữ" });
+    await fontSizeSlider.fill("150");
+    await fontSizeSlider.press("Enter");
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(3);
+    expect(mock.figureActions.compilePayloads[2]?.latexSource).toContain(
+      String.raw`font=\fontsize{15pt}{18pt}\selectfont`,
+    );
+
+    const secondLabel = editor.getByRole("textbox", { name: "Nhãn 2" });
+    await secondLabel.fill("C");
+    await editor.getByRole("button", { name: "Biên dịch" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(4);
+    expect(mock.figureActions.compilePayloads[3]?.latexSource).toContain("{$C$}");
+    expect(mock.figureActions.compilePayloads[3]?.latexSource).not.toContain("{$A$}");
+
+    await editor.getByRole("button", { name: "Chỉnh nhanh" }).click();
+    await editor.getByRole("button", { name: "Xóa số đo 3" }).click();
+    await expect.poll(() => mock.figureActions.compilePayloads).toHaveLength(5);
+    expect(mock.figureActions.compilePayloads[4]?.latexSource).not.toContain(
+      String.raw`65^\circ`,
+    );
+    expect(mock.figureActions.compilePayloads[4]?.latexSource).toContain(
+      String.raw`\draw (0,0)--(2,0);`,
+    );
   });
 
   test("changes or clears a figure caption without compiling the current figure", async ({
@@ -2723,7 +3104,6 @@ function quizQuestionFixture(
       },
     },
     reviewStatus: "NEEDS_REVIEW",
-    solutionFigureMode: "NONE",
     figures: [],
     ...overrides,
   };
@@ -2738,6 +3118,7 @@ async function setupAiGenerationMock(
     initialFailedQuizGeneration?: boolean;
     promptPreviewDelayMs?: number;
     sourceCropDelayMs?: number;
+    solutionRefinementQueueDelayMs?: number;
     initialReviewStatus?: "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "HIDDEN";
     runningPolls?: number;
     initialSummaryContent?: unknown;
@@ -2765,6 +3146,8 @@ async function setupAiGenerationMock(
     reviewStatus: string;
   }> = [];
   const quizBulkReviewSetIds: string[] = [];
+  const solutionRefinementPayloads: Array<Record<string, unknown>> = [];
+  const solutionRefinementPreviewPayloads: Array<Record<string, unknown>> = [];
   const figureActions = {
     applies: 0,
     applyPayloads: [] as Array<Record<string, unknown>>,
@@ -2773,6 +3156,8 @@ async function setupAiGenerationMock(
     deleted: [] as string[],
     previewModes: [] as string[],
     previewPayloads: [] as Array<Record<string, unknown>>,
+    refinementPayloads: [] as Array<Record<string, unknown>>,
+    refinementPreviewPayloads: [] as Array<Record<string, unknown>>,
     rasterApplyPayloads: [] as string[],
     rasterPreviewPayloads: [] as string[],
     sourceCropPayloads: [] as Array<Record<string, unknown>>,
@@ -3626,6 +4011,12 @@ async function setupAiGenerationMock(
     const quizQuestionReviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/review$/,
     );
+    const solutionRefinementPreviewMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/solution-refinement\/preview$/,
+    );
+    const solutionRefinementMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/solution-refinement$/,
+    );
     const quizFigurePreviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/create-new-ai\/preview$/,
     );
@@ -3635,10 +4026,104 @@ async function setupAiGenerationMock(
     const quizFigureRefinePreviewMatch = pathname.match(
       /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/refine-ai\/preview$/,
     );
+    const quizFigureCompileMatch = pathname.match(
+      /^\/admin\/quiz-questions\/([^/]+)\/figures\/([^/]+)\/drafts\/compile$/,
+    );
+    if (method === "POST" && solutionRefinementPreviewMatch) {
+      solutionRefinementPreviewPayloads.push(
+        request.postDataJSON() as Record<string, unknown>,
+      );
+      return fulfillJson(route, 200, {
+        data: {
+          mode: request.postDataJSON().mode,
+          includeCurrentSolutionAsRejected:
+            request.postDataJSON().includeCurrentSolutionAsRejected === true,
+          requestHash: "a".repeat(64),
+          baseContentHash: "b".repeat(64),
+          questionImageDataUrl: null,
+          providerInput: {
+            model: "gpt-5.6-luna",
+            input: [{ role: "user", content: "Đề bài và lời giải hiện tại" }],
+          },
+          systemPrompt: "Rà soát tính đúng và trình bày lại lời giải rõ ràng.",
+          userPrompt: "Đề bài và lời giải hiện tại",
+          configuration: {
+            isDefaultConfigured: true,
+            resolvedProvider: "OPENAI",
+            resolvedModel: "gpt-5.6-luna",
+            temperature: 0.1,
+            reasoningEffort: "medium",
+            maxOutputTokens: 8_000,
+            modelOptions: [],
+          },
+          context: {
+            textInputTokens: 300,
+            imageInputTokens: 0,
+            estimatedTokens: 300,
+          },
+          estimatedCost: {
+            available: true,
+            inputUpperBoundUsd: 0.001,
+            inputUpperBoundVnd: 25,
+            outputUpperBoundUsd: 0.01,
+            outputUpperBoundVnd: 250,
+            upperBoundUsd: 0.011,
+            upperBoundVnd: 275,
+            fxRateVndPerUsd: 25_000,
+          },
+        },
+      });
+    }
+    if (method === "POST" && solutionRefinementMatch) {
+      solutionRefinementPayloads.push(request.postDataJSON() as Record<string, unknown>);
+      if (options.solutionRefinementQueueDelayMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.solutionRefinementQueueDelayMs),
+        );
+      }
+      return fulfillJson(route, 202, {
+        data: {
+          mode: "QUEUED",
+          jobId: "job-solution-refinement",
+          status: "QUEUED",
+        },
+      });
+    }
+    if (method === "GET" && pathname === "/jobs/job-solution-refinement") {
+      return fulfillJson(route, 200, {
+        data: {
+          jobId: "job-solution-refinement",
+          status: "RUNNING",
+          resourceType: "QUIZ_SOLUTION_REFINEMENT",
+          resourceId: null,
+          result: null,
+          error: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          startedAt: new Date().toISOString(),
+          finishedAt: null,
+        },
+      });
+    }
+    if (method === "POST" && quizFigureCompileMatch) {
+      figureActions.compilePayloads.push(
+        request.postDataJSON() as Record<string, unknown>,
+      );
+      return fulfillJson(route, 201, {
+        data: {
+          previewSvg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><path d="M8 70L60 8L112 70Z" fill="none" stroke="#0369a1" stroke-width="4"/></svg>`,
+          revisionId: "55555555-5555-4555-8555-555555555556",
+          sourceVersion: 2,
+        },
+      });
+    }
     if (method === "POST" && quizFigureRefinePreviewMatch) {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      figureActions.refinementPreviewPayloads.push(body);
       return fulfillJson(route, 200, {
         data: {
           operation: "REFINE_CURRENT",
+          adminInstructions: body.adminInstructions ?? null,
           currentImageDataUrl:
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
           providerInput: {
@@ -3682,12 +4167,15 @@ async function setupAiGenerationMock(
       });
     }
     if (method === "POST" && quizFigureRefineMatch) {
+      figureActions.refinementPayloads.push(
+        request.postDataJSON() as Record<string, unknown>,
+      );
       return fulfillJson(route, 202, {
         data: { jobId: "quiz-figure-refine-job", status: "QUEUED" },
       });
     }
     if (method === "POST" && quizFigurePreviewMatch) {
-      const body = request.postDataJSON() as { mode?: string };
+      const body = request.postDataJSON() as Record<string, unknown>;
       const quizFigureSystemPrompt = [
         "### HỒ SƠ MÔN HỌC CỦA HÌNH QUIZ",
         "- Môn học cố định: Toán.",
@@ -3786,6 +4274,8 @@ async function setupAiGenerationMock(
     quizReviewPayloads,
     quizBulkReviewSetIds,
     quizSetReviewPayloads,
+    solutionRefinementPayloads,
+    solutionRefinementPreviewPayloads,
     get summary() {
       return state.summary;
     },
@@ -4321,10 +4811,7 @@ async function assertSingleReferenceChoice(
   if (expectedChoice) {
     await expect(dialog.getByRole("radio", { name: expectedChoice })).toBeVisible();
   }
-  const referenceChoices = [
-    "Tạo mới lại",
-    "Chỉnh sửa hình hiện tại",
-  ] as const;
+  const referenceChoices = ["Tạo mới lại", "Chỉnh sửa hình hiện tại"] as const;
   for (const omittedChoice of referenceChoices.filter(
     (choice) => choice !== expectedChoice,
   )) {

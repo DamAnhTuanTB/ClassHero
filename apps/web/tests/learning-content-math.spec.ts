@@ -1,12 +1,226 @@
 import { expect, test } from "@playwright/test";
 import katex from "katex";
+import "katex/contrib/mhchem";
 import { MathpixMarkdownModel } from "mathpix-markdown-it";
 
 import {
+  normalizeLearningContentLatex,
   normalizeLearningContentLatexCommandEscapes,
   normalizeLearningContentMathMarkdown,
   normalizeMathpixMarkdown,
 } from "@/lib/learning-content-math";
+
+const LATEX_COMMAND_NAMES_THAT_MUST_NOT_TOUCH_PROSE = [
+  "text",
+  "mathrm",
+  "mathbf",
+  "mathit",
+  "mathsf",
+  "mathtt",
+  "mathbb",
+  "mathcal",
+  "operatorname",
+  "ce",
+  "pu",
+  "begin",
+  "end",
+  "frac",
+  "dfrac",
+  "tfrac",
+  "sqrt",
+  "overline",
+  "underline",
+  "overbrace",
+  "underbrace",
+  "widehat",
+  "widetilde",
+  "hat",
+  "tilde",
+  "bar",
+  "vec",
+  "dot",
+  "ddot",
+  "overrightarrow",
+  "overleftarrow",
+  "circ",
+  "pi",
+  "theta",
+  "alpha",
+  "beta",
+  "gamma",
+  "delta",
+  "epsilon",
+  "lambda",
+  "mu",
+  "rho",
+  "sigma",
+  "phi",
+  "varphi",
+  "omega",
+  "infty",
+  "pm",
+  "mp",
+  "times",
+  "div",
+  "cdot",
+  "le",
+  "leq",
+  "ge",
+  "geq",
+  "ne",
+  "neq",
+  "approx",
+  "sim",
+  "cong",
+  "equiv",
+  "parallel",
+  "perp",
+  "in",
+  "notin",
+  "subset",
+  "subseteq",
+  "supset",
+  "supseteq",
+  "cup",
+  "cap",
+  "sum",
+  "prod",
+  "int",
+  "lim",
+  "sin",
+  "cos",
+  "tan",
+  "cot",
+  "log",
+  "ln",
+  "angle",
+  "triangle",
+  "left",
+  "right",
+] as const;
+
+test("normalizes and renders supported Math, Chemistry, and Physics commands", () => {
+  const samples = [
+    { input: String.raw`frac{1}{2}`, expected: String.raw`\dfrac{1}{2}` },
+    {
+      input: String.raw`ce{2H2 + O2 -> 2H2O}`,
+      expected: String.raw`\ce{2H2 + O2 -> 2H2O}`,
+    },
+    { input: String.raw`pu{9.81 m//s2}`, expected: String.raw`\pu{9.81 m//s2}` },
+    { input: String.raw`\\vec{F}`, expected: String.raw`\vec{F}` },
+    { input: String.raw`\\ce{SO4^2-}`, expected: String.raw`\ce{SO4^2-}` },
+    { input: String.raw`\\pu{kg.m.s-2}`, expected: String.raw`\pu{kg.m.s-2}` },
+  ];
+
+  for (const sample of samples) {
+    const normalized = normalizeLearningContentLatex(sample.input);
+    expect(normalized).toBe(sample.expected);
+    const html = katex.renderToString(normalized, {
+      strict: false,
+      throwOnError: false,
+    });
+    expect(html).not.toContain('mathcolor="#cc0000"');
+  }
+});
+
+test("không biến từ trùng tên lệnh LaTeX trong văn xuôi thành công thức", () => {
+  const prose =
+    "Khi kim loại kết hợp với phi kim tạo thành muối, chất tan trong nước và nội dung được in đậm trong log dữ liệu.";
+
+  expect(normalizeMathpixMarkdown(prose)).toBe(prose);
+
+  const commandLikeProse = LATEX_COMMAND_NAMES_THAT_MUST_NOT_TOUCH_PROSE.map(
+    (word) => `trước ${word} sau`,
+  ).join("; ");
+  expect(normalizeMathpixMarkdown(commandLikeProse)).toBe(commandLikeProse);
+
+  const commandLikeTextWithArguments = LATEX_COMMAND_NAMES_THAT_MUST_NOT_TOUCH_PROSE.map(
+    (word) => `${word}{mẫu}`,
+  ).join("; ");
+  expect(normalizeMathpixMarkdown(commandLikeTextWithArguments)).toBe(
+    commandLikeTextWithArguments,
+  );
+
+  const unicodeProse = "muối, muốn, mu\u0301, phi kim, hòa tan, in ấn";
+  expect(normalizeMathpixMarkdown(unicodeProse)).toBe(unicodeProse);
+
+  const escapedOrUnclosedProse = String.raw`Giá \$5; chuỗi \\phi; delimiter chưa đóng $phi kim`;
+  expect(normalizeMathpixMarkdown(escapedOrUnclosedProse)).toBe(escapedOrUnclosedProse);
+
+  const decodedEscapeCases = [
+    [`${String.fromCharCode(9)}riangle`, String.raw`\triangle`],
+    [`${String.fromCharCode(12)}rac{1}{2}`, String.raw`\dfrac{1}{2}`],
+    [`${String.fromCharCode(8)}eta`, String.raw`\beta`],
+    [`${String.fromCharCode(13)}ight`, String.raw`\right`],
+    [`${String.fromCharCode(28)}hat{ABC}`, String.raw`\widehat{ABC}`],
+    [`${String.fromCharCode(28)}widehat{ABC}`, String.raw`\widehat{ABC}`],
+    [`${String.fromCharCode(28)}root{61}`, String.raw`\sqrt{61}`],
+    [`${String.fromCharCode(28)}frac{1}{2}`, String.raw`\dfrac{1}{2}`],
+    [String.raw`\u001cwidehat{ABC}`, String.raw`\widehat{ABC}`],
+    [String.raw`u001croot{61}`, String.raw`\sqrt{61}`],
+    [String.raw`u001calpha`, String.raw`\alpha`],
+    [`${String.fromCharCode(27)}0`, String.raw`\circ`],
+  ] as const;
+  for (const [decoded, repaired] of decodedEscapeCases) {
+    expect(normalizeMathpixMarkdown(`trước ${decoded} sau`)).toBe(`trước ${decoded} sau`);
+    expect(normalizeMathpixMarkdown(`trước $${decoded}$ sau`)).toBe(
+      `trước $${repaired}$ sau`,
+    );
+  }
+
+  expect(
+    normalizeMathpixMarkdown(String.raw`Phi kim có biểu thức $phi=frac{1}{2}$.`),
+  ).toBe(String.raw`Phi kim có biểu thức $\phi=\dfrac{1}{2}$.`);
+  expect(
+    normalizeMathpixMarkdown(String.raw`$phi$; $$frac{1}{2}$$; \(theta\); \[ce{NaCl}\]`),
+  ).toBe(String.raw`$\phi$; $$\dfrac{1}{2}$$; \(\theta\); \[\ce{NaCl}\]`);
+
+  const renderedProse = MathpixMarkdownModel.markdownToHTML(
+    normalizeMathpixMarkdown(prose),
+    { htmlTags: true },
+  );
+  expect(renderedProse).toContain("phi kim tạo thành muối");
+  expect(renderedProse).toContain("chất tan trong nước");
+  expect(renderedProse).not.toContain("\\phi");
+  expect(renderedProse).not.toContain("\\mu");
+  expect(renderedProse).not.toContain("\\tan");
+});
+
+test("loại khoảng trắng sát delimiter để Mathpix nhận đúng inline math", () => {
+  const malformed = String.raw`Vì $ a\cdot(-4)^2=a\cdot4^2=-7 $.`;
+  const normalized = normalizeMathpixMarkdown(malformed);
+
+  expect(normalized).toBe(String.raw`Vì $a\cdot(-4)^2=a\cdot4^2=-7$.`);
+
+  const html = MathpixMarkdownModel.markdownToHTML(normalized, {
+    htmlTags: true,
+    outMath: {
+      include_latex: true,
+      include_svg: false,
+      output_format: "latex",
+    },
+  });
+  expect(html).toContain('class="math-inline');
+  expect(html).not.toContain(String.raw`$ a\cdot`);
+
+  expect(
+    normalizeMathpixMarkdown(String.raw`Trước $ x $ sau; $$ y $$; \( z \); \[ t \]`),
+  ).toBe(String.raw`Trước $x$ sau; $$y$$; \(z\); \[t\]`);
+  expect(normalizeMathpixMarkdown(String.raw`Giữ $\text{ a }$ nguyên vẹn.`)).toBe(
+    String.raw`Giữ $\text{ a }$ nguyên vẹn.`,
+  );
+  expect(normalizeMathpixMarkdown(String.raw`Giữ $a\ $ nguyên vẹn.`)).toBe(
+    String.raw`Giữ $a\ $ nguyên vẹn.`,
+  );
+});
+
+test("tự đóng inline math khi model để công thức tràn sang văn xuôi", () => {
+  const malformed = String.raw`Cao $8\,\text{m}. Hai điểm thuộc cung. Lấy $\pi\approx3{,}14$.`;
+  const repaired = String.raw`Cao $8\,\text{m}$. Hai điểm thuộc cung. Lấy $\pi\approx3{,}14$.`;
+
+  expect(normalizeMathpixMarkdown(malformed)).toBe(repaired);
+  expect(normalizeMathpixMarkdown(repaired)).toBe(repaired);
+});
 
 const LEADING_LOGICAL_RELATION_OPERATORS = [
   "Rightarrow",
@@ -106,9 +320,9 @@ test("chỉ bỏ slash escape dư và không nuốt row separator đứng trư�
   expect(normalizeLearningContentLatexCommandEscapes(String.raw`\\widehat{C}`)).toBe(
     String.raw`\widehat{C}`,
   );
-  expect(
-    normalizeLearningContentLatexCommandEscapes(String.raw`\\\\widehat{C}`),
-  ).toBe(String.raw`\\\widehat{C}`);
+  expect(normalizeLearningContentLatexCommandEscapes(String.raw`\\\\widehat{C}`)).toBe(
+    String.raw`\\\widehat{C}`,
+  );
 
   const rowBeforeAlignmentMarker = String.raw`x&=1\\&=2`;
   expect(normalizeLearningContentLatexCommandEscapes(rowBeforeAlignmentMarker)).toBe(
@@ -173,15 +387,25 @@ test("pipeline Mathpix giữ row separator ở mọi lệnh từng được hỗ
     "ne",
     "le",
     "ge",
+    "vec",
+    "operatorname",
+    "sum",
+    "int",
+    "ce",
+    "pu",
   ];
 
   for (const command of commands) {
     const validRowStart = `x&=1\\\\\\${command}`;
     const expectedCommand = command === "frac" ? "dfrac" : command;
     const expectedRowStart = `x&=1\\\\\\${expectedCommand}`;
-    expect(normalizeMathpixMarkdown(validRowStart)).toBe(expectedRowStart);
+    expect(normalizeMathpixMarkdown(`$$${validRowStart}$$`)).toBe(
+      `$$${expectedRowStart}$$`,
+    );
 
     const doubledCommandEscape = `x&=1\\\\\\\\${command}`;
-    expect(normalizeMathpixMarkdown(doubledCommandEscape)).toBe(expectedRowStart);
+    expect(normalizeMathpixMarkdown(`$$${doubledCommandEscape}$$`)).toBe(
+      `$$${expectedRowStart}$$`,
+    );
   }
 });

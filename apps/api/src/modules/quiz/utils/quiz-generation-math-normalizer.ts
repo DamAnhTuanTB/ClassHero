@@ -1,4 +1,8 @@
-import { normalizeMathTextLatexCommands } from "@learning-path/shared";
+import {
+  normalizeMathTextLatexCommands,
+  normalizeMissingInlineMathClosers,
+  stripForbiddenTextControlCharacters,
+} from "@learning-path/shared";
 
 import type { GeneratedQuizQuestion } from "#api/modules/quiz/types/quiz-generation.types";
 
@@ -161,9 +165,12 @@ function isInlineMathClosingBoundary(character: string | undefined) {
 
 function normalizeGeneratedQuizValue<T>(value: T): T {
   if (typeof value === "string") {
-    return normalizeQuizDisplayMathEnvironments(
-      normalizeMathTextLatexCommands(normalizeQuizInlineMathDelimiters(value)),
-    ) as T;
+    const normalized = normalizeQuizDisplayMathEnvironments(
+      normalizeMathTextLatexCommands(
+        normalizeMissingInlineMathClosers(normalizeQuizInlineMathDelimiters(value)),
+      ),
+    );
+    return stripForbiddenTextControlCharacters(normalized) as T;
   }
   if (Array.isArray(value)) {
     return value.map((item) => normalizeGeneratedQuizValue(item)) as T;

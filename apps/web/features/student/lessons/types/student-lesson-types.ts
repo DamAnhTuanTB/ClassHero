@@ -51,6 +51,7 @@ export type QuizFigureAsset = {
   fileId: string;
   mimeType: string;
   url: string | null;
+  displayScale?: number | null;
 };
 
 export type StudentAssessmentQuestion = {
@@ -71,7 +72,6 @@ export type StudentAssessmentQuestion = {
   sortOrder: number;
   questionNumber?: number;
   hasExplanation?: boolean;
-  solutionFigureMode?: "NONE" | "EXTEND_QUESTION" | "REDRAW_AS_MODEL";
   questionFigure?: QuizFigureAsset | null;
   solutionFigure?: QuizFigureAsset | null;
 };

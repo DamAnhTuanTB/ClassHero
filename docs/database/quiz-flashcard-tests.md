@@ -31,6 +31,12 @@ Rules:
 - Bộ AI tạo do học sinh yêu cầu có `source = AI`, `review_status = NEEDS_REVIEW`, `is_reserve = true`.
 - Học sinh chỉ nhận bộ khi chính bộ đã được admin phát hành
   (`review_status = APPROVED`) và không dùng bộ reserve trực tiếp.
+- Action admin xóa cả Quiz set dùng hard delete. Service phải xóa
+  `quiz_attempts` trước vì FK `quiz_attempts.quiz_set_id` là `RESTRICT`; answer
+  cascade theo attempt, sau đó xóa set để cascade questions/figures. Các
+  `ai_explanations` target `QUIZ_QUESTION` được xóa tường minh vì quan hệ từ câu
+  sang explanation không cascade ngược. `deleted_at` chỉ còn tương thích dữ liệu
+  legacy và không được endpoint xóa set mới ghi nữa.
 
 ### 7.2. `quiz_questions`
 
@@ -49,7 +55,6 @@ difficulty Difficulty default MEDIUM
 review_status ReviewStatus default APPROVED
 published_at timestamp?
 explanation_id uuid? fk ai_explanations.id
-solution_figure_mode QuizSolutionFigureMode default NONE
 sort_order int default 0
 created_at timestamp
 updated_at timestamp
@@ -89,16 +94,16 @@ Rules:
   không lưu source hash/chunk/page ở cấp câu và không đọc legacy `exampleBlock`.
   Student chỉ nhận projection `explanationBlock`, không nhận metadata nội bộ.
 - `quizExplanationBlock` của Quiz Toán chỉ giữ `isGeometry`; không lưu
-  `geometryStatement`, `hypotheses` hoặc `conclusions`. Key cũ trong JSON lịch
-  sử không còn thuộc contract, không được projection ra API/UI và bị loại khi
-  câu AI được lưu lại. Phân loại Hình học không quyết định
-  `solution_figure_mode`. Summary/Example giữ contract GT–KL riêng.
-- `solution_figure_mode`: `NONE`, `EXTEND_QUESTION` hoặc `REDRAW_AS_MODEL`.
-  Không có mode lặp nguyên hình đề trong lời giải. EXTEND luôn có revision lời
-  giải trỏ `derived_from_question_revision_id` tới exact revision hình đề đã dùng
-  làm nền. REDRAW cũng giữ pointer này làm provenance của hình được mô hình hóa
-  lại, nhưng source lời giải là một figure hoàn chỉnh mới chứ không phải phần
-  extension chèn vào source hình đề.
+  `geometryStatement`, `hypotheses`, `conclusions` hoặc `answer`. Đáp án chỉ nằm
+  trong `correct_answer_json`; key cũ trong JSON lịch sử không còn thuộc
+  contract, không được projection ra API/UI và bị loại khi câu AI được lưu lại.
+  Phân loại Hình học không tự quyết định có tạo hình đề hay hình lời giải.
+  Summary/Example giữ contract GT–KL riêng.
+- Quiz không lưu mode hình lời giải trên `quiz_questions`. Phase 1 chỉ trả
+  `solutionFigure: boolean`; nếu `true`, worker tạo một resource role `SOLUTION`
+  hoàn chỉnh và độc lập với resource role `QUESTION`. Hai resource không có
+  lineage hoặc khóa ngoại phụ thuộc nhau; xóa, thay hoặc tạo lại một role không
+  làm thay đổi role còn lại.
 - Với `TEXT_INPUT`, `correct_answer_json` chứa đúng một chuỗi canonical. Backend
   tự so sánh tương đương số chính xác và fallback về chuỗi đã chuẩn hóa;
   `grading_config_json` không còn điều khiển cách chấm và bản ghi mới/cập nhật
@@ -115,9 +120,9 @@ Rules:
 - `quiz_figures` có tối đa một row cho mỗi `(quiz_question_id, role)` với role
   `QUESTION | SOLUTION`, giữ lifecycle, plan, subject snapshot và current/pending
   revision.
-- `quiz_figure_revisions` là nguồn chuẩn của TeX/TikZ hoặc file `ADMIN_UPLOAD`,
-  preview/delivery asset và lineage. Revision SOLUTION do AI mở rộng hoặc vẽ lại
-  phải trỏ exact revision QUESTION đã dùng làm nền hoặc nguồn provenance.
+- `quiz_figure_revisions` là nguồn chuẩn của TeX/TikZ hoặc file `ADMIN_UPLOAD`
+  và preview/delivery asset. Revision `QUESTION` và `SOLUTION` không có lineage
+  phụ thuộc lẫn nhau.
 - `quiz_figure_render_attempts` audit từng lần provider/compile/render và usage.
 - Action `Tinh chỉnh` dùng revision origin và attempt kind `AI_REFINEMENT`; nó
   luôn tạo pending revision mới, không ghi đè source/file của current revision.

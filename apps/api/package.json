@@ -8,8 +8,11 @@
     }
   },
   "scripts": {
+    "predev": "pnpm db:generate",
     "dev": "node scripts/dev-with-metadata.mjs & tsx watch src/workers/main.ts",
+    "predev:api": "pnpm db:generate",
     "dev:api": "node scripts/dev-with-metadata.mjs",
+    "prebuild": "pnpm db:generate",
     "build": "tsc -p tsconfig.build.json",
     "db:generate": "prisma generate --config prisma.config.ts",
     "db:seed": "tsx prisma/seed.ts",
@@ -25,6 +28,7 @@
     "test:m4.3": "vitest run test/m4.3-worker-foundation.test.ts",
     "test:m4.4": "vitest run test/m4.4-document-processing.test.ts test/m4.4-ocr-pipeline.e2e.test.ts",
     "test:m4.4:live": "pnpm build && tsx test/m4.4-live-mathpix-minio.ts",
+    "preworker:dev": "pnpm db:generate",
     "worker:dev": "tsx watch src/workers/main.ts"
   },
   "dependencies": {

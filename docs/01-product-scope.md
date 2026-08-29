@@ -111,6 +111,36 @@ Admin có quyền:
 - Mỗi hình có asset hiện hành hiển thị action `Đổi caption`. Modal cho phép sửa
   hoặc xóa trắng caption; caption rỗng được lưu hợp lệ thành `null` mà không thay
   ảnh, biên dịch lại hoặc gọi AI.
+- Với hình Sinh kiến thức và Quiz có asset hiện hành được tạo qua OpenAI, admin
+  thấy chi phí thực tế của đúng asset. Nếu usage của asset có
+  `cachedInputTokens > 0`, khung ảnh hiển thị thêm nhãn cache ngay trước nhãn chi
+  phí. Ảnh upload/code, crop SGK hoặc provider khác không được suy diễn là đã
+  dùng cache.
+- Modal chỉnh sửa bằng mã code của cả Sinh kiến thức và Quiz có bộ `Chỉnh nhanh`
+  dùng chung, dành cho admin không cần biết TikZ: ẩn nhãn độ dài, số đo góc hoặc
+  nhãn chỉ chứa số; xóa nét phụ đứt/chấm; chọn độ đậm nét; dùng slider `10%–200%`
+  với mốc gốc `100%` cho toàn hình, `Nhãn chính` và `Nhãn phụ`; hoàn tác thao tác gần nhất. Bảng
+  công cụ mở dạng popover nổi nên không chiếm chỗ của editor/preview. Mỗi action
+  biến đổi source theo quy tắc xác
+  định rồi tự gọi pipeline compile/validator hiện có để cập nhật preview; current
+  revision chỉ đổi khi admin bấm `Áp dụng`. Bộ công cụ không gọi provider AI,
+  không xóa tên điểm/ký hiệu nguyên tố theo heuristic mơ hồ và không có action
+  thay đổi hình học tự động. Slider chỉ commit khi thả/blur/Enter để không gọi
+  compile liên tục trong lúc kéo. Thu/phóng dùng metadata comment an toàn trong source
+  để cùng tỷ lệ được giữ ở preview, card admin và giao diện học sinh; ảnh cũ chưa
+  chỉnh giữ nguyên cách hiển thị hiện tại.
+- Trong cùng bộ `Chỉnh nhanh`, nhóm `Nhãn và số đo` liệt kê riêng từng nội dung
+  chữ mà transformer xác định chắc chắn đang được render bởi source TikZ, theo
+  đúng thứ tự xuất hiện. Admin sửa trực tiếp giá trị trong input hoặc xóa đúng
+  mục đó mà không phải tìm dòng code. Icon cài đặt cạnh icon xóa mở ba slider
+  nằm ngay dưới input của chính slot: dịch ngang/dọc `-50pt–+50pt` với vị trí
+  hiện tại là `0`, và cỡ chữ riêng `10%–200%` với cỡ hiện tại là `100%`. Thay đổi
+  chỉ tác động text slot được chọn, giữ nguyên geometry/anchor và tự biên dịch
+  lại preview; `Áp dụng` vẫn là bước lưu duy nhất. Cỡ chữ riêng được nhân trên
+  cỡ nền của nhóm `Nhãn chính/Nhãn phụ`, nên đổi hai lớp slider theo bất kỳ thứ
+  tự nào cũng không làm mất tỷ lệ riêng. Source mơ hồ hoặc cú pháp text chưa được
+  hỗ trợ phải được báo để admin sửa trong editor, không được đoán rồi thay nhầm
+  nội dung khác.
 - Menu ảnh của block có lựa chọn `Xem ảnh sách giáo khoa` khi figure đích có
   reference SGK; lựa chọn này mở cùng khung ảnh nguồn ngay trong block như icon
   mở nhanh ở figure. Trong khung, checkbox `Tự động làm nét ảnh` mặc định tắt.
@@ -129,16 +159,37 @@ Admin có quyền:
   trở thành input của lượt chỉnh kế tiếp trong cùng modal, còn ảnh hiện hành
   không đổi nếu xử lý thất bại. Nét tô vượt mép được clip theo biên ảnh và phần
   mask hợp lệ bên trong vẫn được xử lý.
-- Tạo, sửa, xóa quiz.
+- Tạo, sửa, xóa quiz. Riêng action xóa cả bộ Quiz là xóa cứng: bộ câu hỏi, mọi
+  câu/lời giải/hình và toàn bộ lịch sử làm bài phụ thuộc bị xóa vĩnh viễn; audit
+  log quản trị vẫn được giữ.
 - Dùng AI tạo quiz.
+- Tại từng khối lời giải Quiz, admin có hai action riêng `Tinh chỉnh lời giải`
+  và `Tạo lại lời giải`.
+  Modal tự điền đề bài, phương án/mệnh đề, đáp án đúng và lời giải hiện tại; admin
+  có thể thêm yêu cầu riêng và xem request/chi phí trước khi thực hiện. AI làm rõ
+  lập luận, bổ sung mắt xích còn viết tắt, sửa câu từ/công thức và làm đẹp cách
+  trình bày nhưng phải giữ nguyên đề, đáp án và gợi ý. `Tạo lại lời giải` giải
+  độc lập từ đề, không nhận đáp án/gợi ý/lời giải cũ và được cập nhật đồng bộ đáp
+  án, gợi ý, lời giải. Cả hai action đều đưa câu về trạng thái cần duyệt lại.
+  Riêng `Tạo lại lời giải` có checkbox mặc định tắt để gửi lời giải hiện tại như
+  mẫu sai cần tránh; khi bật vẫn ẩn đáp án và gợi ý cũ.
 - Với từng hình đề/hình lời giải của Quiz, admin có cùng bộ thao tác quản trị như
   hình Sinh kiến thức: chỉnh sửa hoặc tạo mới bằng mã code, tạo mới bằng AI, tải
   ảnh lên, xóa ảnh và chỉnh sửa caption.
+- Trên header từng card Quiz, admin có một menu ảnh AI để tạo trực tiếp hình đề,
+  tạo hình lời giải bằng cách mở rộng exact hình đề AI, hoặc vẽ lại một mô hình
+  lời giải độc lập. EXTEND chỉ khả dụng khi current hình đề thực sự do AI tạo và
+  đã render thành công; REDRAW không yêu cầu hình đề. Mỗi lựa chọn mở lại đúng
+  modal cấu hình/prompt/request/chi phí của luồng `Tạo mới bằng AI` hiện có. Menu
+  này hiện cho mọi loại câu Quiz, gồm cả `Đúng/Sai` một mệnh đề; riêng pipeline
+  sinh Quiz tự động vẫn không tự quyết định tạo hình cho loại câu đó.
 - Với hình Quiz TikZ đã sinh thành công, admin có action `Tinh chỉnh`. Hệ thống
-  gửi đồng thời source hiện tại, ảnh render hiện tại và figure plan gốc cho model
-  ảnh để đánh giá toàn diện rồi trả một source TikZ hoàn chỉnh mới. Tinh chỉnh
-  bao gồm sửa sai/vô lý/thiếu đối tượng, quan hệ, nhãn, số đo, bố cục và khả năng
-  đọc; không bị giới hạn ở làm đẹp mỹ thuật. Bấm action chỉ mở modal cho admin
+  gửi source hiện tại, ảnh render hiện tại và figure plan gốc cho model ảnh để
+  đánh giá toàn diện. Riêng `EXTEND_QUESTION`, request gửi thêm exact source và
+  ảnh render của revision hình đề bất biến; model chỉ trả phần extension mới để
+  backend ghép vào exact base. Các mode còn lại trả source TikZ hoàn chỉnh mới.
+  Tinh chỉnh bao gồm sửa sai/vô lý/thiếu đối tượng, quan hệ, nhãn, số đo, bố cục
+  và khả năng đọc; không bị giới hạn ở làm đẹp mỹ thuật. Bấm action chỉ mở modal cho admin
   xem ảnh, prompt/request thực tế và chi phí tối đa ước tính; chỉ nút `Thực hiện`
   mới enqueue paid call, còn `Hủy` không phát sinh chi phí. Ảnh hiện hành chỉ đổi
   sau khi source mới vượt source policy, compile, SVG validator và promote thành công.

@@ -51,6 +51,7 @@ export function stripQuizGeometryStatementFromMetadata(value: unknown) {
   if (!isRecord(metadata.quizExplanationBlock)) return metadata;
   const explanationBlock = cloneJsonRecord(metadata.quizExplanationBlock);
   delete explanationBlock.geometryStatement;
+  delete explanationBlock.answer;
   metadata.quizExplanationBlock = explanationBlock;
   return metadata;
 }
@@ -78,6 +79,7 @@ export function buildCurrentQuizQuestionJson(
     ? cloneJsonRecord(current.explanation)
     : {};
   delete explanation.geometryStatement;
+  delete explanation.answer;
   const currentExplanationBlock = readCurrentExplanationBlock(
     question.sourceMetadataJson,
   );
@@ -89,7 +91,6 @@ export function buildCurrentQuizQuestionJson(
     question.questionType !== QuestionType.MULTI_STATEMENT_TRUE_FALSE
   ) {
     explanation.solution = currentExplanationBlock.solution;
-    explanation.answer = currentExplanationBlock.answer;
     if (typeof currentExplanationBlock.isGeometry === "boolean") {
       explanation.isGeometry = currentExplanationBlock.isGeometry;
     }
@@ -100,7 +101,6 @@ export function buildCurrentQuizQuestionJson(
         delete explanation.statementSolutions;
       }
     }
-    explanation.answer = buildCurrentAnswer(question);
   }
   current.explanation = explanation;
 
@@ -182,31 +182,6 @@ export function replaceQuizGenerationQuestionOutput(
   return currentOutput;
 }
 
-function buildCurrentAnswer(question: CurrentQuizQuestionJsonSource) {
-  switch (question.questionType) {
-    case QuestionType.MULTIPLE_CHOICE: {
-      const correctOptionId = readStringAnswers(question.correctAnswerJson)[0];
-      const correctOption = readQuizOptions(question.optionsJson).find(
-        (option) => option.id === correctOptionId,
-      );
-      return correctOptionId && correctOption
-        ? `${correctOptionId}. ${correctOption.text}`
-        : (correctOptionId ?? "");
-    }
-    case QuestionType.TRUE_FALSE:
-      return question.correctAnswerJson === true ? "Đúng." : "Sai.";
-    case QuestionType.MULTI_STATEMENT_TRUE_FALSE:
-      return readMultiStatementAnswers(question.correctAnswerJson)
-        .map(
-          (answer, index) =>
-            `${String.fromCharCode(97 + index)}) ${answer.value ? "Đúng" : "Sai"}.`,
-        )
-        .join("\n");
-    case QuestionType.TEXT_INPUT:
-      return readStringAnswers(question.correctAnswerJson)[0] ?? "";
-  }
-}
-
 function stripQuizGeometryStatementFromQuestion(
   question: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -214,6 +189,7 @@ function stripQuizGeometryStatementFromQuestion(
   if (!isRecord(sanitized.explanation)) return sanitized;
   const explanation = cloneJsonRecord(sanitized.explanation);
   delete explanation.geometryStatement;
+  delete explanation.answer;
   sanitized.explanation = explanation;
   return sanitized;
 }
@@ -256,7 +232,6 @@ function readCurrentExplanationBlock(value: unknown) {
   const block = value.quizExplanationBlock;
   if (
     block.type !== "quizExplanation" ||
-    typeof block.answer !== "string" ||
     (block.solution !== null && typeof block.solution !== "string")
   ) {
     return null;
@@ -264,7 +239,7 @@ function readCurrentExplanationBlock(value: unknown) {
   return block;
 }
 
-function serializeQuizRichText(value: unknown): string {
+export function serializeQuizRichText(value: unknown): string {
   if (Array.isArray(value)) {
     return value.map(serializeQuizRichText).filter(Boolean).join("\n").trim();
   }

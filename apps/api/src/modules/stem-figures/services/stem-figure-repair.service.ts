@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   STEM_FIGURE_MAX_SOURCE_CHARACTERS,
@@ -14,6 +14,7 @@ import type { LessonSummarySubjectSnapshot } from "#api/modules/ai/types/lesson-
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import type { StemFigureGenerationBrief } from "#api/modules/stem-figures/types/stem-figure-generation.types";
 import { buildStemFigureSystemPrompt } from "#api/modules/stem-figures/utils/prompts/stem-figure-system-prompt-resolver";
+import { autoRepairStemFigureLatexSource } from "#api/modules/stem-figures/utils/tex-source-policy";
 import type { AiInputImage } from "#api/modules/ai/types/ai-text.types";
 import {
   buildOpenAiStructuredResponseRequest,
@@ -142,6 +143,8 @@ export type StemFigureRepairKind =
 
 @Injectable()
 export class StemFigureRepairService {
+  private readonly logger = new Logger(StemFigureRepairService.name);
+
   constructor(
     @Inject(AiProviderCallService)
     private readonly providerCall: AiProviderCallService,
@@ -305,7 +308,18 @@ export class StemFigureRepairService {
       structuredInput,
       generatedStemFigureSchema,
     );
-    return output.data.latexSource.trim();
+    const autoRepair = autoRepairStemFigureLatexSource({
+      source: output.data.latexSource.trim(),
+      subjectKey: input.subject.key,
+      mode: "REPAIR",
+      authorityText: JSON.stringify({ diagnosticBatch: input.diagnosticBatch }),
+    });
+    if (autoRepair.changes.length) {
+      this.logger.warn(
+        `Stem figure ${input.figureId} applied ${autoRepair.changes.length} deterministic source repair(s) after provider repair.`,
+      );
+    }
+    return autoRepair.source;
   }
 
   async createNew(input: {
@@ -326,6 +340,8 @@ export class StemFigureRepairService {
       "stem-figure-create-new",
       input.figureId,
       input.revisionId,
+      input.backgroundJobId,
+      input.jobAttempt,
     ].join(":");
     const referenceAssets = resolveStemFigureProviderReferenceAssets(input.brief);
     const referenceImages = (input.referenceImages ?? []).slice(
@@ -378,7 +394,30 @@ export class StemFigureRepairService {
       structuredInput,
       generatedStemFigureSchema,
     );
-    return output.data.latexSource.trim();
+    const source = output.data.latexSource.trim();
+    const promptMode = resolveStemFigureCreatePromptMode({
+      referenceMode: toProviderGenerationBrief(input.brief).reference.mode,
+      editsCurrentLatexSource:
+        input.brief.referenceImageMode === "CURRENT_ONLY" &&
+        Boolean(input.brief.currentLatexSource?.trim()),
+    });
+    const autoRepair = autoRepairStemFigureLatexSource({
+      source,
+      subjectKey: input.subject.key,
+      mode: promptMode,
+      authorityText: JSON.stringify({
+        blockContent: input.brief.blockContent,
+        ...(input.brief.adminInstructions?.trim()
+          ? { adminInstructions: input.brief.adminInstructions.trim() }
+          : {}),
+      }),
+    });
+    if (autoRepair.changes.length) {
+      this.logger.warn(
+        `Stem figure ${input.figureId} applied ${autoRepair.changes.length} deterministic source repair(s).`,
+      );
+    }
+    return autoRepair.source;
   }
 }
 
@@ -449,25 +488,38 @@ function resolveStemFigureCreatePromptVersion(
   subject: LessonSummarySubjectSnapshot,
 ) {
   const subjectKey = subject.key.toLowerCase();
-  const version =
+  const unchangedModeVersion =
     subject.key === "MATH"
-      ? "v63-adaptive-label-typography"
-      : "v62-adaptive-label-typography";
+      ? "v83-midpoint-marker-auto-repair"
+      : subject.key === "PHYSICS"
+        ? "v76-no-narrative-callouts"
+        : subject.key === "CHEMISTRY"
+          ? "v75-no-narrative-callouts"
+          : "v75-no-narrative-callouts";
   switch (mode) {
     case "REGENERATE_FROM_SOURCE":
-      return `stem-figure-${subjectKey}-regenerate-from-source-${version}`;
+      return `stem-figure-${subjectKey}-regenerate-from-source-${unchangedModeVersion}`;
     case "EDIT_CURRENT_SOURCE":
-      return `stem-figure-${subjectKey}-edit-current-source-${version}`;
-    case "GENERATE_FROM_BLOCK":
-      return `stem-figure-${subjectKey}-generate-from-block-${version}`;
+      return `stem-figure-${subjectKey}-edit-current-source-${unchangedModeVersion}`;
+    case "GENERATE_FROM_BLOCK": {
+      const generatedModeVersion =
+        subject.key === "MATH"
+          ? "v84-midpoint-marker-auto-repair"
+          : subject.key === "PHYSICS"
+            ? "v77-no-narrative-callouts"
+            : subject.key === "CHEMISTRY"
+              ? "v76-no-narrative-callouts"
+              : "v76-no-narrative-callouts";
+      return `stem-figure-${subjectKey}-generate-from-block-${generatedModeVersion}`;
+    }
   }
 }
 
 function resolveStemFigureRepairPromptVersion(subject: LessonSummarySubjectSnapshot) {
   const version =
     subject.key === "MATH"
-      ? "v17-adaptive-label-typography"
-      : "v16-adaptive-label-typography";
+      ? "v32-midpoint-marker-auto-repair"
+      : "v24-no-narrative-callouts";
   return `stem-figure-${subject.key.toLowerCase()}-batch-repair-${version}`;
 }
 

@@ -168,6 +168,10 @@ Thứ tự này ưu tiên nền tảng trước tính năng sau. Nếu `.codex/p
 | 52.7   | `M9.19` | Quản lý giới hạn input/output theo tính năng AI — Done 2026-08-20                  |
 | 52.8   | `M9.20` | Tách model route Phase 1 text / Phase 2 ảnh theo từng tính năng AI                 |
 | 52.9   | `M9.21` | Admin AI đánh giá và tinh chỉnh toàn diện hình TikZ của Quiz — Done 2026-08-25     |
+| 52.10  | `M9.22` | Admin tạo mới hình đề/lời giải AI từ header card Quiz — Done 2026-08-26            |
+| 52.11  | `M9.23` | Bộ chỉnh nhanh TikZ Summary/Quiz: popover, font và scale card — Done 2026-08-26    |
+| 52.12  | `M9.24` | Admin tinh chỉnh lời giải Quiz bằng AI — Done 2026-08-27                          |
+| 52.13  | `M9.25` | Sửa trực tiếp từng nhãn và số đo trong bộ chỉnh nhanh TikZ — Done 2026-08-28     |
 | 53     | `M9.4`  | Student request-new reserve-first UI + API                                         |
 | 54     | `M9.5`  | AI explanation cache inline UI + API                                               |
 | 55     | `M9.6`  | Chat AI trong lesson bằng RAG                                                      |
@@ -299,6 +303,15 @@ Ghi chú:
 - `M9.21` phụ thuộc Quiz figure/revision `M9.3`, action frame `M9.8`, route ảnh
   `M9.20`, object storage và isolated TeX renderer. Task chỉ tinh chỉnh current
   TikZ theo thao tác admin; không tự chạy vision cho mọi hình vừa sinh.
+- `M9.22` phụ thuộc `M9.3`, modal/action frame `M9.8`, route ảnh `M9.20` và
+  revision guard `M9.21`; thêm question-level authoring độc lập cho QUESTION/SOLUTION,
+  không thêm migration hoặc provider route mới.
+- `M9.23` phụ thuộc source editor/compile gate của `M9.2`, Quiz figure `M9.3` và
+  modal `M9.8`; chỉ thêm deterministic source transform + UI/undo dùng chung,
+  không đổi API/database/prompt/cache và không gọi provider.
+- `M9.24` phụ thuộc Quiz-owned core `M9.3`, review UI `M9.8`, provider routing và
+  budget `M9.9-M9.12`, route text `M9.20`; dùng background job hiện có, không đổi
+  database schema và không làm lan sang Explanation `M9.5`.
 - `M9.4` phụ thuộc `M9.2`, `M9.3`, `M6.2-M6.4`, `M7.1-M7.4` theo loại nội dung và phải
   nối luôn các action request-new hiện có trên UI học sinh.
 - `M9.5` phụ thuộc `M9.1`, `M5.3`, `M6.2-M6.4`, `M7.2-M7.4` và phải có inline

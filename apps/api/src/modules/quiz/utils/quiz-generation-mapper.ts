@@ -1,3 +1,8 @@
+import {
+  normalizeMathTextLatexCommands,
+  normalizeMissingInlineMathClosers,
+  tokenizeMathText,
+} from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
 
 import {
@@ -6,15 +11,15 @@ import {
   type QuizExplanationBlock,
 } from "#api/modules/quiz/types/quiz-generation.types";
 
-const MATH_DELIMITER_PATTERN =
-  /\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|(?<!\\)\$(?!\$)([^$\n]+?)(?<!\\)\$(?!\$)/gu;
 const BRACED_THREE_POINT_ANGLE_PATTERN =
   /\\angle\s*\{([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})\}/gu;
 const THREE_POINT_ANGLE_PATTERN =
   /\\angle\s+([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})([A-Za-z](?:['′″]|[0-9₀-₉]){0,3})(?![A-Za-z0-9_'′″₀-₉])/gu;
 
 export function toQuizTiptap(text: string) {
-  const normalizedText = normalizeQuizAngleNotation(text);
+  const normalizedText = normalizeMathTextLatexCommands(
+    normalizeMissingInlineMathClosers(normalizeQuizAngleNotation(text)),
+  );
   const content: Array<Record<string, unknown>> = [];
   let inlineContent: Array<Record<string, unknown>> = [];
   const flushParagraph = () => {
@@ -25,7 +30,7 @@ export function toQuizTiptap(text: string) {
     inlineContent = [];
   };
 
-  for (const token of tokenizeQuizMathText(normalizedText)) {
+  for (const token of tokenizeMathText(normalizedText)) {
     if (token.type === "math") {
       if (token.display) {
         flushParagraph();
@@ -52,7 +57,6 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
     type: "quizExplanation",
     problem: normalizeQuizAngleNotation(question.explanation.problem),
     solution: normalizeQuizAngleNotation(solution),
-    answer: normalizeQuizAngleNotation(canonicalAnswer),
     ...("isGeometry" in question.explanation
       ? { isGeometry: question.explanation.isGeometry }
       : {}),
@@ -64,7 +68,9 @@ export function mapGeneratedQuizQuestion(question: GeneratedQuizQuestion) {
     questionJson: toQuizTiptap(block.problem),
     hintJson: question.hint ? toQuizTiptap(question.hint) : null,
     explanationJson: toQuizTiptap(
-      [block.solution, `Đáp án: ${block.answer}`].filter(Boolean).join("\n"),
+      [block.solution, `Đáp án: ${normalizeQuizAngleNotation(canonicalAnswer)}`]
+        .filter(Boolean)
+        .join("\n"),
     ),
     explanationBlock: block,
     recoveryIssues: [] as Array<{
@@ -140,41 +146,19 @@ function getCanonicalQuizAnswer(question: GeneratedQuizQuestion) {
       .map((statement) => `${statement.id}) ${statement.value ? "Đúng" : "Sai"}.`)
       .join("\n");
   }
-  if (question.questionType !== QuestionType.MULTIPLE_CHOICE) {
-    return question.explanation.answer;
+  if (question.questionType === QuestionType.TRUE_FALSE) {
+    return question.correctAnswer ? "Đúng." : "Sai.";
+  }
+  if (question.questionType === QuestionType.TEXT_INPUT) {
+    return question.correctAnswer;
   }
   const correctOption = question.options.find(
     (option) => option.id === question.correctOptionId,
   );
-  return correctOption
-    ? `${question.correctOptionId}. ${correctOption.text}`
-    : question.explanation.answer;
-}
-
-function tokenizeQuizMathText(value: string) {
-  const tokens: Array<
-    { type: "text"; value: string } | { type: "math"; display: boolean; latex: string }
-  > = [];
-  let cursor = 0;
-  for (const match of value.matchAll(MATH_DELIMITER_PATTERN)) {
-    const matchIndex = match.index ?? 0;
-    if (matchIndex > cursor) {
-      tokens.push({ type: "text", value: value.slice(cursor, matchIndex) });
-    }
-    const latex = (match[1] ?? match[2] ?? match[3] ?? match[4] ?? "").trim();
-    tokens.push(
-      latex
-        ? {
-            type: "math",
-            display: match[1] !== undefined || match[2] !== undefined,
-            latex,
-          }
-        : { type: "text", value: match[0] },
-    );
-    cursor = matchIndex + match[0].length;
+  if (!correctOption) {
+    throw new Error("Generated Quiz correctOptionId does not match any option.");
   }
-  if (cursor < value.length) tokens.push({ type: "text", value: value.slice(cursor) });
-  return tokens.length > 0 ? tokens : [{ type: "text" as const, value }];
+  return `${question.correctOptionId}. ${correctOption.text}`;
 }
 
 function normalizeQuizAngleNotation(value: string) {
@@ -193,14 +177,9 @@ function normalizeQuizAngleNotation(value: string) {
 
 function trimParagraphBoundaryWhitespace(nodes: Array<Record<string, unknown>>) {
   const trimmed = nodes.map((node) => ({ ...node }));
-  const firstTextIndex = trimmed.findIndex((node) => node.type === "text");
-  let lastTextIndex = -1;
-  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
-    if (trimmed[index]?.type === "text") {
-      lastTextIndex = index;
-      break;
-    }
-  }
+  const firstTextIndex = trimmed[0]?.type === "text" ? 0 : -1;
+  const lastIndex = trimmed.length - 1;
+  const lastTextIndex = trimmed[lastIndex]?.type === "text" ? lastIndex : -1;
   const firstText = trimmed[firstTextIndex]?.text;
   if (firstTextIndex >= 0 && typeof firstText === "string") {
     trimmed[firstTextIndex]!.text = firstText.trimStart();

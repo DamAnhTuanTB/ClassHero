@@ -1,6 +1,7 @@
 import { apiRequest, type ApiRequestOptions } from "@/lib/api-client";
 import type {
   AdminAiModelConfiguration,
+  AdminAiJobData,
   AdminStemFigureCreateAiPreview,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
 import type { AiReasoningEffort } from "@learning-path/shared";
@@ -115,7 +116,6 @@ export interface AdminQuizQuestion {
   } | null;
   generationQuestionJson?: Record<string, unknown> | null;
   reviewStatus: string;
-  solutionFigureMode: "NONE" | "EXTEND_QUESTION" | "REDRAW_AS_MODEL";
   figures: AdminQuizFigure[];
 }
 
@@ -123,17 +123,36 @@ export interface AdminQuizFigure {
   id: string;
   role: "QUESTION" | "SOLUTION";
   status: "QUEUED" | "RENDERING" | "REPAIRING" | "SUCCEEDED" | "NEEDS_REVIEW" | "FAILED";
+  pendingAiTargetMode?: AdminQuizFigureAiTargetMode | null;
   openAiGenerationCostVnd?: number | null;
+  openAiCachedInputTokens?: number | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
   currentRevision: {
     id: string;
+    origin:
+      | "INITIAL_AI"
+      | "AUTO_REPAIR"
+      | "AI_REFINEMENT"
+      | "ADMIN_EDIT"
+      | "ADMIN_REGENERATE"
+      | "ADMIN_UPLOAD"
+      | "MANUAL_REPAIR";
+    status:
+      | "QUEUED"
+      | "RENDERING"
+      | "REPAIRING"
+      | "DRAFT_READY"
+      | "SUCCEEDED"
+      | "NEEDS_REVIEW"
+      | "FAILED";
     sourceKind: "AI_TEX" | "ADMIN_UPLOAD";
     sourceVersion: number;
     latexSource: string | null;
     previewSvg: string | null;
     altText: string;
     caption: string | null;
+    displayScale?: number | null;
     deliveryFile: {
       id: string;
       mimeType: string;
@@ -159,6 +178,13 @@ export interface AdminQuizFigureCreateAiInput {
   userPrompt?: string | null;
 }
 
+export type AdminQuizFigureAiTargetMode = "QUESTION" | "SOLUTION";
+
+export interface AdminQuizQuestionFigureCreateAiInput extends AdminQuizFigureCreateAiInput {
+  targetMode: AdminQuizFigureAiTargetMode;
+  baseRevisionId: string | null;
+}
+
 export interface AdminQuizFigureCreateAiPreview extends Omit<
   AdminStemFigureCreateAiPreview,
   "referenceImageMode" | "generationBrief" | "referenceImages" | "configuration"
@@ -174,6 +200,22 @@ export interface AdminQuizFigureRefinementPreview extends Omit<
   operation: "REFINE_CURRENT";
   currentImageDataUrl: string;
 }
+
+export interface AdminQuizSolutionRefinementPreview {
+  mode: AdminQuizSolutionMode;
+  includeCurrentSolutionAsRejected: boolean;
+  requestHash: string;
+  baseContentHash: string;
+  questionImageDataUrl: string | null;
+  providerInput: Record<string, unknown>;
+  systemPrompt: string;
+  userPrompt: string;
+  configuration: AdminAiModelConfiguration;
+  context: AdminStemFigureCreateAiPreview["context"];
+  estimatedCost: AdminStemFigureCreateAiPreview["estimatedCost"];
+}
+
+export type AdminQuizSolutionMode = "REFINE" | "REGENERATE";
 
 export interface AdminQuizInitialData {
   questions: AdminQuizQuestion[];
@@ -398,6 +440,28 @@ export function createNewAdminQuizFigureWithAi(
   );
 }
 
+export function createAdminQuizFigureForQuestionWithAi(
+  questionId: string,
+  data: AdminQuizQuestionFigureCreateAiInput,
+  token: string,
+) {
+  return apiRequest<{ jobId: string; status: string }>(
+    `/admin/quiz-questions/${questionId}/figures/create-ai`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function previewAdminQuizFigureForQuestionWithAi(
+  questionId: string,
+  data: AdminQuizQuestionFigureCreateAiInput,
+  token: string,
+) {
+  return apiRequest<AdminQuizFigureCreateAiPreview>(
+    `/admin/quiz-questions/${questionId}/figures/create-ai/preview`,
+    { method: "POST", body: data, token },
+  );
+}
+
 export function previewNewAdminQuizFigureWithAi(
   questionId: string,
   figureId: string,
@@ -413,7 +477,10 @@ export function previewNewAdminQuizFigureWithAi(
 export function refineAdminQuizFigureWithAi(
   questionId: string,
   figureId: string,
-  data: { baseRevisionId: string | null },
+  data: {
+    baseRevisionId: string | null;
+    adminInstructions: string | null;
+  },
   token: string,
 ) {
   return apiRequest<{ jobId: string; status: string }>(
@@ -425,7 +492,10 @@ export function refineAdminQuizFigureWithAi(
 export function previewAdminQuizFigureRefinement(
   questionId: string,
   figureId: string,
-  data: { baseRevisionId: string | null },
+  data: {
+    baseRevisionId: string | null;
+    adminInstructions: string | null;
+  },
   token: string,
 ) {
   return apiRequest<AdminQuizFigureRefinementPreview>(
@@ -456,4 +526,39 @@ export function deleteAdminQuizFigure(
     `/admin/quiz-questions/${questionId}/figures/${figureId}`,
     { method: "DELETE", body: data, token },
   );
+}
+
+export function previewAdminQuizSolutionRefinement(
+  questionId: string,
+  data: {
+    mode: AdminQuizSolutionMode;
+    adminInstructions?: string;
+    includeCurrentSolutionAsRejected: boolean;
+  },
+  token: string,
+) {
+  return apiRequest<AdminQuizSolutionRefinementPreview>(
+    `/admin/quiz-questions/${questionId}/solution-refinement/preview`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function queueAdminQuizSolutionRefinement(
+  questionId: string,
+  data: {
+    mode: AdminQuizSolutionMode;
+    adminInstructions?: string;
+    includeCurrentSolutionAsRejected: boolean;
+    requestHash: string;
+  },
+  token: string,
+) {
+  return apiRequest<{ mode: "QUEUED"; jobId: string; status: string }>(
+    `/admin/quiz-questions/${questionId}/solution-refinement`,
+    { method: "POST", body: data, token },
+  );
+}
+
+export function getAdminQuizSolutionRefinementJob(jobId: string, token: string) {
+  return apiRequest<AdminAiJobData>(`/jobs/${jobId}`, { method: "GET", token });
 }

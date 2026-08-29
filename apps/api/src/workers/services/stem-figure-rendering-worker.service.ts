@@ -51,9 +51,14 @@ export class StemFigureRenderingWorkerService implements OnModuleInit, OnModuleD
       this.logger.log(`STEM figure render job ${job.id} completed.`);
     });
     this.worker.on("failed", (job, error) => {
-      this.logger.error(
-        `STEM figure render job ${job?.id ?? "unknown"} failed: ${error.message}`,
+      const maxAttempts = Math.max(
+        1,
+        typeof job?.opts.attempts === "number" ? job.opts.attempts : 1,
       );
+      const retrying = Boolean(job && job.attemptsMade < maxAttempts);
+      const message = `STEM figure render job ${job?.id ?? "unknown"} attempt ${job?.attemptsMade ?? 1}/${maxAttempts} ${retrying ? "will retry" : "failed"}: ${error.message}`;
+      if (retrying) this.logger.warn(message);
+      else this.logger.error(message);
     });
     this.worker.on("error", (error) => {
       this.logger.error(`STEM figure worker error: ${error.message}`);

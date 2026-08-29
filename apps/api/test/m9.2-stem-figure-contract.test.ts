@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   generatedTestOutputSchema,
   getGeneratedTestOutputSchema,
+  LESSON_CONTENT_PROMPT_VERSIONS,
 } from "#api/modules/ai/types/lesson-content-generation.types";
 import {
   getLessonSummaryProviderTransportOutputSchema,
@@ -50,6 +51,7 @@ import {
   buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
   buildTestPrompt,
+  resolveLessonContentPromptVersion,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 import {
   StemFigureRepairService,
@@ -1616,7 +1618,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
 
     const request = generateStructured.mock.calls[0]?.[1];
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v63-adaptive-label-typography",
+      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
     );
     expect(request.maxTokens).toBe(12_000);
     expect(request.systemPrompt).toContain("tự thiết kế một hình LuaLaTeX/TikZ mới");
@@ -1923,7 +1925,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     >;
     expect(request.inputImages).toHaveLength(1);
     expect(request.promptVersion).toBe(
-      "stem-figure-math-edit-current-source-v63-adaptive-label-typography",
+      "stem-figure-math-edit-current-source-v83-midpoint-marker-auto-repair",
     );
     expect(providerBrief).toMatchObject({
       reference: {
@@ -2116,10 +2118,10 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect(request.systemPrompt).toContain("dịch nhãn dọc phân giác");
       expect(request.systemPrompt).toContain("không khóa một offset cho mọi góc");
       expect(request.systemPrompt).toContain(
-        "`$(O)$` chỉ là cách gọi đường tròn trong văn bản bên ngoài canvas",
+        "Mọi đường tròn hình học được render trên canvas",
       );
-      expect(request.systemPrompt).toContain("đúng một nhãn `$O$`");
-      expect(request.systemPrompt).toContain("xóa node `$(O)$` dư");
+      expect(request.systemPrompt).toContain("bắt buộc có đúng một điểm đánh dấu");
+      expect(request.systemPrompt).toContain("nếu chưa đặt tên thì chỉ vẽ marker");
       if (mode === "SOURCE_CROP_ONLY") {
         expect(request.systemPrompt).toContain(
           "chuyên gia vẽ lại một hình STEM từ ảnh sách giáo khoa",
@@ -2129,7 +2131,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("currentLatexSource");
         expect(request.promptVersion).toBe(
-          "stem-figure-math-regenerate-from-source-v63-adaptive-label-typography",
+          "stem-figure-math-regenerate-from-source-v83-midpoint-marker-auto-repair",
         );
       } else if (mode === "CURRENT_ONLY") {
         expect(request.systemPrompt).toContain(
@@ -2140,7 +2142,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         );
         expect(request.systemPrompt).not.toContain("tự thiết kế một hình");
         expect(request.promptVersion).toBe(
-          "stem-figure-math-edit-current-source-v63-adaptive-label-typography",
+          "stem-figure-math-edit-current-source-v83-midpoint-marker-auto-repair",
         );
       } else {
         expect(request.systemPrompt).toContain(
@@ -2152,7 +2154,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         expect(request.systemPrompt).not.toContain("ảnh reference");
         expect(request.systemPrompt).not.toContain("currentLatexSource");
         expect(request.promptVersion).toBe(
-          "stem-figure-math-generate-from-block-v63-adaptive-label-typography",
+          "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
         );
       }
     },
@@ -2186,7 +2188,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
 
     expect(math).toContain("### QUY TẮC HÌNH TOÁN CỦA SINH KIẾN THỨC");
     expect(math).toContain("Vạch bằng nhau/trung điểm");
-    expect(math).toContain("cấm đặt thêm node `$(O)$`");
+    expect(math).toContain("bắt buộc có đúng một điểm đánh dấu");
     expect(math).not.toContain("topology, nút nối, cực tính");
     expect(math).not.toContain("hóa trị, điện tích");
 
@@ -2338,7 +2340,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
     expect(request.systemPrompt).toContain("ưu tiên phép dựng TikZ đơn giản");
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v63-adaptive-label-typography",
+      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
     );
   });
 
@@ -2415,9 +2417,28 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         ],
       },
     });
+    const secondPreview = await service.previewCreateInput({
+      subject: { key: "MATH", name: "Toán", slug: "toan" },
+      brief: {
+        ...figureBrief({
+          blockContent: { type: "knowledge", content: "Một nội dung khác." },
+        }),
+        adminInstructions: "Giữ nhãn rõ ràng.",
+        referenceImageMode: "CURRENT_ONLY",
+        referenceAssets: [
+          {
+            objectKey: "figures/current.svg",
+            mimeType: "image/svg+xml",
+            label: "Hình hiện tại",
+            packetPageNumber: null,
+            source: "CURRENT_FIGURE",
+          },
+        ],
+      },
+    });
 
     expect(generateStructured).not.toHaveBeenCalled();
-    expect(previewStructuredRequest).toHaveBeenCalledOnce();
+    expect(previewStructuredRequest).toHaveBeenCalledTimes(2);
     expect(preview).toMatchObject({
       providerInput: {
         model: "gpt-5.6-luna",
@@ -2461,6 +2482,31 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(JSON.stringify(preview)).toContain(OPENAI_PREVIEW_BINARY_DATA);
     expect(JSON.stringify(preview)).not.toContain('"lessonTitle"');
     expect(JSON.stringify(preview)).not.toContain('"sectionHeading"');
+    expect(preview.providerInput.prompt_cache_key).toBe(
+      secondPreview.providerInput.prompt_cache_key,
+    );
+    expect(Array.isArray(preview.providerInput.input)).toBe(true);
+    expect(Array.isArray(secondPreview.providerInput.input)).toBe(true);
+    if (
+      Array.isArray(preview.providerInput.input) &&
+      Array.isArray(secondPreview.providerInput.input)
+    ) {
+      expect(preview.providerInput.input[0]).toEqual(
+        secondPreview.providerInput.input[0],
+      );
+      expect(JSON.stringify(preview.providerInput.input[0])).toContain(
+        "prompt_cache_breakpoint",
+      );
+      expect(JSON.stringify(preview.providerInput.input[0])).toContain(
+        "một đơn vị số học trên hai trục bắt buộc có cùng độ dài render",
+      );
+      expect(JSON.stringify(preview.providerInput.input[0])).toContain(
+        "chia các đoạn thành từng nhóm quan hệ bằng nhau",
+      );
+      expect(preview.providerInput.input[1]).not.toEqual(
+        secondPreview.providerInput.input[1],
+      );
+    }
   });
 
   it("requires a readable textbook-style layout without implementation recipes", async () => {
@@ -2493,7 +2539,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "Chọn tập đối tượng và quan hệ tối thiểu nhưng đủ",
     );
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v63-adaptive-label-typography",
+      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
     );
   });
 
@@ -2994,7 +3040,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       "Không chép nguyên đề bài, lý thuyết, phép tính trung gian hoặc kết luận lên hình",
     );
     expect(request.promptVersion).toBe(
-      "stem-figure-math-generate-from-block-v63-adaptive-label-typography",
+      "stem-figure-math-generate-from-block-v84-midpoint-marker-auto-repair",
     );
     expect(request.inputImages).toEqual([]);
   });
@@ -3078,7 +3124,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       allowed: ["hình học", "isGeometry", "geometryStatement", "GT–KL"],
       forbidden: ["circuitikz", "chemfig", "mhchem"],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
-      promptVersion: "lesson-summary-math-v29-declared-standard-notation",
+      promptVersion: "lesson-summary-math-v34-no-orphan-intermediate-labels",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3097,7 +3143,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
-      promptVersion: "lesson-summary-physics-v29-declared-standard-notation",
+      promptVersion: "lesson-summary-physics-v30-unambiguous-figure-ready-problem",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
@@ -3116,7 +3162,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
         "GT–KL",
       ],
       heading: "# SYSTEM PROMPT SINH KIẾN THỨC MÔN HÓA HỌC",
-      promptVersion: "lesson-summary-chemistry-v29-declared-standard-notation",
+      promptVersion: "lesson-summary-chemistry-v30-unambiguous-figure-ready-problem",
       forbiddenHeadings: [
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN TOÁN",
         "SYSTEM PROMPT SINH KIẾN THỨC MÔN VẬT LÝ",
@@ -3261,6 +3307,48 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
   });
 
+  it("keeps the Math rectangle rule before the stable Summary cache breakpoint", () => {
+    const buildProviderRequest = (lessonTitle: string, sourceHash: string) => {
+      const request = buildLessonSummaryStructuredInput({
+        lessonId,
+        lessonTitle,
+        targetGrade: 7,
+        subject: { key: "MATH", name: "Toán", slug: "toan" },
+        documentIds: ["00000000-0000-4000-8000-000000000003"],
+        sourceHash,
+        packet: testPacket,
+        configuration: {
+          style: "student_friendly",
+          styleInstructions: "",
+          length: "standard",
+          targetWordCount: null,
+          extraInstructions: "",
+          schemaReferenceStrategy: "ref_v2",
+          promptCacheKeyEnabled: true,
+          promptCacheRetention: "in_memory",
+        },
+      });
+      return buildOpenAiStructuredResponseRequest({
+        request,
+        model: "gpt-5.6",
+        structuredTextFormat: {
+          type: "json_schema",
+          name: request.outputName,
+          strict: true,
+          schema: { type: "object" },
+        },
+      });
+    };
+    const first = buildProviderRequest("Chu vi hình chữ nhật", "a".repeat(64));
+    const second = buildProviderRequest("Diện tích hình chữ nhật", "b".repeat(64));
+
+    expect(first.prompt_cache_key).toBe(second.prompt_cache_key);
+    expect(first.input[0]).toEqual(second.input[0]);
+    expect(JSON.stringify(first.input[0])).toContain("prompt_cache_breakpoint");
+    expect(JSON.stringify(first.input[0])).toContain("số đo lớn hơn là chiều dài");
+    expect(first.input[1]).not.toEqual(second.input[1]);
+  });
+
   it("keeps every subject schema free of another subject's terminology", () => {
     for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY"] as const) {
       const schema = JSON.stringify(
@@ -3272,7 +3360,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     }
   });
 
-  it("keeps the labeled-subpart policy once at the Summary provider root", () => {
+  it("keeps the labeled-subpart policy in the Summary system prompt only", () => {
     const request = buildLessonSummaryStructuredInput({
       lessonId,
       lessonTitle: "Bài học nhiều ý",
@@ -3296,19 +3384,25 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
 
     for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
+      const subjectPrompt = buildLessonSummarySubjectSystemPrompt({
+        key: subjectKey,
+        name: subjectKey,
+        slug: subjectKey.toLowerCase(),
+      });
+      expect(subjectPrompt).toContain("mỗi ý con mang nhãn a), b), c)");
       const schema = resolveAiStructuredTextFormat(
         getLessonSummaryProviderTransportOutputSchema(subjectKey),
         "lesson_summary_provider_contract",
         "ref_v2",
       ).format.schema;
-      expect((schema as { description?: string }).description).toContain(
-        LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
+      expect((schema as { description?: string }).description).toBe(
+        LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION,
       );
       expect(
         collectAllDescriptions(schema).filter((description) =>
           description.includes(LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION),
         ),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
       for (const field of ["problem", "solution", "answer"] as const) {
         const descriptions = collectPropertyDescriptions(schema, field);
         expect(
@@ -3368,6 +3462,13 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     );
 
     for (const subjectKey of ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const) {
+      const subjectPrompt = buildLessonSummarySubjectSystemPrompt({
+        key: subjectKey,
+        name: subjectKey,
+        slug: subjectKey.toLowerCase(),
+      });
+      expect(subjectPrompt).toContain("QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG");
+      expect(subjectPrompt).toContain("QUY TẮC CỨNG VỀ TÍNH LIÊN TỤC");
       const schema = resolveAiStructuredTextFormat(
         getLessonSummaryProviderTransportOutputSchema(subjectKey),
         "lesson_summary_provider_contract",
@@ -3379,7 +3480,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect((schema as { description?: string }).description).toBe(
         LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION,
       );
-      expect((schema as { description?: string }).description).toContain(
+      expect((schema as { description?: string }).description).not.toContain(
         LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION,
       );
       expect(
@@ -3388,7 +3489,7 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
             LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
           ),
         ),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
       for (const field of ["content", "problem", "solution", "answer"] as const) {
         const descriptions = collectPropertyDescriptions(schema, field);
         expect(
@@ -3481,6 +3582,8 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).not.toContain("YÊU CẦU VỀ HÌNH MINH HỌA");
     expect(request.systemPrompt).not.toContain("TÍNH LIÊN TỤC CỦA PHÉP BIẾN ĐỔI");
     expect(request.systemPrompt).not.toContain("KHAI BÁO VÀ ỔN ĐỊNH KÝ HIỆU");
+    expect(request.systemPrompt).not.toContain("CĂN CỨ HIỂN THỊ CHO KẾT LUẬN TRUNG GIAN");
+    expect(request.systemPrompt).not.toContain("số đo lớn hơn là chiều dài");
     expect(request.userPrompt).not.toContain("PHẠM VI MÔN HỌC");
   });
 
@@ -3637,10 +3740,10 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
     expect(request.systemPrompt).toContain("`\\iff`");
     expect(request.systemPrompt).toContain("`\\impliedby`");
     expect(request.promptVersion).toBe(
-      "lesson-summary-math-v29-declared-standard-notation",
+      "lesson-summary-math-v34-no-orphan-intermediate-labels",
     );
     expect(request.schemaVersion).toBe(
-      "lesson-summary-pdf-packet-five-block-schema-v24-no-figure-caption",
+      "lesson-summary-pdf-packet-five-block-schema-v25-slim-provider-descriptions",
     );
   });
 
@@ -4015,43 +4118,47 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       subject: { key: "MATH" as const, name: "Toán", slug: "toan" },
       expected: "giả thiết, phép biến đổi",
       forbidden: ["đơn vị SI", "hóa trị"],
+      proofPolicy: true,
     },
     {
       subject: { key: "PHYSICS" as const, name: "Vật lý", slug: "vat-ly" },
       expected: "đơn vị SI",
       forbidden: ["chứng minh hình học", "hóa trị"],
+      proofPolicy: false,
     },
     {
       subject: { key: "CHEMISTRY" as const, name: "Hóa học", slug: "hoa-hoc" },
       expected: "hóa trị",
       forbidden: ["đơn vị SI", "chứng minh hình học"],
+      proofPolicy: false,
     },
     {
       subject: { key: "GENERAL" as const, name: "Môn khác", slug: "mon-khac" },
       expected: "quy ước thông dụng của domain",
       forbidden: ["đơn vị SI", "hóa trị", "chứng minh hình học"],
+      proofPolicy: false,
     },
   ])(
     "isolates Flashcard and Test prompts to $subject.name",
-    ({ subject, expected, forbidden }) => {
-      const serializedInput = [
-        buildLessonContentSystemPrompt(subject),
-        buildFlashcardPrompt({
-          lessonTitle: "Bài học theo môn",
-          cardCount: 2,
-          difficulty: Difficulty.MEDIUM,
-          subject,
-        }),
-        buildTestPrompt({
-          lessonTitle: "Bài học theo môn",
-          questionCount: 1,
-          durationSeconds: 600,
-          difficultyRatio: { easy: 0, medium: 1, hard: 0 },
-          questionTypes: [QuestionType.TRUE_FALSE],
-          targetGrade: 9,
-          subject,
-        }),
-      ].join("\n");
+    ({ subject, expected, forbidden, proofPolicy }) => {
+      const systemPrompt = buildLessonContentSystemPrompt(subject);
+      const flashcardPrompt = buildFlashcardPrompt({
+        lessonTitle: "Bài học theo môn",
+        cardCount: 2,
+        difficulty: Difficulty.MEDIUM,
+        subject,
+      });
+      const testPrompt = buildTestPrompt({
+        lessonTitle: "Bài học theo môn",
+        questionCount: 1,
+        durationSeconds: 600,
+        difficultyRatio: { easy: 0, medium: 1, hard: 0 },
+        questionTypes: [QuestionType.TRUE_FALSE],
+        targetGrade: 9,
+        subject,
+      });
+      const serializedInput = [systemPrompt, flashcardPrompt, testPrompt].join("\n");
+      expect(testPrompt).toContain("phân bổ chính xác TRUE_FALSE=1");
       expect(serializedInput).toContain(expected);
       expect(serializedInput).toContain(subject.name);
       expect(serializedInput).toContain(
@@ -4060,10 +4167,81 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect(serializedInput).toContain(
         "Mặt trước Flashcard được phép hỏi chính ý nghĩa của một ký hiệu",
       );
+      expect(systemPrompt).toContain("phải chỉ có một cách hiểu chuyên môn");
+      expect(systemPrompt).toContain("các dữ kiện không được mâu thuẫn");
+      expect(systemPrompt).toContain("không vì vậy kéo dài câu đã rõ");
       expect(serializedInput).toContain("Counterexample hợp lệ");
+      if (proofPolicy) {
+        expect(systemPrompt).toContain("dùng `chiều dài` cho số đo lớn hơn");
+        expect(systemPrompt).toContain("đường cao, khoảng cách vuông góc");
+        expect(resolveLessonContentPromptVersion(subject.key)).toBe(
+          LESSON_CONTENT_PROMPT_VERSIONS.MATH,
+        );
+        expect(resolveLessonContentPromptVersion(subject.key)).toBe(
+          "lesson-content-math-v13-exact-type-quota",
+        );
+        expect(testPrompt).toContain("mỗi kết luận không phải dữ kiện đã cho");
+        expect(testPrompt).toContain("Từ (1) và (2), suy ra");
+        expect(testPrompt).toContain("Từ căn cứ thứ nhất, suy ra $P$.`");
+        expect(testPrompt).not.toContain("Từ căn cứ thứ nhất, suy ra $P$. (1)");
+        expect(testPrompt).toContain(
+          "mọi nhãn đã gắn phải được viện dẫn ít nhất một lần",
+        );
+        expect(testPrompt).toContain("Nếu mạch là $A\\Rightarrow B$");
+        expect(testPrompt).toContain("bỏ nhãn không có tham chiếu");
+        expect(testPrompt).toContain("Từ căn cứ thứ hai, suy ra $Q=k$. (1)");
+        expect(testPrompt).toContain("Theo định lý, suy ra $Q=R$.");
+        expect(testPrompt).toContain("Từ (1), suy ra $R=k$.");
+        expect(testPrompt).toContain(
+          "`Theo định lý, suy ra $Q=R$.`\n\n`Từ (1), suy ra $R=k$.`",
+        );
+        expect(systemPrompt).not.toContain("mỗi kết luận không phải dữ kiện đã cho");
+        expect(flashcardPrompt).not.toContain("mỗi kết luận không phải dữ kiện đã cho");
+        expect(flashcardPrompt).not.toContain("Từ (1) và (2), suy ra");
+        expect(flashcardPrompt).not.toContain("Từ (3) và giả thiết $S$, suy ra $T$");
+      } else {
+        expect(systemPrompt).not.toContain("dùng `chiều dài` cho số đo lớn hơn");
+        expect(resolveLessonContentPromptVersion(subject.key)).toBe(
+          "lesson-content-subject-prompt-v10-exact-type-quota",
+        );
+        expect(testPrompt).not.toContain("mỗi kết luận không phải dữ kiện đã cho");
+        expect(testPrompt).not.toContain("Từ (1) và (2), suy ra");
+        expect(testPrompt).not.toContain("Từ (3) và giả thiết $S$, suy ra $T$");
+      }
       for (const value of forbidden) expect(serializedInput).not.toContain(value);
     },
   );
+
+  it("keeps the Math rectangle terminology in the stable Flashcard/Test prefix", () => {
+    const subject = { key: "MATH" as const, name: "Toán", slug: "toan" };
+    const firstSystemPrompt = buildLessonContentSystemPrompt(subject);
+    const secondSystemPrompt = buildLessonContentSystemPrompt(subject);
+    const firstDynamicPrompt = buildTestPrompt({
+      lessonTitle: "Chu vi hình chữ nhật",
+      questionCount: 1,
+      durationSeconds: 600,
+      difficultyRatio: { easy: 1, medium: 0, hard: 0 },
+      questionTypes: [QuestionType.TEXT_INPUT],
+      targetGrade: 6,
+      subject,
+    });
+    const secondDynamicPrompt = buildTestPrompt({
+      lessonTitle: "Diện tích hình chữ nhật",
+      questionCount: 2,
+      durationSeconds: 900,
+      difficultyRatio: { easy: 0, medium: 1, hard: 0 },
+      questionTypes: [QuestionType.MULTIPLE_CHOICE],
+      targetGrade: 7,
+      subject,
+    });
+
+    expect(firstSystemPrompt).toBe(secondSystemPrompt);
+    expect(firstSystemPrompt).toContain("dùng `chiều dài` cho số đo lớn hơn");
+    expect(firstSystemPrompt).toContain("kích thước của hình khối");
+    expect(firstDynamicPrompt).not.toBe(secondDynamicPrompt);
+    expect(firstDynamicPrompt).not.toContain("dùng `chiều dài` cho số đo lớn hơn");
+    expect(secondDynamicPrompt).not.toContain("dùng `chiều dài` cho số đo lớn hơn");
+  });
 
   it.each([
     {
@@ -4139,8 +4317,8 @@ describe("M9.2 TeX/TikZ Summary contract", () => {
       expect(serializedInput).toContain(subject.name);
       expect(request.promptVersion).toBe(
         subject.key === "MATH"
-          ? "stem-figure-math-batch-repair-v17-adaptive-label-typography"
-          : `stem-figure-${subject.key.toLowerCase()}-batch-repair-v16-adaptive-label-typography`,
+          ? "stem-figure-math-batch-repair-v32-midpoint-marker-auto-repair"
+          : `stem-figure-${subject.key.toLowerCase()}-batch-repair-v24-no-narrative-callouts`,
       );
       expect(request.userPrompt).not.toContain("collectionComplete");
       expect(request.userPrompt).not.toContain('"column":null');

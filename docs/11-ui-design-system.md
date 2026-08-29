@@ -93,6 +93,11 @@ Hệ thống sẽ có chế độ chuyển theme sáng/tối. Khi làm UI mới 
 - Ưu tiên dễ đọc trên mobile.
 - Heading rõ hierarchy, không quá to trong dashboard/tool surface.
 - Body text đủ line-height để đọc bài học và lời giải.
+- Nội dung học tập nhiều đoạn phải phân biệt rõ nhịp trong dòng và nhịp giữa
+  các đoạn: dùng `line-height` khoảng `1.6-1.65` cho dòng chữ và thêm paragraph
+  gap riêng khoảng `0.6rem` giữa các đoạn cấp cao. Với Mathpix Markdown, không
+  được chỉ style thẻ `p` vì renderer có thể xuất paragraph thành các `div` anh
+  em không có class; Quiz, lời giải và Sinh kiến thức phải dùng cùng rule này.
 - Không dùng negative letter-spacing.
 - Không scale font bằng viewport width.
 - Công thức Toán/Lý/Hóa phải có khoảng thở, không chen sát text.
@@ -224,6 +229,25 @@ Spacing/radius mặc định:
 - Modal/drawer luôn căn giữa theo chiều dọc và chiều ngang trong viewport trên mobile, tablet và desktop. Không top-align modal ở mobile; khi nội dung dài, giữ modal trong `max-height` và chỉ cho vùng body giữa scroll.
 - Tất cả modal/drawer phải có cấu trúc 3 vùng rõ ràng: phần trên chỉ là tiêu đề ngắn và nút icon `X` để đóng, không có mô tả/subtitle dưới title; phần giữa là nội dung; phần dưới là action chính/phụ. Chỉ phần nội dung ở giữa được scroll; header/footer phải gọn và luôn nằm trong tầm mắt người dùng trên mobile, tablet và desktop. Footer modal luôn có nút `Hủy` để thoát/hủy thao tác và action chính/destructive khi có. Trên mobile, nếu thật sự chỉ có một action thì nút full width; mặc định hai action nằm cùng một hàng hai cột. Trên laptop/desktop, button trong footer modal co theo nội dung (`max-content`/`w-auto`), không kéo full width, và thường canh về phía phải.
 - Button trong modal/drawer phải đồng nhất màu theo vai trò action trên toàn bộ flow: action chính/lưu dùng cùng màu `primary`, mặc định là xanh dương `sky-600` với hover `sky-700` và chữ trắng; hủy/đóng dùng trung tính; destructive dùng đỏ. Không dùng primary màu đen/tối trong một modal nếu các modal cùng hệ đang dùng xanh dương, vì làm UI mất nhất quán và người dùng khó nhận diện hành động chính.
+- Bộ công cụ trợ giúp trong code editor dành cho người không kỹ thuật phải mở từ
+  một trigger dễ hiểu như `Chỉnh nhanh`, có helper text ngắn, nhóm thao tác theo
+  kết quả nhìn thấy thay vì thuật ngữ TikZ. Mỗi action một chạm phải mô tả rõ thứ
+  bị thay đổi, tự cập nhật preview, có pending/error feedback và `Hoàn tác`; trên
+  màn nhỏ panel dùng vùng cuộn giới hạn, không đẩy footer modal khỏi viewport.
+- Panel `Chỉnh nhanh` phải là popover nổi có z-index/shadow/border rõ, neo dưới
+  trigger và không tham gia layout của editor/preview. Escape hoặc click ra ngoài
+  chỉ đóng popover; nhóm điều chỉnh nhiều mức như cỡ chữ dùng segmented controls
+  với nhãn đời thường, không bắt admin nhập lệnh hoặc số pt.
+- Khi `Chỉnh nhanh` liệt kê text lấy từ code, mỗi text slot phải có một row input
+  riêng và action xóa sở hữu đúng row. Giữ thứ tự source, phân biệt các giá trị
+  trùng nhau bằng định danh cú pháp thay vì nội dung chuỗi, dùng vùng cuộn giới
+  hạn và empty/unsupported state rõ ràng. Không compile theo từng phím; commit ở
+  blur/Enter, Escape hoàn nguyên edit chưa commit và lỗi compile không được làm
+  mất source/input hợp lệ gần nhất.
+- Điều chỉnh thu/phóng figure đã lưu phải tác động lên toàn bộ visual card gồm
+  ảnh, caption và badge, rồi căn giữa card. Ảnh bên trong lấp đúng content box
+  của card; cấm giữ card full-width rồi chỉ thu nhỏ `<img>` vì tạo vùng trắng
+  giả và khiến kết quả sau `Áp dụng` khác cảm nhận trong preview.
 - Pattern form mặc định phải bám form chuẩn đã duyệt hoặc form tương tự đang chạy ổn trong dự án: dùng `mode: "onChange"`/`reValidateMode: "onChange"` và truyền `form.formState.errors.<field>` trực tiếp vào primitive field. Muốn modal không hiện lỗi lúc mở thì không gọi `trigger()` sau `reset()`; không tự bọc lỗi bằng `dirtyFields/touchedFields` nếu không có test/logic rõ.
 - Với text input required, message "Nhập ..." chỉ được gắn với trạng thái rỗng sau khi trim. Nếu field có rule tối thiểu 2 ký tự trở lên, định dạng, khoảng giá trị hoặc kiểm tra trùng lặp, phải dùng message riêng tương ứng; không để người dùng đã nhập rồi vẫn thấy lỗi như chưa nhập.
 - Text input required trong `apps/web` nên dùng helper validation chung như `requiredTrimmedText` để tách required/min/max message từ đầu. Nếu một field cần min length lớn hơn 1, helper phải nhận `minMessage` riêng; không dùng lại required message.
@@ -511,6 +535,9 @@ Một màn hình UI chỉ xem là xong khi:
   highlight. Icon xóa là HTML overlay destructive có `aria-label`, touch target
   khoảng `44px`, nằm trong biên figure và mở confirm dialog trước khi thay draft.
   Click nền hoặc `Esc` bỏ chọn. Không dùng click một lần để xóa ngay phần tử SVG.
+- Dropdown action nằm trong card có ancestor `overflow` phải render qua portal
+  hoặc floating layer, neo theo trigger và giữ lề viewport tối thiểu `16px`;
+  không được để mất border, bo góc hoặc option ở cạnh trái/dưới.
 - Lượt chỉnh trực tiếp đầu tiên chỉ xóa label và toàn marker; không xóa
   point/primitive/topology. Summary đã phát hành phải thu hồi trước khi chỉnh hình;
   mọi mutation phải qua schema client và validation/publish guard của backend.
@@ -594,6 +621,12 @@ Một màn hình UI chỉ xem là xong khi:
   tiếp tuyến/pháp tuyến. Không vẽ marker bằng offset x/y tuyệt đối hoặc co giãn
   x/y không đồng nhất. Gate visual phải kiểm marker đúng hình/đúng neo và bounding
   box nhãn không giao nhau, cắt nét hoặc marker ở mọi hướng của đoạn.
+- Marker đoạn bằng nhau phải mã hóa đúng từng nhóm quan hệ: các đoạn cùng nhóm
+  dùng cùng kiểu và số vạch; hai nhóm độc lập dùng marker khác nhau, trừ khi dữ
+  kiện có thẩm quyền khẳng định chúng thuộc cùng một nhóm. Không gộp hai nhóm chỉ
+  vì mỗi nhóm đều do một quan hệ trung điểm tạo ra. Nếu mọi đoạn được khẳng định
+  cùng bằng nhau thì dùng chung marker là đúng. Vạch chia trục/hệ trục, marker
+  điểm dựng và đầu mút mở-đóng không phải marker đoạn bằng nhau.
 - Các rule nhãn/marker trên áp dụng cho toàn bộ hình AI của hệ thống: hình
   Summary/StemFigure và hình đề, hình lời giải mở rộng hoặc hình lời giải vẽ lại
   của Quiz trong mọi prompt mặc định. Đây là rule sinh hình, không phải điều kiện

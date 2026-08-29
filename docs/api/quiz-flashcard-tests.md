@@ -14,8 +14,9 @@ Role: `ADMIN`.
 
 Behavior:
 
-- Trả các bộ chưa bị xóa mềm theo `sortOrder`, rồi `createdAt` tăng dần để giữ
-  ổn định thứ tự tạo của dữ liệu cũ.
+- Trả các bộ đang tồn tại theo `sortOrder`, rồi `createdAt` tăng dần để giữ ổn
+  định thứ tự tạo của dữ liệu cũ. Điều kiện `deletedAt = null` chỉ loại dữ liệu
+  legacy từng bị soft delete; endpoint xóa Quiz set mới dùng hard delete.
 - Mỗi bộ trả `aiGenerations` theo `createdAt` giảm dần, gồm toàn bộ trạng thái
   `QUEUED`/`RUNNING`/`SUCCEEDED`/`FAILED`. Mỗi lần sinh có model, thời điểm,
   `totalCostVnd` thực tế và `usageEventCount` được aggregate server-side từ
@@ -102,6 +103,13 @@ Side effects:
   thuần và PDF có text layer; OCR readiness không phải precondition riêng của
   Quiz. Manifest/hash/ID nguồn vẫn được lưu trong draft để audit và kiểm stale,
   nhưng không được nối thành text gửi provider.
+- Preview đồng thời nối index chống trùng của toàn bộ câu Quiz còn tồn tại trong
+  lesson, không lọc `reviewStatus` và không giới hạn ở set đích. Index chỉ gồm
+  loại câu, đề bài plain text và nội dung phương án/mệnh đề nếu có; không gửi đáp
+  án, hint, lời giải, hình, ID, trạng thái hay metadata. Câu đã xóa mềm, set
+  legacy đã xóa mềm hoặc set đã hard delete bị loại; nội dung trùng hệt sau
+  chuẩn hóa whitespace chỉ gửi một lần. Khối này nằm
+  sau prompt-cache breakpoint và được khóa trong immutable preview draft.
 - JSON Schema preview/worker phải được dựng theo đúng request: chính xác
   `questionCount`, chỉ các `questionTypes` đã chọn và đúng difficulty cố định khi
   không phải `MIXED`. Output root chỉ có `questions`; không có `title` bị bỏ qua.
@@ -123,9 +131,9 @@ Side effects:
   `explanation.statementSolutions[] = { statementId, solution }[]`, đúng một
   phần và đúng thứ tự cho mỗi statement. `statements[].id` và `statementId` chỉ
   nhận chuỗi liên tiếp `a`, `b`, `c`, ...; `S1/S2`, số, chữ hoa hoặc ID tùy ý bị
-  provider schema từ chối. Raw explanation không có `answer`; mapper lấy
-  `statements[].value` để dựng canonical answer thành từng dòng `a) Đúng.`,
-  `b) Sai.`, đồng thời ghép lời giải thành các đoạn mang cùng nhãn trong
+  provider schema từ chối. Raw explanation không có `answer`; lớp trình bày lấy
+  `statements[].value` để dựng đáp án thành từng dòng `a) Đúng.`, `b) Sai.`,
+  đồng thời mapper ghép lời giải thành các đoạn mang cùng nhãn trong
   `quizExplanationBlock.solution`. Sai chuỗi nhãn hoặc coverage/order được ghi
   cảnh báo `STATEMENT_ID_SEQUENCE_MISMATCH` hoặc
   `STATEMENT_SOLUTION_COVERAGE_MISMATCH`.
@@ -149,21 +157,27 @@ Side effects:
   chặn persistence. Sai lệch về phân bổ, option ID hoặc statement ID được lưu
   vào `generationIssues` dưới dạng cảnh báo `REVIEWABLE`; câu AI vẫn ở trạng
   thái `NEEDS_REVIEW` để admin kiểm tra.
-- Với Quiz AI `MULTIPLE_CHOICE`, mapper dựng `quizExplanationBlock.answer` từ
-  `correctOptionId` và nội dung option đúng theo dạng `A. nội dung phương án`.
-  Renderer thêm đúng một nhãn `Đáp án:` in đậm; solution kết luận rồi dừng và
-  card không chèn thêm tiêu đề `Lời giải` bên trong.
+- Quiz AI không nhận hoặc persist `explanation.answer`/
+  `quizExplanationBlock.answer`. Dữ liệu chấm là nguồn đáp án duy nhất:
+  `correctOptionId`, `correctAnswer` hoặc `statements[].value` theo loại câu.
+  Renderer dựng nội dung sau nhãn `Đáp án:` từ nguồn này; solution kết luận rồi
+  dừng và card không chèn thêm tiêu đề `Lời giải` bên trong. API đọc dữ liệu lịch
+  sử phải loại legacy `answer` trước khi trả UI.
 - Quiz Toán chỉ persist `isGeometry` trong `quizExplanationBlock`; provider,
   mapper và API không nhận/trả `geometryStatement`, `hypotheses` hoặc
   `conclusions` cho bất kỳ khối lớp nào. Key cũ nếu còn trong JSON lịch sử không
   được project ra response và bị loại khi câu AI được lưu lại. Quyết định tạo
   figure vẫn độc lập với `isGeometry`. Contract GT–KL của Summary không đổi.
-- Figure không có quota và chỉ được tạo nếu thật sự cần. `solutionFigureMode` là
-  `NONE | EXTEND_QUESTION | REDRAW_AS_MODEL`; API không lặp nguyên asset hình đề
-  thành `solutionFigure`. Mode mở rộng luôn dựng trên exact revision hình đề;
-  mode vẽ lại trả một source hoàn chỉnh mới, dùng exact revision hình đề làm
-  provenance/tham chiếu trực quan. Problem/solution vẫn phải tự đủ nghĩa khi
-  không tải hình.
+- Figure không có quota và chỉ được tạo nếu thật sự cần. Phase 1 chỉ trả hai
+  boolean độc lập `requiresQuestionFigure` và `solutionFigure`; không có mode hay
+  figure plan. Nếu `solutionFigure=true`, Phase 2 dựng một source hoàn chỉnh mới
+  từ `problem` và `solution`, ưu tiên authority `solution > problem`, không nhận
+  hoặc phụ thuộc source/asset/revision hình đề. Problem/solution vẫn phải tự đủ
+  nghĩa khi không tải hình.
+- Current revision hình Quiz có thể chứa marker `% classhero-display-scale`.
+  Backend parse/clamp marker và trả `displayScale` trong figure asset admin,
+  `questionFigure` và `solutionFigure` student; không trả full `latexSource` cho
+  student. Thiếu marker giữ nguyên layout cũ.
 - Hard cutover: API không đọc/ghi `exampleBlock`, không trả
   `explanationExampleBlock` và không có fallback dữ liệu Quiz cũ theo shape Sinh
   kiến thức. Student response dùng `explanationBlock`.
@@ -185,6 +199,24 @@ Body: `{ "title": "Bộ câu hỏi ôn tập" }`. Endpoint không nhận
 #### `DELETE /admin/quiz-sets/:quizSetId`
 
 Role: `ADMIN`.
+
+Behavior: hard delete, không soft delete và không thể khôi phục.
+
+- Thực hiện trong một transaction: xóa toàn bộ `quiz_attempts`/answer phụ thuộc,
+  xóa `quiz_sets` để cascade câu hỏi/hình/revision/render attempt, rồi xóa các
+  `ai_explanations` của những câu vừa bị xóa.
+- Giữ `ai_generations`, provider usage và `audit_logs` để bảo toàn lịch sử chi
+  phí/vận hành; audit action là `QUIZ_SET_PERMANENT_DELETED`.
+- Response:
+
+```json
+{
+  "success": true,
+  "deletedQuestionCount": 10,
+  "deletedAttemptCount": 3,
+  "deletedExplanationCount": 10
+}
+```
 
 #### `POST /admin/quiz-sets/:quizSetId/review`
 
@@ -243,11 +275,13 @@ Role: `ADMIN`.
 - `generationQuestionJson` là `null` với câu thủ công, generation cũ không còn
   output hoặc lineage không hợp lệ. Trường này chỉ phục vụ panel admin và không
   được trả qua API học sinh.
-- Mỗi phần tử `figures[]` trả thêm `openAiGenerationCostVnd: number | null`.
+- Mỗi phần tử `figures[]` trả thêm `openAiGenerationCostVnd: number | null` và
+  `openAiCachedInputTokens: number | null`.
   Field là tổng `cost_vnd` của các usage event OpenAI `SUCCEEDED` thuộc đúng job
   đã tạo delivery asset hiện hành; backend dedupe theo usage event, giữ được giá
   khi revision mới chỉ đổi caption trên cùng file. Ảnh upload/code, provider
-  khác hoặc asset chưa có usage tương ứng trả `null`.
+  khác hoặc asset chưa có usage tương ứng trả `null`. Cached token cũng được
+  cộng/dedupe trên cùng tập event; UI chỉ gắn nhãn cache khi giá trị lớn hơn `0`.
 - Đây là raw JSON ở mức structured payload đã được SDK parse và schema validate,
   không phải toàn bộ HTTP response envelope, token usage hoặc chuỗi byte JSON ban
   đầu của provider. Sau lần admin sửa đầu tiên, nó là working snapshot mới nhất,
@@ -437,7 +471,8 @@ Behavior:
 
 - Cập nhật câu hỏi với cùng contract nội dung như create; cho phép đổi loại câu hỏi và xóa gợi ý/lời giải bằng `null`.
 - Quiz nhận tùy chọn `quizExplanationBlock` theo schema riêng
-  `type=quizExplanation`; endpoint không nhận `exampleBlock`. Source trace cấp
+  `type=quizExplanation`, chỉ gồm `problem`, `solution`, `isGeometry?` và
+  `origin?`; block không nhận `answer`. Endpoint không nhận `exampleBlock`. Source trace cấp
   câu vẫn bị loại theo contract M9.3. Figure AI được quản lý bằng resource riêng;
   ảnh admin tự tải dùng endpoint figure upload, không nhúng base64 vào block.
 
@@ -448,13 +483,9 @@ Role: `ADMIN`.
 - Gắn file ảnh admin đã upload vào role `QUESTION` hoặc `SOLUTION` của câu Quiz.
 - Đây là đường ảnh raster duy nhất của Quiz; AI chỉ sinh TeX/TikZ mới và không
   dùng ảnh gốc/crop sách giáo khoa.
-- AI figure Phase 2 hard-cutover sang output tối giản: hình đề và hình lời giải
-  `REDRAW_AS_MODEL` trả duy nhất `latexSource`; hình lời giải
-  `EXTEND_QUESTION` trả duy nhất `extensionLatex`. Không còn `semanticChecks`,
-  `readabilityChecks` hoặc `extensionPlan`; Zod strict reject nếu provider trả
-  lại field ngoài schema. `addedObjects`/`clarifiedRelations` của lượt mở rộng
-  và `modelingGoal`/`modeledObjects`/`clarifiedRelations` của lượt vẽ lại chỉ là
-  input bắt buộc, không được echo vào output Phase 2.
+- AI figure Phase 2 dùng output tối giản `{ latexSource }` cho cả hình đề và
+  hình lời giải. Không còn `extensionLatex`, mode, semantic checklist hay figure
+  plan trong provider contract; Zod strict reject mọi field ngoài schema.
 - Call figure dùng profile môn chuyên vẽ, schema strategy `auto` và prompt cache
   `in_memory`. Worker lưu request trace (prompt/schema version, strategy
   requested/resolved, schema bytes và token text/ảnh/tổng ước tính) vào
@@ -463,9 +494,59 @@ Role: `ADMIN`.
 - Nếu nội dung/correct answer/hint thay đổi, mark explanation liên quan stale hoặc xóa `explanation_id` theo AI/RAG spec.
 - Ghi audit log.
 
+#### `POST /admin/quiz-questions/:questionId/solution-refinement/preview`
+
+Role: `ADMIN`.
+
+Body nhận `mode`, optional `adminInstructions` tối đa 2.000 ký tự và
+`includeCurrentSolutionAsRejected` mặc định `false`.
+
+- Đọc đề bài, phương án/mệnh đề, đáp án đúng và lời giải hiện tại của đúng câu.
+- Resolve subject/khối lớp và route `(QUIZ, TEXT)`, dựng đúng một structured
+  request theo mode. `REFINE` gửi đáp án/lời giải hiện tại làm authority;
+  `REGENERATE` luôn ẩn đáp án/hint cũ; chỉ khi checkbox bật mới gửi lời giải cũ
+  như rejected candidate. Preview trả `requestHash`, system/user prompt, request OpenAI, token
+  và chi phí tối đa của một call.
+- Không gọi provider, không enqueue và không sửa dữ liệu.
+
+#### `POST /admin/quiz-questions/:questionId/solution-refinement`
+
+Role: `ADMIN`. Response: `202 Accepted` với `jobId`/`status`.
+
+Body dùng cùng checkbox với preview và thêm `requestHash` SHA-256.
+
+- Rebuild request và từ chối `AI_INPUT_SNAPSHOT_STALE` nếu đề/lời giải/config
+  không còn khớp preview. Một câu chỉ có một refinement job active.
+- Enqueue `AI_GENERATION`, resource type `QUIZ_SOLUTION_REFINEMENT`, tối đa một
+  provider attempt và đúng một provider call. Worker kiểm hash lời giải trước
+  paid call và trước persist.
+- `REFINE` chỉ trả một nhánh lời giải `solution` hoặc `statementSolutions[]`;
+  đáp án hiện tại là authority bị khóa. `REGENERATE` trả đáp án mới theo đúng
+  loại câu, hint và một nhánh lời giải; ID phương án/mệnh đề phải thuộc tập hiện
+  có. Worker persist atomically đúng phạm vi mode, đồng bộ mutable generation
+  JSON, ghi audit và chuyển câu về `NEEDS_REVIEW`, `publishedAt=null`.
+- Hint không được gửi vào request và không phải nguồn để model dựng lời giải.
+  `REFINE` không nhận field sửa đề, đáp án, hint hay hình. `REGENERATE` không sửa
+  đề/phương án/mệnh đề/hình nhưng được thay đáp án, hint và lời giải.
+
 #### Admin quản lý revision hình Quiz
 
 Role: `ADMIN`.
+
+- `POST /admin/quiz-questions/:questionId/figures/create-ai/preview` nhận
+  `targetMode=QUESTION|SOLUTION`, `mode`, `baseRevisionId` và cùng bộ override
+  của modal hiện có. Preview validate đúng điều kiện execute, trả exact
+  prompt/request/token/chi phí nhưng không enqueue và không gọi provider.
+- `POST /admin/quiz-questions/:questionId/figures/create-ai` dùng cùng body,
+  upsert figure theo role khi chưa tồn tại, tạo pending revision
+  `ADMIN_REGENERATE` và trả `202 { jobId, status }`. Target `SOLUTION` chỉ dùng
+  `problem` và `solution`, không yêu cầu hoặc gửi hình/code hình đề.
+- Response admin của figure đang chạy trả thêm `pendingAiTargetMode` lấy từ
+  immutable job `planSnapshot`. UI dùng field này để gắn trạng thái “đang xử lý”
+  cho đúng role `QUESTION` hoặc `SOLUTION`.
+- Hai endpoint question-level này nhận đủ bốn loại câu Quiz, gồm `TRUE_FALSE` một
+  mệnh đề. Quy tắc không tự sinh hình cho `TRUE_FALSE` chỉ thuộc Phase 1/Phase 2
+  của lượt sinh Quiz tự động, không chặn thao tác tạo hình chủ động của admin.
 
 - `POST /admin/quiz-questions/:questionId/figures/:figureId/drafts/compile` biên
   dịch TeX cục bộ, tạo revision `DRAFT_READY` và trả `previewSvg`; không gọi AI.
@@ -482,23 +563,33 @@ tại`); mode edit yêu cầu revision hiện hành là `AI_TEX` và gửi sourc
   prompt, Responses API payload, model đã resolve, token và chi phí ước tính để
   modal `Xem dữ liệu` dùng chung ngôn ngữ với Sinh kiến thức.
 - `POST /admin/quiz-questions/:questionId/figures/:figureId/refine-ai` nhận
-  `{ baseRevisionId }`, chỉ chấp nhận current revision `SUCCEEDED`, `AI_TEX` có
-  delivery SVG. Endpoint tạo candidate revision `AI_REFINEMENT`, resolve route
-  `QUIZ/IMAGE`, enqueue `QUIZ_FIGURE_RENDERING` và trả `202 { jobId, status }`.
-  Worker gửi full source + PNG raster hóa từ SVG hiện tại + figure plan gốc;
-  model phải trả full `latexSource`. Current revision không đổi nếu provider,
-  policy, compile, validator hoặc storage thất bại.
+  `{ baseRevisionId, adminInstructions? }`, trong đó `adminInstructions` tùy
+  chọn, tối đa 2.000 ký tự và được trim trước khi snapshot vào job. Endpoint chỉ
+  chấp nhận current revision `SUCCEEDED`, `AI_TEX` có delivery SVG, tạo candidate
+  revision `AI_REFINEMENT`, resolve route `QUIZ/IMAGE`, enqueue
+  `QUIZ_FIGURE_RENDERING` và trả `202 { jobId, status }`.
+  Worker gửi current source + PNG raster hóa từ SVG hiện tại + figure plan gốc.
+  Đây là action `Tinh chỉnh` duy nhất: figure plan là authority, còn source và
+  ảnh current là candidate để đánh giá. Model sửa cả lỗi semantic, topology,
+  quan hệ, nhãn, số đo, bố cục và khả năng đọc; được dựng lại toàn bộ source khi
+  candidate sai hoặc vô lý nhưng không được phát minh dữ kiện ngoài authority.
+  `adminInstructions` chỉ ưu tiên phần cần kiểm tra/cách thể hiện, không được ghi
+  đè authority, đổi lời giải hoặc làm lộ đáp án; refinement vẫn đánh giá toàn bộ
+  hình thay vì chỉ sửa phần admin nhắc tới.
+  Mỗi role gửi đúng một PNG candidate và luôn nhận full `latexSource`; refinement
+  hình lời giải vẫn dùng authority `solution > problem` và không đọc hình đề.
+  Current revision không đổi nếu provider, policy, compile, validator hoặc
+  storage thất bại.
 - `POST /admin/quiz-questions/:questionId/figures/:figureId/refine-ai/preview`
-  dùng cùng optimistic guard, route, source, plan và PNG như request thật nhưng
-  chỉ resolve schema/token/chi phí, tuyệt đối không gọi provider hoặc enqueue.
+  dùng cùng optimistic guard, route, source, plan, `adminInstructions` và đúng
+  một PNG như request thật nhưng chỉ resolve schema/token/chi phí, tuyệt đối
+  không gọi provider hoặc enqueue.
   Response trả ảnh PNG để modal hiển thị; provider JSON thay bytes base64 bằng
   placeholder an toàn, trong khi token ảnh vẫn được ước tính từ PNG thật.
 - `PATCH /admin/quiz-questions/:questionId/figures/:figureId/caption` tạo revision
   metadata mới, không mutate mất lịch sử revision cũ.
-- `DELETE /admin/quiz-questions/:questionId/figures/:figureId` xóa mềm. Xóa hình
-  đề xóa mềm cả hình lời giải phụ thuộc và đặt `solutionFigureMode=NONE`; xóa
-  riêng hình lời giải luôn chuyển về `NONE`; hình đề còn hợp lệ vẫn chỉ hiển thị
-  tại phần đề.
+- `DELETE /admin/quiz-questions/:questionId/figures/:figureId` chỉ xóa mềm đúng
+  resource được chọn. Xóa hình đề không xóa hình lời giải và ngược lại.
 - Mọi mutation dùng `baseRevisionId`; conflict yêu cầu UI tải lại thay vì ghi đè
   revision mới hơn. Quiz không gọi service/private schema của Summary.
 

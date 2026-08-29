@@ -1,5 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { orderQuizQuestionsByType } from "@learning-path/shared";
+import {
+  orderQuizQuestionsByType,
+  readStemFigureDisplayScale,
+} from "@learning-path/shared";
 import { AttemptStatus, Prisma, ReviewStatus } from "@prisma/client";
 import {
   assertCompleteStudentAnswer,
@@ -36,7 +39,6 @@ const studentQuizQuestionSelect = {
   sourceMetadataJson: true,
   difficulty: true,
   sortOrder: true,
-  solutionFigureMode: true,
   figures: {
     where: {
       deletedAt: null,
@@ -48,6 +50,7 @@ const studentQuizQuestionSelect = {
         select: {
           altText: true,
           caption: true,
+          latexSource: true,
           deliveryFile: { select: { id: true, publicUrl: true, mimeType: true } },
         },
       },
@@ -1239,7 +1242,6 @@ function serializeRunnerQuestion(
     difficulty: question.difficulty,
     sortOrder: question.sortOrder,
     questionNumber,
-    solutionFigureMode: question.solutionFigureMode,
     questionFigure,
     solutionFigure: ownSolutionFigure,
     hasExplanation:
@@ -1265,6 +1267,7 @@ function serializeQuizFigure(
     fileId: file.id,
     mimeType: file.mimeType,
     url: file.publicUrl,
+    displayScale: readStemFigureDisplayScale(revision.latexSource),
   };
 }
 
@@ -1344,6 +1347,7 @@ function readQuizExplanationBlock(
   }
   const safeExplanationBlock = { ...explanationBlock };
   delete safeExplanationBlock.geometryStatement;
+  delete safeExplanationBlock.answer;
   if (typeof safeExplanationBlock.solution !== "string") {
     return safeExplanationBlock;
   }

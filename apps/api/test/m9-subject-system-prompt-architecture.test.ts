@@ -47,6 +47,36 @@ function expectCompleteSpatialLabelPolicy(prompt: string) {
   expect(prompt).toContain("`node[midway, ...]` hoặc `node[pos=..., ...]`");
   expect(prompt).toContain("bắt buộc dùng leader line");
   expect(prompt).toContain("midpoint trống vẫn hợp lệ nhưng không bắt buộc");
+  expect(prompt).toContain("cụm nhãn chật dù hai bounding box chưa giao nhau");
+  expect(prompt).toContain("phía pháp tuyến đối diện với tên điểm/nút");
+  expect(prompt).toContain("Một miền trong hình còn trống vẫn là phía trống");
+  expect(prompt).toContain(
+    "chỉ giảm khoảng hở nhưng giữ hai nhãn cùng phía không giải quyết",
+  );
+  expect(prompt).toContain(
+    "bounding box nhãn đo ở phía đối diện sẽ thật sự chạm hay che nét",
+  );
+  expect(prompt).toContain("cấm đổi phía máy móc");
+  expect(prompt).toContain(
+    "đặt cả trị số, khoảng cách mảnh và đơn vị trong cùng `\\mathrm{...}`",
+  );
+  expect(prompt).toContain("lệnh font chỉ bọc đơn vị");
+  expect(prompt).toContain("hay cách trộn math/text tương đương");
+  expect(prompt).toMatch(/\{\$\\mathrm\{(?:10|25)\\,/u);
+  expect(prompt).toMatch(/cấm `\{\$(?:10|25)\\,\\mathrm\{/u);
+  expect(prompt).toContain("Counterexample typography:");
+  expect(prompt).toMatch(
+    /(?:bảo toàn phần typography ngoài phạm vi được phép thay đổi|chỉ giữ typography của candidate khi không mâu thuẫn authority)/u,
+  );
+  expect(prompt).toContain("phân cấp cỡ chữ là invariant bắt buộc");
+  expect(prompt).toContain("là nhãn chính và giữ cỡ baseline");
+  expect(prompt).toContain("nhãn phụ không định danh như số đo hoặc biểu thức góc");
+  expect(prompt).toContain("phải mặc định nhỏ hơn nhãn chính bằng `font=\\small`");
+  expect(prompt).toContain("Không để nhãn phụ ở cùng cỡ baseline");
+  expect(prompt).toContain("Sau mỗi lần chọn hoặc đổi cấp chữ");
+  expect(prompt).toContain("gần nhất có thể với đúng coordinate/path/cung sở hữu");
+  expect(prompt).toContain("chỉ chừa khe hở tối thiểu để không chạm nét");
+  expect(prompt).toContain("cấm thu nhỏ rồi giữ vị trí cũ làm nhãn trôi xa");
   expect(prompt).toContain("Cỡ chữ mặc định chỉ là baseline");
   expect(prompt).toContain("`font=\\small`");
   expect(prompt).toContain("`font=\\footnotesize`");
@@ -56,6 +86,102 @@ function expectCompleteSpatialLabelPolicy(prompt: string) {
   expect(prompt).toContain("Các nhãn cùng vai trò phải dùng cấp chữ nhất quán");
   expect(prompt).toContain("Counterexample:");
   expect(prompt).toContain("gần bounding box nhãn nhất phải là đúng đối tượng sở hữu");
+}
+
+function expectQuizVisibleIdentifierAuthority(prompt: string) {
+  expect(prompt).toContain(
+    "Tên hoặc nhãn định danh nhìn thấy là nội dung ngữ nghĩa, không phải chi tiết trang trí",
+  );
+  expect(prompt).toContain("cấm tự gán chữ cái, chữ số hoặc tên tiện ích");
+  expect(prompt).toContain("không được render thành text node");
+  expect(prompt).toContain("current source và ảnh candidate không phải authority");
+  expect(prompt).toContain(
+    "mọi nhãn định danh nhìn thấy không truy được về authority phải bị xóa",
+  );
+  expect(prompt).toContain("Counterexample hợp lệ:");
+}
+
+function expectGeneratedStemVisibleIdentifierAuthority(prompt: string) {
+  expect(prompt).toContain(
+    "Với hình tự thiết kế từ block, tên hoặc nhãn định danh nhìn thấy chỉ được render khi",
+  );
+  expect(prompt).toContain("Đối tượng chưa được đặt tên phải giữ không nhãn");
+  expect(prompt).toContain("không được render thành text node");
+  expect(prompt).toContain("Counterexample hợp lệ:");
+}
+
+function expectSubjectVisualCompleteness(
+  prompt: string,
+  subject: (typeof subjects)[number]["key"],
+) {
+  expectTikzNumericStabilityPolicy(prompt);
+  if (subject === "MATH") {
+    expect(prompt).toContain("(\\x/15)*(\\x/25)");
+    expect(prompt).toContain("### THÀNH PHẦN TỐI THIỂU THEO HỌ HÌNH TOÁN");
+    expect(prompt).toContain("móng hình");
+    expect(prompt).toContain("`$O$`");
+    expect(prompt).toMatch(/parabol.*đỉnh.*một cặp/u);
+    expect(prompt).toContain("densely dashed");
+    expect(prompt).toContain("tick có số");
+    expect(prompt).toContain(
+      "một đơn vị số học trên hai trục bắt buộc có cùng độ dài render",
+    );
+    expect(prompt).toContain("dùng cùng một hệ số đổi cho cả hai trục");
+    expect(prompt).toContain("chỉ đặt `x=` bằng `y=` trong TikZ không đủ");
+    expect(prompt).toContain(
+      "Không áp dụng tỉ lệ 1:1 khi hai trục biểu diễn đại lượng hoặc đơn vị khác nhau",
+    );
+    expect(prompt).toContain("giữ tick đặc biệt và bỏ tick đều lân cận");
+    expect(prompt).toContain("Bỏ chú thích nền thừa");
+    expect(prompt).toContain("nằm ngoài dải số tick");
+    expect(prompt).toContain("đầu mút mở-đóng");
+    expect(prompt).toMatch(/hình không gian/iu);
+    expect(prompt).toMatch(/cạnh thấy[-/]khuất/u);
+    return;
+  }
+  expect(prompt).not.toContain(
+    "một đơn vị số học trên hai trục bắt buộc có cùng độ dài render",
+  );
+  if (subject === "PHYSICS") {
+    expect(prompt).toContain("### THÀNH PHẦN TỐI THIỂU THEO HỌ HÌNH VẬT LÝ");
+    expect(prompt).toContain("móng hình");
+    expect(prompt).toContain("điểm đổi chế độ/độ dốc");
+    expect(prompt).toContain("densely dashed");
+    expect(prompt).toContain("điểm đặt");
+    expect(prompt).toMatch(/[Jj]unction/u);
+    expect(prompt).toContain("số tia chuẩn");
+    expect(prompt).toContain("zero thành `00`");
+    expect(prompt).toContain("lặp đơn vị tại cùng một vị trí");
+    return;
+  }
+  if (subject === "CHEMISTRY") {
+    expect(prompt).toContain("### THÀNH PHẦN TỐI THIỂU THEO HỌ HÌNH HÓA HỌC");
+    expect(prompt).toContain("móng hình");
+    expect(prompt).toMatch(/mô hình tiểu phân/iu);
+    expect(prompt).toContain("legend");
+    expect(prompt).toContain("densely dashed");
+    expect(prompt).toContain("đầu vào-đầu ra");
+    expect(prompt).toContain("cấm `\\mathrm` ngoài math mode");
+    return;
+  }
+  expect(prompt).toContain("### THÀNH PHẦN TỐI THIỂU CHO BIỂU DIỄN TỔNG QUÁT");
+  expect(prompt).toContain("móng hình");
+  expect(prompt).toContain("giao nhau trên canvas không tự tạo liên kết");
+  expect(prompt).toContain("Style TikZ nội bộ phải dùng tên có prefix riêng");
+  expect(prompt).toContain("legend");
+  expect(prompt).toContain("sơ đồ định tính không bị ép có trục");
+}
+
+function expectTikzNumericStabilityPolicy(prompt: string) {
+  expect(prompt).toContain("### ỔN ĐỊNH CÚ PHÁP VÀ SỐ HỌC PGF/TIKZ");
+  expect(prompt).toContain("fixed-point");
+  expect(prompt).toContain("`scale`, `xscale` hoặc `yscale`");
+  expect(prompt).toContain("TikZ `\\pic` với `angle` hoặc `right angle`");
+  expect(prompt).toContain("`X--V--Y`");
+  expect(prompt).toContain("tên coordinate/node đã khai báo");
+  expect(prompt).toContain("viết không có ngoặc tròn");
+  expect(prompt).toContain("tọa độ thô, biểu thức calc hoặc dạng `(X)--(V)--(Y)`");
+  expect(prompt).toContain("Counterexample:");
 }
 
 describe("subject-owned AI system prompt architecture", () => {
@@ -105,21 +231,19 @@ describe("subject-owned AI system prompt architecture", () => {
       expect(phaseOne).toContain(
         "`requiresQuestionFigure` là cờ boolean quyết định có tạo hình xuất hiện trước khi học sinh trả lời hay không",
       );
-      expect(phaseOne).toContain("`requiresQuestionFigure` phải là đúng một boolean");
+      expect(phaseOne).toContain("Phase 1 chỉ trả hai boolean độc lập");
       expect(phaseOne).not.toContain("caption");
-      expect(phaseOne).toContain("phép kiểm kê visual delta");
-      expect(phaseOne).toContain(
-        "cấm chọn `NONE`, kể cả khi lời giải bằng chữ đã tự đủ nghĩa",
-      );
-      expect(phaseOne).toContain("Counterexample giữ `NONE`");
-      expect(phaseOne).toContain("Counterexample bắt buộc `EXTEND_QUESTION`");
+      expect(phaseOne).toContain("kiểm kê nội bộ");
+      expect(phaseOne).toContain("Đặt `solutionFigure=true` khi và chỉ khi");
+      expect(phaseOne).not.toContain("solutionFigureMode");
+      expect(phaseOne).not.toContain("solutionFigurePlan");
 
       const question = buildQuizFigureSystemPrompt(snapshot, "QUESTION");
-      const extension = buildQuizFigureSystemPrompt(snapshot, "EXTEND_QUESTION");
-      const redraw = buildQuizFigureSystemPrompt(snapshot, "REDRAW_AS_MODEL");
-      for (const prompt of [question, extension, redraw]) {
+      const solution = buildQuizFigureSystemPrompt(snapshot, "SOLUTION");
+      for (const prompt of [question, solution]) {
         expect(prompt).toContain(subject.name);
         expectCompleteSpatialLabelPolicy(prompt);
+        expectQuizVisibleIdentifierAuthority(prompt);
       }
       expect(question).toContain("HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ");
       expect(question).toContain(
@@ -127,11 +251,11 @@ describe("subject-owned AI system prompt architecture", () => {
       );
       expect(question).toContain("Cấm biến hệ quả suy luận thành dữ kiện nhìn thấy");
       expect(question).not.toContain("caption");
-      expect(extension).toContain("HỢP ĐỒNG LƯỢT MỞ RỘNG HÌNH LỜI GIẢI");
-      expect(redraw).toContain("HỢP ĐỒNG LƯỢT VẼ LẠI HÌNH LỜI GIẢI");
+      expect(solution).toContain("HỢP ĐỒNG LƯỢT TẠO HÌNH LỜI GIẢI");
+      expect(solution).toContain("solution là nguồn có độ ưu tiên cao nhất");
+      expect(solution).toContain("hoàn toàn độc lập với hình đề");
       expect(question).not.toContain("requiredModeledObjects");
-      expect(extension).not.toContain("requiredModeledObjects");
-      expect(redraw).toContain("requiredModeledObjects");
+      expect(solution).not.toContain("requiredModeledObjects");
     }
   });
 
@@ -205,12 +329,75 @@ describe("subject-owned AI system prompt architecture", () => {
     }
   });
 
+  it("keeps every Quiz and Summary problem unambiguous and figure-ready", () => {
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const quiz = buildQuizSubjectSystemPrompt(snapshot);
+      const summary = buildLessonSummarySubjectSystemPrompt(subject);
+
+      for (const prompt of [quiz, summary]) {
+        expect(prompt).toContain("chỉ có một cách hiểu chuyên môn");
+        expect(prompt).toContain("các dữ kiện");
+        expect(prompt).toContain("có thể dựng hai hình khác nhau về quan hệ");
+        expect(prompt).toContain("không tồn tại cấu hình thỏa đồng thời mọi dữ kiện");
+        expect(prompt).toContain("Không ép nêu chi tiết trang trí");
+      }
+
+      expect(quiz).toContain("phải bỏ và viết lại");
+      expect(quiz).toContain("worker vẽ hình đề chỉ dùng `problem`");
+      expect(quiz).toContain(
+        "không được kỳ vọng lấy dữ kiện từ PDF, `options`, `statements`, `hint`, `solution`",
+      );
+      expect(summary).toContain("chỉ làm rõ quan hệ được nguồn hỗ trợ, không tự đoán");
+    }
+  });
+
+  it("keeps visible intermediate-proof obligations isolated to Math text prompts", () => {
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const quiz = buildQuizSubjectSystemPrompt(snapshot);
+      const summary = buildLessonSummarySubjectSystemPrompt(subject);
+
+      if (subject.key === "MATH") {
+        for (const prompt of [quiz, summary]) {
+          expect(prompt).toContain("MẠCH SUY LUẬN VÀ NHÃN KẾT LUẬN");
+          expect(prompt).toContain("không phải dữ kiện đã cho");
+          expect(prompt).toContain("Từ (1) và (2), suy ra");
+          expect(prompt).toContain("Từ căn cứ thứ nhất, suy ra $P$.`");
+          expect(prompt).not.toContain("Từ căn cứ thứ nhất, suy ra $P$. (1)");
+          expect(prompt).toContain("mọi nhãn đã gắn phải được viện dẫn ít nhất một lần");
+          expect(prompt).toContain("không đặt hai kết luận mang nhãn cùng dòng");
+          expect(prompt).toContain("Nếu mạch là $A\\Rightarrow B$");
+          expect(prompt).toContain("bỏ mọi nhãn không có tham chiếu về sau");
+          expect(prompt).toContain("Từ căn cứ thứ hai, suy ra $Q=k$. (1)");
+          expect(prompt).toContain("Theo định lý, suy ra $Q=R$.");
+          expect(prompt).toContain("Từ (1), suy ra $R=k$.");
+          expect(prompt).toMatch(/Q=R\$.+`\n\n\s+`Từ \(1\)/u);
+        }
+        expect(summary).toContain("Với `SOURCE_EXACT`");
+      } else {
+        expect(quiz).not.toContain("MẠCH SUY LUẬN VÀ NHÃN KẾT LUẬN");
+        expect(summary).not.toContain("MẠCH SUY LUẬN VÀ NHÃN KẾT LUẬN");
+        expect(quiz).not.toContain("Từ (1) và (2), suy ra");
+        expect(summary).not.toContain("Từ (1) và (2), suy ra");
+        expect(summary).not.toContain("Từ (3) và giả thiết $S$, suy ra $T$");
+      }
+
+      for (const figurePrompt of [
+        buildQuizFigureSystemPrompt(snapshot, "QUESTION"),
+        buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK"),
+      ]) {
+        expect(figurePrompt).not.toContain("MẠCH SUY LUẬN VÀ NHÃN KẾT LUẬN");
+      }
+    }
+  });
+
   it("keeps Quiz refinement prompts dedicated, concise and isolated by subject", () => {
     const uniqueRules = {
       MATH: [
         "bảng biến thiên",
         "cung góc",
-        "đường tròn $(O)$",
+        "mọi đường tròn hình học đều có đúng một marker tại tâm",
         "nhãn trục, hàm số hoặc ô bảng",
       ],
       PHYSICS: [
@@ -233,16 +420,23 @@ describe("subject-owned AI system prompt architecture", () => {
 
     for (const subject of subjects) {
       const snapshot = subject as QuizSubjectSnapshot;
-      for (const mode of ["QUESTION", "EXTEND_QUESTION", "REDRAW_AS_MODEL"] as const) {
+      for (const mode of ["QUESTION", "SOLUTION"] as const) {
         const prompt = buildQuizFigureRefinementSystemPrompt(snapshot, mode);
         expect(prompt).toContain(subject.name);
         expect(prompt).toContain("Danh sách lỗi trên chỉ là ví dụ");
         expect(prompt).toContain("không phải danh sách đóng");
-        expect(prompt).toContain("toàn bộ latexSource hoàn chỉnh");
+        expect(prompt).toContain("CỔNG THOÁT ANCHOR CŨ");
+        expect(prompt).toContain(
+          "source cuối bắt buộc đặt tên điểm/nút và nhãn đo ở hai phía pháp tuyến đối diện",
+        );
+        expect(prompt).toContain(
+          "trượt nhẹ nhưng vẫn giữ cùng phía là tinh chỉnh thất bại",
+        );
         expect(prompt).not.toContain("REGENERATE");
-        expect(prompt).not.toContain("EDIT_CURRENT");
+        expect(prompt).toContain("toàn bộ latexSource hoàn chỉnh");
         expect(prompt).not.toContain("extensionLatex");
-        expect(prompt).not.toContain("adminInstructions");
+        expect(prompt).not.toContain("exactQuestionLatexSource");
+        expect(prompt).toContain("Nếu user input có adminInstructions");
         expect(prompt).not.toContain("HỢP ĐỒNG LƯỢT VẼ HÌNH ĐỀ");
         expect(prompt).not.toContain("HỢP ĐỒNG LƯỢT MỞ RỘNG HÌNH LỜI GIẢI");
         expect(prompt).not.toContain("HỢP ĐỒNG LƯỢT VẼ LẠI HÌNH LỜI GIẢI");
@@ -250,6 +444,7 @@ describe("subject-owned AI system prompt architecture", () => {
           expect(prompt).toContain(rule);
         }
         expectCompleteSpatialLabelPolicy(prompt);
+        expectQuizVisibleIdentifierAuthority(prompt);
       }
     }
 
@@ -306,15 +501,88 @@ describe("subject-owned AI system prompt architecture", () => {
         expect(prompt).toContain(subject.name);
         expect(prompt).not.toContain("caption");
         expectCompleteSpatialLabelPolicy(prompt);
+        expectTikzNumericStabilityPolicy(prompt);
       }
       expect(source).toContain("ẢNH NGUỒN VÀ PHẠM VI");
       expect(edit).toContain("currentLatexSource là code hiện tại");
       expect(generated).toContain("blockContent là nguồn sự thật chuyên môn duy nhất");
+      expectGeneratedStemVisibleIdentifierAuthority(generated);
+      expectGeneratedStemVisibleIdentifierAuthority(generatedWithAdmin);
+      for (const prompt of [source, sourceWithAdmin, edit, editWithAdmin, repair]) {
+        expect(prompt).not.toContain(
+          "Với hình tự thiết kế từ block, tên hoặc nhãn định danh nhìn thấy",
+        );
+      }
       expect(repair).toContain("PHẠM VI SỬA VÀ ĐẦU RA");
     }
   });
 
-  it("keeps the Math circle-name/center-label invariant in every figure mode", () => {
+  it("applies visual-family completeness to every semantic figure mode without redesigning technical repair", () => {
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const question = buildQuizFigureSystemPrompt(snapshot, "QUESTION");
+      const solution = buildQuizFigureSystemPrompt(snapshot, "SOLUTION");
+
+      for (const prompt of [question, solution]) {
+        expectSubjectVisualCompleteness(prompt, subject.key);
+      }
+      expect(question).toContain("Móng hình trung tính luôn bắt buộc");
+      expect(question).toContain("lộ đáp án");
+      expect(solution).toContain("hoàn toàn độc lập với hình đề");
+
+      for (const mode of ["QUESTION", "SOLUTION"] as const) {
+        const refinementPrompt = buildQuizFigureRefinementSystemPrompt(snapshot, mode);
+        expectSubjectVisualCompleteness(refinementPrompt, subject.key);
+        expect(refinementPrompt).toContain("Nếu user input có adminInstructions");
+        expect(refinementPrompt).toContain("không được thêm dữ kiện");
+        expect(refinementPrompt).toContain("ghi đè authority");
+      }
+
+      const source = buildStemFigureSystemPrompt(subject, "REGENERATE_FROM_SOURCE");
+      const edit = buildStemFigureSystemPrompt(subject, "EDIT_CURRENT_SOURCE", {
+        hasAdminInstructions: true,
+      });
+      const generated = buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK");
+      const repair = buildStemFigureSystemPrompt(subject, "REPAIR");
+      for (const prompt of [source, edit, generated]) {
+        expectSubjectVisualCompleteness(prompt, subject.key);
+      }
+      expect(source).toMatch(/Ảnh (?:vẫn )?khóa baseline/u);
+      expect(source).toContain("không tự bổ sung");
+      expect(edit).toContain("đúng phạm vi sửa được authority");
+      expect(generated).toContain("chuẩn completeness bắt buộc");
+      expect(repair).not.toContain("THÀNH PHẦN TỐI THIỂU");
+    }
+
+    const math = buildQuizFigureSystemPrompt(subjects[0], "QUESTION");
+    const physics = buildQuizFigureSystemPrompt(subjects[1], "QUESTION");
+    const chemistry = buildQuizFigureSystemPrompt(subjects[2], "QUESTION");
+    const general = buildQuizFigureSystemPrompt(subjects[3], "QUESTION");
+    expect(math).not.toContain("đỉnh hoạt hóa");
+    expect(physics).not.toContain("bảng biến thiên/xét dấu");
+    expect(chemistry).not.toContain("cạnh thấy-khuất");
+    expect(general).not.toContain("cực trị/điểm ngoặt");
+    expect(general).not.toContain("Junction");
+  });
+
+  it("keeps visible-identifier provenance vocabulary owned by each figure subject", () => {
+    const expectedVocabulary = {
+      MATH: "các đỉnh của một hình",
+      PHYSICS: "vật, điểm, nút mạch, tia, vector, linh kiện",
+      CHEMISTRY: "chất, tiểu phân, dụng cụ, vị trí, bộ phận",
+      GENERAL: "node, mốc, bước, vùng, trục, hàng/cột",
+    } as const;
+
+    for (const subject of subjects) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      const quizPrompt = buildQuizFigureSystemPrompt(snapshot, "QUESTION");
+      const stemPrompt = buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK");
+      expect(quizPrompt).toContain(expectedVocabulary[subject.key]);
+      expect(stemPrompt).toContain(expectedVocabulary[subject.key]);
+    }
+  });
+
+  it("requires a center marker for every Math geometric circle in every figure mode", () => {
     const quizSource = readFileSync(
       resolve(
         process.cwd(),
@@ -330,26 +598,167 @@ describe("subject-owned AI system prompt architecture", () => {
       "utf8",
     );
 
-    expect(quizSource.match(/`\$\(O\)\$` chỉ là cách gọi đường tròn/gu)).toHaveLength(3);
-    expect(stemSource.match(/`\$\(O\)\$` chỉ là cách gọi đường tròn/gu)).toHaveLength(7);
+    expect(quizSource.match(/Lệnh TikZ `circle` chỉ dùng làm chấm điểm/gu)).toHaveLength(
+      2,
+    );
+    expect(stemSource.match(/Lệnh TikZ `circle` chỉ dùng làm chấm điểm/gu)).toHaveLength(
+      7,
+    );
 
     const math = { key: "MATH", name: "Toán", slug: "toan" } as const;
-    for (const prompt of [
-      buildQuizFigureSystemPrompt(math, "QUESTION"),
-      buildQuizFigureSystemPrompt(math, "EXTEND_QUESTION"),
-      buildQuizFigureSystemPrompt(math, "REDRAW_AS_MODEL"),
-    ]) {
-      expect(prompt).toContain("không phải một nhãn canvas");
+    const questionPrompt = buildQuizFigureSystemPrompt(math, "QUESTION");
+    const solutionPrompt = buildQuizFigureSystemPrompt(math, "SOLUTION");
+
+    for (const prompt of [questionPrompt, solutionPrompt]) {
+      expect(prompt).toContain("Mọi đường tròn hình học được render trên canvas");
+      expect(prompt).toContain("bắt buộc có đúng một điểm đánh dấu");
+      expect(prompt).toContain("marker không nhãn");
+      expect(prompt).toContain("Các đường tròn đồng tâm dùng chung một marker");
+      expect(prompt).toContain("không phải đường tròn hình học");
+    }
+    for (const mode of ["QUESTION", "SOLUTION"] as const) {
+      const prompt = buildQuizFigureRefinementSystemPrompt(math, mode);
+      expect(prompt).toContain(
+        "bắt buộc kiểm tra mọi đường tròn hình học đều có đúng một marker tại tâm",
+      );
+      expect(prompt).toContain("tâm chưa được authority đặt tên giữ marker không nhãn");
     }
 
-    for (const mode of [
-      "REGENERATE_FROM_SOURCE",
-      "EDIT_CURRENT_SOURCE",
-      "GENERATE_FROM_BLOCK",
-      "REPAIR",
+    for (const [mode, hasAdminInstructions] of [
+      ["REGENERATE_FROM_SOURCE", false],
+      ["REGENERATE_FROM_SOURCE", true],
+      ["EDIT_CURRENT_SOURCE", false],
+      ["EDIT_CURRENT_SOURCE", true],
+      ["GENERATE_FROM_BLOCK", false],
+      ["GENERATE_FROM_BLOCK", true],
+      ["REPAIR", false],
     ] as const) {
-      expect(buildStemFigureSystemPrompt(math, mode)).toContain(
-        "cấm đặt thêm node `$(O)$`",
+      const prompt = buildStemFigureSystemPrompt(math, mode, { hasAdminInstructions });
+      expect(prompt).toContain("Mọi đường tròn hình học được render trên canvas");
+      expect(prompt).toContain("bắt buộc có đúng một điểm đánh dấu");
+      expect(prompt).toContain("nếu chưa đặt tên thì chỉ vẽ marker");
+      expect(prompt).toContain("Các đường tròn đồng tâm dùng chung một marker");
+      expect(prompt).toContain("không phải đường tròn hình học");
+    }
+
+    for (const subject of subjects.filter((subject) => subject.key !== "MATH")) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      expect(buildQuizFigureSystemPrompt(snapshot, "QUESTION")).not.toContain(
+        "Mọi đường tròn hình học",
+      );
+      expect(buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK")).not.toContain(
+        "Mọi đường tròn hình học",
+      );
+    }
+  });
+
+  it("keeps independent equal-length marker groups distinct in every Math figure mode", () => {
+    const math = { key: "MATH", name: "Toán", slug: "toan" } as const;
+    const stemPrompts = [
+      buildStemFigureSystemPrompt(math, "REGENERATE_FROM_SOURCE"),
+      buildStemFigureSystemPrompt(math, "REGENERATE_FROM_SOURCE", {
+        hasAdminInstructions: true,
+      }),
+      buildStemFigureSystemPrompt(math, "EDIT_CURRENT_SOURCE"),
+      buildStemFigureSystemPrompt(math, "EDIT_CURRENT_SOURCE", {
+        hasAdminInstructions: true,
+      }),
+      buildStemFigureSystemPrompt(math, "GENERATE_FROM_BLOCK"),
+      buildStemFigureSystemPrompt(math, "GENERATE_FROM_BLOCK", {
+        hasAdminInstructions: true,
+      }),
+      buildStemFigureSystemPrompt(math, "REPAIR"),
+    ];
+    const quizPrompts = [
+      ...(["QUESTION", "SOLUTION"] as const).map((mode) =>
+        buildQuizFigureSystemPrompt(math, mode),
+      ),
+      ...(["QUESTION", "SOLUTION"] as const).map((mode) =>
+        buildQuizFigureRefinementSystemPrompt(math, mode),
+      ),
+    ];
+
+    for (const prompt of [...stemPrompts, ...quizPrompts]) {
+      expect(prompt).toContain("chia các đoạn thành từng nhóm quan hệ bằng nhau");
+      expect(prompt).toMatch(
+        /nhóm độc lập.*(?:kiểu hoặc số vạch khác nhau|marker khác nhau)/u,
+      );
+      expect(prompt).toContain(
+        "Không gộp hai nhóm chỉ vì mỗi nhóm đều phát sinh từ quan hệ trung điểm",
+      );
+      expect(prompt).toContain("authority khẳng định mọi đoạn");
+      expect(prompt).toContain("Vạch chia trục/hệ trục");
+      expect(prompt).toContain("marker điểm dựng");
+      expect(prompt).toContain("marker đầu mút mở-đóng");
+      expect(prompt).toContain("`.25`");
+      expect(prompt).toContain("`.75`");
+      expect(prompt).toMatch(/(?:tối đa hai nét|mỗi glyph tối đa hai nét)/u);
+      expect(prompt).toMatch(/(?:không|cấm).*(?:3–5 vạch|bó cụm vạch tại `\.5`)/u);
+    }
+
+    expect(buildStemFigureSystemPrompt(math, "REPAIR")).toContain(
+      "không tự tách, gộp hay đổi marker group ngoài phạm vi",
+    );
+    for (const subject of subjects.filter((subject) => subject.key !== "MATH")) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      expect(buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK")).not.toContain(
+        "chia các đoạn thành từng nhóm quan hệ bằng nhau",
+      );
+      for (const mode of ["QUESTION", "SOLUTION"] as const) {
+        expect(buildQuizFigureSystemPrompt(snapshot, mode)).not.toContain(
+          "chia các đoạn thành từng nhóm quan hệ bằng nhau",
+        );
+        expect(buildQuizFigureRefinementSystemPrompt(snapshot, mode)).not.toContain(
+          "chia các đoạn thành từng nhóm quan hệ bằng nhau",
+        );
+      }
+    }
+  });
+
+  it("locks TikZ angle orientation and distinct angle-marker groups in every Math figure mode", () => {
+    const math = { key: "MATH", name: "Toán", slug: "toan" } as const;
+    const prompts = [
+      buildStemFigureSystemPrompt(math, "REGENERATE_FROM_SOURCE"),
+      buildStemFigureSystemPrompt(math, "EDIT_CURRENT_SOURCE"),
+      buildStemFigureSystemPrompt(math, "GENERATE_FROM_BLOCK"),
+      buildStemFigureSystemPrompt(math, "REPAIR"),
+      buildQuizFigureSystemPrompt(math, "QUESTION"),
+      buildQuizFigureSystemPrompt(math, "SOLUTION"),
+      buildQuizFigureRefinementSystemPrompt(math, "QUESTION"),
+      buildQuizFigureRefinementSystemPrompt(math, "SOLUTION"),
+    ];
+
+    for (const prompt of prompts) {
+      expect(prompt).toContain("`angle=X--V--Y` luôn quét ngược chiều kim đồng hồ");
+      expect(prompt).toContain("góc cực `0, 90, 180, 270`");
+      expect(prompt).toContain("chiều kim đồng hồ");
+      expect(prompt).toContain("`angle=Prev--V--Next`");
+      expect(prompt).toContain("đi ngược chiều kim đồng hồ");
+      expect(prompt).toContain("`angle=Next--V--Prev`");
+      expect(prompt).toContain("độ quét nhỏ hơn `180°`");
+      expect(prompt).toContain("chia các góc thành từng nhóm quan hệ");
+      expect(prompt).toContain("Các góc được khẳng định bằng nhau");
+      expect(prompt).toContain("các góc được authority cho giá trị khác nhau");
+      expect(prompt).toContain("kiểu hoặc số cung khác nhau");
+      expect(prompt).toContain(
+        "Chỉ thay `angle radius` của cùng một cung đơn không được tính là marker khác nhau",
+      );
+      expect(prompt).toContain("số cung đồng tâm hoặc kiểu nét nhìn thấy rõ");
+      expect(prompt).toContain("bán kính chỉ được điều chỉnh cục bộ để tránh va chạm");
+      expect(prompt).toContain("không tự thêm cung chỉ để phân nhóm");
+      expect(prompt).toContain("chia các đoạn thành từng nhóm quan hệ bằng nhau");
+      expect(prompt).toContain("`\\draw ... arc`");
+      expect(prompt).toContain("độ quét literal");
+      expect(prompt).toMatch(/khác số đo cùng (?:chung )?một đỉnh/u);
+    }
+
+    for (const subject of subjects.filter((subject) => subject.key !== "MATH")) {
+      const snapshot = subject as QuizSubjectSnapshot;
+      expect(buildQuizFigureSystemPrompt(snapshot, "QUESTION")).not.toContain(
+        "`angle=Next--V--Prev`",
+      );
+      expect(buildStemFigureSystemPrompt(subject, "GENERATE_FROM_BLOCK")).not.toContain(
+        "chia các góc thành từng nhóm quan hệ",
       );
     }
   });

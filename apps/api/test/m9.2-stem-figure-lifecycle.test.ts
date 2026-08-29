@@ -151,6 +151,70 @@ describe("M9.2 logical figure revision lifecycle", () => {
     });
   });
 
+  it("returns deduplicated OpenAI cost and cached tokens for the current asset", async () => {
+    const usageEvent = {
+      id: "usage-current",
+      cachedInputTokens: 2_048,
+      costVnd: 175,
+    };
+    const currentRevision = {
+      ...revision({
+        id: currentRevisionId,
+        origin: "INITIAL_AI",
+        status: "SUCCEEDED",
+        deliveryFile: { objectKey: "current.svg", publicUrl: null },
+      }),
+      attempts: [
+        {
+          id: "attempt-2",
+          backgroundJob: { providerUsageEvents: [usageEvent] },
+          createdAt: new Date("2026-08-12T00:00:02.000Z"),
+        },
+        {
+          id: "attempt-1",
+          backgroundJob: { providerUsageEvents: [usageEvent] },
+          createdAt: new Date("2026-08-12T00:00:01.000Z"),
+        },
+      ],
+    };
+
+    const result = await serializeStemFigure(
+      {
+        id: figureId,
+        lessonId: "00000000-0000-4000-8000-000000000034",
+        lessonSummaryId: "00000000-0000-4000-8000-000000000036",
+        aiGenerationId: "00000000-0000-4000-8000-000000000037",
+        blockPath: "sections.0.blocks.1",
+        figureIndex: 0,
+        localPlanId: "F001",
+        planJson: {},
+        subjectKey: "MATH",
+        subjectName: "Toán",
+        subjectSlug: "toan",
+        status: "SUCCEEDED",
+        theme: "LIGHT",
+        currentRevisionId,
+        currentRevision,
+        pendingRevisionId: null,
+        pendingRevision: null,
+        revisions: [],
+        lastErrorCategory: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        createdAt: new Date("2026-08-12T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-12T00:00:03.000Z"),
+      } as never,
+      { resolveAccessUrl: vi.fn(async () => "https://assets.test/current.svg") } as never,
+      { createSignedGetUrl: vi.fn() } as never,
+      true,
+    );
+
+    expect(result).toMatchObject({
+      openAiGenerationCostVnd: 175,
+      openAiCachedInputTokens: 2_048,
+    });
+  });
+
   it("does not combine a stale figure error with a newer successful draft", async () => {
     const result = await serializeStemFigure(
       {
@@ -1194,6 +1258,11 @@ describe("M9.2 logical figure revision lifecycle", () => {
       },
       select: { id: true, status: true },
     });
+    expect(prisma.backgroundJob.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ maxAttempts: 3 }),
+      }),
+    );
     expect(queue.enqueue).toHaveBeenCalledWith("new-job-id");
   });
 
@@ -1482,6 +1551,8 @@ describe("M9.2 logical figure revision lifecycle", () => {
             currentRevision: {
               altText: "Hình hiện hành",
               caption: "Caption hiện hành",
+              latexSource: String.raw`% classhero-display-scale: 0.8
+\begin{tikzpicture}\draw (0,0)--(1,0);\end{tikzpicture}`,
               deliveryFile: { objectKey: "current.svg", publicUrl: null },
             },
           },
@@ -1505,6 +1576,7 @@ describe("M9.2 logical figure revision lifecycle", () => {
                       altText: "Hình hiện hành",
                       caption: "Caption hiện hành",
                       assetUrl: "https://assets.test/current.svg",
+                      displayScale: 0.8,
                     },
                   ],
                 },

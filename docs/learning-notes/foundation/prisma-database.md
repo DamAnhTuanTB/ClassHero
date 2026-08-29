@@ -38,6 +38,14 @@ NestJS module/service
 - PrismaClient: client TypeScript dùng để query database.
 - NestJS provider: biến PrismaClient thành service có thể inject trong controller/service khác.
 - Migration: lưu thay đổi database thành file versioned trong repo.
+- Prisma Client là mã được generate từ `schema.prisma`, nên API và worker phải
+  generate lại client rồi khởi động lại sau migration. Không được để worker cũ
+  tiếp tục nhận job sau khi database đã xóa hoặc đổi tên cột: client cũ có thể
+  yêu cầu field không còn tồn tại dù code nghiệp vụ không đọc field đó trực tiếp.
+- Trạng thái lỗi của durable job phải được ghi theo kiểu best effort. Nếu cập
+  nhật revision lỗi, worker vẫn phải thử độc lập việc cập nhật figure và
+  `background_jobs`; không bọc toàn bộ báo lỗi trong một transaction khiến một
+  lỗi phụ che lỗi gốc và để UI poll trạng thái `RUNNING` vô hạn.
 - Enum hard-cutover phải chuyển mọi row mang giá trị cũ trước khi thay PostgreSQL
   enum. Nếu Prisma Client mới đọc một row còn giá trị đã xóa khỏi schema, lỗi xảy
   ra ngay ở truy vấn đọc dù `findMany` không lọc theo enum đó. Migration đổi dữ

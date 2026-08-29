@@ -6,6 +6,23 @@ const rendererStyles = readFileSync(
   resolve(process.cwd(), "components/shared/mathpix-markdown-renderer.css"),
   "utf8",
 );
+const mathContentStyles = readFileSync(
+  resolve(process.cwd(), "components/common/content/math-content-typography.css"),
+  "utf8",
+);
+
+test("lets KaTeX inherit the weight of bold Math, Physics, and Chemistry headings", () => {
+  expect(rendererStyles).toContain(".mmd-content--inherit-math-weight .katex");
+  expect(mathContentStyles).toContain(
+    ".math-content-typography--inherit-math-weight .katex",
+  );
+  expect(rendererStyles).toMatch(
+    /\.mmd-content--inherit-math-weight \.katex\s*\{\s*font-weight: inherit;/u,
+  );
+  expect(mathContentStyles).toMatch(
+    /\.math-content-typography--inherit-math-weight \.katex\s*\{\s*font-weight: inherit;/u,
+  );
+});
 
 test("keeps a wide display formula readable and scrolls only its local block", async ({
   page,

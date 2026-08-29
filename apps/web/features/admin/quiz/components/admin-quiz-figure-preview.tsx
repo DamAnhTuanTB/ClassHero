@@ -1,10 +1,12 @@
 import { Loader2 } from "lucide-react";
+import { readStemFigureDisplayScale } from "@learning-path/shared";
 
 import { AdminFigureCandidateProgress } from "@/components/admin/admin-figure-candidate-progress";
+import { AdminAiFigureUsageBadges } from "@/components/admin/ai-figure-usage-badges";
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import type { AdminQuizFigure } from "@/features/admin/quiz/api/admin-quiz-api";
 import { AdminQuizFigureActionFrame } from "@/features/admin/quiz/components/admin-quiz-figure-action-frame";
-import { AdminQuizFigureCostBadge } from "@/features/admin/quiz/components/admin-quiz-figure-cost-badge";
+import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
 import { cn } from "@/lib/utils";
 
 const PROCESSING_STATUSES = new Set<AdminQuizFigure["status"]>([
@@ -27,6 +29,10 @@ export function AdminQuizFigurePreview({
   const imageUrl = figure.currentRevision?.deliveryFile?.publicUrl;
   const roleLabel = role === "QUESTION" ? "Hình đề" : "Hình lời giải";
   const isProcessing = PROCESSING_STATUSES.has(figure.status);
+  const displayPercent = getStemFigureDisplayPercent(
+    figure.currentRevision?.displayScale ??
+      readStemFigureDisplayScale(figure.currentRevision?.latexSource),
+  );
 
   if (imageUrl) {
     return (
@@ -35,6 +41,7 @@ export function AdminQuizFigurePreview({
           aria-label={`${roleLabel} Quiz`}
           className="mx-auto w-full max-w-2xl rounded-xl border border-[var(--theme-border)] bg-white p-3 shadow-sm dark:bg-white"
           data-testid={`admin-quiz-${role.toLowerCase()}-figure`}
+          style={displayPercent === null ? undefined : { width: `${displayPercent}%` }}
         >
           <img
             src={imageUrl}
@@ -48,7 +55,11 @@ export function AdminQuizFigurePreview({
               <MathpixMarkdownRenderer content={figure.currentRevision.caption} />
             </figcaption>
           ) : null}
-          <AdminQuizFigureCostBadge costVnd={figure.openAiGenerationCostVnd} />
+          <AdminAiFigureUsageBadges
+            cachedInputTokens={figure.openAiCachedInputTokens}
+            costVnd={figure.openAiGenerationCostVnd}
+            testIdPrefix="admin-quiz-figure"
+          />
         </figure>
         {isProcessing ? <AdminFigureCandidateProgress /> : null}
       </AdminQuizFigureActionFrame>

@@ -8,7 +8,11 @@ describe("QuizService figure generation costs", () => {
     const currentDeliveryFileId = "33333333-3333-4333-8333-333333333333";
     const oldDeliveryFileId = "44444444-4444-4444-8444-444444444444";
     const figureId = "22222222-2222-4222-8222-222222222222";
-    const usageEvent = { id: "usage-current", costVnd: 125 };
+    const usageEvent = {
+      id: "usage-current",
+      cachedInputTokens: 1_024,
+      costVnd: 125,
+    };
     const prisma = {
       quizQuestion: {
         findMany: vi.fn().mockResolvedValue([
@@ -42,7 +46,9 @@ describe("QuizService figure generation costs", () => {
             quizFigureId: figureId,
             revision: { deliveryFileId: oldDeliveryFileId },
             backgroundJob: {
-              providerUsageEvents: [{ id: "usage-old", costVnd: 900 }],
+              providerUsageEvents: [
+                { id: "usage-old", cachedInputTokens: 0, costVnd: 900 },
+              ],
             },
           },
         ]),
@@ -62,7 +68,7 @@ describe("QuizService figure generation costs", () => {
                   provider: "OPENAI",
                   status: ProviderUsageStatus.SUCCEEDED,
                 },
-                select: { id: true, costVnd: true },
+                select: { id: true, cachedInputTokens: true, costVnd: true },
               },
             },
           },
@@ -72,6 +78,7 @@ describe("QuizService figure generation costs", () => {
     expect(result[0]?.figures[0]).toMatchObject({
       id: figureId,
       openAiGenerationCostVnd: 125,
+      openAiCachedInputTokens: 1_024,
     });
   });
 
@@ -98,5 +105,6 @@ describe("QuizService figure generation costs", () => {
     const result = await service.listQuestionsBySet("quiz-set-1");
 
     expect(result[0]?.figures[0]?.openAiGenerationCostVnd).toBeNull();
+    expect(result[0]?.figures[0]?.openAiCachedInputTokens).toBeNull();
   });
 });

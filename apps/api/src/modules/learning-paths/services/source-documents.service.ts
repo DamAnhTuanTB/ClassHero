@@ -915,9 +915,7 @@ export class SourceDocumentsService {
       where: {
         id: lessonId,
         deletedAt: null,
-        chapter: {
-          deletedAt: null,
-        },
+        OR: [{ chapterId: null }, { chapter: { deletedAt: null } }],
         learningPath: {
           deletedAt: null,
         },

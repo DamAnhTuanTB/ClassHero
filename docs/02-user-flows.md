@@ -262,14 +262,35 @@ Các bước:
 11. Với mỗi hình đề/hình lời giải trên card Quiz, admin mở menu hình để chỉnh sửa
     bằng mã code, tạo mới bằng mã code, tạo mới bằng AI hoặc tải ảnh lên; các icon
     cạnh menu dùng để chỉnh caption và xóa ảnh. Sửa/tạo code phải biên dịch và xem
-    trước trước khi áp dụng. Xóa hình đề đồng thời xóa hình lời giải phụ thuộc;
-    xóa riêng hình lời giải đưa câu về `solutionFigureMode=NONE` và không lặp lại
-    hình đề trong khối lời giải.
-12. Figure decision của Quiz chỉ có `NONE`, `EXTEND_QUESTION` và
-    `REDRAW_AS_MODEL`. `EXTEND_QUESTION` chèn nét trên exact source hình đề;
-    `REDRAW_AS_MODEL` dựng một source hoàn chỉnh mới để mô hình hóa lại cùng bài
-    toán theo biểu diễn toán học khác. Cả hai hình lời giải đều chỉ bổ trợ trực
-    quan; nội dung chữ không được nhắc hoặc phụ thuộc vào hình.
+    trước trước khi áp dụng. Hình đề và hình lời giải là hai resource độc lập;
+    xóa hoặc tạo lại một hình không làm thay đổi hình còn lại.
+12. Phase 1 của Quiz chỉ quyết định hai boolean độc lập
+    `requiresQuestionFigure` và `solutionFigure`. Hình lời giải chỉ được tạo khi
+    solution thêm đối tượng hoặc quan hệ trực quan mới so với problem. Khi cần,
+    Phase 2 dựng một hình lời giải hoàn chỉnh mới từ `solution > problem`, không
+    dùng hình đề làm nền hoặc tham chiếu. Nội dung chữ vẫn phải tự đủ nghĩa.
+13. Ở header card Quiz, admin bấm icon ảnh để chọn `Tạo hình cho đề bài` hoặc
+    `Tạo hình cho lời giải`. Hai action độc lập; action lời giải chỉ cần câu có
+    lời giải bằng chữ và không yêu cầu current hình đề. Action lời giải bị
+    disabled khi chưa có lời giải chữ. Chọn action mở modal tạo hình hiện
+    có, gồm cấu hình model, yêu cầu bổ sung, prompt/request thật và trần chi phí.
+    Preview không gọi provider; chỉ `Thực hiện` mới enqueue job.
+14. Tại khối lời giải của mỗi câu Quiz, admin chọn `Tinh chỉnh lời giải` hoặc
+    `Tạo lại lời giải`. Modal tự điền dữ liệu phù hợp với action;
+    admin có thể nhập yêu cầu bổ sung rồi cập nhật phần xem system prompt, dữ liệu
+    câu và request OpenAI. `Thực hiện` enqueue một job route `QUIZ/TEXT`; worker
+    làm rõ các bước, bổ sung mắt xích bị viết tắt và biên tập lại câu từ, công thức,
+    liên kết, đoạn và xuống dòng trong một provider call. Nếu lời giải bị sửa trong
+    lúc job chờ, hash conflict dừng job trước khi ghi đè. Thành công đưa câu về
+    `NEEDS_REVIEW`; đề, đáp án và gợi ý giữ nguyên. Với `Tạo lại`, request không
+    gửi đáp án/gợi ý/lời giải cũ; worker giải từ đầu rồi cập nhật nguyên tử đáp
+    án, gợi ý và lời giải mới, còn đề/phương án/mệnh đề giữ nguyên. Checkbox mặc
+    định tắt cho phép gửi riêng lời giải cũ như mẫu sai; đáp án/gợi ý cũ vẫn ẩn
+    và đổi checkbox bắt buộc cập nhật preview trước khi thực hiện.
+15. Khi admin chọn xóa cả bộ Quiz và xác nhận modal, backend xóa cứng trong một
+    transaction: xóa lịch sử làm bài phụ thuộc, xóa bộ để cascade câu/hình và
+    xóa lời giải mồ côi. Thao tác không thể khôi phục; audit log quản trị vẫn giữ
+    snapshot và số lượng dữ liệu đã xóa.
 
 Acceptance Criteria:
 
@@ -295,6 +316,8 @@ Acceptance Criteria:
 - Editor/modal được lazy-load khi admin mở, không làm chậm tải lesson detail.
 - Nút `Phát hành` chỉ bị khóa khi chưa có câu nào được duyệt; câu chờ duyệt không
   khóa nút. `Lưu` giữ nguyên trạng thái bộ và dùng mốc của lượt phát hành gần nhất.
+- Modal xóa bộ Quiz phải cảnh báo rõ câu hỏi, lời giải, hình và lịch sử làm bài
+  đều bị xóa vĩnh viễn; xác nhận thành công không để lại `quiz_sets` soft-deleted.
 
 ---
 
@@ -375,6 +398,38 @@ Các bước chung:
    candidate lỗi; chỉ candidate thành công mới được promote nguyên tử. Sau khi
    asset OpenAI thành công, admin thấy chi phí thực tế bằng VNĐ ở góc dưới phải
    của đúng khung ảnh; sửa caption trên cùng asset không làm mất số tiền này.
+   Cả figure Quiz và Sinh kiến thức dùng cùng hàng badge: nhãn cache chỉ xuất
+   hiện khi usage event OpenAI `SUCCEEDED` của đúng asset có tổng
+   `cachedInputTokens > 0`, nằm ngay trước nhãn chi phí. Trong modal mã code,
+   admin mở `Chỉnh nhanh` để dùng các lựa chọn bằng ngôn ngữ đời thường: ẩn nhãn
+   độ dài/góc/số, xóa nét phụ đứt-chấm, chỉnh độ đậm nét, kéo slider `10%–200%`
+   cho toàn hình và cỡ chữ nhãn chính/nhãn phụ hoặc hoàn tác. Cả ba slider dùng
+   `100%` làm mốc kích thước gốc và chỉ commit khi thả/blur/Enter. Popover nổi đè lên editor nên không
+   làm thay đổi không gian code/preview. Mỗi lựa chọn cập nhật source draft và tự biên dịch lại preview qua
+   backend; lỗi giữ nguyên current asset và source trước thao tác. Action nhãn chỉ
+   bỏ node được nhận diện chắc chắn, giữ nguyên hình học, ký hiệu góc, tên điểm và
+   ký hiệu nguyên tố; admin bấm `Áp dụng` mới promote draft thành current revision.
+   Tỷ lệ thu/phóng được hydrate cho cả card admin và figure học sinh, không bị
+   responsive `object-contain` tự kéo về cùng một kích thước.
+   Nhóm `Nhãn và số đo` quét source draft hiện tại và hiển thị từng text slot theo
+   thứ tự source, gồm node độc lập, node gắn trên path và các field label TikZ/
+   circuitikz đã được parser hỗ trợ chắc chắn. Mỗi dòng có loại nội dung, input
+   giá trị, icon cài đặt và action xóa. Mặc định row gọn; bấm icon cài đặt cạnh
+   icon xóa mới xổ vùng bên dưới input gồm slider `Ngang (x)`, `Dọc (y)` và
+   `Cỡ chữ`. Hai trục dùng khoảng `-50pt–+50pt`, mốc vị trí source hiện tại là
+   `0`; cỡ chữ dùng `10%–200%`, mốc cỡ hiện tại là `100%`. Sửa một dòng phải định
+   danh theo source range/kind của chính slot đó, không replace theo chuỗi nên
+   hai nhãn cùng chữ vẫn sửa độc lập.
+   Slider cỡ chữ riêng là hệ số trên cỡ nền do `Nhãn chính/Nhãn phụ` quản lý:
+   đổi slider nhóm phải scale cả cỡ nền và override riêng để giữ nguyên hệ số;
+   đổi slider riêng sau đó cũng phải đọc đúng cỡ nền mới, không cộng dồn sai.
+   Xóa chỉ bỏ phần text: node chỉ có chức năng hiển thị chữ được bỏ cả command,
+   còn node/label gắn với path, marker hoặc linh kiện chỉ bỏ clause text và giữ
+   geometry. Sau khi blur, Enter, bấm xóa hoặc bấm `Biên dịch` khi input còn đang
+   focus, UI flush bản nháp mới nhất vào source rồi chạy đúng một lần compile/
+   validator; thành công cập nhật preview/history, thất bại giữ lại source và
+   input hợp lệ trước đó kèm lỗi. Khi admin gõ code thủ công, danh sách được parse
+   lại từ source mới và history quick action được reset như hiện tại.
 10. Với Summary, output mới chỉ có năm loại block `knowledge`, `theorem`,
     `property`, `example`, `note`; mỗi theory đi liền một example, note giữ vị
     trí phù hợp. Hình nguồn trực tiếp bổ trợ block ở phía trước hoặc phía sau thì

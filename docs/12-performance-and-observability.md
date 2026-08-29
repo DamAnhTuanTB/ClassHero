@@ -216,16 +216,22 @@ Performance và cost rules:
   Không thêm dependency vào source để làm đẹp chỉ số. Trường
   `local_dependency_recovery` cũ có thể giữ trong schema lịch sử nhưng flow mới
   không phát sinh hoặc dùng nó để sửa package/library declaration.
-- Mỗi figure mặc định tối đa 2 lượt repair; lỗi renderer/container dùng BullMQ
-  retry riêng và không gọi AI.
+- Compiler failure phải ghi structured issue trước, kèm phần đuôi raw log có giới
+  hạn; không chỉ giữ phần đầu log. Nhờ vậy `lastErrorMessage`/attempt log còn chứa
+  lỗi gốc và dòng source sau khi bị clamp cho UI hoặc database.
+- Mỗi figure mặc định tối đa 2 lượt repair. Lỗi transport tạm thời của
+  provider/renderer/network dùng BullMQ retry riêng, tối đa 3 attempt với
+  exponential backoff và không gọi AI repair; mỗi provider attempt có usage/
+  reservation idempotency riêng để không gộp sai chi phí. Lỗi source, validator,
+  budget và provider output xác định không đi qua nhánh retry này.
 - Compile + validator pass mới upload/promote delivery SVG lên R2. Candidate
   `NEEDS_REVIEW/FAILED` giữ private artifacts và không ghi đè current asset.
 - Student không compile hoặc poll job, chỉ tải current SVG/raster đã promote từ R2.
-- `NONE` không tạo job/asset hình lời giải và API không nhân đôi URL hình đề.
-  `EXTEND_QUESTION` và `REDRAW_AS_MODEL` đều có đúng một call Phase 2 cho hình
-  lời giải sau khi hình đề thành công; mode vẽ lại trả full source nhưng vẫn dùng
-  cùng queue, output budget và compile/validator pipeline, không gọi thêm một
-  provider chỉ để chuyển style.
+- `solutionFigure=false` không tạo job/asset hình lời giải và API không nhân đôi
+  URL hình đề. `solutionFigure=true` tạo đúng một call Phase 2 độc lập cho hình
+  lời giải, không chờ hoặc đọc hình đề; output full source vẫn dùng cùng queue,
+  output budget và compile/validator pipeline, không gọi thêm provider để nối,
+  mở rộng hay chuyển style từ hình đề.
 - Cache/idempotency dùng `sourceHash + sourceVersion`; source không đổi không
   được tạo lại cùng job đang active.
 - Giới hạn mặc định: source 40 KB, SVG 2 MB, 20.000 node, 1,5 triệu ký tự path,
@@ -241,12 +247,55 @@ Performance và cost rules:
 - Quiz `Tinh chỉnh` là một paid call theo thao tác chủ động, không chạy tự động
   sau mỗi lần sinh. Worker tải SVG current tối đa 2 MB, raster PNG nền trắng với
   cạnh dài tối đa 1600 px, gửi đúng một ảnh `detail=high` cùng source/plan và dùng
-  route `QUIZ/IMAGE`. Log/usage phải phân biệt operation `REFINE_CURRENT`, origin
+  route `QUIZ/IMAGE`; riêng EXTEND gửi thêm exact PNG/source hình đề. Source
+  current là candidate audit, còn plan là authority; prompt phải yêu cầu dựng mô
+  hình ràng buộc độc lập trước khi tái sử dụng code cũ. Log/usage phải phân biệt operation `REFINE_CURRENT`, origin
   và attempt kind `AI_REFINEMENT`; không log raw source, data URL hoặc object key.
+  `adminInstructions` tùy chọn phải nằm trong dynamic user input sau stable
+  prefix, được trim và bỏ khỏi request khi rỗng; preview và execute phải dùng
+  cùng giá trị. Stable refinement prompt dùng Toán v34, Lý v24, Hóa/General v23;
+  output schema `quiz-figure-refinement-schema-v3-independent-solution` giữ
+  nguyên. Thay đổi thuộc loại
+  `NEW_STABLE_PREFIX_WARMUP`: cache cũ không được tái sử dụng và cần warmup lại
+  prefix mới; schema/order/breakpoint không đổi và không có invalidation dữ liệu
+  runtime ngoài version key. Sau warm-up, dynamic problem/source vẫn nằm sau
+  breakpoint nên request cùng subject × mode tiếp tục dùng chung cache key.
+- Invariant cùng độ dài render cho một đơn vị ngữ nghĩa trên hai trục Descartes
+  chỉ đổi stable prompt Toán của các mode semantic Quiz/StemFigure, không đổi
+  schema, tool, thứ tự request hay breakpoint. Đây là `NEW_STABLE_PREFIX_WARMUP`:
+  prefix cũ không tái sử dụng cho version mới; sau warm-up, các input động cùng
+  subject × mode vẫn dùng chung cache key. Technical repair và môn khác giữ nguyên.
   Preview modal được phép raster hóa/tính token nhưng không gọi provider; JSON
   hiển thị thay bytes ảnh bằng placeholder để tránh payload DOM quá lớn. UI giữ
   current asset và hiển thị trạng thái candidate trong normal flow; không polling
   hoặc gọi lại provider sau terminal state.
+- Quy tắc không cho text node dạng câu/câu dẫn/callout `tên thông tin: giá trị`
+  đổi stable system prompt của mọi subject × mode trong Quiz Figure và
+  Summary/StemFigure. Rollout là `NEW_STABLE_PREFIX_WARMUP`: tăng prompt version,
+  không tái sử dụng cache key cũ; schema, tool, thứ tự request và breakpoint giữ
+  nguyên. Auto-repair narrative chạy local trước compile, không thêm provider
+  call; log chỉ ghi số deterministic source repair, không ghi raw node text.
+- Quy tắc cung góc numeric và marker trung điểm gọn chỉ đổi stable
+  system prompt Toán của Quiz Figure và Summary/StemFigure. Rollout là
+  `NEW_STABLE_PREFIX_WARMUP`: tăng prompt version theo subject × mode, không
+  tái sử dụng cache key cũ; schema, tool, thứ tự request và breakpoint
+  không đổi. Hai auto-repair chạy local trước compile, không thêm paid
+  provider call và chỉ log metadata thay đổi, không log raw source. Cùng
+  pipeline normalization được phép hoist local header đặt nhầm trong root;
+  thao tác này không đổi cache key, schema hay tăng compile/provider call.
+- Preview tạo hình Quiz từ header dùng cùng builder/schema/route với execute,
+  không tạo figure/job và không gọi provider. Mỗi lần admin bấm `Thực hiện` chỉ
+  tạo tối đa một paid call cho target đã chọn; thay hình đề không âm thầm sinh lại
+  lời giải EXTEND, tránh nhân đôi chi phí ngoài dự kiến.
+- Preview hai action lời giải AI M9.24 chỉ dựng request, token/cost estimate và
+  request hash; không gọi provider. Execute tạo tối đa một job và một paid call,
+  tái sử dụng job còn hoạt động của cùng câu hỏi, `maxAttempts=1`, đồng thời kiểm
+  base-content hash trước call và trước persist để tránh trả phí/ghi đè từ snapshot
+  cũ. `REGENERATE` đính kèm ảnh hình đề hiện tại nếu có; stable prompt cache tách
+  namespace theo subject × mode × loại câu và nội dung động nằm sau breakpoint.
+- Checkbox rejected candidate của luồng tạo lại lời giải mặc định tắt. Nhánh bật
+  dùng prompt version + namespace riêng và chỉ thêm current solution; preview
+  không gọi provider trả phí.
 
 Provider operations rules:
 
@@ -326,6 +375,12 @@ AI là phần dễ tạo độ trễ và chi phí cao, nên Codex phải:
   system/developer prompt ổn định; mọi PDF, manifest, custom user request và dữ
   liệu theo lesson đứng sau breakpoint. `prompt_cache_options` dùng TTL `30m`;
   không gửi `prompt_cache_retention` deprecated cho nhóm model này.
+- Index chống trùng câu hỏi hiện có của Quiz là dữ liệu theo lesson nên phải đứng
+  sau explicit breakpoint. Chỉ serialize loại câu, đề bài plain text và phần
+  phương án/mệnh đề thực sự thuộc nội dung câu hỏi; bỏ đáp án, hint, lời giải,
+  hình, ID/trạng thái/metadata, chuẩn hóa whitespace và gộp dòng trùng hệt. Hai
+  index khác nhau của cùng static contract phải giữ cùng cache key/developer
+  prefix; focused test phải khóa ranh giới này.
 - Provider schema Summary và Quiz không lặp nguyên policy định dạng toàn cục trong
   từng field. Root schema giữ contract dùng chung; các field `solution` dùng một
   shared definition qua `$defs`/`$ref` để giữ conditioning riêng của lời giải mà

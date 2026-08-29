@@ -16,6 +16,16 @@
   margin-bottom: 0;
 }
 
+/*
+ * Mathpix emits ordinary top-level Markdown paragraphs as classless sibling
+ * divs, not p elements. Keep paragraph rhythm visibly larger than wrapped-line
+ * leading so generated Quiz solutions and lesson knowledge do not read as one
+ * continuous block.
+ */
+.mmd-content > div:not([class]) + div:not([class]) {
+  margin-top: 0.6rem;
+}
+
 .mmd-content table {
   width: 100%;
   border-collapse: collapse;
@@ -70,6 +80,11 @@
 
 .mmd-content .katex {
   font-size: var(--learning-content-math-optical-size);
+}
+
+/* Bold headings opt in so KaTeX follows the surrounding title weight. */
+.mmd-content--inherit-math-weight .katex {
+  font-weight: inherit;
 }
 
 .mmd-content ul,

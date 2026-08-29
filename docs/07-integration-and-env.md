@@ -470,9 +470,11 @@ Concurrency cấu hình bằng env.
 `TEX_RENDERER_URL` qua private Docker network với bearer token; renderer không
 publish port ra host/Internet trong Compose. Chỉ `TEX_COMPILE_FAILED` có batch
 compiler đầy đủ mới được bounded OpenAI repair. Mỗi repair gửi toàn bộ lỗi và raw
-log của lượt compile đó. Source policy, validator, provider, timeout, network,
-storage và lỗi hạ tầng không tự retry; các thao tác retry thủ công vẫn theo
-lifecycle hình hiện có.
+log của lượt compile đó. Lỗi transport tạm thời như connection error, timeout,
+408/429/5xx hoặc renderer không sẵn sàng được BullMQ retry tối đa 3 attempt với
+exponential backoff; mỗi provider attempt có usage/reservation idempotency riêng
+và không gọi AI repair. Source policy, validator, budget, provider output xác
+định và lỗi nghiệp vụ vẫn dừng ngay; retry thủ công tiếp tục theo lifecycle hình.
 
 Renderer tạo sẵn LuaTeX font-name database làm seed trong image. Khi container
 boot, seed được copy một lần sang `TEXMFCACHE` writable trong tmpfs vì luaotfload

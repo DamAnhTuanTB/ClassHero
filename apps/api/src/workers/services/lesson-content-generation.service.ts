@@ -29,7 +29,6 @@ import {
   getGeneratedTestOutputSchema,
   generatedFlashcardOutputSchema,
   LESSON_CONTENT_MAX_OUTPUT_TOKENS,
-  LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
   testGenerationJobInputSchema,
   type GeneratedQuestion,
@@ -45,6 +44,7 @@ import {
   buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
   buildTestPrompt,
+  resolveLessonContentPromptVersion,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 
 @Injectable()
@@ -360,7 +360,7 @@ function structuredInput(
       sourceHash: source.sourceHash,
     },
     outputName,
-    promptVersion: LESSON_CONTENT_PROMPT_VERSION,
+    promptVersion: resolveLessonContentPromptVersion(source.subject.key),
     schemaVersion: LESSON_CONTENT_SCHEMA_VERSION,
   };
 }

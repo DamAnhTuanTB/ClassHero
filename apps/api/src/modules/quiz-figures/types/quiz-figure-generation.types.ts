@@ -7,8 +7,8 @@ import {
   buildQuizFigureSystemPrompt,
 } from "#api/modules/quiz-figures/utils/prompts/quiz-figure-system-prompt-resolver";
 
-export const QUIZ_FIGURE_SCHEMA_VERSION = "quiz-figure-schema-v6-redraw-model";
-export const QUIZ_FIGURE_EXTENSION_MARKER = "% QUIZ_SOLUTION_EXTENSION";
+export const QUIZ_FIGURE_SCHEMA_VERSION =
+  "quiz-figure-schema-v7-independent-solution-source";
 
 export function resolveQuizFigureSystemPrompt(
   defaultSystemPrompt: string,
@@ -33,13 +33,7 @@ export const generatedQuizQuestionFigureSchema = z
   })
   .strict();
 
-export const generatedQuizSolutionExtensionSchema = z
-  .object({
-    extensionLatex: z.string().trim().min(1).max(20_000),
-  })
-  .strict();
-
-export const generatedQuizSolutionRedrawSchema = z
+export const generatedQuizSolutionFigureSchema = z
   .object({
     latexSource: quizFigureLatexSourceSchema,
   })
@@ -59,45 +53,23 @@ const quizQuestionFigurePlanSchema = z
   })
   .strict();
 
-const quizExtendedSolutionFigurePlanSchema = z
+const quizSolutionFigurePlanSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     role: z.literal("SOLUTION"),
-    mode: z.literal("EXTEND_QUESTION"),
     problem: z.string().trim().min(1),
     solution: z.string().trim().min(1),
-    addedObjects: z.array(z.string().trim().min(1)).min(1).max(20),
-    clarifiedRelations: z.array(z.string().trim().min(1)).min(1).max(20),
-  })
-  .strict();
-
-const quizRedrawnSolutionFigurePlanSchema = z
-  .object({
-    version: z.literal(1),
-    role: z.literal("SOLUTION"),
-    mode: z.literal("REDRAW_AS_MODEL"),
-    problem: z.string().trim().min(1),
-    solution: z.string().trim().min(1),
-    modelingGoal: z.string().trim().min(1).max(500),
-    modeledObjects: z.array(z.string().trim().min(1)).min(1).max(20),
-    clarifiedRelations: z.array(z.string().trim().min(1)).min(1).max(20),
   })
   .strict();
 
 export const quizFigurePlanSchema = z.union([
   quizQuestionFigurePlanSchema,
-  quizExtendedSolutionFigurePlanSchema,
-  quizRedrawnSolutionFigurePlanSchema,
+  quizSolutionFigurePlanSchema,
 ]);
 
 export type QuizFigurePlan = z.infer<typeof quizFigurePlanSchema>;
 export type QuizQuestionFigurePlan = z.infer<typeof quizQuestionFigurePlanSchema>;
-export type QuizExtendedSolutionFigurePlan = z.infer<
-  typeof quizExtendedSolutionFigurePlanSchema
->;
-export type QuizRedrawnSolutionFigurePlan = z.infer<
-  typeof quizRedrawnSolutionFigurePlanSchema
->;
+export type QuizSolutionFigurePlan = z.infer<typeof quizSolutionFigurePlanSchema>;
 
 const quizFigureTargetGradeSchema = z.number().int().min(1).max(12);
 
@@ -115,20 +87,19 @@ export function buildQuizFigureRefinementInput(input: {
   subject: QuizSubjectSnapshot;
   plan: QuizFigurePlan;
   targetGrade?: number | null;
+  adminInstructions?: string | null;
   currentLatexSource: string;
   currentImageDataUrl: string;
 }): AiStructuredInput {
-  const mode =
-    input.plan.role === "QUESTION"
-      ? "QUESTION"
-      : input.plan.mode === "EXTEND_QUESTION"
-        ? "EXTEND_QUESTION"
-        : "REDRAW_AS_MODEL";
+  const mode = input.plan.role;
   return {
     systemPrompt: buildQuizFigureRefinementSystemPrompt(input.subject, mode),
     userPrompt: JSON.stringify({
       figurePlan: input.plan,
       ...(input.targetGrade == null ? {} : { targetGrade: input.targetGrade }),
+      ...(input.adminInstructions?.trim()
+        ? { adminInstructions: input.adminInstructions.trim() }
+        : {}),
       currentLatexSource: input.currentLatexSource,
     }),
     inputImages: [{ imageUrl: input.currentImageDataUrl, detail: "high" }],
@@ -136,8 +107,16 @@ export function buildQuizFigureRefinementInput(input: {
     reasoningEffort: "medium",
     maxTokens: 12_000,
     outputName: "quiz_figure_refinement",
-    promptVersion: `quiz-figure-${input.subject.key.toLowerCase()}-${mode.toLowerCase()}-refinement-${input.subject.key === "MATH" ? "v6-target-grade-context" : "v5-target-grade-context"}`,
-    schemaVersion: "quiz-figure-refinement-schema-v1",
+    promptVersion: `quiz-figure-${input.subject.key.toLowerCase()}-${mode.toLowerCase()}-refinement-comprehensive-${
+      input.subject.key === "PHYSICS"
+        ? "v24-admin-instructions"
+        : input.subject.key === "MATH"
+          ? "v34-admin-instructions"
+          : input.subject.key === "CHEMISTRY"
+            ? "v23-admin-instructions"
+            : "v23-admin-instructions"
+    }`,
+    schemaVersion: "quiz-figure-refinement-schema-v3-independent-solution",
     schemaReferenceStrategy: "auto",
     promptCache: {
       namespace: `quiz-figure-refinement-${input.subject.key.toLowerCase()}`,
@@ -184,72 +163,22 @@ export function buildQuestionFigureInput(input: {
   };
 }
 
-export function buildSolutionFigureExtensionInput(input: {
+export function buildSolutionFigureInput(input: {
   subject: QuizSubjectSnapshot;
-  plan: QuizExtendedSolutionFigurePlan;
+  plan: QuizSolutionFigurePlan;
   targetGrade?: number | null;
-  exactQuestionLatexSource: string;
   adminInstructions?: string | null;
   mode?: "REGENERATE" | "EDIT_CURRENT";
   currentSolutionLatexSource?: string | null;
 }): AiStructuredInput {
   return {
-    systemPrompt: buildQuizFigureSystemPrompt(input.subject, "EXTEND_QUESTION"),
+    systemPrompt: buildQuizFigureSystemPrompt(input.subject, "SOLUTION"),
     userPrompt: JSON.stringify({
       role: "SOLUTION",
       aiMode: input.mode ?? "REGENERATE",
-      mode: "EXTEND_QUESTION",
       ...(input.targetGrade == null ? {} : { targetGrade: input.targetGrade }),
       problem: input.plan.problem,
       solution: input.plan.solution,
-      requiredAddedObjects: input.plan.addedObjects,
-      requiredClarifiedRelations: input.plan.clarifiedRelations,
-      ...(input.mode === "EDIT_CURRENT" && input.currentSolutionLatexSource?.trim()
-        ? { currentSolutionLatexSource: input.currentSolutionLatexSource.trim() }
-        : {}),
-      ...(input.adminInstructions?.trim()
-        ? { adminInstructions: input.adminInstructions.trim() }
-        : {}),
-      exactQuestionLatexSource: input.exactQuestionLatexSource,
-      insertionMarker: QUIZ_FIGURE_EXTENSION_MARKER,
-    }),
-    temperature: 0.1,
-    reasoningEffort: "medium",
-    maxTokens: 8_000,
-    outputName: "quiz_solution_figure_extension",
-    promptVersion: resolveQuizFigurePromptVersion(input.subject, "solution-extend"),
-    schemaVersion: QUIZ_FIGURE_SCHEMA_VERSION,
-    schemaReferenceStrategy: "auto",
-    promptCache: {
-      namespace: "quiz-figure-solution",
-      keyEnabled: true,
-      retention: "in_memory",
-    },
-  };
-}
-
-export function buildSolutionFigureRedrawInput(input: {
-  subject: QuizSubjectSnapshot;
-  plan: QuizRedrawnSolutionFigurePlan;
-  targetGrade?: number | null;
-  exactQuestionLatexSource: string;
-  adminInstructions?: string | null;
-  mode?: "REGENERATE" | "EDIT_CURRENT";
-  currentSolutionLatexSource?: string | null;
-}): AiStructuredInput {
-  return {
-    systemPrompt: buildQuizFigureSystemPrompt(input.subject, "REDRAW_AS_MODEL"),
-    userPrompt: JSON.stringify({
-      role: "SOLUTION",
-      aiMode: input.mode ?? "REGENERATE",
-      mode: "REDRAW_AS_MODEL",
-      ...(input.targetGrade == null ? {} : { targetGrade: input.targetGrade }),
-      problem: input.plan.problem,
-      solution: input.plan.solution,
-      modelingGoal: input.plan.modelingGoal,
-      requiredModeledObjects: input.plan.modeledObjects,
-      requiredClarifiedRelations: input.plan.clarifiedRelations,
-      exactQuestionLatexSource: input.exactQuestionLatexSource,
       ...(input.mode === "EDIT_CURRENT" && input.currentSolutionLatexSource?.trim()
         ? { currentSolutionLatexSource: input.currentSolutionLatexSource.trim() }
         : {}),
@@ -260,12 +189,12 @@ export function buildSolutionFigureRedrawInput(input: {
     temperature: 0.1,
     reasoningEffort: "medium",
     maxTokens: 12_000,
-    outputName: "quiz_solution_figure_redraw",
-    promptVersion: resolveQuizFigurePromptVersion(input.subject, "solution-redraw"),
+    outputName: "quiz_solution_figure",
+    promptVersion: resolveQuizFigurePromptVersion(input.subject, "solution"),
     schemaVersion: QUIZ_FIGURE_SCHEMA_VERSION,
     schemaReferenceStrategy: "auto",
     promptCache: {
-      namespace: "quiz-figure-solution-redraw",
+      namespace: "quiz-figure-solution",
       keyEnabled: true,
       retention: "in_memory",
     },
@@ -274,15 +203,23 @@ export function buildSolutionFigureRedrawInput(input: {
 
 function resolveQuizFigurePromptVersion(
   subject: QuizSubjectSnapshot,
-  mode: "question" | "solution-extend" | "solution-redraw",
+  mode: "question" | "solution",
 ) {
   const version =
     subject.key === "MATH"
       ? mode === "question"
-        ? "v34-target-grade-context"
-        : "v33-target-grade-context"
-      : mode === "question"
-        ? "v32-target-grade-context"
-        : "v31-target-grade-context";
+        ? "v61-independent-midpoint-marker-auto-repair"
+        : "v61-independent-midpoint-marker-auto-repair"
+      : subject.key === "PHYSICS"
+        ? mode === "question"
+          ? "v48-independent-no-narrative-callouts"
+          : "v48-independent-no-narrative-callouts"
+        : subject.key === "CHEMISTRY"
+          ? mode === "question"
+            ? "v47-independent-no-narrative-callouts"
+            : "v47-independent-no-narrative-callouts"
+          : mode === "question"
+            ? "v47-independent-no-narrative-callouts"
+            : "v47-independent-no-narrative-callouts";
   return `quiz-figure-${subject.key.toLowerCase()}-${mode}-${version}`;
 }

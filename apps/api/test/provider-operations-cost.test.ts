@@ -92,6 +92,8 @@ describe("provider operations cost accounting", () => {
     expect(
       isTransientProviderError(Object.assign(new Error("server"), { status: 503 })),
     ).toBe(true);
+    expect(isTransientProviderError(new Error("Connection error."))).toBe(true);
+    expect(isTransientProviderError(new Error("Request timed out."))).toBe(true);
     expect(isTransientProviderError(new Error("schema validation failed"))).toBe(false);
     expect(
       isTransientProviderError(Object.assign(new Error("bad request"), { status: 400 })),

@@ -35,9 +35,7 @@ export class QuizFigureDraftService {
     this.assertBaseRevision(figure.currentRevisionId, dto.baseRevisionId);
     const latexSource = dto.latexSource.trim();
     try {
-      assertQuizFigureLatexSource(latexSource, {
-        requireExtensionMarker: figure.role === "QUESTION",
-      });
+      assertQuizFigureLatexSource(latexSource);
     } catch (error) {
       throw badRequestException(
         "QUIZ_FIGURE_SOURCE_POLICY_REJECTED",

@@ -129,6 +129,7 @@ Worker `M4.4` hiện làm các việc chính:
   tạo file. Crop do admin chọn thủ công và crop do luồng sinh Summary tự động
   promote đều là `TEXTBOOK_SOURCE`, dù `uploadSource` của hai đường đi khác nhau.
 - Form lesson giữ một thứ tự UI riêng cho page range và các file nền tảng. Thứ tự này chỉ phục vụ trải nghiệm thêm/xóa trong modal; payload API vẫn tách page range và danh sách upload theo đúng contract.
+- Lesson có thể không thuộc chapter. Mọi bước gán page range/tài liệu phải tìm lesson theo hai nhánh: `chapterId = null` hoặc chapter còn hoạt động; filter trực tiếp qua relation `chapter` sẽ vô tình loại lesson top-level và làm transaction tạo lesson bị rollback.
 - Tài liệu nền tảng và tài liệu bổ sung là hai luồng khác nhau; thêm hoặc xóa tài liệu nền tảng không được xóa supplemental/homework.
 - `background_jobs.id` là `jobId` cho UI poll và cũng được dùng làm BullMQ `jobId` để enqueue idempotent hơn.
 - DB giữ trạng thái durable để UI xem được kể cả khi worker/Redis restart; BullMQ chỉ là nơi xếp hàng và chạy job.

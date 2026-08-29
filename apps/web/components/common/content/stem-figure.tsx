@@ -1,14 +1,17 @@
 "use client";
 
 import { AlertTriangle, Clock3, LoaderCircle } from "lucide-react";
-import { tokenizeMathText } from "@learning-path/shared";
+import { normalizeMathTextLatexCommands, tokenizeMathText } from "@learning-path/shared";
 import katex from "katex";
+import type { ReactNode } from "react";
+import "katex/contrib/mhchem";
 import "katex/dist/katex.min.css";
 import "@/components/common/content/math-content-typography.css";
 import {
   LEARNING_CONTENT_KATEX_MACROS,
   normalizeLearningContentLatex,
 } from "@/lib/learning-content-math";
+import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
 
 export type StemFigureVisual = {
   kind: "TEX_FIGURE";
@@ -19,17 +22,21 @@ export type StemFigureVisual = {
   previewSvg?: string;
   assetUrl?: string | null;
   lastErrorCategory?: string | null;
+  displayScale?: number | null;
 };
 
 export function StemFigure({
   visual,
   displaySize = "default",
+  footer,
 }: {
   visual: StemFigureVisual;
   showStatus?: boolean;
   displaySize?: "default" | "textbook-source";
+  footer?: ReactNode;
 }) {
   const imageUrl = visual.assetUrl || toSvgDataUrl(visual.previewSvg);
+  const displayPercent = getStemFigureDisplayPercent(visual.displayScale);
   if (!imageUrl) {
     const failed = visual.status === "FAILED";
     const needsReview = visual.status === "NEEDS_REVIEW";
@@ -68,13 +75,20 @@ export function StemFigure({
   }
 
   return (
-    <figure className="my-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+    <figure
+      className="mx-auto my-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
+      style={displayPercent === null ? undefined : { width: `${displayPercent}%` }}
+    >
       <img
         alt={visual.altText}
         className={
-          displaySize === "textbook-source"
-            ? "mx-auto block h-auto w-fit max-h-64 max-w-full object-contain"
-            : "mx-auto block h-auto max-h-[34rem] w-auto max-w-full object-contain"
+          displayPercent !== null
+            ? displaySize === "textbook-source"
+              ? "mx-auto block h-auto max-h-64 w-full object-contain"
+              : "mx-auto block h-auto max-h-[34rem] w-full object-contain"
+            : displaySize === "textbook-source"
+              ? "mx-auto block h-auto w-fit max-h-64 max-w-full object-contain"
+              : "mx-auto block h-auto max-h-[34rem] w-auto max-w-full object-contain"
         }
         decoding="async"
         loading="lazy"
@@ -85,28 +99,44 @@ export function StemFigure({
           <StemFigureMathText value={visual.caption} />
         </figcaption>
       ) : null}
+      {footer}
     </figure>
   );
 }
 
-export function StemFigureMathText({ value }: { value: string }) {
-  return tokenizeMathText(value).map((token, index) =>
-    token.type === "text" ? (
-      <span key={`text-${index}`}>{token.value}</span>
-    ) : (
+export function StemFigureMathText({
+  value,
+  displayMathAsInline = false,
+  inheritMathWeight = false,
+}: {
+  value: string;
+  displayMathAsInline?: boolean;
+  inheritMathWeight?: boolean;
+}) {
+  return tokenizeMathText(normalizeMathTextLatexCommands(value)).map((token, index) => {
+    if (token.type === "text") {
+      return <span key={`text-${index}`}>{token.value}</span>;
+    }
+
+    const displayMode = token.display && !displayMathAsInline;
+    return (
       <span
         key={`math-${index}`}
         className={
-          token.display
-            ? "math-content-typography my-2 block overflow-x-auto py-1"
-            : "math-content-typography inline"
+          displayMode
+            ? `math-content-typography my-2 block overflow-x-auto py-1 ${
+                inheritMathWeight ? "math-content-typography--inherit-math-weight" : ""
+              }`
+            : `math-content-typography inline ${
+                inheritMathWeight ? "math-content-typography--inherit-math-weight" : ""
+              }`
         }
         dangerouslySetInnerHTML={{
-          __html: renderMath(token.latex, token.display),
+          __html: renderMath(token.latex, displayMode),
         }}
       />
-    ),
-  );
+    );
+  });
 }
 
 function renderMath(latex: string, displayMode: boolean) {

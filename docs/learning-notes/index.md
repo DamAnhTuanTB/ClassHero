@@ -25,6 +25,7 @@ File này giúp tìm nhanh bài học kỹ thuật theo tính năng hoặc chủ
 | [Codex notification and Telegram control](foundation/codex-notification-and-telegram.md) | macOS notification, Telegram notification/control, LaunchAgent, transcript    | Codex tooling     | Đã cập nhật |
 | [Frontend bundle isolation](foundation/frontend-bundle-isolation.md)                     | Tách bundle/CSS/provider theo route group khi admin và client chung Next app  | Performance audit | Đã cập nhật |
 | [Fullscreen media layout](foundation/fullscreen-media-layout.md)                         | Full-bleed mobile và fullscreen fallback không bị transform/overflow cắt      | `M7.1`, `M15.1`   | Đã cập nhật |
+| [Chuẩn hóa nội dung Toán, Hóa học và Vật lý](foundation/math-content-normalization.md)   | Tách văn xuôi khỏi vùng LaTeX, sửa escape theo delimiter và giữ Unicode       | `M6.x`, `M7.x`, `M9.2`, `M9.3` | Đã cập nhật |
 | [Playwright UI checks](foundation/playwright-ui-checks.md)                               | Browser E2E, responsive screenshot và UI review local                         | `M2.4`, `M14.3`   | Đã cập nhật |
 | [Prisma database foundation](foundation/prisma-database.md)                              | Prisma, migration, pgvector, PrismaService, seed dev và foundation models     | `M1.1`-`M1.6`     | Đã cập nhật |
 | [Thông báo lỗi an toàn cho người dùng](foundation/user-facing-errors.md)                  | Chặn lỗi kỹ thuật rò vào toast/banner và ánh xạ sang câu tiếng Việt theo ngữ cảnh | Dùng chung toàn web | Đã cập nhật |

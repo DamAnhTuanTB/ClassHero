@@ -261,7 +261,7 @@ function QuizFigureOverviewCard({
           </p>
           <QuizRichContentViewer
             ariaLabel={`Nội dung Câu ${questionNumber}`}
-            className="mt-1 break-words text-sm font-extrabold leading-relaxed text-[var(--theme-text-strong)]"
+            className="mt-1 break-words text-sm font-normal leading-relaxed text-[var(--theme-text-strong)]"
             content={entry.question.questionJson}
             contentAlignment="left"
             fallback={`Câu ${questionNumber}`}

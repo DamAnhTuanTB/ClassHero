@@ -99,6 +99,70 @@ test("student lesson dark theme covers lesson, Quiz, Flashcard, dialogs, and Tes
   await expectNoFrameworkOverlay(page);
 });
 
+test("student Quiz preserves admin figure shrink and enlarge on every viewport", async ({
+  page,
+}, testInfo) => {
+  await setupStudentLearningApiMock(page, {
+    includeScaledQuizFigures: true,
+    testReady: false,
+    testPasses: false,
+  });
+  await page.goto(`/student/lessons/${lessonId}?tab=quiz`);
+  await page.getByRole("button", { name: "Bắt đầu", exact: true }).click();
+
+  const smallFigure = page.getByAltText("Hình đề đã thu nhỏ");
+  await expect(smallFigure).toBeVisible();
+  await expect
+    .poll(() =>
+      smallFigure.evaluate((element) => {
+        const frame = element.parentElement;
+        const container = frame?.parentElement;
+        if (!frame || !container) return 0;
+        return (
+          frame.getBoundingClientRect().width / container.getBoundingClientRect().width
+        );
+      }),
+    )
+    .toBeLessThan(0.72);
+  await expect
+    .poll(() =>
+      smallFigure.evaluate((element) => {
+        const frame = element.parentElement;
+        if (!frame) return 0;
+        const style = window.getComputedStyle(frame);
+        const contentWidth =
+          frame.clientWidth -
+          Number.parseFloat(style.paddingLeft) -
+          Number.parseFloat(style.paddingRight);
+        return element.getBoundingClientRect().width / contentWidth;
+      }),
+    )
+    .toBeGreaterThan(0.98);
+
+  await page.getByRole("button", { name: /B.*4/ }).click();
+  await page.getByRole("button", { name: "Kiểm tra đáp án" }).click();
+  await page.getByRole("button", { name: "Xem lời giải chi tiết" }).click();
+  const largeFigure = page.getByAltText("Hình lời giải đã phóng to");
+  await expect(largeFigure).toBeVisible();
+  await expect
+    .poll(() =>
+      largeFigure.evaluate((element) => {
+        const frame = element.parentElement;
+        const container = frame?.parentElement;
+        if (!frame || !container) return 0;
+        return (
+          frame.getBoundingClientRect().width / container.getBoundingClientRect().width
+        );
+      }),
+    )
+    .toBeGreaterThan(0.9);
+  await page.screenshot({
+    path: `../../.codex/artifacts/m9-23-quick-tools/student-quiz-applied-scale-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await expectNoFrameworkOverlay(page);
+});
+
 test("quiz tab keeps the current panel stable until its preloaded status is ready", async ({
   page,
 }) => {
@@ -3144,6 +3208,7 @@ async function setupStudentLearningApiMock(
     flashcardCompleted?: boolean;
     includeAlternateFlashcardSet?: boolean;
     includeAlternateQuizSet?: boolean;
+    includeScaledQuizFigures?: boolean;
     includeNextLesson?: boolean;
     omitFlashcardSet?: boolean;
     omitQuizSet?: boolean;
@@ -3568,6 +3633,7 @@ async function setupStudentLearningApiMock(
         options.quizQuestionType,
         options.quizQuestionCount,
         options.quizQuestionIncludesMathExamples,
+        options.includeScaledQuizFigures,
       );
       currentQuizAttempt = {
         ...nextAttempt,
@@ -3649,6 +3715,7 @@ async function setupStudentLearningApiMock(
         options.quizQuestionType,
         1,
         options.quizQuestionIncludesMathExamples,
+        options.includeScaledQuizFigures,
       );
       const nextAttempt = {
         ...baseAttempt,
@@ -3956,6 +4023,7 @@ function quizAttemptPayload(
     | "TEXT_INPUT" = "MULTIPLE_CHOICE",
   questionCount = 1,
   includesMathExamples = false,
+  includesScaledFigures = false,
 ) {
   return {
     id: "quiz-attempt-m7",
@@ -4009,9 +4077,39 @@ function quizAttemptPayload(
         difficulty: "EASY",
         sortOrder: index,
         hasExplanation: true,
+        questionFigure:
+          includesScaledFigures && questionNumber === 1
+            ? {
+                role: "QUESTION",
+                altText: "Hình đề đã thu nhỏ",
+                caption: null,
+                fileId: "quiz-question-figure-file",
+                mimeType: "image/svg+xml",
+                url: scaledFigureDataUrl("#0ea5e9"),
+                displayScale: 0.8,
+              }
+            : null,
+        solutionFigure:
+          includesScaledFigures && questionNumber === 1
+            ? {
+                role: "SOLUTION",
+                altText: "Hình lời giải đã phóng to",
+                caption: null,
+                fileId: "quiz-solution-figure-file",
+                mimeType: "image/svg+xml",
+                url: scaledFigureDataUrl("#10b981"),
+                displayScale: 1.2,
+              }
+            : null,
       };
     }),
   };
+}
+
+function scaledFigureDataUrl(stroke: string) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220"><rect x="18" y="18" width="364" height="184" rx="18" fill="white" stroke="${stroke}" stroke-width="8"/><path d="M70 160 L200 55 L330 160 Z" fill="none" stroke="${stroke}" stroke-width="8"/></svg>`,
+  )}`;
 }
 
 function flashcardPayload(

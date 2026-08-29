@@ -1004,6 +1004,14 @@ ADMIN_EDIT | ADMIN_REGENERATE | ADMIN_UPLOAD | MANUAL_REPAIR | null` từ
   `planJson` vẫn chứa nguyên `sourceReferences` Phase 1 để JSON review admin có
   thể chiếu đúng trang, nhãn hình và `sourceTarget` mà không sao chép provenance
   này vào `lesson_summaries.content_json`.
+  Với asset hiện hành có usage OpenAI `SUCCEEDED`, item trả thêm
+  `openAiGenerationCostVnd` và `openAiCachedInputTokens`, được cộng theo đúng
+  revision tạo delivery asset và dedupe theo usage event. Ảnh không có usage
+  OpenAI tương ứng trả `null`; client chỉ hiện nhãn cache khi cached token lớn
+  hơn `0`.
+  Nếu source revision có marker `% classhero-display-scale`, response trả thêm
+  `displayScale` đã parse/clamp để UI admin và student co/phóng cả card figure.
+  Source cũ không có marker trả `null`; student không nhận `latexSource`.
 - `GET /admin/lessons/:lessonId/stem-figures/:figureId`: chi tiết một figure.
 - `POST /admin/lessons/:lessonId/stem-figures/blocks/ensure`: nhận `blockPath`,
   trả logical figure đang hoạt động hoặc phục hồi/tạo một draft figure chưa gắn

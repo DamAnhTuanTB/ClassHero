@@ -32,6 +32,9 @@ Behavior:
   lộ trình hiệu lực.
 - Trả video, material, document `READY`, tóm tắt đã duyệt và metadata của
   quiz/flashcard/test set đã duyệt, không phải reserve.
+- Figure Summary/Quiz đã duyệt trả optional `displayScale` do backend hydrate từ
+  source revision để giao diện co/phóng toàn bộ visual card nhất quán; response
+  student không trả mã TikZ và asset cũ thiếu metadata giữ layout mặc định.
 - File chỉ trả metadata an toàn và `accessUrl` public/signed có hạn; không trả
   `objectKey`, storage bucket hoặc thông tin nội bộ của provider.
 - Aggregate chỉ trả số câu/thẻ của set. Nội dung câu quiz đọc qua endpoint riêng;

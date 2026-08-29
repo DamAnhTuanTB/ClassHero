@@ -15,6 +15,8 @@ import {
 
 export const QUIZ_FIGURE_AI_MODES = ["REGENERATE", "EDIT_CURRENT"] as const;
 export type QuizFigureAiMode = (typeof QUIZ_FIGURE_AI_MODES)[number];
+export const QUIZ_FIGURE_AI_TARGET_MODES = ["QUESTION", "SOLUTION"] as const;
+export type QuizFigureAiTargetMode = (typeof QUIZ_FIGURE_AI_TARGET_MODES)[number];
 
 export class QuizFigureRevisionGuardDto {
   @ApiPropertyOptional({ format: "uuid", nullable: true })
@@ -103,7 +105,19 @@ export class CreateQuizFigureAiDto extends QuizFigureRevisionGuardDto {
   userPrompt?: string;
 }
 
-export class RefineQuizFigureWithAiDto extends QuizFigureRevisionGuardDto {}
+export class CreateQuestionQuizFigureAiDto extends CreateQuizFigureAiDto {
+  @ApiProperty({ enum: QUIZ_FIGURE_AI_TARGET_MODES })
+  @IsIn(QUIZ_FIGURE_AI_TARGET_MODES)
+  targetMode!: QuizFigureAiTargetMode;
+}
+
+export class RefineQuizFigureWithAiDto extends QuizFigureRevisionGuardDto {
+  @ApiPropertyOptional({ maxLength: 2_000, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_000)
+  adminInstructions?: string | null;
+}
 
 export class UpdateQuizFigureCaptionDto extends QuizFigureRevisionGuardDto {
   @ApiPropertyOptional({ maxLength: 500, nullable: true })

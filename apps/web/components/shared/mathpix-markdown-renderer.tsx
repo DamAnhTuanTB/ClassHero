@@ -19,10 +19,12 @@ import { cn } from "@/lib/utils";
 export function MathpixMarkdownRenderer({
   content = "",
   contentAlignment = "authored",
+  inheritMathWeight = false,
   className,
 }: {
   content?: string;
   contentAlignment?: "authored" | "left";
+  inheritMathWeight?: boolean;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +72,7 @@ export function MathpixMarkdownRenderer({
       className={cn(
         "mmd-content",
         contentAlignment === "left" && "mmd-content--left-aligned",
+        inheritMathWeight && "mmd-content--inherit-math-weight",
         className,
       )}
     />

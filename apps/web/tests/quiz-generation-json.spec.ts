@@ -32,7 +32,6 @@ const currentQuestion: AdminQuizQuestion = {
   },
   generationQuestionJson: null,
   reviewStatus: "NEEDS_REVIEW",
-  solutionFigureMode: "NONE",
   figures: [],
 };
 
@@ -51,6 +50,30 @@ test.describe("Quiz mutable generation JSON preview", () => {
     expect(normalizeLatexCommandBackslashes(String.raw`\text{widehat{X} in prose}`)).toBe(
       String.raw`\text{widehat{X} in prose}`,
     );
+    expect(normalizeLatexCommandBackslashes("muối muốn mu\u0301")).toBe(
+      "muối muốn mu\u0301",
+    );
+    expect(normalizeLatexCommandBackslashes("mu + phi")).toBe(String.raw`\mu + \phi`);
+  });
+
+  test("repairs decoded provider control characters before rendering Quiz math", () => {
+    const brokenCommandPrefix = String.fromCharCode(28);
+
+    expect(
+      normalizeLatexCommandBackslashes(
+        `${brokenCommandPrefix}widehat{A}+${brokenCommandPrefix}root{61}+${brokenCommandPrefix}frac{1}{2}`,
+      ),
+    ).toBe(String.raw`\widehat{A}+\sqrt{61}+\frac{1}{2}`);
+    expect(
+      normalizeLatexCommandBackslashes(
+        String.raw`\u001cwidehat{A}+u001cwidehat{C}+\\u001croot{61}+u001calpha`,
+      ),
+    ).toBe(String.raw`\widehat{A}+\widehat{C}+\sqrt{61}+\alpha`);
+    expect(
+      normalizeMathTextLatexCommands(
+        `Giữ nguyên văn bản; công thức $${brokenCommandPrefix}widehat{A}=76^\\circ$.`,
+      ),
+    ).toBe(String.raw`Giữ nguyên văn bản; công thức $\widehat{A}=76^\circ$.`);
   });
 
   test("projects edited working JSON into the local Quiz preview", () => {
@@ -75,8 +98,7 @@ test.describe("Quiz mutable generation JSON preview", () => {
       },
       figure: {
         questionFigure: null,
-        solutionFigureMode: "NONE",
-        solutionFigurePlan: null,
+        solutionFigure: false,
       },
     };
 
@@ -92,18 +114,18 @@ test.describe("Quiz mutable generation JSON preview", () => {
     expect(preview.sourceMetadataJson?.quizExplanationBlock).not.toHaveProperty(
       "geometryStatement",
     );
+    expect(preview.sourceMetadataJson?.quizExplanationBlock).not.toHaveProperty("answer");
     expect(preview.generationQuestionJson).toEqual({
       ...generationQuestionJson,
       explanation: {
         problem: "Câu hỏi mới",
         solution: "Lời giải mới",
-        answer: "B. Phương án B mới",
         isGeometry: false,
       },
     });
   });
 
-  test("uses TEXT_INPUT correctAnswer instead of explanation answer in the preview", () => {
+  test("uses TEXT_INPUT correctAnswer as the only answer authority in the preview", () => {
     const preview = buildQuizQuestionPreviewFromGenerationJson(currentQuestion, {
       questionType: "TEXT_INPUT",
       difficulty: "EASY",
@@ -117,9 +139,8 @@ test.describe("Quiz mutable generation JSON preview", () => {
     });
 
     expect(preview.correctAnswerJson).toEqual(["2.1"]);
-    expect(preview.sourceMetadataJson?.quizExplanationBlock).toMatchObject({
-      answer: "2.1",
-    });
+    expect(preview.sourceMetadataJson?.quizExplanationBlock).not.toHaveProperty("answer");
+    expect(JSON.stringify(preview.explanation?.contentJson)).toContain("Đáp án: 2.1");
   });
 
   test("protects the figure subtree from direct JSON editing", () => {
@@ -211,5 +232,37 @@ Suy ra $\widehat{C}=112^\circ\$.`,
       String.raw`\widehat{A}+\widehat{C}=180^\circ.`,
     );
     expect(JSON.stringify(explanationNodes)).not.toContain("\\$$");
+  });
+
+  test("auto-repair delimiter đóng bị thiếu trong JSON preview và dữ liệu lưu", () => {
+    const malformedProblem = String.raw`Khung rộng $12\,\text{m}$ và cao $8\,\text{m}. Hai đỉnh trên nằm trên nửa đường tròn. Lấy $\pi\approx3,14$.`;
+    const repairedProblem = String.raw`Khung rộng $12\,\text{m}$ và cao $8\,\text{m}$. Hai đỉnh trên nằm trên nửa đường tròn. Lấy $\pi\approx3,14$.`;
+    const preview = buildQuizQuestionPreviewFromGenerationJson(currentQuestion, {
+      questionType: "TEXT_INPUT",
+      difficulty: "HARD",
+      hint: String.raw`Dùng $d=\sqrt{12^2+8^2}. Sau đó tính bán kính.`,
+      correctAnswer: "31.4",
+      explanation: {
+        problem: malformedProblem,
+        solution: String.raw`Ta có $d=4\sqrt{13}$. Suy ra đáp án.`,
+        isGeometry: true,
+      },
+    });
+
+    expect(preview.generationQuestionJson).toMatchObject({
+      explanation: { problem: repairedProblem },
+    });
+    expect(preview.sourceMetadataJson?.quizExplanationBlock).toMatchObject({
+      problem: repairedProblem,
+    });
+    expect(JSON.stringify(preview.questionJson)).toContain(
+      String.raw`"latex":"8\\,\\text{m}"`,
+    );
+    expect(JSON.stringify(preview.questionJson)).toContain(
+      "Hai đỉnh trên nằm trên nửa đường tròn.",
+    );
+    expect(JSON.stringify(preview.questionJson)).not.toContain(
+      String.raw`"latex":"8\\,\\text{m}. Hai đỉnh`,
+    );
   });
 });

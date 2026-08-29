@@ -34,6 +34,7 @@ import {
 import { MathpixMarkdownRenderer } from "@/components/shared/mathpix-markdown-renderer";
 import {
   StemFigure,
+  StemFigureMathText,
   type StemFigureVisual,
 } from "@/components/common/content/stem-figure";
 import {
@@ -524,7 +525,11 @@ export function SummaryBlockRenderer({
             }
           >
             <div className="mb-6 min-w-0 flex-1 pr-0 text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100 sm:pr-10 sm:text-3xl">
-              {displayTitle || data.title}
+              <StemFigureMathText
+                displayMathAsInline
+                inheritMathWeight
+                value={displayTitle || data.title}
+              />
             </div>
 
             {!isReadOnly && viewMode === "UI_ONLY" && (
@@ -974,7 +979,11 @@ export function SummaryBlockRenderer({
                     {section.order || idx + 1}
                   </span>
                   <span className="relative pb-1">
-                    {section.displayHeading}
+                    <StemFigureMathText
+                      displayMathAsInline
+                      inheritMathWeight
+                      value={section.displayHeading}
+                    />
                     <span className="absolute bottom-0 left-0 w-12 h-1 bg-blue-500/20 dark:bg-blue-400/20 rounded-full group-hover:w-full transition-all duration-500 ease-out"></span>
                   </span>
                 </h3>
@@ -1903,7 +1912,10 @@ function BaseBlockContainer({
       </div>
       {shouldShowTitle && (
         <div className={`font-bold ${styles.text}`}>
-          <MathpixMarkdownRenderer content={normalizeBlockMath(block.title, block)} />
+          <MathpixMarkdownRenderer
+            content={normalizeBlockMath(block.title, block)}
+            inheritMathWeight
+          />
         </div>
       )}
       <div className="learning-content-text space-y-2 opacity-90 leading-relaxed text-slate-800 dark:text-slate-200">

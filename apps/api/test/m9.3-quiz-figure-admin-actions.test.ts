@@ -153,7 +153,7 @@ describe("M9.3 Quiz figure admin actions", () => {
     );
   });
 
-  it("reserves the full-source output budget for a redrawn solution model", async () => {
+  it("reserves the full-source output budget for an independent solution figure", async () => {
     const prisma = {
       quizFigure: {
         findFirst: vi
@@ -162,14 +162,10 @@ describe("M9.3 Quiz figure admin actions", () => {
             id: figureId,
             role: "SOLUTION",
             planJson: {
-              version: 1,
+              version: 2,
               role: "SOLUTION",
-              mode: "REDRAW_AS_MODEL",
               problem: "Mảnh đất ABCDEF có các kích thước đã cho.",
               solution: "Kẻ CE vuông góc DE để chia mảnh đất thành hai hình chữ nhật.",
-              modelingGoal: "Vẽ lại mảnh đất thành hai miền chữ nhật.",
-              modeledObjects: ["Đa giác ABCDEF", "Đoạn CE"],
-              clarifiedRelations: ["CE vuông góc DE"],
               caption: "Mô hình toán học của mảnh đất",
             },
             currentRevisionId,
@@ -249,7 +245,6 @@ describe("M9.3 Quiz figure admin actions", () => {
             latexSource,
             deliveryFileId: "77777777-7777-4777-8777-777777777777",
             deliveryFile: { mimeType: "image/svg+xml" },
-            derivedFromQuestionRevisionId: null,
             altText: "Hình đề",
             caption: null,
           },
@@ -296,6 +291,7 @@ describe("M9.3 Quiz figure admin actions", () => {
     await expect(
       service.refineWithAi(questionId, figureId, actorUserId, {
         baseRevisionId: currentRevisionId,
+        adminInstructions: "  Sửa nhãn đang chồng nét.  ",
       }),
     ).resolves.toEqual({ jobId: "job-refine", status: "QUEUED" });
 
@@ -312,11 +308,15 @@ describe("M9.3 Quiz figure admin actions", () => {
       figureId,
       actorUserId,
       expect.objectContaining({ model: "gpt-test" }),
-      { aiMode: "EDIT_CURRENT", operation: "REFINE_CURRENT" },
+      {
+        aiMode: "EDIT_CURRENT",
+        operation: "REFINE_CURRENT",
+        adminInstructions: "Sửa nhãn đang chồng nét.",
+      },
     );
   });
 
-  it("soft-deletes a question figure together with its dependent solution", async () => {
+  it("deletes a question figure without touching the independent solution", async () => {
     const tx = {
       quizFigure: {
         update: vi.fn().mockResolvedValue({}),
@@ -346,15 +346,11 @@ describe("M9.3 Quiz figure admin actions", () => {
     await expect(
       service.deleteFigure(questionId, figureId, { baseRevisionId: currentRevisionId }),
     ).resolves.toEqual({ deleted: true, figureId });
-    expect(tx.quizFigure.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ role: "SOLUTION" }) }),
-    );
-    expect(tx.quizQuestion.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { solutionFigureMode: "NONE" } }),
-    );
+    expect(tx.quizFigure.updateMany).not.toHaveBeenCalled();
+    expect(tx.quizQuestion.update).not.toHaveBeenCalled();
   });
 
-  it("sets the mode to NONE when deleting only the solution figure", async () => {
+  it("deletes only the selected solution figure", async () => {
     const tx = {
       quizFigure: {
         update: vi.fn().mockResolvedValue({}),
@@ -387,9 +383,6 @@ describe("M9.3 Quiz figure admin actions", () => {
     });
 
     expect(tx.quizFigure.updateMany).not.toHaveBeenCalled();
-    expect(tx.quizQuestion.update).toHaveBeenCalledWith({
-      where: { id: questionId },
-      data: { solutionFigureMode: "NONE" },
-    });
+    expect(tx.quizQuestion.update).not.toHaveBeenCalled();
   });
 });

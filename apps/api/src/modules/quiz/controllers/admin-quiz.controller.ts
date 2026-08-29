@@ -37,6 +37,11 @@ import {
   type UpdateQuizSetDto,
 } from "#api/modules/quiz/services/quiz.service";
 import { QuizGenerationJobService } from "#api/modules/quiz/services/quiz-generation-job.service";
+import {
+  PreviewQuizSolutionRefinementDto,
+  QueueQuizSolutionRefinementDto,
+} from "#api/modules/quiz/dto/refine-quiz-solution.dto";
+import { QuizSolutionRefinementService } from "#api/modules/quiz/services/quiz-solution-refinement.service";
 import { IsString, IsOptional } from "class-validator";
 
 // We create wrapper DTOs for the sets for ClassValidator
@@ -62,6 +67,8 @@ export class AdminQuizController {
     private readonly quizService: QuizService,
     @Inject(QuizGenerationJobService)
     private readonly generationJobs: QuizGenerationJobService,
+    @Inject(QuizSolutionRefinementService)
+    private readonly solutionRefinement: QuizSolutionRefinementService,
   ) {}
 
   @Get("lessons/:lessonId/quiz-sets")
@@ -157,7 +164,7 @@ export class AdminQuizController {
   }
 
   @Delete("quiz-sets/:setId")
-  @ApiOperation({ summary: "Delete a quiz set" })
+  @ApiOperation({ summary: "Permanently delete a quiz set and dependent data" })
   deleteSet(
     @Param("setId") setId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -218,6 +225,29 @@ export class AdminQuizController {
       dto,
       getRequestContext(request),
     );
+  }
+
+  @Post("quiz-questions/:questionId/solution-refinement/preview")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview Quiz solution refinement request without calling AI",
+  })
+  previewSolutionRefinement(
+    @Param("questionId") questionId: string,
+    @Body() dto: PreviewQuizSolutionRefinementDto,
+  ) {
+    return this.solutionRefinement.preview(questionId, dto);
+  }
+
+  @Post("quiz-questions/:questionId/solution-refinement")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Queue AI refinement for the current Quiz solution" })
+  refineSolution(
+    @Param("questionId") questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: QueueQuizSolutionRefinementDto,
+  ) {
+    return this.solutionRefinement.queue(questionId, user.id, dto);
   }
 
   @Post("quiz-questions/:questionId/review")

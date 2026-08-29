@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { AdminFigureStatusBadge } from "@/components/admin/admin-figure-status-badge";
 import { AdminFigureStatusCounts } from "@/components/admin/admin-figure-status-counts";
+import { AdminAiFigureUsageBadges } from "@/components/admin/ai-figure-usage-badges";
 import { StemFigureMathText } from "@/components/common/content/stem-figure";
 import { AdminStemFigureActionFrame } from "@/features/admin/ai-generation/components/admin-stem-figure-action-frame";
 import type {
@@ -196,18 +197,27 @@ function FigureOverviewCard({
         modelConfiguration={modelConfiguration}
         sourceCropContainerClassName="p-3 pb-0 sm:p-4 sm:pb-0"
       >
-        <div className="flex min-h-60 items-center justify-center bg-white p-3 sm:p-4">
+        <div className="flex min-h-60 flex-col bg-white p-3 sm:p-4">
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            {imageUrl ? (
+              <img
+                alt={figure.altText}
+                className="block max-h-[24rem] w-auto max-w-full object-contain"
+                decoding="async"
+                loading="lazy"
+                src={imageUrl}
+              />
+            ) : (
+              <FigurePlaceholder figure={figure} />
+            )}
+          </div>
           {imageUrl ? (
-            <img
-              alt={figure.altText}
-              className="block max-h-[24rem] w-auto max-w-full object-contain"
-              decoding="async"
-              loading="lazy"
-              src={imageUrl}
+            <AdminAiFigureUsageBadges
+              cachedInputTokens={figure.openAiCachedInputTokens}
+              costVnd={figure.openAiGenerationCostVnd}
+              testIdPrefix="admin-stem-figure-overview"
             />
-          ) : (
-            <FigurePlaceholder figure={figure} />
-          )}
+          ) : null}
         </div>
       </AdminStemFigureActionFrame>
 

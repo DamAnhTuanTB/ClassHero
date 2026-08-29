@@ -1,4 +1,7 @@
-import { QUIZ_FIGURE_EXTENSION_MARKER } from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
+import { autoRepairMathAnglePics } from "#api/common/ai/tikz-angle-auto-repair";
+import { autoRepairTikzLocalHeaderPlacement } from "#api/common/ai/tikz-local-header-auto-repair";
+import { autoRepairTikzMidpointMarkerBundles } from "#api/common/ai/tikz-midpoint-marker-auto-repair";
+import { autoRepairTikzNarrativeCallouts } from "#api/common/ai/tikz-narrative-callout-auto-repair";
 
 const forbiddenPatterns: Array<[RegExp, string]> = [
   [/\\(?:documentclass|usepackage|RequirePackage)\b/u, "document wrapper/package"],
@@ -9,10 +12,7 @@ const forbiddenPatterns: Array<[RegExp, string]> = [
   [/<(?:svg|script|iframe|foreignObject)\b/iu, "raw active markup"],
 ];
 
-export function assertQuizFigureLatexSource(
-  source: string,
-  options: { requireExtensionMarker?: boolean } = {},
-) {
+export function assertQuizFigureLatexSource(source: string) {
   for (const [pattern, label] of forbiddenPatterns) {
     if (pattern.test(source)) throw new Error(`QUIZ_FIGURE_SOURCE_FORBIDDEN: ${label}`);
   }
@@ -20,30 +20,38 @@ export function assertQuizFigureLatexSource(
   if ((roots?.length ?? 0) !== 1) {
     throw new Error("QUIZ_FIGURE_SOURCE_ROOT_INVALID");
   }
-  if (
-    options.requireExtensionMarker !== false &&
-    !source.includes(QUIZ_FIGURE_EXTENSION_MARKER)
-  ) {
-    throw new Error("QUIZ_FIGURE_EXTENSION_MARKER_MISSING");
-  }
 }
 
-export function applyQuizSolutionExtension(baseSource: string, extension: string) {
-  if (!baseSource.includes(QUIZ_FIGURE_EXTENSION_MARKER)) {
-    throw new Error("QUIZ_FIGURE_EXTENSION_MARKER_MISSING");
+export function autoRepairQuizFigureLatexSource(input: {
+  source: string;
+  subjectKey: string;
+  authorityText: string;
+}) {
+  const localHeader = autoRepairTikzLocalHeaderPlacement(input.source);
+  const narrative = autoRepairTikzNarrativeCallouts(localHeader.source);
+  if (input.subjectKey !== "MATH") {
+    return {
+      source: narrative.source,
+      changes: [...localHeader.changes, ...narrative.changes],
+    };
   }
-  if (/\\begin\s*\{\s*(?:tikzpicture|circuitikz)\s*\}/u.test(extension)) {
-    throw new Error("QUIZ_SOLUTION_EXTENSION_ROOT_FORBIDDEN");
-  }
-  for (const [pattern, label] of forbiddenPatterns) {
-    if (pattern.test(extension)) {
-      throw new Error(`QUIZ_SOLUTION_EXTENSION_FORBIDDEN: ${label}`);
-    }
-  }
-  return baseSource.replace(
-    QUIZ_FIGURE_EXTENSION_MARKER,
-    `${QUIZ_FIGURE_EXTENSION_MARKER}\n${extension.trim()}`,
-  );
+  const angles = autoRepairMathAnglePics({
+    source: narrative.source,
+    authorityText: input.authorityText,
+  });
+  const midpointMarkers = autoRepairTikzMidpointMarkerBundles({
+    source: angles.source,
+    authorityText: input.authorityText,
+  });
+  return {
+    source: midpointMarkers.source,
+    changes: [
+      ...localHeader.changes,
+      ...narrative.changes,
+      ...angles.changes,
+      ...midpointMarkers.changes,
+    ],
+  };
 }
 
 export function sanitizeQuizFigureSvg(svg: string) {

@@ -13,8 +13,11 @@ import { AppModule } from "#api/app.module";
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { QuizGenerationJobService } from "#api/modules/quiz/services/quiz-generation-job.service";
 
-const LIVE_BUDGET_VND = 50_000;
-const PHASE_TWO_RESERVE_VND_PER_LESSON = 2_000;
+const LIVE_BUDGET_VND = readPositiveNumberEnv("M9_3_LIVE_BUDGET_VND", 50_000);
+const PHASE_TWO_RESERVE_VND_PER_LESSON = readPositiveNumberEnv(
+  "M9_3_LIVE_PHASE_TWO_RESERVE_VND_PER_LESSON",
+  2_000,
+);
 const POLL_INTERVAL_MS = 2_000;
 const JOB_TIMEOUT_MS = 12 * 60_000;
 const LIVE_MODEL = process.env.M9_3_LIVE_MODEL ?? "gpt-5.6-luna";
@@ -42,15 +45,31 @@ const figureValidationTargets = [
 ] as const;
 const complexFigureTargets = figureValidationTargets;
 const proofExtensionTargets = figureValidationTargets;
+const realWorldCoverageTargets = [naturalTargets[2]];
+const sourceRelevanceCourseTargets = [
+  naturalTargets[2],
+  figureValidationTargets[0],
+  {
+    lessonId: "b7e016e9-3ff8-44ca-bd24-d784f4d374eb",
+    label: "Toán 9 tập 2 · Bài 22",
+  },
+] as const;
 const liveScenario = process.env.M9_3_LIVE_SCENARIO ?? "natural";
 const targets =
-  liveScenario === "genuine-figures"
-    ? figureValidationTargets
-    : liveScenario === "complex-figure"
-      ? complexFigureTargets
-      : liveScenario === "proof-extension"
-        ? proofExtensionTargets
-        : naturalTargets;
+  liveScenario === "source-relevance-lesson29" ||
+  liveScenario === "source-relevance-single"
+    ? realWorldCoverageTargets
+    : liveScenario === "source-relevance-course"
+    ? sourceRelevanceCourseTargets
+    : liveScenario === "real-world-coverage"
+    ? realWorldCoverageTargets
+    : liveScenario === "genuine-figures"
+      ? figureValidationTargets
+      : liveScenario === "complex-figure"
+        ? complexFigureTargets
+        : liveScenario === "proof-extension"
+          ? proofExtensionTargets
+          : naturalTargets;
 
 const naturalGenerationInput = {
   questionCount: 3,
@@ -128,17 +147,70 @@ const proofExtensionGenerationInput = {
   maxOutputTokens: 8_000,
 };
 
+const realWorldCoverageGenerationInput = {
+  questionCount: 10,
+  difficulty: Difficulty.MIXED,
+  difficultyCounts: { easy: 5, medium: 3, hard: 2 },
+  questionTypes: [
+    QuestionType.MULTIPLE_CHOICE,
+    QuestionType.TRUE_FALSE,
+    QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+    QuestionType.TEXT_INPUT,
+  ],
+  style: "student_friendly" as const,
+  extraInstructions: "",
+  model: LIVE_MODEL,
+  reasoningEffort: "medium" as const,
+  maxOutputTokens: 20_000,
+};
+
+const sourceRelevanceCourseGenerationInput = {
+  questionCount: 4,
+  difficulty: Difficulty.MIXED,
+  difficultyCounts: { easy: 2, medium: 1, hard: 1 },
+  questionTypes: [
+    QuestionType.MULTIPLE_CHOICE,
+    QuestionType.TRUE_FALSE,
+    QuestionType.MULTI_STATEMENT_TRUE_FALSE,
+    QuestionType.TEXT_INPUT,
+  ],
+  style: "student_friendly" as const,
+  extraInstructions: "",
+  model: LIVE_MODEL,
+  reasoningEffort: "medium" as const,
+  maxOutputTokens: 10_000,
+};
+
+const sourceRelevanceSingleGenerationInput = {
+  questionCount: 1,
+  difficulty: Difficulty.MEDIUM,
+  questionTypes: [QuestionType.TEXT_INPUT],
+  style: "student_friendly" as const,
+  extraInstructions: "",
+  model: LIVE_MODEL,
+  reasoningEffort: "medium" as const,
+  maxOutputTokens: 2_000,
+};
+
 const generationInput =
-  liveScenario === "genuine-figures"
-    ? genuineFigureGenerationInput
-    : liveScenario === "complex-figure"
-      ? complexFigureGenerationInput
-      : liveScenario === "proof-extension"
-        ? proofExtensionGenerationInput
-        : naturalGenerationInput;
+  liveScenario === "source-relevance-single"
+    ? sourceRelevanceSingleGenerationInput
+    : liveScenario === "source-relevance-course" ||
+  liveScenario === "source-relevance-lesson29"
+    ? sourceRelevanceCourseGenerationInput
+    : liveScenario === "real-world-coverage"
+    ? realWorldCoverageGenerationInput
+    : liveScenario === "genuine-figures"
+      ? genuineFigureGenerationInput
+      : liveScenario === "complex-figure"
+        ? complexFigureGenerationInput
+        : liveScenario === "proof-extension"
+          ? proofExtensionGenerationInput
+          : naturalGenerationInput;
 
 async function main() {
-  if (process.env.M9_3_LIVE_EXECUTE !== "1") {
+  const previewOnly = process.env.M9_3_LIVE_PREVIEW_ONLY === "1";
+  if (!previewOnly && process.env.M9_3_LIVE_EXECUTE !== "1") {
     throw new Error("Set M9_3_LIVE_EXECUTE=1 to authorize paid provider calls.");
   }
   const app = await NestFactory.createApplicationContext(AppModule, {
@@ -156,12 +228,43 @@ async function main() {
     });
 
     for (const target of targets) {
+      const targetQuizSet = await prisma.quizSet.findFirst({
+        where: { lessonId: target.lessonId, deletedAt: null },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        select: { id: true, title: true },
+      });
+      const scopedGenerationInput = {
+        ...generationInput,
+        targetQuizSetId: targetQuizSet?.id,
+      };
       const preview = await generation.previewQuiz(
         target.lessonId,
         admin.id,
-        generationInput,
+        scopedGenerationInput,
       );
       const phaseOneUpperBoundVnd = preview.estimatedCost.upperBoundVnd ?? 0;
+      const expectedPromptVersion = process.env.M9_3_EXPECTED_PROMPT_VERSION;
+      if (
+        expectedPromptVersion &&
+        preview.promptVersion !== expectedPromptVersion
+      ) {
+        throw new Error(
+          `Expected prompt version ${expectedPromptVersion}, received ${preview.promptVersion}.`,
+        );
+      }
+      if (previewOnly) {
+        results.push({
+          label: target.label,
+          status: "PREVIEW_ONLY",
+          phaseOneUpperBoundVnd,
+          packet: {
+            pageCount: preview.context.packet.pageCount,
+            sizeBytes: preview.context.packet.sizeBytes,
+            estimatedInputTokens: preview.context.estimatedTokens,
+          },
+        });
+        continue;
+      }
       if (
         totalCostVnd + phaseOneUpperBoundVnd + PHASE_TWO_RESERVE_VND_PER_LESSON >
         LIVE_BUDGET_VND
@@ -176,15 +279,23 @@ async function main() {
       }
 
       const queued = await generation.queueQuiz(target.lessonId, admin.id, {
-        ...generationInput,
+        ...scopedGenerationInput,
         requestDraftId: preview.requestDraftId,
         requestHash: preview.requestHash,
       });
       const mainJob = await waitForMainJob(prisma, queued.jobId);
       const aiGeneration = await prisma.aiGeneration.findFirstOrThrow({
         where: { backgroundJobId: queued.jobId },
-        select: { id: true, targetId: true, status: true, errorMessage: true },
+        select: {
+          id: true,
+          targetId: true,
+          status: true,
+          errorMessage: true,
+          outputJson: true,
+        },
       });
+      const { outputJson, ...aiGenerationSummary } = aiGeneration;
+      const sourceCoverageAudit = readSourceCoverageAudit(outputJson);
       if (mainJob.status !== BackgroundJobStatus.SUCCEEDED) {
         const usage = await summarizeUsage(prisma, aiGeneration.id);
         totalCostVnd += usage.costVnd;
@@ -192,7 +303,8 @@ async function main() {
           label: target.label,
           phaseOneUpperBoundVnd,
           mainJob,
-          aiGeneration,
+          aiGeneration: aiGenerationSummary,
+          sourceCoverageAudit,
           usage,
         });
         continue;
@@ -225,6 +337,7 @@ async function main() {
       totalCostVnd += usage.costVnd;
       results.push({
         label: target.label,
+        targetQuizSet,
         packet: {
           pageCount: preview.context.packet.pageCount,
           sizeBytes: preview.context.packet.sizeBytes,
@@ -232,8 +345,13 @@ async function main() {
         },
         phaseOneUpperBoundVnd,
         mainJob,
-        aiGeneration,
-        contract: summarizeContract(questions, figures, generationInput.questionCount),
+        aiGeneration: aiGenerationSummary,
+        sourceCoverageAudit,
+        contract: summarizeContract(
+          questions,
+          figures,
+          scopedGenerationInput.questionCount,
+        ),
         questions,
         figures,
         usage,
@@ -259,6 +377,24 @@ async function main() {
   } finally {
     await app.close();
   }
+}
+
+function readPositiveNumberEnv(name: string, fallback: number) {
+  const rawValue = process.env[name];
+  if (!rawValue) return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number.`);
+  }
+  return parsed;
+}
+
+function readSourceCoverageAudit(outputJson: unknown) {
+  if (!outputJson || typeof outputJson !== "object" || Array.isArray(outputJson)) {
+    return null;
+  }
+  const audit = (outputJson as Record<string, unknown>).sourceCoverageAudit;
+  return audit && typeof audit === "object" && !Array.isArray(audit) ? audit : null;
 }
 
 async function waitForMainJob(prisma: PrismaService, jobId: string) {

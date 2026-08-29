@@ -16,7 +16,9 @@ import {
   attachAdminQuizFigureUpload,
   applyAdminQuizFigureDraft,
   compileAdminQuizFigureDraft,
+  createAdminQuizFigureForQuestionWithAi,
   createNewAdminQuizFigureWithAi,
+  previewAdminQuizFigureForQuestionWithAi,
   previewNewAdminQuizFigureWithAi,
   previewAdminQuizFigureRefinement,
   refineAdminQuizFigureWithAi,
@@ -24,6 +26,7 @@ import {
   type AdminQuizQuestion,
   type AdminQuizFigure,
   type AdminQuizFigureCreateAiInput,
+  type AdminQuizFigureAiTargetMode,
   updateAdminQuizFigureCaption,
   type AdminQuizQuestionPayload,
   type AdminQuizQuestionUpdatePayload,
@@ -415,6 +418,32 @@ export function useAdminQuizFigureMutations(setId: string) {
       ),
     onSuccess: invalidate,
   });
+  const createForQuestionWithAi = useMutation({
+    mutationFn: (
+      input: {
+        questionId: string;
+        targetMode: AdminQuizFigureAiTargetMode;
+        targetFigure: AdminQuizFigure | null;
+        questionFigure: AdminQuizFigure | null;
+      } & AdminQuizFigureCreateAiInput,
+    ) =>
+      createAdminQuizFigureForQuestionWithAi(
+        input.questionId,
+        {
+          targetMode: input.targetMode,
+          baseRevisionId: input.targetFigure?.currentRevision?.id ?? null,
+          mode: input.mode,
+          adminInstructions: input.adminInstructions,
+          model: input.model,
+          temperature: input.temperature,
+          reasoningEffort: input.reasoningEffort,
+          systemPrompt: input.systemPrompt,
+          userPrompt: input.userPrompt,
+        },
+        token,
+      ),
+    onSuccess: invalidate,
+  });
   const previewWithAi = useMutation({
     mutationFn: (
       input: {
@@ -438,22 +467,61 @@ export function useAdminQuizFigureMutations(setId: string) {
         token,
       ),
   });
+  const previewForQuestionWithAi = useMutation({
+    mutationFn: (
+      input: {
+        questionId: string;
+        targetMode: AdminQuizFigureAiTargetMode;
+        targetFigure: AdminQuizFigure | null;
+        questionFigure: AdminQuizFigure | null;
+      } & AdminQuizFigureCreateAiInput,
+    ) =>
+      previewAdminQuizFigureForQuestionWithAi(
+        input.questionId,
+        {
+          targetMode: input.targetMode,
+          baseRevisionId: input.targetFigure?.currentRevision?.id ?? null,
+          mode: input.mode,
+          adminInstructions: input.adminInstructions,
+          model: input.model,
+          temperature: input.temperature,
+          reasoningEffort: input.reasoningEffort,
+          systemPrompt: input.systemPrompt,
+          userPrompt: input.userPrompt,
+        },
+        token,
+      ),
+  });
   const refineWithAi = useMutation({
-    mutationFn: (input: { questionId: string; figure: AdminQuizFigure }) =>
+    mutationFn: (input: {
+      questionId: string;
+      figure: AdminQuizFigure;
+      adminInstructions: string | null;
+    }) =>
       refineAdminQuizFigureWithAi(
         input.questionId,
         input.figure.id,
-        { baseRevisionId: input.figure.currentRevision?.id ?? null },
+        {
+          baseRevisionId: input.figure.currentRevision?.id ?? null,
+          adminInstructions: input.adminInstructions,
+        },
         token,
       ),
     onSuccess: invalidate,
   });
   const previewRefinement = useMutation({
-    mutationFn: (input: { questionId: string; figure: AdminQuizFigure }) =>
+    mutationFn: (input: {
+      questionId: string;
+      figure: AdminQuizFigure;
+      adminInstructions: string | null;
+    }) =>
       previewAdminQuizFigureRefinement(
         input.questionId,
         input.figure.id,
-        { baseRevisionId: input.figure.currentRevision?.id ?? null },
+        {
+          baseRevisionId: input.figure.currentRevision?.id ?? null,
+          adminInstructions: input.adminInstructions,
+        },
         token,
       ),
   });
@@ -489,7 +557,9 @@ export function useAdminQuizFigureMutations(setId: string) {
     applyDraft,
     compileDraft,
     createWithAi,
+    createForQuestionWithAi,
     previewWithAi,
+    previewForQuestionWithAi,
     previewRefinement,
     refineWithAi,
     deleteFigure,

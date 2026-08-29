@@ -9,6 +9,7 @@ import type {
   StudentAssessmentQuestion,
 } from "@/features/student/lessons/types/student-lesson-types";
 import { removeTrailingOptionPeriod } from "@/lib/tiptap-rich-content";
+import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
 import { cn } from "@/lib/utils";
 
 const QUIZ_CONTENT_NORMAL_WEIGHT_CLASS =
@@ -30,6 +31,9 @@ export function AssessmentQuestionCard({
   readOnly?: boolean;
 }) {
   const disabled = readOnly || Boolean(feedback);
+  const questionFigureDisplayPercent = getStemFigureDisplayPercent(
+    question.questionFigure?.displayScale,
+  );
 
   return (
     <section
@@ -50,12 +54,22 @@ export function AssessmentQuestionCard({
       />
 
       {question.questionFigure?.url ? (
-        <figure className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-[var(--theme-border)]">
+        <figure
+          className="mx-auto mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-[var(--theme-border)]"
+          style={
+            questionFigureDisplayPercent === null
+              ? undefined
+              : { width: `${questionFigureDisplayPercent}%` }
+          }
+        >
           {/* The URL is produced by the trusted QuizFigure/File pipeline. */}
           <img
             src={question.questionFigure.url}
             alt={question.questionFigure.altText}
-            className="mx-auto max-h-[28rem] w-auto max-w-full object-contain"
+            className={cn(
+              "mx-auto max-h-[28rem] max-w-full object-contain",
+              questionFigureDisplayPercent === null ? "w-auto" : "w-full",
+            )}
           />
           {question.questionFigure.caption ? (
             <figcaption

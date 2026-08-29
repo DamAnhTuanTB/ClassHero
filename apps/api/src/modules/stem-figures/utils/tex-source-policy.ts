@@ -4,6 +4,10 @@ import {
 } from "@learning-path/shared";
 
 import type { LessonSummarySubjectKey } from "#api/modules/ai/types/lesson-summary-subject.types";
+import { autoRepairMathAnglePics } from "#api/common/ai/tikz-angle-auto-repair";
+import { autoRepairTikzLocalHeaderPlacement } from "#api/common/ai/tikz-local-header-auto-repair";
+import { autoRepairTikzMidpointMarkerBundles } from "#api/common/ai/tikz-midpoint-marker-auto-repair";
+import { autoRepairTikzNarrativeCallouts } from "#api/common/ai/tikz-narrative-callout-auto-repair";
 
 export type TexSourcePolicyIssue = {
   code: string;
@@ -183,6 +187,40 @@ export function validateTexSourcePolicy(
   }
 
   return deduplicateIssues(issues);
+}
+
+export function autoRepairStemFigureLatexSource(input: {
+  source: string;
+  subjectKey: LessonSummarySubjectKey;
+  mode:
+    "REGENERATE_FROM_SOURCE" | "EDIT_CURRENT_SOURCE" | "GENERATE_FROM_BLOCK" | "REPAIR";
+  authorityText: string;
+}) {
+  const localHeader = autoRepairTikzLocalHeaderPlacement(input.source);
+  const narrative = autoRepairTikzNarrativeCallouts(localHeader.source);
+  if (input.subjectKey !== "MATH" || input.mode !== "GENERATE_FROM_BLOCK") {
+    return {
+      source: narrative.source,
+      changes: [...localHeader.changes, ...narrative.changes],
+    };
+  }
+  const angles = autoRepairMathAnglePics({
+    source: narrative.source,
+    authorityText: input.authorityText,
+  });
+  const midpointMarkers = autoRepairTikzMidpointMarkerBundles({
+    source: angles.source,
+    authorityText: input.authorityText,
+  });
+  return {
+    source: midpointMarkers.source,
+    changes: [
+      ...localHeader.changes,
+      ...narrative.changes,
+      ...angles.changes,
+      ...midpointMarkers.changes,
+    ],
+  };
 }
 
 export function maskTexComments(source: string) {

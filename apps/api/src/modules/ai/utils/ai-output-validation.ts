@@ -56,7 +56,7 @@ export function parseAiStructuredOutput<TOutput>(
   schema: AiOutputSchema<TOutput>,
   value: unknown,
 ): TOutput {
-  const parsed = schema.safeParse(value);
+  const parsed = schema.safeParse(sanitizeAiStructuredOutput(value));
 
   if (parsed.success) {
     return parsed.data;
@@ -66,6 +66,30 @@ export function parseAiStructuredOutput<TOutput>(
     `AI structured output failed schema validation: ${formatZodError(parsed.error)}`,
     { cause: parsed.error },
   );
+}
+
+/**
+ * PostgreSQL jsonb cannot represent U+0000 even though it is valid inside a
+ * parsed JavaScript string. Provider output is JSON-compatible, so remove only
+ * that non-semantic character recursively before the final Zod persistence
+ * gate. Other control characters and valid Unicode remain untouched.
+ */
+function sanitizeAiStructuredOutput(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replaceAll("\u0000", "");
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeAiStructuredOutput);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [
+        key.replaceAll("\u0000", ""),
+        sanitizeAiStructuredOutput(entryValue),
+      ]),
+    );
+  }
+  return value;
 }
 
 export function assertAiOutputName(outputName: string): void {

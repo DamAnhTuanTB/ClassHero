@@ -1,4 +1,8 @@
-import { normalizeMathTextLatexCommands, tokenizeMathText } from "@learning-path/shared";
+import {
+  normalizeMathTextLatexCommands,
+  normalizeMissingInlineMathClosers,
+  tokenizeMathText,
+} from "@learning-path/shared";
 
 import type { TiptapJsonNode, TiptapTextDocument } from "@/types/rich-text";
 
@@ -34,7 +38,10 @@ export function createMathTextTiptapDocument(text: string): TiptapTextDocument {
     inlineContent = [];
   };
 
-  for (const token of tokenizeMathText(normalizeMathTextLatexCommands(text.trim()))) {
+  const normalizedText = normalizeMathTextLatexCommands(
+    normalizeMissingInlineMathClosers(text.trim()),
+  );
+  for (const token of tokenizeMathText(normalizedText)) {
     if (token.type === "math") {
       if (token.display) {
         flushParagraph();
@@ -188,14 +195,9 @@ function stripTrailingPeriod(node: TiptapJsonNode): {
 
 function trimParagraphBoundaryWhitespace(nodes: TiptapJsonNode[]) {
   const trimmed = nodes.map((node) => ({ ...node }));
-  const firstTextIndex = trimmed.findIndex((node) => node.type === "text");
-  let lastTextIndex = -1;
-  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
-    if (trimmed[index]?.type === "text") {
-      lastTextIndex = index;
-      break;
-    }
-  }
+  const firstTextIndex = trimmed[0]?.type === "text" ? 0 : -1;
+  const lastIndex = trimmed.length - 1;
+  const lastTextIndex = trimmed[lastIndex]?.type === "text" ? lastIndex : -1;
 
   const firstText = trimmed[firstTextIndex]?.text;
   if (firstTextIndex >= 0 && typeof firstText === "string") {

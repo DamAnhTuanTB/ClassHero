@@ -21,6 +21,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   Sparkles,
   TextCursorInput,
@@ -66,6 +67,7 @@ import {
 import { QuizRichContentViewer } from "@/features/admin/quiz/components/quiz-rich-content-viewer";
 import { AdminQuizFigurePreview } from "@/features/admin/quiz/components/admin-quiz-figure-preview";
 import { AdminQuizFigureStatusSummary } from "@/features/admin/quiz/components/admin-quiz-figure-status-summary";
+import { AdminQuizQuestionFigureAiMenu } from "@/features/admin/quiz/components/admin-quiz-question-figure-ai-menu";
 import type {
   AdminTestQuestion,
   AdminTestSet,
@@ -108,6 +110,14 @@ const AdminQuizSetEditorDialog = dynamic(
   () =>
     import("@/features/admin/quiz/components/admin-quiz-set-editor-dialog").then(
       (module) => module.AdminQuizSetEditorDialog,
+    ),
+  { ssr: false },
+);
+
+const AdminQuizSolutionRefinementDialog = dynamic(
+  () =>
+    import("@/features/admin/quiz/components/admin-quiz-solution-refinement-dialog").then(
+      (module) => module.AdminQuizSolutionRefinementDialog,
     ),
   { ssr: false },
 );
@@ -603,7 +613,9 @@ export function AdminAssessmentTab({
         title={deleteTarget?.type === "set" ? copy.deleteSetTitle : "Xóa câu hỏi"}
         description={
           deleteTarget?.type === "set"
-            ? `Toàn bộ câu hỏi trong “${deleteTarget.label}” sẽ bị xóa. Hành động này không thể hoàn tác.`
+            ? isTest
+              ? `Toàn bộ câu hỏi trong “${deleteTarget.label}” sẽ bị xóa. Hành động này không thể hoàn tác.`
+              : `“${deleteTarget.label}”, toàn bộ câu hỏi, lời giải, hình và lịch sử làm bài liên quan sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`
             : `Câu hỏi và lời giải chi tiết đi kèm sẽ bị xóa khỏi ${copy.setName}.`
         }
         onCancel={() => setDeleteTarget(null)}
@@ -1736,6 +1748,9 @@ function QuestionCard({
   isReviewing: boolean;
   setId: string;
 }) {
+  const [solutionAiMode, setSolutionAiMode] = useState<"REFINE" | "REGENERATE" | null>(
+    null,
+  );
   const isAiGenerated = Boolean(question.sourceMetadataJson?.aiGenerationId);
   const isApproved = question.reviewStatus === "APPROVED";
   const quizQuestion = assessmentKind === "quiz" ? (question as AdminQuizQuestion) : null;
@@ -1764,6 +1779,38 @@ function QuestionCard({
     const candidate = question.sourceMetadataJson?.exampleBlock;
     return isTestExplanationBlockData(candidate) ? candidate : null;
   }, [assessmentKind, question.sourceMetadataJson?.exampleBlock]);
+  const solutionFigurePreview = solutionFigure ? (
+    <AdminQuizFigurePreview
+      figure={solutionFigure}
+      questionId={question.id}
+      role="SOLUTION"
+      setId={setId}
+    />
+  ) : null;
+  const hasCurrentSolution = Boolean(
+    quizExplanationBlock?.solution?.trim() || explanation,
+  );
+  const solutionRefinementAction =
+    quizQuestion && hasCurrentSolution ? (
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold"
+          onClick={() => setSolutionAiMode("REFINE")}
+          type="button"
+        >
+          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+          Tinh chỉnh lời giải
+        </button>
+        <button
+          className="theme-button-primary-subtle inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-extrabold"
+          onClick={() => setSolutionAiMode("REGENERATE")}
+          type="button"
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+          Tạo lại lời giải
+        </button>
+      </div>
+    ) : null;
 
   return (
     <article
@@ -1807,6 +1854,13 @@ function QuestionCard({
             <span aria-hidden="true" />
           )}
           <div className="ml-auto flex shrink-0 gap-2">
+            {quizQuestion ? (
+              <AdminQuizQuestionFigureAiMenu
+                hasSolutionText={Boolean(explanation || quizExplanationBlock)}
+                question={quizQuestion}
+                setId={setId}
+              />
+            ) : null}
             <button
               type="button"
               onClick={onEdit}
@@ -2006,37 +2060,49 @@ function QuestionCard({
               />
             </div>
           ) : null}
-          {solutionFigure ? (
-            <AdminQuizFigurePreview
-              figure={solutionFigure}
-              questionId={question.id}
-              role="SOLUTION"
-              setId={setId}
-            />
-          ) : null}
           {quizExplanationBlock ? (
             <QuizExplanationCard
               block={quizExplanationBlock}
               correctAnswer={question.correctAnswerJson}
               label="Lời giải"
+              media={solutionFigurePreview}
               optionIds={question.optionsJson?.map((option) => option.id)}
               questionType={question.questionType}
               separateAnswerItems={question.questionType === "MULTI_STATEMENT_TRUE_FALSE"}
               showProblem={false}
+              headerAction={solutionRefinementAction}
             />
           ) : testExampleBlock ? (
             <AdminTestExplanationCard block={testExampleBlock} showProblem={false} />
-          ) : explanation ? (
+          ) : explanation || solutionFigurePreview ? (
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-surface-soft)] p-3">
-              <p className="text-xs font-extrabold text-[var(--theme-text-muted)]">
-                Lời giải chi tiết
-              </p>
-              <div className="mt-1 leading-relaxed text-[var(--theme-text)]">
-                <TiptapContentView content={question.explanation?.contentJson} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-extrabold text-[var(--theme-text-muted)]">
+                  Lời giải chi tiết
+                </p>
+                {solutionRefinementAction}
               </div>
+              {solutionFigurePreview ? (
+                <div className="mt-3">{solutionFigurePreview}</div>
+              ) : null}
+              {explanation ? (
+                <div className="mt-3 leading-relaxed text-[var(--theme-text)]">
+                  <TiptapContentView content={question.explanation?.contentJson} />
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
+      ) : null}
+      {quizQuestion ? (
+        <AdminQuizSolutionRefinementDialog
+          currentSolution={quizExplanationBlock?.solution ?? explanation ?? ""}
+          isOpen={solutionAiMode !== null}
+          mode={solutionAiMode ?? "REFINE"}
+          onClose={() => setSolutionAiMode(null)}
+          questionId={quizQuestion.id}
+          setId={setId}
+        />
       ) : null}
     </article>
   );

@@ -1,12 +1,15 @@
 import {
   normalizeLessonSummaryAngleNotation,
+  normalizeMathTextLatexCommands,
   tokenizeMathText,
 } from "@learning-path/shared";
 import { QuestionType } from "@prisma/client";
 import type { GeneratedQuestion } from "#api/modules/ai/types/lesson-content-generation.types";
 
 export function toTiptap(text: string) {
-  const normalizedText = normalizeLessonSummaryAngleNotation(text);
+  const normalizedText = normalizeMathTextLatexCommands(
+    normalizeLessonSummaryAngleNotation(text),
+  );
   const content: Array<Record<string, unknown>> = [];
   let inlineContent: Array<Record<string, unknown>> = [];
 
@@ -49,14 +52,9 @@ export function toTiptap(text: string) {
 
 function trimParagraphBoundaryWhitespace(nodes: Array<Record<string, unknown>>) {
   const trimmed = nodes.map((node) => ({ ...node }));
-  const firstTextIndex = trimmed.findIndex((node) => node.type === "text");
-  let lastTextIndex = -1;
-  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
-    if (trimmed[index]?.type === "text") {
-      lastTextIndex = index;
-      break;
-    }
-  }
+  const firstTextIndex = trimmed[0]?.type === "text" ? 0 : -1;
+  const lastIndex = trimmed.length - 1;
+  const lastTextIndex = trimmed[lastIndex]?.type === "text" ? lastIndex : -1;
 
   const firstText = trimmed[firstTextIndex]?.text;
   if (firstTextIndex >= 0 && typeof firstText === "string") {

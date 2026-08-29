@@ -82,6 +82,10 @@ vì vậy select, TypeScript union, Prisma enum và backend validation phải th
   SVG. Vì vậy card review phải đọc `question.figures`, hiển thị asset terminal và
   chỉ poll query khi còn trạng thái `QUEUED`/`RENDERING`/`REPAIRING`; nếu chỉ
   render JSON câu hỏi thì hình đã tạo thành công vẫn bị “vô hình” trên giao diện.
+- Hình đề và hình lời giải là hai resource theo role độc lập. API admin đọc
+  `planSnapshot` bất biến của durable job và trả `pendingAiTargetMode`; menu dùng
+  identity này để gắn “đang xử lý” đúng role, tránh hiểu trạng thái của một hình
+  là trạng thái của hình còn lại.
 - Phase 2 chỉ nhận `problem` làm nguồn semantic, tự lập whitelist dữ kiện được cho trực tiếp rồi
   mới dựng source. Hình có thể mang hình dáng thỏa dữ kiện, nhưng marker, nhãn,
   màu nhấn hoặc đường phụ không được xác nhận một tính chất chỉ suy ra trong lời
@@ -89,9 +93,9 @@ vì vậy select, TypeScript union, Prisma enum và backend validation phải th
   admin nhập và dữ liệu cũ vẫn là metadata revision độc lập.
 - “Lời giải tự đủ nghĩa bằng chữ” và “lời giải không cần hình bổ sung” là hai
   quyết định độc lập. Phase 1 phải lấy các đối tượng/quan hệ trực quan thật sự
-  được dùng trong solution trừ đi phần đã có ở hình đề. Phần chênh thiết yếu trên
-  cùng nền dẫn tới `EXTEND_QUESTION`; đổi hẳn cách biểu diễn dẫn tới
-  `REDRAW_AS_MODEL`; delta rỗng hoặc chỉ có thay số/tính toán mới dẫn tới `NONE`.
+  được dùng trong solution trừ đi phần đã có trong problem. Delta có đối tượng
+  hoặc quan hệ mới được dùng trong mạch giải thì `solutionFigure=true`; delta rỗng
+  hoặc chỉ có thay số/tính toán thì `false`.
   Cách so sánh này tránh việc một phép dựng quan trọng bị bỏ hình chỉ vì vẫn có
   thể diễn đạt bằng văn bản.
 - Custom system prompt của Quiz vẫn là full override theo chủ đích của sản phẩm;
@@ -104,9 +108,8 @@ vì vậy select, TypeScript union, Prisma enum và backend validation phải th
   tia hoặc luồng truyền vẫn hợp lệ.
 - Ký hiệu tên đường tròn `$(O)$` trong văn bản đề và nhãn điểm tâm `$O$` trên
   canvas là hai tầng biểu đạt của cùng một đối tượng, không phải hai nhãn cần vẽ.
-  Hình đề/vẽ lại chỉ giữ một điểm và một nhãn tâm `$O$`; lượt
-  `EXTEND_QUESTION` dùng lại coordinate tâm trong base và không thêm `$(O)$` hay
-  một `$O$` thứ hai. Đây là prompt invariant, không phải backend rejection gate.
+  Mỗi source hoàn chỉnh chỉ giữ một điểm và một nhãn tâm `$O$`, không thêm
+  `$(O)$` hay một `$O$` thứ hai. Đây là prompt invariant, không phải backend gate.
 - “Đáp án, phương án và lời giải cùng khớp” chỉ là nhất quán nội bộ, chưa phải
   bằng chứng toán học. Prompt Toán cần buộc model giải từ dữ kiện trước khi nhìn
   phương án, kiểm tra đủ giả thiết của định lý, rồi dùng một phép kiểm độc lập
@@ -142,6 +145,23 @@ như phân bổ độ khó và ID duy nhất, nhưng semantic validator chỉ gh
 `REVIEWABLE`: không lọc câu, không ném lỗi và không hủy output OpenAI đã parse.
 Các câu được lưu ở `NEEDS_REVIEW` để admin quyết định.
 
+Độ đa dạng Quiz cần ba biên độc lập. PDF là biên kiến thức/kỹ năng chứ không phải
+danh sách template; ví dụ và bài tập nguồn chỉ giúp model nhận diện không gian
+dạng bài, còn model được sáng tạo dạng mới nếu vẫn giải hoàn toàn bằng nội dung
+nguồn. Technical question type là biên biểu đạt: một mẫu không tự nhiên với trắc
+nghiệm, đúng/sai, nhiều mệnh đề hoặc nhập đáp án phải bị bỏ qua thay vì chuyển đổi
+máy móc. Ngân hàng câu hiện có là biên chống lặp: ưu tiên dạng chưa có và cấm biến
+thể bề mặt, nhưng không cấm vĩnh viễn cả nhóm kỹ năng rộng; khi cần lặp, câu mới
+phải đổi ít nhất hai trục giữa khung nhiệm vụ/biểu diễn, mục tiêu/tập kỹ năng và
+cấu trúc suy luận/phương pháp, trong đó bắt buộc đổi mục tiêu hoặc suy luận. Thứ tự ưu
+tiên là tính đúng và tự nhiên, bám nguồn, chống trùng, rồi mới tối đa coverage.
+Quyền sáng tạo không cho phép copy bài nguồn; với câu nhiều mệnh đề, phải so sánh
+cả khung chung và tập thao tác chi phối vì thay một mệnh đề nhỏ không tạo dạng mới;
+câu kết từng lời giải cũng phải khớp boolean dùng để chấm. Việc hai câu cùng dùng
+biến, điểm hoặc nhiều mệnh đề không tự động làm chúng cùng dạng; chỉ coi là lặp
+khi mục tiêu và phần lớn thao tác chi phối vẫn giữ nguyên mà chỉ đổi nhãn, giá trị,
+số lượng hoặc vài ý con.
+
 Schema reference strategy cũng là một phần của provider conditioning, không chỉ
 là tối ưu byte cho validator. Một strategy đã A/B và rollout cho Sinh kiến thức
 không tự động được phép áp dụng sang Quiz vì hai feature có schema, prompt và
@@ -174,12 +194,17 @@ model biến ô điền số thành tự luận, câu ghép hoặc danh sách đ
 Phần lời giải Quiz chỉ có một tiêu đề do card bên ngoài sở hữu; renderer không
 chèn thêm heading cùng tên trong thân nội dung. Solution đi thẳng qua các bước
 cần thiết, kết luận rồi dừng, không nối thêm nhận xét tổng quát sau khi đã tìm ra
-đáp án. Dòng `Đáp án` là dữ liệu chấm, không phải văn bản kết luận tự do trong
-`explanation.answer`: trắc nghiệm lấy `correctOptionId` rồi đổi sang nhãn A/B/C,
+đáp án. `explanation.answer` không còn thuộc provider hoặc persisted block.
+Dòng `Đáp án` được dựng từ dữ liệu chấm: trắc nghiệm lấy `correctOptionId` rồi đổi sang nhãn A/B/C,
 Đúng/Sai lấy boolean, nhiều mệnh đề lấy ánh xạ `statementId → boolean`, còn nhập
 đáp án lấy chuỗi canonical trong `correctAnswer`. Mapper và renderer cùng dùng
 quy tắc này nên preview admin, dữ liệu đã lưu và UI học sinh không thể hiển thị
 một câu diễn giải khác với đáp án thực sự dùng để chấm.
+
+Khi tinh chỉnh hình Quiz, hệ thống vẫn gửi cả ảnh render và source TikZ hiện tại.
+Source này chỉ là candidate để audit; authority là `problem` cho hình đề và
+`solution > problem` cho hình lời giải. Mỗi role gửi đúng một ảnh candidate và
+luôn trả full source; hình lời giải không nhận source hoặc ảnh hình đề.
 
 Lời giải nhiều thực thể phải có cấu trúc dữ liệu nhiều thực thể ngay từ provider.
 Một string `solution` chung không thể bảo đảm từng mệnh đề có lập luận riêng, dù
@@ -584,6 +609,12 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
 
 ## Luồng lỗi thường gặp
 
+- Modal chỉ là cửa sổ điều khiển, không phải vòng đời của durable job. Sau khi API
+  đã enqueue một job AI, `X`, click nền và `Hủy` phải luôn đóng được modal; hook
+  vẫn giữ `jobId` và poll ở component còn mounted. Không reset `jobId` mỗi lần mở
+  lại modal, vì thao tác đó làm mất theo dõi job đang chạy và có thể khiến admin
+  tưởng nút chưa hoạt động rồi gửi lại. Với preview bất đồng bộ, dùng sequence ID
+  để response cũ không ghi đè dữ liệu của lần mở hoặc yêu cầu mới hơn.
 - Khi modal sinh Quiz thấy danh sách set rỗng, không được suy ra rằng database
   chắc chắn chưa có set: cache web có thể cũ hoặc một job khác vừa tạo set. Trước
   khi mở modal, web phải refetch danh sách authoritative. Ở API, request không có
@@ -744,6 +775,14 @@ M6 là CRUD thủ công. Nội dung AI ở milestone sau phải đi qua cùng sc
   structured block. Các field optional theo JSON contract như
   `geometryStatement: null` là trạng thái hợp lệ và không được làm type guard loại
   cả block rồi âm thầm đổi UI sang fallback.
+- Hai action lời giải AI phải dùng optimistic snapshot ở cả trước provider call và
+  trước persistence: request hash khóa đúng preview, còn base-content hash khóa đề,
+  phương án, đáp án, hint, lời giải và revision/checksum hình đề hiện tại. `REFINE`
+  nhận đáp án như authority bị khóa và chỉ trả lời giải. `REGENERATE` phải thật sự
+  độc lập: không nhận đáp án, hint hoặc lời giải cũ; chỉ nhận đề, phương án/mệnh đề,
+  yêu cầu admin và ảnh hình đề nếu có, rồi trả đồng bộ đáp án, hint, lời giải trong
+  một structured output. Tách payload như vậy tránh neo vào đáp án sai, đồng thời
+  bảo đảm lời giải mới bám dữ kiện trực quan thay vì chỉ bám phần chữ.
 - Tooltip mặc định của nút bàn phím MathLive nằm trong shadow DOM của
   `math-field`. Nếu để tooltip đó trong vùng nhập có `overflow-x: auto`, pseudo
   element khi hover có thể tăng `scrollWidth`, tạo thanh cuộn và vẫn bị

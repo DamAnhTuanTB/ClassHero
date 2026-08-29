@@ -4,7 +4,13 @@ import { PrismaService } from "../src/common/prisma/prisma.service";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { QuizService } from "../src/modules/quiz/services/quiz.service";
 import { QuizSetReviewActionDto } from "../src/modules/quiz/dto/review-quiz-set.dto";
-import { QuestionType, Difficulty, ReviewStatus, UserRole } from "@prisma/client";
+import {
+  AiExplanationTargetType,
+  Difficulty,
+  QuestionType,
+  ReviewStatus,
+  UserRole,
+} from "@prisma/client";
 import { RequestContext } from "../src/common/api/request-context";
 import { randomUUID } from "crypto";
 import { createTestCourseCatalogRelation } from "./helpers/course-catalog-fixture";
@@ -554,5 +560,92 @@ describe("M6.2 Quiz CRUD Integration Test", () => {
     ).rejects.toMatchObject({
       response: { code: "QUIZ_SET_HAS_NO_APPROVED_QUESTIONS" },
     });
+  });
+
+  it("permanently deletes a Quiz set and all dependent learning data", async () => {
+    const set = await prisma.quizSet.create({
+      data: {
+        lessonId: testLessonId,
+        title: "Quiz xóa cứng",
+        questionCount: 1,
+        createdById: testUserId,
+      },
+    });
+    const questionId = randomUUID();
+    const explanation = await prisma.aiExplanation.create({
+      data: {
+        targetType: AiExplanationTargetType.QUIZ_QUESTION,
+        targetId: questionId,
+        lessonId: testLessonId,
+        contentJson: { type: "doc", content: [{ type: "text", text: "Lời giải" }] },
+      },
+    });
+    await prisma.quizQuestion.create({
+      data: {
+        id: questionId,
+        quizSetId: set.id,
+        lessonId: testLessonId,
+        questionType: QuestionType.TRUE_FALSE,
+        questionJson: { type: "doc", content: [{ type: "text", text: "Đúng?" }] },
+        correctAnswerJson: true,
+        explanationId: explanation.id,
+      },
+    });
+    const attempt = await prisma.quizAttempt.create({
+      data: {
+        studentUserId: testUserId,
+        lessonId: testLessonId,
+        quizSetId: set.id,
+        totalCount: 1,
+      },
+    });
+    const answer = await prisma.quizAttemptAnswer.create({
+      data: {
+        attemptId: attempt.id,
+        questionId,
+        answerJson: true,
+        isAnswered: true,
+        isCorrect: true,
+      },
+    });
+
+    await expect(
+      quizService.deleteQuizSet(set.id, testUserId, mockContext),
+    ).resolves.toEqual({
+      success: true,
+      deletedQuestionCount: 1,
+      deletedAttemptCount: 1,
+      deletedExplanationCount: 1,
+    });
+
+    const [
+      deletedSet,
+      deletedQuestion,
+      deletedAttempt,
+      deletedAnswer,
+      deletedExplanation,
+    ] = await Promise.all([
+      prisma.quizSet.findUnique({ where: { id: set.id } }),
+      prisma.quizQuestion.findUnique({ where: { id: questionId } }),
+      prisma.quizAttempt.findUnique({ where: { id: attempt.id } }),
+      prisma.quizAttemptAnswer.findUnique({ where: { id: answer.id } }),
+      prisma.aiExplanation.findUnique({ where: { id: explanation.id } }),
+    ]);
+    expect([
+      deletedSet,
+      deletedQuestion,
+      deletedAttempt,
+      deletedAnswer,
+      deletedExplanation,
+    ]).toEqual([null, null, null, null, null]);
+    await expect(
+      prisma.auditLog.findFirst({
+        where: {
+          action: "QUIZ_SET_PERMANENT_DELETED",
+          entityType: "QuizSet",
+          entityId: set.id,
+        },
+      }),
+    ).resolves.toBeTruthy();
   });
 });

@@ -31,7 +31,6 @@ const revisionSelect = {
   finishedAt: true,
   attempts: {
     orderBy: { createdAt: "desc" as const },
-    take: 1,
     select: {
       id: true,
       sourceVersion: true,
@@ -41,6 +40,14 @@ const revisionSelect = {
       diagnosticBatchHash: true,
       collectionComplete: true,
       createdAt: true,
+      backgroundJob: {
+        select: {
+          providerUsageEvents: {
+            where: { provider: "OPENAI", status: "SUCCEEDED" },
+            select: { id: true, cachedInputTokens: true, costVnd: true },
+          },
+        },
+      },
     },
   },
 } satisfies Prisma.StemFigureRevisionSelect;

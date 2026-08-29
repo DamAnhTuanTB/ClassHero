@@ -1,6 +1,6 @@
 # Current Codex Context
 
-Last updated: 2026-08-25
+Last updated: 2026-08-28
 
 File này là snapshot định hướng nhanh, không phải nhật ký triển khai. Source of
 truth vẫn là `AGENTS.md`, docs domain, milestone/ADR liên quan và code hiện tại.
@@ -39,6 +39,12 @@ Các subtask mới nhất:
   Summary/Quiz modal cho override từng phase; immutable draft/job giữ hai
   snapshot và figure worker ưu tiên route IMAGE. Flashcard/Test mới lưu cấu
   hình mặc định, chưa sinh hình.
+- `M9.22`: header card Quiz có menu portal tạo hình đề, lời giải EXTEND hoặc
+  REDRAW dùng lại modal preview/request/chi phí. EXTEND khóa exact hình đề AI;
+  REDRAW không cần hoặc gửi hình/code hình đề.
+- `M9.25`: shared `Chỉnh nhanh` parse và liệt kê từng nhãn/số đo an toàn thành
+  input sửa/xóa độc lập, rồi dùng compile/validator hiện có; không đổi API/
+  database/worker và không gọi provider.
 
 ## 2. Contract cần nhớ
 
@@ -52,6 +58,10 @@ Các subtask mới nhất:
   validator và sandbox. Provider chỉ trả figure snippet theo contract.
 - Chỉ promote delivery asset sau khi compile và validator đều pass; student chỉ
   tải current SVG/raster đã promote.
+- Quick cleanup trong admin code editor phải sửa trực tiếp `latexSource` draft,
+  tự chạy compile/validator để cập nhật preview và chỉ đổi current revision khi
+  admin bấm `Áp dụng`. Không tạo asset variant, không gọi AI theo mỗi thao tác;
+  transformer phải bảo toàn node chưa xác định chắc chắn đúng loại cần xóa.
 - Test provider trả phí luôn opt-in. Trước forced/full run phải báo số request,
   ước tính chi phí và chờ owner xác nhận.
 
@@ -66,6 +76,17 @@ Các subtask mới nhất:
   matrix hiện tại.
 - `M9.20`: Prisma validate, focused route/summary/quiz tests, scoped lint,
   API/web typecheck/build và worker boot pass; không gọi provider trả phí.
+- `M9.22`: focused authoring/admin-action/REDRAW-worker tests, API/web
+  typecheck/scoped lint, build, Prisma validate, worker boot và browser runtime
+  pass. Live OpenAI smoke chạy đúng 1 request REDRAW: preview tối đa `381 VND`,
+  usage thực tế `48 VND`, job/SVG đều `SUCCEEDED`.
+- `M9.23`: web/API typecheck và scoped lint pass; 40 transform/browser tests,
+  8 Summary/Quiz UI flow tests và 45 TeX Live compile pass. Live OpenAI chạy 4
+  request Toán hình/Toán đại/Vật lý/Hóa học, tổng 15.291 input token (8.434 cache),
+  6.087 output token, 36 transform compile pass, chi phí ước tính `240 VND`.
+- `M9.25`: 60 focused source-action test, 4 responsive browser interaction,
+  10 TeX Live local compile, web typecheck/scoped lint/build pass; không gọi paid
+  provider.
 - Verification M9.17-M9.19 dùng mock/local artifact, không gọi provider trả phí.
 
 Chi tiết lịch sử live audit, chi phí và screenshot nằm trong `.codex/artifacts/`

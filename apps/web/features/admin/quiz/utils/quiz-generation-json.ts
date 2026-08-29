@@ -6,6 +6,7 @@ import type {
   QuizQuestionType,
 } from "@/features/admin/quiz/api/admin-quiz-api";
 import { createMathTextTiptapDocument } from "@/lib/tiptap-rich-content";
+import { normalizeMissingInlineMathClosers } from "@learning-path/shared";
 
 const QUESTION_TYPES = new Set<QuizQuestionType>([
   "MULTIPLE_CHOICE",
@@ -19,8 +20,9 @@ export function buildQuizQuestionPreviewFromGenerationJson(
   current: AdminQuizQuestion,
   generationQuestionJson: Record<string, unknown>,
 ): AdminQuizQuestion {
-  const sanitizedGenerationQuestionJson =
-    stripLegacyQuizGeometryStatement(generationQuestionJson);
+  const sanitizedGenerationQuestionJson = normalizeGenerationJsonText(
+    stripLegacyQuizGeometryStatement(generationQuestionJson),
+  );
   const questionType =
     readQuestionType(sanitizedGenerationQuestionJson.questionType) ??
     current.questionType;
@@ -36,7 +38,6 @@ export function buildQuizQuestionPreviewFromGenerationJson(
     type: "quizExplanation",
     problem,
     solution,
-    answer,
     ...(typeof explanation?.isGeometry === "boolean"
       ? { isGeometry: explanation.isGeometry }
       : {}),
@@ -69,10 +70,34 @@ export function buildQuizQuestionPreviewFromGenerationJson(
 
 function stripLegacyQuizGeometryStatement(value: Record<string, unknown>) {
   const explanation = asRecord(value.explanation);
-  if (!explanation || !("geometryStatement" in explanation)) return value;
+  if (!explanation) return value;
   const safeExplanation = { ...explanation };
   delete safeExplanation.geometryStatement;
+  delete safeExplanation.answer;
   return { ...value, explanation: safeExplanation };
+}
+
+function normalizeGenerationJsonText(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  return normalizeGenerationJsonValue(value) as Record<string, unknown>;
+}
+
+function normalizeGenerationJsonValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return normalizeMissingInlineMathClosers(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizeGenerationJsonValue);
+  }
+  const record = asRecord(value);
+  if (!record) return value;
+  return Object.fromEntries(
+    Object.entries(record).map(([key, item]) => [
+      key,
+      normalizeGenerationJsonValue(item),
+    ]),
+  );
 }
 
 export function isProtectedQuizGenerationJsonEdit(input: {

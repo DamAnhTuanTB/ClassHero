@@ -34,6 +34,7 @@ export const studentLessonSummarySelect = {
         select: {
           altText: true,
           caption: true,
+          latexSource: true,
           deliveryFile: {
             select: {
               objectKey: true,

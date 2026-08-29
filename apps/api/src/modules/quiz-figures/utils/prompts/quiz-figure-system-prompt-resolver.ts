@@ -2,30 +2,25 @@ import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generatio
 import {
   buildMathQuizFigureRefinementSystemPrompt,
   buildMathQuizQuestionFigureSystemPrompt,
-  buildMathQuizSolutionExtensionSystemPrompt,
-  buildMathQuizSolutionRedrawSystemPrompt,
+  buildMathQuizSolutionFigureSystemPrompt,
 } from "#api/modules/quiz-figures/utils/prompts/math-quiz-figure-system-prompt";
 import {
   buildPhysicsQuizFigureRefinementSystemPrompt,
   buildPhysicsQuizQuestionFigureSystemPrompt,
-  buildPhysicsQuizSolutionExtensionSystemPrompt,
-  buildPhysicsQuizSolutionRedrawSystemPrompt,
+  buildPhysicsQuizSolutionFigureSystemPrompt,
 } from "#api/modules/quiz-figures/utils/prompts/physics-quiz-figure-system-prompt";
 import {
   buildChemistryQuizFigureRefinementSystemPrompt,
   buildChemistryQuizQuestionFigureSystemPrompt,
-  buildChemistryQuizSolutionExtensionSystemPrompt,
-  buildChemistryQuizSolutionRedrawSystemPrompt,
+  buildChemistryQuizSolutionFigureSystemPrompt,
 } from "#api/modules/quiz-figures/utils/prompts/chemistry-quiz-figure-system-prompt";
 import {
   buildGeneralQuizFigureRefinementSystemPrompt,
   buildGeneralQuizQuestionFigureSystemPrompt,
-  buildGeneralQuizSolutionExtensionSystemPrompt,
-  buildGeneralQuizSolutionRedrawSystemPrompt,
+  buildGeneralQuizSolutionFigureSystemPrompt,
 } from "#api/modules/quiz-figures/utils/prompts/general-quiz-figure-system-prompt";
 
-export type QuizFigureSystemPromptMode =
-  "QUESTION" | "EXTEND_QUESTION" | "REDRAW_AS_MODEL";
+export type QuizFigureSystemPromptMode = "QUESTION" | "SOLUTION";
 
 export function buildQuizFigureSystemPrompt(
   subject: QuizSubjectSnapshot,
@@ -66,10 +61,8 @@ function resolveMathQuizFigureMode(
   switch (mode) {
     case "QUESTION":
       return buildMathQuizQuestionFigureSystemPrompt(subject);
-    case "EXTEND_QUESTION":
-      return buildMathQuizSolutionExtensionSystemPrompt(subject);
-    case "REDRAW_AS_MODEL":
-      return buildMathQuizSolutionRedrawSystemPrompt(subject);
+    case "SOLUTION":
+      return buildMathQuizSolutionFigureSystemPrompt(subject);
   }
 }
 
@@ -80,10 +73,8 @@ function resolvePhysicsQuizFigureMode(
   switch (mode) {
     case "QUESTION":
       return buildPhysicsQuizQuestionFigureSystemPrompt(subject);
-    case "EXTEND_QUESTION":
-      return buildPhysicsQuizSolutionExtensionSystemPrompt(subject);
-    case "REDRAW_AS_MODEL":
-      return buildPhysicsQuizSolutionRedrawSystemPrompt(subject);
+    case "SOLUTION":
+      return buildPhysicsQuizSolutionFigureSystemPrompt(subject);
   }
 }
 
@@ -94,10 +85,8 @@ function resolveChemistryQuizFigureMode(
   switch (mode) {
     case "QUESTION":
       return buildChemistryQuizQuestionFigureSystemPrompt(subject);
-    case "EXTEND_QUESTION":
-      return buildChemistryQuizSolutionExtensionSystemPrompt(subject);
-    case "REDRAW_AS_MODEL":
-      return buildChemistryQuizSolutionRedrawSystemPrompt(subject);
+    case "SOLUTION":
+      return buildChemistryQuizSolutionFigureSystemPrompt(subject);
   }
 }
 
@@ -108,9 +97,7 @@ function resolveGeneralQuizFigureMode(
   switch (mode) {
     case "QUESTION":
       return buildGeneralQuizQuestionFigureSystemPrompt(subject);
-    case "EXTEND_QUESTION":
-      return buildGeneralQuizSolutionExtensionSystemPrompt(subject);
-    case "REDRAW_AS_MODEL":
-      return buildGeneralQuizSolutionRedrawSystemPrompt(subject);
+    case "SOLUTION":
+      return buildGeneralQuizSolutionFigureSystemPrompt(subject);
   }
 }

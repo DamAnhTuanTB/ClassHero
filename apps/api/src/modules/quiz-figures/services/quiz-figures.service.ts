@@ -15,7 +15,9 @@ import {
 import type {
   ApplyQuizFigureDraftDto,
   CompileQuizFigureDraftDto,
+  CreateQuestionQuizFigureAiDto,
   CreateQuizFigureAiDto,
+  QuizFigureAiTargetMode,
   QuizFigureRevisionGuardDto,
   RefineQuizFigureWithAiDto,
   UpdateQuizFigureCaptionDto,
@@ -26,12 +28,10 @@ import { QuizFigureJobService } from "#api/modules/quiz-figures/services/quiz-fi
 import {
   buildQuizFigureRefinementInput,
   buildQuestionFigureInput,
-  buildSolutionFigureExtensionInput,
-  buildSolutionFigureRedrawInput,
+  buildSolutionFigureInput,
   generatedQuizFigureRefinementSchema,
   generatedQuizQuestionFigureSchema,
-  generatedQuizSolutionExtensionSchema,
-  generatedQuizSolutionRedrawSchema,
+  generatedQuizSolutionFigureSchema,
   quizFigurePlanSchema,
   readQuizFigureTargetGrade,
   resolveQuizFigureSystemPrompt,
@@ -41,6 +41,8 @@ import { buildQuizFigureRefinementImageDataUrl } from "#api/modules/quiz-figures
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 import type { QuizSubjectSnapshot } from "#api/modules/quiz/types/quiz-generation.types";
+import { serializeQuizRichText } from "#api/modules/quiz/utils/quiz-generation-output";
+import { resolveQuizSubject } from "#api/modules/quiz/utils/quiz-subject";
 
 @Injectable()
 export class QuizFiguresService {
@@ -68,30 +70,10 @@ export class QuizFiguresService {
   }) {
     const question = await this.prisma.quizQuestion.findFirst({
       where: { id: input.questionId, deletedAt: null },
-      select: { id: true, lessonId: true, solutionFigureMode: true },
+      select: { id: true, lessonId: true },
     });
     if (!question) {
       throw notFoundException("QUIZ_QUESTION_NOT_FOUND", "Không tìm thấy câu Quiz.");
-    }
-    const questionFigureRevision =
-      input.role === QuizFigureRole.SOLUTION
-        ? await this.prisma.quizFigure.findFirst({
-            where: {
-              quizQuestionId: question.id,
-              role: QuizFigureRole.QUESTION,
-              deletedAt: null,
-            },
-            select: { currentRevisionId: true },
-          })
-        : null;
-    if (
-      input.role === QuizFigureRole.SOLUTION &&
-      !questionFigureRevision?.currentRevisionId
-    ) {
-      throw badRequestException(
-        "QUIZ_SOLUTION_FIGURE_BASE_REQUIRED",
-        "Hãy tải hình đề trước; hình lời giải phải được xây dựng trên hình đề.",
-      );
     }
     const figure = await this.prisma.quizFigure.upsert({
       where: {
@@ -113,32 +95,13 @@ export class QuizFiguresService {
       update: { deletedAt: null },
       select: { id: true },
     });
-    const revision = await this.artifacts.attachAdminUpload({
+    await this.artifacts.attachAdminUpload({
       figureId: figure.id,
       fileId: input.fileId,
       actorUserId: input.actorUserId,
       altText: input.altText,
       caption: input.caption,
     });
-    if (input.role === QuizFigureRole.SOLUTION) {
-      await this.prisma.$transaction([
-        this.prisma.quizFigureRevision.update({
-          where: { id: revision.id },
-          data: {
-            derivedFromQuestionRevisionId: questionFigureRevision!.currentRevisionId,
-          },
-        }),
-        this.prisma.quizQuestion.update({
-          where: { id: question.id },
-          data: {
-            solutionFigureMode:
-              question.solutionFigureMode === "REDRAW_AS_MODEL"
-                ? "REDRAW_AS_MODEL"
-                : "EXTEND_QUESTION",
-          },
-        }),
-      ]);
-    }
     return this.prisma.quizFigure.findUniqueOrThrow({
       where: { id: figure.id },
       select: quizFigureSelect,
@@ -163,6 +126,123 @@ export class QuizFiguresService {
     return this.drafts.apply(questionId, figureId, actorUserId, dto);
   }
 
+  async createForQuestion(
+    questionId: string,
+    actorUserId: string,
+    dto: CreateQuestionQuizFigureAiDto,
+  ) {
+    const context = await this.loadQuestionFigureAuthoringContext(questionId, dto);
+    this.assertQuestionFigureAuthoringContext(context, dto, true);
+    const plan = buildQuestionFigureAuthoringPlan(context, dto.targetMode);
+    const role = targetRole(dto.targetMode);
+    const target = context.targetFigure;
+    const figure = target
+      ? await this.prisma.quizFigure.update({
+          where: { id: target.id },
+          data: {
+            deletedAt: null,
+            ...(target.planJson == null ? { planJson: plan } : {}),
+          },
+          select: { id: true },
+        })
+      : await this.prisma.quizFigure.create({
+          data: {
+            lessonId: context.question.lessonId,
+            quizQuestionId: context.question.id,
+            role,
+            planJson: plan,
+            subjectKey: context.subject.key,
+            subjectName: context.subject.name,
+            subjectSlug: context.subject.slug,
+            status: "QUEUED",
+            createdById: actorUserId,
+          },
+          select: { id: true },
+        });
+    const latest = await this.prisma.quizFigureRevision.findFirst({
+      where: { quizFigureId: figure.id },
+      orderBy: { sourceVersion: "desc" },
+      select: { sourceVersion: true },
+    });
+    const revision = await this.prisma.quizFigureRevision.create({
+      data: {
+        quizFigureId: figure.id,
+        sourceKind: "AI_TEX",
+        origin: "ADMIN_REGENERATE",
+        status: "QUEUED",
+        sourceVersion: (latest?.sourceVersion ?? 0) + 1,
+        altText:
+          target?.currentRevision?.altText ??
+          defaultAuthoringAltText(dto.targetMode, context.problem),
+        caption: target?.currentRevision?.caption ?? null,
+        createdById: actorUserId,
+      },
+      select: { id: true },
+    });
+    await this.prisma.quizFigure.update({
+      where: { id: figure.id },
+      data: {
+        deletedAt: null,
+        status: "QUEUED",
+        pendingRevisionId: revision.id,
+        lastErrorCategory: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+    });
+    const routeSnapshot = await this.resolveAiRoute(dto, role);
+    const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
+      adminInstructions: dto.adminInstructions?.trim() || null,
+      aiMode: dto.mode,
+      systemPrompt: dto.systemPrompt?.trim() || null,
+      userPrompt: dto.userPrompt?.trim() || null,
+      planSnapshot: plan,
+    });
+    return { jobId: job.id, status: job.status };
+  }
+
+  async previewForQuestion(questionId: string, dto: CreateQuestionQuizFigureAiDto) {
+    const context = await this.loadQuestionFigureAuthoringContext(questionId, dto);
+    this.assertQuestionFigureAuthoringContext(context, dto, false);
+    const plan = buildQuestionFigureAuthoringPlan(context, dto.targetMode);
+    const role = targetRole(dto.targetMode);
+    const routeSnapshot = await this.resolveAiRoute(dto, role);
+    let structuredInput: AiStructuredInput;
+    let trace: ResolvedAiStructuredRequestPreview;
+    if (plan.role === "QUESTION") {
+      structuredInput = buildQuestionFigureInput({
+        subject: context.subject,
+        plan,
+        targetGrade: context.targetGrade,
+        adminInstructions: dto.adminInstructions,
+        mode: dto.mode,
+        currentLatexSource: context.targetFigure?.currentRevision?.latexSource,
+      });
+      structuredInput = applyPromptOverrides(structuredInput, dto);
+      trace = await this.provider.previewStructuredRequest(
+        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        structuredInput,
+        generatedQuizQuestionFigureSchema,
+      );
+    } else {
+      structuredInput = buildSolutionFigureInput({
+        subject: context.subject,
+        plan,
+        targetGrade: context.targetGrade,
+        adminInstructions: dto.adminInstructions,
+        mode: dto.mode,
+        currentSolutionLatexSource: context.targetFigure?.currentRevision?.latexSource,
+      });
+      structuredInput = applyPromptOverrides(structuredInput, dto);
+      trace = await this.provider.previewStructuredRequest(
+        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        structuredInput,
+        generatedQuizSolutionFigureSchema,
+      );
+    }
+    return this.buildCreateAiPreview(dto, structuredInput, trace, routeSnapshot);
+  }
+
   async createNewAi(
     questionId: string,
     figureId: string,
@@ -182,23 +262,6 @@ export class QuizFiguresService {
         "QUIZ_FIGURE_CURRENT_LATEX_SOURCE_MISSING",
         "Hình hiện tại không có mã TikZ để AI chỉnh sửa.",
       );
-    }
-    if (figure.role === "SOLUTION") {
-      const questionFigure = await this.prisma.quizFigure.findFirst({
-        where: {
-          quizQuestionId: questionId,
-          role: "QUESTION",
-          deletedAt: null,
-          currentRevisionId: { not: null },
-        },
-        select: { id: true },
-      });
-      if (!questionFigure) {
-        throw badRequestException(
-          "QUIZ_SOLUTION_FIGURE_BASE_REQUIRED",
-          "Hình đề phải sẵn sàng trước khi tạo hình lời giải.",
-        );
-      }
     }
     const latest = await this.prisma.quizFigureRevision.findFirst({
       where: { quizFigureId: figure.id },
@@ -229,11 +292,7 @@ export class QuizFiguresService {
         lastErrorMessage: null,
       },
     });
-    const routeSnapshot = await this.resolveAiRoute(
-      dto,
-      figure.role,
-      plan.role === "SOLUTION" ? plan.mode : undefined,
-    );
+    const routeSnapshot = await this.resolveAiRoute(dto, figure.role);
     const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
       adminInstructions: dto.adminInstructions?.trim() || null,
       aiMode: dto.mode,
@@ -260,11 +319,7 @@ export class QuizFiguresService {
     this.assertPlanRole(figure.role, plan);
     const subject = readSubject(figure);
     const targetGrade = readQuizFigureTargetGrade(figure.aiGeneration?.inputMetaJson);
-    const routeSnapshot = await this.resolveAiRoute(
-      dto,
-      figure.role,
-      plan.role === "SOLUTION" ? plan.mode : undefined,
-    );
+    const routeSnapshot = await this.resolveAiRoute(dto, figure.role);
     let structuredInput: AiStructuredInput;
     let trace: ResolvedAiStructuredRequestPreview;
     if (figure.role === QuizFigureRole.QUESTION) {
@@ -295,56 +350,20 @@ export class QuizFiguresService {
           "Dữ liệu dựng hình lời giải của câu Quiz không hợp lệ.",
         );
       }
-      const base = await this.prisma.quizFigure.findFirst({
-        where: {
-          quizQuestionId: questionId,
-          role: QuizFigureRole.QUESTION,
-          deletedAt: null,
-        },
-        select: { currentRevision: { select: { latexSource: true, status: true } } },
+      structuredInput = buildSolutionFigureInput({
+        subject,
+        plan,
+        targetGrade,
+        adminInstructions: dto.adminInstructions,
+        mode: dto.mode,
+        currentSolutionLatexSource: figure.currentRevision?.latexSource,
       });
-      if (
-        !base?.currentRevision?.latexSource ||
-        base.currentRevision.status !== "SUCCEEDED"
-      ) {
-        throw badRequestException(
-          "QUIZ_SOLUTION_FIGURE_BASE_REQUIRED",
-          "Hình đề phải sẵn sàng trước khi tạo hình lời giải.",
-        );
-      }
-      if (plan.mode === "REDRAW_AS_MODEL") {
-        structuredInput = buildSolutionFigureRedrawInput({
-          subject,
-          plan,
-          targetGrade,
-          exactQuestionLatexSource: base.currentRevision.latexSource,
-          adminInstructions: dto.adminInstructions,
-          mode: dto.mode,
-          currentSolutionLatexSource: figure.currentRevision?.latexSource,
-        });
-        structuredInput = applyPromptOverrides(structuredInput, dto);
-        trace = await this.provider.previewStructuredRequest(
-          { feature: AiGenerationType.QUIZ, routeSnapshot },
-          structuredInput,
-          generatedQuizSolutionRedrawSchema,
-        );
-      } else {
-        structuredInput = buildSolutionFigureExtensionInput({
-          subject,
-          plan,
-          targetGrade,
-          exactQuestionLatexSource: base.currentRevision.latexSource,
-          adminInstructions: dto.adminInstructions,
-          mode: dto.mode,
-          currentSolutionLatexSource: figure.currentRevision?.latexSource,
-        });
-        structuredInput = applyPromptOverrides(structuredInput, dto);
-        trace = await this.provider.previewStructuredRequest(
-          { feature: AiGenerationType.QUIZ, routeSnapshot },
-          structuredInput,
-          generatedQuizSolutionExtensionSchema,
-        );
-      }
+      structuredInput = applyPromptOverrides(structuredInput, dto);
+      trace = await this.provider.previewStructuredRequest(
+        { feature: AiGenerationType.QUIZ, routeSnapshot },
+        structuredInput,
+        generatedQuizSolutionFigureSchema,
+      );
     }
     const resolvedRequest = {
       ...structuredInput,
@@ -355,34 +374,7 @@ export class QuizFiguresService {
       systemPrompt: trace.systemPrompt,
       userPrompt: trace.userPrompt,
     };
-    const modelOptions = await this.modelRouting.getAllActiveModels();
-    return {
-      mode: dto.mode,
-      adminInstructions: dto.adminInstructions?.trim() || null,
-      providerInput: buildOpenAiStructuredResponseRequest({
-        request: resolvedRequest,
-        model: trace.model,
-        structuredTextFormat: trace.textFormat,
-      }),
-      configuration: {
-        isDefaultConfigured: routeSnapshot.hasConfiguration,
-        resolvedProvider: trace.provider,
-        resolvedModel: trace.model,
-        temperature: trace.temperature,
-        reasoningEffort: trace.reasoningEffort,
-        maxOutputTokens: trace.maxOutputTokens,
-        modelOptions: modelOptions.map((option) => ({
-          provider: option.provider,
-          model: option.model,
-          available: option.available,
-          capabilities: option.capabilitiesJson,
-        })),
-      },
-      systemPrompt: trace.systemPrompt,
-      userPrompt: trace.userPrompt,
-      context: trace.inputTokenEstimate,
-      estimatedCost: trace.estimatedCost,
-    };
+    return this.buildCreateAiPreview(dto, resolvedRequest, trace, routeSnapshot);
   }
 
   async refineWithAi(
@@ -412,7 +404,6 @@ export class QuizFiguresService {
     const routeSnapshot = await this.resolveAiRoute(
       { mode: "EDIT_CURRENT" },
       figure.role,
-      plan.role === "SOLUTION" ? plan.mode : undefined,
     );
     const latest = await this.prisma.quizFigureRevision.findFirst({
       where: { quizFigureId: figure.id },
@@ -426,7 +417,6 @@ export class QuizFiguresService {
         origin: "AI_REFINEMENT",
         status: "QUEUED",
         sourceVersion: (latest?.sourceVersion ?? 0) + 1,
-        derivedFromQuestionRevisionId: current.derivedFromQuestionRevisionId,
         altText: current.altText,
         caption: current.caption,
         createdById: actorUserId,
@@ -446,6 +436,7 @@ export class QuizFiguresService {
     const job = await this.jobs.enqueue(figure.id, actorUserId, routeSnapshot, {
       aiMode: "EDIT_CURRENT",
       operation: "REFINE_CURRENT",
+      adminInstructions: dto.adminInstructions?.trim() || null,
     });
     return { jobId: job.id, status: job.status };
   }
@@ -477,7 +468,6 @@ export class QuizFiguresService {
     const routeSnapshot = await this.resolveAiRoute(
       { mode: "EDIT_CURRENT" },
       figure.role,
-      plan.role === "SOLUTION" ? plan.mode : undefined,
     );
     const currentSvg = await this.artifacts.readDeliveryObject(
       current.deliveryFile.objectKey,
@@ -487,14 +477,17 @@ export class QuizFiguresService {
       subject: readSubject(figure),
       plan,
       targetGrade: readQuizFigureTargetGrade(figure.aiGeneration?.inputMetaJson),
+      adminInstructions: dto.adminInstructions,
       currentLatexSource: current.latexSource,
       currentImageDataUrl,
     });
-    const trace = await this.provider.previewStructuredRequest(
-      { feature: AiGenerationType.QUIZ, routeSnapshot },
-      structuredInput,
-      generatedQuizFigureRefinementSchema,
-    );
+    const previewContext = { feature: AiGenerationType.QUIZ, routeSnapshot };
+    const trace: ResolvedAiStructuredRequestPreview =
+      await this.provider.previewStructuredRequest(
+        previewContext,
+        structuredInput,
+        generatedQuizFigureRefinementSchema,
+      );
     const previewRequest = {
       ...structuredInput,
       model: trace.model,
@@ -503,16 +496,15 @@ export class QuizFiguresService {
       maxTokens: trace.maxOutputTokens ?? undefined,
       systemPrompt: trace.systemPrompt,
       userPrompt: trace.userPrompt,
-      inputImages: [
-        {
-          imageUrl: `data:image/png;base64,${OPENAI_PREVIEW_BINARY_DATA}`,
-          detail: "high" as const,
-        },
-      ],
+      inputImages: structuredInput.inputImages?.map(() => ({
+        imageUrl: `data:image/png;base64,${OPENAI_PREVIEW_BINARY_DATA}`,
+        detail: "high" as const,
+      })),
     };
     const modelOptions = await this.modelRouting.getAllActiveModels();
     return {
       operation: "REFINE_CURRENT" as const,
+      adminInstructions: dto.adminInstructions?.trim() || null,
       currentImageDataUrl,
       providerInput: buildOpenAiStructuredResponseRequest({
         request: previewRequest,
@@ -569,7 +561,6 @@ export class QuizFiguresService {
         latexSource: current.latexSource,
         sourceHash: current.sourceHash,
         sourceVersion: (latest?.sourceVersion ?? 0) + 1,
-        derivedFromQuestionRevisionId: current.derivedFromQuestionRevisionId,
         altText: current.altText,
         caption: dto.caption?.trim() || null,
         deliveryFileId: current.deliveryFileId,
@@ -607,25 +598,6 @@ export class QuizFiguresService {
           pendingRevisionId: null,
         },
       });
-      if (figure.role === "QUESTION") {
-        await tx.quizFigure.updateMany({
-          where: { quizQuestionId: questionId, role: "SOLUTION", deletedAt: null },
-          data: {
-            deletedAt: new Date(),
-            currentRevisionId: null,
-            pendingRevisionId: null,
-          },
-        });
-        await tx.quizQuestion.update({
-          where: { id: questionId },
-          data: { solutionFigureMode: "NONE" },
-        });
-      } else {
-        await tx.quizQuestion.update({
-          where: { id: questionId },
-          data: { solutionFigureMode: "NONE" },
-        });
-      }
     });
     return { deleted: true, figureId };
   }
@@ -649,7 +621,6 @@ export class QuizFiguresService {
             sourceKind: true,
             latexSource: true,
             sourceHash: true,
-            derivedFromQuestionRevisionId: true,
             altText: true,
             caption: true,
             deliveryFileId: true,
@@ -669,8 +640,7 @@ export class QuizFiguresService {
 
   private async resolveAiRoute(
     dto: CreateQuizFigureAiDto,
-    role: QuizFigureRole,
-    solutionMode?: "EXTEND_QUESTION" | "REDRAW_AS_MODEL",
+    _role: QuizFigureRole,
   ): Promise<AiFeatureRoute> {
     const base = await this.modelRouting.resolve(
       AiGenerationType.QUIZ,
@@ -724,11 +694,181 @@ export class QuizFiguresService {
         capability === "REASONING_EFFORT"
           ? (dto.reasoningEffort ?? base.reasoningEffort)
           : null,
-      maxOutputTokens:
-        role === QuizFigureRole.QUESTION || solutionMode === "REDRAW_AS_MODEL"
-          ? 12_000
-          : 8_000,
+      maxOutputTokens: 12_000,
     };
+  }
+
+  private async buildCreateAiPreview(
+    dto: CreateQuizFigureAiDto,
+    structuredInput: AiStructuredInput,
+    trace: ResolvedAiStructuredRequestPreview,
+    routeSnapshot: AiFeatureRoute,
+  ) {
+    const resolvedRequest = {
+      ...structuredInput,
+      model: trace.model,
+      temperature: trace.temperature ?? undefined,
+      reasoningEffort: trace.reasoningEffort ?? undefined,
+      maxTokens: trace.maxOutputTokens ?? undefined,
+      systemPrompt: trace.systemPrompt,
+      userPrompt: trace.userPrompt,
+    };
+    const modelOptions = await this.modelRouting.getAllActiveModels();
+    return {
+      mode: dto.mode,
+      adminInstructions: dto.adminInstructions?.trim() || null,
+      providerInput: buildOpenAiStructuredResponseRequest({
+        request: resolvedRequest,
+        model: trace.model,
+        structuredTextFormat: trace.textFormat,
+      }),
+      configuration: {
+        isDefaultConfigured: routeSnapshot.hasConfiguration,
+        resolvedProvider: trace.provider,
+        resolvedModel: trace.model,
+        temperature: trace.temperature,
+        reasoningEffort: trace.reasoningEffort,
+        maxOutputTokens: trace.maxOutputTokens,
+        modelOptions: modelOptions.map((option) => ({
+          provider: option.provider,
+          model: option.model,
+          available: option.available,
+          capabilities: option.capabilitiesJson,
+        })),
+      },
+      systemPrompt: trace.systemPrompt,
+      userPrompt: trace.userPrompt,
+      context: trace.inputTokenEstimate,
+      estimatedCost: trace.estimatedCost,
+    };
+  }
+
+  private async loadQuestionFigureAuthoringContext(
+    questionId: string,
+    dto: CreateQuestionQuizFigureAiDto,
+  ) {
+    const question = await this.prisma.quizQuestion.findFirst({
+      where: { id: questionId, deletedAt: null },
+      select: {
+        id: true,
+        lessonId: true,
+        questionType: true,
+        questionJson: true,
+        sourceMetadataJson: true,
+        explanation: { select: { contentJson: true } },
+        lesson: {
+          select: {
+            learningPath: {
+              select: {
+                domain: { select: { name: true, slug: true } },
+                targetAudiences: {
+                  select: { targetAudience: { select: { grade: true } } },
+                },
+              },
+            },
+          },
+        },
+        figures: {
+          select: {
+            id: true,
+            role: true,
+            deletedAt: true,
+            pendingRevisionId: true,
+            planJson: true,
+            subjectKey: true,
+            subjectName: true,
+            subjectSlug: true,
+            currentRevisionId: true,
+            currentRevision: {
+              select: {
+                id: true,
+                status: true,
+                sourceKind: true,
+                origin: true,
+                latexSource: true,
+                altText: true,
+                caption: true,
+                deliveryFile: { select: { mimeType: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!question) {
+      throw notFoundException("QUIZ_QUESTION_NOT_FOUND", "Không tìm thấy câu Quiz.");
+    }
+    const role = targetRole(dto.targetMode);
+    const targetFigure = question.figures.find((figure) => figure.role === role) ?? null;
+    const questionFigure =
+      question.figures.find(
+        (figure) => figure.role === QuizFigureRole.QUESTION && !figure.deletedAt,
+      ) ?? null;
+    const subjectSource = targetFigure ?? questionFigure;
+    const subject = subjectSource
+      ? readSubject(subjectSource)
+      : resolveQuizSubject({
+          domainName: question.lesson.learningPath.domain.name,
+          domainSlug: question.lesson.learningPath.domain.slug,
+        });
+    const problem = serializeQuizRichText(question.questionJson);
+    const solution = readQuestionSolution(
+      question.sourceMetadataJson,
+      question.explanation?.contentJson,
+    );
+    const targetGrade =
+      question.lesson.learningPath.targetAudiences
+        .map((item) => item.targetAudience.grade)
+        .find((grade): grade is number => grade != null) ?? null;
+    return {
+      question,
+      targetFigure,
+      questionFigure,
+      subject,
+      targetGrade,
+      problem,
+      solution,
+    };
+  }
+
+  private assertQuestionFigureAuthoringContext(
+    context: Awaited<
+      ReturnType<QuizFiguresService["loadQuestionFigureAuthoringContext"]>
+    >,
+    dto: CreateQuestionQuizFigureAiDto,
+    requireIdle: boolean,
+  ) {
+    if (!context.problem) {
+      throw badRequestException(
+        "QUIZ_FIGURE_PROBLEM_REQUIRED",
+        "Câu Quiz phải có nội dung trước khi tạo hình.",
+      );
+    }
+    if (dto.targetMode !== "QUESTION" && !context.solution) {
+      throw badRequestException(
+        "QUIZ_SOLUTION_TEXT_REQUIRED",
+        "Hãy thêm lời giải bằng chữ trước khi tạo hình lời giải.",
+      );
+    }
+    this.assertBaseRevision(
+      context.targetFigure?.currentRevisionId ?? null,
+      dto.baseRevisionId,
+    );
+    if (requireIdle && context.targetFigure?.pendingRevisionId) {
+      throw badRequestException(
+        "QUIZ_FIGURE_OPERATION_IN_PROGRESS",
+        "Hình đang được xử lý. Hãy chờ tác vụ hiện tại hoàn tất.",
+      );
+    }
+    if (dto.mode === "EDIT_CURRENT") {
+      const current = context.targetFigure?.currentRevision;
+      if (!current?.latexSource?.trim() || current.sourceKind !== "AI_TEX") {
+        throw badRequestException(
+          "QUIZ_FIGURE_CURRENT_LATEX_SOURCE_MISSING",
+          "Hình hiện tại không có mã TikZ để AI chỉnh sửa.",
+        );
+      }
+    }
   }
 
   private assertPlanRole(role: QuizFigureRole, plan: QuizFigurePlan) {
@@ -821,6 +961,8 @@ export const quizFigureSelect = {
   currentRevision: {
     select: {
       id: true,
+      origin: true,
+      status: true,
       sourceKind: true,
       sourceVersion: true,
       latexSource: true,
@@ -834,8 +976,60 @@ export const quizFigureSelect = {
   },
 } as const;
 
+export function readQuizFigurePendingAiTargetMode(inputMeta: unknown) {
+  if (!inputMeta || typeof inputMeta !== "object" || Array.isArray(inputMeta)) {
+    return null;
+  }
+  const parsed = quizFigurePlanSchema.safeParse(
+    (inputMeta as Record<string, unknown>).planSnapshot,
+  );
+  if (!parsed.success) return null;
+  if (parsed.data.role === "QUESTION") return "QUESTION" as const;
+  return "SOLUTION" as const;
+}
+
 function defaultAltText(role: QuizFigureRole) {
   return role === QuizFigureRole.QUESTION
     ? "Hình minh họa đề Quiz"
     : "Hình lời giải Quiz";
+}
+
+function targetRole(targetMode: QuizFigureAiTargetMode) {
+  return targetMode === "QUESTION" ? QuizFigureRole.QUESTION : QuizFigureRole.SOLUTION;
+}
+
+function buildQuestionFigureAuthoringPlan(
+  context: {
+    problem: string;
+    solution: string;
+    targetFigure: { planJson: unknown } | null;
+  },
+  targetMode: QuizFigureAiTargetMode,
+): QuizFigurePlan {
+  if (targetMode === "QUESTION") {
+    return { version: 1, role: "QUESTION", problem: context.problem };
+  }
+  return {
+    version: 2,
+    role: "SOLUTION",
+    problem: context.problem,
+    solution: context.solution,
+  };
+}
+
+function readQuestionSolution(sourceMetadata: unknown, explanationJson: unknown) {
+  const metadata = readRecord(sourceMetadata);
+  const block = readRecord(metadata.quizExplanationBlock);
+  const blockSolution = block.solution;
+  if (typeof blockSolution === "string" && blockSolution.trim()) {
+    return blockSolution.trim();
+  }
+  return serializeQuizRichText(explanationJson);
+}
+
+function defaultAuthoringAltText(targetMode: QuizFigureAiTargetMode, problem: string) {
+  const excerpt = problem.replaceAll(/\s+/gu, " ").trim().slice(0, 160);
+  const label =
+    targetMode === "QUESTION" ? "Hình minh họa đề Quiz" : "Hình lời giải Quiz";
+  return excerpt ? `${label}: ${excerpt}` : label;
 }

@@ -280,12 +280,6 @@ enum BackgroundJobQueue {
   PERSONAL_LEARNING_PATH_CLONE
 }
 
-enum QuizSolutionFigureMode {
-  NONE
-  EXTEND_QUESTION
-  REDRAW_AS_MODEL
-}
-
 enum QuizFigureRole {
   QUESTION
   SOLUTION
@@ -1400,7 +1394,6 @@ model QuizQuestion {
   updatedAt          DateTime               @updatedAt @map("updated_at")
   deletedAt          DateTime?              @map("deleted_at")
   attemptAnswers     QuizAttemptAnswer[]
-  solutionFigureMode QuizSolutionFigureMode @default(NONE) @map("solution_figure_mode")
   figures            QuizFigure[]
 
   @@index([quizSetId, sortOrder])
@@ -1457,9 +1450,6 @@ model QuizFigureRevision {
   latexSource                   String?                   @map("latex_source") @db.Text
   sourceHash                    String?                   @map("source_hash")
   sourceVersion                 Int                       @map("source_version")
-  derivedFromQuestionRevisionId String?                   @map("derived_from_question_revision_id") @db.Uuid
-  derivedFromQuestionRevision   QuizFigureRevision?       @relation("QuizFigureSolutionDerivation", fields: [derivedFromQuestionRevisionId], references: [id], onDelete: SetNull)
-  derivedSolutionRevisions      QuizFigureRevision[]      @relation("QuizFigureSolutionDerivation")
   altText                       String                    @map("alt_text")
   caption                       String?
   previewSvg                    String?                   @map("preview_svg") @db.Text
@@ -1483,7 +1473,6 @@ model QuizFigureRevision {
 
   @@unique([quizFigureId, sourceVersion])
   @@index([quizFigureId, createdAt(sort: Desc)])
-  @@index([derivedFromQuestionRevisionId])
   @@index([status, createdAt])
   @@index([deliveryFileId])
   @@map("quiz_figure_revisions")

@@ -3,13 +3,13 @@ import { Difficulty, QuestionType } from "@prisma/client";
 import { z } from "zod";
 
 export const QUIZ_PROMPT_VERSIONS = {
-  MATH: "quiz-math-v51-declared-standard-notation",
-  PHYSICS: "quiz-physics-v51-declared-standard-notation",
-  CHEMISTRY: "quiz-chemistry-v51-declared-standard-notation",
-  GENERAL: "quiz-general-v51-declared-standard-notation",
+  MATH: "quiz-math-v85-independent-solution-figure",
+  PHYSICS: "quiz-physics-v80-independent-solution-figure",
+  CHEMISTRY: "quiz-chemistry-v80-independent-solution-figure",
+  GENERAL: "quiz-general-v80-independent-solution-figure",
 } as const;
 export const QUIZ_SCHEMA_VERSION =
-  "quiz-pdf-figure-schema-v31-explicit-solution-paragraphs";
+  "quiz-pdf-figure-schema-v37-independent-solution-figure";
 export const QUIZ_MAX_OUTPUT_TOKENS = 12_000;
 export const QUIZ_MIN_OUTPUT_TOKENS = 1_000;
 export const QUIZ_MAX_CONFIGURED_OUTPUT_TOKENS = 32_000;
@@ -44,7 +44,7 @@ export function resolveQuizOutputTokenFloor(input: {
 }
 
 export const QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY = [
-  "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trước khi trả kết quả JSON, phải rà soát mọi trường hiển thị có nội dung toán học, đặc biệt là `problem`, `solution`, `statementSolutions[].solution`, `answer`, `hint`, `options[].text` và `statements[].text`.",
+  "QUY TẮC CỨNG VỀ CHUỖI DẤU BẰNG: trước khi trả kết quả JSON, phải rà soát mọi trường hiển thị có nội dung toán học, đặc biệt là `problem`, `solution`, `statementSolutions[].solution`, `hint`, `options[].text` và `statements[].text`.",
   "Bất kỳ chuỗi tính hoặc biến đổi duy nhất nào có từ hai dấu `=` cấp ngoài cùng trở lên đều bắt buộc được xuất thành một khối display `$$...$$` dùng `aligned`/`split`, bất kể chuỗi ngắn, vừa một dòng, không tràn ngang hoặc ban đầu có thể viết inline. Tuyệt đối không đặt chuỗi đó trong `$...$` và không giữ toàn bộ chuỗi trên một dòng.",
   "Trong `aligned`/`split`, mỗi dòng chỉ chứa một dấu `=` cấp ngoài cùng và một bước biến đổi tương ứng. Dòng đầu có dạng `A &= B`, các dòng sau có dạng `&= C`.",
   "Ví dụ tổng quát SAI: `$A=B=C$`. Ví dụ tổng quát SAI: `$$A=B=C.$$` Ví dụ tổng quát ĐÚNG: `$$\\begin{aligned}A&=B\\\\&=C.\\end{aligned}$$`.",
@@ -67,9 +67,6 @@ export const QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY = [
   "Với công thức inline, bắt buộc mở và đóng bằng cùng dấu `$`; không dùng backtick thay cho dấu `$` đóng. Ví dụ SAI: `$E``, ví dụ ĐÚNG: `$E$`.",
 ].join(" ");
 
-const QUIZ_EQUALITY_CHAIN_FIELD_POLICY =
-  "Nếu trường này chứa một chuỗi tính hoặc biến đổi duy nhất có từ hai dấu `=` cấp ngoài cùng trở lên, bất kể chuỗi đang được dự định viết inline hay display, bắt buộc xuất thành `$$\\begin{aligned}...\\end{aligned}$$` hoặc `split` với đúng một dấu `=` cấp ngoài cùng trên mỗi dòng; tuyệt đối không đặt chuỗi đó trong `$...$`.";
-
 export const QUIZ_FUNCTIONAL_PUNCTUATION_AND_INFERENCE_LAYOUT_POLICY = [
   "Bảo toàn dấu câu và ký hiệu có chức năng của nguồn; tự bổ sung dấu câu còn thiếu khi ngữ pháp và quan hệ trình bày xác định rõ. Câu dẫn mở danh sách, hệ, bảng hoặc công thức display ở dòng sau phải kết thúc bằng dấu `:`; dùng dấu `,`, `;` và `.` đúng quan hệ câu, không để chuỗi `..` mà phải chọn `.` hoặc `...` theo nghĩa.",
   "Các cụm `Ta có`, `Do đó`, `Suy ra`, `Vì vậy` khi làm câu dẫn trực tiếp cho công thức display hoặc danh sách ở dòng sau phải có dấu `:`; khi nội dung tiếp tục cùng dòng thì dùng dấu câu theo đúng ngữ pháp, không máy móc thêm dấu hai chấm.",
@@ -83,16 +80,19 @@ export const QUIZ_TRUE_FALSE_SOLUTION_POLICY =
   "Với TRUE_FALSE, `explanation.solution` phải giải thích vì sao mệnh đề đúng hoặc sai rồi kết thúc bằng một câu liên kết tự nhiên với lập luận, như `Vì vậy, mệnh đề đã cho là đúng.` hoặc `Do đó, mệnh đề đã cho là sai.`. Câu kết luận này phải tuân thủ quy tắc đoạn kết luận chung của mọi lời giải. Không dùng câu cụt, tách rời ngữ cảnh như `Mệnh đề đúng.` hoặc `Mệnh đề sai.`.";
 
 export const QUIZ_SUBPART_LINEBREAK_POLICY =
-  "Trong một câu Quiz có nhiều ý, mỗi ý mang nhãn a), b), c), ... phải bắt đầu ở dòng riêng trong `problem`, `solution` và `answer`; không đặt hai ý trên cùng một dòng. Riêng MULTI_STATEMENT_TRUE_FALSE, mỗi lời giải nằm trong một phần tử `statementSolutions` riêng, còn mapper dựng mỗi đáp án a), b), c), ... thành một dòng độc lập.";
+  "Trong một câu Quiz có nhiều ý, mỗi ý mang nhãn a), b), c), ... phải bắt đầu ở dòng riêng trong `problem` và `solution`; không đặt hai ý trên cùng một dòng. Riêng MULTI_STATEMENT_TRUE_FALSE, mỗi lời giải nằm trong một phần tử `statementSolutions` riêng, còn mapper dựng mỗi đáp án a), b), c), ... thành một dòng độc lập từ `statements[].value`.";
 
 export const QUIZ_CONCLUSION_PARAGRAPH_POLICY =
   "Câu kết luận cuối phải nằm trong một đoạn riêng, dù bắt đầu bằng `Vậy`, `Vì vậy`, `Do đó`, `Suy ra` hay không có từ nối: chèn đúng một dòng trống trước câu kết luận, không nối câu này vào cùng đoạn văn hoặc cùng dòng với phép tính, công thức hay lập luận ngay trước đó.";
 
 export const QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY =
-  "Với MULTIPLE_CHOICE, câu kết luận cuối phải trả lời trực tiếp đúng đại lượng, đối tượng hoặc yêu cầu mà `problem` hỏi, chẳng hạn `Vậy thể tích cần tìm là $V$.`; không được kết luận bằng thao tác làm bài hoặc ID phương án như `Vậy chọn phương án C.`, `Vậy đáp án là C.` hay cách diễn đạt tương đương. ID phương án chỉ thuộc dữ liệu chấm điểm và field `answer` theo contract riêng.";
+  "Với MULTIPLE_CHOICE, câu kết luận cuối phải trả lời trực tiếp đúng đại lượng, đối tượng hoặc yêu cầu mà `problem` hỏi, chẳng hạn `Vậy thể tích cần tìm là $V$.`; không được kết luận bằng thao tác làm bài hoặc ID phương án như `Vậy chọn phương án C.`, `Vậy đáp án là C.` hay cách diễn đạt tương đương. ID phương án chỉ thuộc dữ liệu chấm điểm `correctOptionId`.";
 
 export const QUIZ_GRADE_APPROPRIATE_KNOWLEDGE_POLICY =
-  "Trong `problem`, `hint`, `answer`, `solution` và `statementSolutions`, chỉ được sử dụng khái niệm, định lý, công thức, ký hiệu và phương pháp được trình bày trong PDF nguồn hoặc kiến thức tiên quyết cần thiết không vượt quá khối lớp mục tiêu. Không được sử dụng kiến thức, thuật ngữ, định lý hoặc phương pháp thuộc khối lớp cao hơn để rút gọn lời giải, kể cả khi cách giải đó đúng về mặt chuyên môn. Khi PDF nguồn đã trình bày một phương pháp phù hợp, phải ưu tiên phương pháp đó; chỉ dùng cách khác khi cách đó vẫn nằm trong phạm vi kiến thức của nguồn và khối lớp mục tiêu. Khi chưa xác định khối lớp, không dùng phương pháp nâng cao không xuất hiện trong PDF nguồn.";
+  "Trong `problem`, `hint`, `solution` và `statementSolutions`, chỉ được sử dụng khái niệm, định lý, công thức, ký hiệu và phương pháp được trình bày trong PDF nguồn hoặc các kiến thức học sinh đã được học trước đó ở cùng khối hoặc khối dưới. Việc dùng các kiến thức đã được học trước đó không thay thế yêu cầu mỗi câu phải liên quan trực tiếp đến nội dung lesson. Không được sử dụng kiến thức, thuật ngữ, định lý hoặc phương pháp thuộc khối lớp cao hơn để rút gọn lời giải, kể cả khi cách giải đó đúng về mặt chuyên môn. Khi PDF nguồn đã trình bày một phương pháp phù hợp, phải ưu tiên phương pháp đó; chỉ dùng cách khác khi cách đó vẫn nằm trong phạm vi kiến thức của nguồn và khối lớp mục tiêu. Khi chưa xác định khối lớp, không dùng phương pháp nâng cao không xuất hiện trong PDF nguồn.";
+
+export const QUIZ_ORIGINAL_FORMULA_STEP_POLICY =
+  "Khi lời giải dùng một định lý, tính chất, định luật hoặc công thức để tính toán, phải viết công thức gốc trước, sau đó biến đổi công thức, rồi mới thay số. Câu văn nêu nội dung định lý hoặc công thức không thay thế cho bước viết công thức. Dạng đúng theo mẫu tổng quát là `p+q=s`, tiếp theo `q=s-p`, rồi mới thay các giá trị đã biết. Nếu công thức gốc đã có sẵn đại lượng cần tìm ở một vế thì viết công thức đó rồi thay số, không thêm phép biến đổi thừa. Câu thuần lý thuyết không có phép tính không bị ép viết công thức.";
 
 export const QUIZ_HINT_QUALITY_POLICY = [
   "Gợi ý ngắn nhưng phải tự đủ nghĩa và cung cấp ít nhất một cầu nối suy luận cụ thể từ dữ kiện hoặc yêu cầu của chính câu hỏi đến khái niệm, quan hệ, quy tắc hoặc thao tác đầu tiên cần dùng.",
@@ -108,9 +108,9 @@ export const QUIZ_HINT_QUALITY_POLICY = [
 
 export const QUIZ_FIGURE_SELECTION_POLICY = [
   "Quyết định hình theo policy chuyên môn của đúng môn trong system prompt hiện tại; không đặt quota cứng và không dùng riêng tên môn, tên bài hoặc một nhãn phân loại làm điều kiện máy móc.",
-  "Ngoại lệ nghiệp vụ bắt buộc: câu TRUE_FALSE chỉ có đúng một mệnh đề luôn không tạo hình đề hoặc hình lời giải; phải trả `requiresQuestionFigure=false`, `solutionFigureMode=NONE` và `solutionFigurePlan=null`. Quy tắc này không áp dụng cho MULTI_STATEMENT_TRUE_FALSE.",
+  "Ngoại lệ nghiệp vụ bắt buộc: câu TRUE_FALSE chỉ có đúng một mệnh đề luôn không tạo hình đề hoặc hình lời giải; phải trả `requiresQuestionFigure=false` và `solutionFigure=false`. Quy tắc này không áp dụng cho MULTI_STATEMENT_TRUE_FALSE.",
   "Đề bài và lời giải vẫn phải tự đủ nghĩa bằng chữ. Đây là nguyên tắc an toàn cho người học, không phải lý do tự động loại hình khi policy của môn xác định biểu diễn trực quan là cần thiết.",
-  "Trước khi trả JSON, rà lại từng câu theo đúng policy môn và chọn chính xác một trong bốn contract: không có hình, chỉ có hình đề với lời giải NONE, EXTEND_QUESTION hoặc REDRAW_AS_MODEL.",
+  "Phase 1 chỉ trả hai boolean độc lập: `requiresQuestionFigure` cho hình đề và `solutionFigure` cho hình lời giải. Không trả mode hoặc figure plan.",
 ].join(" ");
 
 export const QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY = [
@@ -132,7 +132,7 @@ export const QUIZ_MULTI_STATEMENT_SOLUTION_POLICY =
   "Với MULTI_STATEMENT_TRUE_FALSE, `statements[].id` và `explanation.statementSolutions[].statementId` bắt buộc dùng lần lượt đúng các chữ thường `a`, `b`, `c`, `d`, ... theo thứ tự mảng và luôn bắt đầu từ `a`; tuyệt đối không dùng `S1`, `S2`, số thứ tự, chữ hoa hoặc ID tùy ý. `explanation.statementSolutions` phải có đúng một phần tử cho mỗi câu con, cùng `statementId`, cùng thứ tự và không thêm ID khác. Mỗi `solution` phải giải riêng câu tương ứng bằng dữ kiện, phép tính hoặc lập luận đầy đủ theo phong cách SGK; không viết một lời giải chung, không văn xuôi hóa biểu thức rồi chỉ liệt kê kết quả. Không lặp nhãn `a)`, `b)` ở đầu `solution` vì lớp trình bày tự thêm nhãn. Mỗi phần kết thúc tự nhiên theo dạng `Vậy câu a) đúng.` hoặc `Vậy câu b) sai.`; câu kết luận này bắt buộc là một đoạn riêng có đúng một dòng trống phía trước, không nằm cùng dòng với câu giải thích hoặc công thức trước đó. Trong nội dung hiển thị không gọi là `mệnh đề 1`, `mệnh đề 2`, `S1` hoặc `S2`. Đáp án cuối được dựng từ `statements[].value`, mỗi câu một dòng theo dạng `a) Đúng.`; provider không trả `explanation.answer` cho loại câu này.";
 
 export const QUIZ_TEXT_INPUT_ANSWER_POLICY =
-  "Dùng TEXT_INPUT cho bài tính có đúng một yêu cầu trực tiếp và một kết quả số. `correctAnswer` phải là đúng một chuỗi đáp án chuẩn, không liệt kê nhiều cách viết tương đương, không có xuống dòng, đơn vị, câu văn hoặc LaTeX. Nếu kết quả chính xác là số hữu tỉ: trả số nguyên khi kết quả là số nguyên; nếu không, trả phân số tối giản `p/q` với mẫu dương. Nếu kết quả chính xác là số vô tỉ: `explanation.problem` bắt buộc kết thúc bằng đúng câu `Làm tròn kết quả đến 1 chữ số thập phân.`; `solution` nêu kết quả chính xác rồi thực hiện làm tròn; `correctAnswer` là số thập phân đã làm tròn, dùng dấu `.` và đúng một chữ số sau dấu thập phân; `explanation.answer` phải kết luận cùng giá trị đã làm tròn. Không trả ký hiệu vô tỉ như `π`, `\\sqrt{...}` trong `correctAnswer`. Không thêm yêu cầu làm tròn khi kết quả chính xác là số hữu tỉ. Ví dụ hữu tỉ: kết quả bằng một nửa thì SAI là `1/2; 0.5`, ĐÚNG là `1/2`. Ví dụ vô tỉ: kết quả chính xác là `\\sqrt{2}` thì SAI là `correctAnswer=\\sqrt{2}`, ĐÚNG là problem có câu làm tròn nêu trên và `correctAnswer=1.4`.";
+  "Dùng TEXT_INPUT cho bài tính có đúng một yêu cầu trực tiếp và một kết quả số. `correctAnswer` là nguồn đáp án duy nhất và phải là đúng một chuỗi đáp án chuẩn, không liệt kê nhiều cách viết tương đương, không có xuống dòng, đơn vị, câu văn hoặc LaTeX. Nếu kết quả chính xác là số hữu tỉ: trả số nguyên khi kết quả là số nguyên; nếu không, trả phân số tối giản `p/q` với mẫu dương. Nếu kết quả chính xác là số vô tỉ: `explanation.problem` bắt buộc kết thúc bằng đúng câu `Làm tròn kết quả đến 1 chữ số thập phân.`; `solution` nêu kết quả chính xác rồi thực hiện làm tròn; `correctAnswer` là số thập phân đã làm tròn, dùng dấu `.` và đúng một chữ số sau dấu thập phân. Không trả ký hiệu vô tỉ như `π`, `\\sqrt{...}` trong `correctAnswer`. Không thêm yêu cầu làm tròn khi kết quả chính xác là số hữu tỉ. Ví dụ hữu tỉ: kết quả bằng một nửa thì SAI là `1/2; 0.5`, ĐÚNG là `1/2`. Ví dụ vô tỉ: kết quả chính xác là `\\sqrt{2}` thì SAI là `correctAnswer=\\sqrt{2}`, ĐÚNG là problem có câu làm tròn nêu trên và `correctAnswer=1.4`.";
 
 export const QUIZ_SUBJECT_KEYS = ["MATH", "PHYSICS", "CHEMISTRY", "GENERAL"] as const;
 
@@ -156,25 +156,16 @@ const quizExplanationProblemField = learnerFacingText(
   4_000,
   "Phần nội dung chính của câu hỏi phải nêu đủ đối tượng, ký hiệu, dữ kiện và yêu cầu chuyên môn nếu dạng câu cần, để học sinh trả lời được mà không cần xem hình minh họa. Không thêm nhãn hoặc câu dẫn chỉ nhắc lại thao tác đã được `questionType` thể hiện.",
 );
-const quizExplanationAnswerField = learnerFacingText(
-  2_000,
-  "Kết luận ngắn gọn, nhất quán với lời giải và không chứa tiền tố `Đáp án:`.",
-);
 const quizExplanationBaseShape = {
   problem: quizExplanationProblemField,
-  answer: quizExplanationAnswerField,
 };
 
-const QUIZ_STANDARD_SOLUTION_DESCRIPTION = `Thân lời giải phải đầy đủ và mạch lạc theo phong cách sách giáo khoa: chỉ bỏ diễn giải lặp lại, không gộp phép tính nhiều bước vào câu văn; sau khi thực hiện đủ các bước cần thiết thì kết luận rồi dừng, không viết thêm nhận xét hoặc tính chất tổng quát sau kết luận. Lời giải phải hiểu được mà không cần xem hình minh họa. ${QUIZ_SCHOOLBOOK_SOLUTION_STYLE_POLICY} ${QUIZ_GRADE_APPROPRIATE_KNOWLEDGE_POLICY}`;
-
 const quizSolutionFieldSchema = text(10_000).describe(
-  [
-    QUIZ_STANDARD_SOLUTION_DESCRIPTION,
-    QUIZ_EQUALITY_CHAIN_FIELD_POLICY,
-    QUIZ_FUNCTIONAL_PUNCTUATION_AND_INFERENCE_LAYOUT_POLICY,
-    QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY,
-  ].join(" "),
+  "Lời giải đầy đủ cho đúng câu hỏi hiện tại, tự hiểu được khi không xem hình và tuân thủ các quy tắc nội dung, lập luận, định dạng trong system prompt.",
 );
+
+const QUIZ_HINT_FIELD_DESCRIPTION =
+  "Gợi ý cho đúng câu hỏi hiện tại: nêu cầu nối hoặc thao tác khởi đầu hữu ích nhưng không tiết lộ kết quả, dữ liệu chấm điểm hay toàn bộ lời giải; tuân thủ quy tắc gợi ý trong system prompt.";
 
 const QUIZ_STATEMENT_SOLUTION_ITEM_POLICY =
   "Lời giải độc lập cho đúng một câu con: nêu đủ dữ kiện, công thức, phép tính, phép biến đổi hoặc lập luận cần thiết; không gộp câu khác và không lặp nhãn ở đầu field. Kết thúc bằng một đoạn riêng như `Vậy câu a) đúng.` hoặc `Vậy câu b) sai.`, có đúng một dòng trống phía trước; không viết `mệnh đề 1`/`mệnh đề 2` hay S1/S2.";
@@ -212,7 +203,9 @@ const multiStatementQuizExplanationContentShape = {
     .array(quizStatementSolutionSchema)
     .min(2)
     .max(8)
-    .describe(QUIZ_MULTI_STATEMENT_SOLUTION_POLICY),
+    .describe(
+      "Một lời giải riêng cho mỗi phần tử trong `statements`, cùng ID và cùng thứ tự; nội dung và cách kết luận tuân thủ system prompt.",
+    ),
 };
 
 function createMathQuizExplanationSchema<T extends z.ZodRawShape>(contentShape: T) {
@@ -251,7 +244,6 @@ export const quizExplanationBlockSchema = z
     type: z.literal("quizExplanation"),
     problem: text(2_000),
     solution: text(10_000),
-    answer: text(2_000),
     isGeometry: z.boolean().optional(),
     origin: z.literal("AI_AUTHORED").optional(),
   })
@@ -277,47 +269,6 @@ const numericAnswerSchema = z
     "Đúng một đáp án số chuẩn. Chỉ dùng một trong ba dạng: số nguyên; phân số tối giản `p/q` có mẫu dương cho kết quả hữu tỉ không nguyên; hoặc số thập phân dùng dấu `.` và đúng một chữ số sau dấu thập phân cho kết quả vô tỉ đã được yêu cầu làm tròn. Không dùng dấu `,`, ký hiệu khoa học, LaTeX, ký hiệu vô tỉ, đơn vị, câu văn, xuống dòng hoặc nhiều phương án.",
   );
 
-const extendedSolutionFigurePlanSchema = z
-  .object({
-    addedObjects: z
-      .array(text(300))
-      .min(1)
-      .max(20)
-      .describe(
-        "Các đối tượng trực quan mới, thiết yếu phải thêm trên đúng hình đề để theo dõi lời giải; dùng đúng tên và quy ước của môn hiện tại.",
-      ),
-    clarifiedRelations: z
-      .array(text(300))
-      .min(1)
-      .max(20)
-      .describe(
-        "Các quan hệ trung gian hoặc kết luận cần làm rõ trên hình lời giải bằng ký hiệu chuyên môn chuẩn; không lặp lại tên đối tượng đã liệt kê trong `addedObjects` nếu không nêu thêm quan hệ.",
-      ),
-  })
-  .strict();
-
-const redrawnSolutionFigurePlanSchema = z
-  .object({
-    modelingGoal: text(500).describe(
-      "Mục tiêu chuyển biểu diễn: nêu phần thực tế hoặc bố cục cần lược bỏ và cách mô hình chuyên môn mới giúp theo dõi lời giải; không mô tả đáp án thay cho solution.",
-    ),
-    modeledObjects: z
-      .array(text(300))
-      .min(1)
-      .max(20)
-      .describe(
-        "Toàn bộ đối tượng thiết yếu phải xuất hiện trong hình lời giải được vẽ lại, gồm đối tượng từ đề và mọi đối tượng phụ đã được nêu rõ trong solution.",
-      ),
-    clarifiedRelations: z
-      .array(text(300))
-      .min(1)
-      .max(20)
-      .describe(
-        "Các quan hệ hoặc kết luận đã có trong problem/solution cần thể hiện rõ trên mô hình mới bằng ký hiệu chuẩn của môn hiện tại.",
-      ),
-  })
-  .strict();
-
 const quizNoFigureDecisionSchema = z
   .object({
     requiresQuestionFigure: z
@@ -325,68 +276,24 @@ const quizNoFigureDecisionSchema = z
       .describe(
         "Không tạo hình đề. Với TRUE_FALSE một mệnh đề, đây là giá trị bắt buộc; với loại câu khác, chỉ dùng khi policy của đúng môn xác định không cần hình.",
       ),
-    solutionFigureMode: z.literal("NONE").describe("Không tạo hình cho lời giải."),
-    solutionFigurePlan: z
-      .null()
-      .describe("Bắt buộc là null khi `solutionFigureMode=NONE`."),
+    solutionFigure: z.literal(false).describe("Không tạo hình lời giải cho câu hỏi này."),
   })
   .strict();
 
 export const quizFigureDecisionSchema = z
-  .union([
-    quizNoFigureDecisionSchema,
-    z
-      .object({
-        requiresQuestionFigure: z
-          .literal(true)
-          .describe(
-            "Tạo hình đề vì câu thuộc trường hợp cần hình theo policy của đúng môn.",
-          ),
-        solutionFigureMode: z
-          .literal("NONE")
-          .describe(
-            "Chỉ không tạo hình lời giải khi phép kiểm kê visual delta giữa solution và hình đề rỗng, hoặc phần chênh chỉ là thay số, biến đổi công thức, giá trị đáp án hay câu kết luận không tạo thêm đối tượng/quan hệ trực quan hữu ích. Việc solution tự đủ nghĩa bằng chữ không phải lý do để chọn NONE khi còn visual delta thiết yếu.",
-          ),
-        solutionFigurePlan: z
-          .null()
-          .describe("Bắt buộc là null khi `solutionFigureMode=NONE`."),
-      })
-      .strict(),
-    z
-      .object({
-        requiresQuestionFigure: z
-          .literal(true)
-          .describe("Tạo hình đề để dùng làm nền của hình lời giải mở rộng."),
-        solutionFigureMode: z
-          .literal("EXTEND_QUESTION")
-          .describe(
-            "Bắt buộc mở rộng đúng hình đề khi solution dùng ít nhất một đối tượng hoặc quan hệ trực quan thiết yếu chưa có trên hình đề và các phần bổ sung vẫn dùng cùng nền/hệ tọa độ.",
-          ),
-        solutionFigurePlan: extendedSolutionFigurePlanSchema.describe(
-          "Liệt kê chính xác phần phải bổ sung trên hình đề; không mô tả lại toàn bộ hình.",
-        ),
-      })
-      .strict(),
-    z
-      .object({
-        requiresQuestionFigure: z
-          .literal(true)
-          .describe(
-            "Tạo hình đề để dùng làm tham chiếu và provenance cho hình lời giải vẽ lại.",
-          ),
-        solutionFigureMode: z
-          .literal("REDRAW_AS_MODEL")
-          .describe(
-            "Vẽ một hình lời giải hoàn chỉnh mới để mô hình hóa lại cùng dữ kiện theo bố cục hoặc phong cách chuyên môn khác; không chèn vào source hình đề.",
-          ),
-        solutionFigurePlan: redrawnSolutionFigurePlanSchema.describe(
-          "Mô tả đầy đủ mục tiêu chuyển biểu diễn, các đối tượng và quan hệ phải có trong mô hình lời giải mới.",
-        ),
-      })
-      .strict(),
-  ])
+  .object({
+    requiresQuestionFigure: z
+      .boolean()
+      .describe("Quyết định độc lập có tạo hình đề hay không theo policy của đúng môn."),
+    solutionFigure: z
+      .boolean()
+      .describe(
+        "Đặt true khi và chỉ khi solution thực sự dùng thêm ít nhất một đối tượng hoặc quan hệ có thể vẽ so với problem; đặt false nếu solution không thêm cấu trúc trực quan, kể cả khi có thay số, biến đổi đại số, tính toán, đáp số hoặc kết luận mới.",
+      ),
+  })
+  .strict()
   .describe(
-    "Quyết định có dùng hình hay không và cách tạo hình lời giải theo policy của đúng môn. Trước khi chọn mode phải so sánh các đối tượng/quan hệ trực quan solution thật sự dùng với hình đề: delta rỗng hoặc chỉ là tính toán thuần túy thì NONE; delta thiết yếu trên cùng nền thì EXTEND_QUESTION; cần một biểu diễn hoàn chỉnh khác thì REDRAW_AS_MODEL. Hình chỉ bổ trợ trực quan, không được chứa dữ kiện mà nội dung chữ chưa nêu.",
+    "Phase 1 chỉ trả hai quyết định boolean độc lập cho hình đề và hình lời giải; không lập figure plan và không quyết định cách vẽ.",
   );
 
 const ALL_GENERATED_QUESTION_TYPES = [
@@ -421,17 +328,19 @@ function createQuestionSchemas<
             "Từ 2 đến 6 phương án; mỗi phương án có ID riêng, có đúng một đáp án đúng và các phương án nhiễu phải hợp lý, không chồng nghĩa hoặc làm lộ đáp án.",
           ),
         correctOptionId: text(40).describe(
-          "ID của đúng một phương án trong `options`; Quiz không có trắc nghiệm nhiều đáp án. `explanation.answer` phải có dạng `<correctOptionId>. <nội dung đầy đủ của phương án đúng>`.",
+          "ID của đúng một phương án trong `options`; đây là nguồn đáp án duy nhất cho câu trắc nghiệm và Quiz không có trắc nghiệm nhiều đáp án.",
         ),
       })
       .strict()
-      .describe(QUIZ_DIRECT_ANSWER_CONCLUSION_POLICY),
+      .describe(
+        "Câu trắc nghiệm có đúng một phương án đúng; lời giải phải kết luận trực tiếp yêu cầu của đề theo system prompt.",
+      ),
     [QuestionType.TRUE_FALSE]: z
       .object({
         questionType: z.literal(QuestionType.TRUE_FALSE),
         ...commonFields,
         figure: quizNoFigureDecisionSchema.describe(
-          "TRUE_FALSE chỉ có một mệnh đề nên không tạo hình đề hoặc hình lời giải. Bắt buộc trả đúng `requiresQuestionFigure=false`, `solutionFigureMode=NONE`, `solutionFigurePlan=null`.",
+          "TRUE_FALSE chỉ có một mệnh đề nên không tạo hình đề hoặc hình lời giải. Bắt buộc trả đúng `requiresQuestionFigure=false`, `solutionFigure=false`.",
         ),
         explanation: trueFalseExplanationSchema,
         correctAnswer: z
@@ -442,11 +351,7 @@ function createQuestionSchemas<
       })
       .strict()
       .describe(
-        [
-          QUIZ_TRUE_FALSE_PROBLEM_POLICY,
-          QUIZ_TRUE_FALSE_SOLUTION_POLICY,
-          "Loại câu này không được tạo hình đề hoặc hình lời giải.",
-        ].join(" "),
+        "Câu đúng/sai gồm đúng một mệnh đề, một giá trị chấm điểm và không có hình; cách viết đề và kết luận tuân thủ system prompt.",
       ),
     [QuestionType.MULTI_STATEMENT_TRUE_FALSE]: z
       .object({
@@ -478,7 +383,9 @@ function createQuestionSchemas<
           ),
       })
       .strict()
-      .describe(QUIZ_MULTI_STATEMENT_PROBLEM_POLICY),
+      .describe(
+        "Câu đúng/sai nhiều mệnh đề; `problem` chỉ chứa bối cảnh chung, còn từng nội dung và giá trị chấm điểm nằm trong `statements`.",
+      ),
     [QuestionType.TEXT_INPUT]: z
       .object({
         questionType: z.literal(QuestionType.TEXT_INPUT),
@@ -488,7 +395,9 @@ function createQuestionSchemas<
         correctAnswer: numericAnswerSchema,
       })
       .strict()
-      .describe(QUIZ_TEXT_INPUT_ANSWER_POLICY),
+      .describe(
+        "Câu nhập đáp án có đúng một kết quả số chuẩn trong `correctAnswer`; quy tắc biểu diễn số và làm tròn nằm trong system prompt.",
+      ),
   };
 }
 
@@ -515,9 +424,9 @@ function buildQuestionSchema<T extends z.ZodRawShape>(
 function createNonMathQuizQuestionFields(difficulty: z.ZodType<Difficulty>) {
   return {
     difficulty,
-    hint: learnerFacingText(1_000, QUIZ_HINT_QUALITY_POLICY),
+    hint: learnerFacingText(1_000, QUIZ_HINT_FIELD_DESCRIPTION),
     explanation: nonMathQuizExplanationSchema.describe(
-      "Gồm đề bài, lời giải và đáp án theo đúng môn hiện tại; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa.",
+      "Gồm đề bài và lời giải theo đúng môn hiện tại; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa. Không trả field `answer`; đáp án nằm duy nhất trong dữ liệu chấm điểm của loại câu.",
     ),
   };
 }
@@ -533,7 +442,7 @@ const _generatedNonMathQuizQuestionSchema = buildQuestionSchema(
 const _generatedMathQuizQuestionSchema = buildQuestionSchema(
   {
     difficulty: difficultySchema,
-    hint: learnerFacingText(1_000, QUIZ_HINT_QUALITY_POLICY),
+    hint: learnerFacingText(1_000, QUIZ_HINT_FIELD_DESCRIPTION),
     explanation: createMathQuizExplanationSchema(
       multipleChoiceQuizExplanationContentShape,
     ),
@@ -550,7 +459,62 @@ export interface GeneratedQuizSchemaConfiguration {
   questionCount?: number;
   questionTypes?: readonly QuestionType[];
   difficulty?: Difficulty;
+  includeSourceCoverageAudit?: boolean;
 }
+
+export const generatedQuizSourceCoverageAuditSchema = z
+  .object({
+    sourceHasAssessableRealWorldApplication: z
+      .boolean()
+      .describe(
+        "Đặt true chỉ khi PDF nguồn có ít nhất một họ bài ứng dụng thực tế mà cách giải ngắn nhất bắt buộc dùng ít nhất một trọng tâm của lesson hiện tại; đặt false nếu bài thực tế trong nguồn vẫn giải nguyên vẹn chỉ bằng kiến thức đã học trước đó. Không được đặt false chỉ vì cần sáng tạo bối cảnh mới hoặc tránh trùng bài nguồn.",
+      ),
+    sourceApplicationFamily: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .nullable()
+      .describe(
+        "Nếu nguồn có bài ứng dụng phù hợp, mô tả ngắn họ bài, trọng tâm của lesson hiện tại bắt buộc phải dùng và vai trò mô hình hóa nhận diện từ nguồn mà không chép đề; nếu không có thì null.",
+      ),
+    realWorldQuestions: z
+      .array(
+        z
+          .object({
+            questionNumber: z
+              .number()
+              .int()
+              .min(1)
+              .max(50)
+              .describe(
+                "Số thứ tự 1-based của câu ứng dụng thực tế mới trong questions.",
+              ),
+            newContext: z
+              .string()
+              .trim()
+              .min(1)
+              .max(500)
+              .describe(
+                "Bối cảnh hoạt động, nhu cầu hoặc quyết định thực tế mới của câu; không lặp bối cảnh đặc thù trong nguồn.",
+              ),
+            modelingRole: z
+              .string()
+              .trim()
+              .min(1)
+              .max(500)
+              .describe(
+                "Giải thích ngắn thông tin thực tế tham gia thế nào vào việc lập mô hình và vì sao phải dùng trọng tâm của lesson hiện tại để giải; một vật thể chỉ kèm số đo hoặc một công thức kiến thức cũ không đủ.",
+              ),
+          })
+          .strict(),
+      )
+      .max(50)
+      .describe(
+        "Các câu thực tế mới trong output. Mảng phải có ít nhất một phần tử khi nguồn có họ bài ứng dụng phù hợp và phải rỗng khi nguồn không có.",
+      ),
+  })
+  .strict();
 
 export function getGeneratedQuizOutputSchema(
   configuration: GeneratedQuizSchemaConfiguration,
@@ -565,24 +529,24 @@ export function getGeneratedQuizOutputSchema(
       ? buildQuestionSchema(
           {
             difficulty: requestedDifficulty,
-            hint: learnerFacingText(1_000, QUIZ_HINT_QUALITY_POLICY),
+            hint: learnerFacingText(1_000, QUIZ_HINT_FIELD_DESCRIPTION),
             explanation: createMathQuizExplanationSchema(
               multipleChoiceQuizExplanationContentShape,
             ).describe(
-              "Gồm đề bài, lời giải, đáp án và trường phân loại Hình học; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa.",
+              "Gồm đề bài, lời giải và trường phân loại Hình học; không trả field `answer`; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa.",
             ),
           },
           requestedTypes,
           createMathQuizExplanationSchema(trueFalseQuizExplanationContentShape).describe(
-            "Gồm đúng một mệnh đề, lời giải có kết luận liên kết tự nhiên, đáp án và trường phân loại Hình học; mọi phần phải hiểu được mà không cần xem hình minh họa.",
+            "Gồm đúng một mệnh đề, lời giải có kết luận liên kết tự nhiên và trường phân loại Hình học; không trả field `answer`; mọi phần phải hiểu được mà không cần xem hình minh họa.",
           ),
           createMathQuizExplanationSchema(
             multiStatementQuizExplanationContentShape,
           ).describe(
-            "Gồm đề bài, lời giải riêng trong `statementSolutions` cho từng mệnh đề, đáp án và trường phân loại Hình học; mọi phần phải hiểu được mà không cần xem hình minh họa.",
+            "Gồm đề bài, lời giải riêng trong `statementSolutions` cho từng mệnh đề và trường phân loại Hình học; đáp án nằm trong `statements[].value`; mọi phần phải hiểu được mà không cần xem hình minh họa.",
           ),
           createMathQuizExplanationSchema(standardQuizExplanationContentShape).describe(
-            "Gồm đề bài, lời giải và đáp án số theo đúng môn hiện tại; `problem` và `solution` phải hiểu được mà không cần xem hình minh họa.",
+            "Gồm đề bài và lời giải theo đúng môn hiện tại; không trả field `answer`; đáp án số nằm duy nhất trong `correctAnswer`.",
           ),
         )
       : buildQuestionSchema(
@@ -594,23 +558,59 @@ export function getGeneratedQuizOutputSchema(
         );
   const questions = z.array(questionSchema);
 
+  const resolvedQuestions =
+    configuration.questionCount === undefined
+      ? questions.min(1).max(50)
+      : questions.length(configuration.questionCount);
+  const description =
+    "Danh sách câu Quiz theo đúng số lượng, loại câu và độ khó đã yêu cầu; mọi nội dung học sinh nhìn thấy phải tuân thủ system prompt.";
+  if (!configuration.includeSourceCoverageAudit) {
+    return z.object({ questions: resolvedQuestions }).strict().describe(description);
+  }
   return z
     .object({
-      questions:
-        configuration.questionCount === undefined
-          ? questions.min(1).max(50)
-          : questions.length(configuration.questionCount),
+      sourceCoverageAudit: generatedQuizSourceCoverageAuditSchema,
+      questions: resolvedQuestions,
     })
     .strict()
-    .describe(
-      [
-        QUIZ_EQUALITY_CHAIN_LAYOUT_POLICY,
-        QUIZ_LOGICAL_DERIVATION_POLICY,
-        QUIZ_FUNCTIONAL_PUNCTUATION_AND_INFERENCE_LAYOUT_POLICY,
-        QUIZ_LATEX_ENVIRONMENT_BALANCE_POLICY,
-        QUIZ_SUBPART_LINEBREAK_POLICY,
-      ].join(" "),
-    );
+    .superRefine((output, context) => {
+      const audit = output.sourceCoverageAudit;
+      if (audit.sourceHasAssessableRealWorldApplication) {
+        if (!audit.sourceApplicationFamily || audit.realWorldQuestions.length === 0) {
+          context.addIssue({
+            code: "custom",
+            path: ["sourceCoverageAudit"],
+            message:
+              "Nguồn có họ bài ứng dụng thực tế thì phải mô tả họ bài và chỉ ra ít nhất một câu ứng dụng mới.",
+          });
+        }
+      } else if (
+        audit.sourceApplicationFamily !== null ||
+        audit.realWorldQuestions.length > 0
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["sourceCoverageAudit"],
+          message:
+            "Nguồn không có họ bài ứng dụng thực tế thì sourceApplicationFamily phải null và realWorldQuestions phải rỗng.",
+        });
+      }
+      const seen = new Set<number>();
+      for (const [index, item] of audit.realWorldQuestions.entries()) {
+        if (
+          item.questionNumber > output.questions.length ||
+          seen.has(item.questionNumber)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["sourceCoverageAudit", "realWorldQuestions", index, "questionNumber"],
+            message: "Số thứ tự câu thực tế phải tồn tại và không được lặp.",
+          });
+        }
+        seen.add(item.questionNumber);
+      }
+    })
+    .describe(description);
 }
 
 const sourceSnapshotSchema = z
@@ -678,6 +678,9 @@ export type GeneratedQuizQuestion =
   | z.infer<typeof _generatedNonMathQuizQuestionSchema>
   | z.infer<typeof _generatedMathQuizQuestionSchema>;
 export type GeneratedQuizStatementSolution = z.infer<typeof quizStatementSolutionSchema>;
+export type GeneratedQuizSourceCoverageAudit = z.infer<
+  typeof generatedQuizSourceCoverageAuditSchema
+>;
 export type QuizGenerationJobInput = z.infer<typeof quizGenerationJobInputSchema>;
 export type QuizExplanationBlock = z.infer<typeof quizExplanationBlockSchema>;
 

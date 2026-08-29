@@ -1,3 +1,4 @@
+import { readStemFigureDisplayScale } from "@learning-path/shared";
 import { parseStemFigureDiagnosticBatch } from "#api/modules/stem-figures/utils/stem-figure-diagnostics";
 import type { FilesService } from "#api/modules/files/services/files.service";
 import type { ObjectStorageService } from "#api/modules/files/services/object-storage.service";
@@ -26,6 +27,7 @@ export async function serializeStemFigure(
       : record.status;
   const currentAssetFile = current?.deliveryFile ?? null;
   const assetUrl = await filesService.resolveAccessUrl(currentAssetFile);
+  const currentOpenAiUsage = summarizeCurrentOpenAiUsage(current);
   const latestProviderSnapshots = (record.revisions ?? [])
     .map((revision) =>
       readProviderRequestSnapshots(revision.providerRequestSnapshotsJson),
@@ -77,6 +79,9 @@ export async function serializeStemFigure(
     sourceKind: current?.sourceKind ?? working.sourceKind,
     currentAssetKind: resolveStemFigureCurrentAssetKind(current),
     currentRevisionOrigin: current?.origin ?? null,
+    openAiGenerationCostVnd: currentOpenAiUsage?.costVnd ?? null,
+    openAiCachedInputTokens: currentOpenAiUsage?.cachedInputTokens ?? null,
+    displayScale: readStemFigureDisplayScale(current?.latexSource),
     ...(includeSource ? { latexSource: working.latexSource } : {}),
     sourceHash: working.sourceHash,
     sourceVersion: working.sourceVersion,
@@ -120,6 +125,27 @@ export async function serializeStemFigure(
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
+}
+
+function summarizeCurrentOpenAiUsage(
+  revision: StemFigureRecord["currentRevision"],
+) {
+  if (!revision?.deliveryFileId) return null;
+
+  const eventIds = new Set<string>();
+  let cachedInputTokens = 0;
+  let costVnd = 0;
+
+  for (const attempt of revision.attempts) {
+    for (const event of attempt.backgroundJob?.providerUsageEvents ?? []) {
+      if (eventIds.has(event.id)) continue;
+      eventIds.add(event.id);
+      cachedInputTokens += event.cachedInputTokens;
+      costVnd += event.costVnd;
+    }
+  }
+
+  return eventIds.size > 0 ? { cachedInputTokens, costVnd } : null;
 }
 
 export function resolveStemFigureCurrentAssetKind(

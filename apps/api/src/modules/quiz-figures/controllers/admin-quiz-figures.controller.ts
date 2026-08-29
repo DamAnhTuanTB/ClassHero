@@ -22,6 +22,7 @@ import { AttachQuizFigureUploadDto } from "#api/modules/quiz-figures/dto/attach-
 import {
   ApplyQuizFigureDraftDto,
   CompileQuizFigureDraftDto,
+  CreateQuestionQuizFigureAiDto,
   CreateQuizFigureAiDto,
   RefineQuizFigureWithAiDto,
   QuizFigureRevisionGuardDto,
@@ -55,6 +56,26 @@ export class AdminQuizFiguresController {
       caption: dto.caption,
       actorUserId: user.id,
     });
+  }
+
+  @Post(":questionId/figures/create-ai")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: "Create a question or solution Quiz figure with AI" })
+  createForQuestion(
+    @Param("questionId") questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateQuestionQuizFigureAiDto,
+  ) {
+    return this.figures.createForQuestion(questionId, user.id, dto);
+  }
+
+  @Post(":questionId/figures/create-ai/preview")
+  @ApiOperation({ summary: "Preview a new question or solution Quiz figure request" })
+  previewForQuestion(
+    @Param("questionId") questionId: string,
+    @Body() dto: CreateQuestionQuizFigureAiDto,
+  ) {
+    return this.figures.previewForQuestion(questionId, dto);
   }
 
   @Post(":questionId/figures/:figureId/drafts/compile")

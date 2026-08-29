@@ -518,7 +518,13 @@ export function isTransientProviderError(error: unknown) {
     error instanceof DOMException ||
     message.includes("timeout") ||
     message.includes("timed out") ||
-    message.includes("connection reset")
+    message.includes("connection error") ||
+    message.includes("connection reset") ||
+    message.includes("fetch failed") ||
+    message.includes("econnrefused") ||
+    message.includes("econnreset") ||
+    message.includes("etimedout") ||
+    message.includes("eai_again")
   );
 }
 

@@ -19,6 +19,7 @@ import type {
 } from "#api/jobs/background-job-queues";
 import { getJobErrorMessage } from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
+import { isTransientProviderError } from "#api/modules/ai/services/ai-provider-call.service";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 import { lessonSummaryOutputSchema } from "#api/modules/ai/types/lesson-summary.types";
 import { AiOutputValidationError } from "#api/modules/ai/utils/ai-output-validation";
@@ -33,9 +34,7 @@ import {
 } from "#api/modules/stem-figures/services/stem-figure-repair.service";
 import { SvgValidatorService } from "#api/modules/stem-figures/services/svg-validator.service";
 import { TexRendererClientService } from "#api/modules/stem-figures/services/tex-renderer-client.service";
-import {
-  stemFigureGenerationBriefSchema,
-} from "#api/modules/stem-figures/types/stem-figure-generation.types";
+import { stemFigureGenerationBriefSchema } from "#api/modules/stem-figures/types/stem-figure-generation.types";
 import type {
   StemFigureProviderRequestSnapshot,
   StemFigureProviderRequestSnapshotCollection,
@@ -191,6 +190,14 @@ export class StemFigureRenderingProcessor {
         budgetBlocked ||
         invalidProviderOutput;
       const message = getJobErrorMessage(error).slice(0, 20_000);
+      const maxJobAttempts = Math.max(
+        1,
+        typeof job.opts.attempts === "number"
+          ? job.opts.attempts
+          : durableJob.maxAttempts,
+      );
+      const retrying =
+        !permanent && isTransientProviderError(error) && jobAttempt < maxJobAttempts;
       if (budgetBlocked) {
         await this.markSourceGenerationFailure({
           durableJob,
@@ -217,12 +224,18 @@ export class StemFigureRenderingProcessor {
           figureId: figure.id,
           revision,
           jobAttempt,
-          retrying: false,
+          retrying,
           message,
         });
       }
+      if (retrying) {
+        this.logger.warn(
+          `STEM figure ${figure.id} revision ${revision.id} attempt ${jobAttempt}/${maxJobAttempts} hit transient infrastructure failure and will retry: ${message}`,
+        );
+        throw error instanceof Error ? error : new Error(message);
+      }
       this.logger.warn(
-        `STEM figure ${figure.id} revision ${revision.id} attempt ${jobAttempt} failed without automatic job retry: ${message}`,
+        `STEM figure ${figure.id} revision ${revision.id} attempt ${jobAttempt}/${maxJobAttempts} failed permanently: ${message}`,
       );
       throw new UnrecoverableError(message);
     }

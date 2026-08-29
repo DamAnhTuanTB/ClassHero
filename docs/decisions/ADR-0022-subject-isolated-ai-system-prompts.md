@@ -7,8 +7,8 @@
 
 Prompt hình trước đây có một policy được gọi là toàn hệ thống nhưng phần lớn là
 quy tắc Hình học Toán. Cách ghép đó làm Lý/Hóa nhận vocabulary không thuộc môn,
-đồng thời rule chống lộ kết luận của hình đề có thể lan sang các lượt vẽ hình lời
-giải `EXTEND_QUESTION` và `REDRAW_AS_MODEL` vốn phải thể hiện quan hệ đã làm rõ.
+đồng thời rule chống lộ kết luận của hình đề có thể lan sang lượt vẽ hình lời
+giải `SOLUTION` vốn phải thể hiện quan hệ đã làm rõ.
 
 Owner yêu cầu Toán, Vật lý và Hóa học có system prompt riêng trong cả Sinh kiến
 thức và Quiz. Không dùng bất kỳ core prompt chung nào; kể cả phần role,
@@ -27,8 +27,7 @@ output/safety contract giống hệt nhau cũng phải được viết đầy đ
 - Mỗi operation có mục tiêu khác biệt phải có prompt chuyên dụng trong từng môn.
   Cấm tạo prompt mới bằng cách nối nguyên một prompt của operation khác rồi thêm
   câu yêu cầu model bỏ qua/thay thế contract cũ. Cụ thể, Quiz `Tinh chỉnh` không
-  được prepend prompt sinh hình `QUESTION`, `EXTEND_QUESTION` hoặc
-  `REDRAW_AS_MODEL`; nó chỉ mang authority, policy chuyên môn cần thiết, đánh giá
+  được prepend prompt sinh hình `QUESTION` hoặc `SOLUTION`; nó chỉ mang authority, policy chuyên môn cần thiết, đánh giá
   lỗi mở, output/safety contract của chính operation tinh chỉnh.
 - User input gửi model phải tối giản theo nguồn sự thật: không lặp `role` ngoài
   `figurePlan`, không đưa operation/job metadata hoặc metadata mô tả ảnh nếu cùng
@@ -37,7 +36,7 @@ output/safety contract giống hệt nhau cũng phải được viết đầy đ
 - Prompt version Phase 1 chứa subject; figure Phase 2 chứa subject và mode/role.
 - Rule chống lộ đáp án nằm trong hợp đồng hình đề, không nằm trong policy môn.
 - Regression test phải chứng minh vocabulary Toán/Lý/Hóa không xuất hiện chéo,
-  đồng thời bao phủ Quiz `NONE`, hình đề, `EXTEND_QUESTION`, `REDRAW_AS_MODEL` và
+  đồng thời bao phủ hai boolean Phase 1, role `QUESTION`, role `SOLUTION` và
   các mode tạo/sửa/repair hình của Sinh kiến thức.
 
 ## Consequences

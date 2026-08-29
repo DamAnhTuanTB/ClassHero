@@ -12,6 +12,8 @@ import type {
   AssessmentQuestionType,
   QuizFigureAsset,
 } from "@/features/student/lessons/types/student-lesson-types";
+import { getStemFigureDisplayPercent } from "@/lib/stem-figure-display";
+import { cn } from "@/lib/utils";
 
 export function AssessmentExplanationPanel({
   content,
@@ -38,6 +40,9 @@ export function AssessmentExplanationPanel({
   const structuredExplanation = useMemo(
     () => (isQuizExplanationBlockData(explanationBlock) ? explanationBlock : null),
     [explanationBlock],
+  );
+  const solutionFigureDisplayPercent = getStemFigureDisplayPercent(
+    solutionFigure?.displayScale,
   );
   if (!content && !structuredExplanation && !solutionFigure?.url) return null;
   const isOpen = controlledIsOpen ?? internalIsOpen;
@@ -79,11 +84,21 @@ export function AssessmentExplanationPanel({
             </div>
           )}
           {solutionFigure?.url ? (
-            <figure className="overflow-hidden rounded-2xl border border-sky-200 bg-white p-3 dark:border-sky-400/30 dark:bg-[var(--theme-surface)]">
+            <figure
+              className="mx-auto overflow-hidden rounded-2xl border border-sky-200 bg-white p-3 dark:border-sky-400/30 dark:bg-[var(--theme-surface)]"
+              style={
+                solutionFigureDisplayPercent === null
+                  ? undefined
+                  : { width: `${solutionFigureDisplayPercent}%` }
+              }
+            >
               <img
                 src={solutionFigure.url}
                 alt={solutionFigure.altText}
-                className="mx-auto max-h-[28rem] w-auto max-w-full object-contain"
+                className={cn(
+                  "mx-auto max-h-[28rem] max-w-full object-contain",
+                  solutionFigureDisplayPercent === null ? "w-auto" : "w-full",
+                )}
               />
               {solutionFigure.caption ? (
                 <figcaption className="mt-2 text-center text-sm font-bold text-slate-500 dark:text-[var(--theme-text-muted)]">

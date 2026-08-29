@@ -7,7 +7,6 @@ import { OpenAiProvider } from "#api/modules/ai/providers/openai.provider";
 import {
   generatedFlashcardOutputSchema,
   generatedTestOutputSchema,
-  LESSON_CONTENT_PROMPT_VERSION,
   LESSON_CONTENT_SCHEMA_VERSION,
 } from "#api/modules/ai/types/lesson-content-generation.types";
 import { lessonSummaryProviderTransportOutputSchema } from "#api/modules/ai/types/lesson-summary.types";
@@ -16,6 +15,7 @@ import {
   buildFlashcardPrompt,
   buildLessonContentSystemPrompt,
   buildTestPrompt,
+  resolveLessonContentPromptVersion,
 } from "#api/modules/ai/utils/lesson-content-generation-prompt";
 import {
   getGeneratedQuizOutputSchema,
@@ -151,7 +151,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
           }),
           contextChunks,
           outputName: `m9_8_flashcard_${difficulty.toLowerCase()}`,
-          promptVersion: LESSON_CONTENT_PROMPT_VERSION,
+          promptVersion: resolveLessonContentPromptVersion(mathSubject.key),
           schemaVersion: LESSON_CONTENT_SCHEMA_VERSION,
           maxTokens: 1_200,
         },
@@ -198,7 +198,7 @@ describe.skipIf(!runLiveTest)("M9.8 OpenAI live UI coverage matrix", () => {
           }),
           contextChunks,
           outputName: testCase.label.replaceAll("-", "_"),
-          promptVersion: LESSON_CONTENT_PROMPT_VERSION,
+          promptVersion: resolveLessonContentPromptVersion(mathSubject.key),
           schemaVersion: LESSON_CONTENT_SCHEMA_VERSION,
           maxTokens: testCase.count === 4 ? 2_800 : 2_200,
         },

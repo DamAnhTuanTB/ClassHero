@@ -11,6 +11,7 @@ import {
 import { PrismaService } from "#api/common/prisma/prisma.service";
 import { toJobJson } from "#api/jobs/job-json";
 import { BackgroundJobQueueService } from "#api/modules/jobs/services/background-job-queue.service";
+import type { QuizFigurePlan } from "#api/modules/quiz-figures/types/quiz-figure-generation.types";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
 
 @Injectable()
@@ -31,6 +32,7 @@ export class QuizFigureJobService {
       operation?: "GENERATE" | "REFINE_CURRENT";
       systemPrompt?: string | null;
       userPrompt?: string | null;
+      planSnapshot?: QuizFigurePlan;
     },
   ) {
     const figure = await this.prisma.quizFigure.findUniqueOrThrow({
@@ -81,6 +83,7 @@ export class QuizFigureJobService {
             operation: createOptions?.operation ?? "GENERATE",
             systemPrompt: createOptions?.systemPrompt ?? null,
             userPrompt: createOptions?.userPrompt ?? null,
+            planSnapshot: createOptions?.planSnapshot ?? null,
           }),
           maxAttempts: 1,
         },
@@ -115,8 +118,6 @@ export class QuizFigureJobService {
       where: { id: figureId },
       select: {
         id: true,
-        role: true,
-        quizQuestionId: true,
         createdById: true,
         pendingRevision: {
           select: {
@@ -171,40 +172,6 @@ export class QuizFigureJobService {
           lastErrorMessage: null,
         },
       });
-      if (figure.role === "QUESTION") {
-        const dependent = await tx.quizFigure.findFirst({
-          where: {
-            quizQuestionId: figure.quizQuestionId,
-            role: "SOLUTION",
-            deletedAt: null,
-          },
-          select: { id: true, pendingRevisionId: true },
-        });
-        if (dependent) {
-          await tx.quizFigure.update({
-            where: { id: dependent.id },
-            data: {
-              status: QuizFigureStatus.QUEUED,
-              lastErrorCategory: null,
-              lastErrorCode: null,
-              lastErrorMessage: null,
-            },
-          });
-          if (dependent.pendingRevisionId) {
-            await tx.quizFigureRevision.update({
-              where: { id: dependent.pendingRevisionId },
-              data: {
-                status: QuizFigureRevisionStatus.QUEUED,
-                derivedFromQuestionRevisionId: null,
-                lastErrorCategory: null,
-                lastErrorCode: null,
-                lastErrorMessage: null,
-                finishedAt: null,
-              },
-            });
-          }
-        }
-      }
       return created;
     });
     await this.enqueue(figure.id, ownerUserId, routeSnapshot);

@@ -24,6 +24,8 @@ export type StemFigureJobTrigger =
   | "MANUAL_VALIDATOR_RETRY"
   | "INFRASTRUCTURE_RETRY";
 
+const STEM_FIGURE_INFRASTRUCTURE_MAX_ATTEMPTS = 3;
+
 @Injectable()
 export class StemFigureJobService {
   constructor(
@@ -138,9 +140,10 @@ export class StemFigureJobService {
             systemPrompt: options.systemPrompt ?? null,
             userPrompt: options.userPrompt ?? null,
           }),
-          // Compiler repair is bounded inside the processor. BullMQ must not
-          // automatically retry provider, network, validator, or infrastructure errors.
-          maxAttempts: 1,
+          // Compiler repair remains bounded inside the processor. BullMQ only
+          // consumes the remaining attempts when the processor classifies a
+          // provider/renderer/network failure as transient.
+          maxAttempts: STEM_FIGURE_INFRASTRUCTURE_MAX_ATTEMPTS,
         },
         select: { id: true, status: true },
       });

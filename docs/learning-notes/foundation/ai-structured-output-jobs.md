@@ -46,6 +46,11 @@ con. Nếu chỉ invalidate parent, TanStack Query vẫn giữ asset/status figu
 ## Structured output boundary
 
 - Provider schema giúp ép shape nhưng Zod vẫn là gate cuối trước khi persist.
+- JSON đã parse trong JavaScript vẫn có thể chứa NUL `U+0000`, trong khi
+  PostgreSQL từ chối ký tự này trong cả `jsonb` và `text`. Boundary dùng chung
+  phải bỏ NUL đệ quy khỏi string/key trước Zod persistence gate; chỉ bỏ ký tự vô
+  hình này, giữ nguyên newline, tab, LaTeX và Unicode hợp lệ. Zod vẫn chạy sau
+  bước chuẩn hóa để một field bắt buộc chỉ chứa NUL không thể lách validation.
 - Khi một quyết định AI làm đổi loại input của paid call sau đó, provenance phải
   là field có invariant chứ không chỉ được suy từ metadata khác. Với Summary
   figure, `TEXTBOOK_SOURCE` bắt buộc có `sourceReferences`, còn
@@ -159,15 +164,18 @@ dung chưa đổi.
 
 ## Retry đúng loại lỗi
 
-Có hai lớp retry độc lập:
+Có ba nhánh xử lý lỗi độc lập:
 
 1. Chỉ `TEX_COMPILE_FAILED` có diagnostic batch đầy đủ mới được tự gọi OpenAI
    repair, tối đa `maxRepairAttempts`. Request repair phải chứa toàn bộ structured
    compiler errors và raw compiler log của đúng lượt compile đó.
-2. Source policy, semantic/SVG validator, provider, budget, timeout, network,
-   storage và lỗi hạ tầng đều terminal đối với automatic retry. Admin vẫn có thể
-   chủ động retry hạ tầng, sửa source, xóa, thay ảnh hoặc tạo revision mới qua
-   lifecycle cũ.
+2. Lỗi transport tạm thời như provider/renderer mất kết nối, timeout, 408/429/5xx
+   được BullMQ retry tối đa 3 attempt với exponential backoff. Đây là chạy lại
+   job, không phải AI repair; mỗi provider attempt cần idempotency usage/
+   reservation riêng để không gộp sai chi phí.
+3. Source policy, semantic/SVG validator, budget, provider output xác định và lỗi
+   nghiệp vụ là terminal. Admin vẫn có thể chủ động sửa source, xóa, thay ảnh hoặc
+   tạo revision mới qua lifecycle hiện có.
 
 Mỗi attempt lưu kind, source version/hash, compile log rút gọn, error
 category/code, validator issues và duration. Hết repair budget là terminal, không
@@ -295,6 +303,7 @@ Local fixtures không gọi provider. Live OpenAI test luôn opt-in, báo số r
 
 ## File quan trọng
 
+- `apps/api/src/modules/ai/utils/ai-output-validation.ts`
 - `apps/api/src/modules/ai/types/lesson-summary.types.ts`
 - `apps/api/src/modules/ai/utils/lesson-summary-prompt.ts`
 - `apps/api/src/workers/services/lesson-summary-generation.service.ts`

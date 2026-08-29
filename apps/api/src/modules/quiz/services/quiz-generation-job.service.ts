@@ -49,6 +49,7 @@ import {
   type QuizGenerationJobInput,
 } from "#api/modules/quiz/types/quiz-generation.types";
 import {
+  buildExistingQuizQuestionReferences,
   buildQuizStructuredInput,
   resolveQuizPromptVersion,
 } from "#api/modules/quiz/utils/quiz-generation-prompt";
@@ -209,11 +210,23 @@ export class QuizGenerationJobService {
     input: QueueQuizGenerationInput,
   ) {
     await this.cleanupRequestDraftPackets(lessonId, actorUserId);
-    const targetQuizSet = await this.resolveQuizTargetSet(
-      lessonId,
-      input.targetQuizSetId,
-    );
-    const source = await this.loadPacket(lessonId, input.documentIds);
+    const [targetQuizSet, source, existingQuestions] = await Promise.all([
+      this.resolveQuizTargetSet(lessonId, input.targetQuizSetId),
+      this.loadPacket(lessonId, input.documentIds),
+      this.prisma.quizQuestion.findMany({
+        where: {
+          lessonId,
+          deletedAt: null,
+          quizSet: { deletedAt: null },
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: {
+          questionType: true,
+          questionJson: true,
+          optionsJson: true,
+        },
+      }),
+    ]);
     if (!source.packet) throw new Error("Missing Quiz source packet.");
     const configuration = {
       ...normalizeConfiguration(input, targetQuizSet?.id ?? null),
@@ -244,6 +257,7 @@ export class QuizGenerationJobService {
         bytes: source.packet.bytes,
       },
       configuration: jobConfiguration,
+      existingQuestionReferences: buildExistingQuizQuestionReferences(existingQuestions),
     });
     const inputPrompt = buildAiUserPrompt(request);
     const structuredTextFormatResolution = resolveAiStructuredTextFormat(
@@ -253,6 +267,7 @@ export class QuizGenerationJobService {
         questionCount: jobConfiguration.questionCount,
         questionTypes: jobConfiguration.questionTypes,
         difficulty: jobConfiguration.difficulty,
+        includeSourceCoverageAudit: !jobConfiguration.systemInstructions,
       }),
       request.outputName,
       request.schemaReferenceStrategy,

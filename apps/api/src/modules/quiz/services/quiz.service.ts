@@ -5,6 +5,7 @@ import type { getRequestContext } from "#api/common/api/request-context";
 import {
   AiExplanationTargetType,
   AiGenerationType,
+  BackgroundJobStatus,
   ContentSource,
   Prisma,
   ProviderUsageStatus,
@@ -34,7 +35,10 @@ import {
   quizSubjectKeySchema,
   type QuizExplanationBlock,
 } from "#api/modules/quiz/types/quiz-generation.types";
-import { quizFigureSelect } from "#api/modules/quiz-figures/services/quiz-figures.service";
+import {
+  quizFigureSelect,
+  readQuizFigurePendingAiTargetMode,
+} from "#api/modules/quiz-figures/services/quiz-figures.service";
 import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import {
   readQuizGenerationQuestion,
@@ -331,20 +335,73 @@ export class QuizService {
     });
   }
 
-  async deleteQuizSet(setId: string, userId: string, _context: RequestContext) {
-    const set = await this.prisma.quizSet.findUnique({
-      where: { id: setId, deletedAt: null },
-    });
-    if (!set) {
-      throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
-    }
+  async deleteQuizSet(setId: string, userId: string, context: RequestContext) {
+    return this.prisma.$transaction(async (transaction) => {
+      const set = await transaction.quizSet.findFirst({
+        where: { id: setId, deletedAt: null },
+        select: {
+          id: true,
+          lessonId: true,
+          title: true,
+          source: true,
+          reviewStatus: true,
+          questionCount: true,
+          questions: { select: { id: true } },
+        },
+      });
+      if (!set) {
+        throw notFoundException("NOT_FOUND", "Không tìm thấy bộ câu hỏi");
+      }
 
-    return this.prisma.quizSet.update({
-      where: { id: setId },
-      data: {
-        deletedAt: new Date(),
-        updatedById: userId,
-      },
+      const questionIds = set.questions.map((question) => question.id);
+      const deletedAttemptCount = (
+        await transaction.quizAttempt.deleteMany({ where: { quizSetId: setId } })
+      ).count;
+
+      await transaction.quizSet.delete({ where: { id: setId } });
+
+      const deletedExplanationCount =
+        questionIds.length > 0
+          ? (
+              await transaction.aiExplanation.deleteMany({
+                where: {
+                  targetType: AiExplanationTargetType.QUIZ_QUESTION,
+                  targetId: { in: questionIds },
+                },
+              })
+            ).count
+          : 0;
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: "QUIZ_SET_PERMANENT_DELETED",
+          entityType: "QuizSet",
+          entityId: setId,
+          before: toInputJson({
+            lessonId: set.lessonId,
+            title: set.title,
+            source: set.source,
+            reviewStatus: set.reviewStatus,
+            questionCount: set.questionCount,
+          }),
+          after: toInputJson({
+            hardDeleted: true,
+            deletedQuestionCount: questionIds.length,
+            deletedAttemptCount,
+            deletedExplanationCount,
+          }),
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+
+      return {
+        success: true,
+        deletedQuestionCount: questionIds.length,
+        deletedAttemptCount,
+        deletedExplanationCount,
+      };
     });
   }
 
@@ -390,7 +447,18 @@ export class QuizService {
     const deliveryFileIds = [
       ...new Set(currentFigureAssets.map((asset) => asset.deliveryFileId)),
     ];
-    const [generations, figureCostAttempts] = await Promise.all([
+    const activeFigureIds = [
+      ...new Set(
+        questions.flatMap((question) =>
+          question.figures
+            .filter((figure) =>
+              ["QUEUED", "RENDERING", "REPAIRING"].includes(figure.status),
+            )
+            .map((figure) => figure.id),
+        ),
+      ),
+    ];
+    const [generations, figureCostAttempts, activeFigureJobs] = await Promise.all([
       generationIds.length > 0
         ? this.prisma.aiGeneration.findMany({
             where: { id: { in: generationIds } },
@@ -413,18 +481,39 @@ export class QuizService {
                       provider: "OPENAI",
                       status: ProviderUsageStatus.SUCCEEDED,
                     },
-                    select: { id: true, costVnd: true },
+                    select: { id: true, cachedInputTokens: true, costVnd: true },
                   },
                 },
               },
             },
           })
         : Promise.resolve([]),
+      activeFigureIds.length > 0
+        ? this.prisma.backgroundJob.findMany({
+            where: {
+              resourceType: "QUIZ_FIGURE",
+              resourceId: { in: activeFigureIds },
+              status: {
+                in: [BackgroundJobStatus.QUEUED, BackgroundJobStatus.RUNNING],
+              },
+            },
+            orderBy: { createdAt: "desc" },
+            select: { resourceId: true, inputMeta: true },
+          })
+        : Promise.resolve([]),
     ]);
     const outputByGenerationId = new Map(
       generations.map((generation) => [generation.id, generation.outputJson]),
     );
-    const openAiCostByFigureAsset = collectOpenAiFigureCosts(figureCostAttempts);
+    const openAiUsageByFigureAsset = collectOpenAiFigureUsage(figureCostAttempts);
+    const pendingAiTargetModeByFigureId = new Map<string, "QUESTION" | "SOLUTION">();
+    for (const job of activeFigureJobs) {
+      if (!job.resourceId || pendingAiTargetModeByFigureId.has(job.resourceId)) continue;
+      const pendingTargetMode = readQuizFigurePendingAiTargetMode(job.inputMeta);
+      if (pendingTargetMode) {
+        pendingAiTargetModeByFigureId.set(job.resourceId, pendingTargetMode);
+      }
+    }
 
     return questions.map((question) => {
       const reference = readQuizGenerationQuestionReference(question.sourceMetadataJson);
@@ -440,10 +529,16 @@ export class QuizService {
           const deliveryFileId = figure.currentRevision?.deliveryFile?.id;
           return {
             ...figure,
+            pendingAiTargetMode: pendingAiTargetModeByFigureId.get(figure.id) ?? null,
             openAiGenerationCostVnd: deliveryFileId
-              ? (openAiCostByFigureAsset.get(
+              ? (openAiUsageByFigureAsset.get(
                   quizFigureAssetKey(figure.id, deliveryFileId),
-                ) ?? null)
+                )?.costVnd ?? null)
+              : null,
+            openAiCachedInputTokens: deliveryFileId
+              ? (openAiUsageByFigureAsset.get(
+                  quizFigureAssetKey(figure.id, deliveryFileId),
+                )?.cachedInputTokens ?? null)
               : null,
           };
         }),
@@ -804,7 +899,6 @@ export class QuizService {
               mapped.explanationBlock,
             ),
           ),
-          solutionFigureMode: normalizedQuestion.figure.solutionFigureMode,
           reviewStatus: ReviewStatus.NEEDS_REVIEW,
           publishedAt: null,
           ...(explanationId
@@ -1088,16 +1182,20 @@ export class QuizService {
   }
 }
 
-function collectOpenAiFigureCosts(
+function collectOpenAiFigureUsage(
   attempts: Array<{
     quizFigureId: string;
     revision: { deliveryFileId: string | null };
     backgroundJob: {
-      providerUsageEvents: Array<{ id: string; costVnd: number }>;
+      providerUsageEvents: Array<{
+        id: string;
+        cachedInputTokens: number;
+        costVnd: number;
+      }>;
     } | null;
   }>,
 ) {
-  const costs = new Map<string, number>();
+  const usage = new Map<string, { cachedInputTokens: number; costVnd: number }>();
   const eventIdsByAsset = new Map<string, Set<string>>();
 
   for (const attempt of attempts) {
@@ -1109,12 +1207,16 @@ function collectOpenAiFigureCosts(
     for (const event of attempt.backgroundJob?.providerUsageEvents ?? []) {
       if (seenEventIds.has(event.id)) continue;
       seenEventIds.add(event.id);
-      costs.set(key, (costs.get(key) ?? 0) + event.costVnd);
+      const current = usage.get(key) ?? { cachedInputTokens: 0, costVnd: 0 };
+      usage.set(key, {
+        cachedInputTokens: current.cachedInputTokens + event.cachedInputTokens,
+        costVnd: current.costVnd + event.costVnd,
+      });
     }
     eventIdsByAsset.set(key, seenEventIds);
   }
 
-  return costs;
+  return usage;
 }
 
 function quizFigureAssetKey(figureId: string, deliveryFileId: string) {

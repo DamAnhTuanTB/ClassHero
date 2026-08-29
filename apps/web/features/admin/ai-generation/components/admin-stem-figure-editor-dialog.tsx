@@ -1,10 +1,15 @@
 "use client";
 
 import { Code2, FileImage, LoaderCircle, Play, Save } from "lucide-react";
+import { readStemFigureDisplayScale } from "@learning-path/shared";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
+import {
+  StemFigureSourceActions,
+  type StemFigureSourceActionsHandle,
+} from "@/components/admin/stem-figures/stem-figure-source-actions";
 import {
   useApplyAdminStemFigureDraft,
   useCompileAdminStemFigureDraft,
@@ -16,7 +21,17 @@ import type {
   AdminStemFigureCompileResult,
   AdminStemFigureDiagnosticBatch,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
+import { getStemFigureDraftDisplayPercent } from "@/lib/stem-figure-display";
 import { getUserFacingErrorMessage } from "@/lib/user-facing-error";
+import {
+  applyStemFigureQuickAction,
+  setStemFigureScalePercentage,
+  type StemFigureQuickAction,
+  type StemFigureScaleTarget,
+  type StemFigureTextAdjustmentTarget,
+  updateStemFigureTextSlot,
+  updateStemFigureTextSlotAdjustment,
+} from "@/lib/stem-figure-source-actions";
 
 export function AdminStemFigureEditorDialog({
   figure,
@@ -40,7 +55,9 @@ export function AdminStemFigureEditorDialog({
   const [caption, setCaption] = useState(figure.caption ?? "");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [requestIssues, setRequestIssues] = useState<StemFigureCompileIssue[]>([]);
+  const [quickHistory, setQuickHistory] = useState<string[]>([]);
   const openSessionKeyRef = useRef<string | null>(null);
+  const sourceActionsRef = useRef<StemFigureSourceActionsHandle>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -55,6 +72,7 @@ export function AdminStemFigureEditorDialog({
     setFocusLine(null);
     setRequestIssues([]);
     setResult(null);
+    setQuickHistory([]);
   }, [figure.caption, figure.id, figure.latexSource, isOpen, mode]);
 
   const originalSource = mode === "create" ? "" : (figure.latexSource ?? "");
@@ -67,6 +85,9 @@ export function AdminStemFigureEditorDialog({
       ? figure.assetUrl
       : null;
   const pending = compileMutation.isPending || applyMutation.isPending;
+  const previewDisplayPercent = getStemFigureDraftDisplayPercent(
+    readStemFigureDisplayScale(source) ?? 1,
+  );
   const compileIssues = result?.diagnosticBatch?.issues ?? requestIssues;
   const hasDraftErrors =
     (Boolean(result && result.status !== "DRAFT_READY") || requestIssues.length > 0) &&
@@ -91,8 +112,11 @@ export function AdminStemFigureEditorDialog({
     setResult(null);
   }
 
-  async function compileDraft() {
-    if (!source.trim()) {
+  async function compileDraft(
+    sourceOverride = source,
+    successMessage = "Biên dịch hình thành công.",
+  ) {
+    if (!sourceOverride.trim()) {
       toast.error("Mã hình không được để trống.");
       return null;
     }
@@ -103,13 +127,13 @@ export function AdminStemFigureEditorDialog({
         figureId: figure.id,
         baseRevisionId: figure.currentRevisionId,
         sourceVersion: result?.sourceVersion ?? figure.sourceVersion,
-        latexSource: source,
+        latexSource: sourceOverride,
         altText: figure.altText,
         caption: caption.trim() || null,
       });
       setResult(compiled);
       if (compiled.status === "DRAFT_READY") {
-        toast.success("Biên dịch hình thành công.");
+        toast.success(successMessage);
       } else {
         toast.warning("Mã hình chưa hợp lệ. Hãy xem các lỗi bên dưới và chỉnh lại.");
       }
@@ -119,6 +143,121 @@ export function AdminStemFigureEditorDialog({
       toast.error("Biên dịch hình chưa thành công. Xem chi tiết ở khung bên phải.");
       return null;
     }
+  }
+
+  async function compileLatestDraft() {
+    const textSlotWasCommitted =
+      (await sourceActionsRef.current?.flushPendingChange()) ?? false;
+    if (!textSlotWasCommitted) await compileDraft();
+  }
+
+  async function runQuickAction(action: StemFigureQuickAction) {
+    const previousSource = source;
+    const transformed = applyStemFigureQuickAction(previousSource, action);
+    if (transformed.changedCount === 0) {
+      toast.info("Không tìm thấy chi tiết phù hợp để chỉnh trong hình này.");
+      return;
+    }
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      transformed.source,
+      `Đã chỉnh ${transformed.changedCount} chi tiết và cập nhật hình xem trước.`,
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Thao tác không tạo được hình hợp lệ nên đã được hoàn tác.");
+      return;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+  }
+
+  async function updateScale(target: StemFigureScaleTarget, percentage: number) {
+    const previousSource = source;
+    const transformed = setStemFigureScalePercentage(previousSource, target, percentage);
+    if (transformed.changedCount === 0) return;
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      transformed.source,
+      `Đã cập nhật kích thước ${percentage}% và hình xem trước.`,
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Kích thước mới không tạo được hình hợp lệ nên đã được hoàn tác.");
+      return;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+  }
+
+  async function updateTextSlot(slotId: string, value: string) {
+    const previousSource = source;
+    const transformed = updateStemFigureTextSlot(previousSource, slotId, value);
+    if (transformed.changedCount === 0) return;
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      transformed.source,
+      value.trim()
+        ? "Đã cập nhật nội dung và hình xem trước."
+        : "Đã xóa nội dung và cập nhật hình xem trước.",
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Nội dung mới không tạo được hình hợp lệ nên đã được hoàn tác.");
+      return;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+  }
+
+  async function updateTextSlotAdjustment(
+    slotId: string,
+    target: StemFigureTextAdjustmentTarget,
+    value: number,
+  ) {
+    const previousSource = source;
+    const transformed = updateStemFigureTextSlotAdjustment(
+      previousSource,
+      slotId,
+      target,
+      value,
+    );
+    if (transformed.changedCount === 0) return;
+    setSource(transformed.source);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      transformed.source,
+      "Đã tinh chỉnh nhãn và cập nhật hình xem trước.",
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(previousSource);
+      invalidateCompiledDraft();
+      toast.warning("Tinh chỉnh mới không tạo được hình hợp lệ nên đã được hoàn tác.");
+      return;
+    }
+    setQuickHistory((history) => [...history.slice(-9), previousSource]);
+  }
+
+  async function undoQuickAction() {
+    const previousSource = quickHistory.at(-1);
+    if (!previousSource) return;
+    const currentSource = source;
+    setSource(previousSource);
+    invalidateCompiledDraft();
+    const compiled = await compileDraft(
+      previousSource,
+      "Đã hoàn tác và cập nhật hình xem trước.",
+    );
+    if (compiled?.status !== "DRAFT_READY") {
+      setSource(currentSource);
+      invalidateCompiledDraft();
+      toast.warning("Chưa thể hoàn tác vì bản trước không biên dịch được.");
+      return;
+    }
+    setQuickHistory((history) => history.slice(0, -1));
   }
 
   async function apply() {
@@ -184,12 +323,26 @@ export function AdminStemFigureEditorDialog({
         </header>
 
         <div className="grid min-h-0 flex-1 grid-rows-[minmax(22rem,1fr)_minmax(18rem,0.8fr)] overflow-hidden xl:grid-cols-2 xl:grid-rows-1">
-          <section className="flex min-h-0 flex-col border-b border-[var(--theme-border)] xl:border-b-0 xl:border-r">
+          <section
+            className="flex min-h-0 flex-col border-b border-[var(--theme-border)] xl:border-b-0 xl:border-r"
+            data-testid="stem-figure-source-pane"
+          >
             <div className="flex items-center border-b border-[var(--theme-border)] px-4 py-2">
               <h3 className="flex items-center gap-2 text-sm font-extrabold text-[var(--theme-text-strong)]">
                 <Code2 className="h-4 w-4" aria-hidden="true" /> Mã vẽ hình
               </h3>
             </div>
+            <StemFigureSourceActions
+              canUndo={quickHistory.length > 0}
+              disabled={pending}
+              onAction={(action) => void runQuickAction(action)}
+              onScaleChange={updateScale}
+              onTextSlotAdjustmentChange={updateTextSlotAdjustment}
+              onTextSlotChange={updateTextSlot}
+              onUndo={() => void undoQuickAction()}
+              ref={sourceActionsRef}
+              source={source}
+            />
             <StemFigureCodeEditor
               focusLine={focusLine}
               issues={compileIssues}
@@ -197,6 +350,7 @@ export function AdminStemFigureEditorDialog({
               onChange={(value) => {
                 setSource(value);
                 invalidateCompiledDraft();
+                setQuickHistory([]);
               }}
             />
             <div className="flex flex-col gap-3 border-t border-[var(--theme-border)] p-3">
@@ -241,8 +395,13 @@ export function AdminStemFigureEditorDialog({
                 <div className="grid min-h-full flex-1 place-items-center bg-white p-5">
                   <img
                     alt={caption.trim() || figure.altText}
-                    className="max-h-[65dvh] max-w-full object-contain"
+                    className="object-contain transition-[width,height] duration-200 motion-reduce:transition-none"
+                    data-testid="stem-figure-draft-preview-image"
                     src={previewUrl}
+                    style={{
+                      height: `${previewDisplayPercent}%`,
+                      width: `${previewDisplayPercent}%`,
+                    }}
                   />
                 </div>
               ) : (
@@ -275,7 +434,7 @@ export function AdminStemFigureEditorDialog({
             type="button"
             className="theme-button-primary-subtle inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-extrabold"
             disabled={pending}
-            onClick={compileDraft}
+            onClick={() => void compileLatestDraft()}
           >
             <Play className="h-4 w-4" aria-hidden="true" /> Biên dịch
           </button>

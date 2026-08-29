@@ -12,7 +12,17 @@ export type QuizTexRendererResult =
       log: string;
       durationMs?: number;
       rendererVersion?: string;
+      issues: QuizTexRendererIssue[];
     };
+
+export type QuizTexRendererIssue = {
+  code: string;
+  severity: "ERROR" | "WARNING";
+  message: string;
+  file: string | null;
+  line: number | null;
+  column: number | null;
+};
 
 @Injectable()
 export class QuizTexRendererClientService {
@@ -59,6 +69,7 @@ export class QuizTexRendererClientService {
         durationMs: typeof data.durationMs === "number" ? data.durationMs : undefined,
         rendererVersion:
           typeof data.rendererVersion === "string" ? data.rendererVersion : undefined,
+        issues: readIssues(data.issues),
       };
     } catch (error) {
       return {
@@ -69,9 +80,32 @@ export class QuizTexRendererClientService {
             ? "QUIZ_TEX_REQUEST_TIMEOUT"
             : "QUIZ_TEX_RENDERER_UNAVAILABLE",
         log: error instanceof Error ? error.message : String(error),
+        issues: [],
       };
     } finally {
       clearTimeout(timeout);
     }
   }
+}
+
+function readIssues(value: unknown): QuizTexRendererIssue[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const record = item as Record<string, unknown>;
+    if (typeof record.code !== "string" || typeof record.message !== "string") {
+      return [];
+    }
+    return [
+      {
+        code: record.code,
+        severity:
+          record.severity === "WARNING" ? ("WARNING" as const) : ("ERROR" as const),
+        message: record.message,
+        file: typeof record.file === "string" ? record.file : null,
+        line: typeof record.line === "number" ? record.line : null,
+        column: typeof record.column === "number" ? record.column : null,
+      },
+    ];
+  });
 }

@@ -9,13 +9,13 @@ import { z } from "zod";
 import { lessonSummarySubjectKeySchema } from "#api/modules/ai/types/lesson-summary-subject.types";
 
 export const LESSON_SUMMARY_PROMPT_VERSIONS = {
-  MATH: "lesson-summary-math-v29-declared-standard-notation",
-  PHYSICS: "lesson-summary-physics-v29-declared-standard-notation",
-  CHEMISTRY: "lesson-summary-chemistry-v29-declared-standard-notation",
-  GENERAL: "lesson-summary-general-v29-declared-standard-notation",
+  MATH: "lesson-summary-math-v34-no-orphan-intermediate-labels",
+  PHYSICS: "lesson-summary-physics-v30-unambiguous-figure-ready-problem",
+  CHEMISTRY: "lesson-summary-chemistry-v30-unambiguous-figure-ready-problem",
+  GENERAL: "lesson-summary-general-v30-unambiguous-figure-ready-problem",
 } as const;
 export const LESSON_SUMMARY_SCHEMA_VERSION =
-  "lesson-summary-pdf-packet-five-block-schema-v24-no-figure-caption";
+  "lesson-summary-pdf-packet-five-block-schema-v25-slim-provider-descriptions";
 export const LESSON_SUMMARY_MAX_CONTEXT_TOKENS = 12_000;
 export const LESSON_SUMMARY_MAX_OUTPUT_TOKENS = 8_000;
 export const LESSON_SUMMARY_MIN_OUTPUT_TOKENS = 8_000;
@@ -62,12 +62,8 @@ export const LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION = [
 ].join(" ");
 export const LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION =
   "Trong problem, solution và answer của mọi example/bài tập, mỗi ý con mang nhãn a), b), c) hoặc nhãn chữ cái tương đương phải bắt đầu ở dòng riêng; không được đặt hai nhãn ý con trên cùng một dòng.";
-export const LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION = [
-  "Các quy tắc định dạng sau áp dụng cho mọi field văn bản trong structured output.",
-  LESSON_SUMMARY_FUNCTIONAL_PUNCTUATION_AND_MATH_LAYOUT_INSTRUCTION,
-  LESSON_SUMMARY_LOGICAL_DERIVATION_INSTRUCTION,
-  LESSON_SUMMARY_SUBPART_LINEBREAK_INSTRUCTION,
-].join(" ");
+export const LESSON_SUMMARY_PROVIDER_ROOT_FORMATTING_DESCRIPTION =
+  "Structured output của bản tóm tắt bài học; mọi field văn bản phải tuân thủ quy tắc nội dung, nguồn, lập luận và định dạng trong system prompt.";
 const baseBlockSchema = z.object({
   figures: z.array(stemFigureVisualSchema).max(3).default([]),
   sourcePageNumbers: z.array(z.number().int().positive()).max(20).optional(),

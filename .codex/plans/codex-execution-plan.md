@@ -147,6 +147,15 @@ model`. `maxInputTokens` cùng `maxOutputTokens` thuộc cấu hình từng feat
 - `M9.20` đã triển khai ngày 2026-08-25: schema/API/UI có đủ tám pair; Summary và
   Quiz chụp hai route vào immutable draft/job; figure worker ưu tiên route IMAGE,
   usage event lưu purpose và job legacy tiếp tục fallback route cũ.
+- `M9.22` đã triển khai ngày 2026-08-26: header card Quiz có menu tạo QUESTION,
+  solution EXTEND hoặc solution REDRAW dùng lại modal dữ liệu AI; EXTEND khóa
+  exact hình đề AI, REDRAW độc lập hình đề và không có lineage.
+- `M9.23` đã triển khai ngày 2026-08-26: bộ chỉnh nhanh TikZ dùng chung cho
+  Summary/Quiz, auto compile preview và undo; không đổi API/database/cache. Test
+  phủ lớp 3–12 và 45 compile local; live OpenAI 4 call tốn ước tính 240 VNĐ.
+- `M9.25` đã triển khai ngày 2026-08-28: danh sách input sửa/xóa từng text slot
+  an toàn trong `Chỉnh nhanh` dùng deterministic parser/transformer và compile
+  endpoint hiện có; không đổi API/database/worker và không gọi AI.
 
 ## 1. Phạm vi bước này
 
@@ -332,6 +341,9 @@ chung`/`Bài tập cuối chương`. Output hợp lệ kỹ thuật luôn đư�
     43.4. `M9.11` - Admin Cài đặt AI/OCR UI.
     43.5. `M9.12` - Hard-stop ngân sách tuyệt đối bằng reservation nguyên tử. Done 2026-08-03.
     43.6. `M9.20` - Tách model route Phase 1 text / Phase 2 ảnh theo từng feature. Done 2026-08-25.
+    43.7. `M9.22` - Admin tạo hình đề/lời giải AI từ header card Quiz. Done 2026-08-26.
+    43.8. `M9.23` - Bộ chỉnh nhanh TikZ dùng chung cho Summary/Quiz. Done 2026-08-26.
+    43.9. `M9.25` - Sửa trực tiếp từng nhãn và số đo trong bộ chỉnh nhanh TikZ. Done 2026-08-28.
 44. `M9.4` - Student request-new reserve-first UI + API.
 45. `M9.5` - AI explanation cache inline UI + API.
 46. `M9.6` - Chat AI trong lesson bằng RAG.

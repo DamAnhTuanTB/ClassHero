@@ -3,6 +3,8 @@
 import { BookOpen, ListTree, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { StemFigureMathText } from "@/components/common/content/stem-figure";
+
 export const LESSON_SUMMARY_OBJECTIVES_ANCHOR_ID = "lesson-summary-objectives";
 
 const SECTION_ACCENT_CLASSES = [
@@ -164,7 +166,11 @@ export function LessonSummaryTableOfContents({
                     {section.order || index + 1}
                   </span>
                   <span className="min-w-0 whitespace-normal break-words leading-5">
-                    {section.displayHeading}
+                    <StemFigureMathText
+                      displayMathAsInline
+                      inheritMathWeight
+                      value={section.displayHeading}
+                    />
                   </span>
                 </button>
               );
