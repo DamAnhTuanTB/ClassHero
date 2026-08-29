@@ -492,7 +492,7 @@ Một màn hình UI chỉ xem là xong khi:
 - Không hard-code khác API contract nếu API đã có trong `docs/05-api-contract.md`.
 - Không thêm tính năng ngoài MVP.
 - Theo preference của owner, Codex không tự kiểm browser/Playwright/responsive thật trừ khi owner yêu cầu rõ; mặc định dùng kiểm tĩnh/focused và để owner tự kiểm UI/tương tác trên app.
-- Chỉ chụp/lưu screenshot khi owner yêu cầu bằng command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`. Khi chụp để owner review, lưu vào `.codex/screenshots/<subtask-or-screen>-<viewport>.png`.
+- Chỉ chụp screenshot khi owner yêu cầu bằng command có từ `screenshot`, ví dụ `/task-ui screenshot M3.4`. Ảnh review phải nằm trong `.codex/screenshots/<subtask-or-screen>-<viewport>.png`, bị ignore, không commit và được dọn khi không còn cần; UI đã chốt được ghi bằng pattern/rule và code thay vì giữ ảnh raster.
 - Riêng visual Toán do AI sinh, khi owner yêu cầu nghiệm thu bằng screenshot phải
   chụp từng figure từ component thật và tự xem lại ảnh trước khi báo đạt. Ảnh đã
   đạt và ảnh còn lỗi phải ở hai thư mục cấp cao riêng biệt; không trộn ảnh chưa

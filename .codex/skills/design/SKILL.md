@@ -1,6 +1,6 @@
 ---
 name: design
-description: Create complete production UI images, multi-state UI case sets, combined UI flow-board images, and direct-view HTML flow maps for this Vietnamese learning-path project from commands like "/design mobile M4.5", "/design laptop admin course detail", "thiết kế ảnh UI màn ...", "bao phủ mọi case", or "sơ đồ luồng UI". Use when Codex must design only the fully finished, real-app-quality visual screenshot/mockup/flow map for a requested screen, viewport, role, route, milestone, or subtask by first reviewing approved UI patterns, final-screen-ui screenshots, UI rules, code patterns, roadmap docs, and existing implementation context. Do not implement product code unless the owner separately asks to code.
+description: Create complete production UI previews, multi-state case sets, and direct-view HTML flow maps for this Vietnamese learning-path project from commands like "/design mobile M4.5", "/design laptop admin course detail", "thiết kế ảnh UI màn ...", "bao phủ mọi case", or "sơ đồ luồng UI". Use when Codex must design a finished, real-app-quality visual target for a requested screen, viewport, role, route, milestone, or subtask from approved UI rules, code patterns, roadmap docs, and existing implementation context. Preview screenshots are temporary ignored artifacts and must not become durable Git references. Do not implement product code unless the owner separately asks to code.
 ---
 
 # Design
@@ -35,12 +35,10 @@ Before generating any design image, read these sources:
 2. `docs/11-ui-design-system.md`
 3. `docs/ui-references/approved-patterns.md`
 4. `docs/ui-references/code-patterns.md`
-5. `docs/final-screen-ui/README.md`
-6. `docs/final-screen-ui/manifest.json` if it exists
-7. `docs/08-ui-pages-and-components.md`
-8. `docs/09-implementation-plan.md`
-9. Relevant `docs/implementation/M*.md` when the target names a milestone/subtask
-10. Existing route/screen/component code for the closest implemented screen
+5. `docs/08-ui-pages-and-components.md`
+6. `docs/09-implementation-plan.md`
+7. Relevant `docs/implementation/M*.md` when the target names a milestone/subtask
+8. Existing route/screen/component code for the closest implemented screen
 
 Then read only the relevant code-pattern files under `docs/ui-references/code-patterns/` based on the screen type:
 
@@ -50,19 +48,16 @@ Then read only the relevant code-pattern files under `docs/ui-references/code-pa
 - Auth/public form: `forms.md`, `states.md`, plus approved auth patterns
 - Parent portal: closest parent docs/screens if present, otherwise approved student/public patterns with parent tone from UI design system
 
-## Final-Screen UI Review
+## Approved UI Review
 
-Use `docs/final-screen-ui` as the visual truth for currently accepted screens.
+Use `docs/ui-references/approved-patterns.md`, `docs/11-ui-design-system.md` and
+the closest implemented runtime code as the visual/interaction truth. Do not
+expect or recreate a durable screenshot library in `docs/final-screen-ui`.
 
-Before designing:
-
-- List candidate screenshots that match the target role, viewport, route, or interaction style.
-- Open and visually inspect the strongest 2-5 screenshots with `view_image`.
-- Prefer screenshots in the requested viewport.
-- If the exact role has no screenshots, inspect the closest role and say what is being borrowed.
-- If `docs/final-screen-ui` is missing or empty, fall back to `approved-patterns.md` and existing code, and state that no final screenshot baseline exists.
-
-Do not confuse `docs/final-screen-ui` with temporary `.codex/screenshots` artifacts; final-screen-ui is the durable production reference.
+When a runtime inspection is useful, capture only the minimum temporary images
+needed under `.codex/screenshots/`, inspect them with `view_image`, and keep them
+out of Git. The accepted rule/pattern and code remain authoritative after the
+temporary image is removed.
 
 ## Design Method
 
@@ -75,24 +70,23 @@ Choose the most reliable method for a real-app-quality UI image:
 When creating a temporary prototype:
 
 - Put it under `.codex/designs/<target-slug>/` or another ignored temporary area, unless the owner asks to keep source.
-- Use the same viewport dimensions as final-screen-ui: laptop `1440x1000`, iPad `834x1112`, mobile `390x844`.
-- Save exported design images in `docs/final-screen-ui/_designs/<viewport>/<role>/<target-slug>/screen.png` unless owner names another location.
+- Use viewport dimensions laptop `1440x1000`, iPad `834x1112`, mobile `390x844`.
+- Save exported preview images under `.codex/screenshots/<target-slug>/<viewport>/`; never commit them or copy them into `docs/final-screen-ui`.
 - Do not update `docs/ui-references/approved-patterns.md` from the generated design image. That file is only for owner-approved UI after the owner says "ưng/ok/chốt".
 
 ## Multi-Case And Flow Outputs
 
 When the request asks to cover many cases, all states, a complete flow, or a UI flow diagram, produce more than one isolated screenshot:
 
-- Save each state/case as its own screenshot under `docs/final-screen-ui/_designs/<viewport>/<role>/<target-slug>/<case-slug>/screen.png`.
-- Create a combined overview image named `flow-board.png` in the target folder. It must group cases by the real user/admin flow, number the nodes, label state types, and show arrows/branch notes for main, pending, confirmation, success, and error paths.
+- Save each state/case as a temporary screenshot under `.codex/screenshots/<target-slug>/<viewport>/<case-slug>.png`.
+- Create a combined temporary overview image named `flow-board.png` beside those captures when it materially helps review. It must group cases by the real user/admin flow, number the nodes, label state types, and show arrows/branch notes for main, pending, confirmation, success, and error paths.
 - In multi-case flows, model the happy path first and include every real user/admin input screen in order. Do not let an error state or a post-save summary stand in for the primary action screen. For example, if admins must enter page ranges, include a dedicated "Nhập khoảng trang" screen before validation/error/success nodes.
-- Create a direct-view HTML file named `flow-board.html` in the same target folder. It must use relative image paths, work by opening the local HTML file directly in a browser, include navigation between flow groups, and allow clicking an image to view it larger.
-- Create an `index.html` entry file in the same target folder that opens or redirects to `flow-board.html`, so the folder has an obvious browser entrypoint.
+- Create direct-view `flow-board.html` and `index.html` under the ignored `.codex/designs/<target-slug>/` prototype folder. Relative temporary image paths may be used during active review, but HTML kept as durable documentation must not depend on deleted screenshots.
 - In the HTML flow viewer, thumbnails/screenshots must show the full image by default. Do not crop with fixed `max-height`, `object-fit: cover`, or similar rules unless the owner explicitly asks for cropped previews.
 - In the HTML flow viewer, constrain screenshot node widths so a group with only one screenshot does not stretch a mobile screenshot across the whole page. Prefer bounded grid columns such as `repeat(auto-fit, minmax(230px, 360px))` with `justify-content: start`.
 - In the HTML flow viewer, include a quick flow guide for each node/mode: what must happen before reaching this screen, what this screen is for or what the user/admin does here, and what result is received after the screen/action.
-- Add or update a local `README.md` in the target folder listing all cases, `flow-board.png`, and `flow-board.html`.
-- Keep individual case screenshots available even after creating the combined image and HTML viewer.
+- If useful, add a local README inside the ignored prototype folder listing the temporary cases and HTML viewer.
+- Keep individual case screenshots only for the active review period; do not commit them as accepted UI evidence.
 
 ## Design Quality Rules
 
@@ -106,7 +100,7 @@ The design must:
   - Student: mobile-first, friendly, bright, task-focused, with approved student shell/card/progress rhythm.
   - Parent: calm, trustworthy, concise, less playful than student.
   - Public/auth: polished onboarding or public browsing, SEO-readable when relevant.
-- Use approved patterns and screenshots before inventing new layout language.
+- Use approved patterns and existing runtime code before inventing new layout language.
 - Include realistic Vietnamese UI copy for the role.
 - Write UI copy as product copy for the real user, not as an implementation explanation. Do not expose backend/debug terms such as artifact, cache, JSON, manifest, chunk, provider, schema, RAG, or raw OCR internals in the screenshot unless that exact term is already part of the product vocabulary and useful to the user.
 - Keep app-screen copy terse. A production UI is not a usage guide: do not add long instructional/explanatory paragraphs, technical process descriptions, or “what this feature does” narration inside the screenshot. Prefer short labels, status words, numbers, and actions. Put detailed “Trước đó / Màn này / Kết quả” guidance only in the separate flow-board HTML, not inside the app UI image.
@@ -126,7 +120,7 @@ Required context:
 - `docs/implementation/M4.md`
 - `docs/ui-references/approved-patterns.md#admin-lesson-document-upload---updated-2026-07-23`
 - `docs/ui-references/code-patterns/uploads.md`
-- Existing admin course list/detail screenshots from `docs/final-screen-ui/<viewport>/admin/courses/`
+- Existing admin course list/detail code and approved admin CRUD/upload patterns
 - Existing admin course code under `apps/web/features/admin/courses/`
 
 Core UI to cover:
@@ -143,7 +137,7 @@ Core UI to cover:
 Before generating the image, give a short plan in Vietnamese:
 
 - Target and viewport.
-- Docs/screenshots inspected.
+- Docs/patterns/runtime code inspected.
 - Role and route assumption.
 - Layout direction and major sections.
 - Output path.

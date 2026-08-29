@@ -1,1 +1,2 @@
 - 2026-08-29: Hoàn thiện luồng AI tạo và tinh chỉnh hình Quiz/Summary độc lập, chuẩn hóa nguồn TikZ, hiển thị và chỉnh nhanh nhãn/số đo, siết contract sinh nội dung cùng regression test/tài liệu liên quan; đồng thời loại bỏ `test-results` bị track nhầm và chặn artifact Playwright quay lại Git.
+- 2026-08-29: Dọn repository bằng cách xóa screenshot/prototype, output debug, PDF OCR lớn, ảnh public không còn consumer và các script thử nghiệm một lần; đồng thời mở rộng `.gitignore` và chuẩn hóa quy ước không lưu ảnh review raster trong Git.

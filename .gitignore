@@ -9,7 +9,15 @@ dist/
 build/
 coverage/
 test-results/
+playwright-report/
+playwright-results/
+blob-report/
 *.tsbuildinfo
+
+# Temporary and local review outputs
+tmp/
+apps/api/test/mathpix-output/
+/anh-chup-*/
 
 # Environment files
 .env
@@ -23,6 +31,21 @@ test-results/
 .codex/playwright-results/
 .codex/playwright-report/
 .codex/artifacts/
+.codex/designs/
+
+# UI review captures are temporary; approved UI lives in docs/code, not images
+docs/final-screen-ui/**/*.png
+docs/final-screen-ui/**/*.jpg
+docs/final-screen-ui/**/*.jpeg
+docs/final-screen-ui/**/*.webp
+docs/final-screen-ui/**/*.gif
+docs/final-screen-ui/**/*.webm
+docs/ui-references/designs/**/*.png
+docs/ui-references/designs/**/*.jpg
+docs/ui-references/designs/**/*.jpeg
+docs/ui-references/designs/**/*.webp
+docs/ui-references/designs/**/*.gif
+docs/ui-references/designs/**/*.webm
 
 # Logs
 *.log
@@ -31,9 +54,17 @@ pnpm-debug.log*
 
 # OS/editor
 .DS_Store
+Thumbs.db
+._*
 .idea/
 .vscode/
+*.swp
+*.swo
+*.bak
+*.orig
+*~
 
 # Large test PDFs
 apps/api/test/*.pdf
+/*-OCR-searchable.pdf
 apps/api/debug/

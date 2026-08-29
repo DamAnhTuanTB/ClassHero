@@ -32,7 +32,8 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Reuse for:
   - <màn hình/flow tương tự có thể áp dụng>
 - Evidence:
-  - Screenshot: `.codex/screenshots/<file>.png` nếu có
+  - Ảnh nghiệm thu tạm thời: `.codex/screenshots/<file>.png` nếu có; thư mục này
+    bị ignore và ảnh phải được dọn sau khi không còn cần review.
   - Files: `<path>` nếu hữu ích
 ```
 
@@ -158,9 +159,8 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
 - Reuse for:
   - Màn admin quản lý tài liệu theo khóa học/buổi học, các flow upload một file nguồn dài rồi map vào nhiều entity con, và các bản `/design` cần xuất cả case set, flow-board image và HTML flow map.
 - Evidence:
-  - Flow HTML: `docs/final-screen-ui/_designs/mobile/admin/m4-5/flow-board.html`
-  - Flow image: `docs/final-screen-ui/_designs/mobile/admin/m4-5/flow-board.png`
-  - Case screenshots: `docs/final-screen-ui/_designs/mobile/admin/m4-5/*/screen.png`
+  - Flow HTML/prototype source: `.codex/designs/m4-5-mobile/flow-board.html` và
+    `.codex/designs/m4-5-mobile/cases.html` nếu còn trên máy local.
   - Prototype source: `.codex/designs/m4-5-mobile/cases.html`, `.codex/designs/m4-5-mobile/flow-board.html`
 
 ## Student Explore Courses - 2026-07-16
@@ -216,7 +216,6 @@ Chỉ ghi vào đây sau khi owner nói rõ kiểu như:
   - Các màn học sinh có timeline bài học, chapter accordion, progress CTA hoặc trạng thái locked/trial/enrolled.
   - Các detail screen cần mobile header có back + brand đồng bộ và desktop sticky header trong student shell.
 - Evidence:
-  - Screenshot: `docs/ui-references/designs/student-course-detail/student-course-detail-mobile-v1.png`
   - Files: `apps/web/app/(student)/student/courses/[slug]/page.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/index.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-mobile-brand-bar.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-detail-progress-card.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-chapter-card.tsx`, `apps/web/features/student/courses/screens/student-course-detail-screen/components/student-course-lesson-row.tsx`, `apps/web/features/student/shared/student-courses-data.ts`, `apps/web/app/(student)/student-theme.css`.
 
 ## Student Lesson Video Connection State - 2026-07-28
