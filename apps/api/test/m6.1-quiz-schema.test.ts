@@ -6,7 +6,7 @@ import {
   textInputGradingSchema,
   correctAnswerSchema,
 } from "../src/modules/quiz/types/quiz.types";
-import { tiptapContentSchema } from "../src/common/validation/zod-schemas/tiptap.schema";
+import { tiptapContentSchema } from "@learning-path/shared";
 import { QuizQuestionContentDto } from "../src/modules/quiz/dto/quiz-question-content.dto";
 import { plainToInstance } from "class-transformer";
 import { describe, it, expect } from "vitest";

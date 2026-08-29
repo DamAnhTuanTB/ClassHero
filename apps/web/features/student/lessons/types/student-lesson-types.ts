@@ -1,4 +1,4 @@
-import type { TiptapTextDocument } from "@/types/rich-text";
+import type { TiptapTextDocument } from "@learning-path/shared";
 
 export type StudentLessonTab = "lesson" | "quiz" | "flashcard" | "test";
 export type StudentLearningSurface =

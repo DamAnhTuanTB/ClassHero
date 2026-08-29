@@ -1,5 +1,5 @@
 import { apiRequest } from "@/lib/api-client";
-import type { TiptapTextDocument } from "@/types/rich-text";
+import type { TiptapTextDocument } from "@learning-path/shared";
 
 export type FlashcardDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
 export type FlashcardItemDifficulty = Exclude<FlashcardDifficulty, "MIXED">;

@@ -2,9 +2,9 @@ import {
   normalizeMathTextLatexCommands,
   normalizeMissingInlineMathClosers,
   tokenizeMathText,
+  type TiptapJsonNode,
+  type TiptapTextDocument,
 } from "@learning-path/shared";
-
-import type { TiptapJsonNode, TiptapTextDocument } from "@/types/rich-text";
 
 export function createEmptyTiptapDocument(): TiptapTextDocument {
   return {

@@ -9,7 +9,7 @@ import type {
   TiptapJsonMark,
   TiptapJsonNode,
   TiptapTextDocument,
-} from "@/types/rich-text";
+} from "@learning-path/shared";
 import {
   normalizeLatexCommandBackslashes,
   normalizeMathTextLatexCommands,

@@ -1,5 +1,4 @@
-import type { AiReasoningEffort } from "@learning-path/shared";
-import type { TiptapTextDocument } from "@/types/rich-text";
+import type { AiReasoningEffort, TiptapTextDocument } from "@learning-path/shared";
 
 export type AdminAiGenerationType = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
 export type AdminAiGenerationDialogRequest = {

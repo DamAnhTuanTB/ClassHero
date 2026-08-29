@@ -1,16 +1,7 @@
 import { z } from "zod";
+import { tiptapTextDocumentSchema } from "@learning-path/shared";
 import { requiredTrimmedText } from "@/lib/form-validation";
 import { hasTiptapDocumentContent } from "@/lib/tiptap-rich-content";
-import type { TiptapTextDocument } from "@/types/rich-text";
-
-const tiptapDocumentSchema = z.custom<TiptapTextDocument>(
-  (value) =>
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-    value.type === "doc",
-  "Nội dung rich text chưa hợp lệ",
-);
 
 export const flashcardSetFormSchema = z.object({
   title: requiredTrimmedText({
@@ -22,15 +13,15 @@ export const flashcardSetFormSchema = z.object({
 });
 
 export const flashcardFormSchema = z.object({
-  frontJson: tiptapDocumentSchema.refine(
+  frontJson: tiptapTextDocumentSchema.refine(
     hasTiptapDocumentContent,
     "Nhập nội dung mặt trước",
   ),
-  backJson: tiptapDocumentSchema.refine(
+  backJson: tiptapTextDocumentSchema.refine(
     hasTiptapDocumentContent,
     "Nhập nội dung mặt sau",
   ),
-  explanationJson: tiptapDocumentSchema,
+  explanationJson: tiptapTextDocumentSchema,
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
 });
 

@@ -65,9 +65,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import type { TiptapTextDocument } from "@learning-path/shared";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { ImmediateTooltip } from "@/components/common/ui/immediate-tooltip";
-import type { TiptapTextDocument } from "@/types/rich-text";
 import { uploadAdminQuizImage } from "@/features/admin/quiz/api/admin-quiz-api";
 import { QuizRichImageNodeView } from "@/features/admin/quiz/components/quiz-rich-image-node-view";
 import { QuizTextColorPicker } from "@/features/admin/quiz/components/quiz-text-color-picker";

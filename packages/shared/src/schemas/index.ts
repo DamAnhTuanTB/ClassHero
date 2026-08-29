@@ -5,5 +5,6 @@ export * from "./lesson-summary-text.js";
 export * from "./latex-text.js";
 export * from "./numeric-answer.js";
 export * from "./stem-figure.js";
+export * from "./tiptap.js";
 
 export const idSchema = z.string().uuid();

@@ -65,7 +65,6 @@ File này là bản đồ nhanh của code hiện tại để Codex tìm đúng 
 | `apps/web/features/student/shared/api/student-learning-paths-api.ts`                                                    | API client cho `GET /learning-paths`, `GET /learning-paths/:slug` và mock purchase; mapper/type tách sang `shared/mappers` và `shared/types`                                                                                                                                                                                                              |
 | `apps/web/features/student/shared/hooks/use-student-courses-query.ts`                                                   | TanStack Query hook và query-option factory cho list/detail student course, tự truyền access token sau khi đọc session/token đã lưu trong trình duyệt; M14.8 prefetch detail theo intent hoặc course có xác suất mở cao                                                                                                                                   |
 | `apps/web/lib`                                                                                                          | Utilities/API client dùng chung, gồm `api-client.ts`, `tiptap-rich-content.ts`, `theme-store.ts`, `theme-constants.ts`, `server-theme.ts`; `use-stable-loading-visibility.ts` chỉ chia sẻ chính sách delay/minimum duration của loading, không chia sẻ hình học skeleton giữa các màn                                                                     |
-| `apps/web/types/rich-text.ts`                                                                                           | Type Tiptap JSON dùng chung cho Quiz/Flashcard và rich content editor                                                                                                                                                                                                                                                                                     |
 | `apps/web/playwright.config.ts`                                                                                         | Playwright config, tự build/start web và lưu report local                                                                                                                                                                                                                                                                                                 |
 | `apps/web/tests/auth-ui.spec.ts`                                                                                        | E2E/screenshot smoke test cho auth UI `M2.4`                                                                                                                                                                                                                                                                                                              |
 | `apps/web/tests`                                                                                                        | Test front-end theo feature                                                                                                                                                                                                                                                                                                                               |
@@ -146,12 +145,12 @@ Provider operations entrypoints:
 
 ## 6. Shared Package
 
-| Path                            | Vai trò                                                                                     |
-| ------------------------------- | ------------------------------------------------------------------------------------------- |
-| `packages/shared/src/types`     | Shared TypeScript types                                                                     |
-| `packages/shared/src/schemas`   | Shared Zod schemas, gồm `stem-figure.ts` cho `TEX_FIGURE` light-only                        |
-| `packages/shared/src/constants` | Constants dùng chung, gồm versioned STEM figure toolbox manifest cho prompt/policy/renderer |
-| `packages/shared/src/index.ts`  | Public export                                                                               |
+| Path                            | Vai trò                                                                                                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `packages/shared/src/types`     | Shared TypeScript types                                                                                          |
+| `packages/shared/src/schemas`   | Shared Zod schemas/type suy ra dùng chung Web/API, gồm `stem-figure.ts` và contract Tiptap chuẩn tại `tiptap.ts` |
+| `packages/shared/src/constants` | Constants dùng chung, gồm versioned STEM figure toolbox manifest cho prompt/policy/renderer                      |
+| `packages/shared/src/index.ts`  | Public export                                                                                                    |
 
 Shared package dùng cho schema/type có thể chia sẻ giữa web và API, tránh duplicate contract.
 

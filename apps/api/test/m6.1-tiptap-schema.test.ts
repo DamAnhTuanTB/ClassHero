@@ -1,4 +1,4 @@
-import { tiptapContentSchema } from "../src/common/validation/zod-schemas/tiptap.schema";
+import { tiptapContentSchema } from "@learning-path/shared";
 import { describe, it, expect } from "vitest";
 
 describe("M6.1 Tiptap Schema Validation", () => {
@@ -17,7 +17,7 @@ describe("M6.1 Tiptap Schema Validation", () => {
         },
       ],
     };
-    
+
     const result = tiptapContentSchema.safeParse(doc);
     expect(result.success).toBe(true);
   });
@@ -27,7 +27,7 @@ describe("M6.1 Tiptap Schema Validation", () => {
       type: "paragraph",
       content: [],
     };
-    
+
     const result = tiptapContentSchema.safeParse(doc);
     expect(result.success).toBe(false);
   });
@@ -53,7 +53,7 @@ describe("M6.1 Tiptap Schema Validation", () => {
         },
       ],
     };
-    
+
     const result = tiptapContentSchema.safeParse(doc);
     expect(result.success).toBe(true);
   });

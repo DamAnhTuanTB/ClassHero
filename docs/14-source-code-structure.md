@@ -115,6 +115,7 @@ Rules:
 - Form input/select/checkbox/submit/status/header đã được owner ưng phải được tái sử dụng hoặc nâng cấp tại `apps/web/components/common/forms`.
 - Khi một form/control đã được owner duyệt hoặc dùng lặp lại từ hai nơi trở lên, không để mỗi feature tự dựng lại biến thể riêng; phải nâng cấp thành primitive/hook/helper trong `apps/web/components/common/forms` hoặc shared layer phù hợp rồi cho màn mới reuse.
 - Validation helper dùng chung cho form text nên đặt ở shared web layer như `apps/web/lib/form-validation.ts`; form schema không nên lặp lại chuỗi Zod required/min/max dễ sai message ở từng feature.
+- Không tạo `apps/web/types` như thư mục gom type chung chung. Type chỉ dùng một feature đặt trong `features/<feature>/types`; type dùng chung nhiều feature nhưng chỉ thuộc frontend đặt cạnh shared component/helper sở hữu nó; type/schema là contract của cả Web và API phải đặt trong `packages/shared`.
 - Form numeric dùng chung như tiền, thứ tự, phần trăm hoặc số lượng phải có primitive/style thống nhất, không để từng màn dùng `type="number"` native với spinner/default UI riêng của browser.
 - shadcn/Radix wrapper cũng phải tách mỗi wrapper một file khi có nhiều component con; không tạo thêm file compatibility chỉ re-export nếu không có call site bắt buộc.
 - Không đặt component chỉ dùng một screen vào shared layer.

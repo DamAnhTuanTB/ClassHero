@@ -3,13 +3,14 @@
 import katex from "katex";
 import "katex/contrib/mhchem";
 import "katex/dist/katex.min.css";
-import { normalizeMathTextLatexCommands, tokenizeMathText } from "@learning-path/shared";
+import {
+  normalizeMathTextLatexCommands,
+  tokenizeMathText,
+  type TiptapJsonMark,
+  type TiptapJsonNode,
+  type TiptapTextDocument,
+} from "@learning-path/shared";
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
-import type {
-  TiptapJsonMark,
-  TiptapJsonNode,
-  TiptapTextDocument,
-} from "@/types/rich-text";
 import { hasTiptapDocumentContent } from "@/lib/tiptap-rich-content";
 import {
   LEARNING_CONTENT_KATEX_MACROS,

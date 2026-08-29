@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
+import type { TiptapTextDocument } from "@learning-path/shared";
 
 import { removeTrailingOptionPeriod } from "@/lib/tiptap-rich-content";
-import type { TiptapTextDocument } from "@/types/rich-text";
 
 test("removes only the final sentence period from a multiple-choice option", () => {
   const document: TiptapTextDocument = {

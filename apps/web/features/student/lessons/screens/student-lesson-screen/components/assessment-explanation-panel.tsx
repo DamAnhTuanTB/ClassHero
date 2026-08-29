@@ -2,12 +2,12 @@
 
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { TiptapTextDocument } from "@learning-path/shared";
 import {
   isQuizExplanationBlockData,
   QuizExplanationCard,
 } from "@/components/common/content/quiz-explanation-content";
 import { TiptapContentView } from "@/components/common/content/tiptap-content-view";
-import type { TiptapTextDocument } from "@/types/rich-text";
 import type {
   AssessmentQuestionType,
   QuizFigureAsset,

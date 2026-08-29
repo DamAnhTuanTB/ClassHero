@@ -4,8 +4,7 @@ import type {
   AdminAiJobData,
   AdminStemFigureCreateAiPreview,
 } from "@/features/admin/ai-generation/types/admin-ai-generation.types";
-import type { AiReasoningEffort } from "@learning-path/shared";
-import type { TiptapTextDocument } from "@/types/rich-text";
+import type { AiReasoningEffort, TiptapTextDocument } from "@learning-path/shared";
 
 export type QuizDifficulty = "EASY" | "MEDIUM" | "HARD" | "MIXED";
 export type QuizQuestionType =

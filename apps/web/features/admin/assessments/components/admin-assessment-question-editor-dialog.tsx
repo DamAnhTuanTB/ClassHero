@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { tiptapTextDocumentSchema, type TiptapTextDocument } from "@learning-path/shared";
 import { EditorDialogShell } from "@/components/admin/courses/editor-dialog-shell";
 import { FieldLabel } from "@/components/common/forms/field-label";
 import { OptionField } from "@/components/common/forms/option-field";
@@ -15,7 +16,6 @@ import type {
   AdminQuizQuestion,
   AdminQuizQuestionPayload,
 } from "@/features/admin/quiz/api/admin-quiz-api";
-import type { TiptapTextDocument } from "@/types/rich-text";
 import {
   QuizRichContentEditor,
   ScientificAnswerField,
@@ -40,28 +40,19 @@ import {
 } from "@/lib/tiptap-rich-content";
 import { cn } from "@/lib/utils";
 
-const tiptapDocumentSchema = z.custom<TiptapTextDocument>(
-  (value) =>
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-    value.type === "doc",
-  "Nội dung rich text chưa hợp lệ",
-);
-
-const requiredQuestionContentSchema = tiptapDocumentSchema.refine(
+const requiredQuestionContentSchema = tiptapTextDocumentSchema.refine(
   hasTiptapDocumentContent,
   "Hãy nhập nội dung câu hỏi",
 );
 
 const optionSchema = z.object({
   optionId: z.string().min(1),
-  content: tiptapDocumentSchema,
+  content: tiptapTextDocumentSchema,
 });
 
 const statementSchema = z.object({
   statementId: z.string().min(1),
-  content: tiptapDocumentSchema,
+  content: tiptapTextDocumentSchema,
   answer: z.enum(["true", "false"]),
 });
 
@@ -85,8 +76,8 @@ const questionFormSchema = z
     trueFalseAnswer: z.enum(["true", "false"]),
     statements: z.array(statementSchema),
     acceptedAnswer: z.string(),
-    hintContent: tiptapDocumentSchema,
-    explanationContent: tiptapDocumentSchema,
+    hintContent: tiptapTextDocumentSchema,
+    explanationContent: tiptapTextDocumentSchema,
   })
   .superRefine((value, context) => {
     if (value.questionType === "MULTIPLE_CHOICE") {
@@ -193,8 +184,7 @@ export function AdminAssessmentQuestionEditorDialog({
   const uploadQuizFigure = useAdminQuizFigureUpload(setId);
   const quizQuestion =
     assessmentKind === "quiz" ? (question as AdminQuizQuestion | null) : null;
-  const [draftFigureFiles, setDraftFigureFiles] =
-    useState<AdminQuizDraftFigureFiles>({});
+  const [draftFigureFiles, setDraftFigureFiles] = useState<AdminQuizDraftFigureFiles>({});
   const [isUploadingNewQuestionFigures, setIsUploadingNewQuestionFigures] =
     useState(false);
   const { createQuestion: createTestQuestion, updateQuestion: updateTestQuestion } =
@@ -240,9 +230,7 @@ export function AdminAssessmentQuestionEditorDialog({
       });
       toast.success("Đã cập nhật hình Quiz");
     } catch (error) {
-      toast.error(
-        getUserFacingErrorMessage(error, "Chưa thể tải hình Quiz lên."),
-      );
+      toast.error(getUserFacingErrorMessage(error, "Chưa thể tải hình Quiz lên."));
     }
   };
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tiptapContentSchema } from "#api/common/validation/zod-schemas/tiptap.schema";
+import { tiptapContentSchema } from "@learning-path/shared";
 
 /**
  * Lựa chọn (Option) cho câu hỏi Multiple Choice.
