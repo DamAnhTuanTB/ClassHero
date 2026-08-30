@@ -1,4 +1,5 @@
 import type { AiReasoningEffort, TiptapTextDocument } from "@learning-path/shared";
+import type { AdminJobErrorDetails } from "@/lib/admin-job-error";
 
 export type AdminAiGenerationType = "SUMMARY" | "QUIZ" | "FLASHCARD" | "TEST";
 export type AdminAiGenerationDialogRequest = {
@@ -80,6 +81,7 @@ export interface AdminAiPanelJob {
   resourceId: string | null;
   reviewStatus: AdminLessonSummaryReviewStatus | null;
   error: string | null;
+  errorDetails: AdminJobErrorDetails | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -121,6 +123,7 @@ export interface AdminAiJobData {
   resourceId: string | null;
   result?: unknown;
   error: string | null;
+  errorDetails: AdminJobErrorDetails | null;
   createdAt: string;
   updatedAt: string;
   startedAt: string | null;

@@ -19,7 +19,11 @@ Không hard-code secret trong source code. Không commit `.env` thật vào repo
 - Resend dùng Free tier để test email.
 - payOS dùng môi trường test/sandbox.
 - AI vẫn cần ngân sách test.
-- Paid OCR local được phép bật để owner test vài cuốn đại diện. Mặc định `.env.example` để `OCR_PAID_ENABLED=false`; khi test thật thì đổi local `.env` thành `true`, đặt Mathpix key và giữ artifact cache bật để tránh gọi lại cùng file. Trước khi chạy forced OCR cả cuốn hoặc nhiều cuốn, phải báo số trang và ước tính chi phí cho owner xác nhận.
+- Paid OCR local được phép bật để owner test vài cuốn đại diện. Mặc định
+  `apps/api/.env.example` để `OCR_PAID_ENABLED=false`; khi test thật thì đổi
+  `apps/api/.env` thành `true`, đặt Mathpix key và giữ artifact cache bật để tránh
+  gọi lại cùng file. Trước khi chạy forced OCR cả cuốn hoặc nhiều cuốn, phải báo
+  số trang và ước tính chi phí cho owner xác nhận.
 
 ### Production ban đầu
 
@@ -36,7 +40,25 @@ Ngân sách production nên chuẩn bị khoảng 5.500.000 VNĐ/tháng. Đây l
 
 ---
 
-## 2. `.env.example` đề xuất
+## 2. Env theo application boundary
+
+Nguồn env được tổ chức theo runtime boundary:
+
+- `apps/api/.env` là source of truth duy nhất cho NestJS API, BullMQ worker,
+  Docker Compose và hạ tầng local. API/worker không đọc root `.env`.
+- `apps/web/.env.local` chỉ chứa cấu hình runtime web: biến public
+  `NEXT_PUBLIC_*` và secret server-side do route Next.js sở hữu như
+  `YOUTUBE_API_KEY`. Không đặt OpenAI, Mathpix hoặc backend secret trong file web.
+- `apps/api/.env.example` và `apps/web/.env.example` chỉ là template không chứa
+  secret thật; Docker/runtime tuyệt đối không dùng file `*.env.example` làm
+  `env_file`.
+- Production ưu tiên inject secret bằng môi trường deploy. `process.env` được phép
+  override giá trị file mà không tạo thêm env file trong repo.
+- Không chạy đồng thời worker từ `pnpm dev` và worker Docker trên cùng Redis queue.
+- Lệnh Compose local truyền `--env-file apps/api/.env` để các biến nội suy host
+  port và env bên trong container cùng lấy từ một nguồn.
+
+`apps/api/.env.example`:
 
 ```bash
 # App
@@ -78,7 +100,7 @@ FILE_PUBLIC_BASE_URL=
 FILE_SIGNED_URL_TTL_SECONDS=900
 
 # OpenAI
-OPENAI_API_KEY=change-me
+# OPENAI_API_KEY=replace-with-real-key
 OPENAI_STRUCTURED_MODEL=gpt-4.1-mini
 OPENAI_CHAT_MODEL=gpt-4.1-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
@@ -184,6 +206,11 @@ API validate các biến nền khi boot. Ở `M2.1`, nhóm env bắt buộc gồ
 - `CORS_ORIGINS`, `LOG_LEVEL`.
 
 Nếu thiếu env, API phải fail fast với message liệt kê biến thiếu. `JWT_ACCESS_SECRET` và `JWT_REFRESH_SECRET` không được để placeholder trong production.
+
+`OPENAI_API_KEY` không được nhận các giá trị template như `change-me`. Khi
+`OCR_PAID_ENABLED=true`, `MATHPIX_APP_ID` và `MATHPIX_APP_KEY` vừa phải tồn tại
+vừa không được là placeholder. Cùng validator này chạy cho API và worker để lỗi
+cấu hình xuất hiện ngay lúc boot, thay vì đến khi admin đã tạo job thật.
 
 Từ `M2.3`, API cũng đọc optional `RESEND_API_KEY` và `RESEND_FROM_EMAIL` để gửi email reset password. Nếu hai biến này chưa cấu hình thật ở local/dev, forgot-password vẫn tạo reset token hash và trả response chung nhưng không gọi Resend.
 
@@ -340,6 +367,10 @@ Dùng phụ cho:
 - BullMQ quản lý retry durable nên OpenAI SDK không tự retry lồng bên trong một
   attempt. Riêng Summary giữ `maxAttempts=1`: một lần admin bấm tạo chỉ phát sinh
   đúng một provider call, kể cả khi request hết thời gian chờ.
+- Mathpix HTTP request có timeout 60 giây cho từng lần submit, status và download;
+  polling toàn job vẫn giữ giới hạn riêng. Lỗi OpenAI/Mathpix được chuẩn hóa thành
+  mã credential, quota, rate-limit, timeout, unavailable hoặc request-invalid và
+  lưu vào durable job dưới dạng an toàn để admin thấy nguyên nhân/hướng xử lý.
 - Không gửi toàn bộ tài liệu mỗi lần học sinh hỏi.
 - Cần rate limit và budget guard.
 
@@ -531,7 +562,9 @@ CORS:
 ## 12. Security checklist
 
 - Không commit secret.
-- Có `.env.example`, không có `.env` thật.
+- `apps/api/.env` là backend source of truth duy nhất và luôn bị Git ignore.
+- Có `apps/api/.env.example` và `apps/web/.env.example`, không dùng template làm env runtime.
+- Không đặt backend secret trong `apps/web/.env.local`.
 - Webhook verify checksum.
 - JWT secret đủ mạnh.
 - Refresh token hash trước khi lưu DB.

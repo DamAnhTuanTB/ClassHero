@@ -14,7 +14,10 @@ import type {
   BackgroundJobBullmqData,
   BackgroundJobBullmqResult,
 } from "#api/jobs/background-job-queues";
-import { getJobErrorMessage } from "#api/jobs/job-error";
+import {
+  normalizeJobError,
+  type JobErrorDetails,
+} from "#api/jobs/job-error";
 import { toJobJson } from "#api/jobs/job-json";
 import type { EnvConfig } from "#api/config/env.validation";
 import { extractChunkPdfPageRange } from "#api/modules/ai/utils/chunk-page-range";
@@ -239,14 +242,16 @@ export class DocumentProcessingProcessor {
       return result;
     } catch (error) {
       const isBudgetBlocked = isProviderBudgetError(error);
+      const failure = normalizeJobError(error);
+      const shouldStopRetrying = isBudgetBlocked || !failure.retryable;
       await this.markAttemptFailed(
         runningJob,
-        error,
+        failure,
         attempt,
-        isBudgetBlocked ? attempt : maxAttempts,
+        shouldStopRetrying ? attempt : maxAttempts,
       );
-      if (isBudgetBlocked) {
-        throw new UnrecoverableError(error.message);
+      if (shouldStopRetrying) {
+        throw new UnrecoverableError(failure.message);
       }
       throw error;
     }
@@ -1806,12 +1811,13 @@ export class DocumentProcessingProcessor {
 
   private async markAttemptFailed(
     record: WorkerJobRecord,
-    error: unknown,
+    failure: JobErrorDetails,
     attempt: number,
     maxAttempts: number,
   ) {
-    const hasRetryLeft = attempt < maxAttempts;
-    const message = getJobErrorMessage(error);
+    const hasRetryLeft = failure.retryable && attempt < maxAttempts;
+    const message = failure.message;
+    const currentResult = asRecord(record.result);
 
     await this.prisma.backgroundJob.update({
       where: {
@@ -1820,6 +1826,7 @@ export class DocumentProcessingProcessor {
       data: {
         status: hasRetryLeft ? BackgroundJobStatus.QUEUED : BackgroundJobStatus.FAILED,
         attempts: attempt,
+        result: toJobJson({ ...currentResult, errorDetails: failure }),
         errorMessage: message,
         finishedAt: hasRetryLeft ? null : new Date(),
       },

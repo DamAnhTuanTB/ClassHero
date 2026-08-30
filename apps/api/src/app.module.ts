@@ -3,7 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { AppController } from "#api/app.controller";
 import { AppService } from "#api/app.service";
 import { PrismaModule } from "#api/common/prisma/prisma.module";
-import { validateEnv } from "#api/config/env.validation";
+import { BACKEND_CONFIG_MODULE_OPTIONS } from "#api/config/backend-config.options";
 import { AiModule } from "#api/modules/ai/ai.module";
 import { AuthModule } from "#api/modules/auth/auth.module";
 import { DomainsModule } from "#api/modules/domains/domains.module";
@@ -21,11 +21,7 @@ import { TestsModule } from "#api/modules/tests/tests.module";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: [".env", "apps/api/.env", "../../.env"],
-      validate: validateEnv,
-    }),
+    ConfigModule.forRoot(BACKEND_CONFIG_MODULE_OPTIONS),
     PrismaModule,
     AiModule,
     AuthModule,

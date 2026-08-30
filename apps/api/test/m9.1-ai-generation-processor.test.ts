@@ -32,7 +32,29 @@ function makeRecord(status = BackgroundJobStatus.QUEUED) {
     status,
     ownerUserId: "user-1",
     lessonId: "lesson-1",
-    inputMeta: { action: "SUMMARY" },
+    inputMeta: {
+      action: "SUMMARY",
+      providerRouteSnapshot: {
+        feature: AiGenerationType.SUMMARY,
+        version: 1,
+        model: "gpt-4.1-mini",
+        temperature: null,
+        maxOutputTokens: null,
+        candidates: [
+          {
+            catalogItemId: null,
+            priceVersionId: null,
+            category: "TEXT_GENERATION",
+            provider: AiProviderName.OPENAI,
+            model: "gpt-4.1-mini",
+            maxInputTokens: null,
+            available: true,
+            rates: [],
+          },
+        ],
+        hasConfiguration: true,
+      },
+    },
     resourceType: "LESSON",
     resourceId: "lesson-1",
     maxAttempts: 3,
@@ -133,6 +155,25 @@ describe("M9.1 AI generation processor", () => {
       expect.any(Object),
       expect.any(Error),
       false,
+    );
+  });
+
+  it("stops retrying when OpenAI rejects the configured credential", async () => {
+    execution.generate.mockRejectedValueOnce(
+      Object.assign(new Error("Incorrect API key provided"), {
+        status: 401,
+        code: "invalid_api_key",
+      }),
+    );
+
+    await expect(processor.process(makeJob(0, 3))).rejects.toBeInstanceOf(
+      UnrecoverableError,
+    );
+    expect(execution.persist).not.toHaveBeenCalled();
+    expect(lifecycle.markFailed).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ status: 401 }),
+      true,
     );
   });
 

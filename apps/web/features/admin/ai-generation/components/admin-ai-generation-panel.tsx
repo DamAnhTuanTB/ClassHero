@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { AdminDataErrorState } from "@/components/admin/admin-data-error-state";
+import { AdminJobErrorAlert } from "@/components/admin/admin-job-error-alert";
 import {
   adminAiGenerationQueryKeys,
   useAdminAiGenerationPanel,
@@ -339,14 +340,17 @@ function GenerationCard({
         </span>
       </div>
       <h3 className="mt-3 font-extrabold text-[var(--theme-text-strong)]">{label}</h3>
-      <p className="mt-1 flex-1 text-sm font-medium leading-5 text-[var(--theme-text-muted)]">
-        {job?.status === "FAILED" && job.error
-          ? sanitizeUserFacingMessage(
-              job.error,
-              "Chưa tạo được nội dung. Bạn có thể thử lại.",
-            )
-          : description}
-      </p>
+      {job?.status === "FAILED" ? (
+        <AdminJobErrorAlert
+          className="mt-2 flex-1"
+          details={job.errorDetails}
+          fallbackMessage={job.error}
+        />
+      ) : (
+        <p className="mt-1 flex-1 text-sm font-medium leading-5 text-[var(--theme-text-muted)]">
+          {description}
+        </p>
+      )}
       {hasSucceededContent ? (
         <button
           type="button"
@@ -441,7 +445,7 @@ function AdminAiJobWatcher({
     } else {
       toast.error(
         sanitizeUserFacingMessage(
-          job.error,
+          job.errorDetails?.message ?? job.error,
           "Chưa tạo được nội dung. Bạn có thể thử lại.",
         ),
       );

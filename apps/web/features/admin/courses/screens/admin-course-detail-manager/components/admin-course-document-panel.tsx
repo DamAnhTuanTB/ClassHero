@@ -16,6 +16,7 @@ import {
 import { SkeletonBlock } from "@/components/common/ui/skeleton-block";
 import { useMemo, useState } from "react";
 import { DeleteConfirmDialog } from "@/components/admin/courses/delete-confirm-dialog";
+import { AdminJobErrorAlert } from "@/components/admin/admin-job-error-alert";
 import type { AdminLearningPath } from "@/features/admin/courses/admin-courses-data";
 import {
   formatFileSize,
@@ -291,6 +292,15 @@ export function AdminCourseDocumentPanel({ path }: { path: AdminLearningPath }) 
                 </button>
               </div>
             </div>
+
+            {sourceDocument.status === "FAILED" ? (
+              <div className="border-b border-[var(--theme-border)] bg-[var(--theme-surface)] px-4 py-3">
+                <AdminJobErrorAlert
+                  details={sourceDocument.processingJob?.errorDetails}
+                  fallbackMessage={sourceDocument.processingJob?.error}
+                />
+              </div>
+            ) : null}
 
             {manager.latestRangeWarnings.length > 0 ? (
               <div className="grid gap-2 border-b border-[var(--theme-border)] bg-[var(--theme-warning-bg)] px-4 py-3">

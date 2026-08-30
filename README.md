@@ -20,19 +20,26 @@ Yêu cầu: Node.js, pnpm `11.10.0` và Docker Desktop/Engine.
 ```bash
 npm install --global pnpm@11.10.0
 pnpm install
-cp .env.example .env
 cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
+cp apps/web/.env.example apps/web/.env.local
 ```
 
-Không commit file `.env` thật.
+`apps/api/.env` là nguồn cấu hình duy nhất cho API, worker, Docker Compose và hạ
+tầng local. `apps/web/.env.local` chỉ dành cho runtime web: biến public
+`NEXT_PUBLIC_*` và secret server-side do route Next.js sở hữu như
+`YOUTUBE_API_KEY`. Không đặt OpenAI/Mathpix/backend secret trong file web. API và
+worker không đọc root `.env`; `.env.example` chỉ là template và không được dùng
+làm env runtime. Không commit file env thật.
+
+Mọi lệnh Compose phải truyền `--env-file apps/api/.env` để cả container env và
+các biến nội suy như host port cùng đọc đúng một nguồn.
 
 ## 2. Chạy local
 
 Khởi động Postgres và Redis, apply migration, seed rồi chạy web/API:
 
 ```bash
-docker compose up -d postgres redis
+docker compose --env-file apps/api/.env up -d postgres redis
 pnpm --filter @learning-path/api prisma migrate dev
 pnpm --filter @learning-path/api db:seed
 pnpm dev
@@ -47,12 +54,20 @@ Health:  http://localhost:4000/api/v1/health
 Swagger: http://localhost:4000/api/docs
 ```
 
-Chạy riêng hoặc chạy toàn bộ bằng Docker:
+Chọn một trong hai cách chạy application process; không chạy worker local và
+worker Docker cùng lúc vì cả hai sẽ lấy job từ cùng Redis queue.
+
+Chạy application bằng pnpm, chỉ giữ hạ tầng trong Docker (khuyến nghị khi dev):
 
 ```bash
-pnpm --filter @learning-path/web dev
-pnpm --filter @learning-path/api dev
-docker compose up --build
+docker compose --env-file apps/api/.env up -d postgres redis minio tex-renderer
+pnpm dev
+```
+
+Hoặc chạy toàn bộ application bằng Docker:
+
+```bash
+docker compose --env-file apps/api/.env up --build
 ```
 
 DBeaver local dùng `localhost:5432`, database `learning_path_dev`, user/password

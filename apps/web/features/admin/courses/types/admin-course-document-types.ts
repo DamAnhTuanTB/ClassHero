@@ -1,3 +1,5 @@
+import type { AdminJobErrorDetails } from "@/lib/admin-job-error";
+
 export type AdminDocumentStatus = "UPLOADED" | "PROCESSING" | "READY" | "FAILED";
 
 export type AdminBackgroundJobStatus =
@@ -29,6 +31,7 @@ export type AdminDocumentJobApi = {
   resourceId: string | null;
   progress?: number;
   error: string | null;
+  errorDetails: AdminJobErrorDetails | null;
   createdAt: string;
   updatedAt: string;
   finishedAt: string | null;

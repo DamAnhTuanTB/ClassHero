@@ -337,6 +337,7 @@ function setPanelGenerationPending(
         jobId,
         status,
         error: null,
+        errorDetails: null,
         createdAt: now,
         startedAt: null,
         finishedAt: null,

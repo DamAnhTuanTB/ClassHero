@@ -1,4 +1,5 @@
 import type { JobRecord, JobResponse } from "#api/modules/jobs/types/job.types";
+import { readJobErrorDetails } from "#api/jobs/job-error";
 
 export function serializeJob(record: JobRecord): JobResponse {
   return {
@@ -11,6 +12,7 @@ export function serializeJob(record: JobRecord): JobResponse {
     resourceId: record.resourceId,
     result: record.result,
     error: record.errorMessage,
+    errorDetails: readJobErrorDetails(record.result),
     attempts: record.attempts,
     maxAttempts: record.maxAttempts,
     availableAt: record.availableAt,

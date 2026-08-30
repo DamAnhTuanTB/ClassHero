@@ -201,21 +201,31 @@ const envSchema = z
     }
 
     if (env.OCR_PAID_ENABLED) {
-      if (!env.MATHPIX_APP_ID) {
+      if (!env.MATHPIX_APP_ID || isPlaceholderSecret(env.MATHPIX_APP_ID)) {
         ctx.addIssue({
           code: "custom",
           path: ["MATHPIX_APP_ID"],
-          message: "MATHPIX_APP_ID is required when OCR_PAID_ENABLED is true.",
+          message:
+            "MATHPIX_APP_ID must contain a real credential when OCR_PAID_ENABLED is true.",
         });
       }
 
-      if (!env.MATHPIX_APP_KEY) {
+      if (!env.MATHPIX_APP_KEY || isPlaceholderSecret(env.MATHPIX_APP_KEY)) {
         ctx.addIssue({
           code: "custom",
           path: ["MATHPIX_APP_KEY"],
-          message: "MATHPIX_APP_KEY is required when OCR_PAID_ENABLED is true.",
+          message:
+            "MATHPIX_APP_KEY must contain a real credential when OCR_PAID_ENABLED is true.",
         });
       }
+    }
+
+    if (env.OPENAI_API_KEY && isPlaceholderSecret(env.OPENAI_API_KEY)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["OPENAI_API_KEY"],
+        message: "OPENAI_API_KEY must not use a placeholder value.",
+      });
     }
 
     if (env.OPENAI_EMBEDDING_DIMENSIONS !== EMBEDDING_VECTOR_DIMENSIONS) {
@@ -241,6 +251,12 @@ const envSchema = z
   });
 
 export type EnvConfig = z.infer<typeof envSchema>;
+
+function isPlaceholderSecret(value: string) {
+  return ["change-me", "changeme", "your-api-key", "replace-me"].includes(
+    value.trim().toLowerCase(),
+  );
+}
 
 export function validateEnv(config: Record<string, unknown>): EnvConfig {
   const parsed = envSchema.safeParse(config);

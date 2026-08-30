@@ -3,7 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { PrismaModule } from "#api/common/prisma/prisma.module";
 import { FilesModule } from "#api/modules/files/files.module";
 import { AiModule } from "#api/modules/ai/ai.module";
-import { validateEnv } from "#api/config/env.validation";
+import { BACKEND_CONFIG_MODULE_OPTIONS } from "#api/config/backend-config.options";
 import { DocumentProcessingProcessor } from "#api/workers/processors/document-processing.processor";
 import { EmbeddingProcessor } from "#api/workers/processors/embedding.processor";
 import { DocumentProcessingWorkerService } from "#api/workers/services/document-processing-worker.service";
@@ -34,11 +34,7 @@ import { StemFigureRenderingWorkerService } from "#api/workers/services/stem-fig
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: [".env", "apps/api/.env", "../../.env"],
-      validate: validateEnv,
-    }),
+    ConfigModule.forRoot(BACKEND_CONFIG_MODULE_OPTIONS),
     PrismaModule,
     ProviderOperationsModule,
     AiModule,

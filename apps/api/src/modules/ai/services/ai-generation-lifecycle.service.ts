@@ -18,6 +18,10 @@ import { hashAiValue } from "#api/modules/ai/utils/ai-hash";
 import { isAiProviderOutputError } from "#api/modules/ai/utils/ai-output-validation";
 import { toJobJson } from "#api/jobs/job-json";
 import type { BackgroundJobBullmqResult } from "#api/jobs/background-job-queues";
+import {
+  normalizeJobError,
+  type JobProvider,
+} from "#api/jobs/job-error";
 
 const lifecycleJobSelect = {
   id: true,
@@ -168,7 +172,8 @@ export class AiGenerationLifecycleService {
     error: unknown,
     isFinalAttempt: boolean,
   ): Promise<void> {
-    const message = getSafeAiErrorMessage(error);
+    const failure = normalizeJobError(error, resolveProviderHint(context));
+    const message = failure.message;
     const finishedAt = isFinalAttempt ? new Date() : null;
     const providerFailure = isAiProviderOutputError(error) ? error.details : null;
     const usage = providerFailure?.usage;
@@ -181,6 +186,7 @@ export class AiGenerationLifecycleService {
             ? BackgroundJobStatus.FAILED
             : BackgroundJobStatus.QUEUED,
           attempts: context.attempt,
+          result: toJobJson({ errorDetails: failure }),
           errorMessage: message,
           finishedAt,
         },
@@ -209,7 +215,8 @@ export class AiGenerationLifecycleService {
   }
 }
 
-function getSafeAiErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "Unknown AI job error";
-  return message.replace(/[\r\n]+/g, " ").slice(0, 2_000);
+function resolveProviderHint(context: AiGenerationExecutionContext): JobProvider | null {
+  const provider = context.providerRouteSnapshot?.candidates[0]?.provider;
+  if (provider === "OPENAI" || provider === "GEMINI") return provider;
+  return null;
 }

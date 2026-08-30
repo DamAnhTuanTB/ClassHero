@@ -1,0 +1,1 @@
+- 2026-08-30: Hợp nhất cấu hình runtime theo boundary `apps/api` và `apps/web`, dùng chung nguồn env backend cho API/worker/Compose, đồng thời chuẩn hóa lỗi OpenAI/Mathpix thành durable job error an toàn để admin thấy rõ nguyên nhân, hướng xử lý và tác vụ không còn chờ hoặc retry sai khi credential không hợp lệ.

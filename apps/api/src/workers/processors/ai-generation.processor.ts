@@ -12,6 +12,7 @@ import { AiOutputValidationError } from "#api/modules/ai/utils/ai-output-validat
 import { isProviderBudgetError } from "#api/modules/provider-operations/utils/provider-budget-error";
 import { AiGenerationExecutionService } from "#api/workers/services/ai-generation-execution.service";
 import type { AiFeatureRoute } from "#api/modules/provider-operations/types/provider-operations.types";
+import { normalizeJobError, type JobProvider } from "#api/jobs/job-error";
 
 @Injectable()
 export class AiGenerationProcessor {
@@ -75,9 +76,12 @@ export class AiGenerationProcessor {
     } catch (error) {
       const isInvalidOutput = error instanceof AiOutputValidationError;
       const isBudgetBlocked = isProviderBudgetError(error);
+      const failure = normalizeJobError(error, resolveProviderHint(context));
+      const isNonRetryableProviderFailure = !failure.retryable;
       const isFinalAttempt =
         isInvalidOutput ||
         isBudgetBlocked ||
+        isNonRetryableProviderFailure ||
         error instanceof UnrecoverableError ||
         attempt >= maxAttempts;
       await this.lifecycle.markFailed(context, error, isFinalAttempt);
@@ -94,9 +98,21 @@ export class AiGenerationProcessor {
         );
         throw new UnrecoverableError(error.message);
       }
+      if (isNonRetryableProviderFailure) {
+        this.logger.warn(
+          `AI generation ${context.aiGenerationId} stopped because provider failure ${failure.code} is not retryable.`,
+        );
+        throw new UnrecoverableError(failure.message);
+      }
       throw error;
     }
   }
+}
+
+function resolveProviderHint(context: AiGenerationExecutionContext): JobProvider | null {
+  const provider = context.providerRouteSnapshot?.candidates[0]?.provider;
+  if (provider === "OPENAI" || provider === "GEMINI") return provider;
+  return null;
 }
 
 function readRouteSnapshot(value: unknown): AiFeatureRoute | undefined {

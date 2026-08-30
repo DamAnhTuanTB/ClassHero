@@ -12,6 +12,7 @@ import type {
   SourceDocumentRecord,
   SourceDocumentResponse,
 } from "#api/modules/learning-paths/types/document.types";
+import { readJobErrorDetails } from "#api/jobs/job-error";
 
 const textPreviewLength = 240;
 
@@ -54,6 +55,7 @@ export function serializeDocumentJob(
     resourceId: record.resourceId,
     progress,
     error: record.errorMessage,
+    errorDetails: readJobErrorDetails(record.result),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     finishedAt: record.finishedAt,

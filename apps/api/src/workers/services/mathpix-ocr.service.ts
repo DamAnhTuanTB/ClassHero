@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { EnvConfig } from "#api/config/env.validation";
+import { ProviderRequestError } from "#api/jobs/job-error";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -33,6 +34,7 @@ interface MathpixStatusResponse {
 }
 
 const MATHPIX_API_BASE = "https://api.mathpix.com";
+const MATHPIX_REQUEST_TIMEOUT_MS = 60_000;
 export const MATHPIX_PDF_MODEL_VERSION = "mathpix-v3-pdf";
 export const MATHPIX_OUTPUT_FORMATS = [
   "mmd",
@@ -109,7 +111,7 @@ export class MathpixOcrService {
       `Submitting PDF "${fileName}" (${(fileBuffer.length / 1024 / 1024).toFixed(1)} MB) to Mathpix...`,
     );
 
-    const response = await fetch(`${MATHPIX_API_BASE}/v3/pdf`, {
+    const response = await this.fetchMathpix(`${MATHPIX_API_BASE}/v3/pdf`, {
       method: "POST",
       headers: {
         app_id: this.appId,
@@ -119,8 +121,7 @@ export class MathpixOcrService {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Mathpix submit failed (${response.status}): ${errorBody}`);
+      throw await buildMathpixResponseError(response, "submit PDF");
     }
 
     const data = (await response.json()) as unknown;
@@ -158,7 +159,11 @@ export class MathpixOcrService {
       }
 
       if (status.status === "error") {
-        throw new Error(`Mathpix processing error for pdf_id=${pdfId}`);
+        throw new ProviderRequestError({
+          provider: "MATHPIX",
+          message: "Mathpix reported a PDF processing error.",
+          providerCode: "processing_error",
+        });
       }
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
@@ -177,7 +182,11 @@ export class MathpixOcrService {
       pollInterval = Math.min(pollInterval * 1.5, 15_000);
     }
 
-    throw new Error(`Mathpix timeout after ${timeoutMs / 1000}s for pdf_id=${pdfId}`);
+    throw new ProviderRequestError({
+      provider: "MATHPIX",
+      message: `Mathpix polling timed out after ${timeoutMs / 1000}s.`,
+      providerCode: "timeout",
+    });
   }
 
   /**
@@ -187,7 +196,7 @@ export class MathpixOcrService {
     const url = `${MATHPIX_API_BASE}/v3/pdf/${pdfId}.${ext}`;
     this.logger.debug(`Downloading Mathpix artifact: ${ext}`);
 
-    const response = await fetch(url, {
+    const response = await this.fetchMathpix(url, {
       headers: {
         app_id: this.appId,
         app_key: this.appKey,
@@ -195,9 +204,7 @@ export class MathpixOcrService {
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Mathpix download .${ext} failed (${response.status}): ${await response.text()}`,
-      );
+      throw await buildMathpixResponseError(response, `download .${ext}`);
     }
 
     return Buffer.from(await response.arrayBuffer());
@@ -265,7 +272,7 @@ export class MathpixOcrService {
   }
 
   private async getStatus(pdfId: string): Promise<MathpixStatusResponse> {
-    const response = await fetch(`${MATHPIX_API_BASE}/v3/pdf/${pdfId}`, {
+    const response = await this.fetchMathpix(`${MATHPIX_API_BASE}/v3/pdf/${pdfId}`, {
       headers: {
         app_id: this.appId,
         app_key: this.appKey,
@@ -273,9 +280,7 @@ export class MathpixOcrService {
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Mathpix status check failed (${response.status}): ${await response.text()}`,
-      );
+      throw await buildMathpixResponseError(response, "check status");
     }
 
     return response.json() as Promise<MathpixStatusResponse>;
@@ -284,6 +289,54 @@ export class MathpixOcrService {
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  private async fetchMathpix(url: string, init: RequestInit): Promise<Response> {
+    try {
+      return await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(MATHPIX_REQUEST_TIMEOUT_MS),
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.name : "network_error";
+      throw new ProviderRequestError({
+        provider: "MATHPIX",
+        message: "Mathpix request failed before receiving a response.",
+        providerCode: code,
+        cause: error,
+      });
+    }
+  }
+}
+
+async function buildMathpixResponseError(
+  response: Response,
+  operation: string,
+): Promise<ProviderRequestError> {
+  const body = await readMathpixErrorBody(response);
+  return new ProviderRequestError({
+    provider: "MATHPIX",
+    message: `Mathpix could not ${operation}.`,
+    httpStatus: response.status,
+    providerCode: readMathpixErrorCode(body),
+  });
+}
+
+async function readMathpixErrorBody(response: Response): Promise<unknown> {
+  try {
+    return JSON.parse(await response.text()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function readMathpixErrorCode(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  const errorInfo = isRecord(value.error_info) ? value.error_info : null;
+  return (
+    (errorInfo ? readString(errorInfo, "id") : null) ??
+    readString(value, "error") ??
+    readString(value, "code")
+  );
 }
 
 function summarizeMathpixSubmitResponse(value: unknown) {

@@ -108,6 +108,29 @@ GET /jobs/:jobId
 
 hoặc nhận Socket.IO event nếu user online.
 
+Job lỗi trả thêm chi tiết an toàn, có thể hành động được:
+
+```json
+{
+  "data": {
+    "jobId": "uuid",
+    "status": "FAILED",
+    "error": "Thông tin xác thực OpenAI không hợp lệ hoặc đã bị thu hồi.",
+    "errorDetails": {
+      "code": "PROVIDER_CREDENTIAL_INVALID",
+      "provider": "OPENAI",
+      "message": "Thông tin xác thực OpenAI không hợp lệ hoặc đã bị thu hồi.",
+      "action": "Cập nhật OPENAI_API_KEY trong cấu hình backend rồi khởi động lại API và worker.",
+      "httpStatus": 401,
+      "retryable": false
+    }
+  }
+}
+```
+
+`errorDetails` có thể là `null` với job cũ. Backend không trả raw provider response,
+API key, prompt hoặc stack trace qua trường này.
+
 ---
 
 ## 23. Error codes đề xuất

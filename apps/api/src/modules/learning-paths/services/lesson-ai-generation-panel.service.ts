@@ -12,6 +12,7 @@ import { AiService } from "#api/modules/ai/services/ai.service";
 import { throwLessonNotFound } from "#api/modules/learning-paths/utils/lesson.helpers";
 import { AiModelRoutingService } from "#api/modules/provider-operations/services/ai-model-routing.service";
 import { supportsHighDetailPdfInput } from "#api/modules/provider-operations/utils/ai-model-capabilities";
+import { readJobErrorDetails } from "#api/jobs/job-error";
 
 const PANEL_GENERATION_TYPES = [
   AiGenerationType.SUMMARY,
@@ -39,6 +40,7 @@ const panelGenerationSelect = {
       status: true,
       resourceType: true,
       resourceId: true,
+      result: true,
       errorMessage: true,
       createdAt: true,
       startedAt: true,
@@ -445,6 +447,7 @@ function serializeLatestGeneration(
     resourceId: job?.resourceId ?? null,
     reviewStatus: getGeneratedReviewStatus(type, generation),
     error: job?.errorMessage ?? generation.errorMessage,
+    errorDetails: readJobErrorDetails(job?.result),
     createdAt: job?.createdAt ?? generation.createdAt,
     startedAt: job?.startedAt ?? generation.startedAt,
     finishedAt: job?.finishedAt ?? generation.finishedAt,

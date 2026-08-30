@@ -52,7 +52,7 @@ services:
     container_name: learning-path-api
     command: pnpm --filter @learning-path/api dev
     env_file:
-      - .env.example
+      - apps/api/.env
     environment:
       API_PORT: 4000
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
@@ -90,7 +90,7 @@ services:
     container_name: learning-path-worker
     command: pnpm --filter @learning-path/api worker:dev
     env_file:
-      - .env.example
+      - apps/api/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
       DIRECT_URL: postgresql://postgres:postgres@postgres:5432/learning_path_dev?schema=public
@@ -176,7 +176,7 @@ services:
     container_name: learning-path-web
     command: pnpm --filter @learning-path/web dev
     env_file:
-      - apps/web/.env.example
+      - apps/web/.env.local
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
     ports:

@@ -9,6 +9,7 @@ import {
   LessonDocumentKind,
   Prisma,
 } from "@prisma/client";
+import type { JobErrorDetails } from "#api/jobs/job-error";
 import {
   documentFileSelect,
   documentJobSelect,
@@ -66,6 +67,7 @@ export type DocumentJobResponse = {
   resourceId: string | null;
   progress?: number;
   error: string | null;
+  errorDetails: JobErrorDetails | null;
   createdAt: Date;
   updatedAt: Date;
   finishedAt: Date | null;
